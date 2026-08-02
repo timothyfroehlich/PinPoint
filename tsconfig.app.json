@@ -46,7 +46,7 @@
     // once `outDir` is set, composite requires every program file to be listed,
     // and JSON pulled in by an import is a program file. Globs rather than exact
     // paths so a new JSON import doesn't silently break `typecheck`. (PP-4zcj.)
-    "content/*.json",
+    "content/**/*.json",
     "src/**/*.json"
   ],
   "exclude": [

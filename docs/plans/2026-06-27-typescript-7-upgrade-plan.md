@@ -280,7 +280,8 @@ there was no reason to bet coverage on a second engine there. Only the _local_ p
 | `lint:_slim`                        |     3.47s |  1182 MB |
 | `lint:local` (the two in parallel)  | **3.76s** |  ~1.2 GB |
 
-**Fidelity: zero false negatives.** A seeded-probe union test — for every rule the full
+**Fidelity: no false negatives among the probed rules** (see finding 4 for the two that
+the first probe set missed). A seeded-probe union test — for every rule the full
 config caught, oxlint ∪ slim caught it too — passed on `no-explicit-any`,
 `no-floating-promises`, `no-unsafe-assignment`, `restrict-template-expressions`,
 `no-base-to-string`, `ban-ts-comment`, `explicit-function-return-type`,
@@ -299,16 +300,27 @@ JSX `onClick` is correctly not flagged).
    tsgolint needs it (composite projects can't set `noEmit` (TS6310), so `.mjs` inputs hit
    TS5055 "would overwrite input file"), but adding it makes composite demand that every
    program file be listed, which broke `pnpm run typecheck` with 4 × TS6307 on JSON
-   imports. Fixed by adding `content/*.json` + `src/**/*.json` to `tsconfig.app.json`'s
+   imports. Fixed by adding `content/**/*.json` + `src/**/*.json` to `tsconfig.app.json`'s
    `include`. Only `.tsbuildinfo` is ever written to `.oxlint-tsbuild/`; no JS.
 3. **oxlint's `no-unnecessary-type-assertion` found a true positive typescript-eslint
    missed** — a redundant `as` in `src/lib/notifications/dispatch.ts`. Removed; the rule is
    kept in the mirror.
+4. **A `/code-review high` pass caught two rules the first probe set missed** — the probe
+   set was chosen by hand, so it only proved fidelity for rules it thought to test.
+   `no-useless-assignment` was a genuine false negative and is now listed by hand.
+   `typescript/prefer-optional-chain` is a **deliberate** omission, not drift: oxlint's
+   implementation over-reports on an SSR `typeof window !== "undefined"` guard and a
+   multi-clause null check that typescript-eslint correctly leaves alone, so enabling it
+   makes local RED / CI GREEN. Recorded in `AGENTS.md` so it isn't "restored" later. The
+   general lesson: a hand-picked probe set measures the prober, not the mirror — the only
+   sound check is the full rule-set diff in both directions.
 
 Phase 3 was originally described as "where the headline speed lands for `pnpm run check`."
-That framing was wrong: `check` runs its legs in parallel and its long pole is the ~40s
-unit-test run, not lint. `check` wall-clock is essentially unchanged. The real wins are the
-standalone lint path and the ~3.2 GB → ~1.2 GB memory drop.
+That framing was half-wrong. `check` runs its legs in parallel, so swapping the linter
+alone barely moved it — but the static-gate cleanup it prompted did: dropping the unit
+tests (PP-4zcj) and then pytest took `check` from ~40s to **~9s**, where the long pole is
+now `format:fix` (6.9s) rather than any gate. The lint-specific wins remain the standalone
+path (14.9s → 3.8s) and the ~3.2 GB → ~1.2 GB memory drop.
 
 ### Phase 4 — _(later)_ Next.js native build type-check
 

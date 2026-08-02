@@ -71,8 +71,8 @@ pnpm run preflight:unlocked        # Full pre-commit check (unlocked, bypasses c
 
 ### Which Tests to Run (Decision Tree)
 
-1. **Docs, hooks, config, or other non-source changes?** → `pnpm run check` is enough (~12s)
-2. **Changed pure logic/utils?** → `pnpm run check` (~17s) **and `pnpm run test`** — check is static-only since PP-4zcj
+1. **Docs, hooks, config, or other non-source changes?** → `pnpm run check` is enough (~9s); add `pnpm run check:python` if you touched `scripts/` or `.claude/hooks/`
+2. **Changed pure logic/utils?** → `pnpm run check` (~9s) **and `pnpm run test`** — check is static-only since PP-4zcj
 3. **Changed a single E2E-relevant file?** → `pnpm exec playwright test e2e/path/to/file.spec.ts --project=chromium` (~15-30s)
 4. **Changed UI components/forms?** → `pnpm run smoke` (~60s)
 5. **Changed auth/permissions/middleware?** → `pnpm run smoke` + targeted full specs

@@ -47,8 +47,8 @@ If you’re trying to understand how to implement something, read:
 4. **Run Fast Checks While Iterating**
 
    ```bash
-   pnpm run check      # static gate: typecheck + lint + format (no unit tests)
-   pnpm test           # unit + PGlite integration tests
+   pnpm run check      # static gate: typecheck + lint + format (no tests, no Python)
+   pnpm run test       # unit tests (PGlite)
    ```
 
 5. **Before Pushing**
@@ -77,7 +77,7 @@ PinPoint uses the following test types (see the `pinpoint-testing` skill at `.ag
 Useful commands:
 
 ```bash
-pnpm test                      # Unit + PGlite integration
+pnpm run test                  # Unit tests (PGlite)
 pnpm run test:integration      # Supabase-backed integration tests
 pnpm run smoke                 # Playwright smoke suite
 pnpm run test:watch            # Watch mode for unit tests
@@ -211,8 +211,13 @@ Before merging a PR, the following checks must pass:
   covers the type-checked bulk, and a slim ESLint pass (`PINPOINT_LINT_SLIM=1`, no
   project service) covers the plugins oxlint can't run — the local `pinpoint`
   custom rule, `better-tailwindcss`, `eslint-comments`, `unused-imports`,
-  `react-hooks`, `promise`, `jsx-a11y`. Measured on this repo: 14.9s / 3.2 GB for
+  `react-hooks`, `promise`, `jsx-a11y`. Both halves lint the same
+  `src/ e2e/ scripts/` that `lint` does. Measured on this repo: 14.9s / 3.2 GB for
   full ESLint vs 3.8s / ~1.2 GB for the mirror.
+- `pnpm run check:python`: ruff + `pytest scripts/tests/`. **Not part of
+  `pnpm run check`** — pytest was 14s of check's 17s and Python changes are rare, so
+  it moved to its own command (CI's required `Fast Linters` job still runs it on
+  every push). Run it when you touch `scripts/` or `.claude/hooks/`.
 
   The mirror is a **speed optimization, never a coverage bet**. If the mirror and
   CI disagree, CI is right — a lint failure that only reproduces in CI means the

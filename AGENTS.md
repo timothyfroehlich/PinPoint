@@ -36,7 +36,7 @@
 ### 2.2 Process rules
 
 1. **Escape parentheses in paths**: `src/app/\(app\)/page.tsx`.
-2. **Run `pnpm run check` before committing** (~17s — the default floor). It is a **static** gate: types, lint, format, and the shell/YAML/Python linters. **It does not run unit tests** (PP-4zcj) — those are a required CI job (`test-unit`), part of `preflight`, and available on demand via `pnpm run test` / `test:watch`. Reserve `pnpm run preflight` (the slower check + build + unit + integration) for **non-trivial changes**: migrations, security/auth, server actions, middleware, DB schema. Preflight is the exception, not the per-commit rule.
+2. **Run `pnpm run check` before committing** (~9s — the default floor). It is a **static** gate: types, lint, format, and the shell/YAML/Python linters. **It does not run unit tests, and does not run pytest** (PP-4zcj) — unit tests are a required CI job (`test-unit`), part of `preflight`, and available via `pnpm run test`; the Python hook/script tests are a required CI job (`linters`) and available via `pnpm run check:python`. Reserve `pnpm run preflight` (the slower check + build + unit + integration) for **non-trivial changes**: migrations, security/auth, server actions, middleware, DB schema. Preflight is the exception, not the per-commit rule.
 3. **Don't kill processes you didn't start** — see §4 Process safety.
 4. **Sync with merge, never rebase** — see §5 Branches.
 5. **Root checkout is read-only.** It stays on `main`. All work — including planning docs — happens in a worktree. Dispatch a subagent or switch into an existing worktree. Tool-specific dispatch mechanics live in `CLAUDE.md`. (PP-46z, PP-bg45.)
@@ -57,7 +57,7 @@ One-time install for tools the workflow scripts depend on:
   - macOS: `brew install parallel`
   - Linux: `apt install parallel`
   - Without it, `pnpm run preflight` fails with a clear install hint; use `pnpm run preflight:unlocked` to bypass the cap.
-- **pytest** (used by `pnpm run check:pytest` to run hook tests):
+- **pytest** (used by `pnpm run check:python` to run the hook/script tests):
   - macOS: `brew install pytest`
   - Linux: `pipx install pytest` (requires pipx: `apt install pipx`)
 
@@ -88,21 +88,22 @@ Only stop services you started in this session, by specific PID or via worktree-
 
 ### Key commands
 
-| Command                               | What                                                                                                                                                                                                                             |
-| :------------------------------------ | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pnpm run check`                      | Fast **static** gate: types, lint (via the `lint:local` oxlint mirror), format, yamllint, actionlint, ruff, shellcheck (~17s; `check:pytest` is the long pole). **No unit tests** — see `pnpm run test`.                         |
-| `pnpm run preflight`                  | Full: check + build + integration. **For non-trivial changes** (migrations, auth, server actions, middleware, DB schema) — not every commit. Host-wide cap of 2 concurrent runs (via `sem`); use `preflight:unlocked` to bypass. |
-| `pnpm run smoke`                      | Smoke E2E (~60s)                                                                                                                                                                                                                 |
-| `pnpm run e2e:full`                   | Full E2E suite — CI's job by default; **on a resource-constrained system (a 16 GB laptop, especially with several agent sessions running), don't run it locally.**                                                               |
-| `pnpm run e2e:all`                    | Full + smoke + roots, separate Playwright invocations (~10–15 min) — CI's job by default; **on a resource-constrained system (a 16 GB laptop, especially with several agent sessions running), don't run it locally.**           |
-| `pnpm run db:migrate`                 | Apply schema changes locally                                                                                                                                                                                                     |
-| `pnpm run db:backup`                  | Manual prod dump → `~/.pinpoint/db-backups` (data-only dev seed, **not** a DR artifact)                                                                                                                                          |
-| `pnpm run db:seed:from-prod`          | Reset local + seed from latest prod backup                                                                                                                                                                                       |
-| `pnpm run chores:backups`             | Verify prod Supabase daily physical backups exist + retention is intact (weekly chore; hits prod, not part of `check`)                                                                                                           |
-| `ruff check && ruff format`           | Python lint/format (no venv needed)                                                                                                                                                                                              |
-| `./scripts/workflow/pr-watch.py <PR>` | Watch CI for a PR (Monitor-compatible). Never hand-roll a polling loop.                                                                                                                                                          |
-| `pnpm run dev:status`                 | Check whether Next.js / Supabase / Postgres are up — one command, worktree-port aware. Use it instead of ad-hoc `curl` health checks against localhost.                                                                          |
-| `FORCE_MEM_PRECHECK=skip <command>`   | Bypass the memory-pressure gate for one run (e.g. when you know pressure is transient or acceptable).                                                                                                                            |
+| Command                               | What                                                                                                                                                                                                                                      |
+| :------------------------------------ | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm run check`                      | Fast **static** gate: types, lint (via the `lint:local` oxlint mirror), format, yamllint, actionlint, ruff, shellcheck (~9s; `format:fix` is the long pole). **No unit tests** (see `pnpm run test`), **no pytest** (see `check:python`). |
+| `pnpm run check:python`               | ruff + `pytest scripts/tests/` (~14s). Split out of `check` because Python changes are rare; CI's required `Fast Linters` job runs it on every push regardless. Run after touching `scripts/` or `.claude/hooks/`.                        |
+| `pnpm run preflight`                  | Full: check + build + integration. **For non-trivial changes** (migrations, auth, server actions, middleware, DB schema) — not every commit. Host-wide cap of 2 concurrent runs (via `sem`); use `preflight:unlocked` to bypass.          |
+| `pnpm run smoke`                      | Smoke E2E (~60s)                                                                                                                                                                                                                          |
+| `pnpm run e2e:full`                   | Full E2E suite — CI's job by default; **on a resource-constrained system (a 16 GB laptop, especially with several agent sessions running), don't run it locally.**                                                                        |
+| `pnpm run e2e:all`                    | Full + smoke + roots, separate Playwright invocations (~10–15 min) — CI's job by default; **on a resource-constrained system (a 16 GB laptop, especially with several agent sessions running), don't run it locally.**                    |
+| `pnpm run db:migrate`                 | Apply schema changes locally                                                                                                                                                                                                              |
+| `pnpm run db:backup`                  | Manual prod dump → `~/.pinpoint/db-backups` (data-only dev seed, **not** a DR artifact)                                                                                                                                                   |
+| `pnpm run db:seed:from-prod`          | Reset local + seed from latest prod backup                                                                                                                                                                                                |
+| `pnpm run chores:backups`             | Verify prod Supabase daily physical backups exist + retention is intact (weekly chore; hits prod, not part of `check`)                                                                                                                    |
+| `ruff check && ruff format`           | Python lint/format (no venv needed)                                                                                                                                                                                                       |
+| `./scripts/workflow/pr-watch.py <PR>` | Watch CI for a PR (Monitor-compatible). Never hand-roll a polling loop.                                                                                                                                                                   |
+| `pnpm run dev:status`                 | Check whether Next.js / Supabase / Postgres are up — one command, worktree-port aware. Use it instead of ad-hoc `curl` health checks against localhost.                                                                                   |
+| `FORCE_MEM_PRECHECK=skip <command>`   | Bypass the memory-pressure gate for one run (e.g. when you know pressure is transient or acceptable).                                                                                                                                     |
 
 ### Type-check engine (TS 7 GA dual-install)
 
@@ -113,7 +114,7 @@ TypeScript 7.0 (the Go-native compiler) is GA and installed via Microsoft's reco
 `pnpm run lint` (full ESLint, type-aware via the TS6 JS API) is **authoritative** and is what CI runs — unchanged. `pnpm run check` runs `lint:local` instead: a faster **mirror** of the same rules, split in two because no single engine covers them all.
 
 - `lint:_oxlint` — `oxlint` with `options.typeAware`, backed by the Go-native tsgolint engine. Owns the type-checked bulk plus the syntactic TypeScript rules. ~0.9s / ~930 MB.
-- `lint:_slim` — `PINPOINT_LINT_SLIM=1 eslint src/`. The same `eslint.config.mjs`, with typescript-eslint's `disable-type-checked` spread in and the project service off, so it costs nothing to build a Program. Owns the plugins oxlint can't run: the local `pinpoint` custom rule, `better-tailwindcss`, `eslint-comments`, `unused-imports`, `react-hooks`, `promise`, `jsx-a11y`. ~3.5s / ~1.2 GB.
+- `lint:_slim` — `PINPOINT_LINT_SLIM=1 eslint src/ e2e/ scripts/`. The same `eslint.config.mjs`, with typescript-eslint's `disable-type-checked` spread in and the project service off, so it costs nothing to build a Program. Owns the plugins oxlint can't run: the local `pinpoint` custom rule, `better-tailwindcss`, `eslint-comments`, `unused-imports`, `react-hooks`, `promise`, `jsx-a11y`. ~3.5s / ~1.2 GB.
 
 Together ~3.8s vs full ESLint's ~14.9s, and peak RSS ~1.2 GB vs ~3.2 GB — the memory drop is the point on a 16 GB box running several agent sessions.
 
@@ -121,6 +122,8 @@ Together ~3.8s vs full ESLint's ~14.9s, and peak RSS ~1.2 GB vs ~3.2 GB — the 
 
 1. Add a type-aware rule to `eslint.config.mjs` → add it to `.oxlintrc.json` too, **including any per-override `"off"`**. Rules oxlint still classifies as nursery (e.g. `no-unnecessary-condition`) are skipped by `@oxlint/migrate` and must be listed by hand.
 2. A lint failure that reproduces only in CI means the mirror drifted. Fix the mirror; don't treat it as flake.
+
+**`typescript/prefer-optional-chain` is deliberately absent from `.oxlintrc.json`** — do not "restore" it. ESLint has it at `"error"` and oxlint 1.76 implements it, but oxlint's version over-reports on two real call sites that typescript-eslint correctly leaves alone: an SSR `typeof window !== "undefined" && window.location…` guard (`src/lib/cookies/client.ts`), where `window?.` would still throw a `ReferenceError`, and a multi-clause null check in `PinballMapLinkField.tsx`. Enabling it turns `pnpm run check` red while CI stays green — the one failure direction this architecture exists to prevent. Re-test on a future oxlint release before adding it.
 
 (PP-4zcj.)
 
@@ -130,8 +133,8 @@ When the user explicitly asks for "prototype mode" / "rapid iteration" / "just e
 
 ### Which tests to run
 
-1. Docs, hooks, config, or other non-source changes → `pnpm run check` is enough (~17s)
-2. Pure logic / utils → `pnpm run check` (~17s) **plus `pnpm run test`** — check no longer runs unit tests
+1. Docs, hooks, config, or other non-source changes → `pnpm run check` is enough (~9s) — plus `pnpm run check:python` if you touched `scripts/` or `.claude/hooks/`
+2. Pure logic / utils → `pnpm run check` (~9s) **plus `pnpm run test`** — check no longer runs unit tests
 3. Single E2E spec → `pnpm exec playwright test e2e/path/file.spec.ts --project=chromium` (~15–30s)
 4. UI components / forms → `pnpm run test` (RTL unit) then `pnpm run smoke`
 5. Auth / permissions / middleware → `pnpm run smoke` + targeted specs
