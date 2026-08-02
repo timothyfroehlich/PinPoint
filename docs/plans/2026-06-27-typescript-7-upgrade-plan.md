@@ -308,9 +308,10 @@ JSX `onClick` is correctly not flagged).
 4. **A `/code-review high` pass caught two rules the first probe set missed** — the probe
    set was chosen by hand, so it only proved fidelity for rules it thought to test.
    `no-useless-assignment` was a genuine false negative and is now listed by hand.
-   `typescript/prefer-optional-chain` is a **deliberate** omission, not drift: oxlint's
-   implementation over-reports on an SSR `typeof window !== "undefined"` guard and a
-   multi-clause null check that typescript-eslint correctly leaves alone, so enabling it
+   `typescript/prefer-optional-chain` is a **deliberate** omission, not drift: it fires on
+   two sites ESLint stays silent on — one where oxlint is flatly wrong (`?.` can't replace a
+   `typeof window !== "undefined"` guard; it doesn't protect an undeclared binding) and one
+   where oxlint is actually right and typescript-eslint is just conservative. Either way it
    makes local RED / CI GREEN. Recorded in `AGENTS.md` so it isn't "restored" later. The
    general lesson: a hand-picked probe set measures the prober, not the mirror — the only
    sound check is the full rule-set diff in both directions.
