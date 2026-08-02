@@ -18,6 +18,11 @@ set -euo pipefail
 # 2026-08-02 (its free tier was too small to review PinPoint's PRs), and no bot reviews
 # this repo now. The marker attests that Tim ran `/code-review` over the diff, which an
 # agent cannot do for itself: `/code-review` is a harness built-in only he can trigger.
+#
+# What follows this prefix, up to the `-->`, is compared to the head SHA by STRING
+# EQUALITY. Nothing else may go inside this comment — the review depth mark-claude-review.sh
+# records lives in its own `<!-- pinpoint-review-depth: … -->` comment for exactly that
+# reason, since adding it here would fail every `reviewed` gate on every PR. (PP-9onv.)
 readonly CLAUDE_MARKER_PREFIX="<!-- pinpoint-claude-review:"
 
 # Parse owner/repo dynamically — avoid hardcoded slug. Memoized: several gates ask for
@@ -138,8 +143,14 @@ check_ci() {
 # collapses to "does an attestation pin THIS head?":
 #
 #   marker        a review marker pins head's SHA — head has been reviewed
-#   stale_marker  a marker exists but pins an OLDER SHA — you pushed past the review
+#   stale_marker  a marker exists but pins a DIFFERENT SHA — head was never reviewed
 #   unreviewed    no marker on this PR at all — nobody has reviewed it
+#
+# "Different", not "older": the usual cause is a push on top of the reviewed commit, but
+# a force-push leaves a marker pinning a commit that is not an ancestor of head at all,
+# and there the distance between them is not merely large — it is undefined.
+# merge-handoff.sh reports that case as unknowable rather than counting commits from an
+# unrelated tree, and this gate does not care which it is: neither is a reviewed head.
 #
 # `stale_marker` is the state worth keeping distinct. It is the successor to the old
 # `pushed_after`, and the same trap: the PR visibly HAS a review, so the reflex is to
@@ -236,8 +247,9 @@ check_unresolved_threads() {
 # cannot merge, and nothing here WAITs, because with no bot in the loop there is never
 # an answer already on its way. The marker is
 # `<!-- pinpoint-claude-review: <head_sha> -->` in a PR conversation comment (posted by
-# mark-claude-review.sh); the SHA pin makes it self-expiring, so a later fix changes the
-# head SHA and re-arms the gate.
+# mark-claude-review.sh, alongside a `<!-- pinpoint-review-depth: … -->` comment this
+# gate ignores); the SHA pin makes it self-expiring, so a later fix changes the head SHA
+# and re-arms the gate.
 #
 #   marker        → PASS
 #   stale_marker  → FAIL   remedy: re-review the new head, re-attest
