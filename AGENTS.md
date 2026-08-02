@@ -40,7 +40,7 @@
 3. **Don't kill processes you didn't start** — see §4 Process safety.
 4. **Sync with merge, never rebase** — see §5 Branches.
 5. **Root checkout is read-only.** It stays on `main`. All work — including planning docs — happens in a worktree. Dispatch a subagent or switch into an existing worktree. Tool-specific dispatch mechanics live in `CLAUDE.md`. (PP-46z, PP-bg45.)
-6. **Never `--no-verify`**, never wildcard tool permissions — without explicit user approval each time. **Merging is human-only, via ANY path** — never `gh pr merge`, never MCP `merge_pull_request`, and never `scripts/workflow/merge-pr.sh` (even though it enforces the merge gates, running it is still an agent merge). An agent's terminal state on a PR is: ready-for-review, CI green, a review covering the head commit (see §5 "Review requests"), reviews resolved, screenshots posted if UI-touching, then hand Tim the exact command to run himself: `! scripts/workflow/merge-pr.sh <PR> --human`. (PP-wi85.)
+6. **Never `--no-verify`**, never wildcard tool permissions — without explicit user approval each time. **Merging is human-only, via ANY path** — never `gh pr merge`, never MCP `merge_pull_request`, and never `scripts/workflow/merge-pr.sh` (even though it enforces the merge gates, running it is still an agent merge). An agent's terminal state on a PR is: ready-for-review, CI green, a review covering the head commit (see §5 "Getting a PR reviewed"), threads resolved, screenshots posted if UI-touching, then hand Tim the exact command to run himself: `! scripts/workflow/merge-pr.sh <PR> --human`. (PP-wi85.)
 7. **Beads: `team-maintainer` policy** (not the conservative default).
 
 ## 3. Agent Skills
@@ -169,17 +169,17 @@ Always try local first — seconds vs minutes, full devtools. If a single-test r
 
 Never resolve `drizzle/meta` conflicts manually — the folder holds binary-like schema snapshots; manual edits corrupt the prevId chain. Full regenerate-don't-edit protocol: `pinpoint-deployment` skill.
 
-### Review requests
+### Getting a PR reviewed
 
-**Copilot reviews only when you explicitly ask, as of 2026-08-01. Nothing requests one on your behalf — ever.** Not opening the PR, not a push, not the `ready-for-review` label, not green CI. The merge bar is unchanged — a PR still needs a review covering its **head commit** (Copilot, or a SHA-pinned Claude marker) with threads resolved. Only the trigger changed: you decide when you're ready, and you know you need the review to merge.
+**No bot reviews this repo.** Copilot review was retired on 2026-08-02 (PP-4ric) — the free tier was too small to review PinPoint's PRs, so quota outages were the normal state. The merge bar is unchanged: a PR still needs a review covering its **head commit**, with threads resolved.
 
-That's what makes the spend efficient, so **finish your churn first** — CI fixes, review fixes, merge-from-main — and then ask, once, on work you're actually done with:
+The reviewer is **Tim, running `/code-review` on the branch** — a Claude Code harness built-in an agent cannot launch. So getting reviewed is a handoff: **finish your churn first** (CI fixes, merge-from-main), stop iterating, then tell Tim the branch is ready for review. Once he has, address the findings and attest the head he read:
 
 ```bash
-gh pr edit <PR> --add-reviewer "@copilot"
+bash scripts/workflow/mark-claude-review.sh <PR> "<one-line findings>"
 ```
 
-Judge a review by comparing its `commit_id` to head, never by which event produced it — any review is worthless once you push past it, so a post-review push means asking again. `mark-claude-review.sh` is the fallback for a request Copilot didn't answer, not a way to skip asking. Full rules: `pinpoint-pr-workflow` skill Phase 3.4.
+The marker pins a SHA, so any push invalidates it — re-attest if what you pushed was the review's own findings; get a fresh review if it was anything else. A genuinely trivial change (typo, comment, one-line mechanical fix) can be attested without interrupting him, saying why it was trivial. The marker attests a review happened; posting it otherwise is a false attestation. Full rules: `pinpoint-pr-workflow` skill Phase 3.4.
 
 ### Review comments
 
