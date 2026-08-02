@@ -38,8 +38,7 @@ Coordinate multiple subagents working in parallel across isolated git worktrees.
 # including --dry-run. The lead does NOT run it, even to preview gates. Once the PR
 # is ready (label applied, screenshots posted if UI-touching), hand Tim:
 #   ! scripts/workflow/merge-pr.sh <PR> --human
-gh pr edit <PR> --add-reviewer "@copilot"                     # Ask Copilot for the review — the ONLY thing that triggers one (2026-08-01: nothing auto-fires)
-bash scripts/workflow/mark-claude-review.sh <PR> "<summary>"  # Fallback ONLY after requesting: SHA-pinned Claude-review marker, and only if you actually read the diff
+bash scripts/workflow/mark-claude-review.sh <PR> "<summary>"  # SHA-pinned review marker — the ONLY thing that satisfies the `reviewed` gate. Attests Tim ran /code-review (or that the change was trivial)
 node scripts/workflow/pr-screenshots.mjs <PR>                 # UI-touching PRs: desktop+mobile screenshots, sticky PR comment
 
 # Worktree health — stale-worktrees.sh covers manually created ../pinpoint-worktrees/* ONLY.
@@ -139,13 +138,13 @@ Work bead <ID>. First run `bd show <ID>` && `bd update <ID> --claim` — the bea
 
 Run `pnpm run check` before returning. Then self-review **by hand**: read your own diff (`git diff origin/main...HEAD`) against `REVIEW.md` — the canonical rubric — plus the bead's acceptance criteria and out-of-scope list, and fix what you find. Don't reach for `/code-review` or `ultra`: both are user-triggered harness surfaces (`ultra` is also billed) and an agent cannot launch either.
 
-A review covering the head commit is still **required** to merge — only the trigger changed. **Nothing requests a Copilot review for you**: not opening the PR, not a push, not the `ready-for-review` label, not green CI. That's the point — you decide when you're ready, so the one review you spend lands on finished work.
+A review covering the head commit is still **required** to merge, and **no bot reviews this repo** (PP-4ric). The reviewer is Tim running `/code-review` — which you cannot launch — so getting reviewed is a handoff, not a command you run.
 
-Open the PR whenever you like and watch CI; it costs nothing. Then finish all of it — CI fixes, review fixes, merge-from-main — stop iterating, and ask once:
+Open the PR whenever you like and watch CI; it costs nothing. Then finish all of it — CI fixes, merge-from-main — stop iterating, and ask Tim for the review. When he has given it and you have addressed the findings, attest the head he reviewed:
 
-`gh pr edit <PR> --add-reviewer "@copilot"`
+`bash scripts/workflow/mark-claude-review.sh <PR> "<summary>"`
 
-Judge coverage by comparing the review's `commit_id` to head, not by the fact that a review exists (`gh api repos/timothyfroehlich/PinPoint/pulls/<PR>/reviews --jq '.[] | {user: .user.login, commit_id}'`); push past a review and you have to ask again. Only if Copilot fails to answer a request you actually made (silent skip or quota limit) do you fall back to `bash scripts/workflow/mark-claude-review.sh <PR> "<summary>"` — and only after genuinely reading the diff. The marker is an attestation, not a way to skip asking.
+The marker pins a SHA, so any push after it invalidates it. Re-attesting is right when what you pushed was the review's own findings; anything else needs a fresh `/code-review`. A genuinely trivial change (typo, comment, one-line mechanical fix) can be attested without interrupting Tim — say why it was trivial in the summary. The marker is an attestation that a review happened, never a way to skip one.
 
 ## Return Format
 
@@ -155,7 +154,7 @@ Report back with:
 - **PR**: #<number>
 - **CI**: passing/failing/pending
 - **Self-review**: findings addressed
-- **Copilot review**: requested (when?) / landed / fell back to marker
+- **Review**: attested at <sha> (Tim's /code-review, or trivial-change exception) / still needs Tim's review
 - **Blockers**: none or description
 ```
 
@@ -206,7 +205,7 @@ gh run rerun <run-id> --failed
 
 ### Label Ready PRs
 
-See pinpoint-pr-workflow skill Phase 3.6. Apply `ready-for-review` after CI green + a review covering head + zero unresolved review threads. The label does **not** request the Copilot review — Tim considered wiring it that way and rejected it; requesting stays an explicit act (see the backstop below). Apply via:
+See pinpoint-pr-workflow skill Phase 3.6. Apply `ready-for-review` after CI green + a marker pinning head + zero unresolved review threads. The label does **not** get the PR reviewed (see the backstop below). Apply via:
 
 ```
 mcp__github__issue_write(method: "update", owner, repo, issue_number: <PR>, labels: [<existing>..., "ready-for-review"])
@@ -216,33 +215,24 @@ Or fallback: `gh pr edit <PR> --add-label ready-for-review`.
 
 ### Ensure every PR is reviewed (lead backstop)
 
-The merge bar is unchanged: no PR merges without a review covering the **head commit** — a Copilot review or a SHA-pinned Claude marker (`<!-- pinpoint-claude-review: <head_sha> -->`) — with threads resolved. What changed on 2026-08-01 is that **every** review has to be asked for; nothing fires one automatically, not even opening the PR.
+The merge bar is unchanged: no PR merges without a review covering the **head commit**, recorded as a SHA-pinned marker (`<!-- pinpoint-claude-review: <head_sha> -->`), with threads resolved. What changed on 2026-08-02 (PP-4ric) is who reviews: **no bot does.** The reviewer is Tim running `/code-review`, which no agent — lead or subagent — can launch.
 
-So the common failure is the boring one: the subagent finished, never ran the request, and its PR simply has no review at all. **Check coverage by `commit_id`, not by whether a review exists:**
-
-```bash
-gh api repos/timothyfroehlich/PinPoint/pulls/<PR>/reviews --jq '.[] | {user: .user.login, commit_id, submitted_at}'
-```
-
-An explicit request is forgettable — Tim accepted that tradeoff knowingly in exchange for efficient spend, which makes the lead's check at the handoff boundary load-bearing. Before applying `ready-for-review` or handing a PR to Tim for `merge-pr.sh --human`, confirm a review's `commit_id` matches head. If none does, distinguish the two cases rather than reaching straight for the marker:
-
-**No review, or reviews that all predate the current head** → nobody asked, or the subagent pushed past the one it got. That's an unfinished PR, not a fallback case. Have it stop iterating and request once:
+That makes the lead's job here a scheduling one. A subagent that finishes and ends leaves a PR sitting unreviewed forever, because there is nothing to wait for. **Check the marker against head:**
 
 ```bash
-gh pr edit <PR> --add-reviewer "@copilot"
+gh pr view <PR> --json headRefOid --jq .headRefOid
+gh api repos/timothyfroehlich/PinPoint/issues/<PR>/comments --jq '.[] | select(.body | startswith("<!-- pinpoint-claude-review:")) | .body' | head -1
 ```
 
-Then wait for the review and handle its threads. Don't post a marker to paper over a request nobody made, and don't ask Tim to `--force`.
+Before applying `ready-for-review` or handing a PR to Tim for `merge-pr.sh --human`, confirm the marker pins head. If it doesn't, distinguish the cases:
 
-**A request was made and Copilot didn't deliver** (silent skip, or quota-limited) → run the fallback:
+**No marker at all** → nobody has reviewed it. Batch it with the other PRs waiting on Tim rather than pinging him per-PR: tell him which branches are ready for `/code-review`, and let him work through them.
 
-1. Review the PR diff yourself — a deliberate manual pass over `git diff origin/main...HEAD` against `REVIEW.md` (the canonical rubric) and the bead's acceptance criteria. `/code-review` is a harness built-in that only Tim can trigger, and `ultra` is the cloud multi-agent review — user-triggered and billed. An agent can launch neither, so the manual pass is the backstop.
-2. Address serious findings (fix → have the subagent push → review the new head yourself; a fix re-arms the gate). Decline the rest.
-3. `bash scripts/workflow/mark-claude-review.sh <PR> "<summary>"` to post the marker.
+**A marker pinning an older SHA** → someone reviewed it, then pushed past the review. What was pushed decides the fix: if it was the review's own findings, re-attest at the new head and say so in the summary; if it was new work, it needs a fresh `/code-review`.
 
-**A review's `commit_id` already matches head** → nothing to do. That review is legitimately terminal; requesting another just spends quota to learn the same thing.
+**A marker pinning head** → nothing to do. That review is legitimately terminal.
 
-The `reviewed` gate in `merge-pr.sh` is the hard enforcement — it FAILs the merge if the head commit has no Copilot or Claude review once the 600s window has elapsed. Two caveats until PP-lzaw lands: the window is still measured from the **head push** rather than the request, so a PR awaiting a request nobody made burns the full 600s before failing; and the gate compares review _timestamps_ to the head commit date rather than `commit_id`, so it can read a stale review as covering head. Your `commit_id` check is stricter than the gate — trust it. Satisfying the gate honestly before handoff is the lead's job; telling Tim to `--force`-bypass it defeats the guarantee.
+Don't post a marker to paper over a review nobody ran, and don't ask Tim to `--force`. The `reviewed` gate in `merge-pr.sh` is the hard enforcement — it FAILs on both un-reviewed states and never WAITs, since with no bot in the loop there is no answer already on its way. Satisfying it honestly before handoff is the lead's job.
 
 ---
 
