@@ -44,7 +44,6 @@ import {
 } from "~/lib/tiptap/types";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import { isPgErrorCode } from "~/lib/db/postgres-errors";
-import { pbmListingConflictMessage } from "~/lib/pinballmap/listing-conflict";
 import {
   emitMachineUpdated,
   toMachineOwnerRef,
@@ -1103,29 +1102,21 @@ export async function updateMachineAction(
     if (error instanceof MachineNotFoundError) {
       return err("NOT_FOUND", "Machine not found.");
     }
-    // A BACKSTOP, not a live path. This action cannot touch `initials`, so the
-    // one-lister index is the only unique constraint it can violate — and since
-    // PP-o355.29 it cannot reach even that on its own: the only way it sets
-    // `pinballmapListed` true is the carry-over, which rewrites a value the row
-    // already holds and so cannot collide with itself. What remains is a race
-    // against a concurrent listing write, plus PP-o355.20, which will run
-    // auto-link at title-save time and make this genuinely reachable again.
-    // Kept for both; the collision surfaced as a raw 500 before (PP-o355.15).
+    // NO listing-collision catch here, deliberately (PP-o355.29). This action
+    // cannot touch `initials`, so `machines_pinballmap_listed_unique` is the
+    // only unique constraint it could ever violate — and it cannot reach that
+    // one either. The sole way it sets `pinballmapListed` true is the carry-over
+    // above, gated on `linkUnchanged && currentMachine.pinballmapListed`: it
+    // rewrites a value the same row already holds for the same title, which
+    // cannot collide with itself. Nor can a concurrent writer set up the
+    // collision, because the precondition — two cabinets of one title both
+    // listed — is the exact state the index forbids; seeding it fails.
     //
-    // Gated on `pbmFormPresent`: without the picker on this form no listing
-    // column is written, so a 23505 cannot be the one-lister index. Claiming it
-    // anyway would answer an unrelated unique violation with a confident,
-    // wrong PinballMap message AND skip `serverActionError`'s reporting,
-    // leaving no telemetry for a genuine defect.
-    //
-    // `pbmColumns` is scoped inside the try; the submitted title id is the same
-    // value and is in scope here.
-    if (pbmFormPresent && isPgErrorCode(error, "23505")) {
-      return err(
-        "VALIDATION",
-        await pbmListingConflictMessage(validation.data.pinballmapMachineId, id)
-      );
-    }
+    // PP-o355.15 added a catch here, correctly, while a form post could set the
+    // flag. Closing that made the branch unreachable AND untestable, so it is
+    // removed rather than shipped uncovered. PP-o355.20 runs auto-link at
+    // title-save time, which makes this path a listing writer again — that bead
+    // re-adds the catch together with the test that can finally reach it.
     return serverActionError(
       error,
       "SERVER",
