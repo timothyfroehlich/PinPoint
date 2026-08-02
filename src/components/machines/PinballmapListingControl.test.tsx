@@ -101,10 +101,13 @@ describe("PinballmapListingControl", () => {
   });
 
   it("surfaces a failed link's message (non-ABSENT) instead of failing silently", async () => {
+    // Mirrors what the action actually returns for a duplicate-lister
+    // collision since PP-o355.15: VALIDATION (the operator can fix it by
+    // unlisting the other cabinet), naming the incumbent.
     vi.mocked(linkPinballmapEntryAction).mockResolvedValue(
       err(
-        "SERVER",
-        "Another cabinet of this title is already linked as the PinballMap lister for our location"
+        "VALIDATION",
+        "First Godzilla (GZ1) already holds the PinballMap listing for this title at our location. Only one cabinet per title can hold it — unlist that one first."
       )
     );
     render(
@@ -116,7 +119,7 @@ describe("PinballmapListingControl", () => {
     );
 
     const alert = await screen.findByRole("alert");
-    expect(alert).toHaveTextContent(/already linked as the pinballmap lister/i);
+    expect(alert).toHaveTextContent(/already holds the pinballmap listing/i);
   });
 
   it("keeps the friendly ABSENT copy (no duplicate alert) when the title isn't on the lineup", async () => {
