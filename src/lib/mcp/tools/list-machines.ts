@@ -1,7 +1,16 @@
 import "server-only";
 
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { and, count, eq, ilike, or } from "drizzle-orm";
+import {
+  and,
+  count,
+  eq,
+  ilike,
+  isNotNull,
+  isNull,
+  or,
+  type SQL,
+} from "drizzle-orm";
 import { z } from "zod";
 
 import { checkPermission } from "~/lib/permissions/helpers";
@@ -21,6 +30,43 @@ import type { McpAuthContext } from "~/lib/mcp/verify-token";
 /** Page size when the caller doesn't ask for one. */
 const DEFAULT_LIMIT = 50;
 
+/**
+ * PinballMap link states a caller can filter on (PP-u4ab.9).
+ *
+ * These three partition the fleet exactly: a DB CHECK
+ * (`machines_pinballmap_link_exclusive`) forbids a row that is both linked and
+ * excluded, so every machine is in exactly one bucket.
+ *
+ * `unlinked` is the one that matters for the fleet linking pass (PP-h059): it is
+ * the *worklist*, so it must exclude machines deliberately marked as not on
+ * PinballMap. Those are finished work, not a to-do — folding them in would make
+ * the pass re-examine the same rows on every sweep and never reach empty.
+ */
+const PINBALLMAP_FILTERS = ["unlinked", "linked", "excluded"] as const;
+
+type PinballmapFilter = (typeof PINBALLMAP_FILTERS)[number];
+
+/**
+ * The WHERE fragment each link state selects.
+ *
+ * A `Record` keyed by the filter union rather than an if/else chain so that
+ * adding a state to {@link PINBALLMAP_FILTERS} without a condition is a type
+ * error. A missed branch would silently return the *whole* fleet under a
+ * narrowing filter name, with a `total` that looks authoritative
+ * (CORE-ARCH-012).
+ */
+const PINBALLMAP_FILTER_CONDITIONS: Record<PinballmapFilter, SQL | undefined> =
+  {
+    // Both halves are load-bearing: "no catalog match" alone would keep handing
+    // the linking pass the machines someone already decided are not on PBM.
+    unlinked: and(
+      isNull(machines.pinballmapMachineId),
+      eq(machines.pinballmapExcluded, false)
+    ),
+    linked: isNotNull(machines.pinballmapMachineId),
+    excluded: eq(machines.pinballmapExcluded, true),
+  };
+
 const listMachinesSchema = z.object({
   search: z
     .string()
@@ -34,6 +80,12 @@ const listMachinesSchema = z.object({
     .enum(VALID_MACHINE_PRESENCE_STATUSES)
     .optional()
     .describe("Only machines with this availability status."),
+  pinballmap: z
+    .enum(PINBALLMAP_FILTERS)
+    .optional()
+    .describe(
+      "Only machines in this PinballMap link state. 'unlinked' = no catalog match yet and not marked as absent from PinballMap (the linking worklist); 'linked' = matched to a catalog title; 'excluded' = deliberately marked as not on PinballMap. Combines with 'search' and 'presence'."
+    ),
   limit: z
     .number()
     .int()
@@ -74,6 +126,12 @@ export async function runListMachines(
     );
   }
 
+  if (args.pinballmap) {
+    conditions.push(PINBALLMAP_FILTER_CONDITIONS[args.pinballmap]);
+  }
+
+  // One WHERE for both the page and the count — a filter applied to only one of
+  // them reports a total the page can never reach (CORE-ARCH-012).
   const where = conditions.length > 0 ? and(...conditions) : undefined;
   const limit = args.limit ?? DEFAULT_LIMIT;
   const offset = args.offset ?? 0;
@@ -131,7 +189,7 @@ export function registerListMachines(server: McpServer): void {
     {
       title: "List machines",
       description:
-        "List machines with their initials, name, availability, owner name, and open-issue count. Use this to find a machine's initials before acting on it (e.g. disambiguate 'the Medieval Madness by the door'). Supports a name/initials search and a presence filter. Returns 'count' (this page), 'total' (every match), 'offset', and 'hasMore'. Answer counting questions from 'total', never from 'count' or the array length. To enumerate a collection larger than one page, keep requesting with offset += limit until hasMore is false — raising limit alone caps at 100 and will not reach the rest.",
+        "List machines with their initials, name, availability, owner name, and open-issue count. Use this to find a machine's initials before acting on it (e.g. disambiguate 'the Medieval Madness by the door'). Supports a name/initials search, a presence filter, and a PinballMap link-state filter (pinballmap: 'unlinked' | 'linked' | 'excluded') — use pinballmap: 'unlinked' to get the machines still needing a PinballMap catalog match. Returns 'count' (this page), 'total' (every match), 'offset', and 'hasMore'. Answer counting questions from 'total', never from 'count' or the array length. To enumerate a collection larger than one page, keep requesting with offset += limit until hasMore is false — raising limit alone caps at 100 and will not reach the rest.",
       inputSchema: listMachinesSchema.shape,
     },
     (args, extra) =>
