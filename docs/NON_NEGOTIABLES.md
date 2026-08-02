@@ -62,7 +62,7 @@
 - **Severity:** High
 - **Why:** Prevents snake_case leaking into application code
 - **Do:** Drizzle rows need no conversion — every column declares both names (`firstName: text("first_name")`), so `InferSelectModel` yields camelCase directly. Convert only where Drizzle's mapping does not run: `db.execute()` and raw SQL, Supabase RPC, auth metadata, and external APIs.
-- **Don't:** Export snake_case DB types to components. Never access a Drizzle row by its column name (`row.full_name`) — that property does not exist, and re-deriving that wrong model is the recurring churn this rule exists to stop. Never reintroduce a generic key transformer: until #480, `DrizzleToCamelCase` wrapped essentially every response type and `transformKeysToCamelCase` forced an `as` cast at nearly every DAL call site.
+- **Don't:** Export snake_case DB types to components. Never access a Drizzle row by its column name (`row.full_name`) — that property does not exist, and re-deriving that wrong model is the recurring churn this rule exists to stop. Never reintroduce a generic key transformer: until #480, `DrizzleToCamelCase` wrapped essentially every response type and `transformKeysToCamelCase` was invoked 76 times across 23 files, forcing an `as` cast at nearly all of them.
 
 **CORE-TS-004:** Drizzle naming (snake_case schema)
 
