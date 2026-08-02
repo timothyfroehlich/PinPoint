@@ -44,10 +44,7 @@ import {
 } from "~/lib/tiptap/types";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import { isPgErrorCode } from "~/lib/db/postgres-errors";
-import {
-  isPbmListingConflict,
-  pbmListingConflictMessage,
-} from "~/lib/pinballmap/listing-conflict";
+import { pbmListingConflictMessage } from "~/lib/pinballmap/listing-conflict";
 import {
   emitMachineUpdated,
   toMachineOwnerRef,
@@ -172,12 +169,16 @@ function wantsPbmLinkChange(input: {
  * Pull the raw PinballMap link fields off a create/edit FormData for Zod parsing.
  * `pinballmapMachineId` stays a string (the schema coerces it); the excluded
  * checkbox becomes `true`/`undefined`; a blank reason becomes `undefined`.
+ *
+ * `pinballmapListed` is **not** read here, on purpose — see the note in
+ * `./schemas.ts` (PP-o355.29). Listing state comes from the paths that talk to
+ * PinballMap, or from the stored row on the carry-over below; never from a
+ * request body.
  */
 function readPbmLinkFormFields(formData: FormData): {
   pinballmapMachineId: string | undefined;
   pinballmapExcluded: boolean | undefined;
   pinballmapExcludedReason: string | undefined;
-  pinballmapListed: boolean | undefined;
 } {
   const idRaw = formData.get("pinballmapMachineId");
   const reasonRaw = formData.get("pinballmapExcludedReason");
@@ -190,8 +191,6 @@ function readPbmLinkFormFields(formData: FormData): {
       typeof reasonRaw === "string" && reasonRaw.trim().length > 0
         ? reasonRaw
         : undefined,
-    pinballmapListed:
-      formData.get("pinballmapListed") === "on" ? true : undefined,
   };
 }
 
@@ -358,15 +357,12 @@ export async function createMachineAction(
         redirectTo: `/m/${machine.initials}`,
       });
     } catch (error: unknown) {
-      // Name-matched rather than bare, unlike the listing actions: create is the
-      // only write that can violate EITHER unique constraint, so it has to tell
-      // them apart. See `isPbmListingConflict` for the tradeoff that buys.
-      if (isPbmListingConflict(error)) {
-        return err(
-          "VALIDATION",
-          await pbmListingConflictMessage(pbmColumns.pinballmapMachineId)
-        );
-      }
+      // `initials` is the only unique constraint create can violate. The other
+      // one — `machines_pinballmap_listed_unique` — is partial, indexing only
+      // rows `WHERE pinballmap_listed`, and create always writes that column
+      // false: it is not accepted from the form (PP-o355.29) and no PBM call
+      // happens here. An unindexed row cannot collide, so there is nothing to
+      // disambiguate and a bare 23505 is unambiguous.
       if (isPgErrorCode(error, "23505")) {
         return err("VALIDATION", `Initials '${initials}' are already taken.`);
       }
@@ -457,14 +453,8 @@ export async function createMachineAction(
       redirectTo: `/m/${machine.initials}`,
     });
   } catch (error: unknown) {
-    // Name-matched rather than bare — see the forcePromote catch above and
-    // `isPbmListingConflict`.
-    if (isPbmListingConflict(error)) {
-      return err(
-        "VALIDATION",
-        await pbmListingConflictMessage(pbmColumns.pinballmapMachineId)
-      );
-    }
+    // Initials is the only unique constraint reachable here — see the
+    // forcePromote catch above.
     if (isPgErrorCode(error, "23505")) {
       return err("VALIDATION", `Initials '${initials}' are already taken.`);
     }
@@ -703,16 +693,15 @@ export async function updateMachineAction(
           "You do not have permission to link this machine to Pinball Map."
         );
       }
-      // `pinballmapListed` is not a user-facing field — the edit form renders no
-      // control for it, and it is meant to be flipped only by
-      // `linkPinballmapEntryAction` / the verify action, which talk to PBM. The
-      // form therefore submits nothing for it, and without this carry-over
-      // `resolvePbmLinkColumns` would default it to `false` — silently unlisting
-      // a listed machine on every unrelated "Save details" (PP-o355.19 review).
+      // `pinballmapListed` is not an input to this action at all: the edit form
+      // renders no control for it, `readPbmLinkFormFields` does not read it, and
+      // `updateMachineSchema` does not accept it (PP-o355.29). It is flipped
+      // only by paths that talk to PBM — `linkPinballmapEntryAction` and the
+      // verify/heal action. So the value below comes from the STORED row, and
+      // without this carry-over `resolvePbmLinkColumns` would default it to
+      // `false` — silently unlisting a listed machine on every unrelated "Save
+      // details" (PP-o355.19 review).
       //
-      // `readPbmLinkFormFields` does still READ the raw field, so a crafted POST
-      // can set it with no PBM interaction at all — PP-o355.29, to close before
-      // PP-o355.21 wires the listing controls up for real.
       // Carry the stored value only while the link target is unchanged;
       // re-targeting the link makes the old listing meaningless, and the
       // resolver already forces `false` on the unlinked/excluded branches.
@@ -1114,20 +1103,23 @@ export async function updateMachineAction(
     if (error instanceof MachineNotFoundError) {
       return err("NOT_FOUND", "Machine not found.");
     }
-    // Matched on the bare code, NOT `isPbmListingConflict`, for the same reason
-    // as the listing actions: this action cannot touch `initials`, so the
-    // one-lister index is the only unique constraint it can violate, and
-    // matching the constraint NAME would put a correctable conflict back to a
-    // 500 on any driver that omits the field. It had no catch at all before, so
-    // the collision surfaced as a 500 (PP-o355.15). `pbmColumns` is scoped
-    // inside the try; the submitted title id is the same value and is in scope
-    // here.
+    // A BACKSTOP, not a live path. This action cannot touch `initials`, so the
+    // one-lister index is the only unique constraint it can violate — and since
+    // PP-o355.29 it cannot reach even that on its own: the only way it sets
+    // `pinballmapListed` true is the carry-over, which rewrites a value the row
+    // already holds and so cannot collide with itself. What remains is a race
+    // against a concurrent listing write, plus PP-o355.20, which will run
+    // auto-link at title-save time and make this genuinely reachable again.
+    // Kept for both; the collision surfaced as a raw 500 before (PP-o355.15).
     //
     // Gated on `pbmFormPresent`: without the picker on this form no listing
     // column is written, so a 23505 cannot be the one-lister index. Claiming it
     // anyway would answer an unrelated unique violation with a confident,
     // wrong PinballMap message AND skip `serverActionError`'s reporting,
     // leaving no telemetry for a genuine defect.
+    //
+    // `pbmColumns` is scoped inside the try; the submitted title id is the same
+    // value and is in scope here.
     if (pbmFormPresent && isPgErrorCode(error, "23505")) {
       return err(
         "VALIDATION",
