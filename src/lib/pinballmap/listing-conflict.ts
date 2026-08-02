@@ -2,55 +2,29 @@ import "server-only";
 import { and, eq, ne } from "drizzle-orm";
 import { db } from "~/server/db";
 import { machines } from "~/server/db/schema";
-import {
-  isPgErrorCode,
-  getPostgresErrorConstraint,
-} from "~/lib/db/postgres-errors";
 
 /**
- * Recognising and explaining a duplicate-listing collision (PP-o355.15).
+ * Explaining a duplicate-listing collision (PP-o355.15).
  *
- * Shared by every path that writes `pinballmapListed` — `createMachineAction`,
- * `updateMachineAction`, `linkPinballmapEntryAction`, and the verify/heal
- * transaction. They previously disagreed about what the same failure meant
- * (wrong message / no catch / `SERVER`), which is precisely the drift a single
- * implementation prevents.
- */
-
-/**
- * Name of the partial unique index enforcing one PinballMap lister per catalog
- * title at our location (migration 0052). PBM's `POST /location_machine_xrefs`
- * is find-or-create on `(location_id, machine_id)`, so two cabinets of one title
- * physically cannot hold distinct lmx rows here.
- */
-const PBM_LISTED_UNIQUE = "machines_pinballmap_listed_unique";
-
-/**
- * True when a failed write is specifically a duplicate-listing collision.
+ * The partial unique index `machines_pinballmap_listed_unique` (migration 0052)
+ * enforces one PinballMap lister per catalog title at our location. PBM's
+ * `POST /location_machine_xrefs` is find-or-create on `(location_id,
+ * machine_id)`, so two cabinets of one title physically cannot hold distinct
+ * lmx rows here.
  *
- * `machines` has TWO unique constraints — `machines_initials_unique` and the
- * partial listing index — and both raise SQLSTATE 23505. A bare code check
- * cannot tell them apart, which is why the machine write paths used to answer
- * every 23505 with "Initials are already taken".
- *
- * **Only the create paths use this.** They are the only writes that can violate
- * either constraint, so they have to tell the two apart. Every other listing
- * write touches listing columns alone, so it matches the bare `23505` instead:
- * `getPostgresErrorConstraint` returns `undefined` on a driver exposing neither
- * spelling, and narrowing there would put a correctable conflict back to a 500.
- * Create pays a different price for that same gap — with no constraint name it
- * falls through to the initials message, the very misdiagnosis this module
- * exists to remove. Both drivers we run on supply the field, so the asymmetry is
- * latent rather than live; closing it needs a "do these initials actually
- * collide?" lookup to pick the message, which is more machinery than a
- * hypothetical third driver currently justifies.
+ * **Which writes can trip it.** Only a write that sets `pinballmap_listed` true
+ * puts a row in that partial index, and since PP-o355.29 that is exclusively
+ * the paths that talk to PBM: `linkPinballmapEntryAction` and the verify/heal
+ * transaction. `createMachineAction` always writes the column false, so it can
+ * only ever raise the *initials* 23505 and needs no disambiguation; the carry-
+ * over in `updateMachineAction` re-writes a value the row already holds, which
+ * cannot collide with itself. That is why this module no longer exports a
+ * constraint-name matcher — the callers that needed one no longer exist, and
+ * the surviving callers can match the bare code unambiguously. (Matching on the
+ * name was also driver-dependent: postgres-js spells it `constraint_name`,
+ * PGlite `constraint`, and a driver exposing neither would have downgraded a
+ * correctable conflict to a 500.)
  */
-export function isPbmListingConflict(error: unknown): boolean {
-  return (
-    isPgErrorCode(error, "23505") &&
-    getPostgresErrorConstraint(error) === PBM_LISTED_UNIQUE
-  );
-}
 
 /**
  * Message for a duplicate-listing collision, naming the cabinet that already
