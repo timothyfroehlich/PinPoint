@@ -74,3 +74,7 @@ there as follow-ups.
   "Authentication CAPTCHA (Turnstile fail-open)" above) — but other surfaces are
   not comprehensively rate-limited.
 - **DDoS**: Requires infrastructure-level protection
+- **CSS injection**: `style-src` keeps `'unsafe-inline'` for CSS-in-JS and
+  Next.js server-rendered styles, so inline styles are permitted. This is a
+  deliberate weakening, not an oversight; tightening it to a nonce would mean
+  proving every component's inline styles carry one first.

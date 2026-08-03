@@ -157,7 +157,7 @@ Native reset clears the form's DOM state; explicit `setState` clears React's vie
 ### Server Actions
 
 - Exported server actions are **suffixed `Action`** — `createMachineAction`, `markAsReadAction`. This is the house style for new code, not a universal invariant: a set of older actions under `src/app/**/actions.ts` predate the convention. Name new actions with the suffix; **don't** rename existing ones to match (the rename is churn with a real chance of missing a call site), and **don't assume an unsuffixed export isn't a Server Action** — several are wired straight into `useActionState`.
-- Every action checks authorization through `checkPermission()` from `~/lib/permissions/helpers` (CORE-ARCH-008). Never hand-roll a role comparison. `pinpoint-security` has the full auth/permission gate walkthrough.
+- Every action checks authorization through `checkPermission()` from `~/lib/permissions/helpers` (CORE-ARCH-008). Never hand-roll a role comparison — `pinpoint-security` covers what counts as a non-gating comparison and how the `permissions-audit-allow` audit treats it.
 - Actions return `Result<T, C>` from `~/lib/result.ts` (`ok(...)` / `err(...)`), not thrown exceptions, so `useActionState` can render the failure.
 - Report failures through `serverActionError()` from `~/lib/observability/report-error` rather than a bare `console.error` — that's what routes the error to Sentry with action context.
 - Zod schemas live in a separate `schemas.ts` next to the action (a Next.js requirement — `"use server"` files may only export async functions).

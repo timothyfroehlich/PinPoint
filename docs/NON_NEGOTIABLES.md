@@ -134,8 +134,8 @@
 **CORE-SSR-005:** Don't modify Supabase response object
 
 - **Severity:** Required
-- **Why:** Altering it breaks authentication
-- **Do:** Return response object as‑is from middleware
+- **Why:** Altering it breaks authentication. Rewrapping into a fresh `NextResponse` — or copying headers across by hand — strips the `Set-Cookie` headers carrying the refreshed session tokens, so the _next_ request sees an anonymous user.
+- **Do:** Return the response object from `updateSession` as‑is from middleware
 - **Don't:** Mutate or rewrap the response
 
 **CORE-SSR-006:** Use database trigger for auto-profile creation
@@ -151,7 +151,7 @@
 - **Why:** Internal Supabase schema; breaks abstraction, couples to implementation details, may break with Supabase updates
 - **Do:** Query `user_profiles` table (which mirrors necessary auth data via database triggers)
 - **Don't:** Use raw SQL or Drizzle queries against `auth.users` in Server Actions or services
-- **Exception:** Database triggers (`supabase/seed.sql`) and test setup (`pglite.ts`) may reference `auth.users` for bootstrapping
+- **Exception:** Database triggers (`supabase/seed.sql`) and test setup may reference `auth.users` for bootstrapping — `pglite.ts`, and the integration-test fixtures that seed paired `auth.users` + `user_profiles` rows through the `authUsers` Drizzle wrapper
 
 ---
 

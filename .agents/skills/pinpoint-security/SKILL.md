@@ -1,6 +1,6 @@
 ---
 name: pinpoint-security
-description: The security choices PinPoint made that its own code does not state — which modules may touch `@supabase/ssr` directly, the CSP authoring posture and what is already allowlisted, what counts as a non-gating role comparison under the `permissions-audit-allow` contract, the multi-provider OAuth registry and unlink guard, the shared `sanitize-html` allowlist, and the `~/lib/url` seam (`getSiteUrl` / `requireSiteUrl` / `resolveRequestUrl` / `isInternalUrl` / `getSafeRedirect`) that makes hand-rolled `process.env` URL building a bug. Use when writing a redirect, an absolute URL in an email or webhook, a CSP change, an OAuth flow, a sanitizer, or a permission gate. The enforced rules themselves are `CORE-SEC-*` / `CORE-SSR-*` in `docs/NON_NEGOTIABLES.md`; recorded threat-model decisions are in `docs/SECURITY.md`.
+description: The security choices PinPoint made that its own code does not state — which modules may touch `@supabase/ssr` directly, the CSP authoring posture and what is already allowlisted, what counts as a non-gating role comparison under the `permissions-audit-allow` contract, the multi-provider OAuth registry and unlink guard, the shared `sanitize-html` allowlist, and the `~/lib/url` seam (`getSiteUrl` / `requireSiteUrl` / `resolveRequestUrl` / `isInternalUrl` / `getSafeRedirect`) that makes hand-rolled `process.env` URL building a bug. Use when creating a Supabase server client, writing a Server Action's auth check, a redirect, an absolute URL in an email or webhook, a CSP change, an OAuth flow, a sanitizer, or a permission gate. The enforced rules themselves are `CORE-SEC-*` / `CORE-SSR-*` in `docs/NON_NEGOTIABLES.md`; recorded threat-model decisions are in `docs/SECURITY.md`.
 ---
 
 # PinPoint Security
@@ -47,6 +47,13 @@ or enforces authorization** is forbidden outright and must go through
 behaviour are allowed with an annotation — SQL/query row filtering (an `isAdmin`
 flag driving a `where` clause), UI display flags and badges, business-logic
 preconditions.
+
+**`getRawPermissionValue` is introspection-only.** It returns the raw matrix
+entry — `boolean | "own" | "owner" | "own_or_owner"` — so every conditional
+value is truthy. Using it as a gate (`if (getRawPermissionValue(...))`) grants
+access to everyone at that access level. Reach for it only to choose between
+two UI states; actual access decisions go through `checkPermission()` /
+`getPermissionState()`.
 
 **There are no permission React hooks.** The helpers in
 `src/lib/permissions/helpers.ts` are pure, so client components call them
