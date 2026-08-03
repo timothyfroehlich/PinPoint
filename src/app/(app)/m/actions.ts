@@ -23,6 +23,10 @@ import {
 } from "~/server/db/schema";
 import { createMachineSchema, updateMachineSchema } from "./schemas";
 import { resolvePbmLinkColumns } from "~/lib/pinballmap/link-columns";
+import {
+  captureAutoLink,
+  resolveAutoLinkForMachine,
+} from "~/lib/pinballmap/sync";
 import { type Result, ok, err } from "~/lib/result";
 import { z } from "zod";
 import { eq, and } from "drizzle-orm";
@@ -191,6 +195,33 @@ function readPbmLinkFormFields(formData: FormData): {
         ? reasonRaw
         : undefined,
   };
+}
+
+/**
+ * Apply a listing this save decided to auto-capture (PP-o355.20), best-effort.
+ *
+ * Runs AFTER the details transaction has committed, and swallows everything.
+ * `captureAutoLink` already stands down on the one collision that is expected,
+ * but a deadlock, a dropped connection, or a failure writing the receipt would
+ * otherwise reach `updateMachineAction`'s catch and report "Failed to update
+ * machine" for an edit that is already saved — sending the user to redo work
+ * that landed. Auto-link is derived bookkeeping: it is allowed to not happen,
+ * and the hourly reconcile pass picks it up next time round.
+ */
+async function captureAutoLinkBestEffort(
+  machineId: string,
+  lmxId: number,
+  actorId: string
+): Promise<void> {
+  try {
+    await captureAutoLink({ machineId, lmxId, action: "linked" }, actorId);
+  } catch (autoLinkError: unknown) {
+    reportError(autoLinkError, {
+      action: "updateMachineAutoLink",
+      bestEffort: true,
+      machineId,
+    });
+  }
 }
 
 /**
@@ -637,6 +668,11 @@ export async function updateMachineAction(
   const { id, name, ownerId, presenceStatus, forcePromoteUserId } =
     validation.data;
 
+  // The listing this save decided to auto-capture (PP-o355.20), or null.
+  // Declared out here because it is decided in the PBM block and applied after
+  // whichever of the two update transactions ran.
+  let autoLink: { lmxId: number } | null = null;
+
   try {
     // Load current machine by id — permission check is authoritative.
     // Pre-load presenceStatus and the joined active-owner display name so
@@ -720,6 +756,33 @@ export async function updateMachineAction(
       });
       if (!pbm.ok) return err("VALIDATION", pbm.message);
       pbmColumns = pbm.columns;
+
+      // Auto-link (PP-o355.20): the moment a cabinet is matched to a title that
+      // is already on Pinball Map's lineup, capture that listing alongside the
+      // save. Matching is the human judgment; attaching the lmx is bookkeeping
+      // that mirrors what PBM already shows, so it is not a second button.
+      //
+      // DECIDED here, APPLIED after the details transaction commits (see
+      // `captureAutoLink` below). Keeping it out of that transaction is the
+      // point: the one-lister index makes the listing write the only statement
+      // here that can collide, and derived bookkeeping must never be able to
+      // discard the edit the human actually asked for.
+      //
+      // Only from unlisted → listed. A row the carry-over above kept listed is
+      // skipped entirely, which is also why this can never produce a heal: lmx
+      // drift belongs to the hourly pass, not to whoever happened to hit Save.
+      if (
+        pbmColumns.pinballmapMachineId !== null &&
+        !pbmColumns.pinballmapListed
+      ) {
+        autoLink = await resolveAutoLinkForMachine({
+          machineId: id,
+          pinballmapMachineId: pbmColumns.pinballmapMachineId,
+          // The prospective row: an edit can change availability in the same
+          // submit, and availability is what the tie guard ranks on.
+          presenceStatus: presenceStatus ?? currentMachine.presenceStatus,
+        });
+      }
     }
 
     // Handle forcePromoteUserId path
@@ -833,6 +896,10 @@ export async function updateMachineAction(
 
         return [updatedMachine];
       });
+
+      if (autoLink) {
+        await captureAutoLinkBestEffort(id, autoLink.lmxId, user.id);
+      }
 
       // Post-commit side effects — best-effort: do not fail the action on notification errors
       try {
@@ -1040,6 +1107,10 @@ export async function updateMachineAction(
       return [updatedMachine];
     });
 
+    if (autoLink) {
+      await captureAutoLinkBestEffort(id, autoLink.lmxId, user.id);
+    }
+
     // Post-commit side effects — best-effort: do not fail the action on notification errors
     if (shouldUpdateOwner) {
       try {
@@ -1102,21 +1173,14 @@ export async function updateMachineAction(
     if (error instanceof MachineNotFoundError) {
       return err("NOT_FOUND", "Machine not found.");
     }
-    // NO listing-collision catch here, deliberately (PP-o355.29). This action
-    // cannot touch `initials`, so `machines_pinballmap_listed_unique` is the
-    // only unique constraint it could ever violate — and it cannot reach that
-    // one either. The sole way it sets `pinballmapListed` true is the carry-over
-    // above, gated on `linkUnchanged && currentMachine.pinballmapListed`: it
-    // rewrites a value the same row already holds for the same title, which
-    // cannot collide with itself. Nor can a concurrent writer set up the
-    // collision, because the precondition — two cabinets of one title both
-    // listed — is the exact state the index forbids; seeding it fails.
-    //
-    // PP-o355.15 added a catch here, correctly, while a form post could set the
-    // flag. Closing that made the branch unreachable AND untestable, so it is
-    // removed rather than shipped uncovered. PP-o355.20 runs auto-link at
-    // title-save time, which makes this path a listing writer again — that bead
-    // re-adds the catch together with the test that can finally reach it.
+    // NO listing-collision branch here, and no auto-link failure of any kind can
+    // reach this point. Auto-link (PP-o355.20) made this action a writer of
+    // `pinballmapListed` again, so the one-lister index
+    // `machines_pinballmap_listed_unique` is reachable — but that write lives
+    // outside the details transaction and behind `captureAutoLinkBestEffort`,
+    // which stands down on a collision and reports anything else without
+    // rethrowing. A save that reaches this catch therefore failed on its own
+    // merits; derived bookkeeping is never allowed to discard a good edit.
     return serverActionError(
       error,
       "SERVER",
