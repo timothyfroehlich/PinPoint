@@ -50,27 +50,29 @@ type PinballmapFilter = (typeof PINBALLMAP_FILTERS)[number];
  * The WHERE fragments each link state selects, ANDed into the shared condition
  * list by the caller.
  *
- * A `Record` keyed by the filter union rather than an if/else chain so that
- * adding a state to {@link PINBALLMAP_FILTERS} without a condition is a type
- * error. A missed branch would silently return the *whole* fleet under a
- * narrowing filter name, with a `total` that looks authoritative
- * (CORE-ARCH-012).
+ * A `Record` keyed by the filter union rather than an if/else chain, so a state
+ * added to {@link PINBALLMAP_FILTERS} without a condition fails to compile. The
+ * failure it guards against is a narrowing filter name that narrows nothing:
+ * the *whole* fleet returned under `pinballmap: "unlinked"`, with a `total` that
+ * looks authoritative (CORE-ARCH-012).
  *
- * Arrays of bare `SQL` rather than a nested `and(...)`: `and()` is typed
- * `SQL | undefined`, and an `undefined` here would be dropped by the outer
- * `and(...conditions)` — the same silent whole-fleet answer this Record exists
- * to make impossible.
+ * The value type is a NON-EMPTY tuple of bare `SQL`, which is what makes that
+ * guarantee real rather than merely stated. Two weaker shapes both type-check
+ * while contributing zero predicates to `and(...conditions)`, and both produce
+ * exactly the whole-fleet answer above: `SQL | undefined` (what `and()` itself
+ * returns) and an empty `SQL[]`. Neither is expressible here.
  */
-const PINBALLMAP_FILTER_CONDITIONS: Record<PinballmapFilter, SQL[]> = {
-  // Both halves are load-bearing: "no catalog match" alone would keep handing
-  // the linking pass the machines someone already decided are not on PBM.
-  unlinked: [
-    isNull(machines.pinballmapMachineId),
-    eq(machines.pinballmapExcluded, false),
-  ],
-  linked: [isNotNull(machines.pinballmapMachineId)],
-  excluded: [eq(machines.pinballmapExcluded, true)],
-};
+const PINBALLMAP_FILTER_CONDITIONS: Record<PinballmapFilter, [SQL, ...SQL[]]> =
+  {
+    // Both halves are load-bearing: "no catalog match" alone would keep handing
+    // the linking pass the machines someone already decided are not on PBM.
+    unlinked: [
+      isNull(machines.pinballmapMachineId),
+      eq(machines.pinballmapExcluded, false),
+    ],
+    linked: [isNotNull(machines.pinballmapMachineId)],
+    excluded: [eq(machines.pinballmapExcluded, true)],
+  };
 
 const listMachinesSchema = z.object({
   search: z
@@ -106,7 +108,7 @@ const listMachinesSchema = z.object({
     .min(0)
     .optional()
     .describe(
-      "How many matches to skip, for paging past the limit. Machines are ordered by name, then by initials to break ties between duplicate cabinets of the same title — a total order, so as long as nothing changes which machines match, paging from offset 0 by offset+limit until 'hasMore' is false visits every match exactly once. That condition is the whole rule: if your own actions change whether a machine still matches (linking machines while paging pinballmap:'unlinked'), each one you act on LEAVES the matching set and every machine below it shifts up by one, so advancing the offset jumps over exactly the machines you have not looked at yet. Drain instead of paging — keep re-requesting offset 0 and stop when 'total' reaches 0, setting offset only to the number of machines you have deliberately left as they are, so one you cannot act on doesn't come back forever."
+      "How many matches to skip, for paging past the limit. Machines are ordered by name, then by initials to break ties between duplicate cabinets of the same title, so the order is total and stable. Whether you should advance this offset at all depends on whether your own actions change which machines match — the tool description gives the rule and the two procedures; choosing the wrong one silently skips machines."
     ),
 });
 
@@ -202,7 +204,7 @@ export function registerListMachines(server: McpServer): void {
     {
       title: "List machines",
       description:
-        "List machines with their initials, name, availability, owner name, and open-issue count. Use this to find a machine's initials before acting on it (e.g. disambiguate 'the Medieval Madness by the door'). Supports a name/initials search, a presence filter, and a PinballMap link-state filter (pinballmap: 'unlinked' | 'linked' | 'excluded') — use pinballmap: 'unlinked' to get the machines still needing a PinballMap catalog match. Returns 'count' (this page), 'total' (every match), 'offset', and 'hasMore'. Answer counting questions from 'total', never from 'count' or the array length. There are two ways to get through a collection larger than one page, and picking the wrong one silently skips machines. READING only, nothing changing: keep requesting with offset += limit until hasMore is false (raising limit alone caps at 100 and will not reach the rest). ACTING on what you find, in a way that changes whether it still matches — linking machines while paging pinballmap:'unlinked' is the case this tool is built for: do NOT advance the offset. Each machine you link drops out of the filter and the rest shift up, so offset += limit skips as many machines as you just fixed. Re-request offset 0 and let the worklist drain to a 'total' of 0 instead.",
+        "List machines with their initials, name, availability, owner name, and open-issue count. Use this to find a machine's initials before acting on it (e.g. disambiguate 'the Medieval Madness by the door'). Supports a name/initials search, a presence filter, and a PinballMap link-state filter (pinballmap: 'unlinked' | 'linked' | 'excluded') — use pinballmap: 'unlinked' to get the machines still needing a PinballMap catalog match. Returns 'count' (this page), 'total' (every match), 'offset', and 'hasMore'. Answer counting questions from 'total', never from 'count' or the array length. There are two ways to get through a collection larger than one page, and picking the wrong one silently skips machines. (A) READING only, nothing changing: keep requesting with offset += limit until hasMore is false (raising limit alone caps at 100 and will not reach the rest). (B) ACTING on what you find, in a way that changes whether it still matches — linking machines while paging pinballmap:'unlinked' is the case this tool is built for: do NOT advance the offset per page. Each machine you link drops out of the filter and the rest shift up, so offset += limit skips as many machines as you just fixed. Re-request offset 0 and let the worklist drain. When you leave a machine as it is — you cannot link it, or you are deferring the decision — raise offset by exactly that many so it does not come back on the next request. You are done when a request comes back EMPTY (count 0), NOT when total reaches 0: every machine you deliberately left keeps total above 0 forever, so waiting for 0 is a loop with no exit.",
       inputSchema: listMachinesSchema.shape,
     },
     (args, extra) =>
