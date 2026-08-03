@@ -167,7 +167,7 @@ export async function updateMachineWatchMode({
 }
 
 // --- Machine mutation services (createMachine / updateMachineOwner /
-//     updateMachinePresence) -------------------------------------------------
+//     updateMachinePresence / updateMachineName) ------------------------------
 //
 // These mirror `~/services/issues.ts`: a typed params object (with an explicit
 // `actorUserId`), the whole `db.transaction` — row writes, watcher
@@ -537,6 +537,58 @@ export async function updateMachinePresence({
         ownerChanged: false,
         owner: toMachineOwnerRef(current.ownerId, current.invitedOwnerId),
         presenceStatus,
+      },
+      actorUserId
+    );
+  });
+
+  return { changed: true };
+}
+
+export interface UpdateMachineNameParams {
+  machineId: string;
+  /** The new display name. Callers validate length/trim before calling. */
+  name: string;
+  actorUserId: string;
+  /** Current machine state, pre-loaded by the caller for the permission check. */
+  current: MachineMutationSnapshot;
+}
+
+/**
+ * Rename a machine and emit a `name_changed` lifecycle event, atomically.
+ * Returns `{ changed: false }` without writing when the name is unchanged (no
+ * bumped `updatedAt`, no timeline row). No notifications.
+ *
+ * Only the `name` column moves. `initials` is the FK target for
+ * `issues.machineInitials` and the `/m/<initials>` URL segment, so it is
+ * deliberately not touched here (PP-u4ab.10).
+ */
+export async function updateMachineName({
+  machineId,
+  name,
+  actorUserId,
+  current,
+}: UpdateMachineNameParams): Promise<{ changed: boolean }> {
+  if (current.name === name) {
+    return { changed: false };
+  }
+
+  await db.transaction(async (tx) => {
+    await tx.update(machines).set({ name }).where(eq(machines.id, machineId));
+
+    await emitMachineUpdated(
+      tx,
+      {
+        id: machineId,
+        name: current.name,
+        owner: toMachineOwnerRef(current.ownerId, current.invitedOwnerId),
+        presenceStatus: current.presenceStatus,
+      },
+      {
+        name,
+        ownerChanged: false,
+        owner: toMachineOwnerRef(current.ownerId, current.invitedOwnerId),
+        presenceStatus: undefined,
       },
       actorUserId
     );

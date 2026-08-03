@@ -15,7 +15,13 @@ import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import { describe, expect, it, vi } from "vitest";
 
-import { authUsers, issues, machines, userProfiles } from "~/server/db/schema";
+import {
+  authUsers,
+  issues,
+  machines,
+  timelineEvents,
+  userProfiles,
+} from "~/server/db/schema";
 import { getTestDb, setupTestDb } from "~/test/setup/pglite";
 import type * as NotificationsModule from "~/lib/notifications";
 import type { McpAuthContext } from "~/lib/mcp/verify-token";
@@ -45,6 +51,7 @@ import { runCreateIssue } from "~/lib/mcp/tools/create-issue";
 import { runGetMachine } from "~/lib/mcp/tools/get-machine";
 import { runListMachines } from "~/lib/mcp/tools/list-machines";
 import { runSetMachineAvailability } from "~/lib/mcp/tools/set-machine-availability";
+import { runSetMachineName } from "~/lib/mcp/tools/set-machine-name";
 import { runSetMachineOwner } from "~/lib/mcp/tools/set-machine-owner";
 import { McpToolError } from "~/lib/mcp/tools/shared";
 
@@ -479,6 +486,119 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
         .from(issues)
         .where(eq(issues.machineInitials, machine.initials));
       expect(rows).toHaveLength(2);
+    });
+  });
+
+  describe("set_machine_name (PP-u4ab.10)", () => {
+    /** Every timeline event recorded against a machine. */
+    async function timelineFor(machineId: string): Promise<
+      {
+        eventData: unknown;
+        authorId: string | null;
+      }[]
+    > {
+      const db = await getTestDb();
+      return db
+        .select({
+          eventData: timelineEvents.eventData,
+          authorId: timelineEvents.authorId,
+        })
+        .from(timelineEvents)
+        .where(eq(timelineEvents.machineId, machineId));
+    }
+
+    it("renames the machine and writes exactly one name_changed event", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine({
+        name: "Elvira's House of Horrors",
+      });
+
+      const outcome = await runSetMachineName(
+        {
+          machine: machine.initials,
+          name: "Elvira's House of Horrors (Premium)",
+        },
+        ctx("admin", admin)
+      );
+
+      expect(outcome.result).toMatchObject({
+        initials: machine.initials,
+        name: "Elvira's House of Horrors (Premium)",
+        previousName: "Elvira's House of Horrors",
+        changed: true,
+      });
+
+      const db = await getTestDb();
+      const row = await db.query.machines.findFirst({
+        where: eq(machines.id, machine.id),
+        columns: { name: true, initials: true },
+      });
+      expect(row?.name).toBe("Elvira's House of Horrors (Premium)");
+      // Initials are the FK target for issues and the /m/<initials> URL — a
+      // rename must never touch them.
+      expect(row?.initials).toBe(machine.initials);
+
+      const events = await timelineFor(machine.id);
+      expect(events).toHaveLength(1);
+      expect(events[0]?.eventData).toEqual({
+        kind: "name_changed",
+        from: "Elvira's House of Horrors",
+        to: "Elvira's House of Horrors (Premium)",
+      });
+      expect(events[0]?.authorId).toBe(admin);
+    });
+
+    it("is a no-op when the name already matches, and says so", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine({ name: "Medieval Madness" });
+
+      const outcome = await runSetMachineName(
+        { machine: machine.initials, name: "Medieval Madness" },
+        ctx("admin", admin)
+      );
+
+      // CORE-ARCH-012: nothing was written, so the response must not claim a
+      // change happened.
+      expect((outcome.result as { changed: boolean }).changed).toBe(false);
+      expect(await timelineFor(machine.id)).toHaveLength(0);
+    });
+
+    it("denies a member who does not own the machine", async () => {
+      const member = await makeUser("member");
+      const machine = await seedMachine({ ownerId: null, name: "Attack" });
+
+      await expect(
+        runSetMachineName(
+          { machine: machine.initials, name: "Attack from Mars" },
+          ctx("member", member)
+        )
+      ).rejects.toMatchObject({ reason: "denied" });
+
+      const db = await getTestDb();
+      const row = await db.query.machines.findFirst({
+        where: eq(machines.id, machine.id),
+        columns: { name: true },
+      });
+      expect(row?.name).toBe("Attack");
+    });
+
+    it("lets the machine's owner rename it", async () => {
+      const owner = await makeUser("member", "Pat", "Owner");
+      const machine = await seedMachine({ ownerId: owner, name: "Getaway" });
+
+      const outcome = await runSetMachineName(
+        { machine: machine.initials, name: "The Getaway: High Speed II" },
+        ctx("member", owner)
+      );
+
+      expect((outcome.result as { changed: boolean }).changed).toBe(true);
+    });
+
+    it("throws not_found when the machine is unknown", async () => {
+      const admin = await makeUser("admin");
+      await expect(
+        runSetMachineName({ machine: "NOPE", name: "x" }, ctx("admin", admin))
+      ).rejects.toMatchObject({ reason: "not_found" });
     });
   });
 });
