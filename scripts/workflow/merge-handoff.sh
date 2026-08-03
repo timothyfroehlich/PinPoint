@@ -402,9 +402,16 @@ if [[ ${#blocking[@]} -gt 0 ]]; then
   printf '    - %s\n' "${blocking[@]}"
   rule
 fi
-printf '  ! bash scripts/workflow/merge-handoff.sh %s   (re-run — this report is a snapshot)\n' "$pr"
+
+# The command lines are the only unindented lines in the block, and carry nothing after
+# the command itself. Both properties are load-bearing for pasting: a trailing `(re-run —
+# …)` parenthetical becomes shell arguments, and Claude Code's `!` passthrough wants the
+# bang in column one. Anything explaining a command goes on the line above it.
+printf '  re-run this report (it is a snapshot):\n'
+printf '! bash scripts/workflow/merge-handoff.sh %s\n' "$pr"
 if [[ ${#blocking[@]} -eq 0 ]]; then
-  printf '  ! scripts/workflow/merge-pr.sh %s --human\n' "$pr"
+  printf '  merge — all four gates pass:\n'
+  printf '! scripts/workflow/merge-pr.sh %s --human\n' "$pr"
 fi
 rule
 printf '\n'

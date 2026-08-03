@@ -590,3 +590,30 @@ def test_an_unknowable_review_distance_does_not_read_as_no_review() -> None:
     ) as (_head, run):
         assert "since review  unknowable" in run.stdout, run.stdout
         assert "nothing reviewed to compare against" not in run.stdout
+
+
+# --- The command lines have to survive a paste ---------------------------------------
+
+
+@pytest.mark.parametrize(
+    "scenario,expected",
+    [
+        pytest.param(Scenario(), [RERUN_CMD], id="blocked-rerun-only"),
+        pytest.param(Scenario(review="head"), [RERUN_CMD, MERGE_CMD], id="ready-both"),
+    ],
+)
+def test_command_lines_are_flush_left_and_carry_nothing_after_the_command(
+    scenario: Scenario, expected: list[str]
+) -> None:
+    """Tim pastes these lines. Two properties make that work, and both regressed once.
+
+    A trailing parenthetical — "(re-run — this report is a snapshot)" — becomes shell
+    arguments, and Claude Code's `!` passthrough wants the bang in column one, so a
+    leading indent stops it being a command at all. Anything explaining a command goes
+    on the line above it.
+    """
+    with repo_with_pr(
+        branch_changes={"src/lib/thing.ts": "x\n"}, scenario=scenario
+    ) as (_head, run):
+        bang_lines = [ln for ln in run.stdout.splitlines() if "!" in ln]
+        assert bang_lines == expected, bang_lines
