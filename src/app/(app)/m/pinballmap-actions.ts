@@ -125,17 +125,23 @@ export async function resolvePinballMapLinkAction(
 }
 
 /**
- * Shared preamble for the listing read-actions: authenticate, load the target
- * machine, and confirm the caller may READ-link it (`machines.pinballmap.link`
- * — owner-own-machine / technician / admin). Returns the machine row when
- * permitted, or a failed Result to short-circuit the caller.
+ * Shared preamble for every listing action: authenticate, load the target
+ * machine, and confirm the caller holds `permission` on it. Returns the machine
+ * row when permitted, or a failed Result to short-circuit the caller.
+ *
+ * The caller chooses the gate, because the two halves of the listing controls
+ * are deliberately different capabilities: `machines.pinballmap.link` for the
+ * read-side capture actions (link / verify — no PBM write, so owner-own-machine
+ * / technician / admin), and `machines.pinballmap.push` for the outbound writes
+ * that change what PinballMap shows the public.
  *
  * The machine must already carry a catalog link (`pinballmapMachineId`); a
  * listing handle presupposes a title (schema CHECK), and we resolve the lmx by
  * that title against the stored lineup.
  */
-async function authorizeListingRead(
-  formData: FormData
+async function authorizeListingAction(
+  formData: FormData,
+  permission: "machines.pinballmap.link" | "machines.pinballmap.push"
 ): Promise<
   | { ok: true; userId: string; machine: typeof machines.$inferSelect }
   | { ok: false; result: ListingActionError }
@@ -172,7 +178,7 @@ async function authorizeListingRead(
   });
   const accessLevel = getAccessLevel(profile?.role);
   if (
-    !checkPermission("machines.pinballmap.link", accessLevel, {
+    !checkPermission(permission, accessLevel, {
       userId: user.id,
       machineOwnerId: machine.ownerId,
     })
@@ -210,10 +216,13 @@ export async function linkPinballmapEntryAction(
   _prev: LinkPinballmapResult | undefined,
   formData: FormData
 ): Promise<LinkPinballmapResult> {
-  const authed = await authorizeListingRead(formData);
+  const authed = await authorizeListingAction(
+    formData,
+    "machines.pinballmap.link"
+  );
   if (!authed.ok) return authed.result;
   const { userId, machine } = authed;
-  // Narrowed by authorizeListingRead, but re-assert for the type checker.
+  // Narrowed by authorizeListingAction, but re-assert for the type checker.
   if (machine.pinballmapMachineId === null)
     return err("VALIDATION", "Machine isn't linked to a PinballMap title yet");
 
@@ -315,7 +324,10 @@ export async function verifyPinballmapLinkAction(
   _prev: VerifyPinballmapResult | undefined,
   formData: FormData
 ): Promise<VerifyPinballmapResult> {
-  const authed = await authorizeListingRead(formData);
+  const authed = await authorizeListingAction(
+    formData,
+    "machines.pinballmap.link"
+  );
   if (!authed.ok) return authed.result;
   const { userId, machine } = authed;
   if (machine.pinballmapMachineId === null)
