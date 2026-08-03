@@ -106,7 +106,7 @@ const listMachinesSchema = z.object({
     .min(0)
     .optional()
     .describe(
-      "How many matches to skip, for paging past the limit. Machines are ordered by name, then by initials to break ties between duplicate cabinets of the same title — a total order, so paging from offset 0 by offset+limit until 'hasMore' is false visits every match exactly once."
+      "How many matches to skip, for paging past the limit. Machines are ordered by name, then by initials to break ties between duplicate cabinets of the same title — a total order, so as long as nothing changes which machines match, paging from offset 0 by offset+limit until 'hasMore' is false visits every match exactly once. That condition is the whole rule: if your own actions change whether a machine still matches (linking machines while paging pinballmap:'unlinked'), each one you act on LEAVES the matching set and every machine below it shifts up by one, so advancing the offset jumps over exactly the machines you have not looked at yet. Drain instead of paging — keep re-requesting offset 0 and stop when 'total' reaches 0, setting offset only to the number of machines you have deliberately left as they are, so one you cannot act on doesn't come back forever."
     ),
 });
 
@@ -202,7 +202,7 @@ export function registerListMachines(server: McpServer): void {
     {
       title: "List machines",
       description:
-        "List machines with their initials, name, availability, owner name, and open-issue count. Use this to find a machine's initials before acting on it (e.g. disambiguate 'the Medieval Madness by the door'). Supports a name/initials search, a presence filter, and a PinballMap link-state filter (pinballmap: 'unlinked' | 'linked' | 'excluded') — use pinballmap: 'unlinked' to get the machines still needing a PinballMap catalog match. Returns 'count' (this page), 'total' (every match), 'offset', and 'hasMore'. Answer counting questions from 'total', never from 'count' or the array length. To enumerate a collection larger than one page, keep requesting with offset += limit until hasMore is false — raising limit alone caps at 100 and will not reach the rest.",
+        "List machines with their initials, name, availability, owner name, and open-issue count. Use this to find a machine's initials before acting on it (e.g. disambiguate 'the Medieval Madness by the door'). Supports a name/initials search, a presence filter, and a PinballMap link-state filter (pinballmap: 'unlinked' | 'linked' | 'excluded') — use pinballmap: 'unlinked' to get the machines still needing a PinballMap catalog match. Returns 'count' (this page), 'total' (every match), 'offset', and 'hasMore'. Answer counting questions from 'total', never from 'count' or the array length. There are two ways to get through a collection larger than one page, and picking the wrong one silently skips machines. READING only, nothing changing: keep requesting with offset += limit until hasMore is false (raising limit alone caps at 100 and will not reach the rest). ACTING on what you find, in a way that changes whether it still matches — linking machines while paging pinballmap:'unlinked' is the case this tool is built for: do NOT advance the offset. Each machine you link drops out of the filter and the rest shift up, so offset += limit skips as many machines as you just fixed. Re-request offset 0 and let the worklist drain to a 'total' of 0 instead.",
       inputSchema: listMachinesSchema.shape,
     },
     (args, extra) =>
