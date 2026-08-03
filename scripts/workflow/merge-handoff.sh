@@ -407,7 +407,7 @@ fi
 # the command itself. Both properties are load-bearing for pasting: a trailing `(re-run —
 # …)` parenthetical becomes shell arguments, and Claude Code's `!` passthrough wants the
 # bang in column one. Anything explaining a command goes on the line above it.
-printf '  re-run this report (it is a snapshot):\n'
+printf '  re-run this report:\n'
 printf '! bash scripts/workflow/merge-handoff.sh %s\n' "$pr"
 if [[ ${#blocking[@]} -eq 0 ]]; then
   printf '  merge — all four gates pass:\n'
