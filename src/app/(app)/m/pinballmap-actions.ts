@@ -16,8 +16,12 @@ import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
-import { machines, userProfiles } from "~/server/db/schema";
+import { machines, userProfiles, pinballmapState } from "~/server/db/schema";
 import { reconcileAfterSync } from "~/lib/pinballmap/sync";
+import { getPinballMapWriteCredentials } from "~/lib/pinballmap/credentials";
+import { withLmxAdded } from "~/lib/pinballmap/snapshot-edit";
+import { getPinballMapClient } from "~/lib/pinballmap/client";
+import type { PbmWriteFailure } from "~/lib/pinballmap/types";
 import { log } from "~/lib/logger";
 import {
   searchCatalogFamilies,
@@ -292,6 +296,134 @@ export async function linkPinballmapEntryAction(
 
   revalidatePath(`/m/${machine.initials}`);
   return ok({ lmxId: lmx.id });
+}
+
+/** Human-facing text for a PBM write failure, by reason. */
+function pbmWriteFailureMessage(failure: PbmWriteFailure): string {
+  switch (failure.reason) {
+    case "rate_limited":
+      return "Pinball Map is rate-limiting us. Try again in a few minutes.";
+    case "unauthorized":
+      return "Pinball Map rejected our operator account. An admin needs to re-provision it.";
+    case "not_found":
+      return "Pinball Map couldn't find that entry. It may already be gone.";
+    case "rejected":
+      return failure.message ?? "Pinball Map rejected the change.";
+    case "transient":
+      return "Pinball Map didn't respond properly. Try again.";
+  }
+}
+
+export type ListPinballmapResult = Result<
+  { lmxId: number },
+  | "VALIDATION"
+  | "UNAUTHORIZED"
+  | "NOT_FOUND"
+  | "NOT_PROVISIONED"
+  | "PBM_REJECTED"
+  | "SERVER"
+>;
+
+/**
+ * Add a matched machine to PinballMap's lineup for our location and capture the
+ * lmx PBM mints (PP-o355.30). The genuine outbound write — distinct from
+ * `linkPinballmapEntryAction`, which only captures a handle for an entry PBM
+ * already shows.
+ *
+ * Gated on `machines.pinballmap.push` (CORE-ARCH-008).
+ *
+ * **Ordering is a hard requirement, not a style choice** (CORE-ARCH-011). Two
+ * non-transactional effects run first — decrypting the operator credential and
+ * the PBM HTTP call — and only their results enter the transaction. A tripwire
+ * throws `SideEffectInTransactionError` if either is moved inside it.
+ *
+ * On a PBM rejection nothing is written locally: a listing we could not create
+ * must not be reported as created (CORE-ARCH-012).
+ */
+export async function listMachineOnPinballMapAction(
+  _prev: ListPinballmapResult | undefined,
+  formData: FormData
+): Promise<ListPinballmapResult> {
+  const authed = await authorizeListingAction(
+    formData,
+    "machines.pinballmap.push"
+  );
+  if (!authed.ok) return authed.result;
+  const { userId, machine } = authed;
+  const titleId = machine.pinballmapMachineId;
+  if (titleId === null)
+    return err("VALIDATION", "Machine isn't linked to a PinballMap title yet");
+
+  // Idempotent: a machine already holding a listing has nothing to add.
+  if (machine.pinballmapListed && machine.pinballmapLmxId !== null)
+    return ok({ lmxId: machine.pinballmapLmxId });
+
+  const state = await getPinballMapState();
+  if (!state) return err("SERVER", "Pinball Map isn't configured yet");
+
+  // --- non-transactional effects, both BEFORE the transaction ---
+  const credentials = await getPinballMapWriteCredentials();
+  if (!credentials)
+    return err(
+      "NOT_PROVISIONED",
+      "No Pinball Map operator account is set up yet, so PinPoint can't write to Pinball Map."
+    );
+
+  const client = await getPinballMapClient();
+  const written = await client.addMachine({
+    credentials,
+    locationId: state.locationId,
+    machineId: titleId,
+  });
+  if (!written.ok) {
+    log.error(
+      { reason: written.reason, action: "pinballmap.addMachine" },
+      "PinballMap add rejected"
+    );
+    return err("PBM_REJECTED", pbmWriteFailureMessage(written));
+  }
+  const lmxId = written.lmxId;
+  // --- transaction: local state only ---
+
+  try {
+    await db.transaction(async (tx) => {
+      await tx
+        .update(machines)
+        .set({ pinballmapLmxId: lmxId, pinballmapListed: true })
+        .where(eq(machines.id, machine.id));
+      if (state.snapshotJson) {
+        await tx
+          .update(pinballmapState)
+          .set({
+            snapshotJson: withLmxAdded(state.snapshotJson, lmxId, titleId),
+          })
+          .where(eq(pinballmapState.id, "singleton"));
+      }
+      await createMachineTimelineEvent(
+        machine.id,
+        {
+          sourceType: "lifecycle",
+          tag: "lifecycle",
+          eventData: { kind: "pinballmap_listing", action: "listed", lmxId },
+          actorId: userId,
+        },
+        tx
+      );
+    });
+  } catch (error) {
+    // One lister per title at our location. PBM's find-or-create already handed
+    // us the shared lmx, so the honest report is that another cabinet holds it.
+    if (isPgErrorCode(error, "23505")) {
+      return err(
+        "VALIDATION",
+        await pbmListingConflictMessage(titleId, machine.id)
+      );
+    }
+    throw error;
+  }
+
+  revalidatePath(`/m/${machine.initials}`);
+  return ok({ lmxId });
 }
 
 export type VerifyPinballmapResult = Result<
