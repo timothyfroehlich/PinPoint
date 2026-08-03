@@ -47,7 +47,8 @@ If you’re trying to understand how to implement something, read:
 4. **Run Fast Checks While Iterating**
 
    ```bash
-   pnpm run check      # typecheck + lint + unit tests
+   pnpm run check      # static gate: typecheck + lint + format (no tests, no Python)
+   pnpm run test       # unit tests (PGlite)
    ```
 
 5. **Before Pushing**
@@ -76,7 +77,7 @@ PinPoint uses the following test types (see the `pinpoint-testing` skill at `.ag
 Useful commands:
 
 ```bash
-pnpm test                      # Unit + PGlite integration
+pnpm run test                  # Unit tests (PGlite)
 pnpm run test:integration      # Supabase-backed integration tests
 pnpm run smoke                 # Playwright smoke suite
 pnpm run test:watch            # Watch mode for unit tests
@@ -204,7 +205,26 @@ Before merging a PR, the following checks must pass:
   (the `typescript` package name is aliased to `@typescript/typescript6` until the
   7.1 JS API lands). Use `pnpm run typecheck:tsc6` to A/B against the TS6 engine
   (`tsc6` binary). See `docs/plans/2026-06-27-typescript-7-upgrade-plan.md`.
-- `pnpm run lint`: No ESLint errors.
+- `pnpm run lint`: No ESLint errors. This is the **authoritative** lint pass and the
+  one CI runs. Locally, `pnpm run check` instead runs `pnpm run lint:local` — a
+  faster **mirror** of it: `oxlint` (type-aware, via the Go-native tsgolint engine)
+  covers the type-checked bulk, and a slim ESLint pass (`PINPOINT_LINT_SLIM=1`, no
+  project service) covers the plugins oxlint can't run — the local `pinpoint`
+  custom rule, `better-tailwindcss`, `eslint-comments`, `unused-imports`,
+  `react-hooks`, `promise`, `jsx-a11y`. Both halves lint the same
+  `src/ e2e/ scripts/` that `lint` does. Measured on this repo: 14.9s / 3.2 GB for
+  full ESLint vs 3.8s / ~1.2 GB for the mirror.
+- `pnpm run check:python`: ruff + `pytest scripts/tests/`. **Not part of
+  `pnpm run check`** — pytest was 14s of check's 17s and Python changes are rare, so
+  it moved to its own command (CI's required `Fast Linters` job still runs it on
+  every push). Run it when you touch `scripts/` or `.claude/hooks/`.
+
+  The mirror is a **speed optimization, never a coverage bet**. If the mirror and
+  CI disagree, CI is right — a lint failure that only reproduces in CI means the
+  mirror has drifted, not that CI is flaky. Add a type-aware rule to
+  `eslint.config.mjs` and you must add it to `.oxlintrc.json` too (including any
+  per-override `"off"`), or it silently stops being checked locally. (PP-4zcj.)
+
 - `pnpm run format`: Code is formatted with Prettier.
 - `pnpm test`: All unit and integration tests pass.
 - `pnpm run smoke`: Critical E2E flows pass.

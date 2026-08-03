@@ -46,7 +46,9 @@ import { Button } from "~/components/ui/button";
  * are kept as the intended implementation for PP-o355.21, which wires the
  * listing controls up for real. Until then the only writers of
  * `pinballmapListed` are `linkPinballmapEntryAction` and
- * `verifyPinballmapLinkAction`, and neither is reachable from the UI.
+ * `verifyPinballmapLinkAction`, and neither is reachable from the UI. That is
+ * enforced rather than incidental: the create/update schemas reject the field
+ * outright, so no request body can set it (PP-o355.29).
  */
 export interface PinballmapListingControlProps {
   machineId: string;

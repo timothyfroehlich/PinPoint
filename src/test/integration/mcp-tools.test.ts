@@ -15,7 +15,13 @@ import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import { describe, expect, it, vi } from "vitest";
 
-import { authUsers, issues, machines, userProfiles } from "~/server/db/schema";
+import {
+  authUsers,
+  issues,
+  machines,
+  timelineEvents,
+  userProfiles,
+} from "~/server/db/schema";
 import { getTestDb, setupTestDb } from "~/test/setup/pglite";
 import type * as NotificationsModule from "~/lib/notifications";
 import type { McpAuthContext } from "~/lib/mcp/verify-token";
@@ -45,6 +51,7 @@ import { runCreateIssue } from "~/lib/mcp/tools/create-issue";
 import { runGetMachine } from "~/lib/mcp/tools/get-machine";
 import { runListMachines } from "~/lib/mcp/tools/list-machines";
 import { runSetMachineAvailability } from "~/lib/mcp/tools/set-machine-availability";
+import { runSetMachineName } from "~/lib/mcp/tools/set-machine-name";
 import { runSetMachineOwner } from "~/lib/mcp/tools/set-machine-owner";
 import { McpToolError } from "~/lib/mcp/tools/shared";
 
@@ -130,6 +137,80 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
       expect(result.count).toBe(1);
       expect(result.machines[0]?.owner).toBe("Pat Owner");
       expect(result.machines[0]?.openIssues).toBe(1);
+    });
+
+    it("reports total and hasMore when the page is truncated (PP-u4ab.4)", async () => {
+      const admin = await makeUser("admin");
+      for (const name of ["Truncate A", "Truncate B", "Truncate C"]) {
+        await seedMachine({ name });
+      }
+
+      const outcome = await runListMachines(
+        { search: "Truncate", limit: 2 },
+        ctx("admin", admin)
+      );
+      const result = outcome.result as {
+        count: number;
+        total: number;
+        hasMore: boolean;
+      };
+
+      // The bug this pins: `count` alone reads as "there are 2", which is how a
+      // 100+ machine collection gets miscounted from a 50-row page.
+      expect(result.count).toBe(2);
+      expect(result.total).toBe(3);
+      expect(result.hasMore).toBe(true);
+    });
+
+    it("pages past the limit with offset until hasMore clears (PP-u4ab.4)", async () => {
+      const admin = await makeUser("admin");
+      for (const name of ["Page A", "Page B", "Page C"]) {
+        await seedMachine({ name });
+      }
+
+      interface Page {
+        count: number;
+        total: number;
+        hasMore: boolean;
+      }
+      const first = (
+        await runListMachines(
+          { search: "Page", limit: 2, offset: 0 },
+          ctx("admin", admin)
+        )
+      ).result as Page;
+      const second = (
+        await runListMachines(
+          { search: "Page", limit: 2, offset: 2 },
+          ctx("admin", admin)
+        )
+      ).result as Page;
+
+      expect(first.hasMore).toBe(true);
+      // The last page must report hasMore false even though total > count —
+      // otherwise an enumerating caller loops forever.
+      expect(second.count).toBe(1);
+      expect(second.total).toBe(3);
+      expect(second.hasMore).toBe(false);
+    });
+
+    it("reports hasMore false when the page holds every match", async () => {
+      const admin = await makeUser("admin");
+      await seedMachine({ name: "Complete Alpha" });
+
+      const outcome = await runListMachines(
+        { search: "Complete Alpha" },
+        ctx("admin", admin)
+      );
+      const result = outcome.result as {
+        count: number;
+        total: number;
+        hasMore: boolean;
+      };
+
+      expect(result.count).toBe(1);
+      expect(result.total).toBe(1);
+      expect(result.hasMore).toBe(false);
     });
   });
 
@@ -351,6 +432,173 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
       await expect(
         runCreateIssue({ machine: "NOPE", title: "x" }, ctx("admin", admin))
       ).rejects.toBeInstanceOf(McpToolError);
+    });
+
+    it("returns the original issue when an identical call is retried (PP-u4ab.4)", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine();
+      const args = {
+        machine: machine.initials,
+        title: "right flipper sticking",
+        description: "Sticks on multiball.",
+        severity: "major",
+      } as const;
+
+      const first = await runCreateIssue({ ...args }, ctx("admin", admin));
+      const second = await runCreateIssue({ ...args }, ctx("admin", admin));
+
+      // A transport-level retry resends identical arguments; it must resolve to
+      // the issue already filed rather than a second one.
+      expect(second.issueId).toBe(first.issueId);
+
+      // ...and it must SAY so. Reporting the pre-existing issue's number with
+      // no signal that nothing was written is the success-for-work-not-done
+      // shape CORE-ARCH-012 forbids — the caller would tell a member their
+      // second report was logged when it was dropped.
+      expect((first.result as { created: boolean }).created).toBe(true);
+      expect((second.result as { created: boolean }).created).toBe(false);
+
+      const db = await getTestDb();
+      const rows = await db
+        .select()
+        .from(issues)
+        .where(eq(issues.machineInitials, machine.initials));
+      expect(rows).toHaveLength(1);
+    });
+
+    it("files a separate issue when the content differs", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine();
+
+      const first = await runCreateIssue(
+        { machine: machine.initials, title: "left flipper weak" },
+        ctx("admin", admin)
+      );
+      const second = await runCreateIssue(
+        { machine: machine.initials, title: "right flipper weak" },
+        ctx("admin", admin)
+      );
+
+      expect(second.issueId).not.toBe(first.issueId);
+      const db = await getTestDb();
+      const rows = await db
+        .select()
+        .from(issues)
+        .where(eq(issues.machineInitials, machine.initials));
+      expect(rows).toHaveLength(2);
+    });
+  });
+
+  describe("set_machine_name (PP-u4ab.10)", () => {
+    /** Every timeline event recorded against a machine. */
+    async function timelineFor(machineId: string): Promise<
+      {
+        eventData: unknown;
+        authorId: string | null;
+      }[]
+    > {
+      const db = await getTestDb();
+      return db
+        .select({
+          eventData: timelineEvents.eventData,
+          authorId: timelineEvents.authorId,
+        })
+        .from(timelineEvents)
+        .where(eq(timelineEvents.machineId, machineId));
+    }
+
+    it("renames the machine and writes exactly one name_changed event", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine({
+        name: "Elvira's House of Horrors",
+      });
+
+      const outcome = await runSetMachineName(
+        {
+          machine: machine.initials,
+          name: "Elvira's House of Horrors (Premium)",
+        },
+        ctx("admin", admin)
+      );
+
+      expect(outcome.result).toMatchObject({
+        initials: machine.initials,
+        name: "Elvira's House of Horrors (Premium)",
+        previousName: "Elvira's House of Horrors",
+        changed: true,
+      });
+
+      const db = await getTestDb();
+      const row = await db.query.machines.findFirst({
+        where: eq(machines.id, machine.id),
+        columns: { name: true, initials: true },
+      });
+      expect(row?.name).toBe("Elvira's House of Horrors (Premium)");
+      // Initials are the FK target for issues and the /m/<initials> URL — a
+      // rename must never touch them.
+      expect(row?.initials).toBe(machine.initials);
+
+      const events = await timelineFor(machine.id);
+      expect(events).toHaveLength(1);
+      expect(events[0]?.eventData).toEqual({
+        kind: "name_changed",
+        from: "Elvira's House of Horrors",
+        to: "Elvira's House of Horrors (Premium)",
+      });
+      expect(events[0]?.authorId).toBe(admin);
+    });
+
+    it("is a no-op when the name already matches, and says so", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine({ name: "Medieval Madness" });
+
+      const outcome = await runSetMachineName(
+        { machine: machine.initials, name: "Medieval Madness" },
+        ctx("admin", admin)
+      );
+
+      // CORE-ARCH-012: nothing was written, so the response must not claim a
+      // change happened.
+      expect((outcome.result as { changed: boolean }).changed).toBe(false);
+      expect(await timelineFor(machine.id)).toHaveLength(0);
+    });
+
+    it("denies a member who does not own the machine", async () => {
+      const member = await makeUser("member");
+      const machine = await seedMachine({ ownerId: null, name: "Attack" });
+
+      await expect(
+        runSetMachineName(
+          { machine: machine.initials, name: "Attack from Mars" },
+          ctx("member", member)
+        )
+      ).rejects.toMatchObject({ reason: "denied" });
+
+      const db = await getTestDb();
+      const row = await db.query.machines.findFirst({
+        where: eq(machines.id, machine.id),
+        columns: { name: true },
+      });
+      expect(row?.name).toBe("Attack");
+    });
+
+    it("lets the machine's owner rename it", async () => {
+      const owner = await makeUser("member", "Pat", "Owner");
+      const machine = await seedMachine({ ownerId: owner, name: "Getaway" });
+
+      const outcome = await runSetMachineName(
+        { machine: machine.initials, name: "The Getaway: High Speed II" },
+        ctx("member", owner)
+      );
+
+      expect((outcome.result as { changed: boolean }).changed).toBe(true);
+    });
+
+    it("throws not_found when the machine is unknown", async () => {
+      const admin = await makeUser("admin");
+      await expect(
+        runSetMachineName({ machine: "NOPE", name: "x" }, ctx("admin", admin))
+      ).rejects.toMatchObject({ reason: "not_found" });
     });
   });
 });

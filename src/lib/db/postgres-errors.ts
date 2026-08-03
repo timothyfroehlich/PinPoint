@@ -88,6 +88,13 @@ export const isPgErrorCode = (error: unknown, code: string): boolean =>
  * Returns undefined when absent, so callers must keep a general fallback: not
  * every unique violation carries a name (some arrive from `EXCLUDE` constraints
  * or through drivers that drop the field).
+ *
+ * **No production caller at present** (PP-o355.29 removed the last one, by
+ * making the ambiguity it resolved impossible to reach). Kept as general
+ * infrastructure beside {@link isPgErrorCode}: the driver-spelling split above
+ * is the kind of thing that is expensive to rediscover and cheap to keep, and
+ * the next table with two unique constraints will want it. Do not read its
+ * existence as evidence that some path depends on it.
  */
 export const getPostgresErrorConstraint = (
   error: unknown

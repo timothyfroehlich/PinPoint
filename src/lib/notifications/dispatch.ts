@@ -259,9 +259,7 @@ export async function planNotification(
   const deferredDeliveries: (() => Promise<DeliveryResult>)[] = [];
 
   for (const userId of recipientIds) {
-    const prefs =
-      (prefsMap.get(userId) as NotificationPreferences | undefined) ??
-      buildDefaultPrefs(userId);
+    const prefs = prefsMap.get(userId) ?? buildDefaultPrefs(userId);
 
     // Cross-channel pre-dispatch rule: skip own actions entirely.
     // (Spec decision: suppressOwnActions stays at the top of the recipient
