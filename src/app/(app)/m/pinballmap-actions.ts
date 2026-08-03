@@ -267,11 +267,11 @@ export async function linkPinballmapEntryAction(
     // fix it by unlisting the other cabinet, and `SERVER` makes the UI treat a
     // correctable condition as a crash (PP-o355.15).
     //
-    // Matched on the bare code, NOT `isPbmListingConflict`: this write touches
-    // only the listing columns, so the listing index is the sole unique
-    // constraint it can violate — and `getPostgresErrorConstraint` returns
-    // undefined when a driver drops the field, which would send a correctable
-    // condition back to being a 500.
+    // The bare code is unambiguous here: this write touches only the listing
+    // columns, so the listing index is the sole unique constraint it can
+    // violate. This is the one action that reaches this collision in normal
+    // use — create can't (it never lists), and the edit carry-over only rewrites
+    // a value its own row already holds.
     if (isPgErrorCode(error, "23505")) {
       return err(
         "VALIDATION",

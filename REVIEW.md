@@ -53,12 +53,14 @@ Reviewers read agent skills. Consult the relevant one for the area a PR touches 
 
 Two reviewers exist, and a PR cannot merge without a **head-commit** review from one of them, recorded as a SHA-pinned marker, with every thread resolved:
 
-- **Antigravity, dispatched by the author** via `./scripts/workflow/agy_review.py <PR>` (`--pro` for denser changes). This is the routine path — the author runs it, and it posts inline findings and writes `<!-- pinpoint-agy-review: <head_sha> -->`. That marker is written **only** by that script, and only after it has verified the model actually read the diff it was handed.
-- **Tim, running `/code-review`** — a harness built-in an agent cannot launch, so it is a handoff. Reserved for auth, permissions, migrations, and changes too large for a per-line pass. The author attests the head he read:
+- **Antigravity, dispatched by the author** via `./scripts/workflow/agy_review.py <PR>` (`--pro` for denser changes). This is the routine path — the author runs it, and it posts inline findings and writes `<!-- pinpoint-agy-review: <head_sha> -->` with a depth of `agy-flash` / `agy-pro`. That marker is written **only** by that script, and only after it has verified the model actually read the diff it was handed.
+- **Tim, running `/code-review`** — a harness built-in an agent cannot launch, so it is a handoff. Reserved for auth, permissions, migrations, and changes too large for a per-line pass. The author attests the head he read, naming the level:
 
   ```bash
-  bash scripts/workflow/mark-claude-review.sh <PR> "<one-line findings>"
+  bash scripts/workflow/mark-claude-review.sh <PR> <depth> "<one-line findings>"
   ```
+
+Every marker records what kind of review it was, so no attestation can be read as a `/code-review` that never ran.
 
 The marker pins a SHA, so a later push invalidates it — deliberately, so a 3-commit fixup can't inherit the review of the commit before it. **If you're reviewing, assume the commit you were handed is the one the author intends to be final.** Full author-side rules: `.agents/skills/pinpoint-pr-workflow/SKILL.md` Phase 3.4.
 

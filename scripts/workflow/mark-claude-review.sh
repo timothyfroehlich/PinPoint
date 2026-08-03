@@ -20,8 +20,22 @@ set -euo pipefail
 # happened. Posting the marker for a review nobody ran is a false attestation, not a
 # shortcut. Same honesty model as `merge-pr.sh --force`.
 #
+# The review's DEPTH is recorded alongside the SHA, in a second HTML comment. "A review
+# covered this head" and "a `/code-review low` covered this head" are different facts,
+# and only the first was ever written down — so the merge handoff could not state which
+# review Tim actually ran without an agent recalling it, which is exactly the kind of
+# claim that drifts. `depth` is required for that reason: there is no default that would
+# not be a guess. `trivial` is the one non-review value, for the typo/one-line carve-out
+# the gate docs allow. (PP-9onv.)
+#
+# The depth lives in its OWN comment rather than inside the SHA marker: `_pr-gates.sh`
+# compares the SHA marker's contents to the head SHA by string equality, so anything
+# added inside it would fail every `reviewed` gate.
+#
 # Usage:
-#   bash scripts/workflow/mark-claude-review.sh <PR> ["one-line findings summary"]
+#   bash scripts/workflow/mark-claude-review.sh <PR> <depth> ["one-line findings summary"]
+#
+#   <depth>  low | medium | high | xhigh | max | ultra | trivial
 #
 # Environment:
 #   gh must be authenticated. Repo slug is resolved dynamically via `gh repo view`.
@@ -29,14 +43,33 @@ set -euo pipefail
 # Invoked via `bash …` — no executable bit required (committed mode 644).
 
 MARKER_PREFIX="<!-- pinpoint-claude-review:"
+DEPTH_PREFIX="<!-- pinpoint-review-depth:"
 
 pr="${1:-}"
-summary="${2:-no serious findings}"
+depth="${2:-}"
+summary="${3:-no serious findings}"
+
+usage() {
+  echo "usage: mark-claude-review.sh <PR> <depth> [\"one-line findings summary\"]" >&2
+  echo "       <depth>: low | medium | high | xhigh | max | ultra | trivial" >&2
+}
 
 if [[ -z "$pr" || ! "$pr" =~ ^[0-9]+$ ]]; then
-  echo "usage: mark-claude-review.sh <PR> [\"one-line findings summary\"]" >&2
+  usage
   exit 2
 fi
+
+case "$depth" in
+  low | medium | high | xhigh | max | ultra | trivial) ;;
+  *)
+    # Named rather than defaulted: a marker that claims a review depth nobody ran is a
+    # false attestation in miniature, and the old 2-argument form would silently become
+    # one if it were accepted here.
+    echo "mark-claude-review.sh: missing or unrecognised review depth: '${depth}'" >&2
+    usage
+    exit 2
+    ;;
+esac
 
 repo=$(gh repo view --json nameWithOwner --jq .nameWithOwner)
 
@@ -44,7 +77,15 @@ head_sha=$(gh pr view "$pr" --json headRefOid --jq .headRefOid)
 short_sha="${head_sha:0:7}"
 
 marker="${MARKER_PREFIX} ${head_sha} -->"
-full_body="${marker}"$'\n'"Claude review of head ${short_sha} — ${summary}"
+depth_marker="${DEPTH_PREFIX} ${depth} -->"
+
+if [[ "$depth" == "trivial" ]]; then
+  visible="Claude review of head ${short_sha} — trivial change, no /code-review run — ${summary}"
+else
+  visible="Claude review of head ${short_sha} — \`/code-review ${depth}\` — ${summary}"
+fi
+
+full_body="${marker}"$'\n'"${depth_marker}"$'\n'"${visible}"
 
 # Find an existing sticky comment whose body starts with the marker prefix (any SHA).
 # Pipe to `jq -rs` (slurp) rather than gh's per-page `--jq`, so a marker that landed on

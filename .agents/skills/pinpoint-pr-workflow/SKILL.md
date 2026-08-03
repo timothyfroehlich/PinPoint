@@ -28,7 +28,7 @@ End-to-end pipeline from "I have changes" to "merged in main". Replaces the depr
 
 ### 1.2 Pre-commit validation
 
-Default to `pnpm run check` (~12s; covers type, lint, format, unit tests, yamllint, actionlint, ruff, shellcheck). Use `pnpm run preflight` (full + integration) before commit for non-trivial changes, especially: migrations, security/auth changes, server actions, middleware.
+Default to `pnpm run check` (~9s; covers type, lint, format, yamllint, actionlint, ruff, shellcheck). Python hook/script tests are **not** in it — run `pnpm run check:python` if you touched `scripts/` or `.claude/hooks/`. It is **static-only — no unit tests** since PP-4zcj, so run `pnpm run test` too when you changed logic. Use `pnpm run preflight` (full + unit + integration) before commit for non-trivial changes, especially: migrations, security/auth changes, server actions, middleware.
 
 ### 1.3 E2E selection
 
@@ -190,6 +190,8 @@ It checks out the PR head into a throwaway worktree, hands agy the diff, posts t
 
 **It refuses to write the marker unless agy demonstrably read the diff.** agy confabulates when a read fails — it will emit a confident review of an unrelated PR with zero findings — so the script makes it echo back facts about the diff and hard-fails on a mismatch. If it exits non-zero, nothing was posted and nothing was attested; read the error rather than retrying blindly.
 
+The marker records a depth of `agy-flash` or `agy-pro`, never a `/code-review` level, so the handoff report reads "agy automated review, flash tier (no /code-review run)". Nothing in the record can be mistaken for a depth Tim ran.
+
 **Then close out every thread it opened** (3.3). Each one gets a fix or a one-sentence decline signed `—Claude`, then resolve it. The `threads` gate counts unresolved threads from any author, so this is enforced, not trusted.
 
 #### When to hand off to Tim instead
@@ -203,8 +205,10 @@ agy is roughly a low-effort pass. Measured against six planted `CORE-*` violatio
 The handoff: finish **all** the work first — implementation, CI fixes, merge-from-main — then stop iterating and tell him the branch is ready. Every push invalidates the review he is about to give you. Address the findings, then attest the head he read:
 
 ```bash
-bash scripts/workflow/mark-claude-review.sh <PR> "<one-line findings summary>"
+bash scripts/workflow/mark-claude-review.sh <PR> <depth> "<one-line findings summary>"
 ```
+
+`<depth>` is the level Tim actually ran — `low | medium | high | xhigh | max | ultra` (or `trivial`, below). It is required and has no default: "a review happened" and "a `/code-review low` happened" are different facts, and the merge handoff report states which one. If you don't know which he ran, ask — guessing here writes a false claim into the record that reads exactly like a true one. (`agy_review.py` records its own tier, so you never pass a depth to it.)
 
 **Finish your churn before either reviewer.** For agy it avoids a pointless second run; for Tim it avoids spending the more expensive resource on a tree you're about to change.
 
@@ -226,8 +230,10 @@ If you're unsure which bucket you're in, ask. The cost of asking is one message;
 A genuinely trivial change — a typo, a comment, a one-line mechanical fix — doesn't need a reviewer at all. Attest it yourself and **say why it was trivial** in the marker summary, so the judgement is on the record and reviewable:
 
 ```bash
-bash scripts/workflow/mark-claude-review.sh <PR> "typo in a comment; no behavior change"
+bash scripts/workflow/mark-claude-review.sh <PR> trivial "typo in a comment; no behavior change"
 ```
+
+`trivial` is the depth for this case, and along with the `agy-*` tiers it is one of the depths that does not name a `/code-review` level — the report then says "attested trivial (no /code-review run)" rather than implying a review happened.
 
 This is a narrow exception and it is self-policing. "It's only a small change" is not the test — the test is whether there is any way for it to be wrong. If you're reaching for a justification, it isn't trivial — and since agy costs you one command, reaching for this exception to save effort is the wrong trade.
 
@@ -287,13 +293,19 @@ The label is a hint to Tim that the PR is ready for **him** to merge — it does
 
 ### 4.1 Agent's terminal state: handoff, not merge
 
-Once 3.1–3.6 are satisfied (CI green, a review whose `commit_id` matches head per 3.4, threads resolved, no conflict, screenshots posted if UI-touching), your job on this PR is done. Tell Tim it's ready and hand him the exact command to run himself:
+Once 3.1–3.6 are satisfied (CI green, a review whose `commit_id` matches head per 3.4, threads resolved, no conflict, screenshots posted if UI-touching), your job on this PR is done. Hand it over by **running the handoff report and pasting its output** — do not write the summary yourself:
 
-```
-! scripts/workflow/merge-pr.sh <PR> --human
+```bash
+bash scripts/workflow/merge-handoff.sh <PR>
 ```
 
-If CI is still running, hand him the automerge form instead — it waits rather than making him come back. Get the head reviewed first (Phase 3.4); automerge waits out CI, not an unreviewed head — and a review you never requested never arrives, so it would just burn the timeout:
+It prints what Tim needs to decide whether to merge — which `/code-review` ran and whether it covers head, how many commits landed since, CI, threads, mergeable + how far behind main, when main was last merged in, the diff split into src / tests / docs / other, migrations, newly-registered env vars, UI + screenshots — and ends with two `!`-prefixed commands: one to re-run the report, one to merge.
+
+**Why a script and not a format you fill in.** Every line of it is a fact you would otherwise be recalling: how many commits back the review was, what the line counts are, whether main has been merged in. Those are exactly the claims that drift, and Tim acts on them. `git` and `gh` already know all of it. Paste the block; add prose only for what the block cannot know (why a finding was declined, what to watch on deploy).
+
+**The re-run line is part of the report, not decoration.** The block is a snapshot and is stale as soon as CI re-runs or anyone pushes. Tim re-runs it himself rather than asking you to re-check.
+
+**The merge command only appears when all four gates actually pass.** An un-ready PR gets the blocking reasons instead — so don't hand over a merge command the report didn't print. If CI is still running, the report says so; hand him the automerge form, which waits rather than making him come back. Get the head reviewed first (Phase 3.4); automerge waits out CI, not an unreviewed head — and a review you never requested never arrives, so it would just burn the timeout:
 
 ```
 ! scripts/workflow/merge-pr.sh <PR> --human --automerge

@@ -80,6 +80,12 @@ SIGNATURE = "—Antigravity"
 # changes head and re-arms the gate.
 MARKER_PREFIX = "<!-- pinpoint-agy-review:"
 
+# The review depth lives in its own comment beside the SHA marker (PP-9onv). agy records
+# its tier rather than a `/code-review` level, so nothing in the record can be read as a
+# depth Tim ran — `depth_phrase` in merge-handoff.sh renders `agy-*` accordingly.
+DEPTH_PREFIX = "<!-- pinpoint-review-depth:"
+MODEL_DEPTHS = {FLASH_MODEL: "agy-flash", PRO_MODEL: "agy-pro"}
+
 # agy refuses a workspace outside `trustedWorkspaces`, so review checkouts live under a
 # single stable parent that is trusted once rather than in a per-run temp dir.
 WORKTREE_PARENT = Path.home() / ".cache" / "pinpoint" / "agy-review"
@@ -383,8 +389,60 @@ def head_sha_of(pr):
     ).stdout.strip()
 
 
+def render_findings_comment(result, head_sha, head_moved_to):
+    """The whole review as one plain comment, for when inline anchoring is impossible.
+
+    GitHub resolves `comments[].line` against the pull request's CURRENT diff, not against
+    `commit_id`. So when head moves mid-review and the new head touched the same files,
+    every anchor can fall outside the diff and the inline POST 422s as a batch — losing a
+    review that is still worth reading. This renders it as prose instead: no threads, but
+    nothing thrown away. The marker still pins the reviewed SHA, so the gate reports
+    `stale_marker` either way.
+    """
+    lines = [
+        f"⚠️ **Review of `{head_sha[:7]}`, which is no longer head** "
+        f"(now `{head_moved_to[:7]}`). GitHub would not accept inline comments against "
+        "the moved diff, so the findings are inlined below. Re-run the review on the new "
+        "head to get resolvable threads.",
+        "",
+        result["summary"],
+    ]
+    if result["findings"]:
+        lines += ["", "---", ""]
+        for finding in result["findings"]:
+            rule = finding.get("rule")
+            tag = f" · `{rule}`" if rule else ""
+            lines.append(
+                f"**`{finding['path']}:{finding['line']}`** · "
+                f"{finding.get('severity', '?')}{tag}\n\n{finding['body']}\n"
+            )
+    lines += ["", SIGNATURE]
+    return "\n".join(lines)
+
+
+def _require_shape(result):
+    """Fail with a legible error rather than a KeyError on a malformed response.
+
+    `--json-schema` constrains the first response, but the retry continuation is a plain
+    follow-up prompt with no schema attached, so nothing guarantees its shape. A bare
+    `result["findings"]` there raises KeyError, which neither handler in `main` catches —
+    the caller gets a traceback instead of the script's own FAILED line.
+    """
+    if not isinstance(result, dict):
+        raise ReviewError(f"agy returned {type(result).__name__}, expected an object")
+    if not isinstance(result.get("findings"), list):
+        raise ReviewError("agy response has no `findings` array")
+    if not isinstance(result.get("summary"), str):
+        raise ReviewError("agy response has no `summary` string")
+    for index, finding in enumerate(result["findings"]):
+        missing = [k for k in ("path", "line", "side", "body") if k not in finding]
+        if missing:
+            raise ReviewError(f"findings[{index}] is missing {', '.join(missing)}")
+    return result
+
+
 def invoke_agy(
-    workspace, prompt, model, schema_path, conversation_id=None, verbose=False
+    pr, workspace, prompt, model, schema_path, conversation_id=None, verbose=False
 ):
     """Run agy and return (parsed_result, conversation_id).
 
@@ -414,8 +472,10 @@ def invoke_agy(
     # The envelope echoes the whole review back and can run to tens of KB. It goes to a
     # file so a failure is debuggable without re-running, but never to stdout unless
     # asked — this script is usually driven by an agent whose context it would flood.
+    # Keyed by PR: two concurrent reviews are a plausible use, and a shared filename means
+    # the envelope you inspect after a failure may belong to the other run.
     WORKTREE_PARENT.mkdir(parents=True, exist_ok=True)
-    (WORKTREE_PARENT / "last-agy-envelope.json").write_text(raw)
+    (WORKTREE_PARENT / f"pr-{pr}-agy-envelope.json").write_text(raw)
     if verbose:
         print(f"--- agy envelope ---\n{raw[:2000]}\n--- end ---", file=sys.stderr)
 
@@ -439,7 +499,7 @@ def invoke_agy(
             f"agy response was not the expected JSON: {raw[:500]}"
         ) from exc
 
-    return result, envelope.get("conversation_id")
+    return _require_shape(result), envelope.get("conversation_id")
 
 
 def post_review(slug, pr, payload):
@@ -463,15 +523,26 @@ def post_review(slug, pr, payload):
     return json.loads(proc.stdout)
 
 
-def write_marker(slug, pr, head_sha, summary):
+def write_marker(slug, pr, head_sha, depth, summary):
     """Post or update the sticky SHA-pinned marker.
 
-    Mirrors mark-claude-review.sh: one sticky comment, rewritten in place. `jq -rs`
-    (slurp) rather than gh's per-page `--jq`, so a marker sitting on page 2+ of a busy PR
-    is still found and a duplicate is not posted.
+    Mirrors mark-claude-review.sh: one sticky comment, rewritten in place, laid out as
+    `<sha marker>\\n<depth marker>\\n<visible line>`. `_marker_record` compares everything
+    between the SHA prefix and `-->` to the head SHA by string equality, so the depth goes
+    in its OWN comment — putting it inside the SHA marker would fail every `reviewed` gate.
+    It reads the depth from the same body, so the two must stay in one comment.
+
+    `depth` is `agy-flash` / `agy-pro`, never a `/code-review` level: `depth_phrase` in
+    merge-handoff.sh renders `agy-*` as "no /code-review run", so the record cannot be
+    misread as a review Tim performed.
+
+    `jq -rs` (slurp) rather than gh's per-page `--jq`, so a marker sitting on page 2+ of a
+    busy PR is still found and a duplicate is not posted.
     """
     body = (
-        f"{MARKER_PREFIX} {head_sha} -->\nagy review of head {head_sha[:7]} — {summary}"
+        f"{MARKER_PREFIX} {head_sha} -->\n"
+        f"{DEPTH_PREFIX} {depth} -->\n"
+        f"agy review of head {head_sha[:7]} — {depth} — {summary}"
     )
 
     listing = run(
@@ -484,7 +555,10 @@ def write_marker(slug, pr, head_sha, summary):
             "--arg",
             "prefix",
             MARKER_PREFIX,
-            "[.[] | flatten | .[] | select(.body | startswith($prefix))] | last.id // empty",
+            # `// ""` guards a null body: jq exits 5 on `startswith(null)`, and because
+            # this runs AFTER post_review that would leave the review posted, the marker
+            # unwritten, and a retry posting a duplicate review.
+            '[.[] | flatten | .[] | select((.body // "") | startswith($prefix))] | last.id // empty',
         ],
         input=listing,
         capture_output=True,
@@ -529,22 +603,39 @@ def write_marker(slug, pr, head_sha, summary):
 
 def review(pr, model, dry_run, keep_worktree, verbose):
     slug = repo_slug()
-    head_sha = head_sha_of(pr)
-    print(f"PR #{pr} — head {head_sha[:7]}, model {model}")
+    meta = gh_json(["pr", "view", str(pr), "--json", "headRefOid,baseRefName"])
+    head_sha = meta["headRefOid"]
+    base_ref = meta["baseRefName"]
+    print(f"PR #{pr} — head {head_sha[:7]}, base {base_ref}, model {model}")
 
     run(["git", "fetch", "origin", f"pull/{pr}/head"])
 
+    # Fetch the base branch too, and diff against what was JUST fetched rather than the
+    # local remote-tracking ref. A stale `origin/main` gives an older merge-base, so the
+    # diff contains already-merged code that is not in GitHub's diff for this PR — agy
+    # then reviews it, anchors a finding to one of those lines, and the whole review POST
+    # 422s (one out-of-diff comment rejects the batch). `--refmap=` keeps this read-only:
+    # a plain fetch would fast-forward origin/<base> under other agents holding worktrees
+    # of this same repo.
+    run(["git", "fetch", "--refmap=", "origin", base_ref])
+    base_sha = run(["git", "rev-parse", "FETCH_HEAD"]).stdout.strip()
+
     WORKTREE_PARENT.mkdir(parents=True, exist_ok=True)
     worktree = WORKTREE_PARENT / f"pr-{pr}"
-    if worktree.exists():
-        subprocess.run(  # noqa: S603
-            ["git", "worktree", "remove", "--force", str(worktree)],
-            capture_output=True,
-            text=True,
-            check=False,
-            env={**os.environ, "HUSKY": "0"},
-        )
-        shutil.rmtree(worktree, ignore_errors=True)
+    subprocess.run(  # noqa: S603
+        ["git", "worktree", "remove", "--force", str(worktree)],
+        capture_output=True,
+        text=True,
+        check=False,
+        env={**os.environ, "HUSKY": "0"},
+    )
+    shutil.rmtree(worktree, ignore_errors=True)
+    # Unconditional, and after the remove: `~/.cache` is a legitimately wipeable location,
+    # so the directory can vanish while git still has it registered — and then `add` fails
+    # with "missing but already registered worktree" on every subsequent run for this PR.
+    subprocess.run(  # noqa: S603
+        ["git", "worktree", "prune"], capture_output=True, text=True, check=False
+    )
 
     # HUSKY=0 skips .husky/post-checkout → worktree_setup.py, which would otherwise
     # allocate a Supabase slot, ports and an .env.local that a read-only review has no
@@ -555,10 +646,10 @@ def review(pr, model, dry_run, keep_worktree, verbose):
     )
 
     try:
-        diff_text = run(["git", "diff", "--merge-base", "origin/main", head_sha]).stdout
+        diff_text = run(["git", "diff", "--merge-base", base_sha, head_sha]).stdout
         if not diff_text.strip():
             raise ReviewError(
-                "the diff against origin/main is empty — nothing to review"
+                f"the diff against {base_ref} is empty — nothing to review"
             )
 
         hunks = parse_diff_hunks(diff_text)
@@ -578,7 +669,7 @@ def review(pr, model, dry_run, keep_worktree, verbose):
                 print(f"--- prompt ---\n{prompt[:1500]}\n--- end ---", file=sys.stderr)
 
             result, conversation_id = invoke_agy(
-                worktree, prompt, model, schema_path, verbose=verbose
+                pr, worktree, prompt, model, schema_path, verbose=verbose
             )
 
             # Proof first: a confabulated run must never reach line validation, where its
@@ -603,6 +694,7 @@ def review(pr, model, dry_run, keep_worktree, verbose):
                     f"retry {attempt + 1}: {len(errors)} finding(s) cite invalid lines"
                 )
                 result, conversation_id = invoke_agy(
+                    pr,
                     worktree,
                     build_retry_prompt(errors),
                     model,
@@ -641,13 +733,35 @@ def review(pr, model, dry_run, keep_worktree, verbose):
                 print(json.dumps(payload, indent=2))
             return 0
 
-        url = post_review(slug, pr, payload).get("html_url", "(no url)")
-        print(f"posted: {url}")
+        try:
+            url = post_review(slug, pr, payload).get("html_url", "(no url)")
+            print(f"posted: {url}")
+        except ReviewError:
+            if not moved:
+                raise
+            # Only reachable on the moved-head path, where anchors legitimately no longer
+            # resolve. Any other rejection is a real bug and must stay fatal.
+            print("inline anchors rejected against the moved diff — posting as prose")
+            body = render_findings_comment(result, head_sha, moved)
+            out = run(
+                [
+                    "gh",
+                    "api",
+                    "--method",
+                    "POST",
+                    f"repos/{slug}/issues/{pr}/comments",
+                    "-f",
+                    f"body={body}",
+                    "--jq",
+                    ".html_url",
+                ]
+            ).stdout.strip()
+            print(f"posted (no threads): {out}")
 
         summary = (
             f"{count} finding(s) via {model}" if count else f"no findings via {model}"
         )
-        write_marker(slug, pr, head_sha, summary)
+        write_marker(slug, pr, head_sha, MODEL_DEPTHS.get(model, "agy-other"), summary)
         print(f"marker written for {head_sha[:7]}")
 
         if count:

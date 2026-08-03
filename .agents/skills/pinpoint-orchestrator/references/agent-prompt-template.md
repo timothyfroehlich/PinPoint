@@ -21,7 +21,7 @@ Open the PR whenever you like and watch CI; it costs nothing. Then finish all of
 
 If the change is genuinely trivial (a typo, a comment, a one-line mechanical fix), attest it yourself and say why it was trivial:
 
-`bash scripts/workflow/mark-claude-review.sh <PR> "typo in a comment; no behavior change"`
+`bash scripts/workflow/mark-claude-review.sh <PR> trivial "typo in a comment; no behavior change"`
 
 The marker is an attestation that a review happened, never a way to skip one.
 

@@ -20,11 +20,17 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent.parent / "workflow"))
 
 from agy_review import (  # noqa: E402
+    FLASH_MODEL,
+    MODEL_DEPTHS,
+    PRO_MODEL,
     SIGNATURE,
+    ReviewError,
     _format_ranges,
+    _require_shape,
     build_review_payload,
     diff_proof,
     parse_diff_hunks,
+    render_findings_comment,
     validate_findings,
     verify_proof,
 )
@@ -244,3 +250,99 @@ class TestBuildReviewPayload:
     def test_unmoved_head_adds_no_warning(self):
         payload = build_review_payload(self.RESULT, "a" * 40)
         assert "branch moved" not in payload["body"]
+
+
+class TestRequireShape:
+    """The retry continuation carries no schema, so its shape is unguaranteed.
+
+    `--json-schema` constrains only the first response. A malformed continuation used to
+    raise KeyError, which neither handler in `main` catches — the caller saw a traceback
+    instead of the script's own FAILED line.
+    """
+
+    def test_wellformed_result_passes_through(self):
+        result = {"summary": "ok", "findings": []}
+        assert _require_shape(result) is result
+
+    def test_non_object_is_rejected(self):
+        with pytest.raises(ReviewError, match="expected an object"):
+            _require_shape(["not", "an", "object"])
+
+    def test_missing_findings_is_rejected(self):
+        with pytest.raises(ReviewError, match="no `findings` array"):
+            _require_shape({"summary": "ok"})
+
+    def test_missing_summary_is_rejected(self):
+        with pytest.raises(ReviewError, match="no `summary` string"):
+            _require_shape({"findings": []})
+
+    def test_finding_missing_an_anchor_field_is_named(self):
+        with pytest.raises(ReviewError, match=r"findings\[0\] is missing line, side"):
+            _require_shape(
+                {"summary": "ok", "findings": [{"path": "a.ts", "body": "x"}]}
+            )
+
+
+class TestRenderFindingsComment:
+    """The moved-head fallback: GitHub anchors `line` against the PR's CURRENT diff, not
+    against `commit_id`, so inline anchors can be rejected wholesale once head moves."""
+
+    RESULT = {
+        "summary": "Two problems.",
+        "findings": [
+            {
+                "path": "src/a.ts",
+                "line": 12,
+                "severity": "high",
+                "rule": "CORE-SEC-007",
+                "body": "Leaks an email.",
+            },
+            {
+                "path": "src/b.ts",
+                "line": 40,
+                "severity": "low",
+                "rule": None,
+                "body": "Minor.",
+            },
+        ],
+    }
+
+    def test_names_both_shas_so_the_reader_knows_what_was_reviewed(self):
+        out = render_findings_comment(self.RESULT, "a" * 40, "b" * 40)
+        assert "aaaaaaa" in out
+        assert "bbbbbbb" in out
+
+    def test_every_finding_survives_with_its_location(self):
+        out = render_findings_comment(self.RESULT, "a" * 40, "b" * 40)
+        assert "src/a.ts:12" in out
+        assert "src/b.ts:40" in out
+        assert "Leaks an email." in out
+
+    def test_a_rule_id_is_shown_when_present_and_omitted_when_not(self):
+        out = render_findings_comment(self.RESULT, "a" * 40, "b" * 40)
+        assert "CORE-SEC-007" in out
+        assert "None" not in out
+
+    def test_signed(self):
+        assert render_findings_comment(self.RESULT, "a" * 40, "b" * 40).endswith(
+            SIGNATURE
+        )
+
+    def test_clean_review_still_renders(self):
+        out = render_findings_comment(
+            {"summary": "Nothing found.", "findings": []}, "a" * 40, "b" * 40
+        )
+        assert "Nothing found." in out
+
+
+class TestModelDepths:
+    """A depth must never read as a `/code-review` level Tim did not run (PP-9onv)."""
+
+    def test_each_model_maps_to_an_agy_prefixed_depth(self):
+        assert MODEL_DEPTHS[FLASH_MODEL] == "agy-flash"
+        assert MODEL_DEPTHS[PRO_MODEL] == "agy-pro"
+
+    def test_no_depth_collides_with_a_code_review_level(self):
+        levels = {"low", "medium", "high", "xhigh", "max", "ultra", "trivial"}
+        assert not (set(MODEL_DEPTHS.values()) & levels)
+        assert all(d.startswith("agy-") for d in MODEL_DEPTHS.values())

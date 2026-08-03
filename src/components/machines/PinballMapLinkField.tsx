@@ -217,10 +217,10 @@ export function PinballMapLinkField({
   };
 
   // The edition step is shown only for an ambiguous (multi-edition) family.
+  // The `?.` carries the null guard: if `family` is null the first comparison
+  // is `undefined === null` → false, which also narrows `family` for the second.
   const needsEdition =
-    family !== null &&
-    family.pinballmapMachineId === null &&
-    family.editionCount > 1;
+    family?.pinballmapMachineId === null && family.editionCount > 1;
 
   // Resolved id: a single-edition family's id, or the chosen edition.
   const resolvedId = family

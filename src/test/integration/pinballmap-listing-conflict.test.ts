@@ -1,5 +1,6 @@
 /**
  * Integration Test: duplicate-listing unique violation backstop (PP-o355.15)
+ * and the closed `pinballmapListed` write hole (PP-o355.29).
  *
  * The partial unique index `machines_pinballmap_listed_unique` (migration 0052)
  * enforces one PinballMap lister per catalog title at our location, mirroring
@@ -10,14 +11,18 @@
  * consumes it (PP-o355.20). Until then, do not read these tests as covering a
  * backstop behind something else; they cover the whole of it.
  *
- * The specific defect: `machines` has TWO unique constraints and both raise
- * SQLSTATE 23505, so the bare code check in these actions answered a listing
- * collision with "Initials are already taken" — an actively wrong diagnosis —
- * while `updateMachineAction` had no catch at all and surfaced a 500.
+ * **Where the collision is reachable from.** Only a write that sets
+ * `pinballmap_listed` true enters that partial index, and since PP-o355.29 that
+ * means a path that actually talked to PinballMap. So the collision is provoked
+ * here through `linkPinballmapEntryAction`, not through create/edit: the two
+ * originally-written tests drove it by POSTing `pinballmapListed=on`, which is
+ * precisely the hole PP-o355.29 closed. They are replaced rather than repaired —
+ * re-adding the field to make them pass would reopen the bug.
  */
 
 import { describe, it, expect, vi } from "vitest";
 import { randomUUID } from "node:crypto";
+import { eq } from "drizzle-orm";
 import { getTestDb, setupTestDb } from "~/test/setup/pglite";
 import {
   machines,
@@ -35,11 +40,35 @@ vi.mock("~/lib/supabase/server", () => ({
   createClient: vi.fn(),
 }));
 
-// Pin the PBM client to the in-memory mock at the seam (CORE-TEST-006).
-vi.mock("~/lib/pinballmap/client", async () => {
-  const { getMockClient } = await import("~/lib/pinballmap/client-mock");
-  return { getPinballMapClient: () => Promise.resolve(getMockClient()) };
-});
+// Pin the PBM client to a controllable in-memory lineup at the seam
+// (CORE-TEST-006) — never reaches pinballmap.com. `linkPinballmapEntryAction`
+// syncs from this when no snapshot is stored, which is how the second cabinet
+// gets far enough to hit the unique index.
+const pbm = vi.hoisted(() => ({
+  lineup: [] as { id: number; machineId: number }[],
+}));
+
+vi.mock("~/lib/pinballmap/client", () => ({
+  getPinballMapClient: () => ({
+    fetchLocation: (locationId: number) =>
+      Promise.resolve({
+        locationId,
+        name: "APC",
+        dateLastUpdated: null,
+        lastUpdatedByUsername: null,
+        machineCount: pbm.lineup.length,
+        lmxes: pbm.lineup.map((l) => ({
+          id: l.id,
+          machineId: l.machineId,
+          icEnabled: null,
+          lastUpdatedByUsername: null,
+          conditions: [],
+        })),
+        fetchedAtIso: new Date().toISOString(),
+        raw: { mock: true },
+      }),
+  }),
+}));
 
 vi.mock("next/cache", () => ({
   revalidatePath: vi.fn(),
@@ -83,8 +112,8 @@ async function mockAuthAs(userId: string): Promise<void> {
   } as unknown as Awaited<ReturnType<typeof createClient>>);
 }
 
-/** Seed the catalog title plus the cabinet that already holds its listing. */
-async function seedIncumbent(): Promise<void> {
+/** Seed the catalog title alone — no cabinet holds its listing. */
+async function seedCatalogTitle(): Promise<void> {
   const db = await getTestDb();
   await db.insert(pinballmapCatalog).values({
     pinballmapMachineId: TITLE_ID,
@@ -92,6 +121,12 @@ async function seedIncumbent(): Promise<void> {
     manufacturer: "Stern",
     year: 2021,
   });
+}
+
+/** Seed the catalog title plus the cabinet that already holds its listing. */
+async function seedIncumbent(): Promise<void> {
+  const db = await getTestDb();
+  await seedCatalogTitle();
   await db.insert(machines).values({
     name: "First Godzilla",
     initials: "GZ1",
@@ -104,20 +139,31 @@ describe("duplicate PinballMap listing — 23505 backstop (PGlite)", () => {
   setupTestDb();
 
   it("names the incumbent cabinet instead of blaming initials", async () => {
-    const { createMachineAction } = await import("~/app/(app)/m/actions");
+    const db = await getTestDb();
+    const { linkPinballmapEntryAction } =
+      await import("~/app/(app)/m/pinballmap-actions");
     const admin = await createAdmin();
     await mockAuthAs(admin.id);
     await seedIncumbent();
+    pbm.lineup = [{ id: 900, machineId: TITLE_ID }];
+
+    // A second cabinet of the same title, matched but not yet listed. Linking it
+    // is the one path that still sets `pinballmapListed` true, so it is the one
+    // path that can enter the partial unique index a second time.
+    const [second] = await db
+      .insert(machines)
+      .values({
+        name: "Second Godzilla",
+        // Initials are unique and valid — nothing about this request is an
+        // initials problem, which is exactly what the old message claimed.
+        initials: "GZ2",
+        pinballmapMachineId: TITLE_ID,
+      })
+      .returning();
 
     const fd = new FormData();
-    fd.append("name", "Second Godzilla");
-    // Initials are unique and valid — nothing about this request is an initials
-    // problem, which is exactly what the old message claimed.
-    fd.append("initials", "GZ2");
-    fd.append("pinballmapMachineId", String(TITLE_ID));
-    fd.append("pinballmapListed", "on");
-
-    const result = await createMachineAction(undefined, fd);
+    fd.set("machineId", second.id);
+    const result = await linkPinballmapEntryAction(undefined, fd);
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
@@ -125,6 +171,13 @@ describe("duplicate PinballMap listing — 23505 backstop (PGlite)", () => {
     expect(result.message).toContain("First Godzilla");
     expect(result.message).toContain("GZ1");
     expect(result.message).not.toContain("Initials");
+
+    // The loser stays unlisted — a refused listing must not half-apply.
+    const row = await db.query.machines.findFirst({
+      where: eq(machines.id, second.id),
+    });
+    expect(row?.pinballmapListed).toBe(false);
+    expect(row?.pinballmapLmxId).toBeNull();
   });
 
   it("still reports a genuine initials collision as an initials problem", async () => {
@@ -149,32 +202,70 @@ describe("duplicate PinballMap listing — 23505 backstop (PGlite)", () => {
     expect(result.message).toContain("DUP");
   });
 
-  it("updateMachineAction surfaces the collision as VALIDATION, not a 500", async () => {
+  it("createMachineAction ignores a submitted pinballmapListed", async () => {
+    // PP-o355.29. The field is not rendered by any form, but a server action is
+    // POST-addressable regardless — so "no control exists" is not a defense.
+    //
+    // Deliberately NO incumbent: with one, an accepted field would collide on
+    // the unique index and the test would pass for the wrong reason. Alone, the
+    // write succeeds and the row simply records `listed = true` with a null lmx
+    // — PinPoint asserting a listing on the public map that it never made, and
+    // could not have made, since nothing here talks to PBM (CORE-ARCH-012).
+    const db = await getTestDb();
+    const { createMachineAction } = await import("~/app/(app)/m/actions");
+    const admin = await createAdmin();
+    await mockAuthAs(admin.id);
+    await seedCatalogTitle();
+
+    const fd = new FormData();
+    fd.append("name", "Lone Godzilla");
+    fd.append("initials", "GZ2");
+    fd.append("pinballmapMachineId", String(TITLE_ID));
+    fd.append("pinballmapListed", "on");
+
+    const result = await createMachineAction(undefined, fd);
+
+    // The request succeeds — the field is ignored, not rejected. The machine is
+    // created and matched to the title; it is simply not listed.
+    expect(result.ok).toBe(true);
+    const row = await db.query.machines.findFirst({
+      where: eq(machines.initials, "GZ2"),
+    });
+    expect(row?.pinballmapMachineId).toBe(TITLE_ID);
+    expect(row?.pinballmapListed).toBe(false);
+    expect(row?.pinballmapLmxId).toBeNull();
+  });
+
+  it("updateMachineAction ignores a submitted pinballmapListed", async () => {
     const db = await getTestDb();
     const { updateMachineAction } = await import("~/app/(app)/m/actions");
     const admin = await createAdmin();
     await mockAuthAs(admin.id);
-    await seedIncumbent();
+    // No incumbent, for the same reason as the create case above.
+    await seedCatalogTitle();
 
     const [second] = await db
       .insert(machines)
-      .values({ name: "Second Godzilla", initials: "GZ2" })
+      .values({ name: "Lone Godzilla", initials: "GZ2" })
       .returning();
 
     const fd = new FormData();
     fd.append("id", second.id);
-    fd.append("name", "Second Godzilla");
+    fd.append("name", "Lone Godzilla");
     fd.append("pbmLinkPresent", "1");
     fd.append("pinballmapMachineId", String(TITLE_ID));
     fd.append("pinballmapListed", "on");
 
     const result = await updateMachineAction(undefined, fd);
 
-    expect(result.ok).toBe(false);
-    if (result.ok) return;
-    // The point is that it is a handled validation failure naming the conflict,
-    // not the generic "Failed to update machine" a raw 23505 produced.
-    expect(result.code).toBe("VALIDATION");
-    expect(result.message).toContain("First Godzilla");
+    expect(result.ok).toBe(true);
+    const row = await db.query.machines.findFirst({
+      where: eq(machines.id, second.id),
+    });
+    // The link the form legitimately carries is applied…
+    expect(row?.pinballmapMachineId).toBe(TITLE_ID);
+    // …and the listing claim it does not is dropped.
+    expect(row?.pinballmapListed).toBe(false);
+    expect(row?.pinballmapLmxId).toBeNull();
   });
 });
