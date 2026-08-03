@@ -6,6 +6,7 @@ import { z } from "zod";
 import { checkPermission } from "~/lib/permissions/helpers";
 import {
   CATALOG_SEARCH_LIMIT,
+  isCatalogEmpty,
   listGroupEditions,
   searchCatalogFamilies,
   type CatalogEdition,
@@ -29,7 +30,7 @@ const searchPinballmapCatalogSchema = z.object({
     .min(1)
     .optional()
     .describe(
-      "Title or family name to search for, e.g. 'elvira'. Returns families (a title's edition group, or a standalone title)."
+      "Title or family name to search for, e.g. 'elvira'. Returns families (a title's edition group, or a standalone title). A family with machineGroupId null, or editionCount 1, is already a single title — its pinballmapMachineId is the answer."
     ),
   machineGroupId: z
     .number()
@@ -37,7 +38,7 @@ const searchPinballmapCatalogSchema = z.object({
     .positive()
     .optional()
     .describe(
-      "List one family's individual editions instead of searching. Use the machineGroupId of a family returned by a query — NOT its pinballmapMachineId, which identifies a single edition. An id no family has is an error, never an empty list."
+      "List one family's individual editions instead of searching. Use the machineGroupId of a family returned by a query — NOT its pinballmapMachineId, which identifies a single edition. Only for a family whose machineGroupId is non-null AND whose editionCount is above 1; anything else already resolves to one title, so this call is unnecessary. An id no family has is an error, never an empty list."
     ),
   limit: z
     .number()
@@ -58,7 +59,14 @@ type SearchPinballmapCatalogArgs = z.infer<
 export interface McpCatalogFamilyResult {
   mode: "families";
   query: string;
-  count: number;
+  /**
+   * How many families are in `families` — a page size, NOT a total. Named
+   * `returned` rather than `count` deliberately: `list_machines` teaches the
+   * caller to answer counting questions from `total` and never from `count`, and
+   * a search of a ~10k-row catalog has no cheap, meaningful total to offer.
+   * Nothing here answers "how many titles are there".
+   */
+  returned: number;
   /** True when more families matched than `limit` returned. */
   hasMore: boolean;
   families: CatalogFamily[];
@@ -68,8 +76,29 @@ export interface McpCatalogFamilyResult {
 export interface McpCatalogEditionResult {
   mode: "editions";
   machineGroupId: number;
-  count: number;
+  /** Every edition in the family — unpaged, so this one IS the total. */
+  returned: number;
   editions: CatalogEdition[];
+}
+
+/**
+ * Refuse to characterise an empty result when the mirror itself is empty.
+ *
+ * Both branches of this tool return or explain "nothing found", and both
+ * explanations are claims about Pinball Map's catalog — which we can only make
+ * from a populated mirror. `refreshCatalog` runs weekly and no-ops on an empty
+ * upstream read, so an unpopulated mirror is a live state (fresh preview branch,
+ * a local DB seeded from a prod dump, a run of failed refreshes), not a
+ * theoretical one. Fail loudly instead: the caller can act on "PinPoint has no
+ * catalog data" and cannot act on a silent, permanent "no match".
+ */
+async function assertCatalogPopulated(): Promise<void> {
+  if (await isCatalogEmpty()) {
+    throw new McpToolError(
+      "not_found",
+      "PinPoint's local Pinball Map catalog mirror is empty, so no lookup can succeed — this says nothing about what is or isn't on Pinball Map, and it is not a wrong id. The mirror is filled by a weekly cron (/api/cron/refresh-catalog); a fresh preview branch or a database seeded without it will have no rows. Retrying won't help until it's populated."
+    );
+  }
 }
 
 /**
@@ -110,13 +139,16 @@ export async function runSearchPinballmapCatalog(
 
   if (machineGroupId !== undefined) {
     const editions = await listGroupEditions(machineGroupId);
-    // No family carries this id, so the lookup never happened — and an empty
-    // success would be indistinguishable from "that family has no editions"
-    // (CORE-ARCH-012). The families payload hands back two bare integers side by
-    // side, so passing `pinballmapMachineId` where `machineGroupId` belongs is
-    // the predictable mistake; say so, or the caller confidently reports an
-    // empty family instead of retrying with the right one.
     if (editions.length === 0) {
+      // Zero rows has two very different causes, and only one of them is the
+      // caller's fault. Diagnose before accusing: asserting the wrong-id
+      // explanation against an unpopulated mirror is itself the confident wrong
+      // answer CORE-ARCH-012 forbids.
+      await assertCatalogPopulated();
+      // The mirror has rows, so this id genuinely matches no family. The
+      // families payload hands back `machineGroupId` and `pinballmapMachineId`
+      // as adjacent bare integers, so grabbing the wrong one is the predictable
+      // mistake — name it, or the caller reports an empty family as fact.
       throw new McpToolError(
         "not_found",
         `No Pinball Map family has machineGroupId ${machineGroupId}. If you took that number from a family's 'pinballmapMachineId', that's the id of a single edition, not the family — pass the family's 'machineGroupId' instead, or search by name again.`
@@ -125,7 +157,7 @@ export async function runSearchPinballmapCatalog(
     const result: McpCatalogEditionResult = {
       mode: "editions",
       machineGroupId,
-      count: editions.length,
+      returned: editions.length,
       editions,
     };
     return { result };
@@ -144,10 +176,15 @@ export async function runSearchPinballmapCatalog(
   // everything (the miscount PP-u4ab.4 fixed on list_machines).
   const rows = await searchCatalogFamilies(query, limit + 1);
   const families = rows.slice(0, limit);
+  // An empty result set reads as "that title isn't on Pinball Map" — a claim
+  // about PBM we have no standing to make when the mirror we searched is empty.
+  if (families.length === 0) {
+    await assertCatalogPopulated();
+  }
   const result: McpCatalogFamilyResult = {
     mode: "families",
     query,
-    count: families.length,
+    returned: families.length,
     hasMore: rows.length > limit,
     families,
   };
@@ -160,7 +197,7 @@ export function registerSearchPinballmapCatalog(server: McpServer): void {
     {
       title: "Search the Pinball Map catalog",
       description:
-        "Find a Pinball Map catalog title to identify a machine's model/edition. Two steps, like the web picker: pass `query` to get matching families (an edition group such as 'Elvira's House of Horrors', or a standalone title) with an `editionCount`; then pass that family's `machineGroupId` to list its individual editions (Pro/Premium/LE) with the `pinballmapMachineId` of each. Pass one or the other, never both. When `hasMore` is true, narrow the query — families come back best-match first and there is no paging. Read-only, served from PinPoint's local catalog mirror.",
+        "Find a Pinball Map catalog title to identify a machine's model/edition. Two steps, like the web picker: pass `query` to get matching families (an edition group such as 'Elvira's House of Horrors', or a standalone title) with an `editionCount`; then, ONLY for a family with a non-null `machineGroupId` and `editionCount` above 1, pass that `machineGroupId` to list its individual editions (Pro/Premium/LE) with the `pinballmapMachineId` of each. A standalone title — `machineGroupId` null, or `editionCount` 1 — already carries its `pinballmapMachineId`: that is the answer, don't call again. Most pre-1990s machines are standalone. Pass one argument or the other, never both. `returned` is this page's size, not a total — this tool cannot answer 'how many titles are there'; when `hasMore` is true, narrow the query, as families come back best-match first and there is no paging. Read-only, served from PinPoint's local catalog mirror.",
       inputSchema: searchPinballmapCatalogSchema.shape,
     },
     (args, extra) =>

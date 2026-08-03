@@ -189,6 +189,27 @@ export async function listGroupEditions(
     .orderBy(pinballmapCatalog.name);
 }
 
+/**
+ * True when the local catalog mirror holds no rows at all.
+ *
+ * The mirror is populated by a weekly cron ({@link refreshCatalog}), which
+ * no-ops on an empty upstream read — so "no rows" is a real, reachable state: a
+ * fresh preview branch, a local DB seeded from prod (the dump carries no
+ * catalog), or a run of failed refreshes. Callers need it to tell "nothing
+ * matched your lookup" apart from "nothing could have matched", which otherwise
+ * look identical and invite a confident wrong answer.
+ *
+ * An EXISTS-style probe rather than `count(*)`: the question is only ever
+ * "is it empty?", and Postgres can stop at the first row.
+ */
+export async function isCatalogEmpty(): Promise<boolean> {
+  const [row] = await db
+    .select({ present: sql<number>`1` })
+    .from(pinballmapCatalog)
+    .limit(1);
+  return row === undefined;
+}
+
 /** Look up a single catalog entry by its PBM machine id (for edit preselect). */
 export async function getCatalogEntry(
   machineId: number

@@ -459,7 +459,7 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
       // second step's job.
       expect(family?.pinballmapMachineId).toBeNull();
       // The standalone Bally title is its own family alongside the group.
-      expect(result.count).toBe(2);
+      expect(result.returned).toBe(2);
     });
 
     it("returns a family's individual editions for its machineGroupId", async () => {
@@ -473,7 +473,7 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
       const result = outcome.result as McpCatalogEditionResult;
 
       expect(result.mode).toBe("editions");
-      expect(result.count).toBe(3);
+      expect(result.returned).toBe(3);
       expect(
         result.editions.find(
           (e) => e.name === "Elvira's House of Horrors (Premium)"
@@ -491,7 +491,7 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
       );
       const result = outcome.result as McpCatalogFamilyResult;
 
-      expect(result.count).toBe(1);
+      expect(result.returned).toBe(1);
       expect(result.hasMore).toBe(true);
     });
 
@@ -524,6 +524,63 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
       expect(error).toBeInstanceOf(McpToolError);
       expect((error as McpToolError).reason).toBe("not_found");
       expect((error as McpToolError).message).toContain("pinballmapMachineId");
+    });
+
+    it("returns a standalone title with its pinballmapMachineId already resolved", async () => {
+      const admin = await makeUser("admin");
+      await seedElviraCatalog();
+
+      const outcome = await runSearchPinballmapCatalog(
+        { query: "Party Monsters" },
+        ctx("admin", admin)
+      );
+      const result = outcome.result as McpCatalogFamilyResult;
+
+      // Most pre-1990s titles are standalone, so this is the common path for
+      // our fleet: no group, one edition, id already in hand. A second call
+      // with machineGroupId would be both impossible (it's null) and pointless.
+      expect(result.returned).toBe(1);
+      expect(result.families[0]?.machineGroupId).toBeNull();
+      expect(result.families[0]?.editionCount).toBe(1);
+      expect(result.families[0]?.pinballmapMachineId).toBe(70_020);
+    });
+
+    describe("when the catalog mirror is empty", () => {
+      // No seedElviraCatalog() anywhere in this block: the mirror is a weekly
+      // cron's output that no-ops on an empty upstream read, so "no rows at
+      // all" is a live state on a fresh preview branch or a prod-seeded local.
+
+      it("refuses to report a query as 'no such title'", async () => {
+        const admin = await makeUser("admin");
+
+        // Returning families: [] here would read as "that title isn't on
+        // Pinball Map" — a claim about PBM made from a table we never filled.
+        const error = await runSearchPinballmapCatalog(
+          { query: "elvira" },
+          ctx("admin", admin)
+        ).catch((e: unknown) => e);
+
+        expect(error).toBeInstanceOf(McpToolError);
+        expect((error as McpToolError).message).toContain("mirror is empty");
+      });
+
+      it("blames the empty mirror, not the caller's id, for an editions lookup", async () => {
+        const admin = await makeUser("admin");
+
+        const error = await runSearchPinballmapCatalog(
+          { machineGroupId: ELVIRA_GROUP_ID },
+          ctx("admin", admin)
+        ).catch((e: unknown) => e);
+
+        expect(error).toBeInstanceOf(McpToolError);
+        expect((error as McpToolError).message).toContain("mirror is empty");
+        // The wrong-id diagnosis must NOT fire here: the id is fine, the table
+        // is empty. Asserting a specific caller mistake we haven't established
+        // is the confident wrong answer this whole guard exists to prevent.
+        expect((error as McpToolError).message).not.toContain(
+          "pinballmapMachineId"
+        );
+      });
     });
 
     it("rejects a call with neither query nor machineGroupId", async () => {
