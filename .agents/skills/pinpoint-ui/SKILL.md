@@ -27,8 +27,8 @@ Use this skill when:
 1. **Server Components first**: Default to Server Components, use "use client" only for interactivity
 2. **Honest failure** (CORE-ARCH-012): a control that cannot perform its action must not report that it did — never a success confirmation for input that could not have been collected. There is no no-JS requirement.
 3. **shadcn/ui only**: No MUI components
-4. **Direct Server Action references**: No inline wrappers in forms
-5. **Dropdown Server Actions**: Use `onSelect`, not forms
+4. **Direct Server Action references** (CORE-ARCH-005): No inline wrappers in forms
+5. **Dropdown Server Actions**: Use `onSelect`, not forms — `pinpoint-design-bible` §17 has the reason
 6. **Tailwind CSS v4 + semantic tokens**: Use `bg-primary`, `text-destructive`, etc. — no raw palette classes (`bg-cyan-500`, `text-red-500`) and no hardcoded hex (enforced via ESLint `better-tailwindcss/no-restricted-classes`)
 7. **TooltipProvider is hoisted**: `<TooltipProvider>` is mounted once in `ClientProviders` — don't add nested providers. See `pinpoint-design-bible` §12.
 8. **Baseline Widely available is the floor** (CORE-UI-005): use `<dialog>`, container queries, `:has()`, `:user-invalid`, `inert`, `aspect-ratio`, `fetchpriority`, native form validation directly — no polyfills. Newly-available features (Popover API, View Transitions, anchor positioning) require a per-feature opt-in in `pinpoint-design-bible` §19. Never trust a cached Baseline date — look it up live (`references/browser-support.md`).
@@ -39,16 +39,14 @@ Use this skill when:
 
 Everything below lives one hop away in `references/`. Load the file you need.
 
-| File                                     | Covers                                                                                 |
-| :--------------------------------------- | :------------------------------------------------------------------------------------- |
-| `references/browser-support.md`          | How to look up a feature's Baseline status live; pointers to design-bible §19 / §22    |
-| `references/key-files.md`                | Component basics, Issue Field Display Order, Key Files Registry, Label Standards       |
-| `references/enums-and-props.md`          | Config-Driven Enums, discriminated-union props for multi-type components               |
-| `references/form-patterns.md`            | Direct-Server-Action forms, `useActionState` forms, dropdown Server Actions            |
-| `references/form-correctness.md`         | Form-correctness code (types, autocomplete, `:user-invalid`), native HTML primitives   |
-| `references/styling-and-shadcn.md`       | Tailwind CSS v4 styling, shadcn/ui component patterns, Button variants/sizes/`loading` |
-| `references/accessibility.md`            | Accessibility floor (CORE-A11Y-001..006), Animation & Motion                           |
-| `references/layout-and-anti-patterns.md` | Layout Patterns, UI Anti-Patterns, External References                                 |
+| File                               | Covers                                                                                 |
+| :--------------------------------- | :------------------------------------------------------------------------------------- |
+| `references/browser-support.md`    | How to look up a feature's Baseline status live; pointers to design-bible §19 / §22    |
+| `references/key-files.md`          | Component basics, Issue Field Display Order, Key Files Registry, Label Standards       |
+| `references/enums-and-props.md`    | Config-Driven Enums, discriminated-union props for multi-type components               |
+| `references/form-correctness.md`   | Form-correctness code (types, autocomplete, `:user-invalid`), native HTML primitives   |
+| `references/styling-and-shadcn.md` | Tailwind CSS v4 styling, shadcn/ui component patterns, Button variants/sizes/`loading` |
+| `references/accessibility.md`      | Accessibility floor (CORE-A11Y-001..006), Animation & Motion                           |
 
 ## Color System
 
@@ -66,7 +64,7 @@ Server Components are the default (CORE-ARCH-001). `"use client"` marks an **int
 
 The consequence that bites most often is that `"use client"` is viral downward — everything a client file imports is bundled for the client too. So don't co-locate a data query, a Node-only import, or `~/lib/logger` (which pulls in `fs`) in a file that is or will become a client component.
 
-Canonical page composition and the layout wrappers are in `references/layout-and-anti-patterns.md`.
+Canonical page composition and the layout wrappers are in `references/key-files.md` § Layout.
 
 ## Server Action Forms
 
