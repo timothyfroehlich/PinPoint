@@ -177,7 +177,7 @@
 - **Why:** Defense-in-depth protection against XSS, clickjacking, and protocol downgrade attacks
 - **Do:** Set security headers in `middleware.ts` (CSP with nonces) and `next.config.ts` (static headers)
 - **Don't:** Remove or weaken Content-Security-Policy, rely on 'unsafe-inline' or 'unsafe-eval'
-- **Reference:** `docs/SECURITY.md` for configuration and modification guidelines
+- **Reference:** `middleware.ts` and `next.config.ts` are the configuration; `pinpoint-security` covers how to author a CSP change, and `docs/SECURITY.md` records the threat-model decisions and known gaps
 
 **CORE-SEC-004:** Nonce-based CSP
 
