@@ -421,5 +421,38 @@ describe("MachineDetailsForm", () => {
         screen.queryByText("Discard unsaved changes?")
       ).not.toBeInTheDocument();
     });
+
+    // The mirror of "keeps guarding edits made while a save is in flight": that
+    // one pins the case where the snapshot is stale, this one pins the case
+    // where it isn't. Both listeners have to unsubscribe on a clean settle, or
+    // the reward for saving is a prompt about changes that are already written
+    // (PP-o355.26).
+    it("disarms once a save settles cleanly", async () => {
+      vi.mocked(updateMachineAction).mockResolvedValue(
+        ok({ machineId: baseProps.machineId })
+      );
+      const user = userEvent.setup();
+      renderWithTabLink();
+
+      await user.type(screen.getByLabelText(/Machine Name/), "!");
+      await user.click(screen.getByRole("button", { name: "Save details" }));
+
+      await waitFor(() => {
+        expect(screen.getByTestId("details-dirty-note")).toHaveTextContent(
+          "Saved"
+        );
+      });
+
+      expect(beforeUnloadWasBlocked()).toBe(false);
+
+      await user.click(screen.getByRole("link", { name: "Settings" }));
+
+      expect(
+        screen.queryByText("Discard unsaved changes?")
+      ).not.toBeInTheDocument();
+      // The click was never intercepted, so the anchor navigates natively —
+      // `router.push` is what the DISCARD path uses, and it must stay untouched.
+      expect(pushMock).not.toHaveBeenCalled();
+    });
   });
 });
