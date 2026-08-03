@@ -96,7 +96,7 @@ export function registerGetMachine(server: McpServer): void {
     {
       title: "Get machine detail",
       description:
-        "Get one machine's detail — name, initials, availability (returned as `presence`), owner name, its Pinball Map state (linked catalog title and edition, manufacturer, year, OPDB/IPDB, whether it's listed on the public map; or marked as not on Pinball Map; or null when neither has been recorded), and its recent open issues (each with number, title, severity, status, and URL). Identify the machine by initials or UUID.",
+        "Get one machine's detail — name, initials, availability (returned as `presence`), owner name, its Pinball Map state (linked catalog title and edition, manufacturer, year, OPDB/IPDB, whether it's listed on the public map; or marked as not on Pinball Map; or null when neither has been recorded — and when a linked title is null, read `catalogLookup` before calling the link broken: `mirror_unpopulated` means PinPoint's catalog copy is empty, not that the link is stale), and its recent open issues (each with number, title, severity, status, and URL). Identify the machine by initials or UUID.",
       inputSchema: getMachineSchema.shape,
     },
     (args, extra) =>

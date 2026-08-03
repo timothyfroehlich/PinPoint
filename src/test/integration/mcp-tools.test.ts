@@ -357,6 +357,7 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
         expect(pinballmap).toEqual({
           status: "linked",
           pinballmapMachineId: ELVIRA_PREMIUM_ID,
+          catalogLookup: "found",
           title: "Elvira's House of Horrors (Premium)",
           machineGroupId: ELVIRA_GROUP_ID,
           group: "Elvira's House of Horrors",
@@ -369,8 +370,10 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
         });
       });
 
-      it("reports a null title for a link the catalog mirror no longer holds", async () => {
+      it("calls a link stale only when the populated mirror really lacks the id", async () => {
         const admin = await makeUser("admin");
+        // Mirror has rows — just not this id. Only then is "stale" a fact.
+        await seedElviraCatalog();
         const machine = await seedMachine({
           pbm: { pinballmapMachineId: 999_111 },
         });
@@ -387,9 +390,36 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
         expect(pinballmap).toMatchObject({
           status: "linked",
           pinballmapMachineId: 999_111,
+          catalogLookup: "missing",
           title: null,
           machineGroupId: null,
           group: null,
+        });
+      });
+
+      it("says the mirror is unpopulated rather than calling a good link stale", async () => {
+        const admin = await makeUser("admin");
+        // No seedElviraCatalog(): the mirror is empty, which is a live state on
+        // a fresh preview branch or a local seeded from a prod dump.
+        const machine = await seedMachine({
+          pbm: { pinballmapMachineId: ELVIRA_PREMIUM_ID },
+        });
+
+        const outcome = await runGetMachine(
+          { machine: machine.initials },
+          ctx("admin", admin)
+        );
+        const { pinballmap } = outcome.result as {
+          pinballmap: McpMachinePinballmap | null;
+        };
+
+        // Byte-identical to the stale case without this field — which would
+        // report every linked machine in the fleet as broken when none is.
+        expect(pinballmap).toMatchObject({
+          status: "linked",
+          pinballmapMachineId: ELVIRA_PREMIUM_ID,
+          catalogLookup: "mirror_unpopulated",
+          title: null,
         });
       });
 
