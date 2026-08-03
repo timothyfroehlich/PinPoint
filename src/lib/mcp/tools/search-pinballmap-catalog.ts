@@ -6,6 +6,8 @@ import { z } from "zod";
 import { checkPermission } from "~/lib/permissions/helpers";
 import {
   CATALOG_SEARCH_LIMIT,
+  getCatalogEntry,
+  getGroupName,
   isCatalogEmpty,
   listGroupEditions,
   searchCatalogFamilies,
@@ -76,9 +78,31 @@ export interface McpCatalogFamilyResult {
 export interface McpCatalogEditionResult {
   mode: "editions";
   machineGroupId: number;
+  /**
+   * WHOSE editions these are — the family's display name. Echoed because the
+   * request is a bare integer and PBM's machine ids and machine-group ids are
+   * separate id spaces: an integer meant as one can be valid as the other and
+   * return a real, unrelated family. Without a name in the response there is
+   * nothing to contradict the caller's assumption. `null` when the mirror holds
+   * the group but never captured its name (PBM serves group names from a
+   * separate endpoint) — the editions' own titles are then the check.
+   */
+  familyName: string | null;
   /** Every edition in the family — unpaged, so this one IS the total. */
   returned: number;
   editions: CatalogEdition[];
+  /**
+   * Non-null when the integer passed as `machineGroupId` is ALSO a valid
+   * `pinballmapMachineId` — the id-space collision above, caught at the moment
+   * it can mislead. It names the edition that id identifies, which is almost
+   * certainly what the caller meant if the editions below are the wrong title.
+   *
+   * Always present (`null` when there is no collision) so its absence never
+   * reads as "this tool doesn't check that". Informational, not an error: a
+   * group id that happens to collide is still a legitimate lookup, so the
+   * editions are served either way.
+   */
+  idAlsoMatchesEdition: { pinballmapMachineId: number; name: string } | null;
 }
 
 /**
@@ -154,11 +178,29 @@ export async function runSearchPinballmapCatalog(
         `No Pinball Map family has machineGroupId ${machineGroupId}. If you took that number from a family's 'pinballmapMachineId', that's the id of a single edition, not the family — pass the family's 'machineGroupId' instead, or search by name again.`
       );
     }
+    const [familyName, sameIdAsEdition] = await Promise.all([
+      // Say whose editions these are. A bare integer request cannot be checked
+      // by the caller unless the answer names itself.
+      getGroupName(machineGroupId),
+      // The id-space collision probe: does this same integer also identify a
+      // catalog EDITION? Reading a group id as a machine id is the mistake this
+      // tool invites, and when both are valid the group lookup succeeds with
+      // some unrelated family's editions — silently, without this.
+      getCatalogEntry(machineGroupId),
+    ]);
+
     const result: McpCatalogEditionResult = {
       mode: "editions",
       machineGroupId,
+      familyName,
       returned: editions.length,
       editions,
+      idAlsoMatchesEdition: sameIdAsEdition
+        ? {
+            pinballmapMachineId: sameIdAsEdition.pinballmapMachineId,
+            name: sameIdAsEdition.name,
+          }
+        : null,
     };
     return { result };
   }
@@ -197,7 +239,7 @@ export function registerSearchPinballmapCatalog(server: McpServer): void {
     {
       title: "Search the Pinball Map catalog",
       description:
-        "Find a Pinball Map catalog title to identify a machine's model/edition. Two steps, like the web picker: pass `query` to get matching families (an edition group such as 'Elvira's House of Horrors', or a standalone title) with an `editionCount`; then, ONLY for a family with a non-null `machineGroupId` and `editionCount` above 1, pass that `machineGroupId` to list its individual editions (Pro/Premium/LE) with the `pinballmapMachineId` of each. A standalone title — `machineGroupId` null, or `editionCount` 1 — already carries its `pinballmapMachineId`: that is the answer, don't call again. Most pre-1990s machines are standalone. Pass one argument or the other, never both. `returned` is this page's size, not a total — this tool cannot answer 'how many titles are there'; when `hasMore` is true, narrow the query, as families come back best-match first and there is no paging. Read-only, served from PinPoint's local catalog mirror.",
+        "Find a Pinball Map catalog title to identify a machine's model/edition. Two steps, like the web picker: pass `query` to get matching families (an edition group such as 'Elvira's House of Horrors', or a standalone title) with an `editionCount`; then, ONLY for a family with a non-null `machineGroupId` and `editionCount` above 1, pass that `machineGroupId` to list its individual editions (Pro/Premium/LE) with the `pinballmapMachineId` of each. A standalone title — `machineGroupId` null, or `editionCount` 1 — already carries its `pinballmapMachineId`: that is the answer, don't call again. Most pre-1990s machines are standalone. Pass one argument or the other, never both. CHECK `familyName` ON THE EDITIONS RESPONSE before using any id from it: machine ids and machine-group ids are separate id spaces, so the wrong integer can return a real but unrelated family's editions. If `familyName` is not the title you searched for, or `idAlsoMatchesEdition` is non-null, you passed an edition's `pinballmapMachineId` instead of a family's `machineGroupId` — `idAlsoMatchesEdition` names the title you actually meant. `returned` is this page's size, not a total — this tool cannot answer 'how many titles are there'; when `hasMore` is true, narrow the query, as families come back best-match first and there is no paging. Read-only, served from PinPoint's local catalog mirror.",
       inputSchema: searchPinballmapCatalogSchema.shape,
     },
     (args, extra) =>

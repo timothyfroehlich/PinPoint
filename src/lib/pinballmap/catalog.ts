@@ -173,6 +173,28 @@ export async function searchCatalogFamilies(
   }));
 }
 
+/**
+ * The family (machine group) display name for a group id, or `null` when no row
+ * carries that group id — or when the mirror captured the group without a name
+ * (PBM serves group names from a separate endpoint, so a partial refresh can
+ * leave `groupName` null on real rows).
+ *
+ * Callers that hand a group id back to a user or a model need this to say WHOSE
+ * editions they are: PBM machine ids and machine-group ids are separate id
+ * spaces, so a single integer can be valid in both and a lookup by the wrong one
+ * still returns real rows.
+ */
+export async function getGroupName(
+  machineGroupId: number
+): Promise<string | null> {
+  const [row] = await db
+    .select({ groupName: pinballmapCatalog.groupName })
+    .from(pinballmapCatalog)
+    .where(eq(pinballmapCatalog.machineGroupId, machineGroupId))
+    .limit(1);
+  return row?.groupName ?? null;
+}
+
 /** List a family's editions (the picker's second step), ordered by name. */
 export async function listGroupEditions(
   machineGroupId: number

@@ -479,6 +479,59 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
           (e) => e.name === "Elvira's House of Horrors (Premium)"
         )?.pinballmapMachineId
       ).toBe(ELVIRA_PREMIUM_ID);
+      // The response says whose editions these are, so the caller can check it
+      // got the family it asked for.
+      expect(result.familyName).toBe("Elvira's House of Horrors");
+      // No catalog row has 7001 as its machine id, so there's no ambiguity.
+      expect(result.idAlsoMatchesEdition).toBeNull();
+    });
+
+    it("names the family it actually returned when the group id collides with an edition id", async () => {
+      const admin = await makeUser("admin");
+      await seedElviraCatalog();
+      // PBM machine ids and machine-group ids are SEPARATE id spaces, so one
+      // integer can be valid in both. Here Godzilla's machineGroupId is exactly
+      // Elvira Premium's pinballmapMachineId — the collision that makes a
+      // wrong-id lookup succeed with real rows, so the not_found guard cannot
+      // fire and only the payload can reveal the mistake.
+      await seedCatalog([
+        {
+          pinballmapMachineId: 80011,
+          name: "Godzilla (Pro)",
+          manufacturer: "Stern",
+          year: 2021,
+          machineGroupId: ELVIRA_PREMIUM_ID,
+          groupName: "Godzilla",
+        },
+        {
+          pinballmapMachineId: 80012,
+          name: "Godzilla (Premium)",
+          manufacturer: "Stern",
+          year: 2021,
+          machineGroupId: ELVIRA_PREMIUM_ID,
+          groupName: "Godzilla",
+        },
+      ]);
+
+      const outcome = await runSearchPinballmapCatalog(
+        { machineGroupId: ELVIRA_PREMIUM_ID },
+        ctx("admin", admin)
+      );
+      const result = outcome.result as McpCatalogEditionResult;
+
+      // The worst outcome this tool can produce is linking a cabinet to the
+      // wrong title from a plausible-looking payload. The response must name
+      // the family it actually returned...
+      expect(result.returned).toBe(2);
+      expect(result.familyName).toBe("Godzilla");
+      expect(result.editions.map((e) => e.name)).not.toContain(
+        "Elvira's House of Horrors (Premium)"
+      );
+      // ...and point at the title the caller almost certainly meant.
+      expect(result.idAlsoMatchesEdition).toEqual({
+        pinballmapMachineId: ELVIRA_PREMIUM_ID,
+        name: "Elvira's House of Horrors (Premium)",
+      });
     });
 
     it("reports hasMore when more families match than the limit returns", async () => {
