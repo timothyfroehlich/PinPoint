@@ -421,5 +421,39 @@ describe("MachineDetailsForm", () => {
         screen.queryByText("Discard unsaved changes?")
       ).not.toBeInTheDocument();
     });
+
+    // The mirror of "keeps guarding edits made while a save is in flight": that
+    // one pins the case where the snapshot is stale, this one pins the case
+    // where it isn't. Both listeners have to unsubscribe on a clean settle, or
+    // the reward for saving is a prompt about changes that are already written
+    // (PP-o355.26).
+    it("disarms once a save settles cleanly", async () => {
+      vi.mocked(updateMachineAction).mockResolvedValue(
+        ok({ machineId: baseProps.machineId })
+      );
+      const user = userEvent.setup();
+      renderWithTabLink();
+
+      await user.type(screen.getByLabelText(/Machine Name/), "!");
+      await user.click(screen.getByRole("button", { name: "Save details" }));
+
+      await waitFor(() => {
+        expect(screen.getByTestId("details-dirty-note")).toHaveTextContent(
+          "Saved"
+        );
+      });
+
+      expect(beforeUnloadWasBlocked()).toBe(false);
+
+      await user.click(screen.getByRole("link", { name: "Settings" }));
+
+      // Queried synchronously on purpose. The armed case mounts this dialog
+      // synchronously too (the positive tests above `await findByText` only
+      // because userEvent yields), so a guard that failed to disarm would be
+      // visible right here rather than settling in after the assertion.
+      expect(
+        screen.queryByText("Discard unsaved changes?")
+      ).not.toBeInTheDocument();
+    });
   });
 });

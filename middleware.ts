@@ -16,7 +16,7 @@ import { updateSession } from "~/lib/supabase/middleware";
  * - style-src keeps 'unsafe-inline' for CSS-in-JS compatibility
  *
  * Required for CORE-SSR-003 compliance
- * See docs/SECURITY.md for security headers documentation
+ * See docs/SECURITY.md for the threat-model decisions and known gaps
  */
 export async function middleware(request: NextRequest): Promise<NextResponse> {
   // 1. Run Supabase middleware first to handle session

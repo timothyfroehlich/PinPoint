@@ -354,16 +354,21 @@ export function CreateMachineForm({
         </div>
 
         {/* PinballMap listing — a brand-new machine always starts unlisted, and
-            nothing will list it on its own. The hourly cron only refreshes the
-            location snapshot and heals drifted lmx ids; it deliberately does
-            NOT flip `pinballmapListed` ("that stays a human decision" —
-            src/lib/pinballmap/sync.ts), and the PBM write verbs don't exist
-            yet. So this copy says listing isn't automatic rather than implying
-            something downstream handles it — the failure mode being a machine
-            left silently unlisted forever because nobody thought they had to
-            act. It names no destination either: the Edit dialog is gone
-            (PP-o355.19) and the Manage tab's control is a placeholder until
-            PP-o355.21. Point it at that control once .21 ships. */}
+            create never lists it. What happens next depends on whether the
+            title is already on our location's lineup: auto-link (PP-o355.20)
+            captures the listing on the next hourly sync, or on the next save
+            from the edit form, but ONLY for a title Pinball Map already shows.
+            A title that isn't up there yet needs a person to add it, and this
+            copy is the only thing that says so — the failure mode being a
+            machine left silently unlisted forever because nobody thought they
+            had to act.
+
+            NOTE the copy below now under-promises: "isn't automatic yet" is
+            false for a title already on the lineup, which auto-link will pick
+            up within the hour. Left for Tim — this is user-facing copy and the
+            same sentence needs rewriting anyway when PP-o355.21 ships the
+            six-state control it should point at (the Edit dialog is gone,
+            PP-o355.19, and the Manage tab's control is still a placeholder). */}
         <div className="flex items-start gap-2">
           <MapPin
             aria-hidden="true"
