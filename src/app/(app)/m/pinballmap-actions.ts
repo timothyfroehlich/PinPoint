@@ -19,7 +19,7 @@ import { db } from "~/server/db";
 import { machines, userProfiles, pinballmapState } from "~/server/db/schema";
 import { reconcileAfterSync } from "~/lib/pinballmap/sync";
 import { getPinballMapWriteCredentials } from "~/lib/pinballmap/credentials";
-import { withLmxAdded } from "~/lib/pinballmap/snapshot-edit";
+import { withLmxAdded, withLmxRemoved } from "~/lib/pinballmap/snapshot-edit";
 import { getPinballMapClient } from "~/lib/pinballmap/client";
 import type { PbmWriteFailure } from "~/lib/pinballmap/types";
 import { log } from "~/lib/logger";
@@ -424,6 +424,97 @@ export async function listMachineOnPinballMapAction(
 
   revalidatePath(`/m/${machine.initials}`);
   return ok({ lmxId });
+}
+
+export type UnlistPinballmapResult = Result<
+  Record<string, never>,
+  | "VALIDATION"
+  | "UNAUTHORIZED"
+  | "NOT_FOUND"
+  | "NOT_PROVISIONED"
+  | "PBM_REJECTED"
+  | "SERVER"
+>;
+
+/**
+ * Remove a machine from PinballMap's lineup for our location and clear our
+ * listing columns (PP-o355.30).
+ *
+ * Gated on `machines.pinballmap.push` (CORE-ARCH-008). Same ordering rule as
+ * the list action: credential decrypt and PBM call before the transaction
+ * (CORE-ARCH-011).
+ *
+ * **The stored-snapshot edit is not bookkeeping — it is the correctness of this
+ * action.** Auto-link (PP-o355.20) re-lists any matched, unlisted cabinet whose
+ * title appears on the stored lineup. Clearing our columns while leaving the
+ * lmx in the snapshot means the next reconcile pass, or any save on this machine
+ * inside the hour, silently re-lists it. Dropping the row we just deleted is
+ * what makes an unlist stick.
+ */
+export async function unlistMachineFromPinballMapAction(
+  _prev: UnlistPinballmapResult | undefined,
+  formData: FormData
+): Promise<UnlistPinballmapResult> {
+  const authed = await authorizeListingAction(
+    formData,
+    "machines.pinballmap.push"
+  );
+  if (!authed.ok) return authed.result;
+  const { userId, machine } = authed;
+
+  const lmxId = machine.pinballmapLmxId;
+  if (!machine.pinballmapListed || lmxId === null)
+    return err("VALIDATION", "This machine isn't listed on Pinball Map.");
+
+  const state = await getPinballMapState();
+  if (!state) return err("SERVER", "Pinball Map isn't configured yet");
+
+  // --- non-transactional effects, both BEFORE the transaction ---
+  const credentials = await getPinballMapWriteCredentials();
+  if (!credentials)
+    return err(
+      "NOT_PROVISIONED",
+      "No Pinball Map operator account is set up yet, so PinPoint can't write to Pinball Map."
+    );
+
+  const client = await getPinballMapClient();
+  const written = await client.removeMachine({ credentials, lmxId });
+  if (!written.ok) {
+    log.error(
+      { reason: written.reason, action: "pinballmap.removeMachine" },
+      "PinballMap remove rejected"
+    );
+    return err("PBM_REJECTED", pbmWriteFailureMessage(written));
+  }
+  // --- transaction: local state only ---
+
+  // No 23505 catch: this write only CLEARS `pinballmapListed`, and a row
+  // leaving the partial unique index cannot violate it.
+  await db.transaction(async (tx) => {
+    await tx
+      .update(machines)
+      .set({ pinballmapListed: false, pinballmapLmxId: null })
+      .where(eq(machines.id, machine.id));
+    if (state.snapshotJson) {
+      await tx
+        .update(pinballmapState)
+        .set({ snapshotJson: withLmxRemoved(state.snapshotJson, lmxId) })
+        .where(eq(pinballmapState.id, "singleton"));
+    }
+    await createMachineTimelineEvent(
+      machine.id,
+      {
+        sourceType: "lifecycle",
+        tag: "lifecycle",
+        eventData: { kind: "pinballmap_listing", action: "unlisted", lmxId },
+        actorId: userId,
+      },
+      tx
+    );
+  });
+
+  revalidatePath(`/m/${machine.initials}`);
+  return ok({});
 }
 
 export type VerifyPinballmapResult = Result<

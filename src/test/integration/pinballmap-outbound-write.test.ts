@@ -329,4 +329,126 @@ describe("PinballMap outbound writes (PGlite)", () => {
     if (!result.ok) expect(result.code).toBe("UNAUTHORIZED");
     expect(pbm.lineup).toEqual([]);
   });
+
+  it("unlists a listed machine and clears our columns", async () => {
+    const db = await getTestDb();
+    const { unlistMachineFromPinballMapAction } =
+      await import("~/app/(app)/m/pinballmap-actions");
+    const admin = await createUser("admin");
+    await mockAuthAs(admin.id);
+    pbm.lineup = [{ id: 500, machineId: TITLE_ID }];
+    await seedState([{ id: 500, machineId: TITLE_ID }]);
+
+    const [machine] = await db
+      .insert(machines)
+      .values({
+        name: "Godzilla",
+        initials: "GZ",
+        pinballmapMachineId: TITLE_ID,
+        pinballmapListed: true,
+        pinballmapLmxId: 500,
+      })
+      .returning();
+    if (!machine) throw new Error("failed to seed machine");
+
+    const result = await unlistMachineFromPinballMapAction(
+      undefined,
+      form(machine.id)
+    );
+
+    expect(result.ok).toBe(true);
+    expect(pbm.lineup).toEqual([]);
+
+    const row = await db.query.machines.findFirst({
+      where: eq(machines.id, machine.id),
+    });
+    expect(row?.pinballmapListed).toBe(false);
+    expect(row?.pinballmapLmxId).toBeNull();
+
+    const events = await db
+      .select()
+      .from(timelineEvents)
+      .where(eq(timelineEvents.machineId, machine.id));
+    expect(events).toHaveLength(1);
+    expect(events[0]?.eventData).toEqual({
+      kind: "pinballmap_listing",
+      action: "unlisted",
+      lmxId: 500,
+    });
+  });
+
+  it("survives the next reconcile pass — auto-link does not undo it", async () => {
+    // THE regression this bead exists to prevent. Auto-link (PP-o355.20)
+    // re-lists any matched, unlisted cabinet whose title is on the STORED
+    // lineup. If unlist leaves the lmx in the stored snapshot, the very next
+    // reconcile pass — or any machine save inside the hour — puts the listing
+    // back, and the Unlist button reads as broken.
+    const db = await getTestDb();
+    const { unlistMachineFromPinballMapAction } =
+      await import("~/app/(app)/m/pinballmap-actions");
+    const { reconcileAfterSync } = await import("~/lib/pinballmap/sync");
+    const admin = await createUser("admin");
+    await mockAuthAs(admin.id);
+    pbm.lineup = [{ id: 500, machineId: TITLE_ID }];
+    await seedState([{ id: 500, machineId: TITLE_ID }]);
+
+    const [machine] = await db
+      .insert(machines)
+      .values({
+        name: "Godzilla",
+        initials: "GZ",
+        pinballmapMachineId: TITLE_ID,
+        pinballmapListed: true,
+        pinballmapLmxId: 500,
+      })
+      .returning();
+    if (!machine) throw new Error("failed to seed machine");
+
+    await unlistMachineFromPinballMapAction(undefined, form(machine.id));
+    const reconciled = await reconcileAfterSync();
+
+    expect(reconciled.linked).toBe(0);
+    const row = await db.query.machines.findFirst({
+      where: eq(machines.id, machine.id),
+    });
+    expect(row?.pinballmapListed).toBe(false);
+    expect(row?.pinballmapLmxId).toBeNull();
+  });
+
+  it("writes nothing locally when PinballMap rejects the removal", async () => {
+    const db = await getTestDb();
+    const { unlistMachineFromPinballMapAction } =
+      await import("~/app/(app)/m/pinballmap-actions");
+    const admin = await createUser("admin");
+    await mockAuthAs(admin.id);
+    await seedState([{ id: 500, machineId: TITLE_ID }]);
+    pbm.removeResult = { ok: false, reason: "unauthorized" };
+
+    const [machine] = await db
+      .insert(machines)
+      .values({
+        name: "Godzilla",
+        initials: "GZ",
+        pinballmapMachineId: TITLE_ID,
+        pinballmapListed: true,
+        pinballmapLmxId: 500,
+      })
+      .returning();
+    if (!machine) throw new Error("failed to seed machine");
+
+    const result = await unlistMachineFromPinballMapAction(
+      undefined,
+      form(machine.id)
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.code).toBe("PBM_REJECTED");
+
+    const row = await db.query.machines.findFirst({
+      where: eq(machines.id, machine.id),
+    });
+    // Still listed — we did not manage to remove it from Pinball Map.
+    expect(row?.pinballmapListed).toBe(true);
+    expect(row?.pinballmapLmxId).toBe(500);
+  });
 });
