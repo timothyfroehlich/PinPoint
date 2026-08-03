@@ -77,6 +77,7 @@ describe("reconcileAfterSync (PGlite)", () => {
     await db.insert(pinballmapState).values({
       id: "singleton",
       locationId: 26454,
+      enabled: true,
       snapshotJson: snapshotWith([{ id: 999, machineId: 42 }]),
       lastSyncStatus: "ok",
     });
@@ -108,6 +109,40 @@ describe("reconcileAfterSync (PGlite)", () => {
     expect(result).toEqual({ healed: 0, linked: 0, desynced: 0 });
   });
 
+  it("writes nothing while the integration is disabled", async () => {
+    const db = await getTestDb();
+    const { reconcileAfterSync } = await import("~/lib/pinballmap/sync");
+
+    // "Sync now" does not gate on `enabled` — a human refresh owns that call.
+    // The reconcile pass must gate anyway, or one click would auto-list the
+    // whole fleet while the integration is switched off.
+    const matched = createTestMachine({
+      initials: "OF",
+      name: "Off",
+      pinballmapMachineId: 42,
+    });
+    await db.insert(machines).values([matched]);
+    await db.insert(pinballmapState).values({
+      id: "singleton",
+      locationId: 26454,
+      enabled: false,
+      snapshotJson: snapshotWith([{ id: 999, machineId: 42 }]),
+      lastSyncStatus: "ok",
+    });
+
+    expect(await reconcileAfterSync()).toEqual({
+      healed: 0,
+      linked: 0,
+      desynced: 0,
+    });
+
+    const [row] = await db
+      .select()
+      .from(machines)
+      .where(eq(machines.id, matched.id));
+    expect(row?.pinballmapListed).toBe(false);
+  });
+
   it("auto-links a matched, unlisted cabinet whose title is on the lineup", async () => {
     const db = await getTestDb();
     const { reconcileAfterSync } = await import("~/lib/pinballmap/sync");
@@ -123,6 +158,7 @@ describe("reconcileAfterSync (PGlite)", () => {
     await db.insert(pinballmapState).values({
       id: "singleton",
       locationId: 26454,
+      enabled: true,
       snapshotJson: snapshotWith([{ id: 999, machineId: 42 }]),
       lastSyncStatus: "ok",
     });
@@ -179,6 +215,7 @@ describe("reconcileAfterSync (PGlite)", () => {
     await db.insert(pinballmapState).values({
       id: "singleton",
       locationId: 26454,
+      enabled: true,
       snapshotJson: snapshotWith([{ id: 999, machineId: 42 }]),
       lastSyncStatus: "ok",
     });
@@ -217,6 +254,7 @@ describe("reconcileAfterSync (PGlite)", () => {
     await db.insert(pinballmapState).values({
       id: "singleton",
       locationId: 26454,
+      enabled: true,
       snapshotJson: snapshotWith([{ id: 999, machineId: 42 }]),
       lastSyncStatus: "ok",
     });

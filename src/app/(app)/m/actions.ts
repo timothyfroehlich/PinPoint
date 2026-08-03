@@ -198,6 +198,33 @@ function readPbmLinkFormFields(formData: FormData): {
 }
 
 /**
+ * Apply a listing this save decided to auto-capture (PP-o355.20), best-effort.
+ *
+ * Runs AFTER the details transaction has committed, and swallows everything.
+ * `captureAutoLink` already stands down on the one collision that is expected,
+ * but a deadlock, a dropped connection, or a failure writing the receipt would
+ * otherwise reach `updateMachineAction`'s catch and report "Failed to update
+ * machine" for an edit that is already saved — sending the user to redo work
+ * that landed. Auto-link is derived bookkeeping: it is allowed to not happen,
+ * and the hourly reconcile pass picks it up next time round.
+ */
+async function captureAutoLinkBestEffort(
+  machineId: string,
+  lmxId: number,
+  actorId: string
+): Promise<void> {
+  try {
+    await captureAutoLink({ machineId, lmxId, action: "linked" }, actorId);
+  } catch (autoLinkError: unknown) {
+    reportError(autoLinkError, {
+      action: "updateMachineAutoLink",
+      bestEffort: true,
+      machineId,
+    });
+  }
+}
+
+/**
  * Create Machine Action
  *
  * Creates a new machine with validation.
@@ -871,10 +898,7 @@ export async function updateMachineAction(
       });
 
       if (autoLink) {
-        await captureAutoLink(
-          { machineId: id, lmxId: autoLink.lmxId, action: "linked" },
-          user.id
-        );
+        await captureAutoLinkBestEffort(id, autoLink.lmxId, user.id);
       }
 
       // Post-commit side effects — best-effort: do not fail the action on notification errors
@@ -1084,10 +1108,7 @@ export async function updateMachineAction(
     });
 
     if (autoLink) {
-      await captureAutoLink(
-        { machineId: id, lmxId: autoLink.lmxId, action: "linked" },
-        user.id
-      );
+      await captureAutoLinkBestEffort(id, autoLink.lmxId, user.id);
     }
 
     // Post-commit side effects — best-effort: do not fail the action on notification errors
@@ -1152,14 +1173,14 @@ export async function updateMachineAction(
     if (error instanceof MachineNotFoundError) {
       return err("NOT_FOUND", "Machine not found.");
     }
-    // NO listing-collision branch here. Auto-link (PP-o355.20) made this action
-    // a writer of `pinballmapListed` again, so the one-lister index
-    // `machines_pinballmap_listed_unique` is reachable — but the write that can
-    // trip it lives outside the details transaction now, and `captureAutoLink`
-    // absorbs its own 23505 by standing down. A collision therefore costs the
-    // user nothing: their edit is already committed, and the listing they never
-    // asked for simply isn't captured (the hourly pass revisits it). Turning it
-    // into an error here would discard a good save over derived bookkeeping.
+    // NO listing-collision branch here, and no auto-link failure of any kind can
+    // reach this point. Auto-link (PP-o355.20) made this action a writer of
+    // `pinballmapListed` again, so the one-lister index
+    // `machines_pinballmap_listed_unique` is reachable — but that write lives
+    // outside the details transaction and behind `captureAutoLinkBestEffort`,
+    // which stands down on a collision and reports anything else without
+    // rethrowing. A save that reaches this catch therefore failed on its own
+    // merits; derived bookkeeping is never allowed to discard a good edit.
     return serverActionError(
       error,
       "SERVER",

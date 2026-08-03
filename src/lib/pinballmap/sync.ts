@@ -1,7 +1,10 @@
 import "server-only";
 import { eq, isNotNull } from "drizzle-orm";
 import type { MachinePresenceStatus } from "~/lib/machines/presence";
-import { isPgErrorCode } from "~/lib/db/postgres-errors";
+import {
+  getPostgresErrorConstraint,
+  isPgErrorCode,
+} from "~/lib/db/postgres-errors";
 import { createMachineTimelineEvent } from "~/lib/timeline/machine-events";
 import { db, type DbTransaction } from "~/server/db";
 import { machines } from "~/server/db/schema";
@@ -97,15 +100,24 @@ async function applyAutoLinkWrite(
  * writer took the listing first. Returns whether the write landed.
  *
  * Auto-link is opportunistic bookkeeping, so a collision is never an error: a
- * 23505 on `machines_pinballmap_listed_unique` means some concurrent writer
- * already listed a cabinet of this title, which is the outcome we wanted. It is
- * unambiguous — this statement touches no other unique constraint.
+ * violation of `machines_pinballmap_listed_unique` means some concurrent writer
+ * already listed a cabinet of this title, which is the outcome we wanted.
+ *
+ * Matched by constraint NAME, not by a bare 23505. The transaction holds two
+ * statements, and the second one — the timeline receipt — writes a table with
+ * its own partial unique index (`idx_timeline_events_idempotency_key`). A bare
+ * code check would reinterpret a violation there as "someone else took the
+ * listing", returning `false` with nothing linked and nothing logged: a silent
+ * failure the hourly pass would repeat forever. An unnamed 23505 rethrows for
+ * the same reason — better a loud pass than a quiet lie.
  *
  * The per-write transaction is what makes standing down possible. A rolled-back
  * transaction cannot be continued, so batching every write into one would turn a
  * single collision into "lose the whole hour's links and heals, and 500 the
  * cron" (PP-o355.20 review).
  */
+const LISTED_UNIQUE_CONSTRAINT = "machines_pinballmap_listed_unique";
+
 export async function captureAutoLink(
   write: AutoLinkWrite,
   actorId?: string
@@ -116,7 +128,12 @@ export async function captureAutoLink(
     });
     return true;
   } catch (error) {
-    if (isPgErrorCode(error, "23505")) return false;
+    if (
+      isPgErrorCode(error, "23505") &&
+      getPostgresErrorConstraint(error) === LISTED_UNIQUE_CONSTRAINT
+    ) {
+      return false;
+    }
     throw error;
   }
 }
@@ -140,13 +157,23 @@ export async function captureAutoLink(
  * count nothing.
  *
  * No PBM HTTP here (CORE-ARCH-011 / CORE-PBM-001): it reads the already-stored
- * snapshot and writes only its own decisions, in one transaction. A `null`
- * snapshot (never synced) is a no-op. The writes carry no actor — this pass runs
- * from the hourly cron, so the receipt is a system event.
+ * snapshot and writes only its own decisions. A `null` snapshot (never synced)
+ * is a no-op. The writes carry no actor — this pass runs from the hourly cron,
+ * so the receipt is a system event.
+ *
+ * Gated on `state.enabled` here rather than left to callers, because the two
+ * callers disagree: the cron route gates, and "Sync now" deliberately does not
+ * (a human refresh owns its own decision, PP-hbi0). That asymmetry was fine
+ * while this pass only healed lmx ids. Now that it also LISTS, ungated it would
+ * mean one technician clicking "Sync now" auto-lists the whole fleet while the
+ * integration is switched off — the exact thing `resolveAutoLinkForMachine`
+ * refuses. Fetching a snapshot while disabled is harmless; writing listing state
+ * off it is not.
  */
 export async function reconcileAfterSync(): Promise<ReconcileResult> {
   const state = await getPinballMapState();
-  const snapshot = state?.snapshotJson ?? null;
+  if (!state?.enabled) return { healed: 0, linked: 0, desynced: 0 };
+  const snapshot = state.snapshotJson ?? null;
   if (!snapshot) return { healed: 0, linked: 0, desynced: 0 };
 
   const matched = await db
@@ -194,6 +221,12 @@ export async function reconcileAfterSync(): Promise<ReconcileResult> {
       // "on PBM, not listed here" is therefore not a state any human can
       // resolve, and counting it would inflate "N need attention" by one per
       // duplicate cabinet, permanently — the same reason a tie is excluded.
+      //
+      // The test is UNRESOLVABLE, not "duplicate". A group with no holder at all
+      // — every cabinet `pending_arrival`/`removed` while PBM still shows the
+      // title — keeps counting, and should: a human can clear it by fixing an
+      // availability or unlisting on PBM. Only "the index forbids it" earns the
+      // exclusion.
       if (
         holderId !== null &&
         !isHolder &&
@@ -208,6 +241,12 @@ export async function reconcileAfterSync(): Promise<ReconcileResult> {
   // One transaction per write, not one for the batch: a collision stands down
   // alone instead of voiding every other title's link and heal (see
   // `captureAutoLink`).
+  //
+  // `desynced` is tallied above, from the DECISIONS, and deliberately not
+  // adjusted for a write that then stood down. That is not a stale count: a
+  // stand-down means a concurrent writer took the listing, which makes this
+  // cabinet a non-holder — and a non-holder's desync is exactly what the loop
+  // above excludes as unresolvable. The two rules agree.
   const applied: AutoLinkWrite[] = [];
   for (const write of writes) {
     if (await captureAutoLink(write)) applied.push(write);
