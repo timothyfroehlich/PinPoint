@@ -13,6 +13,14 @@ import { VALID_MACHINE_PRESENCE_STATUSES } from "~/lib/machines/presence";
  * The picker submits `pinballmapMachineId`; the "not on PinballMap" checkbox
  * submits `pinballmapExcluded` (+ optional reason). Model metadata is NOT taken
  * from the client — the server derives it from the catalog mirror on link.
+ *
+ * **`pinballmapListed` is deliberately absent** and must not be added back
+ * (PP-o355.29). It records that a listing exists on the public map, so only a
+ * path that actually talked to PinballMap — or reconciled against a snapshot —
+ * may set it. Accepting it here let a POST assert a public listing we never
+ * made, with a null lmx and no API call (CORE-ARCH-012 honest failure), while
+ * consuming the one-lister slot in `machines_pinballmap_listed_unique` so the
+ * cabinet that genuinely holds the lmx could no longer be listed.
  */
 const pinballmapLinkFields = {
   pinballmapMachineId: z.coerce.number().int().positive().optional(),
@@ -22,10 +30,6 @@ const pinballmapLinkFields = {
     .trim()
     .max(200, "Reason must be less than 200 characters")
     .optional(),
-  // Whether we consider the machine listed on PinballMap's public map (bead C /
-  // PP-o355.3). Only honored when the machine is linked (the server coerces it
-  // to false otherwise); decoupled from availability by design.
-  pinballmapListed: z.boolean().optional(),
 };
 
 /**
@@ -66,10 +70,16 @@ export type CreateMachineInput = z.infer<typeof createMachineSchema>;
  */
 export const updateMachineSchema = z.object({
   id: z.string().uuid(),
+  // Optional on update: `undefined` means "leave the name alone". Forms that
+  // do not edit the name (ownership transfer) must omit it rather than
+  // resubmit a page-load snapshot — doing so reverted a concurrent rename
+  // (PP-o355.19 review). Absent is not the same as empty: a submitted name
+  // still has to be 1-100 chars.
   name: z
     .string()
     .min(1, "Name is required")
-    .max(100, "Machine name must be less than 100 characters"),
+    .max(100, "Machine name must be less than 100 characters")
+    .optional(),
   ownerId: z.string().uuid().optional(),
   presenceStatus: z.enum(VALID_MACHINE_PRESENCE_STATUSES).optional(),
   forcePromoteUserId: z.string().uuid().optional(),

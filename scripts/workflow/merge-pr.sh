@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # merge-pr.sh — composite gate-then-merge enforcer.
-# Re-evaluates all 5 PR gates at merge time (TOCTOU safety vs label-time gates),
+# Re-evaluates all 4 PR gates at merge time (TOCTOU safety vs label-time gates),
 # squash-merges with --match-head-commit if all pass, removes ready-for-review label on failure.
 #
 # Usage: merge-pr.sh <PR> --human [-a|--automerge] [--dry-run] [--force] [--bypass-merge-requirements]
@@ -14,23 +14,27 @@
 #   -a, --automerge               Poll the gates instead of evaluating them once, and merge
 #                                 as soon as they all pass. Fire it while CI is still
 #                                 running — that is what it is for. It does NOT wait out
-#                                 an unreviewed head: `reviewed` hard-fails 600s after a
-#                                 head push with no Copilot review and no Claude marker,
-#                                 and a hard failure ends the run. So attest the review
-#                                 first (mark-claude-review.sh) if Copilot is quota-limited
-#                                 or has already skipped. Terminates on exactly three
-#                                 outcomes, each reported on exit:
+#                                 an unreviewed head: `reviewed` never WAITs, because no
+#                                 bot reviews this repo and so no answer is ever already
+#                                 on its way. An unattested head hard-fails on the FIRST
+#                                 poll and the run ends. So run /code-review and let the
+#                                 agent attest head with mark-claude-review.sh BEFORE
+#                                 firing this. Terminates on exactly three outcomes, each
+#                                 reported on exit:
 #                                   MERGED      — gates went green, PR squash-merged
 #                                   RED         — a gate hard-failed; no merge, label removed
 #                                   TIMED OUT   — still waiting when the budget ran out
-#                                 A WAIT (CI running, review pending) keeps polling; only a
-#                                 hard failure stops it. Tune with AUTOMERGE_TIMEOUT (default
-#                                 3600s) and AUTOMERGE_POLL_INTERVAL (default 30s).
+#                                 A WAIT (CI still running, mergeability still computing)
+#                                 keeps polling; only a hard failure stops it. Tune with
+#                                 AUTOMERGE_TIMEOUT (default 3600s) and
+#                                 AUTOMERGE_POLL_INTERVAL (default 30s).
 #   --dry-run                     Print would-do summary, take no action. Does not require --human.
-#   --force                       Bypass currency + threads + reviewed gates.
+#   --force                       Bypass threads + reviewed gates. This is the ONLY way to
+#                                 merge a head no reviewer has seen, and it requires manual
+#                                 permission approval each time.
 #   --bypass-merge-requirements   Bypass ci gate AND pass --admin to gh pr merge
 #                                 (overrides GitHub branch-protection rules).
-#                                 Combine with --force to bypass currency + threads + reviewed + ci together.
+#                                 Combine with --force to bypass threads + reviewed + ci together.
 #
 # Canonical human-run command: scripts/workflow/merge-pr.sh <PR> --human
 # Fire-and-forget variant:     scripts/workflow/merge-pr.sh <PR> --human --automerge
@@ -58,8 +62,8 @@ HUMAN=false
 AUTOMERGE=false
 
 # Automerge polling budget. Defaults sized for this repo: the full E2E suite runs
-# ~10-15 min, and the review window is another 10, so an hour covers a normal PR
-# with room for a CI re-run.
+# ~10-15 min, so an hour covers a normal PR with room for a CI re-run. It is not
+# sized to wait out a review — the review must already be attested before this runs.
 AUTOMERGE_TIMEOUT=${AUTOMERGE_TIMEOUT:-3600}
 AUTOMERGE_POLL_INTERVAL=${AUTOMERGE_POLL_INTERVAL:-30}
 
@@ -131,7 +135,7 @@ echo "Target: PR #$PR — $PR_TITLE"
 echo "URL: $PR_URL"
 echo "Head SHA: $PR_HEAD_SHA"
 
-# --- Run all 5 gates, collect statuses ---
+# --- Run all 4 gates, collect statuses ---
 # Per-gate bypass kind: "none" (never bypassable), "force" (--force), "admin" (--bypass-merge-requirements).
 #
 # run_all_gates accumulates into globals rather than printing, so the automerge loop can
@@ -181,8 +185,8 @@ run_gate() {
     return 0
   fi
 
-  # rc=2 means a transient WAIT (CI still running, review pending, GitHub still
-  # computing mergeability); anything else is a hard failure. Both block a one-shot
+  # rc=2 means a transient WAIT (CI still running, GitHub still computing
+  # mergeability); anything else is a hard failure. Both block a one-shot
   # run exactly as before — the distinction only tells automerge whether to keep
   # waiting or to stop.
   if [ "$rc" -eq 2 ]; then
@@ -204,7 +208,6 @@ run_all_gates() {
   # GitHub a commit that inherited another commit's CI, review and thread state.
   POLL_HEAD_SHA=$(gh pr view "$PR" --json headRefOid --jq .headRefOid)
   run_gate ci          check_ci                  admin
-  run_gate currency    check_copilot_currency    force
   run_gate threads     check_unresolved_threads  force
   run_gate reviewed    check_review_happened     force
   run_gate no_conflict check_no_merge_conflict   none
@@ -349,4 +352,26 @@ echo "MERGED: PR #$PR"
   _SIGN="${HUDDLE_NAME:-huddle-auto}"
   _MSG="Merged PR #$PR$_BEAD_PART: $PR_TITLE$_FILES_PART. Sync main if you have active branches. —$_SIGN"
   bd comments add "$_TODAY" "$_MSG" >/dev/null 2>&1 || true
+) || true
+
+# --- Reap the merged PR's worktree (fail-open) ---
+# Same contract as the huddle notice above: the merge already happened, so no
+# post-step may propagate an error.
+#
+# worktree_reap.py re-derives the verdict itself rather than trusting "this PR
+# just merged" — it reaps only when the worktree's HEAD *is* the merged SHA and
+# the tree is clean, so a dirty worktree, or one that kept committing after the
+# merge, survives as REVIEW. It also refuses any worktree containing the
+# invoking process's cwd, which is what makes running this from inside the
+# merged branch's own worktree safe.
+(
+  set +e
+  set +u
+  set +o pipefail
+  _REAP_SCRIPT="$(dirname "$0")/../worktree_reap.py"
+  [[ -f "$_REAP_SCRIPT" ]] || exit 0
+  _HEAD_REF=$(gh pr view "$PR" --json headRefName --jq .headRefName 2>/dev/null)
+  [[ -n "$_HEAD_REF" ]] || exit 0
+  _REPO_DIR=$(cd "$(dirname "$0")/../.." && pwd)
+  python3 "$_REAP_SCRIPT" --apply --quiet --branch "$_HEAD_REF" --repo-dir "$_REPO_DIR"
 ) || true

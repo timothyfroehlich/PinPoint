@@ -1,14 +1,24 @@
-"""Unit tests for the currency and reviewed gates in scripts/workflow/_pr-gates.sh.
+"""Unit tests for the `reviewed` and `threads` gates in scripts/workflow/_pr-gates.sh.
 
-These two gates decide whether a PR may merge, so their edge cases are worth pinning
-down. The regression under test (PP-jw0s): Copilot posts a *review object* even when
-it reviewed nothing — quota exhaustion, or no analyzable files — and a login-only
-filter counted that as a review, so both gates could go green on a review that read
-nothing. That is strictly worse than no review, because no-review has an honest path
-(the SHA-pinned Claude marker).
+These gates decide whether a PR may merge, so their edge cases are worth pinning down.
 
-Every test drives the real bash through a stubbed `gh`, so the jq filters and the
-BSD/GNU date branching are exercised rather than mocked away.
+PP-4ric retired Copilot review: its free tier was too small to be useful, so no bot
+reviews this repo now. The `reviewed` gate is satisfied only by the SHA-pinned marker
+`mark-claude-review.sh` posts, which attests that Tim ran `/code-review` (a harness
+built-in an agent cannot launch). Three states replace the old six — there is no
+request to wait on, so nothing here WAITs, and the whole request-timeline/quota-body
+apparatus (PP-lzaw, PP-jw0s) went with the reviewer it modelled.
+
+What survives from that history, and is re-pinned below: the head SHA is compared
+directly rather than inferred from timestamps, so a review of an earlier tree cannot
+read as coverage of head (the PR #1784 false PASS); and the marker lookup slurps across
+pagination, so a marker on page 2+ of a busy PR is still found.
+
+The `threads` gate now counts unresolved threads from ANY author. Left filtered to
+Copilot logins it would have matched nothing and become a permanent PASS.
+
+Every test drives the real bash through a stubbed `gh`, so the jq filters are exercised
+rather than mocked away.
 """
 
 import json
@@ -16,7 +26,6 @@ import os
 import stat
 import subprocess
 import tempfile
-import time
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
@@ -25,43 +34,77 @@ import pytest
 
 GATES_PATH = Path(__file__).parent.parent / "workflow" / "_pr-gates.sh"
 
-QUOTA_BODY = (
-    "Copilot was unable to review this pull request because the user who "
-    "requested the review has reached their quota limit."
-)
-NO_FILES_BODY = "Copilot wasn't able to review any files in this pull request."
-
 HEAD_SHA = "d084c14a43af3ac021f0838f5c7bf4b77f72fb62"
 OTHER_SHA = "0000000000000000000000000000000000000000"
 
-# check_copilot_currency / check_review_happened both hold for 600s after a head push
-# before escalating. Ages either side of that boundary select the WAIT vs terminal path.
-FRESH_HEAD_AGE = 60
-STALE_HEAD_AGE = 1200
+
+def marker_comment(
+    sha: str, depth: str | None = None, summary: str = "no serious findings"
+) -> dict:
+    """A comment in the exact shape mark-claude-review.sh posts.
+
+    `depth=None` is the pre-PP-9onv shape — two lines, no depth comment. Markers in that
+    shape are still live on merged PRs and on any branch attested before the change, so
+    it stays the default here: every existing test doubles as a backward-compat test.
+    """
+    lines = [f"<!-- pinpoint-claude-review: {sha} -->"]
+    if depth is not None:
+        lines.append(f"<!-- pinpoint-review-depth: {depth} -->")
+        lines.append(
+            f"Claude review of head {sha[:7]} — `/code-review {depth}` — {summary}"
+        )
+    else:
+        lines.append(f"Claude review of head {sha[:7]} — {summary}")
+    return {"body": "\n".join(lines), "updated_at": "2026-08-02T20:43:19Z"}
 
 
-def _iso(epoch: float) -> str:
-    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(epoch))
+def thread(*, resolved: bool, author: str) -> dict:
+    return {
+        "isResolved": resolved,
+        "comments": {"nodes": [{"author": {"login": author}}]},
+    }
 
 
 @contextmanager
 def gate_env(
     *,
-    reviews: list[dict],
-    comments: list[dict],
-    head_age_seconds: int,
+    comment_pages: list[list[dict]] | None = None,
+    threads: list[dict] | None = None,
     head_sha: str = HEAD_SHA,
 ) -> Iterator[dict]:
     """Yield an env dict wiring a fake `gh` that answers every call the gates make.
 
     The stub dispatches on the joined argument string rather than parsing flags — it
-    only needs to distinguish the five shapes `_pr-gates.sh` actually issues.
+    only needs to distinguish the four shapes `_pr-gates.sh` actually issues.
+
+    `comment_pages` is a LIST OF PAGES, emitted as separate concatenated JSON arrays
+    exactly as `gh api --paginate` does. A single-page list is the common case; a
+    multi-page one exercises the `jq -rs` slurp the marker lookup depends on.
     """
-    now = time.time()
     with tempfile.TemporaryDirectory() as tmp:
         tmp_path = Path(tmp)
-        (tmp_path / "reviews.json").write_text(json.dumps(reviews))
-        (tmp_path / "comments.json").write_text(json.dumps(comments))
+        (tmp_path / "comments.json").write_text(
+            "\n".join(json.dumps(page) for page in (comment_pages or [[]]))
+        )
+        (tmp_path / "threads.json").write_text(
+            json.dumps(
+                {
+                    "data": {
+                        "repository": {
+                            "pullRequest": {
+                                "reviewThreads": {
+                                    "pageInfo": {
+                                        "hasNextPage": False,
+                                        "endCursor": None,
+                                    },
+                                    "nodes": threads or [],
+                                }
+                            }
+                        }
+                    }
+                }
+            )
+        )
 
         gh_stub = tmp_path / "gh"
         gh_stub.write_text(
@@ -69,11 +112,9 @@ def gate_env(
             'args="$*"\n'
             'case "$args" in\n'
             '  *"--jq .headRefOid"*) printf "%s\\n" "$STUB_HEAD_SHA" ;;\n'
-            '  *"--json headRefOid"*) printf \'{"headRefOid":"%s"}\\n\' "$STUB_HEAD_SHA" ;;\n'
             '  *"nameWithOwner"*) printf "acme/widget\\n" ;;\n'
-            '  *"/commits/"*) printf "%s\\n" "$STUB_HEAD_DATE" ;;\n'
-            '  *"/issues/"*"/comments") cat "$STUB_COMMENTS" ;;\n'
-            '  *"/pulls/"*"/reviews") cat "$STUB_REVIEWS" ;;\n'
+            '  *"api graphql"*) cat "$STUB_THREADS" ;;\n'
+            '  *"/issues/"*"/comments"*) cat "$STUB_COMMENTS" ;;\n'
             '  *) printf "UNEXPECTED gh call: %s\\n" "$args" >&2; exit 1 ;;\n'
             "esac\n"
         )
@@ -84,9 +125,8 @@ def gate_env(
         env = dict(os.environ)
         env["PATH"] = f"{tmp}{os.pathsep}{env.get('PATH', '')}"
         env["STUB_HEAD_SHA"] = head_sha
-        env["STUB_HEAD_DATE"] = _iso(now - head_age_seconds)
-        env["STUB_REVIEWS"] = str(tmp_path / "reviews.json")
         env["STUB_COMMENTS"] = str(tmp_path / "comments.json")
+        env["STUB_THREADS"] = str(tmp_path / "threads.json")
         yield env
 
 
@@ -100,173 +140,283 @@ def run_gate(fn: str, env: dict) -> subprocess.CompletedProcess:
     )
 
 
-def copilot_review(body: str, age_seconds: int) -> dict:
-    return {
-        "user": {"login": "copilot-pull-request-reviewer[bot]"},
-        "submitted_at": _iso(time.time() - age_seconds),
-        "body": body,
-    }
+# --- The merge bar: a head nobody reviewed cannot pass `reviewed` -------------------
 
 
-def claude_marker(sha: str) -> dict:
-    return {"body": f"<!-- pinpoint-claude-review: {sha} -->\nClaude review of head"}
-
-
-# --- The PP-jw0s regression: a non-review must not count as a review ----------------
-
-
-@pytest.mark.parametrize("body", [QUOTA_BODY, NO_FILES_BODY])
-def test_non_review_does_not_satisfy_reviewed_gate(body: str) -> None:
-    """A Copilot 'I could not review this' comment must fail the hard backstop.
-
-    Before the fix this returned PASS: the review object carried a Copilot login and a
-    submitted_at newer than the head, satisfying a login-only filter.
-    """
-    with gate_env(
-        reviews=[copilot_review(body, age_seconds=0)],
-        comments=[],
-        head_age_seconds=STALE_HEAD_AGE,
-    ) as env:
+@pytest.mark.parametrize(
+    "case,comments",
+    [
+        ("no marker at all", []),
+        ("marker pins an earlier commit", [marker_comment(OTHER_SHA)]),
+    ],
+)
+def test_unreviewed_head_never_passes_the_reviewed_gate(
+    case: str, comments: list[dict]
+) -> None:
+    """The hard backstop. A non-zero exit is what blocks merge-pr.sh."""
+    with gate_env(comment_pages=[comments]) as env:
         result = run_gate("check_review_happened", env)
-
-    assert result.returncode == 1, result.stdout
+    assert result.returncode != 0, f"{case} passed the reviewed gate:\n{result.stdout}"
     assert "FAIL: reviewed:" in result.stdout
-    assert "mark-claude-review.sh" in result.stdout, "remedy must be printed"
 
 
-@pytest.mark.parametrize("body", [QUOTA_BODY, NO_FILES_BODY])
-def test_non_review_is_invisible_to_currency_gate(body: str) -> None:
-    """Currency must treat a non-review as absent, not as something to be stale about.
-
-    Counting it produced the inverted incentive: a PR Copilot never touched skipped
-    instantly, while one carrying a useless comment served the full 600s wait.
-    """
-    with gate_env(
-        reviews=[copilot_review(body, age_seconds=0)],
-        comments=[],
-        head_age_seconds=FRESH_HEAD_AGE,
-    ) as env:
-        result = run_gate("check_copilot_currency", env)
-
-    assert result.returncode == 0, result.stdout
-    assert "SKIP: currency: no substantive Copilot review" in result.stdout
-
-
-def test_a_partial_review_is_not_mistaken_for_a_non_review() -> None:
-    """Copilot's real reviews say what they could NOT get to — that must still count.
-
-    Matching the bare words "unable to review" would discard this, pushing `reviewed`
-    toward a FAIL that only --force or a marker clears — training exactly the
-    click-through reflex the gate exists to prevent. The patterns are deliberately
-    scoped to whole-PR phrasings instead.
-    """
-    body = (
-        "Copilot reviewed 3 out of 5 changed files. It was unable to review "
-        "2 generated files. Comments: line 12 dereferences a possibly-null value."
-    )
-    with gate_env(
-        reviews=[copilot_review(body, age_seconds=10)],
-        comments=[],
-        head_age_seconds=FRESH_HEAD_AGE,
-    ) as env:
+def test_marker_pinning_head_passes() -> None:
+    with gate_env(comment_pages=[[marker_comment(HEAD_SHA)]]) as env:
         result = run_gate("check_review_happened", env)
-
     assert result.returncode == 0, result.stdout
-    assert "PASS: reviewed: Copilot review covers head commit" in result.stdout
+    assert "PASS: reviewed:" in result.stdout
+    assert HEAD_SHA[:7] in result.stdout
 
 
-def test_non_review_alongside_real_review_keeps_the_real_one() -> None:
-    """Filtering must drop only the non-review, not every review on the PR."""
+def test_nothing_in_the_reviewed_gate_ever_waits() -> None:
+    """rc=2 tells merge-pr.sh's automerge loop to keep polling.
+
+    With no reviewer to answer a request, there is never an outcome already on its
+    way, so a WAIT here would poll for an hour and then time out. Both un-reviewed
+    states must be terminal.
+    """
+    for comments in ([], [marker_comment(OTHER_SHA)]):
+        with gate_env(comment_pages=[comments]) as env:
+            result = run_gate("check_review_happened", env)
+        assert result.returncode == 1, result.stdout
+        assert "WAIT" not in result.stdout
+
+
+# --- stale_marker is named distinctly from unreviewed -------------------------------
+
+
+def test_stale_marker_says_you_pushed_past_the_review() -> None:
+    """The subtle failure: the PR visibly HAS a review, and it is not of head.
+
+    Reported as its own state so the reader fixes the right thing — re-review the new
+    head — instead of reading the gate as flaky.
+    """
+    with gate_env(comment_pages=[[marker_comment(OTHER_SHA)]]) as env:
+        result = run_gate("check_review_happened", env)
+    assert OTHER_SHA[:7] in result.stdout, result.stdout
+    assert HEAD_SHA[:7] in result.stdout
+    assert "pushed" in result.stdout.lower()
+
+
+def test_unreviewed_does_not_claim_a_review_exists() -> None:
+    with gate_env(comment_pages=[[]]) as env:
+        result = run_gate("check_review_happened", env)
+    assert "no review marker" in result.stdout, result.stdout
+
+
+@pytest.mark.parametrize("comments", [[], [marker_comment(OTHER_SHA)]])
+def test_every_failing_state_names_the_remedy(comments: list[dict]) -> None:
+    """An agent cannot run /code-review, so the remedy has to name the handoff.
+
+    Printing only `mark-claude-review.sh` would read as "attest and move on", which is
+    exactly the false attestation the gate exists to prevent.
+    """
+    with gate_env(comment_pages=[comments]) as env:
+        result = run_gate("check_review_happened", env)
+    assert "/code-review" in result.stdout, result.stdout
+    assert "mark-claude-review.sh 123" in result.stdout
+
+
+# --- Marker lookup: pagination and shape --------------------------------------------
+
+
+def test_marker_on_a_later_page_is_still_found() -> None:
+    """`gh api --paginate` emits one JSON array per page.
+
+    gh's own `--jq` runs per page and would miss this; the gate slurps instead. A busy
+    PR whose marker landed on page 2 must not read as unreviewed.
+    """
+    pages = [
+        [{"body": "unrelated chatter"}] * 3,
+        [{"body": "more chatter"}, marker_comment(HEAD_SHA)],
+    ]
+    with gate_env(comment_pages=pages) as env:
+        result = run_gate("check_review_happened", env)
+    assert result.returncode == 0, result.stdout
+
+
+@pytest.mark.parametrize(
+    "order",
+    [
+        pytest.param([OTHER_SHA, HEAD_SHA], id="attestation-is-newest"),
+        pytest.param([HEAD_SHA, OTHER_SHA], id="attestation-is-oldest"),
+    ],
+)
+def test_any_marker_pinning_head_passes_whatever_the_order(order: list[str]) -> None:
+    """The gate asks "does ANY marker pin head?", not "does the newest one?".
+
+    Duplicate markers are a stray — mark-claude-review.sh rewrites one sticky comment —
+    but a second session or a hand-posted comment can leave two. Reading only one of
+    them lets writer and reader disagree about which is canonical: re-attesting would
+    rewrite a comment the gate never reads, and a genuinely reviewed head would report
+    stale_marker forever with --force as the only exit. The `attestation-is-oldest`
+    case is the one that broke.
+    """
+    pages = [[marker_comment(sha) for sha in order]]
+    with gate_env(comment_pages=pages) as env:
+        result = run_gate("check_review_happened", env)
+    assert result.returncode == 0, result.stdout
+
+
+def test_stale_marker_names_the_newest_marker_when_none_pins_head() -> None:
+    """With nothing pinning head, the SHA reported is the most recent review."""
+    older = "1111111111111111111111111111111111111111"
+    pages = [[marker_comment(older), marker_comment(OTHER_SHA)]]
+    with gate_env(comment_pages=pages) as env:
+        result = run_gate("check_review_happened", env)
+    assert result.returncode != 0, result.stdout
+    assert OTHER_SHA[:7] in result.stdout, result.stdout
+    assert older[:7] not in result.stdout, result.stdout
+
+
+def test_a_comment_merely_mentioning_the_marker_is_not_one() -> None:
+    """The lookup anchors on the START of the body.
+
+    A review thread quoting the marker — or this test file's own name showing up in a
+    PR discussion — must not attest anything.
+    """
+    quoting = {
+        "body": f"I think we should post `<!-- pinpoint-claude-review: {HEAD_SHA} -->` here"
+    }
+    with gate_env(comment_pages=[[quoting]]) as env:
+        result = run_gate("check_review_happened", env)
+    assert result.returncode != 0, result.stdout
+
+
+# --- Threads gate: author-agnostic --------------------------------------------------
+
+
+def test_unresolved_threads_block_regardless_of_author() -> None:
+    """The Copilot-login filter is gone (PP-4ric).
+
+    Left in place it would have matched nothing and turned this gate into a permanent
+    PASS — a false green worse than no gate, since Tim's own review comments never
+    blocked a merge under the old filter either.
+    """
     with gate_env(
-        reviews=[
-            copilot_review("Found a null deref on line 12.", age_seconds=10),
-            copilot_review(QUOTA_BODY, age_seconds=0),
+        threads=[
+            thread(resolved=False, author="timothyfroehlich"),
+            thread(resolved=False, author="some-agent"),
+        ]
+    ) as env:
+        result = run_gate("check_unresolved_threads", env)
+    assert result.returncode != 0, result.stdout
+    assert "2 unresolved review threads" in result.stdout
+
+
+def test_resolved_threads_do_not_block() -> None:
+    with gate_env(
+        threads=[
+            thread(resolved=True, author="timothyfroehlich"),
+            thread(resolved=True, author="some-agent"),
+        ]
+    ) as env:
+        result = run_gate("check_unresolved_threads", env)
+    assert result.returncode == 0, result.stdout
+    assert "PASS: threads: 0 unresolved review threads" in result.stdout
+
+
+def test_no_threads_at_all_passes() -> None:
+    with gate_env(threads=[]) as env:
+        result = run_gate("check_unresolved_threads", env)
+    assert result.returncode == 0, result.stdout
+
+
+def test_thread_failure_names_the_two_ways_to_clear_it() -> None:
+    """AGENTS.md §5 allows declining, not ignoring. The gate should say so."""
+    with gate_env(threads=[thread(resolved=False, author="timothyfroehlich")]) as env:
+        result = run_gate("check_unresolved_threads", env)
+    assert "decline" in result.stdout.lower(), result.stdout
+
+
+# --- Marker record: the extra fields merge-handoff.sh reports -----------------------
+
+
+def marker_record(env: dict) -> list[str]:
+    """`_marker_record` for PR 123, split into its five TSV fields."""
+    result = subprocess.run(
+        [
+            "bash",
+            "-c",
+            f'source "{GATES_PATH}"; _marker_record 123 acme/widget {HEAD_SHA}',
         ],
-        comments=[],
-        head_age_seconds=FRESH_HEAD_AGE,
-    ) as env:
-        result = run_gate("check_review_happened", env)
-
-    assert result.returncode == 0, result.stdout
-    assert "PASS: reviewed: Copilot review covers head commit" in result.stdout
-
-
-# --- The Claude marker is honoured by both gates, not just `reviewed` ---------------
+        capture_output=True,
+        text=True,
+        env=env,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stderr
+    return result.stdout.rstrip("\n").split("\t")
 
 
-def test_claude_marker_satisfies_currency_gate() -> None:
-    """A marker pinned to head answers currency's question directly.
+def test_marker_record_reports_the_review_depth() -> None:
+    """Which /code-review ran is a separate fact from whether one ran.
 
-    Before the fix currency ignored the marker entirely and sat out its full timer
-    waiting on a reviewer that already had a documented substitute.
+    Before PP-9onv only the second was written down, so the merge handoff could not
+    state the first without an agent recalling it.
     """
-    with gate_env(
-        reviews=[copilot_review("Old but real review.", age_seconds=9999)],
-        comments=[claude_marker(HEAD_SHA)],
-        head_age_seconds=FRESH_HEAD_AGE,
-    ) as env:
-        result = run_gate("check_copilot_currency", env)
-
-    assert result.returncode == 0, result.stdout
-    assert "PASS: currency: Claude review covers head commit" in result.stdout
+    with gate_env(comment_pages=[[marker_comment(HEAD_SHA, depth="high")]]) as env:
+        state, sha, depth, at, summary = marker_record(env)
+    assert (state, sha, depth) == ("marker", HEAD_SHA, "high")
+    assert at == "2026-08-02T20:43:19Z"
+    assert "/code-review high" in summary
 
 
-def test_claude_marker_satisfies_reviewed_gate() -> None:
-    with gate_env(
-        reviews=[],
-        comments=[claude_marker(HEAD_SHA)],
-        head_age_seconds=STALE_HEAD_AGE,
-    ) as env:
-        result = run_gate("check_review_happened", env)
+def test_a_marker_without_a_depth_comment_reads_as_unrecorded() -> None:
+    """Absence of the field — not a claim that no review ran.
 
-    assert result.returncode == 0, result.stdout
-    assert "PASS: reviewed: Claude review covers head commit" in result.stdout
-
-
-@pytest.mark.parametrize("gate", ["check_copilot_currency", "check_review_happened"])
-def test_marker_for_a_different_sha_is_ignored(gate: str) -> None:
-    """The SHA pin is what makes the attestation self-expiring after a new push."""
-    with gate_env(
-        reviews=[],
-        comments=[claude_marker(OTHER_SHA)],
-        head_age_seconds=FRESH_HEAD_AGE,
-    ) as env:
-        result = run_gate(gate, env)
-
-    assert "Claude review covers head commit" not in result.stdout
+    Every marker posted before PP-9onv is this shape, and reading one as `trivial` (or
+    as no review at all) would misreport a real review of a real head.
+    """
+    with gate_env(comment_pages=[[marker_comment(HEAD_SHA)]]) as env:
+        state, _sha, depth, _at, _summary = marker_record(env)
+    assert (state, depth) == ("marker", "unrecorded")
 
 
-# --- Unchanged behaviour that the refactor must not have broken --------------------
+def test_trivial_is_recorded_as_its_own_depth() -> None:
+    """The typo/one-line carve-out the gate docs allow, made legible in the handoff."""
+    with gate_env(comment_pages=[[marker_comment(HEAD_SHA, depth="trivial")]]) as env:
+        _state, _sha, depth, _at, summary = marker_record(env)
+    assert depth == "trivial"
+    assert "trivial" in summary
 
 
-def test_stale_real_review_waits_inside_the_window() -> None:
-    with gate_env(
-        reviews=[copilot_review("Real review of the previous head.", age_seconds=9999)],
-        comments=[],
-        head_age_seconds=FRESH_HEAD_AGE,
-    ) as env:
-        result = run_gate("check_copilot_currency", env)
+@pytest.mark.parametrize(
+    "comments,expected_state,expected_sha",
+    [
+        pytest.param(
+            [marker_comment(HEAD_SHA, depth="low")], "marker", HEAD_SHA, id="pins-head"
+        ),
+        pytest.param(
+            [marker_comment(OTHER_SHA, depth="low")],
+            "stale_marker",
+            OTHER_SHA,
+            id="stale",
+        ),
+        pytest.param([], "unreviewed", "", id="none"),
+    ],
+)
+def test_record_and_gate_cannot_disagree_about_the_head(
+    comments: list[dict], expected_state: str, expected_sha: str
+) -> None:
+    """The gate's verdict is the record's first two fields, by construction.
 
-    assert result.returncode == 2, result.stdout
-    assert "WAIT: currency:" in result.stdout
-
-
-def test_stale_real_review_warns_and_proceeds_past_the_window() -> None:
-    """Currency never hard-fails — past the threshold it degrades to WARN."""
-    with gate_env(
-        reviews=[copilot_review("Real review of the previous head.", age_seconds=9999)],
-        comments=[],
-        head_age_seconds=STALE_HEAD_AGE,
-    ) as env:
-        result = run_gate("check_copilot_currency", env)
-
-    assert result.returncode == 0, result.stdout
-    assert "WARN: currency:" in result.stdout
-
-
-def test_no_review_at_all_waits_inside_the_window() -> None:
-    with gate_env(reviews=[], comments=[], head_age_seconds=FRESH_HEAD_AGE) as env:
-        result = run_gate("check_review_happened", env)
-
-    assert result.returncode == 2, result.stdout
-    assert "WAIT: reviewed:" in result.stdout
+    Two lookups that each decided "which marker counts?" would eventually answer
+    differently, and the handoff report would tell Tim a head was reviewed while
+    merge-pr.sh refused it (or worse, the other way round).
+    """
+    with gate_env(comment_pages=[comments]) as env:
+        state, sha, _depth, _at, _summary = marker_record(env)
+        verdict = subprocess.run(
+            [
+                "bash",
+                "-c",
+                f'source "{GATES_PATH}"; _marker_verdict 123 acme/widget {HEAD_SHA}',
+            ],
+            capture_output=True,
+            text=True,
+            env=env,
+            timeout=60,
+        )
+    assert (state, sha) == (expected_state, expected_sha)
+    assert verdict.stdout.strip() == f"{expected_state} {expected_sha}".strip()

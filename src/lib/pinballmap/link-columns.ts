@@ -18,12 +18,20 @@ export type ResolvePbmLinkResult =
  *
  * Shared by the machine server actions and the MCP `add_machine` tool. Reads the
  * catalog mirror only — never reaches pinballmap.com (CORE-PBM-001).
+ *
+ * `pinballmapListed` / `pinballmapLmxId` are the exception to "the submitted
+ * state is authoritative": they are never submitted. No caller may derive them
+ * from a request body (PP-o355.29) — they describe a listing that exists on the
+ * public map, so they come from the stored row (the carry-over in
+ * `updateMachineAction`) or from a path that just talked to PBM. Omitting them
+ * unlists, which is the safe default for a caller that does not know.
  */
 export async function resolvePbmLinkColumns(input: {
   pinballmapMachineId?: number | undefined;
   pinballmapExcluded?: boolean | undefined;
   pinballmapExcludedReason?: string | undefined;
   pinballmapListed?: boolean | undefined;
+  pinballmapLmxId?: number | undefined;
 }): Promise<ResolvePbmLinkResult> {
   const pinballmapMachineId = input.pinballmapMachineId ?? null;
   const pinballmapExcluded = input.pinballmapExcluded ?? false;
@@ -54,6 +62,9 @@ export async function resolvePbmLinkColumns(input: {
     // Listing presupposes a link — only the linked branch below can set it true,
     // so every not-linked outcome (excluded, or neither) unlists the machine.
     pinballmapListed: false,
+    // The lmx describes a live PBM listing, so it cannot outlive one. Clearing
+    // it here is also what keeps the two lmx CHECK constraints satisfiable.
+    pinballmapLmxId: null,
     manufacturer: null,
     year: null,
     opdbId: null,
@@ -85,8 +96,16 @@ export async function resolvePbmLinkColumns(input: {
       columns: {
         ...empty,
         pinballmapMachineId,
-        // Only a linked machine can be listed on the public map.
+        // Only a linked machine can be listed on the public map. Callers that
+        // want to preserve an existing listing pass both flags through from the
+        // STORED row (never from form input — see the note above); anyone who
+        // omits them unlists, which is what an unqualified edit should do.
         pinballmapListed: input.pinballmapListed ?? false,
+        // Keep the lmx only while the listing it identifies survives.
+        pinballmapLmxId:
+          input.pinballmapListed === true
+            ? (input.pinballmapLmxId ?? null)
+            : null,
         manufacturer: entry.manufacturer,
         year: entry.year,
         opdbId: entry.opdbId,

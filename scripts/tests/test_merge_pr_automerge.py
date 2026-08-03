@@ -8,6 +8,9 @@ hard-fails, and give up without touching the PR when the budget runs out. A WAIT
 The whole script runs against a stubbed `gh`, including the real `_pr-gates.sh` it
 sources, so the gate wiring is exercised end to end. `gh pr merge` and `gh pr edit`
 write to marker files instead of acting, which is how "did not merge" is asserted.
+`bd` and `python3` are shadowed for the same reason: the two post-merge steps reach
+outward at real shared state — the live huddle bead, and this machine's real
+worktrees via `worktree_reap.py --apply`.
 """
 
 import json
@@ -23,6 +26,7 @@ from pathlib import Path
 MERGE_SCRIPT = Path(__file__).parent.parent / "workflow" / "merge-pr.sh"
 
 HEAD_SHA = "d084c14a43af3ac021f0838f5c7bf4b77f72fb62"
+HEAD_REF = "feat/stub-branch"
 CI_PASS = '{"name":"CI Gate","status":"COMPLETED","conclusion":"SUCCESS"}'
 CI_RED = '{"name":"CI Gate","status":"COMPLETED","conclusion":"FAILURE"}'
 CI_RUNNING = '{"name":"CI Gate","status":"IN_PROGRESS","conclusion":null}'
@@ -49,6 +53,7 @@ def stub_repo(
     ci_rollup: str,
     labels: list[str] | None = None,
     live_labels: list[str] | None = None,
+    reap_exit: int = 0,
 ) -> Iterator[dict]:
     """Yield paths + env for a run against a fully stubbed `gh`.
 
@@ -66,6 +71,7 @@ def stub_repo(
         label_marker = tmp_path / "label-removed"
         bd_calls = tmp_path / "bd-calls"
         gh_calls = tmp_path / "gh-calls"
+        py_calls = tmp_path / "py-calls"
 
         pr_info = json.dumps(
             {
@@ -101,6 +107,7 @@ def stub_repo(
             '  *"--json mergeable"*) printf "MERGEABLE\\n" ;;\n'
             '  *"--jq .headRefOid"*) printf "%s\\n" "$STUB_HEAD_SHA" ;;\n'
             '  *"--json headRefOid"*) printf \'{"headRefOid":"%s"}\\n\' "$STUB_HEAD_SHA" ;;\n'
+            '  *"--json headRefName"*) printf "%s\\n" "$STUB_HEAD_REF" ;;\n'
             '  "api user"*) printf "tim\\n" ;;\n'
             '  *"nameWithOwner"*) printf "acme/widget\\n" ;;\n'
             '  *graphql*) cat "$STUB_THREADS" ;;\n'
@@ -128,6 +135,22 @@ def stub_repo(
             bd_stub.stat().st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH
         )
 
+        # `python3` MUST be stubbed for exactly the same reason as `bd`, only the
+        # blast radius is larger. After a successful merge, merge-pr.sh runs
+        # `python3 scripts/worktree_reap.py --apply --repo-dir <the real repo>`.
+        # Left unshadowed, a test merge would reap this machine's real worktrees.
+        # merge-pr.sh and _pr-gates.sh reach python3 nowhere else, so shadowing it
+        # wholesale costs nothing.
+        py_stub = tmp_path / "python3"
+        py_stub.write_text(
+            "#!/usr/bin/env bash\n"
+            'printf "%s\\n" "$*" >> "$STUB_PY_CALLS"\n'
+            'exit "${STUB_PY_EXIT:-0}"\n'
+        )
+        py_stub.chmod(
+            py_stub.stat().st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH
+        )
+
         env = dict(os.environ)
         env["PATH"] = f"{tmp}{os.pathsep}{env.get('PATH', '')}"
         env["STUB_HEAD_SHA"] = HEAD_SHA
@@ -140,6 +163,9 @@ def stub_repo(
         env["STUB_LABEL_REMOVED"] = str(label_marker)
         env["STUB_BD_CALLS"] = str(bd_calls)
         env["STUB_GH_CALLS"] = str(gh_calls)
+        env["STUB_PY_CALLS"] = str(py_calls)
+        env["STUB_PY_EXIT"] = str(reap_exit)
+        env["STUB_HEAD_REF"] = HEAD_REF
         env["STUB_LIVE_LABELS"] = ",".join(
             live_labels if live_labels is not None else (labels or [])
         )
@@ -152,6 +178,7 @@ def stub_repo(
             "label_removed": label_marker,
             "bd_calls": bd_calls,
             "gh_calls": gh_calls,
+            "py_calls": py_calls,
         }
 
 
@@ -184,6 +211,9 @@ class Outcome:
         self.bd_calls = ctx["bd_calls"].read_text() if ctx["bd_calls"].exists() else ""
         self.gh_calls = (
             ctx["gh_calls"].read_text().splitlines() if ctx["gh_calls"].exists() else []
+        )
+        self.py_calls = (
+            ctx["py_calls"].read_text().splitlines() if ctx["py_calls"].exists() else []
         )
 
 
@@ -231,6 +261,65 @@ def test_bd_is_shadowed_so_a_test_merge_cannot_reach_the_real_huddle() -> None:
     )
     assert out.returncode == 0, out.stdout + out.stderr
     assert "MERGED: PR #123" in out.stdout
+
+
+def test_python3_is_shadowed_so_a_test_merge_cannot_reap_real_worktrees() -> None:
+    """Same class of bug as the `bd` shadowing above, with a larger blast radius.
+
+    After a successful merge, merge-pr.sh runs `worktree_reap.py --apply` against
+    the repo the script lives in — this machine's real checkout, not the temp
+    dir. Unshadowed, a test merge would delete real worktrees. Asserted on the
+    resolution rather than on recorded calls so it holds even if the reap block
+    bails early for some unrelated reason.
+    """
+    with stub_repo(ci_rollup=CI_PASS) as ctx:
+        resolved = subprocess.run(
+            ["bash", "-c", "command -v python3"],
+            capture_output=True,
+            text=True,
+            env=ctx["env"],
+        ).stdout.strip()
+        stub_dir = str(ctx["py_calls"].parent)
+        out = run_and_snapshot(ctx, "--human", "--automerge")
+
+    assert resolved.startswith(stub_dir), (
+        f"python3 must resolve into the stub dir, got {resolved!r} — "
+        "a test merge could reap real worktrees"
+    )
+    assert out.returncode == 0, out.stdout + out.stderr
+
+
+def test_merge_reaps_the_merged_branchs_worktree() -> None:
+    """The whole point of the post-merge hook: nothing else ever removes it.
+
+    Scoped to the branch that just merged (`--branch`) and dry-run-free
+    (`--apply`), but the verdict is still worktree_reap.py's to make — merge-pr.sh
+    passes no opinion about whether the worktree is safe to remove.
+    """
+    with stub_repo(ci_rollup=CI_PASS) as ctx:
+        out = run_and_snapshot(ctx, "--human", "--automerge")
+
+    assert out.returncode == 0, out.stdout + out.stderr
+    assert "MERGED: PR #123" in out.stdout
+    reap_calls = [c for c in out.py_calls if "worktree_reap.py" in c]
+    assert len(reap_calls) == 1, out.py_calls
+    assert "--apply" in reap_calls[0]
+    assert f"--branch {HEAD_REF}" in reap_calls[0]
+
+
+def test_a_failing_reap_does_not_change_the_merge_exit_status() -> None:
+    """The merge already happened; no post-step may propagate an error.
+
+    A non-zero reap is real information (cleanup codes 1-4 each mean something),
+    but it says nothing about the merge, and `set -euo pipefail` at the top of
+    the script would otherwise turn it into a failed exit on a merged PR.
+    """
+    with stub_repo(ci_rollup=CI_PASS, reap_exit=1) as ctx:
+        out = run_and_snapshot(ctx, "--human", "--automerge")
+
+    assert out.returncode == 0, out.stdout + out.stderr
+    assert "MERGED: PR #123" in out.stdout
+    assert any("worktree_reap.py" in c for c in out.py_calls), out.py_calls
 
 
 def test_head_is_not_re_read_between_the_last_gate_and_the_merge() -> None:

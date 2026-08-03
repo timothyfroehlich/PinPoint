@@ -164,7 +164,7 @@ export function CreateMachineForm({
 
       {/*
        * Promote-and-assign confirmation dialog.
-       * Duplicated from update-machine-form.tsx — pending extraction at 3rd consumer.
+       * Duplicated from machine-owner-transfer.tsx — pending extraction at 3rd consumer.
        *
        * Radix portals the DialogContent outside the form tree, so the confirm
        * button cannot use type="submit" to target the outer form. We build
@@ -353,18 +353,25 @@ export function CreateMachineForm({
           </Select>
         </div>
 
-        {/* PinballMap listing — a brand-new machine always starts unlisted.
-            Connecting it to a PinballMap entry (the state-aware control) happens
-            from the machine's Edit dialog once it exists and has an id to act on
-            (PP-o355.12 read side). */}
+        {/* PinballMap listing — a brand-new machine always starts unlisted, and
+            nothing will list it on its own. The hourly cron only refreshes the
+            location snapshot and heals drifted lmx ids; it deliberately does
+            NOT flip `pinballmapListed` ("that stays a human decision" —
+            src/lib/pinballmap/sync.ts), and the PBM write verbs don't exist
+            yet. So this copy says listing isn't automatic rather than implying
+            something downstream handles it — the failure mode being a machine
+            left silently unlisted forever because nobody thought they had to
+            act. It names no destination either: the Edit dialog is gone
+            (PP-o355.19) and the Manage tab's control is a placeholder until
+            PP-o355.21. Point it at that control once .21 ships. */}
         <div className="flex items-start gap-2">
           <MapPin
             aria-hidden="true"
             className="mt-0.5 size-4 text-muted-foreground"
           />
           <p className="text-sm text-muted-foreground">
-            Connect this machine to its PinballMap listing after creating it —
-            open its Edit dialog and use &ldquo;Connect to PinballMap&rdquo;.
+            Not yet on Pinball Map. Listing it there isn&rsquo;t automatic yet —
+            machine-level listing controls are coming soon.
           </p>
         </div>
 

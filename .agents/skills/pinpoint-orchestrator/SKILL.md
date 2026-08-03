@@ -38,16 +38,19 @@ Coordinate multiple subagents working in parallel across isolated git worktrees.
 # including --dry-run. The lead does NOT run it, even to preview gates. Once the PR
 # is ready (label applied, screenshots posted if UI-touching), hand Tim:
 #   ! scripts/workflow/merge-pr.sh <PR> --human
-bash scripts/workflow/mark-claude-review.sh <PR> "<summary>"  # Post SHA-pinned Claude-review marker (satisfies the `reviewed` gate when Copilot skips)
+bash scripts/workflow/mark-claude-review.sh <PR> <depth> "<summary>"  # SHA-pinned review marker — the ONLY thing that satisfies the `reviewed` gate. Attests Tim ran /code-review (or that the change was trivial)
 node scripts/workflow/pr-screenshots.mjs <PR>                 # UI-touching PRs: desktop+mobile screenshots, sticky PR comment
 
-# Worktree health — covers manually created ../pinpoint-worktrees/* ONLY;
-# agent-created .claude/worktrees/* are handled by the WorktreeRemove hook and not scanned here
+# Worktree health — stale-worktrees.sh covers manually created ../pinpoint-worktrees/* ONLY.
+# The WorktreeRemove hook does NOT remove finished agent worktrees; it only runs cleanup
+# when something else initiates removal, so a background agent that pushes and ends leaves
+# its directory on disk forever. worktree_reap.py is what removes them (PP-49x5).
 ./scripts/workflow/stale-worktrees.sh                    # Report stale/active/dirty worktrees
 ./scripts/workflow/stale-worktrees.sh --clean            # Auto-remove stale worktrees
 
 # Worktree management (post-checkout hook auto-configures ports + Supabase)
 git worktree list                                             # Show all worktrees
+python3 scripts/worktree_reap.py                              # Report worktrees whose work already landed (dry-run; --apply to reclaim)
 python3 scripts/worktree_cleanup.py <worktree-path>           # Full cleanup (Supabase stop, Docker volumes, manifest, worktree removal)
 ```
 
@@ -133,7 +136,15 @@ Work bead <ID>. First run `bd show <ID>` && `bd update <ID> --claim` — the bea
 
 ## Quality Gates
 
-Run `pnpm run check` before returning. Then self-review **by hand**: read your own diff (`git diff origin/main...HEAD`) against `REVIEW.md` — the canonical rubric — plus the bead's acceptance criteria and out-of-scope list, and fix what you find. Don't reach for `/code-review` or `ultra`: both are user-triggered harness surfaces (`ultra` is also billed) and an agent cannot launch either. After your final push, if Copilot hasn't reviewed your head commit within ~10 min, run `bash scripts/workflow/mark-claude-review.sh <PR> "<summary>"` so the `reviewed` merge gate passes.
+Run `pnpm run check` before returning. Then self-review **by hand**: read your own diff (`git diff origin/main...HEAD`) against `REVIEW.md` — the canonical rubric — plus the bead's acceptance criteria and out-of-scope list, and fix what you find. Don't reach for `/code-review` or `ultra`: both are user-triggered harness surfaces (`ultra` is also billed) and an agent cannot launch either.
+
+A review covering the head commit is still **required** to merge, and **no bot reviews this repo** (PP-4ric). The reviewer is Tim running `/code-review` — which you cannot launch — so getting reviewed is a handoff, not a command you run.
+
+Open the PR whenever you like and watch CI; it costs nothing. Then finish all of it — CI fixes, merge-from-main — stop iterating, and ask Tim for the review. When he has given it and you have addressed the findings, attest the head he reviewed:
+
+`bash scripts/workflow/mark-claude-review.sh <PR> <depth> "<summary>"`
+
+The marker pins a SHA, so any push after it invalidates it. Re-attesting is right when what you pushed was the review's own findings; anything else needs a fresh `/code-review`. A genuinely trivial change (typo, comment, one-line mechanical fix) can be attested without interrupting Tim — say why it was trivial in the summary. The marker is an attestation that a review happened, never a way to skip one.
 
 ## Return Format
 
@@ -142,7 +153,8 @@ Report back with:
 - **Branch**: <branch name>
 - **PR**: #<number>
 - **CI**: passing/failing/pending
-- **Self-review**: findings addressed / marker posted?
+- **Self-review**: findings addressed
+- **Review**: attested at <sha> (Tim's /code-review, or trivial-change exception) / still needs Tim's review
 - **Blockers**: none or description
 ```
 
@@ -193,7 +205,7 @@ gh run rerun <run-id> --failed
 
 ### Label Ready PRs
 
-See pinpoint-pr-workflow skill Phase 3.4. Apply `ready-for-review` after CI green + zero unresolved review threads via:
+See pinpoint-pr-workflow skill Phase 3.6. Apply `ready-for-review` after CI green + a marker pinning head + zero unresolved review threads. The label does **not** get the PR reviewed (see the backstop below). Apply via:
 
 ```
 mcp__github__issue_write(method: "update", owner, repo, issue_number: <PR>, labels: [<existing>..., "ready-for-review"])
@@ -203,13 +215,24 @@ Or fallback: `gh pr edit <PR> --add-label ready-for-review`.
 
 ### Ensure every PR is reviewed (lead backstop)
 
-The subagent self-reviews its own diff (Phase 3 template), but that can be skipped or Copilot can silently miss the head commit — so the lead re-checks at the handoff boundary. Before applying `ready-for-review` or handing a PR to Tim for `merge-pr.sh --human`, confirm the head commit is covered by **either** a Copilot review **or** a SHA-pinned Claude marker (`<!-- pinpoint-claude-review: <head_sha> -->`). If neither covers head:
+The merge bar is unchanged: no PR merges without a review covering the **head commit**, recorded as a SHA-pinned marker (`<!-- pinpoint-claude-review: <head_sha> -->`), with threads resolved. What changed on 2026-08-02 (PP-4ric) is who reviews: **no bot does.** The reviewer is Tim running `/code-review`, which no agent — lead or subagent — can launch.
 
-1. Review the PR diff yourself — a deliberate manual pass over `git diff origin/main...HEAD` against `REVIEW.md` (the canonical rubric) and the bead's acceptance criteria. `/code-review` is a harness built-in that only Tim can trigger, and `ultra` is the cloud multi-agent review — user-triggered and billed. An agent can launch neither, so the manual pass is the backstop.
-2. Address serious findings (fix → have the subagent push → re-review; a fix re-arms the gate). Decline the rest.
-3. `bash scripts/workflow/mark-claude-review.sh <PR> "<summary>"` to post the marker.
+That makes the lead's job here a scheduling one. A subagent that finishes and ends leaves a PR sitting unreviewed forever, because there is nothing to wait for. **Check the marker against head:**
 
-The `reviewed` gate in `merge-pr.sh` is the hard enforcement — it FAILs the merge if the head commit has no Copilot or Claude review once the 600s Copilot window has elapsed. Running the fallback before handoff is how the lead satisfies it; telling Tim to `--force`-bypass it defeats the guarantee.
+```bash
+gh pr view <PR> --json headRefOid --jq .headRefOid
+gh api repos/timothyfroehlich/PinPoint/issues/<PR>/comments --jq '.[] | select(.body | startswith("<!-- pinpoint-claude-review:")) | .body' | head -1
+```
+
+Before applying `ready-for-review` or handing a PR to Tim for `merge-pr.sh --human`, confirm the marker pins head. If it doesn't, distinguish the cases:
+
+**No marker at all** → nobody has reviewed it. Batch it with the other PRs waiting on Tim rather than pinging him per-PR: tell him which branches are ready for `/code-review`, and let him work through them.
+
+**A marker pinning an older SHA** → someone reviewed it, then pushed past the review. What was pushed decides the fix: if it was the review's own findings, re-attest at the new head and say so in the summary; if it was new work, it needs a fresh `/code-review`.
+
+**A marker pinning head** → nothing to do. That review is legitimately terminal.
+
+Don't post a marker to paper over a review nobody ran, and don't ask Tim to `--force`. The `reviewed` gate in `merge-pr.sh` is the hard enforcement — it FAILs on both un-reviewed states and never WAITs, since with no bot in the loop there is no answer already on its way. Satisfying it honestly before handoff is the lead's job.
 
 ---
 

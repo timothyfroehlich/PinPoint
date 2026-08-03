@@ -168,12 +168,16 @@ function wantsPbmLinkChange(input: {
  * Pull the raw PinballMap link fields off a create/edit FormData for Zod parsing.
  * `pinballmapMachineId` stays a string (the schema coerces it); the excluded
  * checkbox becomes `true`/`undefined`; a blank reason becomes `undefined`.
+ *
+ * `pinballmapListed` is **not** read here, on purpose — see the note in
+ * `./schemas.ts` (PP-o355.29). Listing state comes from the paths that talk to
+ * PinballMap, or from the stored row on the carry-over below; never from a
+ * request body.
  */
 function readPbmLinkFormFields(formData: FormData): {
   pinballmapMachineId: string | undefined;
   pinballmapExcluded: boolean | undefined;
   pinballmapExcludedReason: string | undefined;
-  pinballmapListed: boolean | undefined;
 } {
   const idRaw = formData.get("pinballmapMachineId");
   const reasonRaw = formData.get("pinballmapExcludedReason");
@@ -186,8 +190,6 @@ function readPbmLinkFormFields(formData: FormData): {
       typeof reasonRaw === "string" && reasonRaw.trim().length > 0
         ? reasonRaw
         : undefined,
-    pinballmapListed:
-      formData.get("pinballmapListed") === "on" ? true : undefined,
   };
 }
 
@@ -354,6 +356,12 @@ export async function createMachineAction(
         redirectTo: `/m/${machine.initials}`,
       });
     } catch (error: unknown) {
+      // `initials` is the only unique constraint create can violate. The other
+      // one — `machines_pinballmap_listed_unique` — is partial, indexing only
+      // rows `WHERE pinballmap_listed`, and create always writes that column
+      // false: it is not accepted from the form (PP-o355.29) and no PBM call
+      // happens here. An unindexed row cannot collide, so there is nothing to
+      // disambiguate and a bare 23505 is unambiguous.
       if (isPgErrorCode(error, "23505")) {
         return err("VALIDATION", `Initials '${initials}' are already taken.`);
       }
@@ -444,6 +452,8 @@ export async function createMachineAction(
       redirectTo: `/m/${machine.initials}`,
     });
   } catch (error: unknown) {
+    // Initials is the only unique constraint reachable here — see the
+    // forcePromote catch above.
     if (isPgErrorCode(error, "23505")) {
       return err("VALIDATION", `Initials '${initials}' are already taken.`);
     }
@@ -585,7 +595,9 @@ export async function updateMachineAction(
 
   const rawData = {
     id: formData.get("id"),
-    name: formData.get("name"),
+    // A missing field reads as `null`, which the optional schema would reject —
+    // normalize so "field absent" means "leave the name alone".
+    name: formData.get("name") ?? undefined,
     ownerId:
       typeof formData.get("ownerId") === "string" &&
       (formData.get("ownerId") as string).length > 0
@@ -638,6 +650,11 @@ export async function updateMachineAction(
         name: true,
         initials: true,
         presenceStatus: true,
+        // Needed to decide whether an edit re-targets the PBM link — see the
+        // `pinballmapListed` carry-over at the `resolvePbmLinkColumns` call.
+        pinballmapMachineId: true,
+        pinballmapListed: true,
+        pinballmapLmxId: true,
       },
     });
 
@@ -675,7 +692,32 @@ export async function updateMachineAction(
           "You do not have permission to link this machine to Pinball Map."
         );
       }
-      const pbm = await resolvePbmLinkColumns(validation.data);
+      // `pinballmapListed` is not an input to this action at all: the edit form
+      // renders no control for it, `readPbmLinkFormFields` does not read it, and
+      // `updateMachineSchema` does not accept it (PP-o355.29). It is flipped
+      // only by paths that talk to PBM — `linkPinballmapEntryAction` and the
+      // verify/heal action. So the value below comes from the STORED row, and
+      // without this carry-over `resolvePbmLinkColumns` would default it to
+      // `false` — silently unlisting a listed machine on every unrelated "Save
+      // details" (PP-o355.19 review).
+      //
+      // Carry the stored value only while the link target is unchanged;
+      // re-targeting the link makes the old listing meaningless, and the
+      // resolver already forces `false` on the unlinked/excluded branches.
+      const submittedPbmId = validation.data.pinballmapMachineId ?? null;
+      const linkUnchanged =
+        submittedPbmId === currentMachine.pinballmapMachineId;
+      const pbm = await resolvePbmLinkColumns({
+        ...validation.data,
+        ...(linkUnchanged && currentMachine.pinballmapListed
+          ? {
+              pinballmapListed: true,
+              ...(currentMachine.pinballmapLmxId === null
+                ? {}
+                : { pinballmapLmxId: currentMachine.pinballmapLmxId }),
+            }
+          : {}),
+      });
       if (!pbm.ok) return err("VALIDATION", pbm.message);
       pbmColumns = pbm.columns;
     }
@@ -736,7 +778,7 @@ export async function updateMachineAction(
         const [updatedMachine] = await tx
           .update(machines)
           .set({
-            name,
+            ...(name !== undefined && { name }),
             ...(presenceStatus !== undefined && { presenceStatus }),
             ownerId: machineOwnerId ?? null,
             invitedOwnerId: machineInvitedOwnerId ?? null,
@@ -781,7 +823,7 @@ export async function updateMachineAction(
             presenceStatus: currentMachine.presenceStatus,
           },
           {
-            name,
+            name: name ?? currentMachine.name,
             ownerChanged: true,
             owner: toMachineOwnerRef(machineOwnerId, machineInvitedOwnerId),
             presenceStatus,
@@ -924,7 +966,7 @@ export async function updateMachineAction(
       const [updatedMachine] = await tx
         .update(machines)
         .set({
-          name,
+          ...(name !== undefined && { name }),
           ...(presenceStatus !== undefined && { presenceStatus }),
           ...(shouldUpdateOwner && {
             ownerId: finalOwnerId,
@@ -987,7 +1029,7 @@ export async function updateMachineAction(
           presenceStatus: currentMachine.presenceStatus,
         },
         {
-          name,
+          name: name ?? currentMachine.name,
           ownerChanged: shouldUpdateOwner,
           owner: toMachineOwnerRef(finalOwnerId, finalInvitedOwnerId),
           presenceStatus,
@@ -1060,6 +1102,21 @@ export async function updateMachineAction(
     if (error instanceof MachineNotFoundError) {
       return err("NOT_FOUND", "Machine not found.");
     }
+    // NO listing-collision catch here, deliberately (PP-o355.29). This action
+    // cannot touch `initials`, so `machines_pinballmap_listed_unique` is the
+    // only unique constraint it could ever violate — and it cannot reach that
+    // one either. The sole way it sets `pinballmapListed` true is the carry-over
+    // above, gated on `linkUnchanged && currentMachine.pinballmapListed`: it
+    // rewrites a value the same row already holds for the same title, which
+    // cannot collide with itself. Nor can a concurrent writer set up the
+    // collision, because the precondition — two cabinets of one title both
+    // listed — is the exact state the index forbids; seeding it fails.
+    //
+    // PP-o355.15 added a catch here, correctly, while a form post could set the
+    // flag. Closing that made the branch unreachable AND untestable, so it is
+    // removed rather than shipped uncovered. PP-o355.20 runs auto-link at
+    // title-save time, which makes this path a listing writer again — that bead
+    // re-adds the catch together with the test that can finally reach it.
     return serverActionError(
       error,
       "SERVER",

@@ -1,6 +1,6 @@
 ---
 name: pinpoint-pr-workflow
-description: Full PR lifecycle for PinPoint — commit, push, CI monitoring, Copilot + human review handling (via MCP), UI screenshots, readiness labeling, human-only gate-enforced merge handoff, and post-merge deploy-watch/cleanup/handoff. Use when committing changes, opening PRs, watching CI, addressing review comments, posting screenshots, handing a PR to Tim to merge, or landing the plane after Tim merges (watching the deploy, cleanup, handoff).
+description: Full PR lifecycle for PinPoint — commit, push, CI monitoring, getting the head commit reviewed (Tim runs /code-review; an agent cannot, and attests the result with a SHA-pinned marker), review handling, UI screenshots, readiness labeling, human-only gate-enforced merge handoff, and post-merge deploy-watch/cleanup/handoff. Use when committing changes, opening PRs, watching CI, handing a PR to Tim for review, attesting a reviewed head, addressing review comments, posting screenshots, handing a PR to Tim to merge, or landing the plane after Tim merges (watching the deploy, cleanup, handoff).
 ---
 
 # PinPoint PR Workflow
@@ -28,7 +28,7 @@ End-to-end pipeline from "I have changes" to "merged in main". Replaces the depr
 
 ### 1.2 Pre-commit validation
 
-Default to `pnpm run check` (~12s; covers type, lint, format, unit tests, yamllint, actionlint, ruff, shellcheck). Use `pnpm run preflight` (full + integration) before commit for non-trivial changes, especially: migrations, security/auth changes, server actions, middleware.
+Default to `pnpm run check` (~9s; covers type, lint, format, yamllint, actionlint, ruff, shellcheck). Python hook/script tests are **not** in it — run `pnpm run check:python` if you touched `scripts/` or `.claude/hooks/`. It is **static-only — no unit tests** since PP-4zcj, so run `pnpm run test` too when you changed logic. Use `pnpm run preflight` (full + unit + integration) before commit for non-trivial changes, especially: migrations, security/auth changes, server actions, middleware.
 
 ### 1.3 E2E selection
 
@@ -91,7 +91,7 @@ Closes #N (if applicable)
 
 ---
 
-## Phase 3: Review (CI + Copilot + label)
+## Phase 3: Review (CI + review + label)
 
 ### 3.1 Watch CI
 
@@ -106,7 +106,7 @@ timeout_ms: 3600000
 )
 ```
 
-Exit 0 = all passed, or stopped for a new Copilot review. Exit 1 = failure — read `tmp/gh-monitor/failure-<RUN_ID>.md`.
+Exit 0 = all passed. Exit 1 = failure — read `tmp/gh-monitor/failure-<RUN_ID>.md`.
 
 If you judge the failure to be a GitHub Actions **infra** flake (network timeout, runner loss, download 5xx, Supabase container-start) rather than a real code/test failure, log it before rerunning: `bash scripts/workflow/log-gha-flake.sh <pr> <run-id> <class> "<symptom>"` (see `docs/runbooks/gha-flake-log.md`).
 
@@ -166,28 +166,68 @@ pullNumber: <PR>
 
 Sign replies with your agent name (`—Claude-Plunger`, `—Claude-Spinner`, etc.).
 
-Copilot review threads count here too — a PR is not ready while Copilot has open threads. Resolve or decline each one (per 3.3) before moving on.
+Every unresolved thread counts, whoever opened it — the `threads` gate is author-agnostic. Resolve or decline each one (per 3.3) before moving on.
 
-### 3.4 Verify Copilot reviewed the latest commit
+### 3.4 Get the head commit reviewed — Tim runs `/code-review`, you attest
 
-A PR isn't "ready for review" — and you must not declare it done — until Copilot has actually reviewed the **current head commit**. This catches the silent-skip case where `update_pull_request_branch` or merge-from-main commits don't trigger Copilot's `review_requested` event (per PR #1342 case).
+**The merge bar has not moved: a PR cannot merge without a review covering the HEAD commit,** with all its threads resolved. Review is mandatory, not on-demand, not discretionary.
 
-Compare:
+**What changed on 2026-08-02 (PP-4ric) is who does it.** The bot reviewer this repo used was retired — its free tier was too small to review PinPoint's PRs, so quota outages were the normal state rather than the exception. No bot reviews this repo now, and there is nothing to request: a PR carries no pending reviewer, and any doc or habit that has you adding one is stale.
 
-- `pull_request_read(method: "get_reviews")` → latest `submitted_at` for a `copilot-pull-request-reviewer` / `copilot-pull-request-reviewer[bot]` review
-- `get_commit(sha: <head_sha>)` → `commit.committer.date`
+The reviewer is **Tim, running `/code-review` on the branch**. You cannot do this for him — `/code-review` is a Claude Code harness built-in only he can trigger (`ultra` likewise, and billed). So the review is a **handoff**, and your job is to make the handoff at the right moment and record the result.
 
-If head is newer than the latest Copilot review:
+#### Sequencing
 
-- Elapsed < 600s → wait, Copilot may still be reviewing.
-- Elapsed >= 600s (or `request_copilot_review` yields nothing after another 60s) → **run a Claude fallback review instead of proceeding unreviewed.** Copilot silently skips `review_requested` events often enough that "no review" cannot be a merge path (per PR #1342 / #1326). The fallback:
-  1. Review the PR diff yourself — a deliberate manual pass over `git diff origin/main...HEAD` against `REVIEW.md`, the canonical rubric. (`/code-review` is a harness built-in that only Tim can trigger; `ultra` is user-triggered and billed. An agent can launch neither.)
-  2. Address serious findings the same way you handle Copilot threads: fix → push → re-review. A fix changes the head SHA and re-arms the `reviewed` gate. Consciously decline the rest.
-  3. `bash scripts/workflow/mark-claude-review.sh <PR> "<one-line findings summary>"` — posts the SHA-pinned sticky marker `<!-- pinpoint-claude-review: <head_sha> -->` that the `reviewed` gate detects.
+1. Open the PR whenever you like and watch CI. Nothing is reviewing yet, so an early PR costs nothing.
+2. Finish **all** the work: the implementation, the CI fixes, the merge-from-main. Stop iterating.
+3. Ask Tim for the review, naming the branch, and wait. This is a real stop — don't fill the time with more commits, because every push invalidates the review he is about to give you.
+4. Address the findings: fix → push → and note that head has moved (see below). Consciously decline the rest, with a reason. **A review that found nothing worth fixing skips straight to step 5** — there is no push, so head is already the SHA he read.
+5. Attest the head he reviewed — **this step is yours, always, and it is the only thing that satisfies the gate.** A clean review with an unposted marker reads to `merge-pr.sh` as `unreviewed`, so the review Tim ran buys nothing until you post it:
 
-`merge-pr.sh` enforces this at merge time via the `reviewed` gate (PASSes on a Copilot review OR a SHA-matched Claude marker; WAITs inside the 600s window; FAILs after it with no review of either kind). Unlike the `currency` gate — which never hard-fails, only WARN-proceeds once its timer runs out — `reviewed` blocks the merge, so the Claude fallback is the way past it, not a bypass. Both gates honour the marker. Don't tell Tim a PR is "ready" or "done" while head is still unreviewed — making a review happen is part of finishing the PR, not an optional extra.
+   ```bash
+   bash scripts/workflow/mark-claude-review.sh <PR> <depth> "<one-line findings summary>"
+   ```
 
-**A Copilot comment saying it _couldn't_ review is not a review** (PP-jw0s). When Copilot is quota-limited or finds nothing to analyze, it still posts a review object with a real timestamp — and both gates used to count it, going green on a review that read nothing. They now match those bodies and treat them as absent, so a quota-limited PR takes the honest path: WAIT, then FAIL with the `mark-claude-review.sh` remedy printed. If you see that FAIL during a quota outage, the gate is working — run the fallback above, don't `--force`.
+   That posts the sticky SHA-pinned marker `<!-- pinpoint-claude-review: <head_sha> -->` that the `reviewed` gate detects.
+
+   `<depth>` is the level Tim actually ran — `low | medium | high | xhigh | max | ultra` (or `trivial`, below). It is required and has no default: "a review happened" and "a `/code-review low` happened" are different facts, and the merge handoff report states which one. If you don't know which he ran, ask — guessing here writes a false claim into the record that reads exactly like a true one.
+
+6. Then 3.5 / 3.6.
+
+**Finish your churn before you ask.** This mattered under the bot reviewer because a review cost quota; it matters more now because it costs Tim's attention. Asking for a review of a tree you're about to change wastes the more expensive resource.
+
+#### Pushing after the review
+
+**The marker pins a SHA, so any push invalidates it** — the gate flips to `stale_marker` and says so. That's deliberate: a 3-commit fixup must not inherit the review of the commit before it.
+
+Which of two things you do next depends on what you pushed:
+
+- **The fixes he asked for.** Re-attest at the new head and say so in the summary — `"applied review findings from <old_sha>"`. A reviewer's own requested changes are within what they reviewed; this is the same round-trip any human review has.
+- **Anything else** — new work, a refactor you thought of, a scope addition. That needs a fresh `/code-review`. Re-attesting over it is a false attestation.
+
+If you're unsure which bucket you're in, ask. The cost of asking is one message; the cost of guessing wrong is merging something nobody read.
+
+#### The trivial-change exception
+
+A genuinely trivial change — a typo, a comment, a one-line mechanical fix — doesn't need to interrupt Tim. Attest it yourself and **say why it was trivial** in the marker summary, so the judgement is on the record and reviewable:
+
+```bash
+bash scripts/workflow/mark-claude-review.sh <PR> trivial "typo in a comment; no behavior change"
+```
+
+`trivial` is the depth for this case, and it is the only one that does not name a `/code-review` level — the report then says "attested trivial (no /code-review run)" rather than implying a review happened.
+
+This is a narrow exception and it is self-policing. "It's only a small change" is not the test — the test is whether there is any way for it to be wrong. If you're reaching for a justification, it isn't trivial.
+
+**The marker attests that a review actually happened.** Posting it otherwise is a false attestation, not a shortcut — the same honesty model as `merge-pr.sh --force`.
+
+#### What the gates check
+
+`merge-pr.sh` enforces this at merge time via the `reviewed` gate: PASS on `marker` (a marker pinning head), FAIL on `stale_marker` (a marker pinning an older commit) and `unreviewed` (no marker at all). Nothing WAITs — with no bot in the loop there is never an answer already on its way, so a WAIT would poll for an hour and then time out.
+
+`pr-watch.py --check-ready` reports the same state but does **not** gate on it. That check answers "is this PR worth Tim's `/code-review` right now?", and the review is what happens after that answer is yes — gating on it would be circular. Check-ready green means "hand it to Tim", not "will merge".
+
+Don't tell Tim a PR is "ready" or "done" while head is unreviewed — say it's ready for his `/code-review`, which is a different claim.
 
 ### 3.5 Post UI screenshots (UI-touching PRs only)
 
@@ -197,13 +237,15 @@ If the diff touches `src/app/**`, `src/components/**`, any `.css`, or design tok
 node scripts/workflow/pr-screenshots.mjs <PR>
 ```
 
-Shoots the manifest in `scripts/workflow/ui-screenshot-manifest.json` (issues list, issue detail, report form, dashboard, a machine detail, collections — pass `--pages a,b,c` to shoot a subset) at desktop (1440×900) and mobile (390×844) viewports, pushes the PNGs to the orphan `pr-screenshots` branch, and posts/updates one sticky PR comment (marker `<!-- pr-screenshots -->`) with a desktop|mobile table per page. Re-run after any UI-affecting push — it updates the same sticky comment in place, tagged with the new head SHA.
+Shoots the manifest in `scripts/workflow/ui-screenshot-manifest.json` (issues list, issue detail, report form, dashboard, a machine detail, collections — pass `--pages=a,b,c` to shoot a subset) at desktop (1440×900) and mobile (390×844) viewports, pushes the PNGs to the orphan `pr-screenshots` branch, and posts/updates one sticky PR comment (marker `<!-- pr-screenshots -->`) with a desktop|mobile table per page. Re-run after any UI-affecting push — it updates the same sticky comment in place, tagged with the new head SHA.
+
+Two `--pages` gotchas: it only accepts the **equals** form (`--pages=machine-edit`); the space-separated form fails with `Unrecognized argument`. And a filtered run rebuilds the sticky comment from just the pages it shot, silently dropping the others — so always finish with an unfiltered run before handing the PR off.
 
 Requires the local dev server (`pnpm run dev`) and Supabase (`supabase start`) running. First run (or a stale/missing login session) regenerates `e2e/.auth/*.json` via the `auth-setup` Playwright project, which resets + reseeds the local dev DB — same as running E2E tests locally, not a new risk.
 
 ### 3.6 Apply `ready-for-review` label
 
-Once CI green + zero unresolved review threads (including Copilot) + Copilot reviewed head commit + no merge conflict + screenshots posted (if UI-touching, per 3.5):
+Once CI green + a review marker pinning head (per 3.4) + zero unresolved review threads + no merge conflict + screenshots posted (if UI-touching, per 3.5):
 
 1. Read current labels via `pull_request_read(method: "get")` and extract `.labels[]`.
 2. Build new labels array: existing labels + `"ready-for-review"`.
@@ -223,6 +265,8 @@ NOTE: PR labels are added via the issues endpoint. `labels` parameter is full-re
 
 The label is a hint to Tim that the PR is ready for **him** to merge — it does not authorize an agent to merge. `merge-pr.sh --human` re-checks all gates when Tim runs it.
 
+**The label does not get the PR reviewed.** Applying it on a PR whose head is past its last review — or that was never reviewed at all — just moves the failure to merge time.
+
 ---
 
 ## Phase 4: Merge — human-only (PP-wi85)
@@ -231,13 +275,19 @@ The label is a hint to Tim that the PR is ready for **him** to merge — it does
 
 ### 4.1 Agent's terminal state: handoff, not merge
 
-Once 3.1–3.6 are satisfied (CI green, threads resolved, head commit reviewed, no conflict, screenshots posted if UI-touching), your job on this PR is done. Tell Tim it's ready and hand him the exact command to run himself:
+Once 3.1–3.6 are satisfied (CI green, a review whose `commit_id` matches head per 3.4, threads resolved, no conflict, screenshots posted if UI-touching), your job on this PR is done. Hand it over by **running the handoff report and pasting its output** — do not write the summary yourself:
 
-```
-! scripts/workflow/merge-pr.sh <PR> --human
+```bash
+bash scripts/workflow/merge-handoff.sh <PR>
 ```
 
-If CI is still running, hand him the automerge form instead — it waits rather than making him come back. Attest the review first (Phase 3.4); automerge waits out CI, not an unreviewed head:
+It prints what Tim needs to decide whether to merge — which `/code-review` ran and whether it covers head, how many commits landed since, CI, threads, mergeable + how far behind main, when main was last merged in, the diff split into src / tests / docs / other, migrations, newly-registered env vars, UI + screenshots — and ends with two `!`-prefixed commands: one to re-run the report, one to merge.
+
+**Why a script and not a format you fill in.** Every line of it is a fact you would otherwise be recalling: how many commits back the review was, what the line counts are, whether main has been merged in. Those are exactly the claims that drift, and Tim acts on them. `git` and `gh` already know all of it. Paste the block; add prose only for what the block cannot know (why a finding was declined, what to watch on deploy).
+
+**The re-run line is part of the report, not decoration.** The block is a snapshot and is stale as soon as CI re-runs or anyone pushes. Tim re-runs it himself rather than asking you to re-check.
+
+**The merge command only appears when all four gates actually pass.** An un-ready PR gets the blocking reasons instead — so don't hand over a merge command the report didn't print. If CI is still running, the report says so; hand him the automerge form, which waits rather than making him come back. Get the head reviewed first (Phase 3.4); automerge waits out CI, not an unreviewed head — and a review you never requested never arrives, so it would just burn the timeout:
 
 ```
 ! scripts/workflow/merge-pr.sh <PR> --human --automerge
@@ -255,15 +305,15 @@ scripts/workflow/merge-pr.sh <PR> --human [-a|--automerge] [--dry-run] [--force]
 
 Other flags (stackable, order-independent):
 
-- `-a` / `--automerge` — poll the gates instead of evaluating once, and merge the moment they all pass. Fire it while CI is still running; that's the point. It does **not** wait out an unreviewed head — `reviewed` hard-fails 600s after a head push with no Copilot review and no Claude marker, and a hard failure ends the run — so post the marker first when Copilot is quota-limited or has skipped. Ends in exactly one of three states, each named on exit: `MERGED`, `RED` (a gate hard-failed — no merge, `ready-for-review` dropped), or `TIMED OUT` (still waiting when the budget expired — PR untouched, label intact, exit code 2). A WAIT keeps it polling; only a hard failure stops it. `AUTOMERGE_TIMEOUT` (default 3600s) and `AUTOMERGE_POLL_INTERVAL` (default 30s) tune it. Mutually exclusive with `--dry-run`. Prints the gate block on the first poll and again whenever the picture changes, so a long wait stays readable.
-- `--force` — bypass `currency` + `threads` + `reviewed` (review-state) gates. Requires manual permission approval.
+- `-a` / `--automerge` — poll the gates instead of evaluating once, and merge the moment they all pass. Fire it while CI is still running; that's the point. It does **not** wait out an unreviewed head — `reviewed` never WAITs, so an unattested head hard-fails on the first poll and ends the run. Get head reviewed and attested first (3.4). Ends in exactly one of three states, each named on exit: `MERGED`, `RED` (a gate hard-failed — no merge, `ready-for-review` dropped), or `TIMED OUT` (still waiting when the budget expired — PR untouched, label intact, exit code 2). A WAIT keeps it polling; only a hard failure stops it. `AUTOMERGE_TIMEOUT` (default 3600s) and `AUTOMERGE_POLL_INTERVAL` (default 30s) tune it. Mutually exclusive with `--dry-run`. Prints the gate block on the first poll and again whenever the picture changes, so a long wait stays readable.
+- `--force` — bypass `threads` + `reviewed` (review-state) gates. Requires manual permission approval.
 - `--bypass-merge-requirements` — bypass `ci` gate AND pass `--admin` to `gh pr merge`,
   overriding GitHub branch-protection rules. Requires manual permission approval.
 
-Combine `--force --bypass-merge-requirements` to bypass `currency` + `threads` + `reviewed` + `ci` together.
+Combine `--force --bypass-merge-requirements` to bypass `threads` + `reviewed` + `ci` together.
 The `no_conflict` gate is NEVER bypassable — GitHub rejects conflicting merges regardless of `--admin`.
 
-`merge-pr.sh` evaluates **5 gates**: `ci`, `currency`, `threads`, `reviewed`, `no_conflict`. The `reviewed` gate is the hard backstop that no head commit merges unreviewed — prefer running the Claude fallback (Phase 3.4) to satisfy it before handoff, rather than telling Tim to `--force` past it.
+`merge-pr.sh` evaluates **4 gates**: `ci`, `threads`, `reviewed`, `no_conflict`. The `reviewed` gate is the hard backstop that no head commit merges unreviewed — satisfy it honestly before handoff (Phase 3.4) rather than telling Tim to `--force` past it.
 
 ### 4.3 Interpret output (for reading over Tim's shoulder / diagnosing a FAIL he reports)
 
@@ -284,13 +334,12 @@ On all PASS: script captures head SHA, calls `gh pr merge <PR> --squash --match-
 
 ### 4.4 Escape hatches (Tim decides; you can inform, not invoke)
 
-**`--force`** — for Copilot/review-state issues (bypasses `currency` + `threads` + `reviewed`):
+**`--force`** — for review-state issues (bypasses `threads` + `reviewed`):
 
-- API failure on the `threads`, `currency`, or `reviewed` gate where the underlying state has been manually verified fine
-- Copilot has silently-skipped a merge-from-main commit and the diff was reviewed manually
-- The `threads` / `currency` / `reviewed` gates are known to fail and that's being explicitly accepted
+- API failure on the `threads` or `reviewed` gate where the underlying state has been manually verified fine
+- The `threads` / `reviewed` gates are known to fail and that's being explicitly accepted
 
-Prefer the Claude fallback (Phase 3.4 — manual diff review + `mark-claude-review.sh`) over asking Tim to `--force` a `reviewed`-gate failure: the fallback makes the guarantee true rather than skipping it, and you can do it before handoff.
+**A `reviewed` FAIL is almost never a `--force` case.** `unreviewed` means nobody has reviewed it and `stale_marker` means you pushed past the review that happened — both describe an unfinished PR, not a broken gate. Take the honest path in 3.4 and hand off a PR whose marker pins head.
 
 **`--bypass-merge-requirements`** — for CI/branch-protection issues:
 

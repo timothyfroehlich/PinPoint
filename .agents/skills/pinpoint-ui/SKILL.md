@@ -31,68 +31,42 @@ Use this skill when:
 5. **Dropdown Server Actions**: Use `onSelect`, not forms
 6. **Tailwind CSS v4 + semantic tokens**: Use `bg-primary`, `text-destructive`, etc. — no raw palette classes (`bg-cyan-500`, `text-red-500`) and no hardcoded hex (enforced via ESLint `better-tailwindcss/no-restricted-classes`)
 7. **TooltipProvider is hoisted**: `<TooltipProvider>` is mounted once in `ClientProviders` — don't add nested providers. See `pinpoint-design-bible` §12.
-8. **Baseline Widely available is the floor** (CORE-UI-005): use `<dialog>`, container queries, `:has()`, `:user-invalid`, `inert`, `aspect-ratio`, `fetchpriority`, native form validation directly — no polyfills. Newly-available features (Popover API, View Transitions, anchor positioning) require a per-feature opt-in in `pinpoint-design-bible` §19. See **Browser Support** in `references/browser-support.md`.
-9. **Form correctness** (CORE-FORM-001..006): right `type`, correct `autocomplete` token, `:user-invalid` styling, `aria-invalid` blur sync, visible required-field indicator, `enterkeyhint` on sequential mobile fields. See **Form Correctness** in `references/form-correctness.md`.
+8. **Baseline Widely available is the floor** (CORE-UI-005): use `<dialog>`, container queries, `:has()`, `:user-invalid`, `inert`, `aspect-ratio`, `fetchpriority`, native form validation directly — no polyfills. Newly-available features (Popover API, View Transitions, anchor positioning) require a per-feature opt-in in `pinpoint-design-bible` §19. Never trust a cached Baseline date — look it up live (`references/browser-support.md`).
+9. **Form correctness** (CORE-FORM-001..006): right `type`, correct `autocomplete` token, `:user-invalid` styling, `aria-invalid` blur sync, visible required-field indicator, `enterkeyhint` on sequential mobile fields. Conventions are owned by `pinpoint-design-bible` §20; the code is in `references/form-correctness.md`.
 10. **Accessibility floor** (CORE-A11Y-001..006): skip link, `motion-reduce:` paired with animations, semantic `<table>` markup, real `<button>` (no `<div role="button">`), `title` is not a tooltip, `inert` background on modals. See **Accessibility** in `references/accessibility.md`.
 
 ## Reference Files
 
 Everything below lives one hop away in `references/`. Load the file you need.
 
-| File                                     | Covers                                                                                             |
-| :--------------------------------------- | :------------------------------------------------------------------------------------------------- |
-| `references/browser-support.md`          | Browser Support (Baseline floor), Modern Web Guidance Catalog                                      |
-| `references/key-files.md`                | Adding Components, Issue Field Display Order, Key Files Registry, Label Standards                  |
-| `references/enums-and-props.md`          | Config-Driven Enums, discriminated-union props for multi-type components                           |
-| `references/form-patterns.md`            | Direct-Server-Action forms, `useActionState` forms, dropdown Server Actions, CSS-first interaction |
-| `references/form-correctness.md`         | Form Correctness (types, autocomplete, `enterkeyhint`, `:user-invalid`), native HTML primitives    |
-| `references/styling-and-shadcn.md`       | Tailwind CSS v4 styling, shadcn/ui component patterns                                              |
-| `references/accessibility.md`            | Accessibility Patterns, Animation & Motion                                                         |
-| `references/layout-and-anti-patterns.md` | Layout Patterns, UI Anti-Patterns, Troubleshooting, External References                            |
+| File                                     | Covers                                                                                 |
+| :--------------------------------------- | :------------------------------------------------------------------------------------- |
+| `references/browser-support.md`          | How to look up a feature's Baseline status live; pointers to design-bible §19 / §22    |
+| `references/key-files.md`                | Component basics, Issue Field Display Order, Key Files Registry, Label Standards       |
+| `references/enums-and-props.md`          | Config-Driven Enums, discriminated-union props for multi-type components               |
+| `references/form-patterns.md`            | Direct-Server-Action forms, `useActionState` forms, dropdown Server Actions            |
+| `references/form-correctness.md`         | Form-correctness code (types, autocomplete, `:user-invalid`), native HTML primitives   |
+| `references/styling-and-shadcn.md`       | Tailwind CSS v4 styling, shadcn/ui component patterns, Button variants/sizes/`loading` |
+| `references/accessibility.md`            | Accessibility floor (CORE-A11Y-001..006), Animation & Motion                           |
+| `references/layout-and-anti-patterns.md` | Layout Patterns, UI Anti-Patterns, External References                                 |
 
 ## Color System
 
-- **Use semantic tokens** (`bg-primary`, `text-destructive`, `text-muted-foreground`, `border-success/40`). Raw Tailwind palette classes (`bg-cyan-500`, `text-red-500`, `border-fuchsia-500`) and hardcoded hex are **forbidden in component code** (enforced via ESLint flat config rule `better-tailwindcss/no-restricted-classes`) — see design-bible §1 for the full rule and the design-layer config exceptions.
-- Status / severity / priority / frequency colors come from `STATUS_CONFIG` / `SEVERITY_CONFIG` / `PRIORITY_CONFIG` / `FREQUENCY_CONFIG` in `src/lib/issues/status.ts` — never freestyle.
-- Theme tokens are defined in `src/app/globals.css` via Tailwind v4 `@theme` block. Dark-only — `dark:` utility classes are dead code, remove them when you touch the file.
-- Primary: `--color-primary` (APC Neon Green `#4ade80`)
-- Secondary: `--color-secondary` (Teal `#2dd4bf`) — **purple/fuchsia secondary was removed in PR #1204; do not reintroduce.**
+- **Use semantic tokens** (`bg-primary`, `text-destructive`, `text-muted-foreground`, `border-success/40`). Raw Tailwind palette classes and hardcoded hex are **forbidden in component code**, enforced by ESLint (`better-tailwindcss/no-restricted-classes`). The token values live in the Tailwind v4 `@theme` block in `src/app/globals.css`; the rule and its two design-layer exceptions are `pinpoint-design-bible` §1.
+- Status / severity / priority / frequency colors come from the configs in `src/lib/issues/status.ts` — never freestyle a status color at a call site.
+- **PinPoint is dark-only.** `dark:` utility classes are dead code; remove them when you touch a file that still has them.
+- **The secondary is teal, and purple is not in the palette** — a purple/fuchsia secondary was removed deliberately (PR #1204) so primary and secondary read as one green-family pairing rather than two competing brands. Do not reintroduce it.
 - For the full visual identity (surface hierarchy, glow rules, accessibility constraints) see `pinpoint-design-bible` §1–§2.
 
 ## Core UI Patterns
 
 ### Server vs Client Components
 
-```typescript
-// Server Component (default)
-export default async function MachinesPage() {
-  const machines = await getMachines();
+Server Components are the default (CORE-ARCH-001). `"use client"` marks an **interaction leaf** — the smallest subtree that genuinely needs state, effects, or event handlers. Push it down: a page that renders a list of cards stays a Server Component even when one control inside a card is interactive.
 
-  return (
-    <div>
-      {machines.map((machine) => (
-        <MachineCard key={machine.id} machine={machine} />
-      ))}
-    </div>
-  );
-}
+The consequence that bites most often is that `"use client"` is viral downward — everything a client file imports is bundled for the client too. So don't co-locate a data query, a Node-only import, or `~/lib/logger` (which pulls in `fs`) in a file that is or will become a client component.
 
-// Client Component (only when needed)
-"use client";
-import { useState } from "react";
-
-export function IssueFilter() {
-  const [filter, setFilter] = useState("all");
-
-  return (
-    <select value={filter} onChange={(e) => setFilter(e.target.value)}>
-      <option value="all">All Issues</option>
-      <option value="open">Open</option>
-      <option value="resolved">Resolved</option>
-    </select>
-  );
-}
-```
+Canonical page composition and the layout wrappers are in `references/layout-and-anti-patterns.md`.
 
 ## Server Action Forms
 
@@ -120,11 +94,13 @@ How it surfaced in each shape:
 
 - **Auto-submitting from `onValueChange`** (the four inline issue-metadata forms, PP-0fvr): the replay looked like a real user selection and fired a **second write carrying the stale value** — silently reverting every status/priority/severity/frequency change.
 - **Submitting from a real button** (edit-machine, create-machine, unified-report, delete-account — PP-1ajq): no bad write, but a **failed** save silently wiped unsaved edits while the form was still on screen. Worst case was delete-account, where a reverted machine-reassignment left the confirmation text intact and the destructive button still enabled — a destructive control armed against a target the user could no longer see.
+- **A form with no Select at all** (machine owner transfer, `src/app/(app)/m/[initials]/(tabs)/edit/machine-owner-transfer.tsx` — PP-o355.19): this section is named for the Radix Select because that is the common case, but **Radix is only one symptom riding on React's reset**. Here a native reset blanked the form's _controlled_ hidden `id`/`name` inputs in the DOM without re-rendering React — the state behind them never changed, so React had no reason to re-sync — leaving a second attempt after a failed transfer to submit an **empty machine id**. If your form carries controlled hidden inputs, it has this bug whether or not a Select is anywhere near it.
 
-Two things worth knowing before you try to fix this some other way:
+Three things worth knowing before you try to fix this some other way:
 
 - **Making the Select controlled does not help.** Radix's replay calls `onValueChange`, so the stale value is written straight into your state — the controlled path is the very path the replay travels.
-- **Mocking `useActionState` is why this stayed invisible to a green suite for five days.** The regression guards (`src/test/unit/components/{issues,machines,settings,report}/*revert*.test.tsx`) deliberately mock neither `react` nor the Select wrappers. Keep it that way: a test that mocks `useActionState` or the Select wrapper cannot observe the reset, and will pass while the bug is live.
+- **Mocking `useActionState` is why this stayed invisible to a green suite for five days.** The regression guards (`src/test/unit/components/{issues,machines,settings,report}/*revert*.test.tsx`, plus the co-located `src/app/(app)/m/[initials]/(tabs)/edit/machine-details-form.test.tsx` for the machine Manage tab) deliberately mock neither `react` nor the Select wrappers. Keep it that way: a test that mocks `useActionState` or the Select wrapper cannot observe the reset, and will pass while the bug is live.
+- **"No Select" is not a clean bill of health.** See the owner-transfer case above — reach for this remedy whenever a form's values live anywhere React won't re-render on reset, not just when Radix is present.
 
 This is the form-level surface of CORE-ARCH-012 (honest failure).
 
@@ -180,7 +156,7 @@ Native reset clears the form's DOM state; explicit `setState` clears React's vie
 
 ### Server Actions
 
-- Exported server actions are **suffixed `Action`** — `createMachineAction`, `markAsReadAction`. This is the house style for new code, not a universal invariant: a minority of existing actions under `src/app/**/actions.ts` predate it and don't carry the suffix (`inviteUser`, `updateUserRole`, `saveDiscordConfig`, `updateMachineDescription` among them — `inviteUser` is wired straight into `useActionState` in `InviteUserDialog.tsx`). Name new actions with the suffix; **don't** rename existing ones to match, and don't assume an unsuffixed export isn't a Server Action.
+- Exported server actions are **suffixed `Action`** — `createMachineAction`, `markAsReadAction`. This is the house style for new code, not a universal invariant: a set of older actions under `src/app/**/actions.ts` predate the convention. Name new actions with the suffix; **don't** rename existing ones to match (the rename is churn with a real chance of missing a call site), and **don't assume an unsuffixed export isn't a Server Action** — several are wired straight into `useActionState`.
 - Every action checks authorization through `checkPermission()` from `~/lib/permissions/helpers` (CORE-ARCH-008). Never hand-roll a role comparison. `pinpoint-security` has the full auth/permission gate walkthrough.
 - Actions return `Result<T, C>` from `~/lib/result.ts` (`ok(...)` / `err(...)`), not thrown exceptions, so `useActionState` can render the failure.
 - Report failures through `serverActionError()` from `~/lib/observability/report-error` rather than a bare `console.error` — that's what routes the error to Sentry with action context.

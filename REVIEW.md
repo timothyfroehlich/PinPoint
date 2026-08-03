@@ -1,6 +1,6 @@
 # PinPoint — Code Review Brief
 
-This is the canonical review rubric for PinPoint. It is harness-neutral: GitHub Copilot code review is documented to read it natively from the repository root (per the [2026-07-17 changelog](https://github.blog/changelog/2026-07-17-copilot-code-review-customization-and-configurability-improvements/), unverified in practice until Copilot's quota resets ~2026-08-01), the Antigravity adapter (`.agents/rules/antigravity.md`) pulls it in via `@REVIEW.md`, and Claude Code reads it via a pointer in `CLAUDE.md`. One brief, three reach paths — edit only here.
+This is the canonical review rubric for PinPoint. It is harness-neutral: Claude Code reads it via a pointer in `CLAUDE.md` (and via the `/code-review` skill), and the Antigravity adapter (`.agents/rules/antigravity.md`) pulls it in via `@REVIEW.md`. Any reviewer added later reads the same brief — edit only here.
 
 PinPoint is a **single-tenant** pinball issue tracker (Austin Pinball Collective), in live production with real user data. Stack: Next.js App Router (React Server Components by default), Drizzle ORM on Supabase Postgres, Supabase SSR auth, shadcn/ui + Tailwind CSS v4, TypeScript `ts-strictest`. There is no multi-tenancy, no RLS, and no tRPC — by design.
 
@@ -34,18 +34,30 @@ If a PR changes roles, statuses, permissions, or user-facing terminology, check 
 
 ## Scope of the review
 
-A Copilot or Antigravity review is roughly equivalent to running the code-review skill at **low effort**, and is aimed at smaller changes — Tim triggers deeper reviews manually on bigger ones. In practice: prioritise the highest-priority rule violations above and genuine correctness defects. Don't editorialise about style a formatter or linter already owns (Prettier, ESLint, oxlint). A clean review — no comments — is a valid outcome; don't manufacture nits to justify the pass.
+A default `/code-review` or Antigravity pass is aimed at smaller changes — Tim triggers deeper reviews (`/code-review ultra`) manually on bigger ones. In practice: prioritise the highest-priority rule violations above and genuine correctness defects. Don't editorialise about style a formatter or linter already owns (Prettier, ESLint, oxlint). A clean review — no comments — is a valid outcome; don't manufacture nits to justify the pass.
 
 ## Reviewer-relevant skill pointers
 
-Copilot and Antigravity both read agent skills. Consult the relevant one for the area a PR touches — this is a routing table, not a summary; read the skill itself for the actual guidance. All live at `.agents/skills/<name>/SKILL.md`.
+Reviewers read agent skills. Consult the relevant one for the area a PR touches — this is a routing table, not a summary; read the skill itself for the actual guidance. All live at `.agents/skills/<name>/SKILL.md`.
 
 - `pinpoint-security` — auth, CSP, Zod validation, Supabase SSR changes.
 - `pinpoint-testing` — whether a PR picked the right test layer (unit/integration/E2E) for what it's testing.
 - `pinpoint-e2e` — Playwright/E2E stability: worker isolation, flake-prone patterns.
-- `pinpoint-typescript` — ts-strictest patterns, generics, Drizzle query typing.
+- `pinpoint-typescript` — the db→app typing decision: no converter layer, narrow with `Pick<>` at boundaries. CORE-TS-007's `!` ban is not linted, so non-null assertions stay a review question.
 - `pinpoint-ui` and `pinpoint-design-bible` — UI, component, and responsive-design changes. `pinpoint-ui` also owns Server Actions, data fetching, and the form conventions (Radix Select form-reset carve-out, CREATE form reset).
 - `pinpoint-deployment` — Drizzle migrations, DB connection/pooler config, preview deployments.
+
+## How a review gets triggered
+
+**Every review on this repo is asked for. No bot reviews it, and nothing fires a review automatically.** GitHub Copilot code review was retired on 2026-08-02 (PP-4ric) — its free tier was too small to review PinPoint's PRs, so quota outages were the normal state. The reviewer is now Tim, running `/code-review` on a branch; Antigravity likewise reviews when he asks.
+
+That did **not** loosen the merge bar. A PR still cannot merge without a review covering its **head commit**, recorded as the author's SHA-pinned marker (`<!-- pinpoint-claude-review: <head_sha> -->`), with every thread resolved. An agent cannot launch `/code-review`, so the author's job is to finish the work, hand the branch over, address the findings, and attest the head that was read:
+
+```bash
+bash scripts/workflow/mark-claude-review.sh <PR> <depth> "<one-line findings>"
+```
+
+The marker pins a SHA, so a later push invalidates it — deliberately, so a 3-commit fixup can't inherit the review of the commit before it. **If you're reviewing, assume the commit you were handed is the one the author intends to be final.** Full author-side rules: `.agents/skills/pinpoint-pr-workflow/SKILL.md` Phase 3.4.
 
 ## Review mechanics
 
@@ -59,9 +71,8 @@ This is enforced two different ways depending on harness. In **Claude Code**, `b
 
 Take note if you're not Claude Code: `.agents/skills/pinpoint-pr-workflow/SKILL.md`, under "Phase 4: Merge — human-only," says direct merge paths are "ALL blocked for an agent by the `block-direct-merge.cjs` PreToolUse hook" with "no agent-usable bypass." That statement is true in Claude Code and **false in every other harness** — the hook simply isn't there. Don't take it at face value if you're reviewing or acting from Antigravity, Codex, or Gemini; the instruction in this section is what actually binds you.
 
-An agent's terminal state on a PR is: ready-for-review, CI green, review threads resolved, screenshots posted if UI-touching. Then hand Tim the exact command to run himself: `! scripts/workflow/merge-pr.sh <PR> --human`.
+An agent's terminal state on a PR is: ready-for-review, CI green, a review covering the head commit (see "How a review gets triggered"), review threads resolved, screenshots posted if UI-touching. Then hand Tim the exact command to run himself: `! scripts/workflow/merge-pr.sh <PR> --human`.
 
 ## Pointers, not copies
 
 - `docs/NON_NEGOTIABLES.md` is the full `CORE-*` catalog — severity, rationale, do/don't for every rule cited above. It stays there; this brief only cites IDs.
-- `.github/instructions/*.instructions.md` holds path-scoped rules (auth, components, database, server-actions, testing, typescript). They stay there; nothing here duplicates them.

@@ -13,7 +13,23 @@ Work bead {beads_id}. First run `bd show {beads_id}` && `bd update {beads_id} --
 
 ### Quality Gates
 
-Run `pnpm run check` before returning. Then self-review **by hand**: read your own diff (`git diff origin/main...HEAD`) against `REVIEW.md` — the canonical rubric — plus the bead's acceptance criteria and out-of-scope list, and fix what you find. Don't reach for `/code-review` or `ultra`: both are user-triggered harness surfaces (`ultra` is also billed) and an agent cannot launch either. After your final push, if Copilot hasn't reviewed your head commit within ~10 min, run `bash scripts/workflow/mark-claude-review.sh <PR> "<summary>"` so the `reviewed` merge gate passes.
+Run `pnpm run check` before returning. Then self-review **by hand**: read your own diff (`git diff origin/main...HEAD`) against `REVIEW.md` — the canonical rubric — plus the bead's acceptance criteria and out-of-scope list, and fix what you find. Don't reach for `/code-review` or `ultra`: both are user-triggered harness surfaces (`ultra` is also billed) and an agent cannot launch either.
+
+A review covering the head commit is **required** to merge, and **no bot reviews this repo**. The reviewer is Tim running `/code-review`, which you cannot launch — so getting reviewed is a handoff, not a command you run.
+
+Open the PR whenever you like and watch CI; it costs nothing. Then finish all of it — CI fixes, merge-from-main — stop iterating, and report the PR as needing Tim's review. Don't wait around for one to appear; nothing is coming on its own.
+
+**Recording that review, though, IS a command you run.** Once his `/code-review` lands, address what it found and attest the SHA he read:
+
+`bash scripts/workflow/mark-claude-review.sh <PR> <depth> "<one-line findings>"`
+
+`<depth>` is the level he ran (`low`|`medium`|`high`|`xhigh`|`max`|`ultra`) — ask if you don't know, don't guess. This marker is the only thing that satisfies the `reviewed` gate, so a review nobody posted leaves the PR unmergeable. **A clean review still gets a marker** — that is the one agents drop, because there is nothing to fix and nothing to push, so it feels like there is nothing to do. Post it; that is what unblocks the merge. Of the workflow scripts only `merge-pr.sh` is off-limits to you.
+
+If the change is genuinely trivial (a typo, a comment, a one-line mechanical fix), attest it yourself and say why it was trivial:
+
+`bash scripts/workflow/mark-claude-review.sh <PR> trivial "typo in a comment; no behavior change"`
+
+The marker is an attestation that a review happened, never a way to skip one.
 
 ### Environment Setup
 
@@ -28,13 +44,15 @@ If tests fail with `POSTGRES_URL is not set`:
 2. Push: `git push -u origin {branch_name}`
 3. Create PR: `gh pr create --title "..." --body "..."`
 4. Verify CI: `gh pr checks <PR>`
+5. Once CI is green and you have stopped iterating, report the PR as needing Tim's `/code-review` — unless it qualifies for the trivial-change exception above
 
 ### Return Format
 
 - **Branch**: {branch_name}
 - **PR**: #{number}
 - **CI**: passing/failing/pending
-- **Self-review**: findings addressed / marker posted?
+- **Self-review**: findings addressed
+- **Review**: needs Tim's /code-review / attested at <sha> (trivial-change exception)
 - **Blockers**: none or description
 ```
 
@@ -44,6 +62,7 @@ If tests fail with `POSTGRES_URL is not set`:
 2. The bead is the source of truth — point the agent at `bd show`; don't restate scope/files in the prompt (two places to drift)
 3. Quality is self-enforced — explicit `pnpm run check` replaces hook enforcement
 4. Structured return format enables quick lead assessment
+5. No review fires automatically at all — the agent must request one, once, after it stops iterating (and again if it pushes past a review). The return format asks about it and the lead re-checks `commit_id` vs head at handoff (SKILL.md → "Ensure every PR is reviewed")
 
 ## Follow-Up Prompt (via SendMessage)
 

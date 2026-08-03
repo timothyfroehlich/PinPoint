@@ -1,37 +1,49 @@
 #!/usr/bin/env python3
-"""PR CI + review watcher for the Claude Code Monitor tool.
+"""PR CI watcher for the Claude Code Monitor tool.
 
-Streams timestamped events to stdout as GitHub Actions runs complete
-and polls for new Copilot reviews. One Monitor call handles both.
+Streams timestamped events to stdout as GitHub Actions runs complete.
 
 Usage: ./scripts/workflow/pr-watch.py [--check-ready | --force] [--verbose] <PR_NUMBER>
   (no flag)      Run blocking pre-checks (mergeable, no failed CI Gate, no
-                 unresolved Copilot threads), then watch CI + reviews. CI
-                 Gate absent or in-progress is NOT a blocking condition —
-                 the watch loop handles those by waiting.
+                 unresolved review threads), then watch CI. CI Gate absent
+                 or in-progress is NOT a blocking condition — the watch
+                 loop handles those by waiting.
   --check-ready  Run the full readiness check (mergeable + CI Gate present
-                 + Copilot resolved + ready label) and exit. CI Gate
-                 absent IS a fail here — this mode answers "is this PR
-                 ready for human review right now?".
+                 + review threads resolved + ready label) and exit. CI
+                 Gate absent IS a fail here — this mode answers "is this
+                 PR ready for human review right now?". The `review` line
+                 is reported but is NOT part of the verdict: the whole
+                 point of this mode is to decide whether the PR is worth
+                 Tim's `/code-review`, so requiring the review to have
+                 already happened would be circular. `merge-pr.sh`'s
+                 `reviewed` gate is what refuses to merge an unreviewed
+                 head.
   --force        Skip the pre-check entirely and watch unconditionally.
   --verbose      Emit per-job progressive updates ("X passed", "CI Gate
                  in_progress — continuing to wait", "Watching PR #N — N
                  run(s)", per-run icon listing, startup retries). Default
                  behavior is quiet — only terminal verdicts (CI Gate
                  decided, check PASS/FAIL) and action items (failure
-                 details, new Copilot review) are emitted, so that
-                 running under Claude Code's Monitor doesn't wake the
-                 agent on every job transition.
+                 details) are emitted, so that running under Claude
+                 Code's Monitor doesn't wake the agent on every job
+                 transition.
 
 Cancelled runs are neither a pass nor a failure — they are reported as
 "superseded" (⊘) and never produce a failure artifact. Cancellation is routine
 here: pushing a second commit cancels the in-flight run via concurrency groups,
 and the Preview Auto-Resync workflow cancels itself the same way. (PP-r63o)
 
-Exit 0: all checks passed, or stopped for new Copilot review,
-        or (with --check-ready) the PR is ready for human review.
+A gh API error while probing a run (rate-limit 403, network drop, auth failure)
+is likewise not a failure — it means we could not find out. Those probes are
+retried with bounded backoff and, if the API stays unreachable, reported as
+"could not determine" (⚠) with the real cause, never as "✗ failed". (PP-qkl8)
+
+Exit 0: all checks passed, or (with --check-ready) the PR is ready for
+        human review.
 Exit 1: one or more checks failed, no matching runs found,
         or (with --check-ready) the PR is not ready.
+Exit 2: the outcome could not be determined — the GitHub API was unreachable.
+        Nothing was observed, so this is neither a pass nor a failure.
 """
 
 from __future__ import annotations
@@ -46,14 +58,22 @@ from datetime import datetime, timezone
 
 REPO_OWNER = "timothyfroehlich"
 REPO_NAME = "PinPoint"
-COPILOT_LOGINS = (
-    "copilot-pull-request-reviewer",
-    "copilot-pull-request-reviewer[bot]",
-)
 READY_LABEL = "ready-for-review"
 CI_GATE_NAME = "CI Gate"
 
-REVIEW_POLL_INTERVAL = 60  # seconds — GitHub rate limit friendly
+# --- Review state (PP-lzaw, rewritten for marker-only review in PP-4ric) -----
+# Kept deliberately in sync with scripts/workflow/_pr-gates.sh, which is the
+# canonical implementation. Duplicated rather than shelled out to because this
+# script is the read-only reporter and _pr-gates.sh is sourced by merge-pr.sh,
+# which agents may not invoke at all. scripts/tests/test_pr_watch.py pins the
+# two vocabularies together.
+CLAUDE_MARKER_PREFIX = "<!-- pinpoint-claude-review:"
+
+REVIEW_HINT = (
+    "ask Tim to run /code-review, then attest with "
+    "scripts/workflow/mark-claude-review.sh {pr} <depth>"
+)
+
 STARTUP_RETRIES = 6  # attempts to find runs for current SHA
 STARTUP_WAIT = 10  # seconds between startup retries
 LOG_DIR = "tmp/gh-monitor"
@@ -62,6 +82,17 @@ LOG_DIR = "tmp/gh-monitor"
 # back cancelled. A cancel almost always means a newer run is already queued;
 # this bounds the wait so a genuinely abandoned run still terminates.
 SUPERSEDED_GATE_GRACE = 180  # seconds
+
+# How many times to re-probe a run's state when the gh call itself fails, and
+# the first backoff (doubling each attempt: 5s, 10s, 20s → ~35s total). The
+# retry is there to ride out a blip; a user-level rate limit resets on the hour,
+# so retrying past this is pointless — better to stop and say why. (PP-qkl8)
+RUN_STATE_ATTEMPTS = 4
+RUN_STATE_BACKOFF = 5  # seconds
+
+# Exit code for "we could not find out" — distinct from 1 ("it failed") so a
+# caller can tell an unobserved outcome from an observed bad one. (PP-qkl8)
+EXIT_UNDETERMINED = 2
 
 _lock = threading.Lock()
 
@@ -90,7 +121,7 @@ def emit_event(msg: str) -> None:
     informational lines that are useful interactively but noisy when the
     script is invoked under Monitor (each stdout line is a notification).
     Reserve emit() for terminal verdicts (CI Gate decided, audit PASS/FAIL)
-    and action items (failure details, new Copilot review).
+    and action items (failure details).
     """
     if VERBOSE_MODE:
         emit(msg)
@@ -169,10 +200,7 @@ def get_review_threads(pr: int) -> list[dict]:
             pullRequest(number: {pr}) {{
               reviewThreads(first: 100{after_arg}) {{
                 pageInfo {{ hasNextPage endCursor }}
-                nodes {{
-                  isResolved
-                  comments(first: 1) {{ nodes {{ author {{ login }} }} }}
-                }}
+                nodes {{ isResolved }}
               }}
             }}
           }}
@@ -185,15 +213,86 @@ def get_review_threads(pr: int) -> list[dict]:
         cursor = rt["pageInfo"]["endCursor"]
 
 
-def _unresolved_copilot(threads: list[dict]) -> int:
-    count = 0
-    for t in threads:
-        if t["isResolved"]:
-            continue
-        nodes = t["comments"]["nodes"]
-        if nodes and nodes[0]["author"]["login"] in COPILOT_LOGINS:
-            count += 1
-    return count
+def _gh_api_list(path: str) -> list[dict]:
+    """GET a paginated GitHub list endpoint, returning every item.
+
+    `gh api --paginate` emits ONE JSON document per page, so json.loads on the
+    whole stream fails from page 2 onward. Decode documents until the buffer is
+    exhausted and flatten.
+    """
+    raw = gh("api", "--paginate", f"{path}?per_page=100")
+    decoder = json.JSONDecoder()
+    items: list[dict] = []
+    idx = 0
+    while idx < len(raw):
+        while idx < len(raw) and raw[idx].isspace():
+            idx += 1
+        if idx >= len(raw):
+            break
+        doc, end = decoder.raw_decode(raw, idx)
+        if isinstance(doc, list):
+            items.extend(doc)
+        idx = end
+    return items
+
+
+def _marker_shas(pr: int) -> list[str]:
+    """Every SHA pinned by a review marker comment on the PR, oldest first.
+
+    A list rather than "the" marker: mark-claude-review.sh keeps one sticky
+    comment, but nothing stops a second session or a hand-posted comment from
+    leaving two, and a reader that picks one comment can disagree with the
+    writer about which is canonical — see `_marker_verdict` in _pr-gates.sh.
+    """
+    repo = f"repos/{REPO_OWNER}/{REPO_NAME}"
+    return [
+        (c.get("body") or "")[len(CLAUDE_MARKER_PREFIX) :].split("-->")[0].strip()
+        for c in _gh_api_list(f"{repo}/issues/{pr}/comments")
+        if (c.get("body") or "").startswith(CLAUDE_MARKER_PREFIX)
+    ]
+
+
+def review_state(pr: int) -> tuple[str, str]:
+    """Return (state, human-readable detail) for the PR's review situation.
+
+    Mirrors `_compute_review_state` in scripts/workflow/_pr-gates.sh — same three
+    states, same ordering. States: marker, stale_marker, unreviewed.
+
+    The distinction that matters is `stale_marker`: the PR visibly HAS a review,
+    so the reflex is to read it as reviewed, when in fact the commit about to
+    merge was never looked at. Nothing re-attests automatically.
+    """
+    head_sha = json.loads(gh("pr", "view", str(pr), "--json", "headRefOid"))[
+        "headRefOid"
+    ]
+    pinned = _marker_shas(pr)
+
+    if head_sha in pinned:
+        return "marker", f"review marker pins head {head_sha[:7]}"
+    if not pinned:
+        return (
+            "unreviewed",
+            f"no review marker — head {head_sha[:7]} is unreviewed; "
+            f"{REVIEW_HINT.format(pr=pr)}",
+        )
+    marker_sha = pinned[-1]
+    return (
+        "stale_marker",
+        f"the marker pins {marker_sha[:7]} but head is {head_sha[:7]} — you "
+        f"pushed after the review, so what would merge was never read; "
+        f"{REVIEW_HINT.format(pr=pr)}",
+    )
+
+
+def _unresolved_threads(threads: list[dict]) -> int:
+    """Count unresolved review threads, from any author.
+
+    Author-agnostic since PP-4ric: the old Copilot-login filter would match
+    nothing now that Copilot is retired, silently turning every thread check
+    into a pass. Threads come from Tim or another agent, and AGENTS.md §5
+    requires each to be fixed or declined-and-resolved either way.
+    """
+    return sum(1 for t in threads if not t["isResolved"])
 
 
 def _ci_gate_state(pr: int) -> tuple[str, str]:
@@ -293,10 +392,13 @@ def _pre_check_blocking(pr: int) -> tuple[bool, str]:
 
     Used by the default watch mode as a fail-fast pre-check BEFORE entering the
     watch loop. Distinguishes conditions that won't resolve by waiting (bad merge
-    state, already-failed CI Gate, unresolved Copilot threads) from conditions
-    that the watch loop is designed to wait through (CI Gate not yet posted, CI
-    Gate in progress). The latter MUST pass this pre-check so the watch loop can
-    fire and `_finalize_via_ci_gate` can poll for completion.
+    state, already-failed CI Gate) from conditions that the watch loop is
+    designed to wait through (CI Gate not yet posted, CI Gate in progress). The
+    latter MUST pass this pre-check so the watch loop can fire and
+    `_finalize_via_ci_gate` can poll for completion.
+
+    Unresolved review threads are reported but do NOT block — watching CI is a
+    step *inside* the address-the-findings loop, not after it.
 
     Readiness-check mode (run_audit, --check-ready) keeps its stricter
     semantics — there, CI-Gate-absent IS correctly a "no, not ready right now".
@@ -319,9 +421,19 @@ def _pre_check_blocking(pr: int) -> tuple[bool, str]:
                 f"CI Gate already failed (conclusion={ci_conclusion or 'unknown'})",
             )
 
-    unresolved = _unresolved_copilot(get_review_threads(pr))
+    unresolved = _unresolved_threads(get_review_threads(pr))
     if unresolved > 0:
-        return False, f"{unresolved} unresolved Copilot thread(s)"
+        # A notice, not a block. Threads are author-agnostic since PP-4ric, so
+        # these are Tim's /code-review findings, and the documented loop is
+        # fix → push → watch CI → resolve once it is green. Blocking here would
+        # refuse to watch the very push that addresses them, leaving --force as
+        # the only way through — which also drops the merge-state and
+        # already-failed-CI pre-checks that are worth keeping. `merge-pr.sh`'s
+        # `threads` gate is what actually refuses to merge on an open thread,
+        # and --check-ready still reports one as not-ready.
+        # emit(), not emit_event(): this is an action item the agent still owes,
+        # not per-job progress noise, so it must survive non-verbose runs.
+        emit(f"{unresolved} unresolved review thread(s) — resolve before merge")
 
     return True, ""
 
@@ -330,7 +442,7 @@ def run_audit(pr: int) -> bool:
     """Print a pass/fail report for review-readiness. Return True if all pass."""
     merge_state, labels = _fetch_merge_state(pr)
     ci_status, ci_conclusion = _ci_gate_state(pr)
-    unresolved = _unresolved_copilot(get_review_threads(pr))
+    unresolved = _unresolved_threads(get_review_threads(pr))
 
     bad_merge = merge_state in ("DIRTY", "CONFLICTING", "BEHIND")
     merge_detail = f"mergeStateStatus={merge_state}"
@@ -356,12 +468,24 @@ def run_audit(pr: int) -> bool:
         "applied" if READY_LABEL in labels else "not applied (orchestrator applies)"
     )
 
+    # Reported, but NOT part of the verdict. This mode answers "is this PR worth
+    # Tim's /code-review right now?", and the review is what happens AFTER that
+    # answer is yes — gating on it would make the check circular and permanently
+    # red. merge-pr.sh's `reviewed` gate is the one that refuses to merge an
+    # unreviewed head. `stale_marker` is worth seeing here anyway: it means the
+    # PR looks reviewed and is not.
+    try:
+        state, review_detail = review_state(pr)
+    except (RuntimeError, ValueError, KeyError) as exc:
+        state, review_detail = "unknown", f"could not determine ({exc})"
+
     checks = [
         (not bad_merge, "mergeable", merge_detail),
         (ci_check[0], "ci-gate", ci_check[1]),
+        (True, "review", f"{state}: {review_detail}"),
         (
             unresolved == 0,
-            "copilot-resolved",
+            "threads-resolved",
             "all resolved"
             if unresolved == 0
             else f"{unresolved} unresolved (use MCP pull_request_read to inspect threads)",
@@ -381,13 +505,61 @@ def run_audit(pr: int) -> bool:
 # ---------------------------------------------------------------------------
 
 
+class RunStateUnavailable(RuntimeError):
+    """The GitHub API could not be reached to determine a run's state.
+
+    Distinct from "the run reported a bad conclusion". Before PP-qkl8 the two
+    were collapsed: a failed `gh run view` returned ("", ""), which fell through
+    to the fail-safe branch and emitted "✗ — failed" plus a failure artifact for
+    a run that was, in the observed case, perfectly healthy and still pending.
+    """
+
+
 def _run_conclusion(run_id: int) -> tuple[str, str]:
-    """Return (status, conclusion) for a run. Returns ("", "") on error."""
+    """Return (status, conclusion) for a run.
+
+    Raises RunStateUnavailable if the gh call itself failed — a rate-limit 403,
+    a network drop, an expired token. That is "we could not find out", which is
+    not a verdict about the run and must never be reported as one.
+
+    The two failure modes are decoded separately so the reason carried up is
+    actionable: a bare "Expecting value: line 1 column 1" tells the reader
+    nothing, so unparseable output is quoted back with the raw prefix.
+    """
     try:
-        data = json.loads(gh("run", "view", str(run_id), "--json", "status,conclusion"))
-        return data.get("status", ""), data.get("conclusion", "")
-    except (RuntimeError, json.JSONDecodeError):
-        return "", ""
+        raw = gh("run", "view", str(run_id), "--json", "status,conclusion")
+    except RuntimeError as exc:
+        raise RunStateUnavailable(str(exc) or "gh run view failed") from exc
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise RunStateUnavailable(
+            f"gh run view returned unparseable output ({exc}): {raw[:120]!r}"
+        ) from exc
+    return data.get("status") or "", data.get("conclusion") or ""
+
+
+def _run_conclusion_retrying(
+    run_id: int, name: str, stop: threading.Event
+) -> tuple[str, str]:
+    """_run_conclusion with bounded exponential backoff on API errors.
+
+    Re-raises RunStateUnavailable once the attempts are exhausted, so the caller
+    still has to decide what an undeterminable run means — it just gets to make
+    that decision after the API has had a fair chance to come back.
+    """
+    delay = RUN_STATE_BACKOFF
+    for attempt in range(RUN_STATE_ATTEMPTS):
+        try:
+            return _run_conclusion(run_id)
+        except RunStateUnavailable as exc:
+            if attempt == RUN_STATE_ATTEMPTS - 1 or stop.is_set():
+                raise
+            emit_event(f"↻  {name} — gh API error ({exc}); retrying in {delay}s")
+            if stop.wait(delay):
+                raise
+            delay *= 2
+    raise AssertionError("unreachable")  # pragma: no cover — loop always exits
 
 
 def watch_run(
@@ -395,8 +567,15 @@ def watch_run(
     name: str,
     stop: threading.Event,
     failures: list[int],
+    undetermined: list[tuple[str, str]],
 ) -> None:
-    """Watch one CI run via gh run watch. Retries if watcher exits prematurely."""
+    """Watch one CI run via gh run watch. Retries if watcher exits prematurely.
+
+    Appends to `failures` only for an observed bad conclusion. When the run's
+    state could not be read at all, appends (name, reason) to `undetermined`
+    instead — the caller reports that as an inability to determine, not as a
+    failure, and writes no failure artifact. (PP-qkl8)
+    """
     while not stop.is_set():
         with subprocess.Popen(
             ["gh", "run", "watch", str(run_id), "--exit-status"],
@@ -419,7 +598,18 @@ def watch_run(
 
         # Verify via API regardless of exit code — gh run watch can exit 0
         # prematurely if jobs haven't been assigned yet when the watcher starts.
-        status, conclusion = _run_conclusion(run_id)
+        try:
+            status, conclusion = _run_conclusion_retrying(run_id, name, stop)
+        except RunStateUnavailable as exc:
+            if stop.is_set():
+                return
+            emit_event(
+                f"⚠  {name} — could not determine run state after "
+                f"{RUN_STATE_ATTEMPTS} attempts: {exc}"
+            )
+            with _lock:
+                undetermined.append((name, str(exc)))
+            return
 
         if proc.returncode == 0 and status not in ("queued", "in_progress"):
             if _is_passing(conclusion):
@@ -451,45 +641,6 @@ def watch_run(
         with _lock:
             failures.append(run_id)
         return
-
-
-_COPILOT_JQ = (
-    '[.[] | select(.user.login == "copilot-pull-request-reviewer"'
-    ' or .user.login == "copilot-pull-request-reviewer[bot]")] | length'
-)
-
-
-def watch_reviews(
-    pr: int,
-    baseline: int | None,
-    stop: threading.Event,
-    review_seen: threading.Event,
-) -> None:
-    """Poll for new Copilot-only reviews every REVIEW_POLL_INTERVAL seconds.
-
-    baseline=None means the initial fetch failed; the first successful poll
-    establishes the baseline instead of comparing against zero.
-    """
-    while not stop.wait(REVIEW_POLL_INTERVAL):
-        try:
-            count = int(
-                gh(
-                    "api",
-                    f"repos/{{owner}}/{{repo}}/pulls/{pr}/reviews?per_page=100",
-                    "--jq",
-                    _COPILOT_JQ,
-                )
-            )
-        except Exception:  # noqa: BLE001
-            continue  # transient API failure — skip cycle
-        if baseline is None:
-            baseline = count  # establish baseline on first successful poll
-            continue
-        if count > baseline:
-            emit("📝 New Copilot review posted")
-            review_seen.set()
-            stop.set()
-            return
 
 
 def write_failure_artifact(run_id: int) -> str:
@@ -651,49 +802,26 @@ def main() -> int:
         icon = "▶ " if run["status"] == "in_progress" else "⏳"
         emit_event(f"{icon} {run['name']}")
 
-    baseline: int | None
-    try:
-        baseline = int(
-            gh(
-                "api",
-                f"repos/{{owner}}/{{repo}}/pulls/{pr}/reviews?per_page=100",
-                "--jq",
-                _COPILOT_JQ,
-            )
-        )
-    except Exception:  # noqa: BLE001
-        baseline = None  # established on first successful poll in watch_reviews
-
     stop = threading.Event()
-    review_seen = threading.Event()
     failures: list[int] = []
+    undetermined: list[tuple[str, str]] = []
 
     ci_threads = [
         threading.Thread(
             target=watch_run,
-            args=(run["databaseId"], run["name"], stop, failures),
+            args=(run["databaseId"], run["name"], stop, failures, undetermined),
             daemon=True,
         )
         for run in active
     ]
-    review_thread = threading.Thread(
-        target=watch_reviews,
-        args=(pr, baseline, stop, review_seen),
-        daemon=True,
-    )
 
     for t in ci_threads:
         t.start()
-    review_thread.start()
 
     for t in ci_threads:
         t.join()
 
     stop.set()
-    review_thread.join(timeout=5)
-
-    if review_seen.is_set():
-        return 0
 
     if failures:
         for run_id in failures:
@@ -701,6 +829,20 @@ def main() -> int:
             emit(f"Failure details: {path}")
         emit(f"{len(failures)} failure(s) detected — check artifact for logs")
         return 1
+
+    if undetermined:
+        # No observed failure, but at least one run's outcome was never read.
+        # Say so and stop: claiming green here would be a guess, and claiming
+        # red would be the false alarm this exists to prevent. Skipping the CI
+        # Gate poll is deliberate — the same API is down, and under a rate-limit
+        # 403 every extra call digs the shared quota deeper. (PP-qkl8)
+        names = ", ".join(name for name, _ in undetermined)
+        emit(
+            f"⚠  Could not determine the outcome of {names} — "
+            f"the GitHub API was unreachable ({undetermined[0][1]}). "
+            "Nothing was observed, so this is neither a pass nor a failure."
+        )
+        return EXIT_UNDETERMINED
 
     # The watched workflow runs all finished without failures. CI Gate is the
     # aggregate that branch protection actually requires; verify it before

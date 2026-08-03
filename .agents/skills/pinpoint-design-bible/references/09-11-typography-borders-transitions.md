@@ -34,7 +34,7 @@ The shared primitives (`CardTitle`/`CardDescription`, `AlertTitle`/`AlertDescrip
 
 ## 11. Transition Durations
 
-Two canonical durations standardize all animated feedback:
+Two canonical durations standardize animated feedback in **application code** — this is a design choice, recorded nowhere in the codebase, so it lives here:
 
 | Intent                                | Duration | Class          | Typical use                                 |
 | ------------------------------------- | -------- | -------------- | ------------------------------------------- |
@@ -49,6 +49,8 @@ Two canonical durations standardize all animated feedback:
 - When a single element animates multiple properties (e.g. colors + a focus ring's box-shadow, or colors + a pressed-state transform), use the bracket syntax: `transition-[color,background-color,border-color,box-shadow] duration-150`
 - For layout shifts (drawers, accordions, height/width transitions), prefer the specific property list with `duration-300`: `transition-[height,width] duration-300`, `transition-[grid-template-rows] duration-300`, etc. Reserve `transition-all duration-300` for cases where the set of animating properties genuinely isn't enumerable.
 
-**Rule:** Never introduce a duration other than 150 or 300 unless the canonical two genuinely don't fit. If you find an edge case, add a new row to this table first, document the use case, then use it consistently across similar elements.
+**Rule:** In application code, never introduce a duration other than 150 or 300 unless the canonical two genuinely don't fit. If you find an edge case, add a row to this table first, document the use case, then use it consistently across similar elements.
+
+**Scope: this rule governs code we write, not the vendored shadcn primitives.** `dialog.tsx`, `alert-dialog.tsx` and `sheet.tsx` ship upstream enter/exit durations of their own, including an asymmetric open/close pair on Sheet — so essentially every modal in the app inherits a value that isn't 150 or 300. That is **accepted**, not a backlog item: rewriting vendored primitives to satisfy a house rule costs us the ability to re-sync them from upstream, for a difference nobody perceives. Two consequences: don't "fix" those files, and don't cite them as precedent for a fourth duration in your own component.
 
 **Motion sensitivity:** Every `animate-*` and non-essential `transition-*` utility pairs with `motion-reduce:animate-none` / `motion-reduce:transition-none` (CORE-A11Y-002). Loading spinners use `animate-spin motion-reduce:animate-none` — the static icon still communicates "loading." Essential motion (e.g., a Sheet sliding into view — the slide is what conveys "this came from the side") can omit the variant; document the choice in a one-line comment so reviewers know it was deliberate.

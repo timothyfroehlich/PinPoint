@@ -1,4 +1,4 @@
-"""Regression tests for worktree_cleanup.py's two silent-failure bugs.
+"""Regression tests for worktree_cleanup.py's silent-failure bugs.
 
 **PP-omz3 — a missing target used to be a silent success.** Handed a path that
 isn't on disk, the script warned and returned, i.e. exit 0. Nothing ran: no
@@ -13,6 +13,13 @@ indistinguishable from "this project has no volumes". Teardown continued,
 removed the worktree, deallocated the slot, and exited 0 while the volumes
 stayed on disk. Same false-zero class as PP-5o7b / PR #1746 in
 `worktree_orphan_sweep.py`, whose UNKNOWN-not-zero shape this follows.
+
+**PP-rbbp — the project id used to be derived from the branch.** PP-4936 pinned
+each worktree's Supabase project id in its `supabase/config.toml` so it stops
+following the branch. Cleanup kept re-deriving it from the branch name, so on a
+worktree whose branch was renamed after setup the volume query filtered on a
+label no volume carries: a clean, wrong zero, and the volumes leaked past a
+teardown that exited 0. The pinned id now wins, with the branch as fallback.
 
 Everything is mocked at the subprocess boundary: these tests never touch the
 real Docker daemon, Supabase, git worktrees, or the slot manifest.
@@ -32,6 +39,21 @@ import worktree_cleanup as cleanup  # noqa: E402
 LABEL = "com.supabase.cli.project"
 BRANCH = "agent-alpha"
 PROJECT_ID = "pinpoint-agent-alpha"
+
+# The branch a worktree ends up on after `git checkout -b` inside it. Its
+# derived id is NOT the one the already-running stack is labelled with — that
+# divergence is the whole of PP-rbbp.
+RENAMED_BRANCH = "fix/renamed-after-setup"
+RENAMED_PROJECT_ID = "pinpoint-fix-renamed-after-setup"
+
+
+def pin_project_id(worktree: Path, project_id: str) -> None:
+    """Write a `supabase/config.toml` shaped like the one setup generates."""
+    config_dir = worktree / "supabase"
+    config_dir.mkdir(exist_ok=True)
+    (config_dir / "config.toml").write_text(
+        f'project_id = "{project_id}"\n\n[api]\nport = 54421\n'
+    )
 
 
 def _kind(args: list[str]) -> str:
@@ -180,6 +202,59 @@ class TestListProjectVolumes:
 
         assert not query.is_unknown
         assert query.volumes == ()
+
+
+# --------------------------------------------------------------------------- #
+# PP-rbbp: which project id cleanup targets
+# --------------------------------------------------------------------------- #
+
+
+class TestResolveProjectId:
+    def test_pinned_id_wins_over_the_branch_derived_one(self, tmp_path: Path) -> None:
+        """The PP-rbbp core: the stack is labelled with the pinned id, not the branch."""
+        pin_project_id(tmp_path, PROJECT_ID)
+
+        assert cleanup.resolve_project_id(tmp_path, RENAMED_BRANCH) == PROJECT_ID
+
+    def test_divergence_is_announced(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        pin_project_id(tmp_path, PROJECT_ID)
+
+        cleanup.resolve_project_id(tmp_path, RENAMED_BRANCH)
+
+        err = capsys.readouterr().err
+        assert PROJECT_ID in err
+        assert RENAMED_PROJECT_ID in err
+
+    def test_agreement_is_silent(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """The common case — branch never renamed — has nothing to report."""
+        pin_project_id(tmp_path, PROJECT_ID)
+
+        assert cleanup.resolve_project_id(tmp_path, BRANCH) == PROJECT_ID
+        assert capsys.readouterr().err == ""
+
+    def test_missing_config_falls_back_to_the_branch(self, tmp_path: Path) -> None:
+        """A worktree set up before PP-4936 has no pinned id to honour."""
+        assert cleanup.resolve_project_id(tmp_path, BRANCH) == PROJECT_ID
+
+    @pytest.mark.parametrize(
+        "config_body",
+        [
+            "[api]\nport = 54421\n",  # no project_id at all
+            'project_id = "not-a-pinpoint-id"\n',  # outside the generated shape
+            'project_id = "pinpoint"\n',  # the bare template value
+        ],
+    )
+    def test_unusable_pinned_id_falls_back_to_the_branch(
+        self, tmp_path: Path, config_body: str
+    ) -> None:
+        (tmp_path / "supabase").mkdir()
+        (tmp_path / "supabase" / "config.toml").write_text(config_body)
+
+        assert cleanup.resolve_project_id(tmp_path, BRANCH) == PROJECT_ID
 
 
 # --------------------------------------------------------------------------- #
@@ -354,6 +429,54 @@ class TestMainTeardown:
         assert "Removed 1 Docker volume(s)" in err
         assert f"Cleaned up worktree: {fake_worktree}" in err
         assert deallocated == [str(fake_worktree)]
+
+    def test_renamed_branch_still_tears_down_the_pinned_project(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        fake_worktree: Path,
+        deallocated: list[str],
+    ) -> None:
+        """PP-rbbp end to end: the branch moved, the volume labels did not."""
+        pin_project_id(fake_worktree, PROJECT_ID)
+        stub = install(
+            monkeypatch,
+            RunStub(
+                rev_parse=(0, f"{RENAMED_BRANCH}\n", ""),
+                volume_ls=(0, f"supabase_db_{PROJECT_ID}\n", ""),
+            ),
+        )
+
+        exit_code = _run_main(monkeypatch, fake_worktree)
+
+        assert exit_code == cleanup.EXIT_OK
+        ls = stub.calls_of("volume_ls")[0]
+        assert f"label={LABEL}={PROJECT_ID}" in ls
+        # The branch-derived id is what leaked the volumes; it must not be queried.
+        assert f"label={LABEL}={RENAMED_PROJECT_ID}" not in ls
+        assert stub.calls_of("volume_rm") == [
+            ["docker", "volume", "rm", f"supabase_db_{PROJECT_ID}"]
+        ]
+        assert "Removed 1 Docker volume(s)" in capsys.readouterr().err
+        assert deallocated == [str(fake_worktree)]
+
+    def test_worktree_without_a_pinned_id_uses_the_branch(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        fake_worktree: Path,
+        deallocated: list[str],
+    ) -> None:
+        """Pre-PP-4936 worktrees have no config.toml — the branch is all there is."""
+        stub = install(
+            monkeypatch,
+            RunStub(
+                rev_parse=(0, f"{RENAMED_BRANCH}\n", ""),
+                volume_ls=(0, "", ""),
+            ),
+        )
+
+        assert _run_main(monkeypatch, fake_worktree) == cleanup.EXIT_OK
+        assert f"label={LABEL}={RENAMED_PROJECT_ID}" in stub.calls_of("volume_ls")[0]
 
     def test_no_volumes_is_a_clean_success(
         self,

@@ -14,6 +14,10 @@
 //                 path and the sticky comment target.
 //   --pages=a,b,c Optional comma-separated list of manifest page ids to shoot.
 //                 Default: every page in ui-screenshot-manifest.json.
+//                 Must use the EQUALS form — `--pages machine-edit` (space)
+//                 fails with "Unrecognized argument". Note a filtered run
+//                 REBUILDS the sticky comment from only the pages it shot,
+//                 dropping the rest, so finish with an unfiltered run.
 //   --force-auth  Regenerate e2e/.auth/*.json storage state even if present
 //                 (use when a previous session looks stale/expired).
 //
@@ -298,8 +302,13 @@ function git(args, opts = {}) {
   return execFileSync("git", args, { encoding: "utf8", ...opts }).trim();
 }
 
-function ghJson(args) {
-  return JSON.parse(execFileSync("gh", args, { encoding: "utf8" }));
+// `gh api --jq <filter>` prints the filter's result as raw text, not JSON — a
+// string result comes back bare (no surrounding quotes), so feeding it to
+// JSON.parse throws even though the request itself succeeded. (PP-5hxi: that
+// threw *after* the sticky comment had already been posted/updated, so the
+// script exited 1 on a run that had in fact done its job.)
+function ghText(args) {
+  return execFileSync("gh", args, { encoding: "utf8" }).trim();
 }
 
 /**
@@ -413,7 +422,7 @@ function postOrUpdateStickyComment(repoSlug, pr, body) {
     console.log(
       `✏️  Updating sticky screenshot comment (id=${stickyComment.id})`
     );
-    return ghJson([
+    return ghText([
       "api",
       "--method",
       "PATCH",
@@ -426,7 +435,7 @@ function postOrUpdateStickyComment(repoSlug, pr, body) {
   }
 
   console.log("📝 Posting new sticky screenshot comment");
-  return ghJson([
+  return ghText([
     "api",
     "--method",
     "POST",

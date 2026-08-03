@@ -1,136 +1,30 @@
 # Styling with Tailwind CSS v4 & shadcn/ui Patterns
 
-Token-driven styling, `cn()` usage, and the canonical shadcn component shapes.
+Token-driven styling and the conventions around the shadcn primitives. The primitives themselves live in `src/components/ui/` and are the source of truth for their own APIs — read the file rather than a description of it.
 
 ## Styling with Tailwind CSS v4
 
-### CSS Variables (No Hardcoded Colors)
+**Semantic tokens only.** Raw Tailwind palette classes and hardcoded hex are forbidden in component code and enforced by ESLint (`better-tailwindcss/no-restricted-classes`). The vocabulary and the design-layer exemptions are `pinpoint-design-bible` §1. Separately, §18 says which spelling is canonical where two exist — the MD-era names in `globals.css` are kept for backward compatibility but are not for new code.
 
-```typescript
-// Use CSS variables from globals.css
-<div className="bg-background text-foreground">
-  <p className="text-muted-foreground">Muted text</p>
-</div>
-
-// BAD: Hardcoded hex colors
-<div style={{ backgroundColor: "#ffffff", color: "#000000" }}>
-```
-
-### Component Styling
-
-```typescript
-// Use className with cn() for merging
-import { cn } from "~/lib/utils";
-
-export function Button({ className, ...props }: ButtonProps) {
-  return (
-    <button
-      className={cn(
-        "rounded-md bg-primary px-4 py-2 text-primary-foreground",
-        className
-      )}
-      {...props}
-    />
-  );
-}
-
-// BAD: String concatenation (doesn't handle conflicts)
-<button className={`base-classes ${className}`} />
-
-// BAD: Inline styles
-<button style={{ marginTop: '10px' }} />
-```
-
-### Global vs Local Styles
-
-```typescript
-// Global styles (globals.css)
-// - Typography (headings, body text)
-// - Theme variables (colors, spacing)
-
-// Local styles (component className)
-// - Component-specific layout
-// - Responsive design
-// - Interactive states (hover, focus)
-
-// BAD: Hardcoded spacing in reusable components
-export function Card({ children }: CardProps) {
-  return <div className="m-4 p-4">{children}</div>; // Too opinionated
-}
-
-// GOOD: Allow className override
-export function Card({ children, className }: CardProps) {
-  return <div className={cn("rounded-lg border", className)}>{children}</div>;
-}
-```
+**Merge classNames with `cn()`** from `~/lib/utils` — never template-string concatenation. `cn()` runs `tailwind-merge`, which drops the losing half of a conflicting pair so the last class you pass wins. Raw concatenation leaves both on the element, and since Tailwind utilities all carry the same specificity, the winner is whichever one sits later in the generated stylesheet — not the one you wrote last. A component that accepts `className` merges it last so callers can override. No inline `style={{…}}`.
 
 ## shadcn/ui Component Patterns
 
-### Button Variants
+### Button
 
-```typescript
-import { Button } from "~/components/ui/button";
+`src/components/ui/button.tsx` owns the variant and size lists. Read the `cva` call there when you need to pick one; any list written down here would be a second copy that drifts the next time a variant is added.
 
-<Button variant="default">Primary Action</Button>
-<Button variant="secondary">Secondary Action</Button>
-<Button variant="destructive">Delete</Button>
-<Button variant="ghost">Subtle Action</Button>
-<Button variant="link">Link Style</Button>
-```
+Two conventions that aren't visible from the API:
 
-### Dialog (Modal) Pattern
+- **Use `loading` rather than hand-rolling an in-flight state.** It disables the button and renders the project's canonical CORE-A11Y-002 spinner (`animate-spin motion-reduce:animate-none`). A bare `disabled` plus your own `<Loader2>` usually loses the `motion-reduce:` pairing.
+- **Don't size icon children.** The base class already sizes any `svg` that doesn't carry its own `size-*`, so adding `size-4` is noise; add one only when overriding. Icon-only buttons still need an `aria-label` (CORE-A11Y-004/005).
 
-```typescript
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "~/components/ui/dialog";
+### Dialogs, sheets and drawers
 
-export function CreateIssueDialog() {
-  return (
-    <Dialog>
-      <DialogTrigger asChild>
-        <Button>Create Issue</Button>
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Create New Issue</DialogTitle>
-          <DialogDescription>
-            Report a problem with a machine.
-          </DialogDescription>
-        </DialogHeader>
-        <CreateIssueForm />
-      </DialogContent>
-    </Dialog>
-  );
-}
-```
+Modal shapes, sizing, and footer button order are archetypes owned by `pinpoint-design-bible` §17. Don't build a custom `Modal` or `Drawer` wrapper.
 
-### Form with shadcn/ui
+Worth knowing before you pick one: **`Sheet` and `Drawer` are different components.** `sheet.tsx` is built on Radix Dialog; `drawer.tsx` wraps **vaul**, which is what gives the mobile "More" menu its swipe-to-close and momentum. They are not interchangeable, and the names don't tell you which is which.
 
-```typescript
-import { Label } from "~/components/ui/label";
-import { Input } from "~/components/ui/input";
-import { Textarea } from "~/components/ui/textarea";
-import { Button } from "~/components/ui/button";
+### Forms
 
-export function IssueForm() {
-  return (
-    <form action={createIssue} className="space-y-4">
-      <div>
-        <Label htmlFor="title">Title <span aria-hidden="true">*</span></Label>
-        <Input id="title" name="title" required enterKeyHint="next" />
-      </div>
-      <div>
-        <Label htmlFor="description">Description</Label>
-        <Textarea id="description" name="description" enterKeyHint="done" />
-      </div>
-      <Button type="submit">Create Issue</Button>
-    </form>
-  );
-}
-```
+Form composition, required-field indicators, and the autocomplete/`enterkeyhint` conventions are `pinpoint-design-bible` §20. The Radix Select submission carve-out — the single biggest footgun in this codebase — is in `SKILL.md` § Server Action Forms; read it before writing any form that contains a `Select`.

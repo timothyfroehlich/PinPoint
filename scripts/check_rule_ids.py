@@ -7,8 +7,7 @@ a different reader:
   docs/NON_NEGOTIABLES.md    canonical catalog -- the authoritative statement
   CLAUDE.md                  always-loaded index, authoring voice
   .claude/rules/*.md         path-scoped, authoring voice (Claude)
-  .github/instructions/*.md  path-scoped, review voice (Copilot)
-  CODE_REVIEW.md             review-agent entry map
+  REVIEW.md                  review-agent entry map + rubric
 
 Generating those from one source would mean synthesising two registers from one
 text, so they are hand-written. This gate catches the drift that actually bites
@@ -102,8 +101,6 @@ CITING_SOURCES: tuple[str, ...] = (
     ".claude/rules/**/*.md",
     ".agents/rules/*.md",
     ".agents/skills/**/*.md",
-    ".github/copilot-instructions.md",
-    ".github/instructions/*.md",
     ".claude/hooks/*.cjs",
 )
 

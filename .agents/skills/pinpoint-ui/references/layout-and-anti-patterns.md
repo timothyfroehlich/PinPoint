@@ -177,13 +177,8 @@ export function Card({ children, className }: CardProps) {
 <div style={{ marginTop: '10px', color: '#ff0000' }}>
 
 // GOOD: Tailwind utilities with semantic tokens
-<div className="mt-2.5 text-destructive">
+<div className="mt-2.5 text-destructive-text">
 ```
-
-## Troubleshooting
-
-- **Styles not applying**: Check Tailwind specificity, check `cn()` usage, clear `.next` cache
-- **Hydration errors**: Ensure no random data (dates, Math.random) renders without `useEffect` or `suppressHydrationWarning`. Check for invalid HTML nesting (`<div>` inside `<p>`).
 
 ## External References
 

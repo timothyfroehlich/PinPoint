@@ -54,4 +54,22 @@ test.describe("Machine Info tab — player landing", () => {
       page.getByRole("heading", { name: /report/i }).first()
     ).toBeVisible();
   });
+
+  // Companion to public-routes-audit.spec.ts's anonymous-viewer case: a
+  // signed-in member who doesn't own this machine (TAF is admin-owned) also
+  // lacks `machines.edit`, so the edit page's own permission gate — not
+  // middleware — must send them back here rather than let them in (PP-o355.19).
+  test("a member without edit permission is redirected away from the edit page (deep link)", async ({
+    page,
+  }) => {
+    await page.goto(`/m/${initials}/edit`);
+
+    await expect(page).toHaveURL(`/m/${initials}`);
+    await expect(
+      page.getByRole("button", { name: "Save details" })
+    ).not.toBeVisible();
+    // ...and the Manage tab that would take them there is not offered in the
+    // first place. The redirect is the deep-link guard; hiding it is the gate.
+    await expect(page.getByTestId("machine-tab-edit")).toHaveCount(0);
+  });
 });

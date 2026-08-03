@@ -32,7 +32,7 @@ describe("MachinePinballmapCard", () => {
       />
     );
     expect(screen.getByTestId("machine-pinballmap-desync")).toHaveTextContent(
-      /listed here but not showing on pinball map/i
+      /listed here.*not showing on pinball map/i
     );
   });
 
@@ -45,11 +45,17 @@ describe("MachinePinballmapCard", () => {
       />
     );
     expect(screen.getByTestId("machine-pinballmap-desync")).toHaveTextContent(
-      /on pinball map but not marked listed here/i
+      /on pinball map.*not marked listed here/i
     );
   });
 
-  it("shows the 'link moved' desync copy", () => {
+  // `lmx_drifted` self-heals: `reconcileAfterSync` repairs every drifted
+  // machine on each hourly cron, using the same predicate that raises the
+  // reason. Surfacing it would report a transient nobody can act on, so it is
+  // deliberately absent from DESYNC_COPY. This test is the guard — if someone
+  // adds the key back, they should be doing it because PP-o355.21 gave the
+  // state a real action, not because the blank looked like an oversight.
+  it("shows no alert for lmx_drifted, which the hourly sync heals itself", () => {
     render(
       <MachinePinballmapCard
         locationUrl={LOCATION_URL}
@@ -57,9 +63,30 @@ describe("MachinePinballmapCard", () => {
         desyncReason="lmx_drifted"
       />
     );
-    expect(screen.getByTestId("machine-pinballmap-desync")).toHaveTextContent(
-      /pinball map link moved/i
+    expect(
+      screen.queryByTestId("machine-pinballmap-desync")
+    ).not.toBeInTheDocument();
+  });
+
+  // The desync alerts are informational only while PP-o355.21 is outstanding:
+  // the Manage tab's listing control is a placeholder, so any copy naming a
+  // control ("verify", "connect") would send the reader somewhere they cannot
+  // act. Assert the absence so restoring a call to action is a deliberate
+  // change made alongside .21, not an accident.
+  it.each([
+    "listed_locally_absent_on_pbm",
+    "on_pbm_not_listed_locally",
+  ] as const)("names no removed control in the %s copy", (reason) => {
+    render(
+      <MachinePinballmapCard
+        locationUrl={LOCATION_URL}
+        desynced
+        desyncReason={reason}
+      />
     );
+    expect(
+      screen.getByTestId("machine-pinballmap-desync")
+    ).not.toHaveTextContent(/\b(verify|connect|reconnect)\b/i);
   });
 
   it("renders no alert when desynced but the reason has no copy (ok/unlinked)", () => {
