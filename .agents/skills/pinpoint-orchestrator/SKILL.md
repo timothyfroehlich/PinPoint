@@ -38,7 +38,7 @@ Coordinate multiple subagents working in parallel across isolated git worktrees.
 # including --dry-run. The lead does NOT run it, even to preview gates. Once the PR
 # is ready (label applied, screenshots posted if UI-touching), hand Tim:
 #   ! scripts/workflow/merge-pr.sh <PR> --human
-bash scripts/workflow/mark-claude-review.sh <PR> "<summary>"  # SHA-pinned review marker — the ONLY thing that satisfies the `reviewed` gate. Attests Tim ran /code-review (or that the change was trivial)
+bash scripts/workflow/mark-claude-review.sh <PR> <depth> "<summary>"  # SHA-pinned review marker — the ONLY thing that satisfies the `reviewed` gate. Attests Tim ran /code-review (or that the change was trivial)
 node scripts/workflow/pr-screenshots.mjs <PR>                 # UI-touching PRs: desktop+mobile screenshots, sticky PR comment
 
 # Worktree health — stale-worktrees.sh covers manually created ../pinpoint-worktrees/* ONLY.
@@ -142,7 +142,7 @@ A review covering the head commit is still **required** to merge, and **no bot r
 
 Open the PR whenever you like and watch CI; it costs nothing. Then finish all of it — CI fixes, merge-from-main — stop iterating, and ask Tim for the review. When he has given it and you have addressed the findings, attest the head he reviewed:
 
-`bash scripts/workflow/mark-claude-review.sh <PR> "<summary>"`
+`bash scripts/workflow/mark-claude-review.sh <PR> <depth> "<summary>"`
 
 The marker pins a SHA, so any push after it invalidates it. Re-attesting is right when what you pushed was the review's own findings; anything else needs a fresh `/code-review`. A genuinely trivial change (typo, comment, one-line mechanical fix) can be attested without interrupting Tim — say why it was trivial in the summary. The marker is an attestation that a review happened, never a way to skip one.
 

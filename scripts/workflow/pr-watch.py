@@ -71,7 +71,7 @@ CLAUDE_MARKER_PREFIX = "<!-- pinpoint-claude-review:"
 
 REVIEW_HINT = (
     "ask Tim to run /code-review, then attest with "
-    "scripts/workflow/mark-claude-review.sh {pr}"
+    "scripts/workflow/mark-claude-review.sh {pr} <depth>"
 )
 
 STARTUP_RETRIES = 6  # attempts to find runs for current SHA
