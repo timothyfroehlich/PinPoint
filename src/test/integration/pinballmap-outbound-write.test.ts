@@ -415,6 +415,58 @@ describe("PinballMap outbound writes (PGlite)", () => {
     expect(row?.pinballmapLmxId).toBeNull();
   });
 
+  it("clears the local listing when the lmx is already gone from PinballMap", async () => {
+    // Someone deleted the entry on pinballmap.com directly. That is the desync
+    // Remove exists to resolve, so a `not_found` finishes the job instead of
+    // stranding the machine — refusing would leave it listed with a dead lmx
+    // and no path out, since every retry 404s and Verify only reports `stale`.
+    const db = await getTestDb();
+    const { unlistMachineFromPinballMapAction } =
+      await import("~/app/(app)/m/pinballmap-actions");
+    const admin = await createUser("admin");
+    await mockAuthAs(admin.id);
+    // Seeded as listed locally, but absent from PBM's lineup and our snapshot.
+    pbm.lineup = [];
+    await seedState([]);
+
+    const [machine] = await db
+      .insert(machines)
+      .values({
+        name: "Godzilla",
+        initials: "GZ",
+        pinballmapMachineId: TITLE_ID,
+        pinballmapListed: true,
+        pinballmapLmxId: 500,
+      })
+      .returning();
+    if (!machine) throw new Error("failed to seed machine");
+
+    const result = await unlistMachineFromPinballMapAction(
+      undefined,
+      form(machine.id)
+    );
+
+    expect(result.ok).toBe(true);
+
+    const row = await db.query.machines.findFirst({
+      where: eq(machines.id, machine.id),
+    });
+    expect(row?.pinballmapListed).toBe(false);
+    expect(row?.pinballmapLmxId).toBeNull();
+
+    // The receipt still records what happened — the listing did end.
+    const events = await db
+      .select()
+      .from(timelineEvents)
+      .where(eq(timelineEvents.machineId, machine.id));
+    expect(events).toHaveLength(1);
+    expect(events[0]?.eventData).toEqual({
+      kind: "pinballmap_listing",
+      action: "unlisted",
+      lmxId: 500,
+    });
+  });
+
   it("writes nothing locally when PinballMap rejects the removal", async () => {
     const db = await getTestDb();
     const { unlistMachineFromPinballMapAction } =

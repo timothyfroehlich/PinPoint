@@ -545,12 +545,27 @@ export async function unlistMachineFromPinballMapAction(
 
   const client = await getPinballMapClient();
   const written = await client.removeMachine({ credentials, lmxId });
-  if (!written.ok) {
+  // `not_found` means the lmx is already gone from PinballMap — someone deleted
+  // the entry on pinballmap.com directly. That is the desync this button exists
+  // to resolve, and it is the one failure whose desired end state (not on PBM,
+  // not listed locally) is already half-reached, so we finish the job rather
+  // than refuse. Refusing would strand the machine: every retry hits the same
+  // 404, and `verifyPinballmapLinkAction` reports `stale` without clearing, so
+  // nothing short of a DB edit could unstick it. Not honesty-washing — we do
+  // reach the state we report (CORE-ARCH-012); we just didn't have to do the
+  // deleting.
+  if (!written.ok && written.reason !== "not_found") {
     log.error(
       { reason: written.reason, action: "pinballmap.removeMachine" },
       "PinballMap remove rejected"
     );
     return err("PBM_REJECTED", pbmWriteFailureMessage(written));
+  }
+  if (!written.ok) {
+    log.info(
+      { lmxId, machineId: machine.id, action: "pinballmap.removeMachine" },
+      "PinballMap lmx already absent — clearing the local listing anyway"
+    );
   }
   // --- transaction: local state only ---
 
