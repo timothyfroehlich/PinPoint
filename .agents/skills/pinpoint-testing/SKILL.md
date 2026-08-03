@@ -102,6 +102,7 @@ The house pattern instead forwards the `db` singleton to worker-scoped PGlite, s
 ## Elsewhere
 
 - `pinpoint-e2e` — Playwright technique, selector strategy, worker isolation, environment defaults.
+- [src/test/README.md](../../../src/test/README.md) — the mechanics: `setupTestDb()` / `getTestDb()` call contract, factories, and which command runs which project.
 - AGENTS.md §5 "Which tests to run" — the decision tree and the commands.
 - [NON_NEGOTIABLES.md](../../../docs/NON_NEGOTIABLES.md#testing) — the `CORE-TEST-*` rules themselves.
 - [e2e-audit-2026-05.md](../../../docs/testing/e2e-audit-2026-05.md) — per-spec verdicts and the bug-class framework's history.
