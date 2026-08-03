@@ -1,6 +1,6 @@
 ---
 name: pinpoint-typescript
-description: The PinPoint-specific database typing decision — `InferSelectModel` yields camelCase types directly, so there is no db→app converter layer and none should be built; narrow with `Pick<>` at boundaries instead, and convert only on the reads and writes Drizzle does not map. Also carries the `exactOptionalPropertyTypes` resolution the compiler flags but does not teach, and which parts of CORE-TS-006/007 no tool enforces. Use when typing a database row on its way to a component, when tempted to write a row-mapping function, when reviewing a non-null assertion (`!`) or an `any`, or when the user mentions InferSelectModel, exactOptionalPropertyTypes, or snake_case/camelCase. General TypeScript technique is deliberately not covered.
+description: The PinPoint-specific database typing decision — `InferSelectModel` yields camelCase types directly, so there is no db→app converter layer and none should be built; narrow with `Pick<>` at boundaries instead, and convert only on the reads and writes Drizzle does not map. Also carries the `exactOptionalPropertyTypes` resolution the compiler flags but does not teach, and which parts of CORE-TS-006/007 no tool enforces. Use when typing a database row on its way to a component, when tempted to write a row-mapping function, when reviewing an `as` cast between two known types (the one third of CORE-TS-007 no tool checks), or when the user mentions InferSelectModel, exactOptionalPropertyTypes, or snake_case/camelCase. General TypeScript technique is deliberately not covered.
 ---
 
 # PinPoint TypeScript
@@ -20,10 +20,20 @@ in app code. `no-explicit-any` (CORE-TS-007) and `explicit-function-return-type`
 `*.config.*` / `scripts/**`. Writing `const page: any` in an e2e spec passes
 every gate.
 
-And CORE-TS-007's ban on `!` is enforced **nowhere**:
-`@typescript-eslint/no-non-null-assertion` is never enabled, and `!` is valid
-TypeScript at every strictness level. That third of a Critical rule rests
-entirely on review.
+CORE-TS-007's ban on `!` **is** linted, as of PP-8k07:
+`@typescript-eslint/no-non-null-assertion` is "error", and
+`eslint-comments/no-restricted-disable` names it, so you cannot disable-comment
+past it in `src/`. It is off in the test and e2e blocks — a wrong assertion
+there fails the test loudly instead of 500ing a page — and that test exemption
+is meant to go away (PP-9q5k), so don't read it as blessed. Note the scope
+differs from the paragraph above: `scripts/**` and `*.config.*` keep
+`no-non-null-assertion` at "error", but they switch
+`eslint-comments/no-restricted-disable` off, so a `// eslint-disable-next-line`
+does work there.
+
+The third of CORE-TS-007 that no tool checks is **unsafe `as`**. The
+`no-unsafe-*` rules target untyped values, not casts between two known types,
+and `tsc` accepts the cast by construction. That one rests entirely on review.
 
 Full catalog: `CORE-TS-001..008` in `docs/NON_NEGOTIABLES.md`.
 

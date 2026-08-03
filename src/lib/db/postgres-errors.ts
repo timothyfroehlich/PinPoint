@@ -89,12 +89,10 @@ export const isPgErrorCode = (error: unknown, code: string): boolean =>
  * every unique violation carries a name (some arrive from `EXCLUDE` constraints
  * or through drivers that drop the field).
  *
- * **No production caller at present** (PP-o355.29 removed the last one, by
- * making the ambiguity it resolved impossible to reach). Kept as general
- * infrastructure beside {@link isPgErrorCode}: the driver-spelling split above
- * is the kind of thing that is expensive to rediscover and cheap to keep, and
- * the next table with two unique constraints will want it. Do not read its
- * existence as evidence that some path depends on it.
+ * Its production caller is `captureAutoLink` (`~/lib/pinballmap/sync`), which
+ * stands down on a duplicate-listing collision and must NOT stand down on the
+ * unique index of the timeline receipt written in the same transaction — the two
+ * are indistinguishable by SQLSTATE alone.
  */
 export const getPostgresErrorConstraint = (
   error: unknown
