@@ -13,12 +13,26 @@
 
 set -euo pipefail
 
-# SHA-pinned review marker, posted by mark-claude-review.sh. Since PP-4ric this is the
-# ONLY thing that satisfies the `reviewed` gate — Copilot review was retired on
-# 2026-08-02 (its free tier was too small to review PinPoint's PRs), and no bot reviews
-# this repo now. The marker attests that Tim ran `/code-review` over the diff, which an
-# agent cannot do for itself: `/code-review` is a harness built-in only he can trigger.
+# SHA-pinned review markers. One of these must pin the head commit for the `reviewed`
+# gate to pass; the SHA pin makes them self-expiring, so a later push re-arms the gate.
+#
+# Two markers, two different attestations — deliberately equal in the gate's eyes:
+#
+#   pinpoint-claude-review  posted by mark-claude-review.sh. Attests that Tim ran
+#                           `/code-review` over the diff, which an agent cannot do for
+#                           itself (it is a harness built-in only he can trigger).
+#   pinpoint-agy-review     posted by agy_review.py. Attests that an Antigravity review
+#                           was posted AND that it demonstrably read the diff it was
+#                           given — that script refuses to write this marker unless the
+#                           model echoed back facts about the diff that only a run which
+#                           actually read it could produce. agy confabulates a plausible
+#                           review when a read fails, so the proof check is what makes
+#                           the marker mean anything. (PP-c6xz.)
+#
+# Copilot review was retired on 2026-08-02 (PP-4ric) — its free tier was too small to
+# review PinPoint's PRs — and no bot reviews this repo unprompted.
 readonly CLAUDE_MARKER_PREFIX="<!-- pinpoint-claude-review:"
+readonly AGY_MARKER_PREFIX="<!-- pinpoint-agy-review:"
 
 # Parse owner/repo dynamically — avoid hardcoded slug. Memoized: several gates ask for
 # it and pr-dashboard.sh runs them once per open PR, so an unmemoized call was one
@@ -50,11 +64,14 @@ _repo_slug() {
 # misses a marker sitting on page 2+ of a busy PR.
 _marker_verdict() {
   local pr=$1 owner_repo=$2 head=$3
+  local prefixes
+  prefixes=$(jq -nc --arg a "$CLAUDE_MARKER_PREFIX" --arg b "$AGY_MARKER_PREFIX" '[$a, $b]')
   gh api --paginate "repos/${owner_repo}/issues/${pr}/comments" \
-    | jq -rs --arg prefix "$CLAUDE_MARKER_PREFIX" --arg head "$head" \
-        '[ .[] | flatten | .[] | (.body // "")
-           | select(startswith($prefix))
-           | ltrimstr($prefix) | split("-->")[0] | gsub("^\\s+|\\s+$"; "")
+    | jq -rs --argjson prefixes "$prefixes" --arg head "$head" \
+        '[ .[] | flatten | .[] | (.body // "") as $body
+           | $prefixes[] as $prefix
+           | select($body | startswith($prefix))
+           | $body | ltrimstr($prefix) | split("-->")[0] | gsub("^\\s+|\\s+$"; "")
          ] as $pinned
          | if ($pinned | index($head)) then "marker \($head)"
            elif ($pinned | length) > 0 then "stale_marker \($pinned | last)"

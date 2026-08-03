@@ -19,7 +19,7 @@
 
 `REVIEW.md` at the repo root is the canonical review rubric, shared with Antigravity. Read it before launching the code-review skill.
 
-**No bot reviews this repo — Copilot review was retired 2026-08-02 (PP-4ric).** A review covering the head commit is still required to merge, and the reviewer is Tim running `/code-review`, which you cannot launch. Finish your churn first, then hand the branch over; once he has reviewed and you have addressed the findings, attest with `bash scripts/workflow/mark-claude-review.sh <PR> "<findings>"`. The marker pins a SHA, so a later push invalidates it. Full rules: `pinpoint-pr-workflow` Phase 3.4.
+**Two reviewers, either marker satisfies the gate.** Routine path is `./scripts/workflow/agy_review.py <PR>` (`--pro` for denser changes) — you run it yourself, it posts inline findings and writes the agy marker. Reserve Tim's `/code-review`, which you cannot launch, for auth, permissions, migrations, or architectural changes; finish your churn first, hand the branch over, then attest with `bash scripts/workflow/mark-claude-review.sh <PR> "<findings>"`. Either marker pins a SHA, so a later push invalidates it. Full rules: `pinpoint-pr-workflow` Phase 3.4.
 
 ### Sandbox network isolation
 

@@ -147,15 +147,18 @@ Never resolve `drizzle/meta` conflicts manually — the folder holds binary-like
 
 ### Getting a PR reviewed
 
-**No bot reviews this repo.** Copilot review was retired on 2026-08-02 (PP-4ric) — the free tier was too small to review PinPoint's PRs, so quota outages were the normal state. The merge bar is unchanged: a PR still needs a review covering its **head commit**, with threads resolved.
-
-The reviewer is **Tim, running `/code-review` on the branch** — a Claude Code harness built-in an agent cannot launch. So getting reviewed is a handoff: **finish your churn first** (CI fixes, merge-from-main), stop iterating, then tell Tim the branch is ready for review. Once he has, address the findings and attest the head he read:
+A PR needs a review covering its **head commit**, with threads resolved. Nothing reviews on PR-open or on push — a review happens because you asked for one. There are two reviewers and **either one's SHA-pinned marker satisfies the gate**:
 
 ```bash
-bash scripts/workflow/mark-claude-review.sh <PR> "<one-line findings>"
+./scripts/workflow/agy_review.py <PR>          # routine path — you run it, costs Tim nothing
+./scripts/workflow/agy_review.py <PR> --pro    # denser changes
 ```
 
-The marker pins a SHA, so any push invalidates it — re-attest if what you pushed was the review's own findings; get a fresh review if it was anything else. A genuinely trivial change (typo, comment, one-line mechanical fix) can be attested without interrupting him, saying why it was trivial. The marker attests a review happened; posting it otherwise is a false attestation. Full rules: `pinpoint-pr-workflow` skill Phase 3.4.
+`agy_review.py` (PP-c6xz) runs the Antigravity CLI over the PR diff, posts findings as inline comments, and writes `<!-- pinpoint-agy-review: <sha> -->`. It refuses to write that marker unless agy demonstrably read the diff — agy confabulates a plausible review when a read fails, so the proof check is what makes the attestation mean anything. Close out every thread it opens.
+
+**Tim running `/code-review`** is the other reviewer — a harness built-in an agent cannot launch, so it is a handoff and costs his attention. Reserve it for auth, permissions, migrations, or changes big enough that a per-line pass misses the point. **Finish your churn first**, stop iterating, then hand over; afterwards attest the head he read with `bash scripts/workflow/mark-claude-review.sh <PR> "<one-line findings>"`.
+
+Either marker pins a SHA, so any push invalidates it — re-run agy, or re-attest if what you pushed was the review's own findings. A genuinely trivial change (typo, comment, one-line mechanical fix) can be self-attested, saying why it was trivial. A marker attests a review happened; posting one otherwise is a false attestation. Full rules: `pinpoint-pr-workflow` skill Phase 3.4.
 
 ### Review comments
 
