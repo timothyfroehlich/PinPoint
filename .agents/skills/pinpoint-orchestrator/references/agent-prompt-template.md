@@ -19,6 +19,12 @@ A review covering the head commit is **required** to merge, and **no bot reviews
 
 Open the PR whenever you like and watch CI; it costs nothing. Then finish all of it — CI fixes, merge-from-main — stop iterating, and report the PR as needing Tim's review. Don't wait around for one to appear; nothing is coming on its own.
 
+**Recording that review, though, IS a command you run.** Once his `/code-review` lands, address what it found and attest the SHA he read:
+
+`bash scripts/workflow/mark-claude-review.sh <PR> <depth> "<one-line findings>"`
+
+`<depth>` is the level he ran (`low`|`medium`|`high`|`xhigh`|`max`|`ultra`) — ask if you don't know, don't guess. This marker is the only thing that satisfies the `reviewed` gate, so a review nobody posted leaves the PR unmergeable. **A clean review still gets a marker** — that is the one agents drop, because there is nothing to fix and nothing to push, so it feels like there is nothing to do. Post it; that is what unblocks the merge. Of the workflow scripts only `merge-pr.sh` is off-limits to you.
+
 If the change is genuinely trivial (a typo, a comment, a one-line mechanical fix), attest it yourself and say why it was trivial:
 
 `bash scripts/workflow/mark-claude-review.sh <PR> trivial "typo in a comment; no behavior change"`
