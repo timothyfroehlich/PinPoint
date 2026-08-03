@@ -1,6 +1,7 @@
 import "server-only";
 import { eq, isNotNull } from "drizzle-orm";
 import type { MachinePresenceStatus } from "~/lib/machines/presence";
+import { isPgErrorCode } from "~/lib/db/postgres-errors";
 import { createMachineTimelineEvent } from "~/lib/timeline/machine-events";
 import { db, type DbTransaction } from "~/server/db";
 import { machines } from "~/server/db/schema";
@@ -31,16 +32,21 @@ export interface ReconcileResult {
   /** Machines auto-linked: matched, unlisted, and present on the lineup. */
   linked: number;
   /**
-   * Machines still in a desynced state a human must resolve (listed here but
-   * absent on PBM). Drift is auto-healed and lineup presence is auto-linked, so
-   * neither is counted here — and neither is a tie, which raises no alert by
-   * design (`./listing-holder` §7).
+   * Machines in a desynced state a human can actually resolve. Everything this
+   * pass fixes itself is excluded (drift is healed, lineup presence is
+   * auto-linked), and so is everything nobody can fix:
+   *
+   *  - a tie, which raises no alert by design (`./listing-holder` §7);
+   *  - a same-title cabinet that is not the listing holder, which can never be
+   *    listed while the holder is (see the counting loop).
+   *
+   * In practice what survives is "listed here but absent on PBM".
    */
   desynced: number;
 }
 
 /** A write the reconcile pass decided on, ready to apply. */
-interface AutoLinkWrite {
+export interface AutoLinkWrite {
   machineId: string;
   lmxId: number;
   action: "linked" | "reconnected";
@@ -84,6 +90,35 @@ async function applyAutoLinkWrite(
     },
     tx
   );
+}
+
+/**
+ * Apply one auto-link write in its OWN transaction, standing down when another
+ * writer took the listing first. Returns whether the write landed.
+ *
+ * Auto-link is opportunistic bookkeeping, so a collision is never an error: a
+ * 23505 on `machines_pinballmap_listed_unique` means some concurrent writer
+ * already listed a cabinet of this title, which is the outcome we wanted. It is
+ * unambiguous — this statement touches no other unique constraint.
+ *
+ * The per-write transaction is what makes standing down possible. A rolled-back
+ * transaction cannot be continued, so batching every write into one would turn a
+ * single collision into "lose the whole hour's links and heals, and 500 the
+ * cron" (PP-o355.20 review).
+ */
+export async function captureAutoLink(
+  write: AutoLinkWrite,
+  actorId?: string
+): Promise<boolean> {
+  try {
+    await db.transaction(async (tx) => {
+      await applyAutoLinkWrite(tx, write, actorId);
+    });
+    return true;
+  } catch (error) {
+    if (isPgErrorCode(error, "23505")) return false;
+    throw error;
+  }
 }
 
 /**
@@ -140,25 +175,47 @@ export async function reconcileAfterSync(): Promise<ReconcileResult> {
     if (outcome.kind === "tie") continue;
     if (outcome.kind === "write") writes.push(outcome);
 
+    // Who holds this title's single listing: the cabinet we are about to write,
+    // or whoever already has the flag. `null` means nobody does.
+    const holderId =
+      outcome.kind === "write"
+        ? outcome.machineId
+        : (group.find((m) => m.pinballmapListed)?.id ?? null);
+
     for (const m of group) {
+      const isHolder = m.id === holderId;
       // Resolved by this pass — counting it would report a state we just fixed.
-      if (outcome.kind === "write" && m.id === outcome.machineId) continue;
+      if (isHolder && outcome.kind === "write") continue;
       const status = derivePbmMachineStatus({ ...m, snapshot });
-      if (status.desynced) desynced += 1;
+      if (!status.desynced) continue;
+      // A same-title cabinet that is NOT the holder can never be listed: PBM
+      // gives the title one lmx at our location and
+      // `machines_pinballmap_listed_unique` enforces one lister. Its
+      // "on PBM, not listed here" is therefore not a state any human can
+      // resolve, and counting it would inflate "N need attention" by one per
+      // duplicate cabinet, permanently — the same reason a tie is excluded.
+      if (
+        holderId !== null &&
+        !isHolder &&
+        status.reason === "on_pbm_not_listed_locally"
+      ) {
+        continue;
+      }
+      desynced += 1;
     }
   }
 
-  if (writes.length > 0) {
-    await db.transaction(async (tx) => {
-      for (const write of writes) {
-        await applyAutoLinkWrite(tx, write);
-      }
-    });
+  // One transaction per write, not one for the batch: a collision stands down
+  // alone instead of voiding every other title's link and heal (see
+  // `captureAutoLink`).
+  const applied: AutoLinkWrite[] = [];
+  for (const write of writes) {
+    if (await captureAutoLink(write)) applied.push(write);
   }
 
   return {
-    healed: writes.filter((w) => w.action === "reconnected").length,
-    linked: writes.filter((w) => w.action === "linked").length,
+    healed: applied.filter((w) => w.action === "reconnected").length,
+    linked: applied.filter((w) => w.action === "linked").length,
     desynced,
   };
 }
@@ -180,13 +237,21 @@ export async function reconcileAfterSync(): Promise<ReconcileResult> {
  *
  * Returns the lmx to capture, or `null` for absent / tie / someone else holds it.
  * Reads the stored snapshot only — no PBM call (CORE-PBM-001).
+ *
+ * Gated on `state.enabled`, unlike `reconcileAfterSync`. Both sync paths are
+ * explicit PinballMap operations whose callers own that gate (the cron route
+ * checks it; "Sync now" is a deliberate human act on the PBM admin surface). A
+ * "Save details" is neither — while the integration is off, editing a machine's
+ * name must not quietly flip listing state off a snapshot nobody is refreshing.
  */
 export async function resolveAutoLinkForMachine(prospective: {
   machineId: string;
   pinballmapMachineId: number;
   presenceStatus: MachinePresenceStatus;
 }): Promise<{ lmxId: number } | null> {
-  const snapshot = (await getPinballMapState())?.snapshotJson ?? null;
+  const state = await getPinballMapState();
+  if (!state?.enabled) return null;
+  const snapshot = state.snapshotJson ?? null;
   if (!snapshot) return null;
 
   const stored = await db

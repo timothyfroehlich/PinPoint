@@ -97,9 +97,15 @@ async function mockAuthAs(userId: string): Promise<void> {
   } as unknown as Awaited<ReturnType<typeof createClient>>);
 }
 
-/** The catalog title, plus the lineup that already carries it. */
+/**
+ * The catalog title, plus the lineup that already carries it.
+ *
+ * `enabled` is explicit and load-bearing: the column defaults to `false`, and
+ * save-time auto-link stands down while the integration is off.
+ */
 async function seedTitleOnLineup(
-  rows = [{ id: LMX_ID, machineId: TITLE_ID }]
+  rows = [{ id: LMX_ID, machineId: TITLE_ID }],
+  enabled = true
 ): Promise<void> {
   const db = await getTestDb();
   await db.insert(pinballmapCatalog).values({
@@ -111,6 +117,7 @@ async function seedTitleOnLineup(
   await db.insert(pinballmapState).values({
     id: "singleton",
     locationId: 26454,
+    enabled,
     snapshotJson: snapshotWith(rows),
     lastSyncStatus: "ok",
   });
@@ -376,5 +383,36 @@ describe("auto-link on title save (PGlite)", () => {
     });
     expect(row?.name).toBe("Godzilla Renamed");
     expect(row?.pinballmapListed).toBe(false);
+  });
+
+  it("stands down while the PinballMap integration is disabled", async () => {
+    // A stored snapshot outlives the toggle: turning the integration off stops
+    // the cron refreshing it, it does not delete it. Saving a machine's details
+    // is not a PinballMap action, so it must not capture a listing off a
+    // snapshot nobody is keeping current.
+    const db = await getTestDb();
+    const { updateMachineAction } = await import("~/app/(app)/m/actions");
+    const admin = await createAdmin();
+    await mockAuthAs(admin.id);
+    await seedTitleOnLineup([{ id: LMX_ID, machineId: TITLE_ID }], false);
+
+    const [machine] = await db
+      .insert(machines)
+      .values({ name: "Godzilla", initials: "GZ" })
+      .returning();
+
+    const result = await updateMachineAction(
+      undefined,
+      editForm(machine.id, "Godzilla")
+    );
+    expect(result.ok).toBe(true);
+
+    const row = await db.query.machines.findFirst({
+      where: eq(machines.id, machine.id),
+    });
+    // The match still lands — that half is the human's judgment, not ours.
+    expect(row?.pinballmapMachineId).toBe(TITLE_ID);
+    expect(row?.pinballmapListed).toBe(false);
+    expect(row?.pinballmapLmxId).toBeNull();
   });
 });

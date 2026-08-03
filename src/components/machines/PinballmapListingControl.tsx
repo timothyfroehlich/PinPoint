@@ -44,11 +44,16 @@ import { Button } from "~/components/ui/button";
  * former call site) with the Manage tab, which shows a "Listing controls are
  * coming soon" placeholder in that section instead. This component and its test
  * are kept as the intended implementation for PP-o355.21, which wires the
- * listing controls up for real. Until then the only writers of
- * `pinballmapListed` are `linkPinballmapEntryAction` and
- * `verifyPinballmapLinkAction`, and neither is reachable from the UI. That is
- * enforced rather than incidental: the create/update schemas reject the field
- * outright, so no request body can set it (PP-o355.29).
+ * listing controls up for real.
+ *
+ * What still holds until then: no request body can SET `pinballmapListed` — the
+ * create/update schemas reject the field outright (PP-o355.29), so listing is
+ * never something a form submits. What changed: it is no longer true that
+ * `linkPinballmapEntryAction` and `verifyPinballmapLinkAction` are its only
+ * writers. Auto-link (PP-o355.20) added two more — `captureAutoLink`, called by
+ * the hourly reconcile pass and by `updateMachineAction` after a save — but both
+ * DERIVE the value from PinballMap's own lineup rather than accepting it from
+ * the client, which is what the schema rule was actually protecting.
  */
 export interface PinballmapListingControlProps {
   machineId: string;

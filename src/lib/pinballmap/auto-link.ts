@@ -20,6 +20,16 @@ import type { LocationSnapshot } from "./types";
  * module the reconcile pass flipped `pinballmapListed` in NEITHER direction; only
  * the ON half is reversed, and unlisting is still exclusively human.
  *
+ * **What PP-o355.21 must decide before it ships an Unlist button.** "Nothing here
+ * unlists" is safe today only because nothing anywhere can: the outbound write
+ * verbs don't exist, so a listing is never withdrawn from PBM's lineup. Once a
+ * human CAN unlist, auto-link becomes an argument with them — clearing the flag
+ * on a matched cabinet whose title is still on the lineup leaves exactly the
+ * state this module re-links, so the next hourly pass silently undoes it within
+ * the hour. Whatever .21 chooses (push the unlist to PBM so the lineup no longer
+ * shows the title, or persist a "human declined this listing" suppression the
+ * decision below honours), it cannot leave both halves as they are.
+ *
  * **Gated by the tie guard.** The decision unit is the whole set of cabinets
  * sharing one `pinballmapMachineId`, not a single machine, because PBM's
  * find-or-create semantics give that title exactly one lmx at our location

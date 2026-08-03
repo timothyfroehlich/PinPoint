@@ -191,4 +191,79 @@ describe("reconcileAfterSync (PGlite)", () => {
     expect(rows.every((r) => !r.pinballmapListed)).toBe(true);
     expect(rows.every((r) => r.pinballmapLmxId === null)).toBe(true);
   });
+
+  it("does not count a same-title cabinet that can never hold the listing", async () => {
+    const db = await getTestDb();
+    const { reconcileAfterSync } = await import("~/lib/pinballmap/sync");
+
+    // One cabinet holds title 42's listing; a second cabinet of the same title
+    // cannot, ever — PBM gives the title one lmx here and the partial unique
+    // index enforces one lister. Its "on PBM, not listed here" is therefore not
+    // a state any human can clear, so counting it would park a permanent +1 on
+    // "N need attention".
+    const holder = createTestMachine({
+      initials: "HD",
+      name: "Holder",
+      pinballmapMachineId: 42,
+      pinballmapListed: true,
+      pinballmapLmxId: 999,
+    });
+    const other = createTestMachine({
+      initials: "OT",
+      name: "Other",
+      pinballmapMachineId: 42,
+    });
+    await db.insert(machines).values([holder, other]);
+    await db.insert(pinballmapState).values({
+      id: "singleton",
+      locationId: 26454,
+      snapshotJson: snapshotWith([{ id: 999, machineId: 42 }]),
+      lastSyncStatus: "ok",
+    });
+
+    const result = await reconcileAfterSync();
+
+    expect(result).toEqual({ healed: 0, linked: 0, desynced: 0 });
+  });
+
+  it("stands down on a listing collision instead of voiding the whole pass", async () => {
+    const db = await getTestDb();
+    const { captureAutoLink } = await import("~/lib/pinballmap/sync");
+
+    // `captureAutoLink` is what a concurrent lister races. It must absorb the
+    // 23505 and report "did not land" — throwing would, in the reconcile pass,
+    // take every other title's link and heal down with it and 500 the cron.
+    const incumbent = createTestMachine({
+      initials: "IN",
+      name: "Incumbent",
+      pinballmapMachineId: 42,
+      pinballmapListed: true,
+      pinballmapLmxId: 999,
+    });
+    const loser = createTestMachine({
+      initials: "LO",
+      name: "Loser",
+      pinballmapMachineId: 42,
+    });
+    await db.insert(machines).values([incumbent, loser]);
+
+    const landed = await captureAutoLink({
+      machineId: loser.id,
+      lmxId: 999,
+      action: "linked",
+    });
+
+    expect(landed).toBe(false);
+    const [row] = await db
+      .select()
+      .from(machines)
+      .where(eq(machines.id, loser.id));
+    expect(row?.pinballmapListed).toBe(false);
+    // The rolled-back write leaves no receipt for a listing that never happened.
+    const events = await db
+      .select()
+      .from(timelineEvents)
+      .where(eq(timelineEvents.machineId, loser.id));
+    expect(events).toHaveLength(0);
+  });
 });
