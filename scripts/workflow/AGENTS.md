@@ -76,7 +76,7 @@ Scripts emit machine-parseable status with these prefixes:
 | `WARN:`  | Soft gate proceeding with a notice                          | Read the notice; not blocking |
 | `BLOCK:` | State mismatch requiring user action (e.g., merge conflict) | Resolve, push, retry          |
 
-The agent reads these tokens from script stdout to decide next steps. The skill (pinpoint-pr-workflow) documents what to do for each token; scripts emit prescriptive advice only where the remedy is otherwise undiscoverable. That is the `reviewed` and `threads` gates: every FAIL is followed by indented continuation lines naming the action that clears it, PR number already substituted. The `reviewed` remedy names **both** steps — Tim runs `/code-review`, then the agent attests — because printing `mark-claude-review.sh` alone reads as "attest and move on", which is the false attestation the gate exists to prevent. Continuation lines are indented and carry no status token, so token parsing is unaffected.
+The agent reads these tokens from script stdout to decide next steps. Scripts emit prescriptive advice only where the remedy is otherwise undiscoverable. That is the `reviewed` and `threads` gates: every FAIL is followed by indented continuation lines naming the action that clears it, PR number already substituted. The `reviewed` remedy names **both** steps — Tim runs `/code-review`, then the agent attests — because printing `mark-claude-review.sh` alone reads as "attest and move on", which is the false attestation the gate exists to prevent. Continuation lines are indented and carry no status token, so token parsing is unaffected.
 
 ## MCP vs Script — When to use which
 
@@ -97,7 +97,7 @@ MCP field-naming gotcha: responses use snake_case (`is_resolved`, `submitted_at`
 ## Key Design Decisions
 
 - **MCP first for reads and per-op writes**: typed tool calls beat shell-escaped gh CLI for the agent's use cases. Scripts wrap composite enforcement that can't be a single API call.
-- **Mechanical script output**: scripts emit status tokens (PASS, WARN, WAIT, FAIL, BLOCK) and the skill documents what to do per token. The `reviewed` and `threads` gates are the deliberate exception — they append indented `remedy:` lines, because which state you are in decides the action and the token alone doesn't say.
+- **Mechanical script output**: scripts emit status tokens (PASS, WARN, WAIT, FAIL, BLOCK) and the table above says what to do per token. The `reviewed` and `threads` gates are the deliberate exception — they append indented `remedy:` lines, because which state you are in decides the action and the token alone doesn't say.
 - **Merge is human-only (PP-wi85)**: `gh pr merge`, MCP `merge_pull_request`, AND `scripts/workflow/merge-pr.sh` itself (any flags, including `--dry-run`) are all blocked for an agent by the `.claude/hooks/block-direct-merge.cjs` PreToolUse hook. There is no agent-usable bypass — the old `.claude-merge-bypass` sentinel was removed entirely. `merge-pr.sh` also refuses to execute a merge without `--human` at the script level, as defense-in-depth for harnesses that don't wire the Claude Code hook.
 - **Fail closed on API errors**: gates that can't determine state exit non-zero.
 
@@ -109,5 +109,5 @@ MCP field-naming gotcha: responses use snake_case (`is_resolved`, `submitted_at`
 
 ## Related Docs
 
-- `.agent/skills/pinpoint-pr-workflow/SKILL.md` — Full skill documenting token responses and MCP call sequences
-- `.agent/skills/pinpoint-orchestrator/SKILL.md` — Orchestrator workflow referencing these scripts
+- `.agents/skills/pinpoint-pr-workflow/SKILL.md` — Full skill: the review handoff, the merge handoff, and the MCP call sequences. Status-token responses are the table above, not there.
+- `.agents/skills/pinpoint-orchestrator/SKILL.md` — Orchestrator workflow referencing these scripts

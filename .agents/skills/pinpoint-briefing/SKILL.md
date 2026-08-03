@@ -1,6 +1,6 @@
 ---
 name: pinpoint-briefing
-description: Run a full project health review at session start or on demand. Answers "what should I work on?" before the orchestrator answers "how do I work on it?". Use when starting a new session, when user asks for a briefing, or before deciding what to pick up next.
+description: Run a full project health review at session start or on demand — answers "what should I work on?" before the orchestrator answers "how do I work on it?". Carries the two audit-reading decisions a wrong reading turns into a phantom finding: why a stale local main makes `pnpm audit` report already-patched CVEs as regressions, and why `pnpm outdated` is deliberately never run (Dependabot's soak time is the supply-chain protection). Use when starting a new session, when the user asks for a briefing, or before deciding what to pick up next.
 ---
 
 # PinPoint Session Briefing
@@ -51,7 +51,7 @@ Launch these five groups simultaneously:
 ./scripts/workflow/orchestration-status.sh
 ```
 
-Covers: open PRs (CI + merge), worktree health, beads ready/in-progress, Dependabot alerts.
+Covers: open PRs (CI + merge), worktree health, beads ready/in-progress, Dependabot alerts. It wraps `pr-dashboard.sh`, `stale-worktrees.sh` and `bd ready -n 50`, so the output template's "Open PRs" and "Worktree Health" sections are filled from this one call — don't re-run those scripts separately.
 
 ### Group B: Security Audit
 
@@ -72,7 +72,7 @@ gh run list --branch main --status completed --limit 5 \
   --json status,conclusion,name,createdAt,url
 ```
 
-Shows the last 5 completed runs on main. Flag any `conclusion == "failure"`.
+Flag any `conclusion == "failure"`.
 
 ### Group D: New GitHub Issues (last 5 days)
 
@@ -92,54 +92,13 @@ The Weekly Security Review routine (an AI/human security pass over the week's PR
 bd list --status=open --label=security
 ```
 
-Read the severity and one-line summary of each open `security` bead. These beads stay **OPEN until the finding is addressed**, so open security beads are normal — surface them; don't treat their open state as an alarm by itself. If a finding turns out to overlap another already-tracked bead or is only recorded elsewhere, note it the same way you would any untracked item.
+Read the severity and one-line summary of each open `security` bead. These beads stay **OPEN until the finding is addressed**, so open security beads are normal — surface them; don't treat their open state as an alarm by itself.
 
 ---
 
 ## Step 2 — Structured Briefing Output
 
-Synthesize all gathered data into this format:
-
-```
-╔══════════════════════════════════════════════════════╗
-║              PINPOINT SESSION BRIEFING               ║
-╚══════════════════════════════════════════════════════╝
-
-📅 Date: [today]
-
-## 🚨 Needs Immediate Attention
-[Anything failing on main, critical security alerts, P0 bugs, high-severity open `security` beads needing attention]
-
-## 🔐 Security
-pnpm audit:    [X vulns (critical/high/moderate)] or ✅ clean
-Dependabot:    [X open alerts] — link to any mergeable PRs
-Security beads: [X open `security`-labeled beads] — list by severity, or ✅ none open
-
-## 📋 Open PRs
-[Table from pr-dashboard.sh: PR# | Title | CI | Merge Ready]
-Highlight: any with failing CI or stale > 7 days
-
-## 🏗️ Main Branch Health
-[Last 5 post-submit runs: pass/fail summary]
-[Flag any failures with link]
-
-## 🐛 New GitHub Issues (last 5 days)
-[List: #NNN Title (created X days ago) — [in beads / NOT TRACKED]]
-
-## 📦 Beads State
-Ready to pick up: [top 5 from `bd ready`]
-In progress:     [from `bd list --status=in_progress`]
-Newly unblocked: [blockers resolved — check `bd blocked` for items whose blocker PRs just merged]
-Recently closed: [from `bd list --status=closed --limit 5`]
-
-## 🌿 Worktree Health
-[From stale-worktrees.sh: any stale/dirty worktrees]
-
-## 🚀 Recommended Next Actions
-1. [Highest impact / most urgent item]
-2. [Second priority]
-3. [Third priority]
-```
+Synthesize all gathered data into the format in [references/briefing-output.md](references/briefing-output.md).
 
 ---
 

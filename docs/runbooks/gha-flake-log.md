@@ -249,5 +249,5 @@ bd show "$root"                                                   # current ledg
 - **Helper:** `scripts/workflow/log-gha-flake.sh`
 - **Chores runbook:** `.agents/skills/pinpoint-chores/SKILL.md` (weekly triage item)
 - **Log-time pointers:** `pinpoint-orchestrator` (Phase 4, infra failures),
-  `pinpoint-pr-workflow` (Phase 3.1 + Phase 4.3 escape hatch)
+  `pinpoint-pr-workflow` (Phase 3.1 + Phase 4.2 escape hatch)
 - **`flaky-test` label** — the _application-test_ flakiness track (distinct owner).
