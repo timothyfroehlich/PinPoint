@@ -16,7 +16,7 @@
 ## Quick Start Checklist
 
 1. Import reusable types from `~/lib/types`; do not duplicate types (CORE-TS-001/002)
-2. Schema columns stay snake_case; Drizzle rows are already camelCase — never convert them, only non-Drizzle reads (CORE-TS-003/004)
+2. Schema columns stay snake_case; Drizzle rows are already camelCase — never convert them, only non-Drizzle reads and writes (CORE-TS-003/004)
 3. Use Supabase SSR wrapper `~/lib/supabase/server`, call `auth.getUser()` immediately (CORE-SSR-001/002)
 4. Ensure Next.js middleware for Supabase SSR token refresh is present (CORE-SSR-003)
 5. Use database trigger for auto-profile creation (OAuth-proof, atomic) (CORE-SSR-006)

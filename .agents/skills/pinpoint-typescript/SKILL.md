@@ -1,6 +1,6 @@
 ---
 name: pinpoint-typescript
-description: The PinPoint-specific database typing decision — `InferSelectModel` yields camelCase types directly, so there is no db→app converter layer and none should be built; narrow with `Pick<>` at boundaries instead, and convert only on reads Drizzle does not map. Also carries the `exactOptionalPropertyTypes` resolution the compiler flags but does not teach, and which parts of CORE-TS-006/007 no tool enforces. Use when typing a database row on its way to a component, when tempted to write a row-mapping function, when reviewing a non-null assertion (`!`) or an `any`, or when the user mentions InferSelectModel, exactOptionalPropertyTypes, or snake_case/camelCase. General TypeScript technique is deliberately not covered.
+description: The PinPoint-specific database typing decision — `InferSelectModel` yields camelCase types directly, so there is no db→app converter layer and none should be built; narrow with `Pick<>` at boundaries instead, and convert only on the reads and writes Drizzle does not map. Also carries the `exactOptionalPropertyTypes` resolution the compiler flags but does not teach, and which parts of CORE-TS-006/007 no tool enforces. Use when typing a database row on its way to a component, when tempted to write a row-mapping function, when reviewing a non-null assertion (`!`) or an `any`, or when the user mentions InferSelectModel, exactOptionalPropertyTypes, or snake_case/camelCase. General TypeScript technique is deliberately not covered.
 ---
 
 # PinPoint TypeScript
@@ -48,12 +48,14 @@ it."
 
 ## There is no db→app converter layer, and you should not build one
 
-Row types are declared in `src/lib/types/database.ts` — import them from there.
-The `~/lib/types` barrel re-exports most but not all of them (`Notification`,
-`IssueWatcher`, `IssueImage`, and the PinballMap types are not re-exported), so
-reach for the barrel first and fall back to the direct path. Either way, do not
-redeclare a parallel hand-written shape. Most are plain `InferSelectModel`; `Issue`
-is the exception, an `Omit<>` that narrows four text columns to string unions.
+Row types are declared in `src/lib/types/database.ts` and imported from the
+`~/lib/types` barrel (CORE-TS-001). The barrel does not yet re-export all of
+them — `Notification`, `NotificationPreference`, `IssueWatcher`, `IssueImage`
+and the PinballMap types are missing, and a few callers import around it as a
+result. If the type you need isn't re-exported, add it to the barrel rather
+than deepening that path, and never redeclare a parallel hand-written shape.
+Most are plain `InferSelectModel`; `Issue` is the exception, an `Omit<>` that
+narrows four text columns to string unions.
 
 A `dbUserToUser` / `toProfileSummary` style converter would be pure ceremony:
 there is no second type system for it to translate into, and every such function
