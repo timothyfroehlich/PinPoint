@@ -10,7 +10,8 @@ const BOM = "\uFEFF";
  * by Excel/Google Sheets. Prefix with a single quote to force text mode.
  */
 function sanitizeFormulaInjection(field: string): string {
-  if (field.length > 0 && "=+-@".includes(field[0]!)) {
+  const first = field[0];
+  if (first !== undefined && "=+-@".includes(first)) {
     return `'${field}`;
   }
   return field;
