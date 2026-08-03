@@ -27,7 +27,7 @@ If all five say "E2E is the right layer", write it. Otherwise, the cheapest laye
 
 ## Which Tests to Run (Decision Tree)
 
-See the `pinpoint-testing` skill § "Which Tests to Run (Decision Tree)" — canonical, don't duplicate here.
+See AGENTS.md §5 "Which tests to run" — canonical, don't duplicate here.
 
 ## The Golden Rule: Worker Isolation
 
@@ -39,6 +39,12 @@ PinPoint E2E tests run in parallel against a **shared database**.
 2.  **Unique Users**: Do not share `admin@test.com` across parallel tests if those tests modify global state (e.g., settings, notifications).
 3.  **Unique Machines**: Create a fresh machine for your test.
 4.  **Unique Titles**: Use `getTestIssueTitle("My Title")` to prefix issues with `[w0_xyz]`.
+
+## Selector Strategy
+
+1. **Prefer**: Accessibility roles and labels (`getByRole`, `getByLabel`)
+2. **Fallback**: Test IDs (`data-testid`) when roles aren't sufficient
+3. **Avoid**: CSS selectors, text content that changes
 
 ## Common Helpers
 

@@ -69,7 +69,7 @@ describe("My Feature", () => {
 
 Tests that require a **real Supabase instance** (authentication, SSR, etc.).
 
-**Run**: `pnpm run test:integration` (requires `supabase start`)
+**Run**: `pnpm run test:integration:supabase` (requires `supabase start`). Note that `pnpm run test:integration` **excludes** this directory — it is the PGlite-only project.
 
 **Key Points**:
 
@@ -88,14 +88,17 @@ Tests that require a **real Supabase instance** (authentication, SSR, etc.).
 ## Running Tests
 
 ```bash
-# Unit + PGlite integration tests (fast)
+# Unit tests (fast)
 pnpm test
 
-# Supabase integration tests (requires supabase start)
+# PGlite integration tests (excludes integration/supabase/)
 pnpm run test:integration
 
+# Supabase integration tests (requires supabase start)
+pnpm run test:integration:supabase
+
 # All tests (unit + integration + supabase)
-pnpm test && pnpm run test:integration
+pnpm test && pnpm run test:integration && pnpm run test:integration:supabase
 
 # Watch mode (unit tests only)
 pnpm run test:watch
@@ -211,4 +214,4 @@ describe("Tests", () => {
 
 ## Questions?
 
-See the `pinpoint-testing` skill at `.agent/skills/pinpoint-testing/SKILL.md` for the full testing strategy.
+See the `pinpoint-testing` skill at `.agents/skills/pinpoint-testing/SKILL.md` for the full testing strategy.
