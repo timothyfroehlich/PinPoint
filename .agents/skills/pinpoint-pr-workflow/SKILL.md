@@ -194,6 +194,8 @@ Two limits worth knowing before you suggest a depth:
 - **`ultra` does not post comments.** The cloud path honours `--fix` but has no comment-posting counterpart, so `--comment` there is a no-op. If Tim runs `ultra`, you are back to reading the findings from him and attesting with the marker.
 - **A clean review posts nothing.** No findings, no comments, no evidence — and the gate reads `unreviewed`. That case is yours to record, with the marker.
 
+**If the findings come back as terminal text rather than PR threads, posting was blocked, not skipped.** That is what happened on the first real run of this flow: neither the inline-comment MCP tool nor the `gh api` fallback was permitted, so a review that found four things left no trace. `.claude/settings.json` allows both now. Treat it as a review that posted nothing — address the findings from what Tim pastes you, then attest with the marker, because the gate is correctly still red.
+
 #### Sequencing
 
 1. Open the PR whenever you like and watch CI. Nothing is reviewing yet, so an early PR costs nothing.
