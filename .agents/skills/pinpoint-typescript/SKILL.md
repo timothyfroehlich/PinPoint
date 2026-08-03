@@ -20,10 +20,16 @@ in app code. `no-explicit-any` (CORE-TS-007) and `explicit-function-return-type`
 `*.config.*` / `scripts/**`. Writing `const page: any` in an e2e spec passes
 every gate.
 
-And CORE-TS-007's ban on `!` is enforced **nowhere**:
-`@typescript-eslint/no-non-null-assertion` is never enabled, and `!` is valid
-TypeScript at every strictness level. That third of a Critical rule rests
-entirely on review.
+CORE-TS-007's ban on `!` **is** linted, as of PP-8k07:
+`@typescript-eslint/no-non-null-assertion` is "error", and
+`eslint-comments/no-restricted-disable` names it, so you cannot disable-comment
+past it in `src/`. It is off in the test and e2e blocks — a wrong assertion
+there fails the test loudly instead of 500ing a page — and that test exemption
+is meant to go away (PP-9q5k), so don't read it as blessed.
+
+The third of CORE-TS-007 that no tool checks is **unsafe `as`**. The
+`no-unsafe-*` rules target untyped values, not casts between two known types,
+and `tsc` accepts the cast by construction. That one rests entirely on review.
 
 Full catalog: `CORE-TS-001..008` in `docs/NON_NEGOTIABLES.md`.
 
