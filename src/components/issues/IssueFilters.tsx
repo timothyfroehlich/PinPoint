@@ -237,8 +237,10 @@ export function IssueFilters({
       clear: () => void;
     }[] = [];
 
-    // Machines
-    filters.machine?.forEach((m) => {
+    // Machines. Captured in a local so the `clear` closures can reference the
+    // array without re-narrowing `filters.machine` inside a callback.
+    const machineFilters = filters.machine ?? [];
+    machineFilters.forEach((m) => {
       const label =
         machineOptions.find((opt) => opt.value === m)?.badgeLabel ?? m;
       badges.push({
@@ -247,7 +249,7 @@ export function IssueFilters({
         clear: () =>
           startTransition(() =>
             pushFilters({
-              machine: filters.machine!.filter((v) => v !== m),
+              machine: machineFilters.filter((v) => v !== m),
               page: 1,
             })
           ),
