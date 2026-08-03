@@ -37,7 +37,7 @@ const searchPinballmapCatalogSchema = z.object({
     .positive()
     .optional()
     .describe(
-      "List one family's individual editions instead of searching. Use the machineGroupId of a family returned by a query."
+      "List one family's individual editions instead of searching. Use the machineGroupId of a family returned by a query — NOT its pinballmapMachineId, which identifies a single edition. An id no family has is an error, never an empty list."
     ),
   limit: z
     .number()
@@ -110,6 +110,18 @@ export async function runSearchPinballmapCatalog(
 
   if (machineGroupId !== undefined) {
     const editions = await listGroupEditions(machineGroupId);
+    // No family carries this id, so the lookup never happened — and an empty
+    // success would be indistinguishable from "that family has no editions"
+    // (CORE-ARCH-012). The families payload hands back two bare integers side by
+    // side, so passing `pinballmapMachineId` where `machineGroupId` belongs is
+    // the predictable mistake; say so, or the caller confidently reports an
+    // empty family instead of retrying with the right one.
+    if (editions.length === 0) {
+      throw new McpToolError(
+        "not_found",
+        `No Pinball Map family has machineGroupId ${machineGroupId}. If you took that number from a family's 'pinballmapMachineId', that's the id of a single edition, not the family — pass the family's 'machineGroupId' instead, or search by name again.`
+      );
+    }
     const result: McpCatalogEditionResult = {
       mode: "editions",
       machineGroupId,

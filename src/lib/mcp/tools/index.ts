@@ -8,6 +8,7 @@ import { registerGetMachine } from "./get-machine";
 import { registerListMachines } from "./list-machines";
 import { registerSearchPinballmapCatalog } from "./search-pinballmap-catalog";
 import { registerSetMachineAvailability } from "./set-machine-availability";
+import { registerSetMachineName } from "./set-machine-name";
 import { registerSetMachineOwner } from "./set-machine-owner";
 
 /**
@@ -20,6 +21,7 @@ export function registerPinpointTools(server: McpServer): void {
   registerGetMachine(server);
   registerSearchPinballmapCatalog(server);
   registerSetMachineAvailability(server);
+  registerSetMachineName(server);
   registerAddMachine(server);
   registerSetMachineOwner(server);
   registerCreateIssue(server);
