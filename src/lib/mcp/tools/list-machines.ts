@@ -108,7 +108,7 @@ const listMachinesSchema = z.object({
     .min(0)
     .optional()
     .describe(
-      "How many matches to skip, for paging past the limit. Machines are ordered by name, then by initials to break ties between duplicate cabinets of the same title, so the order is total and stable. Whether you should advance this offset at all depends on whether your own actions change which machines match — the tool description gives the rule and the two procedures; choosing the wrong one silently skips machines."
+      "How many matches to skip, for paging past the limit. Machines are ordered by name, then by initials to break ties between duplicate cabinets of the same title — a total order, so no match is skipped or returned twice as you page. See the tool description for enumerating a collection larger than one page."
     ),
 });
 
@@ -198,13 +198,43 @@ export async function runListMachines(
   };
 }
 
+/**
+ * The description below documents exactly ONE way to enumerate: advance the
+ * offset until `hasMore` clears. That is complete today because nothing a caller
+ * can reach changes whether a machine matches. No MCP tool links or excludes an
+ * EXISTING machine — `add_machine` accepts the link columns only at creation —
+ * and auto-link (PP-o355.20) writes `pinballmapListed`, never
+ * `pinballmapMachineId`, so it cannot move a row out of the `unlinked` bucket
+ * either. Only a human in the app can.
+ *
+ * PP-u4ab.12 ships the write verb, and on that day one procedure stops being
+ * enough. A caller linking machines while paging `pinballmap: "unlinked"` drops
+ * each one out of the filter, everything below it shifts up, and `offset +=
+ * limit` then skips exactly as many machines as it just fixed — a sweep that
+ * reaches `hasMore: false` having never shown roughly half the worklist. The
+ * replacement, worked out across review rounds 2-4 and parked here rather than
+ * shipped ahead of the capability it describes:
+ *
+ *   Do NOT advance the offset per page. Re-request offset 0 and let the worklist
+ *   drain. When you leave a machine as it is — you cannot link it, or you are
+ *   deferring the decision — raise offset by exactly that many so it does not
+ *   come back on the next request. You are done when a request returns EMPTY
+ *   (count 0), NOT when `total` reaches 0: every machine deliberately left keeps
+ *   total above 0 forever, so waiting for 0 is a loop with no exit.
+ *
+ * It lives in a comment rather than the description because the description is
+ * an instruction to a model that will act on it, and a procedure the model has
+ * no way to carry out is one it can only fail at — a no-progress loop of
+ * identical offset-0 requests (CORE-ARCH-012). Restore it to the description
+ * with .12, not before.
+ */
 export function registerListMachines(server: McpServer): void {
   server.registerTool(
     "list_machines",
     {
       title: "List machines",
       description:
-        "List machines with their initials, name, availability, owner name, and open-issue count. Use this to find a machine's initials before acting on it (e.g. disambiguate 'the Medieval Madness by the door'). Supports a name/initials search, a presence filter, and a PinballMap link-state filter (pinballmap: 'unlinked' | 'linked' | 'excluded') — use pinballmap: 'unlinked' to get the machines still needing a PinballMap catalog match. Returns 'count' (this page), 'total' (every match), 'offset', and 'hasMore'. Answer counting questions from 'total', never from 'count' or the array length. There are two ways to get through a collection larger than one page, and picking the wrong one silently skips machines. (A) READING only, nothing changing: keep requesting with offset += limit until hasMore is false (raising limit alone caps at 100 and will not reach the rest). (B) ACTING on what you find, in a way that changes whether it still matches — linking machines while paging pinballmap:'unlinked' is the case this tool is built for: do NOT advance the offset per page. Each machine you link drops out of the filter and the rest shift up, so offset += limit skips as many machines as you just fixed. Re-request offset 0 and let the worklist drain. When you leave a machine as it is — you cannot link it, or you are deferring the decision — raise offset by exactly that many so it does not come back on the next request. You are done when a request comes back EMPTY (count 0), NOT when total reaches 0: every machine you deliberately left keeps total above 0 forever, so waiting for 0 is a loop with no exit.",
+        "List machines with their initials, name, availability, owner name, and open-issue count. Use this to find a machine's initials before acting on it (e.g. disambiguate 'the Medieval Madness by the door'). Supports a name/initials search, a presence filter, and a PinballMap link-state filter (pinballmap: 'unlinked' | 'linked' | 'excluded') — use pinballmap: 'unlinked' to get the machines still needing a PinballMap catalog match. Returns 'count' (this page), 'total' (every match), 'offset', and 'hasMore'. Answer counting questions from 'total', never from 'count' or the array length. To enumerate a collection larger than one page, keep requesting with offset += limit until hasMore is false — raising limit alone caps at 100 and will not reach the rest. Nothing you can call from here changes whether a machine matches a filter, so the set holds still while you page; the one thing that can shift it is a person editing machines in the app while you sweep.",
       inputSchema: listMachinesSchema.shape,
     },
     (args, extra) =>
