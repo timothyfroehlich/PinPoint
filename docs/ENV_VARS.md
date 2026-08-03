@@ -108,6 +108,8 @@ the degradation is a known, documented choice — not an oversight.
 | `NEXT_PUBLIC_SENTRY_DSN`                                  | 🟢    | ⭕                  | `src/components/SentryInitializer.tsx`    | Sentry not initialized                                                                                                                                                                                                         |
 | `MCP_BEARER_TOKEN`                                        | 🔴    | ⚪                  | `src/lib/mcp/verify-token.ts`             | MCP auth fails closed — `/api/mcp/mcp` 401s, warns `reason: "not_configured"`. Rest of PinPoint unaffected.                                                                                                                    |
 | `MCP_ADMIN_USER_ID`                                       | 🔴    | ⚪                  | `src/lib/mcp/verify-token.ts`             | as above                                                                                                                                                                                                                       |
+| `PINBALLMAP_OUTBOUND_EMAIL`                               | 🟢    | ⚪                  | `supabase/seed-pinballmap-creds.mjs`      | **Seed-time only, never read at runtime.** Absent → outbound list/unlist stays unprovisioned and both actions return `NOT_PROVISIONED`.                                                                                        |
+| `PINBALLMAP_OUTBOUND_TOKEN`                               | 🔴    | ⚪                  | `supabase/seed-pinballmap-creds.mjs`      | as above; the value lands in Supabase Vault, not in a column.                                                                                                                                                                  |
 
 > **PinballMap api_token (PP-o355.23).** A **platform capability, not tenant
 > data** — PBM issues it to an approved account against a use-plan, i.e. to
@@ -144,6 +146,31 @@ the degradation is a known, documented choice — not an oversight.
 > and the first production deploy after that change hard-failed at `next build`
 > with the vars simply not yet set — an optional feature taking prod deploys
 > down with it. Don't put them back (PP-ogzs).
+>
+> **PinballMap per-operator write creds (PP-o355.30).** `PINBALLMAP_OUTBOUND_EMAIL`
+> and `PINBALLMAP_OUTBOUND_TOKEN` are consumed **once**, by
+> `supabase/seed-pinballmap-creds.mjs`, and never read at runtime. The script
+> writes the token into Supabase Vault and stores the returned UUID on
+> `pinballmap_state.outbound_token_vault_id`; the email is a plain column. From
+> then on the DB row is the source of truth, decrypted through the
+> `get_pinballmap_credentials()` RPC (migration 0061, service_role only).
+>
+> Distinct from `PINBALLMAP_API_TOKEN` above and not interchangeable with it: the
+> api_token is a platform capability that gates API **access**, these identify
+> **who** is writing, and PinballMap attributes the edit to that account. Both
+> are required for a write.
+>
+> **Deliberately not build-gated.** Unset → `listMachineOnPinballMapAction` and
+> `unlistMachineFromPinballMapAction` return `NOT_PROVISIONED` and say so; every
+> other surface, including PBM sync and the read-side listing controls, is
+> untouched. That is the §4.1 test failing, so they belong here.
+>
+> Because these are seed-time only, setting them in Vercel does nothing. Provision
+> production by running the script against the prod database with its explicit
+> opt-in token:
+> `SEED_PINBALLMAP_CREDS_FORCE_PRODUCTION=1 POSTGRES_URL=<prod> PINBALLMAP_OUTBOUND_EMAIL=… PINBALLMAP_OUTBOUND_TOKEN=… node supabase/seed-pinballmap-creds.mjs`.
+> The script refuses a production target without that token, and refuses to
+> overwrite a credential that is already provisioned.
 
 ### 4.3 Local / CI / test-only config
 
