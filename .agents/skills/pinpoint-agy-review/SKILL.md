@@ -142,6 +142,22 @@ test would do, what happens at runtime — say so explicitly in the body and set
 `confidence` accordingly. A finding stated as fact that turns out to rest on a
 guess costs more trust than the finding was worth.
 
+**Never state a fact about the outside world from memory.** Package versions, what
+the latest release of something is, whether a version exists on npm, which APIs or
+options a library offers, what is deprecated, what a service's limits are — all of
+this changes after your training cutoff, and none of it is visible from this
+checkout. Your recollection of it is frequently stale and always unverifiable here.
+
+This has produced a real false positive: a finding claimed a version override was
+unsatisfiable because the package "maxes out at 9.0.5", asserted at 95% confidence.
+It was at 10.4.0. The reasoning was sound and the premise was invented.
+
+If a finding depends on such a fact, either ground it in a file you can actually
+read in this checkout — `package.json`, the lockfile, a vendored type definition —
+or **do not report it**. "I cannot verify this from the checkout" is not a reason
+to lower the confidence and file it anyway; it is a reason to leave it out and
+mention it in `summary` instead, where it reads as a question rather than a defect.
+
 If you could not read the brief or the diffs, say so in `summary` and return no
 findings. Never reconstruct a plausible-sounding review from memory of what a PR
 like this usually contains.
