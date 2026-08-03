@@ -6,53 +6,65 @@ Usage: ./scripts/workflow/agy_review.py [--pro | --model M] [--dry-run]
 
   --pro            Use gemini-3.1-pro-high instead of the flash default.
   --model M        Use an explicit agy model id (overrides --pro).
-  --dry-run        Print the exact review payload and exit. Posts nothing,
+  --dry-run        Summarise what would be posted and exit. Posts nothing,
                    writes no marker.
   --keep-worktree  Leave the ephemeral checkout on disk for debugging.
   --verbose        Echo the prompt and the raw agy envelope.
 
-`agy` is the reviewer; this script is the only thing that talks to GitHub. agy runs
-with NO shell access at all (see "agy permissions" below), returns findings as JSON,
-and never touches `gh`. That separation is deliberate — see "Why agy cannot attest
-its own review".
+`agy` is the reviewer; this script is the only thing that talks to GitHub. It checks the
+PR head into a throwaway worktree, lets agy loose in it, validates what comes back, posts
+the findings as an inline review, and only then writes the SHA-pinned marker that
+`_pr-gates.sh` accepts.
 
-## Why agy cannot attest its own review
+## What agy gets, and why
 
-Two measured defects in agy v1.1.7 shape this whole script:
+A real shell in a checkout of the head commit, and the repository's history. It runs
+`git diff` itself, reads `REVIEW.md` and `AGENTS.md` on its own initiative, and can run
+`git blame` or `pnpm run check` to test a claim rather than guess at it.
 
-1. **It reads outside its own workspace.** A relative path in a prompt is not resolved
-   against `workspaceDirs`; observed reads landed in the root checkout, an unrelated
-   worktree, and agy's own scratch dir. So the diff is INLINED into the prompt rather
-   than referenced by filename. Never pass agy a path and assume it read that file.
+An earlier version of this script gave agy NO shell and pasted the whole diff into the
+prompt. That was built on a misdiagnosis. agy resolves paths through `/proc/self/cwd/`,
+which is invisible to a naive log grep, so its reads looked like they were landing
+outside the workspace when they were landing exactly where they should. What the
+constraint actually bought was a reviewer that could not check history, could not run a
+test, and had a 1,700-line diff crowding out its own reasoning.
 
-2. **It confabulates on read failure.** When a read failed, agy did not error — it
-   emitted a confident, detailed review of a *completely different PR* with an empty
-   findings array. A false clean pass is the one failure mode a review gate cannot
-   tolerate.
+## Permissions
 
-Defect 2 is why every response must carry a `proof` object echoing facts about the
-diff that only a run which actually read it can produce. `verify_proof` checks it
-against ground truth computed here, and a mismatch is fatal: no review is posted and
-no marker is written. The marker is trustworthy precisely because it is downstream of
-that check.
+Configured in `~/.gemini/antigravity-cli/settings.json`, outside this repo. Broad allow,
+targeted deny. The denials that matter:
 
-A third measured behaviour: **agy exits 0 even when it produced nothing usable.**
+- `command(gh)` — the wrapper posts. agy must not be able to attest its own review; that
+  separation is the only reason the marker means anything.
+- git's write verbs (`push`, `commit`, `checkout`, `reset`, `branch`, …) — the review
+  worktree is a LINKED worktree whose `.git` points into the real PinPoint repository,
+  and git credentials are ambient. Without these denials a confused reviewer could move
+  refs in the actual repo, no bad intent required. (Observed: agy tried `git checkout
+  <head>` on a worktree already at that commit. Harmless in intent, denied on principle,
+  and the review completed without it.)
+
+The list is not guessable — headless denials are silent and agy improvises differently
+each run. Run `./scripts/workflow/agy_denied.py` after a review to see what it wanted and
+decide, one rule at a time.
+
+`agy-permissions.reference.json` beside this script is a committed snapshot of a working
+list, so a second machine starts from evidence rather than from trial and error. It is a
+reference, not a source of truth: settings.json is global to the host and is not managed
+from this repo. `trustedWorkspaces` must also contain `~/.cache/pinpoint/agy-review`, or
+agy refuses the review checkout as an untrusted workspace.
+
+## The one guard that cannot be relaxed
+
+agy confabulates. Handed a diff it could not read, it once emitted a confident, detailed
+review of a *completely different PR* with an empty findings array — a false clean pass,
+the one failure mode a review gate cannot tolerate.
+
+So every response must carry a `proof` object echoing facts about the diff, checked here
+against ground truth, after EVERY response including retries. A mismatch is fatal: no
+review, no marker. That check is why the marker can be trusted.
+
+A related measured behaviour: **agy exits 0 even when it produced nothing usable.**
 Validity is judged from the response envelope, never from the exit code.
-
-## agy permissions
-
-`~/.gemini/antigravity-cli/settings.json` must carry:
-
-    "permissions": { "allow": ["read_file(*)"],
-                     "deny":  ["write_file(*)", "command(*)"] }
-
-and `~/.cache/pinpoint/agy-review` in `trustedWorkspaces`.
-
-Denying ALL commands is deliberate rather than a curated allow-list. agy improvises
-orientation commands (`pwd && ls -la`, `git branch -a; git worktree list`, `find`,
-`python3 -c`), so a curated list dies on a different unlisted command every run. It is
-also the stronger guarantee: with no shell there is no `python3 -c` write-around of the
-`write_file` denial.
 """
 
 from __future__ import annotations
@@ -298,58 +310,68 @@ def build_review_payload(result, head_sha, head_moved_to=None):
     }
 
 
-def build_prompt(diff_text):
-    """The review prompt, with the diff inlined rather than referenced by path."""
-    return f"""You are reviewing a GitHub pull request for the PinPoint repository. You
-are already inside a checkout of the PR's head commit. Do not search the filesystem for
-the repository and do not change directories.
+def build_prompt(base_sha, head_sha):
+    """The review prompt. agy fetches the diff itself rather than being handed it.
 
-## Your inputs
+    An earlier version inlined the whole diff. That was a workaround for a misdiagnosis:
+    agy resolves paths through `/proc/self/cwd/`, so it reads its workspace perfectly
+    well, and stuffing a 1,700-line diff into the prompt only crowded out the review
+    while denying it git history, blame, and the project's own checks.
+    """
+    return f"""You are reviewing a GitHub pull request for the PinPoint repository. Your
+working directory is a checkout of the PR's head commit ({head_sha[:7]}).
 
-- `REVIEW.md` at the repository root is the canonical review rubric. Read it first. It
-  tells you what to prioritise and, just as importantly, what not to comment on.
-- `AGENTS.md` at the repository root summarises the non-negotiable rules, each citing a
-  `CORE-*` id.
-- The unified diff under review is embedded at the END of this prompt, after the line
-  BEGIN_DIFF. That embedded copy is authoritative — review it and nothing else.
-- Every other file in the tree is the code as it will look after merge. Read whatever
-  surrounding context you need to judge a change.
+## The change under review
 
-## Rules for `line` — this is the most common failure
+    git diff --merge-base {base_sha} {head_sha}
 
-`line` must be a line number that appears as an ADDED or CONTEXT line on the RIGHT (new)
-side of the embedded diff, for that exact file. Derive it from the hunk headers:
-`@@ -old,n +new,m @@` means the right side of that hunk covers lines `new` through
-`new + m - 1`.
+Run that first. It is the change you are reviewing, and nothing outside it is your
+concern — but you may read anything in the tree, and you should when a change only makes
+sense in context.
 
-- Never cite a line that appears only as a removed (`-`) line.
-- Never cite a file that is not in the diff.
-- If a problem is real but you cannot anchor it to a valid right-side line, leave it out
-  of `findings` and describe it in `summary`.
+## What you have
+
+A shell, this checkout, and the repository's history. Use them:
+
+- `REVIEW.md` at the root is the canonical review rubric. Read it — it tells you what to
+  prioritise and what to leave alone.
+- `AGENTS.md` summarises the non-negotiable rules, each citing a `CORE-*` id.
+- `git log`, `git blame` and `git show` are available. If a change looks wrong, check
+  whether it is reverting a deliberate fix.
+- `pnpm run check` (fast, static) and `pnpm run test` (unit) are available. If a claim in
+  the diff is checkable, check it rather than guessing.
+- Some commands are denied — anything that could write to the repository or the network.
+  If one is refused, work around it; do not treat it as a reason to stop.
+
+## Anchoring findings
+
+Each finding is posted as an inline GitHub review comment, so `line` must be a line that
+appears as an ADDED or CONTEXT line on the RIGHT (new) side of that file's diff. Derive it
+from the hunk headers: `@@ -old,n +new,m @@` covers right-side lines `new` through
+`new + m - 1`. A line GitHub cannot anchor rejects the entire review, so if a problem is
+real but cannot be pinned to a valid right-side line, describe it in `summary` instead.
 
 ## Scope
 
 Follow `REVIEW.md`. Prioritise the highest-priority rule violations and genuine
-correctness defects. Do not comment on formatting or style that Prettier, ESLint or
-oxlint already owns. Cite the `CORE-*` id in `body` whenever a rule applies.
+correctness defects, and cite the `CORE-*` id when a rule applies. Do not comment on
+formatting Prettier, ESLint or oxlint already owns.
 
 An empty `findings` array is a valid and expected result. Do not manufacture nits to
 justify having reviewed — a clean review is a real outcome.
 
 ## Proof of reading
 
-Populate `proof` from the embedded diff: `files_changed` is the number of
-`diff --git` lines in it, and `first_diff_line` is the exact text of the first such
-line. If you cannot read the embedded diff, say so in `summary` and return no findings —
-never describe a pull request from memory.
+Populate `proof` from the diff command above: `files_changed` is the number of
+`diff --git` lines it prints, and `first_diff_line` is the exact text of the first one.
+This is machine-checked against the real diff, and a mismatch throws the review away —
+so if you could not run the command, say so in `summary` and return no findings rather
+than describing the pull request from memory.
 
-`proof` is machine-checked and is NOT shown to anyone. Put it only in the `proof` object.
-`summary` is posted verbatim to the pull request, so it must not mention proof, file
-counts, diff headers, or these instructions — write it as a reviewer addressing the
-author.
-
-BEGIN_DIFF
-{diff_text}"""
+Keep `proof` out of `summary`. `summary` is posted verbatim to the pull request: write it
+as a reviewer addressing the author, with no mention of proof, file counts, or these
+instructions.
+"""
 
 
 def build_retry_prompt(errors):
@@ -700,7 +722,7 @@ def review(pr, model, dry_run, keep_worktree, verbose):
             schema_path = Path(handle.name)
 
         try:
-            prompt = build_prompt(diff_text)
+            prompt = build_prompt(base_sha, head_sha)
             if verbose:
                 print(f"--- prompt ---\n{prompt[:1500]}\n--- end ---", file=sys.stderr)
 
