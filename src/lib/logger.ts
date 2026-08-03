@@ -98,12 +98,14 @@ function createLogger(): pino.Logger {
     streams.push({ stream: process.stdout });
   }
 
-  if (streams.length === 0) {
+  const [firstStream] = streams;
+
+  if (!firstStream) {
     return pino(baseConfig);
   }
 
   if (streams.length === 1) {
-    return pino(baseConfig, streams[0]!.stream);
+    return pino(baseConfig, firstStream.stream);
   }
 
   return pino(baseConfig, pino.multistream(streams));
