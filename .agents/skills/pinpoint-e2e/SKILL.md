@@ -27,7 +27,7 @@ If all five say "E2E is the right layer", write it. Otherwise, the cheapest laye
 
 ## Which Tests to Run (Decision Tree)
 
-See the `pinpoint-testing` skill § "Which Tests to Run (Decision Tree)" — canonical, don't duplicate here.
+See AGENTS.md §5 "Which tests to run" — canonical, don't duplicate here.
 
 ## The Golden Rule: Worker Isolation
 
