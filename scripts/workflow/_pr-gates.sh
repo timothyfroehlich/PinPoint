@@ -202,10 +202,16 @@ _compute_review_state() {
 # cannot do the first one: `/code-review` is a Claude Code harness built-in that only
 # Tim can trigger, so the review is a handoff and the marker is what the agent posts
 # once he has run it and the findings are addressed.
+# Names the routine path FIRST. Leading with the handoff sent an agent to interrupt Tim
+# for a PR agy could review in one command — exactly the cost agy_review.py exists to
+# remove, arrived at by following the gate's own advice. (PP-c6xz.)
 _review_remedy() {
   local pr=$1
-  echo "  remedy: ask Tim to run /code-review on this branch, address the findings,"
-  echo "          then attest the head he reviewed:"
+  echo "  remedy: run the automated review, then close out every thread it opens:"
+  echo "    ./scripts/workflow/agy_review.py $pr"
+  echo ""
+  echo "          For auth, permissions, migrations, or an architectural change, ask Tim"
+  echo "          to run /code-review instead, then attest the head he reviewed:"
   echo "    bash scripts/workflow/mark-claude-review.sh $pr <depth> \"<one-line findings>\""
   echo "          (<depth> is the /code-review level he ran: low|medium|high|xhigh|max|ultra)"
 }
@@ -261,16 +267,17 @@ check_unresolved_threads() {
 }
 
 # Gate 3: head commit has been reviewed. The hard backstop — a head nobody reviewed
-# cannot merge, and nothing here WAITs, because with no bot in the loop there is never
-# an answer already on its way. The marker is
-# `<!-- pinpoint-claude-review: <head_sha> -->` in a PR conversation comment (posted by
-# mark-claude-review.sh, alongside a `<!-- pinpoint-review-depth: … -->` comment this
-# gate ignores); the SHA pin makes it self-expiring, so a later fix changes the head SHA
-# and re-arms the gate.
+# cannot merge, and nothing here WAITs, because nothing reviews unprompted, so there is
+# never an answer already on its way. EITHER marker satisfies it (see the block comment
+# at the top of this file): `<!-- pinpoint-claude-review: <head_sha> -->` from
+# mark-claude-review.sh, or `<!-- pinpoint-agy-review: <head_sha> -->` from
+# agy_review.py, each alongside a `<!-- pinpoint-review-depth: … -->` comment this gate
+# ignores. The SHA pin makes them self-expiring, so a later fix changes the head SHA and
+# re-arms the gate.
 #
 #   marker        → PASS
 #   stale_marker  → FAIL   remedy: re-review the new head, re-attest
-#   unreviewed    → FAIL   remedy: Tim runs /code-review, then attest
+#   unreviewed    → FAIL   remedy: run agy_review.py, or Tim runs /code-review + attest
 check_review_happened() {
   local pr=$1
   _compute_review_state "$pr"

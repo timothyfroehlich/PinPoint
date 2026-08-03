@@ -68,10 +68,12 @@ CI_GATE_NAME = "CI Gate"
 # which agents may not invoke at all. scripts/tests/test_pr_watch.py pins the
 # two vocabularies together.
 CLAUDE_MARKER_PREFIX = "<!-- pinpoint-claude-review:"
+AGY_MARKER_PREFIX = "<!-- pinpoint-agy-review:"
+MARKER_PREFIXES = (CLAUDE_MARKER_PREFIX, AGY_MARKER_PREFIX)
 
 REVIEW_HINT = (
-    "ask Tim to run /code-review, then attest with "
-    "scripts/workflow/mark-claude-review.sh {pr} <depth>"
+    "run scripts/workflow/agy_review.py {pr}, or ask Tim to run /code-review and "
+    "attest with scripts/workflow/mark-claude-review.sh {pr} <depth>"
 )
 
 STARTUP_RETRIES = 6  # attempts to find runs for current SHA
@@ -245,11 +247,16 @@ def _marker_shas(pr: int) -> list[str]:
     writer about which is canonical — see `_marker_verdict` in _pr-gates.sh.
     """
     repo = f"repos/{REPO_OWNER}/{REPO_NAME}"
-    return [
-        (c.get("body") or "")[len(CLAUDE_MARKER_PREFIX) :].split("-->")[0].strip()
-        for c in _gh_api_list(f"{repo}/issues/{pr}/comments")
-        if (c.get("body") or "").startswith(CLAUDE_MARKER_PREFIX)
-    ]
+    shas = []
+    for comment in _gh_api_list(f"{repo}/issues/{pr}/comments"):
+        body = comment.get("body") or ""
+        # Either reviewer's marker counts, matching `_marker_record`. Filtering on the
+        # Claude prefix alone would report `unreviewed` for a PR the merge gate passes —
+        # and whichever answer you happened to read would look authoritative.
+        prefix = next((p for p in MARKER_PREFIXES if body.startswith(p)), None)
+        if prefix:
+            shas.append(body[len(prefix) :].split("-->")[0].strip())
+    return shas
 
 
 def review_state(pr: int) -> tuple[str, str]:

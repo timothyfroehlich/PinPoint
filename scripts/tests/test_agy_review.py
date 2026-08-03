@@ -26,6 +26,7 @@ from agy_review import (  # noqa: E402
     SIGNATURE,
     ReviewError,
     _format_ranges,
+    _require_proof,
     _require_shape,
     build_review_payload,
     diff_proof,
@@ -346,3 +347,52 @@ class TestModelDepths:
         levels = {"low", "medium", "high", "xhigh", "max", "ultra", "trivial"}
         assert not (set(MODEL_DEPTHS.values()) & levels)
         assert all(d.startswith("agy-") for d in MODEL_DEPTHS.values())
+
+
+class TestRequireProof:
+    """Called after EVERY response, not just the first.
+
+    The retry replaces `result` wholesale, so verifying proof once left the guard the
+    whole design rests on bypassable by anything that came after it: a retry answered
+    from memory whose invented findings happened to anchor to valid lines would post,
+    and would write the marker.
+    """
+
+    def test_passes_a_response_that_read_the_diff(self):
+        actual = diff_proof(NEW_FILE_DIFF)
+        result = {"summary": "s", "findings": [], "proof": dict(actual)}
+        assert _require_proof(result, actual) is result
+
+    def test_rejects_a_response_describing_another_diff(self):
+        actual = diff_proof(NEW_FILE_DIFF)
+        result = {
+            "summary": "s",
+            "findings": [],
+            "proof": {"files_changed": 16, "first_diff_line": "diff --git a/x b/x"},
+        }
+        with pytest.raises(ReviewError, match="answered from memory"):
+            _require_proof(result, actual)
+
+    def test_rejects_a_response_with_no_proof_at_all(self):
+        with pytest.raises(ReviewError, match="answered from memory"):
+            _require_proof({"summary": "s", "findings": []}, diff_proof(NEW_FILE_DIFF))
+
+    def test_error_names_what_mismatched(self):
+        actual = diff_proof(TWO_FILE_DIFF)
+        with pytest.raises(ReviewError, match="files_changed"):
+            _require_proof({"proof": {**actual, "files_changed": 99}}, actual)
+
+
+class TestRequireShapeSeverity:
+    def test_severity_is_required_because_the_print_loop_indexes_it(self):
+        # The schema constrains only the first response; a retry omitting `severity`
+        # used to raise KeyError past both handlers in main().
+        with pytest.raises(ReviewError, match="findings\\[0\\] is missing severity"):
+            _require_shape(
+                {
+                    "summary": "s",
+                    "findings": [
+                        {"path": "a.ts", "line": 1, "side": "RIGHT", "body": "x"}
+                    ],
+                }
+            )

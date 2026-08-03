@@ -92,6 +92,9 @@ WORKTREE_PARENT = Path.home() / ".cache" / "pinpoint" / "agy-review"
 
 MAX_LINE_RETRIES = 2
 
+# Wall-clock ceiling on one agy invocation, a little over its own `--print-timeout 15m`.
+AGY_TIMEOUT_SECONDS = 16 * 60
+
 RESPONSE_SCHEMA = {
     "type": "object",
     "required": ["summary", "findings", "proof"],
@@ -389,6 +392,21 @@ def head_sha_of(pr):
     ).stdout.strip()
 
 
+def _require_proof(result, actual_proof):
+    """Fatal unless this response demonstrably read the diff it was handed.
+
+    Called after EVERY agy response, not just the first: a retry replaces `result`
+    wholesale, so verifying once would leave the guard bypassable by anything after it.
+    """
+    problems = verify_proof(result.get("proof"), actual_proof)
+    if problems:
+        raise ReviewError(
+            "agy did not read the diff it was given — it appears to have answered "
+            "from memory. Nothing posted.\n  " + "\n  ".join(problems)
+        )
+    return result
+
+
 def render_findings_comment(result, head_sha, head_moved_to):
     """The whole review as one plain comment, for when inline anchoring is impossible.
 
@@ -435,7 +453,12 @@ def _require_shape(result):
     if not isinstance(result.get("summary"), str):
         raise ReviewError("agy response has no `summary` string")
     for index, finding in enumerate(result["findings"]):
-        missing = [k for k in ("path", "line", "side", "body") if k not in finding]
+        # `severity` is included: the schema constrains only the FIRST response, and the
+        # summary print loop indexes it directly, so a retry omitting it would raise
+        # KeyError — the exact failure this function exists to convert into a FAILED line.
+        missing = [
+            k for k in ("path", "line", "side", "severity", "body") if k not in finding
+        ]
         if missing:
             raise ReviewError(f"findings[{index}] is missing {', '.join(missing)}")
     return result
@@ -465,9 +488,22 @@ def invoke_agy(
     if conversation_id:
         cmd += ["--conversation", conversation_id]
 
-    completed = subprocess.run(  # noqa: S603
-        cmd, cwd=workspace, capture_output=True, text=True, check=False
-    )
+    try:
+        completed = subprocess.run(  # noqa: S603
+            cmd,
+            cwd=workspace,
+            capture_output=True,
+            text=True,
+            check=False,
+            # A wall-clock backstop over agy's own `--print-timeout`. If agy wedges rather
+            # than honouring it, an unbounded run hangs here forever with the ephemeral
+            # worktree still registered.
+            timeout=AGY_TIMEOUT_SECONDS,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise ReviewError(
+            f"agy did not return within {AGY_TIMEOUT_SECONDS}s. Nothing posted."
+        ) from exc
     raw = completed.stdout.strip()
     # The envelope echoes the whole review back and can run to tens of KB. It goes to a
     # file so a failure is debuggable without re-running, but never to stdout unless
@@ -674,12 +710,7 @@ def review(pr, model, dry_run, keep_worktree, verbose):
 
             # Proof first: a confabulated run must never reach line validation, where its
             # invented findings would look merely malformed rather than fabricated.
-            problems = verify_proof(result.get("proof"), actual_proof)
-            if problems:
-                raise ReviewError(
-                    "agy did not read the diff it was given — it appears to have "
-                    "answered from memory. Nothing posted.\n  " + "\n  ".join(problems)
-                )
+            _require_proof(result, actual_proof)
 
             for attempt in range(MAX_LINE_RETRIES + 1):
                 errors = validate_findings(result["findings"], hunks)
@@ -693,6 +724,15 @@ def review(pr, model, dry_run, keep_worktree, verbose):
                 print(
                     f"retry {attempt + 1}: {len(errors)} finding(s) cite invalid lines"
                 )
+                # The retry prompt carries the errors, NOT the diff — it only works as a
+                # continuation of the conversation that saw the diff. Without an id, agy
+                # would start fresh on a context-free prompt and answer from memory, which
+                # is the documented confabulation defect with the guard removed.
+                if not conversation_id:
+                    raise ReviewError(
+                        "agy returned no conversation_id, so the retry cannot continue "
+                        "the conversation that read the diff. Nothing posted."
+                    )
                 result, conversation_id = invoke_agy(
                     pr,
                     worktree,
@@ -702,6 +742,10 @@ def review(pr, model, dry_run, keep_worktree, verbose):
                     conversation_id=conversation_id,
                     verbose=verbose,
                 )
+                # Re-verify every time. The retry replaces `result` wholesale, so checking
+                # proof only on the first response leaves the one guard the design rests on
+                # bypassable by any response after it.
+                _require_proof(result, actual_proof)
         finally:
             schema_path.unlink(missing_ok=True)
 
@@ -804,6 +848,17 @@ def main(argv=None):
         return 1
     except subprocess.CalledProcessError as exc:
         print(f"FAILED: {' '.join(exc.cmd)} → {exc.stderr}", file=sys.stderr)
+        return 1
+    except FileNotFoundError as exc:
+        # `agy`, `gh` or `jq` not on PATH. The documented first-run state is "install the
+        # Antigravity CLI and configure its settings.json", so a missing binary is the
+        # likeliest first experience — it should say so rather than print a traceback.
+        print(
+            f"FAILED: {exc.filename} is not installed or not on PATH. "
+            "agy_review.py needs `agy`, `gh` and `jq`; see this script's docstring for "
+            "the agy configuration it also expects.",
+            file=sys.stderr,
+        )
         return 1
 
 

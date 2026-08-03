@@ -789,17 +789,41 @@ GATES_PATH = Path(__file__).parent.parent / "workflow" / "_pr-gates.sh"
 
 
 @pytest.mark.unit
-def test_marker_prefix_is_identical_to_the_bash_gate():
-    """pr-watch and _pr-gates.sh must recognise exactly the same marker.
+@pytest.mark.parametrize(
+    ("bash_name", "python_name"),
+    [
+        ("CLAUDE_MARKER_PREFIX", "CLAUDE_MARKER_PREFIX"),
+        ("AGY_MARKER_PREFIX", "AGY_MARKER_PREFIX"),
+    ],
+)
+def test_marker_prefix_is_identical_to_the_bash_gate(bash_name, python_name):
+    """pr-watch and _pr-gates.sh must recognise exactly the same markers.
 
     A prefix changed in one and not the other makes the readiness report and the
     merge gate disagree about whether a PR has been reviewed — worse than either
     answer alone, because whichever one you happen to read looks authoritative.
+
+    Parametrised per prefix rather than checked as a pair, because that is exactly
+    how this drifted: PP-c6xz taught the bash gate a second marker and left the
+    reporter on one, so the invariant held for the prefix the test named and
+    silently lapsed for the new one.
     """
     gates = GATES_PATH.read_text()
-    match = re.search(r'^readonly CLAUDE_MARKER_PREFIX="(.+)"$', gates, re.M)
-    assert match, "CLAUDE_MARKER_PREFIX not found in _pr-gates.sh"
-    assert match.group(1) == pr_watch.CLAUDE_MARKER_PREFIX
+    match = re.search(rf'^readonly {bash_name}="(.+)"$', gates, re.M)
+    assert match, f"{bash_name} not found in _pr-gates.sh"
+    assert match.group(1) == getattr(pr_watch, python_name)
+
+
+@pytest.mark.unit
+def test_every_bash_marker_prefix_has_a_python_counterpart():
+    """A third marker added to the bash gate must not be invisible to the reporter.
+
+    The parametrised test above pins the prefixes it knows about; this one fails when
+    _pr-gates.sh grows one the reporter has never heard of.
+    """
+    gates = GATES_PATH.read_text()
+    bash_prefixes = set(re.findall(r'^readonly \w*MARKER_PREFIX="(.+)"$', gates, re.M))
+    assert bash_prefixes == set(pr_watch.MARKER_PREFIXES)
 
 
 @pytest.mark.unit
