@@ -24,4 +24,4 @@ Then wire it up: the Drizzle column takes `{ enum: MY_ENUM_VALUES as unknown as 
 
 ### Discriminated-union props for multi-type components
 
-When one component renders several related enum types, discriminate the props on a `type` field so `value` narrows with it, rather than widening `value` to a union of every enum and validating at runtime. `src/components/issues/IssueBadge.tsx` is the exemplar; `IssueBadgeGrid` shows how to compose it from a `Pick<>` of the row. The technique itself is textbook TypeScript — reach for `pinpoint-typescript` if you need narrowing or exhaustiveness help.
+When one component renders several related enum types, discriminate the props on a `type` field so `value` narrows with it, rather than widening `value` to a union of every enum and validating at runtime. `src/components/issues/IssueBadge.tsx` is the exemplar; `IssueBadgeGrid` shows how to compose it from a `Pick<>` of the row. The technique itself is textbook TypeScript; in this component's shape a missed case is a compiler error, because the `Icon` binding forces control-flow analysis over the switch.
