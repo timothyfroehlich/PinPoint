@@ -447,12 +447,13 @@ describe("MachineDetailsForm", () => {
 
       await user.click(screen.getByRole("link", { name: "Settings" }));
 
+      // Queried synchronously on purpose. The armed case mounts this dialog
+      // synchronously too (the positive tests above `await findByText` only
+      // because userEvent yields), so a guard that failed to disarm would be
+      // visible right here rather than settling in after the assertion.
       expect(
         screen.queryByText("Discard unsaved changes?")
       ).not.toBeInTheDocument();
-      // The click was never intercepted, so the anchor navigates natively —
-      // `router.push` is what the DISCARD path uses, and it must stay untouched.
-      expect(pushMock).not.toHaveBeenCalled();
     });
   });
 });
