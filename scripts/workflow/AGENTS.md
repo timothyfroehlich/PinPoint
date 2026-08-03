@@ -109,5 +109,5 @@ MCP field-naming gotcha: responses use snake_case (`is_resolved`, `submitted_at`
 
 ## Related Docs
 
-- `.agents/skills/pinpoint-pr-workflow/SKILL.md` — Full skill documenting token responses and MCP call sequences
+- `.agents/skills/pinpoint-pr-workflow/SKILL.md` — Full skill: the review handoff, the merge handoff, and the MCP call sequences. Status-token responses are the table above, not there.
 - `.agents/skills/pinpoint-orchestrator/SKILL.md` — Orchestrator workflow referencing these scripts

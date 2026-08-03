@@ -51,6 +51,8 @@ Launch these five groups simultaneously:
 ./scripts/workflow/orchestration-status.sh
 ```
 
+Covers: open PRs (CI + merge), worktree health, beads ready/in-progress, Dependabot alerts. It wraps `pr-dashboard.sh`, `stale-worktrees.sh` and `bd ready -n 50`, so the output template's "Open PRs" and "Worktree Health" sections are filled from this one call — don't re-run those scripts separately.
+
 ### Group B: Security Audit
 
 ```bash

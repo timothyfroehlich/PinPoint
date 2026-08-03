@@ -190,9 +190,11 @@ Never say "ready to push when you are" — you push. Never say a PR is "merged" 
 
 `merge-pr.sh` evaluates **4 gates**: `ci`, `threads`, `reviewed`, `no_conflict`. `--force` bypasses the review-state pair (`threads` + `reviewed`); `--bypass-merge-requirements` bypasses `ci` and passes `--admin`. Both require manual permission approval — treat the approval prompt as an "are you sure?" checkpoint. The `no_conflict` gate is NEVER bypassable; GitHub rejects conflicting merges regardless of `--admin`.
 
+**On any FAIL the script removes the `ready-for-review` label if present** (and likewise on the `--automerge` RED path). The label's contract is "click-merge-without-thinking"; if a gate fails at merge time that contract is broken, so the label goes. Practical consequence: after Tim reports a FAIL, fix the underlying issue, push, and **re-apply the label** (3.6) before re-handing him the `--human` command — don't assume it survived.
+
 **A `reviewed` FAIL is almost never a `--force` case.** `unreviewed` means nobody has reviewed it and `stale_marker` means you pushed past the review that happened — both describe an unfinished PR, not a broken gate. Take the honest path in 3.4 and hand off a PR whose marker pins head.
 
-`--bypass-merge-requirements` is for a required check failing for known-irrelevant reasons (infrastructure flake, unrelated job) where the change has been manually verified safe — log the flake first — or an emergency hotfix where waiting for CI is not acceptable. Do NOT suggest bypassing when a merge conflict exists, or when the underlying state hasn't been manually verified.
+`--bypass-merge-requirements` is for a required check failing for known-irrelevant reasons (infrastructure flake, unrelated job) where the change has been manually verified safe — log the flake first with `bash scripts/workflow/log-gha-flake.sh <pr> <run-id> <class> "<symptom>"` (see `docs/runbooks/gha-flake-log.md`) — or an emergency hotfix where waiting for CI is not acceptable. Do NOT suggest bypassing when a merge conflict exists, or when the underlying state hasn't been manually verified.
 
 ### 4.3 If `merge-pr.sh` itself is broken
 

@@ -41,6 +41,11 @@ If a subagent can't be reached (GC'd, session ended), spawn a new one on the sam
 
 ## Phase 1: Task Selection
 
+```bash
+bd ready -n 50              # Issues with no blockers. The default limit is 10, which hides work
+bd list --status=open       # All open issues
+```
+
 Present options to the user. Before proceeding, verify tasks are independent:
 
 - No task blocks another (`bd show <id>`)
@@ -135,7 +140,6 @@ Don't post a marker to paper over a review nobody ran, and don't ask Tim to `--f
 
 ### Beads hygiene
 
-- `bd ready -n 50` — the default limit is 10, which hides work.
 - Cross-reference `bd list --status=in_progress` against merged PRs; close what landed.
 - Check for closed issues still blocking others (`bd blocked` → `bd dep remove`).
 - `bd dolt pull` only in **embedded** beads mode. In **server** mode

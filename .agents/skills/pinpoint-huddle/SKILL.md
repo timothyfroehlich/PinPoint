@@ -7,7 +7,7 @@ description: The conventions behind the inter-session coordination channel that 
 
 The huddle system is a context-efficient channel between parallel sessions working on PinPoint. Each session learns what other sessions did recently, posts its own updates, and filters out its own echoes — all without consuming thousands of tokens at every session start.
 
-The hooks (`huddle-session-start.sh` at SessionStart, `huddle-poll.sh` at UserPromptSubmit and throttled PostToolUse) do the injection, and each notice they print carries its own command — bootstrap, registration with the naming rules, rotation. This skill is the part they don't print: the conventions, and why they are what they are.
+The hooks (`huddle-session-start.sh` at SessionStart, `huddle-poll.sh` at UserPromptSubmit and throttled PostToolUse) do the injection. The bootstrap and registration notices carry their own commands, including the naming format and examples; the rotation notice points back here for its dispatch. This skill is the part the hooks don't print: the conventions, the knobs, and why they are what they are.
 
 ## Reading the work digest
 
@@ -128,6 +128,14 @@ The subagent acquires a file lock in phase A. If a peer session already rotated,
 
 If nothing actually changed, ignore the nudge. A bare "still working on it" is noise.
 
+### Turning the volume down
+
+Nothing prints these, so they live here:
+
+- `HUDDLE_NUDGE_SECONDS=0` disables the quiet-session nudge. It otherwise fires at most once per window per session, never on a session's first poll, and never when you've posted inside the window.
+- `HUDDLE_THROTTLE_SECONDS` (default 180) caps how often the PostToolUse poll runs; it's set on the hook's command line in `.claude/settings.json`. Setting it to `0` polls on every tool call — debugging only.
+- To stop PostToolUse polling entirely, remove that PostToolUse entry from `.claude/settings.json`. UserPromptSubmit polling continues regardless.
+
 ## How to post coordination updates
 
 **Two events are auto-posted — you don't need to post these manually:**
@@ -159,6 +167,11 @@ Things NOT worth posting:
 - A _bare_ status ping with no scope or invitation ("I started working on X") — that's noise. But a **scoped kickoff with an invitation** (specific area/branch + "ping me if you have context") **is** worth posting, once per session, for substantive work — see "What still requires a manual post" above.
 
 ## Multi-machine (one shared Dolt server)
+
+Two things the copy-paste snippets above depend on, and neither is self-evident from the JSON:
+
+- **`config.json` is a rebuildable cache, not a source of truth.** It holds only `root_bead_id`, and it does not exist on a fresh clone. Session-start and `huddle_root_id` call `huddle_discover_root`, which finds the existing "Huddle coordination root" epic and **adopts** it (writing `config.json`) rather than forking a second root. If a raw `jq -r '.root_bead_id'` comes back null or the file is missing, that's a machine that hasn't adopted yet, not a broken huddle.
+- **Root-notes `today_bead.id` is a hint, not the answer.** Today's daily resolves by `bd children <root>` title query; the notes pointer is a fast-path hint that gets verified via `bd show` before it's trusted. This is what fixed the PP-9lq5 dangling-pointer bug — a purged or renamed daily self-heals instead of lingering as a broken reference.
 
 The huddle works across multiple machines (Mac + Bazzite) with many concurrent
 sessions per machine. Both machines use **one live `dolt sql-server` on Bazzite**
