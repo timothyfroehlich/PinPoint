@@ -54,6 +54,9 @@ Reviewers read agent skills. Consult the relevant one for the area a PR touches 
 That did **not** loosen the merge bar. A PR still cannot merge without a review covering its **head commit**, with every thread resolved. Two things can record that (PP-97tt), and either clears the `reviewed` gate:
 
 - **Inline review comments on the head commit.** `/code-review <depth> --comment <PR#>` posts its findings to the PR, and those comments pin the commit the reviewer read. This is the normal case for a review that found something: it attests itself.
+
+  **The gate checks the shape, not the provenance.** It has no way to tell a `/code-review` finding from an ordinary inline remark — a review comment carries no mark saying what produced it — so _any_ top-level inline comment on head clears `reviewed`, whoever left it and whatever prompted it. That is an honour system, and it is the same one the marker has always run on: `mark-claude-review.sh` is equally postable for a review nobody ran. **Leave inline comments because you read the diff at that commit, never to move a gate.** The part with teeth is `threads` — anything you post there blocks the merge until it is resolved.
+
 - **The author's SHA-pinned marker** (`<!-- pinpoint-claude-review: <head_sha> -->`), for everything else — a review that found nothing, an `ultra` run (the cloud path can't post comments), or a run without the flag:
 
   ```bash

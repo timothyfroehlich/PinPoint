@@ -340,6 +340,25 @@ def test_review_comments_pinning_head_pass_the_gate() -> None:
     assert "PASS: reviewed: inline review comments pin head" in result.stdout
 
 
+def test_any_top_level_comment_counts_not_only_code_review_findings() -> None:
+    """Pinned because it is the honest scope of the gate, not because it is desirable.
+
+    A review comment carries no mark saying which command produced it, so a plain
+    line-level remark on head is indistinguishable from a `/code-review --comment`
+    finding and PASSes the same way. There is no discriminator available at this layer —
+    it would have to be embedded in the comment body at post time, by a harness prompt
+    this repo does not own.
+
+    This test exists so the behaviour is a recorded decision rather than a surprise: if
+    a future change tightens it, this test should fail loudly and be deleted on purpose.
+    """
+    remark = review_comment(HEAD_SHA)
+    remark["body"] = "why this shape rather than a Map?"
+    with gate_env(review_comment_pages=[[remark]]) as env:
+        result = run_gate("check_review_happened", env)
+    assert result.returncode == 0, result.stdout
+
+
 def test_commit_id_is_never_read_in_place_of_original_commit_id() -> None:
     """The false-green this design turns on.
 

@@ -268,13 +268,22 @@ def _review_comment_shas(pr: int) -> list[str]:
     - replies excluded. A reply is created at whatever head is current, so an
       agent answering the thread it just fixed would otherwise re-attest a
       commit no reviewer has seen.
+
+    Ordered by `updated_at`, not by API order, because the bash groups by SHA
+    and takes `sort_by(.at) | last`. Only the last element is ever read — it is
+    the SHA the "you pushed after the review" message names — so taking the API
+    order here would let the two tools name DIFFERENT commits whenever an older
+    finding was edited most recently. The verdict would still agree; the report
+    would not, and a reader has no way to tell which one is lying.
     """
     repo = f"repos/{REPO_OWNER}/{REPO_NAME}"
-    return [
-        c["original_commit_id"]
+    top_level = [
+        c
         for c in _gh_api_list(f"{repo}/pulls/{pr}/comments")
         if c.get("in_reply_to_id") is None and c.get("original_commit_id")
     ]
+    top_level.sort(key=lambda c: c.get("updated_at") or c.get("created_at") or "")
+    return [c["original_commit_id"] for c in top_level]
 
 
 def review_state(pr: int) -> tuple[str, str]:

@@ -95,7 +95,7 @@ def marker_comment(sha=HEAD_SHA):
     return {"body": f"<!-- pinpoint-claude-review: {sha} -->\nClaude review of head"}
 
 
-def review_comment(sha=HEAD_SHA, *, in_reply_to=None):
+def review_comment(sha=HEAD_SHA, *, in_reply_to=None, at="2026-08-03T10:00:00Z"):
     """An inline finding, as `/code-review <depth> --comment <PR>` leaves it.
 
     `commit_id` deliberately differs from `original_commit_id`: GitHub re-anchors
@@ -106,6 +106,8 @@ def review_comment(sha=HEAD_SHA, *, in_reply_to=None):
         "original_commit_id": sha,
         "commit_id": "1" * 40,
         "in_reply_to_id": in_reply_to,
+        "updated_at": at,
+        "created_at": at,
     }
 
 
@@ -878,7 +880,7 @@ def test_review_state_stale_marker(monkeypatch):
     ],
 )
 def test_review_state_accepts_any_marker_pinning_head(monkeypatch, order):
-    """Parity with `_marker_verdict` in the bash: membership, not "the newest".
+    """Parity with `_review_verdict` in the bash: membership, not "the newest".
 
     Duplicate markers are a stray, but if one lands, a reader that inspects only
     one comment can disagree with mark-claude-review.sh about which is canonical
@@ -957,6 +959,33 @@ def test_review_state_ignores_replies(monkeypatch):
         make_gh(review_comments=[review_comment(HEAD_SHA, in_reply_to=90210)]),
     )
     assert pr_watch.review_state(PR)[0] == "unreviewed"
+
+
+@pytest.mark.unit
+def test_stale_comments_names_the_same_sha_the_bash_would(monkeypatch):
+    """Both tools sort by `updated_at`, not by the order the API returned.
+
+    The bash groups by SHA and takes `sort_by(.at) | last`; reading API order
+    here instead would name a DIFFERENT commit whenever an older finding was
+    edited most recently. The verdict would still agree, so nothing would fail —
+    the two reports would just disagree about which commit was reviewed, with no
+    way for a reader to tell which one is lying.
+    """
+    older = "2" * 40
+    monkeypatch.setattr(
+        pr_watch,
+        "gh",
+        make_gh(
+            review_comments=[
+                review_comment(OLD_SHA, at="2026-08-03T09:00:00Z"),
+                review_comment(older, at="2026-08-03T08:00:00Z"),
+            ]
+        ),
+    )
+    state, detail = pr_watch.review_state(PR)
+    assert state == "stale_comments"
+    assert OLD_SHA[:7] in detail, detail
+    assert older[:7] not in detail, detail
 
 
 @pytest.mark.unit

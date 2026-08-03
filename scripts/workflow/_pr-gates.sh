@@ -44,11 +44,28 @@ _repo_slug() {
 #   marker    the sticky `<!-- pinpoint-claude-review: <sha> -->` comment that
 #             mark-claude-review.sh posts. Carries a recorded depth and a findings
 #             summary, so it is the richer record and wins a tie.
-#   comments  inline review comments Tim's `/code-review <depth> --comment <PR>` posted
-#             on the PR. They pin a SHA of their own, so a review that found something
-#             attests itself — no second step, nothing for an agent to forget. A review
-#             that found NOTHING posts nothing, which is why the marker still exists.
-#             (PP-97tt.)
+#   comments  ANY top-level inline review comment on the PR. The case this exists for is
+#             `/code-review <depth> --comment <PR>`: its findings pin a SHA of their own,
+#             so a review that found something attests itself — no second step, nothing
+#             for an agent to forget. A review that found NOTHING posts nothing, which is
+#             why the marker still exists. (PP-97tt.)
+#
+#             READ "ANY" LITERALLY — it is the honest description of what this checks.
+#             A review comment carries no mark saying which command produced it, so this
+#             cannot distinguish a `/code-review` finding from an ordinary line-level
+#             remark: one inline question on head, from anyone, reads as `commented` and
+#             PASSes. There is no fix available at this layer. A discriminator would have
+#             to be embedded in the comment BODY at post time, and the posting side is a
+#             harness prompt this repo does not own — so a marker we cannot make the
+#             harness emit would fail every real review instead.
+#
+#             This is therefore an honour gate, in the same sense the marker already was:
+#             `mark-claude-review.sh` has always been postable for a review nobody ran,
+#             and its header says so. What changed is the surface area — the false-attest
+#             move went from "run a script named mark-claude-review" to "leave a comment",
+#             which is a thing done for other reasons. Weigh it as a speed bump, not a
+#             boundary. The `threads` gate is the part with teeth: whatever lands here
+#             also blocks the merge until it is resolved.
 #
 # Pinned on `original_commit_id`, never `commit_id`. GitHub re-anchors `commit_id` as a
 # PR advances so a still-applicable comment keeps pointing at a live line; a gate reading
@@ -200,9 +217,12 @@ check_ci() {
 #   stale_comments  review comments exist but pin a DIFFERENT SHA — likewise
 #   unreviewed      no evidence on this PR at all — nobody has reviewed it
 #
-# The two stale states are kept apart because their remedies differ: a stale marker is
-# cleared by re-attesting (the agent's own command), a stale comment set only by getting
-# the new head reviewed. Collapsing them would print the wrong next step half the time.
+# The two stale states are kept apart so the report can name WHICH evidence went stale,
+# and because one of them has a trap the other doesn't: a stale marker can be re-attested
+# by rewriting the same sticky comment, whereas nothing re-posts a reviewer's inline
+# comments at a new SHA — so `stale_comments` is cleared by `mark-claude-review.sh` too,
+# and never by touching the threads. `_review_remedy` says so per-state, because the
+# obvious-looking move there (reply, resolve, expect green) is the one that does nothing.
 #
 # "Different", not "older": the usual cause is a push on top of the reviewed commit, but
 # a force-push leaves a marker pinning a commit that is not an ancestor of head at all,
@@ -253,8 +273,24 @@ _compute_review_state() {
 # The marker stays, and is named second, because a review that finds NOTHING posts no
 # comments: the case with the least to fix is the one with no evidence, and it is the
 # agent's job to record it. (PP-97tt.)
+#
+# Takes the state, because `stale_comments` needs a different lead-in from the other two.
+# There the review already happened and the findings are already on the PR — telling that
+# reader to go ask for a review would send them back to Tim for a round-trip the marker
+# covers. It is also the state where the intuitive move (reply, resolve, expect green)
+# accomplishes nothing, so the remedy names the marker first instead of last.
 _review_remedy() {
-  local pr=$1
+  local pr=$1 state=${2:-}
+  if [ "$state" = "stale_comments" ]; then
+    echo "  remedy: if you pushed the fixes his comments asked for, that round-trip is"
+    echo "          within what he reviewed — re-attest the new head yourself:"
+    echo "    bash scripts/workflow/mark-claude-review.sh $pr <depth> \"applied review findings from ${RS_REVIEW_SHA:0:7}\""
+    echo "          Nothing re-posts his comments at the new SHA, so the marker is the"
+    echo "          only thing that clears this. If you pushed anything ELSE, that is new"
+    echo "          work and needs a fresh review:"
+    echo "    /code-review <depth> --comment $pr"
+    return
+  fi
   echo "  remedy: ask Tim to run this on the branch, and paste it to him verbatim —"
   echo "          the PR number and --comment are what post the findings to the PR:"
   echo "    /code-review <depth> --comment $pr"
@@ -353,7 +389,7 @@ check_review_happened() {
       echo "  You pushed AFTER the review, so what is about to merge was never read."
       echo "  Resolving those threads does not re-attest — a reply is created at whatever"
       echo "  head is current, so it is deliberately not counted as evidence."
-      _review_remedy "$pr"
+      _review_remedy "$pr" stale_comments
       return 1
       ;;
     unreviewed)

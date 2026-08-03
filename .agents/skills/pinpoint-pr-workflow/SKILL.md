@@ -222,6 +222,8 @@ Two limits worth knowing before you suggest a depth:
 
 **Resolving the threads does not re-attest.** A reply is created against whatever head is current, so counting one would let you clear the gate by answering the thread you just fixed. Replies are excluded for exactly that reason — after you push the fixes, the review comments still pin the commit Tim read, and the gate still says `stale_comments`.
 
+**`stale_comments` is cleared by the marker, and only by the marker.** Nothing re-posts a reviewer's comments at a new SHA, so `mark-claude-review.sh` is the exit even though the review that raised the findings was his. The rule for _whether_ you may re-attest is unchanged and is the one below — it's only the mechanism that has no second option here.
+
 Which of two things you do next depends on what you pushed:
 
 - **The fixes he asked for.** Re-attest at the new head with `mark-claude-review.sh` and say so in the summary — `"applied review findings from <old_sha>"`. A reviewer's own requested changes are within what they reviewed; this is the same round-trip any human review has. The marker is the only way to clear it here: his comments are stuck on the old SHA and nothing re-posts them.
