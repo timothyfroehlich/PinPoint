@@ -47,25 +47,30 @@ const PINBALLMAP_FILTERS = ["unlinked", "linked", "excluded"] as const;
 type PinballmapFilter = (typeof PINBALLMAP_FILTERS)[number];
 
 /**
- * The WHERE fragment each link state selects.
+ * The WHERE fragments each link state selects, ANDed into the shared condition
+ * list by the caller.
  *
  * A `Record` keyed by the filter union rather than an if/else chain so that
  * adding a state to {@link PINBALLMAP_FILTERS} without a condition is a type
  * error. A missed branch would silently return the *whole* fleet under a
  * narrowing filter name, with a `total` that looks authoritative
  * (CORE-ARCH-012).
+ *
+ * Arrays of bare `SQL` rather than a nested `and(...)`: `and()` is typed
+ * `SQL | undefined`, and an `undefined` here would be dropped by the outer
+ * `and(...conditions)` — the same silent whole-fleet answer this Record exists
+ * to make impossible.
  */
-const PINBALLMAP_FILTER_CONDITIONS: Record<PinballmapFilter, SQL | undefined> =
-  {
-    // Both halves are load-bearing: "no catalog match" alone would keep handing
-    // the linking pass the machines someone already decided are not on PBM.
-    unlinked: and(
-      isNull(machines.pinballmapMachineId),
-      eq(machines.pinballmapExcluded, false)
-    ),
-    linked: isNotNull(machines.pinballmapMachineId),
-    excluded: eq(machines.pinballmapExcluded, true),
-  };
+const PINBALLMAP_FILTER_CONDITIONS: Record<PinballmapFilter, SQL[]> = {
+  // Both halves are load-bearing: "no catalog match" alone would keep handing
+  // the linking pass the machines someone already decided are not on PBM.
+  unlinked: [
+    isNull(machines.pinballmapMachineId),
+    eq(machines.pinballmapExcluded, false),
+  ],
+  linked: [isNotNull(machines.pinballmapMachineId)],
+  excluded: [eq(machines.pinballmapExcluded, true)],
+};
 
 const listMachinesSchema = z.object({
   search: z
@@ -127,7 +132,7 @@ export async function runListMachines(
   }
 
   if (args.pinballmap) {
-    conditions.push(PINBALLMAP_FILTER_CONDITIONS[args.pinballmap]);
+    conditions.push(...PINBALLMAP_FILTER_CONDITIONS[args.pinballmap]);
   }
 
   // One WHERE for both the page and the count — a filter applied to only one of
