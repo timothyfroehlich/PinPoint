@@ -54,7 +54,7 @@ Reviewers read agent skills. Consult the relevant one for the area a PR touches 
 That did **not** loosen the merge bar. A PR still cannot merge without a review covering its **head commit**, recorded as the author's SHA-pinned marker (`<!-- pinpoint-claude-review: <head_sha> -->`), with every thread resolved. An agent cannot launch `/code-review`, so the author's job is to finish the work, hand the branch over, address the findings, and attest the head that was read:
 
 ```bash
-bash scripts/workflow/mark-claude-review.sh <PR> "<one-line findings>"
+bash scripts/workflow/mark-claude-review.sh <PR> <depth> "<one-line findings>"
 ```
 
 The marker pins a SHA, so a later push invalidates it — deliberately, so a 3-commit fixup can't inherit the review of the commit before it. **If you're reviewing, assume the commit you were handed is the one the author intends to be final.** Full author-side rules: `.agents/skills/pinpoint-pr-workflow/SKILL.md` Phase 3.4.

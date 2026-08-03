@@ -7,6 +7,7 @@ import { registerCreateIssue } from "./create-issue";
 import { registerGetMachine } from "./get-machine";
 import { registerListMachines } from "./list-machines";
 import { registerSetMachineAvailability } from "./set-machine-availability";
+import { registerSetMachineName } from "./set-machine-name";
 import { registerSetMachineOwner } from "./set-machine-owner";
 
 /**
@@ -18,6 +19,7 @@ export function registerPinpointTools(server: McpServer): void {
   registerListMachines(server);
   registerGetMachine(server);
   registerSetMachineAvailability(server);
+  registerSetMachineName(server);
   registerAddMachine(server);
   registerSetMachineOwner(server);
   registerCreateIssue(server);

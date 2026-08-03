@@ -18,6 +18,11 @@ set -euo pipefail
 # 2026-08-02 (its free tier was too small to review PinPoint's PRs), and no bot reviews
 # this repo now. The marker attests that Tim ran `/code-review` over the diff, which an
 # agent cannot do for itself: `/code-review` is a harness built-in only he can trigger.
+#
+# What follows this prefix, up to the `-->`, is compared to the head SHA by STRING
+# EQUALITY. Nothing else may go inside this comment — the review depth mark-claude-review.sh
+# records lives in its own `<!-- pinpoint-review-depth: … -->` comment for exactly that
+# reason, since adding it here would fail every `reviewed` gate on every PR. (PP-9onv.)
 readonly CLAUDE_MARKER_PREFIX="<!-- pinpoint-claude-review:"
 
 # Parse owner/repo dynamically — avoid hardcoded slug. Memoized: several gates ask for
@@ -31,7 +36,19 @@ _repo_slug() {
   printf '%s\n' "$_REPO_SLUG_CACHE"
 }
 
-# The review markers' verdict on a given head, printed as "<state> <sha>".
+# The full record of the review marker that decides a head's state, as one TSV line:
+#
+#   <state>\t<sha>\t<depth>\t<updated_at>\t<summary line>
+#
+# `_marker_verdict` (the gate's question) is the first two fields; merge-handoff.sh
+# reports the rest, so this is the single place the pinning semantics live. Keeping one
+# implementation is deliberate: a second lookup that answered "which marker counts?"
+# even slightly differently would let the gate and the handoff report disagree about
+# whether head was reviewed, which is the one thing neither may be wrong about.
+#
+# `depth` is the `/code-review` level recorded by mark-claude-review.sh in a second
+# HTML comment. Markers posted before PP-9onv have no such comment and read as
+# `unrecorded` — absence of the field, not a claim that no review ran.
 #
 # Asked as "does ANY marker pin this head?", deliberately — not "does the newest one?".
 # mark-claude-review.sh keeps ONE sticky comment and rewrites it in place, so a PR
@@ -48,18 +65,33 @@ _repo_slug() {
 #
 # `jq -rs` (slurp) rather than gh's `--jq`, which runs per-page under --paginate and so
 # misses a marker sitting on page 2+ of a busy PR.
-_marker_verdict() {
+_marker_record() {
   local pr=$1 owner_repo=$2 head=$3
   gh api --paginate "repos/${owner_repo}/issues/${pr}/comments" \
     | jq -rs --arg prefix "$CLAUDE_MARKER_PREFIX" --arg head "$head" \
-        '[ .[] | flatten | .[] | (.body // "")
-           | select(startswith($prefix))
-           | ltrimstr($prefix) | split("-->")[0] | gsub("^\\s+|\\s+$"; "")
-         ] as $pinned
-         | if ($pinned | index($head)) then "marker \($head)"
-           elif ($pinned | length) > 0 then "stale_marker \($pinned | last)"
-           else "unreviewed "
-           end'
+        '[ .[] | flatten | .[]
+           | (.body // "") as $b
+           | select($b | startswith($prefix))
+           | { sha: ($b | ltrimstr($prefix) | split("-->")[0] | gsub("^\\s+|\\s+$"; "")),
+               depth: ($b | [scan("<!-- pinpoint-review-depth:\\s*([a-z]+)\\s*-->")]
+                          | flatten | (.[0] // "unrecorded")),
+               at: (.updated_at // ""),
+               summary: ($b | split("\n") | last | gsub("^\\s+|\\s+$"; "")) }
+         ] as $markers
+         | [ $markers[] | select(.sha == $head) ] as $pinned
+         | if ($pinned | length) > 0 then ($pinned | last) + { state: "marker" }
+           elif ($markers | length) > 0 then ($markers | last) + { state: "stale_marker" }
+           else { state: "unreviewed", sha: "", depth: "", at: "", summary: "" }
+           end
+         | [ .state, .sha, .depth, .at, .summary ] | @tsv'
+}
+
+# The review markers' verdict on a given head, printed as "<state> <sha>" — the two
+# fields of `_marker_record` the merge gate acts on.
+_marker_verdict() {
+  local record
+  record=$(_marker_record "$1" "$2" "$3")
+  printf '%s %s\n' "$(cut -f1 <<< "$record")" "$(cut -f2 <<< "$record")"
 }
 
 # Gate 1: CI Gate check has SUCCESS conclusion.
@@ -111,8 +143,14 @@ check_ci() {
 # collapses to "does an attestation pin THIS head?":
 #
 #   marker        a review marker pins head's SHA — head has been reviewed
-#   stale_marker  a marker exists but pins an OLDER SHA — you pushed past the review
+#   stale_marker  a marker exists but pins a DIFFERENT SHA — head was never reviewed
 #   unreviewed    no marker on this PR at all — nobody has reviewed it
+#
+# "Different", not "older": the usual cause is a push on top of the reviewed commit, but
+# a force-push leaves a marker pinning a commit that is not an ancestor of head at all,
+# and there the distance between them is not merely large — it is undefined.
+# merge-handoff.sh reports that case as unknowable rather than counting commits from an
+# unrelated tree, and this gate does not care which it is: neither is a reviewed head.
 #
 # `stale_marker` is the state worth keeping distinct. It is the successor to the old
 # `pushed_after`, and the same trap: the PR visibly HAS a review, so the reflex is to
@@ -151,7 +189,8 @@ _review_remedy() {
   local pr=$1
   echo "  remedy: ask Tim to run /code-review on this branch, address the findings,"
   echo "          then attest the head he reviewed:"
-  echo "    bash scripts/workflow/mark-claude-review.sh $pr \"<one-line findings>\""
+  echo "    bash scripts/workflow/mark-claude-review.sh $pr <depth> \"<one-line findings>\""
+  echo "          (<depth> is the /code-review level he ran: low|medium|high|xhigh|max|ultra)"
 }
 
 # Gate 2: Zero unresolved review threads. Uses GraphQL with cursor pagination.
@@ -208,8 +247,9 @@ check_unresolved_threads() {
 # cannot merge, and nothing here WAITs, because with no bot in the loop there is never
 # an answer already on its way. The marker is
 # `<!-- pinpoint-claude-review: <head_sha> -->` in a PR conversation comment (posted by
-# mark-claude-review.sh); the SHA pin makes it self-expiring, so a later fix changes the
-# head SHA and re-arms the gate.
+# mark-claude-review.sh, alongside a `<!-- pinpoint-review-depth: … -->` comment this
+# gate ignores); the SHA pin makes it self-expiring, so a later fix changes the head SHA
+# and re-arms the gate.
 #
 #   marker        → PASS
 #   stale_marker  → FAIL   remedy: re-review the new head, re-attest
