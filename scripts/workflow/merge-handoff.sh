@@ -305,7 +305,7 @@ if grep -qE "$UI_PATHS" <<< "$changed_paths"; then
   ui_changed=yes
 fi
 
-shots=$(gh api --paginate "repos/$(_repo_slug)/issues/${pr}/comments" \
+shots=$(gh api --paginate "repos/$(_repo_slug)/issues/${pr}/comments?per_page=100" \
   | jq -rs --arg marker "$SCREENSHOT_MARKER" \
       '[ .[] | flatten | .[] | select((.body // "") | startswith($marker)) ] | last.updated_at // ""')
 

@@ -114,11 +114,17 @@ _repo_slug() {
 #
 # `jq -s` (slurp) rather than gh's `--jq`, which runs per-page under --paginate and so
 # misses a marker sitting on page 2+ of a busy PR.
+#
+# `per_page=100` on both, matching pr-watch.py's mirror. The default is 30, and this
+# function went from one paginated call to two — while pr-dashboard.sh runs it once per
+# OPEN PR. At 30/page that is a real bite out of the 5000/hr quota shared with every
+# other session on the host, and a 403 here reads as "no evidence", so exhausting the
+# quota degrades into gate failures rather than into an error anyone would recognise.
 _review_record() {
   local pr=$1 owner_repo=$2 head=$3
   local markers comments
 
-  markers=$(gh api --paginate "repos/${owner_repo}/issues/${pr}/comments" \
+  markers=$(gh api --paginate "repos/${owner_repo}/issues/${pr}/comments?per_page=100" \
     | jq -s --arg prefix "$CLAUDE_MARKER_PREFIX" \
         '[ .[] | flatten | .[]
            | (.body // "") as $b
@@ -133,7 +139,7 @@ _review_record() {
   # Grouped by the SHA reviewed, so a review that raised six findings is ONE piece of
   # evidence rather than six — the summary then reports the count, which is the fact a
   # reader of the handoff report wants.
-  comments=$(gh api --paginate "repos/${owner_repo}/pulls/${pr}/comments" \
+  comments=$(gh api --paginate "repos/${owner_repo}/pulls/${pr}/comments?per_page=100" \
     | jq -s '[ .[] | flatten | .[]
                | select(.in_reply_to_id == null)
                | select((.original_commit_id // "") != "")
@@ -220,9 +226,17 @@ check_ci() {
 # The two stale states are kept apart so the report can name WHICH evidence went stale,
 # and because one of them has a trap the other doesn't: a stale marker can be re-attested
 # by rewriting the same sticky comment, whereas nothing re-posts a reviewer's inline
-# comments at a new SHA — so `stale_comments` is cleared by `mark-claude-review.sh` too,
-# and never by touching the threads. `_review_remedy` says so per-state, because the
-# obvious-looking move there (reply, resolve, expect green) is the one that does nothing.
+# comments at a new SHA. So the honest exit from `stale_comments` is the marker, and
+# replying to the threads is not one — a reply is a reply, and the gate skips those.
+# `_review_remedy` says so per-state, because the obvious-looking move there (reply,
+# resolve, expect green) is the one that does nothing.
+#
+# "Honest exit", not "only exit". Nothing ENFORCES it: a NEW top-level comment on the new
+# head is evidence like any other, so posting one flips `stale_comments` straight to
+# `commented`. That is the same honour system described above, and it is worth saying
+# twice, because prose about this state reads as an invariant and it is not one. What is
+# actually enforced is narrower: what the reviewer already wrote cannot be made to cover
+# a commit they never saw.
 #
 # "Different", not "older": the usual cause is a push on top of the reviewed commit, but
 # a force-push leaves a marker pinning a commit that is not an ancestor of head at all,
@@ -286,7 +300,7 @@ _review_remedy() {
     echo "          within what he reviewed — re-attest the new head yourself:"
     echo "    bash scripts/workflow/mark-claude-review.sh $pr <depth> \"applied review findings from ${RS_REVIEW_SHA:0:7}\""
     echo "          Nothing re-posts his comments at the new SHA, so the marker is the"
-    echo "          only thing that clears this. If you pushed anything ELSE, that is new"
+    echo "          honest way to clear this. If you pushed anything ELSE, that is new"
     echo "          work and needs a fresh review:"
     echo "    /code-review <depth> --comment $pr"
     return

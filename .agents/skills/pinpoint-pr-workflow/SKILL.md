@@ -194,7 +194,7 @@ Two limits worth knowing before you suggest a depth:
 - **`ultra` does not post comments.** The cloud path honours `--fix` but has no comment-posting counterpart, so `--comment` there is a no-op. If Tim runs `ultra`, you are back to reading the findings from him and attesting with the marker.
 - **A clean review posts nothing.** No findings, no comments, no evidence — and the gate reads `unreviewed`. That case is yours to record, with the marker.
 
-**If the findings come back as terminal text rather than PR threads, posting was blocked, not skipped.** That is what happened on the first real run of this flow: neither the inline-comment MCP tool nor the `gh api` fallback was permitted, so a review that found four things left no trace. `.claude/settings.json` allows both now. Treat it as a review that posted nothing — address the findings from what Tim pastes you, then attest with the marker, because the gate is correctly still red.
+**If the findings come back as terminal text rather than PR threads, posting was blocked, not skipped.** That is what happened on the first real run of this flow: neither the inline-comment MCP tool nor the `gh api` fallback was permitted, so a review that found four things left no trace. `.claude/settings.json` allows both now — but the classifier still refuses some call shapes intermittently, so this stays a thing that happens rather than a thing that was fixed. Treat it as a review that posted nothing: address the findings from what Tim pastes you, then attest with the marker, because the gate is correctly still red.
 
 #### Sequencing
 
@@ -224,7 +224,9 @@ Two limits worth knowing before you suggest a depth:
 
 **Resolving the threads does not re-attest.** A reply is created against whatever head is current, so counting one would let you clear the gate by answering the thread you just fixed. Replies are excluded for exactly that reason — after you push the fixes, the review comments still pin the commit Tim read, and the gate still says `stale_comments`.
 
-**`stale_comments` is cleared by the marker, and only by the marker.** Nothing re-posts a reviewer's comments at a new SHA, so `mark-claude-review.sh` is the exit even though the review that raised the findings was his. The rule for _whether_ you may re-attest is unchanged and is the one below — it's only the mechanism that has no second option here.
+**`stale_comments` is cleared by the marker.** Nothing re-posts a reviewer's comments at a new SHA, so `mark-claude-review.sh` is the exit even though the review that raised the findings was his. The rule for _whether_ you may re-attest is unchanged and is the one below.
+
+That is the honest exit, not an enforced one: a _new_ top-level comment on the new head would also flip the state to `commented`. Don't reach for that — it records a review of the new head that nobody performed, which is the false attestation the marker's own docs warn about, arriving through a different door.
 
 Which of two things you do next depends on what you pushed:
 
