@@ -156,6 +156,14 @@ export default [
       // Strict any prevention
       "@typescript-eslint/no-explicit-any": "error",
 
+      // CORE-TS-007 bans `any`, non-null `!`, and unsafe `as`. Only the `any`
+      // third had a gate: `!` is valid TypeScript under every strictness
+      // setting, so neither tsc nor the two type-checked ruleset spreads above
+      // rejected it (the rule ships in `strict`, which we don't spread). It is
+      // syntactic, so `disableTypeChecked` leaves it on and the slim local pass
+      // enforces it too — no `.oxlintrc.json` entry needed. (PP-8k07.)
+      "@typescript-eslint/no-non-null-assertion": "error",
+
       // Unnecessary condition checks (catches bugs)
       "@typescript-eslint/no-unnecessary-condition": "error",
 
@@ -192,10 +200,15 @@ export default [
 
       // ===== ESLint Comments =====
 
-      // Prevent disabling strict type checks
+      // Prevent disabling strict type checks. All three CORE-TS-007 escapes
+      // belong here — a rule you can turn off with a one-line comment is a
+      // recommendation, not a gate, and NON_NEGOTIABLES.md now advertises this
+      // one as enforced. Both test blocks set this rule "off", so the two
+      // no-non-null-assertion exemptions there are unaffected. (PP-8k07.)
       "eslint-comments/no-restricted-disable": [
         "error",
         "@typescript-eslint/no-explicit-any",
+        "@typescript-eslint/no-non-null-assertion",
         "@typescript-eslint/no-unsafe-*",
       ],
 
@@ -246,6 +259,12 @@ export default [
 
       // mocks/spies are inherently empty
       "@typescript-eslint/no-empty-function": "off",
+      // CORE-TS-007 bans `!` because a wrong assertion 500s a page in front of
+      // a user. In a test the same wrong assertion throws inside the test and
+      // fails it loudly, which is the honest failure the rule exists to force
+      // — so asserting on a fixture the test itself just created is fine here
+      // and nowhere else. (PP-8k07.)
+      "@typescript-eslint/no-non-null-assertion": "off",
       // tsconfig gap: `tsconfig.tests.json` lacks `noUncheckedIndexedAccess`,
       // causing false positives on legitimate defensive checks. Scope: src
       // tests. The `**/*.spec.ts` glob above also matches e2e specs, but the
@@ -278,6 +297,7 @@ export default [
       "eslint-comments/no-restricted-disable": "off",
       "@typescript-eslint/no-empty-function": "off",
       "@typescript-eslint/no-unnecessary-condition": "off",
+      "@typescript-eslint/no-non-null-assertion": "off",
       "no-restricted-imports": "off",
     },
   },

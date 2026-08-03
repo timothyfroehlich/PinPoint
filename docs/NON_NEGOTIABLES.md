@@ -91,6 +91,7 @@
 - **Why:** `any`, non-null `!`, and unsafe `as` defeat ts-strictest and hide real bugs
 - **Do:** Use proper type guards, narrowing, and Zod-validated shapes. Reach for `unknown` + a guard instead of `any`.
 - **Don't:** Use `any`, non-null assertions (`x!`), or unsafe casts (`as Foo`) to silence the type checker
+- **Enforced by:** ESLint — `@typescript-eslint/no-explicit-any` and `no-non-null-assertion`, both "error". Test and e2e blocks turn each off: a wrong assertion there fails the test loudly instead of 500ing a page. `tsc` cannot help with either — both are valid TypeScript at every strictness setting. The **unsafe `as`** third has no gate and is review-enforced; `no-unsafe-*` targets untyped values, not casts between known types. (PP-8k07.)
 
 **CORE-TS-008:** Always use `~/` path aliases
 
