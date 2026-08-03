@@ -15,7 +15,6 @@ allowBuilds:
   sharp: false
 
 minimumReleaseAgeExclude:
-  - js-yaml@5.2.2
   - hono@4.12.34
 
 overrides:
@@ -37,8 +36,8 @@ overrides:
   fast-uri: '>=3.1.5 <4'
   sharp: '>=0.35.0'
   '@hono/node-server': '>=2.0.5'
-  hono: '>=4.12.34'
-  ip-address: '>=10.3.1'
+  hono: '>=4.12.34 <5'
+  ip-address: '>=10.3.1 <11'
 
 peerDependencyRules:
   allowedVersions:

@@ -23,8 +23,8 @@ overrides:
   fast-uri: '>=3.1.5 <4'
   sharp: '>=0.35.0'
   '@hono/node-server': '>=2.0.5'
-  hono: '>=4.12.34'
-  ip-address: '>=10.3.1'
+  hono: '>=4.12.34 <5'
+  ip-address: '>=10.3.1 <11'
 
 importers:
 
@@ -840,7 +840,7 @@ packages:
     resolution: {integrity: sha512-bjD221KPLoJTWUwso1J6fGKiTXEUFedG/s0visavY4zakFPkeGURMRNly+FhBHs7T8Dz4qHaZIMX9ZoJHSJtKA==}
     engines: {node: '>=20'}
     peerDependencies:
-      hono: '>=4.12.34'
+      hono: '>=4.12.34 <5'
 
   '@hookform/resolvers@5.4.0':
     resolution: {integrity: sha512-EIsqr/t/qbinPIhGjMdtvutIN1Kk4uwbROE9/UQ93CAVGR7GkA7Y92+fX80OzXi/OB67jVFYwKGO1WzkxmkFZw==}
