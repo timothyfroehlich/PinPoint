@@ -38,11 +38,24 @@ HEAD_SHA = "d084c14a43af3ac021f0838f5c7bf4b77f72fb62"
 OTHER_SHA = "0000000000000000000000000000000000000000"
 
 
-def marker_comment(sha: str) -> dict:
-    """A comment in the exact shape mark-claude-review.sh posts."""
-    return {
-        "body": f"<!-- pinpoint-claude-review: {sha} -->\nClaude review of head {sha[:7]} — no serious findings"
-    }
+def marker_comment(
+    sha: str, depth: str | None = None, summary: str = "no serious findings"
+) -> dict:
+    """A comment in the exact shape mark-claude-review.sh posts.
+
+    `depth=None` is the pre-PP-9onv shape — two lines, no depth comment. Markers in that
+    shape are still live on merged PRs and on any branch attested before the change, so
+    it stays the default here: every existing test doubles as a backward-compat test.
+    """
+    lines = [f"<!-- pinpoint-claude-review: {sha} -->"]
+    if depth is not None:
+        lines.append(f"<!-- pinpoint-review-depth: {depth} -->")
+        lines.append(
+            f"Claude review of head {sha[:7]} — `/code-review {depth}` — {summary}"
+        )
+    else:
+        lines.append(f"Claude review of head {sha[:7]} — {summary}")
+    return {"body": "\n".join(lines), "updated_at": "2026-08-02T20:43:19Z"}
 
 
 def thread(*, resolved: bool, author: str) -> dict:
@@ -314,3 +327,96 @@ def test_thread_failure_names_the_two_ways_to_clear_it() -> None:
     with gate_env(threads=[thread(resolved=False, author="timothyfroehlich")]) as env:
         result = run_gate("check_unresolved_threads", env)
     assert "decline" in result.stdout.lower(), result.stdout
+
+
+# --- Marker record: the extra fields merge-handoff.sh reports -----------------------
+
+
+def marker_record(env: dict) -> list[str]:
+    """`_marker_record` for PR 123, split into its five TSV fields."""
+    result = subprocess.run(
+        [
+            "bash",
+            "-c",
+            f'source "{GATES_PATH}"; _marker_record 123 acme/widget {HEAD_SHA}',
+        ],
+        capture_output=True,
+        text=True,
+        env=env,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stderr
+    return result.stdout.rstrip("\n").split("\t")
+
+
+def test_marker_record_reports_the_review_depth() -> None:
+    """Which /code-review ran is a separate fact from whether one ran.
+
+    Before PP-9onv only the second was written down, so the merge handoff could not
+    state the first without an agent recalling it.
+    """
+    with gate_env(comment_pages=[[marker_comment(HEAD_SHA, depth="high")]]) as env:
+        state, sha, depth, at, summary = marker_record(env)
+    assert (state, sha, depth) == ("marker", HEAD_SHA, "high")
+    assert at == "2026-08-02T20:43:19Z"
+    assert "/code-review high" in summary
+
+
+def test_a_marker_without_a_depth_comment_reads_as_unrecorded() -> None:
+    """Absence of the field — not a claim that no review ran.
+
+    Every marker posted before PP-9onv is this shape, and reading one as `trivial` (or
+    as no review at all) would misreport a real review of a real head.
+    """
+    with gate_env(comment_pages=[[marker_comment(HEAD_SHA)]]) as env:
+        state, _sha, depth, _at, _summary = marker_record(env)
+    assert (state, depth) == ("marker", "unrecorded")
+
+
+def test_trivial_is_recorded_as_its_own_depth() -> None:
+    """The typo/one-line carve-out the gate docs allow, made legible in the handoff."""
+    with gate_env(comment_pages=[[marker_comment(HEAD_SHA, depth="trivial")]]) as env:
+        _state, _sha, depth, _at, summary = marker_record(env)
+    assert depth == "trivial"
+    assert "trivial" in summary
+
+
+@pytest.mark.parametrize(
+    "comments,expected_state,expected_sha",
+    [
+        pytest.param(
+            [marker_comment(HEAD_SHA, depth="low")], "marker", HEAD_SHA, id="pins-head"
+        ),
+        pytest.param(
+            [marker_comment(OTHER_SHA, depth="low")],
+            "stale_marker",
+            OTHER_SHA,
+            id="stale",
+        ),
+        pytest.param([], "unreviewed", "", id="none"),
+    ],
+)
+def test_record_and_gate_cannot_disagree_about_the_head(
+    comments: list[dict], expected_state: str, expected_sha: str
+) -> None:
+    """The gate's verdict is the record's first two fields, by construction.
+
+    Two lookups that each decided "which marker counts?" would eventually answer
+    differently, and the handoff report would tell Tim a head was reviewed while
+    merge-pr.sh refused it (or worse, the other way round).
+    """
+    with gate_env(comment_pages=[comments]) as env:
+        state, sha, _depth, _at, _summary = marker_record(env)
+        verdict = subprocess.run(
+            [
+                "bash",
+                "-c",
+                f'source "{GATES_PATH}"; _marker_verdict 123 acme/widget {HEAD_SHA}',
+            ],
+            capture_output=True,
+            text=True,
+            env=env,
+            timeout=60,
+        )
+    assert (state, sha) == (expected_state, expected_sha)
+    assert verdict.stdout.strip() == f"{expected_state} {expected_sha}".strip()

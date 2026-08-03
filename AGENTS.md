@@ -40,7 +40,7 @@
 3. **Don't kill processes you didn't start** — see §4 Process safety.
 4. **Sync with merge, never rebase** — see §5 Branches.
 5. **Root checkout is read-only.** It stays on `main`. All work — including planning docs — happens in a worktree. Dispatch a subagent or switch into an existing worktree. Tool-specific dispatch mechanics live in `CLAUDE.md`. (PP-46z, PP-bg45.)
-6. **Never `--no-verify`**, never wildcard tool permissions — without explicit user approval each time. **Merging is human-only, via ANY path** — never `gh pr merge`, never MCP `merge_pull_request`, and never `scripts/workflow/merge-pr.sh` (even though it enforces the merge gates, running it is still an agent merge). An agent's terminal state on a PR is: ready-for-review, CI green, a review covering the head commit (see §5 "Getting a PR reviewed"), threads resolved, screenshots posted if UI-touching, then hand Tim the exact command to run himself: `! scripts/workflow/merge-pr.sh <PR> --human`. (PP-wi85.)
+6. **Never `--no-verify`**, never wildcard tool permissions — without explicit user approval each time. **Merging is human-only, via ANY path** — never `gh pr merge`, never MCP `merge_pull_request`, and never `scripts/workflow/merge-pr.sh` (even though it enforces the merge gates, running it is still an agent merge). An agent's terminal state on a PR is: ready-for-review, CI green, a review covering the head commit (see §5 "Getting a PR reviewed"), threads resolved, screenshots posted if UI-touching, then hand over with `bash scripts/workflow/merge-handoff.sh <PR>` — it prints the state Tim needs plus the command for him to run himself, `! scripts/workflow/merge-pr.sh <PR> --human`. (PP-wi85.)
 7. **Beads: `team-maintainer` policy** (not the conservative default).
 
 ## 3. Agent Skills
@@ -176,10 +176,20 @@ Never resolve `drizzle/meta` conflicts manually — the folder holds binary-like
 The reviewer is **Tim, running `/code-review` on the branch** — a Claude Code harness built-in an agent cannot launch. So getting reviewed is a handoff: **finish your churn first** (CI fixes, merge-from-main), stop iterating, then tell Tim the branch is ready for review. Once he has, address the findings and attest the head he read:
 
 ```bash
-bash scripts/workflow/mark-claude-review.sh <PR> "<one-line findings>"
+bash scripts/workflow/mark-claude-review.sh <PR> <depth> "<one-line findings>"
 ```
 
-The marker pins a SHA, so any push invalidates it — re-attest if what you pushed was the review's own findings; get a fresh review if it was anything else. A genuinely trivial change (typo, comment, one-line mechanical fix) can be attested without interrupting him, saying why it was trivial. The marker attests a review happened; posting it otherwise is a false attestation. Full rules: `pinpoint-pr-workflow` skill Phase 3.4.
+`<depth>` is the level he ran — `low | medium | high | xhigh | max | ultra`, or `trivial` for the carve-out below — and is required: "reviewed" and "reviewed at `low`" are different facts, and the handoff report states which. The marker pins a SHA, so any push invalidates it — re-attest if what you pushed was the review's own findings; get a fresh review if it was anything else. A genuinely trivial change (typo, comment, one-line mechanical fix) can be attested without interrupting him, saying why it was trivial. The marker attests a review happened; posting it otherwise is a false attestation. Full rules: `pinpoint-pr-workflow` skill Phase 3.4.
+
+### Handing a PR over to merge
+
+Don't write the handoff summary — **run it and paste it**:
+
+```bash
+bash scripts/workflow/merge-handoff.sh <PR>
+```
+
+It computes what Tim needs in order to merge without re-deriving anything: which `/code-review` covered head and how many commits back it was, CI, threads, mergeable + distance behind main, when main was last merged in, the diff split src / tests / docs / other, migrations, newly-registered env vars, UI + screenshots — then two `!`-prefixed commands, one to re-run the report (it is a snapshot) and one to merge. The merge command is printed **only** when all four gates pass; otherwise the block names what is blocking, so an un-ready PR cannot be handed over as ready. Every field is a claim an agent would otherwise be making from memory. (PP-9onv.)
 
 ### Review comments
 
