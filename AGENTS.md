@@ -200,8 +200,6 @@ bash scripts/workflow/merge-handoff.sh <PR>
 
 It computes what Tim needs in order to merge without re-deriving anything: which review covered head and how many commits back it was, CI, threads, mergeable + distance behind main, when main was last merged in, the diff split src / tests / docs / other, migrations, newly-registered env vars, UI + screenshots — then two `!`-prefixed commands, one to re-run the report (it is a snapshot) and one to merge. The merge command is printed **only** when all four gates pass; otherwise the block names what is blocking, so an un-ready PR cannot be handed over as ready. Every field is a claim an agent would otherwise be making from memory. (PP-9onv.)
 
-```
-
 ### Review comments
 
 The canonical review rubric is `REVIEW.md` at the repo root. If a PR accumulates review comments (from Tim or another agent): fix the code, OR decline with a one-sentence reply (`add_reply_to_pull_request_comment`) and resolve the thread (`pull_request_review_write(method: "resolve_thread")`). Sign replies with your agent name (`—Claude`, `—Gemini`, `—Codex`, `—Antigravity`). Declined comments must get a reply — no silent ignores.
@@ -267,4 +265,3 @@ When `pnpm audit --audit-level=high` goes RED on a freshly-published advisory **
 Actionable, "what" and "how" only. Skills carry the deep dives.
 
 **Canonical specs are authoritative** — particularly `pinpoint-design-bible` (§5 page archetypes, §17 modal archetypes). When implementation changes UI behavior covered there, **edit the spec in place**. Don't append divergence notes or "TODO: spec out of date" disclaimers. If you find one, fold it into canonical text and delete it. Dated artifacts in `docs/superpowers/specs/` are records — leave them alone.
-```
