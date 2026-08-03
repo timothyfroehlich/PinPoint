@@ -29,6 +29,8 @@ If the change is genuinely trivial (a typo, a comment, a one-line mechanical fix
 
 `bash scripts/workflow/mark-claude-review.sh <PR> trivial "typo in a comment; no behavior change"`
 
+The marker pins a SHA, so any push after it invalidates it. Re-attesting is right when what you pushed was the review's own findings; anything else needs a fresh `/code-review`.
+
 The marker is an attestation that a review happened, never a way to skip one.
 
 ### Environment Setup
