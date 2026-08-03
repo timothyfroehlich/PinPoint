@@ -326,10 +326,13 @@ export async function verifyPinballmapLinkAction(
   // `machines_pinballmap_lmx_requires_listed` forces an unlisted row's
   // `pinballmapLmxId` to null, so the `lmx.id === machine.pinballmapLmxId`
   // comparison below can never match and every such verify falls into the heal
-  // branch — which sets `pinballmapListed: true`. Putting a machine on Pinball
-  // Map is a human decision (see `sync.ts`), never a side effect of a
-  // spot-check. Refuse before the sync so a request we will not honour never
-  // spends a manual-refresh slot (CORE-PBM-001).
+  // branch — which sets `pinballmapListed: true`. Listing is never a side effect
+  // of a spot-check. Note this guard is NOT redundant with auto-link
+  // (PP-o355.20): auto-link consults the tie guard before listing anything,
+  // whereas this branch would list unconditionally, so removing the guard would
+  // reintroduce exactly the duplicate-listing path auto-link is careful to
+  // avoid. Refuse before the sync so a request we will not honour never spends a
+  // manual-refresh slot (CORE-PBM-001).
   if (!machine.pinballmapListed)
     return err(
       "VALIDATION",
@@ -409,9 +412,9 @@ export async function verifyPinballmapLinkAction(
   return ok({ state: "healed" });
 }
 
-/** Result of an on-demand "Sync now" — the machine count and heals applied. */
+/** Result of an on-demand "Sync now" — the machine count and writes applied. */
 export type SyncPinballMapNowResult = Result<
-  { machineCount: number; healed: number },
+  { machineCount: number; healed: number; linked: number },
   "UNAUTHORIZED" | "SERVER" | "THROTTLED"
 >;
 
@@ -467,11 +470,11 @@ export async function syncPinballMapNowAction(
       return err("SERVER", result.error);
     }
 
-    const { healed } = await reconcileAfterSync();
+    const { healed, linked } = await reconcileAfterSync();
     // Desync badges on machine Info cards derive from the stored snapshot, so
     // refresh the whole machine subtree after a successful sync.
     revalidatePath("/m", "layout");
-    return ok({ machineCount: result.machineCount, healed });
+    return ok({ machineCount: result.machineCount, healed, linked });
   } catch (error: unknown) {
     log.error({ err: error }, "Manual PinballMap sync failed");
     return err("SERVER", "Pinball Map sync failed. Please try again.");

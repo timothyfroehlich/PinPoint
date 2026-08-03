@@ -6,10 +6,12 @@
  * enforces one PinballMap lister per catalog title at our location, mirroring
  * PBM's find-or-create on `(location_id, machine_id)`.
  *
- * At head this catch is the ONLY defense. `resolveListingHolder` exists but has
- * no production caller yet — it becomes the primary guard once auto-link
- * consumes it (PP-o355.20). Until then, do not read these tests as covering a
- * backstop behind something else; they cover the whole of it.
+ * Since PP-o355.20 the primary guard is `resolveListingHolder`, reached through
+ * `~/lib/pinballmap/auto-link` — it declines to list a cabinet whose title
+ * another cabinet already holds. These 23505 catches sit behind it. They still
+ * matter: `linkPinballmapEntryAction` (the path exercised below) does not
+ * consult the holder rule, and on the paths that do, a concurrent writer can
+ * still take the slot between the group read and the write.
  *
  * **Where the collision is reachable from.** Only a write that sets
  * `pinballmap_listed` true enters that partial index, and since PP-o355.29 that
@@ -241,7 +243,10 @@ describe("duplicate PinballMap listing — 23505 backstop (PGlite)", () => {
     const { updateMachineAction } = await import("~/app/(app)/m/actions");
     const admin = await createAdmin();
     await mockAuthAs(admin.id);
-    // No incumbent, for the same reason as the create case above.
+    // No incumbent, for the same reason as the create case above — and no stored
+    // snapshot either, so auto-link (PP-o355.20) has no lineup to act on. Both
+    // absences are load-bearing: the assertion below must fail if the FIELD is
+    // honoured, not pass because some other path happened to list the machine.
     await seedCatalogTitle();
 
     const [second] = await db

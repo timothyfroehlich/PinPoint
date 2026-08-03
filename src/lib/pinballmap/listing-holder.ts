@@ -27,11 +27,11 @@ import {
  * implementations would drift, and the partial unique index would start
  * rejecting writes one of them believed were legal.
  *
- * **No production caller yet.** This module lands ahead of its consumer on
- * purpose: PP-o355.20 may not set `listed = true` until the rule deciding which
- * cabinet may hold a listing exists, so the rule ships first. Until auto-link
- * wires it up, the only thing actually preventing a duplicate listing at runtime
- * is the 23505 backstop in `./listing-conflict` plus the DB index itself.
+ * **Its consumer is `./auto-link`** (PP-o355.20), which wraps it with the lineup
+ * lookup and is what both the hourly reconcile pass and title-save call. That
+ * makes this rule the primary runtime guard against a duplicate listing; the
+ * 23505 catches in the action layer are a concurrency backstop behind it, not
+ * the first line of defense they were before auto-link landed.
  */
 
 /** The fields the rule needs. Deliberately structural, so callers pass rows. */

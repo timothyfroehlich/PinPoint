@@ -40,7 +40,7 @@ A default `/code-review` or Antigravity pass is aimed at smaller changes — Tim
 
 Reviewers read agent skills. Consult the relevant one for the area a PR touches — this is a routing table, not a summary; read the skill itself for the actual guidance. All live at `.agents/skills/<name>/SKILL.md`.
 
-- `pinpoint-security` — auth, CSP, Zod validation, Supabase SSR changes.
+- `pinpoint-security` — CSP authoring, redirects and site-URL construction, the `@supabase/ssr` allowlist, sanitizers, and what counts as a non-gating role comparison. The rules themselves are `CORE-SEC-*` / `CORE-SSR-*`.
 - `pinpoint-testing` — whether a PR picked the right test layer (unit/integration/E2E) for what it's testing.
 - `pinpoint-e2e` — Playwright/E2E stability: worker isolation, flake-prone patterns.
 - `pinpoint-typescript` — the db→app typing decision: no converter layer, narrow with `Pick<>` at boundaries. CORE-TS-007's `!` ban is not linted, so non-null assertions stay a review question.
