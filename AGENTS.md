@@ -173,7 +173,7 @@ Never resolve `drizzle/meta` conflicts manually — the folder holds binary-like
 
 **No bot reviews this repo.** Copilot review was retired on 2026-08-02 (PP-4ric) — the free tier was too small to review PinPoint's PRs, so quota outages were the normal state. The merge bar is unchanged: a PR still needs a review covering its **head commit**, with threads resolved.
 
-The reviewer is **Tim, running `/code-review` on the branch** — a Claude Code harness built-in an agent cannot launch. So getting reviewed is a handoff: **finish your churn first** (CI fixes, merge-from-main), stop iterating, then tell Tim the branch is ready for review. Once he has, address any findings and attest the head he read — posting the marker is **yours to run**, including when the review came back clean and there was nothing to fix:
+The reviewer is **Tim, running `/code-review` on the branch** — a Claude Code harness built-in an agent cannot launch. So getting reviewed is a handoff: **finish your churn first** (CI fixes, merge-from-main), stop iterating, then tell Tim the branch is ready for review. Once he has, address the findings and attest the head he read:
 
 ```bash
 bash scripts/workflow/mark-claude-review.sh <PR> <depth> "<one-line findings>"
