@@ -512,8 +512,6 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
       // The response says whose editions these are, so the caller can check it
       // got the family it asked for.
       expect(result.familyName).toBe("Elvira's House of Horrors");
-      // No catalog row has 7001 as its machine id, so there's no ambiguity.
-      expect(result.idAlsoMatchesEdition).toBeNull();
     });
 
     it("names the family it actually returned when the group id collides with an edition id", async () => {
@@ -550,18 +548,20 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
       const result = outcome.result as McpCatalogEditionResult;
 
       // The worst outcome this tool can produce is linking a cabinet to the
-      // wrong title from a plausible-looking payload. The response must name
-      // the family it actually returned...
+      // wrong title from a plausible-looking payload. The one thing that
+      // catches it is the response naming the family it actually returned: a
+      // caller that asked about Elvira and reads "Godzilla" can see the miss.
+      //
+      // Nothing here flags the id itself. PBM group ids (small and dense) sit
+      // inside the machine-id range (1..~10k), so "this integer is also a
+      // machine id" is true for nearly every CORRECT group id — a flag on it
+      // would fire on the common path and teach the caller to throw away good
+      // results.
       expect(result.returned).toBe(2);
       expect(result.familyName).toBe("Godzilla");
       expect(result.editions.map((e) => e.name)).not.toContain(
         "Elvira's House of Horrors (Premium)"
       );
-      // ...and point at the title the caller almost certainly meant.
-      expect(result.idAlsoMatchesEdition).toEqual({
-        pinballmapMachineId: ELVIRA_PREMIUM_ID,
-        name: "Elvira's House of Horrors (Premium)",
-      });
     });
 
     it("reports hasMore when more families match than the limit returns", async () => {
