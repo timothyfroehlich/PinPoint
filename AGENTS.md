@@ -173,13 +173,21 @@ Never resolve `drizzle/meta` conflicts manually — the folder holds binary-like
 
 **No bot reviews this repo.** Copilot review was retired on 2026-08-02 (PP-4ric) — the free tier was too small to review PinPoint's PRs, so quota outages were the normal state. The merge bar is unchanged: a PR still needs a review covering its **head commit**, with threads resolved.
 
-The reviewer is **Tim, running `/code-review` on the branch** — a Claude Code harness built-in an agent cannot launch. So getting reviewed is a handoff: **finish your churn first** (CI fixes, merge-from-main), stop iterating, then tell Tim the branch is ready for review. Once he has, address the findings and attest the head he read:
+The reviewer is **Tim, running `/code-review` on the branch** — a Claude Code harness built-in an agent cannot launch. So getting reviewed is a handoff: **finish your churn first** (CI fixes, merge-from-main), stop iterating, then hand him the command to paste — not a description of it:
+
+```
+/code-review <depth> --comment <PR#>
+```
+
+`--comment` posts each finding to the PR as an inline review comment. That does two things: the `threads` gate then blocks the merge until you fix or decline-and-resolve every one, and the comments pin head themselves, which satisfies `reviewed` with no second step (PP-97tt). The `<PR#>` is not decoration — `--comment` only posts when the target is a PR, and is silently ignored against a local branch. `ultra` ignores it either way; the cloud path has no comment-posting counterpart.
+
+**A review that finds nothing posts nothing**, so that case — plus `ultra`, plus any run without `--comment` — is yours to record:
 
 ```bash
 bash scripts/workflow/mark-claude-review.sh <PR> <depth> "<one-line findings>"
 ```
 
-`<depth>` is the level he ran — `low | medium | high | xhigh | max | ultra`, or `trivial` for the carve-out below — and is required: "reviewed" and "reviewed at `low`" are different facts, and the handoff report states which. The marker pins a SHA, so any push invalidates it — re-attest if what you pushed was the review's own findings; get a fresh review if it was anything else. A genuinely trivial change (typo, comment, one-line mechanical fix) can be attested without interrupting him, saying why it was trivial. The marker attests a review happened; posting it otherwise is a false attestation. Full rules: `pinpoint-pr-workflow` skill Phase 3.4.
+`<depth>` is the level he ran — `low | medium | high | xhigh | max | ultra`, or `trivial` for the carve-out below — and is required: "reviewed" and "reviewed at `low`" are different facts, and the handoff report states which. Inline comments carry no depth, so attesting alongside them is still worth doing. Either kind of evidence pins a SHA, so any push invalidates it — and resolving the threads does **not** re-attest, because replies are deliberately not counted. Re-attest with the marker if what you pushed was the review's own findings; get a fresh review if it was anything else. A genuinely trivial change (typo, comment, one-line mechanical fix) can be attested without interrupting him, saying why it was trivial. The marker attests a review happened; posting it otherwise is a false attestation. Full rules: `pinpoint-pr-workflow` skill Phase 3.4.
 
 ### Handing a PR over to merge
 

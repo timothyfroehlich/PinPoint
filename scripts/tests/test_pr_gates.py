@@ -3,16 +3,27 @@
 These gates decide whether a PR may merge, so their edge cases are worth pinning down.
 
 PP-4ric retired Copilot review: its free tier was too small to be useful, so no bot
-reviews this repo now. The `reviewed` gate is satisfied only by the SHA-pinned marker
-`mark-claude-review.sh` posts, which attests that Tim ran `/code-review` (a harness
-built-in an agent cannot launch). Three states replace the old six — there is no
-request to wait on, so nothing here WAITs, and the whole request-timeline/quota-body
-apparatus (PP-lzaw, PP-jw0s) went with the reviewer it modelled.
+reviews this repo now. Nothing here WAITs as a result — there is no request on its way
+back, and the whole request-timeline/quota-body apparatus (PP-lzaw, PP-jw0s) went with
+the reviewer it modelled.
 
-What survives from that history, and is re-pinned below: the head SHA is compared
-directly rather than inferred from timestamps, so a review of an earlier tree cannot
-read as coverage of head (the PR #1784 false PASS); and the marker lookup slurps across
-pagination, so a marker on page 2+ of a busy PR is still found.
+Two kinds of evidence satisfy the `reviewed` gate, and PP-97tt added the second:
+
+- the SHA-pinned marker `mark-claude-review.sh` posts, attesting that Tim ran
+  `/code-review` (a harness built-in an agent cannot launch);
+- the inline review comments `/code-review <depth> --comment <PR>` posts, which pin the
+  commit the reviewer actually read.
+
+Both pin a SHA, so both expire on the next push. The three cases most worth pinning down
+here are the ones where a wrong answer is a false GREEN: `commit_id` must not be read in
+place of `original_commit_id` (GitHub re-anchors the former, which would make every
+review comment pin head forever), replies must not count (an agent answering the thread
+it just fixed would otherwise attest a commit nobody read), and a review of an earlier
+tree must not read as coverage of head (the PR #1784 false PASS).
+
+What else survives from that history and is re-pinned below: the head SHA is compared
+directly rather than inferred from timestamps, and both comment lookups slurp across
+pagination, so evidence on page 2+ of a busy PR is still found.
 
 The `threads` gate now counts unresolved threads from ANY author. Left filtered to
 Copilot logins it would have matched nothing and become a permanent PASS.
@@ -58,6 +69,29 @@ def marker_comment(
     return {"body": "\n".join(lines), "updated_at": "2026-08-02T20:43:19Z"}
 
 
+def review_comment(
+    sha: str,
+    *,
+    in_reply_to: int | None = None,
+    at: str = "2026-08-03T10:00:00Z",
+    commit_id: str | None = None,
+) -> dict:
+    """A comment in the shape `/code-review <depth> --comment <PR>` leaves behind.
+
+    `commit_id` defaults to something DIFFERENT from `original_commit_id` on purpose:
+    GitHub re-anchors `commit_id` as a PR advances, so any test that accidentally
+    passes by reading it would be pinning the false-green bug rather than the fix.
+    """
+    return {
+        "original_commit_id": sha,
+        "commit_id": commit_id if commit_id is not None else OTHER_SHA,
+        "in_reply_to_id": in_reply_to,
+        "updated_at": at,
+        "created_at": at,
+        "body": "This dereferences `machine` before the null check.",
+    }
+
+
 def thread(*, resolved: bool, author: str) -> dict:
     return {
         "isResolved": resolved,
@@ -69,22 +103,28 @@ def thread(*, resolved: bool, author: str) -> dict:
 def gate_env(
     *,
     comment_pages: list[list[dict]] | None = None,
+    review_comment_pages: list[list[dict]] | None = None,
     threads: list[dict] | None = None,
     head_sha: str = HEAD_SHA,
 ) -> Iterator[dict]:
     """Yield an env dict wiring a fake `gh` that answers every call the gates make.
 
     The stub dispatches on the joined argument string rather than parsing flags — it
-    only needs to distinguish the four shapes `_pr-gates.sh` actually issues.
+    only needs to distinguish the five shapes `_pr-gates.sh` actually issues. The two
+    comment endpoints are distinct: `issues/<pr>/comments` carries the review markers,
+    `pulls/<pr>/comments` the inline review comments (PP-97tt).
 
-    `comment_pages` is a LIST OF PAGES, emitted as separate concatenated JSON arrays
+    Both `*_pages` args are LISTS OF PAGES, emitted as separate concatenated JSON arrays
     exactly as `gh api --paginate` does. A single-page list is the common case; a
-    multi-page one exercises the `jq -rs` slurp the marker lookup depends on.
+    multi-page one exercises the `jq -s` slurp both lookups depend on.
     """
     with tempfile.TemporaryDirectory() as tmp:
         tmp_path = Path(tmp)
         (tmp_path / "comments.json").write_text(
             "\n".join(json.dumps(page) for page in (comment_pages or [[]]))
+        )
+        (tmp_path / "review-comments.json").write_text(
+            "\n".join(json.dumps(page) for page in (review_comment_pages or [[]]))
         )
         (tmp_path / "threads.json").write_text(
             json.dumps(
@@ -115,6 +155,7 @@ def gate_env(
             '  *"nameWithOwner"*) printf "acme/widget\\n" ;;\n'
             '  *"api graphql"*) cat "$STUB_THREADS" ;;\n'
             '  *"/issues/"*"/comments"*) cat "$STUB_COMMENTS" ;;\n'
+            '  *"/pulls/"*"/comments"*) cat "$STUB_REVIEW_COMMENTS" ;;\n'
             '  *) printf "UNEXPECTED gh call: %s\\n" "$args" >&2; exit 1 ;;\n'
             "esac\n"
         )
@@ -126,6 +167,7 @@ def gate_env(
         env["PATH"] = f"{tmp}{os.pathsep}{env.get('PATH', '')}"
         env["STUB_HEAD_SHA"] = head_sha
         env["STUB_COMMENTS"] = str(tmp_path / "comments.json")
+        env["STUB_REVIEW_COMMENTS"] = str(tmp_path / "review-comments.json")
         env["STUB_THREADS"] = str(tmp_path / "threads.json")
         yield env
 
@@ -283,6 +325,110 @@ def test_a_comment_merely_mentioning_the_marker_is_not_one() -> None:
     assert result.returncode != 0, result.stdout
 
 
+# --- Inline review comments as review evidence (PP-97tt) ----------------------------
+
+
+def test_review_comments_pinning_head_pass_the_gate() -> None:
+    """The point of `--comment`: a review that found something attests itself.
+
+    Without this the findings sat on the PR while the gate still read `unreviewed`,
+    waiting on an agent to notice and post a marker.
+    """
+    with gate_env(review_comment_pages=[[review_comment(HEAD_SHA)]]) as env:
+        result = run_gate("check_review_happened", env)
+    assert result.returncode == 0, result.stdout
+    assert "PASS: reviewed: inline review comments pin head" in result.stdout
+
+
+def test_commit_id_is_never_read_in_place_of_original_commit_id() -> None:
+    """The false-green this design turns on.
+
+    GitHub re-anchors `commit_id` to keep a still-applicable comment attached to a live
+    line, so a gate reading it would find every review comment pinning head forever and
+    wave through commits nobody read. Here the comment was made on an OLD commit and
+    GitHub has re-anchored it to head; the honest answer is still `stale_comments`.
+    """
+    with gate_env(
+        review_comment_pages=[[review_comment(OTHER_SHA, commit_id=HEAD_SHA)]]
+    ) as env:
+        result = run_gate("check_review_happened", env)
+    assert result.returncode != 0, result.stdout
+    assert "FAIL: reviewed:" in result.stdout
+    assert OTHER_SHA[:7] in result.stdout, result.stdout
+
+
+def test_a_reply_does_not_attest_the_head_it_was_written_at() -> None:
+    """The accidental self-attestation this excludes.
+
+    A reply is created against whatever head is current, so an agent that pushes a fix
+    and then answers the thread it just addressed would re-green the gate on a commit no
+    reviewer has seen. Only top-level comments count as someone reading the diff.
+    """
+    with gate_env(
+        review_comment_pages=[
+            [
+                review_comment(OTHER_SHA),
+                review_comment(HEAD_SHA, in_reply_to=90210),
+            ]
+        ]
+    ) as env:
+        result = run_gate("check_review_happened", env)
+    assert result.returncode != 0, result.stdout
+    assert OTHER_SHA[:7] in result.stdout, result.stdout
+
+
+def test_review_comments_on_an_earlier_commit_report_stale_comments() -> None:
+    """Distinct from `stale_marker` because the remedy differs.
+
+    A stale marker is cleared by re-attesting; stale comments only by getting the new
+    head reviewed, and the gate says so rather than pointing at the wrong command.
+    """
+    with gate_env(review_comment_pages=[[review_comment(OTHER_SHA)]]) as env:
+        result = run_gate("check_review_happened", env)
+    assert result.returncode != 0, result.stdout
+    assert "the review comments pin" in result.stdout
+    assert "Resolving those threads does not re-attest" in result.stdout
+
+
+def test_review_comments_on_a_later_page_are_still_found() -> None:
+    """`gh api --paginate` emits one array per page; a naive parse sees only the first.
+
+    Same trap the marker lookup already guards against, and a busy PR is exactly where
+    a review comment ends up on page 2.
+    """
+    pages = [[review_comment(OTHER_SHA)], [review_comment(HEAD_SHA)]]
+    with gate_env(review_comment_pages=pages) as env:
+        result = run_gate("check_review_happened", env)
+    assert result.returncode == 0, result.stdout
+
+
+def test_a_marker_pinning_head_outranks_stale_comments() -> None:
+    """Precedence is fixed, not newest-wins.
+
+    The two clocks are not comparable — a marker's `updated_at` moves when the sticky
+    comment is rewritten — so ordering by timestamp would make the verdict depend on
+    which unrelated edit happened last.
+    """
+    with gate_env(
+        comment_pages=[[marker_comment(HEAD_SHA, depth="high")]],
+        review_comment_pages=[[review_comment(OTHER_SHA)]],
+    ) as env:
+        result = run_gate("check_review_happened", env)
+        state, sha, depth, _at, _summary = review_record(env)
+    assert result.returncode == 0, result.stdout
+    assert (state, sha, depth) == ("marker", HEAD_SHA, "high")
+
+
+def test_review_comments_record_their_count_not_one_row_each() -> None:
+    """A six-finding review is one review. The handoff report says so."""
+    with gate_env(
+        review_comment_pages=[[review_comment(HEAD_SHA) for _ in range(6)]]
+    ) as env:
+        state, sha, depth, _at, summary = review_record(env)
+    assert (state, sha, depth) == ("commented", HEAD_SHA, "unrecorded")
+    assert "6 inline review comment(s)" in summary
+
+
 # --- Threads gate: author-agnostic --------------------------------------------------
 
 
@@ -332,13 +478,13 @@ def test_thread_failure_names_the_two_ways_to_clear_it() -> None:
 # --- Marker record: the extra fields merge-handoff.sh reports -----------------------
 
 
-def marker_record(env: dict) -> list[str]:
-    """`_marker_record` for PR 123, split into its five TSV fields."""
+def review_record(env: dict) -> list[str]:
+    """`_review_record` for PR 123, split into its five TSV fields."""
     result = subprocess.run(
         [
             "bash",
             "-c",
-            f'source "{GATES_PATH}"; _marker_record 123 acme/widget {HEAD_SHA}',
+            f'source "{GATES_PATH}"; _review_record 123 acme/widget {HEAD_SHA}',
         ],
         capture_output=True,
         text=True,
@@ -349,14 +495,14 @@ def marker_record(env: dict) -> list[str]:
     return result.stdout.rstrip("\n").split("\t")
 
 
-def test_marker_record_reports_the_review_depth() -> None:
+def test_review_record_reports_the_review_depth() -> None:
     """Which /code-review ran is a separate fact from whether one ran.
 
     Before PP-9onv only the second was written down, so the merge handoff could not
     state the first without an agent recalling it.
     """
     with gate_env(comment_pages=[[marker_comment(HEAD_SHA, depth="high")]]) as env:
-        state, sha, depth, at, summary = marker_record(env)
+        state, sha, depth, at, summary = review_record(env)
     assert (state, sha, depth) == ("marker", HEAD_SHA, "high")
     assert at == "2026-08-02T20:43:19Z"
     assert "/code-review high" in summary
@@ -369,14 +515,14 @@ def test_a_marker_without_a_depth_comment_reads_as_unrecorded() -> None:
     as no review at all) would misreport a real review of a real head.
     """
     with gate_env(comment_pages=[[marker_comment(HEAD_SHA)]]) as env:
-        state, _sha, depth, _at, _summary = marker_record(env)
+        state, _sha, depth, _at, _summary = review_record(env)
     assert (state, depth) == ("marker", "unrecorded")
 
 
 def test_trivial_is_recorded_as_its_own_depth() -> None:
     """The typo/one-line carve-out the gate docs allow, made legible in the handoff."""
     with gate_env(comment_pages=[[marker_comment(HEAD_SHA, depth="trivial")]]) as env:
-        _state, _sha, depth, _at, summary = marker_record(env)
+        _state, _sha, depth, _at, summary = review_record(env)
     assert depth == "trivial"
     assert "trivial" in summary
 
@@ -406,12 +552,12 @@ def test_record_and_gate_cannot_disagree_about_the_head(
     merge-pr.sh refused it (or worse, the other way round).
     """
     with gate_env(comment_pages=[comments]) as env:
-        state, sha, _depth, _at, _summary = marker_record(env)
+        state, sha, _depth, _at, _summary = review_record(env)
         verdict = subprocess.run(
             [
                 "bash",
                 "-c",
-                f'source "{GATES_PATH}"; _marker_verdict 123 acme/widget {HEAD_SHA}',
+                f'source "{GATES_PATH}"; _review_verdict 123 acme/widget {HEAD_SHA}',
             ],
             capture_output=True,
             text=True,

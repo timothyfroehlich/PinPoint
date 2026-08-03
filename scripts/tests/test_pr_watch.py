@@ -19,11 +19,13 @@ reporting a failure for something that was not one.
    a healthy run whose jobs were all still pending. "We could not find out" is
    not a verdict. (PP-qkl8)
 
-Review state (PP-4ric): Copilot review was retired on 2026-08-02, so no bot
-reviews this repo. `--check-ready` reports which of three marker states a PR is
-in without gating on it — "reviewed", "reviewed then pushed past", and "never
-reviewed" need different actions, and flattening `stale_marker` into "reviewed"
-is how a commit nobody read reaches the merge command.
+Review state (PP-4ric, extended by PP-97tt): Copilot review was retired on
+2026-08-02, so no bot reviews this repo. Two things now record that a head was
+reviewed — the SHA-pinned marker, and the inline comments `/code-review
+--comment` posts — and `--check-ready` reports which of the five resulting
+states a PR is in without gating on it. "Reviewed", "reviewed then pushed past",
+and "never reviewed" need different actions, and flattening a stale state into
+"reviewed" is how a commit nobody read reaches the merge command.
 
 Everything is mocked at the `gh` CLI seam (`pr_watch.gh`) — these tests never
 reach GitHub (CORE-TEST-006).
@@ -93,6 +95,20 @@ def marker_comment(sha=HEAD_SHA):
     return {"body": f"<!-- pinpoint-claude-review: {sha} -->\nClaude review of head"}
 
 
+def review_comment(sha=HEAD_SHA, *, in_reply_to=None):
+    """An inline finding, as `/code-review <depth> --comment <PR>` leaves it.
+
+    `commit_id` deliberately differs from `original_commit_id`: GitHub re-anchors
+    the former as the PR advances, so reading it would report every review
+    comment as pinning head forever.
+    """
+    return {
+        "original_commit_id": sha,
+        "commit_id": "1" * 40,
+        "in_reply_to_id": in_reply_to,
+    }
+
+
 def make_gh(
     *,
     rollup=(),
@@ -101,14 +117,17 @@ def make_gh(
     threads=(),
     labels=(),
     issue_comments=(),
+    review_comments=(),
 ):
     """Build a fake `gh` that answers every call pr-watch makes.
 
     Records each invocation on `.calls` so tests can assert what was queried.
 
-    `issue_comments` is what `review_state` reads. It defaults to empty — the
-    `unreviewed` state — which is deliberate: `unreviewed` is reported but does
-    NOT gate readiness, so tests that don't care about the review stay unaffected.
+    `issue_comments` and `review_comments` are the two evidence sources
+    `review_state` reads (PP-97tt) — markers on the issues endpoint, inline
+    findings on the pulls one. Both default to empty, the `unreviewed` state,
+    which is deliberate: `unreviewed` is reported but does NOT gate readiness, so
+    tests that don't care about the review stay unaffected.
     """
 
     def fake_gh(*args: str) -> str:
@@ -130,6 +149,8 @@ def make_gh(
                 return json.dumps({"headRefOid": HEAD_SHA})
         if args[:2] == ("api", "--paginate"):
             path = args[2]
+            if "/pulls/" in path and "/comments" in path:
+                return json.dumps(list(review_comments))
             if "/comments" in path:
                 return json.dumps(list(issue_comments))
         if args[:2] == ("api", "graphql"):
@@ -803,12 +824,15 @@ def test_marker_prefix_is_identical_to_the_bash_gate():
 
 
 @pytest.mark.unit
-@pytest.mark.parametrize("state", ["marker", "stale_marker", "unreviewed"])
+@pytest.mark.parametrize(
+    "state",
+    ["marker", "commented", "stale_marker", "stale_comments", "unreviewed"],
+)
 def test_state_vocabulary_is_shared_with_the_bash_gate(state):
-    """Both implementations name the same three states, so reports are comparable.
+    """Both implementations name the same five states, so reports are comparable.
 
     Pinned against the `case` arms of `check_review_happened` rather than the
-    assignments — the bash computes RS_STATE in one step from `_marker_verdict`,
+    assignments — the bash computes RS_STATE in one step from `_review_verdict`,
     so the arms are the only place each name is spelled out.
     """
     arms = re.findall(r"^    (\w+)\)$", GATES_PATH.read_text(), re.M)
@@ -891,6 +915,60 @@ def test_review_state_takes_the_newest_marker(monkeypatch):
         pr_watch,
         "gh",
         make_gh(issue_comments=[marker_comment(OLD_SHA), marker_comment(HEAD_SHA)]),
+    )
+    assert pr_watch.review_state(PR)[0] == "marker"
+
+
+@pytest.mark.unit
+def test_review_state_comments_pinning_head(monkeypatch):
+    """The second evidence kind (PP-97tt), mirroring the bash `commented` state."""
+    monkeypatch.setattr(
+        pr_watch, "gh", make_gh(review_comments=[review_comment(HEAD_SHA)])
+    )
+    state, detail = pr_watch.review_state(PR)
+    assert state == "commented"
+    assert HEAD_SHA[:7] in detail
+
+
+@pytest.mark.unit
+def test_review_state_reads_original_commit_id_not_commit_id(monkeypatch):
+    """The false-green guard, pinned in the mirror as well as the gate.
+
+    `review_comment` sets `commit_id` to something that is not the reviewed SHA
+    precisely so an implementation reading the wrong field fails here rather than
+    reporting a commit nobody read as reviewed.
+    """
+    monkeypatch.setattr(
+        pr_watch, "gh", make_gh(review_comments=[review_comment(OLD_SHA)])
+    )
+    assert pr_watch.review_state(PR)[0] == "stale_comments"
+
+
+@pytest.mark.unit
+def test_review_state_ignores_replies(monkeypatch):
+    """A reply is written at whatever head is current.
+
+    Counting one would let an agent re-attest by answering the thread it just
+    fixed — the exact accident the SHA pin exists to prevent.
+    """
+    monkeypatch.setattr(
+        pr_watch,
+        "gh",
+        make_gh(review_comments=[review_comment(HEAD_SHA, in_reply_to=90210)]),
+    )
+    assert pr_watch.review_state(PR)[0] == "unreviewed"
+
+
+@pytest.mark.unit
+def test_review_state_prefers_the_marker_over_review_comments(monkeypatch):
+    """Fixed precedence, matching the bash. See `_review_record`."""
+    monkeypatch.setattr(
+        pr_watch,
+        "gh",
+        make_gh(
+            issue_comments=[marker_comment(HEAD_SHA)],
+            review_comments=[review_comment(OLD_SHA)],
+        ),
     )
     assert pr_watch.review_state(PR)[0] == "marker"
 

@@ -19,7 +19,7 @@
 
 `REVIEW.md` at the repo root is the canonical review rubric, shared with Antigravity. Read it before launching the code-review skill.
 
-**No bot reviews this repo — Copilot review was retired 2026-08-02 (PP-4ric).** A review covering the head commit is still required to merge, and the reviewer is Tim running `/code-review`, which you cannot launch. Finish your churn first, then hand the branch over; once he has reviewed and you have addressed the findings, attest with `bash scripts/workflow/mark-claude-review.sh <PR> <depth> "<findings>"` (`<depth>` = the `/code-review` level he ran). The marker pins a SHA, so a later push invalidates it. Full rules: `pinpoint-pr-workflow` Phase 3.4.
+**No bot reviews this repo — Copilot review was retired 2026-08-02 (PP-4ric).** A review covering the head commit is still required to merge, and the reviewer is Tim running `/code-review`, which you cannot launch. Finish your churn first, then hand him the command to paste — `/code-review <depth> --comment <PR#>`. `--comment` posts the findings to the PR as inline review comments, which both block the merge until you resolve them and satisfy the `reviewed` gate by pinning head (PP-97tt); the `<PR#>` is required for it to post at all, and `ultra` ignores it. A review that found nothing posts nothing, so attest that case yourself with `bash scripts/workflow/mark-claude-review.sh <PR> <depth> "<findings>"` (`<depth>` = the `/code-review` level he ran). Every kind of evidence pins a SHA, so a later push invalidates it. Full rules: `pinpoint-pr-workflow` Phase 3.4.
 
 ### Sandbox network isolation
 

@@ -51,13 +51,18 @@ Reviewers read agent skills. Consult the relevant one for the area a PR touches 
 
 **Every review on this repo is asked for. No bot reviews it, and nothing fires a review automatically.** GitHub Copilot code review was retired on 2026-08-02 (PP-4ric) — its free tier was too small to review PinPoint's PRs, so quota outages were the normal state. The reviewer is now Tim, running `/code-review` on a branch; Antigravity likewise reviews when he asks.
 
-That did **not** loosen the merge bar. A PR still cannot merge without a review covering its **head commit**, recorded as the author's SHA-pinned marker (`<!-- pinpoint-claude-review: <head_sha> -->`), with every thread resolved. An agent cannot launch `/code-review`, so the author's job is to finish the work, hand the branch over, address the findings, and attest the head that was read:
+That did **not** loosen the merge bar. A PR still cannot merge without a review covering its **head commit**, with every thread resolved. Two things can record that (PP-97tt), and either clears the `reviewed` gate:
 
-```bash
-bash scripts/workflow/mark-claude-review.sh <PR> <depth> "<one-line findings>"
-```
+- **Inline review comments on the head commit.** `/code-review <depth> --comment <PR#>` posts its findings to the PR, and those comments pin the commit the reviewer read. This is the normal case for a review that found something: it attests itself.
+- **The author's SHA-pinned marker** (`<!-- pinpoint-claude-review: <head_sha> -->`), for everything else — a review that found nothing, an `ultra` run (the cloud path can't post comments), or a run without the flag:
 
-The marker pins a SHA, so a later push invalidates it — deliberately, so a 3-commit fixup can't inherit the review of the commit before it. **If you're reviewing, assume the commit you were handed is the one the author intends to be final.** Full author-side rules: `.agents/skills/pinpoint-pr-workflow/SKILL.md` Phase 3.4.
+  ```bash
+  bash scripts/workflow/mark-claude-review.sh <PR> <depth> "<one-line findings>"
+  ```
+
+**If you're reviewing, post your findings as inline comments on the PR** — that is what both blocks the merge until they're addressed and records that you read the diff. A review whose findings live only in a terminal leaves no trace for either gate.
+
+Both pin a SHA, so a later push invalidates them — deliberately, so a 3-commit fixup can't inherit the review of the commit before it. Replies don't count as evidence for the same reason: they're written at whatever head is current, so answering a thread must not re-attest. **If you're reviewing, assume the commit you were handed is the one the author intends to be final.** Full author-side rules: `.agents/skills/pinpoint-pr-workflow/SKILL.md` Phase 3.4.
 
 ## Review mechanics
 

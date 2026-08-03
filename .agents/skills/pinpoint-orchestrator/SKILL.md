@@ -38,7 +38,7 @@ Coordinate multiple subagents working in parallel across isolated git worktrees.
 # including --dry-run. The lead does NOT run it, even to preview gates. Once the PR
 # is ready (label applied, screenshots posted if UI-touching), hand Tim:
 #   ! scripts/workflow/merge-pr.sh <PR> --human
-bash scripts/workflow/mark-claude-review.sh <PR> <depth> "<summary>"  # SHA-pinned review marker — the ONLY thing that satisfies the `reviewed` gate. Attests Tim ran /code-review (or that the change was trivial)
+bash scripts/workflow/mark-claude-review.sh <PR> <depth> "<summary>"  # SHA-pinned review marker — satisfies the `reviewed` gate when the review left no inline comments (found nothing / ran at ultra / trivial change)
 node scripts/workflow/pr-screenshots.mjs <PR>                 # UI-touching PRs: desktop+mobile screenshots, sticky PR comment
 
 # Worktree health — stale-worktrees.sh covers manually created ../pinpoint-worktrees/* ONLY.
@@ -140,11 +140,13 @@ Run `pnpm run check` before returning. Then self-review **by hand**: read your o
 
 A review covering the head commit is still **required** to merge, and **no bot reviews this repo** (PP-4ric). The reviewer is Tim running `/code-review` — which you cannot launch — so getting reviewed is a handoff, not a command you run.
 
-Open the PR whenever you like and watch CI; it costs nothing. Then finish all of it — CI fixes, merge-from-main — stop iterating, and ask Tim for the review. When he has given it and you have addressed the findings, attest the head he reviewed:
+Open the PR whenever you like and watch CI; it costs nothing. Then finish all of it — CI fixes, merge-from-main — stop iterating, and hand Tim the command to paste: `/code-review <depth> --comment <PR#>`. `--comment` posts his findings to the PR as inline review comments, which block the merge until you address them and satisfy the `reviewed` gate by pinning head.
+
+When the review left nothing behind — it found nothing, or he ran `ultra`, which cannot post comments — recording it is yours:
 
 `bash scripts/workflow/mark-claude-review.sh <PR> <depth> "<summary>"`
 
-The marker pins a SHA, so any push after it invalidates it. Re-attesting is right when what you pushed was the review's own findings; anything else needs a fresh `/code-review`. A genuinely trivial change (typo, comment, one-line mechanical fix) can be attested without interrupting Tim — say why it was trivial in the summary. The marker is an attestation that a review happened, never a way to skip one.
+Every kind of evidence pins a SHA, so any push after it invalidates it, and resolving the threads does not re-attest. Re-attesting with the marker is right when what you pushed was the review's own findings; anything else needs a fresh `/code-review`. A genuinely trivial change (typo, comment, one-line mechanical fix) can be attested without interrupting Tim — say why it was trivial in the summary. The marker is an attestation that a review happened, never a way to skip one.
 
 ## Return Format
 
@@ -215,22 +217,21 @@ Or fallback: `gh pr edit <PR> --add-label ready-for-review`.
 
 ### Ensure every PR is reviewed (lead backstop)
 
-The merge bar is unchanged: no PR merges without a review covering the **head commit**, recorded as a SHA-pinned marker (`<!-- pinpoint-claude-review: <head_sha> -->`), with threads resolved. What changed on 2026-08-02 (PP-4ric) is who reviews: **no bot does.** The reviewer is Tim running `/code-review`, which no agent — lead or subagent — can launch.
+The merge bar is unchanged: no PR merges without a review covering the **head commit**, with threads resolved. What changed on 2026-08-02 (PP-4ric) is who reviews: **no bot does.** The reviewer is Tim running `/code-review`, which no agent — lead or subagent — can launch. Two things record that he did (PP-97tt): the SHA-pinned marker (`<!-- pinpoint-claude-review: <head_sha> -->`), or the inline review comments `--comment` posts, which pin head themselves.
 
-That makes the lead's job here a scheduling one. A subagent that finishes and ends leaves a PR sitting unreviewed forever, because there is nothing to wait for. **Check the marker against head:**
+That makes the lead's job here a scheduling one. A subagent that finishes and ends leaves a PR sitting unreviewed forever, because there is nothing to wait for. **Ask the script rather than reconstructing the answer by hand:**
 
 ```bash
-gh pr view <PR> --json headRefOid --jq .headRefOid
-gh api repos/timothyfroehlich/PinPoint/issues/<PR>/comments --jq '.[] | select(.body | startswith("<!-- pinpoint-claude-review:")) | .body' | head -1
+./scripts/workflow/pr-watch.py <PR> --check-ready   # prints a `review` line naming the state
 ```
 
-Before applying `ready-for-review` or handing a PR to Tim for `merge-pr.sh --human`, confirm the marker pins head. If it doesn't, distinguish the cases:
+Before applying `ready-for-review` or handing a PR to Tim for `merge-pr.sh --human`, confirm that line reads `marker` or `commented`. If it doesn't, the state names the case:
 
-**No marker at all** → nobody has reviewed it. Batch it with the other PRs waiting on Tim rather than pinging him per-PR: tell him which branches are ready for `/code-review`, and let him work through them.
+**`unreviewed`** → nobody has reviewed it. Batch it with the other PRs waiting on Tim rather than pinging him per-PR: tell him which branches are ready, and hand him one `/code-review <depth> --comment <PR#>` per branch.
 
-**A marker pinning an older SHA** → someone reviewed it, then pushed past the review. What was pushed decides the fix: if it was the review's own findings, re-attest at the new head and say so in the summary; if it was new work, it needs a fresh `/code-review`.
+**`stale_marker` / `stale_comments`** → someone reviewed it, then pushed past the review. What was pushed decides the fix: if it was the review's own findings, re-attest at the new head with the marker and say so in the summary; if it was new work, it needs a fresh `/code-review`. Note that only the marker clears `stale_comments` — nothing re-posts a reviewer's comments at a new SHA.
 
-**A marker pinning head** → nothing to do. That review is legitimately terminal.
+**`marker` / `commented`** → nothing to do. That review is legitimately terminal.
 
 Don't post a marker to paper over a review nobody ran, and don't ask Tim to `--force`. The `reviewed` gate in `merge-pr.sh` is the hard enforcement — it FAILs on both un-reviewed states and never WAITs, since with no bot in the loop there is no answer already on its way. Satisfying it honestly before handoff is the lead's job.
 

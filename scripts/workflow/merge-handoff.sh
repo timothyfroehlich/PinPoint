@@ -135,7 +135,7 @@ conflict_out=$(check_no_merge_conflict "$pr" 2>&1) || true
 # Review state: which review, how long ago, and what has landed since
 # ---------------------------------------------------------------------------------
 
-record=$(_marker_record "$pr" "$(_repo_slug)" "$head_sha")
+record=$(_review_record "$pr" "$(_repo_slug)" "$head_sha")
 rv_state=$(cut -f1 <<< "$record")
 rv_sha=$(cut -f2 <<< "$record")
 rv_depth=$(cut -f3 <<< "$record")
@@ -143,13 +143,26 @@ rv_at=$(cut -f4 <<< "$record")
 
 # Two of the depths do not name a `/code-review` level, and printing one for them would
 # be this script asserting a review that never ran — in the one place whose whole claim is
-# that nothing here is recalled. Shared by both marker branches: it was duplicated, and
+# that nothing here is recalled. Shared by every branch below: it was duplicated once, and
 # the stale branch was the copy that forgot.
+#
+# Inline review comments carry no depth at all, so they land on `unrecorded` too. Which
+# `/code-review` level Tim ran is not recoverable from what GitHub stores — the honest
+# report is that the level is unknown, not a guess that reads like a fact. Attesting with
+# mark-claude-review.sh alongside is what puts the level on the record.
 depth_phrase() {
   case "$1" in
     trivial) printf 'attested trivial (no /code-review run)\n' ;;
-    unrecorded) printf 'depth unrecorded (marker predates PP-9onv)\n' ;;
+    unrecorded) printf 'depth unrecorded\n' ;;
     *) printf '/code-review %s\n' "$1" ;;
+  esac
+}
+
+# What produced the evidence, so the report never implies a marker where there is none.
+source_phrase() {
+  case "$1" in
+    marker | stale_marker) printf 'review marker\n' ;;
+    *) printf 'inline review comments\n' ;;
   esac
 }
 
@@ -157,25 +170,25 @@ review_desc=""
 since_review_from=""
 since_review_note=""
 case "$rv_state" in
-  marker)
-    review_desc="$(depth_phrase "$rv_depth") · ${rv_at} · covers head ${short_head}"
+  marker | commented)
+    review_desc="$(source_phrase "$rv_state") · $(depth_phrase "$rv_depth") · ${rv_at} · covers head ${short_head}"
     ;;
-  stale_marker)
+  stale_marker | stale_comments)
     # "How many revisions back" only has an answer when the reviewed commit is still an
     # ancestor of head. After a force-push it is not, and the honest report is that the
     # distance is unknowable — not a number computed from an unrelated commit.
     if git cat-file -e "${rv_sha}^{commit}" 2>/dev/null \
       && git merge-base --is-ancestor "$rv_sha" "$head_sha" 2>/dev/null; then
       behind=$(git rev-list --count "${rv_sha}..${head_sha}")
-      review_desc="$(depth_phrase "$rv_depth") · ${rv_at} · STALE: ${behind} commit(s) back, reviewed ${rv_sha:0:7}, head is ${short_head}"
+      review_desc="$(source_phrase "$rv_state") · $(depth_phrase "$rv_depth") · ${rv_at} · STALE: ${behind} commit(s) back, reviewed ${rv_sha:0:7}, head is ${short_head}"
       since_review_from=$rv_sha
     else
-      review_desc="$(depth_phrase "$rv_depth") · ${rv_at} · STALE: reviewed ${rv_sha:0:7}, not an ancestor of head (force-push?)"
+      review_desc="$(source_phrase "$rv_state") · $(depth_phrase "$rv_depth") · ${rv_at} · STALE: reviewed ${rv_sha:0:7}, not an ancestor of head (force-push?)"
       since_review_note="unknowable — the reviewed commit is not an ancestor of head"
     fi
     ;;
   *)
-    review_desc="NONE — no review marker on this PR"
+    review_desc="NONE — no review marker or review comments on this PR"
     ;;
 esac
 
@@ -245,7 +258,7 @@ elif [[ -n "$since_review_note" ]]; then
   # compare against" here would contradict the review line two rows above, which names
   # the reviewed SHA.
   diff_since_review=$since_review_note
-elif [[ "$rv_state" == "marker" ]]; then
+elif [[ "$rv_state" == "marker" || "$rv_state" == "commented" ]]; then
   diff_since_review="none — the review covers head"
 else
   diff_since_review="n/a — nothing reviewed to compare against"
@@ -390,7 +403,9 @@ add_block() { blocking+=("$1"); }
 if [[ "$(gate_token "$ci_out")" != "PASS" ]]; then add_block "ci: $(gate_state "$ci_out")"; fi
 if [[ "$(gate_token "$threads_out")" != "PASS" ]]; then add_block "threads: $(gate_state "$threads_out")"; fi
 if [[ "$(gate_token "$conflict_out")" != "PASS" ]]; then add_block "no_conflict: $(gate_state "$conflict_out")"; fi
-if [[ "$rv_state" != "marker" ]]; then add_block "reviewed: ${rv_state} — Tim runs /code-review, then the agent attests"; fi
+if [[ "$rv_state" != "marker" && "$rv_state" != "commented" ]]; then
+  add_block "reviewed: ${rv_state} — Tim runs \`/code-review <depth> --comment ${pr}\`, or the agent attests"
+fi
 if [[ "$is_draft" == "true" ]]; then add_block "draft: flip to ready-for-review"; fi
 if [[ "$pr_state" != "OPEN" ]]; then add_block "state: PR is ${pr_state}, not open"; fi
 # The gate answers came from `gh` at one SHA and the diff from git at another, so no

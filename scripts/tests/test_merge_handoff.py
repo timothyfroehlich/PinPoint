@@ -65,13 +65,17 @@ def write(repo: Path, path: str, body: str) -> None:
 class Scenario:
     """What the stubbed GitHub says about the PR. Defaults describe a mergeable PR.
 
-    `review` names WHICH commit the marker pins, rather than a SHA: commit hashes depend
-    on commit time, so a fixture built twice does not produce the same head, and a test
-    that hard-codes one would attest a commit that no longer exists.
+    `review` names WHICH commit the evidence pins, rather than a SHA: commit hashes
+    depend on commit time, so a fixture built twice does not produce the same head, and a
+    test that hard-codes one would attest a commit that no longer exists.
 
-      "head"      the marker covers head — the reviewed case
-      "previous"  the marker covers head~1 — a commit was pushed after the review
-      "orphan"    the marker pins a commit unrelated to the branch — post-force-push
+      "head"      the evidence covers head — the reviewed case
+      "previous"  the evidence covers head~1 — a commit was pushed after the review
+      "orphan"    the evidence pins a commit unrelated to the branch — post-force-push
+
+    `review_kind` picks which of the two evidence shapes the stub produces (PP-97tt):
+    `"marker"` for the sticky mark-claude-review.sh comment, `"comments"` for the inline
+    review comments `/code-review --comment` posts.
     """
 
     ci_status: str = "COMPLETED"
@@ -80,6 +84,7 @@ class Scenario:
     state: str = "OPEN"
     draft: bool = False
     review: str | None = None
+    review_kind: str = "marker"
     review_depth: str = "medium"
     gh_head: str = "head"
     threads: list[dict] = field(default_factory=list)
@@ -96,6 +101,22 @@ def marker(sha: str, depth: str = "medium") -> dict:
             f"Claude review of head {sha[:7]} — `/code-review {depth}` — no serious findings"
         ),
         "updated_at": "2026-08-02T20:43:19Z",
+    }
+
+
+def review_comment(sha: str) -> dict:
+    """One inline finding, as `/code-review <depth> --comment <PR>` leaves it.
+
+    `commit_id` is deliberately NOT `sha`: GitHub re-anchors it as the PR advances, and
+    the record must read `original_commit_id` or every review comment pins head forever.
+    """
+    return {
+        "original_commit_id": sha,
+        "commit_id": "1" * 40,
+        "in_reply_to_id": None,
+        "updated_at": "2026-08-03T10:00:00Z",
+        "created_at": "2026-08-03T10:00:00Z",
+        "body": "This dereferences `machine` before the null check.",
     }
 
 
@@ -169,13 +190,17 @@ def repo_with_pr(
         git("push", "-q", "origin", f"HEAD:refs/pull/{PR}/head", cwd=work)
 
         comments = list(scenario.comments)
+        review_comments: list[dict] = []
         if scenario.review is not None:
             reviewed = {
                 "head": head_sha,
                 "previous": git("rev-parse", "HEAD~1", cwd=work),
                 "orphan": "0" * 40,
             }[scenario.review]
-            comments.append(marker(reviewed, depth=scenario.review_depth))
+            if scenario.review_kind == "marker":
+                comments.append(marker(reviewed, depth=scenario.review_depth))
+            else:
+                review_comments.append(review_comment(reviewed))
 
         meta = {
             "number": PR,
@@ -219,6 +244,7 @@ def repo_with_pr(
         (tmp_path / "rollup.json").write_text(rollup)
         (tmp_path / "threads.json").write_text(json.dumps(threads_payload))
         (tmp_path / "comments.json").write_text(json.dumps(comments))
+        (tmp_path / "review-comments.json").write_text(json.dumps(review_comments))
 
         # Dispatches on the joined argument string, most specific first: `gh pr view`
         # carries a different --json set per caller and they must not collide.
@@ -233,6 +259,7 @@ def repo_with_pr(
             '  *"--jq .headRefOid"*) jq -r .headRefOid "$STUB_META" ;;\n'
             '  *"pr view"*) cat "$STUB_META" ;;\n'
             '  *"api graphql"*) cat "$STUB_THREADS" ;;\n'
+            '  *"/pulls/"*"/comments"*) cat "$STUB_REVIEW_COMMENTS" ;;\n'
             '  *"/comments"*) cat "$STUB_COMMENTS" ;;\n'
             '  *) printf "UNEXPECTED gh call: %s\\n" "$args" >&2; exit 1 ;;\n'
             "esac\n"
@@ -249,6 +276,7 @@ def repo_with_pr(
             "STUB_ROLLUP": str(tmp_path / "rollup.json"),
             "STUB_THREADS": str(tmp_path / "threads.json"),
             "STUB_COMMENTS": str(tmp_path / "comments.json"),
+            "STUB_REVIEW_COMMENTS": str(tmp_path / "review-comments.json"),
             "STUB_MERGEABLE": scenario.mergeable,
         }
         run = subprocess.run(
@@ -555,9 +583,7 @@ def test_the_race_is_detected_by_sha_not_by_a_missing_object() -> None:
     "depth,expected",
     [
         pytest.param("trivial", "attested trivial (no /code-review run)", id="trivial"),
-        pytest.param(
-            "unrecorded", "depth unrecorded (marker predates PP-9onv)", id="unrecorded"
-        ),
+        pytest.param("unrecorded", "depth unrecorded", id="unrecorded"),
     ],
 )
 def test_a_stale_marker_does_not_invent_a_code_review_level(
@@ -576,6 +602,50 @@ def test_a_stale_marker_does_not_invent_a_code_review_level(
     ) as (_head, run):
         assert expected in run.stdout, run.stdout
         assert f"/code-review {depth}" not in run.stdout
+
+
+# --- Review comments as evidence (PP-97tt) ------------------------------------------
+
+
+def test_review_comments_covering_head_report_as_reviewed() -> None:
+    """`/code-review --comment` findings are evidence in their own right.
+
+    The report must say so, and must not print the merge command's absence — a PR whose
+    findings are posted and threads resolved is mergeable.
+    """
+    with repo_with_pr(
+        branch_changes={"src/lib/thing.ts": "x\n"},
+        scenario=Scenario(review="head", review_kind="comments"),
+    ) as (_head, run):
+        assert "inline review comments" in run.stdout, run.stdout
+        assert "covers head" in run.stdout, run.stdout
+        assert "NOT MERGEABLE YET" not in run.stdout, run.stdout
+
+
+def test_review_comments_never_name_a_code_review_level() -> None:
+    """Which depth Tim ran is not recoverable from what GitHub stores.
+
+    Guessing one would put a claim in the handoff report that reads exactly like a fact
+    the script computed. `mark-claude-review.sh` alongside is what records the level.
+    """
+    with repo_with_pr(
+        branch_changes={"src/lib/thing.ts": "x\n"},
+        scenario=Scenario(review="head", review_kind="comments"),
+    ) as (_head, run):
+        assert "depth unrecorded" in run.stdout, run.stdout
+        assert "/code-review " not in run.stdout.split("NOT MERGEABLE")[0], run.stdout
+
+
+def test_stale_review_comments_report_the_distance_like_a_stale_marker() -> None:
+    """Same trap, same reporting: the PR visibly has a review and is not reviewed."""
+    with repo_with_pr(
+        branch_changes={"src/lib/thing.ts": "x\n"},
+        extra_branch_commit={"src/lib/other.ts": "y\n"},
+        scenario=Scenario(review="previous", review_kind="comments"),
+    ) as (_head, run):
+        assert "inline review comments" in run.stdout, run.stdout
+        assert "STALE: 1 commit(s) back" in run.stdout, run.stdout
+        assert "NOT MERGEABLE YET" in run.stdout, run.stdout
 
 
 def test_an_unknowable_review_distance_does_not_read_as_no_review() -> None:
