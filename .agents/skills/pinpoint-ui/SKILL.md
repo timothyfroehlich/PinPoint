@@ -28,7 +28,7 @@ Use this skill when:
 2. **Honest failure** (CORE-ARCH-012): a control that cannot perform its action must not report that it did — never a success confirmation for input that could not have been collected. There is no no-JS requirement.
 3. **shadcn/ui only**: No MUI components
 4. **Direct Server Action references** (CORE-ARCH-005): No inline wrappers in forms
-5. **Dropdown Server Actions**: Use `onSelect`, not forms — `pinpoint-design-bible` §17 has the reason
+5. **Dropdown Server Actions** (CORE-ARCH-006): Use `onSelect`, not forms
 6. **Tailwind CSS v4 + semantic tokens**: Use `bg-primary`, `text-destructive`, etc. — no raw palette classes (`bg-cyan-500`, `text-red-500`) and no hardcoded hex (enforced via ESLint `better-tailwindcss/no-restricted-classes`)
 7. **TooltipProvider is hoisted**: `<TooltipProvider>` is mounted once in `ClientProviders` — don't add nested providers. See `pinpoint-design-bible` §12.
 8. **Baseline Widely available is the floor** (CORE-UI-005): use `<dialog>`, container queries, `:has()`, `:user-invalid`, `inert`, `aspect-ratio`, `fetchpriority`, native form validation directly — no polyfills. Newly-available features (Popover API, View Transitions, anchor positioning) require a per-feature opt-in in `pinpoint-design-bible` §19. Never trust a cached Baseline date — look it up live (`references/browser-support.md`).
