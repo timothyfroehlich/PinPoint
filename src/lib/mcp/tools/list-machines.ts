@@ -106,7 +106,7 @@ const listMachinesSchema = z.object({
     .min(0)
     .optional()
     .describe(
-      "How many matches to skip, for paging past the limit. Machines are ordered by name, so a stable full listing is offset 0, then offset+limit until 'hasMore' is false."
+      "How many matches to skip, for paging past the limit. Machines are ordered by name, then by initials to break ties between duplicate cabinets of the same title — a total order, so paging from offset 0 by offset+limit until 'hasMore' is false visits every match exactly once."
     ),
 });
 
@@ -156,7 +156,15 @@ export async function runListMachines(
         ownerId: true,
         invitedOwnerId: true,
       },
-      orderBy: (m, { asc }) => [asc(m.name)],
+      // `initials` breaks ties on `name`, and it is unique (it is the FK target
+      // for issues.machineInitials), so this is a TOTAL order. Sorting on name
+      // alone leaves rows with equal names in an order Postgres is free to vary
+      // between queries — and paging by offset issues one query per page. The
+      // collection has duplicate same-title cabinets on purpose, so two
+      // "Medieval Madness" straddling a page boundary could come back twice
+      // while a third machine is never returned at all: a sweep that reports
+      // itself complete while silently skipping a machine (CORE-ARCH-012).
+      orderBy: (m, { asc }) => [asc(m.name), asc(m.initials)],
       limit,
       offset,
     }),

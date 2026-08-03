@@ -344,9 +344,11 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
         const expectedUnlinked: string[] = [];
         for (let i = 0; i < 110; i += 1) {
           const initials = nextInitials();
-          // Distinct names: the page order is `asc(name)`, so ties would make
-          // offset paging non-deterministic and the test flaky.
-          const name = `Fleet ${String(i).padStart(3, "0")}`;
+          // Eight cabinets share each title. Duplicate same-title cabinets are
+          // real in this collection, and 8 does not divide the page size of 25,
+          // so every page boundary lands INSIDE a tie group — which is the only
+          // arrangement that can catch an unstable sort.
+          const name = `Fleet Title ${String(Math.floor(i / 8)).padStart(2, "0")}`;
           if (i % 5 === 0) {
             rows.push({ name, initials, pinballmapMachineId: 900_000 + i });
           } else if (i % 17 === 0) {
@@ -356,7 +358,11 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
             expectedUnlinked.push(initials);
           }
         }
-        await db.insert(machines).values(rows);
+        // Inserted in reverse, so within every tie group the heap order is the
+        // OPPOSITE of the order the tool must return. Without a tiebreaker
+        // Postgres is free to hand back the heap order, and the sweep below
+        // sees one cabinet twice while another never appears.
+        await db.insert(machines).values([...rows].reverse());
 
         const seen: string[] = [];
         const limit = 25;
@@ -378,8 +384,43 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
         // The count query and the page query must share the filter — a total
         // that outruns what paging can reach is a loop that never terminates.
         expect(total).toBe(expectedUnlinked.length);
+        // No repeats, and no gaps. Set equality is the assertion that matters:
+        // a sweep can return the right NUMBER of rows while having handed back
+        // one machine twice and skipped another, and that failure reports
+        // itself as a completed pass.
         expect(new Set(seen).size).toBe(seen.length);
         expect([...seen].sort()).toEqual([...expectedUnlinked].sort());
+      });
+
+      it("breaks name ties by initials, so a paged sweep is a total order", async () => {
+        const admin = await makeUser("admin");
+        const db = await getTestDb();
+
+        // Six cabinets, one title. `name` is not a unique key in this
+        // collection — duplicate same-title cabinets are a supported case (see
+        // the PinballMap tie guard, PP-o355.15).
+        const expected = Array.from({ length: 6 }, () => nextInitials()).sort();
+        await db
+          .insert(machines)
+          .values(
+            [...expected]
+              .reverse()
+              .map((initials) => ({ name: "Medieval Madness", initials }))
+          );
+
+        const seen: string[] = [];
+        for (let offset = 0; offset < expected.length; offset += 2) {
+          const page = await list(
+            { pinballmap: "unlinked", limit: 2, offset },
+            admin
+          );
+          seen.push(...page.machines.map((m) => m.initials));
+        }
+
+        // Every page boundary falls inside the tie group, so an order that is
+        // only stable within a single query — not across the separate queries
+        // paging actually issues — shows up here as a duplicate plus a miss.
+        expect(seen).toEqual(expected);
       });
     });
   });
