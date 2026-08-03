@@ -10,6 +10,8 @@ Usage: ./scripts/workflow/agy_review.py [--pro | --model M] [--dry-run]
                    writes no marker.
   --keep-worktree  Leave the ephemeral checkout on disk for debugging.
   --verbose        Echo the prompt and the raw agy envelope.
+  --at SHA         Replay an earlier commit of the PR (forces --dry-run). For
+                   measuring detection against a head whose findings are known.
 
 `agy` is the reviewer; this script is the only thing that talks to GitHub. It checks the
 PR head into a throwaway worktree, lets agy loose in it, validates what comes back, posts
@@ -18,40 +20,47 @@ the findings as an inline review, and only then writes the SHA-pinned marker tha
 
 ## What agy gets, and why
 
-A real shell in a checkout of the head commit, and the repository's history. It runs
-`git diff` itself, reads `REVIEW.md` and `AGENTS.md` on its own initiative, and can run
-`git blame` or `pnpm run check` to test a claim rather than guess at it.
+Reads, and nothing else. A checkout of the head commit, each changed file's diff sitting
+beside it as `<file>.agy-diff.patch`, and `AGY_REVIEW_BRIEF.md` at the root carrying the
+PR's title, author and current description plus the line ranges a finding may anchor to.
 
-An earlier version of this script gave agy NO shell and pasted the whole diff into the
-prompt. That was built on a misdiagnosis. agy resolves paths through `/proc/self/cwd/`,
-which is invisible to a naive log grep, so its reads looked like they were landing
-outside the workspace when they were landing exactly where they should. What the
-constraint actually bought was a reviewer that could not check history, could not run a
-test, and had a 1,700-line diff crowding out its own reasoning.
+The procedure lives in `.agents/skills/pinpoint-agy-review/SKILL.md`, which the prompt
+names explicitly — skills do NOT auto-activate in headless `-p` mode (measured: matching
+on the skill description never fires), so the prompt stays four lines and everything
+reviewable is a version-controlled file.
 
-## Permissions
+A middle version of this script gave agy a real shell and a curated command allow-list.
+That is abandoned, on evidence:
 
-Configured in `~/.gemini/antigravity-cli/settings.json`, outside this repo. Broad allow,
-targeted deny. The denials that matter:
+- **A denied command ends the run.** Not "the model is told no and adapts" — the CLI
+  shuts the conversation stream down and returns `status: SUCCESS` with an empty
+  response. One denial cost a 52-step review of PR #1810. Upstream documents the
+  opposite ("the run continues, exits 0"); it does not.
+- **Some commands cannot be allowed at all.** A `git diff` scoped to a path containing
+  square brackets is refused even with `command(git)` allowed — bracketed pathspecs
+  defeat any multi-token rule, and PinPoint's dynamic route segments are full of them.
+- **The deny list is not a boundary.** A broader allow silently overrides a narrower
+  deny: with `command(git)` allowed, `git branch` and `git gc` ran despite explicit deny
+  rules. Documented precedence is "Deny > Ask > Allow"; measured behaviour is not.
 
-- `command(gh)` — the wrapper posts. agy must not be able to attest its own review; that
-  separation is the only reason the marker means anything.
-- git's write verbs (`push`, `commit`, `checkout`, `reset`, `branch`, …) — the review
-  worktree is a LINKED worktree whose `.git` points into the real PinPoint repository,
-  and git credentials are ambient. Without these denials a confused reviewer could move
-  refs in the actual repo, no bad intent required. (Observed: agy tried `git checkout
-  <head>` on a worktree already at that commit. Harmless in intent, denied on principle,
-  and the review completed without it.)
+So the permission profile is the one shape that cannot trip the tripwire:
 
-The list is not guessable — headless denials are silent and agy improvises differently
-each run. Run `./scripts/workflow/agy_denied.py` after a review to see what it wanted and
-decide, one rule at a time.
+    "permissions": {
+      "allow": ["read_file(*)"],
+      "deny":  ["command(*)", "write_file(*)"]
+    }
 
-`agy-permissions.reference.json` beside this script is a committed snapshot of a working
-list, so a second machine starts from evidence rather than from trial and error. It is a
-reference, not a source of truth: settings.json is global to the host and is not managed
-from this repo. `trustedWorkspaces` must also contain `~/.cache/pinpoint/agy-review`, or
-agy refuses the review checkout as an untrusted workspace.
+Subagents still work under it (verified) — the skill fans the review out across them,
+one per changed file, which is how a large PR stays reviewable.
+
+Two things this costs, stated plainly: agy cannot consult git history, and cannot run
+`pnpm run check` to test a claim. Both were available in the shell version, and that
+version found strictly less than this one.
+
+`trustedWorkspaces` must contain `~/.cache/pinpoint/agy-review`, or agy refuses the
+review checkout as an untrusted workspace. `agy-permissions.reference.json` beside this
+script records the profile; settings.json is global to the host and is not managed from
+this repo. `./scripts/workflow/agy_denied.py` reports anything agy tried to run anyway.
 
 ## The one guard that cannot be relaxed
 
@@ -109,19 +118,37 @@ AGY_TIMEOUT_SECONDS = 16 * 60
 
 RESPONSE_SCHEMA = {
     "type": "object",
-    "required": ["summary", "findings", "proof"],
+    "required": ["verdict", "summary", "findings", "proof"],
     "properties": {
+        # A one-word ship/no-ship call. It does not drive the merge gate — unresolved
+        # threads and the marker do that — but it makes an empty `findings` array legible:
+        # `approve` says "I looked and found nothing", which is a different claim from a
+        # review that simply failed to produce findings.
+        "verdict": {"type": "string", "enum": ["approve", "needs-attention"]},
         "summary": {"type": "string"},
         "findings": {
             "type": "array",
             "items": {
                 "type": "object",
-                "required": ["path", "line", "side", "severity", "rule", "body"],
+                "required": [
+                    "path",
+                    "line",
+                    "side",
+                    "severity",
+                    "confidence",
+                    "rule",
+                    "body",
+                ],
                 "properties": {
                     "path": {"type": "string"},
                     "line": {"type": "integer"},
                     "side": {"type": "string", "enum": ["RIGHT"]},
                     "severity": {"type": "string", "enum": ["high", "medium", "low"]},
+                    # Self-reported, and the reviewer cannot run anything to check its own
+                    # claim, so a finding that rests on an unread caller should say 0.5
+                    # rather than round up. Rendered beside the severity so the reader can
+                    # triage; never used to silently drop a finding.
+                    "confidence": {"type": "number", "minimum": 0, "maximum": 1},
                     "rule": {"type": ["string", "null"]},
                     "body": {"type": "string"},
                 },
@@ -277,6 +304,23 @@ def validate_findings(findings, hunks):
     return errors
 
 
+def _finding_prefix(finding):
+    """Lead each inline comment with severity, rule and self-reported confidence.
+
+    Confidence is on the comment rather than only in the JSON because the reviewer cannot
+    run anything to check its own claim — a finding that rests on a caller it never read
+    should be visibly less certain than one read straight off the line it points at, and
+    the person triaging threads is the one who needs that.
+    """
+    bits = [finding["severity"]]
+    if finding.get("rule"):
+        bits.append(finding["rule"])
+    confidence = finding.get("confidence")
+    if isinstance(confidence, (int, float)):
+        bits.append(f"confidence {confidence:.0%}")
+    return f"**{' · '.join(bits)}**\n\n"
+
+
 def build_review_payload(result, head_sha, head_moved_to=None):
     """Assemble the GitHub review POST body.
 
@@ -284,6 +328,20 @@ def build_review_payload(result, head_sha, head_moved_to=None):
     `gh` is authed as the same account that opens them.
     """
     body = result["summary"]
+
+    # `.get` rather than `[...]`: the retry continuation carries no schema, so a second
+    # response can legitimately arrive without a verdict. A missing one is rendered as
+    # nothing rather than guessed at — inventing "approve" here would be the one lie this
+    # whole script is built to prevent.
+    verdict = result.get("verdict")
+    if verdict in {"approve", "needs-attention"}:
+        label = (
+            "✅ **approve** — no material findings"
+            if verdict == "approve"
+            else "⚠️ **needs attention**"
+        )
+        body = f"{label}\n\n{body}"
+
     if head_moved_to:
         body = (
             f"> ⚠️ **The branch moved during this review.** These findings cover "
@@ -297,7 +355,7 @@ def build_review_payload(result, head_sha, head_moved_to=None):
             "path": finding["path"],
             "line": finding["line"],
             "side": finding["side"],
-            "body": f"{finding['body']}\n\n{SIGNATURE}",
+            "body": f"{_finding_prefix(finding)}{finding['body']}\n\n{SIGNATURE}",
         }
         for finding in result["findings"]
     ]
@@ -310,67 +368,183 @@ def build_review_payload(result, head_sha, head_moved_to=None):
     }
 
 
-def build_prompt(base_sha, head_sha):
-    """The review prompt. agy fetches the diff itself rather than being handed it.
+SIDECAR_SUFFIX = ".agy-diff.patch"
+BRIEF_NAME = "AGY_REVIEW_BRIEF.md"
+SKILL_RELPATH = ".agents/skills/pinpoint-agy-review/SKILL.md"
 
-    An earlier version inlined the whole diff. That was a workaround for a misdiagnosis:
-    agy resolves paths through `/proc/self/cwd/`, so it reads its workspace perfectly
-    well, and stuffing a 1,700-line diff into the prompt only crowded out the review
-    while denying it git history, blame, and the project's own checks.
+
+def split_diff_by_file(diff_text):
+    """Split one unified diff into `{new_path: that file's diff alone}`.
+
+    Splitting the merge-base diff we already computed — rather than running `git diff`
+    once per file — keeps every sidecar byte-identical to the diff the hunk map and the
+    proof were derived from. A per-file `git diff` could disagree with it (rename
+    detection is computed across the whole diff, not per path), and then a finding could
+    anchor to a line the validator never saw.
     """
-    return f"""You are reviewing a GitHub pull request for the PinPoint repository. Your
-working directory is a checkout of the PR's head commit ({head_sha[:7]}).
+    sections = {}
+    current = None
+    buffer = []
+    for raw in diff_text.splitlines(keepends=True):
+        header = _DIFF_HEADER.match(raw.rstrip("\n"))
+        if header:
+            if current is not None:
+                sections[current] = "".join(buffer)
+            current = header.group("new")
+            buffer = [raw]
+            continue
+        if current is not None:
+            buffer.append(raw)
+    if current is not None:
+        sections[current] = "".join(buffer)
+    return sections
 
-## The change under review
 
-    git diff --merge-base {base_sha} {head_sha}
+def install_skill(worktree):
+    """Copy the review procedure INTO the checkout, over whatever the PR has there.
 
-Run that first. It is the change you are reviewing, and nothing outside it is your
-concern — but you may read anything in the tree, and you should when a change only makes
-sense in context.
+    The worktree is the PR's head commit, so without this the skill is whatever that
+    branch happens to contain — which for any PR branched before the skill landed is
+    nothing at all. agy does not complain about that: told to read a file that is not
+    there, it proceeds on the brief alone and returns a review that looks normal. Every
+    run against PRs #1807/#1809/#1818/#1819 worked exactly that way before this existed.
 
-## What you have
+    Taking it from the reviewer's side is also the only safe direction. A procedure read
+    out of the tree under review is a procedure the PR can edit — a diff that rewrites
+    this file to "return no findings" would be honoured by the reviewer reading it.
 
-A shell, this checkout, and the repository's history. Use them:
+    `REVIEW.md` is deliberately NOT pinned this way: it is the rubric, a PR may legitimately
+    change it, and a change to it should be reviewed against its own new text.
+    """
+    source = Path(__file__).resolve().parents[2] / SKILL_RELPATH
+    if not source.is_file():
+        raise ReviewError(
+            f"the review procedure is missing from this checkout: {source}. "
+            "Nothing was posted — a review without it is not the review this "
+            "script claims to run."
+        )
+    target = worktree / SKILL_RELPATH
+    target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(source, target)
 
-- `REVIEW.md` at the root is the canonical review rubric. Read it — it tells you what to
-  prioritise and what to leave alone.
-- `AGENTS.md` summarises the non-negotiable rules, each citing a `CORE-*` id.
-- `git log`, `git blame` and `git show` are available. If a change looks wrong, check
-  whether it is reverting a deliberate fix.
-- `pnpm run check` (fast, static) and `pnpm run test` (unit) are available. If a claim in
-  the diff is checkable, check it rather than guessing.
-- Some commands are denied — anything that could write to the repository or the network.
-  If one is refused, work around it; do not treat it as a reason to stop.
 
-## Anchoring findings
+def is_generated(path):
+    """True for files a reviewer must not hand-edit, so a sidecar for them is only cost.
 
-Each finding is posted as an inline GitHub review comment, so `line` must be a line that
-appears as an ADDED or CONTEXT line on the RIGHT (new) side of that file's diff. Derive it
-from the hunk headers: `@@ -old,n +new,m @@` covers right-side lines `new` through
-`new + m - 1`. A line GitHub cannot anchor rejects the entire review, so if a problem is
-real but cannot be pinned to a valid right-side line, describe it in `summary` instead.
+    Measured on PR #1818: 2650 of its 5364 changed lines were a single
+    `drizzle/meta/*_snapshot.json`. Handing that to the model spends context on a blob
+    whose only correct review is "it was generated" — and `drizzle/meta` in particular
+    is the one place AGENTS.md forbids editing by hand at all, because the snapshots
+    carry a prevId chain that manual edits corrupt.
 
-## Scope
+    Deliberately narrow: generated artifacts only, not merely large or boring files.
+    Long plan docs and test fixtures stay reviewable — a human wrote them, so a reviewer
+    can have an opinion about them.
+    """
+    return (
+        path.startswith("drizzle/meta/")
+        or path.endswith(".snap")
+        or path in {"pnpm-lock.yaml", "package-lock.json", "yarn.lock"}
+    )
 
-Follow `REVIEW.md`. Prioritise the highest-priority rule violations and genuine
-correctness defects, and cite the `CORE-*` id when a rule applies. Do not comment on
-formatting Prettier, ESLint or oxlint already owns.
 
-An empty `findings` array is a valid and expected result. Do not manufacture nits to
-justify having reviewed — a clean review is a real outcome.
+def write_sidecars(worktree, sections):
+    """Drop each file's patch beside the file itself; return the paths written.
 
-## Proof of reading
+    A reviewer reading `src/lib/foo.ts` finds `src/lib/foo.ts.agy-diff.patch` in the same
+    directory, so "what changed here" never requires scrolling a combined diff to find
+    the right hunk. Deleted files get a sidecar too — the directory still exists, and the
+    removal is reviewable.
+    """
+    written = {}
+    for path, patch in sections.items():
+        if is_generated(path):
+            continue
+        target = worktree / (path + SIDECAR_SUFFIX)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(patch)
+        written[path] = path + SIDECAR_SUFFIX
+    return written
 
-Populate `proof` from the diff command above: `files_changed` is the number of
-`diff --git` lines it prints, and `first_diff_line` is the exact text of the first one.
-This is machine-checked against the real diff, and a mismatch throws the review away —
-so if you could not run the command, say so in `summary` and return no findings rather
-than describing the pull request from memory.
 
-Keep `proof` out of `summary`. `summary` is posted verbatim to the pull request: write it
-as a reviewer addressing the author, with no mention of proof, file counts, or these
-instructions.
+def build_brief(pr, meta, base_sha, head_sha, sections, hunks, proof):
+    """The orientation document agy reads first: what this PR claims to be, and where.
+
+    The PR description is the thing a diff cannot supply — whether the change does what
+    the author says is most of what a review is for, and without it the model can only
+    check the code against itself.
+    """
+    body = (meta.get("body") or "").strip() or "_(no description)_"
+    rows = []
+    for path in sorted(sections):
+        if is_generated(path):
+            continue
+        anchorable = _format_ranges(hunks.get(path, set()))
+        rows.append(f"| `{path}` | `{path}{SIDECAR_SUFFIX}` | {anchorable} |")
+    table = "\n".join(rows)
+
+    # Name the skipped files rather than silently omitting them: a reviewer who can see
+    # 14 files in the PR but 12 in this table would otherwise have to wonder whether the
+    # other two were withheld or missed.
+    generated = [p for p in sorted(sections) if is_generated(p)]
+    generated_note = ""
+    if generated:
+        listed = "\n".join(f"- `{p}`" for p in generated)
+        generated_note = (
+            "\n## Generated — no patch written, do not review\n\n"
+            "These changed, and are counted in `files_changed` below, but they are "
+            "machine-generated. Regenerating them is the only correct edit, so there is "
+            "nothing here to have an opinion about.\n\n" + listed + "\n"
+        )
+
+    return f"""# Review brief — PR #{pr}
+
+**{meta.get("title", "(untitled)")}**
+by {(meta.get("author") or {}).get("login", "unknown")} · {meta.get("url", "")}
+
+- base (merge-base): `{base_sha}`
+- head under review: `{head_sha}`
+
+## What the author says this does
+
+{body}
+
+## Changed files
+
+Each file has its diff against the merge-base beside it. The last column is the
+set of right-side lines a finding may anchor to — anything outside it is rejected
+by GitHub and takes the whole review down with it.
+
+| file | its diff | anchorable lines |
+| :--- | :------- | :--------------- |
+{table}
+{generated_note}
+## proof (copy these back verbatim)
+
+- `files_changed`: {proof["files_changed"]}
+- `first_diff_line`: `{proof["first_diff_line"]}`
+"""
+
+
+def build_prompt(pr, head_sha):
+    """Point agy at the skill and the brief. Everything else lives in those files.
+
+    Skills do not auto-activate in headless `-p` mode — description matching simply does
+    not fire (measured), so the skill has to be named in the prompt. That is the point:
+    the prompt stays a stable four lines and the reviewable content lives in a file under
+    version control, where it can be edited without touching this script.
+    """
+    return f"""Review pull request #{pr} of the PinPoint repository. Your working
+directory is a checkout of its head commit ({head_sha[:7]}).
+
+Read `{SKILL_RELPATH}` in this workspace and follow it exactly. It is the
+procedure for this review — how the diffs are laid out, how to use subagents, how to
+anchor findings, and what to return.
+
+Start with `{BRIEF_NAME}` at the root, then `REVIEW.md`.
+
+You have no shell. Every command is denied and one attempt ends the run, discarding
+the review. Everything you need is a file read.
 """
 
 
@@ -460,6 +634,41 @@ def render_findings_comment(result, head_sha, head_moved_to):
     return "\n".join(lines)
 
 
+def _extract_review_object(response):
+    """Pull the review object out of agy's turn text, wherever in it that lands.
+
+    `response` is the whole assistant turn, not a bare JSON document, and the object's
+    position within it is not stable. Measured on real runs: PR #1818 put the object
+    first and narration after it ("Extra data: line 2"), while PR #1809 narrated three
+    lines of subagent progress and put the object last ("Expecting value: line 1"). Both
+    were complete reviews thrown away by a parse anchored to the start of the string.
+
+    So the discriminator is shape, not position: decode at every `{` and keep the last
+    object carrying both `findings` and `proof`. Last, not first, because the closing
+    object is the agent's final answer if it ever emits more than one. `strict=False`
+    tolerates the raw newlines agy writes inside `summary` (upstream #702).
+
+    Returns None when no such object exists — the caller turns that into a hard failure,
+    since a review that cannot be parsed must never become a marker.
+    """
+    decoder = json.JSONDecoder(strict=False)
+    found = None
+    for index, char in enumerate(response):
+        if char != "{":
+            continue
+        try:
+            candidate, _end = decoder.raw_decode(response, index)
+        except json.JSONDecodeError:
+            continue
+        if (
+            isinstance(candidate, dict)
+            and "findings" in candidate
+            and "proof" in candidate
+        ):
+            found = candidate
+    return found
+
+
 def _require_shape(result):
     """Fail with a legible error rather than a KeyError on a malformed response.
 
@@ -533,7 +742,7 @@ def invoke_agy(
     # Keyed by PR: two concurrent reviews are a plausible use, and a shared filename means
     # the envelope you inspect after a failure may belong to the other run.
     WORKTREE_PARENT.mkdir(parents=True, exist_ok=True)
-    (WORKTREE_PARENT / f"pr-{pr}-agy-envelope.json").write_text(raw)
+    (WORKTREE_PARENT / f"pr-{pr}-{model}-agy-envelope.json").write_text(raw)
     if verbose:
         print(f"--- agy envelope ---\n{raw[:2000]}\n--- end ---", file=sys.stderr)
 
@@ -550,12 +759,25 @@ def invoke_agy(
     if envelope.get("status") != "SUCCESS":
         raise ReviewError(f"agy status was {envelope.get('status')!r}: {raw[:500]}")
 
-    try:
-        result = json.loads(envelope["response"])
-    except (KeyError, json.JSONDecodeError) as exc:
+    response = envelope.get("response") or ""
+    if not response.strip():
+        # agy reports SUCCESS with an empty response when a tool call was refused: the
+        # run does not continue as its docs claim, it ends. Its stderr names the exact
+        # command and the rule that would allow it, so surface that instead of the
+        # envelope — the envelope only says the response was not JSON, which sends you
+        # looking for a parsing bug that isn't there.
         raise ReviewError(
-            f"agy response was not the expected JSON: {raw[:500]}"
-        ) from exc
+            "agy returned an empty response — the run ended early, usually because a "
+            "tool call was denied.\n  agy said: "
+            + (completed.stderr.strip()[:500] or "(nothing on stderr)")
+        )
+
+    result = _extract_review_object(response)
+    if result is None:
+        raise ReviewError(
+            "agy response contained no review object with `findings` and `proof`:\n"
+            f"{response[:500]}"
+        )
 
     return _require_shape(result), envelope.get("conversation_id")
 
@@ -659,14 +881,32 @@ def write_marker(slug, pr, head_sha, depth, summary):
 # ---------------------------------------------------------------------------
 
 
-def review(pr, model, dry_run, keep_worktree, verbose):
+def review(pr, model, dry_run, keep_worktree, verbose, at=None):
     slug = repo_slug()
-    meta = gh_json(["pr", "view", str(pr), "--json", "headRefOid,baseRefName"])
+    meta = gh_json(
+        [
+            "pr",
+            "view",
+            str(pr),
+            "--json",
+            "headRefOid,baseRefName,title,body,url,author",
+        ]
+    )
     head_sha = meta["headRefOid"]
     base_ref = meta["baseRefName"]
-    print(f"PR #{pr} — head {head_sha[:7]}, base {base_ref}, model {model}")
 
     run(["git", "fetch", "origin", f"pull/{pr}/head"])
+
+    if at:
+        # Replay an earlier commit of this PR. The only way to measure detection rate is
+        # against a diff whose real findings are already known, and those live in the
+        # past — at a head someone has since reviewed and fixed. Forced to dry-run: a
+        # review of a superseded commit must never post or write a marker.
+        head_sha = run(["git", "rev-parse", at]).stdout.strip()
+        dry_run = True
+        print(f"replaying {head_sha[:7]} (forced dry-run)")
+
+    print(f"PR #{pr} — head {head_sha[:7]}, base {base_ref}, model {model}")
 
     # Fetch the base branch too, and diff against what was JUST fetched rather than the
     # local remote-tracking ref. A stale `origin/main` gives an older merge-base, so the
@@ -717,12 +957,29 @@ def review(pr, model, dry_run, keep_worktree, verbose):
             f"{sum(len(v) for v in hunks.values())} anchorable line(s)"
         )
 
+        # Lay the change out in the tree instead of in the prompt: one patch beside each
+        # file it belongs to, plus a brief carrying what a diff cannot — the PR's stated
+        # intent. Both are read, not prompted, so the prompt stays short enough that the
+        # model spends its context on the code.
+        install_skill(worktree)
+
+        sections = split_diff_by_file(diff_text)
+        written = write_sidecars(worktree, sections)
+        (worktree / BRIEF_NAME).write_text(
+            build_brief(pr, meta, base_sha, head_sha, sections, hunks, actual_proof)
+        )
+        skipped = len(sections) - len(written)
+        skipped_note = f" ({skipped} generated file(s) skipped)" if skipped else ""
+        print(
+            f"laid out: {len(written)} sidecar patch(es){skipped_note} + {BRIEF_NAME}"
+        )
+
         with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as handle:
             json.dump(RESPONSE_SCHEMA, handle)
             schema_path = Path(handle.name)
 
         try:
-            prompt = build_prompt(base_sha, head_sha)
+            prompt = build_prompt(pr, head_sha)
             if verbose:
                 print(f"--- prompt ---\n{prompt[:1500]}\n--- end ---", file=sys.stderr)
 
@@ -771,8 +1028,10 @@ def review(pr, model, dry_run, keep_worktree, verbose):
         finally:
             schema_path.unlink(missing_ok=True)
 
+        # Under --at the head has "moved" by construction — we chose an older commit
+        # deliberately — so the warning would be noise on every calibration run.
         current_head = head_sha_of(pr)
-        moved = current_head if current_head != head_sha else None
+        moved = None if at else (current_head if current_head != head_sha else None)
         if moved:
             print(f"WARNING: head moved {head_sha[:7]} → {moved[:7]} during the review")
 
@@ -783,7 +1042,7 @@ def review(pr, model, dry_run, keep_worktree, verbose):
         # The full payload is written to disk rather than printed. It embeds every
         # finding body and the summary, and this script is normally run by an agent whose
         # context the dump would otherwise fill for no benefit. `--verbose` opts in.
-        log_path = WORKTREE_PARENT / f"pr-{pr}-payload.json"
+        log_path = WORKTREE_PARENT / f"pr-{pr}-{model}-payload.json"
         log_path.write_text(json.dumps(payload, indent=2))
 
         for finding in result["findings"]:
@@ -859,12 +1118,17 @@ def main(argv=None):
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--keep-worktree", action="store_true")
     parser.add_argument("--verbose", action="store_true")
+    parser.add_argument(
+        "--at", help="review an earlier commit of this PR (forces --dry-run)"
+    )
     args = parser.parse_args(argv)
 
     model = args.model or (PRO_MODEL if args.pro else FLASH_MODEL)
 
     try:
-        return review(args.pr, model, args.dry_run, args.keep_worktree, args.verbose)
+        return review(
+            args.pr, model, args.dry_run, args.keep_worktree, args.verbose, args.at
+        )
     except ReviewError as exc:
         print(f"FAILED: {exc}", file=sys.stderr)
         return 1
