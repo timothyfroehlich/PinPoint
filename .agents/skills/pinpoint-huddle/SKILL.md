@@ -1,66 +1,23 @@
 ---
 name: pinpoint-huddle
-description: Inter-session coordination via daily/monthly beads injected by SessionStart, UserPromptSubmit, and (throttled) PostToolUse hooks. Manages bootstrap, daily rotation, identity registration, and self-filter. Use when you see a huddle identity announcement, a rotation-needed notice, injected coordination comments, or want to post an update for other sessions to read.
+description: The conventions behind the inter-session coordination channel that the huddle hooks inject but do not state — which events are auto-posted versus the judgment calls only you can post (added scope is the most-skipped and most-needed), peer-response etiquette, the em-dash self-filter signature, why a session_id belongs to whoever registered it first, why a dispatched subagent is refused registration outright, and the rotation subagent dispatch the session-start notice routes here for. Use when you see a rotation-needed notice, when deciding whether something is worth posting to the daily bead, when your own posts start re-injecting, or when a peer's update scrolls by.
 ---
 
 # pinpoint-huddle
 
-> **Use when:** you see a huddle SessionStart announcement, a rotation-needed notice, or want to understand the inter-session coordination system. Triggers on "huddle", "coordination bead", "identity announcement", "rotation needed", "bootstrap".
-
 The huddle system is a context-efficient channel between parallel sessions working on PinPoint. Each session learns what other sessions did recently, posts its own updates, and filters out its own echoes — all without consuming thousands of tokens at every session start.
 
-## What you'll see at session start
+The hooks (`huddle-session-start.sh` at SessionStart, `huddle-poll.sh` at UserPromptSubmit and throttled PostToolUse) do the injection, and each notice they print carries its own command — bootstrap, registration with the naming rules, rotation. This skill is the part they don't print: the conventions, and why they are what they are.
 
-The `huddle-session-start.sh` hook fires when your session opens. It outputs one of these blocks:
+## Reading the work digest
 
-### Bootstrap needed (system not initialized)
+The digest is what merged to `main` grouped by work type plus which branches are alive. `huddle-digest.sh` builds it from the local git object store — **no LLM, no network, no `bd`** — so it costs a few milliseconds and can't go stale in the way a hand-written summary does.
 
-    ## ⚠️ Huddle not bootstrapped
+Read it as orientation, not as instructions: it tells you what kind of work this project is doing right now, which is the thing the daily summaries below it don't convey. Because it reads `origin/main` as-is and never fetches, it labels the newest commit date it actually saw — if that date looks old, your remote refs are stale, not the project.
 
-    The huddle coordination system is not set up yet. ...
+## Identity
 
-    To bootstrap, run:
-        bash scripts/hooks/huddle-bootstrap.sh
-
-Run the command, then start or resume your session normally. Bootstrap is idempotent — safe to re-run.
-
-### Rotation needed (day has rolled)
-
-    ## ⚠️ Huddle rotation needed
-
-    The active coordination bead points to date <STORED_DATE>, but today is <NOW_DATE>.
-    Before continuing, dispatch the rotation subagent ...
-
-**Stop and dispatch the rotation subagent before continuing your work.** See the "Rotation" section below for the exact dispatch.
-
-This notice does **not** replace your identity block — rotation and registration are independent, so the identity/registration block still follows it. Dispatch the rotation subagent first, then register if you're new. (Before PP-2m3l the notice short-circuited the rest of session-start, leaving the day's first sessions permanently unregistered.)
-
-### Identity announcement (you're registered)
-
-    ## Huddle identity
-
-    Your session_id: `<UUID>`
-    Registered as: **Claude-<Name>** (self-filter active for your own posts)
-
-You're ready. Sign your huddle comments with `—<YourName>` (em-dash + your full registered name).
-
-### Registration needed (you're new or pruned)
-
-    ## Huddle identity — registration needed
-
-    Your session_id: `<UUID>`
-    ...
-
-Read the full notice, derive a name from your first prompt, and register:
-
-    bash scripts/hooks/huddle-whoami.sh register <YourName> <session_id>
-
-**Naming rules:**
-
-- Format: `<Harness>-<Topic>` (CamelCase, ASCII, under ~30 chars)
-- Examples: `Claude-WorktreeHookFix`, `Antigravity-TestAudit`, `Codex-DesignBible`
-- DO NOT use bead IDs, PR numbers, or generic labels like `Worker1`
-- If the name's taken, the helper suggests variations; pick one and retry
+Sign your huddle comments with `—<YourFullRegisteredName>` (em-dash + your full registered name). The self-filter matches this suffix to suppress your own echoes.
 
 **A session_id belongs to whoever registered it first.** `register` refuses to
 rebind a session_id that already holds a different name — no silent overwrite,
@@ -69,57 +26,29 @@ attribution (PP-788v). If you meant to rename **your own** session, re-run with
 `--force`. If you were _handed_ a session_id by another agent, it is not yours:
 don't register, just sign your posts.
 
-### Work digest (follows identity)
+### Self-filter rules
 
-    ## What we have been working on (last 7 days)
+- Comments are filtered by exact suffix match: `—<YourName>` (shorthand) or `—Claude-<YourName>` (canonical).
+- The em-dash (U+2014) distinguishes from hyphen-minus — no false positives between `—Claude-Spinner` and `—Spinner`.
+- If your name gets pruned (14-day inactivity) and your own past posts start re-injecting, re-register: `bash scripts/hooks/huddle-whoami.sh register <Name> <session_id>`.
 
-    **Merged to `main` — 42 commits in the last 7 days** (newest 2026-07-28, via `origin/main`)
+### Subagent sessions
 
-    _New capability (8)_ — mcp (2), agents, collections, db, hooks, pinballmap, settings
-    - shareable settings sets — owner/community kinds, visibility, tournament tag (#1730)
-    ...
-    _Housekeeping_ — 9 dependency bumps, 4 chore
+Subagent sessions (`Agent({...})` dispatches) are skipped entirely — both hooks exit 0 without output. Subagents should not register names or post coordination updates; they're ephemeral.
 
-    **In flight — 9 branches touched in the last 7 days**
-    - `feat/machine-edit-page` — label the machine record tab "Manage", not "Edit" _2026-07-27_
+**`huddle-whoami.sh` enforces this, it isn't just guidance.** `register` and `discover` refuse outright when the caller is a dispatched subagent (detected via `CLAUDE_CODE_CHILD_SESSION` plus an `AI_AGENT` ending in `_agent` — a harness-spawned _top-level_ session carries the first marker but not the second, so it can still register). There is no `--force` for this, because a subagent has no correct id to supply: `CLAUDE_CODE_SESSION_ID` holds the **parent's** id, the transcript heuristic only sees top-level transcripts, and the scratchpad path embeds the parent's UUID. Every route returns the parent (PP-788v — three consecutive subagents overwrote the orchestrator's own mapping in one night; "just tell agents to use their own id" was tried twice and failed, because that value doesn't exist in a subagent's environment).
 
-The shape of recent work: what merged to `main` grouped by work type (with a scope histogram naming which parts of the app moved), and which branches are currently alive. `huddle-digest.sh` builds it from the local git object store — **no LLM, no network, no `bd`** — so it costs a few milliseconds and can't go stale in the way a hand-written summary does.
-
-Read it as orientation, not as instructions: it tells you what kind of work this project is doing right now, which is the thing the daily summaries below it don't convey. Because it reads `origin/main` as-is and never fetches, it labels the newest commit date it actually saw — if that date looks old, your remote refs are stale, not the project.
-
-### Recent activity summary (follows the digest)
-
-Then this month's coordination summary and the descriptions of the N most-recent daily beads (default N=2, `settings.n_dailies_to_inject`). Dailies are written in a "Merged / In-flight / Discoveries / Blockers" shape; they're the day-scale detail layer — recent discoveries and live blockers — under the week-scale digest. N dropped from 5 to 2 when the digest landed (PP-llkj): five days of blocker-shaped summaries was duplicated budget and read as a list of everything that recently broke.
-
-### After compaction
-
-Compaction emits a condensed block rather than nothing: your registered name, today's bead id, a reminder to post if your scope grew, and the work digest. The full registration/etiquette text is skipped — you saw it at startup. Compaction is a deliberate prompt point because a compacted session is the one most likely to have quietly changed shape.
+If you're a subagent that needs to say something in the huddle: post the comment and sign it `—<YourName>`. A signature needs no registration.
 
 ## Bootstrap
 
-The huddle system must be bootstrapped once per local clone before it activates. If you see the "not bootstrapped" notice at session start, run:
-
-    bash scripts/hooks/huddle-bootstrap.sh
-
-This creates:
-
-- A root epic bead (permanent — never closes)
-- Today's daily bead (child of root — accepts coordination comments)
-- This month's monthly bead (child of root — collects daily summaries)
-- `.agents/huddle/config.json` with the root bead ID
-- Root bead notes JSON with pointers (§4.2 schema)
-
-Re-running is safe — it's a no-op if already bootstrapped, printing current state.
+Bootstrap runs once per local clone; the session-start notice prints the command. Re-running is safe — it's a no-op if already bootstrapped, printing current state.
 
 **Historical archive:** PP-cvh contains coordination activity prior to bootstrap. It stays open as a read-only reference; no one writes there after bootstrap runs.
 
 ## Rotation
 
-When the `today_bead.date` in root notes doesn't match today's local date, hooks emit a "rotation needed" notice. **You must dispatch a rotation subagent before continuing your work.**
-
-### Rotation subagent dispatch
-
-**First, post a heads-up on the active daily bead**, then dispatch. Peer sessions poll that bead; a heads-up tells them a rotation is already underway so they don't fire their own subagent. (The rotation file-lock already makes a double-dispatch a safe no-op — this just saves peers a wasted subagent.) At this moment `today_bead.id` still points to the current, pre-rotation daily — that's the bead peers are polling, so it's the right place to post:
+The session-start notice routes here for the dispatch. **First, post a heads-up on the active daily bead**, then dispatch. Peer sessions poll that bead; a heads-up tells them a rotation is already underway so they don't fire their own subagent. (The rotation file-lock already makes a double-dispatch a safe no-op — this just saves peers a wasted subagent.) At this moment `today_bead.id` still points to the current, pre-rotation daily — that's the bead peers are polling, so it's the right place to post:
 
 ```bash
 HUDDLE_DIR="$(dirname "$(git rev-parse --git-common-dir)")/.agents/huddle"
@@ -189,46 +118,15 @@ After phase B, report: "Rotation complete. OLD_TODAY=<id> closed. NEW_TODAY=<id>
 
 The subagent acquires a file lock in phase A. If a peer session already rotated, phase A exits immediately — safe to dispatch even if you're unsure.
 
-## What you'll see during normal work
-
-The `huddle-poll.sh` hook fires from two events:
-
-- **`UserPromptSubmit`** — always polls before each user turn (unthrottled).
-- **`PostToolUse`** — polls at most once every `HUDDLE_THROTTLE_SECONDS` seconds (default 180 = 3 min).
-
-When the hook finds new comments since this worktree's last cursor, it injects them:
-
-    ## New huddle coordination comments (N)
-
-    **<author>** (<timestamp>):
-    <comment text>
-    ...
-
-Comments signed by your own session (matching `—<YourName>` or `—Claude-<YourName>`) are filtered out — you won't see your own posts re-injected.
+## Responding to peers
 
 **Peer-response etiquette:** when a peer's kickoff or update scrolls by, reply only if you have _specific relevant context_ — a conflict with what they're touching, a gotcha you hit there, a related in-flight branch or bead. Don't ack-spam ("sounds good", "noted") — silence is the correct response when you have nothing concrete to add.
 
-### Quiet-session nudge
-
-The same hook watches whether _you_ have said anything. If your session is registered and has no post on today's bead — or your newest post has aged past 45 minutes — it prints one reminder:
-
-    ## Huddle: say what you are working on
-
-    **Claude-Foo**, your last huddle post was 2026-07-28T12:04:11Z. Since then, has the work changed shape?
-    ...
-      - **scope was ADDED to what you were already doing**
-      - you changed direction or dropped the approach you announced
-      - you started touching a new file/area others could conflict on
-
-It fires at most once per window per session, never on a session's first poll, and never when you've posted inside the window. `HUDDLE_NUDGE_SECONDS=0` disables it; the clock lives in `<state-dir>/nudged-<session_id>`.
+### The quiet-session nudge
 
 **Why it exists:** the kickoff is not the failure point — the silence after it is. A session announces a plan, then Tim adds a second ask, or review feedback grows the change, or a one-line fix turns into a refactor, and peers spend hours coordinating against a plan that stopped being true. Added scope is the single most under-reported thing in the huddle, which is why the nudge names it first.
 
 If nothing actually changed, ignore the nudge. A bare "still working on it" is noise.
-
-### Throttle override
-
-Edit `.claude/settings.json` and update `HUDDLE_THROTTLE_SECONDS=180` on the PostToolUse hook command line. Setting it to `0` polls on every tool call — useful for debugging only. To stop PostToolUse polling entirely, remove the entire PostToolUse entry from `.claude/settings.json` (UserPromptSubmit polling continues regardless).
 
 ## How to post coordination updates
 
@@ -260,57 +158,6 @@ Things NOT worth posting:
 - Internal debugging chatter
 - A _bare_ status ping with no scope or invitation ("I started working on X") — that's noise. But a **scoped kickoff with an invitation** (specific area/branch + "ping me if you have context") **is** worth posting, once per session, for substantive work — see "What still requires a manual post" above.
 
-Sign with `—<YourFullRegisteredName>` (em-dash + your registered name). The self-filter matches this suffix to suppress your own echoes.
-
-## Scripts
-
-| Script                                   | Trigger                                                  | Purpose                                                                                                                                                                                                                                                                                                                                                         |
-| ---------------------------------------- | -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `scripts/hooks/huddle-bootstrap.sh`      | manual (one-time)                                        | Init root epic + daily + monthly + config.json                                                                                                                                                                                                                                                                                                                  |
-| `scripts/hooks/huddle-rotate.sh`         | rotation subagent                                        | Phase A: atomic create-and-pointer-update; outputs OLD/NEW bead IDs                                                                                                                                                                                                                                                                                             |
-| `scripts/hooks/huddle-poll.sh`           | UserPromptSubmit + PostToolUse (throttled)               | Inject new today_bead comments since last_seen; quiet-session nudge                                                                                                                                                                                                                                                                                             |
-| `scripts/hooks/huddle-session-start.sh`  | SessionStart                                             | Bootstrap notice, rotation notice, identity (condensed on compact), work digest, summary injection                                                                                                                                                                                                                                                              |
-| `scripts/hooks/huddle-digest.sh`         | session-start (also runnable by hand)                    | "Last 7 days" work digest from git alone — merged-to-main by work type + in-flight branches. `--days N`, `--max-items N`, `--no-branches`                                                                                                                                                                                                                       |
-| `scripts/hooks/huddle-pr-announce.sh`    | PostToolUse (`Bash`\|`mcp__github__create_pull_request`) | Auto-post PR-open notice; dedup + fail-open                                                                                                                                                                                                                                                                                                                     |
-| `scripts/hooks/huddle-whoami.sh`         | manual                                                   | Register/lookup/list/discover session→name mappings                                                                                                                                                                                                                                                                                                             |
-| `scripts/hooks/huddle-rotation-check.sh` | sourced by both hooks                                    | Date-compare: returns 0 if today_bead.date < today                                                                                                                                                                                                                                                                                                              |
-| `scripts/hooks/huddle-lib.sh`            | sourced by all hooks                                     | Shared helpers: `huddle_dolt_mode` (server/embedded gate), state-dir + `huddle_root_id` + `huddle_today_bead_id` (title-query, verified hint) resolvers; `huddle_sync` (embedded-only throttled Dolt push+pull, no-op in server mode), `huddle_discover_root` (fork-proof adopt), `huddle_reconcile_today` (dedup), `huddle_warn_degraded` (server-down signal) |
-
-## State files
-
-All under `<main-worktree>/.agents/huddle/` (shared across all linked worktrees via `git rev-parse --git-common-dir`). Git-ignored — machine-local.
-
-| File                    | Purpose                                                                                                                                                                               |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `config.json`           | `{"root_bead_id": "PP-xxx"}` — **rebuildable cache** (rewritten from a title query on miss/stale); written by bootstrap or auto-adopted on a fresh machine (see Multi-machine)        |
-| `session-names.json`    | `{session_id: name}` map (canonical for self-filter). **Intentionally machine-local** — a session lives on one machine, and a peer machine's posts must NOT be self-filtered on yours |
-| `nudged-<session_id>`   | Per-session quiet-nudge clock (epoch seconds). Swept during rotation at >2d                                                                                                           |
-| `last-seen-<path-hash>` | Per-checkout poll cursor (newest injected `created_at`). Stale cursors (>14d) are swept during rotation                                                                               |
-| `last-pull`             | **Embedded mode only.** Per-machine Dolt-sync throttle marker (epoch seconds). Unused in server mode (`huddle_sync` no-ops)                                                           |
-| `pull.lock`             | **Embedded mode only.** Non-blocking flock/lockf target so exactly one session syncs when many fire at once                                                                           |
-| `rotation.lock`         | flock/lockf target for same-machine rotation serialization (both modes)                                                                                                               |
-| `degraded-warned`       | **Server mode only.** Throttle marker (epoch seconds) for the ~10-min "beads server unreachable" stderr notice                                                                        |
-
-Plus one per-worktree file outside the shared state dir:
-
-| File                                            | Purpose                                                   |
-| ----------------------------------------------- | --------------------------------------------------------- |
-| `$CLAUDE_PROJECT_DIR/.agents/.huddle-last-poll` | Throttle marker (epoch seconds) for PostToolUse fast-path |
-
-## Bead hierarchy
-
-```
-Huddle Root  (epic, never closes)                   ── PP-XXXX
-  notes JSON: today_bead, monthly_bead, recent_dailies, settings, last_rotation
-  │
-  ├── Daily 2026-05-20  ── PP-AAAA  (open; receives coordination comments today)
-  ├── Daily 2026-05-19  ── PP-CCCC  (closed; summary in description, archive in notes)
-  │     ... older dailies ...
-  │
-  ├── Monthly 2026-05   ── PP-BBBB  (open until month rolls)
-  └── Monthly 2026-04   ── PP-EEEE  (closed; rollup summary)
-```
-
 ## Multi-machine (one shared Dolt server)
 
 The huddle works across multiple machines (Mac + Bazzite) with many concurrent
@@ -323,48 +170,6 @@ timer on Bazzite; see `scripts/beads-server/` and its `SETUP.md`). This replaced
 the older embedded-per-machine + `bd dolt push/pull` design, which had two
 divergent writers (the PP-1d51 collision).
 
-**Mode gate.** The backend is chosen per-machine by `dolt_mode` in
-`<main-worktree>/.beads/metadata.json` (`"server"` or `"embedded"`, gitignored).
-`huddle_dolt_mode` (`huddle-lib.sh`) reads it tolerantly (missing ⇒ `embedded`).
-Every hot-path `bd dolt push/pull` is gated on it, so the same hook code works in
-both modes and cutover/rollback is a one-line metadata flip:
-
-- **`huddle_sync`** — no-op in server mode; throttled `bd dolt push`+`pull`
-  (shared `last-pull` marker + `pull.lock`, one per `HUDDLE_SYNC_SECONDS`/machine)
-  in embedded mode. Fully fail-open either way.
-- **Fresh-machine auto-adopt (no fork).** `config.json` (the `root_bead_id`) is a
-  rebuildable cache. Session-start / `huddle_root_id` call `huddle_discover_root`
-  — find the existing "Huddle coordination root" epic and **adopt** it (write
-  `config.json`) instead of forking. In embedded mode discovery pulls first; in
-  server mode it queries the live DB directly.
-- **Idempotent rotation.** `huddle-rotate.sh` adopts an existing "Huddle daily
-  `<today>`" by title instead of creating a duplicate; `huddle_reconcile_today`
-  collapses any rare double-create to the canonical (lowest id). In embedded mode
-  rotation also does the verified pre-pull / post-push / trailing pull; in server
-  mode those are skipped (one shared DB, one child counter — no collision).
-- **Server-down visibility.** In server mode, when a hook's `bd` read fails,
-  `huddle_warn_degraded` prints a throttled (~10 min) `huddle degraded: beads
-server unreachable` to stderr so a down server isn't silently fail-open on both
-  machines.
-
-**State reads straight from beads (no caches).** Today's daily resolves by
-`bd children <root>` title query (root-notes `today_bead.id` is a fast-path hint,
-verified via `bd show` before trust); `recent_dailies` is gone (session-start
-queries children by title). This fixes the PP-9lq5 dangling-pointer bug and means
-a purged/renamed daily self-heals instead of lingering as a broken reference.
-
-## Self-filter rules
-
-- Comments are filtered by exact suffix match: `—<YourName>` (shorthand) or `—Claude-<YourName>` (canonical).
-- The em-dash (U+2014) distinguishes from hyphen-minus — no false positives between `—Claude-Spinner` and `—Spinner`.
-- If your name gets pruned (14-day inactivity) and your own past posts start re-injecting, re-register: `bash scripts/hooks/huddle-whoami.sh register <Name> <session_id>`.
-
-## Subagent sessions
-
-Subagent sessions (`Agent({...})` dispatches) are skipped entirely. Detection: `transcript_path` contains `/subagents/`. Both hooks exit 0 without output. Subagents should not register names or post coordination updates — they're ephemeral.
-
-**`huddle-whoami.sh` enforces this, it isn't just guidance.** `register` and `discover` refuse outright when the caller is a dispatched subagent (detected via `CLAUDE_CODE_CHILD_SESSION` plus an `AI_AGENT` ending in `_agent` — a harness-spawned _top-level_ session carries the first marker but not the second, so it can still register). There is no `--force` for this, because a subagent has no correct id to supply: `CLAUDE_CODE_SESSION_ID` holds the **parent's** id, the transcript heuristic only sees top-level transcripts, and the scratchpad path embeds the parent's UUID. Every route returns the parent (PP-788v — three consecutive subagents overwrote the orchestrator's own mapping in one night; "just tell agents to use their own id" was tried twice and failed, because that value doesn't exist in a subagent's environment).
-
-If you're a subagent that needs to say something in the huddle: post the comment and sign it `—<YourName>`. A signature needs no registration.
+`session-names.json` is **intentionally machine-local** — a session lives on one machine, and a peer machine's posts must NOT be self-filtered on yours.
 
 Full design: `docs/superpowers/specs/2026-05-17-huddle-system-design.md`.

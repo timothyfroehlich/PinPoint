@@ -1,6 +1,6 @@
 ---
 name: pinpoint-orchestrator
-description: Orchestrate parallel subagent work in git worktrees — task selection, end-to-end dispatch, monitoring, follow-up, and cleanup.
+description: Coordinating parallel subagent work in git worktrees — the lead's coordinator-not-implementer boundary, the two upstream Claude Code worktree bugs and what each one actually requires (dispatch only from the main worktree for #47548; the `WorktreeCreate` lock relaxes the old N=1 rule for #47266), why the bead rather than the prompt carries scope and what a mechanical-refactor bead must name out-of-scope, the lead's review backstop now that no bot reviews this repo and a finished subagent leaves a PR unreviewed forever, and the beads-close-on-merge lifecycle. Use when dispatching subagents, when a parent branch flips after dispatch, when deciding whether a PR is ready to hand Tim, or when the user says "spin up agents", "orchestrate", or "parallel work".
 ---
 
 # Pinpoint Orchestrator
@@ -15,44 +15,15 @@ Coordinate multiple subagents working in parallel across isolated git worktrees.
 - Parallel feature development across branches
 - User says "spin up agents", "orchestrate", "parallel work", "dispatch"
 
-## Scripts Reference
+## Situational awareness
 
-```bash
-# Orchestration startup (ONE call for full situational awareness)
-./scripts/workflow/orchestration-status.sh               # PR dashboard + worktree health + beads + security alerts
-./scripts/workflow/orchestration-status.sh --prs-only    # Just PR dashboard
-./scripts/workflow/orchestration-status.sh --security-only  # Just Dependabot alerts
-# (also: --worktrees-only, --beads-only)
+`./scripts/workflow/orchestration-status.sh` is one call for the full picture — PR dashboard,
+worktree health, beads, security alerts (`--prs-only`, `--worktrees-only`, `--beads-only`,
+`--security-only` narrow it). `pr-dashboard.sh [PRs...]` and `pr-watch.py <PR>` cover CI.
 
-# PR monitoring
-./scripts/workflow/pr-dashboard.sh [PR numbers...]       # CI + merge status table (all open PRs if no args)
-./scripts/workflow/pr-watch.py <PR>                      # Stream CI events (Monitor-tool compatible; canonical)
-./scripts/workflow/pr-watch.py --check-ready <PR>        # One-shot readiness audit (pass/fail; exits 0 if ready)
-
-# Review thread inspection + reply → use MCP via pinpoint-pr-workflow skill Phase 3
-# (mcp__github__pull_request_read / add_reply_to_pull_request_comment / pull_request_review_write)
-
-# Readiness label + merge handoff: pinpoint-pr-workflow skill Phases 3.4-3.6 + 4
-# Apply label via mcp__github__issue_write or `gh pr edit --add-label`
-# merge-pr.sh is human-only (PP-wi85) — blocked for agents via ANY invocation shape,
-# including --dry-run. The lead does NOT run it, even to preview gates. Once the PR
-# is ready (label applied, screenshots posted if UI-touching), hand Tim:
-#   ! scripts/workflow/merge-pr.sh <PR> --human
-bash scripts/workflow/mark-claude-review.sh <PR> <depth> "<summary>"  # SHA-pinned review marker — the ONLY thing that satisfies the `reviewed` gate. Attests Tim ran /code-review (or that the change was trivial)
-node scripts/workflow/pr-screenshots.mjs <PR>                 # UI-touching PRs: desktop+mobile screenshots, sticky PR comment
-
-# Worktree health — stale-worktrees.sh covers manually created ../pinpoint-worktrees/* ONLY.
-# The WorktreeRemove hook does NOT remove finished agent worktrees; it only runs cleanup
-# when something else initiates removal, so a background agent that pushes and ends leaves
-# its directory on disk forever. worktree_reap.py is what removes them (PP-49x5).
-./scripts/workflow/stale-worktrees.sh                    # Report stale/active/dirty worktrees
-./scripts/workflow/stale-worktrees.sh --clean            # Auto-remove stale worktrees
-
-# Worktree management (post-checkout hook auto-configures ports + Supabase)
-git worktree list                                             # Show all worktrees
-python3 scripts/worktree_reap.py                              # Report worktrees whose work already landed (dry-run; --apply to reclaim)
-python3 scripts/worktree_cleanup.py <worktree-path>           # Full cleanup (Supabase stop, Docker volumes, manifest, worktree removal)
-```
+**`merge-pr.sh` is human-only (PP-wi85)** — blocked for agents via ANY invocation shape,
+including `--dry-run`. The lead does NOT run it, even to preview gates. Once the PR is ready,
+hand Tim `! scripts/workflow/merge-pr.sh <PR> --human`.
 
 ---
 
@@ -70,12 +41,7 @@ If a subagent can't be reached (GC'd, session ended), spawn a new one on the sam
 
 ## Phase 1: Task Selection
 
-```bash
-bd ready                    # Issues with no blockers
-bd list --status=open       # All open issues
-```
-
-Present options to user. Before proceeding, verify tasks are independent:
+Present options to the user. Before proceeding, verify tasks are independent:
 
 - No task blocks another (`bd show <id>`)
 - Tasks don't modify the same files
@@ -92,26 +58,11 @@ Present options to user. Before proceeding, verify tasks are independent:
 >
 > **Fallback**: If the hook is disabled or missing, revert to the N=1-per-message rule: dispatch one, confirm `.claude/worktrees/agent-*` appeared on disk, then dispatch the next.
 
-Manual worktree creation is for the lead's own use only:
-
-```bash
-git worktree add ../pinpoint-worktrees/<branch-name> -b <branch-name>
-```
-
 ---
 
 ## Phase 3: Agent Dispatch
 
-```
-Agent(
-  subagent_type: "general-purpose",
-  isolation: "worktree",
-  run_in_background: true,
-  mode: "bypassPermissions",
-  name: "<short-name>",          # optional but useful — makes the agent addressable via SendMessage({to: name})
-  prompt: "<full prompt — see template below>"
-)
-```
+`Agent(subagent_type: "general-purpose", isolation: "worktree", run_in_background: true, mode: "bypassPermissions", name: "<short-name>")`. The optional `name` makes the agent addressable via `SendMessage({to: name})`.
 
 **Model**: omit `model` to inherit the session model (usually correct). Override only when confident a tier fits: a heavier model for judgment-heavy work, a lighter one for mechanical, well-specified changes.
 
@@ -123,42 +74,7 @@ Agent(
 4. Full PR lifecycle: "Create PR, verify CI green."
 5. Structured return format: branch, PR#, CI status, blockers
 
-**Prompt template:**
-
-```markdown
-## Task
-
-Work bead <ID>. First run `bd show <ID>` && `bd update <ID> --claim` — the bead is the spec. Implement exactly what it describes; don't expand scope.
-
-## Context not in the bead
-
-<only what the bead doesn't already say — cross-bead conflicts, reference PRs, sequencing. Omit this section entirely if there's nothing to add.>
-
-## Quality Gates
-
-Run `pnpm run check` before returning. Then self-review **by hand**: read your own diff (`git diff origin/main...HEAD`) against `REVIEW.md` — the canonical rubric — plus the bead's acceptance criteria and out-of-scope list, and fix what you find. Don't reach for `/code-review` or `ultra`: both are user-triggered harness surfaces (`ultra` is also billed) and an agent cannot launch either.
-
-A review covering the head commit is still **required** to merge, and **no bot reviews this repo** (PP-4ric). The reviewer is Tim running `/code-review` — which you cannot launch — so getting reviewed is a handoff, not a command you run.
-
-Open the PR whenever you like and watch CI; it costs nothing. Then finish all of it — CI fixes, merge-from-main — stop iterating, and ask Tim for the review. When he has given it and you have addressed the findings, attest the head he reviewed:
-
-`bash scripts/workflow/mark-claude-review.sh <PR> <depth> "<summary>"`
-
-The marker pins a SHA, so any push after it invalidates it. Re-attesting is right when what you pushed was the review's own findings; anything else needs a fresh `/code-review`. A genuinely trivial change (typo, comment, one-line mechanical fix) can be attested without interrupting Tim — say why it was trivial in the summary. The marker is an attestation that a review happened, never a way to skip one.
-
-## Return Format
-
-Report back with:
-
-- **Branch**: <branch name>
-- **PR**: #<number>
-- **CI**: passing/failing/pending
-- **Self-review**: findings addressed
-- **Review**: attested at <sha> (Tim's /code-review, or trivial-change exception) / still needs Tim's review
-- **Blockers**: none or description
-```
-
-Full annotated version: `references/agent-prompt-template.md`.
+Ready-to-use prompt, follow-up template, and the annotated rationale for each part: [references/agent-prompt-template.md](references/agent-prompt-template.md).
 
 > **The bead must be complete — especially for mechanical refactors.** Because the agent executes the bead literally and you're no longer restating scope in the prompt, the bead has to carry it. A "convert/rename only X" bead MUST include an explicit **out-of-scope** list naming the look-alikes that are intentionally excluded, and why — otherwise the agent over-scopes. Casework: a "convert 2 catch blocks to the `err()` helper" bead ballooned to 6, Sentry-wrapping a rate-limit guard and a Zod-validation guard that are _expected user conditions, not server errors_ (PR #1247 → reverted in #1250). If the bead doesn't say "don't touch Y," the agent will.
 
@@ -166,34 +82,9 @@ Full annotated version: `references/agent-prompt-template.md`.
 
 ## Phase 4: Monitor Loop
 
-### Dashboard
-
-```bash
-./scripts/workflow/pr-dashboard.sh 940 941 942       # Specific PRs
-./scripts/workflow/pr-dashboard.sh                    # All open PRs
-./scripts/workflow/pr-watch.py <PR>                   # Stream one PR's CI events
-```
-
 ### Follow-Up via SendMessage
 
-A spawned agent keeps its context — continue it with `SendMessage` using its ID or name rather than spawning fresh. Common scenarios:
-
-- CI fails → get failure logs → send failure context
-- User requests changes → send review feedback
-
-### Handle Failures
-
-**CI fails** → Get context, then message the subagent:
-
-```bash
-gh run view <run-id> --log-failed | tail -50
-```
-
-**Review comments** → Inspect via MCP (see pinpoint-pr-workflow skill Phase 3.2-3.3), then message the subagent:
-
-```
-mcp__github__pull_request_read(method: "get_review_comments", owner, repo, pullNumber, perPage: 100)
-```
+A spawned agent keeps its context — continue it with `SendMessage` using its ID or name rather than spawning fresh. CI failed? Pull the failure logs (`gh run view <run-id> --log-failed | tail -50`) and send the context. Review comments? Inspect via MCP (see `pinpoint-pr-workflow` Phase 3.2–3.3), then message the subagent.
 
 **Infrastructure failures** — first log the flake, then rerun (see `docs/runbooks/gha-flake-log.md`):
 
@@ -205,13 +96,7 @@ gh run rerun <run-id> --failed
 
 ### Label Ready PRs
 
-See pinpoint-pr-workflow skill Phase 3.6. Apply `ready-for-review` after CI green + a marker pinning head + zero unresolved review threads. The label does **not** get the PR reviewed (see the backstop below). Apply via:
-
-```
-mcp__github__issue_write(method: "update", owner, repo, issue_number: <PR>, labels: [<existing>..., "ready-for-review"])
-```
-
-Or fallback: `gh pr edit <PR> --add-label ready-for-review`.
+See `pinpoint-pr-workflow` Phase 3.6. Apply `ready-for-review` after CI green + a marker pinning head + zero unresolved review threads. The label does **not** get the PR reviewed (see the backstop below).
 
 ### Ensure every PR is reviewed (lead backstop)
 
@@ -248,62 +133,19 @@ Don't post a marker to paper over a review nobody ran, and don't ask Tim to `--f
 | PR merges               | `bd close <id> --reason="PR #N merged"` |
 | PR closed without merge | `bd update <id> --status=open`          |
 
-### Final Summary
+### Beads hygiene
 
-```
-## Orchestration Complete
-
-PRs Ready for Review:
-- #123: Fix machine dropdown — All checks passing
-
-PRs Needing Attention:
-- #124: Add owner link — CI failing
-
-Remaining Worktrees:
-- feat/task-def (PR #124 needs work)
-```
-
-### Cleanup
-
-Worktrees created by `Agent(isolation: "worktree")` are cleaned up by Claude Code's `WorktreeRemove` hook (runs `scripts/worktree_cleanup.py`). For manually created worktrees, run the script yourself — plain `git worktree remove` leaks slot entries and Docker volumes:
-
-```bash
-python3 scripts/worktree_cleanup.py ../pinpoint-worktrees/<branch>
-```
-
----
-
-## Proactive Beads Maintenance
-
-### On Session Start
-
-- `bd ready -n 50` (default limit is 10, which hides work)
-- `bd list --status=in_progress` to check for stale in-progress issues
-- Cross-reference: any in-progress issues whose PRs are already merged? Close them
-- Check for closed issues still blocking others (`bd blocked` → `bd dep remove`)
-
-### During Work
-
-- PR **merges** → immediately close the beads issue
-- Agent creates PR → issue stays `in_progress`
-- Discover new work → `bd create`
-- Stale dependencies → `bd dep remove` to unblock
-
-### On Session End
-
-- `bd list --status=in_progress` — anything done? Close it
+- `bd ready -n 50` — the default limit is 10, which hides work.
+- Cross-reference `bd list --status=in_progress` against merged PRs; close what landed.
+- Check for closed issues still blocking others (`bd blocked` → `bd dep remove`).
 - `bd dolt pull` only in **embedded** beads mode. In **server** mode
   (`dolt_mode: "server"` in `.beads/metadata.json` — the shared Bazzite Dolt
   server) reads/writes are already live against the one shared DB; there is
   nothing to pull, and the DoltHub bridge handles remote replication.
 
----
+### Cleanup
 
-## Anti-Patterns
-
-- **DON'T assume hooks enforce quality for subagents** — include `pnpm run check` in the prompt
-- **DON'T fix code yourself as the orchestrator** — message the subagent
-- **DON'T dispatch from a linked worktree** — bug #47548 (see Phase 2)
+The `WorktreeRemove` hook does NOT remove finished agent worktrees — it only runs cleanup when something else initiates removal, so a background agent that pushes and ends leaves its directory on disk forever. `python3 scripts/worktree_reap.py` is what removes them (PP-49x5; dry-run by default, `--apply` to reclaim). For manually created worktrees, run `python3 scripts/worktree_cleanup.py <path>` yourself — plain `git worktree remove` leaks slot entries and Docker volumes. `./scripts/workflow/stale-worktrees.sh` covers manually created `../pinpoint-worktrees/*` ONLY.
 
 ## Error Recovery
 
