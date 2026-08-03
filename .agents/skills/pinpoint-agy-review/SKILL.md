@@ -199,8 +199,9 @@ A single JSON object matching the enforced schema:
   `approve` only if you cannot support a substantive adversarial finding.
 - `summary` — prose addressed to the PR author, posted verbatim. Write it as a
   reviewer speaking to them: a terse ship / no-ship assessment, not a neutral
-  recap of the diff. Never mention this skill, the sidecar files, proof, or file
-  counts.
+  recap of the diff. **Do not open by restating the verdict** — the wrapper
+  renders that above your text, so "✅ approve" as your first line reads twice.
+  Never mention this skill, the sidecar files, proof, or file counts.
 - `findings[]` — `path` (repo-relative, no leading `./`), `line`, `side`
   (`"RIGHT"`), `severity`, `confidence`, `rule` (the `CORE-*` id or `null`),
   `body` (what is wrong, why it is reachable, what it costs, and what to do).
