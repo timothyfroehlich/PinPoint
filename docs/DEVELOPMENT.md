@@ -59,15 +59,15 @@ If you’re trying to understand how to implement something, read:
 
 ## Testing Overview
 
-PinPoint uses the following test types (see the `pinpoint-testing` skill at `.agent/skills/pinpoint-testing/SKILL.md` for details):
+PinPoint uses the following test types (see the `pinpoint-testing` skill at `.agents/skills/pinpoint-testing/SKILL.md` for details):
 
 - **Unit Tests** (`pnpm test`)
   - Location: `src/test/unit/**`
   - What: Pure logic, utilities, validation
-- **Integration Tests (PGlite)** (`pnpm test`)
-  - Location: `src/test/integration/**`
+- **Integration Tests (PGlite)** (`pnpm run test:integration`)
+  - Location: `src/test/integration/**` (excluding `supabase/`)
   - What: Database queries, Server Actions (using worker‑scoped PGlite)
-- **Supabase Integration Tests** (`pnpm run test:integration`)
+- **Supabase Integration Tests** (`pnpm run test:integration:supabase`)
   - Location: `src/test/integration/supabase/**`
   - What: Real Supabase interactions (requires `supabase start`)
 - **E2E Tests (Playwright)** (`pnpm run smoke`)
@@ -77,9 +77,10 @@ PinPoint uses the following test types (see the `pinpoint-testing` skill at `.ag
 Useful commands:
 
 ```bash
-pnpm run test                  # Unit tests (PGlite)
-pnpm run test:integration      # Supabase-backed integration tests
-pnpm run smoke                 # Playwright smoke suite
+pnpm run test                     # Unit tests
+pnpm run test:integration         # PGlite integration tests
+pnpm run test:integration:supabase # Supabase-backed integration tests
+pnpm run smoke                    # Playwright smoke suite
 pnpm run test:watch            # Watch mode for unit tests
 pnpm run test:coverage         # Coverage for unit tests
 ```
