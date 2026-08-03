@@ -200,10 +200,15 @@ export default [
 
       // ===== ESLint Comments =====
 
-      // Prevent disabling strict type checks
+      // Prevent disabling strict type checks. All three CORE-TS-007 escapes
+      // belong here — a rule you can turn off with a one-line comment is a
+      // recommendation, not a gate, and NON_NEGOTIABLES.md now advertises this
+      // one as enforced. Both test blocks set this rule "off", so the two
+      // no-non-null-assertion exemptions there are unaffected. (PP-8k07.)
       "eslint-comments/no-restricted-disable": [
         "error",
         "@typescript-eslint/no-explicit-any",
+        "@typescript-eslint/no-non-null-assertion",
         "@typescript-eslint/no-unsafe-*",
       ],
 
