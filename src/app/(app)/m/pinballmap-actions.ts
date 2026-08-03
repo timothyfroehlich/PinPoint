@@ -12,16 +12,16 @@
 
 "use server";
 
-import { eq } from "drizzle-orm";
+import { and, eq, ne } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { createClient } from "~/lib/supabase/server";
-import { db } from "~/server/db";
+import { db, type Tx } from "~/server/db";
 import { machines, userProfiles, pinballmapState } from "~/server/db/schema";
 import { reconcileAfterSync } from "~/lib/pinballmap/sync";
 import { getPinballMapWriteCredentials } from "~/lib/pinballmap/credentials";
 import { withLmxAdded, withLmxRemoved } from "~/lib/pinballmap/snapshot-edit";
 import { getPinballMapClient } from "~/lib/pinballmap/client";
-import type { PbmWriteFailure } from "~/lib/pinballmap/types";
+import type { LocationSnapshot, PbmWriteFailure } from "~/lib/pinballmap/types";
 import { log } from "~/lib/logger";
 import {
   searchCatalogFamilies,
@@ -314,6 +314,65 @@ function pbmWriteFailureMessage(failure: PbmWriteFailure): string {
   }
 }
 
+/**
+ * Apply `edit` to the stored location snapshot, against a row this transaction
+ * holds a lock on.
+ *
+ * The copy the action read before its PBM call is NOT safe to write back. The
+ * credential decrypt and the HTTP round-trip sit in between — and the live
+ * client serializes writes behind a process-wide queue — so two list/unlist
+ * actions, or an hourly cron sync, routinely overlap that window. Writing the
+ * whole `snapshot_json` blob from a pre-call copy silently drops the other
+ * writer's edit, leaving a machine listed locally but absent from the stored
+ * lineup: exactly the `listed_locally_absent_on_pbm` desync these edits exist to
+ * prevent. Re-reading `FOR UPDATE` serializes the read-modify-write on the
+ * singleton's row lock.
+ *
+ * A null snapshot (never synced) is left alone — there is no lineup to correct.
+ */
+async function editStoredSnapshot(
+  tx: Tx,
+  edit: (snapshot: LocationSnapshot) => LocationSnapshot
+): Promise<void> {
+  const [row] = await tx
+    .select({ snapshotJson: pinballmapState.snapshotJson })
+    .from(pinballmapState)
+    .where(eq(pinballmapState.id, "singleton"))
+    .for("update");
+  if (!row?.snapshotJson) return;
+  await tx
+    .update(pinballmapState)
+    .set({ snapshotJson: edit(row.snapshotJson), updatedAt: new Date() })
+    .where(eq(pinballmapState.id, "singleton"));
+}
+
+/**
+ * The other cabinet of `pinballmapMachineId` that already holds this title's
+ * listing, if any.
+ *
+ * Checked BEFORE the PBM write, not just via the 23505 backstop after it.
+ * `addMachine` is find-or-create, so when the incumbent's listing is itself
+ * desynced (`listed_locally_absent_on_pbm` — someone deleted the entry on
+ * pinballmap.com) the POST genuinely CREATES a row on PBM's public lineup; the
+ * local transaction then trips `machines_pinballmap_listed_unique` and rolls
+ * everything back, orphaning a listing PinPoint has no handle for. Refusing up
+ * front also avoids spending a PBM write on a request we already know we will
+ * decline (CORE-PBM-001).
+ */
+async function findListingIncumbent(
+  pinballmapMachineId: number,
+  excludeMachineId: string
+): Promise<{ id: string } | undefined> {
+  return db.query.machines.findFirst({
+    where: and(
+      eq(machines.pinballmapMachineId, pinballmapMachineId),
+      eq(machines.pinballmapListed, true),
+      ne(machines.id, excludeMachineId)
+    ),
+    columns: { id: true },
+  });
+}
+
 export type ListPinballmapResult = Result<
   { lmxId: number },
   | "VALIDATION"
@@ -361,6 +420,14 @@ export async function listMachineOnPinballMapAction(
   const state = await getPinballMapState();
   if (!state) return err("SERVER", "Pinball Map isn't configured yet");
 
+  // One lister per title. Refuse BEFORE the PBM write — see
+  // `findListingIncumbent` for why the 23505 backstop alone is not enough here.
+  if (await findListingIncumbent(titleId, machine.id))
+    return err(
+      "VALIDATION",
+      await pbmListingConflictMessage(titleId, machine.id)
+    );
+
   // --- non-transactional effects, both BEFORE the transaction ---
   const credentials = await getPinballMapWriteCredentials();
   if (!credentials)
@@ -391,14 +458,9 @@ export async function listMachineOnPinballMapAction(
         .update(machines)
         .set({ pinballmapLmxId: lmxId, pinballmapListed: true })
         .where(eq(machines.id, machine.id));
-      if (state.snapshotJson) {
-        await tx
-          .update(pinballmapState)
-          .set({
-            snapshotJson: withLmxAdded(state.snapshotJson, lmxId, titleId),
-          })
-          .where(eq(pinballmapState.id, "singleton"));
-      }
+      await editStoredSnapshot(tx, (snapshot) =>
+        withLmxAdded(snapshot, lmxId, titleId)
+      );
       await createMachineTimelineEvent(
         machine.id,
         {
@@ -423,6 +485,10 @@ export async function listMachineOnPinballMapAction(
   }
 
   revalidatePath(`/m/${machine.initials}`);
+  // The stored snapshot changed, and every machine's desync badge derives from
+  // it — a sibling cabinet of this title reads differently now (same reason
+  // `syncPinballMapNowAction` refreshes the whole subtree).
+  revalidatePath("/m", "layout");
   return ok({ lmxId });
 }
 
@@ -495,12 +561,7 @@ export async function unlistMachineFromPinballMapAction(
       .update(machines)
       .set({ pinballmapListed: false, pinballmapLmxId: null })
       .where(eq(machines.id, machine.id));
-    if (state.snapshotJson) {
-      await tx
-        .update(pinballmapState)
-        .set({ snapshotJson: withLmxRemoved(state.snapshotJson, lmxId) })
-        .where(eq(pinballmapState.id, "singleton"));
-    }
+    await editStoredSnapshot(tx, (snapshot) => withLmxRemoved(snapshot, lmxId));
     await createMachineTimelineEvent(
       machine.id,
       {
@@ -514,6 +575,9 @@ export async function unlistMachineFromPinballMapAction(
   });
 
   revalidatePath(`/m/${machine.initials}`);
+  // See the list action: the shared snapshot changed, so sibling cabinets'
+  // desync badges did too.
+  revalidatePath("/m", "layout");
   return ok({});
 }
 

@@ -87,15 +87,29 @@ try {
     // missing row is normal here, not a sign migrations were skipped, and this
     // script creates it.
     const existing = await sql`
-      SELECT outbound_token_vault_id
+      SELECT outbound_email, outbound_token_vault_id
       FROM pinballmap_state
       WHERE id = 'singleton'
     `;
 
-    if (existing[0]?.outbound_token_vault_id) {
+    // BOTH halves, because that is what `getPinballMapWriteCredentials` demands:
+    // a row with a vault id but no email reads as NOT provisioned at runtime, so
+    // treating the vault id alone as "done" would print success while the app
+    // stays permanently unprovisioned, with no supported way to repair it.
+    if (existing[0]?.outbound_token_vault_id && existing[0]?.outbound_email) {
       console.log(
-        "✅ PinballMap operator token already provisioned — leaving DB values untouched."
+        "✅ PinballMap operator credentials already provisioned — leaving DB values untouched."
       );
+      return false;
+    }
+
+    if (existing[0]?.outbound_token_vault_id) {
+      console.error(
+        "❌ pinballmap_state has a token vault id but no outbound_email — half-provisioned.\n" +
+          "   Runtime reads this as NOT provisioned. Clear outbound_token_vault_id\n" +
+          "   (the orphaned vault.secrets row too) and re-run to reprovision cleanly."
+      );
+      process.exitCode = 1;
       return false;
     }
 

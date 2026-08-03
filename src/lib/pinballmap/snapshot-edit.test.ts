@@ -53,6 +53,21 @@ describe("withLmxAdded", () => {
     expect(result.machineCount).toBe(1);
   });
 
+  it("replaces a stale lmx for the same title rather than duplicating it", () => {
+    // PBM gives a title one lmx at our location, and every consumer resolves it
+    // by machineId. If the stored snapshot still holds the id PBM re-minted
+    // away from, appending the new one leaves two rows under machineId 10 —
+    // `derivePbmMachineStatus` would then pick the dead id by array order,
+    // flag the machine we just listed as `lmx_drifted`, and let the reconcile
+    // pass heal it onto an lmx that no longer exists.
+    const result = withLmxAdded(snapshot([{ id: 1, machineId: 10 }]), 2, 10);
+
+    expect(result.lmxes).toEqual([
+      expect.objectContaining({ id: 2, machineId: 10 }),
+    ]);
+    expect(result.machineCount).toBe(1);
+  });
+
   it("does not mutate the input", () => {
     const input = snapshot([{ id: 1, machineId: 10 }]);
     withLmxAdded(input, 2, 20);

@@ -21,7 +21,16 @@ import type { LocationSnapshot } from "./types";
  *
  * A no-op when that lmx is already listed — PinballMap's create is
  * find-or-create, so re-listing a title already on the lineup hands back the
- * EXISTING lmx rather than minting a second one.
+ * EXISTING lmx rather than minting a second one. The early return (rather than
+ * a replace) is deliberate: the stored row carries conditions and
+ * `lastUpdatedByUsername` a synthesized one does not.
+ *
+ * A STALE row for the same title is dropped, though. PBM gives a title exactly
+ * one lmx at our location, and every consumer resolves it by `machineId`
+ * (`findLmxForMachine`, `derivePbmMachineStatus`), not by `id` — so leaving an
+ * old id behind after PBM re-minted the row would make those lookups return the
+ * dead lmx by array order, report the machine we just listed as `lmx_drifted`,
+ * and let the reconcile pass "heal" it onto an lmx that no longer exists.
  */
 export function withLmxAdded(
   snapshot: LocationSnapshot,
@@ -30,7 +39,7 @@ export function withLmxAdded(
 ): LocationSnapshot {
   if (snapshot.lmxes.some((l) => l.id === lmxId)) return snapshot;
   const lmxes = [
-    ...snapshot.lmxes,
+    ...snapshot.lmxes.filter((l) => l.machineId !== pinballmapMachineId),
     {
       id: lmxId,
       machineId: pinballmapMachineId,
