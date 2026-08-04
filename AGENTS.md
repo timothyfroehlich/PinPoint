@@ -72,6 +72,7 @@ Each git worktree gets isolated Supabase ports automatically. The Husky `post-ch
 - **Ports**: main worktree uses defaults (3000 / 54321 / 54322). Slot N: `3000+N*10`, `54321+N*100`, `54322+N*100`.
 - **Supabase `project_id`**: derived from the branch name the **first** time a worktree is set up, then **pinned** — later checkouts reuse the id already in `supabase/config.toml`. It names the Docker containers and labels the volumes, so letting it follow a `git checkout -b` would rename the stack out from under itself (`supabase stop` matches nothing, the old containers keep the ports bound, cleanup misses them). `config.toml` is the authoritative record of the running stack's id. (PP-4936.)
 - **Config**: edit `supabase/config.toml.template`, not the generated file (which is chmod 444).
+- **SELinux hosts (Bazzite)**: since CLI 2.111.0 the pgsodium root key is staged on the host under `supabase/.temp/start-secrets/` and bind-mounted read-only into the db container — with no `z`/`Z` relabel, so an SELinux-enforcing host denies the container the read and Postgres dies on `FATAL: invalid secret key`. `scripts/selinux-label-supabase-secrets.sh` labels that directory `container_file_t:s0` once; everything the CLI later stages inside it inherits the label. It runs from `worktree_setup.py` (so every post-checkout) and from `db:_restart`, and is a no-op on macOS and CI. Run it by hand in a worktree that predates it, or if `pnpm run dev:status` says the label is wrong. (PP-9mg0.)
 
 ### Starting the local stack (self-service)
 

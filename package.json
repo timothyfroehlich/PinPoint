@@ -40,7 +40,7 @@
     "e2e:all": "bash scripts/workflow/e2e-all-isolated.sh",
     "db:reset": "npm-run-all db:_restart db:_drop_tables db:migrate test:_generate-schema db:_seed db:_seed-users db:_seed-collections db:_seed-machine-settings db:_seed-discord db:_seed-timeline-backfill db:_seed-timeline-demo db:_seed-pinballmap-catalog",
     "db:studio": "drizzle-kit studio",
-    "db:_restart": "supabase stop && supabase start",
+    "db:_restart": "supabase stop && bash scripts/selinux-label-supabase-secrets.sh && supabase start",
     "db:_drop_tables": "node --env-file=.env.local scripts/force-db-reset.mjs",
     "db:_push": "node -e \"console.error('drizzle-kit push is disabled in this repo. Use: pnpm run db:generate && pnpm run db:migrate'); process.exit(1)\"",
     "db:migrate": "drizzle-kit migrate",

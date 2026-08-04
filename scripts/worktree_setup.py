@@ -547,6 +547,29 @@ def write_protected_file(path: Path, content: str) -> None:
     path.chmod(stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH)
 
 
+def label_supabase_secrets(worktree_path: Path) -> None:
+    """Pre-label the Supabase CLI's secret staging dir for SELinux hosts.
+
+    Best-effort and a no-op off SELinux. Without it, `supabase start` fails on
+    an SELinux-enforcing host with "FATAL: invalid secret key" -- see the
+    script's header for why (PP-9mg0).
+    """
+    script = worktree_path / "scripts" / "selinux-label-supabase-secrets.sh"
+    if not script.is_file():
+        return
+    result = subprocess.run(
+        ["bash", str(script), str(worktree_path)],
+        cwd=worktree_path,
+    )
+    if result.returncode != 0:
+        print(
+            f"worktree_setup: warning: {script.name} exited "
+            f"{result.returncode}; `supabase start` may fail with "
+            f'"FATAL: invalid secret key" (PP-9mg0)',
+            file=sys.stderr,
+        )
+
+
 def resolve_brainstorm_server_path() -> str | None:
     """Find the highest-version superpowers brainstorming start-server.sh.
 
@@ -783,6 +806,8 @@ def main() -> None:
     write_protected_file(env_path, env_content)
 
     generate_launch_json(worktree_path, port_config)
+
+    label_supabase_secrets(worktree_path)
 
     # Install dependencies if this is a fresh worktree
     if not (worktree_path / "node_modules").exists():

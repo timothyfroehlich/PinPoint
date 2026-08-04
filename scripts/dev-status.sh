@@ -26,6 +26,20 @@ if command -v supabase &>/dev/null; then
   sb_status=$(supabase status 2>&1 || true)
   if ! echo "$sb_status" | grep -q "is running"; then
     echo "❌ Supabase is not started. Run: supabase start"
+
+    # On an SELinux host an unlabeled secret staging dir is why it won't start
+    # (the db container restart-loops on "FATAL: invalid secret key"), and the
+    # CLI's own error says nothing about it. Name the cause here. (PP-9mg0.)
+    secrets_dir="supabase/.temp/start-secrets"
+    if command -v selinuxenabled &>/dev/null && selinuxenabled && [ -d "$secrets_dir" ]; then
+      # shellcheck disable=SC2012  # one known directory, not a glob
+      label=$(ls -Zd "$secrets_dir" 2>/dev/null | awk '{print $1}' || true)
+      if [ "${label##*:container_file_t:}" != "s0" ]; then
+        echo "⚠️  $secrets_dir is labeled ${label:-unknown}, not container_file_t:s0."
+        echo "   Supabase's containers cannot read the staged pgsodium key with that label."
+        echo "   Fix: bash scripts/selinux-label-supabase-secrets.sh"
+      fi
+    fi
     exit 1
   fi
 fi
