@@ -14,9 +14,6 @@ allowBuilds:
   esbuild: false
   sharp: false
 
-minimumReleaseAgeExclude:
-  - hono@4.12.34
-
 overrides:
   esbuild: '>=0.28.1'
   minimatch: '>=10.2.3'
@@ -36,7 +33,6 @@ overrides:
   fast-uri: '>=3.1.5 <4'
   sharp: '>=0.35.0'
   '@hono/node-server': '>=2.0.5'
-  hono: '>=4.12.34 <5'
   ip-address: '>=10.3.1 <11'
 
 peerDependencyRules:
