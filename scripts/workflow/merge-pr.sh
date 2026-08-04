@@ -16,10 +16,12 @@
 #                                 running — that is what it is for. It does NOT wait out
 #                                 an unreviewed head: `reviewed` never WAITs, because no
 #                                 bot reviews this repo and so no answer is ever already
-#                                 on its way. An unattested head hard-fails on the FIRST
-#                                 poll and the run ends. So run /code-review and let the
-#                                 agent attest head with mark-claude-review.sh BEFORE
-#                                 firing this. Terminates on exactly three outcomes, each
+#                                 on its way. An unreviewed head hard-fails on the FIRST
+#                                 poll and the run ends. So get the review recorded BEFORE
+#                                 firing this — either `/code-review <depth> --comment <PR>`,
+#                                 whose inline comments pin head themselves, or, when a
+#                                 clean review posted nothing, the agent attesting with
+#                                 mark-claude-review.sh. Terminates on exactly three outcomes, each
 #                                 reported on exit:
 #                                   MERGED      — gates went green, PR squash-merged
 #                                   RED         — a gate hard-failed; no merge, label removed

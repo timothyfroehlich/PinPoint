@@ -73,6 +73,18 @@ _repo_slug() {
 # nobody read as reviewed. `original_commit_id` is immutable and is literally the commit
 # the reviewer was looking at, which is the question being asked.
 #
+# ...with one caveat, and it is the marker's one advantage over comments as evidence.
+# `original_commit_id` is the commit GitHub ANCHORED the comment to, which is not
+# necessarily the commit the reviewer read. A review comment posted without an explicit
+# `commit_id` defaults to the PR's REMOTE head, while `/code-review` reads the local
+# working tree — so reviewing a checkout that is behind origin produces comments pinning
+# a commit nobody looked at. That is the PR #1784 false-PASS class arriving through the
+# new evidence kind, and nothing here can detect it: the field reads identically either
+# way. mark-claude-review.sh does not share the hazard, because it stamps the SHA the
+# attester names. The mitigation is procedural — pull before reviewing — which is why
+# merge-handoff.sh prints the reviewed SHA and its distance from head rather than just
+# saying "reviewed": a wrong one is only ever caught by a human reading that line.
+#
 # REPLIES ARE EXCLUDED (`in_reply_to_id == null`). A reply is created at whatever head is
 # current, so an agent that pushes a fix and then answers the thread it just addressed
 # would re-green this gate on a commit no reviewer has seen — the exact failure the SHA
@@ -115,11 +127,16 @@ _repo_slug() {
 # `jq -s` (slurp) rather than gh's `--jq`, which runs per-page under --paginate and so
 # misses a marker sitting on page 2+ of a busy PR.
 #
-# `per_page=100` on both, matching pr-watch.py's mirror. The default is 30, and this
-# function went from one paginated call to two — while pr-dashboard.sh runs it once per
-# OPEN PR. At 30/page that is a real bite out of the 5000/hr quota shared with every
-# other session on the host, and a 403 here reads as "no evidence", so exhausting the
-# quota degrades into gate failures rather than into an error anyone would recognise.
+# This function went from one paginated call to two, and that doubling is unmitigated:
+# pr-dashboard.sh runs it once per OPEN PR, and merge-pr.sh --automerge re-runs it every
+# 30s. It matters because a 403 here reads as "no evidence", so exhausting the 5000/hr
+# quota shared with every other session on the host degrades into gate failures rather
+# than into an error anyone would recognise as rate-limiting.
+#
+# `per_page=100` on both (matching pr-watch.py's mirror) is NOT what offsets that. Below
+# 30 comments — most PRs — it changes nothing, because one page was already one request.
+# It only earns anything on a busy PR, where it turns 4 requests into 1. The doubling
+# stands regardless; the page size just stops a long thread from compounding it.
 _review_record() {
   local pr=$1 owner_repo=$2 head=$3
   local markers comments
