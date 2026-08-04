@@ -172,7 +172,10 @@ There is no `status` column on the `machines` table — a machine's operational 
 
 ### Logging
 
-`src/lib/logger.ts` is canonical and short — read it rather than a prose copy. It is the pino config, the `log.info` / `log.warn` / `log.error` wrappers, and two conventions its comments record: PII fields (`email`, `reporterEmail`, nested or not) are redacted by the logger itself, and **an error goes under the `err` key** — `pino.stdSerializers.err` is wired to that key alone, and the comment records that every call site was standardised on it so the single mapping suffices.
+`src/lib/logger.ts` is canonical and short — read it rather than a prose copy. It is the pino config plus the `log.info` / `log.warn` / `log.error` wrappers. Two conventions are worth knowing before you write a call site:
+
+- **Never log PII — log user IDs instead.** The `redact` list is a backstop for two known key names, not a filter: `["reporterEmail", "*.reporterEmail", "email", "*.email"]` covers those two keys at the top level or exactly one level deep, because pino's `*` matches a single level. `contactEmail`, `userEmail`, or an `email` nested two deep are all logged raw — to `logs/<session>/app.log` locally and to stdout on Vercel.
+- **An error goes under the `err` key.** `pino.stdSerializers.err` is wired to that key alone, and the comment records that every call site was standardised on it so the single mapping suffices.
 
 One UI-specific fact that lives here: **`~/lib/logger` imports `mkdirSync` from `"fs"`, so it cannot be imported into a Client Component.** `console.*` is therefore correct and expected inside `"use client"` files. Don't "fix" a console call in a client component by swapping in `~/lib/logger`; that breaks the build.
 
