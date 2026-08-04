@@ -1,5 +1,9 @@
 {
   "permissions": {
+    "allow": [
+      "mcp__github_inline_comment__create_inline_comment",
+      "Bash(gh api repos/timothyfroehlich/PinPoint/pulls/*/comments*)"
+    ],
     "deny": [
       "Bash(supabase db push:*)",
       "Bash(supabase projects delete:*)",
@@ -9,6 +13,9 @@
       "Bash(killall:*)",
       "Bash(gh issue delete *)",
       "Bash(gh repo delete *)",
+      "Bash(gh api *DELETE*)",
+      "Bash(gh api *PATCH*)",
+      "Bash(gh api *PUT*)",
       "Bash(shutdown:*)",
       "Bash(reboot:*)",
       "Bash(mkfs:*)"

@@ -9,12 +9,19 @@ set -euo pipefail
 # current head, a later fix (new head SHA) invalidates the attestation and forces
 # a fresh review.
 #
-# Since PP-4ric this is the ONLY thing that satisfies that gate — Copilot review was
-# retired on 2026-08-02 and no bot reviews this repo. What it attests to is Tim having
-# run `/code-review` over the branch: that is a Claude Code harness built-in an agent
-# cannot launch, so the review itself is a handoff and this helper is what records it.
-# The one exception is a genuinely trivial change (a typo, a comment, a one-line
-# mechanical fix), where the summary should say why it was trivial.
+# What it attests to is Tim having run `/code-review` over the branch: that is a Claude
+# Code harness built-in an agent cannot launch, so the review itself is a handoff and
+# this helper is what records it. The one exception is a genuinely trivial change (a
+# typo, a comment, a one-line mechanical fix), where the summary should say why it was
+# trivial.
+#
+# This was the ONLY thing that satisfied that gate between PP-4ric (Copilot review
+# retired, 2026-08-02) and PP-97tt, which taught the gate to accept the inline review
+# comments `/code-review <depth> --comment <PR>` posts. Those cover the reviews that
+# FOUND something; this helper covers the rest — a review that found nothing, one run at
+# `ultra` (the cloud path cannot post comments), one run without the flag, and the
+# trivial carve-out. It is also still worth posting alongside comments, because they
+# record no depth and this does.
 #
 # The helper only *attests* — the caller is responsible for the review having actually
 # happened. Posting the marker for a review nobody ran is a false attestation, not a

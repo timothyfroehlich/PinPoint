@@ -1,6 +1,6 @@
 ---
 name: pinpoint-pr-workflow
-description: The PR-lifecycle decisions the scripts and gates do not state — why getting reviewed is a handoff (Tim runs `/code-review`; an agent cannot) and why the SHA-pinned marker you post is the only thing that satisfies the `reviewed` gate, which pushes let you re-attest versus needing a fresh review, the narrow trivial-change exception, why the merge handoff is a script you run rather than a summary you write, the `--pages` screenshot gotchas, and the Dependabot back-to-back lockfile trap. Use when committing, opening a PR, handing a branch to Tim for review, attesting a reviewed head, addressing review comments, posting screenshots, handing a PR over to merge, or landing the plane after Tim merges.
+description: The PR-lifecycle decisions the scripts and gates do not state — why getting reviewed is a handoff (Tim runs `/code-review`; an agent cannot), why you hand him `--comment <PR#>` and what satisfies the `reviewed` gate when that leaves nothing behind, which pushes let you re-attest versus needing a fresh review, the narrow trivial-change exception, why the merge handoff is a script you run rather than a summary you write, the `--pages` screenshot gotchas, and the Dependabot back-to-back lockfile trap. Use when committing, opening a PR, handing a branch to Tim for review, attesting a reviewed head, addressing review comments, posting screenshots, handing a PR over to merge, or landing the plane after Tim merges.
 ---
 
 # PinPoint PR Workflow
@@ -85,13 +85,33 @@ Every unresolved thread counts, whoever opened it — the `threads` gate is auth
 
 The reviewer is **Tim, running `/code-review` on the branch**. You cannot do this for him — `/code-review` is a Claude Code harness built-in only he can trigger (`ultra` likewise, and billed). So the review is a **handoff**, and your job is to make the handoff at the right moment and record the result.
 
+#### Hand him this command, verbatim
+
+Don't ask him to "run `/code-review` on the branch" — give him the line to paste:
+
+```
+/code-review <depth> --comment <PR#>
+```
+
+Both additions carry weight, and neither is optional:
+
+- **`--comment`** posts each finding to the PR as an inline review comment instead of leaving it in his terminal. That turns every finding into a review thread, so the `threads` gate refuses the merge until you fix or decline-and-resolve each one — and the comments pin the head SHA themselves, which satisfies the `reviewed` gate without a second step (PP-97tt).
+- **`<PR#>`** is what makes `--comment` do anything. The flag only posts when the review target is a GitHub PR; run against the local branch it is silently ignored and the findings print to his terminal as before.
+
+Two limits worth knowing before you suggest a depth:
+
+- **`ultra` does not post comments.** The cloud path honours `--fix` but has no comment-posting counterpart, so `--comment` there is a no-op. If Tim runs `ultra`, you are back to reading the findings from him and attesting with the marker.
+- **A clean review posts nothing.** No findings, no comments, no evidence — and the gate reads `unreviewed`. That case is yours to record, with the marker.
+
+**If the findings come back as terminal text rather than PR threads, posting was blocked, not skipped.** That is what happened on the first real run of this flow: neither the inline-comment MCP tool nor the `gh api` fallback was permitted, so a review that found four things left no trace. `.claude/settings.json` allows both now — but the classifier still refuses some call shapes intermittently, so this stays a thing that happens rather than a thing that was fixed. Treat it as a review that posted nothing: address the findings from what Tim pastes you, then attest with the marker, because the gate is correctly still red.
+
 #### Sequencing
 
 1. Open the PR whenever you like and watch CI. Nothing is reviewing yet, so an early PR costs nothing.
 2. Finish **all** the work: the implementation, the CI fixes, the merge-from-main. Stop iterating.
-3. Ask Tim for the review, naming the branch, and wait. This is a real stop — don't fill the time with more commits, because every push invalidates the review he is about to give you.
-4. Address the findings: fix → push → and note that head has moved (see below). Consciously decline the rest, with a reason. **A review that found nothing worth fixing skips straight to step 5** — there is no push, so head is already the SHA he read.
-5. Attest the head he reviewed — **this step is yours, always, and it is the only thing that satisfies the gate.** A clean review with an unposted marker reads to `merge-pr.sh` as `unreviewed`, so the review Tim ran buys nothing until you post it:
+3. Hand him the command above and wait. This is a real stop — don't fill the time with more commits, because every push invalidates the review he is about to give you.
+4. Address the findings: fix → push → and note that head has moved (see below). Consciously decline the rest, with a reason, and resolve the thread either way.
+5. **Attest the head he reviewed whenever the review left no comments behind** — a review that found nothing, or one run at `ultra`, or one he ran without `--comment`. In each of those the PR carries no evidence, and `merge-pr.sh` reads `unreviewed` until you post it:
 
    ```bash
    bash scripts/workflow/mark-claude-review.sh <PR> <depth> "<one-line findings summary>"
@@ -101,17 +121,25 @@ The reviewer is **Tim, running `/code-review` on the branch**. You cannot do thi
 
    `<depth>` is the level Tim actually ran — `low | medium | high | xhigh | max | ultra` (or `trivial`, below). It is required and has no default: "a review happened" and "a `/code-review low` happened" are different facts, and the merge handoff report states which one. If you don't know which he ran, ask — guessing here writes a false claim into the record that reads exactly like a true one.
 
+   **Posting it anyway is still worth doing when the comments already cleared the gate**, because they carry no depth: the handoff report can say "inline review comments · depth unrecorded" or it can name the level Tim ran, and the second is the better record.
+
 6. Then 3.5 / 3.6.
 
 **Finish your churn before you ask.** This mattered under the bot reviewer because a review cost quota; it matters more now because it costs Tim's attention. Asking for a review of a tree you're about to change wastes the more expensive resource.
 
 #### Pushing after the review
 
-**The marker pins a SHA, so any push invalidates it** — the gate flips to `stale_marker` and says so. That's deliberate: a 3-commit fixup must not inherit the review of the commit before it.
+**Both kinds of evidence pin a SHA, so any push invalidates them** — the gate flips to `stale_marker` or `stale_comments` and says so. That's deliberate: a 3-commit fixup must not inherit the review of the commit before it.
+
+**Resolving the threads does not re-attest.** A reply is created against whatever head is current, so counting one would let you clear the gate by answering the thread you just fixed. Replies are excluded for exactly that reason — after you push the fixes, the review comments still pin the commit Tim read, and the gate still says `stale_comments`.
+
+**`stale_comments` is cleared by the marker.** Nothing re-posts a reviewer's comments at a new SHA, so `mark-claude-review.sh` is the exit even though the review that raised the findings was his. The rule for _whether_ you may re-attest is unchanged and is the one below.
+
+That is the honest exit, not an enforced one: a _new_ top-level comment on the new head would also flip the state to `commented`. Don't reach for that — it records a review of the new head that nobody performed, which is the false attestation the marker's own docs warn about, arriving through a different door.
 
 Which of two things you do next depends on what you pushed:
 
-- **The fixes he asked for.** Re-attest at the new head and say so in the summary — `"applied review findings from <old_sha>"`. A reviewer's own requested changes are within what they reviewed; this is the same round-trip any human review has.
+- **The fixes he asked for.** Re-attest at the new head with `mark-claude-review.sh` and say so in the summary — `"applied review findings from <old_sha>"`. A reviewer's own requested changes are within what they reviewed; this is the same round-trip any human review has. The marker is the only way to clear it here: his comments are stuck on the old SHA and nothing re-posts them.
 - **Anything else** — new work, a refactor you thought of, a scope addition. That needs a fresh `/code-review`. Re-attesting over it is a false attestation.
 
 If you're unsure which bucket you're in, ask. The cost of asking is one message; the cost of guessing wrong is merging something nobody read.
@@ -133,6 +161,8 @@ This is a narrow exception and it is self-policing. "It's only a small change" i
 #### Readiness is not review
 
 `pr-watch.py --check-ready` reports review state but does **not** gate on it. That check answers "is this PR worth Tim's `/code-review` right now?", and the review is what happens after that answer is yes — gating on it would be circular. Check-ready green means "hand it to Tim", not "will merge".
+
+The five states and their verdicts are `scripts/workflow/AGENTS.md`; the gate prints its own remedy. Two properties it does **not** print: a marker outranks review comments when both pin head, by fixed precedence rather than by timestamp — the two clocks aren't comparable. And a `gh` failure on either lookup reads as "no evidence there", which is fail-closed by construction, since a lookup can only remove evidence, never add it.
 
 Don't tell Tim a PR is "ready" or "done" while head is unreviewed — say it's ready for his `/code-review`, which is a different claim.
 

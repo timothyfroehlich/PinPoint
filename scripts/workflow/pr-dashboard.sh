@@ -103,10 +103,10 @@ for pr in $PRS; do
         review_str="${thread_count} unres"
     elif _compute_review_state "$pr" 2>/dev/null; then
         case "$RS_STATE" in
-            marker)       review_str="reviewed" ;;
-            stale_marker) review_str="RE-REVIEW" ;;
-            unreviewed)   review_str="NOT REVIEWED" ;;
-            *)            review_str="?" ;;
+            marker | commented)            review_str="reviewed" ;;
+            stale_marker | stale_comments) review_str="RE-REVIEW" ;;
+            unreviewed)                    review_str="NOT REVIEWED" ;;
+            *)                             review_str="?" ;;
         esac
     else
         review_str="?"

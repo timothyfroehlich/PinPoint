@@ -90,6 +90,9 @@ def stub_repo(
 
         (tmp_path / "pr_info.json").write_text(pr_info)
         (tmp_path / "comments.json").write_text(comments)
+        # No inline review comments: these tests drive the marker path, and an empty
+        # answer here is the honest one rather than a fall-through that happens to work.
+        (tmp_path / "review-comments.json").write_text("[]")
         (tmp_path / "threads.json").write_text(EMPTY_THREADS)
         (tmp_path / "rollup.json").write_text(ci_rollup)
 
@@ -112,7 +115,12 @@ def stub_repo(
             '  *"nameWithOwner"*) printf "acme/widget\\n" ;;\n'
             '  *graphql*) cat "$STUB_THREADS" ;;\n'
             '  *"/commits/"*) printf "%s\\n" "$STUB_HEAD_DATE" ;;\n'
-            '  *"/issues/"*"/comments") cat "$STUB_COMMENTS" ;;\n'
+            # Trailing `*` on both comment endpoints, NOT an end anchor: the gates append
+            # `?per_page=100`, and an anchored pattern silently falls through to the
+            # catch-all instead of returning the markers — which reads as `unreviewed`
+            # and fails the gate, several tests away from the line that caused it.
+            '  *"/issues/"*"/comments"*) cat "$STUB_COMMENTS" ;;\n'
+            '  *"/pulls/"*"/comments"*) cat "$STUB_REVIEW_COMMENTS" ;;\n'
             '  *"/pulls/"*"/reviews") printf "[]\\n" ;;\n'
             '  *) printf "UNEXPECTED gh call: %s\\n" "$args" >&2; exit 1 ;;\n'
             "esac\n"
@@ -157,6 +165,7 @@ def stub_repo(
         env["STUB_HEAD_DATE"] = head_date
         env["STUB_PR_INFO"] = str(tmp_path / "pr_info.json")
         env["STUB_COMMENTS"] = str(tmp_path / "comments.json")
+        env["STUB_REVIEW_COMMENTS"] = str(tmp_path / "review-comments.json")
         env["STUB_THREADS"] = str(tmp_path / "threads.json")
         env["STUB_ROLLUP"] = str(tmp_path / "rollup.json")
         env["STUB_MERGED"] = str(merged_marker)

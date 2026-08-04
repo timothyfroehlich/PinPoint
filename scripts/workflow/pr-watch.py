@@ -70,8 +70,8 @@ CI_GATE_NAME = "CI Gate"
 CLAUDE_MARKER_PREFIX = "<!-- pinpoint-claude-review:"
 
 REVIEW_HINT = (
-    "ask Tim to run /code-review, then attest with "
-    "scripts/workflow/mark-claude-review.sh {pr} <depth>"
+    "ask Tim to run `/code-review <depth> --comment {pr}` so the findings land "
+    "on the PR, or attest with scripts/workflow/mark-claude-review.sh {pr} <depth>"
 )
 
 STARTUP_RETRIES = 6  # attempts to find runs for current SHA
@@ -242,7 +242,7 @@ def _marker_shas(pr: int) -> list[str]:
     A list rather than "the" marker: mark-claude-review.sh keeps one sticky
     comment, but nothing stops a second session or a hand-posted comment from
     leaving two, and a reader that picks one comment can disagree with the
-    writer about which is canonical — see `_marker_verdict` in _pr-gates.sh.
+    writer about which is canonical — see `_review_verdict` in _pr-gates.sh.
     """
     repo = f"repos/{REPO_OWNER}/{REPO_NAME}"
     return [
@@ -252,13 +252,48 @@ def _marker_shas(pr: int) -> list[str]:
     ]
 
 
+def _review_comment_shas(pr: int) -> list[str]:
+    """Every SHA pinned by a top-level inline review comment, oldest first.
+
+    The second kind of review evidence (PP-97tt): `/code-review <depth>
+    --comment <PR>` posts its findings here, and those comments pin the commit
+    the reviewer read.
+
+    Two filters carry the whole meaning, and both mirror `_review_record` in
+    _pr-gates.sh:
+
+    - `original_commit_id`, never `commit_id`. GitHub re-anchors `commit_id` as
+      a PR advances, so reading it would report every review comment as pinning
+      head forever — a permanent false green.
+    - replies excluded. A reply is created at whatever head is current, so an
+      agent answering the thread it just fixed would otherwise re-attest a
+      commit no reviewer has seen.
+
+    Ordered by `updated_at`, not by API order, because the bash groups by SHA
+    and takes `sort_by(.at) | last`. Only the last element is ever read — it is
+    the SHA the "you pushed after the review" message names — so taking the API
+    order here would let the two tools name DIFFERENT commits whenever an older
+    finding was edited most recently. The verdict would still agree; the report
+    would not, and a reader has no way to tell which one is lying.
+    """
+    repo = f"repos/{REPO_OWNER}/{REPO_NAME}"
+    top_level = [
+        c
+        for c in _gh_api_list(f"{repo}/pulls/{pr}/comments")
+        if c.get("in_reply_to_id") is None and c.get("original_commit_id")
+    ]
+    top_level.sort(key=lambda c: c.get("updated_at") or c.get("created_at") or "")
+    return [c["original_commit_id"] for c in top_level]
+
+
 def review_state(pr: int) -> tuple[str, str]:
     """Return (state, human-readable detail) for the PR's review situation.
 
-    Mirrors `_compute_review_state` in scripts/workflow/_pr-gates.sh — same three
-    states, same ordering. States: marker, stale_marker, unreviewed.
+    Mirrors `_compute_review_state` in scripts/workflow/_pr-gates.sh — same five
+    states, same ordering. States: marker, commented, stale_marker,
+    stale_comments, unreviewed.
 
-    The distinction that matters is `stale_marker`: the PR visibly HAS a review,
+    The distinction that matters is the stale pair: the PR visibly HAS a review,
     so the reflex is to read it as reviewed, when in fact the commit about to
     merge was never looked at. Nothing re-attests automatically.
     """
@@ -266,21 +301,30 @@ def review_state(pr: int) -> tuple[str, str]:
         "headRefOid"
     ]
     pinned = _marker_shas(pr)
+    commented = _review_comment_shas(pr)
 
     if head_sha in pinned:
         return "marker", f"review marker pins head {head_sha[:7]}"
-    if not pinned:
+    if head_sha in commented:
+        return "commented", f"inline review comments pin head {head_sha[:7]}"
+    if not pinned and not commented:
         return (
             "unreviewed",
-            f"no review marker — head {head_sha[:7]} is unreviewed; "
+            f"no review marker or review comments — head {head_sha[:7]} is "
+            f"unreviewed; {REVIEW_HINT.format(pr=pr)}",
+        )
+    if pinned:
+        return (
+            "stale_marker",
+            f"the marker pins {pinned[-1][:7]} but head is {head_sha[:7]} — you "
+            f"pushed after the review, so what would merge was never read; "
             f"{REVIEW_HINT.format(pr=pr)}",
         )
-    marker_sha = pinned[-1]
     return (
-        "stale_marker",
-        f"the marker pins {marker_sha[:7]} but head is {head_sha[:7]} — you "
-        f"pushed after the review, so what would merge was never read; "
-        f"{REVIEW_HINT.format(pr=pr)}",
+        "stale_comments",
+        f"the review comments pin {commented[-1][:7]} but head is "
+        f"{head_sha[:7]} — you pushed after the review, so what would merge was "
+        f"never read; {REVIEW_HINT.format(pr=pr)}",
     )
 
 
