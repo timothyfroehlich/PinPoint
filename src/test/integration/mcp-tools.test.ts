@@ -212,6 +212,217 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
       expect(result.total).toBe(1);
       expect(result.hasMore).toBe(false);
     });
+
+    describe("pinballmap link-state filter (PP-u4ab.9)", () => {
+      interface LinkStatePage {
+        count: number;
+        total: number;
+        offset: number;
+        hasMore: boolean;
+        machines: { initials: string; name: string }[];
+      }
+
+      let pbmCatalogId = 800_000;
+
+      /**
+       * Move a seeded machine into a PinballMap link state. An UPDATE after
+       * `seedMachine` rather than a second insert path, so machine creation
+       * (and the initials counter) stays in one place.
+       */
+      async function setLinkState(
+        id: string,
+        state: "linked" | "excluded"
+      ): Promise<void> {
+        const db = await getTestDb();
+        if (state === "linked") {
+          pbmCatalogId += 1;
+          await db
+            .update(machines)
+            .set({ pinballmapMachineId: pbmCatalogId })
+            .where(eq(machines.id, id));
+        } else {
+          await db
+            .update(machines)
+            .set({
+              pinballmapExcluded: true,
+              pinballmapExcludedReason: "Homebrew, no catalog title",
+            })
+            .where(eq(machines.id, id));
+        }
+      }
+
+      async function list(
+        args: Parameters<typeof runListMachines>[0],
+        admin: string
+      ): Promise<LinkStatePage> {
+        const outcome = await runListMachines(args, ctx("admin", admin));
+        return outcome.result as LinkStatePage;
+      }
+
+      it("'unlinked' skips machines marked as not on PinballMap", async () => {
+        const admin = await makeUser("admin");
+        const worklist = await seedMachine({ name: "Link Alpha" });
+        const linked = await seedMachine({ name: "Link Bravo" });
+        const excluded = await seedMachine({ name: "Link Charlie" });
+        await setLinkState(linked.id, "linked");
+        await setLinkState(excluded.id, "excluded");
+
+        const result = await list({ pinballmap: "unlinked" }, admin);
+
+        // The exclusion half is the point: a machine deliberately marked as not
+        // on PinballMap is finished work, so it must not come back as a to-do on
+        // every sweep of the linking pass.
+        expect(result.machines.map((m) => m.initials)).toEqual([
+          worklist.initials,
+        ]);
+        expect(result.total).toBe(1);
+        expect(result.hasMore).toBe(false);
+      });
+
+      it("'linked' and 'excluded' return their own buckets", async () => {
+        const admin = await makeUser("admin");
+        await seedMachine({ name: "Bucket Alpha" });
+        const linked = await seedMachine({ name: "Bucket Bravo" });
+        const excluded = await seedMachine({ name: "Bucket Charlie" });
+        await setLinkState(linked.id, "linked");
+        await setLinkState(excluded.id, "excluded");
+
+        const linkedPage = await list({ pinballmap: "linked" }, admin);
+        const excludedPage = await list({ pinballmap: "excluded" }, admin);
+
+        expect(linkedPage.machines.map((m) => m.initials)).toEqual([
+          linked.initials,
+        ]);
+        expect(linkedPage.total).toBe(1);
+        expect(excludedPage.machines.map((m) => m.initials)).toEqual([
+          excluded.initials,
+        ]);
+        expect(excludedPage.total).toBe(1);
+      });
+
+      it("composes with search and presence", async () => {
+        const admin = await makeUser("admin");
+        const target = await seedMachine({
+          name: "Sweep Target",
+          presenceStatus: "off_the_floor",
+        });
+        // Each of these fails exactly one of the three filters.
+        await seedMachine({
+          name: "Sweep Onfloor",
+          presenceStatus: "on_the_floor",
+        });
+        await seedMachine({
+          name: "Other Offfloor",
+          presenceStatus: "off_the_floor",
+        });
+        const linked = await seedMachine({
+          name: "Sweep Linked",
+          presenceStatus: "off_the_floor",
+        });
+        await setLinkState(linked.id, "linked");
+
+        const result = await list(
+          {
+            search: "Sweep",
+            presence: "off_the_floor",
+            pinballmap: "unlinked",
+          },
+          admin
+        );
+
+        expect(result.machines.map((m) => m.initials)).toEqual([
+          target.initials,
+        ]);
+        expect(result.total).toBe(1);
+      });
+
+      it("pages a 100+ machine fleet by link state without repeats or gaps", async () => {
+        const admin = await makeUser("admin");
+        const db = await getTestDb();
+
+        const rows: (typeof machines.$inferInsert)[] = [];
+        const expectedUnlinked: string[] = [];
+        for (let i = 0; i < 110; i += 1) {
+          const initials = nextInitials();
+          // Eight cabinets share each title. Duplicate same-title cabinets are
+          // real in this collection, and 8 does not divide the page size of 25,
+          // so every page boundary lands INSIDE a tie group — which is the only
+          // arrangement that can catch an unstable sort.
+          const name = `Fleet Title ${String(Math.floor(i / 8)).padStart(2, "0")}`;
+          if (i % 5 === 0) {
+            rows.push({ name, initials, pinballmapMachineId: 900_000 + i });
+          } else if (i % 17 === 0) {
+            rows.push({ name, initials, pinballmapExcluded: true });
+          } else {
+            rows.push({ name, initials });
+            expectedUnlinked.push(initials);
+          }
+        }
+        // Inserted in reverse, so within every tie group the heap order is the
+        // OPPOSITE of the order the tool must return. Without a tiebreaker
+        // Postgres is free to hand back the heap order, and the sweep below
+        // sees one cabinet twice while another never appears.
+        await db.insert(machines).values([...rows].reverse());
+
+        const seen: string[] = [];
+        const limit = 25;
+        let offset = 0;
+        let total = -1;
+        // Bounded: a `hasMore` that never clears is the bug this guards, and an
+        // unbounded loop would hang the suite instead of failing it.
+        for (let page = 0; page < 10; page += 1) {
+          const result = await list(
+            { pinballmap: "unlinked", limit, offset },
+            admin
+          );
+          total = result.total;
+          seen.push(...result.machines.map((m) => m.initials));
+          if (!result.hasMore) break;
+          offset += limit;
+        }
+
+        // The count query and the page query must share the filter — a total
+        // that outruns what paging can reach is a loop that never terminates.
+        expect(total).toBe(expectedUnlinked.length);
+        // No repeats, and no gaps. Set equality is the assertion that matters:
+        // a sweep can return the right NUMBER of rows while having handed back
+        // one machine twice and skipped another, and that failure reports
+        // itself as a completed pass.
+        expect(new Set(seen).size).toBe(seen.length);
+        expect([...seen].sort()).toEqual([...expectedUnlinked].sort());
+      });
+
+      it("breaks name ties by initials, so a paged sweep is a total order", async () => {
+        const admin = await makeUser("admin");
+        const db = await getTestDb();
+
+        // Six cabinets, one title. `name` is not a unique key in this
+        // collection — duplicate same-title cabinets are a supported case (see
+        // the PinballMap tie guard, PP-o355.15).
+        const expected = Array.from({ length: 6 }, () => nextInitials()).sort();
+        await db
+          .insert(machines)
+          .values(
+            [...expected]
+              .reverse()
+              .map((initials) => ({ name: "Medieval Madness", initials }))
+          );
+
+        const seen: string[] = [];
+        for (let offset = 0; offset < expected.length; offset += 2) {
+          const page = await list(
+            { pinballmap: "unlinked", limit: 2, offset },
+            admin
+          );
+          seen.push(...page.machines.map((m) => m.initials));
+        }
+
+        // Every page boundary falls inside the tie group, so an order that is
+        // only stable within a single query — not across the separate queries
+        // paging actually issues — shows up here as a duplicate plus a miss.
+        expect(seen).toEqual(expected);
+      });
+    });
   });
 
   describe("get_machine", () => {
