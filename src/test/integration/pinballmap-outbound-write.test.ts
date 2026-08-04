@@ -415,6 +415,56 @@ describe("PinballMap outbound writes (PGlite)", () => {
     expect(row?.pinballmapLmxId).toBeNull();
   });
 
+  it("unlists through a drifted lmx instead of deleting nothing", async () => {
+    // PP-rnup. PBM re-minted the title's row (delete + re-add outside its
+    // resurrection window), so the id we stored is dead and the hourly sync has
+    // already put the LIVE id in the snapshot. Keying the removal on the stored
+    // handle deleted nothing — PBM answered `not_found`, we cleared the local
+    // flag, the title stayed on the public lineup, and the next reconcile pass
+    // re-listed the cabinet. The human's unlist silently un-happened AND the
+    // machine never actually left PinballMap.
+    const db = await getTestDb();
+    const { unlistMachineFromPinballMapAction } =
+      await import("~/app/(app)/m/pinballmap-actions");
+    const { reconcileAfterSync } = await import("~/lib/pinballmap/sync");
+    const admin = await createUser("admin");
+    await mockAuthAs(admin.id);
+    pbm.lineup = [{ id: 777, machineId: TITLE_ID }];
+    await seedState([{ id: 777, machineId: TITLE_ID }]);
+
+    const [machine] = await db
+      .insert(machines)
+      .values({
+        name: "Godzilla",
+        initials: "GZ",
+        pinballmapMachineId: TITLE_ID,
+        pinballmapListed: true,
+        // The stale handle — never healed before the human clicked Unlist.
+        pinballmapLmxId: 500,
+      })
+      .returning();
+    if (!machine) throw new Error("failed to seed machine");
+
+    const result = await unlistMachineFromPinballMapAction(
+      undefined,
+      form(machine.id)
+    );
+
+    expect(result.ok).toBe(true);
+    // The live row is gone from PinballMap — the whole point of the button.
+    expect(pbm.lineup).toEqual([]);
+    // …and the stored lineup no longer carries the title, so reconcile agrees.
+    const state = await db.query.pinballmapState.findFirst();
+    expect(state?.snapshotJson?.lmxes).toEqual([]);
+    const reconciled = await reconcileAfterSync();
+    expect(reconciled.linked).toBe(0);
+    const row = await db.query.machines.findFirst({
+      where: eq(machines.id, machine.id),
+    });
+    expect(row?.pinballmapListed).toBe(false);
+    expect(row?.pinballmapLmxId).toBeNull();
+  });
+
   it("clears the local listing when the lmx is already gone from PinballMap", async () => {
     // Someone deleted the entry on pinballmap.com directly. That is the desync
     // Remove exists to resolve, so a `not_found` finishes the job instead of

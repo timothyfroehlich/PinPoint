@@ -83,7 +83,8 @@ describe("withLmxRemoved", () => {
         { id: 1, machineId: 10 },
         { id: 2, machineId: 20 },
       ]),
-      1
+      1,
+      10
     );
 
     expect(result.lmxes).toEqual([
@@ -93,15 +94,52 @@ describe("withLmxRemoved", () => {
   });
 
   it("is a no-op when the lmx is already absent", () => {
-    const result = withLmxRemoved(snapshot([{ id: 1, machineId: 10 }]), 99);
+    const result = withLmxRemoved(snapshot([{ id: 1, machineId: 10 }]), 99, 99);
 
     expect(result.lmxes).toHaveLength(1);
     expect(result.machineCount).toBe(1);
   });
 
+  it("drops a re-minted row for the same title, not just the id passed", () => {
+    // PP-rnup. The stored snapshot can hold a DIFFERENT id for the title we
+    // just unlisted — PBM re-mints an lmx after a delete + re-add outside its
+    // resurrection window. Filtering on id alone left that row behind, and
+    // `resolveAutoLink` reads any row under the title as "still on the lineup"
+    // and re-lists the machine, silently undoing the human's unlist.
+    const result = withLmxRemoved(
+      snapshot([
+        { id: 2, machineId: 10 },
+        { id: 3, machineId: 20 },
+      ]),
+      1,
+      10
+    );
+
+    expect(result.lmxes).toEqual([
+      expect.objectContaining({ id: 3, machineId: 20 }),
+    ]);
+    expect(result.machineCount).toBe(1);
+  });
+
+  it("falls back to the id alone when the machine carries no title link", () => {
+    const result = withLmxRemoved(
+      snapshot([
+        { id: 1, machineId: 10 },
+        { id: 2, machineId: 20 },
+      ]),
+      1,
+      null
+    );
+
+    expect(result.lmxes).toEqual([
+      expect.objectContaining({ id: 2, machineId: 20 }),
+    ]);
+    expect(result.machineCount).toBe(1);
+  });
+
   it("does not mutate the input", () => {
     const input = snapshot([{ id: 1, machineId: 10 }]);
-    withLmxRemoved(input, 1);
+    withLmxRemoved(input, 1, 10);
 
     expect(input.lmxes).toHaveLength(1);
   });

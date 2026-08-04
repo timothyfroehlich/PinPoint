@@ -528,12 +528,28 @@ export async function unlistMachineFromPinballMapAction(
   if (!authed.ok) return authed.result;
   const { userId, machine } = authed;
 
-  const lmxId = machine.pinballmapLmxId;
-  if (!machine.pinballmapListed || lmxId === null)
+  const storedLmxId = machine.pinballmapLmxId;
+  if (!machine.pinballmapListed || storedLmxId === null)
     return err("VALIDATION", "This machine isn't listed on Pinball Map.");
 
   const state = await getPinballMapState();
   if (!state) return err("SERVER", "Pinball Map isn't configured yet");
+
+  // Delete the lmx the lineup ACTUALLY carries, not the handle we happen to
+  // store. When PBM re-mints a row (delete + re-add outside its 7-day
+  // resurrection window) our stored id goes stale — the `lmx_drifted` state
+  // auto-link heals as `reconnected`. Unlisting on the stale id deletes nothing:
+  // PBM answers `not_found`, we clear the local flag, and the title is still on
+  // the public lineup, so the next auto-link pass re-lists the machine. The
+  // human's unlist silently un-happens and the cabinet never left PinballMap.
+  // Resolving through the snapshot by title is the same lookup auto-link uses,
+  // so the two agree on which row is live. Falls back to the stored id when the
+  // title is absent from the lineup entirely — that IS the already-gone case the
+  // `not_found` branch below exists to finish.
+  const liveLmxId =
+    (machine.pinballmapMachineId !== null && state.snapshotJson
+      ? findLmxForMachine(state.snapshotJson, machine.pinballmapMachineId)?.id
+      : undefined) ?? storedLmxId;
 
   // --- non-transactional effects, both BEFORE the transaction ---
   const credentials = await getPinballMapWriteCredentials();
@@ -544,7 +560,7 @@ export async function unlistMachineFromPinballMapAction(
     );
 
   const client = await getPinballMapClient();
-  const written = await client.removeMachine({ credentials, lmxId });
+  const written = await client.removeMachine({ credentials, lmxId: liveLmxId });
   // `not_found` means the lmx is already gone from PinballMap — someone deleted
   // the entry on pinballmap.com directly. That is the desync this button exists
   // to resolve, and it is the one failure whose desired end state (not on PBM,
@@ -563,7 +579,11 @@ export async function unlistMachineFromPinballMapAction(
   }
   if (!written.ok) {
     log.info(
-      { lmxId, machineId: machine.id, action: "pinballmap.removeMachine" },
+      {
+        lmxId: liveLmxId,
+        machineId: machine.id,
+        action: "pinballmap.removeMachine",
+      },
       "PinballMap lmx already absent — clearing the local listing anyway"
     );
   }
@@ -576,13 +596,22 @@ export async function unlistMachineFromPinballMapAction(
       .update(machines)
       .set({ pinballmapListed: false, pinballmapLmxId: null })
       .where(eq(machines.id, machine.id));
-    await editStoredSnapshot(tx, (snapshot) => withLmxRemoved(snapshot, lmxId));
+    await editStoredSnapshot(tx, (snapshot) =>
+      withLmxRemoved(snapshot, liveLmxId, machine.pinballmapMachineId)
+    );
     await createMachineTimelineEvent(
       machine.id,
       {
         sourceType: "lifecycle",
         tag: "lifecycle",
-        eventData: { kind: "pinballmap_listing", action: "unlisted", lmxId },
+        // The lmx we actually deleted, which is the stored one except after a
+        // re-mint. Recording the stale handle would make the timeline disagree
+        // with what PinballMap saw.
+        eventData: {
+          kind: "pinballmap_listing",
+          action: "unlisted",
+          lmxId: liveLmxId,
+        },
         actorId: userId,
       },
       tx

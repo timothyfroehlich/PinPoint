@@ -20,6 +20,7 @@ import { describe, expect, it } from "vitest";
 import {
   describeTarget,
   isCloudDatabaseUrl,
+  isForceProductionEnabled,
   isPinPointProductionTarget,
   PRODUCTION_PROJECT_REF,
 } from "../../../../scripts/lib/db-target.mjs";
@@ -125,6 +126,30 @@ describe("db-target — isPinPointProductionTarget (exact project)", () => {
   it("does not match a local stack", () => {
     expect(isPinPointProductionTarget(LOCAL_URL)).toBe(false);
   });
+});
+
+describe("db-target — isForceProductionEnabled (opt-in, not truthiness)", () => {
+  // PP-rnup. All three FORCE_PRODUCTION guards used to read
+  // `Boolean(process.env[...])`, which is backwards for a guard: the two
+  // spellings an operator reaches for to turn a flag OFF are both truthy
+  // strings, so `=0` ENABLED the prod bypass.
+  it.each(["0", "false", "off", "no", "", "  ", "yes", "1 1", "true-ish"])(
+    "treats %o as disabled",
+    (value) => {
+      expect(isForceProductionEnabled(value)).toBe(false);
+    }
+  );
+
+  it("treats an unset variable as disabled", () => {
+    expect(isForceProductionEnabled(undefined)).toBe(false);
+  });
+
+  it.each(["1", "true", "TRUE", " 1 ", "True"])(
+    "treats %o as enabled",
+    (value) => {
+      expect(isForceProductionEnabled(value)).toBe(true);
+    }
+  );
 });
 
 describe("db-target — describeTarget never leaks credentials", () => {
@@ -337,11 +362,72 @@ describe("mark-migration-applied.ts — production confirmation gate", () => {
     expect(stderr).toContain("Failed to mark migration as applied");
   });
 
+  it("still refuses when the token is set to a falsey STRING", () => {
+    // PP-rnup. `Boolean("0")` is true, so the old truthiness read turned an
+    // operator's attempt to disable the bypass into an enable.
+    const { status, stderr } = runTsxScript(
+      script,
+      {
+        POSTGRES_URL: PROD_POOLER_URL,
+        MARK_MIGRATION_FORCE_PRODUCTION: "0",
+      },
+      ["0001"]
+    );
+    expect(status).toBe(1);
+    expect(stderr).toContain(
+      "Refusing to write to drizzle.__drizzle_migrations"
+    );
+  });
+
   it("does not gate a localhost target at all", () => {
     const { stderr } = runTsxScript(script, { POSTGRES_URL: LOCAL_URL }, [
       "0001",
     ]);
     expect(stderr).not.toContain("Refusing to write");
+  });
+});
+
+describe("seed-pinballmap-creds.mjs — prod-capable behind an explicit opt-in", () => {
+  const script = "supabase/seed-pinballmap-creds.mjs";
+  // No credentials in the env: the guard runs first, and on the paths that get
+  // past it the script exits at the "not both set" skip — BEFORE it opens a
+  // client. Nothing here can reach a real PinballMap or prod endpoint.
+
+  it("refuses the production project with no opt-in", () => {
+    const { status, stderr } = runScript(script, {
+      POSTGRES_URL: PROD_POOLER_URL,
+    });
+    expect(status).toBe(1);
+    expect(stderr).toContain("Refusing to write PinballMap credentials");
+    expect(stderr).toContain("SEED_PINBALLMAP_CREDS_FORCE_PRODUCTION=1");
+    expect(stderr).not.toContain(":pw@");
+  });
+
+  it("still refuses when the opt-in is set to a falsey STRING", () => {
+    // PP-rnup, and the sharpest instance of it: this script writes an operator
+    // token into prod's Vault, so `=0` meaning "yes" pushes a DEV credential
+    // into production.
+    const { status, stderr } = runScript(script, {
+      POSTGRES_URL: PROD_POOLER_URL,
+      SEED_PINBALLMAP_CREDS_FORCE_PRODUCTION: "0",
+    });
+    expect(status).toBe(1);
+    expect(stderr).toContain("Refusing to write PinballMap credentials");
+  });
+
+  it("permits the prod path once the opt-in is really set", () => {
+    const { status, stderr } = runScript(script, {
+      POSTGRES_URL: PROD_POOLER_URL,
+      SEED_PINBALLMAP_CREDS_FORCE_PRODUCTION: "1",
+    });
+    expect(stderr).not.toContain("Refusing to write PinballMap credentials");
+    // Past the gate, then out at the no-credentials skip without connecting.
+    expect(status).toBe(0);
+  });
+
+  it("does not gate a localhost target at all", () => {
+    const { stderr } = runScript(script, { POSTGRES_URL: LOCAL_URL });
+    expect(stderr).not.toContain("Refusing to write PinballMap credentials");
   });
 });
 
