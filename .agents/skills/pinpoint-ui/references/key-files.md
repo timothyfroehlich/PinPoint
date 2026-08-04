@@ -53,7 +53,7 @@ Single-select user pickers all follow the **Picker Pattern** (Popover + cmdk Com
 
 ### Layout
 
-Every authenticated page should compose `<MainLayout>` → `<PageContainer>` → `<PageHeader>` → content. See `pinpoint-design-bible` §5 for the size mapping (narrow/standard/wide/full).
+Every authenticated page should compose `<MainLayout>` → `<PageContainer>` → `<PageHeader>` → content. MainLayout wraps the route — don't re-add it here; the route-group layouts (`src/app/(app)/layout.tsx`, `(site)`, `(dev)`) are the only files that render it. See `pinpoint-design-bible` §5 for the size mapping (narrow/standard/wide/full).
 
 | File                                        | What It Teaches                                                                                                   |
 | :------------------------------------------ | :---------------------------------------------------------------------------------------------------------------- |

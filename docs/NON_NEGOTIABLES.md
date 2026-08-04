@@ -333,7 +333,7 @@
 - **Severity:** Critical
 - **Why:** Inline wrappers break Next.js form submission handling
 - **Do:** Use Server Actions directly: `<form action={serverAction}>`
-- **Don't:** Wrap in inline async functions: `action={async () => { await serverAction(); }}`
+- **Don't:** Wrap in inline async functions: `action={async () => { await serverAction(); }}`. Don't hand-roll a mutation as `onSubmit` + `fetch("/api/…")` either — that leaves the Server Action path entirely, which is a different failure from the wrapper but the same rule. (`onSubmit` by itself is fine and is sometimes required — see CORE-ARCH-012's Radix Select carve-out, which dispatches the same Server Action directly.)
 - **Rationale:** Next.js serializes Server Actions automatically; wrappers create client-side functions that can't be serialized
 
 **CORE-ARCH-006:** Server Actions in dropdown menus
