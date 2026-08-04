@@ -51,11 +51,29 @@ export function withLmxAdded(
   return { ...snapshot, lmxes, machineCount: lmxes.length };
 }
 
-/** The snapshot with `lmxId` absent. A no-op when it is already gone. */
+/**
+ * The snapshot with `pinballmapMachineId`'s listing absent. A no-op when it is
+ * already gone.
+ *
+ * Drops the title's row by `machineId`, not just the `id` we deleted — the same
+ * asymmetry-closing rule `withLmxAdded` applies, and for the same reason: PBM
+ * gives a title exactly one lmx at our location, and every consumer resolves it
+ * by `machineId`. Filtering on `id` alone left a re-minted row behind, which
+ * `resolveAutoLink` reads as "the title is still on the lineup" and re-lists
+ * within the hour — silently undoing a human unlist (PP-rnup).
+ *
+ * `lmxId` is still matched first so this stays a no-op in the ordinary case
+ * where the caller's handle and the stored row already agree.
+ */
 export function withLmxRemoved(
   snapshot: LocationSnapshot,
-  lmxId: number
+  lmxId: number,
+  pinballmapMachineId: number | null
 ): LocationSnapshot {
-  const lmxes = snapshot.lmxes.filter((l) => l.id !== lmxId);
+  const lmxes = snapshot.lmxes.filter(
+    (l) =>
+      l.id !== lmxId &&
+      (pinballmapMachineId === null || l.machineId !== pinballmapMachineId)
+  );
   return { ...snapshot, lmxes, machineCount: lmxes.length };
 }
