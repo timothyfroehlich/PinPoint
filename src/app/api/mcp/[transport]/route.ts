@@ -16,8 +16,10 @@ export const maxDuration = 60;
  * every request is admin-gated by {@link verifyToken} via `withMcpAuth`, and
  * each tool additionally runs `checkPermission()` underneath (defense in depth).
  *
- * Tools: the six-tool v1 catalog ({@link registerPinpointTools}) plus a `whoami`
- * diagnostic used to validate the connection end-to-end.
+ * Tools: the PinPoint tool catalog ({@link registerPinpointTools}) plus a
+ * `whoami` diagnostic used to validate the connection end-to-end. Deliberately
+ * no count here — that number goes stale every time a tool lands (PP-x8jb);
+ * `registerPinpointTools` is the list.
  */
 const handler = createMcpHandler(
   (server) => {

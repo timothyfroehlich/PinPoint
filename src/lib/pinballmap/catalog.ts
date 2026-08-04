@@ -173,6 +173,28 @@ export async function searchCatalogFamilies(
   }));
 }
 
+/**
+ * The family (machine group) display name for a group id, or `null` when no row
+ * carries that group id — or when the mirror captured the group without a name
+ * (PBM serves group names from a separate endpoint, so a partial refresh can
+ * leave `groupName` null on real rows).
+ *
+ * Callers that hand a group id back to a user or a model need this to say WHOSE
+ * editions they are: PBM machine ids and machine-group ids are separate id
+ * spaces, so a single integer can be valid in both and a lookup by the wrong one
+ * still returns real rows.
+ */
+export async function getGroupName(
+  machineGroupId: number
+): Promise<string | null> {
+  const [row] = await db
+    .select({ groupName: pinballmapCatalog.groupName })
+    .from(pinballmapCatalog)
+    .where(eq(pinballmapCatalog.machineGroupId, machineGroupId))
+    .limit(1);
+  return row?.groupName ?? null;
+}
+
 /** List a family's editions (the picker's second step), ordered by name. */
 export async function listGroupEditions(
   machineGroupId: number
@@ -187,6 +209,27 @@ export async function listGroupEditions(
     .from(pinballmapCatalog)
     .where(eq(pinballmapCatalog.machineGroupId, machineGroupId))
     .orderBy(pinballmapCatalog.name);
+}
+
+/**
+ * True when the local catalog mirror holds no rows at all.
+ *
+ * The mirror is populated by a weekly cron ({@link refreshCatalog}), which
+ * no-ops on an empty upstream read — so "no rows" is a real, reachable state: a
+ * fresh preview branch, a local DB seeded from prod (the dump carries no
+ * catalog), or a run of failed refreshes. Callers need it to tell "nothing
+ * matched your lookup" apart from "nothing could have matched", which otherwise
+ * look identical and invite a confident wrong answer.
+ *
+ * An EXISTS-style probe rather than `count(*)`: the question is only ever
+ * "is it empty?", and Postgres can stop at the first row.
+ */
+export async function isCatalogEmpty(): Promise<boolean> {
+  const [row] = await db
+    .select({ present: sql<number>`1` })
+    .from(pinballmapCatalog)
+    .limit(1);
+  return row === undefined;
 }
 
 /** Look up a single catalog entry by its PBM machine id (for edit preselect). */

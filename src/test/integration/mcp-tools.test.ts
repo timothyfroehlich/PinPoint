@@ -19,6 +19,7 @@ import {
   authUsers,
   issues,
   machines,
+  pinballmapCatalog,
   timelineEvents,
   userProfiles,
 } from "~/server/db/schema";
@@ -50,6 +51,12 @@ import { runAddMachine } from "~/lib/mcp/tools/add-machine";
 import { runCreateIssue } from "~/lib/mcp/tools/create-issue";
 import { runGetMachine } from "~/lib/mcp/tools/get-machine";
 import { runListMachines } from "~/lib/mcp/tools/list-machines";
+import { runSearchPinballmapCatalog } from "~/lib/mcp/tools/search-pinballmap-catalog";
+import type {
+  McpCatalogEditionResult,
+  McpCatalogFamilyResult,
+} from "~/lib/mcp/tools/search-pinballmap-catalog";
+import type { McpMachinePinballmap } from "~/lib/mcp/tools/pinballmap-block";
 import { runSetMachineAvailability } from "~/lib/mcp/tools/set-machine-availability";
 import { runSetMachineName } from "~/lib/mcp/tools/set-machine-name";
 import { runSetMachineOwner } from "~/lib/mcp/tools/set-machine-owner";
@@ -89,10 +96,24 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
     return `MC${String(counter).padStart(3, "0")}`;
   }
 
+  /** PinballMap columns a seeded machine may carry (schema CHECKs still apply). */
+  interface SeedPbm {
+    pinballmapMachineId?: number;
+    pinballmapExcluded?: boolean;
+    pinballmapExcludedReason?: string;
+    pinballmapListed?: boolean;
+    pinballmapLmxId?: number;
+    manufacturer?: string;
+    year?: number;
+    opdbId?: string;
+    ipdbId?: number;
+  }
+
   async function seedMachine(overrides?: {
     name?: string;
     ownerId?: string | null;
     presenceStatus?: "on_the_floor" | "off_the_floor";
+    pbm?: SeedPbm;
   }): Promise<{ id: string; initials: string }> {
     const db = await getTestDb();
     const [machine] = await db
@@ -102,10 +123,72 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
         initials: nextInitials(),
         ownerId: overrides?.ownerId ?? null,
         presenceStatus: overrides?.presenceStatus ?? "on_the_floor",
+        ...(overrides?.pbm ?? {}),
       })
       .returning();
     if (!machine) throw new Error("failed to seed machine");
     return machine;
+  }
+
+  /**
+   * Seed the local PinballMap catalog mirror. Every catalog read in these tests
+   * is served from this table — nothing reaches pinballmap.com (CORE-PBM-001).
+   */
+  async function seedCatalog(
+    rows: {
+      pinballmapMachineId: number;
+      name: string;
+      manufacturer?: string;
+      year?: number;
+      opdbId?: string;
+      ipdbId?: number;
+      machineGroupId?: number;
+      groupName?: string;
+    }[]
+  ): Promise<void> {
+    const db = await getTestDb();
+    await db.insert(pinballmapCatalog).values(rows);
+  }
+
+  const ELVIRA_GROUP_ID = 7001;
+  const ELVIRA_PREMIUM_ID = 70012;
+
+  /** The Elvira family (Pro/Premium/LE) plus one standalone title. */
+  async function seedElviraCatalog(): Promise<void> {
+    await seedCatalog([
+      {
+        pinballmapMachineId: 70011,
+        name: "Elvira's House of Horrors (Pro)",
+        manufacturer: "Stern",
+        year: 2019,
+        machineGroupId: ELVIRA_GROUP_ID,
+        groupName: "Elvira's House of Horrors",
+      },
+      {
+        pinballmapMachineId: ELVIRA_PREMIUM_ID,
+        name: "Elvira's House of Horrors (Premium)",
+        manufacturer: "Stern",
+        year: 2019,
+        opdbId: "GRBN4-MQGE5",
+        ipdbId: 6587,
+        machineGroupId: ELVIRA_GROUP_ID,
+        groupName: "Elvira's House of Horrors",
+      },
+      {
+        pinballmapMachineId: 70013,
+        name: "Elvira's House of Horrors (LE)",
+        manufacturer: "Stern",
+        year: 2019,
+        machineGroupId: ELVIRA_GROUP_ID,
+        groupName: "Elvira's House of Horrors",
+      },
+      {
+        pinballmapMachineId: 70020,
+        name: "Elvira and the Party Monsters",
+        manufacturer: "Bally",
+        year: 1989,
+      },
+    ]);
   }
 
   describe("list_machines", () => {
@@ -212,6 +295,217 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
       expect(result.total).toBe(1);
       expect(result.hasMore).toBe(false);
     });
+
+    describe("pinballmap link-state filter (PP-u4ab.9)", () => {
+      interface LinkStatePage {
+        count: number;
+        total: number;
+        offset: number;
+        hasMore: boolean;
+        machines: { initials: string; name: string }[];
+      }
+
+      let pbmCatalogId = 800_000;
+
+      /**
+       * Move a seeded machine into a PinballMap link state. An UPDATE after
+       * `seedMachine` rather than a second insert path, so machine creation
+       * (and the initials counter) stays in one place.
+       */
+      async function setLinkState(
+        id: string,
+        state: "linked" | "excluded"
+      ): Promise<void> {
+        const db = await getTestDb();
+        if (state === "linked") {
+          pbmCatalogId += 1;
+          await db
+            .update(machines)
+            .set({ pinballmapMachineId: pbmCatalogId })
+            .where(eq(machines.id, id));
+        } else {
+          await db
+            .update(machines)
+            .set({
+              pinballmapExcluded: true,
+              pinballmapExcludedReason: "Homebrew, no catalog title",
+            })
+            .where(eq(machines.id, id));
+        }
+      }
+
+      async function list(
+        args: Parameters<typeof runListMachines>[0],
+        admin: string
+      ): Promise<LinkStatePage> {
+        const outcome = await runListMachines(args, ctx("admin", admin));
+        return outcome.result as LinkStatePage;
+      }
+
+      it("'unlinked' skips machines marked as not on PinballMap", async () => {
+        const admin = await makeUser("admin");
+        const worklist = await seedMachine({ name: "Link Alpha" });
+        const linked = await seedMachine({ name: "Link Bravo" });
+        const excluded = await seedMachine({ name: "Link Charlie" });
+        await setLinkState(linked.id, "linked");
+        await setLinkState(excluded.id, "excluded");
+
+        const result = await list({ pinballmap: "unlinked" }, admin);
+
+        // The exclusion half is the point: a machine deliberately marked as not
+        // on PinballMap is finished work, so it must not come back as a to-do on
+        // every sweep of the linking pass.
+        expect(result.machines.map((m) => m.initials)).toEqual([
+          worklist.initials,
+        ]);
+        expect(result.total).toBe(1);
+        expect(result.hasMore).toBe(false);
+      });
+
+      it("'linked' and 'excluded' return their own buckets", async () => {
+        const admin = await makeUser("admin");
+        await seedMachine({ name: "Bucket Alpha" });
+        const linked = await seedMachine({ name: "Bucket Bravo" });
+        const excluded = await seedMachine({ name: "Bucket Charlie" });
+        await setLinkState(linked.id, "linked");
+        await setLinkState(excluded.id, "excluded");
+
+        const linkedPage = await list({ pinballmap: "linked" }, admin);
+        const excludedPage = await list({ pinballmap: "excluded" }, admin);
+
+        expect(linkedPage.machines.map((m) => m.initials)).toEqual([
+          linked.initials,
+        ]);
+        expect(linkedPage.total).toBe(1);
+        expect(excludedPage.machines.map((m) => m.initials)).toEqual([
+          excluded.initials,
+        ]);
+        expect(excludedPage.total).toBe(1);
+      });
+
+      it("composes with search and presence", async () => {
+        const admin = await makeUser("admin");
+        const target = await seedMachine({
+          name: "Sweep Target",
+          presenceStatus: "off_the_floor",
+        });
+        // Each of these fails exactly one of the three filters.
+        await seedMachine({
+          name: "Sweep Onfloor",
+          presenceStatus: "on_the_floor",
+        });
+        await seedMachine({
+          name: "Other Offfloor",
+          presenceStatus: "off_the_floor",
+        });
+        const linked = await seedMachine({
+          name: "Sweep Linked",
+          presenceStatus: "off_the_floor",
+        });
+        await setLinkState(linked.id, "linked");
+
+        const result = await list(
+          {
+            search: "Sweep",
+            presence: "off_the_floor",
+            pinballmap: "unlinked",
+          },
+          admin
+        );
+
+        expect(result.machines.map((m) => m.initials)).toEqual([
+          target.initials,
+        ]);
+        expect(result.total).toBe(1);
+      });
+
+      it("pages a 100+ machine fleet by link state without repeats or gaps", async () => {
+        const admin = await makeUser("admin");
+        const db = await getTestDb();
+
+        const rows: (typeof machines.$inferInsert)[] = [];
+        const expectedUnlinked: string[] = [];
+        for (let i = 0; i < 110; i += 1) {
+          const initials = nextInitials();
+          // Eight cabinets share each title. Duplicate same-title cabinets are
+          // real in this collection, and 8 does not divide the page size of 25,
+          // so every page boundary lands INSIDE a tie group — which is the only
+          // arrangement that can catch an unstable sort.
+          const name = `Fleet Title ${String(Math.floor(i / 8)).padStart(2, "0")}`;
+          if (i % 5 === 0) {
+            rows.push({ name, initials, pinballmapMachineId: 900_000 + i });
+          } else if (i % 17 === 0) {
+            rows.push({ name, initials, pinballmapExcluded: true });
+          } else {
+            rows.push({ name, initials });
+            expectedUnlinked.push(initials);
+          }
+        }
+        // Inserted in reverse, so within every tie group the heap order is the
+        // OPPOSITE of the order the tool must return. Without a tiebreaker
+        // Postgres is free to hand back the heap order, and the sweep below
+        // sees one cabinet twice while another never appears.
+        await db.insert(machines).values([...rows].reverse());
+
+        const seen: string[] = [];
+        const limit = 25;
+        let offset = 0;
+        let total = -1;
+        // Bounded: a `hasMore` that never clears is the bug this guards, and an
+        // unbounded loop would hang the suite instead of failing it.
+        for (let page = 0; page < 10; page += 1) {
+          const result = await list(
+            { pinballmap: "unlinked", limit, offset },
+            admin
+          );
+          total = result.total;
+          seen.push(...result.machines.map((m) => m.initials));
+          if (!result.hasMore) break;
+          offset += limit;
+        }
+
+        // The count query and the page query must share the filter — a total
+        // that outruns what paging can reach is a loop that never terminates.
+        expect(total).toBe(expectedUnlinked.length);
+        // No repeats, and no gaps. Set equality is the assertion that matters:
+        // a sweep can return the right NUMBER of rows while having handed back
+        // one machine twice and skipped another, and that failure reports
+        // itself as a completed pass.
+        expect(new Set(seen).size).toBe(seen.length);
+        expect([...seen].sort()).toEqual([...expectedUnlinked].sort());
+      });
+
+      it("breaks name ties by initials, so a paged sweep is a total order", async () => {
+        const admin = await makeUser("admin");
+        const db = await getTestDb();
+
+        // Six cabinets, one title. `name` is not a unique key in this
+        // collection — duplicate same-title cabinets are a supported case (see
+        // the PinballMap tie guard, PP-o355.15).
+        const expected = Array.from({ length: 6 }, () => nextInitials()).sort();
+        await db
+          .insert(machines)
+          .values(
+            [...expected]
+              .reverse()
+              .map((initials) => ({ name: "Medieval Madness", initials }))
+          );
+
+        const seen: string[] = [];
+        for (let offset = 0; offset < expected.length; offset += 2) {
+          const page = await list(
+            { pinballmap: "unlinked", limit: 2, offset },
+            admin
+          );
+          seen.push(...page.machines.map((m) => m.initials));
+        }
+
+        // Every page boundary falls inside the tie group, so an order that is
+        // only stable within a single query — not across the separate queries
+        // paging actually issues — shows up here as a duplicate plus a miss.
+        expect(seen).toEqual(expected);
+      });
+    });
   });
 
   describe("get_machine", () => {
@@ -242,6 +536,362 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
       await expect(
         runGetMachine({ machine: "ZZZ" }, ctx("admin", admin))
       ).rejects.toBeInstanceOf(McpToolError);
+    });
+
+    describe("pinballmap block (PP-u4ab.8)", () => {
+      it("reports the linked catalog title, edition family, model metadata and listing state", async () => {
+        const admin = await makeUser("admin");
+        await seedElviraCatalog();
+        const machine = await seedMachine({
+          name: "Elvira's House of Horrors",
+          pbm: {
+            pinballmapMachineId: ELVIRA_PREMIUM_ID,
+            pinballmapListed: true,
+            pinballmapLmxId: 55555,
+            manufacturer: "Stern",
+            year: 2019,
+            opdbId: "GRBN4-MQGE5",
+            ipdbId: 6587,
+          },
+        });
+
+        const outcome = await runGetMachine(
+          { machine: machine.initials },
+          ctx("admin", admin)
+        );
+        const { pinballmap } = outcome.result as {
+          pinballmap: McpMachinePinballmap | null;
+        };
+
+        // The walk-the-floor question this bead exists for: "is our Elvira
+        // recorded as the Premium?" must be answerable from this block alone.
+        expect(pinballmap).toEqual({
+          status: "linked",
+          pinballmapMachineId: ELVIRA_PREMIUM_ID,
+          catalogLookup: "found",
+          title: "Elvira's House of Horrors (Premium)",
+          machineGroupId: ELVIRA_GROUP_ID,
+          group: "Elvira's House of Horrors",
+          manufacturer: "Stern",
+          year: 2019,
+          opdbId: "GRBN4-MQGE5",
+          ipdbId: 6587,
+          listed: true,
+          lmxId: 55555,
+        });
+      });
+
+      it("calls a link stale only when the populated mirror really lacks the id", async () => {
+        const admin = await makeUser("admin");
+        // Mirror has rows — just not this id. Only then is "stale" a fact.
+        await seedElviraCatalog();
+        const machine = await seedMachine({
+          pbm: { pinballmapMachineId: 999_111 },
+        });
+
+        const outcome = await runGetMachine(
+          { machine: machine.initials },
+          ctx("admin", admin)
+        );
+        const { pinballmap } = outcome.result as {
+          pinballmap: McpMachinePinballmap | null;
+        };
+
+        // Still "linked" — the stored id is real; the mirror just can't name it.
+        expect(pinballmap).toMatchObject({
+          status: "linked",
+          pinballmapMachineId: 999_111,
+          catalogLookup: "missing",
+          title: null,
+          machineGroupId: null,
+          group: null,
+        });
+      });
+
+      it("says the mirror is unpopulated rather than calling a good link stale", async () => {
+        const admin = await makeUser("admin");
+        // No seedElviraCatalog(): the mirror is empty, which is a live state on
+        // a fresh preview branch or a local seeded from a prod dump.
+        const machine = await seedMachine({
+          pbm: { pinballmapMachineId: ELVIRA_PREMIUM_ID },
+        });
+
+        const outcome = await runGetMachine(
+          { machine: machine.initials },
+          ctx("admin", admin)
+        );
+        const { pinballmap } = outcome.result as {
+          pinballmap: McpMachinePinballmap | null;
+        };
+
+        // Byte-identical to the stale case without this field — which would
+        // report every linked machine in the fleet as broken when none is.
+        expect(pinballmap).toMatchObject({
+          status: "linked",
+          pinballmapMachineId: ELVIRA_PREMIUM_ID,
+          catalogLookup: "mirror_unpopulated",
+          title: null,
+        });
+      });
+
+      it("reports the excluded state and its reason, not null", async () => {
+        const admin = await makeUser("admin");
+        const machine = await seedMachine({
+          pbm: {
+            pinballmapExcluded: true,
+            pinballmapExcludedReason: "Homebrew, not a catalog title",
+          },
+        });
+
+        const outcome = await runGetMachine(
+          { machine: machine.initials },
+          ctx("admin", admin)
+        );
+        const { pinballmap } = outcome.result as {
+          pinballmap: McpMachinePinballmap | null;
+        };
+
+        // "Deliberately not on Pinball Map" is a recorded fact; collapsing it to
+        // null would make it indistinguishable from "nobody has looked yet".
+        expect(pinballmap).toEqual({
+          status: "excluded",
+          reason: "Homebrew, not a catalog title",
+        });
+      });
+
+      it("returns pinballmap as an explicit null when neither linked nor excluded", async () => {
+        const admin = await makeUser("admin");
+        const machine = await seedMachine();
+
+        const outcome = await runGetMachine(
+          { machine: machine.initials },
+          ctx("admin", admin)
+        );
+        const result = outcome.result as {
+          pinballmap: McpMachinePinballmap | null;
+        };
+
+        expect(result.pinballmap).toBeNull();
+        // Present-and-null, never absent: an omitted key reads as "this tool
+        // doesn't report PBM state" rather than "this machine has none".
+        expect(Object.keys(result)).toContain("pinballmap");
+      });
+    });
+  });
+
+  describe("search_pinballmap_catalog (PP-u4ab.8)", () => {
+    it("returns the family with its edition count for a query", async () => {
+      const admin = await makeUser("admin");
+      await seedElviraCatalog();
+
+      const outcome = await runSearchPinballmapCatalog(
+        { query: "elvira" },
+        ctx("admin", admin)
+      );
+      const result = outcome.result as McpCatalogFamilyResult;
+
+      expect(result.mode).toBe("families");
+      expect(result.hasMore).toBe(false);
+      const family = result.families.find(
+        (f) => f.machineGroupId === ELVIRA_GROUP_ID
+      );
+      expect(family?.editionCount).toBeGreaterThan(1);
+      // A multi-edition family must NOT resolve to a single id — that's the
+      // second step's job.
+      expect(family?.pinballmapMachineId).toBeNull();
+      // The standalone Bally title is its own family alongside the group.
+      expect(result.returned).toBe(2);
+    });
+
+    it("returns a family's individual editions for its machineGroupId", async () => {
+      const admin = await makeUser("admin");
+      await seedElviraCatalog();
+
+      const outcome = await runSearchPinballmapCatalog(
+        { machineGroupId: ELVIRA_GROUP_ID },
+        ctx("admin", admin)
+      );
+      const result = outcome.result as McpCatalogEditionResult;
+
+      expect(result.mode).toBe("editions");
+      expect(result.returned).toBe(3);
+      expect(
+        result.editions.find(
+          (e) => e.name === "Elvira's House of Horrors (Premium)"
+        )?.pinballmapMachineId
+      ).toBe(ELVIRA_PREMIUM_ID);
+      // The response says whose editions these are, so the caller can check it
+      // got the family it asked for.
+      expect(result.familyName).toBe("Elvira's House of Horrors");
+    });
+
+    it("names the family it actually returned when the group id collides with an edition id", async () => {
+      const admin = await makeUser("admin");
+      await seedElviraCatalog();
+      // PBM machine ids and machine-group ids are SEPARATE id spaces, so one
+      // integer can be valid in both. Here Godzilla's machineGroupId is exactly
+      // Elvira Premium's pinballmapMachineId — the collision that makes a
+      // wrong-id lookup succeed with real rows, so the not_found guard cannot
+      // fire and only the payload can reveal the mistake.
+      await seedCatalog([
+        {
+          pinballmapMachineId: 80011,
+          name: "Godzilla (Pro)",
+          manufacturer: "Stern",
+          year: 2021,
+          machineGroupId: ELVIRA_PREMIUM_ID,
+          groupName: "Godzilla",
+        },
+        {
+          pinballmapMachineId: 80012,
+          name: "Godzilla (Premium)",
+          manufacturer: "Stern",
+          year: 2021,
+          machineGroupId: ELVIRA_PREMIUM_ID,
+          groupName: "Godzilla",
+        },
+      ]);
+
+      const outcome = await runSearchPinballmapCatalog(
+        { machineGroupId: ELVIRA_PREMIUM_ID },
+        ctx("admin", admin)
+      );
+      const result = outcome.result as McpCatalogEditionResult;
+
+      // The worst outcome this tool can produce is linking a cabinet to the
+      // wrong title from a plausible-looking payload. The one thing that
+      // catches it is the response naming the family it actually returned: a
+      // caller that asked about Elvira and reads "Godzilla" can see the miss.
+      //
+      // Nothing here flags the id itself. PBM group ids (small and dense) sit
+      // inside the machine-id range (1..~10k), so "this integer is also a
+      // machine id" is true for nearly every CORRECT group id — a flag on it
+      // would fire on the common path and teach the caller to throw away good
+      // results.
+      expect(result.returned).toBe(2);
+      expect(result.familyName).toBe("Godzilla");
+      expect(result.editions.map((e) => e.name)).not.toContain(
+        "Elvira's House of Horrors (Premium)"
+      );
+    });
+
+    it("reports hasMore when more families match than the limit returns", async () => {
+      const admin = await makeUser("admin");
+      await seedElviraCatalog();
+
+      const outcome = await runSearchPinballmapCatalog(
+        { query: "elvira", limit: 1 },
+        ctx("admin", admin)
+      );
+      const result = outcome.result as McpCatalogFamilyResult;
+
+      expect(result.returned).toBe(1);
+      expect(result.hasMore).toBe(true);
+    });
+
+    it("throws not_found for a group id no family has", async () => {
+      const admin = await makeUser("admin");
+      await seedElviraCatalog();
+
+      // An empty success here would read as "that family has no editions" —
+      // a confident answer to a lookup that never happened (CORE-ARCH-012).
+      await expect(
+        runSearchPinballmapCatalog(
+          { machineGroupId: 424_242 },
+          ctx("admin", admin)
+        )
+      ).rejects.toMatchObject({ reason: "not_found" });
+    });
+
+    it("throws not_found when handed an edition's pinballmapMachineId instead of the family's machineGroupId", async () => {
+      const admin = await makeUser("admin");
+      await seedElviraCatalog();
+
+      // The families payload carries both ids as bare integers, so confusing
+      // them is the predictable mistake. It must correct the caller, not hand
+      // back an empty family it can report as fact.
+      const error = await runSearchPinballmapCatalog(
+        { machineGroupId: ELVIRA_PREMIUM_ID },
+        ctx("admin", admin)
+      ).catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(McpToolError);
+      expect((error as McpToolError).reason).toBe("not_found");
+      expect((error as McpToolError).message).toContain("pinballmapMachineId");
+    });
+
+    it("returns a standalone title with its pinballmapMachineId already resolved", async () => {
+      const admin = await makeUser("admin");
+      await seedElviraCatalog();
+
+      const outcome = await runSearchPinballmapCatalog(
+        { query: "Party Monsters" },
+        ctx("admin", admin)
+      );
+      const result = outcome.result as McpCatalogFamilyResult;
+
+      // Most pre-1990s titles are standalone, so this is the common path for
+      // our fleet: no group, one edition, id already in hand. A second call
+      // with machineGroupId would be both impossible (it's null) and pointless.
+      expect(result.returned).toBe(1);
+      expect(result.families[0]?.machineGroupId).toBeNull();
+      expect(result.families[0]?.editionCount).toBe(1);
+      expect(result.families[0]?.pinballmapMachineId).toBe(70_020);
+    });
+
+    describe("when the catalog mirror is empty", () => {
+      // No seedElviraCatalog() anywhere in this block: the mirror is a weekly
+      // cron's output that no-ops on an empty upstream read, so "no rows at
+      // all" is a live state on a fresh preview branch or a prod-seeded local.
+
+      it("refuses to report a query as 'no such title'", async () => {
+        const admin = await makeUser("admin");
+
+        // Returning families: [] here would read as "that title isn't on
+        // Pinball Map" — a claim about PBM made from a table we never filled.
+        const error = await runSearchPinballmapCatalog(
+          { query: "elvira" },
+          ctx("admin", admin)
+        ).catch((e: unknown) => e);
+
+        expect(error).toBeInstanceOf(McpToolError);
+        expect((error as McpToolError).message).toContain("mirror is empty");
+      });
+
+      it("blames the empty mirror, not the caller's id, for an editions lookup", async () => {
+        const admin = await makeUser("admin");
+
+        const error = await runSearchPinballmapCatalog(
+          { machineGroupId: ELVIRA_GROUP_ID },
+          ctx("admin", admin)
+        ).catch((e: unknown) => e);
+
+        expect(error).toBeInstanceOf(McpToolError);
+        expect((error as McpToolError).message).toContain("mirror is empty");
+        // The wrong-id diagnosis must NOT fire here: the id is fine, the table
+        // is empty. Asserting a specific caller mistake we haven't established
+        // is the confident wrong answer this whole guard exists to prevent.
+        expect((error as McpToolError).message).not.toContain(
+          "pinballmapMachineId"
+        );
+      });
+    });
+
+    it("rejects a call with neither query nor machineGroupId", async () => {
+      const admin = await makeUser("admin");
+      await expect(
+        runSearchPinballmapCatalog({}, ctx("admin", admin))
+      ).rejects.toMatchObject({ reason: "invalid" });
+    });
+
+    it("rejects a call with both query and machineGroupId", async () => {
+      const admin = await makeUser("admin");
+      await expect(
+        runSearchPinballmapCatalog(
+          { query: "elvira", machineGroupId: ELVIRA_GROUP_ID },
+          ctx("admin", admin)
+        )
+      ).rejects.toMatchObject({ reason: "invalid" });
     });
   });
 
