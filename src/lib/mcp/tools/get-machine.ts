@@ -9,6 +9,7 @@ import { checkPermission } from "~/lib/permissions/helpers";
 import { db } from "~/server/db";
 import { issues } from "~/server/db/schema";
 
+import { buildMachinePinballmap } from "./pinballmap-block";
 import {
   getOwnerNamesByMachine,
   issueUrl,
@@ -47,6 +48,7 @@ export async function runGetMachine(
 
   const machine = await resolveMachine(args.machine);
   const ownerNames = await getOwnerNamesByMachine([machine]);
+  const pinballmap = await buildMachinePinballmap(machine);
 
   const openIssues = await db.query.issues.findMany({
     where: and(
@@ -71,6 +73,10 @@ export async function runGetMachine(
       presence: machine.presenceStatus,
       owner: ownerNames.get(machine.id) ?? null,
       url: machineUrl(machine.initials),
+      // Always present: `null` means the machine is neither linked to a Pinball
+      // Map title nor marked as not on it, which is a different fact from being
+      // excluded. See `McpMachinePinballmap`.
+      pinballmap,
       openIssues: openIssues.map((i) => ({
         number: i.issueNumber,
         title: i.title,
@@ -90,7 +96,7 @@ export function registerGetMachine(server: McpServer): void {
     {
       title: "Get machine detail",
       description:
-        "Get one machine's detail — name, initials, availability, owner name, and its recent open issues (each with number, title, severity, status, and URL). Identify the machine by initials or UUID.",
+        "Get one machine's detail — name, initials, availability (returned as `presence`), owner name, its Pinball Map state (linked catalog title and edition, manufacturer, year, OPDB/IPDB, whether it's listed on the public map; or marked as not on Pinball Map; or null when neither has been recorded — and when a linked title is null, read `catalogLookup` before calling the link broken: `mirror_unpopulated` means PinPoint's catalog copy is empty, not that the link is stale), and its recent open issues (each with number, title, severity, status, and URL). Identify the machine by initials or UUID.",
       inputSchema: getMachineSchema.shape,
     },
     (args, extra) =>
