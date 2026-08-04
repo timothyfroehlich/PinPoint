@@ -142,10 +142,16 @@ def main(argv=None):
     print(f"Denied tool calls across the last {args.runs} agy run(s):\n")
     shown = set()
     for finding in findings:
-        key = finding["rule"] if not args.all else (finding["rule"], finding["command"])
-        if key in shown:
-            continue
-        shown.add(key)
+        # `--all` bypasses deduplication entirely rather than merely widening the key.
+        # Keying on (rule, command) still collapsed repeated *identical* denials, which
+        # are the signal worth seeing — agy retrying the same refused command across a
+        # run is what tells you it is stuck on that command rather than exploring.
+        # `parse_denials` keeps duplicates in order for exactly this reason.
+        if not args.all:
+            key = finding["rule"]
+            if key in shown:
+                continue
+            shown.add(key)
         print(f"  {finding['command']}")
         if finding["compound"]:
             print(

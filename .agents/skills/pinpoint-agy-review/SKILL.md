@@ -221,10 +221,17 @@ A single JSON object matching the enforced schema:
 - `findings[]` — `path` (repo-relative, no leading `./`), `line`, `side`
   (`"RIGHT"`), `severity`, `confidence`, `rule` (the `CORE-*` id or `null`),
   `body` (what is wrong, why it is reachable, what it costs, and what to do).
-- `proof` — `files_changed` and `first_diff_line`, copied exactly from
-  `AGY_REVIEW_BRIEF.md`. The wrapper checks these against the real diff and
-  throws the whole review away on a mismatch. It exists because a failed read
-  makes you describe a plausible PR from memory instead of erroring.
+- `proof` — `files_changed`, and `quoted_line`: the exact text of the specific
+  line of the specific `.agy-diff.patch` that `AGY_REVIEW_BRIEF.md` names.
+  **Open that file and copy the line.** Its text is deliberately not written in
+  the brief, because the point of the check is that only a run which actually
+  read a patch can answer it. Reproduce it character for character, including
+  any leading `+`, `-` or space.
+
+  The wrapper checks both against the real diff and throws the whole review away
+  on a mismatch. This exists because a failed read makes you describe a plausible
+  PR from memory instead of erroring — so if you cannot open the named patch,
+  say so in `summary` and return no findings rather than guessing at the line.
 
 ---
 

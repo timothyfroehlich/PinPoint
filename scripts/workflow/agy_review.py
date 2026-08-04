@@ -68,9 +68,21 @@ agy confabulates. Handed a diff it could not read, it once emitted a confident, 
 review of a *completely different PR* with an empty findings array — a false clean pass,
 the one failure mode a review gate cannot tolerate.
 
-So every response must carry a `proof` object echoing facts about the diff, checked here
-against ground truth, after EVERY response including retries. A mismatch is fatal: no
-review, no marker. That check is why the marker can be trusted.
+So every response must carry a `proof` object checked here against ground truth, after
+EVERY response including retries. A mismatch is fatal: no review, no marker.
+
+**The proof has to be unforgeable from the brief, or it guarantees nothing.** An earlier
+version asked for the file count and the first `diff --git` line, and printed both in
+`AGY_REVIEW_BRIEF.md` under "copy these back verbatim" — so a run that read only the
+brief, which also carries the title, author and full PR description, could satisfy the
+check having never opened a single patch. That is precisely the confabulating run, and
+it would have ended in a posted review and a marker the merge gate accepts.
+
+The guard is now a content challenge: the brief names a file and a line number, and the
+response must quote that line back. The answer appears nowhere in the orientation file,
+so producing it requires opening the sidecar. `files_changed` is retained as a cheap
+sanity check and is explicitly NOT load-bearing — like the old first-line fact, it is
+derivable from the brief's file table.
 
 A related measured behaviour: **agy exits 0 even when it produced nothing usable.**
 Validity is judged from the response envelope, never from the exit code.
@@ -156,10 +168,10 @@ RESPONSE_SCHEMA = {
         },
         "proof": {
             "type": "object",
-            "required": ["files_changed", "first_diff_line"],
+            "required": ["files_changed", "quoted_line"],
             "properties": {
                 "files_changed": {"type": "integer"},
-                "first_diff_line": {"type": "string"},
+                "quoted_line": {"type": "string"},
             },
         },
     },
@@ -228,18 +240,56 @@ def parse_diff_hunks(diff_text):
     return hunks
 
 
-def diff_proof(diff_text):
-    """Ground-truth facts a run must echo back to prove it read the diff.
+def choose_proof_quote(sidecars, head_sha):
+    """Pick the line a run must quote back, and where it lives.
 
-    Deliberately cheap to verify and impossible to guess: the exact text of the first
-    `diff --git` line, and how many files the diff touches.
+    Returns `{"path", "line", "text"}`, or None when there is no reviewable sidecar to
+    draw from (a diff of nothing but generated files).
+
+    The choice is derived from `head_sha`, so replaying a commit asks the same question
+    — reproducible for `--at`, and still unguessable to a model that has not opened the
+    file, which is the only property that matters.
+
+    Blank and pure-marker lines are skipped: `@@`, `+++`, `---` and empty lines either
+    repeat across every patch or appear in the brief, so quoting one back would prove
+    nothing.
+    """
+    candidates = []
+    for path in sorted(sidecars):
+        for index, text in enumerate(sidecars[path].splitlines(), start=1):
+            stripped = text.strip()
+            if len(stripped) < 12:
+                continue
+            if stripped.startswith(("@@", "+++", "---", "diff --git", "index ")):
+                continue
+            candidates.append({"path": path, "line": index, "text": text})
+    if not candidates:
+        return None
+    return candidates[int(head_sha[:8], 16) % len(candidates)]
+
+
+def diff_proof(diff_text, quote=None):
+    """Ground truth a run must echo back to prove it read the diff itself.
+
+    `files_changed` is a cheap sanity check and nothing more. It is derivable from the
+    brief's own file table, so it cannot carry the guarantee — and neither could the
+    first `diff --git` line this used to ask for, since the brief lists every changed
+    path and that line is just a path in a fixed format. Both were forgeable by a run
+    that read only the orientation file, which is exactly the confabulating run this
+    check exists to catch (see the module docstring).
+
+    `quoted_line` is the real guard: the exact text of one line of one sidecar patch,
+    chosen per commit. The brief names the file and the line number but never the
+    content, so the only way to produce it is to open the patch. That is the whole
+    contract — the marker is written downstream of this, so if this is forgeable the
+    marker means nothing.
     """
     lines = diff_text.splitlines()
-    first = next((line for line in lines if line.startswith("diff --git ")), "")
-    return {
-        "files_changed": sum(1 for line in lines if line.startswith("diff --git ")),
-        "first_diff_line": first,
+    proof = {
+        "files_changed": sum(1 for line in lines if line.startswith("diff --git "))
     }
+    proof["quoted_line"] = quote["text"] if quote else ""
+    return proof
 
 
 def verify_proof(claimed, actual):
@@ -252,12 +302,10 @@ def verify_proof(claimed, actual):
             f"proof.files_changed={claimed.get('files_changed')!r} "
             f"but the diff touches {actual['files_changed']} file(s)"
         )
-    if (claimed.get("first_diff_line") or "").strip() != actual[
-        "first_diff_line"
-    ].strip():
+    if (claimed.get("quoted_line") or "").strip() != actual["quoted_line"].strip():
         problems.append(
-            f"proof.first_diff_line={claimed.get('first_diff_line')!r} "
-            f"but the diff starts with {actual['first_diff_line']!r}"
+            f"proof.quoted_line={claimed.get('quoted_line')!r} "
+            f"but that line reads {actual['quoted_line']!r}"
         )
     return problems
 
@@ -301,6 +349,18 @@ def validate_findings(findings, hunks):
                 f"findings[{index}]: {path}:{line} is not in the diff. "
                 f"Valid RIGHT-side lines for that file: {_format_ranges(hunks[path])}."
             )
+        # `side` is checked here rather than trusted from the schema because the schema
+        # is not enforced on a retry (see `_require_shape`). Told its lines were
+        # rejected, a natural
+        # correction is to re-anchor to a removed line as LEFT — which passes the shape
+        # check, then 422s the entire batch at POST time and discards two full agy runs.
+        # Feeding it into the self-correction loop turns that into one more retry.
+        if finding.get("side") != "RIGHT":
+            errors.append(
+                f"findings[{index}]: side={finding.get('side')!r}, but only RIGHT is "
+                "postable — a removed line does not exist on the right-hand side and "
+                "cannot be anchored. Re-anchor to an added or context line."
+            )
     return errors
 
 
@@ -329,7 +389,7 @@ def build_review_payload(result, head_sha, head_moved_to=None):
     """
     body = result["summary"]
 
-    # `.get` rather than `[...]`: the retry continuation carries no schema, so a second
+    # `.get` rather than `[...]`: schema enforcement on a retry is unverified, so a second
     # response can legitimately arrive without a verdict. A missing one is rendered as
     # nothing rather than guessed at — inventing "approve" here would be the one lie this
     # whole script is built to prevent.
@@ -467,7 +527,7 @@ def write_sidecars(worktree, sections):
     return written
 
 
-def build_brief(pr, meta, base_sha, head_sha, sections, hunks, proof):
+def build_brief(pr, meta, base_sha, head_sha, sections, hunks, proof, quote=None):
     """The orientation document agy reads first: what this PR claims to be, and where.
 
     The PR description is the thing a diff cannot supply — whether the change does what
@@ -475,6 +535,21 @@ def build_brief(pr, meta, base_sha, head_sha, sections, hunks, proof):
     check the code against itself.
     """
     body = (meta.get("body") or "").strip() or "_(no description)_"
+
+    # The question, never the answer. Naming the file and the line number is what makes
+    # this checkable; printing the text would make it copyable from here, which is the
+    # whole defect this replaced.
+    if quote:
+        quote_instruction = (
+            f"the exact text of **line {quote['line']}** of "
+            f"`{quote['path']}{SIDECAR_SUFFIX}`, character for character, "
+            "including any leading `+`, `-` or space."
+        )
+    else:
+        quote_instruction = (
+            'the empty string `""` — this diff has no reviewable file to quote from.'
+        )
+
     rows = []
     for path in sorted(sections):
         if is_generated(path):
@@ -519,10 +594,13 @@ by GitHub and takes the whole review down with it.
 | :--- | :------- | :--------------- |
 {table}
 {generated_note}
-## proof (copy these back verbatim)
+## proof
+
+Return these in `proof`. They are checked against the real diff, and a mismatch
+throws the whole review away — so answer them from the files, not from this page.
 
 - `files_changed`: {proof["files_changed"]}
-- `first_diff_line`: `{proof["first_diff_line"]}`
+- `quoted_line`: {quote_instruction}
 """
 
 
@@ -672,8 +750,10 @@ def _extract_review_object(response):
 def _require_shape(result):
     """Fail with a legible error rather than a KeyError on a malformed response.
 
-    `--json-schema` constrains the first response, but the retry continuation is a plain
-    follow-up prompt with no schema attached, so nothing guarantees its shape. A bare
+    `--json-schema` is passed on EVERY invocation including retries — but whether agy
+    enforces it on a `--conversation` continuation has never been tested, so the shape of
+    a retry response is not something to rely on. (An earlier comment here asserted the
+    flag was omitted on retries; that was simply wrong about the code.) A bare
     `result["findings"]` there raises KeyError, which neither handler in `main` catches —
     the caller gets a traceback instead of the script's own FAILED line.
     """
@@ -684,7 +764,7 @@ def _require_shape(result):
     if not isinstance(result.get("summary"), str):
         raise ReviewError("agy response has no `summary` string")
     for index, finding in enumerate(result["findings"]):
-        # `severity` is included: the schema constrains only the FIRST response, and the
+        # `severity` is included: retry-response shape is not guaranteed (above), and the
         # summary print loop indexes it directly, so a retry omitting it would raise
         # KeyError — the exact failure this function exists to convert into a FAILED line.
         missing = [
@@ -951,11 +1031,6 @@ def review(pr, model, dry_run, keep_worktree, verbose, at=None):
             )
 
         hunks = parse_diff_hunks(diff_text)
-        actual_proof = diff_proof(diff_text)
-        print(
-            f"diff: {actual_proof['files_changed']} file(s), "
-            f"{sum(len(v) for v in hunks.values())} anchorable line(s)"
-        )
 
         # Lay the change out in the tree instead of in the prompt: one patch beside each
         # file it belongs to, plus a brief carrying what a diff cannot — the PR's stated
@@ -965,8 +1040,20 @@ def review(pr, model, dry_run, keep_worktree, verbose, at=None):
 
         sections = split_diff_by_file(diff_text)
         written = write_sidecars(worktree, sections)
+
+        # The proof challenge is drawn from the sidecars actually written, so it can only
+        # name a file agy was really given — never a generated one it was told to skip.
+        quote = choose_proof_quote({path: sections[path] for path in written}, head_sha)
+        actual_proof = diff_proof(diff_text, quote)
+        print(
+            f"diff: {actual_proof['files_changed']} file(s), "
+            f"{sum(len(v) for v in hunks.values())} anchorable line(s)"
+        )
+
         (worktree / BRIEF_NAME).write_text(
-            build_brief(pr, meta, base_sha, head_sha, sections, hunks, actual_proof)
+            build_brief(
+                pr, meta, base_sha, head_sha, sections, hunks, actual_proof, quote
+            )
         )
         skipped = len(sections) - len(written)
         skipped_note = f" ({skipped} generated file(s) skipped)" if skipped else ""
@@ -1082,6 +1169,22 @@ def review(pr, model, dry_run, keep_worktree, verbose, at=None):
                 ]
             ).stdout.strip()
             print(f"posted (no threads): {out}")
+
+        # `needs-attention` with nothing anchored is the one combination that must not
+        # produce a marker. Both prompts tell the reviewer to move an unanchorable
+        # finding into the summary, so a real high-severity concern can legitimately end
+        # up as prose with `findings` empty — at which point no thread exists, `threads`
+        # passes with zero unresolved, `reviewed` passes on this marker, and
+        # merge-handoff prints the merge command for a PR whose own review said it needs
+        # attention. Withholding the marker leaves the gate closed until a human looks.
+        if result.get("verdict") == "needs-attention" and not count:
+            print(
+                "\nNO MARKER WRITTEN: the review returned `needs-attention` but anchored "
+                "no findings, so nothing opened a thread and nothing would block the "
+                "merge. Its concerns are in the summary above — read them, act on them, "
+                "and re-run once they can be anchored or are resolved."
+            )
+            return 1
 
         summary = (
             f"{count} finding(s) via {model}" if count else f"no findings via {model}"

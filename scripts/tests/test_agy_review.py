@@ -29,9 +29,11 @@ from agy_review import (  # noqa: E402
     _require_proof,
     _require_shape,
     build_review_payload,
+    choose_proof_quote,
     diff_proof,
     parse_diff_hunks,
     render_findings_comment,
+    split_diff_by_file,
     validate_findings,
     verify_proof,
 )
@@ -90,67 +92,112 @@ class TestParseDiffHunks:
         assert parse_diff_hunks("") == {}
 
 
+QUOTE = {"path": "src/components/Panel.tsx", "line": 7, "text": "+  const x = 1;"}
+
+
+class TestChooseProofQuote:
+    """The quote is what makes the proof unforgeable, so it must come from a sidecar."""
+
+    def test_picks_a_substantive_line_from_a_sidecar(self):
+        sidecars = split_diff_by_file(TWO_FILE_DIFF)
+        quote = choose_proof_quote(sidecars, "a" * 40)
+        assert quote is not None
+        assert quote["path"] in sidecars
+        # The chosen line must really be at that 1-based offset of that patch.
+        assert sidecars[quote["path"]].splitlines()[quote["line"] - 1] == quote["text"]
+
+    def test_never_picks_a_line_the_brief_already_reveals(self):
+        """A `diff --git`/`@@`/`+++` line is derivable from the brief's file table.
+
+        Quoting one back would prove nothing, which is the defect this replaced.
+        """
+        sidecars = split_diff_by_file(TWO_FILE_DIFF)
+        for sha in (f"{n:040x}" for n in range(40)):
+            quote = choose_proof_quote(sidecars, sha)
+            assert (
+                not quote["text"]
+                .strip()
+                .startswith(("@@", "+++", "---", "diff --git", "index "))
+            )
+
+    def test_no_reviewable_sidecar_yields_no_challenge(self):
+        assert choose_proof_quote({}, "a" * 40) is None
+
+
 class TestDiffProof:
-    def test_counts_files_and_captures_first_header(self):
-        assert diff_proof(TWO_FILE_DIFF) == {
+    def test_counts_files_and_carries_the_quoted_line(self):
+        assert diff_proof(TWO_FILE_DIFF, QUOTE) == {
             "files_changed": 2,
-            "first_diff_line": "diff --git a/src/components/Panel.tsx b/src/components/Panel.tsx",
+            "quoted_line": "+  const x = 1;",
         }
 
     def test_empty_diff(self):
-        assert diff_proof("") == {"files_changed": 0, "first_diff_line": ""}
+        assert diff_proof("") == {"files_changed": 0, "quoted_line": ""}
 
 
 class TestVerifyProof:
     """The confabulation guard. These are the tests that keep the marker honest."""
 
     def test_matching_proof_passes(self):
-        actual = diff_proof(TWO_FILE_DIFF)
+        actual = diff_proof(TWO_FILE_DIFF, QUOTE)
         assert verify_proof(dict(actual), actual) == []
 
     def test_tolerates_surrounding_whitespace(self):
-        actual = diff_proof(NEW_FILE_DIFF)
+        actual = diff_proof(NEW_FILE_DIFF, QUOTE)
         claimed = {
             "files_changed": 1,
-            "first_diff_line": f"  {actual['first_diff_line']}  ",
+            "quoted_line": f"  {actual['quoted_line']}  ",
         }
         assert verify_proof(claimed, actual) == []
 
     def test_wrong_file_count_is_rejected(self):
-        actual = diff_proof(TWO_FILE_DIFF)
+        actual = diff_proof(TWO_FILE_DIFF, QUOTE)
         problems = verify_proof({**actual, "files_changed": 16}, actual)
         assert len(problems) == 1
         assert "16" in problems[0]
 
+    def test_a_run_that_read_only_the_brief_is_rejected(self):
+        """The defect this design replaced.
+
+        `files_changed` is printed in the brief, so a run that never opened a patch can
+        still produce it. The quoted line is the half it cannot get from there, and
+        getting it wrong must sink the review on its own.
+        """
+        actual = diff_proof(TWO_FILE_DIFF, QUOTE)
+        claimed = {"files_changed": actual["files_changed"], "quoted_line": ""}
+        problems = verify_proof(claimed, actual)
+        assert len(problems) == 1
+        assert "quoted_line" in problems[0]
+
     def test_review_of_a_different_pr_is_rejected(self):
         # The observed failure: agy answered from memory about an unrelated PR. Its proof
         # describes that PR's diff, not the one it was handed.
-        actual = diff_proof(NEW_FILE_DIFF)
+        actual = diff_proof(NEW_FILE_DIFF, QUOTE)
         claimed = {
             "files_changed": 16,
-            "first_diff_line": "diff --git a/.oxlintrc.json b/.oxlintrc.json",
+            "quoted_line": "+import { z } from 'zod';",
         }
         assert len(verify_proof(claimed, actual)) == 2
 
     def test_missing_proof_is_rejected(self):
-        assert verify_proof(None, diff_proof(NEW_FILE_DIFF)) == [
+        assert verify_proof(None, diff_proof(NEW_FILE_DIFF, QUOTE)) == [
             "proof is missing or not an object"
         ]
 
     def test_non_object_proof_is_rejected(self):
-        assert verify_proof("looks fine to me", diff_proof(NEW_FILE_DIFF))
+        assert verify_proof("looks fine to me", diff_proof(NEW_FILE_DIFF, QUOTE))
 
 
 class TestValidateFindings:
     def test_anchorable_findings_pass(self):
         hunks = parse_diff_hunks(NEW_FILE_DIFF)
-        findings = [{"path": "src/components/Panel.tsx", "line": 3}]
+        findings = [{"path": "src/components/Panel.tsx", "line": 3, "side": "RIGHT"}]
         assert validate_findings(findings, hunks) == []
 
     def test_line_outside_the_hunk_is_rejected_with_valid_ranges(self):
         hunks = parse_diff_hunks(NEW_FILE_DIFF)
         problems = validate_findings(
-            [{"path": "src/components/Panel.tsx", "line": 91}], hunks
+            [{"path": "src/components/Panel.tsx", "line": 91, "side": "RIGHT"}], hunks
         )
         assert len(problems) == 1
         assert "findings[0]" in problems[0]
@@ -160,16 +207,30 @@ class TestValidateFindings:
     def test_file_not_in_the_diff_is_rejected(self):
         hunks = parse_diff_hunks(NEW_FILE_DIFF)
         problems = validate_findings(
-            [{"path": "src/lib/invented.ts", "line": 3}], hunks
+            [{"path": "src/lib/invented.ts", "line": 3, "side": "RIGHT"}], hunks
         )
         assert "not a file in the diff" in problems[0]
+
+    def test_a_left_side_finding_is_rejected(self):
+        """A removed line has no right-hand side, so GitHub 422s the whole batch.
+
+        The schema pins `side` only on the first response, so without this the natural
+        self-correction "re-anchor it as LEFT" passes validation and then discards two
+        full agy runs at POST time.
+        """
+        hunks = parse_diff_hunks(NEW_FILE_DIFF)
+        problems = validate_findings(
+            [{"path": "src/components/Panel.tsx", "line": 3, "side": "LEFT"}], hunks
+        )
+        assert len(problems) == 1
+        assert "only RIGHT is postable" in problems[0]
 
     def test_each_bad_finding_is_reported_separately(self):
         hunks = parse_diff_hunks(TWO_FILE_DIFF)
         findings = [
-            {"path": "src/components/Panel.tsx", "line": 3},
-            {"path": "src/components/Panel.tsx", "line": 99},
-            {"path": "nope.ts", "line": 1},
+            {"path": "src/components/Panel.tsx", "line": 3, "side": "RIGHT"},
+            {"path": "src/components/Panel.tsx", "line": 99, "side": "RIGHT"},
+            {"path": "nope.ts", "line": 1, "side": "RIGHT"},
         ]
         problems = validate_findings(findings, hunks)
         assert len(problems) == 2
