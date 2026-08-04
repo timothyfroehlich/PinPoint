@@ -1,6 +1,6 @@
 ---
 name: pinpoint-pr-workflow
-description: The PR-lifecycle decisions the scripts and gates do not state — why getting reviewed is a handoff (Tim runs `/code-review`; an agent cannot) and why the SHA-pinned marker you post is the only thing that satisfies the `reviewed` gate, which pushes let you re-attest versus needing a fresh review, the narrow trivial-change exception, why the merge handoff is a script you run rather than a summary you write, the `--pages` screenshot gotchas, and the Dependabot back-to-back lockfile trap. Use when committing, opening a PR, handing a branch to Tim for review, attesting a reviewed head, addressing review comments, posting screenshots, handing a PR over to merge, or landing the plane after Tim merges.
+description: The PR-lifecycle decisions the scripts and gates do not state — which of the two reviewers to spend (you run `agy_review.py` yourself; Tim's `/code-review` is a handoff you cannot launch), why the SHA-pinned marker is the only thing that satisfies the `reviewed` gate, which pushes let you re-attest versus needing a fresh review, the narrow trivial-change exception, why the merge handoff is a script you run rather than a summary you write, the `--pages` screenshot gotchas, and the Dependabot back-to-back lockfile trap. Use when committing, opening a PR, running or interpreting an agy review, handing a branch to Tim for review, attesting a reviewed head, addressing review comments, posting screenshots, handing a PR over to merge, or landing the plane after Tim merges.
 ---
 
 # PinPoint PR Workflow
@@ -77,62 +77,82 @@ Fixing, declining with a one-sentence signed reply, and resolving the thread is 
 
 Every unresolved thread counts, whoever opened it — the `threads` gate is author-agnostic. Resolve or decline each one before moving on.
 
-### 3.4 Get the head commit reviewed — Tim runs `/code-review`, you attest
+### 3.4 Get the head commit reviewed — run `agy_review.py`, or hand off to Tim
 
-**The merge bar has not moved: a PR cannot merge without a review covering the HEAD commit,** with all its threads resolved. Review is mandatory, not on-demand, not discretionary.
+**A PR cannot merge without a review covering the HEAD commit,** with all its threads resolved. Review is mandatory, not on-demand, not discretionary.
 
-**What changed on 2026-08-02 (PP-4ric) is who does it.** The bot reviewer this repo used was retired — its free tier was too small to review PinPoint's PRs, so quota outages were the normal state rather than the exception. No bot reviews this repo now, and there is nothing to request: a PR carries no pending reviewer, and any doc or habit that has you adding one is stale.
+There are **two** reviewers, and either one's marker satisfies the gate:
 
-The reviewer is **Tim, running `/code-review` on the branch**. You cannot do this for him — `/code-review` is a Claude Code harness built-in only he can trigger (`ultra` likewise, and billed). So the review is a **handoff**, and your job is to make the handoff at the right moment and record the result.
+- **`agy` (Antigravity CLI, Gemini)** — the routine path. You dispatch it yourself; it costs Tim nothing. Use it by default.
+- **Tim running `/code-review`** — a Claude Code harness built-in you cannot launch. A handoff, and therefore expensive. Reserve it for changes where the cost of a miss is high.
 
-#### Sequencing
+Copilot was retired on 2026-08-02 (PP-4ric) — its free tier was too small. Nothing reviews on PR-open or on push; a review happens because you asked for one.
 
-1. Open the PR whenever you like and watch CI. Nothing is reviewing yet, so an early PR costs nothing.
-2. Finish **all** the work: the implementation, the CI fixes, the merge-from-main. Stop iterating.
-3. Ask Tim for the review, naming the branch, and wait. This is a real stop — don't fill the time with more commits, because every push invalidates the review he is about to give you.
-4. Address the findings: fix → push → and note that head has moved (see below). Consciously decline the rest, with a reason. **A review that found nothing worth fixing skips straight to step 5** — there is no push, so head is already the SHA he read.
-5. Attest the head he reviewed — **this step is yours, always, and it is the only thing that satisfies the gate.** A clean review with an unposted marker reads to `merge-pr.sh` as `unreviewed`, so the review Tim ran buys nothing until you post it:
+#### The routine path
 
-   ```bash
-   bash scripts/workflow/mark-claude-review.sh <PR> <depth> "<one-line findings summary>"
-   ```
+```bash
+./scripts/workflow/agy_review.py <PR>          # gemini-3.6-flash-high
+./scripts/workflow/agy_review.py <PR> --pro    # gemini-3.1-pro-high, for denser changes
+```
 
-   That posts the sticky SHA-pinned marker `<!-- pinpoint-claude-review: <head_sha> -->` that the `reviewed` gate detects.
+It checks out the PR head into a throwaway worktree, hands agy the diff, posts the findings as inline review comments, and writes the SHA-pinned marker `<!-- pinpoint-agy-review: <head_sha> -->`. Add `--dry-run` to see what it would post without posting.
 
-   `<depth>` is the level Tim actually ran — `low | medium | high | xhigh | max | ultra` (or `trivial`, below). It is required and has no default: "a review happened" and "a `/code-review low` happened" are different facts, and the merge handoff report states which one. If you don't know which he ran, ask — guessing here writes a false claim into the record that reads exactly like a true one.
+**It refuses to write the marker unless agy demonstrably read the diff.** agy confabulates when a read fails — it will emit a confident review of an unrelated PR with zero findings — so the script makes it echo back facts about the diff and hard-fails on a mismatch. If it exits non-zero, nothing was posted and nothing was attested; read the error rather than retrying blindly.
 
-6. Then 3.5 / 3.6.
+The marker records a depth of `agy-flash` or `agy-pro`, never a `/code-review` level, so the handoff report reads "agy automated review, flash tier (no /code-review run)". Nothing in the record can be mistaken for a depth Tim ran.
 
-**Finish your churn before you ask.** This mattered under the bot reviewer because a review cost quota; it matters more now because it costs Tim's attention. Asking for a review of a tree you're about to change wastes the more expensive resource.
+**Then close out every thread it opened** (3.3). Each one gets a fix or a one-sentence decline signed `—Claude`, then resolve it. The `threads` gate counts unresolved threads from any author, so this is enforced, not trusted.
+
+#### When to hand off to Tim instead
+
+agy is roughly a low-effort pass. Measured against six planted `CORE-*` violations it caught all six, but it is a smaller model reading a diff — it is not equivalent to `/code-review`. Ask Tim when:
+
+- the change touches auth, permissions, migrations, or money-like invariants;
+- it is large or architectural enough that a per-line pass misses the point;
+- agy returned no findings and that surprises you.
+
+The handoff: finish **all** the work first — implementation, CI fixes, merge-from-main — then stop iterating and tell him the branch is ready. Every push invalidates the review he is about to give you. Address the findings, then attest the head he read. **A review that found nothing worth fixing skips straight to attesting** — there is no push, so head is already the SHA he read.
+
+**Posting the marker is yours, always, and it is the only thing that satisfies the gate.** A clean review with an unposted marker reads to `merge-pr.sh` as `unreviewed`, so the review Tim ran buys nothing until you post it — and a review that found nothing is exactly the case agents stall on, because there is nothing to fix and nothing to push.
+
+```bash
+bash scripts/workflow/mark-claude-review.sh <PR> <depth> "<one-line findings summary>"
+```
+
+`<depth>` is the level Tim actually ran — `low | medium | high | xhigh | max | ultra` (or `trivial`, below). It is required and has no default: "a review happened" and "a `/code-review low` happened" are different facts, and the merge handoff report states which one. If you don't know which he ran, ask — guessing here writes a false claim into the record that reads exactly like a true one. (`agy_review.py` records its own tier, so you never pass a depth to it.)
+
+**Finish your churn before either reviewer.** For agy it avoids a pointless second run; for Tim it avoids spending the more expensive resource on a tree you're about to change.
 
 #### Pushing after the review
 
 **The marker pins a SHA, so any push invalidates it** — the gate flips to `stale_marker` and says so. That's deliberate: a 3-commit fixup must not inherit the review of the commit before it.
 
-Which of two things you do next depends on what you pushed:
+**If agy reviewed it, just run it again.** A re-run is cheap and costs nobody's attention, so there is no judgement call to make — re-review the new head and let it re-write the marker.
+
+**If Tim reviewed it,** which of two things you do next depends on what you pushed:
 
 - **The fixes he asked for.** Re-attest at the new head and say so in the summary — `"applied review findings from <old_sha>"`. A reviewer's own requested changes are within what they reviewed; this is the same round-trip any human review has.
-- **Anything else** — new work, a refactor you thought of, a scope addition. That needs a fresh `/code-review`. Re-attesting over it is a false attestation.
+- **Anything else** — new work, a refactor you thought of, a scope addition. That needs a fresh review. Re-attesting over it is a false attestation. Running agy over the new head is a legitimate way to clear it without interrupting him again, provided the new work is within agy's competence (see "When to hand off to Tim instead").
 
 If you're unsure which bucket you're in, ask. The cost of asking is one message; the cost of guessing wrong is merging something nobody read.
 
 #### The trivial-change exception
 
-A genuinely trivial change — a typo, a comment, a one-line mechanical fix — doesn't need to interrupt Tim. Attest it yourself and **say why it was trivial** in the marker summary, so the judgement is on the record and reviewable:
+A genuinely trivial change — a typo, a comment, a one-line mechanical fix — doesn't need a reviewer at all. Attest it yourself and **say why it was trivial** in the marker summary, so the judgement is on the record and reviewable:
 
 ```bash
 bash scripts/workflow/mark-claude-review.sh <PR> trivial "typo in a comment; no behavior change"
 ```
 
-`trivial` is the depth for this case, and it is the only one that does not name a `/code-review` level — the report then says "attested trivial (no /code-review run)" rather than implying a review happened.
+`trivial` is the depth for this case, and along with the `agy-*` tiers it is one of the depths that does not name a `/code-review` level — the report then says "attested trivial (no /code-review run)" rather than implying a review happened.
 
-This is a narrow exception and it is self-policing. "It's only a small change" is not the test — the test is whether there is any way for it to be wrong. If you're reaching for a justification, it isn't trivial.
+This is a narrow exception and it is self-policing. "It's only a small change" is not the test — the test is whether there is any way for it to be wrong. If you're reaching for a justification, it isn't trivial — and since agy costs you one command, reaching for this exception to save effort is the wrong trade.
 
 **The marker attests that a review actually happened.** Posting it otherwise is a false attestation, not a shortcut — the same honesty model as `merge-pr.sh --force`.
 
 #### Readiness is not review
 
-`pr-watch.py --check-ready` reports review state but does **not** gate on it. That check answers "is this PR worth Tim's `/code-review` right now?", and the review is what happens after that answer is yes — gating on it would be circular. Check-ready green means "hand it to Tim", not "will merge".
+`pr-watch.py --check-ready` reports review state but does **not** gate on it. That check answers "is this PR worth reviewing right now?", and the review is what happens after that answer is yes — gating on it would be circular. Check-ready green means "review it", not "will merge".
 
 Don't tell Tim a PR is "ready" or "done" while head is unreviewed — say it's ready for his `/code-review`, which is a different claim.
 

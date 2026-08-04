@@ -13,17 +13,31 @@
 
 set -euo pipefail
 
-# SHA-pinned review marker, posted by mark-claude-review.sh. Since PP-4ric this is the
-# ONLY thing that satisfies the `reviewed` gate — Copilot review was retired on
-# 2026-08-02 (its free tier was too small to review PinPoint's PRs), and no bot reviews
-# this repo now. The marker attests that Tim ran `/code-review` over the diff, which an
-# agent cannot do for itself: `/code-review` is a harness built-in only he can trigger.
+# SHA-pinned review markers. One of these must pin the head commit for the `reviewed`
+# gate to pass; the SHA pin makes them self-expiring, so a later push re-arms the gate.
 #
-# What follows this prefix, up to the `-->`, is compared to the head SHA by STRING
-# EQUALITY. Nothing else may go inside this comment — the review depth mark-claude-review.sh
-# records lives in its own `<!-- pinpoint-review-depth: … -->` comment for exactly that
-# reason, since adding it here would fail every `reviewed` gate on every PR. (PP-9onv.)
+# Two markers, two attestations — deliberately equal in the gate's eyes:
+#
+#   pinpoint-claude-review  posted by mark-claude-review.sh. Attests that Tim ran
+#                           `/code-review` over the diff, which an agent cannot do for
+#                           itself (it is a harness built-in only he can trigger).
+#   pinpoint-agy-review     posted by agy_review.py. Attests that an Antigravity review
+#                           was posted AND that it demonstrably read the diff it was
+#                           given — that script refuses to write the marker unless the
+#                           model echoed back facts about the diff that only a run which
+#                           actually read it could produce. agy confabulates a plausible
+#                           review when a read fails, so the proof check is what makes
+#                           this marker mean anything. (PP-c6xz.)
+#
+# Copilot review was retired on 2026-08-02 (PP-4ric) — its free tier was too small to
+# review PinPoint's PRs — and no bot reviews this repo unprompted.
+#
+# What follows either prefix, up to the `-->`, is compared to the head SHA by STRING
+# EQUALITY. Nothing else may go inside these comments — the review depth lives in its own
+# `<!-- pinpoint-review-depth: … -->` comment for exactly that reason, since adding it
+# here would fail every `reviewed` gate on every PR. (PP-9onv.)
 readonly CLAUDE_MARKER_PREFIX="<!-- pinpoint-claude-review:"
+readonly AGY_MARKER_PREFIX="<!-- pinpoint-agy-review:"
 
 # Parse owner/repo dynamically — avoid hardcoded slug. Memoized: several gates ask for
 # it and pr-dashboard.sh runs them once per open PR, so an unmemoized call was one
@@ -67,13 +81,16 @@ _repo_slug() {
 # misses a marker sitting on page 2+ of a busy PR.
 _marker_record() {
   local pr=$1 owner_repo=$2 head=$3
+  local prefixes
+  prefixes=$(jq -nc --arg a "$CLAUDE_MARKER_PREFIX" --arg b "$AGY_MARKER_PREFIX" '[$a, $b]')
   gh api --paginate "repos/${owner_repo}/issues/${pr}/comments" \
-    | jq -rs --arg prefix "$CLAUDE_MARKER_PREFIX" --arg head "$head" \
+    | jq -rs --argjson prefixes "$prefixes" --arg head "$head" \
         '[ .[] | flatten | .[]
            | (.body // "") as $b
+           | $prefixes[] as $prefix
            | select($b | startswith($prefix))
            | { sha: ($b | ltrimstr($prefix) | split("-->")[0] | gsub("^\\s+|\\s+$"; "")),
-               depth: ($b | [scan("<!-- pinpoint-review-depth:\\s*([a-z]+)\\s*-->")]
+               depth: ($b | [scan("<!-- pinpoint-review-depth:\\s*([a-z-]+)\\s*-->")]
                           | flatten | (.[0] // "unrecorded")),
                at: (.updated_at // ""),
                summary: ($b | split("\n") | last | gsub("^\\s+|\\s+$"; "")) }
@@ -185,10 +202,16 @@ _compute_review_state() {
 # cannot do the first one: `/code-review` is a Claude Code harness built-in that only
 # Tim can trigger, so the review is a handoff and the marker is what the agent posts
 # once he has run it and the findings are addressed.
+# Names the routine path FIRST. Leading with the handoff sent an agent to interrupt Tim
+# for a PR agy could review in one command — exactly the cost agy_review.py exists to
+# remove, arrived at by following the gate's own advice. (PP-c6xz.)
 _review_remedy() {
   local pr=$1
-  echo "  remedy: ask Tim to run /code-review on this branch, address the findings,"
-  echo "          then attest the head he reviewed:"
+  echo "  remedy: run the automated review, then close out every thread it opens:"
+  echo "    ./scripts/workflow/agy_review.py $pr"
+  echo ""
+  echo "          For auth, permissions, migrations, or an architectural change, ask Tim"
+  echo "          to run /code-review instead, then attest the head he reviewed:"
   echo "    bash scripts/workflow/mark-claude-review.sh $pr <depth> \"<one-line findings>\""
   echo "          (<depth> is the /code-review level he ran: low|medium|high|xhigh|max|ultra)"
 }
@@ -244,16 +267,17 @@ check_unresolved_threads() {
 }
 
 # Gate 3: head commit has been reviewed. The hard backstop — a head nobody reviewed
-# cannot merge, and nothing here WAITs, because with no bot in the loop there is never
-# an answer already on its way. The marker is
-# `<!-- pinpoint-claude-review: <head_sha> -->` in a PR conversation comment (posted by
-# mark-claude-review.sh, alongside a `<!-- pinpoint-review-depth: … -->` comment this
-# gate ignores); the SHA pin makes it self-expiring, so a later fix changes the head SHA
-# and re-arms the gate.
+# cannot merge, and nothing here WAITs, because nothing reviews unprompted, so there is
+# never an answer already on its way. EITHER marker satisfies it (see the block comment
+# at the top of this file): `<!-- pinpoint-claude-review: <head_sha> -->` from
+# mark-claude-review.sh, or `<!-- pinpoint-agy-review: <head_sha> -->` from
+# agy_review.py, each alongside a `<!-- pinpoint-review-depth: … -->` comment this gate
+# ignores. The SHA pin makes them self-expiring, so a later fix changes the head SHA and
+# re-arms the gate.
 #
 #   marker        → PASS
 #   stale_marker  → FAIL   remedy: re-review the new head, re-attest
-#   unreviewed    → FAIL   remedy: Tim runs /code-review, then attest
+#   unreviewed    → FAIL   remedy: run agy_review.py, or Tim runs /code-review + attest
 check_review_happened() {
   local pr=$1
   _compute_review_state "$pr"

@@ -149,6 +149,7 @@ depth_phrase() {
   case "$1" in
     trivial) printf 'attested trivial (no /code-review run)\n' ;;
     unrecorded) printf 'depth unrecorded (marker predates PP-9onv)\n' ;;
+    agy-*) printf 'agy automated review, %s tier (no /code-review run)\n' "${1#agy-}" ;;
     *) printf '/code-review %s\n' "$1" ;;
   esac
 }

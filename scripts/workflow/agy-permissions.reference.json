@@ -1,0 +1,6 @@
+{
+  "permissions": {
+    "allow": ["read_file(*)"],
+    "deny": ["command(*)", "write_file(*)"]
+  }
+}
