@@ -73,7 +73,7 @@ If you’re changing code, **start here**:
 - `AGENTS.md` – project rules, constraints, and expectations
 - `docs/NON_NEGOTIABLES.md` – things you must not break
 - `.agents/skills/` – how we structure code (and why); `pinpoint-ui`, `pinpoint-typescript`, `pinpoint-security`, `pinpoint-testing` are the ones you'll reach for most
-- `docs/DEVELOPMENT.md` – day‑to‑day commands and workflow
+- `docs/PRODUCT_SPEC.md` and `docs/TECH_SPEC.md` – what the product should do, and how it is built
 
 ### Prerequisites
 
@@ -114,19 +114,24 @@ pnpm run db:reset
 
 This restarts Supabase, drops app tables, reapplies all migrations, regenerates the test schema, and seeds users/data.
 
+To browse or edit the data directly, `pnpm run db:studio` opens Drizzle Studio.
+
 ### Everyday Commands
 
 ```bash
 pnpm run dev          # start dev server
 pnpm run check        # static gate: typecheck + lint + format (no tests, no Python)
 pnpm run test         # unit tests (PGlite)
-pnpm run test:integration   # Supabase-backed integration tests
+pnpm run test:integration           # PGlite integration tests
+pnpm run test:integration:supabase  # Supabase-backed integration tests (needs supabase start)
 pnpm run check:python # ruff + pytest over scripts/ and the hooks
 pnpm run smoke        # Playwright smoke E2E tests
 pnpm run preflight    # full local CI gate before pushing
 ```
 
-For more detail, see `docs/DEVELOPMENT.md` and the `pinpoint-testing` skill at `.agents/skills/pinpoint-testing/SKILL.md`.
+For the command reference and the rules behind it, see `AGENTS.md` §5; for which
+tests to write where, the `pinpoint-testing` skill at
+`.agents/skills/pinpoint-testing/SKILL.md`.
 
 ---
 
