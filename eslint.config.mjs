@@ -9,6 +9,7 @@ import reactHooks from "eslint-plugin-react-hooks";
 import jsxA11y from "eslint-plugin-jsx-a11y";
 import globals from "globals";
 import { pinpointTransactionPlugin } from "./eslint-rules/no-side-effects-in-transaction.mjs";
+import { pinpointServerActionNamingPlugin } from "./eslint-rules/server-action-file-naming.mjs";
 
 // ===== Slim mode (PP-4zcj) =====
 // This config is AUTHORITATIVE and complete. CI always runs it whole
@@ -60,7 +61,16 @@ export default [
       "unused-imports": unusedImportsPlugin,
       promise: promisePlugin,
       "eslint-comments": eslintCommentsPlugin,
-      pinpoint: pinpointTransactionPlugin,
+      // One `pinpoint` namespace, several local rule modules. Each rule lives in
+      // its own file under ./eslint-rules/ (single source of truth, also
+      // imported by src/test/eslint/*.test.ts); this merges their `rules` maps
+      // into the single plugin entry flat config expects.
+      pinpoint: {
+        rules: {
+          ...pinpointTransactionPlugin.rules,
+          ...pinpointServerActionNamingPlugin.rules,
+        },
+      },
     },
     languageOptions: {
       parser: typescriptParser,
@@ -150,6 +160,16 @@ export default [
       // ./eslint-rules/no-side-effects-in-transaction.mjs (single source of
       // truth, also exercised by src/test/eslint/*.test.ts).
       "pinpoint/no-side-effects-in-transaction": "error",
+
+      // A module-level `"use server"` file must be named `actions.ts` /
+      // `*-action(s).ts`, or live in `src/server/actions/`. Server Actions are
+      // deliberately scattered (route-local colocation), so "is this an action
+      // module?" is a content question — but the `.claude/rules/` `paths:`
+      // globs that load CORE-ARCH-005/008/011/012 can only match on filename.
+      // Without this rule an off-pattern name silently drops out of them and
+      // nothing fails. Rationale + globs:
+      // ./eslint-rules/server-action-file-naming.mjs.
+      "pinpoint/server-action-file-naming": "error",
 
       // ===== TypeScript Safety =====
 
