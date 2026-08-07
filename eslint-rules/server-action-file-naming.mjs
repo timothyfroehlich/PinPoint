@@ -1,0 +1,107 @@
+// ===== Server Action file naming =====
+//
+// A module whose directive prologue is `"use server"` must be named
+// `actions.ts(x)` or `<something>-action(s).ts(x)`, or live under
+// `src/server/actions/`.
+//
+// ── Why a naming rule exists at all ──────────────────────────────────────────
+// Server Actions are deliberately NOT collected into one directory: a
+// route-local action colocates with its route under `src/app/**` (that is the
+// App Router convention and the import graph confirms it — each colocated
+// action is imported only from within its own feature subtree), while a
+// genuinely cross-cutting action lives in `src/server/actions/`. That split is
+// worth keeping.
+//
+// The cost of keeping it is that "is this a Server Action module?" becomes a
+// file-CONTENT question, and several things that need to answer it can only
+// match on PATH:
+//
+//   - `.claude/rules/*.md` frontmatter (`paths:` globs) — the path-scoped rule
+//     tier that loads CORE-ARCH-005 / CORE-ARCH-008 / CORE-ARCH-011 / CORE-ARCH-012
+//     when an agent opens an action file. Globs cannot read a directive.
+//   - Any future CODEOWNERS entry, path filter in CI, or reviewer checklist
+//     keyed on actions.
+//
+// Those consumers all use the same four globs:
+//
+//     **/actions.ts
+//     **/*-action.ts
+//     **/*-actions.ts
+//     src/server/actions/**
+//
+// A new action named `foo.ts` would silently fall out of every one of them, and
+// nothing would fail — the rules just quietly stop loading. This rule is what
+// makes that failure loud. It does NOT enforce where the file lives, only what
+// it is called; moving actions around stays a free choice.
+//
+// ── Scope: module-level directive only ───────────────────────────────────────
+// Only a `"use server"` in the module's directive prologue marks the whole file
+// as a Server Action module, and only that is matched here
+// (`Program > ExpressionStatement[directive="use server"]`). An inline
+// `"use server"` inside a function body is a different construct with a
+// different rule (CORE-ARCH-005 bans it as a form-action wrapper) and is not
+// this rule's business. A `"use server"` appearing in a comment or a string
+// literal is not a directive and never matches — three files in `src/app/(auth)`
+// mention it in prose for exactly this reason.
+
+/** Basename of a conforming action module: `actions.ts` or `*-action(s).ts`, `.tsx` too. */
+export const ACTION_FILENAME_PATTERN = /^(?:.*-)?actions?\.tsx?$/;
+
+/** Shared (non-route-local) actions live here and are exempt from the basename rule. */
+export const SHARED_ACTIONS_DIR_PATTERN = /(?:^|[/\\])src[/\\]server[/\\]actions[/\\]/;
+
+export const SERVER_ACTION_FILE_NAMING_MESSAGE =
+  'A module with a top-level "use server" directive must be named ' +
+  "`actions.ts` or `<name>-action.ts` / `<name>-actions.ts`, or live under " +
+  "`src/server/actions/`. Path-based consumers — the `.claude/rules/` " +
+  "`paths:` globs that load the Server Action rules (CORE-ARCH-005/008/011/012) " +
+  "— match on filename, not on the directive, so an off-pattern name silently " +
+  "drops the file out of them.";
+
+/**
+ * Returns true when `filename` satisfies the Server Action naming convention.
+ *
+ * @param {string} filename absolute or relative path to the linted file
+ */
+export function isConformingActionFilename(filename) {
+  if (SHARED_ACTIONS_DIR_PATTERN.test(filename)) return true;
+  const basename = filename.split(/[/\\]/).pop() ?? "";
+  return ACTION_FILENAME_PATTERN.test(basename);
+}
+
+/**
+ * Custom ESLint rule: a module-level `"use server"` file must be named so the
+ * path globs that route rules to Server Actions can find it.
+ *
+ * @type {import("eslint").Rule.RuleModule}
+ */
+export const serverActionFileNamingRule = {
+  meta: {
+    type: "problem",
+    docs: {
+      description:
+        'Require a module with a top-level "use server" directive to be named actions.ts / *-action(s).ts or live in src/server/actions/.',
+    },
+    schema: [],
+    messages: { serverActionFileNaming: SERVER_ACTION_FILE_NAMING_MESSAGE },
+  },
+  create(context) {
+    return {
+      'Program > ExpressionStatement[directive="use server"]': (node) => {
+        const filename = context.filename;
+        if (!filename) return;
+        if (isConformingActionFilename(filename)) return;
+        context.report({ node, messageId: "serverActionFileNaming" });
+      },
+    };
+  },
+};
+
+/**
+ * Flat-config plugin object. Merge its `rules` into the `pinpoint` plugin entry
+ * in `eslint.config.mjs`, then enable
+ * `"pinpoint/server-action-file-naming": "error"`.
+ */
+export const pinpointServerActionNamingPlugin = {
+  rules: { "server-action-file-naming": serverActionFileNamingRule },
+};
