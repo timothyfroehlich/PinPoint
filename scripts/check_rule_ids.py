@@ -5,8 +5,8 @@ PinPoint states its rules in several places, each in a different voice and for
 a different reader:
 
   docs/NON_NEGOTIABLES.md    canonical catalog -- the authoritative statement
-  CLAUDE.md                  always-loaded index, authoring voice
-  .claude/rules/*.md         path-scoped, authoring voice (Claude)
+  AGENTS.md / CLAUDE.md      always-loaded process context, authoring voice
+  .claude/rules/*.md         the rules themselves, path-scoped (Claude Code)
   REVIEW.md                  review-agent entry map + rubric
 
 Generating those from one source would mean synthesising two registers from one
@@ -14,27 +14,36 @@ text, so they are hand-written. This gate catches the drift that actually bites
 -- a rule renamed or deleted in the catalog while citations linger, and catalog
 rules that no mechanism references at all -- without pretending to diff prose.
 
-Three checks:
+Four checks:
 
   ERROR  A cited CORE-* ID that does not exist in the catalog. Always a bug:
          either a typo or a rule that was renamed/removed without updating its
          citations. This is the check that runs in `pnpm run check`.
   ERROR  A fragile "rule N" / "commandment N" / "AGENTS.md §2.1" citation
-         (PP-22e4). AGENTS.md §2.1 -- the numbered non-negotiables list -- is
-         being replaced by a grouped index, which turns every citation by
-         rule number or to "§2.1" itself into a pointer to nothing. Unlike a
+         (PP-22e4). AGENTS.md §2.1 used to be the numbered non-negotiables
+         list; PP-22e4.4 moved the rules to .claude/rules/, so every citation
+         by rule number or to "§2.1" itself now points at nothing. Unlike a
          CORE-* ID, neither form is machine-checkable against the catalog, so
          the only sound gate is banning the pattern outright and requiring
          the CORE-* ID instead.
   AUDIT  (--orphans) A catalog rule cited nowhere. Opt-in, never fails the
-         build: as of 2026-07-24, 42 of ~62 catalog rules are "orphans" by this
-         definition, because the catalog is deliberately broader than the set
-         promoted into an always-loaded index or a path-scoped file. Printing
-         42 lines on every run would train everyone to ignore the gate, so it
-         is a coverage audit you run deliberately, not a default warning.
+         build: 17 of 67 catalog rules are "orphans" by this definition as of
+         2026-08-07 (it was 42 of 62 before the .claude/rules/ tier, which
+         cites more of the catalog than the old AGENTS.md list did), because
+         the catalog is deliberately broader than the set promoted into an
+         always-loaded or path-scoped file. Printing that list on every run
+         would train everyone to ignore the gate, so it is a coverage audit
+         you run deliberately, not a default warning.
+  ERROR  The always-loaded context files (AGENTS.md, CLAUDE.md, and any
+         .claude/rules/*.md with no `paths:` frontmatter) exceed their byte
+         budget. Not a prose-quality check -- a budget on the one thing every
+         session pays for regardless of what it is doing. A rule file that
+         declares `paths:` is on-demand and is not counted, so moving text
+         behind a glob is always the cheap fix.
 
 Exit codes: 0 clean, 1 unknown IDs found, 2 catalog missing, 3 descending
-range cited, 4 fragile rule-number/§2.1 citation found.
+range cited, 4 fragile rule-number/§2.1 citation found, 5 always-loaded
+context over budget.
 """
 
 from __future__ import annotations
@@ -72,16 +81,18 @@ NUMBERED_RULE_CITATION = re.compile(
     r"\b(?:AGENTS\.md`?\s+)?(?:[Rr]ule|[Cc]ommandment)\s*#?\d+\b"
 )
 
-# "AGENTS.md §2.1" itself (the numbered non-negotiables list being replaced by
-# a grouped index -- see module docstring). Tolerates the same optional
-# backtick as NUMBERED_RULE_CITATION.
+# "AGENTS.md §2.1" itself. That section no longer lists the rules -- PP-22e4.4
+# moved them to .claude/rules/ and left a pointer -- so citing it sends the
+# reader somewhere the rule is not. Tolerates the same optional backtick as
+# NUMBERED_RULE_CITATION.
 SECTION_21_CITATION = re.compile(r"AGENTS\.md`?\s*§\s*2\.1\b")
 
 CATALOG = "docs/NON_NEGOTIABLES.md"
 
-# Files and globs whose CORE-* citations must resolve. Missing paths are fine:
-# .claude/rules/ does not exist yet -- the context-system rebuild (PP-22e4)
-# lands it in a later PR, and this gate is written to already cover it.
+# Files and globs whose CORE-* citations must resolve. Missing paths are fine
+# -- a glob that matches nothing is skipped, so this list can name a surface
+# before it exists (it named .claude/rules/ for two weeks before PP-22e4.4
+# created it) and can outlive one that is retired.
 #
 # .agents/skills/ is here because it is a first-class citation surface, not a
 # doc archive: AGENTS.md section 3 instructs every agent to load the relevant
@@ -141,6 +152,77 @@ LEGACY_CITATION_SOURCES: tuple[str, ...] = (
 LEGACY_CITATION_SELF_EXCLUDE = frozenset(
     {"scripts/check_rule_ids.py", "scripts/tests/test_check_rule_ids.py"}
 )
+
+# ===== Always-loaded context budget (PP-22e4.4) =====
+#
+# Every byte of these files enters context on every session, whatever the
+# session is doing. That is a real, measurable resource, and it only ever grows
+# by accident: each addition is individually defensible and nobody sees the
+# total. This is a budget on that total -- not a prose-quality check, which
+# would be a fool's errand. It has exactly one question to ask, and it asks it
+# at the moment someone is adding always-loaded text: does this need to be
+# always-loaded, or does it have a path?
+#
+# If it has a path, it belongs in a .claude/rules/*.md with a `paths:` glob
+# list, where it costs nothing until a matching file is opened. That is the
+# whole reason the tier exists -- AGENTS.md section 2.1 used to carry all 20
+# non-negotiables here, including the responsive-layout rules during a
+# migration and the migration rule during a CSS change.
+#
+# Only files with no `paths:` frontmatter count. A rule file that declares
+# globs is on-demand and is deliberately NOT budgeted, so splitting a rule out
+# by path is always the cheap fix.
+ALWAYS_LOADED_SOURCES: tuple[str, ...] = (
+    "AGENTS.md",
+    "CLAUDE.md",
+    ".claude/rules/*.md",
+)
+
+# 40 KiB. Chosen against a measured 38.1 KiB at the time this landed, so the
+# headroom is ~2 KB -- enough for ordinary edits, tight enough that a new
+# always-loaded section trips it. Raising it is a real decision: do it in a
+# commit that says what got added and why no `paths:` glob would cover it.
+ALWAYS_LOADED_BUDGET_BYTES = 40 * 1024
+
+
+def declares_paths(text: str) -> bool:
+    """True when a rule file's YAML frontmatter declares a `paths:` key.
+
+    Such a file is path-scoped: Claude Code loads it only when a file matching
+    one of its globs is read, so it costs nothing at launch and is exempt from
+    the always-loaded budget.
+
+    Deliberately not a YAML parse. The question is only "does the frontmatter
+    block declare paths", and the block is bounded so a `paths:` mentioned in
+    prose further down the file -- which .claude/rules/README.md does, while
+    itself being path-scoped -- cannot be mistaken for a declaration.
+    """
+    lines = text.splitlines()
+    if not lines or lines[0].strip() != "---":
+        return False
+    for line in lines[1:]:
+        if line.strip() == "---":
+            return False  # Closed the block without declaring paths.
+        if line.startswith("paths:"):
+            return True
+    return False  # Unterminated frontmatter: treat as no declaration.
+
+
+def collect_always_loaded(root: Path) -> dict[str, int]:
+    """Map relative path -> byte size, for every always-loaded context file."""
+    sizes: dict[str, int] = {}
+    for pattern in ALWAYS_LOADED_SOURCES:
+        for path in _glob_paths(root, pattern):
+            if not path.is_file():
+                continue
+            rel = path.relative_to(root).as_posix()
+            if rel in sizes:
+                continue
+            text = path.read_text(encoding="utf-8")
+            if declares_paths(text):
+                continue  # Path-scoped: on demand, not at launch.
+            sizes[rel] = len(text.encode("utf-8"))
+    return sizes
 
 
 def find_repo_root(start: Path) -> Path:
@@ -318,10 +400,10 @@ def main(argv: list[str] | None = None) -> int:
             for line_no, matched_text in legacy[rel]:
                 print(f"  {rel}:{line_no}: {matched_text!r}", file=sys.stderr)
         print(
-            "\nAGENTS.md §2.1 is being replaced by a grouped index (PP-22e4) -- "
-            'a rule number or "§2.1" citation points at nothing once that '
-            "lands. Cite the CORE-* ID instead (look it up against "
-            f"{CATALOG}, or AGENTS.md §2.1's own list for now).",
+            "\nAGENTS.md §2.1 no longer lists the rules (PP-22e4.4) -- they "
+            'moved to .claude/rules/, so a rule number or a "§2.1" citation '
+            "now points at nothing. Cite the CORE-* ID instead; look it up in "
+            f"{CATALOG}, which is the only catalog there is.",
             file=sys.stderr,
         )
         return 4
@@ -347,6 +429,33 @@ def main(argv: list[str] | None = None) -> int:
             file=sys.stderr,
         )
         return 1
+
+    # ERROR: the always-loaded context files exceed their byte budget
+    # (PP-22e4.4). Reported after the citation checks because a broken citation
+    # is a correctness bug and this is a budget overrun.
+    always_loaded = collect_always_loaded(root)
+    total = sum(always_loaded.values())
+    if total > ALWAYS_LOADED_BUDGET_BYTES:
+        over = total - ALWAYS_LOADED_BUDGET_BYTES
+        print(
+            f"check:rule-ids: always-loaded context is {total:,} bytes, "
+            f"{over:,} over the {ALWAYS_LOADED_BUDGET_BYTES:,}-byte budget\n",
+            file=sys.stderr,
+        )
+        for rel in sorted(always_loaded, key=lambda r: -always_loaded[r]):
+            print(f"  {always_loaded[rel]:>7,}  {rel}", file=sys.stderr)
+        print(
+            "\nThese files enter context on every session, whatever the session "
+            "is doing. Before raising the budget, ask whether what you added "
+            "has a path: if it applies to a subtree rather than the whole repo, "
+            "move it to a .claude/rules/*.md with a `paths:` glob list, where "
+            "it costs nothing until a matching file is opened (see "
+            ".claude/rules/README.md). Raising the budget is a real decision -- "
+            "do it in a commit that says what got added and why no glob covers "
+            "it.",
+            file=sys.stderr,
+        )
+        return 5
 
     # AUDIT (opt-in): in the catalog but cited nowhere.
     if args.orphans:
