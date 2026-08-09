@@ -64,7 +64,7 @@ If tests fail with `POSTGRES_URL is not set`:
 2. The bead is the source of truth — point the agent at `bd show`; don't restate scope/files in the prompt (two places to drift)
 3. Quality is self-enforced — explicit `pnpm run check` replaces hook enforcement
 4. Structured return format enables quick lead assessment
-5. No review fires automatically at all — the agent must request one, once, after it stops iterating (and again if it pushes past a review). The return format asks about it and the lead re-checks `commit_id` vs head at handoff (SKILL.md → "Ensure every PR is reviewed")
+5. Nothing reviews automatically and there is nothing for the agent to request — its terminal state is a PR reported as needing Tim's `/code-review`. The return format asks for exactly that, and at handoff the lead checks the marker's pinned SHA against head (SKILL.md → "Ensure every PR is reviewed")
 
 ## Follow-Up Prompt (via SendMessage)
 
