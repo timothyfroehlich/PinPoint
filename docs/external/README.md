@@ -6,9 +6,27 @@ read before touching the PinballMap integration (`src/lib/pinballmap/`).
 
 | File                      | What                                                                                   | Provenance                                                             |
 | :------------------------ | :------------------------------------------------------------------------------------- | :--------------------------------------------------------------------- |
-| `pinballmap-llms.txt`     | PBM's own API guidance for AI assistants — auth, rate limits, anti-patterns, endpoints | Fetched verbatim from `https://pinballmap.com/llms.txt` (2026-07-23)   |
+| `pinballmap-llms.txt`     | PBM's own API guidance for AI assistants — auth, rate limits, anti-patterns, endpoints | Fetched verbatim from `https://pinballmap.com/llms.txt` (2026-08-09)   |
 | `pinballmap-robots.txt`   | PBM's robots policy — blocks AI crawlers from the site                                 | Fetched verbatim from `https://pinballmap.com/robots.txt` (2026-07-18) |
 | `pinballmap-api-terms.md` | Our distilled conduct + attribution notes, with sources                                | Authored by us, cites llms.txt + FAQ                                   |
+
+> **2026-08-09 refresh — attribution must name the specific location.** PBM's
+> `llms.txt` (`Last updated: 2026-08-06`) gained an **`## Attribution`** section.
+> It is the only change; the rest of the file is byte-identical to the 2026-07-22
+> version. Substance: Pinball Map data is [CC BY-SA
+> 4.0](https://creativecommons.org/licenses/by-sa/4.0/) and requires attribution.
+> A generic `https://pinballmap.com` link is fine for general credit (an about
+> page), **but a surface that displays data for a specific location must link to
+> that location's listing** — `https://pinballmap.com/map?by_location_id=<id>`.
+> They additionally _encourage_ (not require) explanatory language such as
+> "update this location listing at Pinball Map \<link\>", because PBM is a source
+> of truth many people rely on and they want readers routed back to correct it.
+> **We already comply with the hard requirement**: `pinballmapLocationUrl()`
+> (`src/lib/pinballmap/public-url.ts`) has emitted the `by_location_id` form
+> since PP-o355.3, and both `/map?…` and `/map/?…` were verified to return HTTP
+> 200 with no redirect. The encouraged explanatory copy is **not** yet on our two
+> rendered link-backs (the Info-tab card and the Manage-tab section heading) —
+> tracked in **PP-2h1b**. `robots.txt` unchanged since 2026-07-18.
 
 > **2026-07-23 refresh — client-side token ban + a self-dating header.** PBM's
 > `llms.txt` now carries a `Last updated:` date (currently 2026-07-22) and asks
