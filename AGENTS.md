@@ -53,13 +53,8 @@ Load relevant skills for every task. If your tool doesn't support skills, read t
 
 One-time install for tools the workflow scripts depend on:
 
-- **GNU parallel** (provides `sem`, used by `pnpm run preflight` to cap host-wide concurrency at 2):
-  - macOS: `brew install parallel`
-  - Linux: `apt install parallel`
-  - Without it, `pnpm run preflight` fails with a clear install hint; use `pnpm run preflight:unlocked` to bypass the cap.
-- **pytest** (used by `pnpm run check:python` to run the hook/script tests):
-  - macOS: `brew install pytest`
-  - Linux: `pipx install pytest` (requires pipx: `apt install pipx`)
+- **GNU parallel** — provides `sem`, which `pnpm run preflight` uses to cap host-wide concurrency at 2. Without it, `preflight` fails with a clear install hint; `pnpm run preflight:unlocked` bypasses the cap.
+- **pytest** — `pnpm run check:python` runs the hook/script tests with it.
 
 ### Worktrees & ports
 
@@ -96,8 +91,8 @@ Only stop services you started in this session, by specific PID or via worktree-
 | `pnpm run check:python`               | ruff + `pytest scripts/tests/` (~14s). Split out of `check` because Python changes are rare; CI's required `Fast Linters` job runs it on every push regardless. Run after touching `scripts/` or `.claude/hooks/`.                        |
 | `pnpm run preflight`                  | Full: check + build + integration. **For non-trivial changes** (migrations, auth, server actions, middleware, DB schema) — not every commit. Host-wide cap of 2 concurrent runs (via `sem`); use `preflight:unlocked` to bypass.          |
 | `pnpm run smoke`                      | Smoke E2E (~60s)                                                                                                                                                                                                                          |
-| `pnpm run e2e:full`                   | Full E2E suite — CI's job by default; **on a resource-constrained system (a 16 GB laptop, especially with several agent sessions running), don't run it locally.**                                                                        |
-| `pnpm run e2e:all`                    | Full + smoke + roots, separate Playwright invocations (~10–15 min) — CI's job by default; **on a resource-constrained system (a 16 GB laptop, especially with several agent sessions running), don't run it locally.**                    |
+| `pnpm run e2e:full`                   | Full E2E suite — CI's job by default. Three parallel Chromium workers plus a Supabase stack and a Next server; peaks several GB.                                                                                                          |
+| `pnpm run e2e:all`                    | Full + smoke + roots, separate Playwright invocations (~10–15 min) — CI's job by default. Same footprint as `e2e:full`, three times over.                                                                                                 |
 | `pnpm run db:migrate`                 | Apply schema changes locally                                                                                                                                                                                                              |
 | `pnpm run db:backup`                  | Manual prod dump → `~/.pinpoint/db-backups` (data-only dev seed, **not** a DR artifact)                                                                                                                                                   |
 | `pnpm run db:seed:from-prod`          | Reset local + seed from latest prod backup                                                                                                                                                                                                |
@@ -118,7 +113,7 @@ TypeScript 7.0 (the Go-native compiler) is GA and installed via Microsoft's reco
 - `lint:_oxlint` — `oxlint` with `options.typeAware`, backed by the Go-native tsgolint engine. Owns the type-checked bulk plus the syntactic TypeScript rules. ~0.9s / ~930 MB.
 - `lint:_slim` — `PINPOINT_LINT_SLIM=1 eslint src/ e2e/ scripts/`. The same `eslint.config.mjs`, with typescript-eslint's `disable-type-checked` spread in and the project service off, so it costs nothing to build a Program. Owns the plugins oxlint can't run: the local `pinpoint` custom rule, `better-tailwindcss`, `eslint-comments`, `unused-imports`, `react-hooks`, `promise`, `jsx-a11y`. ~3.5s / ~1.2 GB.
 
-Together ~3.8s vs full ESLint's ~14.9s, and peak RSS ~1.2 GB vs ~3.2 GB — the memory drop is the point on a 16 GB box running several agent sessions.
+Together ~3.8s vs full ESLint's ~14.9s, and peak RSS ~1.2 GB vs ~3.2 GB. The memory drop is the point, not the wall-clock.
 
 **The mirror is a speed optimization, never a coverage bet.** Drift fails safe: whatever it misses, CI's full ESLint still catches, so the worst case is a CI-only failure, never silent loss. Two maintenance rules follow:
 
@@ -148,7 +143,7 @@ When the user explicitly asks for "prototype mode" / "rapid iteration" / "just e
 6. DB schema / migrations → `pnpm run preflight`
 7. Final pre-review → push and let **CI** run the full suite; don't sweep locally.
 
-**Never** invoke `pnpm exec playwright test` with no spec path — it runs every spec in one Playwright process and cross-contaminates seed state. The full suite (`e2e:full` / `e2e:all`) is CI's job by default — roughly 8–10 minutes of three parallel Chromium workers plus a Supabase stack and a Next server; **on a resource-constrained system (a 16 GB laptop, especially with several agent sessions running), don't run it locally** — on a machine with real headroom it's a reasonable thing to run when you actually want the signal. Always use `--project=chromium` for targeted runs; `--headed` to debug visually. Report flaky tests; don't retry in a loop.
+**Never** invoke `pnpm exec playwright test` with no spec path — it runs every spec in one Playwright process and cross-contaminates seed state. The full suite (`e2e:full` / `e2e:all`) is CI's job by default — roughly 8–10 minutes of three parallel Chromium workers plus a Supabase stack and a Next server, peaking at several GB. Run it locally when you actually want the signal and the host has the headroom. Always use `--project=chromium` for targeted runs; `--headed` to debug visually. Report flaky tests; don't retry in a loop.
 
 ### Reproducing CI failures locally
 

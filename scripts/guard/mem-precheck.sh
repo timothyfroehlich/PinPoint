@@ -128,6 +128,15 @@ _hard_block() {
   echo "  Swap used: ${swap_mb} MB  (hard-block if >= ${THRESHOLD_SWAP} MB)" >&2
   echo ""                                                >&2
   echo "  Heavy command blocked. Options:" >&2
+  # Offloading is the preferred answer, not a fallback: integration and E2E are
+  # meant to run on the remote runner by default. Only suggested when the CLI is
+  # actually present, so a machine without a runner is not sent somewhere useless.
+  if command -v crabbox >/dev/null 2>&1; then
+    echo "    • Run it on the remote runner (preferred):" >&2
+    echo "        crabbox job run integration | integration-supabase | smoke | e2e-full" >&2
+    echo "      Integration and E2E belong there by default. Not for dev servers or" >&2
+    echo "      interactive debugging — those stay local. See the 'crabbox' skill." >&2
+  fi
   echo "    • Wait for other sessions to finish, then retry." >&2
   echo "    • Skip this check:  FORCE_MEM_PRECHECK=skip <command>" >&2
   echo ""                                                >&2
