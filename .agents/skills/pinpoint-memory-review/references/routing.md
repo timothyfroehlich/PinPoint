@@ -62,7 +62,7 @@ Delete the redundant copies and keep the best-written one at the correct tier. *
 
 **Duplication where the copies are not equal — the tmux `-CC` fact.** It lives in three places: a Bazzite memory file, comments in `dotfiles/mac/.zshrc.local`, and the `bazzite` skill. The naive dedupe keeps the skill's copy and deletes the rest — which would destroy the `kill -WINCH <server-pid>` recovery procedure, the single most useful part, present only in the Bazzite memory. Correct handling: merge the recovery into the skill copy first, _then_ delete the others. This is why defect 3 says merge-before-delete rather than pick-one.
 
-**Straight duplication — `copilot-quota`.** Exists as both a beads memory and a Bazzite memory file. Same fact, no distinct detail. It is also time-boxed (the quota resets at month start), so the real verdict is neither "keep both" nor "keep one" but _expired — delete both_.
+**Straight duplication — `copilot-quota`.** It existed as both a beads memory and a Bazzite memory file: same fact, no distinct detail. It was also time-boxed — the quota reset at month start, and the bot reviewer it described was retired outright on 2026-08-02 (PP-4ric) — so the real verdict was neither "keep both" nor "keep one" but _expired — delete both_.
 
 **Demotion to mechanism — `--no-verify`.** "Never use `--no-verify`" is prose in the global `CLAUDE.md`. There is already a hook stack enforcing commit gates. If a hook can reject the flag outright, the prose is redundant and should go; if it cannot, the prose stays and the gap is worth a bead. Either way the review's job is to _ask_, not to leave a rule sitting in prose because it has always been there.
 
