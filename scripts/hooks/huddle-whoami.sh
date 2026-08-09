@@ -26,10 +26,10 @@
 #   list                     Dump all session_id → name pairs (sorted by name).
 #   discover                 Print the session_id of the calling shell. Uses
 #                            $CLAUDE_CODE_SESSION_ID when set (exact), then
-#                            $CLAUDE_SESSION_ID as an explicit override for
-#                            other harnesses; falls back to the transcript
-#                            heuristic with a warning (Claude Code only; see
-#                            WARNING below). Refuses for subagents.
+#                            $CLAUDE_SESSION_ID as a fallback for other
+#                            harnesses, then the transcript heuristic with a
+#                            warning (Claude Code only; see WARNING below).
+#                            Refuses for subagents.
 #
 # OWNERSHIP — a session_id is owned by whoever registered it first. `register`
 # guards BOTH directions of collision:
@@ -179,11 +179,30 @@ discover_session_id() {
 # agent, so the script's filename is in the command string verbatim.
 WHOAMI_SIGNATURE=$(basename "$0")
 
+# Regex for a command that RUNS this script, as opposed to one that merely
+# names it. `contains($sig)` is not enough: `rg -n discover
+# scripts/hooks/huddle-whoami.sh` contains the signature and is a Bash tool_use,
+# but reading the file is not invoking it — and an agent researching this guard
+# does exactly that. Both misreadings are live: a subagent that greps the file
+# makes its parent look like a subagent, and a parent that cats it makes a real
+# subagent look top-level.
+#
+# So the signature must sit in COMMAND POSITION: at the start of the command or
+# after a `;`/`&`/`|` separator, optionally behind a `bash`/`sh` prefix, and
+# optionally behind a directory path. As an argument to some other program it
+# does not count.
+WHOAMI_INVOCATION_RE="(^|[;&|][[:space:]]*)[[:space:]]*(([^[:space:]]*/)?(ba)?sh[[:space:]]+)?([^[:space:]]*/)?$(
+  printf '%s' "$WHOAMI_SIGNATURE" | sed 's/\./\\./g'
+)([[:space:]]|$)"
+
 # How many trailing records to scan. The caller's tool_use is normally the LAST
-# line, but a PreToolUse hook_success `attachment` can be appended between it
-# and execution (measured: 1 of 34 Bash calls in a live transcript). That
-# record embeds the command string too, so a small window still matches.
-WHOAMI_TAIL_RECORDS=5
+# line, but records land after it: a PreToolUse hook_success attachment
+# (measured: 1 of 34 Bash calls), and — the bigger effect — parallel tool calls,
+# which write one record per tool_use, with runs of 5 consecutive tool_use
+# records measured in this project's transcripts. A window of 5 sat exactly at
+# that boundary, so a batched call could push the caller's own record out of
+# view. `tail` on a few more lines costs nothing.
+WHOAMI_TAIL_RECORDS=25
 
 # How recent a record must be to count as evidence about the process running
 # right now, in seconds.
@@ -204,48 +223,79 @@ WHOAMI_TAIL_RECORDS=5
 # `register`.
 WHOAMI_FRESH_SECONDS=120
 
-# Epoch seconds for the ISO-8601 timestamp $1, or empty when it does not parse.
-# jq is already a hard dependency of this script, and `date` is not portable
-# between macOS (-j -f) and Linux (-d) — jq's fromdateiso8601 is the same
-# everywhere. It rejects fractional seconds, which Claude Code writes, so the
-# fraction is stripped first.
-iso_to_epoch() {
-  printf '%s' "$1" |
-    sed 's/\.[0-9]*Z$/Z/' |
-    jq -Rr 'fromdateiso8601? // empty' 2>/dev/null || true
-}
+# jq program: newest epoch-MILLISECONDS among the input records that record an
+# actual Bash invocation of this script, or nothing. $re is
+# WHOAMI_INVOCATION_RE.
+#
+# THE MATCH MUST BE STRUCTURAL, NOT A SUBSTRING OF THE LINE. A raw
+# `grep -F huddle-whoami.sh` over the JSONL matches any record that merely
+# mentions the path, which is not the same claim at all. Measured in a live
+# transcript, the raw grep's matches in one 25-record window were a
+# `file-history-snapshot`, a `queue-operation` and a `user` message — and NOT
+# ONE was a Bash tool_use invoking the script. Editing this file is enough to
+# produce matching records. Both misreadings are reachable: a subagent that
+# merely greps the file makes the parent look like a subagent (the PP-uxnn
+# lockout again), and a parent that merely cats it makes a real subagent look
+# top-level (the PP-788v clobber). So: require a tool_use block, name Bash, and
+# the signature inside input.command.
+#
+# Milliseconds are kept. Truncating to whole seconds made same-second records
+# compare equal, and the caller's loop keeps the FIRST candidate on a tie —
+# always the top-level transcript — so a genuine subagent record 0.4s newer
+# than an unrelated parent record silently lost. The bias was systematic in the
+# fail-open direction.
+#
+# `fromjson? // empty` skips malformed or partially-flushed lines instead of
+# aborting the whole read, which matters when the file is being appended to as
+# it is read. `fromdateiso8601` rejects fractional seconds, so the fraction is
+# split off and re-added as milliseconds.
+# shellcheck disable=SC2016  # $re is a jq variable (--arg re), not a shell one
+WHOAMI_JQ_NEWEST_EPOCH_MS='
+  def epoch_ms:
+    capture("^(?<base>[^.]+?)(?:\\.(?<frac>[0-9]+))?Z$")
+    | (((.base + "Z") | fromdateiso8601) * 1000)
+      + (((.frac // "0") + "000")[0:3] | tonumber);
+  [ inputs
+    | fromjson? // empty
+    | select(.timestamp != null)
+    | select(
+        (.message.content // [])
+        | if type == "array" then
+            any(
+              .type == "tool_use"
+              and .name == "Bash"
+              and ((.input.command // "") | test($re))
+            )
+          else false end
+      )
+    | (.timestamp | epoch_ms? // empty)
+  ] | max // empty
+'
 
-# Newest `timestamp` among the trailing records of $1 that name this script AND
-# are no older than $WHOAMI_FRESH_SECONDS, as epoch seconds; empty if none.
-# ISO-8601 UTC sorts lexicographically, so `sort` picks the newest before the
-# freshness test. The key match tolerates whitespace around the colon; Claude
-# Code writes compact JSON, but nothing in the format guarantees that.
-newest_fresh_signature_epoch() {
-  local ts epoch now
-  ts=$(
-    tail -n "$WHOAMI_TAIL_RECORDS" "$1" 2>/dev/null |
-      grep -F -- "$WHOAMI_SIGNATURE" |
-      grep -o '"timestamp"[[:space:]]*:[[:space:]]*"[^"]*"' |
-      sed 's/.*"\([^"]*\)"$/\1/' |
-      sort |
-      tail -n 1 || true
+# Newest record in $1 that invokes this script AND is no older than
+# $WHOAMI_FRESH_SECONDS, as epoch milliseconds; empty if there is none.
+newest_fresh_signature_epoch_ms() {
+  local ms now_ms
+  ms=$(
+    jq -n -R --arg re "$WHOAMI_INVOCATION_RE" "$WHOAMI_JQ_NEWEST_EPOCH_MS" \
+      < <(tail -n "$WHOAMI_TAIL_RECORDS" "$1" 2>/dev/null) 2>/dev/null || true
   )
-  [[ -n $ts ]] || return 0
-  epoch=$(iso_to_epoch "$ts")
-  [[ -n $epoch ]] || return 0
-  now=$(jq -n 'now|floor')
+  [[ -n $ms ]] || return 0
+  now_ms=$(jq -n 'now * 1000 | floor')
   # Future-dated records (clock skew) are as untrustworthy as stale ones.
-  if ((epoch <= now && now - epoch <= WHOAMI_FRESH_SECONDS)); then
-    printf '%s\n' "$epoch"
+  if ((ms <= now_ms && now_ms - ms <= WHOAMI_FRESH_SECONDS * 1000)); then
+    printf '%s\n' "$ms"
   fi
 }
 
 # Path of the transcript belonging to the agent whose tool call is running us,
 # or exit 1 when that cannot be determined. Candidates are the session's own
 # top-level transcript plus every subagent transcript under it; the one holding
-# the most recent FRESH record naming this script wins, which is the caller's,
-# because that record was written moments ago. Stale records are ignored
-# entirely rather than ranked — see WHOAMI_FRESH_SECONDS.
+# the most recent FRESH record that INVOKES this script wins, which is the
+# caller's, because that record was written moments ago. Stale records are
+# ignored entirely rather than ranked (see WHOAMI_FRESH_SECONDS), and records
+# that merely mention the script do not count at all (see
+# WHOAMI_JQ_NEWEST_EPOCH_MS).
 caller_transcript() {
   local sid=${CLAUDE_CODE_SESSION_ID:-}
   [[ -n $sid ]] || return 1
@@ -256,12 +306,12 @@ caller_transcript() {
   shopt -s nullglob
   candidates=("$dir/$sid.jsonl" "$dir/$sid"/subagents/*.jsonl)
   shopt -u nullglob
-  local best_file="" best_epoch="" file epoch
+  local best_file="" best_ms="" file ms
   for file in "${candidates[@]}"; do
-    epoch=$(newest_fresh_signature_epoch "$file")
-    [[ -n $epoch ]] || continue
-    if [[ -z $best_epoch ]] || ((epoch > best_epoch)); then
-      best_epoch=$epoch
+    ms=$(newest_fresh_signature_epoch_ms "$file")
+    [[ -n $ms ]] || continue
+    if [[ -z $best_ms ]] || ((ms > best_ms)); then
+      best_ms=$ms
       best_file=$file
     fi
   done
@@ -420,11 +470,19 @@ case "$cmd" in
     # three warnings (PP-uxnn). The test suite did not catch it because it
     # sets the variable it asserts on; the assertion was self-fulfilling.
     #
-    # $CLAUDE_SESSION_ID is still honoured as an explicit override so a
-    # non-Claude harness can hand its own id in without inheriting Claude
-    # Code's name. Fall back to the transcript heuristic only when neither is
-    # set, and warn that the result may be wrong when multiple sessions are
-    # active concurrently (PP-bh7w).
+    # $CLAUDE_SESSION_ID is still read, as a FALLBACK — not an override. It
+    # loses to Claude's own variable whenever both are set, so a non-Claude
+    # shim launched from inside a Claude Code shell inherits Claude's id and
+    # gets that, even having exported its own. Documented as the lesser of two
+    # imperfect options: making it win would let one stale value in a shell
+    # profile silently misroute every session on the machine, which is the
+    # failure mode this file already has two regressions for. A harness that
+    # needs certainty passes the id as an argument — the documented route, and
+    # what .agents/hooks/antigravity-bootstrap.cjs does.
+    #
+    # Fall back to the transcript heuristic only when neither is set, and warn
+    # that the result may be wrong when multiple sessions are active
+    # concurrently (PP-bh7w).
     session_id_env="${CLAUDE_CODE_SESSION_ID:-${CLAUDE_SESSION_ID:-}}"
     if [[ -n "$session_id_env" ]]; then
       printf '%s\n' "$session_id_env"

@@ -125,6 +125,60 @@ def write_transcript(path: Path, *records: tuple[str, str]) -> None:
     path.write_text("\n".join(lines) + "\n")
 
 
+def write_raw_transcript(path: Path, *records: dict[str, object]) -> None:
+    """Write pre-built records verbatim, for shapes `write_transcript` cannot express."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    lines = [json.dumps(r, separators=(",", ":")) for r in records]
+    path.write_text("\n".join(lines) + "\n")
+
+
+def mention_only_records(ts: str) -> list[dict[str, object]]:
+    """Records that NAME the script without invoking it.
+
+    Every one of these is matched by a raw `grep -F huddle-whoami.sh` over the
+    line, and none of them is evidence that this agent ran the script. The
+    first three were taken from a live transcript, where they were the *only*
+    matches in a 25-record window — editing or reading the file is enough to
+    produce them.
+    """
+    return [
+        {"type": "file-history-snapshot", "timestamp": ts, "filePath": str(SCRIPT)},
+        {"type": "queue-operation", "timestamp": ts, "detail": str(SCRIPT)},
+        {
+            "type": "user",
+            "timestamp": ts,
+            "message": {"content": "look at scripts/hooks/huddle-whoami.sh"},
+        },
+        # A Bash call that merely READS the script — the shape that makes a
+        # subagent doing research look like it invoked the guard.
+        {
+            "type": "assistant",
+            "timestamp": ts,
+            "message": {
+                "content": [
+                    {
+                        "type": "tool_use",
+                        "name": "Bash",
+                        "input": {
+                            "command": "rg -n discover scripts/hooks/huddle-whoami.sh"
+                        },
+                    }
+                ]
+            },
+        },
+        # A tool RESULT echoing the command back.
+        {
+            "type": "user",
+            "timestamp": ts,
+            "message": {
+                "content": [
+                    {"type": "tool_result", "content": REGISTER_COMMAND},
+                ]
+            },
+        },
+    ]
+
+
 def top_level_transcript(repo: Path, *records: tuple[str, str]) -> None:
     write_transcript(transcript_dir(repo) / f"{SID}.jsonl", *records)
 
@@ -346,6 +400,114 @@ def test_fresh_subagent_record_still_refuses(repo: Path) -> None:
     assert names(repo) == {}
 
 
+def test_records_that_merely_mention_the_script_are_not_invocations(
+    repo: Path,
+) -> None:
+    """Regression, PP-uxnn review: the match was a substring of the raw JSONL line.
+
+    `grep -F huddle-whoami.sh` over the line counts any record that names the
+    path — a file-history snapshot, a queue operation, a user message, a `rg`
+    that reads the file, a tool_result echoing an earlier command. In a live
+    transcript those were the ONLY matches in a 25-record window, and not one
+    was a Bash tool_use invoking the script; editing this file produces them.
+
+    Here the subagent transcript holds nothing BUT mentions, all fresh. If any
+    of them counts, a legitimate top-level session is refused — the PP-uxnn
+    lockout a third time, now triggered by a subagent that merely read the file.
+    """
+    write_raw_transcript(
+        transcript_dir(repo) / SID / "subagents" / "agent-abc123.jsonl",
+        *mention_only_records(ago(2)),
+    )
+    rc, out, _ = run(repo, "register", "Claude-TopLevel", SID, env=AGENT_ENV)
+    assert rc == 0
+    assert "Registered" in out
+    assert names(repo) == {SID: "Claude-TopLevel"}
+
+
+def test_parent_mentioning_the_script_does_not_mask_a_real_subagent(
+    repo: Path,
+) -> None:
+    """The same overmatch in the other direction — the PP-788v clobber path.
+
+    Parent merely reads the file 1s ago; the subagent genuinely invokes it 3s
+    ago. Under a substring match the parent's newer mention outranks the
+    subagent's real call, the subagent is classified top-level, and it
+    overwrites the parent's mapping — the exact damage this guard exists to
+    stop.
+    """
+    write_raw_transcript(
+        transcript_dir(repo) / f"{SID}.jsonl",
+        *mention_only_records(ago(1)),
+    )
+    subagent_transcript(repo, (ago(3), REGISTER_COMMAND))
+    rc, _, err = run(repo, "register", "Claude-Subagent", SID, env=AGENT_ENV)
+    assert rc == 1
+    assert "this is a dispatched subagent" in err
+    assert names(repo) == {}
+
+
+INVOCATIONS = [
+    "bash scripts/hooks/huddle-whoami.sh register Claude-X " + SID,
+    "bash /abs/path/scripts/hooks/huddle-whoami.sh discover",
+    "/abs/path/scripts/hooks/huddle-whoami.sh discover",
+    "sh scripts/hooks/huddle-whoami.sh list",
+    "cd /somewhere && bash scripts/hooks/huddle-whoami.sh discover",
+    "bash scripts/hooks/huddle-whoami.sh discover; echo done",
+]
+
+MENTIONS = [
+    "rg -n discover scripts/hooks/huddle-whoami.sh",
+    "cat scripts/hooks/huddle-whoami.sh",
+    "git diff scripts/hooks/huddle-whoami.sh",
+    "shellcheck scripts/hooks/huddle-whoami.sh",
+    "echo huddle-whoami.sh",
+    "sed -i s/x/y/ scripts/hooks/huddle-whoami.sh",
+]
+
+
+@pytest.mark.parametrize("command", INVOCATIONS)
+def test_command_position_counts_as_an_invocation(repo: Path, command: str) -> None:
+    """The script in command position — with or without a bash/sh prefix, a path, or a separator."""
+    subagent_transcript(repo, (ago(2), command))
+    rc, _, err = run(repo, "register", "Claude-Subagent", SID, env=AGENT_ENV)
+    assert rc == 1, f"should have been read as an invocation: {command}"
+    assert "this is a dispatched subagent" in err
+
+
+@pytest.mark.parametrize("command", MENTIONS)
+def test_argument_position_is_not_an_invocation(repo: Path, command: str) -> None:
+    """The script as an ARGUMENT to another program — reading it is not running it."""
+    subagent_transcript(repo, (ago(2), command))
+    rc, out, _ = run(repo, "register", "Claude-TopLevel", SID, env=AGENT_ENV)
+    assert rc == 0, f"should not have been read as an invocation: {command}"
+    assert names(repo) == {SID: "Claude-TopLevel"}
+
+
+def test_subsecond_ordering_is_not_lost_to_truncation(repo: Path) -> None:
+    """Regression, PP-uxnn review: whole-second epochs made same-second records tie.
+
+    Ties keep the FIRST candidate, which is unconditionally the top-level
+    transcript, so a genuine subagent record fractionally newer than an
+    unrelated parent record lost — systematically, and always in the
+    fail-open direction.
+
+    Both records land in the same wall-clock second, subagent newer by 400ms.
+    """
+    now = datetime.now(timezone.utc) - timedelta(seconds=5)
+    base = now.replace(microsecond=0)
+
+    def stamp(ms: int) -> str:
+        return base.strftime("%Y-%m-%dT%H:%M:%S.") + f"{ms:03d}Z"
+
+    top_level_transcript(repo, (stamp(100), REGISTER_COMMAND))
+    subagent_transcript(repo, (stamp(500), REGISTER_COMMAND))
+    rc, _, err = run(repo, "register", "Claude-Subagent", SID, env=AGENT_ENV)
+    assert rc == 1
+    assert "this is a dispatched subagent" in err
+    assert names(repo) == {}
+
+
 def test_agent_env_markers_alone_do_not_refuse(repo: Path) -> None:
     """No transcripts to read is indeterminate, and indeterminate fails open.
 
@@ -399,12 +561,32 @@ def test_discover_uses_the_env_var_claude_code_actually_sets(repo: Path) -> None
     assert "falling back to transcript heuristic" not in err
 
 
-def test_discover_honours_the_generic_override_for_other_harnesses(repo: Path) -> None:
+def test_discover_falls_back_to_the_generic_var_for_other_harnesses(
+    repo: Path,
+) -> None:
     """$CLAUDE_SESSION_ID stays supported so a non-Claude harness can pass its id."""
     rc, out, err = run(repo, "discover", env={"CLAUDE_SESSION_ID": OTHER_SID})
     assert rc == 0
     assert out.strip() == OTHER_SID
     assert "falling back to transcript heuristic" not in err
+
+
+def test_claude_code_var_wins_when_both_are_set(repo: Path) -> None:
+    """$CLAUDE_SESSION_ID is a fallback, not an override — pin which one wins.
+
+    A non-Claude shim launched from inside a Claude Code shell inherits
+    $CLAUDE_CODE_SESSION_ID and gets Claude's id even having exported its own.
+    That is the accepted trade: letting the generic name win would let one
+    stale value in a shell profile misroute every session on the machine. A
+    harness needing certainty passes the id as an argument.
+    """
+    rc, out, _ = run(
+        repo,
+        "discover",
+        env={"CLAUDE_CODE_SESSION_ID": SID, "CLAUDE_SESSION_ID": OTHER_SID},
+    )
+    assert rc == 0
+    assert out.strip() == SID
 
 
 def test_unknown_option_is_rejected(repo: Path) -> None:
