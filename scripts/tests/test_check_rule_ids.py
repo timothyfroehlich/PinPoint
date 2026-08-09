@@ -151,6 +151,15 @@ class TestFindLegacyCitations:
         # "Rule" followed by a word, not a number, must not match.
         assert find_legacy_citations("Rule of Three before abstracting") == []
 
+    def test_ignores_heading_ending_in_rule_above_an_ordered_list(self):
+        # A citation lives on one line. Matching across a newline would make
+        # every markdown heading that ends in "rule" followed by an ordered
+        # list -- .claude/rules/README.md's "Adding or changing a rule" -- read
+        # as a citation of "rule 1".
+        assert (
+            find_legacy_citations("## Adding or changing a rule\n\n1. State it") == []
+        )
+
     def test_reports_correct_line_number(self):
         text = "line one\nline two\nAGENTS.md rule 9 here\n"
         assert find_legacy_citations(text) == [(3, "AGENTS.md rule 9")]
@@ -502,6 +511,14 @@ class TestAlwaysLoadedBudget:
         sizes = collect_always_loaded(repo)
         assert ".claude/rules/always.md" in sizes
         assert ".claude/rules/scoped.md" not in sizes
+
+    def test_counts_nested_rule_files(self, repo: Path):
+        # The loader walks .claude/rules/ recursively, so a nested file with no
+        # `paths:` is always-loaded too and must be budgeted.
+        nested = self._rules(repo) / "deep"
+        nested.mkdir()
+        (nested / "extra.md").write_text("q" * 42, encoding="utf-8")
+        assert collect_always_loaded(repo) == {".claude/rules/deep/extra.md": 42}
 
     def test_counts_agents_and_claude_md(self, repo: Path):
         (repo / "AGENTS.md").write_text("a" * 10, encoding="utf-8")

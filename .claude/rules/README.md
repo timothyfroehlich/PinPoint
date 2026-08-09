@@ -19,10 +19,10 @@ Claude Code loads a file here by its frontmatter:
   matching any glob in the list.
 
 That split is the whole point. Before this directory existed the same 20 rules
-sat in `AGENTS.md` §2.1 and were loaded on every session regardless of what
-the session was doing — the responsive-layout rules were in context for a
-migration, the migration rule was in context for a CSS change. Now four rules
-load always and sixteen load when they are relevant.
+sat in one numbered list in `AGENTS.md` and were loaded on every session
+regardless of what the session was doing — the responsive-layout rules were in
+context for a migration, the migration rule was in context for a CSS change.
+Now four rules load always and sixteen load when they are relevant.
 
 ## Adding or changing a rule
 

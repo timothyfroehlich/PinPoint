@@ -77,15 +77,18 @@ RANGE_ID = re.compile(r"\bCORE-([A-Z][A-Z0-9]*)-(\d{3})\.\.(\d{3})\b")
 # never machine-checkable the way a CORE-* ID is (there's no catalog of
 # numbers to check against), so the only sound fix is banning the pattern and
 # requiring the ID.
+# Horizontal whitespace only, never \s: a citation lives on one line, and a
+# newline-spanning \s* makes a markdown heading that ends in "rule" followed by
+# an ordered list ("## Adding or changing a rule\n\n1. ...") match as "rule 1".
 NUMBERED_RULE_CITATION = re.compile(
-    r"\b(?:AGENTS\.md`?\s+)?(?:[Rr]ule|[Cc]ommandment)\s*#?\d+\b"
+    r"\b(?:AGENTS\.md`?[ \t]+)?(?:[Rr]ule|[Cc]ommandment)[ \t]*#?\d+\b"
 )
 
 # "AGENTS.md §2.1" itself. That section no longer lists the rules -- PP-22e4.4
 # moved them to .claude/rules/ and left a pointer -- so citing it sends the
 # reader somewhere the rule is not. Tolerates the same optional backtick as
 # NUMBERED_RULE_CITATION.
-SECTION_21_CITATION = re.compile(r"AGENTS\.md`?\s*§\s*2\.1\b")
+SECTION_21_CITATION = re.compile(r"AGENTS\.md`?[ \t]*§[ \t]*2\.1\b")
 
 CATALOG = "docs/NON_NEGOTIABLES.md"
 
@@ -133,6 +136,8 @@ LEGACY_CITATION_SOURCES: tuple[str, ...] = (
     "CLAUDE.md",
     "docs/NON_NEGOTIABLES.md",
     "docs/ENV_VARS.md",
+    ".claude/rules/*.md",
+    ".claude/rules/**/*.md",
     "src/**/*.ts",
     "src/**/*.tsx",
     "scripts/**/*.mjs",
@@ -172,10 +177,14 @@ LEGACY_CITATION_SELF_EXCLUDE = frozenset(
 # Only files with no `paths:` frontmatter count. A rule file that declares
 # globs is on-demand and is deliberately NOT budgeted, so splitting a rule out
 # by path is always the cheap fix.
+# Nested directories are included because the loader walks .claude/rules/
+# recursively -- a rule file one level down with no `paths:` is just as
+# always-loaded as one at the top, and would otherwise escape the budget.
 ALWAYS_LOADED_SOURCES: tuple[str, ...] = (
     "AGENTS.md",
     "CLAUDE.md",
     ".claude/rules/*.md",
+    ".claude/rules/**/*.md",
 )
 
 # 40 KiB. Chosen against a measured 38.1 KiB at the time this landed, so the
@@ -387,9 +396,10 @@ def main(argv: list[str] | None = None) -> int:
         return 3
 
     # ERROR: a fragile "rule N" / "commandment N" / "AGENTS.md §2.1" citation
-    # (PP-22e4). §2.1 is being replaced by a grouped index, so both forms
-    # break the moment that happens, and neither is machine-checkable against
-    # a catalog the way a CORE-* ID is -- ban the pattern outright.
+    # (PP-22e4). §2.1 no longer lists the rules -- PP-22e4.4 moved them to
+    # .claude/rules/ -- so both forms now point at nothing, and neither is
+    # machine-checkable against a catalog the way a CORE-* ID is: ban the
+    # pattern outright.
     legacy = collect_legacy_citations(root)
     if legacy:
         print(
