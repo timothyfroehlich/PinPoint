@@ -77,10 +77,22 @@ describe("Server Action file naming", () => {
     ["src/app/(app)/issues/watcher-actions.ts", "plural suffix"],
     ["src/app/(app)/issues/export-action.ts", "singular suffix"],
     ["src/app/(auth)/oauth-actions.ts", "hyphenated prefix"],
-    ["src/components/issues/issue-actions.tsx", ".tsx"],
     ["src/server/actions/avatar.ts", "shared actions dir, any basename"],
   ])("stays silent on %s (%s)", (filename) => {
     expect(violations(USE_SERVER_MODULE, filename)).toHaveLength(0);
+  });
+
+  it.each([
+    [
+      "src/app/(app)/issues/action.ts",
+      "bare singular: **/actions.ts is plural",
+    ],
+    ["src/components/issues/issue-actions.tsx", ".tsx: every glob ends in .ts"],
+  ])("reports %s (%s)", (filename) => {
+    // Near-misses. Both read as conforming names but match none of the four
+    // globs, so accepting them would pass a file the path-based consumers then
+    // silently drop — exactly what this rule exists to catch.
+    expect(violations(USE_SERVER_MODULE, filename)).toHaveLength(1);
   });
 
   it('stays silent on an off-pattern file with NO "use server" directive', () => {
@@ -138,7 +150,6 @@ export const marker = "use server";
   describe("isConformingActionFilename", () => {
     it.each([
       "actions.ts",
-      "actions.tsx",
       "watcher-actions.ts",
       "export-action.ts",
       "test-discord-dm-action.ts",
@@ -150,6 +161,8 @@ export const marker = "use server";
 
     it.each([
       "mutations.ts",
+      "action.ts",
+      "actions.tsx",
       "action.md",
       "actions.js",
       "reactions.ts",

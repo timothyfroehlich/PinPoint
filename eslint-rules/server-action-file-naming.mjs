@@ -1,7 +1,7 @@
 // ===== Server Action file naming =====
 //
 // A module whose directive prologue is `"use server"` must be named
-// `actions.ts(x)` or `<something>-action(s).ts(x)`, or live under
+// `actions.ts` or `<something>-action(s).ts`, or live under
 // `src/server/actions/`.
 //
 // ── Why a naming rule exists at all ──────────────────────────────────────────
@@ -44,8 +44,17 @@
 // literal is not a directive and never matches — three files in `src/app/(auth)`
 // mention it in prose for exactly this reason.
 
-/** Basename of a conforming action module: `actions.ts` or `*-action(s).ts`, `.tsx` too. */
-export const ACTION_FILENAME_PATTERN = /^(?:.*-)?actions?\.tsx?$/;
+// The pattern must accept EXACTLY what the four globs above match — no more.
+// Two near-misses this deliberately rejects, because accepting either would
+// pass a file the globs then drop, which is the failure this rule exists to
+// catch:
+//   - bare singular `action.ts` — `**/actions.ts` is plural, and the other two
+//     globs require the literal `-`.
+//   - any `.tsx` — every glob ends in `.ts`. A module that is nothing but
+//     Server Actions has no JSX, so `.tsx` is the wrong extension regardless;
+//     widening the globs to cover it would buy nothing.
+/** Basename of a conforming action module: `actions.ts` or `*-action(s).ts`. */
+export const ACTION_FILENAME_PATTERN = /^(?:actions|.*-actions?)\.ts$/;
 
 /** Shared (non-route-local) actions live here and are exempt from the basename rule. */
 export const SHARED_ACTIONS_DIR_PATTERN = /(?:^|[/\\])src[/\\]server[/\\]actions[/\\]/;
