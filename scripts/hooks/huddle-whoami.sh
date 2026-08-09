@@ -156,9 +156,17 @@ discover_session_id() {
 # same `*/subagents/*` signal huddle-poll.sh and huddle-session-start.sh
 # already use, which they get free from their hook payload. A script invoked
 # from the Bash tool has to find its own record instead: the tool_use for the
-# running command is flushed to the CALLING agent's transcript before the
-# command executes, so the newest record naming this script identifies the
+# running command is USUALLY flushed to the CALLING agent's transcript before
+# the command executes, so the newest record naming this script identifies the
 # caller.
+#
+# "Usually" is load-bearing and was originally written as a certainty. The
+# flush is not guaranteed — a top-level `discover` was observed running with
+# its own record still unwritten. So the newest record is only trusted when it
+# is also RECENT (see WHOAMI_FRESH_SECONDS); otherwise the read is treated as
+# indeterminate. Nothing here is a security boundary — it picks between a
+# clear error message and a confusing one, and `register`'s rebind guard is
+# what actually prevents the damage.
 #
 # Fails open by design, in both the old sense and a new one: other harnesses
 # (Antigravity, Codex) do not write these transcripts and are unaffected, and
@@ -177,24 +185,67 @@ WHOAMI_SIGNATURE=$(basename "$0")
 # record embeds the command string too, so a small window still matches.
 WHOAMI_TAIL_RECORDS=5
 
-# Newest `timestamp` value among the trailing records of $1 that name this
-# script, or empty. ISO-8601 UTC sorts lexicographically, so `sort` is enough.
-# The key match tolerates whitespace around the colon; Claude Code writes
-# compact JSON, but nothing in the format guarantees that.
-newest_signature_timestamp() {
-  tail -n "$WHOAMI_TAIL_RECORDS" "$1" 2>/dev/null |
-    grep -F -- "$WHOAMI_SIGNATURE" |
-    grep -o '"timestamp"[[:space:]]*:[[:space:]]*"[^"]*"' |
-    sed 's/.*"\([^"]*\)"$/\1/' |
-    sort |
-    tail -n 1 || true
+# How recent a record must be to count as evidence about the process running
+# right now, in seconds.
+#
+# Without this bound the guard reads STALE evidence and refuses a legitimate
+# top-level session (PP-uxnn, second bug). The flush of the caller's own
+# tool_use is not guaranteed to happen before the command executes — measured
+# live: a top-level `discover` whose record had not yet been written lost to an
+# 18-minute-old record left in a subagent transcript by an earlier dispatch,
+# and the session was told it was a subagent. Any session that has ever
+# dispatched a subagent touching this script was one unflushed write away from
+# being locked out, which is the exact failure this detection replaced.
+#
+# A real caller's record is written moments before the command runs, so a
+# generous bound separates the two cases cleanly. Anything older is not
+# evidence about this process and is ignored, which degrades to "indeterminate"
+# — deliberately the fail-OPEN direction, backstopped by the rebind guard in
+# `register`.
+WHOAMI_FRESH_SECONDS=120
+
+# Epoch seconds for the ISO-8601 timestamp $1, or empty when it does not parse.
+# jq is already a hard dependency of this script, and `date` is not portable
+# between macOS (-j -f) and Linux (-d) — jq's fromdateiso8601 is the same
+# everywhere. It rejects fractional seconds, which Claude Code writes, so the
+# fraction is stripped first.
+iso_to_epoch() {
+  printf '%s' "$1" |
+    sed 's/\.[0-9]*Z$/Z/' |
+    jq -Rr 'fromdateiso8601? // empty' 2>/dev/null || true
+}
+
+# Newest `timestamp` among the trailing records of $1 that name this script AND
+# are no older than $WHOAMI_FRESH_SECONDS, as epoch seconds; empty if none.
+# ISO-8601 UTC sorts lexicographically, so `sort` picks the newest before the
+# freshness test. The key match tolerates whitespace around the colon; Claude
+# Code writes compact JSON, but nothing in the format guarantees that.
+newest_fresh_signature_epoch() {
+  local ts epoch now
+  ts=$(
+    tail -n "$WHOAMI_TAIL_RECORDS" "$1" 2>/dev/null |
+      grep -F -- "$WHOAMI_SIGNATURE" |
+      grep -o '"timestamp"[[:space:]]*:[[:space:]]*"[^"]*"' |
+      sed 's/.*"\([^"]*\)"$/\1/' |
+      sort |
+      tail -n 1 || true
+  )
+  [[ -n $ts ]] || return 0
+  epoch=$(iso_to_epoch "$ts")
+  [[ -n $epoch ]] || return 0
+  now=$(jq -n 'now|floor')
+  # Future-dated records (clock skew) are as untrustworthy as stale ones.
+  if ((epoch <= now && now - epoch <= WHOAMI_FRESH_SECONDS)); then
+    printf '%s\n' "$epoch"
+  fi
 }
 
 # Path of the transcript belonging to the agent whose tool call is running us,
 # or exit 1 when that cannot be determined. Candidates are the session's own
 # top-level transcript plus every subagent transcript under it; the one holding
-# the most recent record that names this script wins, which is the caller's,
-# because that record was written moments ago.
+# the most recent FRESH record naming this script wins, which is the caller's,
+# because that record was written moments ago. Stale records are ignored
+# entirely rather than ranked — see WHOAMI_FRESH_SECONDS.
 caller_transcript() {
   local sid=${CLAUDE_CODE_SESSION_ID:-}
   [[ -n $sid ]] || return 1
@@ -205,12 +256,12 @@ caller_transcript() {
   shopt -s nullglob
   candidates=("$dir/$sid.jsonl" "$dir/$sid"/subagents/*.jsonl)
   shopt -u nullglob
-  local best_file="" best_ts="" file ts
+  local best_file="" best_epoch="" file epoch
   for file in "${candidates[@]}"; do
-    ts=$(newest_signature_timestamp "$file")
-    [[ -n $ts ]] || continue
-    if [[ -z $best_ts || $ts > $best_ts ]]; then
-      best_ts=$ts
+    epoch=$(newest_fresh_signature_epoch "$file")
+    [[ -n $epoch ]] || continue
+    if [[ -z $best_epoch ]] || ((epoch > best_epoch)); then
+      best_epoch=$epoch
       best_file=$file
     fi
   done

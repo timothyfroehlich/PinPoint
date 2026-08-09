@@ -41,6 +41,7 @@ import os
 import subprocess
 import tempfile
 from collections.abc import Iterator
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -61,6 +62,25 @@ AGENT_ENV = {
 # A recorded Bash call naming this script — what the caller's transcript holds
 # by the time the script runs.
 REGISTER_COMMAND = "bash scripts/hooks/huddle-whoami.sh register Claude-X " + SID
+
+DISCOVER_COMMAND = "bash scripts/hooks/huddle-whoami.sh discover"
+
+
+def ago(seconds: float) -> str:
+    """An ISO-8601 UTC timestamp `seconds` in the past, formatted as Claude Code writes it.
+
+    Timestamps must be relative to the run, not literals: the script ignores
+    records older than WHOAMI_FRESH_SECONDS, so a fixed date would age out and
+    every detection test would start passing for the wrong reason (the record
+    being invisible rather than correctly classified). See STALE_SECONDS.
+    """
+    stamp = datetime.now(timezone.utc) - timedelta(seconds=seconds)
+    return stamp.strftime("%Y-%m-%dT%H:%M:%S.") + f"{stamp.microsecond // 1000:03d}Z"
+
+
+# Comfortably past the script's 120s freshness bound, for the stale-record
+# tests. Kept well clear of it so the suite does not sit near the boundary.
+STALE_SECONDS = 3600
 
 
 @pytest.fixture
@@ -214,8 +234,8 @@ def test_force_does_not_override_a_taken_name(repo: Path) -> None:
 
 def test_subagent_cannot_register(repo: Path) -> None:
     """The caller's own tool_use sits in a subagents/ transcript."""
-    top_level_transcript(repo, ("2026-08-09T12:00:00.000Z", "git status"))
-    subagent_transcript(repo, ("2026-08-09T12:00:05.000Z", REGISTER_COMMAND))
+    top_level_transcript(repo, (ago(10), "git status"))
+    subagent_transcript(repo, (ago(5), REGISTER_COMMAND))
     rc, out, err = run(repo, "register", "Claude-Subagent", SID, env=AGENT_ENV)
     assert rc == 1
     assert out == ""
@@ -231,13 +251,13 @@ def test_subagent_cannot_register_even_over_a_free_session_id(repo: Path) -> Non
     belt-and-braces: an unregistered parent id would be claimed by the
     subagent's name, and the parent would then be locked out by guard 1.
     """
-    subagent_transcript(repo, ("2026-08-09T12:00:05.000Z", REGISTER_COMMAND))
+    subagent_transcript(repo, (ago(5), REGISTER_COMMAND))
     run(repo, "register", "Claude-Subagent", "some-unclaimed-id", env=AGENT_ENV)
     assert names(repo) == {}
 
 
 def test_subagent_refusal_ignores_force(repo: Path) -> None:
-    subagent_transcript(repo, ("2026-08-09T12:00:05.000Z", REGISTER_COMMAND))
+    subagent_transcript(repo, (ago(5), REGISTER_COMMAND))
     rc, _, err = run(repo, "register", "--force", "Claude-Subagent", SID, env=AGENT_ENV)
     assert rc == 1
     assert "this is a dispatched subagent" in err
@@ -252,8 +272,8 @@ def test_subagent_is_found_behind_a_trailing_hook_attachment(repo: Path) -> None
     """
     subagent_transcript(
         repo,
-        ("2026-08-09T12:00:05.000Z", REGISTER_COMMAND),
-        ("2026-08-09T12:00:05.040Z", "(hook attachment, no signature)"),
+        (ago(5), REGISTER_COMMAND),
+        (ago(4), "(hook attachment, no signature)"),
     )
     rc, _, err = run(repo, "register", "Claude-Subagent", SID, env=AGENT_ENV)
     assert rc == 1
@@ -269,12 +289,61 @@ def test_top_level_session_registers_despite_the_agent_env_markers(
     Code puts them in every Bash-tool shell — but the call is recorded in the
     TOP-LEVEL transcript, and a stale subagent record must not outrank it.
     """
-    subagent_transcript(repo, ("2026-08-09T11:59:00.000Z", REGISTER_COMMAND))
-    top_level_transcript(repo, ("2026-08-09T12:00:05.000Z", REGISTER_COMMAND))
+    subagent_transcript(repo, (ago(65), REGISTER_COMMAND))
+    top_level_transcript(repo, (ago(5), REGISTER_COMMAND))
     rc, out, _ = run(repo, "register", "Claude-HerdrRecon", SID, env=AGENT_ENV)
     assert rc == 0
     assert "Registered" in out
     assert names(repo) == {SID: "Claude-HerdrRecon"}
+
+
+def test_stale_subagent_record_does_not_refuse_an_unflushed_top_level_call(
+    repo: Path,
+) -> None:
+    """Regression, PP-uxnn: the false positive that reintroduced the lockout.
+
+    The detection assumed the caller's own tool_use is always flushed before the
+    command runs. It is not. Observed live: a top-level `discover` ran with its
+    record still unwritten, so the only record naming the script was one an
+    earlier dispatched subagent had left 18 minutes before — and the session was
+    told it was a subagent. Every session that had ever dispatched a subagent
+    touching this script was one unflushed write away from being locked out.
+
+    So: top-level transcript holds NO matching record (the unflushed case), and
+    the subagent's is stale. A record that old says nothing about the process
+    running now and must be ignored, leaving the read indeterminate — which
+    fails open, with `register`'s rebind guard as the backstop.
+    """
+    top_level_transcript(repo, (ago(3), "git status"))
+    subagent_transcript(repo, (ago(STALE_SECONDS), REGISTER_COMMAND))
+    rc, out, _ = run(repo, "register", "Claude-TopLevel", SID, env=AGENT_ENV)
+    assert rc == 0
+    assert "Registered" in out
+    assert names(repo) == {SID: "Claude-TopLevel"}
+
+
+def test_stale_record_does_not_refuse_discover_either(repo: Path) -> None:
+    """Same staleness rule on the read-only path."""
+    subagent_transcript(repo, (ago(STALE_SECONDS), DISCOVER_COMMAND))
+    rc, out, err = run(repo, "discover", env=AGENT_ENV)
+    assert rc == 0
+    assert out.strip() == SID
+    assert "dispatched subagent" not in err
+
+
+def test_fresh_subagent_record_still_refuses(repo: Path) -> None:
+    """The freshness bound must not blunt the guard it protects.
+
+    Paired with the two staleness tests above: same setup, recent record, and
+    the refusal must still fire. Without this, widening the bound to uselessness
+    would leave the suite green.
+    """
+    top_level_transcript(repo, (ago(3), "git status"))
+    subagent_transcript(repo, (ago(2), REGISTER_COMMAND))
+    rc, _, err = run(repo, "register", "Claude-Subagent", SID, env=AGENT_ENV)
+    assert rc == 1
+    assert "this is a dispatched subagent" in err
+    assert names(repo) == {}
 
 
 def test_agent_env_markers_alone_do_not_refuse(repo: Path) -> None:
@@ -293,7 +362,7 @@ def test_subagent_cannot_discover(repo: Path) -> None:
     """discover would hand back the PARENT's id — cause #1 of the clobber."""
     subagent_transcript(
         repo,
-        ("2026-08-09T12:00:05.000Z", "bash scripts/hooks/huddle-whoami.sh discover"),
+        (ago(5), DISCOVER_COMMAND),
     )
     rc, out, err = run(repo, "discover", env=AGENT_ENV)
     assert rc == 1
@@ -304,7 +373,7 @@ def test_subagent_cannot_discover(repo: Path) -> None:
 def test_top_level_session_can_discover(repo: Path) -> None:
     top_level_transcript(
         repo,
-        ("2026-08-09T12:00:05.000Z", "bash scripts/hooks/huddle-whoami.sh discover"),
+        (ago(5), DISCOVER_COMMAND),
     )
     rc, out, _ = run(repo, "discover", env=AGENT_ENV)
     assert rc == 0
