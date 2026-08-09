@@ -449,6 +449,13 @@ def test_parent_mentioning_the_script_does_not_mask_a_real_subagent(
 
 INVOCATIONS = [
     "bash scripts/hooks/huddle-whoami.sh register Claude-X " + SID,
+    # Multi-line, invocation on a later line. 17.5% of real Bash tool_use
+    # commands in this project's transcripts are multi-line (117/669), and
+    # jq's Oniguruma treats `^` as start-of-STRING, so these matched nothing
+    # until `\n` joined the separator class — a subagent running the ordinary
+    # `cd`-then-run shape was read as top-level.
+    'cd "$REPO"\nbash scripts/hooks/huddle-whoami.sh register Claude-X ' + SID,
+    "set -e\ncd /repo\nbash scripts/hooks/huddle-whoami.sh discover",
     "bash /abs/path/scripts/hooks/huddle-whoami.sh discover",
     "/abs/path/scripts/hooks/huddle-whoami.sh discover",
     "sh scripts/hooks/huddle-whoami.sh list",
@@ -458,6 +465,9 @@ INVOCATIONS = [
 
 MENTIONS = [
     "rg -n discover scripts/hooks/huddle-whoami.sh",
+    # Multi-line must not become a blanket pass in the other direction: the
+    # script is still only an argument here.
+    'cd "$REPO"\nrg -n discover scripts/hooks/huddle-whoami.sh',
     "cat scripts/hooks/huddle-whoami.sh",
     "git diff scripts/hooks/huddle-whoami.sh",
     "shellcheck scripts/hooks/huddle-whoami.sh",
@@ -482,6 +492,48 @@ def test_argument_position_is_not_an_invocation(repo: Path, command: str) -> Non
     rc, out, _ = run(repo, "register", "Claude-TopLevel", SID, env=AGENT_ENV)
     assert rc == 0, f"should not have been read as an invocation: {command}"
     assert names(repo) == {SID: "Claude-TopLevel"}
+
+
+def test_a_record_with_a_non_object_message_does_not_disable_detection(
+    repo: Path,
+) -> None:
+    """Regression, PP-uxnn review: an unguarded index aborted the whole jq run.
+
+    `.message.content` raises on a record whose `.message` is not an object,
+    and jq aborts the entire program on the first one — not just that record.
+    The caller swallows the error (`2>/dev/null || true`), so a single odd
+    record would silently switch detection off for that transcript and the
+    subagent would sail through.
+
+    The odd record here sits BEFORE a genuine invocation in the same file, so
+    the guard only fires if the run survived it.
+    """
+    path = transcript_dir(repo) / SID / "subagents" / "agent-abc123.jsonl"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    records = [
+        {"type": "user", "timestamp": ago(4), "message": "a bare string"},
+        {"type": "summary", "timestamp": ago(3), "message": 42},
+        {
+            "type": "assistant",
+            "timestamp": ago(2),
+            "message": {
+                "content": [
+                    {
+                        "type": "tool_use",
+                        "name": "Bash",
+                        "input": {"command": REGISTER_COMMAND},
+                    }
+                ]
+            },
+        },
+    ]
+    path.write_text(
+        "\n".join(json.dumps(r, separators=(",", ":")) for r in records) + "\n"
+    )
+    rc, _, err = run(repo, "register", "Claude-Subagent", SID, env=AGENT_ENV)
+    assert rc == 1
+    assert "this is a dispatched subagent" in err
+    assert names(repo) == {}
 
 
 def test_subsecond_ordering_is_not_lost_to_truncation(repo: Path) -> None:

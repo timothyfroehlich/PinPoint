@@ -187,11 +187,25 @@ WHOAMI_SIGNATURE=$(basename "$0")
 # makes its parent look like a subagent, and a parent that cats it makes a real
 # subagent look top-level.
 #
-# So the signature must sit in COMMAND POSITION: at the start of the command or
-# after a `;`/`&`/`|` separator, optionally behind a `bash`/`sh` prefix, and
-# optionally behind a directory path. As an argument to some other program it
-# does not count.
-WHOAMI_INVOCATION_RE="(^|[;&|][[:space:]]*)[[:space:]]*(([^[:space:]]*/)?(ba)?sh[[:space:]]+)?([^[:space:]]*/)?$(
+# So the signature must sit in COMMAND POSITION: at the start of the command,
+# on a new LINE, or after a `;`/`&`/`|` separator, optionally behind a
+# `bash`/`sh` prefix, and optionally behind a directory path. As an argument to
+# some other program it does not count.
+#
+# The newline in the separator class is load-bearing. jq's Oniguruma runs with
+# ONIG_OPTION_SINGLELINE, so `^` means START OF STRING, not start of line —
+# without `\n` here, a multi-line command matched nothing at all, and 17.5% of
+# real Bash tool_use commands in this project's transcripts are multi-line
+# (117 of 669 across the 8 newest). A subagent running the ordinary
+# `cd "$REPO"\nbash scripts/hooks/huddle-whoami.sh register …` was classified
+# top-level and could clobber the parent's mapping — the PP-788v path. Every
+# INVOCATIONS test case was single-line, so the suite stayed green through it.
+#
+# Known and accepted gap: a wrapper prefix other than bash/sh (`timeout 5 bash
+# …`, `env FOO=1 …`) still misses. That is the fail-OPEN direction, caught by
+# `register`'s rebind guard, and widening the pattern to chase it would risk
+# false positives, which have no backstop and lock a session out.
+WHOAMI_INVOCATION_RE="(^|[;&|\\n][[:space:]]*)[[:space:]]*(([^[:space:]]*/)?(ba)?sh[[:space:]]+)?([^[:space:]]*/)?$(
   printf '%s' "$WHOAMI_SIGNATURE" | sed 's/\./\\./g'
 )([[:space:]]|$)"
 
@@ -259,7 +273,13 @@ WHOAMI_JQ_NEWEST_EPOCH_MS='
     | fromjson? // empty
     | select(.timestamp != null)
     | select(
-        (.message.content // [])
+        # `?` on both steps: a record whose .message is not an object (a plain
+        # string, say) makes a bare .message.content raise, and jq aborts the
+        # WHOLE program on the first such record. The caller swallows that
+        # (`2>/dev/null || true`), so one odd record would silently disable
+        # detection for the entire transcript. Every other risky step here is
+        # already defensive for the same reason.
+        (.message?.content? // [])
         | if type == "array" then
             any(
               .type == "tool_use"
