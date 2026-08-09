@@ -105,7 +105,7 @@ jobs:
           echo "head_sha=${head_sha}" >> "$GITHUB_OUTPUT"
           echo "PR #${PR_NUMBER} head: ${head_ref} @ ${head_sha}"
 
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # ratchet:actions/checkout@v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # ratchet:actions/checkout@v7.0.1
         if: steps.parse.outputs.action != 'noop'
         with:
           ref: ${{ steps.pr.outputs.head_sha }}
