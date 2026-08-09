@@ -25,14 +25,35 @@ read-only GETs, which were previously public. (Lone exception:
 → Obtaining + wiring the token is tracked in bead **PP-uusr** (blocks the prod
 rollout `PP-o355.10`).
 
-## Attribution (FAQ)
+## Attribution (llms.txt — added 2026-08-06; FAQ)
 
 > Users must include attribution and a link back to this site when using
-> Pinball Map data.
+> Pinball Map data. — FAQ
+
+`llms.txt` now spells out what "a link back" means, and it is **not** the
+homepage:
+
+> Pinball Map data is licensed under CC BY-SA 4.0, which requires attribution. A
+> generic link to `https://pinballmap.com` is fine for general credit (e.g. an
+> about page), but if your app displays data for a specific location, the
+> attribution link must point to that location's listing, not just the homepage:
+> `https://pinballmap.com/map?by_location_id=<location_id>`
+
+> Given Pinball Map's role as a source of truth for many, it's important to
+> explicitly direct people to the site so that they can update it. If possible,
+> we encourage your link to include some kind of explanatory language, like
+> "update this location listing at Pinball Map \<link\>."
 
 → Anywhere we render PBM-sourced data (imported condition comments, listing
-status), show attribution and a link back to pinballmap.com. The imported-comment
-timeline item carries "via PinballMap" + a link to the machine on PBM.
+status), show attribution and a **location-specific** link back. Every one of
+our link-backs is built by `pinballmapLocationUrl()`
+(`src/lib/pinballmap/public-url.ts`), which emits the `by_location_id` form —
+never hand-write a pinballmap.com URL. The imported-comment timeline item carries
+"via PinballMap" + a link to the machine on PBM.
+
+→ The **explanatory language is encouraged, not required**, and our rendered
+link-backs do not carry it yet — tracked in **PP-2h1b**. The hard requirement
+(location-specific target) we already meet.
 
 ## Request volume & polling (llms.txt)
 
