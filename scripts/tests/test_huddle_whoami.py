@@ -306,15 +306,36 @@ def test_top_level_session_can_discover(repo: Path) -> None:
         repo,
         ("2026-08-09T12:00:05.000Z", "bash scripts/hooks/huddle-whoami.sh discover"),
     )
-    rc, out, _ = run(repo, "discover", env={**AGENT_ENV, "CLAUDE_SESSION_ID": SID})
+    rc, out, _ = run(repo, "discover", env=AGENT_ENV)
     assert rc == 0
     assert out.strip() == SID
 
 
-def test_discover_still_returns_an_explicit_session_id(repo: Path) -> None:
-    rc, out, _ = run(repo, "discover", env={"CLAUDE_SESSION_ID": OTHER_SID})
+def test_discover_uses_the_env_var_claude_code_actually_sets(repo: Path) -> None:
+    """Regression, PP-uxnn: the exact path keyed off a variable that does not exist.
+
+    `discover` read $CLAUDE_SESSION_ID; Claude Code sets $CLAUDE_CODE_SESSION_ID
+    (https://code.claude.com/docs/en/env-vars.md). So the exact branch was
+    unreachable in real use and every call fell through to the transcript
+    heuristic, printing three warnings. The old tests missed it by injecting the
+    misspelled variable themselves — asserting on a name only the test defined.
+
+    Hence: no transcript is written here, and the misspelled name is NOT set.
+    Discovery can only succeed via the documented variable, and a fall-through
+    to the heuristic would fail outright with nothing on disk to read.
+    """
+    rc, out, err = run(repo, "discover", env={"CLAUDE_CODE_SESSION_ID": OTHER_SID})
     assert rc == 0
     assert out.strip() == OTHER_SID
+    assert "falling back to transcript heuristic" not in err
+
+
+def test_discover_honours_the_generic_override_for_other_harnesses(repo: Path) -> None:
+    """$CLAUDE_SESSION_ID stays supported so a non-Claude harness can pass its id."""
+    rc, out, err = run(repo, "discover", env={"CLAUDE_SESSION_ID": OTHER_SID})
+    assert rc == 0
+    assert out.strip() == OTHER_SID
+    assert "falling back to transcript heuristic" not in err
 
 
 def test_unknown_option_is_rejected(repo: Path) -> None:

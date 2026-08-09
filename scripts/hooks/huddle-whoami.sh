@@ -24,10 +24,12 @@
 #                            name unless --force is passed. Exits 1 with usage
 #                            if SESSION_ID is omitted.
 #   list                     Dump all session_id → name pairs (sorted by name).
-#   discover                 Print the best-guess session_id of the calling
-#                            shell. Prefers $CLAUDE_SESSION_ID when set;
-#                            falls back to the transcript heuristic with a
-#                            warning (Claude Code only; see WARNING below).
+#   discover                 Print the session_id of the calling shell. Uses
+#                            $CLAUDE_CODE_SESSION_ID when set (exact), then
+#                            $CLAUDE_SESSION_ID as an explicit override for
+#                            other harnesses; falls back to the transcript
+#                            heuristic with a warning (Claude Code only; see
+#                            WARNING below). Refuses for subagents.
 #
 # OWNERSHIP — a session_id is owned by whoever registered it first. `register`
 # guards BOTH directions of collision:
@@ -51,7 +53,7 @@
 # transcript, which is wrong for any non-newest session (2026-05-20 incident
 # on PP-lt12 — root cause of PP-sjkz). SESSION_ID is therefore REQUIRED for
 # whoami and register; the discover subcommand invokes the heuristic only
-# when the caller explicitly requests it and $CLAUDE_SESSION_ID is absent.
+# when the caller explicitly requests it and $CLAUDE_CODE_SESSION_ID is absent.
 
 set -euo pipefail
 
@@ -134,6 +136,19 @@ discover_session_id() {
 # dispatched subagent were measured to have byte-identical values for
 # AI_AGENT, CLAUDE_CODE_CHILD_SESSION and CLAUDE_CODE_SESSION_ID. There is no
 # env-level discriminator.)
+#
+# The docs say the same thing, and are the durable citation now that the
+# reasoning above rests on a minified bundle that will be shaped differently
+# next release. Per https://code.claude.com/docs/en/env-vars.md,
+# CLAUDE_CODE_CHILD_SESSION is "set to 1 in subprocesses Claude Code spawns
+# via the Bash, PowerShell, and Monitor tools, hook commands, and status line
+# commands" — every Bash-tool shell, not a dispatch marker. Its actual purpose
+# is unrelated to subagents: it "distinguishes a nested claude session from a
+# top-level claude launched in an IDE-integrated terminal", so a nested TUI is
+# excluded from --resume, --continue and `claude agents`. AI_AGENT appears
+# nowhere in the documentation at all — the old guard rested half on a
+# misread variable and half on an undocumented internal. No documented
+# variable distinguishes a dispatched subagent from its parent.
 #
 # What IS different is where the harness records the call. Claude Code writes
 # a top-level session's transcript to <project>/<session>.jsonl and a
@@ -339,16 +354,33 @@ case "$cmd" in
       refuse_subagent "discover a session_id"
       exit 1
     fi
-    # Prefer the env var set by Claude Code's hook context — it is guaranteed
-    # correct for the calling session. Fall back to the transcript heuristic
-    # only when the env var is absent, and warn that the result may be wrong
-    # when multiple sessions are active concurrently (PP-bh7w).
-    if [[ -n "${CLAUDE_SESSION_ID:-}" ]]; then
-      printf '%s\n' "$CLAUDE_SESSION_ID"
+    # Prefer the env var Claude Code seeds into the shell — it is exact, where
+    # the transcript heuristic is a guess. Safe to trust HERE specifically:
+    # it holds the PARENT's id inside a subagent, but the guard above already
+    # returned for that case, so reaching this line means the caller is
+    # top-level and the id is its own.
+    #
+    # $CLAUDE_CODE_SESSION_ID is the real variable name, documented at
+    # https://code.claude.com/docs/en/env-vars.md ("Set automatically to the
+    # current session ID in Bash and PowerShell tool subprocesses, hook
+    # command subprocesses, and stdio MCP server subprocesses"). This used to
+    # read $CLAUDE_SESSION_ID — no such variable exists, so the exact path was
+    # unreachable and every `discover` fell through to the heuristic and its
+    # three warnings (PP-uxnn). The test suite did not catch it because it
+    # sets the variable it asserts on; the assertion was self-fulfilling.
+    #
+    # $CLAUDE_SESSION_ID is still honoured as an explicit override so a
+    # non-Claude harness can hand its own id in without inheriting Claude
+    # Code's name. Fall back to the transcript heuristic only when neither is
+    # set, and warn that the result may be wrong when multiple sessions are
+    # active concurrently (PP-bh7w).
+    session_id_env="${CLAUDE_CODE_SESSION_ID:-${CLAUDE_SESSION_ID:-}}"
+    if [[ -n "$session_id_env" ]]; then
+      printf '%s\n' "$session_id_env"
     else
-      printf 'WARNING: CLAUDE_SESSION_ID is not set; falling back to transcript heuristic.\n' >&2
+      printf 'WARNING: CLAUDE_CODE_SESSION_ID is not set; falling back to transcript heuristic.\n' >&2
       printf 'WARNING: This result may be incorrect when multiple Claude sessions are active.\n' >&2
-      printf 'WARNING: Pass the session_id explicitly, or run from a hook context where CLAUDE_SESSION_ID is set.\n' >&2
+      printf 'WARNING: Pass the session_id explicitly, or run from a context where CLAUDE_CODE_SESSION_ID is set.\n' >&2
       discover_session_id || { printf '(could not discover)\n' >&2; exit 1; }
     fi
     ;;
