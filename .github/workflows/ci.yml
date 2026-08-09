@@ -312,7 +312,7 @@ jobs:
             ! -name '*.lock.yml' -print0 | xargs -0 zizmor --min-severity low --format plain
 
       - name: Ratchet Check (pinned actions)
-        uses: sethvargo/ratchet@43c2f868adf316878296666232da1c8d2733f159  # ratchet:sethvargo/ratchet@main
+        uses: sethvargo/ratchet@a7ead07a89972fef4316ad196af18f87ac77bb97  # ratchet:sethvargo/ratchet@main
         with:
           files: |
             .github/workflows/ci.yml
