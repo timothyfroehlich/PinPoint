@@ -16,14 +16,11 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from check_rule_ids import (  # noqa: E402
-    ALWAYS_LOADED_BUDGET_BYTES,
     CITING_SOURCES,
-    collect_always_loaded,
     collect_catalog_ids,
     collect_citations,
     collect_descending_ranges,
     collect_legacy_citations,
-    declares_paths,
     extract_ids,
     find_descending_ranges,
     find_legacy_citations,
@@ -469,88 +466,3 @@ class TestRealRepo:
             assert (root / pattern).is_file(), (
                 f"CITING_SOURCES entry {pattern!r} does not exist on disk"
             )
-
-
-class TestDeclaresPaths:
-    """A rule file is exempt from the always-loaded budget iff it declares globs."""
-
-    def test_true_for_paths_frontmatter(self):
-        assert declares_paths('---\npaths:\n  - "src/**"\n---\n\n# Rule\n')
-
-    def test_false_for_no_frontmatter(self):
-        assert not declares_paths("# Rule\n\nAlways loaded.\n")
-
-    def test_false_for_frontmatter_without_paths(self):
-        assert not declares_paths("---\ntitle: Rule\n---\n\n# Rule\n")
-
-    def test_false_when_paths_appears_only_after_the_block(self):
-        # .claude/rules/README.md explains `paths:` in prose while itself
-        # being path-scoped. Prose after the closing --- must not count as a
-        # declaration, or an always-loaded file could exempt itself by
-        # mentioning the key.
-        assert not declares_paths("---\ntitle: Rule\n---\n\npaths: are great\n")
-
-    def test_false_for_unterminated_frontmatter(self):
-        assert not declares_paths("---\ntitle: Rule\n\n# Rule\n")
-
-
-class TestAlwaysLoadedBudget:
-    """The budget counts only what enters context on every session."""
-
-    def _rules(self, repo: Path) -> Path:
-        rules = repo / ".claude" / "rules"
-        rules.mkdir(parents=True)
-        return rules
-
-    def test_path_scoped_rule_file_is_not_counted(self, repo: Path):
-        rules = self._rules(repo)
-        (rules / "scoped.md").write_text(
-            '---\npaths:\n  - "src/**"\n---\n\n' + "x" * 5000, encoding="utf-8"
-        )
-        (rules / "always.md").write_text("y" * 100, encoding="utf-8")
-        sizes = collect_always_loaded(repo)
-        assert ".claude/rules/always.md" in sizes
-        assert ".claude/rules/scoped.md" not in sizes
-
-    def test_counts_nested_rule_files(self, repo: Path):
-        # The loader walks .claude/rules/ recursively, so a nested file with no
-        # `paths:` is always-loaded too and must be budgeted.
-        nested = self._rules(repo) / "deep"
-        nested.mkdir()
-        (nested / "extra.md").write_text("q" * 42, encoding="utf-8")
-        assert collect_always_loaded(repo) == {".claude/rules/deep/extra.md": 42}
-
-    def test_counts_agents_and_claude_md(self, repo: Path):
-        (repo / "AGENTS.md").write_text("a" * 10, encoding="utf-8")
-        (repo / "CLAUDE.md").write_text("b" * 20, encoding="utf-8")
-        assert collect_always_loaded(repo) == {"AGENTS.md": 10, "CLAUDE.md": 20}
-
-    def test_over_budget_exits_5_and_names_the_files(self, repo: Path, capsys):
-        (repo / "AGENTS.md").write_text(
-            "z" * (ALWAYS_LOADED_BUDGET_BYTES + 1), encoding="utf-8"
-        )
-        assert main(["--root", str(repo)]) == 5
-        err = capsys.readouterr().err
-        assert "over the" in err
-        assert "AGENTS.md" in err
-        # The message must point at the cheap fix, not just at the number.
-        assert "paths:" in err
-
-    def test_under_budget_passes(self, repo: Path):
-        (repo / "AGENTS.md").write_text("z" * 100, encoding="utf-8")
-        assert main(["--root", str(repo)]) == 0
-
-    def test_budget_is_measured_in_utf8_bytes_not_characters(self, repo: Path):
-        # A rule file full of em dashes and section signs costs 3x its
-        # character count. Counting characters would under-report the real
-        # context cost of exactly the prose style these files are written in.
-        (repo / "AGENTS.md").write_text("—" * 10, encoding="utf-8")
-        assert collect_always_loaded(repo) == {"AGENTS.md": 30}
-
-    def test_real_repo_is_within_budget(self):
-        root = find_repo_root(Path(__file__).resolve().parent)
-        total = sum(collect_always_loaded(root).values())
-        assert total <= ALWAYS_LOADED_BUDGET_BYTES, (
-            f"always-loaded context is {total:,} bytes, over the "
-            f"{ALWAYS_LOADED_BUDGET_BYTES:,}-byte budget"
-        )

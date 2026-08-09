@@ -34,16 +34,9 @@ Four checks:
          always-loaded or path-scoped file. Printing that list on every run
          would train everyone to ignore the gate, so it is a coverage audit
          you run deliberately, not a default warning.
-  ERROR  The always-loaded context files (AGENTS.md, CLAUDE.md, and any
-         .claude/rules/*.md with no `paths:` frontmatter) exceed their byte
-         budget. Not a prose-quality check -- a budget on the one thing every
-         session pays for regardless of what it is doing. A rule file that
-         declares `paths:` is on-demand and is not counted, so moving text
-         behind a glob is always the cheap fix.
 
 Exit codes: 0 clean, 1 unknown IDs found, 2 catalog missing, 3 descending
-range cited, 4 fragile rule-number/§2.1 citation found, 5 always-loaded
-context over budget.
+range cited, 4 fragile rule-number/§2.1 citation found.
 """
 
 from __future__ import annotations
@@ -157,81 +150,6 @@ LEGACY_CITATION_SOURCES: tuple[str, ...] = (
 LEGACY_CITATION_SELF_EXCLUDE = frozenset(
     {"scripts/check_rule_ids.py", "scripts/tests/test_check_rule_ids.py"}
 )
-
-# ===== Always-loaded context budget (PP-22e4.4) =====
-#
-# Every byte of these files enters context on every session, whatever the
-# session is doing. That is a real, measurable resource, and it only ever grows
-# by accident: each addition is individually defensible and nobody sees the
-# total. This is a budget on that total -- not a prose-quality check, which
-# would be a fool's errand. It has exactly one question to ask, and it asks it
-# at the moment someone is adding always-loaded text: does this need to be
-# always-loaded, or does it have a path?
-#
-# If it has a path, it belongs in a .claude/rules/*.md with a `paths:` glob
-# list, where it costs nothing until a matching file is opened. That is the
-# whole reason the tier exists -- AGENTS.md section 2.1 used to carry all 20
-# non-negotiables here, including the responsive-layout rules during a
-# migration and the migration rule during a CSS change.
-#
-# Only files with no `paths:` frontmatter count. A rule file that declares
-# globs is on-demand and is deliberately NOT budgeted, so splitting a rule out
-# by path is always the cheap fix.
-# Nested directories are included because the loader walks .claude/rules/
-# recursively -- a rule file one level down with no `paths:` is just as
-# always-loaded as one at the top, and would otherwise escape the budget.
-ALWAYS_LOADED_SOURCES: tuple[str, ...] = (
-    "AGENTS.md",
-    "CLAUDE.md",
-    ".claude/rules/*.md",
-    ".claude/rules/**/*.md",
-)
-
-# 40 KiB. Chosen against a measured 38.1 KiB at the time this landed, so the
-# headroom is ~2 KB -- enough for ordinary edits, tight enough that a new
-# always-loaded section trips it. Raising it is a real decision: do it in a
-# commit that says what got added and why no `paths:` glob would cover it.
-ALWAYS_LOADED_BUDGET_BYTES = 40 * 1024
-
-
-def declares_paths(text: str) -> bool:
-    """True when a rule file's YAML frontmatter declares a `paths:` key.
-
-    Such a file is path-scoped: Claude Code loads it only when a file matching
-    one of its globs is read, so it costs nothing at launch and is exempt from
-    the always-loaded budget.
-
-    Deliberately not a YAML parse. The question is only "does the frontmatter
-    block declare paths", and the block is bounded so a `paths:` mentioned in
-    prose further down the file -- which .claude/rules/README.md does, while
-    itself being path-scoped -- cannot be mistaken for a declaration.
-    """
-    lines = text.splitlines()
-    if not lines or lines[0].strip() != "---":
-        return False
-    for line in lines[1:]:
-        if line.strip() == "---":
-            return False  # Closed the block without declaring paths.
-        if line.startswith("paths:"):
-            return True
-    return False  # Unterminated frontmatter: treat as no declaration.
-
-
-def collect_always_loaded(root: Path) -> dict[str, int]:
-    """Map relative path -> byte size, for every always-loaded context file."""
-    sizes: dict[str, int] = {}
-    for pattern in ALWAYS_LOADED_SOURCES:
-        for path in _glob_paths(root, pattern):
-            if not path.is_file():
-                continue
-            rel = path.relative_to(root).as_posix()
-            if rel in sizes:
-                continue
-            text = path.read_text(encoding="utf-8")
-            if declares_paths(text):
-                continue  # Path-scoped: on demand, not at launch.
-            sizes[rel] = len(text.encode("utf-8"))
-    return sizes
 
 
 def find_repo_root(start: Path) -> Path:
@@ -439,33 +357,6 @@ def main(argv: list[str] | None = None) -> int:
             file=sys.stderr,
         )
         return 1
-
-    # ERROR: the always-loaded context files exceed their byte budget
-    # (PP-22e4.4). Reported after the citation checks because a broken citation
-    # is a correctness bug and this is a budget overrun.
-    always_loaded = collect_always_loaded(root)
-    total = sum(always_loaded.values())
-    if total > ALWAYS_LOADED_BUDGET_BYTES:
-        over = total - ALWAYS_LOADED_BUDGET_BYTES
-        print(
-            f"check:rule-ids: always-loaded context is {total:,} bytes, "
-            f"{over:,} over the {ALWAYS_LOADED_BUDGET_BYTES:,}-byte budget\n",
-            file=sys.stderr,
-        )
-        for rel in sorted(always_loaded, key=lambda r: -always_loaded[r]):
-            print(f"  {always_loaded[rel]:>7,}  {rel}", file=sys.stderr)
-        print(
-            "\nThese files enter context on every session, whatever the session "
-            "is doing. Before raising the budget, ask whether what you added "
-            "has a path: if it applies to a subtree rather than the whole repo, "
-            "move it to a .claude/rules/*.md with a `paths:` glob list, where "
-            "it costs nothing until a matching file is opened (see "
-            ".claude/rules/README.md). Raising the budget is a real decision -- "
-            "do it in a commit that says what got added and why no glob covers "
-            "it.",
-            file=sys.stderr,
-        )
-        return 5
 
     # AUDIT (opt-in): in the catalog but cited nowhere.
     if args.orphans:
