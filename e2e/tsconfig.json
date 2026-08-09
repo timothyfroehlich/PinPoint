@@ -8,7 +8,25 @@
   // intentionally does NOT extend ../tsconfig.app.json — that project is
   // `composite`, and inheriting composite here would impose declaration-emit
   // checks + file-listing rules on the e2e sources.
-  "extends": ["../tsconfig.base.json", "@tsconfig/strictest/tsconfig.json"],
+  //
+  // The strictest entry is a RELATIVE path, not the bare `@tsconfig/strictest/
+  // tsconfig.json` specifier used by ../tsconfig.app.json, and that difference
+  // is load-bearing (PP-el95). Playwright loads this file with its own tsconfig
+  // reader, which is not a Node resolver: for a specifier containing `/` and `.`
+  // it tries exactly one node_modules location, `<dir-of-this-file>/node_modules/
+  // <specifier>`, and never walks upward. There is no e2e/node_modules, so the
+  // bare specifier has never resolved here — Playwright ≤1.61 silently treated
+  // the unresolvable extends as an empty config, and 1.62.0 turned that same
+  // miss into a hard `Failed to resolve "extends" path` error that fails every
+  // E2E job at collection time. tsc resolves either form to the same file (the
+  // root node_modules symlink for this direct devDependency), so the compiler
+  // settings e2e sources get are unchanged. ../tsconfig.app.json keeps the bare
+  // specifier: it sits at the repo root, where Playwright's single-location
+  // lookup happens to land on the real package.
+  "extends": [
+    "../tsconfig.base.json",
+    "../node_modules/@tsconfig/strictest/tsconfig.json"
+  ],
   "compilerOptions": {
     "noEmit": true,
     "moduleResolution": "NodeNext",
