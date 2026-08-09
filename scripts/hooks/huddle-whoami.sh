@@ -121,20 +121,95 @@ discover_session_id() {
 # "use your own id" was tried twice and failed both times, because the value
 # it asks for does not exist anywhere in a subagent's environment.
 #
-# Detection: Claude Code spawns a subagent as its own process seeded with
-# CLAUDE_CODE_CHILD_SESSION=1 AND AI_AGENT=claude-code_<version>_agent. The
-# CHILD_SESSION marker alone is NOT sufficient — harness-spawned TOP-LEVEL
-# sessions (cmux, the web bridge) carry it too and are legitimate registrants;
-# only the `_agent` suffix marks a dispatch (a harness session gets
-# `_harness`). Requiring both keeps top-level sessions registerable.
+# DETECTION IS BY TRANSCRIPT PATH, NOT BY ENV (PP-uxnn). The original guard
+# keyed off CLAUDE_CODE_CHILD_SESSION plus an AI_AGENT ending in `_agent`, on
+# the belief that Claude Code seeds those only into a dispatch. It does not.
+# The CLI builds the environment of EVERY shell the Bash tool spawns with
+#   T2t({sessionId: <session id>, effortLevel: …, source: "agent"})
+# and `source: "agent"` there means "the model is spawning this process" — any
+# tool call — not "dispatched subagent". So both markers are present in a
+# top-level session's Bash shell too, the predicate was true for everyone, and
+# from 2026-08-08 every Claude session on the machine was locked out of
+# registering. (Verified on 2.1.224/225/226; a top-level session and a
+# dispatched subagent were measured to have byte-identical values for
+# AI_AGENT, CLAUDE_CODE_CHILD_SESSION and CLAUDE_CODE_SESSION_ID. There is no
+# env-level discriminator.)
 #
-# Fails open by design: other harnesses (Antigravity, Codex) set neither var,
-# so they are unaffected, and a Claude Code version that stops setting them
-# just falls back to the harness-agnostic rebind guard in `register`.
+# What IS different is where the harness records the call. Claude Code writes
+# a top-level session's transcript to <project>/<session>.jsonl and a
+# dispatched subagent's to <project>/<session>/subagents/<agent>.jsonl — the
+# same `*/subagents/*` signal huddle-poll.sh and huddle-session-start.sh
+# already use, which they get free from their hook payload. A script invoked
+# from the Bash tool has to find its own record instead: the tool_use for the
+# running command is flushed to the CALLING agent's transcript before the
+# command executes, so the newest record naming this script identifies the
+# caller.
+#
+# Fails open by design, in both the old sense and a new one: other harnesses
+# (Antigravity, Codex) do not write these transcripts and are unaffected, and
+# an indeterminate read — no matching record, an unrecognised layout, an
+# invocation wrapped in another script — is treated as "not a subagent" and
+# falls back to the harness-agnostic rebind guard in `register`.
+
+# The literal that must appear in the caller's recorded command. Every
+# documented invocation is `bash scripts/hooks/huddle-whoami.sh …` typed by the
+# agent, so the script's filename is in the command string verbatim.
+WHOAMI_SIGNATURE=$(basename "$0")
+
+# How many trailing records to scan. The caller's tool_use is normally the LAST
+# line, but a PreToolUse hook_success `attachment` can be appended between it
+# and execution (measured: 1 of 34 Bash calls in a live transcript). That
+# record embeds the command string too, so a small window still matches.
+WHOAMI_TAIL_RECORDS=5
+
+# Newest `timestamp` value among the trailing records of $1 that name this
+# script, or empty. ISO-8601 UTC sorts lexicographically, so `sort` is enough.
+# The key match tolerates whitespace around the colon; Claude Code writes
+# compact JSON, but nothing in the format guarantees that.
+newest_signature_timestamp() {
+  tail -n "$WHOAMI_TAIL_RECORDS" "$1" 2>/dev/null |
+    grep -F -- "$WHOAMI_SIGNATURE" |
+    grep -o '"timestamp"[[:space:]]*:[[:space:]]*"[^"]*"' |
+    sed 's/.*"\([^"]*\)"$/\1/' |
+    sort |
+    tail -n 1 || true
+}
+
+# Path of the transcript belonging to the agent whose tool call is running us,
+# or exit 1 when that cannot be determined. Candidates are the session's own
+# top-level transcript plus every subagent transcript under it; the one holding
+# the most recent record that names this script wins, which is the caller's,
+# because that record was written moments ago.
+caller_transcript() {
+  local sid=${CLAUDE_CODE_SESSION_ID:-}
+  [[ -n $sid ]] || return 1
+  local dir
+  dir=$(project_transcript_dir)
+  [[ -d $dir ]] || return 1
+  local candidates=()
+  shopt -s nullglob
+  candidates=("$dir/$sid.jsonl" "$dir/$sid"/subagents/*.jsonl)
+  shopt -u nullglob
+  local best_file="" best_ts="" file ts
+  for file in "${candidates[@]}"; do
+    ts=$(newest_signature_timestamp "$file")
+    [[ -n $ts ]] || continue
+    if [[ -z $best_ts || $ts > $best_ts ]]; then
+      best_ts=$ts
+      best_file=$file
+    fi
+  done
+  [[ -n $best_file ]] || return 1
+  printf '%s\n' "$best_file"
+}
+
 caller_is_subagent() {
-  [[ -n "${CLAUDE_CODE_CHILD_SESSION:-}" ]] || return 1
-  [[ "${AI_AGENT:-}" == *_agent ]] || return 1
-  return 0
+  local transcript
+  transcript=$(caller_transcript) || return 1
+  case "$transcript" in
+    */subagents/*) return 0 ;;
+    *) return 1 ;;
+  esac
 }
 
 # Shared refusal for the subagent case. $1 is the subcommand being refused.

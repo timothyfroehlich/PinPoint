@@ -16,10 +16,21 @@ peer's) and misattributed its huddle comments — including to Tim.
 Two guards are under test:
   1. the reverse-direction collision refusal (harness-agnostic, --force
      overrides for a genuine rename);
-  2. the subagent refusal on `register` and `discover`, keyed off the env pair
-     Claude Code seeds into a dispatch (CLAUDE_CODE_CHILD_SESSION + an
-     AI_AGENT ending in `_agent`). No --force override — there is no correct
-     id for a subagent to supply.
+  2. the subagent refusal on `register` and `discover`, keyed off the caller's
+     transcript path. No --force override — there is no correct id for a
+     subagent to supply.
+
+Guard 2 used to key off the env pair CLAUDE_CODE_CHILD_SESSION + an AI_AGENT
+ending in `_agent`, on the belief that Claude Code seeds those only into a
+dispatch. It does not: the CLI puts both into the environment of EVERY shell
+the Bash tool spawns, so from 2026-08-08 the predicate was true for top-level
+sessions too and every Claude session on the machine was locked out of
+registering (PP-uxnn). A top-level session and a dispatched subagent were
+measured to carry byte-identical AI_AGENT, CLAUDE_CODE_CHILD_SESSION and
+CLAUDE_CODE_SESSION_ID values — there is no env-level discriminator, so the
+guard now looks at where the harness recorded the call: <project>/<sid>.jsonl
+for a top-level session, <project>/<sid>/subagents/<agent>.jsonl for a
+dispatch. Both directions are covered below.
 
 Each test builds a throwaway git repo so `huddle_state_dir` resolves to
 <repo>/.agents/huddle, then runs the script with an explicit env.
@@ -38,22 +49,18 @@ SCRIPT = Path(__file__).parent.parent / "hooks" / "huddle-whoami.sh"
 SID = "11111111-2222-3333-4444-555555555555"
 OTHER_SID = "99999999-8888-7777-6666-555555555555"
 
-# The env a dispatched Claude Code subagent inherits. CLAUDE_CODE_SESSION_ID
-# holds the PARENT's id — which is exactly why registering from here is wrong.
-SUBAGENT_ENV = {
+# What EVERY Claude Code Bash-tool shell carries — top-level session and
+# dispatched subagent alike. CLAUDE_CODE_SESSION_ID holds the top-level id in
+# both cases, which is exactly why a subagent registering it is wrong.
+AGENT_ENV = {
     "CLAUDE_CODE_CHILD_SESSION": "1",
-    "AI_AGENT": "claude-code_2-1-220_agent",
+    "AI_AGENT": "claude-code_2-1-226_agent",
     "CLAUDE_CODE_SESSION_ID": SID,
 }
 
-# A harness-spawned TOP-LEVEL session (cmux, the web bridge). It carries the
-# same CHILD_SESSION marker but is a legitimate registrant — which is why
-# detection requires the `_agent` AI_AGENT suffix as well.
-HARNESS_ENV = {
-    "CLAUDE_CODE_CHILD_SESSION": "1",
-    "AI_AGENT": "claude-code_2-1-220_harness",
-    "CLAUDE_CODE_SESSION_ID": SID,
-}
+# A recorded Bash call naming this script — what the caller's transcript holds
+# by the time the script runs.
+REGISTER_COMMAND = "bash scripts/hooks/huddle-whoami.sh register Claude-X " + SID
 
 
 @pytest.fixture
@@ -63,6 +70,48 @@ def repo() -> Iterator[Path]:
         root = Path(tmp)
         subprocess.run(["git", "init", "-q"], cwd=root, check=True)
         yield root
+
+
+def transcript_dir(repo: Path) -> Path:
+    """Where the script looks for Claude Code transcripts, given HOME=repo.
+
+    Mirrors `project_transcript_dir`: the main worktree root with every `/`
+    replaced by `-`. `.resolve()` matters on macOS, where the temp dir is
+    /var/folders/... but bash's `pwd` reports the physical /private/var/...
+    """
+    mangled = str(repo.resolve()).replace("/", "-")
+    return repo / ".claude" / "projects" / mangled
+
+
+def write_transcript(path: Path, *records: tuple[str, str]) -> None:
+    """Write a JSONL transcript of (timestamp, command) tool_use records."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    lines = [
+        json.dumps(
+            {
+                "type": "assistant",
+                "timestamp": ts,
+                "message": {
+                    "content": [
+                        {"type": "tool_use", "name": "Bash", "input": {"command": cmd}}
+                    ]
+                },
+            },
+            # Compact, the way Claude Code's JSON.stringify writes it.
+            separators=(",", ":"),
+        )
+        for ts, cmd in records
+    ]
+    path.write_text("\n".join(lines) + "\n")
+
+
+def top_level_transcript(repo: Path, *records: tuple[str, str]) -> None:
+    write_transcript(transcript_dir(repo) / f"{SID}.jsonl", *records)
+
+
+def subagent_transcript(repo: Path, *records: tuple[str, str]) -> None:
+    path = transcript_dir(repo) / SID / "subagents" / "agent-abc123.jsonl"
+    write_transcript(path, *records)
 
 
 def names(repo: Path) -> dict[str, str]:
@@ -164,7 +213,10 @@ def test_force_does_not_override_a_taken_name(repo: Path) -> None:
 
 
 def test_subagent_cannot_register(repo: Path) -> None:
-    rc, out, err = run(repo, "register", "Claude-Subagent", SID, env=SUBAGENT_ENV)
+    """The caller's own tool_use sits in a subagents/ transcript."""
+    top_level_transcript(repo, ("2026-08-09T12:00:00.000Z", "git status"))
+    subagent_transcript(repo, ("2026-08-09T12:00:05.000Z", REGISTER_COMMAND))
+    rc, out, err = run(repo, "register", "Claude-Subagent", SID, env=AGENT_ENV)
     assert rc == 1
     assert out == ""
     assert "this is a dispatched subagent" in err
@@ -179,33 +231,84 @@ def test_subagent_cannot_register_even_over_a_free_session_id(repo: Path) -> Non
     belt-and-braces: an unregistered parent id would be claimed by the
     subagent's name, and the parent would then be locked out by guard 1.
     """
-    run(repo, "register", "Claude-Subagent", "some-unclaimed-id", env=SUBAGENT_ENV)
+    subagent_transcript(repo, ("2026-08-09T12:00:05.000Z", REGISTER_COMMAND))
+    run(repo, "register", "Claude-Subagent", "some-unclaimed-id", env=AGENT_ENV)
     assert names(repo) == {}
 
 
 def test_subagent_refusal_ignores_force(repo: Path) -> None:
-    rc, _, err = run(
-        repo, "register", "--force", "Claude-Subagent", SID, env=SUBAGENT_ENV
-    )
+    subagent_transcript(repo, ("2026-08-09T12:00:05.000Z", REGISTER_COMMAND))
+    rc, _, err = run(repo, "register", "--force", "Claude-Subagent", SID, env=AGENT_ENV)
     assert rc == 1
     assert "this is a dispatched subagent" in err
     assert names(repo) == {}
 
 
-def test_harness_spawned_top_level_session_can_still_register(repo: Path) -> None:
-    """CLAUDE_CODE_CHILD_SESSION alone must not trip the subagent guard."""
-    rc, out, _ = run(repo, "register", "Claude-Harness", SID, env=HARNESS_ENV)
+def test_subagent_is_found_behind_a_trailing_hook_attachment(repo: Path) -> None:
+    """A PreToolUse hook_success record can land after the tool_use.
+
+    Measured once in 34 live Bash calls, so the last line alone is not a safe
+    place to look — the scan covers a short window of trailing records.
+    """
+    subagent_transcript(
+        repo,
+        ("2026-08-09T12:00:05.000Z", REGISTER_COMMAND),
+        ("2026-08-09T12:00:05.040Z", "(hook attachment, no signature)"),
+    )
+    rc, _, err = run(repo, "register", "Claude-Subagent", SID, env=AGENT_ENV)
+    assert rc == 1
+    assert "this is a dispatched subagent" in err
+
+
+def test_top_level_session_registers_despite_the_agent_env_markers(
+    repo: Path,
+) -> None:
+    """PP-uxnn: the exact shape that locked every session out.
+
+    CLAUDE_CODE_CHILD_SESSION and an `_agent` AI_AGENT are present — Claude
+    Code puts them in every Bash-tool shell — but the call is recorded in the
+    TOP-LEVEL transcript, and a stale subagent record must not outrank it.
+    """
+    subagent_transcript(repo, ("2026-08-09T11:59:00.000Z", REGISTER_COMMAND))
+    top_level_transcript(repo, ("2026-08-09T12:00:05.000Z", REGISTER_COMMAND))
+    rc, out, _ = run(repo, "register", "Claude-HerdrRecon", SID, env=AGENT_ENV)
     assert rc == 0
     assert "Registered" in out
-    assert names(repo) == {SID: "Claude-Harness"}
+    assert names(repo) == {SID: "Claude-HerdrRecon"}
+
+
+def test_agent_env_markers_alone_do_not_refuse(repo: Path) -> None:
+    """No transcripts to read is indeterminate, and indeterminate fails open.
+
+    Other harnesses (Antigravity, Codex) land here too — they write no Claude
+    transcripts — and must stay registerable.
+    """
+    rc, out, _ = run(repo, "register", "Claude-Alpha", SID, env=AGENT_ENV)
+    assert rc == 0
+    assert "Registered" in out
+    assert names(repo) == {SID: "Claude-Alpha"}
 
 
 def test_subagent_cannot_discover(repo: Path) -> None:
     """discover would hand back the PARENT's id — cause #1 of the clobber."""
-    rc, out, err = run(repo, "discover", env=SUBAGENT_ENV)
+    subagent_transcript(
+        repo,
+        ("2026-08-09T12:00:05.000Z", "bash scripts/hooks/huddle-whoami.sh discover"),
+    )
+    rc, out, err = run(repo, "discover", env=AGENT_ENV)
     assert rc == 1
     assert out == ""
     assert "this is a dispatched subagent" in err
+
+
+def test_top_level_session_can_discover(repo: Path) -> None:
+    top_level_transcript(
+        repo,
+        ("2026-08-09T12:00:05.000Z", "bash scripts/hooks/huddle-whoami.sh discover"),
+    )
+    rc, out, _ = run(repo, "discover", env={**AGENT_ENV, "CLAUDE_SESSION_ID": SID})
+    assert rc == 0
+    assert out.strip() == SID
 
 
 def test_discover_still_returns_an_explicit_session_id(repo: Path) -> None:
