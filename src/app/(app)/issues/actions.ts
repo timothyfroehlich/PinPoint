@@ -564,7 +564,7 @@ export async function assignIssueAction(
     }
 
     // Assign issue via service
-    const deliveryPlan = await assignIssue({
+    const { deliveryPlan } = await assignIssue({
       issueId,
       assignedTo,
       actorId: user.id,
