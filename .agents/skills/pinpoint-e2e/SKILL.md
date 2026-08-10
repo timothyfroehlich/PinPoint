@@ -22,7 +22,7 @@ If all five say "E2E is the right layer", write it. Otherwise, the cheapest laye
 ## Quick Start
 
 - **Run Smoke Tests**: `pnpm run smoke` (Fast, critical paths)
-- **Run Full Suite**: `pnpm run e2e:full` / `e2e:all` (Comprehensive — CI's job by default; on a resource-constrained system, especially with several agent sessions running, don't run it locally)
+- **Run Full Suite**: `pnpm run e2e:full` / `e2e:all` (Comprehensive — CI's job by default; three parallel Chromium workers plus a Supabase stack and a Next server, peaking at several GB)
 - **Debug Mode**: `pnpm exec playwright test e2e/path/to/test.spec.ts --debug`
 
 ## Which Tests to Run (Decision Tree)

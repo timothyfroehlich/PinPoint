@@ -5,8 +5,8 @@
 # persistent counting semaphore stored under ~/.parallel/semaphores/).
 #
 # Rationale: a single preflight peaks at ~1.5 GB of vitest RSS + ~2 GB during
-# `next build`. Two concurrent preflights = ~3 GB combined peak, comfortable
-# on a 16 GB Mac. Three or more start swapping. The cap protects developers
+# `next build`. Two concurrent preflights = ~3 GB combined peak; three or more
+# start swapping on a typical laptop. The cap protects developers
 # who keep multiple worktrees open and accidentally fire preflight in two of
 # them at once.
 #
