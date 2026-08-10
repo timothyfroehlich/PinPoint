@@ -20,9 +20,20 @@
 import { test, expect, type Page } from "@playwright/test";
 import { cleanupTestEntities } from "../support/cleanup.js";
 import { STORAGE_STATE } from "../support/auth-state.js";
+import { TEST_USERS } from "../support/constants.js";
+import {
+  getProfileIdByEmail,
+  updateUserRole,
+} from "../support/supabase-admin.js";
 
 const testMachines = new Set<string>();
-const testEmails = new Set<string>();
+
+// The promote journey below flips this SEEDED user from guest to member for
+// real — that is the whole point of the flow. Nothing put the role back, so the
+// second run of this file in the same database found a member where it needed a
+// guest, no promote dialog ever appeared, and both tests failed. Demoting in
+// afterEach is what makes the file re-runnable. (PP-168u.)
+const GUEST_EMAIL = TEST_USERS.guest.email;
 
 /** Open the owner picker popover and wait for it to be interactive. */
 async function openOwnerPicker(page: Page) {
@@ -69,14 +80,17 @@ test.describe("Machine Owner Picker — promote-dialog journeys (PP-6oi)", () =>
   test.use({ storageState: STORAGE_STATE.admin });
 
   test.afterEach(async ({ request }) => {
-    if (testMachines.size > 0 || testEmails.size > 0) {
+    if (testMachines.size > 0) {
       await cleanupTestEntities(request, {
         machineInitials: Array.from(testMachines),
-        userEmails: Array.from(testEmails),
       });
       testMachines.clear();
-      testEmails.clear();
     }
+    // Unconditional, and after the machines are gone (the promoted user owns
+    // the machine the confirm test creates). Only the confirm test promotes,
+    // but it can fail at any assertion AFTER the promotion has committed, so
+    // "demote when the test passed" would be exactly backwards. One UPDATE.
+    await updateUserRole(await getProfileIdByEmail(GUEST_EMAIL), "guest");
   });
 
   test("promote dialog appears when a guest owner is selected", async ({

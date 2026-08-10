@@ -25,14 +25,22 @@
  */
 
 import { test, expect } from "@playwright/test";
+import { openDropdownMenu } from "../support/actions.js";
 import { STORAGE_STATE } from "../support/auth-state.js";
-import { seededMachines, seededIssue } from "../support/constants.js";
+import { cleanupTestEntities } from "../support/cleanup.js";
+import { seededMachines } from "../support/constants.js";
+import {
+  fillReportForm,
+  submitFormAndWaitForRedirect,
+} from "../support/page-helpers.js";
 
 const machineA = seededMachines.addamsFamily.initials;
 const machineB = seededMachines.eightBallDeluxe.initials;
-const issueNumber = seededIssue("TAF").num;
 
+// PREFIX tags note bodies; REASSIGN_PREFIX tags issue titles, which is what the
+// reassign journey's cleanup matches on.
 const PREFIX = "E2E PP-0x98";
+const REASSIGN_PREFIX = `${PREFIX} Reassign`;
 
 test.describe("Machine Timeline (PP-0x98)", () => {
   test.describe("member journeys", () => {
@@ -138,17 +146,47 @@ test.describe("Machine Timeline (PP-0x98)", () => {
     });
   });
 
+  // Reassignment is a ONE-WAY move of a real row, so this journey files its own
+  // issue instead of moving a seeded one. It used to move seeded TAF-01 to EBD
+  // and leave it there: TAF-01 then no longer existed at /m/TAF/i/1, so a second
+  // run in the same database timed out waiting for the kebab that page never
+  // rendered — and machine-info.spec.ts, which asserts TAF-01 in the hero's
+  // known-issues peek, went red as collateral. Moving it back is not a repair:
+  // a returning issue gets a fresh per-machine number, so TAF-01 would stay
+  // gone. (PP-168u.)
   test.describe("admin reassign journey", () => {
     test.use({ storageState: STORAGE_STATE.admin });
+
+    test.afterEach(async ({ request }) => {
+      await cleanupTestEntities(request, {
+        issueTitlePrefix: REASSIGN_PREFIX,
+      });
+    });
 
     test("reassigning an issue surfaces events on BOTH timelines", async ({
       page,
     }) => {
-      // 1. Open the source issue on machine A.
-      await page.goto(`/m/${machineA}/i/${issueNumber.toString()}`);
+      // 1. File a throwaway issue on machine A and land on its detail page.
+      await page.goto(`/report?machine=${machineA}`);
+      await fillReportForm(page, {
+        title: `${REASSIGN_PREFIX} ${Date.now().toString()}`,
+        priority: "medium",
+      });
+      await submitFormAndWaitForRedirect(
+        page,
+        page.getByRole("button", { name: "Submit Issue Report" }),
+        { awayFrom: "/report" }
+      );
+      await expect(page).toHaveURL(new RegExp(`/m/${machineA}/i/[0-9]+$`));
 
       // 2. Reassign via kebab menu → reassign → pick destination → confirm.
-      await page.getByTestId("issue-actions-menu-trigger").click();
+      // openDropdownMenu, not a bare click: we arrive here straight off the
+      // report form's redirect, and the report form's ProseMirror editor can
+      // still hold focus when the first click lands — the trigger reports
+      // clickable, the click is swallowed, and the menu never opens. The helper
+      // asserts aria-expanded and retries once. (issues-reassign-machine.spec.ts
+      // opens this same menu the same way after the same flow.)
+      await openDropdownMenu(page.getByTestId("issue-actions-menu-trigger"));
       await page.getByTestId("issue-actions-menu-reassign").click();
 
       // The reassign dialog renders a searchable combobox — filter by the
