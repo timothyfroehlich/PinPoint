@@ -68,8 +68,8 @@ export async function recordAbandonedListing(
 /**
  * Every entry this machine has abandoned and nobody has removed yet.
  *
- * Not called from anywhere in this commit — wired up on the machine's
- * PinballMap card in Task 5 (PP-l81u).
+ * Wired up on the machine's PinballMap card (Task 5, PP-l81u) — see
+ * `src/app/(app)/m/[initials]/(tabs)/page.tsx`.
  */
 export async function listAbandonedForMachine(
   machineId: string

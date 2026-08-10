@@ -102,3 +102,24 @@ describe("MachinePinballmapCard", () => {
     ).not.toBeInTheDocument();
   });
 });
+
+describe("abandoned listings", () => {
+  it("names what is still on the public map", () => {
+    render(
+      <MachinePinballmapCard
+        locationUrl={LOCATION_URL}
+        abandoned={[{ lmxId: 4471, title: "Godzilla (Pro)" }]}
+      />
+    );
+
+    expect(
+      screen.getByText(/Godzilla \(Pro\) is still on Pinball Map/i)
+    ).toBeInTheDocument();
+  });
+
+  it("says nothing when there are none", () => {
+    render(<MachinePinballmapCard locationUrl={LOCATION_URL} abandoned={[]} />);
+
+    expect(screen.queryByText(/still on Pinball Map/i)).not.toBeInTheDocument();
+  });
+});

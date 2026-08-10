@@ -62,6 +62,12 @@ export interface MachinePinballmapCardProps {
   desynced?: boolean;
   /** Which desync copy to show; only read when `desynced`. */
   desyncReason?: PbmMachineStatus["reason"];
+  /**
+   * Entries this machine walked away from that are still live on the public map
+   * (PP-l81u). Cleanup is manual on pinballmap.com in this bead; the record
+   * clears itself once the hourly sync stops seeing the entry.
+   */
+  abandoned?: { lmxId: number; title: string }[];
 }
 
 const CARD = "rounded-xl border border-outline-variant bg-card p-4";
@@ -72,6 +78,7 @@ export function MachinePinballmapCard({
   locationUrl,
   desynced = false,
   desyncReason,
+  abandoned,
 }: MachinePinballmapCardProps): React.JSX.Element {
   const desyncMessage =
     desynced && desyncReason ? DESYNC_COPY[desyncReason] : undefined;
@@ -93,6 +100,24 @@ export function MachinePinballmapCard({
         >
           <AlertTriangle className="size-4" aria-hidden="true" />
           <AlertDescription>{desyncMessage}</AlertDescription>
+        </Alert>
+      ) : null}
+
+      {abandoned && abandoned.length > 0 ? (
+        <Alert
+          variant="warning"
+          className="mb-3"
+          data-testid="machine-pinballmap-abandoned"
+        >
+          <AlertTriangle className="size-4" aria-hidden="true" />
+          <AlertDescription>
+            {abandoned.map((entry) => (
+              <span key={entry.lmxId} className="block">
+                {entry.title} is still on Pinball Map. Remove it there — this
+                notice clears itself once it is gone.
+              </span>
+            ))}
+          </AlertDescription>
         </Alert>
       ) : null}
 
