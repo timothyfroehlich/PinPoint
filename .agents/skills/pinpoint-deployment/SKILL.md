@@ -1,11 +1,11 @@
 ---
 name: pinpoint-deployment
-description: Deployment reference for PinPoint — Supabase/Postgres pooler and connection-string reference (Supavisor transaction vs session pooler, IPv4/IPv6, prepared statements, and the resolved PP-d8l8 silent-commit-loss incident); the day-to-day Drizzle migration loop (db:generate, db:migrate, db:reset, test:_generate-schema, the exported PGlite schema.sql, ensure-test-schema, CORE-ARCH-009 migrations-not-push); resolving drizzle/meta conflicts on merge; on-demand TTL'd Supabase preview branches, the /preview command, the sticky status comment, and the hourly reaper; and the per-PR /audit-override escape hatch for unrelated pnpm audit failures blocking CI Gate. Use when changing the Drizzle schema or generating/applying a migration; when touching src/server/db/**, scripts/migrate-production.ts, or scripts/lib/pg-client.mjs (DB connection/pooler config); when a merge or rebase produces conflicts under drizzle/meta or drizzle migration .sql/_snapshot.json files; when setting up, debugging, or explaining Vercel preview deployments or the /preview command; or when a PR's audit job goes red on a freshly-published advisory unrelated to the PR's own changes, or when explaining/debugging the /audit-override command.
+description: Deployment reference for PinPoint — Supabase/Postgres pooler and connection-string reference (Supavisor transaction vs session pooler, IPv4/IPv6, prepared statements, and the resolved PP-d8l8 silent-commit-loss incident); the day-to-day Drizzle migration loop (db:generate, db:migrate, db:reset, test:_generate-schema, the exported PGlite schema.sql, ensure-test-schema, CORE-ARCH-009 migrations-not-push); resolving drizzle/meta conflicts on merge; the Vercel production build (vercel-build = migrate:production && next build, so a failed build has already migrated prod), diagnosing a failed deploy without build logs, and the write-only SENSITIVE default on `vercel env add`; why `supabase start` died with "FATAL: invalid secret key" on an SELinux host under CLI 2.111.0 and why 2.112.0+ fixed it (PP-9mg0); on-demand TTL'd Supabase preview branches, the /preview command, the sticky status comment, and the hourly reaper; and the per-PR /audit-override escape hatch for unrelated pnpm audit failures blocking CI Gate. Use when changing the Drizzle schema or generating/applying a migration; when touching src/server/db/**, scripts/migrate-production.ts, or scripts/lib/pg-client.mjs (DB connection/pooler config); when a merge or rebase produces conflicts under drizzle/meta or drizzle migration .sql/_snapshot.json files; when a production deploy fails or you are setting a production env var with the Vercel CLI; when setting up, debugging, or explaining Vercel preview deployments or the /preview command; when a PR's audit job goes red on a freshly-published advisory unrelated to the PR's own changes, or when explaining/debugging the /audit-override command; or when the local Supabase stack will not start and the db container is restart-looping.
 ---
 
 # PinPoint Deployment
 
-Merged reference covering PinPoint's deployment-adjacent operational surfaces: DB connections/pooling, the day-to-day migration loop, migration-conflict resolution, preview deployments, and the audit-gate override. Four of these sections were previously their own skills (`pinpoint-db-connections`, `pinpoint-migration-conflicts`, `pinpoint-preview-deployments`, `pinpoint-audit-override`) and are reproduced here verbatim; **Database Migrations (day-to-day)** was absorbed from the retired patterns docs (PP-22e4).
+Merged reference covering PinPoint's deployment-adjacent operational surfaces: DB connections/pooling, the day-to-day migration loop, getting the local stack to start, migration-conflict resolution, production deploys, preview deployments, and the audit-gate override. Four of these sections were previously their own skills (`pinpoint-db-connections`, `pinpoint-migration-conflicts`, `pinpoint-preview-deployments`, `pinpoint-audit-override`) and are reproduced here verbatim; **Database Migrations (day-to-day)** was absorbed from the retired patterns docs (PP-22e4), **Production Deploys (Vercel)** from two beads memories demoted in the 2026-08-09 review (PP-p4ek), and **Local stack won't start on an SELinux host** from the PP-9mg0 investigation.
 
 ## DB Connections
 
@@ -65,6 +65,23 @@ PinPoint uses **Drizzle ORM** for schema definition and migrations, plus a **sep
 - **Commit everything together**: `schema.ts`, the new `drizzle/` files (`.sql` **and** `_snapshot.json`), and the updated `src/test/setup/schema.sql`.
 - **Production and preview are `db:migrate` only.** Never `db:reset`, never `drizzle-kit push` against them. (AGENTS.md §7.)
 
+## Local stack won't start on an SELinux host (resolved, PP-9mg0)
+
+**Fixed by the CLI pin bump to 2.113.0 (#1837). Recorded because the symptom is unrecognizable from its error message, and the trigger was a CLI version — so an older CLI reintroduces it.**
+
+Symptom on Bazzite (Fedora Atomic, SELinux enforcing, `docker` is a shim over rootless podman): `supabase start` never completes, the `supabase_db_*` container restart-loops, and the log reads
+
+```
+pgsodium_getkey.sh: /etc/postgresql-custom/pgsodium_root.key: Read-only file system
+FATAL:  invalid secret key
+```
+
+Cause: **CLI 2.111.0 only**. Older CLIs wrote the pgsodium root key from _inside_ the container. 2.111.0 staged it on the host at `supabase/.temp/start-secrets/<container>/secret-0` and bind-mounted it `:ro` — with no `z`/`Z` relabel. The staged file inherits `user_home_t` from the repo, the container runs as `container_t`, so SELinux denies the `stat`. That makes `pgsodium_getkey.sh`'s `[[ ! -f "$KEY_FILE" ]]` true (`test -f` is false on `EACCES`), so it tries to _create_ the key — writing through a read-only mount. Both messages, one cause. Kong and pooler staged secrets the same way; db just failed first.
+
+Why it is gone: 2.112.0 replaced the bind mount with `docker cp` from a short-lived temp file, and the 2.113.0 `secretFiles` doc says it is never a host bind mount (supabase/cli#6022). Verified on Bazzite at 2.113.0 — the stack is healthy, `supabase/.temp/start-secrets/` is never created, and no Supabase container has any host bind mount into the repo.
+
+If it ever returns: check the CLI version first. Either bump it, or label the staging directory once — `chcon -R -t container_file_t -l s0 supabase/.temp/start-secrets` — which is enough because the directory survives a restart (the CLI removes only the per-container subdirectory) and staged files inherit the parent's label. macOS and CI have no SELinux and were never affected.
+
 ## Migration Conflicts
 
 Never resolve `drizzle/meta` conflicts manually — the folder holds binary-like schema snapshots; manual edits corrupt the `prevId` chain.
@@ -79,6 +96,29 @@ Never resolve `drizzle/meta` conflicts manually — the folder holds binary-like
 6. `pnpm db:reset` to verify.
 
 Before merging any migration PR: every new `.sql` has a matching `_snapshot.json`; `pnpm db:generate` reports "No schema changes".
+
+## Production Deploys (Vercel)
+
+Vercel's production build runs `pnpm run vercel-build` — which is `migrate:production && next build` (`package.json`). Two of the three notes below follow from that ordering.
+
+### Migrations run first, so a failed build may already have migrated prod
+
+`migrate:production` finishes **before** `next build` starts. A build that dies later — on the `next.config.ts` env assertion (`assertVercelDeploymentEnv`), on a compile error, on anything — has **already applied the PR's migrations to production**.
+
+Vercel does not promote a failed build, so production keeps serving the **previous** deployment and stays healthy (curl it before assuming an outage). But if the PR carried migrations, prod's database is now migrated while prod's code is still the old build. Verify the new schema is forward-compatible with that old code rather than assuming nothing happened.
+
+### Diagnosing a failed production deploy without build logs
+
+The `claude_ai_Vercel` MCP's `get_deployment_build_logs` **401s** — `get_deployment` and `list_teams` work, the log tool does not; the Vercel CLI is the only path to build logs. Without them, infer from two signals:
+
+- **The `buildingAt` → `ready` delta.** A very short one (~19s) means it died at **module evaluation**, not on a compile error — i.e. a top-level assertion or import-time throw, which is exactly what a missing registered env var looks like.
+- **Whether the previous production deploy succeeded**, which isolates the failure to the change that just landed.
+
+### Setting a production env var: the SENSITIVE footgun
+
+`vercel env add <name> production` defaults to Vercel's **SENSITIVE** type, which is **write-only**: `vercel env pull` returns the literal string `[SENSITIVE]` (length 11) instead of the value, and the dashboard cannot show it either. The server still receives the real value at build and runtime, **so the app works** — while the secret is unretrievable by humans. That silently breaks any secret Tim also needs a copy of (a bearer token he has to paste into a client config, say).
+
+Pass `--no-sensitive` for anything that must stay readable. Verify by pulling to a temp file and checking the value's **length**, then shred the file — do not print secrets. (`docs/ENV_VARS.md` notes this on `PINBALLMAP_API_TOKEN`'s entry; the rule is general.)
 
 ## Preview Deployments
 
