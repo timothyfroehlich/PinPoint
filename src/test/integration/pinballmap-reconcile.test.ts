@@ -427,5 +427,121 @@ describe("reconcileAfterSync (PGlite)", () => {
       const rows = await db.select().from(pinballmapAbandonedListings);
       expect(rows).toHaveLength(1);
     });
+
+    it("clears a record once a different listed machine reclaims its lmx", async () => {
+      // Godzilla #1 abandoned lmx 4471 (retitled off title 6221). Auto-link has
+      // since matched a DIFFERENT machine to 6221 and listed it on that same
+      // still-live lmx — legal, since #1's own `pinballmapListed` is false and
+      // the one-lister index only forbids two SIMULTANEOUS listers. #1's card
+      // must stop telling its owner to remove a listing #2 now depends on.
+      const db = await getTestDb();
+      const { reconcileAfterSync } = await import("~/lib/pinballmap/sync");
+
+      const abandoner = createTestMachine({
+        initials: "GZD",
+        name: "Godzilla #1",
+        pinballmapMachineId: 6222,
+      });
+      const reclaimer = createTestMachine({
+        initials: "GZE",
+        name: "Godzilla #2",
+        pinballmapMachineId: 6221,
+        pinballmapListed: true,
+        pinballmapLmxId: 4471,
+      });
+      await db.insert(machines).values([abandoner, reclaimer]);
+      await db.insert(pinballmapAbandonedListings).values({
+        machineId: abandoner.id,
+        lmxId: 4471,
+        pinballmapMachineId: 6221,
+      });
+
+      // The lmx is still ON the lineup (the reclaimer is genuinely listed) —
+      // presence alone would keep the old branch from clearing it.
+      await db.insert(pinballmapState).values({
+        id: "singleton",
+        locationId: 26454,
+        enabled: true,
+        snapshotJson: snapshotWith([{ id: 4471, machineId: 6221 }]),
+        lastSyncStatus: "ok",
+      });
+
+      const result = await reconcileAfterSync();
+
+      expect(result.abandonmentsCleared).toBe(1);
+      const rows = await db.select().from(pinballmapAbandonedListings);
+      expect(rows).toHaveLength(0);
+    });
+
+    it("refuses to clear when the lineup is empty but PBM reports machines present", async () => {
+      // A broken or renamed payload: `parseLocation` defaults `lmxes` to `[]`
+      // when it can't find/parse `location_machine_xrefs`, but a genuine 200
+      // response still carries the real `machine_count`. Treating this as "the
+      // location has nothing listed" would wipe every record.
+      const db = await getTestDb();
+      const { reconcileAfterSync } = await import("~/lib/pinballmap/sync");
+
+      const machine = createTestMachine({
+        initials: "GZF",
+        name: "Godzilla",
+        pinballmapMachineId: 6222,
+      });
+      await db.insert(machines).values(machine);
+      await db.insert(pinballmapAbandonedListings).values({
+        machineId: machine.id,
+        lmxId: 4471,
+        pinballmapMachineId: 6221,
+      });
+
+      await db.insert(pinballmapState).values({
+        id: "singleton",
+        locationId: 26454,
+        enabled: true,
+        snapshotJson: {
+          ...snapshotWith([]),
+          machineCount: 12,
+        },
+        lastSyncStatus: "ok",
+      });
+
+      const result = await reconcileAfterSync();
+
+      expect(result.abandonmentsCleared).toBe(0);
+      const rows = await db.select().from(pinballmapAbandonedListings);
+      expect(rows).toHaveLength(1);
+    });
+
+    it("clears everything when the lineup is genuinely empty", async () => {
+      // Zero lmxes AND a zero machine count from PBM itself — a real, empty
+      // location, not a broken payload. Every stale record clears.
+      const db = await getTestDb();
+      const { reconcileAfterSync } = await import("~/lib/pinballmap/sync");
+
+      const machine = createTestMachine({
+        initials: "GZG",
+        name: "Godzilla",
+        pinballmapMachineId: 6222,
+      });
+      await db.insert(machines).values(machine);
+      await db.insert(pinballmapAbandonedListings).values({
+        machineId: machine.id,
+        lmxId: 4471,
+        pinballmapMachineId: 6221,
+      });
+
+      await db.insert(pinballmapState).values({
+        id: "singleton",
+        locationId: 26454,
+        enabled: true,
+        snapshotJson: snapshotWith([]),
+        lastSyncStatus: "ok",
+      });
+
+      const result = await reconcileAfterSync();
+
+      expect(result.abandonmentsCleared).toBe(1);
+      const rows = await db.select().from(pinballmapAbandonedListings);
+      expect(rows).toHaveLength(0);
+    });
   });
 });

@@ -1,9 +1,9 @@
 import "server-only";
 
-import { eq, notInArray } from "drizzle-orm";
+import { eq, notInArray, or, sql } from "drizzle-orm";
 
 import { db, type DbTransaction } from "~/server/db";
-import { pinballmapAbandonedListings } from "~/server/db/schema";
+import { machines, pinballmapAbandonedListings } from "~/server/db/schema";
 import { createMachineTimelineEvent } from "~/lib/timeline/machine-events";
 import type { LocationSnapshot } from "./types";
 import type { AbandonedListing } from "./link-columns";
@@ -86,7 +86,11 @@ export async function listAbandonedForMachine(
 
 /**
  * Drop records whose entry is no longer on the lineup — someone removed it by
- * hand on pinballmap.com, which is the only cleanup path this bead ships.
+ * hand on pinballmap.com — OR whose lmx a listed machine has since reclaimed
+ * (most often auto-link re-capturing the entry under a different, or the same,
+ * title). The reclaim check runs regardless of lineup presence: the entry is
+ * typically still ON the synced lineup when this fires, since the reclaiming
+ * machine is the one now holding it live.
  *
  * MUST only be called with a freshly synced snapshot. Called from
  * `reconcileAfterSync` (PP-l81u), gated on both its call sites having a
@@ -101,18 +105,50 @@ export async function clearResolvedAbandonments(
 ): Promise<number> {
   const liveLmxIds = snapshot.lmxes.map((l) => l.id);
 
-  // An empty lineup is a legitimate state (a location with nothing listed), so
-  // `notInArray` against an empty list is not usable — it would clear nothing on
-  // some drivers and everything on others. Branch explicitly.
-  const cleared =
-    liveLmxIds.length === 0
-      ? await db.delete(pinballmapAbandonedListings).returning({
-          id: pinballmapAbandonedListings.id,
-        })
-      : await db
-          .delete(pinballmapAbandonedListings)
-          .where(notInArray(pinballmapAbandonedListings.lmxId, liveLmxIds))
-          .returning({ id: pinballmapAbandonedListings.id });
+  // A listed machine already holding this lmx has reclaimed it. Left
+  // unhandled, the machine's own card would tell its owner "this entry is
+  // still on Pinball Map — remove it there," and following that instruction
+  // would delete a listing that is live again (CORE-ARCH-012: the notice
+  // implies an action that must not happen).
+  const reclaimedByListedMachine = sql`EXISTS (
+    SELECT 1 FROM ${machines}
+    WHERE ${machines.pinballmapListed}
+      AND ${machines.pinballmapLmxId} = ${pinballmapAbandonedListings.lmxId}
+  )`;
+
+  if (liveLmxIds.length === 0) {
+    // PBM's own `machine_count` is the cross-check `parseLocation` hands us
+    // for free. An empty lineup that ALSO reports zero machines is a
+    // genuinely empty location — safe to clear everything (nothing on it can
+    // be a still-live reclaim either). An empty lineup that reports machines
+    // present is a broken or renamed payload: `parseLocation` defaults
+    // `lmxes` to `[]` and silently drops unparseable xrefs, so this shape is
+    // reachable from a 200 response, not just a failed fetch. Clearing on it
+    // would wipe every record and report cleanup that never happened
+    // (CORE-ARCH-012) — refuse instead, leaving every record for the next
+    // healthy sync to resolve.
+    //
+    // `machineCount` itself falls back to `lmxes.length` when PBM omits the
+    // field — considered, not missed: an omitted count alongside an empty
+    // lineup has nothing to contradict, so it still reads as genuinely empty.
+    if (snapshot.machineCount > 0) {
+      return 0;
+    }
+    const cleared = await db.delete(pinballmapAbandonedListings).returning({
+      id: pinballmapAbandonedListings.id,
+    });
+    return cleared.length;
+  }
+
+  const cleared = await db
+    .delete(pinballmapAbandonedListings)
+    .where(
+      or(
+        notInArray(pinballmapAbandonedListings.lmxId, liveLmxIds),
+        reclaimedByListedMachine
+      )
+    )
+    .returning({ id: pinballmapAbandonedListings.id });
 
   return cleared.length;
 }
