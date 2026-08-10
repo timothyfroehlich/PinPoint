@@ -51,11 +51,37 @@ export function withLmxAdded(
   return { ...snapshot, lmxes, machineCount: lmxes.length };
 }
 
-/** The snapshot with `lmxId` absent. A no-op when it is already gone. */
+/**
+ * The snapshot with the unlisted title's row absent.
+ *
+ * Drops **every** row whose `machineId` is `pinballmapMachineId`, plus any row
+ * whose `id` is `lmxId` — an OR, evaluated over every row, not a lookup with a
+ * fallback. In the ordinary case both predicates point at the same single row.
+ *
+ * Removing by `machineId` and not just by the `id` we deleted is the same rule
+ * `withLmxAdded` applies, for the same reason: PBM gives a title exactly one lmx
+ * at our location, and every consumer resolves it by `machineId`. Filtering on
+ * `id` alone left a re-minted row behind, which `resolveAutoLink` reads as "the
+ * title is still on the lineup" and re-lists within the hour — silently undoing
+ * a human unlist (PP-rnup).
+ *
+ * Consequence worth knowing: if a stored snapshot ever carried two rows for one
+ * title — a PBM anomaly, since find-or-create should prevent it — both go, while
+ * only one was deleted on PBM. The local snapshot then understates the lineup
+ * until the next hourly sync re-fetches it. That is the safer direction: the
+ * opposite error re-lists a cabinet a human just withdrew.
+ *
+ * Passing `pinballmapMachineId: null` narrows it to the `id` match alone.
+ */
 export function withLmxRemoved(
   snapshot: LocationSnapshot,
-  lmxId: number
+  lmxId: number,
+  pinballmapMachineId: number | null
 ): LocationSnapshot {
-  const lmxes = snapshot.lmxes.filter((l) => l.id !== lmxId);
+  const lmxes = snapshot.lmxes.filter(
+    (l) =>
+      l.id !== lmxId &&
+      (pinballmapMachineId === null || l.machineId !== pinballmapMachineId)
+  );
   return { ...snapshot, lmxes, machineCount: lmxes.length };
 }
