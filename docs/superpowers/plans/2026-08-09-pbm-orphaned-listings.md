@@ -20,7 +20,8 @@
 - **Never reach pinballmap.com from tests** (CORE-PBM-001, CORE-TEST-006). Mock `~/lib/pinballmap/client` at its seam.
 - **ts-strictest** (CORE-TS-007). No `any`, no `!` non-null assertion, no unsafe `as`.
 - **Path alias `~/`** for every internal import (CORE-TS-008).
-- **`pnpm run check` before every commit** (~9s). It does **not** run unit tests — run `pnpm run test` too when a task touched testable logic.
+- **`pnpm run check` before every commit** (~9s). It does **not** run unit tests — run the unit suite too when a task touched testable logic.
+- **`pnpm run test -- <path>` does NOT filter** in this repo — it runs all ~2100 unit tests regardless of the path. For a single file use `pnpm exec vitest run --project unit --no-color <path>`. (Found by the Task 2 implementer, 2026-08-09.)
 - **Escape parens in shell paths**: `src/app/\(app\)/m/actions.ts`.
 - **Heavy suites go to Bazzite.** Use the `crabbox` skill for `test:integration`; do not run E2E locally.
 
@@ -403,7 +404,7 @@ describe("resolvePbmLinkColumnsForUpdate", () => {
 Run:
 
 ```bash
-pnpm run test -- src/lib/pinballmap/link-columns.test.ts
+pnpm exec vitest run --project unit --no-color src/lib/pinballmap/link-columns.test.ts
 ```
 
 Expected: FAIL — `resolvePbmLinkColumnsForCreate` is not exported.
@@ -619,7 +620,7 @@ Leave the auto-link block that follows unchanged.
 Run:
 
 ```bash
-pnpm run test -- src/lib/pinballmap/link-columns.test.ts
+pnpm exec vitest run --project unit --no-color src/lib/pinballmap/link-columns.test.ts
 pnpm run check
 ```
 
@@ -1103,7 +1104,7 @@ Run:
 
 ```bash
 FORCE_MEM_PRECHECK=skip pnpm exec vitest run --project integration --no-color --max-workers=2 src/test/integration/pinballmap-retitle-abandonment.test.ts
-pnpm run test -- src/lib/pinballmap/link-columns.test.ts
+pnpm exec vitest run --project unit --no-color src/lib/pinballmap/link-columns.test.ts
 pnpm run check
 ```
 
@@ -1317,7 +1318,7 @@ describe("abandoned listings", () => {
 Run:
 
 ```bash
-pnpm run test -- "src/app/(app)/m/[initials]/(tabs)/machine-pinballmap-card.test.tsx"
+pnpm exec vitest run --project unit --no-color "src/app/(app)/m/[initials]/(tabs)/machine-pinballmap-card.test.tsx"
 ```
 
 Expected: FAIL — `abandoned` is not a prop.
@@ -1385,7 +1386,7 @@ Check `getCatalogEntry`'s return type before writing the fallback — if `name` 
 Run:
 
 ```bash
-pnpm run test -- "src/app/(app)/m/[initials]/(tabs)/machine-pinballmap-card.test.tsx"
+pnpm exec vitest run --project unit --no-color "src/app/(app)/m/[initials]/(tabs)/machine-pinballmap-card.test.tsx"
 pnpm run check
 ```
 
