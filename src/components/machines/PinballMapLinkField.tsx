@@ -237,9 +237,9 @@ export function PinballMapLinkField({
    * a failed or empty resolve made that window permanent.
    *
    * So until the user actually changes something, submit the STORED link. If
-   * its catalog row has since disappeared, `resolvePbmLinkColumns` rejects the
-   * save with "no longer in the catalog — search again", which is the honest
-   * failure (CORE-ARCH-012) rather than a silent wipe.
+   * its catalog row has since disappeared, `resolvePbmLinkColumnsForUpdate`
+   * rejects the save with "no longer in the catalog — search again", which is
+   * the honest failure (CORE-ARCH-012) rather than a silent wipe.
    */
   const submittedId = userChanged ? resolvedId : defaultMachineId;
 

@@ -22,7 +22,10 @@ import {
   invitedUsers,
 } from "~/server/db/schema";
 import { createMachineSchema, updateMachineSchema } from "./schemas";
-import { resolvePbmLinkColumns } from "~/lib/pinballmap/link-columns";
+import {
+  resolvePbmLinkColumnsForCreate,
+  resolvePbmLinkColumnsForUpdate,
+} from "~/lib/pinballmap/link-columns";
 import {
   captureAutoLink,
   resolveAutoLinkForMachine,
@@ -324,7 +327,7 @@ export async function createMachineAction(
       "You do not have permission to link machines to Pinball Map."
     );
   }
-  const pbm = await resolvePbmLinkColumns(validation.data);
+  const pbm = await resolvePbmLinkColumnsForCreate(validation.data);
   if (!pbm.ok) return err("VALIDATION", pbm.message);
   const pbmColumns = pbm.columns;
 
@@ -687,7 +690,8 @@ export async function updateMachineAction(
         initials: true,
         presenceStatus: true,
         // Needed to decide whether an edit re-targets the PBM link — see the
-        // `pinballmapListed` carry-over at the `resolvePbmLinkColumns` call.
+        // `pinballmapListed` carry-over at the `resolvePbmLinkColumnsForUpdate`
+        // call.
         pinballmapMachineId: true,
         pinballmapListed: true,
         pinballmapLmxId: true,
@@ -730,29 +734,13 @@ export async function updateMachineAction(
       }
       // `pinballmapListed` is not an input to this action at all: the edit form
       // renders no control for it, `readPbmLinkFormFields` does not read it, and
-      // `updateMachineSchema` does not accept it (PP-o355.29). It is flipped
-      // only by paths that talk to PBM — `linkPinballmapEntryAction` and the
-      // verify/heal action. So the value below comes from the STORED row, and
-      // without this carry-over `resolvePbmLinkColumns` would default it to
-      // `false` — silently unlisting a listed machine on every unrelated "Save
-      // details" (PP-o355.19 review).
-      //
-      // Carry the stored value only while the link target is unchanged;
-      // re-targeting the link makes the old listing meaningless, and the
-      // resolver already forces `false` on the unlinked/excluded branches.
-      const submittedPbmId = validation.data.pinballmapMachineId ?? null;
-      const linkUnchanged =
-        submittedPbmId === currentMachine.pinballmapMachineId;
-      const pbm = await resolvePbmLinkColumns({
-        ...validation.data,
-        ...(linkUnchanged && currentMachine.pinballmapListed
-          ? {
-              pinballmapListed: true,
-              ...(currentMachine.pinballmapLmxId === null
-                ? {}
-                : { pinballmapLmxId: currentMachine.pinballmapLmxId }),
-            }
-          : {}),
+      // `updateMachineSchema` does not accept it (PP-o355.29). The resolver
+      // takes the STORED row and owns the carry-over decision, so no caller can
+      // unlist a machine by leaving an argument out (PP-l81u).
+      const pbm = await resolvePbmLinkColumnsForUpdate(validation.data, {
+        pinballmapMachineId: currentMachine.pinballmapMachineId,
+        pinballmapListed: currentMachine.pinballmapListed,
+        pinballmapLmxId: currentMachine.pinballmapLmxId,
       });
       if (!pbm.ok) return err("VALIDATION", pbm.message);
       pbmColumns = pbm.columns;

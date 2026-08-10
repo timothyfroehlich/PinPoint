@@ -3,36 +3,75 @@ import type { MachinePbmColumns } from "~/services/machines";
 import { getCatalogEntry } from "./catalog";
 import { validatePbmLinkSelection } from "./linking";
 
-export type ResolvePbmLinkResult =
-  { ok: true; columns: MachinePbmColumns } | { ok: false; message: string };
-
-/**
- * Resolve a machine's PinballMap columns from a submitted link selection.
- *
- * Enforces the mutual-exclusion + (flag-gated) requirement via
- * {@link validatePbmLinkSelection}, and — crucially — derives model metadata
- * (manufacturer/year/OPDB/IPDB) from the local catalog mirror rather than
- * trusting the caller. Returns the full column set so create and edit
- * inserts/updates can spread it; the submitted state is authoritative (clearing
- * the picker unlinks, which is how re-link/unlink works).
- *
- * Shared by the machine server actions and the MCP `add_machine` tool. Reads the
- * catalog mirror only — never reaches pinballmap.com (CORE-PBM-001).
- *
- * `pinballmapListed` / `pinballmapLmxId` are the exception to "the submitted
- * state is authoritative": they are never submitted. No caller may derive them
- * from a request body (PP-o355.29) — they describe a listing that exists on the
- * public map, so they come from the stored row (the carry-over in
- * `updateMachineAction`) or from a path that just talked to PBM. Omitting them
- * unlists, which is the safe default for a caller that does not know.
- */
-export async function resolvePbmLinkColumns(input: {
+/** The submitted link selection. Listing state is never part of it (PP-o355.29). */
+export interface PbmLinkSelection {
   pinballmapMachineId?: number | undefined;
   pinballmapExcluded?: boolean | undefined;
   pinballmapExcludedReason?: string | undefined;
-  pinballmapListed?: boolean | undefined;
-  pinballmapLmxId?: number | undefined;
-}): Promise<ResolvePbmLinkResult> {
+}
+
+/** The stored machine's PBM state, read from the row — never from a request. */
+export interface StoredPbmLinkState {
+  pinballmapMachineId: number | null;
+  pinballmapListed: boolean;
+  pinballmapLmxId: number | null;
+}
+
+/** A live PinballMap entry the machine no longer claims (PP-l81u). */
+export interface AbandonedListing {
+  lmxId: number;
+  pinballmapMachineId: number;
+}
+
+export type ResolvePbmLinkResult =
+  { ok: true; columns: MachinePbmColumns } | { ok: false; message: string };
+
+export type ResolvePbmLinkUpdateResult =
+  | { ok: true; columns: MachinePbmColumns; abandoned: AbandonedListing | null }
+  | { ok: false; message: string };
+
+/**
+ * Resolve PBM columns for a machine being CREATED.
+ *
+ * Takes no listing state, because a machine that does not exist yet cannot
+ * already be on the public map. The hazard the old shared signature carried —
+ * omitting listing state and silently unlisting — is removed by construction
+ * here rather than by a caller remembering a rule.
+ */
+export async function resolvePbmLinkColumnsForCreate(
+  input: PbmLinkSelection
+): Promise<ResolvePbmLinkResult> {
+  return resolveCore(input, {
+    pinballmapMachineId: null,
+    pinballmapListed: false,
+    pinballmapLmxId: null,
+  }).then((result) =>
+    result.ok ? { ok: true, columns: result.columns } : result
+  );
+}
+
+/**
+ * Resolve PBM columns for a machine being UPDATED.
+ *
+ * Takes the STORED row and decides carry-over versus clear itself, so no caller
+ * computes `linkUnchanged` independently (PP-l81u defect 1).
+ *
+ * Returns the columns AND any listing the machine just walked away from. The
+ * abandonment is part of the return value rather than something the caller
+ * works out, because a caller that applies the columns and forgets the record
+ * reintroduces exactly the defect this split closes.
+ */
+export async function resolvePbmLinkColumnsForUpdate(
+  input: PbmLinkSelection,
+  stored: StoredPbmLinkState
+): Promise<ResolvePbmLinkUpdateResult> {
+  return resolveCore(input, stored);
+}
+
+async function resolveCore(
+  input: PbmLinkSelection,
+  stored: StoredPbmLinkState
+): Promise<ResolvePbmLinkUpdateResult> {
   const pinballmapMachineId = input.pinballmapMachineId ?? null;
   const pinballmapExcluded = input.pinballmapExcluded ?? false;
 
@@ -55,12 +94,20 @@ export async function resolvePbmLinkColumns(input: {
     };
   }
 
+  // Carry the stored listing only while the link target is unchanged. Every
+  // other outcome — re-target, excluded, unlinked — leaves the old listing
+  // meaningless for this machine.
+  const linkUnchanged =
+    pinballmapMachineId !== null &&
+    pinballmapMachineId === stored.pinballmapMachineId;
+  const keepsListing = linkUnchanged && stored.pinballmapListed;
+
   const empty: MachinePbmColumns = {
     pinballmapMachineId: null,
     pinballmapExcluded: false,
     pinballmapExcludedReason: null,
     // Listing presupposes a link — only the linked branch below can set it true,
-    // so every not-linked outcome (excluded, or neither) unlists the machine.
+    // so every not-linked outcome unlists the machine.
     pinballmapListed: false,
     // The lmx describes a live PBM listing, so it cannot outlive one. Clearing
     // it here is also what keeps the two lmx CHECK constraints satisfiable.
@@ -79,6 +126,7 @@ export async function resolvePbmLinkColumns(input: {
         pinballmapExcluded: true,
         pinballmapExcludedReason: input.pinballmapExcludedReason ?? null,
       },
+      abandoned: null,
     };
   }
 
@@ -96,24 +144,17 @@ export async function resolvePbmLinkColumns(input: {
       columns: {
         ...empty,
         pinballmapMachineId,
-        // Only a linked machine can be listed on the public map. Callers that
-        // want to preserve an existing listing pass both flags through from the
-        // STORED row (never from form input — see the note above); anyone who
-        // omits them unlists, which is what an unqualified edit should do.
-        pinballmapListed: input.pinballmapListed ?? false,
-        // Keep the lmx only while the listing it identifies survives.
-        pinballmapLmxId:
-          input.pinballmapListed === true
-            ? (input.pinballmapLmxId ?? null)
-            : null,
+        pinballmapListed: keepsListing,
+        pinballmapLmxId: keepsListing ? stored.pinballmapLmxId : null,
         manufacturer: entry.manufacturer,
         year: entry.year,
         opdbId: entry.opdbId,
         ipdbId: entry.ipdbId,
       },
+      abandoned: null,
     };
   }
 
   // Neither linked nor excluded (requirement off): all PBM columns stay empty.
-  return { ok: true, columns: empty };
+  return { ok: true, columns: empty, abandoned: null };
 }
