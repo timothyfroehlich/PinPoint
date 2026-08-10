@@ -1,0 +1,149 @@
+import "server-only";
+
+import { createHash } from "node:crypto";
+
+import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { after } from "next/server";
+import { z } from "zod";
+
+import { dispatchNotification } from "~/lib/notifications";
+import { checkPermission } from "~/lib/permissions/helpers";
+import { plainTextToDoc } from "~/lib/tiptap/types";
+import { addIssueComment } from "~/services/issues";
+
+import {
+  issueUrl,
+  McpToolError,
+  resolveIssue,
+  runTool,
+  type ToolOutcome,
+} from "./shared";
+import type { McpAuthContext } from "~/lib/mcp/verify-token";
+
+/** Retries inside this window resolve to the comment already posted. */
+const RETRY_WINDOW_MS = 10 * 60 * 1000;
+
+/**
+ * The joiner for the idempotency key's field parts: a NUL, written as the
+ * `\u0000` ESCAPE and never as a literal byte. A literal NUL in the source makes
+ * the whole file binary to the toolchain — `git diff` reports "Binary files
+ * differ" so the file is unreviewable, and `rg` skips it in directory searches,
+ * which silently drops it out of every future codebase sweep. `create_issue`'s
+ * key uses the same escape.
+ */
+const KEY_SEPARATOR = "\u0000";
+
+const addIssueCommentSchema = z.object({
+  machine: z
+    .string()
+    .trim()
+    .min(1)
+    .describe("Machine initials (case-insensitive) or UUID."),
+  number: z
+    .number()
+    .int()
+    .min(1)
+    .describe("The issue number within that machine, as shown in its URL."),
+  comment: z
+    .string()
+    .trim()
+    .min(1)
+    .max(10_000)
+    .describe("The comment text. Plain text — markdown is not rendered."),
+});
+
+type AddIssueCommentArgs = z.infer<typeof addIssueCommentSchema>;
+
+/**
+ * Content-addressed idempotency key, the same scheme as `create_issue`'s.
+ *
+ * NUL-joined so no field's content can impersonate a boundary between two
+ * others ("ab" + "c" must not hash the same as "a" + "bc").
+ */
+export function createCommentIdempotencyKey(
+  issueId: string,
+  comment: string,
+  userId: string,
+  now: number
+): string {
+  const parts = [
+    issueId,
+    comment,
+    userId,
+    String(Math.floor(now / RETRY_WINDOW_MS)),
+  ];
+  const digest = createHash("sha256")
+    .update(parts.join(KEY_SEPARATOR))
+    .digest();
+
+  // Take the leading 16 bytes and stamp the version (8) and RFC 4122 variant
+  // bits in place, then render the canonical 8-4-4-4-12 form.
+  const bytes = digest.subarray(0, 16);
+  bytes[6] = ((bytes[6] ?? 0) & 0x0f) | 0x80;
+  bytes[8] = ((bytes[8] ?? 0) & 0x3f) | 0x80;
+  const hex = bytes.toString("hex");
+  return [
+    hex.slice(0, 8),
+    hex.slice(8, 12),
+    hex.slice(12, 16),
+    hex.slice(16, 20),
+    hex.slice(20, 32),
+  ].join("-");
+}
+
+export async function runAddIssueComment(
+  args: AddIssueCommentArgs,
+  ctx: McpAuthContext
+): Promise<ToolOutcome> {
+  if (!checkPermission("comments.add", ctx.accessLevel)) {
+    throw new McpToolError("denied", "You cannot comment on issues.");
+  }
+
+  const issue = await resolveIssue(args.machine, args.number);
+
+  const { comment, deliveryPlan, deduped } = await addIssueComment({
+    issueId: issue.id,
+    content: plainTextToDoc(args.comment),
+    userId: ctx.userId,
+    idempotencyKey: createCommentIdempotencyKey(
+      issue.id,
+      args.comment,
+      ctx.userId,
+      Date.now()
+    ),
+  });
+
+  after(() => dispatchNotification(deliveryPlan));
+
+  return {
+    result: {
+      // Whether this call actually wrote anything. `deduped` comes from the
+      // service explicitly — NOT from an empty delivery plan, which a genuinely
+      // new comment also produces when the commenter is the only watcher or no
+      // channels are configured. Reporting a real write as "already posted" is
+      // the same honest-failure violation as the reverse (CORE-ARCH-012).
+      created: !deduped,
+      commentId: comment.id,
+      machine: issue.machineInitials,
+      number: issue.issueNumber,
+      url: issueUrl(issue.machineInitials, issue.issueNumber),
+    },
+    issueId: issue.id,
+  };
+}
+
+export function registerAddIssueComment(server: McpServer): void {
+  server.registerTool(
+    "add_issue_comment",
+    {
+      title: "Comment on an issue",
+      description:
+        "Post a comment on an issue, attributed to the authenticated user. Identify the issue by machine (initials or UUID) plus the issue number shown in its URL and returned by list_issues, get_machine, and create_issue. Plain text only — markdown is not rendered. Retrying an identical comment shortly after one usually resolves to the comment already posted instead of a duplicate — check 'created' in the response: false means nothing new was written, so report it as already posted rather than as a new comment.",
+      inputSchema: addIssueCommentSchema.shape,
+    },
+    (args, extra) =>
+      runTool("add_issue_comment", extra, (ctx) =>
+        runAddIssueComment(args, ctx)
+      )
+  );
+}
