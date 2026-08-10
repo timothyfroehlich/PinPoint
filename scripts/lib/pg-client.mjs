@@ -36,7 +36,7 @@ export function resolveScriptDatabaseUrl() {
  */
 export function createScriptClient(
   databaseUrl = resolveScriptDatabaseUrl(),
-  options = {},
+  options = {}
 ) {
   return postgres(databaseUrl, { ...options, prepare: false });
 }

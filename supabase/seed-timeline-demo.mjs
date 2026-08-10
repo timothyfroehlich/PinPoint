@@ -126,9 +126,7 @@ async function run() {
       authorId,
       doc: {
         type: "doc",
-        content: [
-          { type: "paragraph", content: [{ type: "text", text }] },
-        ],
+        content: [{ type: "paragraph", content: [{ type: "text", text }] }],
       },
     });
 

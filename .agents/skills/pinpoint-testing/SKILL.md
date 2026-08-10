@@ -1,6 +1,6 @@
 ---
 name: pinpoint-testing
-description: Which layer catches which class of bug, and where the coverage for each class already lives — the bug-class table AGENTS.md routes to, the canonical file per class so new tests extend rather than duplicate, and the "Test What We Own" boundary with its casework. Use when deciding what layer a new test belongs at, before creating a new test file, when tempted to synthesize a third party's internal state in a test, or when reviewing whether a PR picked the right layer. Playwright technique lives in `pinpoint-e2e`; the rules themselves are `CORE-TEST-*` in `docs/NON_NEGOTIABLES.md`; which commands to run is AGENTS.md §5.
+description: Which layer catches which class of bug, and where the coverage for each class already lives — the bug-class table AGENTS.md routes to, the canonical file per class so new tests extend rather than duplicate, and the "Test What We Own" boundary with its casework. Also the one mocking pattern worth knowing — forwarding `~/server/db` to the worker-scoped PGlite instance rather than handing a test canned rows. Use when deciding what layer a new test belongs at, before creating a new test file, when reaching for a mock of the database or an ORM, when tempted to synthesize a third party's internal state in a test, or when reviewing whether a PR picked the right layer. Playwright technique lives in `pinpoint-e2e`; the rules themselves are `CORE-TEST-*` in `docs/NON_NEGOTIABLES.md`; which commands to run is AGENTS.md §5.
 ---
 
 # PinPoint Testing

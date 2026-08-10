@@ -3,7 +3,7 @@
  *
  * Verifies the profile page is reachable from the settings "View your public
  * profile →" link and that the user's name heading is visible.
- * Full edit-journey coverage is in e2e/profiles/profile-edit.spec.ts.
+ * Full edit-journey coverage is in e2e/full/profile-edit.spec.ts.
  */
 
 import { test, expect } from "@playwright/test";

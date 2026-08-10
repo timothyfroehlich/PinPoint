@@ -57,7 +57,8 @@
 export const ACTION_FILENAME_PATTERN = /^(?:actions|.*-actions?)\.ts$/;
 
 /** Shared (non-route-local) actions live here and are exempt from the basename rule. */
-export const SHARED_ACTIONS_DIR_PATTERN = /(?:^|[/\\])src[/\\]server[/\\]actions[/\\]/;
+export const SHARED_ACTIONS_DIR_PATTERN =
+  /(?:^|[/\\])src[/\\]server[/\\]actions[/\\]/;
 
 export const SERVER_ACTION_FILE_NAMING_MESSAGE =
   'A module with a top-level "use server" directive must be named ' +

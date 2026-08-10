@@ -45,8 +45,7 @@ const databaseUrl = resolveScriptDatabaseUrl();
 //   ALLOW_NONLOCAL_BACKFILL=1 node --env-file=<prod-env> supabase/seed-timeline-backfill.mjs
 {
   const url = new URL(databaseUrl);
-  const isLocal =
-    url.hostname === "localhost" || url.hostname === "127.0.0.1";
+  const isLocal = url.hostname === "localhost" || url.hostname === "127.0.0.1";
   if (!isLocal && !process.env.ALLOW_NONLOCAL_BACKFILL) {
     console.error(
       `❌ seed-timeline-backfill refuses non-local DB (${url.hostname}) without ALLOW_NONLOCAL_BACKFILL=1`

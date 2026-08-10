@@ -21,8 +21,7 @@ import { parseArgs } from "util";
 const INTERNAL_DOMAIN = "pinpoint.internal";
 
 function generatePassword() {
-  const chars =
-    "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
   const bytes = randomBytes(16);
   return Array.from(bytes, (b) => chars[b % chars.length]).join("");
 }
