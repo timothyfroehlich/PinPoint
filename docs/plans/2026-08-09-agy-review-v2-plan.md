@@ -681,3 +681,73 @@ Rejected categories, so the survey is not re-run: docs-only PRs (14 of them — 
 are prose-accuracy, not code defects, and #1820's ten findings are all docs fact-checking),
 zero-finding or trivial-depth reviews (14), dependency bumps (6), and the meta-PRs about this
 review system itself (#1811, #1854), which are a bad blind target for obvious reasons.
+
+### v6 measured: the failure moved, which is the whole point of the new harness
+
+Three runs, two targets, two model families, all on the same prompt version.
+
+| run            | target              | known defects | found | near miss | false positives |
+| :------------- | :------------------ | ------------: | ----: | --------: | --------------: |
+| Gemini 3.1 Pro | #1856 @ `a5b19d75`  |             3 |     — |         — |               — |
+| Opus 4.6       | #1856 @ `a5b19d75`  |             3 | **0** |     **3** |               1 |
+| Gemini 3.1 Pro | #1807 @ `74849f897` |             3 | **2** |         0 |               0 |
+
+The Gemini #1856 row is empty because that run never happened: all five subagents were
+canceled on command rules and it returned `needs-attention` with five entries in
+`blocked_slices` and no findings. It failed honestly — no fabricated review, which is the
+"you may not approve a review you did not receive" rule doing its job — but it measures the
+permission surface, not the reviewer. **A run that comes back empty needs `blocked_slices`
+read before anything is concluded about the model or the prompt.**
+
+### #1807: the Expect obligation works, on the class it was built for
+
+Two of three, and all three defects on this target are absence. Both hits came out of the
+expectation list rather than out of reading the code. The slice generated "the drain
+documentation must tell the caller how to handle un-actionable items to avoid infinite loops"
+before opening the descriptions, then traced a caller through a fleet sweep and landed on the
+defect exactly as the fix commit describes it: the sweep spins forever on the one machine
+nobody can link. The same list caught the second defect, the tool-level and parameter-level
+descriptions disagreeing with the more prominent one wrong.
+
+The third was owned by a slice that never ran, and was reported as blocked rather than
+silently dropped.
+
+**The review found both and then failed to report them.** `findings` came back empty, with
+the defects written out in `coverage` and paraphrased in `summary`, because the subagent could
+not pin them to a diff line — the anchoring rule said to put an unanchorable problem in
+`summary`, and it did. That rule has been changed: an unanchorable finding is still a finding,
+with `line: null`. A defect parked in prose the author skims is a defect that does not get
+fixed.
+
+### #1856: every known defect was correctly anticipated and then wrongly cleared
+
+Opus scored zero, and the expectation lists say why. The lifecycle slice generated, before
+reading any implementation:
+
+- "The abandoned listing is reclaimed by a machine in PinPoint" — this is defect A2.
+- "The abandoned listing is removed by a human on the PBM website" — this is A1's clear
+  condition.
+
+and the test slice generated "test database isolation for parallel workers avoids
+cross-contamination", which is A3. **All three were marked `implemented`.**
+
+So the obligation did its job — the right question was asked in all three cases — and the
+failure moved one step downstream, from "never thought to look" to "looked and concluded
+wrong". That is a different and far more tractable problem, and it is only visible because the
+answer key names where each defect lives. Scoring against a review write-up would have shown
+0 of 3 and nothing else.
+
+The fix is structural rather than more instruction: an item marked `implemented` must now cite
+the file and line implementing it, and the verdict is `unverified` when it cannot. A verdict
+that costs nothing to assert gets asserted.
+
+Opus also raised, at `high` and confidence 1.0, the cascade-delete finding that a real
+reviewer had explicitly declined at this tree as out of scope by spec decision. One precision
+failure against zero on the other target.
+
+### The permission surface is part of the reviewer
+
+Both Gemini runs and three of Opus's five subagents lost turns to canceled commands, and the
+recurring shapes were pipes and `grep`. `command(grep)` is now granted — reviewers reach for
+it constantly and it cannot write — and both skills now say that `a | b` is refused as a unit
+exactly like `a && b`. This is not incidental: on #1856 it cost an entire five-slice wave.
