@@ -354,3 +354,330 @@ The general shape of the miss is worth remembering: the slice existed, its brief
 database rules explicitly, and the subagent still reported clean because it judged from
 recall instead of opening the file. Naming a concern is not the same as making the reviewer
 read something.
+
+## Second calibration: PR #1851 (2026-08-10)
+
+MCP issue tools, `gemini-3.6-flash-high`, five slices, both waves clean
+(`status: SUCCESS`, `blocked_slices: []`, 370s and 125s).
+
+Ground truth: Tim's `/code-review high`, **5 findings**. agy returned **2**, both surviving
+refutation. **Overlap: 1 by location, 0 by diagnosis.**
+
+| Tim's finding                                                                                         | agy                                                                                                                |
+| :---------------------------------------------------------------------------------------------------- | :----------------------------------------------------------------------------------------------------------------- |
+| `add-issue-comment.ts` — a literal `0x00` byte makes the file binary to git and `rg`                  | **same line, wrong bug** — claimed `.join(" ")` causing hash collisions                                            |
+| `get-issue.ts:88` — `asc` + `limit` returns the _oldest_ N and drops the newest, no truncation signal | missed                                                                                                             |
+| `update-issue.ts:254` — raw internal error text relayed to the client, `reportError` never called     | missed                                                                                                             |
+| `update-issue.ts:274` — a partially-failed update is audited as `outcome: "ok"`                       | missed                                                                                                             |
+| `update-issue.ts:48` — comment describes an ownership grant `checkPermission` can never fire          | missed                                                                                                             |
+| —                                                                                                     | `update-issue.ts:246` — `changed`/`from` from the pre-loop snapshot (real, but needs a race, and `low` not `high`) |
+
+### Finding 1: refutation cannot fix an observation error
+
+The NUL case is the important one, because **one root cause produced both Tim's finding and
+agy's false positive**. The raw `0x00` renders as nothing in a terminal dump, so agy read
+the joiner as a space, concluded the scheme was space-joined, and derived a sound collision
+argument from a false premise. The prompt had already warned it the file was binary and told
+it to use `cat`/`view_file`; it did, and still misread the byte.
+
+**Then its refuter confirmed it at `stands`.** The refuter shares the finder's blind spot —
+it read the same byte the same wrong way. So the second wave catches _reasoning_ errors and
+is structurally unable to catch an _observation_ error both agents make. That is a real limit
+on what refutation buys, and it means a confident false positive can survive the whole
+pipeline. `cat -v` disproves the claim in one command.
+
+This is the same shape as the "package maxes out at 9.0.5" false positive already recorded
+in agy's skill: sound reasoning, invented premise, high stated confidence. The generalisation
+worth adding is that a claim about an exact character, byte, or whitespace must be verified
+with something that renders control characters — never read off a plain dump — and that the
+refuter brief should say so too.
+
+### Finding 2: severity is not calibrated
+
+agy filed a race-dependent, outcome-preserving discrepancy as `high` at confidence 0.95 —
+two levels above where it belongs. Both of its findings were `high`/0.95, which is what a
+model that does not really discriminate looks like. Worth watching across more runs before
+changing the rubric.
+
+### Where this leaves the design
+
+Two calibrations now: **2/4 on #1825, 0/5 on #1851.** The pipeline runs reliably and
+declares its coverage honestly, but it is not yet a second reviewer worth acting on — on
+#1851 a maintainer following it would have chased a non-bug and merged five real ones.
+
+The #1825 result showed sliced fan-out recovers findings a single pass missed. The #1851
+result shows that is not sufficient: every one of Tim's five sat inside a slice agy's own
+subagents owned and reported clean on, and three of them sat in `update-issue.ts`, which the
+"honest failure and partial state" slice covered explicitly while surfacing a weaker fourth
+claim in the same file. The gap is depth within a slice, not slice selection.
+
+### Outcome: one finding landed
+
+`update-issue.ts:246` was accepted and fixed in `0fe73f19` — `assignIssue` now returns
+`{ deliveryPlan, oldAssignedTo, changed }` with `oldAssignedTo` read at the same moment as
+the no-op decision, so callers report the value the write actually replaced rather than one
+from an earlier snapshot. Two tests added, including one simulating the losing side of the
+race. Severity `low` was confirmed by the implementing agent.
+
+So the honest scoreline on #1851 is **0 of the human reviewer's 5, plus 1 real defect the
+human review missed**, plus 1 false positive. Recall against a strong reviewer is the wrong
+sole metric — a second reviewer that finds a disjoint defect has value even at 0 overlap —
+but a pipeline that also emits a confident false positive at 0.95 cannot be handed to a
+maintainer unfiltered.
+
+On scoring the NUL finding: the implementing agent argues it is "a true positive from a
+false premise" rather than a false positive, since the line was right and the byte really
+was the problem. As _written_ the claim is false — the joiner is not a space, there is no
+collision, and acting on the text as given produces the wrong fix. But the distinction
+matters for diagnosis: the reviewer was reacting to a real artifact it could not perceive
+correctly, not hallucinating from nothing.
+
+## v5: the Compare obligation (2026-08-10)
+
+Three changes, from a literature survey of LLM code-review prompting.
+
+**1. A second obligation, `Compare`, alongside `Trace`.** Tracing finds code that is wrong
+and structurally cannot find code that is _missing_ — there is nothing there to read. Every
+slice brief now requires naming and reading **at least two reference targets outside the
+added lines** (a sibling implementing the same pattern, a helper's contract, a caller, other
+call sites of a changed function), returned as `checked_against`. An empty `checked_against`
+invalidates a clean report.
+
+Evidence: **AbsenceBench** (arXiv 2506.11440) — absence detection is an attention-mechanism
+gap, not an effort gap; models fail to identify what is missing even with everything in
+context. **Making Absence Visible** (arXiv 2601.07234) — an explicit reference frame moved
+human detection 31%→88%; prompting alone without the frame did much less.
+
+**2. A `coverage` array, one entry per slice including clean ones.** `findings: []` cannot
+distinguish a slice that looked and found nothing from a slice that never looked. `coverage`
+can, and it is what the dispatcher audits before relaying a clean pass.
+
+**3. Wave 2 moved out of agy onto Sonnet.** A same-family refuter shares the finder's
+misreadings — ours blessed a claim one `cat -v` disproves. agy's own Claude models are a
+generation behind (`claude-sonnet-4-6`), so refutation now runs as Claude Code subagents:
+one per candidate, blind to siblings, carrying an evidence rule ("check the claim, do not
+re-read it") and a downward-only severity pass folded in.
+
+Evidence: **Refute-or-Promote** (arXiv 2604.19049) — ten agents including a senior arbiter
+unanimously confirmed a nonexistent vulnerability, all sharing one wrong assumption; three
+agents made an identical byte-ordering error; _"unanimity should not raise confidence by
+itself"_. Their fix was a cross-model critic plus empirical validation gates. Severity: a
+dedicated downward-only pass corrected 8 of 9 cases.
+
+**Explicitly NOT done: making the slice prompts more elaborate.** Adding
+explanation-and-correction steps to a verification prompt dropped correct verification from
+52.4% to 11.0% (arXiv 2508.12358) — elaboration biases toward assuming defects exist. Every
+change above is structural separation instead.
+
+### v5 result on #1851: 1 of 5, from 0 of 5
+
+All five slices reported with real outside-the-diff references — `matrix.ts`,
+`create-issue.ts`, `list-machines.ts`, `verify-token.ts`, `set-machine-owner.ts`,
+`issues/actions.ts`. In v4 they read almost nothing outside the added lines.
+
+**Recovered: `update-issue.ts:125`** — `checkPermission` runs before `resolveIssue` with no
+`OwnershipContext`, against a matrix where `issues.update.reporting` is conditional on
+ownership for guest. That is the human reviewer's finding 5, and it was found by reading
+`matrix.ts`, exactly the absence-by-reference mechanism the obligation is for.
+
+The `:246` assignee finding returned, now argued against its siblings ("unlike
+`updateIssueTitle`, `updateIssueStatus`, which re-read DB state") — a stronger version of
+the same claim. The NUL false positive also returned, at `medium` rather than `high`.
+
+### The NUL byte has now corrupted four layers
+
+git (file reported binary, whole diff unreviewable), ripgrep (silently skips it without
+`--text`), agy's reader (rendered it as a space, producing a confident false positive its
+own refuter blessed), and finally this session's own prompt construction — building the
+refuter brief, the byte passed through JSON handling and emerged as a space, so the refuter
+received a claim reading "joined with space instead of NUL (`parts.join(' ')`)".
+
+Worth stating plainly because it generalises: **a value that breaks the tools also breaks
+every reviewer downstream of them, including the ones checking each other.** This is why the
+evidence rule has to name specific commands (`cat -v`, `rg --text`) rather than saying
+"verify carefully" — carefully re-reading a corrupted rendering reproduces the corruption.
+
+### v5 wave 2: the cross-family refuter, and what it corrected
+
+Three candidates, three Claude Code Sonnet subagents, each blind to its siblings.
+
+| candidate                               | v4 (Gemini refuter) | v5 (Sonnet refuter)                 |
+| :-------------------------------------- | :------------------ | :---------------------------------- |
+| `add-issue-comment.ts:65` NUL vs space  | `stands`            | **`refuted`, conf 0.98**            |
+| `update-issue.ts:125` ownership context | not raised in v4    | **`narrowed`, medium to low**       |
+| `update-issue.ts:246` assignee snapshot | `stands`            | **no verdict returned** (see below) |
+
+**The NUL refutation is the direct validation of the change.** The Sonnet refuter ran `xxd`
+and `cat -v`, found the literal 0x00, and killed the claim — the same claim the Gemini
+refuter had blessed. It also independently surfaced the _real_ distinction while doing so:
+`create-issue.ts:107` writes the separator as a unicode escape sequence,
+`add-issue-comment.ts:65` writes a raw byte. Same runtime value, different source encoding,
+and the raw byte is what made the file binary.
+
+**The severity pass only ever moved downward**, as instructed: medium to low on a
+reachability argument (the admin-only token gate plus an unconditional `true` in the matrix
+means the ownership-conditional branch is dead on that path), and medium to refuted. Nothing
+was raised.
+
+### Harness fact: a Claude Code refuter can go idle without delivering
+
+Two of four subagent dispatches — both assigned to the `:246` candidate — returned
+`idle_notification` with no verdict, twice each, including after a direct request to resend.
+The other two delivered normally. Cause unknown.
+
+Consequence for the dispatcher: **check that every candidate came back**, the same accounting
+problem `blocked_slices` solves on agy's side. A refuter that silently fails to report looks
+identical to one that had nothing to say, and defaulting a missing verdict to either
+`stands` or `refuted` is wrong.
+
+That candidate's status is known independently anyway — the mechanism was verified by hand,
+and the implementing session accepted it and shipped the fix in `0fe73f19` at `low` severity.
+
+### The NUL byte, layer five
+
+It also broke this session's own tooling twice: once building a refuter brief, where the byte
+passed through JSON handling and reached the subagent rendered as a space, and once writing
+this very section, where a heredoc carrying it was rejected outright as "control characters
+that would be hidden in the approval dialog".
+
+git, ripgrep, agy's reader, a prompt-construction step, and a shell guard. Five layers, five
+different failure modes, from one byte. The lesson for the skill is narrow and worth keeping:
+the evidence rule must name specific commands, because every generic instruction to "check
+carefully" is executed through some rendering, and the rendering is the thing that is lying.
+
+### Scoreline
+
+|                                        | v4  | v5               |
+| :------------------------------------- | :-- | :--------------- |
+| of the human reviewer's 5 findings     | 0   | **1**            |
+| real defects the human review missed   | 1   | 1 (the same one) |
+| false positives surviving the pipeline | 1   | **0**            |
+
+Recall went up and precision went clean. **1 of 5 is still poor.** The pagination defect, the
+error-relay and Sentry gap, and the audit-log gap were missed again, and all three are
+absence-shaped findings inside slices that did report valid outside-the-diff references. So
+the Compare obligation is necessary and not sufficient: naming two references is a floor, and
+these three needed the reviewer to notice a _particular_ absent thing against them.
+
+## v6 — expect before you read, and a calibration harness that does not depend on a review
+
+v5's lesson was that the Compare obligation is necessary and not sufficient. Naming two
+reference files is a floor; the three missed findings all sat in slices that named valid
+references and still did not notice the particular absent thing. So v6 changes two things:
+what the reviewer is obliged to produce, and how we find out whether it worked.
+
+### Calibrate on fix commits, not on posted review comments
+
+Every measurement up to here scored agy against a `/code-review` write-up posted on a PR.
+That has three problems. The findings are only as real as the write-up; there is no way to
+tell "read the right file and drew the wrong conclusion" from "never looked"; and each new
+calibration target costs a human review.
+
+A branch that went through a review round carries the repair in its own history: `fix(...)`
+commits landing after the feature commits, usually restating the finding in the message. For
+such a commit F, the tree at F's **parent** contained exactly the defects F repairs, and F's
+diff is the answer key. The defects are certainly real, because someone fixed them. Their
+location is known, so a near miss is measurable. And the targets are free — a survey of PRs
+#1800–1858 found eight usable ones in an afternoon, from 86 lines to 1,800.
+
+Two traps, both hit while building the first target:
+
+- **A `fix(...)` headline is not a code fix.** Four commits on the #1856 branch begin
+  `docs(pinballmap): fix …` and touch only the plan markdown.
+- **Check out the parent, not the fix.** The obvious reading of "calibrate on the fix commit"
+  reviews the tree that already contains the repair. And when the parent is a merge commit it
+  is fine to check out but wrong to diff from — take the merge base against `origin/main`, or
+  the branch's own work drowns in main's.
+
+The first target is PR #1856 at `a5b19d75`, whose three known defects are ahead of it in
+`21ec03c4`: a clear condition that reads a reissued row id as a removal, an auto-link write
+that does not clear the record it just superseded, and an E2E worker-id collision. Two of the
+three are absence, which is the class being tested.
+
+### The third obligation: Expect first
+
+Before opening the code that implements its concern, a slice must write down what a correct
+implementation would have to contain — from the domain and the change's stated purpose, not
+from the code. For state with a lifecycle that means enumerating every event that should
+create a record and every event that should remove one, as a numbered list, before looking at
+how removal is implemented. For anything consuming a third party's response it means
+enumerating the shapes that response can take before looking at how it is parsed. Then the
+slice checks its list item by item and returns it as `expected`, with a verdict per item —
+implemented, missing, or not applicable.
+
+The ordering is the entire mechanism. Reading the implementation first makes whatever is
+there look like the whole of what should be there, and an absent case leaves nothing on the
+page to attend to. Generating the list first is what puts the missing item somewhere it can
+be seen. This is the same structural-separation shape as Trace and Compare — a distinct
+obligation with a distinct output — and not the elaboration that measurably makes reviewers
+worse.
+
+Two ways a slice fakes it, both checkable by the dispatcher: fewer than four items, or every
+item marked implemented. A list that agrees with the implementation item for item was derived
+from it.
+
+### The negative result: file-level absence scanning does not find condition-level absence
+
+The idea that the dispatcher should precompute an "absence surface" — untouched siblings in
+each touched directory, source modules with no test sibling, call sites of changed exports
+that were not updated — was built and run against #1856. It produced almost nothing usable.
+Section 1 listed 34 untouched E2E specs, which is noise. Section 3 found one call site outside
+the diff, and that was a quoting bug in the script rather than a real one. Section 2's one
+signal — the new module has no unit-test sibling while thirteen of its neighbours do — is a
+false positive, because the module is covered by integration tests instead.
+
+The reason is worth keeping, because it is the same reason the whole problem is hard. All
+three known defects here are **condition-level** absences: a missing clause in a `where`, a
+missing delete inside a transaction, a colliding id in a test. No file-level scan can see
+those, because at file level nothing is missing. What generalises from the idea is not the
+scan but its shape — generate the expectation, then check it — applied to transitions rather
+than to files. That is what the Expect obligation does.
+
+### Holding the model fixed
+
+Every measurement through v5 varied the prompt against `gemini-3.1-pro-high`, so none of them
+says whether the prompt or the model was the binding constraint. v6 is therefore run twice on
+the same slices and the same commit, once on Gemini 3.1 Pro and once on
+`claude-opus-4-6-thinking`. If the two families miss different things, the cheapest recall
+available is running wave 1 twice and unioning the candidates, which costs nothing in design
+and would outrank any further prompt wording.
+
+### Harness: a subagent can go idle without delivering, and the work survives
+
+v5 recorded two of four refuters going idle with no verdict. It happened again here to a
+plain research subagent, which idled without returning a completed survey. Pinging it
+directly produced the whole report.
+
+So the failure is in **delivery, not in the work** — which makes the fix cheap and makes
+silent acceptance expensive. Dispatch refuters synchronously, account for every candidate
+against a returned verdict, and when one is missing, ask for it before writing anything up.
+A background agent that idles is indistinguishable from one that had nothing to say.
+
+### The calibration target set
+
+Surveyed from PRs #1800–1858. "Review SHA" is the commit to check out — always the fix
+commit's parent. Sizes exclude planning docs, generated Drizzle snapshots, and lockfiles.
+
+| #   | PR    | Review SHA  | Fix                      | Known defects       | Src+test | Why it is here                                                            |
+| :-- | :---- | :---------- | :----------------------- | :------------------ | -------: | :------------------------------------------------------------------------ |
+| 1   | #1818 | `87cf3b73c` | `f1e1fae8f`, `6ea681065` | 6 (2 absence)       |    ~1150 | Two fix rounds; stale read-modify-write and a missing revalidate          |
+| 2   | #1851 | `f93611c59` | `0fe73f191`              | 7                   |    ~1783 | Richest set found; the NUL byte lives here                                |
+| 3   | #1825 | `37137622`  | `9759f4928`              | 3 (1 absence, high) |     ~370 | A missing authz check with **no diff pointing at it** — post-merge hotfix |
+| 4   | #1809 | `77d36312b` | `575bf1cb5`              | 4                   |      149 | Smallest with a full round                                                |
+| 5   | #1856 | `a5b19d75`  | `21ec03c4`               | 3 (2 absence)       |    ~1530 | The v6 target                                                             |
+| 6   | #1802 | `4afc2e5e6` | `bafd41e83`              | 3                   |       86 | Cheapest usable probe                                                     |
+| 7   | #1807 | `74849f897` | `eda30504d`              | 3, **all absence**  |      286 | Directly on the failing class, at almost no cost                          |
+| 8   | #1838 | `34ffe86a8` | `15c8780b0`              | 3 (2 absence)       |      647 | Hook tooling, not app code — use only if that is acceptable               |
+
+Three of these are worth more than their size suggests. **#1807** is three absence defects in
+one function for 286 lines, which makes it the cheapest direct test of the thing v6 exists to
+fix. **#1825** is a missing `auth.role()` guard in a `SECURITY DEFINER` RPC found _after_
+merge, so there is no diff highlighting the area — it tests whether a reviewer finds a missing
+check without being pointed at the neighbourhood. **#1856** carries two deliberately declined
+findings alongside its three real ones, which makes it the only target that measures
+false-positive discipline and recall at the same time.
+
+Rejected categories, so the survey is not re-run: docs-only PRs (14 of them — their findings
+are prose-accuracy, not code defects, and #1820's ten findings are all docs fact-checking),
+zero-finding or trivial-depth reviews (14), dependency bumps (6), and the meta-PRs about this
+review system itself (#1811, #1854), which are a bad blind target for obvious reasons.
