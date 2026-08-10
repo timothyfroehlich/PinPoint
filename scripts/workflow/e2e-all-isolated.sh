@@ -15,6 +15,16 @@
 # corpus and a third suite has no job. Keep it that way: a new spec goes in
 # full/ or smoke/, never at e2e/ root or in a sibling directory. (PP-8oeq.)
 #
+# Both invocations pass --project=chromium, mirroring the required CI jobs
+# (ci.yml: "E2E Full Tests (Chromium)" and "E2E Smoke Tests (Chromium)"). This
+# is a correctness requirement, not a speed one: the configs declare four
+# browser projects, Playwright runs them concurrently in one process, and
+# several specs write singleton seeded rows (the member's own profile, machine
+# owners, machine settings). Two projects then interleave on the same row and
+# each asserts the other's value — measured, 9 such failures on firefox and
+# Mobile Chrome. Cross-browser coverage is CI's job, where each browser gets
+# its own job and its own database. (PP-stut.)
+#
 # Usage:
 #   bash scripts/workflow/e2e-all-isolated.sh
 #   pnpm run e2e:all
@@ -44,10 +54,10 @@ run_suite() {
     fi
 }
 
-run_suite "full" pnpm exec playwright test --config=playwright.config.full.ts || exit $?
-run_suite "smoke" pnpm exec playwright test --config=playwright.config.smoke.ts || exit $?
+run_suite "full" pnpm exec playwright test --config=playwright.config.full.ts --project=chromium || exit $?
+run_suite "smoke" pnpm exec playwright test --config=playwright.config.smoke.ts --project=chromium || exit $?
 
 echo ""
 echo "═══════════════════════════════════════════════════════════════════"
-echo "✅ All E2E suites passed (full + smoke)"
+echo "✅ All E2E suites passed (full + smoke, chromium)"
 echo "═══════════════════════════════════════════════════════════════════"
