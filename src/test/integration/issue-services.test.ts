@@ -505,6 +505,45 @@ describe("Issue Service Functions (Integration)", () => {
       expect(assignEvent?.authorId).toBe(testUser.id);
     });
 
+    /**
+     * The result reports what the call DID, so no caller has to infer it from a
+     * read of its own.
+     *
+     * assignIssue no-ops when the row already holds the requested assignee, and
+     * a caller comparing against an earlier snapshot cannot see that: it would
+     * report itself as the writer whenever another writer got there first
+     * (CORE-ARCH-012). `oldAssignedTo` is read at the same moment as the
+     * no-op decision, so it is the value the write actually replaced.
+     */
+    it("reports changed and the replaced assignee", async () => {
+      const db = await getTestDb();
+
+      const wrote = await assignIssue({
+        issueId: testIssue.id,
+        assignedTo: testUser2.id,
+        actorId: testUser.id,
+      });
+      expect(wrote).toMatchObject({ changed: true, oldAssignedTo: null });
+
+      const repeat = await assignIssue({
+        issueId: testIssue.id,
+        assignedTo: testUser2.id,
+        actorId: testUser.id,
+      });
+      expect(repeat).toMatchObject({
+        changed: false,
+        oldAssignedTo: testUser2.id,
+      });
+
+      // The no-op wrote nothing at all — no second timeline event.
+      const events = await db.query.issueComments.findMany({
+        where: eq(issueComments.issueId, testIssue.id),
+      });
+      expect(
+        events.filter((e) => e.isSystem && e.eventData?.type === "assigned")
+      ).toHaveLength(1);
+    });
+
     it("should create unassigned timeline event", async () => {
       const db = await getTestDb();
 

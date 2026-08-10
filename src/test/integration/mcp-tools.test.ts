@@ -25,6 +25,7 @@ import {
   timelineEvents,
   userProfiles,
 } from "~/server/db/schema";
+import { docToPlainText } from "~/lib/tiptap/types";
 import { getTestDb, setupTestDb } from "~/test/setup/pglite";
 import type * as NotificationsModule from "~/lib/notifications";
 import type { McpAuthContext } from "~/lib/mcp/verify-token";
@@ -1804,9 +1805,94 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
         { machine: machine.initials, number: 1 },
         ctx("admin", admin)
       );
-      expect((outcome.result as { comments: unknown[] }).comments).toHaveLength(
-        0
+      const result = outcome.result as {
+        comments: unknown[];
+        commentCount: number;
+      };
+      expect(result.comments).toHaveLength(0);
+      // The count query carries the same isSystem filter as the page query — a
+      // count that included the status row would report a thread that the
+      // caller can never see any of.
+      expect(result.commentCount).toBe(0);
+    });
+
+    /**
+     * A truncated thread must keep its TAIL, not its head.
+     *
+     * `asc(createdAt)` + `limit` returns the OLDEST N and silently drops the
+     * newest — on a long thread that hides exactly the comments saying what has
+     * already been done, from the tool whose stated job is to be read before
+     * commenting or updating. `commentCount` and `commentsTruncated` are what
+     * make the omission visible rather than passing for the whole thread
+     * (CORE-ARCH-012).
+     *
+     * The timestamps are written explicitly: three comments posted in a row can
+     * land inside one clock tick, and this test is meaningless if the order it
+     * asserts is the order the rows happened to come back in.
+     */
+    it("returns the newest comments and reports the truncation", async () => {
+      const admin = await makeUser("admin", "Tim", "Froehlich");
+      const machine = await seedMachine({ name: "The Addams Family" });
+      await runCreateIssue(
+        { machine: machine.initials, title: "vault not registering" },
+        ctx("admin", admin)
       );
+      for (const text of ["oldest", "middle", "newest"]) {
+        await runAddIssueComment(
+          { machine: machine.initials, number: 1, comment: text },
+          ctx("admin", admin)
+        );
+      }
+
+      const db = await getTestDb();
+      const rows = await db.query.issueComments.findMany({
+        where: eq(issueComments.isSystem, false),
+        columns: { id: true, content: true },
+      });
+      for (const row of rows) {
+        const text = docToPlainText(row.content);
+        const offset = ["oldest", "middle", "newest"].indexOf(text);
+        await db
+          .update(issueComments)
+          .set({ createdAt: new Date(Date.UTC(2026, 0, 1, 0, offset)) })
+          .where(eq(issueComments.id, row.id));
+      }
+
+      const outcome = await runGetIssue(
+        { machine: machine.initials, number: 1, commentLimit: 2 },
+        ctx("admin", admin)
+      );
+      const result = outcome.result as {
+        commentCount: number;
+        commentsTruncated: boolean;
+        comments: { text: string }[];
+      };
+
+      expect(result.comments.map((c) => c.text)).toEqual(["middle", "newest"]);
+      expect(result.commentCount).toBe(3);
+      expect(result.commentsTruncated).toBe(true);
+    });
+
+    it("reports commentsTruncated: false when the whole thread fits", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine({ name: "Funhouse" });
+      await runCreateIssue(
+        { machine: machine.initials, title: "rudy not talking" },
+        ctx("admin", admin)
+      );
+      await runAddIssueComment(
+        { machine: machine.initials, number: 1, comment: "speaker unplugged" },
+        ctx("admin", admin)
+      );
+
+      const outcome = await runGetIssue(
+        { machine: machine.initials, number: 1 },
+        ctx("admin", admin)
+      );
+      expect(outcome.result).toMatchObject({
+        commentCount: 1,
+        commentsTruncated: false,
+      });
     });
 
     it("throws not_found for an unknown issue number", async () => {
@@ -1967,10 +2053,12 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
     });
 
     /**
-     * A member holds triage but not the "own"-scoped reporting permission on
-     * someone else's issue, so a mixed call must be denied as a whole — and
-     * denied BEFORE anything is written, since the gate runs ahead of the apply
-     * loop.
+     * A guest holds NEITHER permission through the bare access-level check this
+     * tool performs: `issues.update.triage` is flatly false for guests, and
+     * their `issues.update.reporting` grant is the conditional `"own"`, which
+     * `checkPermission` resolves to false without an OwnershipContext. So a
+     * mixed call must be denied as a whole — and denied BEFORE anything is
+     * written, since the gate runs ahead of the apply loop.
      */
     it("denies a mixed update before writing any field", async () => {
       const admin = await makeUser("admin");
@@ -2031,6 +2119,47 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
     });
 
     /**
+     * `changed` for the assignee comes from the service, not from the snapshot
+     * `runUpdateIssue` read before the loop.
+     *
+     * `assignIssue` no-ops when the row already holds the requested assignee,
+     * and it checks that both before and inside its transaction. So if another
+     * writer assigns the same person between our snapshot read and that check,
+     * the service writes nothing while a snapshot comparison would say this
+     * call made the change (CORE-ARCH-012). Simulated here by writing the row
+     * directly, which is exactly what the losing side of that race sees.
+     */
+    it("reports changed: false when the assignee was already set by someone else", async () => {
+      const admin = await makeUser("admin");
+      const tech = await makeUser("technician", "Ada", "Lovelace");
+      const machine = await seedMachine({ name: "Theatre of Magic" });
+      const created = await runCreateIssue(
+        { machine: machine.initials, title: "trunk not opening" },
+        ctx("admin", admin)
+      );
+
+      // The concurrent writer: the row now holds what we are about to request,
+      // while runUpdateIssue's own snapshot will still say unassigned.
+      const db = await getTestDb();
+      await db
+        .update(issues)
+        .set({ assignedTo: tech })
+        .where(eq(issues.id, created.issueId ?? ""));
+
+      const outcome = await runUpdateIssue(
+        { machine: machine.initials, number: 1, assignee: tech },
+        ctx("admin", admin)
+      );
+      const result = outcome.result as {
+        applied: { field: string; from: string | null; changed: boolean }[];
+      };
+
+      expect(result.applied).toEqual([
+        { field: "assignee", from: tech, to: tech, changed: false },
+      ]);
+    });
+
+    /**
      * The partial-application contract, and the reason update_issue returns a
      * success payload instead of an error when a field fails.
      *
@@ -2070,9 +2199,19 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
 
         expect(result.partial).toBe(true);
         expect(result.failed.field).toBe("priority");
-        expect(result.failed.reason).toBe("priority write failed");
+        // The thrown text does NOT pass through. Anything a service throws here
+        // is driver or Postgres text, and this response goes to an MCP client;
+        // `runTool` reduces the errors IT catches the same way, and this path
+        // never reaches runTool.
+        expect(result.failed.reason).not.toContain("priority write failed");
+        expect(result.failed.reason).toContain("priority");
         // severity is applied before priority and must be reported as landed.
         expect(result.applied.map((a) => a.field)).toEqual(["severity"]);
+        // The payload is a success payload, but the AUDIT line is not — a
+        // half-applied write must not be recorded as outcome "ok", since that
+        // log line is the only server-side record of MCP mutations.
+        expect(outcome.auditOutcome).toBe("error");
+        expect(outcome.auditReason).toBe("partial:priority");
 
         const db = await getTestDb();
         const row = await db.query.issues.findFirst({

@@ -6,6 +6,7 @@ import { z } from "zod";
 
 import { ISSUE_STATUS_VALUES } from "~/lib/issues/status";
 import { dispatchNotification, type DeliveryPlan } from "~/lib/notifications";
+import { reportError } from "~/lib/observability/report-error";
 import { checkPermission } from "~/lib/permissions/helpers";
 import {
   assignIssue,
@@ -44,10 +45,20 @@ type UpdatableField = (typeof UPDATABLE_FIELDS)[number];
 /**
  * Which matrix permission each field requires.
  *
- * `issues.update.reporting` covers what a reporter naturally owns — guests hold
- * it on their OWN issues. `issues.update.triage` is the organizational half and
- * starts at member. One blanket check for the whole tool would either deny a
- * legitimate status change or hand out triage rights along with it.
+ * `issues.update.reporting` covers what a reporter naturally owns — title,
+ * status, severity, frequency. `issues.update.triage` is the organizational
+ * half — priority and assignee. One blanket check for the whole tool would
+ * either deny a legitimate status change or hand out triage rights along with
+ * it.
+ *
+ * Both are checked with the caller's access level ALONE, no `OwnershipContext`.
+ * The matrix grants guests `"own"` on `issues.update.reporting`, and
+ * `checkPermission` resolves any conditional value to `false` without a
+ * context — so a guest is denied both halves here, not just triage. That is the
+ * intended reading of this surface rather than an oversight: the MCP caller is
+ * a bearer token acting for one operator, not a person browsing an issue they
+ * filed, and there is no request-scoped reporter identity to compare against.
+ * It fails closed, and the door already requires admin.
  *
  * A `Record` keyed by the field union, so a field added to
  * {@link UPDATABLE_FIELDS} without a permission decision fails to compile
@@ -232,27 +243,46 @@ export async function runUpdateIssue(
         }
         case "assignee": {
           const next = assigneeId ?? null;
-          plans.push(
-            await assignIssue({
-              issueId: issue.id,
-              assignedTo: next,
-              actorId: ctx.userId,
-            })
-          );
+          const result = await assignIssue({
+            issueId: issue.id,
+            assignedTo: next,
+            actorId: ctx.userId,
+          });
+          plans.push(result.deliveryPlan);
+          // `from`/`changed` come from the service, NOT from the `issue`
+          // snapshot read before the loop. assignIssue no-ops when the row
+          // already holds `next`, so a snapshot comparison would report this
+          // call as the one that made the change whenever another writer got
+          // there first (CORE-ARCH-012).
           applied.push({
             field,
-            from: issue.assignedTo,
+            from: result.oldAssignedTo,
             to: next,
-            changed: issue.assignedTo !== next,
+            changed: result.changed,
           });
           break;
         }
       }
     } catch (error) {
-      failure = {
-        field,
-        reason: error instanceof Error ? error.message : "unknown error",
-      };
+      // Handled the way `runTool` handles an error it catches itself: reported
+      // to Sentry, and reduced to a message that carries no driver or Postgres
+      // text. runTool never sees this one — the call still returns a success
+      // payload, because the fields before it are written — so the reporting
+      // has to happen here or a recurring partial write produces no events at
+      // all. An McpToolError's message is already user-facing and curated, so
+      // it passes through as-is.
+      if (error instanceof McpToolError) {
+        failure = { field, reason: error.message };
+      } else {
+        reportError(error, {
+          action: "mcp.tool.update_issue",
+          userId: ctx.userId,
+        });
+        failure = {
+          field,
+          reason: `Changing ${field} failed. The failure has been logged.`,
+        };
+      }
       break;
     }
   }
@@ -261,7 +291,7 @@ export async function runUpdateIssue(
   // inside a service's transaction (CORE-ARCH-011).
   after(() => Promise.all(plans.map((plan) => dispatchNotification(plan))));
 
-  return {
+  const outcome: ToolOutcome = {
     result: {
       machine: issue.machineInitials,
       number: issue.issueNumber,
@@ -275,6 +305,12 @@ export async function runUpdateIssue(
     },
     issueId: issue.id,
   };
+  if (failure) {
+    // A success payload, but not a successful call — the audit line says so.
+    outcome.auditOutcome = "error";
+    outcome.auditReason = `partial:${failure.field}`;
+  }
+  return outcome;
 }
 
 export function registerUpdateIssue(server: McpServer): void {

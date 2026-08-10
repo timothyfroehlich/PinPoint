@@ -45,6 +45,17 @@ export interface ToolOutcome {
   result: unknown;
   machineId?: string;
   issueId?: string;
+  /**
+   * Audit outcome override, for a tool that RETURNS a payload but did not fully
+   * succeed. `update_issue` applies each field in its own transaction, so a
+   * mid-run failure has to come back as a success payload naming what landed —
+   * without this, that call would be logged `outcome: "ok"` and a half-applied
+   * write would leave no trace in the only server-side record of MCP mutations.
+   * Defaults to `"ok"`.
+   */
+  auditOutcome?: "error";
+  /** Short reason paired with {@link auditOutcome} — never raw error text. */
+  auditReason?: string;
 }
 
 function toTextResult(value: unknown): CallToolResult {
@@ -73,9 +84,10 @@ export async function runTool(
       tool: toolName,
       userId: ctx.userId,
       clientId: ctx.clientId,
-      outcome: "ok",
+      outcome: outcome.auditOutcome ?? "ok",
       machineId: outcome.machineId,
       issueId: outcome.issueId,
+      reason: outcome.auditReason,
     });
     return toTextResult(outcome.result);
   } catch (error) {

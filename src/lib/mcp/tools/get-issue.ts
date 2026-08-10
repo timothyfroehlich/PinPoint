@@ -1,11 +1,11 @@
 import "server-only";
 
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, count, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 
 import { checkPermission } from "~/lib/permissions/helpers";
-import { docToPlainText } from "~/lib/tiptap/types";
+import { docToPlainText, type ProseMirrorDoc } from "~/lib/tiptap/types";
 import { db } from "~/server/db";
 import { issueComments, userProfiles } from "~/server/db/schema";
 
@@ -20,6 +20,16 @@ import type { McpAuthContext } from "~/lib/mcp/verify-token";
 
 /** Comments returned when the caller doesn't ask for a count. */
 const DEFAULT_COMMENT_LIMIT = 20;
+
+/** The comment slice returned to the caller, plus the full thread length. */
+interface CommentWindow {
+  rows: {
+    content: ProseMirrorDoc | null;
+    createdAt: Date;
+    author: { name: string } | null;
+  }[];
+  total: number;
+}
 
 const getIssueSchema = z.object({
   machine: z
@@ -39,7 +49,7 @@ const getIssueSchema = z.object({
     .max(100)
     .optional()
     .describe(
-      `Maximum comments to include, oldest first (default ${DEFAULT_COMMENT_LIMIT}).`
+      `How many of the MOST RECENT comments to include (default ${DEFAULT_COMMENT_LIMIT}, max 100). They are returned oldest-first within that window. 'commentCount' reports the full thread length and 'commentsTruncated' says whether older comments were left out.`
     ),
 });
 
@@ -73,21 +83,42 @@ export async function runGetIssue(
   // The thread is a separate permission from the issue body. Omitting it beats
   // denying the whole call — the issue itself is still readable.
   const canReadComments = checkPermission("comments.view", ctx.accessLevel);
-  const commentRows = canReadComments
-    ? await db.query.issueComments.findMany({
-        where: and(
-          eq(issueComments.issueId, issue.id),
-          // System rows carry `eventData`, not prose. Rendering them into
-          // readable history is real work for marginal value: the transitions
-          // they describe are already visible as the issue's current state.
-          eq(issueComments.isSystem, false)
-        ),
+  const commentWhere = and(
+    eq(issueComments.issueId, issue.id),
+    // System rows carry `eventData`, not prose. Rendering them into readable
+    // history is real work for marginal value: the transitions they describe
+    // are already visible as the issue's current state.
+    eq(issueComments.isSystem, false)
+  );
+  const commentLimit = args.commentLimit ?? DEFAULT_COMMENT_LIMIT;
+
+  // Newest-first with the limit, then reversed for display: the WINDOW is the
+  // tail of the thread, not its head. Selecting `asc` + `limit` instead would
+  // return the OLDEST N and drop the newest — on a long thread, hiding exactly
+  // the comments that say what has been done about the issue, from a tool whose
+  // whole job is to be read before commenting or updating.
+  //
+  // `commentCount` is the full thread length, so a truncated window is
+  // detectable rather than passing for the whole thread (CORE-ARCH-012).
+  const loadComments = async (): Promise<CommentWindow> => {
+    const [newestFirst, countRows] = await Promise.all([
+      db.query.issueComments.findMany({
+        where: commentWhere,
         columns: { content: true, createdAt: true },
         with: { author: { columns: { name: true } } },
-        orderBy: (c, { asc }) => [asc(c.createdAt)],
-        limit: args.commentLimit ?? DEFAULT_COMMENT_LIMIT,
-      })
-    : [];
+        orderBy: (c, { desc }) => [desc(c.createdAt)],
+        limit: commentLimit,
+      }),
+      db.select({ value: count() }).from(issueComments).where(commentWhere),
+    ]);
+    return {
+      rows: [...newestFirst].reverse(),
+      total: countRows[0]?.value ?? 0,
+    };
+  };
+  const { rows: commentRows, total: commentCount } = canReadComments
+    ? await loadComments()
+    : { rows: [], total: 0 };
 
   return {
     result: {
@@ -109,6 +140,8 @@ export async function runGetIssue(
       updatedAt: issue.updatedAt.toISOString(),
       closedAt: issue.closedAt?.toISOString() ?? null,
       url: issueUrl(issue.machineInitials, issue.issueNumber),
+      commentCount,
+      commentsTruncated: commentRows.length < commentCount,
       comments: commentRows.map((c) => ({
         author: c.author?.name ?? "Anonymous",
         text: docToPlainText(c.content),
@@ -125,7 +158,7 @@ export function registerGetIssue(server: McpServer): void {
     {
       title: "Get issue detail",
       description:
-        "Get one issue in full — title, description, status, severity, priority, frequency, reporter and assignee names, timestamps, URL, and the comment thread (oldest first). Identify it by machine (initials or UUID) plus the issue number shown in its URL and returned by list_issues, get_machine, and create_issue. Use this before commenting or updating, so you are acting on the issue you think you are. Timeline/system rows are not included in the thread; the issue's current status is what they would describe.",
+        "Get one issue in full — title, description, status, severity, priority, frequency, reporter and assignee names, timestamps, URL, and the comment thread. Identify it by machine (initials or UUID) plus the issue number shown in its URL and returned by list_issues, get_machine, and create_issue. Use this before commenting or updating, so you are acting on the issue you think you are. The thread returns the MOST RECENT comments (20 by default, up to 100 via commentLimit), listed oldest-first within that window; 'commentCount' is the full thread length and 'commentsTruncated' is true when older comments were left out, so raise commentLimit if you need the earlier history. Timeline/system rows are not included in the thread; the issue's current status is what they would describe.",
       inputSchema: getIssueSchema.shape,
     },
     (args, extra) =>

@@ -920,13 +920,31 @@ export async function toggleIssueWatcher({
 }
 
 /**
+ * What an {@link assignIssue} call actually did.
+ *
+ * `changed` and `oldAssignedTo` are reported rather than left for the caller to
+ * infer from a snapshot it read earlier. This function no-ops when the row
+ * already holds `assignedTo`, and it checks that TWICE — once before the
+ * transaction and again inside it — so a caller comparing against its own
+ * earlier read would claim it changed the assignee whenever another writer got
+ * there first (CORE-ARCH-012). Same reason `addIssueComment` returns `deduped`.
+ */
+export interface AssignIssueResult {
+  deliveryPlan: DeliveryPlan;
+  /** The assignee the row held when this call looked, not when the caller did. */
+  oldAssignedTo: string | null;
+  /** Whether this call wrote. False when the row already held `assignedTo`. */
+  changed: boolean;
+}
+
+/**
  * Assign an issue to a user
  */
 export async function assignIssue({
   issueId,
   assignedTo,
   actorId,
-}: AssignIssueParams): Promise<DeliveryPlan> {
+}: AssignIssueParams): Promise<AssignIssueResult> {
   // Pre-transaction no-op check: avoid the cost of resolving channels (HTTP
   // round-trip via getDiscordConfig() Vault decrypt) AND opening a write
   // transaction when the assignment is unchanged (PP-rfc, Copilot follow-up).
@@ -940,7 +958,11 @@ export async function assignIssue({
   }
 
   if (preCheckIssue.assignedTo === assignedTo) {
-    return { deliveries: [] };
+    return {
+      deliveryPlan: { deliveries: [] },
+      oldAssignedTo: preCheckIssue.assignedTo,
+      changed: false,
+    };
   }
 
   // Only resolve channels when a notification will actually fire (a
@@ -975,7 +997,11 @@ export async function assignIssue({
 
     // Re-check inside the transaction in case of a race with another writer.
     if (currentIssue.assignedTo === assignedTo) {
-      return { deliveries: [] };
+      return {
+        deliveryPlan: { deliveries: [] },
+        oldAssignedTo: currentIssue.assignedTo,
+        changed: false,
+      };
     }
 
     // Get new assignee name if assigning to someone
@@ -1073,7 +1099,12 @@ export async function assignIssue({
       });
     }
 
-    return { deliveries };
+    return {
+      deliveryPlan: { deliveries },
+      // Read inside the transaction, so this is the value the write replaced.
+      oldAssignedTo: currentIssue.assignedTo,
+      changed: true,
+    };
   });
 }
 
