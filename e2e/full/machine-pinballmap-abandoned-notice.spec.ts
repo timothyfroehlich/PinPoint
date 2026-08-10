@@ -63,26 +63,30 @@ test.describe("PinballMap abandoned-listing notice (PP-l81u)", () => {
     const newTitleName = `Zz E2E New Title ${prefix}`;
 
     const technicianId = await getProfileIdByEmail("technician@test.com");
-    await createTestMachine(technicianId, initials);
 
-    await seedPinballMapCatalogEntry({
-      pinballmapMachineId: oldTitleId,
-      name: oldTitleName,
-      manufacturer: "E2E Test Co",
-      year: 2020,
-    });
-    await seedPinballMapCatalogEntry({
-      pinballmapMachineId: newTitleId,
-      name: newTitleName,
-      manufacturer: "E2E Test Co",
-      year: 2021,
-    });
-    await linkMachineToPinballMap(initials, {
-      pinballmapMachineId: oldTitleId,
-      pinballmapLmxId: lmxId,
-    });
-
+    // Seeding lives INSIDE the try so the finally actually covers it. A throw
+    // partway through — the second catalog insert, the link — would otherwise
+    // leak a machine and a catalog row into the shared local database, and a
+    // stray catalog row is searchable by the picker in every other spec.
     try {
+      await createTestMachine(technicianId, initials);
+      await seedPinballMapCatalogEntry({
+        pinballmapMachineId: oldTitleId,
+        name: oldTitleName,
+        manufacturer: "E2E Test Co",
+        year: 2020,
+      });
+      await seedPinballMapCatalogEntry({
+        pinballmapMachineId: newTitleId,
+        name: newTitleName,
+        manufacturer: "E2E Test Co",
+        year: 2021,
+      });
+      await linkMachineToPinballMap(initials, {
+        pinballmapMachineId: oldTitleId,
+        pinballmapLmxId: lmxId,
+      });
+
       await page.goto(`/m/${initials}/edit`);
 
       // Retitle: open the catalog picker and choose a different title. Both

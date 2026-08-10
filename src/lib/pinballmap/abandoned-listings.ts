@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, eq, notInArray, or, sql } from "drizzle-orm";
+import { and, eq, isNotNull, notInArray, or, sql } from "drizzle-orm";
 
 import { db, type DbTransaction } from "~/server/db";
 import { machines, pinballmapAbandonedListings } from "~/server/db/schema";
@@ -92,16 +92,22 @@ export async function listAbandonedForMachine(
  * typically still ON the synced lineup when this fires, since the reclaiming
  * machine is the one now holding it live.
  *
- * "No longer on the lineup" needs BOTH the lmx and its title to be gone.
- * PBM row ids move under a live entry — that is the whole reason
+ * "No longer on the lineup" is not the same question as "this row id is gone".
+ * PBM reissues row ids under a live entry — that is the whole reason
  * `reconcileAfterSync` has a HEAL effect ("same title, PBM's row id just moved
  * — a delete + re-add"). Keying the clear on the lmx alone would read that
- * drift as "someone removed it", delete the record, retract the notice and
- * report the removal in `abandonmentsCleared`, while the orphan is still
- * sitting on the public map under a new id (CORE-ARCH-012). Requiring the title
- * to be absent too costs only a false POSITIVE — the notice lingering while
- * some other cabinet's entry for the same title is on the lineup — and a
- * lingering "go look" beats a false "resolved".
+ * drift as "someone removed it", retract the notice and report the removal in
+ * `abandonmentsCleared`, while the orphan is still sitting on the public map
+ * under a new id (CORE-ARCH-012).
+ *
+ * So the record clears when its lmx is off the lineup AND every entry still on
+ * the lineup under its title is claimed by a listed machine. An UNclaimed entry
+ * under that title is the reissued-id case and holds the record open; a claimed
+ * one belongs to a cabinet we know about and says nothing about the orphan.
+ * Checking claimed-ness — rather than the title's mere presence — is what keeps
+ * a second cabinet listed under the same title from pinning the notice open
+ * forever, which matters because duplicate titles are ordinary in a 100+
+ * machine collection and there is deliberately no dismiss control.
  *
  * MUST only be called with a freshly synced snapshot. Called from
  * `reconcileAfterSync` (PP-l81u), gated on both its call sites having a
@@ -115,7 +121,6 @@ export async function clearResolvedAbandonments(
   snapshot: LocationSnapshot
 ): Promise<number> {
   const liveLmxIds = snapshot.lmxes.map((l) => l.id);
-  const liveTitleIds = [...new Set(snapshot.lmxes.map((l) => l.machineId))];
 
   // A listed machine already holding this lmx has reclaimed it. Left
   // unhandled, the machine's own card would tell its owner "this entry is
@@ -128,44 +133,71 @@ export async function clearResolvedAbandonments(
       AND ${machines.pinballmapLmxId} = ${pinballmapAbandonedListings.lmxId}
   )`;
 
-  if (liveLmxIds.length === 0) {
-    // PBM's own `machine_count` is the cross-check `parseLocation` hands us
-    // for free. An empty lineup that ALSO reports zero machines is a
-    // genuinely empty location — safe to clear everything (nothing on it can
-    // be a still-live reclaim either). An empty lineup that reports machines
-    // present is a broken or renamed payload: `parseLocation` defaults
-    // `lmxes` to `[]` and silently drops unparseable xrefs, so this shape is
-    // reachable from a 200 response, not just a failed fetch. Clearing on it
-    // would wipe every record and report cleanup that never happened
-    // (CORE-ARCH-012) — refuse instead, leaving every record for the next
-    // healthy sync to resolve.
-    //
-    // `machineCount` itself falls back to `lmxes.length` when PBM omits the
-    // field — considered, not missed: an omitted count alongside an empty
-    // lineup has nothing to contradict, so it still reads as genuinely empty.
-    if (snapshot.machineCount > 0) {
-      return 0;
-    }
-    const cleared = await db.delete(pinballmapAbandonedListings).returning({
-      id: pinballmapAbandonedListings.id,
-    });
-    return cleared.length;
+  // PBM's own `machine_count` is the cross-check `parseLocation` hands us for
+  // free. An empty lineup that ALSO reports zero machines is a genuinely empty
+  // location. An empty lineup that reports machines present is a broken or
+  // renamed payload: `parseLocation` defaults `lmxes` to `[]` and silently
+  // drops unparseable xrefs, so this shape is reachable from a 200 response,
+  // not just a failed fetch. Treating it as "everything was removed" would
+  // wipe every record and report cleanup that never happened (CORE-ARCH-012).
+  //
+  // `machineCount` itself falls back to `lmxes.length` when PBM omits the
+  // field — considered, not missed: an omitted count alongside an empty lineup
+  // has nothing to contradict, so it still reads as genuinely empty.
+  const payloadIsBroken = liveLmxIds.length === 0 && snapshot.machineCount > 0;
+
+  // Note what the broken payload does NOT suppress: the reclaim clear below.
+  // That one reads only local `machines` — no lineup involved — and it is a
+  // safety clear, retracting an instruction to delete a listing some machine
+  // now depends on. Suppressing it would leave that instruction on screen for
+  // as long as PBM keeps serving the malformed shape.
+  const conditions = [reclaimedByListedMachine];
+
+  if (!payloadIsBroken) {
+    // Entries on the lineup that no listed machine claims. One of these under
+    // an abandoned record's title may BE that record's entry under a reissued
+    // row id, so it holds the record open.
+    const heldLmxIds = new Set(
+      (
+        await db
+          .select({ lmxId: machines.pinballmapLmxId })
+          .from(machines)
+          .where(
+            and(
+              eq(machines.pinballmapListed, true),
+              isNotNull(machines.pinballmapLmxId)
+            )
+          )
+      ).flatMap((row) => (row.lmxId === null ? [] : [row.lmxId]))
+    );
+    const unclaimedTitleIds = [
+      ...new Set(
+        snapshot.lmxes
+          .filter((l) => !heldLmxIds.has(l.id))
+          .map((l) => l.machineId)
+      ),
+    ];
+
+    // An empty lineup carries no entry at all, so every record's entry is gone
+    // — and `notInArray` against `[]` is not a query drizzle will build.
+    const lmxIsGone =
+      liveLmxIds.length === 0
+        ? sql`true`
+        : notInArray(pinballmapAbandonedListings.lmxId, liveLmxIds);
+
+    conditions.push(
+      unclaimedTitleIds.length === 0
+        ? lmxIsGone
+        : sql`${lmxIsGone} AND ${notInArray(
+            pinballmapAbandonedListings.pinballmapMachineId,
+            unclaimedTitleIds
+          )}`
+    );
   }
 
   const cleared = await db
     .delete(pinballmapAbandonedListings)
-    .where(
-      or(
-        and(
-          notInArray(pinballmapAbandonedListings.lmxId, liveLmxIds),
-          notInArray(
-            pinballmapAbandonedListings.pinballmapMachineId,
-            liveTitleIds
-          )
-        ),
-        reclaimedByListedMachine
-      )
-    )
+    .where(or(...conditions))
     .returning({ id: pinballmapAbandonedListings.id });
 
   return cleared.length;

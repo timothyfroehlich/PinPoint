@@ -611,5 +611,88 @@ describe("reconcileAfterSync (PGlite)", () => {
       const rows = await db.select().from(pinballmapAbandonedListings);
       expect(rows).toHaveLength(0);
     });
+
+    it("clears when a SECOND cabinet keeps the title on the lineup", async () => {
+      // Duplicate titles are ordinary in a 100+ machine collection. Machine B
+      // is listed under title 6221 on its own lmx, so the title never leaves
+      // the lineup — but B's entry is claimed, and the abandoned lmx 4471 is
+      // gone, so the orphan really was removed by hand. Keying this on the
+      // title's mere presence would pin the notice open permanently, and there
+      // is deliberately no dismiss control.
+      const db = await getTestDb();
+      const { reconcileAfterSync } = await import("~/lib/pinballmap/sync");
+
+      const retitled = createTestMachine({
+        initials: "GZJ",
+        name: "Godzilla",
+        pinballmapMachineId: 6222,
+      });
+      const sibling = createTestMachine({
+        initials: "GZK",
+        name: "Godzilla the second",
+        pinballmapMachineId: 6221,
+        pinballmapListed: true,
+        pinballmapLmxId: 4472,
+      });
+      await db.insert(machines).values([retitled, sibling]);
+      await db.insert(pinballmapAbandonedListings).values({
+        machineId: retitled.id,
+        lmxId: 4471,
+        pinballmapMachineId: 6221,
+      });
+
+      await db.insert(pinballmapState).values({
+        id: "singleton",
+        locationId: 26454,
+        enabled: true,
+        snapshotJson: snapshotWith([{ id: 4472, machineId: 6221 }]),
+        lastSyncStatus: "ok",
+      });
+
+      const result = await reconcileAfterSync();
+
+      expect(result.abandonmentsCleared).toBe(1);
+      const rows = await db.select().from(pinballmapAbandonedListings);
+      expect(rows).toHaveLength(0);
+    });
+
+    it("still retracts a reclaimed record when the payload is broken", async () => {
+      // The broken-payload refusal above suppresses the "entry was removed"
+      // clear, which needs a trustworthy lineup. It must NOT suppress the
+      // reclaim clear, which reads only local machines: that one exists to
+      // retract an instruction to delete a listing a machine now depends on,
+      // and leaving it up for as long as PBM serves the malformed shape is the
+      // harm it was written to prevent.
+      const db = await getTestDb();
+      const { reconcileAfterSync } = await import("~/lib/pinballmap/sync");
+
+      const reclaimer = createTestMachine({
+        initials: "GZL",
+        name: "Godzilla",
+        pinballmapMachineId: 6221,
+        pinballmapListed: true,
+        pinballmapLmxId: 4471,
+      });
+      await db.insert(machines).values(reclaimer);
+      await db.insert(pinballmapAbandonedListings).values({
+        machineId: reclaimer.id,
+        lmxId: 4471,
+        pinballmapMachineId: 6221,
+      });
+
+      await db.insert(pinballmapState).values({
+        id: "singleton",
+        locationId: 26454,
+        enabled: true,
+        snapshotJson: { ...snapshotWith([]), machineCount: 12 },
+        lastSyncStatus: "ok",
+      });
+
+      const result = await reconcileAfterSync();
+
+      expect(result.abandonmentsCleared).toBe(1);
+      const rows = await db.select().from(pinballmapAbandonedListings);
+      expect(rows).toHaveLength(0);
+    });
   });
 });
