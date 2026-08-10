@@ -112,6 +112,45 @@ describe("resolvePbmLinkColumnsForUpdate", () => {
     expect(result.columns.pinballmapLmxId).toBeNull();
   });
 
+  it("records an abandonment when a listed machine is marked not on Pinball Map (PP-l81u)", async () => {
+    // The entry is still live on pinballmap.com no matter how PinPoint now
+    // classifies the machine — excluding it must not discard the handle.
+    const result = await resolvePbmLinkColumnsForUpdate(
+      { pinballmapExcluded: true, pinballmapExcludedReason: "Homebrew" },
+      {
+        pinballmapMachineId: 6221,
+        pinballmapListed: true,
+        pinballmapLmxId: 4471,
+      }
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.abandoned).toEqual({
+      lmxId: 4471,
+      pinballmapMachineId: 6221,
+    });
+  });
+
+  it("records an abandonment when a listed machine's link is cleared entirely (PP-l81u)", async () => {
+    const result = await resolvePbmLinkColumnsForUpdate(
+      {},
+      {
+        pinballmapMachineId: 6221,
+        pinballmapListed: true,
+        pinballmapLmxId: 4471,
+      }
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.columns.pinballmapMachineId).toBeNull();
+    expect(result.abandoned).toEqual({
+      lmxId: 4471,
+      pinballmapMachineId: 6221,
+    });
+  });
+
   it("rejects a title that has left the catalog", async () => {
     vi.mocked(getCatalogEntry).mockResolvedValue(null);
 

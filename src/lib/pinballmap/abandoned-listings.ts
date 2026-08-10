@@ -15,9 +15,17 @@ import type { AbandonedListing } from "./link-columns";
  * together — a retitle that lands without its record is the bug this closes.
  * Both writes are local, so nothing here violates CORE-ARCH-011.
  *
- * `onConflictDoNothing` on the lmx: two machines cannot both own the cleanup for
- * one entry, and the one-lister index means the second machine was never the
- * lister anyway.
+ * `onConflictDoUpdate` on the lmx: the entry is tracked at most once, but WHICH
+ * machine owns its cleanup can legitimately change over time. Machine A
+ * abandons lmx 4471 (retitles off title 6221); a later save auto-links a
+ * DIFFERENT machine B to that same still-live lmx under title 6221; B later
+ * retitles too, abandoning the same lmx a second time. The one-lister index
+ * (`machines_pinballmap_listed_unique`) only forbids two SIMULTANEOUSLY
+ * listed machines under one title — it says nothing about this sequential
+ * case, so a plain `onConflictDoNothing` would silently leave the record
+ * pointing at A after B is the one who actually walked away from it. Re-point
+ * `machineId` / `pinballmapMachineId` / `createdAt` at whoever abandoned it
+ * most recently.
  */
 export async function recordAbandonedListing(
   tx: DbTransaction,
@@ -32,8 +40,13 @@ export async function recordAbandonedListing(
       lmxId: abandoned.lmxId,
       pinballmapMachineId: abandoned.pinballmapMachineId,
     })
-    .onConflictDoNothing({
+    .onConflictDoUpdate({
       target: pinballmapAbandonedListings.lmxId,
+      set: {
+        machineId,
+        pinballmapMachineId: abandoned.pinballmapMachineId,
+        createdAt: new Date(),
+      },
     });
 
   await createMachineTimelineEvent(
@@ -52,7 +65,12 @@ export async function recordAbandonedListing(
   );
 }
 
-/** Every entry this machine has abandoned and nobody has removed yet. */
+/**
+ * Every entry this machine has abandoned and nobody has removed yet.
+ *
+ * Not called from anywhere in this commit — wired up on the machine's
+ * PinballMap card in Task 5 (PP-l81u).
+ */
 export async function listAbandonedForMachine(
   machineId: string
 ): Promise<{ lmxId: number; pinballmapMachineId: number }[]> {
@@ -70,8 +88,9 @@ export async function listAbandonedForMachine(
  * Drop records whose entry is no longer on the lineup — someone removed it by
  * hand on pinballmap.com, which is the only cleanup path this bead ships.
  *
- * MUST only be called with a freshly synced snapshot. Callers reach this via
- * `reconcileAfterSync`, which both call sites gate on a successful sync; a
+ * MUST only be called with a freshly synced snapshot. Not called from
+ * anywhere in this commit — `reconcileAfterSync` is where Task 4 (PP-l81u)
+ * wires this in, gated on both its call sites having a successful sync; a
  * failed fetch yields a stale lineup, and treating absence there as "cleaned up"
  * would wipe every record and report cleanup nobody performed (CORE-ARCH-012).
  *

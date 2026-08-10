@@ -5,8 +5,10 @@
  * The old title's entry stays live on pinballmap.com, and `lmxId` is the only
  * handle for it. Before this, the retitle discarded it silently. This covers
  * the wiring through `updateMachineAction` (same pattern as
- * `pinballmap-auto-link-on-save.test.ts`); the resolver's abandonment
- * decision rules are unit-tested in `link-columns.test.ts`.
+ * `pinballmap-auto-link-on-save.test.ts`) and the ownership re-attribution
+ * when two different machines abandon the same lmx in sequence. The
+ * resolver's three abandon/don't-abandon decision branches (retitle, mark
+ * excluded, unlink) are unit-tested in `link-columns.test.ts`.
  */
 
 import { describe, it, expect, vi } from "vitest";
@@ -248,5 +250,61 @@ describe("retitling a listed machine", () => {
     });
     expect(after?.pinballmapListed).toBe(true);
     expect(after?.pinballmapLmxId).toBe(4471);
+  });
+
+  it("re-attributes ownership when a different machine later abandons the same lmx", async () => {
+    // A abandons lmx 4471 (title 6221). A later save auto-links a DIFFERENT
+    // machine B to that same still-live lmx under title 6221 — legal, since A's
+    // `pinballmapListed` is now false and the one-lister index only forbids two
+    // SIMULTANEOUS listers. B then abandons the same lmx a second time. The
+    // record must end up owned by B, not silently left pointing at A.
+    const db = await getTestDb();
+    const { updateMachineAction } = await import("~/app/(app)/m/actions");
+    const admin = await createAdmin();
+    await mockAuthAs(admin.id);
+    await seedCatalog();
+
+    const [machineA] = await db
+      .insert(machines)
+      .values({
+        name: "Godzilla A",
+        initials: "GZA",
+        pinballmapMachineId: 6221,
+        pinballmapListed: true,
+        pinballmapLmxId: 4471,
+      })
+      .returning();
+
+    const first = await updateMachineAction(
+      undefined,
+      retitleForm(machineA.id, 6222)
+    );
+    expect(first.ok).toBe(true);
+
+    // Auto-link matches a different cabinet to the now-vacant title 6221 and
+    // captures the same lmx PinPoint just recorded as abandoned.
+    const [machineB] = await db
+      .insert(machines)
+      .values({
+        name: "Godzilla B",
+        initials: "GZB",
+        pinballmapMachineId: 6221,
+        pinballmapListed: true,
+        pinballmapLmxId: 4471,
+      })
+      .returning();
+
+    const second = await updateMachineAction(
+      undefined,
+      retitleForm(machineB.id, 6223)
+    );
+    expect(second.ok).toBe(true);
+
+    const rows = await db
+      .select()
+      .from(pinballmapAbandonedListings)
+      .where(eq(pinballmapAbandonedListings.lmxId, 4471));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.machineId).toBe(machineB.id);
   });
 });

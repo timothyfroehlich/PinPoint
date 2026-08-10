@@ -41,9 +41,11 @@ export type MachineTimelineEventData =
   // listing. `lmxId` is the captured location_machine_xref id at event time
   // (null only for an unlisted → the handle was cleared). `linked`/`reconnected`
   // are read-only captures; `listed`/`unlisted` are operator-token writes.
-  // `abandoned` is a retitle walking away from a live entry (PP-l81u): the entry
-  // stays on PBM and `lmxId` is the handle recorded for it. Unlike `unlisted`,
-  // nothing was written to PinballMap.
+  // `abandoned` fires whenever a local edit walks away from a still-live entry
+  // (PP-l81u) — a retitle, marking the machine excluded, or clearing the link
+  // entirely, all while it was listed. The entry stays on PBM and `lmxId` is
+  // the handle recorded for it. Unlike `unlisted`, nothing was written to
+  // PinballMap.
   | {
       kind: "pinballmap_listing";
       action: "listed" | "unlisted" | "linked" | "reconnected" | "abandoned";
