@@ -2,6 +2,7 @@ import "server-only";
 
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 
+import { registerAddIssueComment } from "./add-issue-comment";
 import { registerAddMachine } from "./add-machine";
 import { registerCreateIssue } from "./create-issue";
 import { registerGetMachine } from "./get-machine";
@@ -25,4 +26,5 @@ export function registerPinpointTools(server: McpServer): void {
   registerAddMachine(server);
   registerSetMachineOwner(server);
   registerCreateIssue(server);
+  registerAddIssueComment(server);
 }

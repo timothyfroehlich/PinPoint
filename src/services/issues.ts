@@ -697,6 +697,18 @@ export async function addIssueComment({
 }: AddIssueCommentParams): Promise<{
   comment: IssueComment;
   deliveryPlan: DeliveryPlan;
+  /**
+   * True when the idempotency key matched an existing row and nothing was
+   * written, so `comment` is the pre-existing one.
+   *
+   * Callers must not infer this from an empty `deliveryPlan`. A genuinely new
+   * comment also produces zero deliveries whenever the commenter is the only
+   * watcher, no notification channels are configured, or the best-effort
+   * notification block below swallows an error — so the empty-plan proxy
+   * reports "already posted" for real writes (CORE-ARCH-012). `createIssue`
+   * carries the same explicit flag for the same reason.
+   */
+  deduped: boolean;
 }> {
   // Resolve channels outside the transaction to avoid an HTTP round-trip
   // (Supabase Vault RPC) inside the DB connection window (PP-rfc).
@@ -718,7 +730,11 @@ export async function addIssueComment({
           { commentId: existing.id, idempotencyKey, action: "addIssueComment" },
           "Idempotent retry — returning existing comment, no new write"
         );
-        return { comment: existing, deliveryPlan: { deliveries: [] } };
+        return {
+          comment: existing,
+          deliveryPlan: { deliveries: [] },
+          deduped: true,
+        };
       }
     }
 
@@ -760,7 +776,11 @@ export async function addIssueComment({
             },
             "Idempotency conflict on insert — returning race winner"
           );
-          return { comment: winner, deliveryPlan: { deliveries: [] } };
+          return {
+            comment: winner,
+            deliveryPlan: { deliveries: [] },
+            deduped: true,
+          };
         }
       }
       throw new Error("Failed to create comment");
@@ -856,7 +876,7 @@ export async function addIssueComment({
         commentId: comment.id,
       });
     }
-    return { comment, deliveryPlan: { deliveries } };
+    return { comment, deliveryPlan: { deliveries }, deduped: false };
   });
 }
 

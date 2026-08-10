@@ -18,6 +18,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   authUsers,
   invitedUsers,
+  issueComments,
   issues,
   machines,
   pinballmapCatalog,
@@ -48,6 +49,7 @@ vi.mock("next/server", () => ({
   },
 }));
 
+import { runAddIssueComment } from "~/lib/mcp/tools/add-issue-comment";
 import { runAddMachine } from "~/lib/mcp/tools/add-machine";
 import { runCreateIssue } from "~/lib/mcp/tools/create-issue";
 import { runGetMachine } from "~/lib/mcp/tools/get-machine";
@@ -1337,6 +1339,126 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
       await expect(resolveAssignee(invitedId)).rejects.toMatchObject({
         reason: "not_found",
       });
+    });
+  });
+
+  describe("add_issue_comment (PP-u4ab.14)", () => {
+    it("posts a comment and reports created: true", async () => {
+      const admin = await makeUser("admin", "Tim", "Froehlich");
+      const machine = await seedMachine({ name: "Attack from Mars" });
+      await runCreateIssue(
+        { machine: machine.initials, title: "left flipper weak" },
+        ctx("admin", admin)
+      );
+
+      const outcome = await runAddIssueComment(
+        {
+          machine: machine.initials,
+          number: 1,
+          comment: "Checked the coil sleeve.",
+        },
+        ctx("admin", admin)
+      );
+      const result = outcome.result as { created: boolean; commentId: string };
+
+      expect(result.created).toBe(true);
+      expect(result.commentId).toBeDefined();
+
+      const db = await getTestDb();
+      const rows = await db.query.issueComments.findMany({
+        where: eq(issueComments.issueId, outcome.issueId ?? ""),
+      });
+      expect(rows).toHaveLength(1);
+    });
+
+    /**
+     * The regression this pins: `created` must come from the service's explicit
+     * `deduped` flag, never from an empty delivery plan. Here the commenter is
+     * the ONLY watcher and `getChannels` is mocked to `[]`, so a genuinely new
+     * comment produces zero deliveries — the exact case where the empty-plan
+     * proxy would report `created: false` for a real write.
+     */
+    it("reports created: true even when the comment notifies nobody", async () => {
+      const admin = await makeUser("admin", "Solo", "Reporter");
+      const machine = await seedMachine({ name: "Fish Tales" });
+      await runCreateIssue(
+        { machine: machine.initials, title: "right ramp rejects" },
+        ctx("admin", admin)
+      );
+
+      const outcome = await runAddIssueComment(
+        { machine: machine.initials, number: 1, comment: "Bent the flap." },
+        ctx("admin", admin)
+      );
+
+      expect((outcome.result as { created: boolean }).created).toBe(true);
+    });
+
+    it("dedupes an identical retry and reports created: false", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine({ name: "Medieval Madness" });
+      await runCreateIssue(
+        { machine: machine.initials, title: "ball stuck" },
+        ctx("admin", admin)
+      );
+
+      const args = {
+        machine: machine.initials,
+        number: 1,
+        comment: "Same text.",
+      };
+      const first = await runAddIssueComment(args, ctx("admin", admin));
+      const second = await runAddIssueComment(args, ctx("admin", admin));
+
+      expect((first.result as { created: boolean }).created).toBe(true);
+      expect((second.result as { created: boolean }).created).toBe(false);
+      expect((second.result as { commentId: string }).commentId).toBe(
+        (first.result as { commentId: string }).commentId
+      );
+
+      const db = await getTestDb();
+      const rows = await db.query.issueComments.findMany({
+        where: eq(issueComments.issueId, second.issueId ?? ""),
+      });
+      expect(rows).toHaveLength(1);
+    });
+
+    it("treats a different comment on the same issue as a new post", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine({ name: "Cirqus Voltaire" });
+      await runCreateIssue(
+        { machine: machine.initials, title: "ringmaster stuck" },
+        ctx("admin", admin)
+      );
+
+      await runAddIssueComment(
+        { machine: machine.initials, number: 1, comment: "First note." },
+        ctx("admin", admin)
+      );
+      const second = await runAddIssueComment(
+        { machine: machine.initials, number: 1, comment: "Second note." },
+        ctx("admin", admin)
+      );
+
+      expect((second.result as { created: boolean }).created).toBe(true);
+
+      const db = await getTestDb();
+      const rows = await db.query.issueComments.findMany({
+        where: eq(issueComments.issueId, second.issueId ?? ""),
+      });
+      expect(rows).toHaveLength(2);
+    });
+
+    it("throws not_found for an issue number that does not exist", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine({ name: "Twilight Zone" });
+
+      await expect(
+        runAddIssueComment(
+          { machine: machine.initials, number: 7, comment: "hi" },
+          ctx("admin", admin)
+        )
+      ).rejects.toMatchObject({ reason: "not_found" });
     });
   });
 });
