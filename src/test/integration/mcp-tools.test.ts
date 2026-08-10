@@ -52,6 +52,7 @@ vi.mock("next/server", () => ({
 import { runAddIssueComment } from "~/lib/mcp/tools/add-issue-comment";
 import { runAddMachine } from "~/lib/mcp/tools/add-machine";
 import { runCreateIssue } from "~/lib/mcp/tools/create-issue";
+import { runGetIssue } from "~/lib/mcp/tools/get-issue";
 import { runGetMachine } from "~/lib/mcp/tools/get-machine";
 import { runListMachines } from "~/lib/mcp/tools/list-machines";
 import { runSearchPinballmapCatalog } from "~/lib/mcp/tools/search-pinballmap-catalog";
@@ -1457,6 +1458,118 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
       await expect(
         runAddIssueComment(
           { machine: machine.initials, number: 7, comment: "hi" },
+          ctx("admin", admin)
+        )
+      ).rejects.toMatchObject({ reason: "not_found" });
+    });
+  });
+
+  describe("get_issue (PP-u4ab.14)", () => {
+    it("returns full detail with the comment thread and no emails", async () => {
+      const admin = await makeUser("admin", "Tim", "Froehlich");
+      const machine = await seedMachine({ name: "Attack from Mars" });
+      await runCreateIssue(
+        {
+          machine: machine.initials,
+          title: "left flipper weak",
+          description: "Barely reaches the ramp.",
+          severity: "major",
+        },
+        ctx("admin", admin)
+      );
+      await runAddIssueComment(
+        {
+          machine: machine.initials,
+          number: 1,
+          comment: "Checked the coil sleeve.",
+        },
+        ctx("admin", admin)
+      );
+
+      const outcome = await runGetIssue(
+        { machine: machine.initials, number: 1 },
+        ctx("admin", admin)
+      );
+      const result = outcome.result as {
+        title: string;
+        description: string;
+        severity: string;
+        status: string;
+        reporter: string;
+        assignee: string | null;
+        url: string;
+        comments: { author: string; text: string; createdAt: string }[];
+      };
+
+      expect(result.title).toBe("left flipper weak");
+      expect(result.description).toBe("Barely reaches the ramp.");
+      expect(result.severity).toBe("major");
+      expect(result.status).toBe("new");
+      expect(result.reporter).toBe("Tim Froehlich");
+      expect(result.assignee).toBeNull();
+      expect(result.url).toContain(`/m/${machine.initials}/i/1`);
+      expect(result.comments).toHaveLength(1);
+      expect(result.comments[0]).toMatchObject({
+        author: "Tim Froehlich",
+        text: "Checked the coil sleeve.",
+      });
+
+      // CORE-SEC-007: no email may reach an MCP caller. The seeded users all
+      // carry `<uuid>@example.com`, so an "@" anywhere in the payload is a leak.
+      expect(JSON.stringify(result)).not.toContain("@");
+    });
+
+    it("reports the assignee's name once one is set", async () => {
+      const admin = await makeUser("admin");
+      const tech = await makeUser("technician", "Ada", "Lovelace");
+      const machine = await seedMachine({ name: "Medieval Madness" });
+      await runCreateIssue(
+        { machine: machine.initials, title: "ball stuck" },
+        ctx("admin", admin)
+      );
+      await runUpdateIssue(
+        { machine: machine.initials, number: 1, assignee: tech },
+        ctx("admin", admin)
+      );
+
+      const outcome = await runGetIssue(
+        { machine: machine.initials, number: 1 },
+        ctx("admin", admin)
+      );
+      expect((outcome.result as { assignee: string | null }).assignee).toBe(
+        "Ada Lovelace"
+      );
+    });
+
+    it("excludes system rows from the thread", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine({ name: "Twilight Zone" });
+      await runCreateIssue(
+        { machine: machine.initials, title: "scoop weak" },
+        ctx("admin", admin)
+      );
+      // A status change writes a system row against the issue.
+      await runUpdateIssue(
+        { machine: machine.initials, number: 1, status: "confirmed" },
+        ctx("admin", admin)
+      );
+
+      const outcome = await runGetIssue(
+        { machine: machine.initials, number: 1 },
+        ctx("admin", admin)
+      );
+      expect((outcome.result as { comments: unknown[] }).comments).toHaveLength(
+        0
+      );
+    });
+
+    it("throws not_found for an unknown issue number", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine({ name: "Cirqus Voltaire" });
+
+      await expect(
+        runGetIssue(
+          { machine: machine.initials, number: 4 },
           ctx("admin", admin)
         )
       ).rejects.toMatchObject({ reason: "not_found" });

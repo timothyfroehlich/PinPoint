@@ -5,6 +5,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { registerAddIssueComment } from "./add-issue-comment";
 import { registerAddMachine } from "./add-machine";
 import { registerCreateIssue } from "./create-issue";
+import { registerGetIssue } from "./get-issue";
 import { registerGetMachine } from "./get-machine";
 import { registerListMachines } from "./list-machines";
 import { registerSearchPinballmapCatalog } from "./search-pinballmap-catalog";
@@ -21,6 +22,7 @@ import { registerUpdateIssue } from "./update-issue";
 export function registerPinpointTools(server: McpServer): void {
   registerListMachines(server);
   registerGetMachine(server);
+  registerGetIssue(server);
   registerSearchPinballmapCatalog(server);
   registerSetMachineAvailability(server);
   registerSetMachineName(server);
