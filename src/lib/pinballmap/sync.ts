@@ -8,6 +8,7 @@ import {
 import { createMachineTimelineEvent } from "~/lib/timeline/machine-events";
 import { db, type DbTransaction } from "~/server/db";
 import { machines } from "~/server/db/schema";
+import { clearResolvedAbandonments } from "./abandoned-listings";
 import { resolveAutoLink, type AutoLinkCandidate } from "./auto-link";
 import { getPinballMapState } from "./state";
 import { derivePbmMachineStatus } from "./status";
@@ -46,6 +47,11 @@ export interface ReconcileResult {
    * In practice what survives is "listed here but absent on PBM".
    */
   desynced: number;
+  /**
+   * Abandoned-listing records cleared because their entry is no longer on the
+   * lineup — someone removed it by hand on pinballmap.com (`./abandoned-listings`).
+   */
+  abandonmentsCleared: number;
 }
 
 /** A write the reconcile pass decided on, ready to apply. */
@@ -140,7 +146,7 @@ export async function captureAutoLink(
 
 /**
  * Reconcile our stored per-machine PBM state against the persisted location
- * snapshot (written by `syncLocationSnapshot`). Three effects:
+ * snapshot (written by `syncLocationSnapshot`). Four effects:
  *
  *  - LINK: a matched, unlisted cabinet whose title is on the lineup captures
  *    that lmx and is marked listed (PP-o355.20). One direction only — nothing
@@ -151,6 +157,9 @@ export async function captureAutoLink(
  *  - COUNT: tally machines desynced for a reason we will not resolve (listed
  *    here but gone from PBM) so the control room / status card can surface
  *    "N need attention".
+ *  - CLEAR: drop abandoned-listing records (PP-l81u) whose entry is no longer
+ *    on the lineup — someone removed it by hand on pinballmap.com
+ *    (`./abandoned-listings`, `clearResolvedAbandonments`).
  *
  * Both writes are decided by `resolveAutoLink`, so both are gated by the tie
  * guard: where cabinets tie at the top presence rank we choose nothing and
@@ -172,9 +181,11 @@ export async function captureAutoLink(
  */
 export async function reconcileAfterSync(): Promise<ReconcileResult> {
   const state = await getPinballMapState();
-  if (!state?.enabled) return { healed: 0, linked: 0, desynced: 0 };
+  if (!state?.enabled)
+    return { healed: 0, linked: 0, desynced: 0, abandonmentsCleared: 0 };
   const snapshot = state.snapshotJson ?? null;
-  if (!snapshot) return { healed: 0, linked: 0, desynced: 0 };
+  if (!snapshot)
+    return { healed: 0, linked: 0, desynced: 0, abandonmentsCleared: 0 };
 
   const matched = await db
     .select(RECONCILE_COLUMNS)
@@ -252,10 +263,17 @@ export async function reconcileAfterSync(): Promise<ReconcileResult> {
     if (await captureAutoLink(write)) applied.push(write);
   }
 
+  // Someone removed the entry by hand on pinballmap.com — the only cleanup path
+  // this bead ships. Safe here because we only ever run on a freshly synced
+  // snapshot: both callers return early unless the sync succeeded, and a failed
+  // sync leaves `snapshotJson` untouched rather than emptying it.
+  const abandonmentsCleared = await clearResolvedAbandonments(snapshot);
+
   return {
     healed: applied.filter((w) => w.action === "reconnected").length,
     linked: applied.filter((w) => w.action === "linked").length,
     desynced,
+    abandonmentsCleared,
   };
 }
 

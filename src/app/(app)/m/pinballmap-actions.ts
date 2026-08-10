@@ -900,7 +900,12 @@ export async function verifyPinballmapLinkAction(
 
 /** Result of an on-demand "Sync now" — the machine count and writes applied. */
 export type SyncPinballMapNowResult = Result<
-  { machineCount: number; healed: number; linked: number },
+  {
+    machineCount: number;
+    healed: number;
+    linked: number;
+    abandonmentsCleared: number;
+  },
   "UNAUTHORIZED" | "SERVER" | "THROTTLED"
 >;
 
@@ -956,11 +961,16 @@ export async function syncPinballMapNowAction(
       return err("SERVER", result.error);
     }
 
-    const { healed, linked } = await reconcileAfterSync();
+    const { healed, linked, abandonmentsCleared } = await reconcileAfterSync();
     // Desync badges on machine Info cards derive from the stored snapshot, so
     // refresh the whole machine subtree after a successful sync.
     revalidatePath("/m", "layout");
-    return ok({ machineCount: result.machineCount, healed, linked });
+    return ok({
+      machineCount: result.machineCount,
+      healed,
+      linked,
+      abandonmentsCleared,
+    });
   } catch (error: unknown) {
     log.error({ err: error }, "Manual PinballMap sync failed");
     return err("SERVER", "Pinball Map sync failed. Please try again.");

@@ -19,7 +19,12 @@ import { describe, it, expect, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { getTestDb, setupTestDb } from "~/test/setup/pglite";
 import { createTestMachine } from "~/test/helpers/factories";
-import { machines, pinballmapState, timelineEvents } from "~/server/db/schema";
+import {
+  machines,
+  pinballmapAbandonedListings,
+  pinballmapState,
+  timelineEvents,
+} from "~/server/db/schema";
 import type { LocationSnapshot } from "~/lib/pinballmap/types";
 
 vi.mock("~/server/db", async () => {
@@ -106,7 +111,12 @@ describe("reconcileAfterSync (PGlite)", () => {
   it("returns zeroes when there is no stored snapshot", async () => {
     const { reconcileAfterSync } = await import("~/lib/pinballmap/sync");
     const result = await reconcileAfterSync();
-    expect(result).toEqual({ healed: 0, linked: 0, desynced: 0 });
+    expect(result).toEqual({
+      healed: 0,
+      linked: 0,
+      desynced: 0,
+      abandonmentsCleared: 0,
+    });
   });
 
   it("writes nothing while the integration is disabled", async () => {
@@ -134,6 +144,7 @@ describe("reconcileAfterSync (PGlite)", () => {
       healed: 0,
       linked: 0,
       desynced: 0,
+      abandonmentsCleared: 0,
     });
 
     const [row] = await db
@@ -222,7 +233,12 @@ describe("reconcileAfterSync (PGlite)", () => {
 
     const result = await reconcileAfterSync();
 
-    expect(result).toEqual({ healed: 0, linked: 0, desynced: 0 });
+    expect(result).toEqual({
+      healed: 0,
+      linked: 0,
+      desynced: 0,
+      abandonmentsCleared: 0,
+    });
 
     const rows = await db.select().from(machines);
     expect(rows.every((r) => !r.pinballmapListed)).toBe(true);
@@ -261,7 +277,12 @@ describe("reconcileAfterSync (PGlite)", () => {
 
     const result = await reconcileAfterSync();
 
-    expect(result).toEqual({ healed: 0, linked: 0, desynced: 0 });
+    expect(result).toEqual({
+      healed: 0,
+      linked: 0,
+      desynced: 0,
+      abandonmentsCleared: 0,
+    });
   });
 
   it("stands down on a listing collision instead of voiding the whole pass", async () => {
@@ -303,5 +324,108 @@ describe("reconcileAfterSync (PGlite)", () => {
       .from(timelineEvents)
       .where(eq(timelineEvents.machineId, loser.id));
     expect(events).toHaveLength(0);
+  });
+
+  describe("abandoned listings", () => {
+    it("clears a record once its entry is gone from the lineup", async () => {
+      const db = await getTestDb();
+      const { reconcileAfterSync } = await import("~/lib/pinballmap/sync");
+
+      const machine = createTestMachine({
+        initials: "GZA",
+        name: "Godzilla",
+        pinballmapMachineId: 6222,
+      });
+      await db.insert(machines).values(machine);
+      await db.insert(pinballmapAbandonedListings).values({
+        machineId: machine.id,
+        lmxId: 4471,
+        pinballmapMachineId: 6221,
+      });
+
+      // The synced lineup no longer carries 4471 — someone removed it by hand.
+      await db.insert(pinballmapState).values({
+        id: "singleton",
+        locationId: 26454,
+        enabled: true,
+        snapshotJson: snapshotWith([{ id: 5120, machineId: 6222 }]),
+        lastSyncStatus: "ok",
+      });
+
+      const result = await reconcileAfterSync();
+
+      expect(result.abandonmentsCleared).toBe(1);
+      const rows = await db.select().from(pinballmapAbandonedListings);
+      expect(rows).toHaveLength(0);
+    });
+
+    it("keeps a record while its entry is still on the lineup", async () => {
+      const db = await getTestDb();
+      const { reconcileAfterSync } = await import("~/lib/pinballmap/sync");
+
+      const machine = createTestMachine({
+        initials: "GZB",
+        name: "Godzilla",
+        pinballmapMachineId: 6222,
+      });
+      await db.insert(machines).values(machine);
+      await db.insert(pinballmapAbandonedListings).values({
+        machineId: machine.id,
+        lmxId: 4471,
+        pinballmapMachineId: 6221,
+      });
+
+      await db.insert(pinballmapState).values({
+        id: "singleton",
+        locationId: 26454,
+        enabled: true,
+        snapshotJson: snapshotWith([
+          { id: 4471, machineId: 6221 },
+          { id: 5120, machineId: 6222 },
+        ]),
+        lastSyncStatus: "ok",
+      });
+
+      const result = await reconcileAfterSync();
+
+      expect(result.abandonmentsCleared).toBe(0);
+      const rows = await db.select().from(pinballmapAbandonedListings);
+      expect(rows).toHaveLength(1);
+    });
+
+    it("clears nothing when there is no stored snapshot", async () => {
+      // `reconcileAfterSync` returns early without a snapshot, which is what
+      // keeps a failed sync from wiping every record: `syncLocationSnapshot`
+      // never overwrites `snapshotJson` on its error path, and both callers
+      // gate on a successful result. Absence must never read as "cleaned up".
+      const db = await getTestDb();
+      const { reconcileAfterSync } = await import("~/lib/pinballmap/sync");
+
+      const machine = createTestMachine({
+        initials: "GZC",
+        name: "Godzilla",
+        pinballmapMachineId: 6222,
+      });
+      await db.insert(machines).values(machine);
+      await db.insert(pinballmapAbandonedListings).values({
+        machineId: machine.id,
+        lmxId: 4471,
+        pinballmapMachineId: 6221,
+      });
+
+      await db.insert(pinballmapState).values({
+        id: "singleton",
+        locationId: 26454,
+        enabled: true,
+        snapshotJson: null,
+        lastSyncStatus: "ok",
+      });
+
+      const result = await reconcileAfterSync();
+
+      expect(result.abandonmentsCleared).toBe(0);
+      const rows = await db.select().from(pinballmapAbandonedListings);
+      expect(rows).toHaveLength(1);
+    });
   });
 });

@@ -30,7 +30,7 @@ describe("PinballmapSyncNow", () => {
 
   it("shows no alert on a successful sync", async () => {
     vi.mocked(syncPinballMapNowAction).mockResolvedValue(
-      ok({ machineCount: 42, healed: 0, linked: 0 })
+      ok({ machineCount: 42, healed: 0, linked: 0, abandonmentsCleared: 0 })
     );
     render(<PinballmapSyncNow />);
 

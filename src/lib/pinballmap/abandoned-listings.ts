@@ -88,11 +88,11 @@ export async function listAbandonedForMachine(
  * Drop records whose entry is no longer on the lineup — someone removed it by
  * hand on pinballmap.com, which is the only cleanup path this bead ships.
  *
- * MUST only be called with a freshly synced snapshot. Not called from
- * anywhere in this commit — `reconcileAfterSync` is where Task 4 (PP-l81u)
- * wires this in, gated on both its call sites having a successful sync; a
- * failed fetch yields a stale lineup, and treating absence there as "cleaned up"
- * would wipe every record and report cleanup nobody performed (CORE-ARCH-012).
+ * MUST only be called with a freshly synced snapshot. Called from
+ * `reconcileAfterSync` (PP-l81u), gated on both its call sites having a
+ * successful sync; a failed fetch yields a stale lineup, and treating absence
+ * there as "cleaned up" would wipe every record and report cleanup nobody
+ * performed (CORE-ARCH-012).
  *
  * Returns how many were cleared.
  */
