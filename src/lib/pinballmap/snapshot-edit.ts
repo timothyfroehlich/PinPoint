@@ -52,18 +52,26 @@ export function withLmxAdded(
 }
 
 /**
- * The snapshot with `pinballmapMachineId`'s listing absent. A no-op when it is
- * already gone.
+ * The snapshot with the unlisted title's row absent.
  *
- * Drops the title's row by `machineId`, not just the `id` we deleted — the same
- * asymmetry-closing rule `withLmxAdded` applies, and for the same reason: PBM
- * gives a title exactly one lmx at our location, and every consumer resolves it
- * by `machineId`. Filtering on `id` alone left a re-minted row behind, which
- * `resolveAutoLink` reads as "the title is still on the lineup" and re-lists
- * within the hour — silently undoing a human unlist (PP-rnup).
+ * Drops **every** row whose `machineId` is `pinballmapMachineId`, plus any row
+ * whose `id` is `lmxId` — an OR, evaluated over every row, not a lookup with a
+ * fallback. In the ordinary case both predicates point at the same single row.
  *
- * `lmxId` is still matched first so this stays a no-op in the ordinary case
- * where the caller's handle and the stored row already agree.
+ * Removing by `machineId` and not just by the `id` we deleted is the same rule
+ * `withLmxAdded` applies, for the same reason: PBM gives a title exactly one lmx
+ * at our location, and every consumer resolves it by `machineId`. Filtering on
+ * `id` alone left a re-minted row behind, which `resolveAutoLink` reads as "the
+ * title is still on the lineup" and re-lists within the hour — silently undoing
+ * a human unlist (PP-rnup).
+ *
+ * Consequence worth knowing: if a stored snapshot ever carried two rows for one
+ * title — a PBM anomaly, since find-or-create should prevent it — both go, while
+ * only one was deleted on PBM. The local snapshot then understates the lineup
+ * until the next hourly sync re-fetches it. That is the safer direction: the
+ * opposite error re-lists a cabinet a human just withdrew.
+ *
+ * Passing `pinballmapMachineId: null` narrows it to the `id` match alone.
  */
 export function withLmxRemoved(
   snapshot: LocationSnapshot,

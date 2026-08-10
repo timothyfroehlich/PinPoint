@@ -38,12 +38,20 @@ const adminClient = createClient(supabaseUrl, serviceRoleKey);
 const anonClient = createClient(supabaseUrl, supabaseAnonKey);
 // Needed to hand `authenticated` the EXECUTE privilege the guard is supposed to
 // survive — supabase-js cannot run DDL.
-const sql = postgres(databaseUrl);
+//
+// `prepare: false` because `databaseUrl` falls back to `POSTGRES_URL`, which in
+// any pooled environment is the Supavisor transaction pooler on `:6543` — no
+// prepared statements there (AGENTS.md §7, PP-d8l8). Without it a pooled run
+// fails on the GRANT rather than on an assertion, which reads as a broken guard
+// test instead of a misconfigured connection.
+const sql = postgres(databaseUrl, { prepare: false });
 
 const RPC = "get_pinballmap_credentials";
 
 describe("get_pinballmap_credentials() — in-body role guard", () => {
-  let memberUser: { id: string };
+  // `undefined` until `beforeAll` gets that far — teardown runs even when it
+  // does not, so it cannot assume either of these exists.
+  let memberUser: { id: string } | undefined;
   let memberAuthedClient: SupabaseClient;
 
   beforeAll(async () => {
@@ -69,11 +77,19 @@ describe("get_pinballmap_credentials() — in-body role guard", () => {
   });
 
   afterAll(async () => {
-    await adminClient.auth.admin.deleteUser(memberUser.id);
-    // Defensive: the grant test restores this itself, but a failure mid-test
-    // must not leave `authenticated` holding EXECUTE for the rest of the run.
-    await sql`REVOKE ALL ON FUNCTION public.get_pinballmap_credentials() FROM anon, authenticated`;
-    await sql.end();
+    // Ordered worst-consequence-first, and every step reachable even if the one
+    // before it throws. A `beforeAll` failure used to take out the whole hook on
+    // `memberUser.id`, leaving `authenticated` holding EXECUTE on a credential
+    // RPC for the rest of the run and the pg socket open until vitest's
+    // teardown timeout.
+    try {
+      // Defensive: the grant test restores this itself, but a failure mid-test
+      // must not leave the privilege behind.
+      await sql`REVOKE ALL ON FUNCTION public.get_pinballmap_credentials() FROM anon, authenticated`;
+      if (memberUser) await adminClient.auth.admin.deleteUser(memberUser.id);
+    } finally {
+      await sql.end();
+    }
   });
 
   // The two below exercise the shipped state, where the REVOKE is intact. They
