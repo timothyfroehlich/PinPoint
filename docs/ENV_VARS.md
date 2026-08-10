@@ -183,9 +183,18 @@ the degradation is a known, documented choice — not an oversight.
 | `DEV_ALLOWED_ORIGINS`                                                           | 🟢            | Dev      | `next.config.ts`                           | comma-sep origins for cross-machine `next dev`; ignored by `next build`/Vercel |
 | `PINBALLMAP_MODE`                                                               | 🟢            | All      | `src/lib/pinballmap/config.ts`             | default keys off `VERCEL_ENV`: `live` only on a production deployment          |
 | `MOCK_BLOB_STORAGE`                                                             | 🟢            | Dev/test | `src/lib/blob/client.ts`                   | feature flag                                                                   |
-| `DRIZZLE_FORCE_PRODUCTION`                                                      | 🟢            | Ops      | `drizzle.config.ts`                        | explicit opt-in guard for prod DDL                                             |
+| `DRIZZLE_FORCE_PRODUCTION`                                                      | 🟢            | Ops      | `drizzle.config.ts`                        | explicit opt-in guard for prod DDL — see the `*_FORCE_PRODUCTION` note below   |
 | `LOG_LEVEL` / `PINPOINT_LOG_DIR`                                                | 🟢            | All      | `src/lib/logger.ts`                        | defaults: `info` / `<cwd>/logs`                                                |
 | `SKIP_SUPABASE_RESET`, `E2E_DOCKER_READY_ATTEMPTS`, `E2E_DOCKER_READY_DELAY_MS` | 🟢            | CI/test  | `e2e/global-setup.ts`                      | E2E harness tuning                                                             |
+
+> **`*_FORCE_PRODUCTION` accepts `1` or `true`, and nothing else.**
+> `DRIZZLE_FORCE_PRODUCTION`, `MARK_MIGRATION_FORCE_PRODUCTION` and
+> `SEED_PINBALLMAP_CREDS_FORCE_PRODUCTION` all read through
+> `isForceProductionEnabled()` in `scripts/lib/db-target.mjs`. They used to test
+> the raw value for truthiness, which meant `=0` and `=false` — the two spellings
+> you reach for to turn a flag off — **enabled** the prod bypass (PP-rnup).
+> Anything that is not `1`/`true` now reads as disabled, so the failure direction
+> is a refusal that names the token, never an unintended write to production.
 
 ### 4.4 Platform-set (do not manage manually)
 

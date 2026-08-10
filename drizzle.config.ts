@@ -1,7 +1,10 @@
 import { loadEnvConfig } from "@next/env";
 import { defineConfig } from "drizzle-kit";
 
-import { isCloudDatabaseUrl } from "./scripts/lib/db-target.mjs";
+import {
+  isCloudDatabaseUrl,
+  isForceProductionEnabled,
+} from "./scripts/lib/db-target.mjs";
 import { assertNotDrizzlePush } from "./scripts/lib/drizzle-push-guard";
 
 // Safety: `drizzle-kit push` is banned (CORE-ARCH-009). This runs FIRST — before
@@ -54,7 +57,10 @@ if (!directUrl) {
 // Safety: prevent drizzle-kit from accidentally running against production.
 // The host match lives in scripts/lib/db-target.mjs so drizzle-kit and
 // scripts/mark-migration-applied.ts share one copy of it.
-if (isCloudDatabaseUrl(directUrl) && !process.env.DRIZZLE_FORCE_PRODUCTION) {
+if (
+  isCloudDatabaseUrl(directUrl) &&
+  !isForceProductionEnabled(process.env.DRIZZLE_FORCE_PRODUCTION)
+) {
   throw new Error(
     `SAFETY: drizzle-kit would run against a production database!\n` +
       `   URL: ${directUrl.replace(/:[^:@]+@/, ":***@")}\n` +

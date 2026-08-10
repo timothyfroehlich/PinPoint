@@ -1,6 +1,6 @@
 ---
 name: pinpoint-security
-description: The security choices PinPoint made that its own code does not state — which modules may touch `@supabase/ssr` directly, the CSP authoring posture and what is already allowlisted, what counts as a non-gating role comparison under the `permissions-audit-allow` contract, the multi-provider OAuth registry and unlink guard, the shared `sanitize-html` allowlist, and the `~/lib/url` seam (`getSiteUrl` / `requireSiteUrl` / `resolveRequestUrl` / `isInternalUrl` / `getSafeRedirect`) that makes hand-rolled `process.env` URL building a bug. Use when creating a Supabase server client, writing a Server Action's auth check, a redirect, an absolute URL in an email or webhook, a CSP change, an OAuth flow, a sanitizer, or a permission gate. The enforced rules themselves are `CORE-SEC-*` / `CORE-SSR-*` in `docs/NON_NEGOTIABLES.md`; recorded threat-model decisions are in `docs/SECURITY.md`.
+description: The security choices PinPoint made that its own code does not state — which modules may touch `@supabase/ssr` directly, the CSP authoring posture and what is already allowlisted, what counts as a non-gating role comparison under the `permissions-audit-allow` contract, why a `SECURITY DEFINER` RPC returning a secret needs an in-body `auth.role()` check rather than `REVOKE`/`GRANT` alone (and which migrations to copy), the multi-provider OAuth registry and unlink guard, the shared `sanitize-html` allowlist, and the `~/lib/url` seam (`getSiteUrl` / `requireSiteUrl` / `resolveRequestUrl` / `isInternalUrl` / `getSafeRedirect`) that makes hand-rolled `process.env` URL building a bug. Use when creating a Supabase server client, writing a Server Action's auth check, a Postgres function that reads Vault, a redirect, an absolute URL in an email or webhook, a CSP change, an OAuth flow, a sanitizer, or a permission gate. The enforced rules themselves are `CORE-SEC-*` / `CORE-SSR-*` in `docs/NON_NEGOTIABLES.md`; recorded threat-model decisions are in `docs/SECURITY.md`.
 ---
 
 # PinPoint Security
@@ -91,6 +91,27 @@ Never read `process.env` and stitch a URL together by hand. Use the helpers in `
 Why it's centralized: the fallback rules differ per environment, and a hand-rolled copy silently emails users a `localhost` link from production.
 
 **Watch for this**: the local-mock branch of `src/lib/blob/client.ts` still builds its upload URL from `process.env["NEXT_PUBLIC_SITE_URL"] ?? \`http://localhost:${port}\`` instead of calling `getSiteUrl()` — the one place in the codebase that still hand-rolls this. Don't copy it, and fold it in if you're already touching that file.
+
+## `SECURITY DEFINER` RPCs that return a secret
+
+**`REVOKE`/`GRANT` is not the gate. The gate is an `auth.role()` check inside the function body.**
+
+Supabase re-grants `EXECUTE` on `public.*` functions to `authenticated` at connection time, which can undo a SQL-level `REVOKE`, and PostgREST exposes every public function as `POST /rest/v1/rpc/<name>`. A `SECURITY DEFINER` function that decrypts a Vault secret and relies only on grants is one connection-time re-grant away from handing that secret to any logged-in member.
+
+So every such function opens with:
+
+```sql
+IF COALESCE(auth.role(), '') <> 'service_role' THEN
+  RAISE EXCEPTION 'permission denied for function <name>'
+    USING ERRCODE = '42501';
+END IF;
+```
+
+and keeps the `REVOKE`/`GRANT` as defense in depth.
+
+This has been learned twice the expensive way. `0028_natural_vengeance.sql` shipped `get_discord_config()` grants-only and `0029_discord_config_role_check.sql` hardened it; `0061_pinballmap_credentials_rpc.sql` then cited **0028** as its model and repeated the mistake, fixed in `0062_pinballmap_credentials_role_check.sql` (PP-rnup). **Copy 0029 or 0062 — never 0028 or 0061.** Those two are already applied and are left unedited on purpose, so their headers still point at the unhardened shape.
+
+**Testing it needs one non-obvious step.** A test that only asserts "a member is refused" proves nothing about the guard: with the `REVOKE` intact Postgres refuses on privilege first, so the test passes against the unhardened function too. To isolate the body check, `GRANT EXECUTE ... TO authenticated` over a direct `postgres` connection first (supabase-js cannot run DDL), assert the refusal, and revoke in a `finally`. `pinballmap-credentials-rpc.test.ts` is the reference; `discord-config-rls.test.ts` still has the weaker shape.
 
 ## Input sanitization
 

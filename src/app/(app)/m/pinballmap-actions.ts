@@ -34,6 +34,7 @@ import {
   getPinballMapState,
   syncLocationSnapshot,
 } from "~/lib/pinballmap/state";
+import { PBM_MANUAL_SYNC_MIN_INTERVAL_MS } from "~/lib/pinballmap/config";
 import { findLmxForMachine } from "~/lib/pinballmap/resolve-lmx";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import { createMachineTimelineEvent } from "~/lib/timeline/machine-events";
@@ -298,6 +299,87 @@ export async function linkPinballmapEntryAction(
   return ok({ lmxId: lmx.id });
 }
 
+/**
+ * What a `not_found` from `removeMachine` actually means (PP-rnup).
+ *
+ * It is ambiguous, and the two readings need opposite handling:
+ *
+ * - **The entry really is gone** — someone deleted it on pinballmap.com. Finish
+ *   the unlist locally; that is the desync the button exists to resolve.
+ * - **Our handle was stale** — PBM re-minted the title's lmx (a delete plus a
+ *   re-add outside its 7-day resurrection window) and the row is still on the
+ *   lineup under a new id. Clearing local state here reports an unlist that did
+ *   not happen: the title stays on PBM and the next reconcile pass re-lists the
+ *   cabinet within the hour (CORE-ARCH-012).
+ *
+ * Only the live lineup separates them. Resolving the lmx from the stored
+ * snapshot before the delete narrows the window but cannot close it — the
+ * snapshot is itself up to an hour old, so both the machine row and the snapshot
+ * can carry the same dead id.
+ *
+ * So: refresh through the sanctioned `syncLocationSnapshot` chokepoint
+ * (CORE-PBM-001 — it owns the ≤20/hour manual throttle) and re-resolve. The
+ * refresh is skipped when the stored snapshot is already newer than the throttle
+ * interval, since that is the freshest lineup we are allowed to fetch anyway.
+ *
+ * Refusing is not a dead end the way it would have been before this: the only
+ * refusals left are "we could not reach PBM just now" and "PBM's lineup
+ * contradicts its own 404", and the first clears on retry.
+ */
+type NotFoundVerdict =
+  /** Confirmed absent from the live lineup — finish the unlist locally. */
+  | { kind: "gone" }
+  /** Still listed under a different id — delete that one instead. */
+  | { kind: "retry"; lmxId: number }
+  /** No trustworthy evidence either way — do not claim an unlist happened. */
+  | { kind: "refuse"; message: string };
+
+async function classifyRemoveNotFound(args: {
+  attemptedLmxId: number;
+  pinballmapMachineId: number | null;
+  snapshotSyncedAt: Date | null;
+  userId: string;
+}): Promise<NotFoundVerdict> {
+  const { attemptedLmxId, pinballmapMachineId, snapshotSyncedAt, userId } =
+    args;
+
+  const isFresh = (syncedAt: Date | null): boolean =>
+    syncedAt !== null &&
+    Date.now() - syncedAt.getTime() < PBM_MANUAL_SYNC_MIN_INTERVAL_MS;
+
+  if (!isFresh(snapshotSyncedAt)) {
+    // Outcome is deliberately ignored: `throttled` means a concurrent refresh
+    // just landed and `error` means PBM is unreachable, and the freshness check
+    // below answers both correctly without re-deriving them here.
+    await syncLocationSnapshot({ updatedBy: userId, trigger: "manual" });
+  }
+
+  const refreshed = await getPinballMapState();
+  if (!isFresh(refreshed?.lastSyncedAt ?? null)) {
+    return {
+      kind: "refuse",
+      message:
+        "Pinball Map says that entry doesn't exist, but PinPoint couldn't refresh the lineup to confirm it's really gone. Nothing was changed — try again in a few minutes.",
+    };
+  }
+
+  const live =
+    pinballmapMachineId !== null && refreshed?.snapshotJson
+      ? findLmxForMachine(refreshed.snapshotJson, pinballmapMachineId)
+      : undefined;
+
+  if (!live) return { kind: "gone" };
+  if (live.id !== attemptedLmxId) return { kind: "retry", lmxId: live.id };
+
+  // PBM 404s the id its own freshly-fetched lineup still advertises. Not a case
+  // we can resolve by guessing.
+  return {
+    kind: "refuse",
+    message:
+      "Pinball Map still lists this machine but rejected the removal. Nothing was changed — an admin should check the listing on pinballmap.com.",
+  };
+}
+
 /** Human-facing text for a PBM write failure, by reason. */
 function pbmWriteFailureMessage(failure: PbmWriteFailure): string {
   switch (failure.reason) {
@@ -516,6 +598,14 @@ export type UnlistPinballmapResult = Result<
  * lmx in the snapshot means the next reconcile pass, or any save on this machine
  * inside the hour, silently re-lists it. Dropping the row we just deleted is
  * what makes an unlist stick.
+ *
+ * **Which lmx we delete is also correctness**, for the same reason. PBM re-mints
+ * a title's row after a delete + re-add, so the id we stored can be dead while
+ * the title is still on the lineup. Deleting the dead id removes nothing, and
+ * auto-link puts the cabinet straight back. Two things guard that (PP-rnup):
+ * the id is resolved from the stored lineup by title rather than taken from the
+ * machine row, and a `not_found` reply is checked against a freshly re-fetched
+ * lineup instead of being read as "already gone" — see `classifyRemoveNotFound`.
  */
 export async function unlistMachineFromPinballMapAction(
   _prev: UnlistPinballmapResult | undefined,
@@ -528,12 +618,30 @@ export async function unlistMachineFromPinballMapAction(
   if (!authed.ok) return authed.result;
   const { userId, machine } = authed;
 
-  const lmxId = machine.pinballmapLmxId;
-  if (!machine.pinballmapListed || lmxId === null)
+  const storedLmxId = machine.pinballmapLmxId;
+  if (!machine.pinballmapListed || storedLmxId === null)
     return err("VALIDATION", "This machine isn't listed on Pinball Map.");
 
   const state = await getPinballMapState();
   if (!state) return err("SERVER", "Pinball Map isn't configured yet");
+
+  // Delete the lmx the lineup ACTUALLY carries, not the handle we happen to
+  // store. When PBM re-mints a row (delete + re-add outside its 7-day
+  // resurrection window) our stored id goes stale — the `lmx_drifted` state
+  // auto-link heals as `reconnected`. Unlisting on the stale id deletes nothing:
+  // PBM answers `not_found`, we clear the local flag, and the title is still on
+  // the public lineup, so the next auto-link pass re-lists the machine. The
+  // human's unlist silently un-happens and the cabinet never left PinballMap.
+  // Resolving through the snapshot by title is the same lookup auto-link uses,
+  // so the two agree on which row is live.
+  //
+  // This narrows the window; it does not close it, because the snapshot can be
+  // an hour stale and carry the same dead id as the machine row. `not_found` is
+  // where that residue is caught — see `classifyRemoveNotFound`.
+  const liveLmxId =
+    (machine.pinballmapMachineId !== null && state.snapshotJson
+      ? findLmxForMachine(state.snapshotJson, machine.pinballmapMachineId)?.id
+      : undefined) ?? storedLmxId;
 
   // --- non-transactional effects, both BEFORE the transaction ---
   const credentials = await getPinballMapWriteCredentials();
@@ -544,16 +652,12 @@ export async function unlistMachineFromPinballMapAction(
     );
 
   const client = await getPinballMapClient();
-  const written = await client.removeMachine({ credentials, lmxId });
-  // `not_found` means the lmx is already gone from PinballMap — someone deleted
-  // the entry on pinballmap.com directly. That is the desync this button exists
-  // to resolve, and it is the one failure whose desired end state (not on PBM,
-  // not listed locally) is already half-reached, so we finish the job rather
-  // than refuse. Refusing would strand the machine: every retry hits the same
-  // 404, and `verifyPinballmapLinkAction` reports `stale` without clearing, so
-  // nothing short of a DB edit could unstick it. Not honesty-washing — we do
-  // reach the state we report (CORE-ARCH-012); we just didn't have to do the
-  // deleting.
+  let deletedLmxId = liveLmxId;
+  let written = await client.removeMachine({
+    credentials,
+    lmxId: deletedLmxId,
+  });
+
   if (!written.ok && written.reason !== "not_found") {
     log.error(
       { reason: written.reason, action: "pinballmap.removeMachine" },
@@ -561,11 +665,70 @@ export async function unlistMachineFromPinballMapAction(
     );
     return err("PBM_REJECTED", pbmWriteFailureMessage(written));
   }
+
+  // `not_found` is ambiguous — already gone, or our handle was stale and the
+  // title is still listed under a re-minted id. `classifyRemoveNotFound` asks
+  // the live lineup which one it is; taking the already-gone reading on faith
+  // is what silently un-does a human unlist (PP-rnup).
   if (!written.ok) {
-    log.info(
-      { lmxId, machineId: machine.id, action: "pinballmap.removeMachine" },
-      "PinballMap lmx already absent — clearing the local listing anyway"
-    );
+    const verdict = await classifyRemoveNotFound({
+      attemptedLmxId: deletedLmxId,
+      pinballmapMachineId: machine.pinballmapMachineId,
+      snapshotSyncedAt: state.lastSyncedAt,
+      userId,
+    });
+
+    if (verdict.kind === "refuse") {
+      log.warn(
+        {
+          lmxId: deletedLmxId,
+          machineId: machine.id,
+          action: "pinballmap.removeMachine",
+        },
+        "PinballMap returned not_found and the live lineup could not confirm removal — refusing to clear"
+      );
+      return err("PBM_REJECTED", verdict.message);
+    }
+
+    if (verdict.kind === "retry") {
+      log.info(
+        {
+          staleLmxId: deletedLmxId,
+          lmxId: verdict.lmxId,
+          machineId: machine.id,
+          action: "pinballmap.removeMachine",
+        },
+        "PinballMap re-minted this title's lmx — retrying the removal on the live id"
+      );
+      deletedLmxId = verdict.lmxId;
+      written = await client.removeMachine({
+        credentials,
+        lmxId: deletedLmxId,
+      });
+      if (!written.ok) {
+        log.error(
+          { reason: written.reason, action: "pinballmap.removeMachine" },
+          "PinballMap remove rejected on the re-resolved lmx"
+        );
+        return err("PBM_REJECTED", pbmWriteFailureMessage(written));
+      }
+    } else {
+      // Confirmed absent from a lineup we just re-fetched. Finish the job
+      // rather than refuse: the desired end state (not on PBM, not listed
+      // locally) is already half-reached, and refusing would strand the
+      // machine — every retry hits the same 404 and
+      // `verifyPinballmapLinkAction` reports `stale` without clearing. Not
+      // honesty-washing (CORE-ARCH-012): we now have positive evidence of the
+      // state we are about to report, we just didn't have to do the deleting.
+      log.info(
+        {
+          lmxId: deletedLmxId,
+          machineId: machine.id,
+          action: "pinballmap.removeMachine",
+        },
+        "PinballMap lmx confirmed absent from the live lineup — clearing the local listing"
+      );
+    }
   }
   // --- transaction: local state only ---
 
@@ -576,13 +739,22 @@ export async function unlistMachineFromPinballMapAction(
       .update(machines)
       .set({ pinballmapListed: false, pinballmapLmxId: null })
       .where(eq(machines.id, machine.id));
-    await editStoredSnapshot(tx, (snapshot) => withLmxRemoved(snapshot, lmxId));
+    await editStoredSnapshot(tx, (snapshot) =>
+      withLmxRemoved(snapshot, deletedLmxId, machine.pinballmapMachineId)
+    );
     await createMachineTimelineEvent(
       machine.id,
       {
         sourceType: "lifecycle",
         tag: "lifecycle",
-        eventData: { kind: "pinballmap_listing", action: "unlisted", lmxId },
+        // The lmx we actually deleted, which is the stored one except after a
+        // re-mint. Recording the stale handle would make the timeline disagree
+        // with what PinballMap saw.
+        eventData: {
+          kind: "pinballmap_listing",
+          action: "unlisted",
+          lmxId: deletedLmxId,
+        },
         actorId: userId,
       },
       tx

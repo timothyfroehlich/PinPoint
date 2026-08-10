@@ -47,11 +47,41 @@ const pbm = vi.hoisted(() => ({
   nextLmxId: 500,
   addResult: null as PbmWriteFailure | null,
   removeResult: null as PbmWriteFailure | null,
+  /** Set to make a live re-fetch fail, as an unreachable PBM would. */
+  fetchError: null as string | null,
 }));
+
+// Hoisted because the client mock's `fetchLocation` needs it, and a mock
+// factory runs before module-scope consts are initialized.
+const snapshotBuilder = vi.hoisted(
+  () =>
+    (rows: { id: number; machineId: number }[]): LocationSnapshot => ({
+      locationId: 26454,
+      name: "APC",
+      dateLastUpdated: null,
+      lastUpdatedByUsername: null,
+      machineCount: rows.length,
+      lmxes: rows.map((r) => ({
+        ...r,
+        icEnabled: null,
+        lastUpdatedByUsername: null,
+        conditions: [],
+      })),
+      fetchedAtIso: "2026-08-03T00:00:00Z",
+      raw: {},
+    })
+);
 
 vi.mock("~/lib/pinballmap/client", () => ({
   getPinballMapClient: () =>
     Promise.resolve({
+      // The live lineup, which is what separates "already gone" from "our
+      // handle is stale" when a remove 404s (PP-rnup). `syncLocationSnapshot`
+      // is the only caller from these tests.
+      fetchLocation: () => {
+        if (pbm.fetchError) return Promise.reject(new Error(pbm.fetchError));
+        return Promise.resolve(snapshotOf(pbm.lineup));
+      },
       addMachine: ({ machineId }: { machineId: number }) => {
         if (pbm.addResult) return Promise.resolve(pbm.addResult);
         const existing = pbm.lineup.find((l) => l.machineId === machineId);
@@ -75,23 +105,7 @@ vi.mock("~/lib/pinballmap/client", () => ({
 
 const TITLE_ID = 7;
 
-const snapshotOf = (
-  rows: { id: number; machineId: number }[]
-): LocationSnapshot => ({
-  locationId: 26454,
-  name: "APC",
-  dateLastUpdated: null,
-  lastUpdatedByUsername: null,
-  machineCount: rows.length,
-  lmxes: rows.map((r) => ({
-    ...r,
-    icEnabled: null,
-    lastUpdatedByUsername: null,
-    conditions: [],
-  })),
-  fetchedAtIso: "2026-08-03T00:00:00Z",
-  raw: {},
-});
+const snapshotOf = snapshotBuilder;
 
 async function createUser(role: "admin" | "member"): Promise<{ id: string }> {
   const db = await getTestDb();
@@ -147,6 +161,7 @@ describe("PinballMap outbound writes (PGlite)", () => {
     pbm.nextLmxId = 500;
     pbm.addResult = null;
     pbm.removeResult = null;
+    pbm.fetchError = null;
     const { getPinballMapWriteCredentials } =
       await import("~/lib/pinballmap/credentials");
     vi.mocked(getPinballMapWriteCredentials).mockResolvedValue({
@@ -415,11 +430,202 @@ describe("PinballMap outbound writes (PGlite)", () => {
     expect(row?.pinballmapLmxId).toBeNull();
   });
 
+  it("unlists through a drifted lmx instead of deleting nothing", async () => {
+    // PP-rnup. PBM re-minted the title's row (delete + re-add outside its
+    // resurrection window), so the id we stored is dead and the hourly sync has
+    // already put the LIVE id in the snapshot. Keying the removal on the stored
+    // handle deleted nothing — PBM answered `not_found`, we cleared the local
+    // flag, the title stayed on the public lineup, and the next reconcile pass
+    // re-listed the cabinet. The human's unlist silently un-happened AND the
+    // machine never actually left PinballMap.
+    const db = await getTestDb();
+    const { unlistMachineFromPinballMapAction } =
+      await import("~/app/(app)/m/pinballmap-actions");
+    const { reconcileAfterSync } = await import("~/lib/pinballmap/sync");
+    const admin = await createUser("admin");
+    await mockAuthAs(admin.id);
+    pbm.lineup = [{ id: 777, machineId: TITLE_ID }];
+    await seedState([{ id: 777, machineId: TITLE_ID }]);
+
+    const [machine] = await db
+      .insert(machines)
+      .values({
+        name: "Godzilla",
+        initials: "GZ",
+        pinballmapMachineId: TITLE_ID,
+        pinballmapListed: true,
+        // The stale handle — never healed before the human clicked Unlist.
+        pinballmapLmxId: 500,
+      })
+      .returning();
+    if (!machine) throw new Error("failed to seed machine");
+
+    const result = await unlistMachineFromPinballMapAction(
+      undefined,
+      form(machine.id)
+    );
+
+    expect(result.ok).toBe(true);
+    // The live row is gone from PinballMap — the whole point of the button.
+    expect(pbm.lineup).toEqual([]);
+    // …and the stored lineup no longer carries the title, so reconcile agrees.
+    const state = await db.query.pinballmapState.findFirst();
+    expect(state?.snapshotJson?.lmxes).toEqual([]);
+    const reconciled = await reconcileAfterSync();
+    expect(reconciled.linked).toBe(0);
+    const row = await db.query.machines.findFirst({
+      where: eq(machines.id, machine.id),
+    });
+    expect(row?.pinballmapListed).toBe(false);
+    expect(row?.pinballmapLmxId).toBeNull();
+  });
+
+  it("unlists after a re-mint the stored snapshot has not caught up with", async () => {
+    // PP-rnup, the mirror of the case above and the one resolving from the
+    // snapshot cannot reach: PBM re-minted 777 -> 888 at 12:10 and the next
+    // hourly sync is not until 13:00, so the machine row AND the stored
+    // snapshot both carry the dead 777. The remove 404s. Reading that as
+    // "already gone" clears our columns while the title is still on the public
+    // lineup, and the 13:00 reconcile re-lists the cabinet — the same silent
+    // un-doing, one layer down. So a 404 is checked against a freshly fetched
+    // lineup before it is believed.
+    const db = await getTestDb();
+    const { unlistMachineFromPinballMapAction } =
+      await import("~/app/(app)/m/pinballmap-actions");
+    const { reconcileAfterSync } = await import("~/lib/pinballmap/sync");
+    const admin = await createUser("admin");
+    await mockAuthAs(admin.id);
+    pbm.lineup = [{ id: 888, machineId: TITLE_ID }];
+    await seedState([{ id: 777, machineId: TITLE_ID }]);
+
+    const [machine] = await db
+      .insert(machines)
+      .values({
+        name: "Godzilla",
+        initials: "GZ",
+        pinballmapMachineId: TITLE_ID,
+        pinballmapListed: true,
+        pinballmapLmxId: 777,
+      })
+      .returning();
+    if (!machine) throw new Error("failed to seed machine");
+
+    const result = await unlistMachineFromPinballMapAction(
+      undefined,
+      form(machine.id)
+    );
+
+    expect(result.ok).toBe(true);
+    // The cabinet actually left PinballMap — the assertion the old code failed.
+    expect(pbm.lineup).toEqual([]);
+    const state = await db.query.pinballmapState.findFirst();
+    expect(state?.snapshotJson?.lmxes).toEqual([]);
+    expect((await reconcileAfterSync()).linked).toBe(0);
+    const row = await db.query.machines.findFirst({
+      where: eq(machines.id, machine.id),
+    });
+    expect(row?.pinballmapListed).toBe(false);
+    expect(row?.pinballmapLmxId).toBeNull();
+
+    // The receipt names the lmx PinballMap actually deleted, not our dead one.
+    const events = await db
+      .select()
+      .from(timelineEvents)
+      .where(eq(timelineEvents.machineId, machine.id));
+    expect(events[0]?.eventData).toEqual({
+      kind: "pinballmap_listing",
+      action: "unlisted",
+      lmxId: 888,
+    });
+  });
+
+  it("refuses rather than reporting an unlist it could not confirm", async () => {
+    // Same drift, but PBM is unreachable when we try to re-check. With no
+    // evidence either way, clearing the columns would be a success toast for
+    // something that may not have happened (CORE-ARCH-012). Transient by
+    // construction — the next click re-checks.
+    const db = await getTestDb();
+    const { unlistMachineFromPinballMapAction } =
+      await import("~/app/(app)/m/pinballmap-actions");
+    const admin = await createUser("admin");
+    await mockAuthAs(admin.id);
+    pbm.lineup = [{ id: 888, machineId: TITLE_ID }];
+    await seedState([{ id: 777, machineId: TITLE_ID }]);
+    pbm.fetchError = "PinballMap unreachable";
+
+    const [machine] = await db
+      .insert(machines)
+      .values({
+        name: "Godzilla",
+        initials: "GZ",
+        pinballmapMachineId: TITLE_ID,
+        pinballmapListed: true,
+        pinballmapLmxId: 777,
+      })
+      .returning();
+    if (!machine) throw new Error("failed to seed machine");
+
+    const result = await unlistMachineFromPinballMapAction(
+      undefined,
+      form(machine.id)
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.code).toBe("PBM_REJECTED");
+    // Still on PinballMap, and still listed here — the two agree.
+    expect(pbm.lineup).toEqual([{ id: 888, machineId: TITLE_ID }]);
+    const row = await db.query.machines.findFirst({
+      where: eq(machines.id, machine.id),
+    });
+    expect(row?.pinballmapListed).toBe(true);
+    expect(row?.pinballmapLmxId).toBe(777);
+  });
+
+  it("refuses when PinballMap 404s an lmx its own lineup still advertises", async () => {
+    // PBM contradicting itself. Nothing to retry against, so refuse rather than
+    // guess — and leave the local state alone so the desync stays visible.
+    const db = await getTestDb();
+    const { unlistMachineFromPinballMapAction } =
+      await import("~/app/(app)/m/pinballmap-actions");
+    const admin = await createUser("admin");
+    await mockAuthAs(admin.id);
+    pbm.lineup = [{ id: 777, machineId: TITLE_ID }];
+    await seedState([{ id: 777, machineId: TITLE_ID }]);
+    pbm.removeResult = { ok: false, reason: "not_found" };
+
+    const [machine] = await db
+      .insert(machines)
+      .values({
+        name: "Godzilla",
+        initials: "GZ",
+        pinballmapMachineId: TITLE_ID,
+        pinballmapListed: true,
+        pinballmapLmxId: 777,
+      })
+      .returning();
+    if (!machine) throw new Error("failed to seed machine");
+
+    const result = await unlistMachineFromPinballMapAction(
+      undefined,
+      form(machine.id)
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.code).toBe("PBM_REJECTED");
+    const row = await db.query.machines.findFirst({
+      where: eq(machines.id, machine.id),
+    });
+    expect(row?.pinballmapListed).toBe(true);
+  });
+
   it("clears the local listing when the lmx is already gone from PinballMap", async () => {
     // Someone deleted the entry on pinballmap.com directly. That is the desync
     // Remove exists to resolve, so a `not_found` finishes the job instead of
     // stranding the machine — refusing would leave it listed with a dead lmx
     // and no path out, since every retry 404s and Verify only reports `stale`.
+    // The difference from the two cases above is evidence: the re-fetched
+    // lineup does not carry the title either, so "already gone" is observed
+    // rather than assumed.
     const db = await getTestDb();
     const { unlistMachineFromPinballMapAction } =
       await import("~/app/(app)/m/pinballmap-actions");

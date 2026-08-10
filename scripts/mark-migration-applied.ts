@@ -4,7 +4,11 @@ import { createInterface } from "node:readline/promises";
 import { readFileSync } from "fs";
 import { join } from "path";
 
-import { describeTarget, isCloudDatabaseUrl } from "./lib/db-target.mjs";
+import {
+  describeTarget,
+  isCloudDatabaseUrl,
+  isForceProductionEnabled,
+} from "./lib/db-target.mjs";
 
 interface MigrationEntry {
   idx: number;
@@ -86,7 +90,9 @@ if (!connectionString) {
 // never opens a connection to prod. Not reachable from `vercel-build`, which
 // runs `migrate:production` only.
 const isProductionTarget = isCloudDatabaseUrl(connectionString);
-const forceProduction = Boolean(process.env["MARK_MIGRATION_FORCE_PRODUCTION"]);
+const forceProduction = isForceProductionEnabled(
+  process.env["MARK_MIGRATION_FORCE_PRODUCTION"]
+);
 
 if (isProductionTarget && !forceProduction) {
   console.error(
