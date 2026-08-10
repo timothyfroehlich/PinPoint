@@ -133,7 +133,7 @@ _hard_block() {
   # actually present, so a machine without a runner is not sent somewhere useless.
   if command -v crabbox >/dev/null 2>&1; then
     echo "    • Run it on the remote runner (preferred):" >&2
-    echo "        crabbox job run integration | integration-supabase | smoke | e2e-full" >&2
+    echo "        crabbox job run {integration|integration-supabase|smoke|e2e-full}" >&2
     echo "      Integration and E2E belong there by default. Not for dev servers or" >&2
     echo "      interactive debugging — those stay local. See the 'crabbox' skill." >&2
   fi

@@ -54,7 +54,7 @@ Load relevant skills for every task. If your tool doesn't support skills, read t
 One-time install for tools the workflow scripts depend on:
 
 - **GNU parallel** — provides `sem`, which `pnpm run preflight` uses to cap host-wide concurrency at 2. Without it, `preflight` fails with a clear install hint; `pnpm run preflight:unlocked` bypasses the cap.
-- **pytest** — `pnpm run check:python` runs the hook/script tests with it.
+- **pytest** — `pnpm run check:python` runs the hook/script tests with it, and dies with a bare `pytest: command not found` if it is absent (no runtime install hint, unlike `sem`). Install it however your host installs Python CLI tools — Homebrew, pipx, distro package.
 
 ### Worktrees & ports
 
