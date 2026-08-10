@@ -13,7 +13,9 @@ Work bead {beads_id}. First run `bd show {beads_id}` && `bd update {beads_id} --
 
 ### Quality Gates
 
-Run `pnpm run check` before returning. Then self-review **by hand**: read your own diff (`git diff origin/main...HEAD`) against `REVIEW.md` — the canonical rubric — plus the bead's acceptance criteria and out-of-scope list, and fix what you find. Don't reach for `/code-review` or `ultra`: both are user-triggered harness surfaces (`ultra` is also billed) and an agent cannot launch either.
+Before returning, run the gates **AGENTS.md §5 "Which tests to run"** names for the layers you touched — that tiered list is the source of truth, so read it rather than assuming. Note in particular that `pnpm run check` is a **static** gate: it runs no unit tests and no pytest, so on its own it cannot fail on a broken test.
+
+Then self-review **by hand**: read your own diff (`git diff origin/main...HEAD`) against `REVIEW.md` — the canonical rubric — plus the bead's acceptance criteria and out-of-scope list, and fix what you find. Don't reach for `/code-review` or `ultra`: both are user-triggered harness surfaces (`ultra` is also billed) and an agent cannot launch either.
 
 A review covering the head commit is **required** to merge, and **no bot reviews this repo**. The reviewer is Tim running `/code-review`, which you cannot launch — so getting reviewed is a handoff, not a command you run.
 
@@ -62,7 +64,7 @@ If tests fail with `POSTGRES_URL is not set`:
 
 1. `isolation: "worktree"` sets CWD automatically — no absolute paths needed
 2. The bead is the source of truth — point the agent at `bd show`; don't restate scope/files in the prompt (two places to drift)
-3. Quality is self-enforced — explicit `pnpm run check` replaces hook enforcement
+3. Quality is self-enforced — hooks don't fire for subagents, so the prompt IS the enforcement. Point at AGENTS.md §5's tiered list, never at `pnpm run check` alone: `check` is static and cannot fail on a broken test (PP-lql4)
 4. Structured return format enables quick lead assessment
 5. Nothing reviews automatically and there is nothing for the agent to request — its terminal state is a PR reported as needing Tim's `/code-review`. The return format asks for exactly that, and at handoff the lead checks the marker's pinned SHA against head (SKILL.md → "Ensure every PR is reviewed")
 

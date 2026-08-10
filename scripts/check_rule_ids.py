@@ -5,8 +5,8 @@ PinPoint states its rules in several places, each in a different voice and for
 a different reader:
 
   docs/NON_NEGOTIABLES.md    canonical catalog -- the authoritative statement
-  CLAUDE.md                  always-loaded index, authoring voice
-  .claude/rules/*.md         path-scoped, authoring voice (Claude)
+  AGENTS.md / CLAUDE.md      always-loaded process context, authoring voice
+  .claude/rules/*.md         the rules themselves, path-scoped (Claude Code)
   REVIEW.md                  review-agent entry map + rubric
 
 Generating those from one source would mean synthesising two registers from one
@@ -20,18 +20,20 @@ Three checks:
          either a typo or a rule that was renamed/removed without updating its
          citations. This is the check that runs in `pnpm run check`.
   ERROR  A fragile "rule N" / "commandment N" / "AGENTS.md §2.1" citation
-         (PP-22e4). AGENTS.md §2.1 -- the numbered non-negotiables list -- is
-         being replaced by a grouped index, which turns every citation by
-         rule number or to "§2.1" itself into a pointer to nothing. Unlike a
+         (PP-22e4). AGENTS.md §2.1 used to be the numbered non-negotiables
+         list; PP-22e4.4 moved the rules to .claude/rules/, so every citation
+         by rule number or to "§2.1" itself now points at nothing. Unlike a
          CORE-* ID, neither form is machine-checkable against the catalog, so
          the only sound gate is banning the pattern outright and requiring
          the CORE-* ID instead.
   AUDIT  (--orphans) A catalog rule cited nowhere. Opt-in, never fails the
-         build: as of 2026-07-24, 42 of ~62 catalog rules are "orphans" by this
-         definition, because the catalog is deliberately broader than the set
-         promoted into an always-loaded index or a path-scoped file. Printing
-         42 lines on every run would train everyone to ignore the gate, so it
-         is a coverage audit you run deliberately, not a default warning.
+         build: 17 of 67 catalog rules are "orphans" by this definition as of
+         2026-08-07 (it was 42 of 62 before the .claude/rules/ tier, which
+         cites more of the catalog than the old AGENTS.md list did), because
+         the catalog is deliberately broader than the set promoted into an
+         always-loaded or path-scoped file. Printing that list on every run
+         would train everyone to ignore the gate, so it is a coverage audit
+         you run deliberately, not a default warning.
 
 Exit codes: 0 clean, 1 unknown IDs found, 2 catalog missing, 3 descending
 range cited, 4 fragile rule-number/§2.1 citation found.
@@ -68,20 +70,41 @@ RANGE_ID = re.compile(r"\bCORE-([A-Z][A-Z0-9]*)-(\d{3})\.\.(\d{3})\b")
 # never machine-checkable the way a CORE-* ID is (there's no catalog of
 # numbers to check against), so the only sound fix is banning the pattern and
 # requiring the ID.
+# Horizontal whitespace only, never \s: a citation lives on one line, and a
+# newline-spanning \s* makes a markdown heading that ends in "rule" followed by
+# an ordered list ("## Adding or changing a rule\n\n1. ...") match as "rule 1".
 NUMBERED_RULE_CITATION = re.compile(
-    r"\b(?:AGENTS\.md`?\s+)?(?:[Rr]ule|[Cc]ommandment)\s*#?\d+\b"
+    r"\b(?:AGENTS\.md`?[ \t]+)?(?:[Rr]ule|[Cc]ommandment)[ \t]*#?\d+\b"
 )
 
-# "AGENTS.md §2.1" itself (the numbered non-negotiables list being replaced by
-# a grouped index -- see module docstring). Tolerates the same optional
-# backtick as NUMBERED_RULE_CITATION.
-SECTION_21_CITATION = re.compile(r"AGENTS\.md`?\s*§\s*2\.1\b")
+# The citation form the horizontal-whitespace-only rule above gives up: one
+# hard-wrapped between the keyword and the number ("...as required by
+# AGENTS.md rule\n12..."). The scanned surfaces are hand-wrapped at ~78
+# columns, so this is a real shape rather than a theoretical one.
+#
+# It is a separate check because a plain `\s` in NUMBERED_RULE_CITATION cannot
+# distinguish it from a markdown heading that ends in "rule" followed by an
+# ordered list -- which .claude/rules/README.md contains. The blank line
+# between heading and list is what separates them: a wrapped sentence has none.
+# So this matches only when the number is on the *immediately* following line,
+# and never when the keyword line is itself a heading.
+WRAPPED_RULE_CITATION = re.compile(
+    r"\b(?:AGENTS\.md`?[ \t]+)?(?:[Rr]ule|[Cc]ommandment)[ \t]*$"
+)
+WRAPPED_CITATION_NUMBER = re.compile(r"^[ \t]*#?\d+\b")
+
+# "AGENTS.md §2.1" itself. That section no longer lists the rules -- PP-22e4.4
+# moved them to .claude/rules/ and left a pointer -- so citing it sends the
+# reader somewhere the rule is not. Tolerates the same optional backtick as
+# NUMBERED_RULE_CITATION.
+SECTION_21_CITATION = re.compile(r"AGENTS\.md`?[ \t]*§[ \t]*2\.1\b")
 
 CATALOG = "docs/NON_NEGOTIABLES.md"
 
-# Files and globs whose CORE-* citations must resolve. Missing paths are fine:
-# .claude/rules/ does not exist yet -- the context-system rebuild (PP-22e4)
-# lands it in a later PR, and this gate is written to already cover it.
+# Files and globs whose CORE-* citations must resolve. Missing paths are fine
+# -- a glob that matches nothing is skipped, so this list can name a surface
+# before it exists (it named .claude/rules/ for two weeks before PP-22e4.4
+# created it) and can outlive one that is retired.
 #
 # .agents/skills/ is here because it is a first-class citation surface, not a
 # doc archive: AGENTS.md section 3 instructs every agent to load the relevant
@@ -122,6 +145,8 @@ LEGACY_CITATION_SOURCES: tuple[str, ...] = (
     "CLAUDE.md",
     "docs/NON_NEGOTIABLES.md",
     "docs/ENV_VARS.md",
+    ".claude/rules/*.md",
+    ".claude/rules/**/*.md",
     "src/**/*.ts",
     "src/**/*.tsx",
     "scripts/**/*.mjs",
@@ -241,6 +266,16 @@ def find_legacy_citations(text: str) -> list[tuple[int, str]]:
         for match in regex.finditer(text):
             line_no = text.count("\n", 0, match.start()) + 1
             hits.append((line_no, match.group(0)))
+
+    lines = text.splitlines()
+    for index, line in enumerate(lines[:-1]):
+        if line.lstrip().startswith("#"):
+            continue  # A heading, not a wrapped sentence.
+        match = WRAPPED_RULE_CITATION.search(line)
+        if match and WRAPPED_CITATION_NUMBER.match(lines[index + 1]):
+            wrapped = f"{match.group(0)} {lines[index + 1].strip()}"
+            hits.append((index + 1, wrapped))
+
     hits.sort()
     return hits
 
@@ -305,9 +340,10 @@ def main(argv: list[str] | None = None) -> int:
         return 3
 
     # ERROR: a fragile "rule N" / "commandment N" / "AGENTS.md §2.1" citation
-    # (PP-22e4). §2.1 is being replaced by a grouped index, so both forms
-    # break the moment that happens, and neither is machine-checkable against
-    # a catalog the way a CORE-* ID is -- ban the pattern outright.
+    # (PP-22e4). §2.1 no longer lists the rules -- PP-22e4.4 moved them to
+    # .claude/rules/ -- so both forms now point at nothing, and neither is
+    # machine-checkable against a catalog the way a CORE-* ID is: ban the
+    # pattern outright.
     legacy = collect_legacy_citations(root)
     if legacy:
         print(
@@ -318,10 +354,10 @@ def main(argv: list[str] | None = None) -> int:
             for line_no, matched_text in legacy[rel]:
                 print(f"  {rel}:{line_no}: {matched_text!r}", file=sys.stderr)
         print(
-            "\nAGENTS.md §2.1 is being replaced by a grouped index (PP-22e4) -- "
-            'a rule number or "§2.1" citation points at nothing once that '
-            "lands. Cite the CORE-* ID instead (look it up against "
-            f"{CATALOG}, or AGENTS.md §2.1's own list for now).",
+            "\nAGENTS.md §2.1 no longer lists the rules (PP-22e4.4) -- they "
+            'moved to .claude/rules/, so a rule number or a "§2.1" citation '
+            "now points at nothing. Cite the CORE-* ID instead; look it up in "
+            f"{CATALOG}, which is the only catalog there is.",
             file=sys.stderr,
         )
         return 4
