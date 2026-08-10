@@ -1410,9 +1410,26 @@ const abandoned = await Promise.all(
 );
 ```
 
-Pass `abandoned={abandoned}` to `<MachinePinballmapCard>`. Import `listAbandonedForMachine` from `~/lib/pinballmap/abandoned-listings` and `getCatalogEntry` from `~/lib/pinballmap/catalog`.
+Pass `abandoned={abandoned}` to `<MachinePinballmapCard>`. Import `listAbandonedForMachine` from `~/lib/pinballmap/abandoned-listings` and `getCatalogEntry` from `~/lib/pinballmap/catalog`. (`getCatalogEntry` returns `PinballmapCatalogEntry | null`, whose display title is `name: string` — verified, the fallback above is correct as written.)
 
-Check `getCatalogEntry`'s return type before writing the fallback — if `name` is not a field on it, use whichever field holds the display title.
+**You must also widen the card's render condition, or none of this is visible.** Immediately below, the card is built as:
+
+```tsx
+const pinballmapCard =
+  machine.pinballmapListed || showDesync ? (
+```
+
+A machine that just abandoned an entry is by definition **not listed**, and `derivePbmMachineStatus` reports it as `ok` — it points at a new title and correctly has no listing under it, so `showDesync` is false too. Both halves of that condition are false exactly when an abandonment exists, so the card would not render at all and the notice would never appear. This is the failure the whole task exists to prevent, so verify it end to end rather than trusting the prop wiring.
+
+Add a third disjunct so the card renders when there is something abandoned to report. Gate it the same way the desync alert is gated — on `canLink` — because an abandoned entry is a maintainer's concern and follows the same "surfaced where it can be acted on" rule that the comment above `pbmStatus` already states. Something of this shape:
+
+```tsx
+const showAbandoned = canLink && abandoned.length > 0;
+const pinballmapCard =
+  machine.pinballmapListed || showDesync || showAbandoned ? (
+```
+
+Read the surrounding block before editing — the comment above `pbmStatus` explains the existing gating and should be extended to cover this third case rather than left describing only two.
 
 - [ ] **Step 5: Run the tests to verify they pass**
 
