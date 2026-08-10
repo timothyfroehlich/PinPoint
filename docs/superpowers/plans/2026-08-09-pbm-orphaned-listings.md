@@ -1133,16 +1133,20 @@ git commit -m "feat(pinballmap): record the listing a retitle walks away from (P
 
 - [ ] **Step 1: Write the failing test**
 
-Append to `src/test/integration/pinballmap-reconcile.test.ts`. Read the file first — reuse its existing snapshot-building and state-seeding helpers rather than writing new ones.
+Append to `src/test/integration/pinballmap-reconcile.test.ts`.
+
+**There is no `seedState` helper in this file** — each test inserts the singleton inline. The two helpers that DO exist are `snapshotWith(rows: { id: number; machineId: number }[]): LocationSnapshot` (defined at the top of the file) and `createTestMachine({ initials, name, pinballmapMachineId, pinballmapListed, pinballmapLmxId })` imported from `~/test/helpers/factories`. Use both, and seed the singleton inline exactly as the existing tests do. Add `pinballmapAbandonedListings` to the schema import on line 22.
 
 ```ts
 describe("abandoned listings", () => {
   it("clears a record once its entry is gone from the lineup", async () => {
     const db = await getTestDb();
-    const [machine] = await db
-      .insert(machines)
-      .values({ name: "Godzilla", initials: "GZA", pinballmapMachineId: 6222 })
-      .returning();
+    const machine = createTestMachine({
+      initials: "GZA",
+      name: "Godzilla",
+      pinballmapMachineId: 6222,
+    });
+    await db.insert(machines).values(machine);
     await db.insert(pinballmapAbandonedListings).values({
       machineId: machine.id,
       lmxId: 4471,
@@ -1150,7 +1154,13 @@ describe("abandoned listings", () => {
     });
 
     // The synced lineup no longer carries 4471 — someone removed it by hand.
-    await seedState({ lmxes: [{ id: 5120, machineId: 6222 }] });
+    await db.insert(pinballmapState).values({
+      id: "singleton",
+      locationId: 26454,
+      enabled: true,
+      snapshotJson: snapshotWith([{ id: 5120, machineId: 6222 }]),
+      lastSyncStatus: "ok",
+    });
 
     const result = await reconcileAfterSync();
 
@@ -1161,21 +1171,27 @@ describe("abandoned listings", () => {
 
   it("keeps a record while its entry is still on the lineup", async () => {
     const db = await getTestDb();
-    const [machine] = await db
-      .insert(machines)
-      .values({ name: "Godzilla", initials: "GZB", pinballmapMachineId: 6222 })
-      .returning();
+    const machine = createTestMachine({
+      initials: "GZB",
+      name: "Godzilla",
+      pinballmapMachineId: 6222,
+    });
+    await db.insert(machines).values(machine);
     await db.insert(pinballmapAbandonedListings).values({
       machineId: machine.id,
       lmxId: 4471,
       pinballmapMachineId: 6221,
     });
 
-    await seedState({
-      lmxes: [
+    await db.insert(pinballmapState).values({
+      id: "singleton",
+      locationId: 26454,
+      enabled: true,
+      snapshotJson: snapshotWith([
         { id: 4471, machineId: 6221 },
         { id: 5120, machineId: 6222 },
-      ],
+      ]),
+      lastSyncStatus: "ok",
     });
 
     const result = await reconcileAfterSync();
@@ -1191,17 +1207,25 @@ describe("abandoned listings", () => {
     // overwrites `snapshotJson` on its error path, and both callers gate on a
     // successful result. Absence must never read as "cleaned up".
     const db = await getTestDb();
-    const [machine] = await db
-      .insert(machines)
-      .values({ name: "Godzilla", initials: "GZC", pinballmapMachineId: 6222 })
-      .returning();
+    const machine = createTestMachine({
+      initials: "GZC",
+      name: "Godzilla",
+      pinballmapMachineId: 6222,
+    });
+    await db.insert(machines).values(machine);
     await db.insert(pinballmapAbandonedListings).values({
       machineId: machine.id,
       lmxId: 4471,
       pinballmapMachineId: 6221,
     });
 
-    await seedState({ snapshot: null });
+    await db.insert(pinballmapState).values({
+      id: "singleton",
+      locationId: 26454,
+      enabled: true,
+      snapshotJson: null,
+      lastSyncStatus: "ok",
+    });
 
     const result = await reconcileAfterSync();
 
@@ -1212,7 +1236,7 @@ describe("abandoned listings", () => {
 });
 ```
 
-Adapt `seedState` to whatever the file's existing helper is actually called and what shape it takes. If it does not support a null snapshot, extend it rather than bypassing it.
+Each test in this file seeds its own `pinballmapState` singleton, so these must run against a clean table — follow whatever isolation the surrounding `describe` blocks already use rather than assuming.
 
 - [ ] **Step 2: Run it to verify it fails**
 
