@@ -32,6 +32,7 @@
 
 import {
   isPinPointProductionTarget,
+  isForceProductionEnabled,
   describeTarget,
 } from "../scripts/lib/db-target.mjs";
 import { createScriptClient } from "../scripts/lib/pg-client.mjs";
@@ -43,7 +44,7 @@ if (!POSTGRES_URL) {
   process.exit(1);
 }
 
-const forceProduction = Boolean(
+const forceProduction = isForceProductionEnabled(
   process.env["SEED_PINBALLMAP_CREDS_FORCE_PRODUCTION"]
 );
 
