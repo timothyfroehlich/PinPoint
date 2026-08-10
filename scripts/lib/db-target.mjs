@@ -77,6 +77,30 @@ export function describeTarget(value) {
 }
 
 /**
+ * Does this `FORCE_PRODUCTION`-style env value mean "yes, I meant it"?
+ *
+ * The three prod opt-ins (`DRIZZLE_FORCE_PRODUCTION`,
+ * `MARK_MIGRATION_FORCE_PRODUCTION`, `SEED_PINBALLMAP_CREDS_FORCE_PRODUCTION`)
+ * each read their variable for truthiness, which is backwards for a guard: JS
+ * truthiness makes `=0` and `=false` — the two spellings an operator reaches for
+ * to TURN A FLAG OFF — enable the bypass. On the PinballMap seed that means
+ * `SEED_PINBALLMAP_CREDS_FORCE_PRODUCTION=0` writes an operator token into
+ * prod's Vault (PP-rnup).
+ *
+ * Only the documented `=1`, and `=true` as its obvious synonym, count. Anything
+ * else — `0`, `false`, `yes`, a typo, an empty string — reads as disabled, which
+ * is the fail-safe direction for a guard: the worst outcome is a refusal whose
+ * message names the exact form to type.
+ *
+ * @param {string | undefined} value the raw env var value
+ * @returns {boolean}
+ */
+export function isForceProductionEnabled(value) {
+  const normalized = value?.trim().toLowerCase();
+  return normalized === "1" || normalized === "true";
+}
+
+/**
  * Refuse to continue when `value` targets PinPoint production.
  *
  * There is deliberately NO escape hatch: every caller is a seed script whose

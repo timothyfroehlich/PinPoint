@@ -2,8 +2,8 @@
 # heavy-run.sh — wrap a command in the host-wide concurrency semaphore.
 #
 # Guards memory-intensive commands (test:integration, build, smoke) from
-# stacking up across parallel worktree sessions on a 16 GB Mac. Uses the same
-# --jobs 2 slot count as preflight-locked.sh, but a SEPARATE semaphore id
+# stacking up across parallel worktree sessions on a memory-constrained host.
+# Uses the same --jobs 2 slot count as preflight-locked.sh, but a SEPARATE id
 # (`pinpoint-heavy` vs `pinpoint-preflight`). The two pools are intentionally
 # distinct: preflight already holds an outer `pinpoint-preflight` slot and then
 # invokes these same heavy steps internally, so sharing one id would have
