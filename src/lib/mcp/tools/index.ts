@@ -11,6 +11,7 @@ import { registerSearchPinballmapCatalog } from "./search-pinballmap-catalog";
 import { registerSetMachineAvailability } from "./set-machine-availability";
 import { registerSetMachineName } from "./set-machine-name";
 import { registerSetMachineOwner } from "./set-machine-owner";
+import { registerUpdateIssue } from "./update-issue";
 
 /**
  * Register the MCP tool catalog (spec §"Tool catalog") on an McpServer. Reads
@@ -27,4 +28,5 @@ export function registerPinpointTools(server: McpServer): void {
   registerSetMachineOwner(server);
   registerCreateIssue(server);
   registerAddIssueComment(server);
+  registerUpdateIssue(server);
 }

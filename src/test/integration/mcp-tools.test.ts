@@ -63,6 +63,7 @@ import type { McpMachinePinballmap } from "~/lib/mcp/tools/pinballmap-block";
 import { runSetMachineAvailability } from "~/lib/mcp/tools/set-machine-availability";
 import { runSetMachineName } from "~/lib/mcp/tools/set-machine-name";
 import { runSetMachineOwner } from "~/lib/mcp/tools/set-machine-owner";
+import { runUpdateIssue } from "~/lib/mcp/tools/update-issue";
 import {
   McpToolError,
   resolveAssignee,
@@ -1459,6 +1460,270 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
           ctx("admin", admin)
         )
       ).rejects.toMatchObject({ reason: "not_found" });
+    });
+  });
+
+  describe("update_issue (PP-u4ab.14)", () => {
+    it("applies several fields and reports each change", async () => {
+      const admin = await makeUser("admin");
+      const tech = await makeUser("technician", "Ada", "Lovelace");
+      const machine = await seedMachine({ name: "Attack from Mars" });
+      await runCreateIssue(
+        { machine: machine.initials, title: "left flipper weak" },
+        ctx("admin", admin)
+      );
+
+      const outcome = await runUpdateIssue(
+        {
+          machine: machine.initials,
+          number: 1,
+          status: "confirmed",
+          severity: "major",
+          assignee: "Ada Lovelace",
+        },
+        ctx("admin", admin)
+      );
+      const result = outcome.result as {
+        partial: boolean;
+        applied: {
+          field: string;
+          from: string | null;
+          to: string | null;
+          changed: boolean;
+        }[];
+      };
+
+      expect(result.partial).toBe(false);
+      expect(result.applied).toHaveLength(3);
+      expect(result.applied.find((a) => a.field === "status")).toMatchObject({
+        from: "new",
+        to: "confirmed",
+        changed: true,
+      });
+      expect(result.applied.find((a) => a.field === "severity")).toMatchObject({
+        from: "minor",
+        to: "major",
+        changed: true,
+      });
+      expect(result.applied.find((a) => a.field === "assignee")?.to).toBe(tech);
+
+      const db = await getTestDb();
+      const row = await db.query.issues.findFirst({
+        where: eq(issues.id, outcome.issueId ?? ""),
+        columns: { status: true, severity: true, assignedTo: true },
+      });
+      expect(row).toMatchObject({
+        status: "confirmed",
+        severity: "major",
+        assignedTo: tech,
+      });
+    });
+
+    it("reports changed: false for a field already at that value", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine({ name: "Medieval Madness" });
+      await runCreateIssue(
+        { machine: machine.initials, title: "ball stuck" },
+        ctx("admin", admin)
+      );
+
+      const outcome = await runUpdateIssue(
+        { machine: machine.initials, number: 1, status: "new" },
+        ctx("admin", admin)
+      );
+      const result = outcome.result as {
+        applied: { field: string; changed: boolean }[];
+      };
+      expect(result.applied[0]).toMatchObject({
+        field: "status",
+        changed: false,
+      });
+    });
+
+    it("unassigns when the assignee is an empty string", async () => {
+      const admin = await makeUser("admin");
+      const tech = await makeUser("technician", "Grace", "Hopper");
+      const machine = await seedMachine({ name: "Fish Tales" });
+      await runCreateIssue(
+        { machine: machine.initials, title: "shaker rattles" },
+        ctx("admin", admin)
+      );
+      await runUpdateIssue(
+        { machine: machine.initials, number: 1, assignee: tech },
+        ctx("admin", admin)
+      );
+
+      const outcome = await runUpdateIssue(
+        { machine: machine.initials, number: 1, assignee: "" },
+        ctx("admin", admin)
+      );
+      const result = outcome.result as {
+        applied: { field: string; from: string | null; to: string | null }[];
+      };
+      expect(result.applied[0]).toMatchObject({
+        field: "assignee",
+        from: tech,
+        to: null,
+      });
+
+      const db = await getTestDb();
+      const row = await db.query.issues.findFirst({
+        where: eq(issues.id, outcome.issueId ?? ""),
+        columns: { assignedTo: true },
+      });
+      expect(row?.assignedTo).toBeNull();
+    });
+
+    it("rejects an update that supplies no fields", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine({ name: "Twilight Zone" });
+      await runCreateIssue(
+        { machine: machine.initials, title: "scoop weak" },
+        ctx("admin", admin)
+      );
+
+      await expect(
+        runUpdateIssue(
+          { machine: machine.initials, number: 1 },
+          ctx("admin", admin)
+        )
+      ).rejects.toMatchObject({ reason: "invalid" });
+    });
+
+    it("denies a guest on a triage field", async () => {
+      const guest = await makeUser("guest");
+      const admin = await makeUser("admin");
+      const machine = await seedMachine({ name: "Cirqus Voltaire" });
+      await runCreateIssue(
+        { machine: machine.initials, title: "ringmaster stuck" },
+        ctx("admin", admin)
+      );
+
+      await expect(
+        runUpdateIssue(
+          { machine: machine.initials, number: 1, priority: "high" },
+          ctx("guest", guest)
+        )
+      ).rejects.toThrow(/cannot change an issue's priority/);
+    });
+
+    /**
+     * A member holds triage but not the "own"-scoped reporting permission on
+     * someone else's issue, so a mixed call must be denied as a whole — and
+     * denied BEFORE anything is written, since the gate runs ahead of the apply
+     * loop.
+     */
+    it("denies a mixed update before writing any field", async () => {
+      const admin = await makeUser("admin");
+      const guest = await makeUser("guest");
+      const machine = await seedMachine({ name: "Ghostbusters" });
+      await runCreateIssue(
+        { machine: machine.initials, title: "left ramp" },
+        ctx("admin", admin)
+      );
+
+      await expect(
+        runUpdateIssue(
+          {
+            machine: machine.initials,
+            number: 1,
+            severity: "major",
+            priority: "high",
+          },
+          ctx("guest", guest)
+        )
+      ).rejects.toMatchObject({ reason: "denied" });
+
+      const db = await getTestDb();
+      const row = await db.query.issues.findFirst({
+        where: eq(issues.machineInitials, machine.initials),
+        columns: { severity: true, priority: true },
+      });
+      expect(row).toMatchObject({ severity: "minor", priority: "medium" });
+    });
+
+    it("fails the whole call when the assignee cannot be resolved", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine({ name: "Monster Bash" });
+      await runCreateIssue(
+        { machine: machine.initials, title: "mummy stuck" },
+        ctx("admin", admin)
+      );
+
+      await expect(
+        runUpdateIssue(
+          {
+            machine: machine.initials,
+            number: 1,
+            severity: "major",
+            assignee: "Nobody Here",
+          },
+          ctx("admin", admin)
+        )
+      ).rejects.toMatchObject({ reason: "not_found" });
+
+      // Resolution runs before the apply loop, so severity must be untouched.
+      const db = await getTestDb();
+      const row = await db.query.issues.findFirst({
+        where: eq(issues.machineInitials, machine.initials),
+        columns: { severity: true },
+      });
+      expect(row?.severity).toBe("minor");
+    });
+
+    /**
+     * The partial-application contract, and the reason update_issue returns a
+     * success payload instead of an error when a field fails.
+     *
+     * Each field commits in its own transaction, so a mid-loop failure leaves
+     * the earlier fields WRITTEN. `severity` lands, `priority` throws, and the
+     * response has to say both things at once — otherwise the caller is told
+     * nothing happened while the database says otherwise (CORE-ARCH-012).
+     */
+    it("keeps earlier fields written when a later one fails, and says so", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine({ name: "Ghostbusters" });
+      await runCreateIssue(
+        { machine: machine.initials, title: "left ramp" },
+        ctx("admin", admin)
+      );
+
+      const services = await import("~/services/issues");
+      const spy = vi
+        .spyOn(services, "updateIssuePriority")
+        .mockRejectedValueOnce(new Error("priority write failed"));
+
+      try {
+        const outcome = await runUpdateIssue(
+          {
+            machine: machine.initials,
+            number: 1,
+            severity: "major",
+            priority: "high",
+          },
+          ctx("admin", admin)
+        );
+        const result = outcome.result as {
+          partial: boolean;
+          failed: { field: string; reason: string };
+          applied: { field: string }[];
+        };
+
+        expect(result.partial).toBe(true);
+        expect(result.failed.field).toBe("priority");
+        expect(result.failed.reason).toBe("priority write failed");
+        // severity is applied before priority and must be reported as landed.
+        expect(result.applied.map((a) => a.field)).toEqual(["severity"]);
+
+        const db = await getTestDb();
+        const row = await db.query.issues.findFirst({
+          where: eq(issues.id, outcome.issueId ?? ""),
+          columns: { severity: true, priority: true },
+        });
+        expect(row).toMatchObject({ severity: "major", priority: "medium" });
+      } finally {
+        spy.mockRestore();
+      }
     });
   });
 });
