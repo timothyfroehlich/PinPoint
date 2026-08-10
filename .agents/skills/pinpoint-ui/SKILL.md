@@ -29,7 +29,7 @@ Use this skill when:
 3. **shadcn/ui only**: No MUI components
 4. **Direct Server Action references** (CORE-ARCH-005): No inline wrappers in forms
 5. **Dropdown Server Actions** (CORE-ARCH-006): Use `onSelect`, not forms
-6. **Tailwind CSS v4 + semantic tokens**: Use `bg-primary`, `text-destructive`, etc. — no raw palette classes (`bg-cyan-500`, `text-red-500`) and no hardcoded hex (enforced via ESLint `better-tailwindcss/no-restricted-classes`)
+6. **Tailwind CSS v4 + semantic tokens**: Use `bg-primary`, `text-destructive-text`, etc. — no raw palette classes (`bg-cyan-500`, `text-red-500`) and no hardcoded hex (enforced via ESLint `better-tailwindcss/no-restricted-classes`)
 7. **TooltipProvider is hoisted**: `<TooltipProvider>` is mounted once in `ClientProviders` — don't add nested providers. See `pinpoint-design-bible` §12.
 8. **Baseline Widely available is the floor** (CORE-UI-005): use `<dialog>`, container queries, `:has()`, `:user-invalid`, `inert`, `aspect-ratio`, `fetchpriority`, native form validation directly — no polyfills. Newly-available features (Popover API, View Transitions, anchor positioning) require a per-feature opt-in in `pinpoint-design-bible` §19. Never trust a cached Baseline date — look it up live (`references/browser-support.md`).
 9. **Form correctness** (CORE-FORM-001..006): right `type`, correct `autocomplete` token, `:user-invalid` styling, `aria-invalid` blur sync, visible required-field indicator, `enterkeyhint` on sequential mobile fields. Conventions are owned by `pinpoint-design-bible` §20; the code is in `references/form-correctness.md`.
@@ -50,7 +50,7 @@ Everything below lives one hop away in `references/`. Load the file you need.
 
 ## Color System
 
-- **Use semantic tokens** (`bg-primary`, `text-destructive`, `text-muted-foreground`, `border-success/40`). Raw Tailwind palette classes and hardcoded hex are **forbidden in component code**, enforced by ESLint (`better-tailwindcss/no-restricted-classes`). The token values live in the Tailwind v4 `@theme` block in `src/app/globals.css`; the rule and its two design-layer exceptions are `pinpoint-design-bible` §1.
+- **Use semantic tokens** (`bg-primary`, `text-destructive-text`, `text-muted-foreground`, `border-success/40`). Raw Tailwind palette classes and hardcoded hex are **forbidden in component code**, enforced by ESLint (`better-tailwindcss/no-restricted-classes`). The token values live in the Tailwind v4 `@theme` block in `src/app/globals.css`; the rule and its two design-layer exceptions are `pinpoint-design-bible` §1.
 - Status / severity / priority / frequency colors come from the configs in `src/lib/issues/status.ts` — never freestyle a status color at a call site.
 - **PinPoint is dark-only.** `dark:` utility classes are dead code; remove them when you touch a file that still has them.
 - **The secondary is teal, and purple is not in the palette** — a purple/fuchsia secondary was removed deliberately (PR #1204) so primary and secondary read as one green-family pairing rather than two competing brands. Do not reintroduce it.
