@@ -1,6 +1,6 @@
 ---
 name: pinpoint-memory-review
-description: Weekly curated pass over everything recorded about how we work — beads memories, Claude auto-memories on both the Mac and Bazzite, and the canonical context files. Prunes stale facts, promotes and demotes between tiers, dedupes across tiers, and hands Tim a short veto list. Use when the weekly chores checklist reaches the memory item, or when Tim says "memory review", "review memories", or asks what has been recorded.
+description: Weekly curated pass over everything recorded about how we work — beads memories, Claude auto-memories on both the Mac and Bazzite, and the canonical context files. Prunes stale facts, promotes and demotes between tiers, dedupes across tiers, hands Tim a short veto list, then applies the verdicts on both machines. Use when the weekly chores checklist reaches the memory item, or when Tim says "memory review", "review memories", or asks what has been recorded. **Auditing the contents of skills is explicitly out of scope** — this pass covers recorded facts, not the skill corpus.
 ---
 
 # pinpoint-memory-review

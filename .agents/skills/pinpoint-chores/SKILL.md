@@ -1,6 +1,6 @@
 ---
 name: pinpoint-chores
-description: Runbook for the weekly PinPoint "chores" session — the human-in-the-loop maintenance pass (Supabase CLI pin, TS-7 rollout, Dependabot, changelog, Sentry/Supabase advisors, PinballMap vendored-docs drift, GHA infra-flake triage, cloud-routine beads). Use when Tim says "let's do chores", when the SessionStart chores-nag fires ("🧹 Weekly chores are N days overdue"), or when you want the chores checklist. After finishing, re-arm the nag with `bd defer`.
+description: Runbook for the weekly PinPoint "chores" session — the human-in-the-loop maintenance pass, ten checklist items: the Supabase CLI and pnpm corepack version pins (each with its own cooldown and its own set of sites to update), TS-7 rollout, Dependabot PRs, changelog, Sentry and Supabase advisors, cloud-routine review beads, PinballMap vendored-docs drift, GHA infra-flake triage, prod backup validation (`pnpm run chores:backups`), and the memory-and-context review it hands to `pinpoint-memory-review`. Use when Tim says "let's do chores", when the SessionStart chores-nag fires ("🧹 Weekly chores are N days overdue"), or when you want the chores checklist. After finishing, re-arm the nag with `bd defer`. Session-start project health is `pinpoint-briefing`, not this.
 ---
 
 # pinpoint-chores

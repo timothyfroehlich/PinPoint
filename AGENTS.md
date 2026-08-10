@@ -12,7 +12,7 @@
 
 **`docs/NON_NEGOTIABLES.md` is the catalog** — every implementation rule, with its canonical `CORE-*` ID, severity, rationale, and do/don't. Read it before writing code in an area you have not touched before, and cite rules by ID.
 
-This section used to restate all 20 rules as one-line summaries, loaded on every session regardless of what the session was doing. They now live in `.claude/rules/`, grouped by where they apply: files with a `paths:` glob list load when a matching file is opened, and `always.md` — the four rules no glob would narrow — loads at launch. `.claude/rules/README.md` explains the split and how to add a rule.
+This section used to restate all 20 rules as one-line summaries, loaded on every session regardless of what the session was doing. They now live in `.claude/rules/`, grouped by where they apply: files with a `paths:` glob list load when a matching file is opened, and `always.md` — the six rules no glob would narrow honestly — loads at launch. `.claude/rules/README.md` explains the split and how to add a rule.
 
 That tier is Claude Code-specific. In any other tool, read the catalog directly.
 
