@@ -1,11 +1,11 @@
 ---
 name: pinpoint-deployment
-description: Deployment reference for PinPoint — Supabase/Postgres pooler and connection-string reference (Supavisor transaction vs session pooler, IPv4/IPv6, prepared statements, and the resolved PP-d8l8 silent-commit-loss incident); the day-to-day Drizzle migration loop (db:generate, db:migrate, db:reset, test:_generate-schema, the exported PGlite schema.sql, ensure-test-schema, CORE-ARCH-009 migrations-not-push); resolving drizzle/meta conflicts on merge; on-demand TTL'd Supabase preview branches, the /preview command, the sticky status comment, and the hourly reaper; and the per-PR /audit-override escape hatch for unrelated pnpm audit failures blocking CI Gate. Use when changing the Drizzle schema or generating/applying a migration; when touching src/server/db/**, scripts/migrate-production.ts, or scripts/lib/pg-client.mjs (DB connection/pooler config); when a merge or rebase produces conflicts under drizzle/meta or drizzle migration .sql/_snapshot.json files; when setting up, debugging, or explaining Vercel preview deployments or the /preview command; or when a PR's audit job goes red on a freshly-published advisory unrelated to the PR's own changes, or when explaining/debugging the /audit-override command.
+description: Deployment reference for PinPoint — Supabase/Postgres pooler and connection-string reference (Supavisor transaction vs session pooler, IPv4/IPv6, prepared statements, and the resolved PP-d8l8 silent-commit-loss incident); the day-to-day Drizzle migration loop (db:generate, db:migrate, db:reset, test:_generate-schema, the exported PGlite schema.sql, ensure-test-schema, CORE-ARCH-009 migrations-not-push); resolving drizzle/meta conflicts on merge; the Vercel production build (vercel-build = migrate:production && next build, so a failed build has already migrated prod), diagnosing a failed deploy without build logs, and the write-only SENSITIVE default on `vercel env add`; on-demand TTL'd Supabase preview branches, the /preview command, the sticky status comment, and the hourly reaper; and the per-PR /audit-override escape hatch for unrelated pnpm audit failures blocking CI Gate. Use when changing the Drizzle schema or generating/applying a migration; when touching src/server/db/**, scripts/migrate-production.ts, or scripts/lib/pg-client.mjs (DB connection/pooler config); when a merge or rebase produces conflicts under drizzle/meta or drizzle migration .sql/_snapshot.json files; when a production deploy fails or you are setting a production env var with the Vercel CLI; when setting up, debugging, or explaining Vercel preview deployments or the /preview command; or when a PR's audit job goes red on a freshly-published advisory unrelated to the PR's own changes, or when explaining/debugging the /audit-override command.
 ---
 
 # PinPoint Deployment
 
-Merged reference covering PinPoint's deployment-adjacent operational surfaces: DB connections/pooling, the day-to-day migration loop, migration-conflict resolution, preview deployments, and the audit-gate override. Four of these sections were previously their own skills (`pinpoint-db-connections`, `pinpoint-migration-conflicts`, `pinpoint-preview-deployments`, `pinpoint-audit-override`) and are reproduced here verbatim; **Database Migrations (day-to-day)** was absorbed from the retired patterns docs (PP-22e4).
+Merged reference covering PinPoint's deployment-adjacent operational surfaces: DB connections/pooling, the day-to-day migration loop, migration-conflict resolution, production deploys, preview deployments, and the audit-gate override. Four of these sections were previously their own skills (`pinpoint-db-connections`, `pinpoint-migration-conflicts`, `pinpoint-preview-deployments`, `pinpoint-audit-override`) and are reproduced here verbatim; **Database Migrations (day-to-day)** was absorbed from the retired patterns docs (PP-22e4), and **Production Deploys (Vercel)** from two beads memories demoted in the 2026-08-09 review (PP-p4ek).
 
 ## DB Connections
 
@@ -79,6 +79,29 @@ Never resolve `drizzle/meta` conflicts manually — the folder holds binary-like
 6. `pnpm db:reset` to verify.
 
 Before merging any migration PR: every new `.sql` has a matching `_snapshot.json`; `pnpm db:generate` reports "No schema changes".
+
+## Production Deploys (Vercel)
+
+Vercel's production build runs `pnpm run vercel-build` — which is `migrate:production && next build` (`package.json`). Two of the three notes below follow from that ordering.
+
+### Migrations run first, so a failed build may already have migrated prod
+
+`migrate:production` finishes **before** `next build` starts. A build that dies later — on the `next.config.ts` env assertion (`assertVercelDeploymentEnv`), on a compile error, on anything — has **already applied the PR's migrations to production**.
+
+Vercel does not promote a failed build, so production keeps serving the **previous** deployment and stays healthy (curl it before assuming an outage). But if the PR carried migrations, prod's database is now migrated while prod's code is still the old build. Verify the new schema is forward-compatible with that old code rather than assuming nothing happened.
+
+### Diagnosing a failed production deploy without build logs
+
+The `claude_ai_Vercel` MCP's `get_deployment_build_logs` **401s** — `get_deployment` and `list_teams` work, the log tool does not; the Vercel CLI is the only path to build logs. Without them, infer from two signals:
+
+- **The `buildingAt` → `ready` delta.** A very short one (~19s) means it died at **module evaluation**, not on a compile error — i.e. a top-level assertion or import-time throw, which is exactly what a missing registered env var looks like.
+- **Whether the previous production deploy succeeded**, which isolates the failure to the change that just landed.
+
+### Setting a production env var: the SENSITIVE footgun
+
+`vercel env add <name> production` defaults to Vercel's **SENSITIVE** type, which is **write-only**: `vercel env pull` returns the literal string `[SENSITIVE]` (length 11) instead of the value, and the dashboard cannot show it either. The server still receives the real value at build and runtime, **so the app works** — while the secret is unretrievable by humans. That silently breaks any secret Tim also needs a copy of (a bearer token he has to paste into a client config, say).
+
+Pass `--no-sensitive` for anything that must stay readable. Verify by pulling to a temp file and checking the value's **length**, then shred the file — do not print secrets. (`docs/ENV_VARS.md` notes this on `PINBALLMAP_API_TOKEN`'s entry; the rule is general.)
 
 ## Preview Deployments
 
