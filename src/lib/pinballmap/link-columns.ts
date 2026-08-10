@@ -102,6 +102,20 @@ async function resolveCore(
     pinballmapMachineId === stored.pinballmapMachineId;
   const keepsListing = linkUnchanged && stored.pinballmapListed;
 
+  // The stored listing survives only when the link target is unchanged. Every
+  // other outcome leaves a LIVE entry on pinballmap.com that this machine no
+  // longer claims — that is the thing to write down, not discard (PP-l81u).
+  const abandoned: AbandonedListing | null =
+    !keepsListing &&
+    stored.pinballmapListed &&
+    stored.pinballmapLmxId !== null &&
+    stored.pinballmapMachineId !== null
+      ? {
+          lmxId: stored.pinballmapLmxId,
+          pinballmapMachineId: stored.pinballmapMachineId,
+        }
+      : null;
+
   const empty: MachinePbmColumns = {
     pinballmapMachineId: null,
     pinballmapExcluded: false,
@@ -126,7 +140,7 @@ async function resolveCore(
         pinballmapExcluded: true,
         pinballmapExcludedReason: input.pinballmapExcludedReason ?? null,
       },
-      abandoned: null,
+      abandoned,
     };
   }
 
@@ -151,10 +165,10 @@ async function resolveCore(
         opdbId: entry.opdbId,
         ipdbId: entry.ipdbId,
       },
-      abandoned: null,
+      abandoned,
     };
   }
 
   // Neither linked nor excluded (requirement off): all PBM columns stay empty.
-  return { ok: true, columns: empty, abandoned: null };
+  return { ok: true, columns: empty, abandoned };
 }

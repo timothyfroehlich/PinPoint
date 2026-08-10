@@ -25,7 +25,9 @@ import { createMachineSchema, updateMachineSchema } from "./schemas";
 import {
   resolvePbmLinkColumnsForCreate,
   resolvePbmLinkColumnsForUpdate,
+  type AbandonedListing,
 } from "~/lib/pinballmap/link-columns";
+import { recordAbandonedListing } from "~/lib/pinballmap/abandoned-listings";
 import {
   captureAutoLink,
   resolveAutoLinkForMachine,
@@ -720,6 +722,11 @@ export async function updateMachineAction(
     // link permission and derives metadata from the catalog mirror. When the
     // marker is absent, link columns are left untouched.
     let pbmColumns: MachinePbmColumns | null = null;
+    // A live PinballMap entry this save walks away from (PP-l81u), or null.
+    // Set alongside `pbmColumns` below and written in the same transaction as
+    // the columns — a retitle whose record does not land leaves a public
+    // listing nobody can find.
+    let abandonedListing: AbandonedListing | null = null;
     if (pbmFormPresent) {
       if (
         !checkPermission("machines.pinballmap.link", accessLevel, {
@@ -744,6 +751,7 @@ export async function updateMachineAction(
       });
       if (!pbm.ok) return err("VALIDATION", pbm.message);
       pbmColumns = pbm.columns;
+      abandonedListing = pbm.abandoned;
 
       // Auto-link (PP-o355.20): the moment a cabinet is matched to a title that
       // is already on Pinball Map's lineup, capture that listing alongside the
@@ -843,6 +851,10 @@ export async function updateMachineAction(
 
         if (!updatedMachine) {
           throw new Error("Machine update failed");
+        }
+
+        if (abandonedListing) {
+          await recordAbandonedListing(tx, id, abandonedListing, user.id);
         }
 
         // Add new owner as watcher if active user
@@ -1037,6 +1049,10 @@ export async function updateMachineAction(
 
       if (!updatedMachine) {
         throw new MachineNotFoundError();
+      }
+
+      if (abandonedListing) {
+        await recordAbandonedListing(tx, id, abandonedListing, user.id);
       }
 
       // Handle owner changes in machine_watchers (inside tx so they roll back
