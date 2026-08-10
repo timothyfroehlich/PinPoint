@@ -87,10 +87,11 @@ color: blue
 
 ```bash
 # Fast Quality Check (recommended for quick feedback)
-pnpm run check  # Runs: typecheck, lint, test, format:fix in parallel (~5s)
+pnpm run check  # Static gate only: typecheck, lint, format, shell/YAML/Python linters (~9s). No unit tests, no pytest.
+pnpm run test   # Unit suite — check does NOT run it
 
 # Comprehensive Pre-Commit Check
-pnpm run preflight  # Full suite: check + build + integration + smoke tests
+pnpm run preflight  # Full suite: check + build + unit + integration
 
 # Individual Component Checks
 pnpm run typecheck       # TypeScript type checking

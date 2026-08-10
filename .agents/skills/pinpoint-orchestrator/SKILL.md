@@ -75,7 +75,7 @@ Present options to the user. Before proceeding, verify tasks are independent:
 
 1. The bead ID + "First run `bd show <id>` && `bd update <id> --claim`, then work from the bead." The bead carries scope, files, line numbers, and acceptance criteria — do NOT restate them in the prompt (two places to drift).
 2. Only context that ISN'T already in the bead — cross-bead conflicts, a reference PR, sequencing constraints. Omit when there's nothing to add.
-3. Quality gate: "Run `pnpm run check` before returning."
+3. Quality gate: point the agent at **AGENTS.md §5 "Which tests to run"** and tell it to run the tiers matching what it touched. Do **not** write "run `pnpm run check`" and stop — `check` is a static gate that runs no unit tests and no pytest (PP-4zcj), so that instruction cannot fail on a broken test and CI becomes the first thing that notices (PP-lql4).
 4. Full PR lifecycle: "Create PR, verify CI green."
 5. Structured return format: branch, PR#, CI status, blockers
 
