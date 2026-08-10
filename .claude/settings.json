@@ -72,11 +72,6 @@
             "type": "command",
             "command": "node .claude/hooks/inject-beads-actor.cjs",
             "timeout": 5000
-          },
-          {
-            "type": "command",
-            "command": "node .claude/hooks/block-heavy-under-pressure.cjs",
-            "timeout": 335000
           }
         ]
       },

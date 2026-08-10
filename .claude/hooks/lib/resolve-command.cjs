@@ -65,8 +65,8 @@
  *                    for messages only — NOT source-exact
  *
  *   options.splitNewlines  default true. Pass false to keep a newline from
- *                          separating segments (block-heavy-under-pressure
- *                          deliberately does this — see PP-qota).
+ *                          separating segments — see PP-qota for why a guard
+ *                          might want that.
  */
 
 "use strict";

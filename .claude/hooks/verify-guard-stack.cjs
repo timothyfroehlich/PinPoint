@@ -45,7 +45,6 @@ const fs = require("node:fs");
 const EXPECTED_GUARD_HOOKS = [
   "normalize-workspace-paths.cjs",
   "inject-beads-actor.cjs",
-  "block-heavy-under-pressure.cjs",
   "block-direct-merge.cjs",
   "block-main-worktree-branch-switch.cjs",
   "block-worktree-dispatch-from-linked.cjs",
@@ -115,7 +114,7 @@ function extractScriptPaths(command) {
 /**
  * Does a repo-relative script path exist on disk?
  *
- * Resolves against the same candidate roots as block-heavy-under-pressure.cjs
+ * Resolves against the candidate roots a hook itself would use
  * (CLAUDE_PROJECT_DIR → __dirname-relative → cwd) and counts the script as
  * present if ANY candidate root has it. Inside a worktree the hook runs from
  * the worktree's own .claude/hooks/, and CLAUDE_PROJECT_DIR may point at a
@@ -249,13 +248,6 @@ const BEHAVIOR_PROBES = [
     verdict: (fn, command) => fn(command).block,
     mustBlock: ["git checkout feature/x", 'eval "git switch feature/x"'],
     mustAllow: ["git checkout main", "echo git checkout feature/x"],
-  },
-  {
-    hook: "block-heavy-under-pressure.cjs",
-    export: "isHeavyCommand",
-    verdict: (fn, command) => fn(command),
-    mustBlock: ["pnpm run build", "pnpm exec playwright test"],
-    mustAllow: ['echo "how to run pnpm run build"', "pnpm run lint"],
   },
 ];
 
