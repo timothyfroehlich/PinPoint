@@ -22,7 +22,7 @@
     "lint:_oxlint": "oxlint src/ e2e/ scripts/",
     "lint:_slim": "PINPOINT_LINT_SLIM=1 eslint src/ e2e/ scripts/ --quiet",
     "fix:lint-format": "npm-run-all --sequential lint:fix format:fix",
-    "format": "prettier --check \"**/*.{js,jsx,mjs,cjs,ts,tsx,json,css,md}\" --log-level error",
+    "format": "prettier --check \"**/*.{js,jsx,mjs,cjs,ts,tsx,json,css,md}\" --log-level warn",
     "format:fix": "prettier --write \"**/*.{js,jsx,mjs,cjs,ts,tsx,json,css,md}\" --log-level error",
     "test:ensure-schema": "tsx scripts/ensure-test-schema.ts",
     "test": "pnpm run test:ensure-schema && vitest run --project unit --silent --no-color --reporter=dot --max-workers=4",
@@ -212,11 +212,11 @@
       "eslint --fix",
       "prettier --write"
     ],
-    "{src,e2e,scripts}/**/*.{mjs,cjs}": [
+    "{src,e2e,scripts}/**/*.{mjs,cjs,js,jsx}": [
       "eslint --fix",
       "prettier --write"
     ],
-    "*.{js,jsx,json,css,md}": [
+    "*.{json,css,md}": [
       "prettier --write"
     ]
   }
