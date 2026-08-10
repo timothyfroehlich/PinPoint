@@ -17,7 +17,7 @@ import { issues } from "~/server/db/schema";
 import {
   issueUrl,
   McpToolError,
-  resolveAssignee,
+  resolveAssigneeFilter,
   resolveMachine,
   runTool,
   type ToolOutcome,
@@ -75,7 +75,7 @@ const listIssuesSchema = z.object({
     .min(1)
     .optional()
     .describe(
-      "Only issues assigned to this member (full name or UUID). Note there is no filter for 'unassigned'."
+      "Only issues assigned to this person (full name or UUID). Any user resolves here, including one who can no longer be assigned new work. Note there is no filter for 'unassigned'."
     ),
   limit: z
     .number()
@@ -118,17 +118,14 @@ export async function runListIssues(
     conditions.push(eq(issues.severity, args.severity));
   }
   if (args.assignee) {
-    // A name that resolves to nobody throws out of resolveAssignee, so this
-    // never silently degrades into "no assignee filter" — which would return
-    // the whole collection under a filter name that narrowed nothing.
-    const assigneeId = await resolveAssignee(args.assignee);
-    if (assigneeId === null) {
-      throw new McpToolError(
-        "invalid",
-        "Pass a member's name or UUID to filter by assignee, or omit the argument."
-      );
-    }
-    conditions.push(eq(issues.assignedTo, assigneeId));
+    // resolveAssigneeFilter, NOT resolveAssignee: this asks who the name refers
+    // to, not who may be assigned work. A name that resolves to nobody still
+    // throws, so the filter never silently degrades into "no assignee filter" —
+    // which would return the whole collection under a filter that narrowed
+    // nothing.
+    conditions.push(
+      eq(issues.assignedTo, await resolveAssigneeFilter(args.assignee))
+    );
   }
 
   // One WHERE for both the page and the count — a filter applied to only one of

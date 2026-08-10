@@ -122,6 +122,25 @@ const updateIssueSchema = z.object({
 
 type UpdateIssueArgs = z.infer<typeof updateIssueSchema>;
 
+/**
+ * The value for a field the apply loop is about to write, as a loud failure
+ * rather than a silent fallback.
+ *
+ * `supplied` already guarantees the argument is defined, so this never throws
+ * today. Writing `args.status ?? issue.status` instead would also never fall
+ * back today — but it fails the wrong way if that guarantee ever breaks: the
+ * tool would re-write the value from the snapshot read before the loop,
+ * clobbering whatever a concurrent writer had put there with data already known
+ * to be stale, and report it as a change it made. Failing here is a caught
+ * error naming the field.
+ */
+function suppliedValue<T>(value: T | undefined, field: UpdatableField): T {
+  if (value === undefined) {
+    throw new McpToolError("invalid", `No value supplied for ${field}.`);
+  }
+  return value;
+}
+
 /** One field's outcome, reported whether or not the value actually moved. */
 interface FieldChange {
   field: UpdatableField;
@@ -173,7 +192,7 @@ export async function runUpdateIssue(
         case "title": {
           const result = await updateIssueTitle({
             issueId: issue.id,
-            title: args.title ?? issue.title,
+            title: suppliedValue(args.title, field),
             userId: ctx.userId,
           });
           applied.push({
@@ -187,7 +206,7 @@ export async function runUpdateIssue(
         case "status": {
           const result = await updateIssueStatus({
             issueId: issue.id,
-            status: args.status ?? issue.status,
+            status: suppliedValue(args.status, field),
             userId: ctx.userId,
           });
           plans.push(result.deliveryPlan);
@@ -202,7 +221,7 @@ export async function runUpdateIssue(
         case "severity": {
           const result = await updateIssueSeverity({
             issueId: issue.id,
-            severity: args.severity ?? issue.severity,
+            severity: suppliedValue(args.severity, field),
             userId: ctx.userId,
           });
           applied.push({
@@ -216,7 +235,7 @@ export async function runUpdateIssue(
         case "frequency": {
           const result = await updateIssueFrequency({
             issueId: issue.id,
-            frequency: args.frequency ?? issue.frequency,
+            frequency: suppliedValue(args.frequency, field),
             userId: ctx.userId,
           });
           applied.push({
@@ -230,7 +249,7 @@ export async function runUpdateIssue(
         case "priority": {
           const result = await updateIssuePriority({
             issueId: issue.id,
-            priority: args.priority ?? issue.priority,
+            priority: suppliedValue(args.priority, field),
             userId: ctx.userId,
           });
           applied.push({

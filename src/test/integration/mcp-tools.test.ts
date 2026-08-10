@@ -71,6 +71,7 @@ import { runUpdateIssue } from "~/lib/mcp/tools/update-issue";
 import {
   McpToolError,
   resolveAssignee,
+  resolveAssigneeFilter,
   resolveIssue,
 } from "~/lib/mcp/tools/shared";
 
@@ -1327,6 +1328,30 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
       await expect(resolveAssignee("Guest Person")).rejects.toThrow(/guest/i);
     });
 
+    /**
+     * The filter resolver answers a different question than `resolveAssignee`:
+     * who does this name refer to, not who may be given work. A guest resolves
+     * (they may still hold issues from before the demotion), and two people
+     * sharing a name are ambiguous even when only one of them is assignable —
+     * silently picking the assignable one would filter on a person the caller
+     * never named.
+     */
+    it("resolves a guest for the read filter, and still rejects ambiguity", async () => {
+      const guest = await makeUser("guest", "Guest", "Person");
+      expect(await resolveAssigneeFilter("Guest Person")).toBe(guest);
+      expect(await resolveAssigneeFilter(guest)).toBe(guest);
+
+      await makeUser("guest", "Pat", "Kim");
+      await makeUser("member", "Pat", "Kim");
+      await expect(resolveAssigneeFilter("Pat Kim")).rejects.toMatchObject({
+        reason: "invalid",
+      });
+
+      await expect(resolveAssigneeFilter(randomUUID())).rejects.toMatchObject({
+        reason: "not_found",
+      });
+    });
+
     it("rejects an invited user id — issues have no invited-assignee column", async () => {
       const db = await getTestDb();
       const invitedId = randomUUID();
@@ -1707,6 +1732,55 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
 
       await expect(
         runListIssues({ assignee: "Nobody Here" }, ctx("admin", admin))
+      ).rejects.toMatchObject({ reason: "not_found" });
+    });
+
+    /**
+     * The assignee filter asks who a name REFERS TO, not who may be assigned
+     * work. Routing it through `resolveAssignee` — the write-eligibility
+     * resolver — gets the wrong answer for rows that already exist: demoting a
+     * member to guest does not unassign their issues, so the filter would throw
+     * "no assignable member" for a name whose issues are sitting right there
+     * (CORE-ARCH-012).
+     *
+     * The last assertion is the other half: the read widened, the write did not.
+     */
+    it("finds issues assigned to a member who was later demoted to guest", async () => {
+      const admin = await makeUser("admin");
+      const demoted = await makeUser("technician", "Grace", "Hopper");
+      const machine = await seedMachine({ name: "Medieval Madness" });
+      await runCreateIssue(
+        { machine: machine.initials, title: "trolls stuck down" },
+        ctx("admin", admin)
+      );
+      await runUpdateIssue(
+        { machine: machine.initials, number: 1, assignee: demoted },
+        ctx("admin", admin)
+      );
+
+      const db = await getTestDb();
+      await db
+        .update(userProfiles)
+        .set({ role: "guest" })
+        .where(eq(userProfiles.id, demoted));
+
+      const byName = await runListIssues(
+        { machine: machine.initials, assignee: "Grace Hopper" },
+        ctx("admin", admin)
+      );
+      expect((byName.result as { total: number }).total).toBe(1);
+
+      const byId = await runListIssues(
+        { machine: machine.initials, assignee: demoted },
+        ctx("admin", admin)
+      );
+      expect((byId.result as { total: number }).total).toBe(1);
+
+      await expect(
+        runUpdateIssue(
+          { machine: machine.initials, number: 1, assignee: "Grace Hopper" },
+          ctx("admin", admin)
+        )
       ).rejects.toMatchObject({ reason: "not_found" });
     });
   });

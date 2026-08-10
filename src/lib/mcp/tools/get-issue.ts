@@ -81,7 +81,15 @@ export async function runGetIssue(
   const nameById = new Map(profiles.map((p) => [p.id, p.name]));
 
   // The thread is a separate permission from the issue body. Omitting it beats
-  // denying the whole call — the issue itself is still readable.
+  // denying the whole call — the issue itself is still readable. When it IS
+  // omitted the payload says so (`commentsWithheld` below), because an empty
+  // `comments` with `commentCount: 0` is otherwise the same answer as an issue
+  // nobody has commented on (CORE-ARCH-012).
+  //
+  // The matrix grants `comments.view` at every access level including
+  // unauthenticated, so this is false nowhere today and there is no test that
+  // exercises the withheld branch. The check stays because the alternative is a
+  // surface that silently keeps returning the thread if that ever changes.
   const canReadComments = checkPermission("comments.view", ctx.accessLevel);
   const commentWhere = and(
     eq(issueComments.issueId, issue.id),
@@ -142,6 +150,9 @@ export async function runGetIssue(
       url: issueUrl(issue.machineInitials, issue.issueNumber),
       commentCount,
       commentsTruncated: commentRows.length < commentCount,
+      // Present only when the thread was withheld, so the ordinary response
+      // does not carry a permanently-false field.
+      ...(canReadComments ? {} : { commentsWithheld: true }),
       comments: commentRows.map((c) => ({
         author: c.author?.name ?? "Anonymous",
         text: docToPlainText(c.content),
