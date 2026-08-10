@@ -24,8 +24,18 @@ const hookPath = path.resolve(
   process.cwd(),
   ".claude/hooks/block-heavy-under-pressure.cjs"
 );
-const { isHeavyCommand } = require(hookPath) as {
+const { isHeavyCommand, crabboxJobFor, hasCrabbox, offloadReminder } = require(
+  hookPath
+) as {
   isHeavyCommand: (cmd: string) => boolean;
+  crabboxJobFor: (cmd: string) => string | null;
+  // Env is a plain record, not NodeJS.ProcessEnv: the project augments that
+  // type to require NODE_ENV, and these only ever read PATH.
+  hasCrabbox: (env?: Record<string, string | undefined>) => boolean;
+  offloadReminder: (
+    cmd: string,
+    env?: Record<string, string | undefined>
+  ) => string | null;
 };
 
 // ---------------------------------------------------------------------------
@@ -254,16 +264,28 @@ afterAll(() => {
   fs.rmSync(stubRoot, { recursive: true, force: true });
 });
 
-/** Run the hook as a subprocess against the always-blocking stub precheck. */
-function runHook(command: string): { status: number; stdout: string } {
+/**
+ * Run the hook as a subprocess against the always-blocking stub precheck.
+ *
+ * `pathOverride` replaces $PATH so crabbox presence is decided by the test
+ * rather than by the machine. Without it these assertions would pass locally
+ * (crabbox installed) and fail in CI (crabbox absent), or the reverse.
+ */
+function runHook(
+  command: string,
+  pathOverride?: string
+): { status: number; stdout: string } {
   const env: NodeJS.ProcessEnv = {
     ...process.env,
     CLAUDE_PROJECT_DIR: stubRoot,
   };
+  if (pathOverride !== undefined) env.PATH = pathOverride;
   // The hook passes through unconditionally when $CI is set; drop it so the
   // classifier is what decides here (CI is set on GitHub Actions runners).
   delete env.CI;
-  const result = spawnSync("node", [hookPath], {
+  // Spawn via the absolute interpreter path, not "node": `pathOverride`
+  // replaces $PATH wholesale, so a bare "node" would no longer resolve.
+  const result = spawnSync(process.execPath, [hookPath], {
     env,
     input: JSON.stringify({ tool_name: "Bash", tool_input: { command } }),
     encoding: "utf8",
@@ -299,5 +321,169 @@ describe("hook subprocess — the precheck only runs for real heavy commands", (
     );
     expect(status).toBe(0);
     expect(stdout).toBe("");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Offload reminder (PP-9ka9)
+//
+// When the gate is overridden with FORCE_MEM_PRECHECK=skip, the hook attaches a
+// note pointing at the crabbox runner. It must never turn into a decision, must
+// only fire where a job actually exists, and must stay silent on a host with no
+// runner — so these tests control $PATH rather than trusting the machine's.
+// ---------------------------------------------------------------------------
+const crabboxDir = fs.mkdtempSync(path.join(os.tmpdir(), "fake-crabbox-"));
+fs.writeFileSync(path.join(crabboxDir, "crabbox"), "#!/bin/sh\nexit 0\n", {
+  mode: 0o755,
+});
+const emptyPathDir = fs.mkdtempSync(path.join(os.tmpdir(), "no-crabbox-"));
+
+// PATH shapes for the subprocess cases. The "present" one PREPENDS to the real
+// PATH because the non-override path shells out to `bash` for the precheck and
+// would otherwise fail-open on a missing interpreter — which would make the
+// test pass for the wrong reason. The "absent" one must replace PATH outright,
+// since the point is that crabbox is not reachable; that path short-circuits on
+// the override before any subprocess is needed.
+const pathWithCrabbox = [crabboxDir, process.env.PATH ?? ""].join(
+  path.delimiter
+);
+
+afterAll(() => {
+  fs.rmSync(crabboxDir, { recursive: true, force: true });
+  fs.rmSync(emptyPathDir, { recursive: true, force: true });
+});
+
+describe("crabboxJobFor — maps a command to the job that would run it", () => {
+  it.each([
+    ["pnpm run test:integration", "integration"],
+    ["pnpm run test:integration:supabase", "integration-supabase"],
+    ["pnpm run smoke", "smoke"],
+    ["pnpm run e2e", "e2e-full"],
+    ["pnpm run e2e:full", "e2e-full"],
+    ["pnpm run e2e:all", "e2e-full"],
+  ])("%s → %s", (cmd, job) => {
+    expect(crabboxJobFor(cmd)).toBe(job);
+  });
+
+  it("still maps when the override prefix is present", () => {
+    expect(crabboxJobFor("FORCE_MEM_PRECHECK=skip pnpm run smoke")).toBe(
+      "smoke"
+    );
+  });
+
+  it("maps through a shell sequence", () => {
+    expect(crabboxJobFor("cd apps/web && pnpm run test:integration")).toBe(
+      "integration"
+    );
+  });
+
+  it("returns null for build — heavy, but crabbox has no build job", () => {
+    expect(crabboxJobFor("pnpm run build")).toBeNull();
+  });
+
+  it.each(["vitest run", "playwright test", "pnpm exec playwright test"])(
+    "returns null for %s — heavy but the suite is not knowable",
+    (cmd) => {
+      expect(crabboxJobFor(cmd)).toBeNull();
+    }
+  );
+
+  it("returns null for prose that merely names a script", () => {
+    expect(crabboxJobFor('echo "try pnpm run smoke"')).toBeNull();
+  });
+});
+
+describe("hasCrabbox — presence is read from $PATH", () => {
+  it("finds an executable crabbox on PATH", () => {
+    expect(hasCrabbox({ PATH: crabboxDir })).toBe(true);
+  });
+
+  it("is false when PATH has no crabbox", () => {
+    expect(hasCrabbox({ PATH: emptyPathDir })).toBe(false);
+  });
+
+  it("is false when PATH is unset", () => {
+    expect(hasCrabbox({})).toBe(false);
+  });
+
+  it("does not mistake a non-executable file for the CLI", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "unexec-crabbox-"));
+    fs.writeFileSync(path.join(dir, "crabbox"), "not a binary", {
+      mode: 0o644,
+    });
+    expect(hasCrabbox({ PATH: dir })).toBe(false);
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+});
+
+describe("offloadReminder — only speaks when it has something true to say", () => {
+  it("names the job for an offloadable suite", () => {
+    const msg = offloadReminder("FORCE_MEM_PRECHECK=skip pnpm run smoke", {
+      PATH: crabboxDir,
+    });
+    expect(msg).toContain("crabbox job run smoke");
+  });
+
+  it("is silent for build even with crabbox installed", () => {
+    expect(
+      offloadReminder("FORCE_MEM_PRECHECK=skip pnpm run build", {
+        PATH: crabboxDir,
+      })
+    ).toBeNull();
+  });
+
+  it("is silent on a host with no runner", () => {
+    expect(
+      offloadReminder("FORCE_MEM_PRECHECK=skip pnpm run smoke", {
+        PATH: emptyPathDir,
+      })
+    ).toBeNull();
+  });
+});
+
+describe("hook subprocess — the override reminder rides along, never decides", () => {
+  it("attaches additionalContext naming the job", () => {
+    const { status, stdout } = runHook(
+      "FORCE_MEM_PRECHECK=skip pnpm run test:integration",
+      pathWithCrabbox
+    );
+    expect(status).toBe(0);
+    const parsed = JSON.parse(stdout) as {
+      hookSpecificOutput: Record<string, unknown>;
+    };
+    expect(parsed.hookSpecificOutput.hookEventName).toBe("PreToolUse");
+    expect(parsed.hookSpecificOutput.additionalContext).toContain(
+      "crabbox job run integration"
+    );
+  });
+
+  it("emits no permissionDecision, so the command is not gated by the reminder", () => {
+    const { stdout } = runHook(
+      "FORCE_MEM_PRECHECK=skip pnpm run smoke",
+      pathWithCrabbox
+    );
+    expect(stdout).not.toContain("permissionDecision");
+  });
+
+  it("stays silent for build under the override", () => {
+    const { stdout } = runHook(
+      "FORCE_MEM_PRECHECK=skip pnpm run build",
+      pathWithCrabbox
+    );
+    expect(stdout).toBe("");
+  });
+
+  it("stays silent when crabbox is not installed", () => {
+    const { stdout } = runHook(
+      "FORCE_MEM_PRECHECK=skip pnpm run test:integration",
+      emptyPathDir
+    );
+    expect(stdout).toBe("");
+  });
+
+  it("does not fire without the override — that path runs the precheck", () => {
+    const { stdout } = runHook("pnpm run test:integration", pathWithCrabbox);
+    expect(stdout).toContain('"permissionDecision":"deny"');
+    expect(stdout).not.toContain("crabbox job run");
   });
 });

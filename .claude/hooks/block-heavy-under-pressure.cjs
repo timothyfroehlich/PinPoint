@@ -150,7 +150,89 @@ function isHeavyCommand(command) {
   return segments.some(isHeavySegment);
 }
 
-module.exports = { isHeavyCommand };
+// --- Offload reminder (PP-9ka9) ----------------------------------------------
+// When an agent overrides the gate with FORCE_MEM_PRECHECK=skip, the block
+// message it already read is behind it — it is re-running the same command with
+// a prefix. The override is the moment a reminder is worth delivering, so this
+// attaches one to the tool call. It never denies: the override is a legitimate
+// escape hatch and stays one.
+//
+// A reminder is only honest when a job actually exists. `pnpm run build` is in
+// the heavy set but crabbox has no build job, so it maps to null and stays
+// silent. Anything ambiguous (bare `vitest run`, a raw `playwright test` whose
+// config we cannot infer) also maps to null rather than naming a job that might
+// run the wrong suite.
+const CRABBOX_JOB_BY_SCRIPT = new Map([
+  ["test:integration", "integration"],
+  ["test:integration:supabase", "integration-supabase"],
+  ["smoke", "smoke"],
+  ["e2e", "e2e-full"],
+  ["e2e:full", "e2e-full"],
+  ["e2e:all", "e2e-full"],
+]);
+
+/**
+ * Which crabbox job would have run this command, if any?
+ *
+ * Deliberately matches only `pnpm run <script>` shapes. The classifier above
+ * also treats `vitest run` and `playwright test` as heavy, but those carry no
+ * reliable signal about WHICH suite they are — a raw `playwright test
+ * --config=playwright.config.full.ts` is e2e-full while a bare one is not — and
+ * naming the wrong job is worse than saying nothing.
+ */
+function crabboxJobFor(command) {
+  const { segments } = resolveCommand(String(command || ""), {
+    splitNewlines: false,
+  });
+  for (const segment of segments) {
+    const argv = [segment.name, ...segment.args];
+    if (!PACKAGE_RUNNERS.has(path.basename(argv[0]))) continue;
+    let i = 1;
+    while (i < argv.length && argv[i].startsWith("-")) i++;
+    if (!RUNNER_RUN_SUBCOMMANDS.has(argv[i] || "")) continue;
+    const job = CRABBOX_JOB_BY_SCRIPT.get(argv[i + 1] || "");
+    if (job) return job;
+  }
+  return null;
+}
+
+/**
+ * Is the crabbox CLI on PATH?
+ *
+ * Checked here rather than shelling out to `command -v`, which would cost a
+ * process on a hook that runs before every Bash call. Silent when absent, so a
+ * host with no runner — Bazzite, CI, a contributor's machine — sees nothing
+ * rather than advice it cannot act on.
+ */
+function hasCrabbox(env = process.env) {
+  const dirs = String(env.PATH || "").split(path.delimiter).filter(Boolean);
+  return dirs.some((dir) => {
+    try {
+      fs.accessSync(path.join(dir, "crabbox"), fs.constants.X_OK);
+      return true;
+    } catch {
+      return false;
+    }
+  });
+}
+
+/** The reminder text, or null when there is nothing honest to say. */
+function offloadReminder(command, env = process.env) {
+  if (!hasCrabbox(env)) return null;
+  const job = crabboxJobFor(command);
+  if (!job) return null;
+  return (
+    `This host is under memory pressure and the gate was overridden, so this ` +
+    `command is about to compete for RAM that is already short.\n\n` +
+    `The same suite runs on the Bazzite runner against your uncommitted tree:\n` +
+    `  crabbox job run ${job}\n\n` +
+    `Integration and E2E belong there by default — it is the faster answer as ` +
+    `well as the safer one. Dev servers and interactive debugging stay local. ` +
+    `See the "crabbox" skill. Proceeding with the local run either way.`
+  );
+}
+
+module.exports = { isHeavyCommand, crabboxJobFor, hasCrabbox, offloadReminder };
 
 async function main() {
   let inputData = "";
@@ -196,6 +278,21 @@ async function main() {
   // hook would run the precheck and could deny a command the user explicitly
   // told us to skip. Allow immediately when the inline override is present.
   if (/(^|\s)FORCE_MEM_PRECHECK=skip(\s|$)/.test(command)) {
+    // Allowed unconditionally — but this is the one moment worth reminding the
+    // agent that the work could run on the remote runner (PP-9ka9). No
+    // permissionDecision is emitted, so the normal permission flow is untouched
+    // and the command still runs; additionalContext just rides along.
+    const reminder = offloadReminder(command);
+    if (reminder) {
+      process.stdout.write(
+        JSON.stringify({
+          hookSpecificOutput: {
+            hookEventName: "PreToolUse",
+            additionalContext: reminder,
+          },
+        }),
+      );
+    }
     process.exit(0);
   }
 
