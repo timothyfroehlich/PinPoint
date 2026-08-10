@@ -1,25 +1,22 @@
 #!/usr/bin/env node
 //
-// antigravity-bootstrap.cjs — Antigravity bootstrap shim for the
-// harness-agnostic beads + huddle hook scripts.
+// antigravity-bootstrap.cjs — Antigravity bootstrap shim for beads.
 //
-// Antigravity's PreInvocation hook payload uses different field names than
-// the shape `scripts/hooks/huddle-*.sh` expect (which originated in Claude
-// Code's hook contract). This shim:
-//   1. Reads Antigravity's JSON payload (conversationId, workspacePaths,
-//      initialNumSteps, …).
-//   2. Translates it into the harness-neutral payload shape the huddle
-//      scripts read (session_id, transcript_path, cwd, hook_event_name,
-//      source).
-//   3. At session start (initialNumSteps === 0): runs `bd prime` for beads
-//      task context, then runs huddle-session-start.sh for identity
-//      announcement.
-//   4. Mid-trajectory: runs huddle-poll.sh for new PP-cvh comments.
-// All output is wrapped in Antigravity's `{ injectSteps: [...] }` response
-// shape and written to stdout.
+// At session start (initialNumSteps <= 1) it runs `bd prime` for beads task
+// context and injects the result via Antigravity's `{ injectSteps: [...] }`
+// response shape. Mid-trajectory it injects nothing.
+//
+// NO HUDDLE. This shim used to run huddle-session-start.sh at session start and
+// inject huddle-poll.sh output as a mid-trajectory user message. Both were
+// removed: Antigravity's role in this repo is code review, and a reviewer that
+// is told to register a session identity does exactly that — a `gemini-3.1-pro-high`
+// review run reached for `bash scripts/hooks/huddle-bootstrap.sh` mid-review,
+// correctly following the instruction it had been handed. Coordination chatter
+// injected into a review is noise at best and a distraction from the diff at
+// worst, and an agy review is dispatched by a Claude session that is already in
+// the huddle on its behalf. (PP-c6xz.)
 
 const { execFileSync } = require('child_process');
-const path = require('path');
 
 async function main() {
   let inputData = '';
@@ -38,8 +35,6 @@ async function main() {
     process.exit(0);
   }
 
-  const conversationId = input.conversationId || '';
-  const invocationNum = input.invocationNum || 1;
   const initialNumSteps = typeof input.initialNumSteps === 'number' ? input.initialNumSteps : 0;
   // Antigravity seeds the trajectory with at least 1 system step before the
   // first model invocation, so initialNumSteps is 1 (not 0) on the genuine
@@ -47,95 +42,26 @@ async function main() {
   const isSessionStart = initialNumSteps <= 1;
   const workspacePath = input.workspacePaths?.[0] || process.cwd();
 
-  // Translate Antigravity's payload into the harness-neutral shape the
-  // huddle scripts expect (originally defined by Claude Code's hook contract,
-  // now the de-facto shared contract for all harnesses routing through these
-  // scripts).
-  const hookPayload = {
-    session_id: conversationId,
-    // Synthesize a transcript path that won't trip subagent-detection rules
-    // (which skip if the path contains `/subagents/`). Antigravity doesn't
-    // write transcripts to disk the way Claude Code does, so this is purely
-    // synthetic for the contract.
-    transcript_path: path.join(workspacePath, `${conversationId}.jsonl`),
-    cwd: workspacePath,
-    hook_event_name: isSessionStart ? 'SessionStart' : 'UserPromptSubmit',
-    source: 'startup'
-  };
-
-  const payloadString = JSON.stringify(hookPayload);
-
-  if (isSessionStart) {
-    let combinedOutput = '';
-
-    // 1. Run bd prime to get task list and guidelines
-    try {
-      const beadsOutput = execFileSync('bd', ['prime'], {
-        cwd: workspacePath,
-        encoding: 'utf8'
-      }).trim();
-      if (beadsOutput) {
-        combinedOutput += beadsOutput + '\n\n';
-      }
-    } catch (err) {
-      process.stderr.write(`[antigravity-bootstrap] Error running bd prime: ${err.message}\n`);
-    }
-
-    // 2. Run huddle-session-start.sh to announce session identity
-    try {
-      const huddleStartScript = path.join(workspacePath, 'scripts/hooks/huddle-session-start.sh');
-      const huddleOutput = execFileSync('bash', [huddleStartScript], {
-        input: payloadString,
-        cwd: workspacePath,
-        encoding: 'utf8'
-      }).trim();
-      if (huddleOutput) {
-        combinedOutput += huddleOutput;
-      }
-    } catch (err) {
-      process.stderr.write(`[antigravity-bootstrap] Error running huddle-session-start.sh: ${err.message}\n`);
-    }
-
-    if (combinedOutput.trim()) {
-      const response = {
-        injectSteps: [
-          {
-            userMessage: combinedOutput.trim()
-          }
-        ]
-      };
-      process.stdout.write(JSON.stringify(response));
-    } else {
-      process.stdout.write(JSON.stringify({ injectSteps: [] }));
-    }
-
-  } else {
-    // Mid-trajectory: run huddle-poll.sh to fetch updates
-    try {
-      const huddlePollScript = path.join(workspacePath, 'scripts/hooks/huddle-poll.sh');
-      const huddleOutput = execFileSync('bash', [huddlePollScript], {
-        input: payloadString,
-        cwd: workspacePath,
-        encoding: 'utf8'
-      }).trim();
-
-      if (huddleOutput) {
-        const response = {
-          injectSteps: [
-            {
-              userMessage: huddleOutput
-            }
-          ]
-        };
-        process.stdout.write(JSON.stringify(response));
-      } else {
-        process.stdout.write(JSON.stringify({ injectSteps: [] }));
-      }
-    } catch (err) {
-      process.stderr.write(`[antigravity-bootstrap] Error running huddle-poll.sh: ${err.message}\n`);
-      process.stdout.write(JSON.stringify({ injectSteps: [] }));
-    }
+  if (!isSessionStart) {
+    process.stdout.write(JSON.stringify({ injectSteps: [] }));
+    return;
   }
+
+  let beadsOutput = '';
+  try {
+    beadsOutput = execFileSync('bd', ['prime'], {
+      cwd: workspacePath,
+      encoding: 'utf8'
+    }).trim();
+  } catch (err) {
+    process.stderr.write(`[antigravity-bootstrap] Error running bd prime: ${err.message}\n`);
+  }
+
+  process.stdout.write(
+    JSON.stringify(
+      beadsOutput ? { injectSteps: [{ userMessage: beadsOutput }] } : { injectSteps: [] }
+    )
+  );
 }
 
 main().catch((err) => {
