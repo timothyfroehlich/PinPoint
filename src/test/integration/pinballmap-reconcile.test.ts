@@ -543,5 +543,73 @@ describe("reconcileAfterSync (PGlite)", () => {
       const rows = await db.select().from(pinballmapAbandonedListings);
       expect(rows).toHaveLength(0);
     });
+
+    it("keeps a record when PBM re-added the same title under a new lmx", async () => {
+      // PBM row ids move under a live entry — a delete + re-add on
+      // pinballmap.com is exactly what the HEAL effect above exists for. The
+      // abandoned entry is still on the public map, just under lmx 9999 now.
+      // Clearing on the missing lmx alone would retract the notice and report
+      // a removal nobody performed (CORE-ARCH-012).
+      const db = await getTestDb();
+      const { reconcileAfterSync } = await import("~/lib/pinballmap/sync");
+
+      const machine = createTestMachine({
+        initials: "GZH",
+        name: "Godzilla",
+        pinballmapMachineId: 6222,
+      });
+      await db.insert(machines).values(machine);
+      await db.insert(pinballmapAbandonedListings).values({
+        machineId: machine.id,
+        lmxId: 4471,
+        pinballmapMachineId: 6221,
+      });
+
+      await db.insert(pinballmapState).values({
+        id: "singleton",
+        locationId: 26454,
+        enabled: true,
+        snapshotJson: snapshotWith([{ id: 9999, machineId: 6221 }]),
+        lastSyncStatus: "ok",
+      });
+
+      const result = await reconcileAfterSync();
+
+      expect(result.abandonmentsCleared).toBe(0);
+      const rows = await db.select().from(pinballmapAbandonedListings);
+      expect(rows).toHaveLength(1);
+    });
+
+    it("retires a record the moment auto-link recaptures its lmx", async () => {
+      // Retitle away and straight back: `updateMachineAction` records the
+      // abandonment, then its post-commit auto-link re-lists the same machine
+      // on the same still-live lmx. Waiting for the next hourly pass would
+      // leave the machine's own card telling its owner to remove an entry the
+      // same save just claimed.
+      const db = await getTestDb();
+      const { captureAutoLink } = await import("~/lib/pinballmap/sync");
+
+      const machine = createTestMachine({
+        initials: "GZI",
+        name: "Godzilla",
+        pinballmapMachineId: 6221,
+      });
+      await db.insert(machines).values(machine);
+      await db.insert(pinballmapAbandonedListings).values({
+        machineId: machine.id,
+        lmxId: 4471,
+        pinballmapMachineId: 6221,
+      });
+
+      const landed = await captureAutoLink({
+        machineId: machine.id,
+        lmxId: 4471,
+        action: "linked",
+      });
+
+      expect(landed).toBe(true);
+      const rows = await db.select().from(pinballmapAbandonedListings);
+      expect(rows).toHaveLength(0);
+    });
   });
 });

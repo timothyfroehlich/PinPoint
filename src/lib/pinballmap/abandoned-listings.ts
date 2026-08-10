@@ -1,6 +1,6 @@
 import "server-only";
 
-import { eq, notInArray, or, sql } from "drizzle-orm";
+import { and, eq, notInArray, or, sql } from "drizzle-orm";
 
 import { db, type DbTransaction } from "~/server/db";
 import { machines, pinballmapAbandonedListings } from "~/server/db/schema";
@@ -92,6 +92,17 @@ export async function listAbandonedForMachine(
  * typically still ON the synced lineup when this fires, since the reclaiming
  * machine is the one now holding it live.
  *
+ * "No longer on the lineup" needs BOTH the lmx and its title to be gone.
+ * PBM row ids move under a live entry — that is the whole reason
+ * `reconcileAfterSync` has a HEAL effect ("same title, PBM's row id just moved
+ * — a delete + re-add"). Keying the clear on the lmx alone would read that
+ * drift as "someone removed it", delete the record, retract the notice and
+ * report the removal in `abandonmentsCleared`, while the orphan is still
+ * sitting on the public map under a new id (CORE-ARCH-012). Requiring the title
+ * to be absent too costs only a false POSITIVE — the notice lingering while
+ * some other cabinet's entry for the same title is on the lineup — and a
+ * lingering "go look" beats a false "resolved".
+ *
  * MUST only be called with a freshly synced snapshot. Called from
  * `reconcileAfterSync` (PP-l81u), gated on both its call sites having a
  * successful sync; a failed fetch yields a stale lineup, and treating absence
@@ -104,6 +115,7 @@ export async function clearResolvedAbandonments(
   snapshot: LocationSnapshot
 ): Promise<number> {
   const liveLmxIds = snapshot.lmxes.map((l) => l.id);
+  const liveTitleIds = [...new Set(snapshot.lmxes.map((l) => l.machineId))];
 
   // A listed machine already holding this lmx has reclaimed it. Left
   // unhandled, the machine's own card would tell its owner "this entry is
@@ -144,7 +156,13 @@ export async function clearResolvedAbandonments(
     .delete(pinballmapAbandonedListings)
     .where(
       or(
-        notInArray(pinballmapAbandonedListings.lmxId, liveLmxIds),
+        and(
+          notInArray(pinballmapAbandonedListings.lmxId, liveLmxIds),
+          notInArray(
+            pinballmapAbandonedListings.pinballmapMachineId,
+            liveTitleIds
+          )
+        ),
         reclaimedByListedMachine
       )
     )

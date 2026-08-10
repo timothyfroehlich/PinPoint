@@ -47,9 +47,15 @@ test.describe("PinballMap abandoned-listing notice (PP-l81u)", () => {
   }) => {
     const prefix = getTestPrefix();
     const initials = getTestMachineInitials();
-    // Worker-scoped integer ids so parallel runs never collide on the
-    // catalog's primary key or the machines_pinballmap_listed_unique index.
-    const base = Date.now() % 1_000_000;
+    // Run-scoped integer ids so parallel runs never collide on the catalog's
+    // primary key or the machines_pinballmap_listed_unique index. Randomised
+    // rather than clock-derived, and each run claims a whole block of 10:
+    // `Date.now() % 1_000_000` puts two workers that start 1 ms apart one
+    // integer apart, which is exactly the gap between this test's OLD and NEW
+    // title ids — worker A's newTitleId would be worker B's oldTitleId, one
+    // insert would fail on the catalog PK, and A's cleanup would delete B's
+    // row mid-test.
+    const base = Math.floor(Math.random() * 9_000_000) * 10;
     const oldTitleId = 900_000_000 + base;
     const newTitleId = 900_000_000 + base + 1;
     const lmxId = 800_000_000 + base;

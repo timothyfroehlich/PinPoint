@@ -7,7 +7,7 @@ import {
 } from "~/lib/db/postgres-errors";
 import { createMachineTimelineEvent } from "~/lib/timeline/machine-events";
 import { db, type DbTransaction } from "~/server/db";
-import { machines } from "~/server/db/schema";
+import { machines, pinballmapAbandonedListings } from "~/server/db/schema";
 import { clearResolvedAbandonments } from "./abandoned-listings";
 import { resolveAutoLink, type AutoLinkCandidate } from "./auto-link";
 import { getPinballMapState } from "./state";
@@ -85,6 +85,15 @@ async function applyAutoLinkWrite(
     .update(machines)
     .set({ pinballmapLmxId: write.lmxId, pinballmapListed: true })
     .where(eq(machines.id, write.machineId));
+  // Capturing this lmx IS the reclaim `clearResolvedAbandonments` looks for, so
+  // retire any abandonment record for it here rather than leaving it to the next
+  // hourly pass. The window matters: `captureAutoLink` also runs post-commit
+  // from `updateMachineAction`, so retitling a listed machine away and back
+  // would otherwise leave its own card telling the owner to go remove an entry
+  // the same save just re-listed it on (CORE-ARCH-012).
+  await tx
+    .delete(pinballmapAbandonedListings)
+    .where(eq(pinballmapAbandonedListings.lmxId, write.lmxId));
   await createMachineTimelineEvent(
     write.machineId,
     {
