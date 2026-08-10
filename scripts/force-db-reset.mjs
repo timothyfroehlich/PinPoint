@@ -21,15 +21,14 @@ assertLocalDatabase(databaseUrl);
 // Trigger/helper functions PinPoint creates in the public schema. CASCADE
 // removes dependent triggers — including handle_new_user's trigger on
 // auth.users, which is ours, not Supabase's. Migrations recreate these.
-const functions = [
-  "public.handle_new_user()",
-  "public.get_discord_config()",
-];
+const functions = ["public.handle_new_user()", "public.get_discord_config()"];
 
 const client = createScriptClient(databaseUrl);
 
 async function dropApplicationObjects() {
-  console.log("🧹 Dropping application tables and functions (public schema)...");
+  console.log(
+    "🧹 Dropping application tables and functions (public schema)..."
+  );
 
   // Discover every table in the public schema dynamically instead of tracking a
   // hardcoded list. A static list silently rots: a newly-added table that isn't

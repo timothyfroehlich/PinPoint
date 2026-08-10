@@ -24,7 +24,7 @@ assertNotPinPointProduction(databaseUrl, "POSTGRES_URL");
 const prodRef = process.env.PROD_PROJECT_REF;
 if (prodRef && databaseUrl.includes(prodRef)) {
   console.error(
-    `❌ Refusing to reset: POSTGRES_URL references the production project (${prodRef}).`,
+    `❌ Refusing to reset: POSTGRES_URL references the production project (${prodRef}).`
   );
   process.exit(1);
 }

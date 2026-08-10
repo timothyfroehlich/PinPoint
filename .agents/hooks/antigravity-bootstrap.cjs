@@ -18,11 +18,11 @@
 // All output is wrapped in Antigravity's `{ injectSteps: [...] }` response
 // shape and written to stdout.
 
-const { execFileSync } = require('child_process');
-const path = require('path');
+const { execFileSync } = require("child_process");
+const path = require("path");
 
 async function main() {
-  let inputData = '';
+  let inputData = "";
   for await (const chunk of process.stdin) {
     inputData += chunk;
   }
@@ -38,9 +38,10 @@ async function main() {
     process.exit(0);
   }
 
-  const conversationId = input.conversationId || '';
+  const conversationId = input.conversationId || "";
   const invocationNum = input.invocationNum || 1;
-  const initialNumSteps = typeof input.initialNumSteps === 'number' ? input.initialNumSteps : 0;
+  const initialNumSteps =
+    typeof input.initialNumSteps === "number" ? input.initialNumSteps : 0;
   // Antigravity seeds the trajectory with at least 1 system step before the
   // first model invocation, so initialNumSteps is 1 (not 0) on the genuine
   // first turn of a fresh conversation. Treat <= 1 as session-start.
@@ -59,80 +60,91 @@ async function main() {
     // synthetic for the contract.
     transcript_path: path.join(workspacePath, `${conversationId}.jsonl`),
     cwd: workspacePath,
-    hook_event_name: isSessionStart ? 'SessionStart' : 'UserPromptSubmit',
-    source: 'startup'
+    hook_event_name: isSessionStart ? "SessionStart" : "UserPromptSubmit",
+    source: "startup",
   };
 
   const payloadString = JSON.stringify(hookPayload);
 
   if (isSessionStart) {
-    let combinedOutput = '';
+    let combinedOutput = "";
 
     // 1. Run bd prime to get task list and guidelines
     try {
-      const beadsOutput = execFileSync('bd', ['prime'], {
+      const beadsOutput = execFileSync("bd", ["prime"], {
         cwd: workspacePath,
-        encoding: 'utf8'
+        encoding: "utf8",
       }).trim();
       if (beadsOutput) {
-        combinedOutput += beadsOutput + '\n\n';
+        combinedOutput += beadsOutput + "\n\n";
       }
     } catch (err) {
-      process.stderr.write(`[antigravity-bootstrap] Error running bd prime: ${err.message}\n`);
+      process.stderr.write(
+        `[antigravity-bootstrap] Error running bd prime: ${err.message}\n`
+      );
     }
 
     // 2. Run huddle-session-start.sh to announce session identity
     try {
-      const huddleStartScript = path.join(workspacePath, 'scripts/hooks/huddle-session-start.sh');
-      const huddleOutput = execFileSync('bash', [huddleStartScript], {
+      const huddleStartScript = path.join(
+        workspacePath,
+        "scripts/hooks/huddle-session-start.sh"
+      );
+      const huddleOutput = execFileSync("bash", [huddleStartScript], {
         input: payloadString,
         cwd: workspacePath,
-        encoding: 'utf8'
+        encoding: "utf8",
       }).trim();
       if (huddleOutput) {
         combinedOutput += huddleOutput;
       }
     } catch (err) {
-      process.stderr.write(`[antigravity-bootstrap] Error running huddle-session-start.sh: ${err.message}\n`);
+      process.stderr.write(
+        `[antigravity-bootstrap] Error running huddle-session-start.sh: ${err.message}\n`
+      );
     }
 
     if (combinedOutput.trim()) {
       const response = {
         injectSteps: [
           {
-            userMessage: combinedOutput.trim()
-          }
-        ]
+            userMessage: combinedOutput.trim(),
+          },
+        ],
       };
       process.stdout.write(JSON.stringify(response));
     } else {
       process.stdout.write(JSON.stringify({ injectSteps: [] }));
     }
-
   } else {
     // Mid-trajectory: run huddle-poll.sh to fetch updates
     try {
-      const huddlePollScript = path.join(workspacePath, 'scripts/hooks/huddle-poll.sh');
-      const huddleOutput = execFileSync('bash', [huddlePollScript], {
+      const huddlePollScript = path.join(
+        workspacePath,
+        "scripts/hooks/huddle-poll.sh"
+      );
+      const huddleOutput = execFileSync("bash", [huddlePollScript], {
         input: payloadString,
         cwd: workspacePath,
-        encoding: 'utf8'
+        encoding: "utf8",
       }).trim();
 
       if (huddleOutput) {
         const response = {
           injectSteps: [
             {
-              userMessage: huddleOutput
-            }
-          ]
+              userMessage: huddleOutput,
+            },
+          ],
         };
         process.stdout.write(JSON.stringify(response));
       } else {
         process.stdout.write(JSON.stringify({ injectSteps: [] }));
       }
     } catch (err) {
-      process.stderr.write(`[antigravity-bootstrap] Error running huddle-poll.sh: ${err.message}\n`);
+      process.stderr.write(
+        `[antigravity-bootstrap] Error running huddle-poll.sh: ${err.message}\n`
+      );
       process.stdout.write(JSON.stringify({ injectSteps: [] }));
     }
   }

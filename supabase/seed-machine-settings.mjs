@@ -184,7 +184,11 @@ function buildSets(afmId, ownerId, techId) {
           kind: "table",
           title: "Fuse values",
           rows: [
-            { id: "F101", name: "General illumination", value: "5 A slow-blow" },
+            {
+              id: "F101",
+              name: "General illumination",
+              value: "5 A slow-blow",
+            },
             { id: "F102", name: "Flipper power", value: "3 A slow-blow" },
             { id: "F103", name: "Solenoid power", value: "8 A slow-blow" },
             { id: "F104", name: "DMD high voltage", value: "1.6 A slow-blow" },
