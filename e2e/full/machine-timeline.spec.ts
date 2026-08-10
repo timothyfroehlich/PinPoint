@@ -37,8 +37,8 @@ import {
 const machineA = seededMachines.addamsFamily.initials;
 const machineB = seededMachines.eightBallDeluxe.initials;
 
-// PREFIX tags note bodies; REASSIGN_PREFIX tags issue titles, which is what the
-// reassign journey's cleanup matches on.
+// PREFIX tags note bodies; REASSIGN_PREFIX is the human-readable stem of the
+// reassign journey's issue title (the run appends its own unique suffix).
 const PREFIX = "E2E PP-0x98";
 const REASSIGN_PREFIX = `${PREFIX} Reassign`;
 
@@ -157,19 +157,32 @@ test.describe("Machine Timeline (PP-0x98)", () => {
   test.describe("admin reassign journey", () => {
     test.use({ storageState: STORAGE_STATE.admin });
 
+    // The exact title this run filed. Cleanup matches on it rather than on
+    // REASSIGN_PREFIX: the cleanup endpoint's prefix match is an unbounded
+    // `ilike(title, '<prefix>%')` delete, and the comprehensive job runs this
+    // same file in three browser projects against one database — a prefix
+    // sweep would delete another project's issue mid-reassign.
+    let reassignTitle: string | null = null;
+
     test.afterEach(async ({ request }) => {
+      if (reassignTitle === null) return;
       await cleanupTestEntities(request, {
-        issueTitlePrefix: REASSIGN_PREFIX,
+        issueTitlePrefix: reassignTitle,
       });
+      reassignTitle = null;
     });
 
     test("reassigning an issue surfaces events on BOTH timelines", async ({
       page,
-    }) => {
+    }, testInfo) => {
+      // Project + worker in the title so two projects filing in the same
+      // millisecond still get distinct titles.
+      reassignTitle = `${REASSIGN_PREFIX} ${testInfo.project.name}-${testInfo.workerIndex.toString()}-${Date.now().toString()}`;
+
       // 1. File a throwaway issue on machine A and land on its detail page.
       await page.goto(`/report?machine=${machineA}`);
       await fillReportForm(page, {
-        title: `${REASSIGN_PREFIX} ${Date.now().toString()}`,
+        title: reassignTitle,
         priority: "medium",
       });
       await submitFormAndWaitForRedirect(

@@ -5,7 +5,7 @@
  * page. NN #11 — every clickable element gets clicked in an E2E test.
  */
 
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page, type TestInfo } from "@playwright/test";
 import { cleanupTestEntities } from "../support/cleanup.js";
 import { seededMachines } from "../support/constants.js";
 import {
@@ -15,10 +15,29 @@ import {
 import { STORAGE_STATE } from "../support/auth-state.js";
 import { openDropdownMenu } from "../support/actions.js";
 
-// Prefix shared across all tests in this file; cleaned up in afterEach by title
-// prefix so cleanup works regardless of URL pattern (issues now live at
-// /m/<initials>/i/<number>, not /issues/<uuid>).
+// Stem shared across all tests in this file. Cleanup matches on title rather
+// than URL because issues live at /m/<initials>/i/<number>, not
+// /issues/<uuid>, so the URL carries no id to delete by.
+//
+// Each test builds its FULL title through `uniqueTitle` and cleanup matches
+// that exact string, never the bare stem: the cleanup endpoint's match is an
+// unbounded `ilike(title, '<value>%')` delete, and the comprehensive job runs
+// this file in three browser projects against one database — a stem-wide sweep
+// would delete a peer project's issue mid-reassign. (PP-168u.)
 const ISSUE_PREFIX = "E2E Reassign";
+
+/** The exact title this run filed, for afterEach to delete. */
+let filedTitle: string | null = null;
+
+function uniqueTitle(testInfo: TestInfo, label?: string): string {
+  const parts = [
+    ISSUE_PREFIX,
+    ...(label === undefined ? [] : [label]),
+    `${testInfo.project.name}-${testInfo.workerIndex.toString()}-${Date.now().toString()}`,
+  ];
+  filedTitle = parts.join(" ");
+  return filedTitle;
+}
 
 async function createIssueOnMachine(
   page: Page,
@@ -40,10 +59,14 @@ async function createIssueOnMachine(
 }
 
 test.describe("Issue reassignment", () => {
+  test.beforeEach(() => {
+    filedTitle = null;
+  });
+
   test.afterEach(async ({ request }) => {
-    await cleanupTestEntities(request, {
-      issueTitlePrefix: ISSUE_PREFIX,
-    });
+    if (filedTitle === null) return;
+    await cleanupTestEntities(request, { issueTitlePrefix: filedTitle });
+    filedTitle = null;
   });
 
   test.describe("as technician", () => {
@@ -51,11 +74,11 @@ test.describe("Issue reassignment", () => {
 
     test("moves the issue to a different machine and redirects to the new URL", async ({
       page,
-    }) => {
+    }, testInfo) => {
       const fromInitials = seededMachines.addamsFamily.initials;
       const toInitials = seededMachines.humptyDumpty.initials;
       const toName = seededMachines.humptyDumpty.name;
-      const issueTitle = `${ISSUE_PREFIX} ${Date.now().toString()}`;
+      const issueTitle = uniqueTitle(testInfo);
 
       await createIssueOnMachine(page, fromInitials, issueTitle);
 
@@ -107,12 +130,12 @@ test.describe("Issue reassignment", () => {
 
     test("does not expose the reassign action when the member does not own the machine", async ({
       page,
-    }) => {
+    }, testInfo) => {
       // Member is not the owner of TAF in the seed data, so the page omits
       // the `actions` prop on PageHeader (userCanReassign is false), and
       // IssueActionsMenu is never rendered.
       const fromInitials = seededMachines.addamsFamily.initials;
-      const issueTitle = `${ISSUE_PREFIX} Member view ${Date.now().toString()}`;
+      const issueTitle = uniqueTitle(testInfo, "Member view");
 
       await createIssueOnMachine(page, fromInitials, issueTitle);
 

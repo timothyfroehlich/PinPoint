@@ -20,20 +20,23 @@
 import { test, expect, type Page } from "@playwright/test";
 import { cleanupTestEntities } from "../support/cleanup.js";
 import { STORAGE_STATE } from "../support/auth-state.js";
-import { TEST_USERS } from "../support/constants.js";
-import {
-  getProfileIdByEmail,
-  updateUserRole,
-} from "../support/supabase-admin.js";
+import { createTestUser, deleteTestUser } from "../support/supabase-admin.js";
 
 const testMachines = new Set<string>();
 
-// The promote journey below flips this SEEDED user from guest to member for
-// real — that is the whole point of the flow. Nothing put the role back, so the
-// second run of this file in the same database found a member where it needed a
-// guest, no promote dialog ever appeared, and both tests failed. Demoting in
-// afterEach is what makes the file re-runnable. (PP-168u.)
-const GUEST_EMAIL = TEST_USERS.guest.email;
+// Each test gets its OWN throwaway guest instead of the seeded guest@test.com.
+//
+// The promote journey flips a guest to member for real — that is the whole
+// point of the flow — so pointing it at a seeded user left a member where the
+// next run needed a guest: no promote dialog appeared and both tests failed.
+// Demoting the seeded user in teardown would restore it, but not safely: the
+// comprehensive job runs this file in three browser projects against one
+// database, so one project's demote can land while another still holds a
+// guest-owned machine, and migration 0027's `user_profiles_no_demote_owner`
+// trigger raises `check_violation` on exactly that. A per-test user mutates
+// nothing shared, so there is no restore to get wrong. (PP-168u.)
+let guestUserId: string | null = null;
+let guestName = "";
 
 /** Open the owner picker popover and wait for it to be interactive. */
 async function openOwnerPicker(page: Page) {
@@ -79,18 +82,38 @@ async function selectGuestUserBySearch(page: Page, name: string) {
 test.describe("Machine Owner Picker — promote-dialog journeys (PP-6oi)", () => {
   test.use({ storageState: STORAGE_STATE.admin });
 
+  test.beforeEach(async () => {
+    const testId = Math.random().toString(36).substring(7);
+    guestName = `Ownerpick Guest${testId}`;
+    // A user created through the auth admin API lands on `guest` by default
+    // (the handle_new_user trigger in supabase/seed.sql), which is what these
+    // journeys need.
+    const user = await createTestUser(
+      `owner-picker-guest-${testId}@test.com`,
+      "TestPassword123",
+      { firstName: "Ownerpick", lastName: `Guest${testId}` }
+    );
+    guestUserId = user.id;
+  });
+
   test.afterEach(async ({ request }) => {
-    if (testMachines.size > 0) {
-      await cleanupTestEntities(request, {
-        machineInitials: Array.from(testMachines),
-      });
-      testMachines.clear();
+    try {
+      if (testMachines.size > 0) {
+        await cleanupTestEntities(request, {
+          machineInitials: Array.from(testMachines),
+        });
+        testMachines.clear();
+      }
+    } finally {
+      // finally: a failed machine cleanup must not skip the user delete and
+      // leak the account. Machines go first regardless — machines.owner_id
+      // references user_profiles with no ON DELETE, so a still-owned machine
+      // would block the delete.
+      if (guestUserId !== null) {
+        await deleteTestUser(guestUserId);
+        guestUserId = null;
+      }
     }
-    // Unconditional, and after the machines are gone (the promoted user owns
-    // the machine the confirm test creates). Only the confirm test promotes,
-    // but it can fail at any assertion AFTER the promotion has committed, so
-    // "demote when the test passed" would be exactly backwards. One UPDATE.
-    await updateUserRole(await getProfileIdByEmail(GUEST_EMAIL), "guest");
   });
 
   test("promote dialog appears when a guest owner is selected", async ({
@@ -110,10 +133,10 @@ test.describe("Machine Owner Picker — promote-dialog journeys (PP-6oi)", () =>
     // Open picker and select guest via search (search bypasses the
     // "Show guests" checkbox filter — more robust on mobile viewports).
     await openOwnerPicker(page);
-    await selectGuestUserBySearch(page, "Guest User");
+    await selectGuestUserBySearch(page, guestName);
 
-    // Owner trigger should show "Guest User" selected
-    await expect(page.getByTestId("owner-select")).toContainText("Guest User");
+    // Owner trigger should show the throwaway guest as selected
+    await expect(page.getByTestId("owner-select")).toContainText(guestName);
 
     // Submit the form
     await page.getByRole("button", { name: /Create Machine/i }).click();
@@ -162,10 +185,10 @@ test.describe("Machine Owner Picker — promote-dialog journeys (PP-6oi)", () =>
     // Open picker and select guest via search (search bypasses the
     // "Show guests" checkbox filter — more robust on mobile viewports).
     await openOwnerPicker(page);
-    await selectGuestUserBySearch(page, "Guest User");
+    await selectGuestUserBySearch(page, guestName);
 
     // Verify selection
-    await expect(page.getByTestId("owner-select")).toContainText("Guest User");
+    await expect(page.getByTestId("owner-select")).toContainText(guestName);
 
     // Submit
     await page.getByRole("button", { name: /Create Machine/i }).click();

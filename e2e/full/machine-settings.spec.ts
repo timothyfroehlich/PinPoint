@@ -82,10 +82,11 @@ test.describe("Machine Settings (PP-43q3)", () => {
       viewport: { width: 1280, height: 1800 },
     });
 
-    let editorMachineId: string;
+    let editorMachineId: string | null = null;
     let editorMachine: string;
 
     test.beforeEach(async () => {
+      editorMachineId = null;
       const adminId = await getProfileIdByEmail("admin@test.com");
       const created = await createTestMachine(adminId);
       editorMachineId = created.id;
@@ -93,8 +94,13 @@ test.describe("Machine Settings (PP-43q3)", () => {
     });
 
     test.afterEach(async () => {
+      // Guarded: afterEach still runs when beforeEach threw, and calling
+      // deleteTestMachine with no id raises an invalid-uuid error that would
+      // replace the real setup failure in the report.
+      if (editorMachineId === null) return;
       // ON DELETE CASCADE drops any set this journey created with the machine.
       await deleteTestMachine(editorMachineId);
+      editorMachineId = null;
     });
 
     test("creates a set, auto-saves, and survives a reload", async ({
