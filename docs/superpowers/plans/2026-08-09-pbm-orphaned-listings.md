@@ -29,19 +29,18 @@
 
 ## File Structure
 
-| File                                                            | Responsibility                                                                                                                                               |
-| --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `src/server/db/schema.ts`                                       | Adds `pinballmapAbandonedListings` table + its relation.                                                                                                     |
-| `drizzle/0063_*.sql`                                            | Generated migration creating the table.                                                                                                                      |
-| `src/lib/pinballmap/link-columns.ts`                            | Splits into `resolvePbmLinkColumnsForCreate` and `resolvePbmLinkColumnsForUpdate`; the update variant owns the carry-over decision and reports abandonments. |
-| `src/lib/pinballmap/abandoned-listings.ts`                      | New. Data access for abandonment rows: record inside a transaction, list for a machine, clear against a snapshot.                                            |
-| `src/lib/timeline/machine-event-types.ts`                       | Adds `"abandoned"` to the `pinballmap_listing` action union.                                                                                                 |
-| `src/services/machines.ts`                                      | `updateMachineDetails` accepts an optional abandonment and writes it in the same transaction.                                                                |
-| `src/app/(app)/m/actions.ts`                                    | Both call sites move to the new entry points; the 12-line carry-over block is deleted.                                                                       |
-| `src/lib/mcp/tools/add-machine.ts`                              | Moves to the create entry point.                                                                                                                             |
-| `src/lib/pinballmap/sync.ts`                                    | `reconcileAfterSync` clears abandonment rows absent from the synced lineup.                                                                                  |
-| `src/app/(app)/m/[initials]/(tabs)/page.tsx`                    | Loads a machine's abandonments and passes them to the card.                                                                                                  |
-| `src/app/(app)/m/[initials]/(tabs)/machine-pinballmap-card.tsx` | Renders a line naming what is still on the public map.                                                                                                       |
+| File                                                            | Responsibility                                                                                                                                                                                                                                                                          |
+| --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/server/db/schema.ts`                                       | Adds `pinballmapAbandonedListings` table + its relation.                                                                                                                                                                                                                                |
+| `drizzle/0063_*.sql`                                            | Generated migration creating the table.                                                                                                                                                                                                                                                 |
+| `src/lib/pinballmap/link-columns.ts`                            | Splits into `resolvePbmLinkColumnsForCreate` and `resolvePbmLinkColumnsForUpdate`; the update variant owns the carry-over decision and reports abandonments.                                                                                                                            |
+| `src/lib/pinballmap/abandoned-listings.ts`                      | New. Data access for abandonment rows: record inside a transaction, list for a machine, clear against a snapshot.                                                                                                                                                                       |
+| `src/lib/timeline/machine-event-types.ts`                       | Adds `"abandoned"` to the `pinballmap_listing` action union.                                                                                                                                                                                                                            |
+| `src/app/(app)/m/actions.ts`                                    | Both resolver call sites move to the new entry points and the 12-line carry-over block is deleted; both `db.transaction` blocks in `updateMachineAction` write the abandonment beside the machine columns. (`src/services/machines.ts` is NOT involved — see the correction at Task 3.) |
+| `src/lib/mcp/tools/add-machine.ts`                              | Moves to the create entry point.                                                                                                                                                                                                                                                        |
+| `src/lib/pinballmap/sync.ts`                                    | `reconcileAfterSync` clears abandonment rows absent from the synced lineup.                                                                                                                                                                                                             |
+| `src/app/(app)/m/[initials]/(tabs)/page.tsx`                    | Loads a machine's abandonments and passes them to the card.                                                                                                                                                                                                                             |
+| `src/app/(app)/m/[initials]/(tabs)/machine-pinballmap-card.tsx` | Renders a line naming what is still on the public map.                                                                                                                                                                                                                                  |
 
 ---
 
@@ -647,14 +646,24 @@ git commit -m "refactor(pinballmap): split the link-column resolver by intent (P
 
 ### Task 3: Record the abandonment on a retitle
 
+> **CORRECTION — this task's code blocks below are wrong in one respect, and were implemented differently on purpose.**
+>
+> They call `updateMachineDetails` / `UpdateMachineDetailsArgs` in `src/services/machines.ts`. **No such function or type exists** — the plan author invented them (`rg -n "updateMachineDetails" src/ --hidden` returns nothing). `services/machines.ts` owns `createMachine`; the update logic lives inline in the **two `db.transaction` blocks inside `updateMachineAction`** in `src/app/(app)/m/actions.ts`, and both apply `...(pbmColumns ?? {})`, so both can clear `pinballmapListed`.
+>
+> **What was actually built:** `recordAbandonedListing` is called in both of those real transactions, immediately after each machine `UPDATE`, and `src/services/machines.ts` is untouched. The tests were written against `updateMachineAction` directly, matching the harness in `pinballmap-auto-link-on-save.test.ts` — which is what this task's own Step 1 prose says to do, contradicting its code block.
+>
+> Read every `updateMachineDetails({...})` call below as "the machine UPDATE inside `updateMachineAction`'s transaction". Left in place rather than rewritten so the record shows what was specified versus what shipped.
+>
+> Two further corrections from the Task 3 review, both applied in a fix round:
+> **`onConflictDoNothing` on `lmxId` became `onConflictDoUpdate`** — a no-op silently leaves an orphan attributed to a machine that no longer has any relationship to it, while the machine that actually caused it shows nothing. And **"marked not on Pinball Map" DOES record an abandonment**, contrary to what a reviewer constraint originally stated: the entry stays live on pinballmap.com no matter how PinPoint reclassifies the machine.
+
 **Files:**
 
 - Create: `src/lib/pinballmap/abandoned-listings.ts`
 - Modify: `src/lib/pinballmap/link-columns.ts` (populate `abandoned`)
-- Modify: `src/lib/timeline/machine-event-types.ts:46`
-- Modify: `src/services/machines.ts` (`UpdateMachineDetailsArgs` + the transaction)
-- Modify: `src/app/(app)/m/actions.ts` (pass `pbm.abandoned` through)
-- Test: `src/test/integration/pinballmap-retitle-abandonment.test.ts`
+- Modify: `src/lib/timeline/machine-event-types.ts:46` and `src/lib/timeline/format-machine-event.ts`
+- Modify: `src/app/(app)/m/actions.ts` — call `recordAbandonedListing` in **both** transaction blocks (NOT `src/services/machines.ts`, see the correction above)
+- Test: `src/test/integration/pinballmap-retitle-abandonment.test.ts`, plus abandonment cases in `src/lib/pinballmap/link-columns.test.ts`
 
 **Interfaces:**
 
