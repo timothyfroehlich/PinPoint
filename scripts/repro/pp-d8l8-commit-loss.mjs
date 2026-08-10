@@ -30,7 +30,11 @@ const PREPARE = (process.env.PREPARE ?? "true") === "true";
 const N = Number(process.env.N ?? 16);
 const MACHINE = "ZZRP"; // matches ^[A-Z0-9]{2,6}$
 
-const sql = postgres(POOLER_URL, { prepare: PREPARE, max: N, connect_timeout: 10 });
+const sql = postgres(POOLER_URL, {
+  prepare: PREPARE,
+  max: N,
+  connect_timeout: 10,
+});
 
 async function reset() {
   // Clean slate: remove the test machine (cascades to its issues), recreate at 1.
@@ -62,13 +66,13 @@ async function oneSubmit(i) {
 
 async function main() {
   console.log(
-    `\nPP-d8l8 harness — prepare=${PREPARE} N=${N}\n  pooler=${POOLER_URL.replace(/:[^:@/]*@/, ":****@")}`,
+    `\nPP-d8l8 harness — prepare=${PREPARE} N=${N}\n  pooler=${POOLER_URL.replace(/:[^:@/]*@/, ":****@")}`
   );
   await reset();
 
   // Fire all N concurrently to maximize contention on the counter row.
   const results = await Promise.all(
-    Array.from({ length: N }, (_, i) => oneSubmit(i)),
+    Array.from({ length: N }, (_, i) => oneSubmit(i))
   );
 
   const resolved = results.filter((r) => r.ok);
@@ -95,7 +99,9 @@ async function main() {
   console.log(`  transactions resolved (no error): ${resolved.length}`);
   console.log(`  transactions rejected (error):    ${rejected.length}`);
   console.log(`  rows actually persisted:          ${persisted}`);
-  console.log(`  machine counter advanced to:      ${counter.next_issue_number}`);
+  console.log(
+    `  machine counter advanced to:      ${counter.next_issue_number}`
+  );
   console.log(`  issue numbers:                    [${numbers.join(", ")}]`);
   if (rejected.length) {
     const sample = [...new Set(rejected.map((r) => r.error))].slice(0, 3);
