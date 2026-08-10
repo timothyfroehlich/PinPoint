@@ -54,6 +54,8 @@ import { runAddMachine } from "~/lib/mcp/tools/add-machine";
 import { runCreateIssue } from "~/lib/mcp/tools/create-issue";
 import { runGetIssue } from "~/lib/mcp/tools/get-issue";
 import { runGetMachine } from "~/lib/mcp/tools/get-machine";
+import { registerPinpointTools } from "~/lib/mcp/tools";
+import { runListIssues } from "~/lib/mcp/tools/list-issues";
 import { runListMachines } from "~/lib/mcp/tools/list-machines";
 import { runSearchPinballmapCatalog } from "~/lib/mcp/tools/search-pinballmap-catalog";
 import type {
@@ -1460,6 +1462,250 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
           { machine: machine.initials, number: 7, comment: "hi" },
           ctx("admin", admin)
         )
+      ).rejects.toMatchObject({ reason: "not_found" });
+    });
+  });
+
+  /**
+   * Every other test here calls a `run*` handler directly, which passes whether
+   * or not the tool is registered. `registerPinpointTools` is therefore the one
+   * place a finished tool can be silently absent from the surface, so the
+   * catalog gets asserted by name.
+   *
+   * `whoami` is deliberately not in this list — it is registered on the route
+   * itself, not through this function.
+   */
+  it("registers every tool in the catalog", () => {
+    const registered: string[] = [];
+    const fakeServer = {
+      registerTool: (name: string) => {
+        registered.push(name);
+      },
+    } as unknown as Parameters<typeof registerPinpointTools>[0];
+
+    registerPinpointTools(fakeServer);
+
+    expect(registered.sort()).toEqual([
+      "add_issue_comment",
+      "add_machine",
+      "create_issue",
+      "get_issue",
+      "get_machine",
+      "list_issues",
+      "list_machines",
+      "search_pinballmap_catalog",
+      "set_machine_availability",
+      "set_machine_name",
+      "set_machine_owner",
+      "update_issue",
+    ]);
+  });
+
+  describe("list_issues (PP-u4ab.14)", () => {
+    it("defaults to open issues only", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine({ name: "Attack from Mars" });
+      await runCreateIssue(
+        { machine: machine.initials, title: "open one" },
+        ctx("admin", admin)
+      );
+      await runCreateIssue(
+        { machine: machine.initials, title: "closed one" },
+        ctx("admin", admin)
+      );
+      await runUpdateIssue(
+        { machine: machine.initials, number: 2, status: "fixed" },
+        ctx("admin", admin)
+      );
+
+      const outcome = await runListIssues(
+        { machine: machine.initials },
+        ctx("admin", admin)
+      );
+      const result = outcome.result as {
+        total: number;
+        issues: { title: string }[];
+      };
+      expect(result.total).toBe(1);
+      expect(result.issues[0]?.title).toBe("open one");
+    });
+
+    it("accepts the 'closed' shorthand and an explicit status set", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine({ name: "Medieval Madness" });
+      await runCreateIssue(
+        { machine: machine.initials, title: "a" },
+        ctx("admin", admin)
+      );
+      await runCreateIssue(
+        { machine: machine.initials, title: "b" },
+        ctx("admin", admin)
+      );
+      await runUpdateIssue(
+        { machine: machine.initials, number: 2, status: "wont_fix" },
+        ctx("admin", admin)
+      );
+
+      const closed = await runListIssues(
+        { machine: machine.initials, status: "closed" },
+        ctx("admin", admin)
+      );
+      expect((closed.result as { total: number }).total).toBe(1);
+
+      const both = await runListIssues(
+        { machine: machine.initials, status: ["new", "wont_fix"] },
+        ctx("admin", admin)
+      );
+      expect((both.result as { total: number }).total).toBe(2);
+
+      const single = await runListIssues(
+        { machine: machine.initials, status: "wont_fix" },
+        ctx("admin", admin)
+      );
+      expect((single.result as { total: number }).total).toBe(1);
+    });
+
+    it("keeps the page and the total in agreement while paging", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine({ name: "Twilight Zone" });
+      for (let i = 0; i < 5; i++) {
+        await runCreateIssue(
+          { machine: machine.initials, title: `issue ${i}` },
+          ctx("admin", admin)
+        );
+      }
+
+      const page = await runListIssues(
+        { machine: machine.initials, limit: 2, offset: 0 },
+        ctx("admin", admin)
+      );
+      expect(page.result).toMatchObject({
+        count: 2,
+        total: 5,
+        offset: 0,
+        hasMore: true,
+      });
+
+      const last = await runListIssues(
+        { machine: machine.initials, limit: 2, offset: 4 },
+        ctx("admin", admin)
+      );
+      expect(last.result).toMatchObject({ count: 1, total: 5, hasMore: false });
+    });
+
+    it("returns a total order, so paging never skips or repeats a row", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine({ name: "Fish Tales" });
+      // Created in one loop, so several rows share a createdAt to the second —
+      // exactly the case a createdAt-only sort would leave underdetermined.
+      for (let i = 0; i < 6; i++) {
+        await runCreateIssue(
+          { machine: machine.initials, title: `tie ${i}` },
+          ctx("admin", admin)
+        );
+      }
+
+      const seen: number[] = [];
+      for (let offset = 0; offset < 6; offset += 2) {
+        const page = await runListIssues(
+          { machine: machine.initials, limit: 2, offset },
+          ctx("admin", admin)
+        );
+        seen.push(
+          ...(page.result as { issues: { number: number }[] }).issues.map(
+            (i) => i.number
+          )
+        );
+      }
+
+      expect(seen).toHaveLength(6);
+      expect(new Set(seen).size).toBe(6);
+    });
+
+    it("searches across machines when none is named", async () => {
+      const admin = await makeUser("admin");
+      const first = await seedMachine({ name: "Cirqus Voltaire" });
+      const second = await seedMachine({ name: "Monster Bash" });
+      await runCreateIssue(
+        { machine: first.initials, title: "first one" },
+        ctx("admin", admin)
+      );
+      await runCreateIssue(
+        { machine: second.initials, title: "second one" },
+        ctx("admin", admin)
+      );
+
+      const scoped = await runListIssues(
+        { machine: first.initials },
+        ctx("admin", admin)
+      );
+      expect((scoped.result as { total: number }).total).toBe(1);
+
+      const all = await runListIssues({}, ctx("admin", admin));
+      const machinesSeen = new Set(
+        (all.result as { issues: { machine: string }[] }).issues.map(
+          (i) => i.machine
+        )
+      );
+      expect(machinesSeen.has(first.initials)).toBe(true);
+      expect(machinesSeen.has(second.initials)).toBe(true);
+    });
+
+    it("filters by severity and by assignee", async () => {
+      const admin = await makeUser("admin");
+      const tech = await makeUser("technician", "Ada", "Lovelace");
+      const machine = await seedMachine({ name: "Ghostbusters" });
+      await runCreateIssue(
+        { machine: machine.initials, title: "major one", severity: "major" },
+        ctx("admin", admin)
+      );
+      await runCreateIssue(
+        {
+          machine: machine.initials,
+          title: "cosmetic one",
+          severity: "cosmetic",
+        },
+        ctx("admin", admin)
+      );
+      await runUpdateIssue(
+        { machine: machine.initials, number: 1, assignee: tech },
+        ctx("admin", admin)
+      );
+
+      const bySeverity = await runListIssues(
+        { machine: machine.initials, severity: "major" },
+        ctx("admin", admin)
+      );
+      const severityResult = bySeverity.result as {
+        total: number;
+        issues: { title: string; assignee: string | null }[];
+      };
+      expect(severityResult.total).toBe(1);
+      expect(severityResult.issues[0]?.title).toBe("major one");
+      expect(severityResult.issues[0]?.assignee).toBe("Ada Lovelace");
+
+      const byAssignee = await runListIssues(
+        { machine: machine.initials, assignee: "Ada Lovelace" },
+        ctx("admin", admin)
+      );
+      expect((byAssignee.result as { total: number }).total).toBe(1);
+    });
+
+    /**
+     * A filter name that narrows nothing is worse than an error: it returns the
+     * whole collection under a `total` that reads as authoritative
+     * (CORE-ARCH-012). An unresolvable assignee must throw, not fall through.
+     */
+    it("throws rather than ignoring an unresolvable assignee filter", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine({ name: "Monster Bash" });
+      await runCreateIssue(
+        { machine: machine.initials, title: "mummy stuck" },
+        ctx("admin", admin)
+      );
+
+      await expect(
+        runListIssues({ assignee: "Nobody Here" }, ctx("admin", admin))
       ).rejects.toMatchObject({ reason: "not_found" });
     });
   });
