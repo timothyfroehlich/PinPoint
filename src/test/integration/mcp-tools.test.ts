@@ -17,6 +17,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   authUsers,
+  invitedUsers,
   issues,
   machines,
   pinballmapCatalog,
@@ -60,7 +61,11 @@ import type { McpMachinePinballmap } from "~/lib/mcp/tools/pinballmap-block";
 import { runSetMachineAvailability } from "~/lib/mcp/tools/set-machine-availability";
 import { runSetMachineName } from "~/lib/mcp/tools/set-machine-name";
 import { runSetMachineOwner } from "~/lib/mcp/tools/set-machine-owner";
-import { McpToolError } from "~/lib/mcp/tools/shared";
+import {
+  McpToolError,
+  resolveAssignee,
+  resolveIssue,
+} from "~/lib/mcp/tools/shared";
 
 describe("MCP tool handlers (PP-u4ab.2)", () => {
   setupTestDb();
@@ -1249,6 +1254,89 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
       await expect(
         runSetMachineName({ machine: "NOPE", name: "x" }, ctx("admin", admin))
       ).rejects.toMatchObject({ reason: "not_found" });
+    });
+  });
+
+  describe("resolveIssue / resolveAssignee (PP-u4ab.14)", () => {
+    it("resolves an issue by machine initials and number", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine({ name: "Attack from Mars" });
+      await runCreateIssue(
+        { machine: machine.initials, title: "left flipper weak" },
+        ctx("admin", admin)
+      );
+
+      // Lower-cased on purpose: initials resolution is case-insensitive.
+      const resolved = await resolveIssue(machine.initials.toLowerCase(), 1);
+      expect(resolved.issueNumber).toBe(1);
+      expect(resolved.machineInitials).toBe(machine.initials);
+      expect(resolved.title).toBe("left flipper weak");
+      expect(resolved.status).toBe("new");
+    });
+
+    it("resolves by machine UUID as well as initials", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine({ name: "Medieval Madness" });
+      await runCreateIssue(
+        { machine: machine.initials, title: "ball stuck" },
+        ctx("admin", admin)
+      );
+
+      const resolved = await resolveIssue(machine.id, 1);
+      expect(resolved.machineInitials).toBe(machine.initials);
+    });
+
+    it("throws not_found for an unknown issue number, naming list_issues", async () => {
+      const machine = await seedMachine({ name: "Twilight Zone" });
+      await expect(resolveIssue(machine.initials, 99)).rejects.toMatchObject({
+        reason: "not_found",
+      });
+      await expect(resolveIssue(machine.initials, 99)).rejects.toThrow(
+        /list_issues/
+      );
+    });
+
+    it("resolves an assignee by full name and by UUID, and empty clears", async () => {
+      const tech = await makeUser("technician", "Ada", "Lovelace");
+      expect(await resolveAssignee("Ada Lovelace")).toBe(tech);
+      expect(await resolveAssignee(tech)).toBe(tech);
+      expect(await resolveAssignee(null)).toBeNull();
+      expect(await resolveAssignee("   ")).toBeNull();
+    });
+
+    it("rejects an ambiguous assignee name with the candidate UUIDs", async () => {
+      const a = await makeUser("member", "Sam", "Jones");
+      const b = await makeUser("member", "Sam", "Jones");
+      await expect(resolveAssignee("Sam Jones")).rejects.toThrow(
+        /Pass the specific UUID/
+      );
+      await expect(resolveAssignee("Sam Jones")).rejects.toThrow(
+        new RegExp(`${a}|${b}`)
+      );
+    });
+
+    it("rejects a guest as an assignee", async () => {
+      await makeUser("guest", "Guest", "Person");
+      await expect(resolveAssignee("Guest Person")).rejects.toThrow(/guest/i);
+    });
+
+    it("rejects an invited user id — issues have no invited-assignee column", async () => {
+      const db = await getTestDb();
+      const invitedId = randomUUID();
+      await db.insert(invitedUsers).values({
+        id: invitedId,
+        email: `${invitedId}@example.com`,
+        firstName: "Invited",
+        lastName: "Person",
+        role: "member",
+      });
+
+      // resolveOwner accepts this shape (machines carry invitedOwnerId).
+      // assigned_to references user_profiles only, so it must be rejected
+      // rather than silently dropped.
+      await expect(resolveAssignee(invitedId)).rejects.toMatchObject({
+        reason: "not_found",
+      });
     });
   });
 });

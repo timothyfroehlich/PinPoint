@@ -10,9 +10,11 @@ import {
   requireMcpAuthContext,
   type McpAuthContext,
 } from "~/lib/mcp/verify-token";
-import { OPEN_STATUSES } from "~/lib/issues/status";
+import { OPEN_STATUSES, type IssueStatus } from "~/lib/issues/status";
 import type { MachinePresenceStatus } from "~/lib/machines/presence";
 import { reportError } from "~/lib/observability/report-error";
+import type { ProseMirrorDoc } from "~/lib/tiptap/types";
+import type { IssueFrequency, IssuePriority, IssueSeverity } from "~/lib/types";
 import { getSiteUrl } from "~/lib/url";
 import type { MachinePbmColumns } from "~/services/machines";
 import { db } from "~/server/db";
@@ -240,6 +242,137 @@ export async function resolveOwner(
     );
   }
   return { ownerId: first.id, invitedOwnerId: null };
+}
+
+/** The issue snapshot every issue tool resolves before acting. */
+export interface IssueRef {
+  id: string;
+  issueNumber: number;
+  machineInitials: string;
+  title: string;
+  status: IssueStatus;
+  severity: IssueSeverity;
+  priority: IssuePriority;
+  frequency: IssueFrequency;
+  assignedTo: string | null;
+  reportedBy: string | null;
+  reporterName: string | null;
+  description: ProseMirrorDoc | null;
+  createdAt: Date;
+  updatedAt: Date;
+  closedAt: Date | null;
+}
+
+/**
+ * Resolve an issue from the pair the MCP surface actually speaks: a machine
+ * (initials or UUID) and the per-machine issue number.
+ *
+ * Issue UUIDs are deliberately not accepted. No tool returns one, so a UUID
+ * argument shape would be one the caller can never populate. `unique_issue_number`
+ * on (machine_initials, issue_number) is what makes this pair a key.
+ *
+ * NOTE: `reporterEmail` is never selected. It exists on the row for anonymous
+ * and invited reporters and must not leave the server (CORE-SEC-007).
+ */
+export async function resolveIssue(
+  machineRef: string,
+  issueNumber: number
+): Promise<IssueRef> {
+  const machine = await resolveMachine(machineRef);
+  const issue = await db.query.issues.findFirst({
+    where: and(
+      eq(issues.machineInitials, machine.initials),
+      eq(issues.issueNumber, issueNumber)
+    ),
+    columns: {
+      id: true,
+      issueNumber: true,
+      machineInitials: true,
+      title: true,
+      status: true,
+      severity: true,
+      priority: true,
+      frequency: true,
+      assignedTo: true,
+      reportedBy: true,
+      reporterName: true,
+      description: true,
+      createdAt: true,
+      updatedAt: true,
+      closedAt: true,
+    },
+  });
+  if (!issue) {
+    throw new McpToolError(
+      "not_found",
+      `No issue #${issueNumber} on ${machine.initials}. Use list_issues to find the right number.`
+    );
+  }
+  return issue;
+}
+
+/**
+ * Resolve an assignee argument — a UUID, a full name ("First Last"), or empty
+ * (to unassign) — to a `userProfiles.id`.
+ *
+ * Deliberately NOT {@link resolveOwner}. Machines carry both `ownerId` and
+ * `invitedOwnerId`, so ownership can land on an invited user; `issues` has only
+ * `assigned_to` referencing `user_profiles`. An invited user therefore has no
+ * column to be assigned into, and must be rejected rather than silently
+ * dropped — accepting the id and writing nothing would report an assignment
+ * that never happened (CORE-ARCH-012).
+ */
+export async function resolveAssignee(
+  ref: string | null | undefined
+): Promise<string | null> {
+  if (ref == null || ref.trim() === "") return null;
+  const value = ref.trim();
+
+  if (uuidSchema.safeParse(value).success) {
+    const user = await db.query.userProfiles.findFirst({
+      where: eq(userProfiles.id, value),
+      columns: { id: true, role: true },
+    });
+    if (!user) {
+      throw new McpToolError(
+        "not_found",
+        `No user found with id ${value}. Note that invited users cannot be assigned issues.`
+      );
+    }
+    // permissions-audit-allow: business-logic data validation, not a permission gate
+    if (user.role === "guest") {
+      throw new McpToolError(
+        "invalid",
+        "That user is a guest and cannot be assigned issues."
+      );
+    }
+    return user.id;
+  }
+
+  const matches = await db.query.userProfiles.findMany({
+    where: sql`lower(${userProfiles.firstName} || ' ' || ${userProfiles.lastName}) = lower(${value})`,
+    columns: { id: true, firstName: true, lastName: true, role: true },
+    limit: 5,
+  });
+  // permissions-audit-allow: business-logic data validation, not a permission gate
+  const eligible = matches.filter((m) => m.role !== "guest");
+  const [first] = eligible;
+  if (!first) {
+    throw new McpToolError(
+      "not_found",
+      `No assignable member named "${ref}". Check the spelling, or pass the user's UUID. Guests cannot be assigned issues.`
+    );
+  }
+  if (eligible.length > 1) {
+    const candidates = eligible
+      .map((m) => `${fullName(m)} (${m.id})`)
+      .join(", ");
+    throw new McpToolError(
+      "invalid",
+      `Multiple members named "${ref}": ${candidates}. Pass the specific UUID.`
+    );
+  }
+  return first.id;
 }
 
 /** Absolute URL for a machine's detail page. */
