@@ -39,6 +39,9 @@ Full statements, severity, and do/don't: `docs/NON_NEGOTIABLES.md`.
 
 These are the broadest globs in this directory — roughly two-thirds of the
 source tree — and that is deliberate rather than sloppy: they still exclude
-`src/lib`, `src/server`, tests, `scripts/`, and `drizzle/`, so a backend or
-migration session never loads them. Design-system depth (page archetypes,
+`src/lib`, `src/server`, `src/services`, `scripts/`, and `drizzle/`, so a
+backend or migration session never loads them. They do **not** exclude tests:
+96 `*.test.ts(x)` files live under `src/components/` and `src/app/`, so editing
+a component test loads this file alongside `testing.md`. That is the right
+answer for a component test and simply a little noise for the rest. Design-system depth (page archetypes,
 spacing, severity vocabulary) lives in `pinpoint-design-bible`, not here.

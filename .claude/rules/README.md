@@ -13,8 +13,9 @@ index that arrives at the right moment, not a second copy of the catalog.
 Claude Code loads a file here by its frontmatter:
 
 - **No `paths:` field** → loaded at launch, for every session. Only
-  `always.md` qualifies: rules that apply to every file in the repo, where
-  there is no glob that would narrow anything.
+  `always.md` qualifies: rules that apply to every file in the repo, plus the
+  two that follow a call (`checkPermission`, `db.transaction`) scattered widely
+  enough that any honest glob set would cover most of `src/`.
 - **A `paths:` list** → loaded on demand, the first time Claude reads a file
   matching any glob in the list.
 
@@ -22,7 +23,7 @@ That split is the whole point. Before this directory existed the same 20 rules
 sat in one numbered list in `AGENTS.md` and were loaded on every session
 regardless of what the session was doing — the responsive-layout rules were in
 context for a migration, the migration rule was in context for a CSS change.
-Now four rules load always and sixteen load when they are relevant.
+Now six rules load always and fourteen load when they are relevant.
 
 ## Adding or changing a rule
 

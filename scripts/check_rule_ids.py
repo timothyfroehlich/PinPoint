@@ -14,7 +14,7 @@ text, so they are hand-written. This gate catches the drift that actually bites
 -- a rule renamed or deleted in the catalog while citations linger, and catalog
 rules that no mechanism references at all -- without pretending to diff prose.
 
-Four checks:
+Three checks:
 
   ERROR  A cited CORE-* ID that does not exist in the catalog. Always a bug:
          either a typo or a rule that was renamed/removed without updating its
@@ -76,6 +76,22 @@ RANGE_ID = re.compile(r"\bCORE-([A-Z][A-Z0-9]*)-(\d{3})\.\.(\d{3})\b")
 NUMBERED_RULE_CITATION = re.compile(
     r"\b(?:AGENTS\.md`?[ \t]+)?(?:[Rr]ule|[Cc]ommandment)[ \t]*#?\d+\b"
 )
+
+# The citation form the horizontal-whitespace-only rule above gives up: one
+# hard-wrapped between the keyword and the number ("...as required by
+# AGENTS.md rule\n12..."). The scanned surfaces are hand-wrapped at ~78
+# columns, so this is a real shape rather than a theoretical one.
+#
+# It is a separate check because a plain `\s` in NUMBERED_RULE_CITATION cannot
+# distinguish it from a markdown heading that ends in "rule" followed by an
+# ordered list -- which .claude/rules/README.md contains. The blank line
+# between heading and list is what separates them: a wrapped sentence has none.
+# So this matches only when the number is on the *immediately* following line,
+# and never when the keyword line is itself a heading.
+WRAPPED_RULE_CITATION = re.compile(
+    r"\b(?:AGENTS\.md`?[ \t]+)?(?:[Rr]ule|[Cc]ommandment)[ \t]*$"
+)
+WRAPPED_CITATION_NUMBER = re.compile(r"^[ \t]*#?\d+\b")
 
 # "AGENTS.md §2.1" itself. That section no longer lists the rules -- PP-22e4.4
 # moved them to .claude/rules/ and left a pointer -- so citing it sends the
@@ -250,6 +266,16 @@ def find_legacy_citations(text: str) -> list[tuple[int, str]]:
         for match in regex.finditer(text):
             line_no = text.count("\n", 0, match.start()) + 1
             hits.append((line_no, match.group(0)))
+
+    lines = text.splitlines()
+    for index, line in enumerate(lines[:-1]):
+        if line.lstrip().startswith("#"):
+            continue  # A heading, not a wrapped sentence.
+        match = WRAPPED_RULE_CITATION.search(line)
+        if match and WRAPPED_CITATION_NUMBER.match(lines[index + 1]):
+            wrapped = f"{match.group(0)} {lines[index + 1].strip()}"
+            hits.append((index + 1, wrapped))
+
     hits.sort()
     return hits
 

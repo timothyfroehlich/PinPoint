@@ -157,6 +157,32 @@ class TestFindLegacyCitations:
             find_legacy_citations("## Adding or changing a rule\n\n1. State it") == []
         )
 
+    def test_finds_citation_hard_wrapped_between_keyword_and_number(self):
+        # The scanned surfaces are hand-wrapped at ~78 columns, so a citation
+        # can land with the keyword ending one line and the number opening the
+        # next. Horizontal-whitespace-only matching misses it by construction.
+        text = "It is forbidden by AGENTS.md rule\n12 and always has been.\n"
+        assert find_legacy_citations(text) == [
+            (1, "AGENTS.md rule 12 and always has been.")
+        ]
+
+    def test_wrapped_form_ignores_heading_above_an_ordered_list(self):
+        # Same shape as the wrapped citation except for the blank line, which
+        # is exactly what separates a markdown heading + list from a sentence
+        # that wrapped. This is .claude/rules/README.md's own text.
+        assert (
+            find_legacy_citations("## Adding or changing a rule\n\n1. State it") == []
+        )
+
+    def test_wrapped_form_ignores_heading_directly_above_a_number(self):
+        # Belt and braces: even with no blank line, a heading is never a
+        # wrapped sentence.
+        assert find_legacy_citations("## Adding or changing a rule\n1. State it") == []
+
+    def test_wrapped_form_requires_the_number_on_the_next_line(self):
+        # A keyword at end of line with prose under it is not a citation.
+        assert find_legacy_citations("something about a rule\nand more prose") == []
+
     def test_reports_correct_line_number(self):
         text = "line one\nline two\nAGENTS.md rule 9 here\n"
         assert find_legacy_citations(text) == [(3, "AGENTS.md rule 9")]

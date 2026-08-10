@@ -4,7 +4,6 @@ paths:
   - "**/*-action.ts"
   - "**/*-actions.ts"
   - "src/server/actions/**"
-  - "src/lib/permissions/**"
 ---
 
 # Writing or changing a Server Action
@@ -20,15 +19,10 @@ Full statements, severity, and do/don't: `docs/NON_NEGOTIABLES.md`.
   React 19's post-action reset replays the Select's mount-time value, on
   failure as well as success (PP-0fvr, PP-1ajq; `pinpoint-ui` skill →
   **Server Action Forms**).
-- **Permissions go through the matrix** (CORE-ARCH-008): all checks via
-  `checkPermission()` from `~/lib/permissions/helpers`. The help page
-  auto-generates from the matrix — keep enforcement and matrix in sync.
-- **No side effects inside DB transactions** (CORE-ARCH-011):
-  external/non-transactional effects (HTTP, email, Discord, blob, Vault RPC)
-  never run inside `db.transaction` — fetch inputs before it, deliver effects
-  after commit (`after()` + `planNotification`/`dispatchNotification`). A
-  runtime tripwire throws `SideEffectInTransactionError` if violated. (The
-  Doodle Bug, PP-2053.)
+
+CORE-ARCH-008 (permissions via the matrix) and CORE-ARCH-011 (no side effects
+inside `db.transaction`) apply to actions too, but they are **not** here —
+both are called from far outside any action file, so they live in `always.md`.
 
 ## Why these globs are filenames
 
@@ -44,6 +38,3 @@ honest: it fails the build on a module-level `"use server"` file named off the
 pattern. Without that rule a new action named `foo.ts` would drop out of these
 rules and nothing would fail — the rules would just quietly stop loading.
 Change the globs here and you must change that rule too.
-
-`src/lib/permissions/**` is in the list because CORE-ARCH-008 is as relevant
-when editing the matrix as when calling it.
