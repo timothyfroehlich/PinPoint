@@ -63,7 +63,7 @@ For multiple independent tasks, use worktree-isolated subagents.
 
 **Primary**: Standalone subagents with `isolation: "worktree"` + `run_in_background: true`. Use `SendMessage` (by agent ID or `name`) for follow-up (review comments, CI fixes). The `post-checkout` hook automatically allocates ports and generates configs.
 
-**Quality Enforcement**: Self-enforced via prompt instructions (`pnpm run check` before returning). Hooks don't fire for subagents.
+**Quality Enforcement**: Hooks don't fire for subagents, so the dispatch prompt is the enforcement. Point the agent at AGENTS.md §5 "Which tests to run" — the tiered list — not at `pnpm run check` alone, which is a static gate that runs no tests.
 
 **Anti-patterns**:
 
