@@ -272,7 +272,9 @@ export const pinballmapCatalog = pgTable(
  * Issues Table
  *
  * Issues reported for pinball machines.
- * Every issue MUST have exactly one machine (enforced by CHECK constraint).
+ * Every issue MUST have exactly one machine (CORE-ARCH-004). Enforced by
+ * `machine_initials` being NOT NULL with a foreign key to `machines.initials`
+ * (ON DELETE CASCADE) — there is no CHECK constraint and no `machine_id`.
  */
 export const issues = pgTable(
   "issues",

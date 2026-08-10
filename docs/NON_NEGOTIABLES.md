@@ -259,7 +259,7 @@
 **CORE-PERF-003:** Image priority and preconnect discipline
 
 - **Severity:** Required
-- **Why:** `priority` (which emits `fetchpriority="high"`, Baseline Widely available) is a zero-sum signal — every prioritized image deprioritizes every other resource. Marking non-LCP images as `priority` (e.g., the 32px header logo, a sidebar logo, an image inside a closed dialog) burns budget the browser can't reclaim. Likewise, the first request to a known image origin pays full DNS + TLS handshake cost unless preconnected.
+- **Why:** `priority` (which emits `fetchpriority="high"` — Baseline **Newly** available since 2024-10-29, adopted below PinPoint's floor as a safe no-op; see `pinpoint-design-bible` §19) is a zero-sum signal — every prioritized image deprioritizes every other resource. Marking non-LCP images as `priority` (e.g., the 32px header logo, a sidebar logo, an image inside a closed dialog) burns budget the browser can't reclaim. Likewise, the first request to a known image origin pays full DNS + TLS handshake cost unless preconnected.
 - **Do:** Set `priority` on exactly one image per page — the LCP candidate — and only when you've confirmed it is above the fold for the dominant viewport. Always provide `sizes` for images that render at non-`100vw`. Add `<link rel="preconnect">` in the root layout for known image origins (e.g., Vercel Blob bucket).
 - **Don't:** Sprinkle `priority` on logos, hero variants, or pre-mounted dialog images "just in case." Don't omit `sizes` on `priority` images.
 - **Reference:** modern-web-guidance `optimize-image-priority`, `optimize-preload-priority`.
@@ -325,8 +325,8 @@
 
 - **Severity:** Critical
 - **Why:** Core product requirement
-- **Do:** Enforce `machine_id` foreign key with CHECK constraint
-- **Don't:** Allow issues without machines
+- **Do:** Enforce the link on `issues.machine_initials` — `NOT NULL` plus a foreign key to `machines.initials` with `ON DELETE CASCADE` (`src/server/db/schema.ts`, `issuesRelations`). The join key is the natural key `machine_initials`, not a surrogate id.
+- **Don't:** Allow issues without machines. Don't reach for a `machine_id` column or a CHECK constraint on `issues` — neither exists, and `NOT NULL` + FK already enforces the rule.
 
 **CORE-ARCH-005:** Direct Server Action references in forms
 
@@ -473,7 +473,8 @@
 
 - **Severity:** Critical
 - **Why:** Pinning a clear floor is what makes a "modern web" basis useful — every UI decision is anchored to the set of HTML / CSS / JS features the browser platform considers cross-browser stable. **Baseline Widely available** means a feature has been available in all major engines for ~2.5 years and is safe without fallbacks. Aim higher and Safari users break; aim lower and the bundle bloats with polyfills for features already shipping natively.
-- **Do:** Reach for Baseline Widely available primitives directly: `<dialog>`, container queries, `:has()`, `:user-invalid`, `inert`, `aspect-ratio`, native form validation, `fetchpriority`, CSS Grid `auto-fit/minmax`. (`text-wrap: balance` / `text-pretty` are Newly available — see `pinpoint-design-bible` §19 deferred list; the existing §9 typography rule uses them selectively, which predates and is grandfathered into this policy.) No feature detection or polyfill needed.
+- **Do:** Reach for Baseline Widely available primitives directly: `<dialog>`, container queries, `:has()`, `:user-invalid`, `inert`, `aspect-ratio`, native form validation, CSS Grid `auto-fit/minmax`. No feature detection or polyfill needed. Derive a feature's tier **live** from `modern-web-guidance` (CORE-UI-006) rather than from a cached date — this list names the primitives, not their dates, for exactly that reason.
+- **Do:** Two Newly-available features are adopted below the floor with a recorded opt-in in `pinpoint-design-bible` §19 — `fetchpriority` (via `next/image`'s `priority`) and `text-wrap: balance` / `text-pretty` (used selectively per §9). Both degrade to a harmless no-op. Adding a third requires the same opt-in, in §19, in the PR that adopts it.
 - **Don't:** Adopt Baseline Newly available features (Popover API, View Transitions, anchor positioning, scroll-driven animations, `interestfor`, the `closedby` attribute) without a per-feature opt-in documented in `pinpoint-design-bible` §19. Don't add a polyfill for any Widely-available feature.
 - **Reference:** `pinpoint-design-bible` §19 Browser Support Policy. To check a feature's status, search the modern-web-guidance catalog (CORE-UI-006) — every guide notes its Baseline status.
 
@@ -495,7 +496,7 @@
 - **Why:** WCAG 2.4.1 Level A. Without it, keyboard users tab through the AppHeader navigation on every single page load before reaching content. PinPoint's header has 6+ tab stops; that's a hard daily-driver cost for any keyboard-first user.
 - **Do:** The first child of `<body>` (in `src/app/layout.tsx`) must be `<a href="#main-content" className="sr-only focus:not-sr-only ...">Skip to main content</a>`. The `<main>` element in `MainLayout.tsx` must carry `id="main-content"` and `tabIndex={-1}`.
 - **Don't:** Ship a layout that puts content behind the header in tab order with no skip affordance.
-- **Status:** Not yet implemented; implementation tracked under beads epic PP-kqbk (child PP-kqbk.3). New layouts must satisfy this rule.
+- **Status:** Implemented (PP-kqbk.3). `src/app/layout.tsx` renders the anchor as the first child of `<body>`; the `<main id="main-content" tabIndex={-1}>` target lives in `src/components/layout/MainLayout.tsx` and `src/app/(auth)/layout.tsx`. Both halves are load-bearing — a new layout shell must port the pair, not just the anchor.
 
 **CORE-A11Y-002:** `motion-reduce:` pairs with every animation utility
 
@@ -532,7 +533,7 @@
 - **Why:** The `inert` global attribute (Baseline Widely available) removes an element and all its descendants from the tab order, click handling, and the accessibility tree in one declarative step. `aria-hidden` alone is weaker — it removes from the AT tree but not from the tab order, so keyboard focus can still tab into background content. When a modal opens, the background should be `inert`.
 - **Do:** When opening a modal that doesn't use native `<dialog>.showModal()` (Radix Dialog, Sheet, AlertDialog, Drawer), set `inert` on the page root or the sibling containing background content. Wire `anyModalOpen` state once in `ClientProviders.tsx` (the same place that hosts the existing `<TooltipProvider>`) and consume it via React context — don't track open state per modal. Radix's `onOpenChange` callback feeds this context. Native `<dialog>` handles this automatically via top-layer.
 - **Don't:** Rely on `aria-hidden="true"` + pointer-events tricks alone. Don't manually manage focus trapping when `inert` does it for you.
-- **Status:** Not yet implemented; tracked under PP-kqbk.8.
+- **Status:** Not yet implemented; tracked under PP-kqbk.8. (Re-verified 2026-08-10: zero `inert` usages in `src/` — `RowEditSheet.tsx` mentions it only in a comment, and its test asserts `aria-hidden`, which is the weaker behavior this rule exists to replace.)
 
 ---
 
