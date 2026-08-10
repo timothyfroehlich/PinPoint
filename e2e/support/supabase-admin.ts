@@ -452,3 +452,59 @@ export async function getNotificationPreferences(userId: string) {
   if (error) throw error;
   return data;
 }
+
+/**
+ * Seed a row directly into the local PinballMap catalog mirror (PP-l81u E2E).
+ * Lets a test search/select a title through the real edit-form picker without
+ * depending on whatever the weekly catalog refresh happens to contain, and
+ * without ever reaching pinballmap.com (CORE-PBM-001/CORE-TEST-006).
+ */
+export async function seedPinballMapCatalogEntry(entry: {
+  pinballmapMachineId: number;
+  name: string;
+  manufacturer?: string | null;
+  year?: number | null;
+}) {
+  const { error } = await supabaseAdmin.from("pinballmap_catalog").insert({
+    pinballmap_machine_id: entry.pinballmapMachineId,
+    name: entry.name,
+    manufacturer: entry.manufacturer ?? null,
+    year: entry.year ?? null,
+  });
+  if (error) throw error;
+}
+
+/**
+ * Remove catalog rows seeded by `seedPinballMapCatalogEntry`.
+ */
+export async function deletePinballMapCatalogEntries(
+  pinballmapMachineIds: number[]
+) {
+  if (pinballmapMachineIds.length === 0) return;
+  const { error } = await supabaseAdmin
+    .from("pinballmap_catalog")
+    .delete()
+    .in("pinballmap_machine_id", pinballmapMachineIds);
+  if (error) throw error;
+}
+
+/**
+ * Mark a test machine as linked-and-listed on PinballMap, directly in the DB.
+ * Mirrors what a prior save through the real edit form would have produced,
+ * so a test can start from "already listed" without spending a whole extra
+ * form round-trip getting there.
+ */
+export async function linkMachineToPinballMap(
+  machineInitials: string,
+  link: { pinballmapMachineId: number; pinballmapLmxId: number }
+) {
+  const { error } = await supabaseAdmin
+    .from("machines")
+    .update({
+      pinballmap_machine_id: link.pinballmapMachineId,
+      pinballmap_listed: true,
+      pinballmap_lmx_id: link.pinballmapLmxId,
+    })
+    .eq("initials", machineInitials);
+  if (error) throw error;
+}
