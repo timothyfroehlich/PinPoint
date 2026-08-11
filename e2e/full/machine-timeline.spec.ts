@@ -215,19 +215,32 @@ test.describe("Machine Timeline (PP-0x98)", () => {
         timeout: 15_000,
       });
 
-      // 3. Source machine timeline shows the "moved to" system row.
-      // .first() — shared E2E state may include earlier reassigns of other
-      // issues on the same machine; we only care that the row exists.
+      // 3. Source machine timeline shows the "moved to" row FOR THIS issue.
+      // Scoped by kind + title, not a bare /moved to/ match: the comprehensive
+      // job runs this file in three browser projects against one database, and
+      // a reassign row from a peer project (or an earlier reassign of another
+      // issue) sits on this same timeline. An unscoped `.first()` would be
+      // satisfied by that row, so the assertion could not fail even if this
+      // run emitted no event at all — which is the only thing it exists to
+      // prove. The row carries the issue title on its second line and its
+      // event kind on `data-event-kind`.
       await page.goto(`/m/${machineA}/timeline`);
-      await expect(page.getByText(/moved to/i).first()).toBeVisible({
-        timeout: 10_000,
-      });
+      await expect(
+        page
+          .locator("[data-event-kind='issue_reassigned_out']")
+          .filter({ hasText: reassignTitle })
+          .getByText(/moved to/i)
+      ).toBeVisible({ timeout: 10_000 });
 
-      // 4. Destination machine timeline shows the "received from" system row.
+      // 4. Destination machine timeline shows the "received from" row for the
+      // same issue — scoped the same way and for the same reason.
       await page.goto(`/m/${machineB}/timeline`);
-      await expect(page.getByText(/received from/i).first()).toBeVisible({
-        timeout: 10_000,
-      });
+      await expect(
+        page
+          .locator("[data-event-kind='issue_reassigned_in']")
+          .filter({ hasText: reassignTitle })
+          .getByText(/received from/i)
+      ).toBeVisible({ timeout: 10_000 });
     });
   });
 });

@@ -88,8 +88,18 @@ test.describe("Machine Owner Picker — promote-dialog journeys (PP-6oi)", () =>
     // A user created through the auth admin API lands on `guest` by default
     // (the handle_new_user trigger in supabase/seed.sql), which is what these
     // journeys need.
+    //
+    // `@example.com`, NOT `@test.com`: nothing else can reclaim a leaked
+    // auth.users row. `db:fast-reset` deliberately never truncates the auth
+    // schema, and `/api/test-data/cleanup` lacks the privilege, so the ONLY
+    // sweeper is global-setup's `cleanupInviteSignupUsers`, whose filter is
+    // `@example.com`. A run that dies between this hook and the afterEach
+    // (worker kill, timeout) would leave a `@test.com` row in auth.users
+    // forever, regrowing the unbounded-growth problem PP-ph46 fixed. Seed
+    // users are `@test.com` / `@pinpoint.internal`, so this domain also can
+    // never collide with one.
     const user = await createTestUser(
-      `owner-picker-guest-${testId}@test.com`,
+      `owner-picker-guest-${testId}@example.com`,
       "TestPassword123",
       { firstName: "Ownerpick", lastName: `Guest${testId}` }
     );
@@ -97,30 +107,54 @@ test.describe("Machine Owner Picker — promote-dialog journeys (PP-6oi)", () =>
   });
 
   test.afterEach(async ({ request }) => {
+    const userId = guestUserId;
+    guestUserId = null;
+
+    // Machines go first: machines.owner_id references user_profiles with no
+    // ON DELETE, so a still-owned machine blocks the user delete.
+    let machineError: Error | null = null;
     try {
       if (testMachines.size > 0) {
         await cleanupTestEntities(request, {
           machineInitials: Array.from(testMachines),
         });
-        testMachines.clear();
       }
+    } catch (error) {
+      machineError = error instanceof Error ? error : new Error(String(error));
     } finally {
-      // finally: a failed machine cleanup must not skip the user delete and
-      // leak the account. Machines go first regardless — machines.owner_id
-      // references user_profiles with no ON DELETE, so a still-owned machine
-      // would block the delete.
-      if (guestUserId !== null) {
-        await deleteTestUser(guestUserId);
-        guestUserId = null;
+      testMachines.clear();
+    }
+
+    // The user delete runs even when the machine cleanup failed — skipping it
+    // would leak an auth.users row that only global-setup's sweeper can
+    // reclaim. But it is NOT allowed to become the reported failure in that
+    // case: with the machine still around it raises an FK error that is a
+    // symptom of the machine cleanup failing, and letting it propagate (the
+    // previous `finally` did) would replace the real error with a misleading
+    // one.
+    if (userId !== null) {
+      try {
+        await deleteTestUser(userId);
+      } catch (error) {
+        if (machineError === null) {
+          throw error instanceof Error ? error : new Error(String(error));
+        }
       }
     }
+
+    if (machineError !== null) throw machineError;
   });
 
   test("promote dialog appears when a guest owner is selected", async ({
     page,
   }) => {
     const testId = Math.random().toString(36).substring(7);
-    const machineInitials = `OPK${testId.toUpperCase()}`.substring(0, 5);
+    // 6 chars, not 5 — the form's own maxLength. Truncating to 5 left only two
+    // random characters (1296 combinations) to keep three browser projects on
+    // one database apart, and a collision does not just fail the create: the
+    // loser's afterEach deletes machines BY INITIALS, so it would delete the
+    // winner's machine mid-test. Three characters is 46656.
+    const machineInitials = `OPK${testId.toUpperCase()}`.substring(0, 6);
 
     testMachines.add(machineInitials);
 
@@ -170,7 +204,8 @@ test.describe("Machine Owner Picker — promote-dialog journeys (PP-6oi)", () =>
     page,
   }) => {
     const testId = Math.random().toString(36).substring(7);
-    const machineInitials = `OPC${testId.toUpperCase()}`.substring(0, 5);
+    // 6 chars — see the sibling test for why 5 was too few.
+    const machineInitials = `OPC${testId.toUpperCase()}`.substring(0, 6);
 
     testMachines.add(machineInitials);
 

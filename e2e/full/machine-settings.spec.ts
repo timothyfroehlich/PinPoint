@@ -172,10 +172,13 @@ test.describe("Machine Settings (PP-43q3)", () => {
       viewport: { width: 1280, height: 1800 },
     });
 
-    let machineId: string;
+    // "" rather than null so the tests below can keep passing `machineId`
+    // straight to seedSettingsSet without a null check.
+    let machineId = "";
     let machineInitials: string;
 
     test.beforeEach(async () => {
+      machineId = "";
       const adminId = await getProfileIdByEmail("admin@test.com");
       const created = await createTestMachine(adminId);
       machineId = created.id;
@@ -183,8 +186,14 @@ test.describe("Machine Settings (PP-43q3)", () => {
     });
 
     test.afterEach(async () => {
+      // Guarded for the same reason as the editor journey above: afterEach
+      // still runs when beforeEach threw, and deleteTestMachine("") raises an
+      // invalid-uuid error that would replace the real setup failure in the
+      // report.
+      if (machineId === "") return;
       // ON DELETE CASCADE drops the seeded settings sets with the machine.
       await deleteTestMachine(machineId);
+      machineId = "";
     });
 
     // The two named sections used by both tests: a software section (heading
