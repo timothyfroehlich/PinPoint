@@ -130,6 +130,23 @@ This is a narrow exception and it is self-policing. "It's only a small change" i
 
 **The marker attests that a review actually happened.** Posting it otherwise is a false attestation, not a shortcut — the same honesty model as `merge-pr.sh --force`.
 
+#### Why the marker command carries a permission allow rule
+
+`.claude/settings.json` has one `permissions.allow` entry, and it is this script:
+
+```json
+"allow": ["Bash(bash scripts/workflow/mark-claude-review.sh *)"]
+```
+
+It is there because the command was intermittently denied. On 2026-08-03 an auto-mode session was refused with `Blocked by classifier` on PR #1815, while the same command succeeded four times across 2026-08-09/10 (PRs #1832, #1828, #1829, #1848). The block was contextual, not a standing rule — which is the worst shape for a required step, because it fails only sometimes and leaves the PR sitting at `unreviewed` with no path forward. A background subagent has no human to hand the command to at all. Rules are evaluated deny → ask → allow, and an explicit allow resolves the call before the classifier is consulted, so the entry makes the step deterministic. (PP-yx97. A new tool permission needs Tim's explicit approval each time; he gave it on 2026-08-11. This is not a CORE-SEC-010 surface — that rule governs prod-mutating Supabase tools, and its ban on `allow` applies to those.)
+
+**What the rule does not do is make the attestation true.** It removes the harness's opinion about whether you earned the marker, which means your own judgement is now the only thing standing between a false attestation and the merge gate. The honesty model above is not softened by the allow rule; it is the entire remaining check. Merging stays human-only regardless (PP-wi85), so a marker you should not have posted misleads Tim rather than merging anything by itself — that is a smaller failure, not a harmless one.
+
+Two limits worth knowing:
+
+- The rule matches the documented invocation, `bash scripts/workflow/mark-claude-review.sh …`. An absolute path is rewritten to a relative one by the `normalize-workspace-paths.cjs` hook, so that form works too. Chaining (`… && something-else`) does not inherit the allow — each subcommand is matched on its own.
+- A summary string containing an unbalanced quote makes the whole command unresolvable to `block-direct-merge.cjs`, which then scans the raw text and blocks on `merge-pr.sh` or `pr merge`. Rare, and it fails closed. Fix the quoting rather than working around it.
+
 #### Readiness is not review
 
 `pr-watch.py --check-ready` reports review state but does **not** gate on it. That check answers "is this PR worth Tim's `/code-review` right now?", and the review is what happens after that answer is yes — gating on it would be circular. Check-ready green means "hand it to Tim", not "will merge".
