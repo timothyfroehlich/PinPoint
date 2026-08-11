@@ -21,6 +21,7 @@ import {
   authUsers,
   timelineEvents,
   pinballmapState,
+  pinballmapAbandonedListings,
 } from "~/server/db/schema";
 import type { LocationSnapshot, PbmWriteFailure } from "~/lib/pinballmap/types";
 
@@ -214,6 +215,59 @@ describe("PinballMap outbound writes (PGlite)", () => {
       lmxId: 500,
     });
     expect(events[0]?.authorId).toBe(admin.id);
+  });
+
+  it("retires an abandonment record when the add reclaims its lmx", async () => {
+    // PinballMap hands back the EXISTING lmx when the entry is already on the
+    // lineup, so listing can reclaim exactly the entry some machine walked away
+    // from. Leaving the record for the hourly clear would keep a card telling
+    // its owner to remove a listing this very action just claimed
+    // (CORE-ARCH-012, PP-l81u).
+    const db = await getTestDb();
+    const { listMachineOnPinballMapAction } =
+      await import("~/app/(app)/m/pinballmap-actions");
+    const admin = await createUser("admin");
+    await mockAuthAs(admin.id);
+
+    // The entry is already live on PBM under this title, unclaimed by us.
+    pbm.lineup = [{ id: 777, machineId: TITLE_ID }];
+    await seedState([{ id: 777, machineId: TITLE_ID }]);
+
+    const [abandoner] = await db
+      .insert(machines)
+      .values({ name: "Godzilla", initials: "GZO" })
+      .returning();
+    if (!abandoner) throw new Error("failed to seed abandoner");
+    await db.insert(pinballmapAbandonedListings).values({
+      machineId: abandoner.id,
+      lmxId: 777,
+      pinballmapMachineId: TITLE_ID,
+    });
+
+    const [claimer] = await db
+      .insert(machines)
+      .values({
+        name: "Godzilla",
+        initials: "GZP",
+        pinballmapMachineId: TITLE_ID,
+      })
+      .returning();
+    if (!claimer) throw new Error("failed to seed claimer");
+
+    const result = await listMachineOnPinballMapAction(
+      undefined,
+      form(claimer.id)
+    );
+
+    expect(result.ok).toBe(true);
+    const row = await db.query.machines.findFirst({
+      where: eq(machines.id, claimer.id),
+    });
+    expect(row?.pinballmapLmxId).toBe(777);
+
+    // Retired in the same transaction, not an hour later.
+    const records = await db.select().from(pinballmapAbandonedListings);
+    expect(records).toHaveLength(0);
   });
 
   it("adds the new lmx to the stored snapshot", async () => {

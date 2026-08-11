@@ -69,6 +69,8 @@ export function formatMachineEvent(
           return "Linked to PinballMap entry";
         case "reconnected":
           return "Reconnected PinballMap link";
+        case "abandoned":
+          return "Left an entry live on PinballMap";
       }
   }
 }
