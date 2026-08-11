@@ -8,7 +8,7 @@ import { isPgErrorCode } from "~/lib/db/postgres-errors";
 import { dispatchNotification } from "~/lib/notifications";
 import { checkPermission } from "~/lib/permissions/helpers";
 import { VALID_MACHINE_PRESENCE_STATUSES } from "~/lib/machines/presence";
-import { resolvePbmLinkColumns } from "~/lib/pinballmap/link-columns";
+import { resolvePbmLinkColumnsForCreate } from "~/lib/pinballmap/link-columns";
 import { createMachine } from "~/services/machines";
 
 import {
@@ -98,7 +98,7 @@ export async function runAddMachine(
 
   let pbmColumns = null;
   if (linkPbm) {
-    const resolved = await resolvePbmLinkColumns({
+    const resolved = await resolvePbmLinkColumnsForCreate({
       pinballmapMachineId: args.pinballmapMachineId,
       pinballmapExcluded: args.pinballmapExcluded,
       pinballmapExcludedReason: args.pinballmapExcludedReason,

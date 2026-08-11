@@ -62,6 +62,27 @@ export interface MachinePinballmapCardProps {
   desynced?: boolean;
   /** Which desync copy to show; only read when `desynced`. */
   desyncReason?: PbmMachineStatus["reason"];
+  /**
+   * The machine's own current standing on PBM, stated before any alert. Without
+   * it the abandoned-listing notice below names a title that is not this
+   * machine's, and the first read is "why is the Addams Family page talking
+   * about Godzilla" — i.e. it looks like a bug rather than a task.
+   *
+   * `null` for a machine with no PBM link at all.
+   */
+  linkedTitle: string | null;
+  /** Whether this machine currently holds a listing on PBM. */
+  listed: boolean;
+  /**
+   * Entries this machine walked away from that are still live on the public map
+   * (PP-l81u). Cleanup is manual on pinballmap.com in this bead; the record
+   * clears itself once the hourly sync stops seeing the entry.
+   *
+   * `title` is `null` when the catalog no longer carries that title — the entry
+   * on PBM outlives our copy of its name. Quoting only applies to a real title;
+   * the id fallback reads as an id, not as something someone named.
+   */
+  abandoned?: { lmxId: number; title: string | null }[];
 }
 
 const CARD = "rounded-xl border border-outline-variant bg-card p-4";
@@ -72,6 +93,9 @@ export function MachinePinballmapCard({
   locationUrl,
   desynced = false,
   desyncReason,
+  linkedTitle,
+  listed,
+  abandoned,
 }: MachinePinballmapCardProps): React.JSX.Element {
   const desyncMessage =
     desynced && desyncReason ? DESYNC_COPY[desyncReason] : undefined;
@@ -85,6 +109,14 @@ export function MachinePinballmapCard({
         Pinball Map
       </p>
 
+      <p className="mb-3 text-sm" data-testid="machine-pinballmap-status">
+        {linkedTitle === null
+          ? "Not linked to a Pinball Map title."
+          : `${listed ? "Listed" : "Linked"} as ${linkedTitle}${
+              listed ? "." : " · not listed."
+            }`}
+      </p>
+
       {desyncMessage ? (
         <Alert
           variant="warning"
@@ -93,6 +125,43 @@ export function MachinePinballmapCard({
         >
           <AlertTriangle className="size-4" aria-hidden="true" />
           <AlertDescription>{desyncMessage}</AlertDescription>
+        </Alert>
+      ) : null}
+
+      {abandoned && abandoned.length > 0 ? (
+        <Alert
+          variant="warning"
+          className="mb-3"
+          data-testid="machine-pinballmap-abandoned"
+        >
+          <AlertTriangle className="size-4" aria-hidden="true" />
+          <AlertDescription>
+            {abandoned.map((entry) => (
+              <span key={entry.lmxId} className="block">
+                Previous listing still live:{" "}
+                {entry.title === null
+                  ? `Pinball Map entry #${String(entry.lmxId)}`
+                  : `“${entry.title}”`}
+              </span>
+            ))}
+            {/*
+              GOV.UK Details pattern: expands in place, no navigation, and it
+              works on touch where a tooltip does not. Named for its topic
+              rather than "Learn more" / "What's this?", both of which NN/G
+              flags as poor information scent. No `"use client"` needed —
+              `<details>` is native.
+            */}
+            <details className="mt-2">
+              <summary className="cursor-pointer text-xs font-medium text-primary hover:underline">
+                Why is this here?
+              </summary>
+              <p className="mt-1 text-xs text-muted-foreground">
+                This machine was listed on Pinball Map under that title. Only
+                someone with a pinballmap.com account can take the old entry
+                down.
+              </p>
+            </details>
+          </AlertDescription>
         </Alert>
       ) : null}
 

@@ -67,7 +67,8 @@ export interface McpMachinePinballmapLinked {
   group: string | null;
   /**
    * Model metadata as PinPoint stored it, copied from the catalog when the link
-   * was made (never trusted from a client — see `resolvePbmLinkColumns`).
+   * was made (never trusted from a client — see `resolvePbmLinkColumnsForCreate`
+   * / `resolvePbmLinkColumnsForUpdate`).
    */
   manufacturer: string | null;
   year: number | null;
