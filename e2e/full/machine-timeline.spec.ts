@@ -25,14 +25,22 @@
  */
 
 import { test, expect } from "@playwright/test";
+import { openDropdownMenu } from "../support/actions.js";
 import { STORAGE_STATE } from "../support/auth-state.js";
-import { seededMachines, seededIssue } from "../support/constants.js";
+import { cleanupTestEntities } from "../support/cleanup.js";
+import { seededMachines } from "../support/constants.js";
+import {
+  fillReportForm,
+  submitFormAndWaitForRedirect,
+} from "../support/page-helpers.js";
 
 const machineA = seededMachines.addamsFamily.initials;
 const machineB = seededMachines.eightBallDeluxe.initials;
-const issueNumber = seededIssue("TAF").num;
 
+// PREFIX tags note bodies; REASSIGN_PREFIX is the human-readable stem of the
+// reassign journey's issue title (the run appends its own unique suffix).
 const PREFIX = "E2E PP-0x98";
+const REASSIGN_PREFIX = `${PREFIX} Reassign`;
 
 test.describe("Machine Timeline (PP-0x98)", () => {
   test.describe("member journeys", () => {
@@ -138,17 +146,60 @@ test.describe("Machine Timeline (PP-0x98)", () => {
     });
   });
 
+  // Reassignment is a ONE-WAY move of a real row, so this journey files its own
+  // issue instead of moving a seeded one. It used to move seeded TAF-01 to EBD
+  // and leave it there: TAF-01 then no longer existed at /m/TAF/i/1, so a second
+  // run in the same database timed out waiting for the kebab that page never
+  // rendered — and machine-info.spec.ts, which asserts TAF-01 in the hero's
+  // known-issues peek, went red as collateral. Moving it back is not a repair:
+  // a returning issue gets a fresh per-machine number, so TAF-01 would stay
+  // gone. (PP-168u.)
   test.describe("admin reassign journey", () => {
     test.use({ storageState: STORAGE_STATE.admin });
 
+    // The exact title this run filed. Cleanup matches on it rather than on
+    // REASSIGN_PREFIX: the cleanup endpoint's prefix match is an unbounded
+    // `ilike(title, '<prefix>%')` delete, and the comprehensive job runs this
+    // same file in three browser projects against one database — a prefix
+    // sweep would delete another project's issue mid-reassign.
+    let reassignTitle: string | null = null;
+
+    test.afterEach(async ({ request }) => {
+      if (reassignTitle === null) return;
+      await cleanupTestEntities(request, {
+        issueTitlePrefix: reassignTitle,
+      });
+      reassignTitle = null;
+    });
+
     test("reassigning an issue surfaces events on BOTH timelines", async ({
       page,
-    }) => {
-      // 1. Open the source issue on machine A.
-      await page.goto(`/m/${machineA}/i/${issueNumber.toString()}`);
+    }, testInfo) => {
+      // Project + worker in the title so two projects filing in the same
+      // millisecond still get distinct titles.
+      reassignTitle = `${REASSIGN_PREFIX} ${testInfo.project.name}-${testInfo.workerIndex.toString()}-${Date.now().toString()}`;
+
+      // 1. File a throwaway issue on machine A and land on its detail page.
+      await page.goto(`/report?machine=${machineA}`);
+      await fillReportForm(page, {
+        title: reassignTitle,
+        priority: "medium",
+      });
+      await submitFormAndWaitForRedirect(
+        page,
+        page.getByRole("button", { name: "Submit Issue Report" }),
+        { awayFrom: "/report" }
+      );
+      await expect(page).toHaveURL(new RegExp(`/m/${machineA}/i/[0-9]+$`));
 
       // 2. Reassign via kebab menu → reassign → pick destination → confirm.
-      await page.getByTestId("issue-actions-menu-trigger").click();
+      // openDropdownMenu, not a bare click: we arrive here straight off the
+      // report form's redirect, and the report form's ProseMirror editor can
+      // still hold focus when the first click lands — the trigger reports
+      // clickable, the click is swallowed, and the menu never opens. The helper
+      // asserts aria-expanded and retries once. (issues-reassign-machine.spec.ts
+      // opens this same menu the same way after the same flow.)
+      await openDropdownMenu(page.getByTestId("issue-actions-menu-trigger"));
       await page.getByTestId("issue-actions-menu-reassign").click();
 
       // The reassign dialog renders a searchable combobox — filter by the
@@ -164,19 +215,32 @@ test.describe("Machine Timeline (PP-0x98)", () => {
         timeout: 15_000,
       });
 
-      // 3. Source machine timeline shows the "moved to" system row.
-      // .first() — shared E2E state may include earlier reassigns of other
-      // issues on the same machine; we only care that the row exists.
+      // 3. Source machine timeline shows the "moved to" row FOR THIS issue.
+      // Scoped by kind + title, not a bare /moved to/ match: the comprehensive
+      // job runs this file in three browser projects against one database, and
+      // a reassign row from a peer project (or an earlier reassign of another
+      // issue) sits on this same timeline. An unscoped `.first()` would be
+      // satisfied by that row, so the assertion could not fail even if this
+      // run emitted no event at all — which is the only thing it exists to
+      // prove. The row carries the issue title on its second line and its
+      // event kind on `data-event-kind`.
       await page.goto(`/m/${machineA}/timeline`);
-      await expect(page.getByText(/moved to/i).first()).toBeVisible({
-        timeout: 10_000,
-      });
+      await expect(
+        page
+          .locator("[data-event-kind='issue_reassigned_out']")
+          .filter({ hasText: reassignTitle })
+          .getByText(/moved to/i)
+      ).toBeVisible({ timeout: 10_000 });
 
-      // 4. Destination machine timeline shows the "received from" system row.
+      // 4. Destination machine timeline shows the "received from" row for the
+      // same issue — scoped the same way and for the same reason.
       await page.goto(`/m/${machineB}/timeline`);
-      await expect(page.getByText(/received from/i).first()).toBeVisible({
-        timeout: 10_000,
-      });
+      await expect(
+        page
+          .locator("[data-event-kind='issue_reassigned_in']")
+          .filter({ hasText: reassignTitle })
+          .getByText(/received from/i)
+      ).toBeVisible({ timeout: 10_000 });
     });
   });
 });

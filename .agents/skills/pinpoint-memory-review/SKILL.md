@@ -1,6 +1,6 @@
 ---
 name: pinpoint-memory-review
-description: Weekly curated pass over everything recorded about how we work — beads memories, Claude auto-memories on both the Mac and Bazzite, and the canonical context files. Prunes stale facts, promotes and demotes between tiers, dedupes across tiers, and hands Tim a short veto list. Use when the weekly chores checklist reaches the memory item, or when Tim says "memory review", "review memories", or asks what has been recorded.
+description: Weekly curated pass over everything recorded about how we work — beads memories, Claude auto-memories on both the Mac and Bazzite, and the canonical context files. Prunes stale facts, promotes and demotes between tiers, dedupes across tiers, hands Tim a short veto list, then applies the verdicts on both machines. Use when the weekly chores checklist reaches the memory item, or when Tim says "memory review", "review memories", or asks what has been recorded. **Auditing the contents of skills is explicitly out of scope** — this pass covers recorded facts, not the skill corpus.
 ---
 
 # pinpoint-memory-review
@@ -35,7 +35,7 @@ bd memories
 
 ⚠️ If Bazzite is unreachable, try `bazzite-lan` before concluding anything is wrong — and note that **`tailscale ping` succeeding proves nothing**, since disco pings ride outside WireGuard. A 1.96.4 magicsock bug once made the tailnet look perfectly healthy while dropping every byte of data.
 
-Each inventory reports `memory_stores[]` with a `scope`, plus `context_files[]`, `rules` (whose `exists` is `false` until PP-22e4 PR 8 lands), and `skills[]`.
+Each inventory reports `memory_stores[]` with a `scope`, plus `context_files[]`, `rules`, and `skills[]`.
 
 **The corpus is `project` + `home` + `worktree` only.** `~/.claude/projects` holds a store for every repo Tim has ever opened, and those come back as **`other-project`** — read them for context if you like, but never verify, dedupe, or propose changes to them. They belong to a different project. Passing a worktree path as `--repo` is fine; the collector resolves it back to the main checkout, which is where the memories that matter live.
 
@@ -107,4 +107,4 @@ Note findings as a comment on the weekly chores bead, then re-defer it a week ou
 - **Never audit skill contents.** The review may propose "this fact belongs in skill X", but it does not read skills hunting for problems. Out of scope by decision — it is too much for one pass.
 - **Home-scope memories are reviewed but not propagated** by default. Several are machine-specific by nature — a Bluetooth chipset fix is meaningless on the Mac. A home-scope memory crosses over only if the fact is judged machine-independent.
 - **Beads memories are triaged per-fact, not migrated wholesale.** Each is judged against the cost table like anything else. Most should drain out of the always-loaded tier, but that is a conclusion, not a rule.
-- **Never promote into `AGENTS.md`.** PP-22e4 reduces it to a ≤10-line stub with a CI gate.
+- **Never promote into `AGENTS.md`.** It is the always-loaded tier: everything in it is paid for by every session, whatever that session is doing.

@@ -10,6 +10,8 @@ Image loading sits at the intersection of LCP, layout stability, and bandwidth. 
 
 `priority` emits `fetchpriority="high"` plus eager loading. The browser interprets this as "this image is critical to first paint." Every prioritized image deprioritizes every other resource — so adding `priority` to a non-LCP image actively hurts LCP.
 
+(`fetchpriority` is Baseline **Newly** available, adopted below PinPoint's floor as a safe no-op — the opt-in is recorded in §19. Nothing below changes because of that; a browser without support just uses its own heuristics.)
+
 | Place                              | Should `priority`?                           |
 | :--------------------------------- | :------------------------------------------- |
 | The largest above-the-fold image   | Yes — that's the LCP candidate               |

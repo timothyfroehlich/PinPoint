@@ -17,12 +17,15 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   authUsers,
+  invitedUsers,
+  issueComments,
   issues,
   machines,
   pinballmapCatalog,
   timelineEvents,
   userProfiles,
 } from "~/server/db/schema";
+import { docToPlainText } from "~/lib/tiptap/types";
 import { getTestDb, setupTestDb } from "~/test/setup/pglite";
 import type * as NotificationsModule from "~/lib/notifications";
 import type { McpAuthContext } from "~/lib/mcp/verify-token";
@@ -47,9 +50,13 @@ vi.mock("next/server", () => ({
   },
 }));
 
+import { runAddIssueComment } from "~/lib/mcp/tools/add-issue-comment";
 import { runAddMachine } from "~/lib/mcp/tools/add-machine";
 import { runCreateIssue } from "~/lib/mcp/tools/create-issue";
+import { runGetIssue } from "~/lib/mcp/tools/get-issue";
 import { runGetMachine } from "~/lib/mcp/tools/get-machine";
+import { registerPinpointTools } from "~/lib/mcp/tools";
+import { runListIssues } from "~/lib/mcp/tools/list-issues";
 import { runListMachines } from "~/lib/mcp/tools/list-machines";
 import { runSearchPinballmapCatalog } from "~/lib/mcp/tools/search-pinballmap-catalog";
 import type {
@@ -60,7 +67,13 @@ import type { McpMachinePinballmap } from "~/lib/mcp/tools/pinballmap-block";
 import { runSetMachineAvailability } from "~/lib/mcp/tools/set-machine-availability";
 import { runSetMachineName } from "~/lib/mcp/tools/set-machine-name";
 import { runSetMachineOwner } from "~/lib/mcp/tools/set-machine-owner";
-import { McpToolError } from "~/lib/mcp/tools/shared";
+import { runUpdateIssue } from "~/lib/mcp/tools/update-issue";
+import {
+  McpToolError,
+  resolveAssignee,
+  resolveAssigneeFilter,
+  resolveIssue,
+} from "~/lib/mcp/tools/shared";
 
 describe("MCP tool handlers (PP-u4ab.2)", () => {
   setupTestDb();
@@ -1249,6 +1262,1040 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
       await expect(
         runSetMachineName({ machine: "NOPE", name: "x" }, ctx("admin", admin))
       ).rejects.toMatchObject({ reason: "not_found" });
+    });
+  });
+
+  describe("resolveIssue / resolveAssignee (PP-u4ab.14)", () => {
+    it("resolves an issue by machine initials and number", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine({ name: "Attack from Mars" });
+      await runCreateIssue(
+        { machine: machine.initials, title: "left flipper weak" },
+        ctx("admin", admin)
+      );
+
+      // Lower-cased on purpose: initials resolution is case-insensitive.
+      const resolved = await resolveIssue(machine.initials.toLowerCase(), 1);
+      expect(resolved.issueNumber).toBe(1);
+      expect(resolved.machineInitials).toBe(machine.initials);
+      expect(resolved.title).toBe("left flipper weak");
+      expect(resolved.status).toBe("new");
+    });
+
+    it("resolves by machine UUID as well as initials", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine({ name: "Medieval Madness" });
+      await runCreateIssue(
+        { machine: machine.initials, title: "ball stuck" },
+        ctx("admin", admin)
+      );
+
+      const resolved = await resolveIssue(machine.id, 1);
+      expect(resolved.machineInitials).toBe(machine.initials);
+    });
+
+    it("throws not_found for an unknown issue number, naming list_issues", async () => {
+      const machine = await seedMachine({ name: "Twilight Zone" });
+      await expect(resolveIssue(machine.initials, 99)).rejects.toMatchObject({
+        reason: "not_found",
+      });
+      await expect(resolveIssue(machine.initials, 99)).rejects.toThrow(
+        /list_issues/
+      );
+    });
+
+    it("resolves an assignee by full name and by UUID, and empty clears", async () => {
+      const tech = await makeUser("technician", "Ada", "Lovelace");
+      expect(await resolveAssignee("Ada Lovelace")).toBe(tech);
+      expect(await resolveAssignee(tech)).toBe(tech);
+      expect(await resolveAssignee(null)).toBeNull();
+      expect(await resolveAssignee("   ")).toBeNull();
+    });
+
+    it("rejects an ambiguous assignee name with the candidate UUIDs", async () => {
+      const a = await makeUser("member", "Sam", "Jones");
+      const b = await makeUser("member", "Sam", "Jones");
+      await expect(resolveAssignee("Sam Jones")).rejects.toThrow(
+        /Pass the specific UUID/
+      );
+      await expect(resolveAssignee("Sam Jones")).rejects.toThrow(
+        new RegExp(`${a}|${b}`)
+      );
+    });
+
+    it("rejects a guest as an assignee", async () => {
+      await makeUser("guest", "Guest", "Person");
+      await expect(resolveAssignee("Guest Person")).rejects.toThrow(/guest/i);
+    });
+
+    /**
+     * The filter resolver answers a different question than `resolveAssignee`:
+     * who does this name refer to, not who may be given work. A guest resolves
+     * (they may still hold issues from before the demotion), and two people
+     * sharing a name are ambiguous even when only one of them is assignable —
+     * silently picking the assignable one would filter on a person the caller
+     * never named.
+     */
+    it("resolves a guest for the read filter, and still rejects ambiguity", async () => {
+      const guest = await makeUser("guest", "Guest", "Person");
+      expect(await resolveAssigneeFilter("Guest Person")).toBe(guest);
+      expect(await resolveAssigneeFilter(guest)).toBe(guest);
+
+      await makeUser("guest", "Pat", "Kim");
+      await makeUser("member", "Pat", "Kim");
+      await expect(resolveAssigneeFilter("Pat Kim")).rejects.toMatchObject({
+        reason: "invalid",
+      });
+
+      await expect(resolveAssigneeFilter(randomUUID())).rejects.toMatchObject({
+        reason: "not_found",
+      });
+    });
+
+    it("rejects an invited user id — issues have no invited-assignee column", async () => {
+      const db = await getTestDb();
+      const invitedId = randomUUID();
+      await db.insert(invitedUsers).values({
+        id: invitedId,
+        email: `${invitedId}@example.com`,
+        firstName: "Invited",
+        lastName: "Person",
+        role: "member",
+      });
+
+      // resolveOwner accepts this shape (machines carry invitedOwnerId).
+      // assigned_to references user_profiles only, so it must be rejected
+      // rather than silently dropped.
+      await expect(resolveAssignee(invitedId)).rejects.toMatchObject({
+        reason: "not_found",
+      });
+    });
+  });
+
+  describe("add_issue_comment (PP-u4ab.14)", () => {
+    it("posts a comment and reports created: true", async () => {
+      const admin = await makeUser("admin", "Tim", "Froehlich");
+      const machine = await seedMachine({ name: "Attack from Mars" });
+      await runCreateIssue(
+        { machine: machine.initials, title: "left flipper weak" },
+        ctx("admin", admin)
+      );
+
+      const outcome = await runAddIssueComment(
+        {
+          machine: machine.initials,
+          number: 1,
+          comment: "Checked the coil sleeve.",
+        },
+        ctx("admin", admin)
+      );
+      const result = outcome.result as { created: boolean; commentId: string };
+
+      expect(result.created).toBe(true);
+      expect(result.commentId).toBeDefined();
+
+      const db = await getTestDb();
+      const rows = await db.query.issueComments.findMany({
+        where: eq(issueComments.issueId, outcome.issueId ?? ""),
+      });
+      expect(rows).toHaveLength(1);
+    });
+
+    /**
+     * The regression this pins: `created` must come from the service's explicit
+     * `deduped` flag, never from an empty delivery plan. Here the commenter is
+     * the ONLY watcher and `getChannels` is mocked to `[]`, so a genuinely new
+     * comment produces zero deliveries — the exact case where the empty-plan
+     * proxy would report `created: false` for a real write.
+     */
+    it("reports created: true even when the comment notifies nobody", async () => {
+      const admin = await makeUser("admin", "Solo", "Reporter");
+      const machine = await seedMachine({ name: "Fish Tales" });
+      await runCreateIssue(
+        { machine: machine.initials, title: "right ramp rejects" },
+        ctx("admin", admin)
+      );
+
+      const outcome = await runAddIssueComment(
+        { machine: machine.initials, number: 1, comment: "Bent the flap." },
+        ctx("admin", admin)
+      );
+
+      expect((outcome.result as { created: boolean }).created).toBe(true);
+    });
+
+    it("dedupes an identical retry and reports created: false", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine({ name: "Medieval Madness" });
+      await runCreateIssue(
+        { machine: machine.initials, title: "ball stuck" },
+        ctx("admin", admin)
+      );
+
+      const args = {
+        machine: machine.initials,
+        number: 1,
+        comment: "Same text.",
+      };
+      const first = await runAddIssueComment(args, ctx("admin", admin));
+      const second = await runAddIssueComment(args, ctx("admin", admin));
+
+      expect((first.result as { created: boolean }).created).toBe(true);
+      expect((second.result as { created: boolean }).created).toBe(false);
+      expect((second.result as { commentId: string }).commentId).toBe(
+        (first.result as { commentId: string }).commentId
+      );
+
+      const db = await getTestDb();
+      const rows = await db.query.issueComments.findMany({
+        where: eq(issueComments.issueId, second.issueId ?? ""),
+      });
+      expect(rows).toHaveLength(1);
+    });
+
+    it("treats a different comment on the same issue as a new post", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine({ name: "Cirqus Voltaire" });
+      await runCreateIssue(
+        { machine: machine.initials, title: "ringmaster stuck" },
+        ctx("admin", admin)
+      );
+
+      await runAddIssueComment(
+        { machine: machine.initials, number: 1, comment: "First note." },
+        ctx("admin", admin)
+      );
+      const second = await runAddIssueComment(
+        { machine: machine.initials, number: 1, comment: "Second note." },
+        ctx("admin", admin)
+      );
+
+      expect((second.result as { created: boolean }).created).toBe(true);
+
+      const db = await getTestDb();
+      const rows = await db.query.issueComments.findMany({
+        where: eq(issueComments.issueId, second.issueId ?? ""),
+      });
+      expect(rows).toHaveLength(2);
+    });
+
+    it("throws not_found for an issue number that does not exist", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine({ name: "Twilight Zone" });
+
+      await expect(
+        runAddIssueComment(
+          { machine: machine.initials, number: 7, comment: "hi" },
+          ctx("admin", admin)
+        )
+      ).rejects.toMatchObject({ reason: "not_found" });
+    });
+  });
+
+  /**
+   * Every other test here calls a `run*` handler directly, which passes whether
+   * or not the tool is registered. `registerPinpointTools` is therefore the one
+   * place a finished tool can be silently absent from the surface, so the
+   * catalog gets asserted by name.
+   *
+   * `whoami` is deliberately not in this list — it is registered on the route
+   * itself, not through this function.
+   */
+  it("registers every tool in the catalog", () => {
+    const registered: string[] = [];
+    const fakeServer = {
+      registerTool: (name: string) => {
+        registered.push(name);
+      },
+    } as unknown as Parameters<typeof registerPinpointTools>[0];
+
+    registerPinpointTools(fakeServer);
+
+    expect(registered.sort()).toEqual([
+      "add_issue_comment",
+      "add_machine",
+      "create_issue",
+      "get_issue",
+      "get_machine",
+      "list_issues",
+      "list_machines",
+      "search_pinballmap_catalog",
+      "set_machine_availability",
+      "set_machine_name",
+      "set_machine_owner",
+      "update_issue",
+    ]);
+  });
+
+  describe("list_issues (PP-u4ab.14)", () => {
+    it("defaults to open issues only", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine({ name: "Attack from Mars" });
+      await runCreateIssue(
+        { machine: machine.initials, title: "open one" },
+        ctx("admin", admin)
+      );
+      await runCreateIssue(
+        { machine: machine.initials, title: "closed one" },
+        ctx("admin", admin)
+      );
+      await runUpdateIssue(
+        { machine: machine.initials, number: 2, status: "fixed" },
+        ctx("admin", admin)
+      );
+
+      const outcome = await runListIssues(
+        { machine: machine.initials },
+        ctx("admin", admin)
+      );
+      const result = outcome.result as {
+        total: number;
+        issues: { title: string }[];
+      };
+      expect(result.total).toBe(1);
+      expect(result.issues[0]?.title).toBe("open one");
+    });
+
+    it("accepts the 'closed' shorthand and an explicit status set", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine({ name: "Medieval Madness" });
+      await runCreateIssue(
+        { machine: machine.initials, title: "a" },
+        ctx("admin", admin)
+      );
+      await runCreateIssue(
+        { machine: machine.initials, title: "b" },
+        ctx("admin", admin)
+      );
+      await runUpdateIssue(
+        { machine: machine.initials, number: 2, status: "wont_fix" },
+        ctx("admin", admin)
+      );
+
+      const closed = await runListIssues(
+        { machine: machine.initials, status: "closed" },
+        ctx("admin", admin)
+      );
+      expect((closed.result as { total: number }).total).toBe(1);
+
+      const both = await runListIssues(
+        { machine: machine.initials, status: ["new", "wont_fix"] },
+        ctx("admin", admin)
+      );
+      expect((both.result as { total: number }).total).toBe(2);
+
+      const single = await runListIssues(
+        { machine: machine.initials, status: "wont_fix" },
+        ctx("admin", admin)
+      );
+      expect((single.result as { total: number }).total).toBe(1);
+    });
+
+    it("keeps the page and the total in agreement while paging", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine({ name: "Twilight Zone" });
+      for (let i = 0; i < 5; i++) {
+        await runCreateIssue(
+          { machine: machine.initials, title: `issue ${i}` },
+          ctx("admin", admin)
+        );
+      }
+
+      const page = await runListIssues(
+        { machine: machine.initials, limit: 2, offset: 0 },
+        ctx("admin", admin)
+      );
+      expect(page.result).toMatchObject({
+        count: 2,
+        total: 5,
+        offset: 0,
+        hasMore: true,
+      });
+
+      const last = await runListIssues(
+        { machine: machine.initials, limit: 2, offset: 4 },
+        ctx("admin", admin)
+      );
+      expect(last.result).toMatchObject({ count: 1, total: 5, hasMore: false });
+    });
+
+    it("returns a total order, so paging never skips or repeats a row", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine({ name: "Fish Tales" });
+      // Created in one loop, so several rows share a createdAt to the second —
+      // exactly the case a createdAt-only sort would leave underdetermined.
+      for (let i = 0; i < 6; i++) {
+        await runCreateIssue(
+          { machine: machine.initials, title: `tie ${i}` },
+          ctx("admin", admin)
+        );
+      }
+
+      const seen: number[] = [];
+      for (let offset = 0; offset < 6; offset += 2) {
+        const page = await runListIssues(
+          { machine: machine.initials, limit: 2, offset },
+          ctx("admin", admin)
+        );
+        seen.push(
+          ...(page.result as { issues: { number: number }[] }).issues.map(
+            (i) => i.number
+          )
+        );
+      }
+
+      expect(seen).toHaveLength(6);
+      expect(new Set(seen).size).toBe(6);
+    });
+
+    it("searches across machines when none is named", async () => {
+      const admin = await makeUser("admin");
+      const first = await seedMachine({ name: "Cirqus Voltaire" });
+      const second = await seedMachine({ name: "Monster Bash" });
+      await runCreateIssue(
+        { machine: first.initials, title: "first one" },
+        ctx("admin", admin)
+      );
+      await runCreateIssue(
+        { machine: second.initials, title: "second one" },
+        ctx("admin", admin)
+      );
+
+      const scoped = await runListIssues(
+        { machine: first.initials },
+        ctx("admin", admin)
+      );
+      expect((scoped.result as { total: number }).total).toBe(1);
+
+      const all = await runListIssues({}, ctx("admin", admin));
+      const machinesSeen = new Set(
+        (all.result as { issues: { machine: string }[] }).issues.map(
+          (i) => i.machine
+        )
+      );
+      expect(machinesSeen.has(first.initials)).toBe(true);
+      expect(machinesSeen.has(second.initials)).toBe(true);
+    });
+
+    it("filters by severity and by assignee", async () => {
+      const admin = await makeUser("admin");
+      const tech = await makeUser("technician", "Ada", "Lovelace");
+      const machine = await seedMachine({ name: "Ghostbusters" });
+      await runCreateIssue(
+        { machine: machine.initials, title: "major one", severity: "major" },
+        ctx("admin", admin)
+      );
+      await runCreateIssue(
+        {
+          machine: machine.initials,
+          title: "cosmetic one",
+          severity: "cosmetic",
+        },
+        ctx("admin", admin)
+      );
+      await runUpdateIssue(
+        { machine: machine.initials, number: 1, assignee: tech },
+        ctx("admin", admin)
+      );
+
+      const bySeverity = await runListIssues(
+        { machine: machine.initials, severity: "major" },
+        ctx("admin", admin)
+      );
+      const severityResult = bySeverity.result as {
+        total: number;
+        issues: { title: string; assignee: string | null }[];
+      };
+      expect(severityResult.total).toBe(1);
+      expect(severityResult.issues[0]?.title).toBe("major one");
+      expect(severityResult.issues[0]?.assignee).toBe("Ada Lovelace");
+
+      const byAssignee = await runListIssues(
+        { machine: machine.initials, assignee: "Ada Lovelace" },
+        ctx("admin", admin)
+      );
+      expect((byAssignee.result as { total: number }).total).toBe(1);
+    });
+
+    /**
+     * A filter name that narrows nothing is worse than an error: it returns the
+     * whole collection under a `total` that reads as authoritative
+     * (CORE-ARCH-012). An unresolvable assignee must throw, not fall through.
+     */
+    it("throws rather than ignoring an unresolvable assignee filter", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine({ name: "Monster Bash" });
+      await runCreateIssue(
+        { machine: machine.initials, title: "mummy stuck" },
+        ctx("admin", admin)
+      );
+
+      await expect(
+        runListIssues({ assignee: "Nobody Here" }, ctx("admin", admin))
+      ).rejects.toMatchObject({ reason: "not_found" });
+    });
+
+    /**
+     * The assignee filter asks who a name REFERS TO, not who may be assigned
+     * work. Routing it through `resolveAssignee` — the write-eligibility
+     * resolver — gets the wrong answer for rows that already exist: demoting a
+     * member to guest does not unassign their issues, so the filter would throw
+     * "no assignable member" for a name whose issues are sitting right there
+     * (CORE-ARCH-012).
+     *
+     * The last assertion is the other half: the read widened, the write did not.
+     */
+    it("finds issues assigned to a member who was later demoted to guest", async () => {
+      const admin = await makeUser("admin");
+      const demoted = await makeUser("technician", "Grace", "Hopper");
+      const machine = await seedMachine({ name: "Medieval Madness" });
+      await runCreateIssue(
+        { machine: machine.initials, title: "trolls stuck down" },
+        ctx("admin", admin)
+      );
+      await runUpdateIssue(
+        { machine: machine.initials, number: 1, assignee: demoted },
+        ctx("admin", admin)
+      );
+
+      const db = await getTestDb();
+      await db
+        .update(userProfiles)
+        .set({ role: "guest" })
+        .where(eq(userProfiles.id, demoted));
+
+      const byName = await runListIssues(
+        { machine: machine.initials, assignee: "Grace Hopper" },
+        ctx("admin", admin)
+      );
+      expect((byName.result as { total: number }).total).toBe(1);
+
+      const byId = await runListIssues(
+        { machine: machine.initials, assignee: demoted },
+        ctx("admin", admin)
+      );
+      expect((byId.result as { total: number }).total).toBe(1);
+
+      await expect(
+        runUpdateIssue(
+          { machine: machine.initials, number: 1, assignee: "Grace Hopper" },
+          ctx("admin", admin)
+        )
+      ).rejects.toMatchObject({ reason: "not_found" });
+    });
+  });
+
+  describe("get_issue (PP-u4ab.14)", () => {
+    it("returns full detail with the comment thread and no emails", async () => {
+      const admin = await makeUser("admin", "Tim", "Froehlich");
+      const machine = await seedMachine({ name: "Attack from Mars" });
+      await runCreateIssue(
+        {
+          machine: machine.initials,
+          title: "left flipper weak",
+          description: "Barely reaches the ramp.",
+          severity: "major",
+        },
+        ctx("admin", admin)
+      );
+      await runAddIssueComment(
+        {
+          machine: machine.initials,
+          number: 1,
+          comment: "Checked the coil sleeve.",
+        },
+        ctx("admin", admin)
+      );
+
+      const outcome = await runGetIssue(
+        { machine: machine.initials, number: 1 },
+        ctx("admin", admin)
+      );
+      const result = outcome.result as {
+        title: string;
+        description: string;
+        severity: string;
+        status: string;
+        reporter: string;
+        assignee: string | null;
+        url: string;
+        comments: { author: string; text: string; createdAt: string }[];
+      };
+
+      expect(result.title).toBe("left flipper weak");
+      expect(result.description).toBe("Barely reaches the ramp.");
+      expect(result.severity).toBe("major");
+      expect(result.status).toBe("new");
+      expect(result.reporter).toBe("Tim Froehlich");
+      expect(result.assignee).toBeNull();
+      expect(result.url).toContain(`/m/${machine.initials}/i/1`);
+      expect(result.comments).toHaveLength(1);
+      expect(result.comments[0]).toMatchObject({
+        author: "Tim Froehlich",
+        text: "Checked the coil sleeve.",
+      });
+
+      // CORE-SEC-007: no email may reach an MCP caller. The seeded users all
+      // carry `<uuid>@example.com`, so an "@" anywhere in the payload is a leak.
+      expect(JSON.stringify(result)).not.toContain("@");
+    });
+
+    it("reports the assignee's name once one is set", async () => {
+      const admin = await makeUser("admin");
+      const tech = await makeUser("technician", "Ada", "Lovelace");
+      const machine = await seedMachine({ name: "Medieval Madness" });
+      await runCreateIssue(
+        { machine: machine.initials, title: "ball stuck" },
+        ctx("admin", admin)
+      );
+      await runUpdateIssue(
+        { machine: machine.initials, number: 1, assignee: tech },
+        ctx("admin", admin)
+      );
+
+      const outcome = await runGetIssue(
+        { machine: machine.initials, number: 1 },
+        ctx("admin", admin)
+      );
+      expect((outcome.result as { assignee: string | null }).assignee).toBe(
+        "Ada Lovelace"
+      );
+    });
+
+    it("excludes system rows from the thread", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine({ name: "Twilight Zone" });
+      await runCreateIssue(
+        { machine: machine.initials, title: "scoop weak" },
+        ctx("admin", admin)
+      );
+      // A status change writes a system row against the issue.
+      await runUpdateIssue(
+        { machine: machine.initials, number: 1, status: "confirmed" },
+        ctx("admin", admin)
+      );
+
+      const outcome = await runGetIssue(
+        { machine: machine.initials, number: 1 },
+        ctx("admin", admin)
+      );
+      const result = outcome.result as {
+        comments: unknown[];
+        commentCount: number;
+      };
+      expect(result.comments).toHaveLength(0);
+      // The count query carries the same isSystem filter as the page query — a
+      // count that included the status row would report a thread that the
+      // caller can never see any of.
+      expect(result.commentCount).toBe(0);
+    });
+
+    /**
+     * A truncated thread must keep its TAIL, not its head.
+     *
+     * `asc(createdAt)` + `limit` returns the OLDEST N and silently drops the
+     * newest — on a long thread that hides exactly the comments saying what has
+     * already been done, from the tool whose stated job is to be read before
+     * commenting or updating. `commentCount` and `commentsTruncated` are what
+     * make the omission visible rather than passing for the whole thread
+     * (CORE-ARCH-012).
+     *
+     * The timestamps are written explicitly: three comments posted in a row can
+     * land inside one clock tick, and this test is meaningless if the order it
+     * asserts is the order the rows happened to come back in.
+     */
+    it("returns the newest comments and reports the truncation", async () => {
+      const admin = await makeUser("admin", "Tim", "Froehlich");
+      const machine = await seedMachine({ name: "The Addams Family" });
+      await runCreateIssue(
+        { machine: machine.initials, title: "vault not registering" },
+        ctx("admin", admin)
+      );
+      for (const text of ["oldest", "middle", "newest"]) {
+        await runAddIssueComment(
+          { machine: machine.initials, number: 1, comment: text },
+          ctx("admin", admin)
+        );
+      }
+
+      const db = await getTestDb();
+      const rows = await db.query.issueComments.findMany({
+        where: eq(issueComments.isSystem, false),
+        columns: { id: true, content: true },
+      });
+      for (const row of rows) {
+        const text = docToPlainText(row.content);
+        const offset = ["oldest", "middle", "newest"].indexOf(text);
+        await db
+          .update(issueComments)
+          .set({ createdAt: new Date(Date.UTC(2026, 0, 1, 0, offset)) })
+          .where(eq(issueComments.id, row.id));
+      }
+
+      const outcome = await runGetIssue(
+        { machine: machine.initials, number: 1, commentLimit: 2 },
+        ctx("admin", admin)
+      );
+      const result = outcome.result as {
+        commentCount: number;
+        commentsTruncated: boolean;
+        comments: { text: string }[];
+      };
+
+      expect(result.comments.map((c) => c.text)).toEqual(["middle", "newest"]);
+      expect(result.commentCount).toBe(3);
+      expect(result.commentsTruncated).toBe(true);
+    });
+
+    it("reports commentsTruncated: false when the whole thread fits", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine({ name: "Funhouse" });
+      await runCreateIssue(
+        { machine: machine.initials, title: "rudy not talking" },
+        ctx("admin", admin)
+      );
+      await runAddIssueComment(
+        { machine: machine.initials, number: 1, comment: "speaker unplugged" },
+        ctx("admin", admin)
+      );
+
+      const outcome = await runGetIssue(
+        { machine: machine.initials, number: 1 },
+        ctx("admin", admin)
+      );
+      expect(outcome.result).toMatchObject({
+        commentCount: 1,
+        commentsTruncated: false,
+      });
+    });
+
+    it("throws not_found for an unknown issue number", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine({ name: "Cirqus Voltaire" });
+
+      await expect(
+        runGetIssue(
+          { machine: machine.initials, number: 4 },
+          ctx("admin", admin)
+        )
+      ).rejects.toMatchObject({ reason: "not_found" });
+    });
+  });
+
+  describe("update_issue (PP-u4ab.14)", () => {
+    it("applies several fields and reports each change", async () => {
+      const admin = await makeUser("admin");
+      const tech = await makeUser("technician", "Ada", "Lovelace");
+      const machine = await seedMachine({ name: "Attack from Mars" });
+      await runCreateIssue(
+        { machine: machine.initials, title: "left flipper weak" },
+        ctx("admin", admin)
+      );
+
+      const outcome = await runUpdateIssue(
+        {
+          machine: machine.initials,
+          number: 1,
+          status: "confirmed",
+          severity: "major",
+          assignee: "Ada Lovelace",
+        },
+        ctx("admin", admin)
+      );
+      const result = outcome.result as {
+        partial: boolean;
+        applied: {
+          field: string;
+          from: string | null;
+          to: string | null;
+          changed: boolean;
+        }[];
+      };
+
+      expect(result.partial).toBe(false);
+      expect(result.applied).toHaveLength(3);
+      expect(result.applied.find((a) => a.field === "status")).toMatchObject({
+        from: "new",
+        to: "confirmed",
+        changed: true,
+      });
+      expect(result.applied.find((a) => a.field === "severity")).toMatchObject({
+        from: "minor",
+        to: "major",
+        changed: true,
+      });
+      expect(result.applied.find((a) => a.field === "assignee")?.to).toBe(tech);
+
+      const db = await getTestDb();
+      const row = await db.query.issues.findFirst({
+        where: eq(issues.id, outcome.issueId ?? ""),
+        columns: { status: true, severity: true, assignedTo: true },
+      });
+      expect(row).toMatchObject({
+        status: "confirmed",
+        severity: "major",
+        assignedTo: tech,
+      });
+    });
+
+    it("reports changed: false for a field already at that value", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine({ name: "Medieval Madness" });
+      await runCreateIssue(
+        { machine: machine.initials, title: "ball stuck" },
+        ctx("admin", admin)
+      );
+
+      const outcome = await runUpdateIssue(
+        { machine: machine.initials, number: 1, status: "new" },
+        ctx("admin", admin)
+      );
+      const result = outcome.result as {
+        applied: { field: string; changed: boolean }[];
+      };
+      expect(result.applied[0]).toMatchObject({
+        field: "status",
+        changed: false,
+      });
+    });
+
+    it("unassigns when the assignee is an empty string", async () => {
+      const admin = await makeUser("admin");
+      const tech = await makeUser("technician", "Grace", "Hopper");
+      const machine = await seedMachine({ name: "Fish Tales" });
+      await runCreateIssue(
+        { machine: machine.initials, title: "shaker rattles" },
+        ctx("admin", admin)
+      );
+      await runUpdateIssue(
+        { machine: machine.initials, number: 1, assignee: tech },
+        ctx("admin", admin)
+      );
+
+      const outcome = await runUpdateIssue(
+        { machine: machine.initials, number: 1, assignee: "" },
+        ctx("admin", admin)
+      );
+      const result = outcome.result as {
+        applied: { field: string; from: string | null; to: string | null }[];
+      };
+      expect(result.applied[0]).toMatchObject({
+        field: "assignee",
+        from: tech,
+        to: null,
+      });
+
+      const db = await getTestDb();
+      const row = await db.query.issues.findFirst({
+        where: eq(issues.id, outcome.issueId ?? ""),
+        columns: { assignedTo: true },
+      });
+      expect(row?.assignedTo).toBeNull();
+    });
+
+    it("rejects an update that supplies no fields", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine({ name: "Twilight Zone" });
+      await runCreateIssue(
+        { machine: machine.initials, title: "scoop weak" },
+        ctx("admin", admin)
+      );
+
+      await expect(
+        runUpdateIssue(
+          { machine: machine.initials, number: 1 },
+          ctx("admin", admin)
+        )
+      ).rejects.toMatchObject({ reason: "invalid" });
+    });
+
+    it("denies a guest on a triage field", async () => {
+      const guest = await makeUser("guest");
+      const admin = await makeUser("admin");
+      const machine = await seedMachine({ name: "Cirqus Voltaire" });
+      await runCreateIssue(
+        { machine: machine.initials, title: "ringmaster stuck" },
+        ctx("admin", admin)
+      );
+
+      await expect(
+        runUpdateIssue(
+          { machine: machine.initials, number: 1, priority: "high" },
+          ctx("guest", guest)
+        )
+      ).rejects.toThrow(/cannot change an issue's priority/);
+    });
+
+    /**
+     * A guest holds NEITHER permission through the bare access-level check this
+     * tool performs: `issues.update.triage` is flatly false for guests, and
+     * their `issues.update.reporting` grant is the conditional `"own"`, which
+     * `checkPermission` resolves to false without an OwnershipContext. So a
+     * mixed call must be denied as a whole — and denied BEFORE anything is
+     * written, since the gate runs ahead of the apply loop.
+     */
+    it("denies a mixed update before writing any field", async () => {
+      const admin = await makeUser("admin");
+      const guest = await makeUser("guest");
+      const machine = await seedMachine({ name: "Ghostbusters" });
+      await runCreateIssue(
+        { machine: machine.initials, title: "left ramp" },
+        ctx("admin", admin)
+      );
+
+      await expect(
+        runUpdateIssue(
+          {
+            machine: machine.initials,
+            number: 1,
+            severity: "major",
+            priority: "high",
+          },
+          ctx("guest", guest)
+        )
+      ).rejects.toMatchObject({ reason: "denied" });
+
+      const db = await getTestDb();
+      const row = await db.query.issues.findFirst({
+        where: eq(issues.machineInitials, machine.initials),
+        columns: { severity: true, priority: true },
+      });
+      expect(row).toMatchObject({ severity: "minor", priority: "medium" });
+    });
+
+    it("fails the whole call when the assignee cannot be resolved", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine({ name: "Monster Bash" });
+      await runCreateIssue(
+        { machine: machine.initials, title: "mummy stuck" },
+        ctx("admin", admin)
+      );
+
+      await expect(
+        runUpdateIssue(
+          {
+            machine: machine.initials,
+            number: 1,
+            severity: "major",
+            assignee: "Nobody Here",
+          },
+          ctx("admin", admin)
+        )
+      ).rejects.toMatchObject({ reason: "not_found" });
+
+      // Resolution runs before the apply loop, so severity must be untouched.
+      const db = await getTestDb();
+      const row = await db.query.issues.findFirst({
+        where: eq(issues.machineInitials, machine.initials),
+        columns: { severity: true },
+      });
+      expect(row?.severity).toBe("minor");
+    });
+
+    /**
+     * `changed` for the assignee comes from the service, not from the snapshot
+     * `runUpdateIssue` read before the loop.
+     *
+     * `assignIssue` no-ops when the row already holds the requested assignee,
+     * and it checks that both before and inside its transaction. So if another
+     * writer assigns the same person between our snapshot read and that check,
+     * the service writes nothing while a snapshot comparison would say this
+     * call made the change (CORE-ARCH-012). Simulated here by writing the row
+     * directly, which is exactly what the losing side of that race sees.
+     */
+    it("reports changed: false when the assignee was already set by someone else", async () => {
+      const admin = await makeUser("admin");
+      const tech = await makeUser("technician", "Ada", "Lovelace");
+      const machine = await seedMachine({ name: "Theatre of Magic" });
+      const created = await runCreateIssue(
+        { machine: machine.initials, title: "trunk not opening" },
+        ctx("admin", admin)
+      );
+
+      // The concurrent writer: the row now holds what we are about to request,
+      // while runUpdateIssue's own snapshot will still say unassigned.
+      const db = await getTestDb();
+      await db
+        .update(issues)
+        .set({ assignedTo: tech })
+        .where(eq(issues.id, created.issueId ?? ""));
+
+      const outcome = await runUpdateIssue(
+        { machine: machine.initials, number: 1, assignee: tech },
+        ctx("admin", admin)
+      );
+      const result = outcome.result as {
+        applied: { field: string; from: string | null; changed: boolean }[];
+      };
+
+      expect(result.applied).toEqual([
+        { field: "assignee", from: tech, to: tech, changed: false },
+      ]);
+    });
+
+    /**
+     * The partial-application contract, and the reason update_issue returns a
+     * success payload instead of an error when a field fails.
+     *
+     * Each field commits in its own transaction, so a mid-loop failure leaves
+     * the earlier fields WRITTEN. `severity` lands, `priority` throws, and the
+     * response has to say both things at once — otherwise the caller is told
+     * nothing happened while the database says otherwise (CORE-ARCH-012).
+     */
+    it("keeps earlier fields written when a later one fails, and says so", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine({ name: "Ghostbusters" });
+      await runCreateIssue(
+        { machine: machine.initials, title: "left ramp" },
+        ctx("admin", admin)
+      );
+
+      const services = await import("~/services/issues");
+      const spy = vi
+        .spyOn(services, "updateIssuePriority")
+        .mockRejectedValueOnce(new Error("priority write failed"));
+
+      try {
+        const outcome = await runUpdateIssue(
+          {
+            machine: machine.initials,
+            number: 1,
+            severity: "major",
+            priority: "high",
+          },
+          ctx("admin", admin)
+        );
+        const result = outcome.result as {
+          partial: boolean;
+          failed: { field: string; reason: string };
+          applied: { field: string }[];
+        };
+
+        expect(result.partial).toBe(true);
+        expect(result.failed.field).toBe("priority");
+        // The thrown text does NOT pass through. Anything a service throws here
+        // is driver or Postgres text, and this response goes to an MCP client;
+        // `runTool` reduces the errors IT catches the same way, and this path
+        // never reaches runTool.
+        expect(result.failed.reason).not.toContain("priority write failed");
+        expect(result.failed.reason).toContain("priority");
+        // severity is applied before priority and must be reported as landed.
+        expect(result.applied.map((a) => a.field)).toEqual(["severity"]);
+        // The payload is a success payload, but the AUDIT line is not — a
+        // half-applied write must not be recorded as outcome "ok", since that
+        // log line is the only server-side record of MCP mutations.
+        expect(outcome.auditOutcome).toBe("error");
+        expect(outcome.auditReason).toBe("partial:priority");
+
+        const db = await getTestDb();
+        const row = await db.query.issues.findFirst({
+          where: eq(issues.id, outcome.issueId ?? ""),
+          columns: { severity: true, priority: true },
+        });
+        expect(row).toMatchObject({ severity: "major", priority: "medium" });
+      } finally {
+        spy.mockRestore();
+      }
     });
   });
 });

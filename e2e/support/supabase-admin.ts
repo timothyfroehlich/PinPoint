@@ -66,7 +66,14 @@ export async function createTestMachine(ownerId: string, initials?: string) {
     .eq("role", "guest");
   if (promoteError) throw promoteError;
 
-  const finalInitials = initials ?? `TM${Math.floor(Math.random() * 10000)}`;
+  // 4 base-36 characters (1.68M values), not 4 decimal digits (10k). Initials
+  // are unique-constrained, so a collision throws in whatever beforeEach called
+  // this — and the comprehensive job draws a dozen-plus per run across three
+  // browser projects against one database. Six characters total is the app's
+  // own initials limit (the /m/new field's maxLength).
+  const finalInitials =
+    initials ??
+    `TM${Math.random().toString(36).slice(2, 6).toUpperCase().padEnd(4, "0")}`;
   const { data, error } = await supabaseAdmin
     .from("machines")
     .insert({

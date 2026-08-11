@@ -199,9 +199,10 @@ function fetchBackups() {
 
   try {
     return JSON.parse(stdout);
-  } catch {
+  } catch (error) {
     throw new Error(
-      `Could not parse CLI output as JSON — did \`--output json\` stop being honored?\n${stdout.slice(0, 400)}`
+      `Could not parse CLI output as JSON — did \`--output json\` stop being honored?\n${stdout.slice(0, 400)}`,
+      { cause: error }
     );
   }
 }
