@@ -1,7 +1,5 @@
 import "server-only";
 
-import { createHash } from "node:crypto";
-
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { after } from "next/server";
 import { z } from "zod";
@@ -12,26 +10,15 @@ import { plainTextToDoc } from "~/lib/tiptap/types";
 import { addIssueComment } from "~/services/issues";
 
 import {
+  contentAddressedUuid,
   issueUrl,
   McpToolError,
   resolveIssue,
+  retryWindowPart,
   runTool,
   type ToolOutcome,
 } from "./shared";
 import type { McpAuthContext } from "~/lib/mcp/verify-token";
-
-/** Retries inside this window resolve to the comment already posted. */
-const RETRY_WINDOW_MS = 10 * 60 * 1000;
-
-/**
- * The joiner for the idempotency key's field parts: a NUL, written as the
- * `\u0000` ESCAPE and never as a literal byte. A literal NUL in the source makes
- * the whole file binary to the toolchain — `git diff` reports "Binary files
- * differ" so the file is unreviewable, and `rg` skips it in directory searches,
- * which silently drops it out of every future codebase sweep. `create_issue`'s
- * key uses the same escape.
- */
-const KEY_SEPARATOR = "\u0000";
 
 const addIssueCommentSchema = z.object({
   machine: z
@@ -55,10 +42,14 @@ const addIssueCommentSchema = z.object({
 type AddIssueCommentArgs = z.infer<typeof addIssueCommentSchema>;
 
 /**
- * Content-addressed idempotency key, the same scheme as `create_issue`'s.
+ * Content-addressed idempotency key, the same scheme as `create_issue`'s — the
+ * digest-to-UUIDv8 rendering and the NUL joining both live in
+ * {@link contentAddressedUuid}, so the two tools cannot drift apart on the bits
+ * that decide whether a retry collides.
  *
- * NUL-joined so no field's content can impersonate a boundary between two
- * others ("ab" + "c" must not hash the same as "a" + "bc").
+ * Exported for the unit tests that pin the properties that matter: identical
+ * calls in one window collide, anything else does not, and the output is always
+ * a well-formed v8 UUID.
  */
 export function createCommentIdempotencyKey(
   issueId: string,
@@ -66,29 +57,7 @@ export function createCommentIdempotencyKey(
   userId: string,
   now: number
 ): string {
-  const parts = [
-    issueId,
-    comment,
-    userId,
-    String(Math.floor(now / RETRY_WINDOW_MS)),
-  ];
-  const digest = createHash("sha256")
-    .update(parts.join(KEY_SEPARATOR))
-    .digest();
-
-  // Take the leading 16 bytes and stamp the version (8) and RFC 4122 variant
-  // bits in place, then render the canonical 8-4-4-4-12 form.
-  const bytes = digest.subarray(0, 16);
-  bytes[6] = ((bytes[6] ?? 0) & 0x0f) | 0x80;
-  bytes[8] = ((bytes[8] ?? 0) & 0x3f) | 0x80;
-  const hex = bytes.toString("hex");
-  return [
-    hex.slice(0, 8),
-    hex.slice(8, 12),
-    hex.slice(12, 16),
-    hex.slice(16, 20),
-    hex.slice(20, 32),
-  ].join("-");
+  return contentAddressedUuid([issueId, comment, userId, retryWindowPart(now)]);
 }
 
 export async function runAddIssueComment(

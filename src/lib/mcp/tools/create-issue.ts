@@ -1,7 +1,5 @@
 import "server-only";
 
-import { createHash } from "node:crypto";
-
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { after } from "next/server";
 import { z } from "zod";
@@ -9,12 +7,19 @@ import { z } from "zod";
 import { dispatchNotification } from "~/lib/notifications";
 import { checkPermission } from "~/lib/permissions/helpers";
 import { plainTextToDoc } from "~/lib/tiptap/types";
+import {
+  ISSUE_FREQUENCY_VALUES,
+  ISSUE_PRIORITY_VALUES,
+  ISSUE_SEVERITY_VALUES,
+} from "~/lib/types";
 import { createIssue } from "~/services/issues";
 
 import {
+  contentAddressedUuid,
   issueUrl,
   McpToolError,
   resolveMachine,
+  retryWindowPart,
   runTool,
   type ToolOutcome,
 } from "./shared";
@@ -40,38 +45,20 @@ const createIssueSchema = z.object({
       "Optional plain-text detail; converted to the app's rich format."
     ),
   severity: z
-    .enum(["cosmetic", "minor", "major", "unplayable"])
+    .enum(ISSUE_SEVERITY_VALUES)
     .optional()
     .describe("How bad it is (default minor)."),
   priority: z
-    .enum(["low", "medium", "high"])
+    .enum(ISSUE_PRIORITY_VALUES)
     .optional()
     .describe("Triage priority (default medium)."),
   frequency: z
-    .enum(["intermittent", "frequent", "constant"])
+    .enum(ISSUE_FREQUENCY_VALUES)
     .optional()
     .describe("How often it happens (default intermittent)."),
 });
 
 type CreateIssueArgs = z.infer<typeof createIssueSchema>;
-
-/**
- * How long an identical `create_issue` call is treated as a retry of the same
- * report rather than a second, deliberate one.
- *
- * MCP has no client-supplied idempotency token, so the key is derived from the
- * call itself: same admin, same machine, same field-for-field content, same
- * window. A transport-level retry resends byte-identical arguments and lands on
- * the same key, so the service returns the original issue instead of filing a
- * duplicate.
- *
- * The window is what keeps this from being wrong in the other direction — a
- * genuine re-report of the same fault weeks later ("left flipper weak" after a
- * repair regressed) must file a NEW issue, not silently resolve to the old one.
- * A retry that straddles a window boundary degrades to the previous behaviour
- * (a duplicate), which is the safe direction to fail.
- */
-const RETRY_WINDOW_MS = 10 * 60 * 1000;
 
 /**
  * Content-addressed idempotency key for one create_issue call.
@@ -92,7 +79,7 @@ export function createIssueIdempotencyKey(
   machineId: string,
   now: number
 ): string {
-  const parts = [
+  return contentAddressedUuid([
     userId,
     machineId,
     args.title,
@@ -100,25 +87,8 @@ export function createIssueIdempotencyKey(
     args.severity ?? "",
     args.priority ?? "",
     args.frequency ?? "",
-    String(Math.floor(now / RETRY_WINDOW_MS)),
-  ];
-  // NUL-joined so no field's content can impersonate a boundary between two
-  // others ("ab" + "c" must not hash the same as "a" + "bc").
-  const digest = createHash("sha256").update(parts.join("\u0000")).digest();
-
-  // Take the leading 16 bytes and stamp the version (8) and RFC 4122 variant
-  // bits in place, then render the canonical 8-4-4-4-12 form.
-  const bytes = digest.subarray(0, 16);
-  bytes[6] = ((bytes[6] ?? 0) & 0x0f) | 0x80;
-  bytes[8] = ((bytes[8] ?? 0) & 0x3f) | 0x80;
-  const hex = bytes.toString("hex");
-  return [
-    hex.slice(0, 8),
-    hex.slice(8, 12),
-    hex.slice(12, 16),
-    hex.slice(16, 20),
-    hex.slice(20, 32),
-  ].join("-");
+    retryWindowPart(now),
+  ]);
 }
 
 export async function runCreateIssue(
