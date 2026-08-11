@@ -19,13 +19,15 @@ Full statements, severity, and do/don't: `docs/NON_NEGOTIABLES.md`.
   (PP-rs9), `use-is-mobile` (PP-43q3 — row-edit sheet + confirm-delete).
 - **Baseline Widely available is the UI floor** (CORE-UI-005, CORE-UI-006):
   reach for `<dialog>`, container queries, `:has()`, `:user-invalid`, `inert`,
-  `aspect-ratio`, `fetchpriority`, etc. directly — no polyfills, no feature
-  detection. Look up modern patterns via the `modern-web-guidance` plugin
+  `aspect-ratio`, etc. directly — no polyfills, no feature detection. Look up
+  modern patterns via the `modern-web-guidance` plugin
   (`npx -y modern-web-guidance@latest search "<query>"` then
-  `retrieve "<id>"`); each guide tags its Baseline status. Newly-available
-  features (Popover API, View Transitions, anchor positioning, scroll-driven
-  animations) require a per-feature opt-in documented in
-  `pinpoint-design-bible` §19.
+  `retrieve "<id>"`); each guide tags its Baseline status, and that live lookup
+  is the only trustworthy source for a tier — never a date written down here.
+  Newly-available features (Popover API, View Transitions, anchor positioning,
+  scroll-driven animations) require a per-feature opt-in documented in
+  `pinpoint-design-bible` §19; `fetchpriority` and `text-wrap: balance` are the
+  two that already have one.
 - **Form correctness** (CORE-FORM-001..006): right `type` (`email`/`tel`/`url`/
   `password`), correct `autocomplete` token (`current-password` /
   `new-password` / `off` on confirm), `:user-invalid` styling on the shared
