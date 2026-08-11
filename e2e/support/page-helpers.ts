@@ -327,3 +327,59 @@ export async function fillReportForm(
     await watchToggle.setChecked(watchIssue);
   }
 }
+
+/** The Tailwind `md` breakpoint, which is what decides the layout below. */
+const MD_BREAKPOINT_PX = 768;
+
+/**
+ * Resolves the issue-detail comment form for the current viewport, opening the
+ * mobile sheet when that is the branch in play.
+ *
+ * Both branches are in the DOM at once: the inline `issue-comment-form` carries
+ * `hidden md:flex`, and below `md` a StickyCommentComposer button opens the same
+ * form inside a Sheet. So a test has to work out which one is live.
+ *
+ * It has to *know*, not sample. Two specs used to decide with
+ * `sheetTrigger.isVisible({ timeout: 3000 })`, which reads like a 3s wait and is
+ * not one — `isVisible()` never retries, and its `timeout` option is deprecated
+ * and ignored. The check therefore fired at whatever instant the Server Action
+ * redirect happened to land on, so a sticky composer that had not hydrated yet
+ * would read as "desktop" and send the test at the inline form that is
+ * `display: none` on mobile. Deciding on viewport width removes the sampling:
+ * it is the same input the CSS uses, and it cannot be raced.
+ *
+ * **This did not fix the Mobile Chrome full-suite failures.** It was written to,
+ * and it didn't: `form-resets:190` still failed after the change. Both specs
+ * also pass in isolation, which rules out a per-spec defect and points at
+ * cross-spec interference instead. So read this as a latent-defect fix — a wait
+ * that never waited — not as the cause of anything observed. (PP-jxhy.)
+ */
+export async function openIssueCommentForm(
+  page: Page
+): Promise<{ form: Locator; isSheet: boolean }> {
+  const viewportWidth = page.viewportSize()?.width ?? MD_BREAKPOINT_PX;
+  const isSheet = viewportWidth < MD_BREAKPOINT_PX;
+
+  if (!isSheet) {
+    return { form: page.getByTestId("issue-comment-form"), isSheet: false };
+  }
+
+  const sheetTrigger = page.getByRole("button", { name: "Add a comment" });
+  await sheetTrigger.waitFor({ state: "visible", timeout: 15000 });
+
+  const dialog = page.getByRole("dialog", { name: "Add a comment" });
+
+  // Click, confirm, click again if the first was dropped. The composer paints
+  // before React attaches its handler, and under `--workers=3` the dev server is
+  // busy compiling for other spec files, so a click can land on an inert button
+  // and vanish — the same lost-click race `openDropdownMenu` guards in
+  // `actions.ts`. Waiting longer cannot recover it, because nothing is pending.
+  await sheetTrigger.click();
+  try {
+    await dialog.waitFor({ state: "visible", timeout: 10000 });
+  } catch {
+    await sheetTrigger.click();
+    await dialog.waitFor({ state: "visible", timeout: 10000 });
+  }
+  return { form: dialog, isSheet: true };
+}

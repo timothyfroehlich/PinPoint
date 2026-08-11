@@ -164,6 +164,38 @@ export async function logout(page: Page, _testInfo: TestInfo): Promise<void> {
 }
 
 /**
+ * Budget for a portal, drawer, or dropdown to mount once its trigger is clicked.
+ *
+ * These helpers hard-coded 5s (3s in the retrying dropdown loop), which silently
+ * opted out of the config's CI-aware `expect.timeout` — an explicit `{ timeout }`
+ * always beats `expect: { timeout }`, so the 30s CI budget never applied here.
+ * A shared helper quietly capping every caller below the environment's own
+ * setting is a defect on its own terms, whatever it happens to be masking.
+ *
+ * 5s is also thin for this suite specifically: the E2E `webServer` runs
+ * `pnpm run dev`, so a route pays an on-demand Next compile on its first
+ * request, and mobile viewports render component trees a chromium run never
+ * compiles (`MetadataDrawer`, `StickyCommentComposer`, `RowEditSheet`).
+ *
+ * **This did not fix the Mobile Chrome full-suite failures.** It was written to
+ * — `status-overhaul:25` times out at the Radix branch below — and 20s did not
+ * rescue it. That spec also passes in isolation, so the cause is cross-spec
+ * interference, not a mount that needed longer. Read this as a latent-defect
+ * fix (a shared helper silently capping every caller below the environment's
+ * own budget), not as the cause of anything observed. (PP-jxhy.)
+ *
+ * Local keeps the short budget: that dev server is usually warm, and a
+ * genuinely missing selector should still fail fast.
+ */
+const PORTAL_MOUNT_TIMEOUT = process.env["CI"] ? 20_000 : 5_000;
+
+/**
+ * Same idea, halved, for `openDropdownMenu` — it clicks twice, so this budget
+ * is spent twice before the test gives up, and the CI test timeout is 60s.
+ */
+const DROPDOWN_OPEN_TIMEOUT = process.env["CI"] ? 10_000 : 3_000;
+
+/**
  * Click a Radix dropdown trigger and confirm it actually opened. Retries once
  * if the first click loses to a focus/overlay race.
  *
@@ -176,7 +208,7 @@ export async function openDropdownMenu(trigger: Locator): Promise<void> {
   await trigger.click();
   try {
     await expect(trigger).toHaveAttribute("aria-expanded", "true", {
-      timeout: 3000,
+      timeout: DROPDOWN_OPEN_TIMEOUT,
     });
     return;
   } catch {
@@ -186,7 +218,9 @@ export async function openDropdownMenu(trigger: Locator): Promise<void> {
     await expect(
       trigger,
       "Dropdown trigger did not open after two click attempts. aria-expanded never became 'true' — the click is likely being intercepted by an overlay (modal, editor focus trap, etc.)."
-    ).toHaveAttribute("aria-expanded", "true", { timeout: 3000 });
+    ).toHaveAttribute("aria-expanded", "true", {
+      timeout: DROPDOWN_OPEN_TIMEOUT,
+    });
   }
 }
 
@@ -249,10 +283,24 @@ export async function selectOption(
     throw new Error(`Unknown select trigger: ${triggerTestId}`);
   }
 
-  // Click the select trigger
+  // Open via openDropdownMenu, which confirms the trigger actually opened and
+  // clicks a second time if it didn't.
+  //
+  // A bare `trigger.click()` here is what made the Mobile Chrome full suite fail
+  // about once per run. The button paints before React attaches Radix's
+  // handlers, and under `--workers=3` the dev server is compiling routes for two
+  // other spec files, so hydration lags behind paint by enough that a click
+  // lands on an inert button and is simply dropped. Nothing is pending
+  // afterwards, which is why raising the option-visible timeout to 20s did not
+  // help — the wait was never the problem, the lost click was. Serial runs pass
+  // (92/92) because hydration wins the race every time when the dev server has
+  // nothing else to compile.
+  //
+  // PP-168u killed the same class in `machine-timeline` by routing through this
+  // helper; `selectOption` had simply never been given it. (PP-jxhy.)
   const trigger = page.getByTestId(triggerTestId);
   await expect(trigger).toBeVisible();
-  await trigger.click();
+  await openDropdownMenu(trigger);
 
   // Wait for the option to be visible in the popover
   const optionTestId = getOptionTestId(optionValue);
@@ -260,19 +308,19 @@ export async function selectOption(
   if (triggerTestId.endsWith("-trigger")) {
     // Drawer items use dispatchEvent — they respond to synthetic clicks.
     // Wait for visibility first so the drawer open animation has completed.
-    await expect(option).toBeVisible({ timeout: 5000 });
+    await expect(option).toBeVisible({ timeout: PORTAL_MOUNT_TIMEOUT });
     await option.dispatchEvent("click");
   } else {
     // Wait for the Radix Select portal to mount — options aren't in the DOM until the portal
     // opens (async portal render), so clicking without waiting causes a 30s timeout race.
     // force:true is still needed because shadcn/ui Select options can be positioned outside
     // the visible viewport but are still technically "visible" per Playwright's CSS check.
-    await expect(option).toBeVisible({ timeout: 5000 });
+    await expect(option).toBeVisible({ timeout: PORTAL_MOUNT_TIMEOUT });
     await option.click({ force: true });
   }
 
   // Wait for dropdown to close
-  await expect(option).toBeHidden({ timeout: 5000 });
+  await expect(option).toBeHidden({ timeout: PORTAL_MOUNT_TIMEOUT });
 }
 
 /**
@@ -290,16 +338,18 @@ export async function selectMachine(
 ): Promise<void> {
   const trigger = page.getByTestId("machine-select");
   await expect(trigger).toBeVisible();
-  await trigger.click();
+  // Same lost-click exposure as selectOption above — the Popover trigger also
+  // flips aria-expanded, so the same confirm-and-retry applies. (PP-jxhy.)
+  await openDropdownMenu(trigger);
 
   const option = machineId
     ? page.getByTestId(`machine-option-${machineId}`)
     : page.locator('[data-testid^="machine-option-"]').first();
-  await expect(option).toBeVisible({ timeout: 5000 });
+  await expect(option).toBeVisible({ timeout: PORTAL_MOUNT_TIMEOUT });
   await option.click();
 
   // Selecting closes the popover, so the option unmounts.
-  await expect(option).toBeHidden({ timeout: 5000 });
+  await expect(option).toBeHidden({ timeout: PORTAL_MOUNT_TIMEOUT });
 }
 
 /** The hidden input carrying the report form's selected machine id. */
