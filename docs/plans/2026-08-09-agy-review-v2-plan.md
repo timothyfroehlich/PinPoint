@@ -751,3 +751,103 @@ Both Gemini runs and three of Opus's five subagents lost turns to canceled comma
 recurring shapes were pipes and `grep`. `command(grep)` is now granted — reviewers reach for
 it constantly and it cannot write — and both skills now say that `a | b` is refused as a unit
 exactly like `a && b`. This is not incidental: on #1856 it cost an entire five-slice wave.
+
+### Column four, measured: a refuter killed a true finding
+
+Every calibration so far counted what refutation removed and treated that as precision. The
+number nobody collects is how often refutation removes something real. Here it is.
+
+The two #1807 candidates are known-true — the fix commit repairs both and explains why. Each
+went to its own Sonnet refuter, blind to the other, under the standard brief.
+
+| candidate                       | verdict     | severity      | confidence |
+| :------------------------------ | :---------- | :------------ | ---------: |
+| the drain loop cannot terminate | **refuted** | low           |        0.9 |
+| the two descriptions disagree   | narrowed    | medium to low |       0.75 |
+
+One of two true findings killed, at high confidence, by a refuter that read the right file and
+quoted the right line.
+
+**How the kill worked is the part worth keeping.** The finding is that two texts contradict
+each other and the more prominent one is unsafe on its own. The refuter dismissed it by
+quoting the _other_ text — the parameter description that does carry the termination rule —
+and concluding a caller reading the whole schema would not hang. That is not a refutation of
+the finding; it is a restatement of it. When a finding is that A and B disagree, "B is
+correct" cannot be the answer.
+
+So: **one refuter may not kill a finding.** Two refuters, and `refuted` requires agreement
+while `stands` does not. The asymmetry is the point — a weak finding that survives costs a
+reader half a minute, and a true one that dies costs the review. The same two refuters
+demonstrate why a single verdict cannot be trusted: on the same repository, quoting the same
+line of source, one said `stands` and the other `refuted`.
+
+**Both also narrowed on an ungrounded premise.** Each argued from how MCP clients present
+tool schemas to a model — a fact about the outside world, asserted from knowledge, absent from
+the checkout. The grounding rule already forbids this when reporting a finding; it now applies
+to refuting one, because a finding dismissed on an invented premise is harder to catch than a
+finding raised on one. Nobody re-checks what was already thrown away.
+
+### The other harness lessons of this round
+
+**`status: SUCCESS` does not mean the review finished.** A run returned SUCCESS after 69
+seconds with "I have spawned the 4 subagents… I'll wait for their responses". The check is
+whether the response parses as the JSON object, never the status field.
+
+**Subagents die when the parent ends its turn, and v6.1 caused that.** The prompt gained "do
+not poll your subagents' status in a loop" as an efficiency measure; the next four-slice wave
+came back with all four canceled. Told there was nothing useful to do while waiting, the
+parent stopped waiting. It then reported the loss as a server restart, which is the model's
+guess and not a system message. The instruction now says the opposite: stay active, periodic
+status checks are how the turn is held open. A redundant status check costs nothing next to a
+lost wave.
+
+**agy's non-Gemini models share one account-wide quota, and a single review exhausts it.** One
+five-slice Opus 4.6 review spent the whole allowance; afterwards `claude-sonnet-4-6` and
+`gpt-oss-120b` both refused a one-word prompt with `Individual quota reached … Resets in 4h`,
+while Gemini runs continued. A cross-family wave 1 is therefore an experiment to budget for,
+not a routine second opinion — and it is the reason cross-family independence belongs in wave
+2, which runs on Claude Code and costs agy nothing.
+
+**The idle subagent is a delivery failure, four occurrences in.** Refuters, a research
+subagent, and a refuter dispatched with `run_in_background: false` have all gone idle without
+returning a result, and every one of them produced its complete work when asked directly. The
+procedure is to tick each candidate off against a verdict actually received and message
+whatever is missing, rather than to prevent it.
+
+### The second refuter, and which constraint actually did the work
+
+The killed finding went back out to a second refuter carrying three new constraints: do not
+refute a claimed contradiction by quoting the correct half of it; hold your own counter-
+argument to the evidence standard the claim is held to; and if you conclude the caller has a
+way out, name it and confirm from the code that it is reachable.
+
+It returned `stands`, medium, 0.85 — and established the point neither the original finding
+nor the first refuter had:
+
+> `total` is a plain `count()` over the filter with **no limit or offset applied**, so no value
+> of `offset` changes it. The documented escape — set `offset` to the number of machines you
+> have deliberately left alone — changes which page comes back and never changes `total`. The
+> one thing that would is `pinballmapExcluded`, and grepping all seven `registerTool()` calls
+> shows it is settable only by `add_machine`, only at creation. A pre-existing unactionable
+> machine has no MCP-only escape at all.
+
+So the first refutation was not a judgement call that went the other way; it was **wrong on a
+checkable fact**. It pointed at an escape hatch and never asked whether the quantity that
+hatch is supposed to move responds to it.
+
+That identifies which of the three constraints carries the weight. Most refutations turn on an
+escape — a guard upstream, a validation elsewhere, a parameter the caller can set, a retry
+that fixes it — and the refuter's real job is to find that mechanism in the code and confirm
+it applies to the situation described. "Name the escape and verify it" is now in the standard
+brief for that reason. The other two constraints are worth keeping and did visible work (this
+refuter explicitly declined to reason about how an MCP client renders parameter descriptions,
+in either direction), but they are guards against bad arguments rather than the thing that
+finds the answer.
+
+Scoreline for the wave-2 experiment, which is the first time recall through refutation has
+been measured here at all:
+
+|                                                              | true findings killed |
+| :----------------------------------------------------------- | -------------------: |
+| one refuter, standard brief                                  |               1 of 2 |
+| two refuters, `refuted` requiring agreement, new constraints |           **0 of 2** |
