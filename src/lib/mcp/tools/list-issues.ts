@@ -13,6 +13,7 @@ import {
 import { checkPermission } from "~/lib/permissions/helpers";
 import { db } from "~/server/db";
 import { issues } from "~/server/db/schema";
+import { ISSUE_SEVERITY_VALUES } from "~/lib/types";
 
 import {
   issueUrl,
@@ -66,7 +67,7 @@ const listIssuesSchema = z.object({
       "Which statuses to include: 'open' (the default), 'closed', one status, or an array of statuses. Open statuses are new, confirmed, wait_owner, in_progress, need_parts, need_help. Closed are fixed, wont_fix, wai, no_repro, duplicate."
     ),
   severity: z
-    .enum(["cosmetic", "minor", "major", "unplayable"])
+    .enum(ISSUE_SEVERITY_VALUES)
     .optional()
     .describe("Only issues at this severity."),
   assignee: z

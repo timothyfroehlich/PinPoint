@@ -18,7 +18,7 @@ import {
 } from "./shared";
 import type { McpAuthContext } from "~/lib/mcp/verify-token";
 
-/** Comments returned when the caller doesn't ask for a count. */
+/** Comments returned when the caller doesn't ask for a specific limit. */
 const DEFAULT_COMMENT_LIMIT = 20;
 
 /** The comment slice returned to the caller, plus the full thread length. */
@@ -114,7 +114,13 @@ export async function runGetIssue(
         where: commentWhere,
         columns: { content: true, createdAt: true },
         with: { author: { columns: { name: true } } },
-        orderBy: (c, { desc }) => [desc(c.createdAt)],
+        // `id` breaks ties on `createdAt` for the same reason `list_issues`
+        // orders on a total key: with `createdAt` alone, two comments sharing a
+        // timestamp sit in an order Postgres is free to vary, and the LIMIT
+        // falls between them — so the window can drop one comment and the next
+        // call can show a different one, from a tool whose job is to be read
+        // before acting (CORE-ARCH-012).
+        orderBy: (c, { desc }) => [desc(c.createdAt), desc(c.id)],
         limit: commentLimit,
       }),
       db.select({ value: count() }).from(issueComments).where(commentWhere),

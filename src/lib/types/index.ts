@@ -16,6 +16,12 @@ export type {
   IssueFrequency,
 } from "./database";
 
+export {
+  ISSUE_SEVERITY_VALUES,
+  ISSUE_PRIORITY_VALUES,
+  ISSUE_FREQUENCY_VALUES,
+} from "./database";
+
 export type { UserContext, UserRole } from "./user";
 export { USER_ROLES } from "./user";
 

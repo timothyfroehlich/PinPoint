@@ -16,6 +16,11 @@ import {
   updateIssueStatus,
   updateIssueTitle,
 } from "~/services/issues";
+import {
+  ISSUE_FREQUENCY_VALUES,
+  ISSUE_PRIORITY_VALUES,
+  ISSUE_SEVERITY_VALUES,
+} from "~/lib/types";
 
 import {
   issueUrl,
@@ -98,17 +103,17 @@ const updateIssueSchema = z.object({
       "New status. Open: new, confirmed, wait_owner, in_progress, need_parts, need_help. Closed: fixed, wont_fix, wai, no_repro, duplicate."
     ),
   severity: z
-    .enum(["cosmetic", "minor", "major", "unplayable"])
+    .enum(ISSUE_SEVERITY_VALUES)
     .optional()
     .describe(
       "How much it affects play: cosmetic, minor, major, or unplayable."
     ),
   frequency: z
-    .enum(["intermittent", "frequent", "constant"])
+    .enum(ISSUE_FREQUENCY_VALUES)
     .optional()
     .describe("How often it happens: intermittent, frequent, or constant."),
   priority: z
-    .enum(["low", "medium", "high"])
+    .enum(ISSUE_PRIORITY_VALUES)
     .optional()
     .describe("Work priority: low, medium, or high."),
   assignee: z
