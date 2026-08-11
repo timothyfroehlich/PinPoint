@@ -109,11 +109,19 @@ test.describe("PinballMap abandoned-listing notice (PP-l81u)", () => {
       });
 
       // The old title's entry is still live on pinballmap.com under the OLD
-      // link — that's what the notice on Info is reporting.
+      // link — that's what the notice on Info is reporting. Assert the text,
+      // not just the testid: the whole point of this notice is that it names a
+      // title which is NOT this machine's current one, and a testid-only
+      // assertion would survive the copy naming the wrong title entirely.
       await page.goto(`/m/${initials}`);
       await expect(
         page.getByTestId("machine-pinballmap-abandoned")
-      ).toBeVisible();
+      ).toContainText(`Previous listing still live: “${oldTitleName}”`);
+      // The status line above it carries the machine's own current title, which
+      // is what keeps the line above from reading as a bug.
+      await expect(page.getByTestId("machine-pinballmap-status")).toContainText(
+        newTitleName
+      );
     } finally {
       await cleanupTestEntities(request, { machineInitials: [initials] });
       await deletePinballMapCatalogEntries([oldTitleId, newTitleId]);

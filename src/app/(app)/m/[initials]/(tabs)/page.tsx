@@ -129,12 +129,20 @@ export default async function MachineInfoTab({
       const entry = await getCatalogEntry(row.pinballmapMachineId);
       return {
         lmxId: row.lmxId,
-        // The catalog row can disappear; the entry on PBM does not. Fall back
-        // to the id so the notice still names something actionable.
-        title: entry?.name ?? `Pinball Map entry ${row.lmxId}`,
+        // The catalog row can disappear; the entry on PBM does not. The card
+        // falls back to naming the id so the notice still points at something.
+        title: entry?.name ?? null,
       };
     })
   );
+
+  // The machine's own current standing, stated above any alert. The abandoned
+  // notice necessarily names a DIFFERENT title than this machine's, so without
+  // this line the reader's first thought is "wrong machine", not "task to do".
+  const linkedTitleEntry =
+    machine.pinballmapMachineId === null
+      ? null
+      : await getCatalogEntry(machine.pinballmapMachineId);
   // A machine that just abandoned an entry is by definition not listed, and
   // `derivePbmMachineStatus` reports it `ok` (it points at a new title and
   // correctly has no listing under it) — so without this disjunct the card
@@ -146,6 +154,8 @@ export default async function MachineInfoTab({
         locationUrl={pinballmapLocationUrl()}
         desynced={showDesync}
         desyncReason={pbmStatus.reason}
+        linkedTitle={linkedTitleEntry?.name ?? null}
+        listed={machine.pinballmapListed}
         abandoned={abandoned}
       />
     ) : null;
