@@ -828,7 +828,10 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     needs: [changes, setup, typecheck, lint, format, linters, test-unit, test-integration, test-migrations]
-    timeout-minutes: 45
+    # Backstop only — the real limits are per-step (see the comment above the
+    # Playwright steps). Must stay above setup + both step timeouts, or a job
+    # cancellation silently swallows the verdict again. (PP-jxhy.)
+    timeout-minutes: 75
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920  # ratchet:step-security/harden-runner@v2.20.0
@@ -888,73 +891,57 @@ jobs:
       - name: Setup Supabase
         uses: ./.github/actions/setup-supabase
 
+      # Each Playwright step carries its OWN timeout-minutes, deliberately.
+      # A job-level timeout cancels the job outright: the evaluate step never
+      # runs, and the run reports `cancelled` — which reads as "superseded by a
+      # newer push" rather than "main is broken". That is exactly how run
+      # 31430839981 hid ten real failures. A step-level timeout paired with
+      # `continue-on-error: true` instead marks the step failed and lets the
+      # job carry on to its verdict. The job timeout below is only a backstop
+      # and must stay comfortably above the sum of these. (PP-jxhy.)
+      #
+      # Budget, measured on run 31430839981: setup ~2.5m, smoke ~13m,
+      # full ~24m on a green main (it burned 30m unfinished on a red one,
+      # because each failure costs a 30s locator timeout plus retries).
       - name: Run Comprehensive Smoke Tests (all browsers)
         continue-on-error: true
+        timeout-minutes: 25
         env:
           MOCK_BLOB_STORAGE: "true"
           PLAYWRIGHT_STDOUT: "pipe"
           PLAYWRIGHT_STDERR: "pipe"
-          PLAYWRIGHT_JSON_OUTPUT_NAME: playwright-report/results.json
+          # Per-run filename, NOT a shared results.json. The reporter writes
+          # once at the end, so a run that dies leaves the PREVIOUS run's file
+          # in place and the next evaluate step reads it as its own verdict —
+          # a false green. Distinct paths make "missing" unambiguous.
+          PLAYWRIGHT_JSON_OUTPUT_NAME: playwright-report/results-smoke.json
           UNSUBSCRIBE_SIGNING_SECRET: "ci-test-only-not-a-real-secret-0000000000000000000000000000000000"
         run: |
+          rm -f playwright-report/results-smoke.json
           pnpm exec playwright test --config=playwright.config.smoke.ts \
             --project=chromium --project="Mobile Chrome" \
             --project="Mobile Safari" --workers=3
 
       - name: Evaluate gating browser results (Smoke)
-        run: |
-          RESULTS=playwright-report/results.json
-          JQ_NAMES='.suites[].specs[] | select(.ok == false) | .tests[0].projectName'
-          JQ_TITLES='.suites[].specs[] | select(.ok == false) | "[\(.tests[0].projectName)] \(.title)"'
-          GATING_FAILS=$(jq -r "$JQ_NAMES" "$RESULTS" | grep -cvE '^Mobile Safari$' || true)
-          if [ "$GATING_FAILS" -gt 0 ]; then
-            echo 'Gating browser failures (Smoke):'
-            jq -r "$JQ_TITLES" "$RESULTS" | grep -vE '^\[Mobile Safari\]'
-            exit 1
-          fi
-          SAFARI_FAILS=$(jq -r "$JQ_NAMES" "$RESULTS" | grep -cE '^Mobile Safari$' || true)
-          echo "Gating browsers green (Smoke). Mobile Safari failures (non-gating): $SAFARI_FAILS"
+        run: bash scripts/workflow/evaluate-e2e-results.sh Smoke playwright-report/results-smoke.json
 
       - name: Run Comprehensive Full Tests (all browsers)
         continue-on-error: true
+        timeout-minutes: 40
         env:
           MOCK_BLOB_STORAGE: "true"
           PLAYWRIGHT_STDOUT: "pipe"
           PLAYWRIGHT_STDERR: "pipe"
-          PLAYWRIGHT_JSON_OUTPUT_NAME: playwright-report/results.json
+          PLAYWRIGHT_JSON_OUTPUT_NAME: playwright-report/results-full.json
           UNSUBSCRIBE_SIGNING_SECRET: "ci-test-only-not-a-real-secret-0000000000000000000000000000000000"
         run: |
+          rm -f playwright-report/results-full.json
           pnpm exec playwright test --config=playwright.config.full.ts \
             --project=chromium --project="Mobile Chrome" \
             --project="Mobile Safari" --workers=3
 
       - name: Evaluate gating browser results (Full)
-        run: |
-          RESULTS=playwright-report/results.json
-          JQ_NAMES='.suites[].specs[] | select(.ok == false) | .tests[0].projectName'
-          JQ_TITLES='.suites[].specs[] | select(.ok == false) | "[\(.tests[0].projectName)] \(.title)"'
-          GATING_FAILS=$(jq -r "$JQ_NAMES" "$RESULTS" | grep -cvE '^Mobile Safari$' || true)
-          if [ "$GATING_FAILS" -gt 0 ]; then
-            echo 'Gating browser failures (Full):'
-            jq -r "$JQ_TITLES" "$RESULTS" | grep -vE '^\[Mobile Safari\]'
-            exit 1
-          fi
-          SAFARI_FAILS=$(jq -r "$JQ_NAMES" "$RESULTS" | grep -cE '^Mobile Safari$' || true)
-          echo "Gating browsers green (Full). Mobile Safari failures (non-gating): $SAFARI_FAILS"
-
-      - name: Summarize test failures
-        if: failure()
-        run: |
-          {
-            echo '## E2E Test Failures'
-            echo ''
-            echo '```'
-            jq -r '.suites[].specs[] | select(.ok == false) | "FAIL: [\(.tests[0].projectName)] \(.title)"' \
-              playwright-report/results.json \
-              2>/dev/null \
-              || echo "No structured results found — check Playwright report artifact"
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
+        run: bash scripts/workflow/evaluate-e2e-results.sh Full playwright-report/results-full.json
 
       - name: Upload Playwright report
         if: always()
