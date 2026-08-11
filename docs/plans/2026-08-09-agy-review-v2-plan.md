@@ -851,3 +851,79 @@ been measured here at all:
 | :----------------------------------------------------------- | -------------------: |
 | one refuter, standard brief                                  |               1 of 2 |
 | two refuters, `refuted` requiring agreement, new constraints |           **0 of 2** |
+
+### Flash, #1807: 2 of 3, no blocked slices, no false positives, first round
+
+Switching wave 1 to `gemini-3.6-flash-high` produced the best result of the exercise, on the
+cheapest model on the menu and with no resume needed.
+
+|                                                      | v6 Pro | v6.2 Flash |
+| :--------------------------------------------------- | -----: | ---------: |
+| known defects found                                  | 2 of 3 | **2 of 3** |
+| reported as `findings` rather than stranded in prose |      0 |      **3** |
+| slices blocked                                       | 2 of 4 |      **0** |
+| false positives                                      |      0 |          0 |
+| resumes needed                                       |      1 |      **0** |
+
+The two hits are B1 and B3, and both are stated with the right mechanism rather than the right
+vicinity:
+
+> "total counts all matching rows in the database (including the skipped machines) and will
+> remain >= 1 even when the page query at offset returns 0 rows … The completion condition
+> when skipping unchanged items must be `count === 0` or `hasMore === false`, not
+> `total === 0`."
+
+That is what the fix commit says, and it is the same fact a second refuter needed a dedicated
+pass to establish earlier in the session. The type finding likewise names the repair the
+author actually applied — restore `[SQL, ...SQL[]]`.
+
+B2 was missed, and missed in an interesting way: the finding cites both the tool-level
+description (line 205) and the `offset` parameter description (line 109) and treats them as
+saying the same thing. The defect is that they do not. Merging two texts into one quotation is
+a specific failure worth watching for — a slice looking for one problem read past a second one
+that was sitting in the same two lines it had already opened.
+
+**One grounding slip, harmless here.** The type finding asserts the declaration "was changed
+from a non-empty tuple type … to `Record<PinballmapFilter, SQL[]>`". The direction is
+backwards: `SQL[]` is what the tree under review has, and the tuple is what the fix introduced
+afterwards. The defect identification is exactly right and the invented history did not affect
+it, but a reviewer narrating a change history it cannot see is the same class of error as
+asserting a package version from memory, and it would matter in a finding whose argument
+rested on it.
+
+### Wave 2, settled: two lenses, and neither of them is "check it again"
+
+The type finding from the Flash run went to two refuters with deliberately different questions
+rather than two copies of the same one.
+
+| lens | question                                                           | verdict        |
+| :--- | :----------------------------------------------------------------- | :------------- |
+| A    | does the type actually permit an empty array, and is it reachable? | narrowed, low  |
+| B    | assume it happens — what does the caller actually get?             | stands, medium |
+
+Neither refuted, so the finding stands at the lower severity, which is exactly where the
+change's author put it when fixing it.
+
+**Both grounded their arguments in files rather than in knowledge, which is the constraint
+that had been missing.** Lens B needed to know what Drizzle does with an empty condition list;
+instead of asserting it, it read the vendored `drizzle-orm` source and confirmed that `and()`
+over zero conditions returns `undefined` and `.where(undefined)` emits no WHERE clause. It
+then went looking for anything else that would still narrow the query — a soft-delete column,
+a tenant column, an RLS policy on `machines` — and reported that none exists, which is what
+makes "the caller gets the whole fleet" a checked statement instead of a dramatic one.
+
+**The lenses stayed in their lanes.** Lens B declined to rule on whether the type permits the
+empty array at all: "that is the other reviewer's job; I am only certifying that IF it does,
+the blast radius is exactly as claimed." That separation is why the pair produced a bounded
+finding rather than two overlapping opinions — and lens B supplied the bound nobody had asked
+for, that the whole-fleet outcome needs `pinballmap` to be the _only_ filter supplied, and
+degrades to a silent partial mislabeling when combined with `search` or `presence`.
+
+So the wave-2 design is now three rules, each earned from a specific failure:
+
+1. **Two refuters, and `refuted` requires agreement.** One refuter killed a true finding at
+   0.9 earlier in the same session.
+2. **Different lenses, not repeated attempts.** Redundancy catches noise; diversity catches
+   the failure modes a single angle cannot see.
+3. **A refutation is held to the claim's evidence standard**, including "name the escape and
+   verify it is reachable" — the check that saved the killed finding.
