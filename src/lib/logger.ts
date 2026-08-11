@@ -6,6 +6,83 @@ const LOG_LEVEL = process.env["LOG_LEVEL"] ?? "info";
 const DEFAULT_LOG_ROOT = join(process.cwd(), "logs");
 
 /**
+ * Log-payload keys that may carry a raw email address.
+ *
+ * CORE-SEC-007 is scoped to display surfaces, so this list — not that rule —
+ * is what keeps user emails out of `logs/<session>/app.log` and, on Vercel,
+ * production stdout. The house precedent is still call-site masking with
+ * `maskEmail` (`~/lib/logging/mask`); this list is the backstop for the call
+ * sites that forget.
+ *
+ * `email` and `reporterEmail` exist in the codebase today; `submittedEmail` is
+ * the raw login-form value in `src/app/(auth)/actions.ts`. `userEmail` and
+ * `contactEmail` do not exist yet and are here defensively — a backstop that
+ * only covers names already in use is one commit away from being wrong.
+ */
+const EMAIL_LOG_KEYS = [
+  "email",
+  "reporterEmail",
+  "userEmail",
+  "contactEmail",
+  "submittedEmail",
+] as const;
+
+/**
+ * How many `*.` wildcard levels each key in {@link EMAIL_LOG_KEYS} gets.
+ *
+ * Pino's `*` matches exactly one level, so the previous `["email", "*.email"]`
+ * form wrote `{ ctx: { user: { email } } }` out raw (PP-tg9y). Depth 3 means a
+ * key is caught anywhere from the top level of the payload down to four levels
+ * in — `{ a: { b: { c: { email } } } }`.
+ *
+ * Three, and not "as deep as possible", for two reasons. Pino has no recursive
+ * wildcard, so unbounded is not on the menu — only more paths. And wildcard
+ * paths are the expensive part of redaction, at roughly linear cost in
+ * keys × levels: benchmarked on pino 10.3.1 / node 24 with a representative
+ * payload, no redaction was ~0.8µs per `log.info`, the old four-path list
+ * ~2.4µs, and these 20 paths ~17.9µs. That is noise against a serverless
+ * invocation measured in tens of milliseconds, but it is why the list is an
+ * explicit set rather than an open-ended one.
+ *
+ * Three is also two levels of headroom over the deepest shape any current call
+ * site produces — `reportError` spreads a context object into the payload, so
+ * a domain object passed as context puts its keys one level down.
+ */
+const EMAIL_REDACT_WILDCARD_DEPTH = 3;
+
+/**
+ * `["email", …, "*.email", …, "*.*.*.submittedEmail"]` — every key in
+ * {@link EMAIL_LOG_KEYS} at every depth up to
+ * {@link EMAIL_REDACT_WILDCARD_DEPTH}.
+ */
+const EMAIL_REDACT_PATHS: string[] = Array.from(
+  { length: EMAIL_REDACT_WILDCARD_DEPTH + 1 },
+  (_unused, depth) => "*.".repeat(depth)
+).flatMap((prefix) => EMAIL_LOG_KEYS.map((key) => `${prefix}${key}`));
+
+/**
+ * Options shared by every logger instance. Exported so tests can exercise the
+ * real redaction config against an in-memory stream rather than a copy of it.
+ */
+export const baseLoggerOptions: pino.LoggerOptions = {
+  level: LOG_LEVEL,
+  // Redact PII (email) from log output at any realistic nesting depth; uses
+  // Pino's default "[Redacted]" censor.
+  redact: EMAIL_REDACT_PATHS,
+  formatters: {
+    level: (label: string) => {
+      return { level: label };
+    },
+  },
+  // Pino's stdSerializers.err only fires for the `err` key. All call sites
+  // have been standardised to use `err` so this single mapping is sufficient.
+  serializers: {
+    err: pino.stdSerializers.err,
+  },
+  timestamp: pino.stdTimeFunctions.isoTime,
+};
+
+/**
  * Creates a timestamped directory name in format: YYYY-MM-DD_HH-mm-ss
  * This ensures each server restart gets its own log directory
  */
@@ -64,24 +141,6 @@ function createLogger(): pino.Logger {
   const logFile = sessionDir ? join(sessionDir, "app.log") : undefined;
   const isDevelopment = process.env.NODE_ENV === "development";
 
-  const baseConfig: pino.LoggerOptions = {
-    level: LOG_LEVEL,
-    // Redact reporter PII (email) from log output. Covers both top-level and
-    // one-level-nested occurrences; uses Pino's default "[Redacted]" censor.
-    redact: ["reporterEmail", "*.reporterEmail", "email", "*.email"],
-    formatters: {
-      level: (label: string) => {
-        return { level: label };
-      },
-    },
-    // Pino's stdSerializers.err only fires for the `err` key. All call sites
-    // have been standardised to use `err` so this single mapping is sufficient.
-    serializers: {
-      err: pino.stdSerializers.err,
-    },
-    timestamp: pino.stdTimeFunctions.isoTime,
-  };
-
   const streams: pino.StreamEntry[] = [];
 
   if (logFile) {
@@ -101,14 +160,14 @@ function createLogger(): pino.Logger {
   const [firstStream] = streams;
 
   if (!firstStream) {
-    return pino(baseConfig);
+    return pino(baseLoggerOptions);
   }
 
   if (streams.length === 1) {
-    return pino(baseConfig, firstStream.stream);
+    return pino(baseLoggerOptions, firstStream.stream);
   }
 
-  return pino(baseConfig, pino.multistream(streams));
+  return pino(baseLoggerOptions, pino.multistream(streams));
 }
 
 let loggerInstance: pino.Logger | null = null;
