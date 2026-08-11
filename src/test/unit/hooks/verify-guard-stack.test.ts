@@ -59,7 +59,6 @@ const {
 const ALL_EXPECTED_HOOKS = [
   "normalize-workspace-paths.cjs",
   "inject-beads-actor.cjs",
-  "block-heavy-under-pressure.cjs",
   "block-direct-merge.cjs",
   "block-main-worktree-branch-switch.cjs",
   "block-worktree-dispatch-from-linked.cjs",
@@ -411,7 +410,6 @@ describe("evaluateGuardBehavior — degradation is reported, never thrown", () =
       load: () => ({
         classifyMerge: () => ({ block: false }),
         classifyCommand: () => ({ block: false }),
-        isHeavyCommand: () => false,
       }),
     });
     expect(problems.join("\n")).toContain("block-direct-merge.cjs allows");
@@ -425,7 +423,6 @@ describe("evaluateGuardBehavior — degradation is reported, never thrown", () =
       load: () => ({
         classifyMerge: () => ({ block: true }),
         classifyCommand: () => ({ block: true }),
-        isHeavyCommand: () => true,
       }),
     });
     expect(problems.join("\n")).toContain("blocks");
@@ -454,9 +451,6 @@ describe("evaluateGuardBehavior — degradation is reported, never thrown", () =
           throw new Error("boom");
         },
         classifyCommand: () => {
-          throw new Error("boom");
-        },
-        isHeavyCommand: () => {
           throw new Error("boom");
         },
       }),

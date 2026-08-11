@@ -14,7 +14,12 @@
  * The missing concept was UNRESOLVABLE. A guard needs three answers, not two:
  * "this is command X", "this is definitely not command X", and "I cannot tell".
  * This module returns all three; each guard then picks its own posture on the
- * third (the merge guard blocks, the memory gate allows).
+ * third. Both in-repo consumers block on it, because both guard a boundary
+ * where a miss is unrecoverable: the merge guard (a merged PR cannot be
+ * un-merged) and the branch-switch guard (a switched-out worktree strands
+ * another session's work). A guard whose failure mode is merely a slower or
+ * noisier run should allow instead — nothing in this repo is in that class
+ * today, but the third answer exists so such a guard can be written.
  *
  * WHAT IT DOES
  *   - Quote-aware tokenizer: quoted spans become ONE argument, never a command.
@@ -65,8 +70,8 @@
  *                    for messages only — NOT source-exact
  *
  *   options.splitNewlines  default true. Pass false to keep a newline from
- *                          separating segments (block-heavy-under-pressure
- *                          deliberately does this — see PP-qota).
+ *                          separating segments — see PP-qota for why a guard
+ *                          might want that.
  */
 
 "use strict";

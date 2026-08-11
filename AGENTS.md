@@ -83,7 +83,6 @@ Only stop services you started in this session, by specific PID or via worktree-
 | `ruff check && ruff format`           | Python lint/format (no venv needed)                                                                                                                                                                                                       |
 | `./scripts/workflow/pr-watch.py <PR>` | Watch CI for a PR (Monitor-compatible). Never hand-roll a polling loop.                                                                                                                                                                   |
 | `pnpm run dev:status`                 | Check whether Next.js / Supabase / Postgres are up — one command, worktree-port aware. Use it instead of ad-hoc `curl` health checks against localhost.                                                                                   |
-| `FORCE_MEM_PRECHECK=skip <command>`   | Bypass the memory-pressure gate for one run (e.g. when you know pressure is transient or acceptable).                                                                                                                                     |
 
 ### Type-check engine (TS 7 GA dual-install)
 
