@@ -8,7 +8,7 @@ The shadcn primitives (and the Radix layer underneath) already handle a lot of a
 
 ### Skip-to-main link (CORE-A11Y-001)
 
-The skip link and its target are split across two files — `src/app/layout.tsx` renders the anchor, `src/components/layout/MainLayout.tsx` owns the `<main>` it points at. Copy from those; don't reconstruct from memory.
+The skip link and its target are split across files — `src/app/layout.tsx` renders the anchor, and the `<main>` it points at lives in `src/components/layout/MainLayout.tsx` for the app shell and `src/app/(auth)/layout.tsx` for the auth pages, which don't render `MainLayout`. Copy from those; don't reconstruct from memory.
 
 The decision worth carrying: **both halves are load-bearing.** An anchor pointing at a `<main>` that isn't focusable moves the scroll position but not focus, which is the failure mode that reads as "we have a skip link" while doing nothing for the keyboard user. If you introduce a new layout shell, port the pair, not just the anchor.
 

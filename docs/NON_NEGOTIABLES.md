@@ -326,7 +326,7 @@
 - **Severity:** Critical
 - **Why:** Core product requirement
 - **Do:** Enforce the link on `issues.machine_initials` — `NOT NULL` plus a foreign key to `machines.initials` with `ON DELETE CASCADE` (`src/server/db/schema.ts`, `issuesRelations`). The join key is the natural key `machine_initials`, not a surrogate id.
-- **Don't:** Allow issues without machines. Don't reach for a `machine_id` column or a CHECK constraint on `issues` — neither exists, and `NOT NULL` + FK already enforces the rule.
+- **Don't:** Allow issues without machines. Don't reach for a `machine_id` column or a CHECK constraint on the machine link — neither exists for that relationship, and `NOT NULL` + FK already enforces the rule. (`issues` does carry a CHECK constraint elsewhere — `reporter_check`, enforcing the reporter XOR rule — it's unrelated to the machine link.)
 
 **CORE-ARCH-005:** Direct Server Action references in forms
 
@@ -474,7 +474,7 @@
 - **Severity:** Critical
 - **Why:** Pinning a clear floor is what makes a "modern web" basis useful — every UI decision is anchored to the set of HTML / CSS / JS features the browser platform considers cross-browser stable. **Baseline Widely available** means a feature has been available in all major engines for ~2.5 years and is safe without fallbacks. Aim higher and Safari users break; aim lower and the bundle bloats with polyfills for features already shipping natively.
 - **Do:** Reach for Baseline Widely available primitives directly: `<dialog>`, container queries, `:has()`, `:user-invalid`, `inert`, `aspect-ratio`, native form validation, CSS Grid `auto-fit/minmax`. No feature detection or polyfill needed. Derive a feature's tier **live** from `modern-web-guidance` (CORE-UI-006) rather than from a cached date — this list names the primitives, not their dates, for exactly that reason.
-- **Do:** Two Newly-available features are adopted below the floor with a recorded opt-in in `pinpoint-design-bible` §19 — `fetchpriority` (via `next/image`'s `priority`) and `text-wrap: balance` / `text-pretty` (used selectively per §9). Both degrade to a harmless no-op. Adding a third requires the same opt-in, in §19, in the PR that adopts it.
+- **Do:** Three features below the floor are adopted with a recorded opt-in in `pinpoint-design-bible` §19 — `fetchpriority` (Newly available, via `next/image`'s `priority`), `text-wrap: balance` (Newly available), and `text-pretty` (Limited availability — no Firefox), used selectively per §9. All three degrade to a harmless no-op. Adding another requires the same opt-in, in §19, in the PR that adopts it.
 - **Don't:** Adopt Baseline Newly available features (Popover API, View Transitions, anchor positioning, scroll-driven animations, `interestfor`, the `closedby` attribute) without a per-feature opt-in documented in `pinpoint-design-bible` §19. Don't add a polyfill for any Widely-available feature.
 - **Reference:** `pinpoint-design-bible` §19 Browser Support Policy. To check a feature's status, search the modern-web-guidance catalog (CORE-UI-006) — every guide notes its Baseline status.
 
@@ -494,7 +494,7 @@
 
 - **Severity:** Required
 - **Why:** WCAG 2.4.1 Level A. Without it, keyboard users tab through the AppHeader navigation on every single page load before reaching content. PinPoint's header has 6+ tab stops; that's a hard daily-driver cost for any keyboard-first user.
-- **Do:** The first child of `<body>` (in `src/app/layout.tsx`) must be `<a href="#main-content" className="sr-only focus:not-sr-only ...">Skip to main content</a>`. The `<main>` element in `MainLayout.tsx` must carry `id="main-content"` and `tabIndex={-1}`.
+- **Do:** The first child of `<body>` (in `src/app/layout.tsx`) must be `<a href="#main-content" className="sr-only focus:not-sr-only ...">Skip to main content</a>`. The `<main>` element the link targets must carry `id="main-content"` and `tabIndex={-1}` — that's `MainLayout.tsx` for the app shell, and `(auth)/layout.tsx` for the auth pages, which don't render `MainLayout`.
 - **Don't:** Ship a layout that puts content behind the header in tab order with no skip affordance.
 - **Status:** Implemented (PP-kqbk.3). `src/app/layout.tsx` renders the anchor as the first child of `<body>`; the `<main id="main-content" tabIndex={-1}>` target lives in `src/components/layout/MainLayout.tsx` and `src/app/(auth)/layout.tsx`. Both halves are load-bearing — a new layout shell must port the pair, not just the anchor.
 
