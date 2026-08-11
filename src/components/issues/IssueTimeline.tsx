@@ -260,8 +260,17 @@ function TimelineItem({
               )}
               <Tooltip>
                 <TooltipTrigger asChild>
+                  {/* The label names the absolute instant the tooltip reveals,
+                      rather than leaving the relative label as the accessible
+                      name. `<RelativeTime>` renders nothing until the client
+                      ticker mounts, so without this the button is nameless on
+                      the pre-hydration paint (axe `button-name`, PP-h490) — and
+                      even hydrated, "3 minutes ago" is a poor name for a
+                      control whose whole purpose is to disclose the exact
+                      time. */}
                   <button
                     type="button"
+                    aria-label={formatDateTime(event.createdAt)}
                     className={cn(
                       "cursor-help bg-transparent p-0 text-[11px] text-muted-foreground",
                       timestampTooltipTriggerClassName
@@ -307,6 +316,7 @@ function TimelineItem({
                     <TooltipTrigger asChild>
                       <button
                         type="button"
+                        aria-label={formatDateTime(event.createdAt)}
                         className={cn(
                           "cursor-help bg-transparent p-0 text-xs text-muted-foreground",
                           timestampTooltipTriggerClassName
@@ -324,6 +334,7 @@ function TimelineItem({
                       <TooltipTrigger asChild>
                         <button
                           type="button"
+                          aria-label={`Edited ${formatDateTime(event.updatedAt)}`}
                           className={cn(
                             "cursor-help bg-transparent p-0 text-xs text-muted-foreground",
                             timestampTooltipTriggerClassName
