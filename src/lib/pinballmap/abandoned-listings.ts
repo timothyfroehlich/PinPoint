@@ -66,6 +66,32 @@ export async function recordAbandonedListing(
 }
 
 /**
+ * Retire the record for an lmx a machine is claiming right now (PP-l81u).
+ *
+ * Every write that sets `pinballmap_listed = true` alongside an lmx has to call
+ * this in its own transaction, and there are four: `applyAutoLinkWrite`, the
+ * manual link, the outbound list, and the verify/heal. Two of those can capture
+ * an lmx some machine walked away from — PBM hands back the EXISTING lmx when
+ * the entry is already on the lineup, and a heal claims a re-minted id.
+ *
+ * Waiting for the hourly `clearResolvedAbandonments` instead would leave a card
+ * telling its owner to remove an entry that is live and claimed again, for up
+ * to an hour (CORE-ARCH-012). Deleting by lmx rather than by machine is
+ * deliberate: whoever previously abandoned it is not necessarily the machine
+ * claiming it now.
+ *
+ * A no-op when nothing was abandoned, which is the common case.
+ */
+export async function retireAbandonmentForLmx(
+  tx: DbTransaction,
+  lmxId: number
+): Promise<void> {
+  await tx
+    .delete(pinballmapAbandonedListings)
+    .where(eq(pinballmapAbandonedListings.lmxId, lmxId));
+}
+
+/**
  * Every entry this machine has abandoned and nobody has removed yet.
  *
  * Wired up on the machine's PinballMap card (Task 5, PP-l81u) — see

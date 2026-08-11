@@ -136,29 +136,46 @@ export default async function MachineInfoTab({
     })
   );
 
-  // The machine's own current standing, stated above any alert. The abandoned
-  // notice necessarily names a DIFFERENT title than this machine's, so without
-  // this line the reader's first thought is "wrong machine", not "task to do".
-  const linkedTitleEntry =
-    machine.pinballmapMachineId === null
-      ? null
-      : await getCatalogEntry(machine.pinballmapMachineId);
   // A machine that just abandoned an entry is by definition not listed, and
   // `derivePbmMachineStatus` reports it `ok` (it points at a new title and
   // correctly has no listing under it) — so without this disjunct the card
   // would never render for the one case this bead exists to surface.
   const showAbandoned = canLink && abandoned.length > 0;
-  const pinballmapCard =
-    machine.pinballmapListed || showDesync || showAbandoned ? (
-      <MachinePinballmapCard
-        locationUrl={pinballmapLocationUrl()}
-        desynced={showDesync}
-        desyncReason={pbmStatus.reason}
-        linkedTitle={linkedTitleEntry?.name ?? null}
-        listed={machine.pinballmapListed}
-        abandoned={abandoned}
-      />
-    ) : null;
+  const showPinballmapCard =
+    machine.pinballmapListed || showDesync || showAbandoned;
+
+  // The machine's own current standing, stated above any alert. The abandoned
+  // notice necessarily names a DIFFERENT title than this machine's, so without
+  // this line the reader's first thought is "wrong machine", not "task to do".
+  //
+  // Resolved only when the card actually renders: on the public QR-scan landing
+  // of an unlisted machine there is no card, and `getCatalogEntry` is a plain
+  // query with no request-level cache, so an unconditional read here would be a
+  // round trip per view whose result is thrown away.
+  const linkedTitleEntry =
+    showPinballmapCard && machine.pinballmapMachineId !== null
+      ? await getCatalogEntry(machine.pinballmapMachineId)
+      : null;
+  // The catalog row can be missing (never refreshed, or the title retired) for
+  // a machine that is nonetheless linked — and often listed, which is why the
+  // card is on screen at all. Naming the id beats claiming it is not linked,
+  // and matches the abandoned notice's own fallback.
+  const linkedTitle =
+    machine.pinballmapMachineId === null
+      ? null
+      : (linkedTitleEntry?.name ??
+        `Pinball Map title #${String(machine.pinballmapMachineId)}`);
+
+  const pinballmapCard = showPinballmapCard ? (
+    <MachinePinballmapCard
+      locationUrl={pinballmapLocationUrl()}
+      desynced={showDesync}
+      desyncReason={pbmStatus.reason}
+      linkedTitle={linkedTitle}
+      listed={machine.pinballmapListed}
+      abandoned={abandoned}
+    />
+  ) : null;
 
   const rail = (
     <InfoRail
