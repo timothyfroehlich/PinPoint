@@ -9,8 +9,8 @@ describe("formatDiscordMessage", () => {
       issueTitle: "Pop bumper not working",
       formattedIssueId: "AFM-07",
       resourceType: "issue",
-      resourceId: "issue-uuid-1",
       machineName: "Attack From Mars",
+      machineInitials: undefined,
       newStatus: undefined,
       commentContent: undefined,
     });
@@ -18,7 +18,7 @@ describe("formatDiscordMessage", () => {
     expect(out).toContain("AFM-07");
     expect(out).toContain("Pop bumper not working");
     expect(out).toContain("assigned");
-    expect(out).toContain("https://app.example.com/issues/issue-uuid-1");
+    expect(out).toContain("https://app.example.com/m/AFM/i/7");
     expect(out).toMatch(/Manage notifications.*\/settings\/notifications/i);
   });
 
@@ -29,14 +29,47 @@ describe("formatDiscordMessage", () => {
       issueTitle: undefined,
       formattedIssueId: undefined,
       resourceType: "machine",
-      resourceId: "machine-uuid-1",
       machineName: "Medieval Madness",
+      machineInitials: "MM",
       newStatus: undefined,
       commentContent: undefined,
     });
 
     expect(out).toContain("Medieval Madness");
-    expect(out).toContain("https://app.example.com/machines/machine-uuid-1");
+    expect(out).toContain("https://app.example.com/m/MM");
+  });
+
+  it("falls back to the machine list when initials are missing", () => {
+    const out = formatDiscordMessage({
+      type: "machine_ownership_changed",
+      siteUrl: "https://app.example.com",
+      issueTitle: undefined,
+      formattedIssueId: undefined,
+      resourceType: "machine",
+      machineName: "Medieval Madness",
+      machineInitials: undefined,
+      newStatus: undefined,
+      commentContent: undefined,
+    });
+
+    expect(out).toContain("https://app.example.com/m\n");
+  });
+
+  it("falls back to the issue list when the formatted id is unparseable", () => {
+    const out = formatDiscordMessage({
+      type: "new_comment",
+      siteUrl: "https://app.example.com",
+      issueTitle: "Broken flipper",
+      // Single-character initials violate the 2-6 char DB constraint.
+      formattedIssueId: "X-1",
+      resourceType: "issue",
+      machineName: undefined,
+      machineInitials: undefined,
+      newStatus: undefined,
+      commentContent: undefined,
+    });
+
+    expect(out).toContain("https://app.example.com/issues\n");
   });
 
   it("includes new status when issue_status_changed", () => {
@@ -46,8 +79,8 @@ describe("formatDiscordMessage", () => {
       issueTitle: "Flippers weak",
       formattedIssueId: "TWD-03",
       resourceType: "issue",
-      resourceId: "issue-2",
       machineName: "Walking Dead",
+      machineInitials: undefined,
       newStatus: "Resolved",
       commentContent: undefined,
     });
@@ -63,8 +96,8 @@ describe("formatDiscordMessage", () => {
       issueTitle: "@everyone please look at this @here",
       formattedIssueId: "X-1",
       resourceType: "issue",
-      resourceId: "i1",
       machineName: undefined,
+      machineInitials: undefined,
       newStatus: undefined,
       commentContent: undefined,
     });
@@ -87,8 +120,8 @@ describe("formatDiscordMessage", () => {
       issueTitle: "Hi <@123456> see <#7890> via <@&5555> role",
       formattedIssueId: "X-1",
       resourceType: "issue",
-      resourceId: "i1",
       machineName: undefined,
+      machineInitials: undefined,
       newStatus: undefined,
       commentContent: undefined,
     });
@@ -109,8 +142,8 @@ describe("formatDiscordMessage", () => {
       issueTitle: "**bold** _italic_ `code` ~strike~ |spoiler| > quote \\back",
       formattedIssueId: "X-1",
       resourceType: "issue",
-      resourceId: "i1",
       machineName: undefined,
+      machineInitials: undefined,
       newStatus: undefined,
       commentContent: undefined,
     });
@@ -135,15 +168,15 @@ describe("formatDiscordMessage", () => {
       type: "new_issue",
       siteUrl: "https://app.example.com",
       issueTitle: "ok",
-      formattedIssueId: "X-1",
+      formattedIssueId: "WW-01",
       resourceType: "issue",
-      resourceId: "i1",
       machineName: "Whitewater",
+      machineInitials: undefined,
       newStatus: undefined,
       commentContent: undefined,
     });
 
-    expect(out).toContain("https://app.example.com/issues/i1");
+    expect(out).toContain("https://app.example.com/m/WW/i/1");
     expect(out).toContain(
       "Manage notifications: https://app.example.com/settings/notifications"
     );
@@ -154,20 +187,20 @@ describe("formatDiscordMessage", () => {
       type: "new_comment",
       siteUrl: "https://app.example.com",
       issueTitle: "x".repeat(5000),
-      formattedIssueId: "X-1",
+      formattedIssueId: "XX-12",
       resourceType: "issue",
-      resourceId: "i1",
       machineName: undefined,
+      machineInitials: undefined,
       newStatus: undefined,
       commentContent: undefined,
     });
 
     expect(out.length).toBeLessThanOrEqual(2000);
     // Link and footer both preserved.
-    expect(out).toContain("https://app.example.com/issues/i1");
+    expect(out).toContain("https://app.example.com/m/XX/i/12");
     expect(out).toContain("/settings/notifications");
     // Body was truncated — should end the body section with an ellipsis
     // before the link starts.
-    expect(out).toMatch(/…\nhttps:\/\/app\.example\.com\/issues\/i1/);
+    expect(out).toMatch(/…\nhttps:\/\/app\.example\.com\/m\/XX\/i\/12/);
   });
 });

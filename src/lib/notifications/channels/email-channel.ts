@@ -7,6 +7,7 @@ import { NON_TEXT_TAGS } from "~/lib/sanitize-html-config";
 import { isInternalAccount } from "~/lib/auth/internal-accounts";
 import { getSiteUrl } from "~/lib/url";
 import { getThreadingHeaders } from "~/lib/notifications/email-threading";
+import { buildResourceUrl } from "~/lib/notifications/resource-url";
 import { reportError } from "~/lib/observability/report-error";
 import type {
   DeliveryChannel,
@@ -262,25 +263,11 @@ export function getEmailHtml({
     ? sanitizeHtml(formattedIssueId, EMAIL_SANITIZE_OPTIONS)
     : "";
 
-  let issueUrl = `${siteUrl}/issues`;
-  if (formattedIssueId) {
-    // Format is [INITIALS]-[NUMBER]; initials are 2-6 alphanumeric chars (no hyphens)
-    const parts = formattedIssueId.split("-");
-    if (parts.length >= 2) {
-      const numberPart = parts.pop();
-      const initialsPart = parts.join("-");
-      // Validate initialsPart matches schema: exactly 2-6 uppercase letters or digits
-      if (
-        numberPart &&
-        /^\d+$/.test(numberPart) &&
-        /^[A-Z0-9]{2,6}$/.test(initialsPart)
-      ) {
-        const issueNumber = parseInt(numberPart, 10);
-        // URL encode for defense-in-depth, even though validation ensures only safe characters
-        issueUrl = `${siteUrl}/m/${encodeURIComponent(initialsPart)}/i/${issueNumber}`;
-      }
-    }
-  }
+  const issueUrl = buildResourceUrl({
+    siteUrl,
+    resourceType: "issue",
+    formattedIssueId,
+  });
 
   const sanitizedDescription =
     (type === "new_issue" || type === "issue_assigned") && issueDescription

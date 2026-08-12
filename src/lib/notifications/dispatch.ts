@@ -77,6 +77,12 @@ export interface CreateNotificationProps {
   includeActor?: boolean | undefined;
   issueTitle?: string | undefined;
   machineName?: string | undefined;
+  /**
+   * Machine initials, used to build the `/m/<INITIALS>` link in machine-resource
+   * notifications. Optional: `planNotification` resolves it from the machine row
+   * when a caller doesn't pass it. (PP-gzq2)
+   */
+  machineInitials?: string | undefined;
   formattedIssueId?: string | undefined;
   commentContent?: string | undefined;
   newStatus?: string | undefined;
@@ -98,6 +104,7 @@ export async function planNotification(
     includeActor = true,
     issueTitle,
     machineName,
+    machineInitials,
     formattedIssueId,
     commentContent,
     newStatus,
@@ -126,6 +133,7 @@ export async function planNotification(
 
   let resolvedIssueTitle = issueTitle;
   let resolvedMachineName = machineName;
+  let resolvedMachineInitials = machineInitials;
   let resolvedFormattedIssueId = formattedIssueId;
 
   if (type === "new_issue") {
@@ -151,11 +159,12 @@ export async function planNotification(
     } else {
       const machine = await tx.query.machines.findFirst({
         where: eq(machines.id, resourceId),
-        columns: { id: true, name: true, ownerId: true },
+        columns: { id: true, name: true, ownerId: true, initials: true },
       });
       machineId = machine?.id ?? null;
       machineOwnerId = machine?.ownerId ?? null;
       resolvedMachineName = resolvedMachineName ?? machine?.name;
+      resolvedMachineInitials = resolvedMachineInitials ?? machine?.initials;
     }
 
     const globalSubscribers = await tx.query.notificationPreferences.findMany({
@@ -219,6 +228,29 @@ export async function planNotification(
 
   if (recipientIds.size === 0) return { deliveries: [] };
 
+  // Notification links are built from initials + issue number, never from
+  // `resourceId` — no route addresses a resource by id (PP-gzq2). Every current
+  // caller passes what its link needs; these are the backstops, so a caller that
+  // forgets degrades to a list page rather than an unusable link. Placed after
+  // the empty-recipient early return so they cost nothing when nobody is being
+  // notified, and guarded so they cost nothing when the caller did pass them.
+  if (resourceType === "machine" && !resolvedMachineInitials) {
+    const machine = await tx.query.machines.findFirst({
+      where: eq(machines.id, resourceId),
+      columns: { initials: true },
+    });
+    resolvedMachineInitials = machine?.initials;
+  }
+  if (resourceType === "issue" && !resolvedFormattedIssueId) {
+    const issue = await tx.query.issues.findFirst({
+      where: eq(issues.id, resourceId),
+      columns: { machineInitials: true, issueNumber: true },
+    });
+    if (issue) {
+      resolvedFormattedIssueId = `${issue.machineInitials}-${String(issue.issueNumber).padStart(2, "0")}`;
+    }
+  }
+
   // 2. Fetch preferences
   const preferences = await tx.query.notificationPreferences.findMany({
     where: inArray(notificationPreferences.userId, [...recipientIds]),
@@ -277,6 +309,7 @@ export async function planNotification(
       discordUserId: discordUserIdMap.get(userId) ?? null,
       issueTitle: resolvedIssueTitle,
       machineName: resolvedMachineName,
+      machineInitials: resolvedMachineInitials,
       formattedIssueId: resolvedFormattedIssueId,
       commentContent,
       newStatus,
