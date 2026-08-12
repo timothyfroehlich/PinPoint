@@ -1,6 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
-# Find all hardcoded role comparisons outside the permissions module + tests.
+# Find all hardcoded role comparisons outside the matrix implementation + tests.
+#
+# The exemption is deliberately two FILES, not the whole `src/lib/permissions/`
+# directory. `matrix.ts` and `helpers.ts` ARE the matrix — a role comparison
+# there is the implementation of the rule, not a bypass of it. Every other file
+# in that directory is ordinary caller code and stays audited, including
+# `collections.ts` (PP-vdz6): a permission helper does not stop needing an
+# annotation just because it now sits next to the matrix. Exempting the
+# directory wholesale would let a future `viewer.role === "admin"` land in
+# `canManageCollection` with no marker and no audit failure — the exact defect
+# PP-vdz6 exists to close.
+#
 # Opt out by adding `// permissions-audit-allow: <reason>` on the same line
 # OR on the line immediately above OR the line immediately below (prettier may
 # wrap inline comments off the role-check line when they exceed printWidth,
@@ -15,7 +26,8 @@ if ! command -v rg >/dev/null 2>&1; then
   exit 2
 fi
 raw=$(rg -n -B1 -A1 '\brole\s*(===|!==)\s*"(admin|technician|member|guest)"' src \
-  --glob '!src/lib/permissions/**' \
+  --glob '!src/lib/permissions/matrix.ts' \
+  --glob '!src/lib/permissions/helpers.ts' \
   --glob '!**/*.test.*' \
   --glob '!src/test/**' \
   || true)
@@ -72,7 +84,7 @@ matches=$(echo "$raw" | awk '
   }
 ' | sort -u)
 if [[ -n "$matches" ]]; then
-  echo "ERROR: hardcoded role checks outside src/lib/permissions/:" >&2
+  echo "ERROR: hardcoded role checks outside matrix.ts / helpers.ts:" >&2
   echo "$matches" >&2
   echo "" >&2
   echo "Use checkPermission() from ~/lib/permissions/helpers." >&2

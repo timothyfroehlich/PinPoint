@@ -39,7 +39,9 @@ in `docs/SECURITY.md`.
 
 ## What counts as a non-gating role comparison (CORE-ARCH-008)
 
-The `permissions-audit-allow` annotation contract is **enforced**, not documentation. `scripts/audit/no-hardcoded-role-checks.sh` scans `src/` (excluding the permissions module and tests) for `role === "<role>"` comparisons and fails on any that lack `// permissions-audit-allow: <reason>` on the same line, the line directly above, or the line directly below. The audit is wired into `pnpm run check` as `audit:role-checks` — preflight will reject unannotated gates.
+The `permissions-audit-allow` annotation contract is **enforced**, not documentation. `scripts/audit/no-hardcoded-role-checks.sh` scans `src/` for `role === "<role>"` comparisons and fails on any that lack `// permissions-audit-allow: <reason>` on the same line, the line directly above, or the line directly below. The audit is wired into `pnpm run check` as `audit:role-checks` — preflight will reject unannotated gates.
+
+**The exemption is two files, not the permissions directory.** Only `src/lib/permissions/matrix.ts` and `helpers.ts` are skipped (plus tests and `src/test/`), because a role comparison in those two _is_ the matrix implementation. Everything else under `src/lib/permissions/` is audited like any other caller — including `collections.ts`, which holds the collection access predicates. PP-vdz6 narrowed this: the glob used to be `src/lib/permissions/**`, so moving a permission helper into the directory silently bought it an exemption, which is the same blind spot that let a `viewer.role === "admin"` gate sit un-audited in the first place.
 
 The line the audit cannot draw for you: a role comparison that **gates a request
 or enforces authorization** is forbidden outright and must go through

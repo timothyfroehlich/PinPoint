@@ -21,6 +21,7 @@ import os
 import stat
 import subprocess
 import tempfile
+import time
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -53,6 +54,16 @@ case "$1" in
     exit 0
     ;;
 esac
+exit 0
+"""
+
+
+# Stub `herdr`: serve `herdr workspace list` from $HERDR_STUB_JSON. With
+# $HERDR_STUB_HANG set it sleeps instead, standing in for a wedged herdr server
+# so the `timeout 1` guard is exercised rather than assumed.
+HERDR_STUB = r"""#!/usr/bin/env bash
+if [[ -n "${HERDR_STUB_HANG:-}" ]]; then sleep 30; exit 0; fi
+[[ -n "${HERDR_STUB_JSON:-}" ]] && cat "$HERDR_STUB_JSON"
 exit 0
 """
 
@@ -176,7 +187,32 @@ def register(repo: Path, name: str, session_id: str = SESSION_ID) -> None:
     )
 
 
-def run_hook_payload(repo: Path, payload: dict[str, object]) -> tuple[int, str, str]:
+def stub_herdr(repo: Path, label: str | None, *, hang: bool = False) -> dict[str, str]:
+    """Install a `herdr` stub and return the env vars that activate it.
+
+    `label` is the workspace label the stub reports for workspace "wX"; None
+    installs a stub that reports a *different* workspace, which is the moved-pane
+    / stale-id case. `hang` makes it sleep, for the timeout guard.
+    """
+    stub = repo / "bin" / "herdr"
+    stub.write_text(HERDR_STUB)
+    stub.chmod(stub.stat().st_mode | stat.S_IEXEC)
+    workspaces = [{"workspace_id": "wOTHER", "label": "somebody else"}]
+    if label is not None:
+        workspaces.append({"workspace_id": "wX", "label": label})
+    payload = repo / "herdr-workspaces.json"
+    _write_json(payload, {"result": {"workspaces": workspaces}})
+    env = {"HERDR_WORKSPACE_ID": "wX", "HERDR_STUB_JSON": str(payload)}
+    if hang:
+        env["HERDR_STUB_HANG"] = "1"
+    return env
+
+
+def run_hook_payload(
+    repo: Path,
+    payload: dict[str, object],
+    extra_env: dict[str, str] | None = None,
+) -> tuple[int, str, str]:
     """Run the hook with an arbitrary stdin payload. Returns (rc, out, err).
 
     Takes the payload dict verbatim so a test can omit a key or vary the key
@@ -188,6 +224,14 @@ def run_hook_payload(repo: Path, payload: dict[str, object]) -> tuple[int, str, 
     env["BD_LOG"] = str(repo / "bd.log")
     env["BD_SHOW_DIR"] = str(repo / "shows")
     env["BD_CHILDREN_JSON"] = str(repo / "children.json")
+    # Drop the inherited herdr identity. Without this the hook reaches the real
+    # herdr server whenever pytest runs from a herdr pane, so the naming block
+    # takes the label branch locally and the no-label branch in CI with nothing
+    # pinning either — the next assertion anyone adds on that text would pass
+    # here and fail in CI. Tests that want the label branch stub `herdr` on PATH
+    # and set HERDR_WORKSPACE_ID themselves.
+    env.pop("HERDR_WORKSPACE_ID", None)
+    env.update(extra_env or {})
     proc = subprocess.run(
         ["bash", str(HOOK_PATH)],
         cwd=repo,
@@ -204,6 +248,7 @@ def run_hook(
     session_id: str = SESSION_ID,
     source: str = "startup",
     transcript_path: str = "/tmp/transcripts/abc.jsonl",
+    extra_env: dict[str, str] | None = None,
 ) -> tuple[int, str, str]:
     """Run the hook with a well-formed SessionStart payload on stdin."""
     return run_hook_payload(
@@ -215,6 +260,7 @@ def run_hook(
             "hook_event_name": "SessionStart",
             "source": source,
         },
+        extra_env=extra_env,
     )
 
 
@@ -554,3 +600,66 @@ def test_subagent_transcript_emits_nothing(repo: Path) -> None:
     )
     assert rc == 0, err
     assert out == ""
+
+
+# --- PP-355h: name derivation from the herdr workspace label -----------------
+
+
+def test_workspace_label_is_offered_as_the_first_naming_choice(repo: Path) -> None:
+    """The label branch renders the label and its CamelCased form."""
+    rc, out, err = run_hook(repo, extra_env=stub_herdr(repo, "main e2e failures"))
+    assert rc == 0, err
+    assert REGISTRATION_MARKER in out
+    assert 'workspace label, which is "main e2e failures"' in out
+    assert "becomes <Harness>-MainE2eFailures" in out
+
+
+def test_no_herdr_env_falls_back_to_bead_then_task(repo: Path) -> None:
+    """Absent HERDR_WORKSPACE_ID, naming drops to bead-then-task and says why."""
+    rc, out, err = run_hook(repo)
+    assert rc == 0, err
+    assert REGISTRATION_MARKER in out
+    assert "No herdr workspace label available" in out
+    assert "workspace label, which is" not in out
+
+
+def test_unknown_workspace_id_falls_back(repo: Path) -> None:
+    """A stale/moved id resolves to no label rather than a peer's label.
+
+    The stub reports only "wOTHER" while the hook asks for "wX".
+    """
+    rc, out, err = run_hook(repo, extra_env=stub_herdr(repo, None))
+    assert rc == 0, err
+    assert "No herdr workspace label available" in out
+    assert "somebody else" not in out
+
+
+def test_label_without_alphanumerics_does_not_render_a_bare_prefix(
+    repo: Path,
+) -> None:
+    """A label that camelizes to "" must not yield "<Harness>-".
+
+    huddle-whoami.sh's ^[A-Za-z0-9_-]+$ validator accepts a bare "Claude-", so
+    offering it invites a truncated registration.
+    """
+    rc, out, err = run_hook(repo, extra_env=stub_herdr(repo, "🔥"))
+    assert rc == 0, err
+    assert "becomes <Harness>-\n" not in out
+    assert "becomes <Harness>-." not in out
+    assert "No herdr workspace label available" in out
+
+
+def test_wedged_herdr_does_not_consume_the_hook_budget(repo: Path) -> None:
+    """A hung herdr must cost ~1s, not the hook's whole 5000ms budget.
+
+    Blowing the budget makes Claude Code discard ALL stdout, so the session gets
+    no session_id and never registers — the PP-2m3l breakage this file guards.
+    """
+    start = time.monotonic()
+    rc, out, err = run_hook(repo, extra_env=stub_herdr(repo, "whatever", hang=True))
+    elapsed = time.monotonic() - start
+    assert rc == 0, err
+    assert elapsed < 4.0, f"herdr timeout guard did not fire (took {elapsed:.1f}s)"
+    assert REGISTRATION_MARKER in out
+    assert f"`{SESSION_ID}`" in out
+    assert "No herdr workspace label available" in out
