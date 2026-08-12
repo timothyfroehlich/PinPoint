@@ -578,7 +578,7 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
         id: "collections.view",
         label: "View collections",
         description:
-          "View a collection's Overview, Issues, and Timeline. Collections are private to their owner — reaching someone else's also needs the permission below, an editor grant on that collection, or its share link (a per-collection capability URL, not a role).",
+          "View a collection's Overview, Issues, and Timeline. Collections are private to their owner — reaching someone else's also needs \"View anyone's collection\", an editor grant on that collection, or its share link (a per-collection capability URL, not a role).",
         access: {
           unauthenticated: true,
           guest: true,
