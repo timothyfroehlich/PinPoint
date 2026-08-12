@@ -27,7 +27,11 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
   if (canonicalPath) {
     const url = request.nextUrl.clone();
     url.pathname = canonicalPath;
-    return NextResponse.redirect(url);
+    // 308, not the 307 default: the rule is structural, not situational.
+    // Initials are uppercase by check constraint and permanent once assigned,
+    // so the lowercase form will never become the right URL. A permanent
+    // redirect lets browsers and crawlers stop paying for the hop.
+    return NextResponse.redirect(url, 308);
   }
 
   // 1. Run Supabase middleware first to handle session

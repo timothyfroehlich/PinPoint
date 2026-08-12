@@ -32,16 +32,24 @@ const INITIALS_PATTERN = /^[A-Za-z0-9]{2,6}$/;
 export function canonicalMachinePath(pathname: string): string | null {
   const segments = pathname.split("/");
   // ["", "m", "<initials>", ...rest]
-  if (segments[1] !== "m") return null;
+  const prefix = segments[1];
+  // The `/m` prefix is matched case-insensitively for the same reason the
+  // initials are: a phone keyboard capitalizes the first character of what it
+  // thinks is a sentence, so `/M/afm` is a link people actually produce.
+  if (prefix?.toLowerCase() !== "m") return null;
 
-  const initials = segments[2];
-  if (!initials) return null;
-  if (RESERVED_SEGMENTS.has(initials)) return null;
-  if (!INITIALS_PATTERN.test(initials)) return null;
+  const segment = segments[2];
+  if (!segment) return null;
+  if (!INITIALS_PATTERN.test(segment)) return null;
 
-  const canonical = initials.toUpperCase();
-  if (canonical === initials) return null;
+  // A reserved segment keeps its own casing — `/M/new` still becomes `/m/new`,
+  // the create page, rather than a machine lookup for "NEW".
+  const canonicalSegment = RESERVED_SEGMENTS.has(segment)
+    ? segment
+    : segment.toUpperCase();
+  if (prefix === "m" && canonicalSegment === segment) return null;
 
-  segments[2] = canonical;
+  segments[1] = "m";
+  segments[2] = canonicalSegment;
   return segments.join("/");
 }

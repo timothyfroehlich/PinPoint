@@ -1,3 +1,5 @@
+import { readdirSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { canonicalMachinePath } from "./canonical-path";
 
@@ -25,6 +27,35 @@ describe("canonicalMachinePath", () => {
 
   it("leaves the reserved /m/new create route alone", () => {
     expect(canonicalMachinePath("/m/new")).toBeNull();
+    // Reserved segments keep their own casing rather than being uppercased
+    // into a machine lookup.
+    expect(canonicalMachinePath("/M/new")).toBe("/m/new");
+  });
+
+  /**
+   * The reserved list is the one part of this module that goes stale silently:
+   * add `src/app/(app)/m/bulk/` and `/m/bulk` starts redirecting to `/m/BULK`
+   * and 404ing, in a file whose author never opened this one. Read the route
+   * directory instead of trusting the comment.
+   */
+  it("reserves every static route directory under /m/", () => {
+    const routeDir = join(process.cwd(), "src/app/(app)/m");
+    const staticSegments = readdirSync(routeDir, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name)
+      .filter((name) => !name.startsWith("[") && !name.startsWith("("));
+
+    expect(staticSegments.length).toBeGreaterThan(0);
+    for (const segment of staticSegments) {
+      expect(canonicalMachinePath(`/m/${segment}`)).toBeNull();
+    }
+  });
+
+  it("uppercases a lowercase /m prefix too", () => {
+    // Phone keyboards capitalize the first character of what they take to be
+    // a sentence, so /M/afm is a link people actually produce.
+    expect(canonicalMachinePath("/M/afm")).toBe("/m/AFM");
+    expect(canonicalMachinePath("/M/AFM")).toBe("/m/AFM");
   });
 
   it("ignores paths that are not machine detail pages", () => {

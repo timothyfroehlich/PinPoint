@@ -22,7 +22,7 @@ describe("middleware machine URL canonicalization", () => {
   it("redirects a lowercase initials segment to the uppercase form", async () => {
     const response = await middleware(request("http://localhost/m/afm"));
 
-    expect(response.status).toBe(307);
+    expect(response.status).toBe(308);
     expect(response.headers.get("location")).toBe("http://localhost/m/AFM");
     expect(updateSessionMock).not.toHaveBeenCalled();
   });

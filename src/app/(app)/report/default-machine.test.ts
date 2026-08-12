@@ -20,6 +20,17 @@ describe("resolveDefaultMachineId", () => {
     expect(resolveDefaultMachineId(machines, undefined, "Bb")).toBe("b");
   });
 
+  it("ignores a repeated query param instead of throwing", () => {
+    // `?machine=aa&machine=bb` reaches the page as an array. It names two
+    // machines, so it resolves to no preselection.
+    expect(resolveDefaultMachineId(machines, undefined, ["aa", "bb"])).toBe(
+      undefined
+    );
+    expect(resolveDefaultMachineId(machines, ["a", "b"], undefined)).toBe(
+      undefined
+    );
+  });
+
   it("returns undefined when query missing or invalid", () => {
     expect(resolveDefaultMachineId(machines, "missing", "missing")).toBe(
       undefined

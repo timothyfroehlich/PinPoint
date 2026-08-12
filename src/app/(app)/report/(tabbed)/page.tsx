@@ -22,11 +22,14 @@ export const maxDuration = 60;
 export default async function PublicReportPage({
   searchParams,
 }: {
+  // Every one of these arrives as `string[]` when the key is repeated
+  // (`?machine=afm&machine=bbh`), so they are typed the way the App Router
+  // actually delivers them rather than the way they are normally used.
   searchParams: Promise<{
-    error?: string;
-    machine?: string;
-    machineId?: string;
-    source?: string;
+    error?: string | string[];
+    machine?: string | string[];
+    machineId?: string | string[];
+    source?: string | string[];
   }>;
 }): Promise<React.JSX.Element> {
   // Machines + assignees come from the shared request-deduped loaders (also
@@ -54,9 +57,10 @@ export default async function PublicReportPage({
   const machinesList = await machinesListPromise;
 
   const params = await searchParams;
-  const errorMessage = params.error
-    ? decodeURIComponent(params.error)
-    : undefined;
+  const errorMessage =
+    typeof params.error === "string"
+      ? decodeURIComponent(params.error)
+      : undefined;
 
   const machineIdFromQuery = params.machineId;
   const machineInitialsFromQuery = params.machine;
