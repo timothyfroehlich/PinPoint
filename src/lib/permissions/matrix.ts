@@ -405,6 +405,25 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
         },
       },
       {
+        id: "machines.pinballmap.diagnose",
+        label: "See Pinball Map configuration warnings",
+        description:
+          "See the warning on a machine when our Pinball Map state needs resolving — an entry left behind on the public map, or our records disagreeing with what the map shows. Read-only: resolving it needs the link and push permissions.",
+        access: {
+          unauthenticated: false,
+          guest: false,
+          // Deliberately wider than `machines.pinballmap.link`, which members
+          // hold only for their own machines. The warning points at a wrong
+          // entry on a PUBLIC map that any member may be the one to notice, and
+          // it is read-only — it links to the Manage tab, where the actual
+          // controls re-check `link` and `push`. (Tim, 2026-08-12: "for
+          // Members +".)
+          member: true,
+          technician: true,
+          admin: true,
+        },
+      },
+      {
         id: "machines.pinballmap.push",
         label: "Push listing changes to PinballMap",
         description:

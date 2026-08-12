@@ -96,6 +96,30 @@ export function derivePbmMachineStatus(args: {
 }
 
 /**
+ * Whether a desync is worth telling a person about (PP-o355.21).
+ *
+ * Not every `desynced: true` is actionable. `lmx_drifted` is repaired by
+ * `reconcileAfterSync` on the very next hourly cron — its heal condition is
+ * this same predicate — so it only exists in the window between PBM moving a
+ * row id and the next run. Reporting a state that fixes itself, to someone who
+ * can do nothing about it, is noise.
+ *
+ * Of the two that remain, `listed_locally_absent_on_pbm` is the durable one:
+ * nothing ever auto-unlists, so it persists until a person acts.
+ * `on_pbm_not_listed_locally` became mostly transient once auto-link
+ * (PP-o355.20) started capturing the listing for a lone eligible cabinet, and
+ * now survives only where auto-link stands down — same-title cabinets tied at
+ * the top presence rank. It is kept because that tie is exactly the case a
+ * person has to break by hand.
+ */
+export function isActionableDesync(status: PbmMachineStatus): boolean {
+  return (
+    status.reason === "listed_locally_absent_on_pbm" ||
+    status.reason === "on_pbm_not_listed_locally"
+  );
+}
+
+/**
  * Whether a machine should appear on PBM's lineup — our LOCAL listing intent
  * only. Deliberately independent of `presenceStatus`: the three-concept model
  * (linking / listing / availability) keeps availability from driving map

@@ -16,12 +16,14 @@ import {
 import { getMachineForLayout } from "../_data";
 import { pinballmapLocationUrl } from "~/lib/pinballmap/public-url";
 import { getPinballMapState } from "~/lib/pinballmap/state";
-import { derivePbmMachineStatus } from "~/lib/pinballmap/sync";
+import {
+  derivePbmMachineStatus,
+  isActionableDesync,
+} from "~/lib/pinballmap/status";
 import { listAbandonedForMachine } from "~/lib/pinballmap/abandoned-listings";
 import { getCatalogEntry } from "~/lib/pinballmap/catalog";
 import { InfoHero } from "./info-hero";
 import { InfoRail } from "./info-rail";
-import { MachinePinballmapCard } from "./machine-pinballmap-card";
 
 /**
  * Machine Info Tab (default route for /m/[initials]/) — the QR-scanning
@@ -74,25 +76,7 @@ export default async function MachineInfoTab({
     accessLevel
   );
 
-  // PinballMap linking (bead B / PP-o355.2) gates the maintainer-facing desync
-  // signal below. The catalog picker itself moved to the edit page
-  // (PP-o355.19), so this landing no longer resolves the linked title's display
-  // name or the unified-user list — both were dialog-only reads.
-  const canLink = checkPermission(
-    "machines.pinballmap.link",
-    accessLevel,
-    ownershipContext
-  );
   const machineStatus = deriveMachineStatus(openIssues);
-
-  // The stored PBM snapshot drives the desync signal, which is a maintainer-
-  // facing alert (it points at a mismatch to resolve). Only read it when the
-  // viewer may act on it (`canLink`) AND the machine is linked — so the public
-  // QR-scan landing never pays for (or shows) it. Location-wide singleton.
-  const pbmState =
-    canLink && machine.pinballmapMachineId !== null
-      ? await getPinballMapState()
-      : null;
 
   // Description renders read-only inside the Details card; editing happens on
   // the Edit Machine page (not inline). Gate on docIsEmpty rather than just
@@ -104,78 +88,56 @@ export default async function MachineInfoTab({
     <RichTextDisplay content={machine.description} />
   ) : null;
 
-  // PinballMap card (PP-o355.3 + desync PP-o355.11 + abandoned listings
-  // PP-l81u): everyone sees the plain "View on PinballMap" card for listed
-  // machines. The desync alert and the abandoned-listing notice are both
-  // maintainer-only (`canLink`) — for those users the card also appears on a
-  // desynced-but-not-listed machine (e.g. on PBM but not marked listed here)
-  // or on an unlisted machine with something abandoned still live under its
-  // old title, so the mismatch surfaces where it can be acted on. `pbmState`
-  // is null for non-maintainers, so `desynced` is false for them regardless;
-  // the abandoned-listing query is likewise skipped for them.
-  const pbmStatus = derivePbmMachineStatus({
-    pinballmapMachineId: machine.pinballmapMachineId,
-    pinballmapListed: machine.pinballmapListed,
-    pinballmapLmxId: machine.pinballmapLmxId,
-    snapshot: pbmState?.snapshotJson ?? null,
-  });
-  const showDesync = canLink && pbmStatus.desynced;
-
-  const abandonedRows = canLink
-    ? await listAbandonedForMachine(machine.id)
-    : [];
-  const abandoned = await Promise.all(
-    abandonedRows.map(async (row) => {
-      const entry = await getCatalogEntry(row.pinballmapMachineId);
-      return {
-        lmxId: row.lmxId,
-        // The catalog row can disappear; the entry on PBM does not. The card
-        // falls back to naming the id so the notice still points at something.
-        title: entry?.name ?? null,
-      };
-    })
-  );
-
-  // A machine that just abandoned an entry is by definition not listed, and
-  // `derivePbmMachineStatus` reports it `ok` (it points at a new title and
-  // correctly has no listing under it) — so without this disjunct the card
-  // would never render for the one case this bead exists to surface.
-  const showAbandoned = canLink && abandoned.length > 0;
-  const showPinballmapCard =
-    machine.pinballmapListed || showDesync || showAbandoned;
-
-  // The machine's own current standing, stated above any alert. The abandoned
-  // notice necessarily names a DIFFERENT title than this machine's, so without
-  // this line the reader's first thought is "wrong machine", not "task to do".
+  // Model — the game's identity, shown to everyone. Unlike the PinballMap card
+  // this replaces (PP-o355.21), it is not permission-gated: what game a cabinet
+  // is is public. It is also catalog data rather than location data, so it
+  // carries no CORE-PBM-001 link obligation of its own — the Pinball Map row
+  // beneath it does, and always links.
   //
-  // Resolved only when the card actually renders: on the public QR-scan landing
-  // of an unlisted machine there is no card, and `getCatalogEntry` is a plain
-  // query with no request-level cache, so an unconditional read here would be a
-  // round trip per view whose result is thrown away.
+  // The catalog row can be missing (never refreshed, or the title retired) for
+  // a machine that is nonetheless linked. Naming the id beats claiming there is
+  // no model at all; "Not specified" is reserved for a machine with no catalog
+  // match, which is a different and correctable state (PP-3bbr).
   const linkedTitleEntry =
-    showPinballmapCard && machine.pinballmapMachineId !== null
+    machine.pinballmapMachineId !== null
       ? await getCatalogEntry(machine.pinballmapMachineId)
       : null;
-  // The catalog row can be missing (never refreshed, or the title retired) for
-  // a machine that is nonetheless linked — and often listed, which is why the
-  // card is on screen at all. Naming the id beats claiming it is not linked,
-  // and matches the abandoned notice's own fallback.
-  const linkedTitle =
+  const modelName =
     machine.pinballmapMachineId === null
       ? null
       : (linkedTitleEntry?.name ??
         `Pinball Map title #${String(machine.pinballmapMachineId)}`);
 
-  const pinballmapCard = showPinballmapCard ? (
-    <MachinePinballmapCard
-      locationUrl={pinballmapLocationUrl()}
-      desynced={showDesync}
-      desyncReason={pbmStatus.reason}
-      linkedTitle={linkedTitle}
-      listed={machine.pinballmapListed}
-      abandoned={abandoned}
-    />
-  ) : null;
+  // The Config-issue warning. Two unrelated disagreements raise it, which is
+  // why its label is generic: an entry left live on the public map under a
+  // title this machine no longer uses (PP-l81u), or an actionable desync
+  // between our records and the stored snapshot (PP-o355.11).
+  //
+  // Gated on `machines.pinballmap.diagnose` rather than `machines.pinballmap.
+  // link` because a member holds `link` only for machines they own, and a wrong
+  // entry on a public map is something any member may be the one to notice. The
+  // warning is read-only — it links to the Manage tab, where the controls
+  // re-check `link` and `push`.
+  const canDiagnose = checkPermission(
+    "machines.pinballmap.diagnose",
+    accessLevel,
+    ownershipContext
+  );
+  // Both reads are skipped for viewers who would not see the result, so the
+  // public QR-scan landing pays for neither. The snapshot is a location-wide
+  // singleton; the abandonment query is machine-scoped.
+  const pbmState = canDiagnose ? await getPinballMapState() : null;
+  const desynced = isActionableDesync(
+    derivePbmMachineStatus({
+      pinballmapMachineId: machine.pinballmapMachineId,
+      pinballmapListed: machine.pinballmapListed,
+      pinballmapLmxId: machine.pinballmapLmxId,
+      snapshot: pbmState?.snapshotJson ?? null,
+    })
+  );
+  const configIssue =
+    canDiagnose &&
+    (desynced || (await listAbandonedForMachine(machine.id)).length > 0);
 
   const rail = (
     <InfoRail
@@ -183,7 +145,13 @@ export default async function MachineInfoTab({
       invitedOwner={machine.invitedOwner}
       addedAt={machine.createdAt}
       descriptionSlot={descriptionSlot}
-      pinballmapSlot={pinballmapCard}
+      modelName={modelName}
+      pinballmap={{
+        locationUrl: pinballmapLocationUrl(),
+        listed: machine.pinballmapListed,
+        configIssue,
+        manageHref: `/m/${machine.initials}/edit`,
+      }}
     />
   );
 
