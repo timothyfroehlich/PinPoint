@@ -177,12 +177,17 @@ export async function logout(page: Page, _testInfo: TestInfo): Promise<void> {
  * request, and mobile viewports render component trees a chromium run never
  * compiles (`MetadataDrawer`, `StickyCommentComposer`, `RowEditSheet`).
  *
- * **This did not fix the Mobile Chrome full-suite failures.** It was written to
- * — `status-overhaul:25` times out at the Radix branch below — and 20s did not
- * rescue it. That spec also passes in isolation, so the cause is cross-spec
- * interference, not a mount that needed longer. Read this as a latent-defect
- * fix (a shared helper silently capping every caller below the environment's
- * own budget), not as the cause of anything observed. (PP-jxhy.)
+ * **This is a latent-defect fix, not the cause of anything observed.** The
+ * Mobile Chrome full-suite failures were dropped clicks, fixed by the hydration
+ * wait in `support/fixtures.ts`.
+ *
+ * A caveat on how that was established, because it is easy to repeat the
+ * mistake: the crabbox runner does **not** set `CI`, so on it these constants
+ * evaluate to the local 5s/3s and `playwright.config.ts` uses `actionTimeout`
+ * 5s and an `expect` timeout of 10s rather than CI's 30s. Any conclusion of the
+ * form "widening the timeout did not help" drawn from a runner session is
+ * therefore worthless — the widening never applied. Check `echo $CI` on the
+ * host before reading anything into a timeout experiment. (PP-jxhy.)
  *
  * Local keeps the short budget: that dev server is usually warm, and a
  * genuinely missing selector should still fail fast.
