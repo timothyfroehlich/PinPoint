@@ -773,137 +773,87 @@ export async function unlistMachineFromPinballMapAction(
   return ok({});
 }
 
-export type VerifyPinballmapResult = Result<
-  { state: "ok" | "stale" | "healed" },
-  "VALIDATION" | "UNAUTHORIZED" | "NOT_FOUND" | "SERVER" | "THROTTLED"
+export type AcceptMissingListingResult = Result<
+  Record<string, never>,
+  "VALIDATION" | "UNAUTHORIZED" | "NOT_FOUND" | "SERVER"
 >;
 
 /**
- * On-demand "Verify" — re-check a machine's stored PinballMap link against a
- * FRESH lineup (this is the explicit "check now" affordance, so it always forces
- * a sync). Read-only, `machines.pinballmap.link`.
+ * "Accept" — agree with Pinball Map that this machine is no longer on the
+ * lineup, and clear our listing columns to match (PP-o355.21).
  *
- *  - stored lmx still present  → `ok`      (nothing to do)
- *  - title resolves to a NEW id → `healed`  (update the stored handle + timeline)
- *  - title absent from lineup   → `stale`   (leave the stored id; UI shows Reconnect)
+ * The resolution for `missing_on_pbm`: we hold a listing, the lineup does not
+ * show it, and somebody removed it over there. Nothing is sent to Pinball Map —
+ * there is nothing left to delete — so this needs no operator credential and is
+ * gated on `machines.pinballmap.link` (the local-bookkeeping capability) rather
+ * than `push`.
  *
- * Crucially, a fresh sync is a PRECONDITION for any of those verdicts: "Verify"
- * promises the answer reflects PinballMap's CURRENT lineup. If the refresh can't
- * complete — the fetch errored, or the manual-refresh throttle (PP-hbi0) refused
- * it — we must NOT resolve against the possibly-stale STORED snapshot and claim
- * it's current (that silent stale-verify was the original bug). Instead we
- * surface the sync outcome (`SERVER` / `THROTTLED`) and leave the stored link
- * untouched.
+ * **Refusing when the title IS on the lineup is the whole safety of this
+ * action.** Accepting a healthy listing would clear our columns while the entry
+ * stayed live and unclaimed on the public map — and the next auto-link pass
+ * would simply re-list the machine, so the click would appear to work and then
+ * silently undo itself (CORE-ARCH-012). The stored snapshot can be an hour old,
+ * which is fine here: this only ever fires from a control the same snapshot
+ * painted, and the failure mode of a stale "still there" is a refusal the
+ * reader can retry, not a wrong write.
  *
- * Continuous background desync detection stays in the hourly snapshot (PP-o355.11);
- * this is the user-triggered spot-check, so a single sync per click is within
- * conduct (CORE-PBM-001).
+ * No snapshot edit, unlike the unlist path: the lmx we are dropping is already
+ * absent from the lineup, so there is nothing to remove from our copy of it.
  */
-export async function verifyPinballmapLinkAction(
-  _prev: VerifyPinballmapResult | undefined,
+export async function acceptMissingPinballmapListingAction(
+  _prev: AcceptMissingListingResult | undefined,
   formData: FormData
-): Promise<VerifyPinballmapResult> {
+): Promise<AcceptMissingListingResult> {
   const authed = await authorizeListingAction(
     formData,
     "machines.pinballmap.link"
   );
   if (!authed.ok) return authed.result;
   const { userId, machine } = authed;
-  if (machine.pinballmapMachineId === null)
-    return err("VALIDATION", "Machine isn't linked to a PinballMap title yet");
+  const titleId = machine.pinballmapMachineId;
+  if (titleId === null)
+    return err("VALIDATION", "Machine isn't linked to a Pinball Map title yet");
 
-  // Verify re-checks a listing we HOLD, and an unlisted cabinet holds none.
-  // Without this guard, verifying one would silently LIST it: the schema CHECK
-  // `machines_pinballmap_lmx_requires_listed` forces an unlisted row's
-  // `pinballmapLmxId` to null, so the `lmx.id === machine.pinballmapLmxId`
-  // comparison below can never match and every such verify falls into the heal
-  // branch — which sets `pinballmapListed: true`. Listing is never a side effect
-  // of a spot-check. Note this guard is NOT redundant with auto-link
-  // (PP-o355.20): auto-link consults the tie guard before listing anything,
-  // whereas this branch would list unconditionally, so removing the guard would
-  // reintroduce exactly the duplicate-listing path auto-link is careful to
-  // avoid. Refuse before the sync so a request we will not honour never spends a
-  // manual-refresh slot (CORE-PBM-001).
+  const storedLmxId = machine.pinballmapLmxId;
   if (!machine.pinballmapListed)
-    return err(
-      "VALIDATION",
-      "This machine isn't listed on Pinball Map, so there's no listing to re-check."
-    );
+    return err("VALIDATION", "This machine isn't listed on Pinball Map.");
 
-  // Verify means "check right now" — force a fresh sync before resolving. Bail
-  // out (rather than resolve against a stale snapshot) if the sync didn't land.
-  const sync = await syncLocationSnapshot({
-    updatedBy: userId,
-    trigger: "manual",
-  });
-  if (!sync.ok) {
-    if (sync.reason === "throttled")
-      return err(
-        "THROTTLED",
-        "Pinball Map was refreshed moments ago. Wait a minute, then re-check this link."
-      );
+  const state = await getPinballMapState();
+  if (!state?.snapshotJson)
     return err(
       "SERVER",
-      "Couldn't reach Pinball Map to re-check this link. Its listing status may be out of date — try again shortly."
+      "PinPoint hasn't read Pinball Map's lineup yet, so it can't confirm the listing is gone."
     );
-  }
 
-  const snapshot = (await getPinballMapState())?.snapshotJson;
-  if (!snapshot) return err("SERVER", "Pinball Map lineup unavailable");
+  if (findLmxForMachine(state.snapshotJson, titleId))
+    return err(
+      "VALIDATION",
+      "This machine is still on Pinball Map's lineup, so there's nothing to accept. Use Remove from Pinball Map to take it down."
+    );
 
-  const lmx = findLmxForMachine(snapshot, machine.pinballmapMachineId);
-  if (!lmx) return ok({ state: "stale" });
-  if (lmx.id === machine.pinballmapLmxId) return ok({ state: "ok" });
-
-  // Title now maps to a different lmx (PBM re-minted it) — heal the stored handle.
-  //
-  // This writes `pinballmapListed`, so the one-lister partial unique index
-  // applies and a violation would escape as a 500 the way it did on the
-  // create/update paths (PP-o355.15). The not-listed guard above closes the
-  // concrete duplicate-cabinet path — reaching here means this machine is
-  // already the sole listed row for its title, so it can only collide with a
-  // concurrent write. Kept as a genuine backstop, not a load-bearing catch.
-  try {
-    await db.transaction(async (tx) => {
-      await tx
-        .update(machines)
-        .set({ pinballmapLmxId: lmx.id, pinballmapListed: true })
-        .where(eq(machines.id, machine.id));
-      // A heal claims the lmx PBM re-minted, which can be one a machine
-      // abandoned.
-      await retireAbandonmentForLmx(tx, lmx.id);
-      await createMachineTimelineEvent(
-        machine.id,
-        {
-          sourceType: "lifecycle",
-          tag: "lifecycle",
-          eventData: {
-            kind: "pinballmap_listing",
-            action: "reconnected",
-            lmxId: lmx.id,
-          },
-          actorId: userId,
+  await db.transaction(async (tx) => {
+    await tx
+      .update(machines)
+      .set({ pinballmapListed: false, pinballmapLmxId: null })
+      .where(eq(machines.id, machine.id));
+    await createMachineTimelineEvent(
+      machine.id,
+      {
+        sourceType: "lifecycle",
+        tag: "lifecycle",
+        eventData: {
+          kind: "pinballmap_listing",
+          action: "accepted_removal",
+          lmxId: storedLmxId,
         },
-        tx
-      );
-    });
-  } catch (error: unknown) {
-    // Bare code for the same reason as the link path above — this transaction
-    // writes only listing columns, so any 23505 here is the one-lister index.
-    // Exclude self from the incumbent lookup: this machine IS the listed row
-    // for its title (the guard above guarantees it), so an unfiltered lookup
-    // would name it and tell the operator to unlist what they're verifying.
-    if (isPgErrorCode(error, "23505")) {
-      return err(
-        "VALIDATION",
-        await pbmListingConflictMessage(machine.pinballmapMachineId, machine.id)
-      );
-    }
-    throw error;
-  }
+        actorId: userId,
+      },
+      tx
+    );
+  });
 
   revalidatePath(`/m/${machine.initials}`);
-  return ok({ state: "healed" });
+  return ok({});
 }
 
 /** Result of an on-demand "Sync now" — the machine count and writes applied. */

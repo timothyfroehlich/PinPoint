@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  derivePbmListingState,
   derivePbmMachineStatus,
   isActionableDesync,
   shouldBeListedOnPbm,
@@ -125,6 +126,85 @@ describe("isActionableDesync", () => {
   it("stays quiet when nothing disagrees", () => {
     expect(isActionableDesync(status("ok"))).toBe(false);
     expect(isActionableDesync(status("unlinked"))).toBe(false);
+  });
+});
+
+describe("derivePbmListingState", () => {
+  const listingState = (
+    over: Partial<Parameters<typeof derivePbmListingState>[0]> = {}
+  ): ReturnType<typeof derivePbmListingState> =>
+    derivePbmListingState({
+      pinballmapMachineId: 42,
+      pinballmapExcluded: false,
+      pinballmapListed: true,
+      pinballmapLmxId: 900,
+      snapshot: snap([{ id: 900, machineId: 42 }]),
+      ...over,
+    });
+
+  it("listed and agreeing", () => {
+    expect(listingState()).toBe("listed");
+  });
+
+  it("matched with the title off the lineup", () => {
+    expect(
+      listingState({
+        pinballmapListed: false,
+        pinballmapLmxId: null,
+        snapshot: snap([]),
+      })
+    ).toBe("not_listed");
+  });
+
+  it("we hold a listing the lineup no longer shows", () => {
+    expect(listingState({ snapshot: snap([]) })).toBe("missing_on_pbm");
+  });
+
+  it("the lineup shows the title but no machine holds it", () => {
+    expect(
+      listingState({ pinballmapListed: false, pinballmapLmxId: null })
+    ).toBe("unclaimed_on_pbm");
+  });
+
+  it("separates 'no model yet' from 'deliberately not on their catalog'", () => {
+    // Same "nothing to list", different reason — and the reason is the half a
+    // reader can act on.
+    expect(
+      listingState({
+        pinballmapMachineId: null,
+        pinballmapListed: false,
+        pinballmapLmxId: null,
+      })
+    ).toBe("unmatched");
+    expect(
+      listingState({
+        pinballmapMachineId: null,
+        pinballmapExcluded: true,
+        pinballmapListed: false,
+        pinballmapLmxId: null,
+      })
+    ).toBe("not_on_pbm");
+  });
+
+  it("reports unsynced rather than guessing with no stored lineup", () => {
+    // The old control answered "Not listed" here, for a fleet that was listed.
+    expect(listingState({ snapshot: null })).toBe("unsynced");
+    expect(
+      listingState({
+        pinballmapListed: false,
+        pinballmapLmxId: null,
+        snapshot: null,
+      })
+    ).toBe("unsynced");
+  });
+
+  it("reads lmx drift as plain 'listed'", () => {
+    // The machine IS on the lineup; only the row id moved, and the next hourly
+    // reconcile repairs the handle. Surfacing it would put a warning in front
+    // of someone with nothing to do about it (see `isActionableDesync`).
+    expect(listingState({ snapshot: snap([{ id: 999, machineId: 42 }]) })).toBe(
+      "listed"
+    );
   });
 });
 

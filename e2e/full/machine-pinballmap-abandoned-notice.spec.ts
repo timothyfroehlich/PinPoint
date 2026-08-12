@@ -1,20 +1,20 @@
 /**
  * E2E: retitling a linked+listed machine surfaces the abandoned-listing
- * notice on its Info tab (PP-l81u).
+ * notice on its Manage tab, and a warning on Info that points at it
+ * (PP-l81u, moved by PP-o355.21).
  *
- * The line this guards is `src/app/(app)/m/[initials]/(tabs)/page.tsx`'s
- * render gate for the PinballMap card:
+ * What this guards is a TWO-PAGE trail that no cheaper layer can see. The
+ * notice lives on Manage, next to the controls that resolve it; the only thing
+ * that tells a reader to go there is the "Config issue" warning on Info. Break
+ * either end — drop `abandoned.length > 0` from the Manage page, or drop the
+ * abandonment term from Info's `configIssue` — and the notice becomes
+ * unreachable while every unit and integration test stays green, because they
+ * render a component directly or stop at the database.
  *
- *   machine.pinballmapListed || showDesync || showAbandoned
- *
- * A machine that just retitled off a listing is, by definition, no longer
- * `pinballmapListed`, and `derivePbmMachineStatus` correctly reports it `ok`
- * (it points at a new title with no listing under it) — so the first two
- * disjuncts are false exactly when the notice is needed. Deleting
- * `|| showAbandoned` leaves the card, and the notice inside it, unreachable
- * for anyone, while every unit and integration test (which render the card
- * directly or stop at the database) stays green. This is the one layer that
- * goes through the real page and can catch that.
+ * It is also the one layer that catches the state being wrong rather than
+ * absent: a machine that just retitled off a listing is no longer
+ * `pinballmapListed` and derives as plain "not listed", so nothing about its
+ * own listing hints that it left something behind.
  *
  * Catalog entries and the "already listed" starting state are seeded
  * directly via `supabase-admin` helpers rather than through a real
@@ -109,19 +109,28 @@ test.describe("PinballMap abandoned-listing notice (PP-l81u)", () => {
       });
 
       // The old title's entry is still live on pinballmap.com under the OLD
-      // link — that's what the notice on Info is reporting. Assert the text,
-      // not just the testid: the whole point of this notice is that it names a
-      // title which is NOT this machine's current one, and a testid-only
-      // assertion would survive the copy naming the wrong title entirely.
-      await page.goto(`/m/${initials}`);
+      // link — that's what the notice reports. Assert the text, not just the
+      // testid: the whole point of this notice is that it names a title which
+      // is NOT this machine's current one, and a testid-only assertion would
+      // survive the copy naming the wrong title entirely.
+      await page.reload();
       await expect(
         page.getByTestId("machine-pinballmap-abandoned")
       ).toContainText(`Previous listing still live: “${oldTitleName}”`);
-      // The status line above it carries the machine's own current title, which
-      // is what keeps the line above from reading as a bug.
-      await expect(page.getByTestId("machine-pinballmap-status")).toContainText(
-        newTitleName
+      // The listing control above it speaks for the machine's CURRENT title,
+      // which is what keeps the notice from reading as a bug about the wrong
+      // game. A retitle clears `listed`, and the new title is not on the
+      // lineup, so the derived state is "not listed".
+      await expect(page.getByTestId("pbm-listing-status")).toContainText(
+        "Not on our location's lineup"
       );
+
+      // The other half of the trail: Info's warning is what sends a reader
+      // here, so a notice that only Manage knows about would never be found.
+      await page.goto(`/m/${initials}`);
+      await expect(
+        page.getByTestId("machine-pinballmap-config-issue")
+      ).toHaveAttribute("href", `/m/${initials}/edit`);
     } finally {
       await cleanupTestEntities(request, { machineInitials: [initials] });
       await deletePinballMapCatalogEntries([oldTitleId, newTitleId]);

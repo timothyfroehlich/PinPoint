@@ -1,7 +1,7 @@
 import type React from "react";
 import { notFound, redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
-import { ExternalLink, MapPin } from "lucide-react";
+import { AlertTriangle, ExternalLink } from "lucide-react";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
 import { userProfiles, pinballmapCatalog } from "~/server/db/schema";
@@ -12,6 +12,11 @@ import {
 } from "~/lib/permissions/index";
 import { pinballmapLocationUrl } from "~/lib/pinballmap/public-url";
 import { getPinballMapState } from "~/lib/pinballmap/state";
+import { derivePbmListingState } from "~/lib/pinballmap/status";
+import { listAbandonedForMachine } from "~/lib/pinballmap/abandoned-listings";
+import { getCatalogEntry } from "~/lib/pinballmap/catalog";
+import { Alert, AlertDescription } from "~/components/ui/alert";
+import { PinballmapListingControl } from "~/components/machines/PinballmapListingControl";
 import { formatDateTime } from "~/lib/dates";
 import { getUnifiedUsers } from "~/lib/users/queries";
 import { getMachineForLayout } from "~/app/(app)/m/[initials]/_data";
@@ -94,6 +99,14 @@ export default async function MachineEditPage({
     accessLevel,
     ownershipContext
   );
+  // Stricter still: `push` is what writes to the public map, and it is admin
+  // only. Add / Remove hang off this; Claim and Accept — which write nothing
+  // outward — hang off `canLink` above.
+  const canPush = checkPermission(
+    "machines.pinballmap.push",
+    accessLevel,
+    ownershipContext
+  );
 
   const pinballmapTitlePromise: Promise<string | null> =
     canLink && machine.pinballmapMachineId !== null
@@ -122,6 +135,35 @@ export default async function MachineEditPage({
     status: u.status,
     role: u.role,
   }));
+
+  // The listing control's state is DERIVED here and handed down — nothing in it
+  // discovers state by calling Pinball Map (CORE-PBM-001, PP-o355.21).
+  const listingState = derivePbmListingState({
+    pinballmapMachineId: machine.pinballmapMachineId,
+    pinballmapExcluded: machine.pinballmapExcluded,
+    pinballmapListed: machine.pinballmapListed,
+    pinballmapLmxId: machine.pinballmapLmxId,
+    snapshot: pbmState?.snapshotJson ?? null,
+  });
+
+  // Whether an operator credential exists at all — read off the two columns the
+  // state row already carries, never by decrypting the token. Without one the
+  // outbound writes cannot run, so Add / Remove are absent rather than present
+  // and failing (CORE-ARCH-012).
+  const writeEnabled =
+    pbmState?.outboundEmail != null && pbmState.outboundTokenVaultId != null;
+
+  // Entries left live on the public map by an earlier retitle (PP-l81u). The
+  // catalog row can disappear while the entry on Pinball Map outlives it, so a
+  // null title falls back to naming the entry by id rather than inventing one.
+  const abandoned = await Promise.all(
+    (canLink ? await listAbandonedForMachine(machine.id) : []).map(
+      async (row) => ({
+        lmxId: row.lmxId,
+        title: (await getCatalogEntry(row.pinballmapMachineId))?.name ?? null,
+      })
+    )
+  );
 
   const canEditAnyMachine =
     accessLevel === "admin" || accessLevel === "technician";
@@ -190,31 +232,61 @@ export default async function MachineEditPage({
           )}
         </div>
 
-        {/* Placeholder, not the real control. PP-o355.21 replaces the #1683
-            listing control wholesale — its states are DERIVED from the last
-            sync snapshot rather than discovered by pressing "Connect", and
-            "Connect"/"Verify" are retired outright. Shipping the old control on
-            this new tab would teach an idiom we're about to take away, and its
-            "Not listed" badge is wrong for machines that are in fact on the
-            map. So the box holds its place and says nothing it would have to
-            walk back. "Sync now" above is real and still works. */}
-        <section
-          aria-label="Pinball Map listing"
-          className="space-y-2 rounded-md border border-outline bg-surface p-3"
-        >
-          <div className="flex items-center gap-2">
-            <MapPin
-              aria-hidden="true"
-              className="size-4 text-muted-foreground"
+        {canLink ? (
+          <>
+            <PinballmapListingControl
+              machineId={machine.id}
+              state={listingState}
+              listed={machine.pinballmapListed}
+              canLink={canLink}
+              canPush={canPush}
+              writeEnabled={writeEnabled}
+              modelName={pinballmapTitleName}
             />
-            <h3 className="text-sm font-medium text-foreground">
-              Pinball Map listing
-            </h3>
-          </div>
-          <p className="text-sm text-muted-foreground">
-            Listing controls are coming soon.
-          </p>
-        </section>
+
+            {/* Entries this machine walked away from that are still live on the
+                public map (PP-l81u). The Info tab's "Config issue" warning
+                links here, so this is where that trail has to end — a warning
+                that sends you to a page saying nothing about it is worse than
+                no warning. Cleanup from inside PinPoint is PP-o355.32; until
+                then the only person who can take the old entry down is someone
+                with a pinballmap.com account, and saying so is the honest
+                version (CORE-ARCH-012). */}
+            {abandoned.length > 0 ? (
+              <Alert
+                variant="warning"
+                data-testid="machine-pinballmap-abandoned"
+              >
+                <AlertTriangle className="size-4" aria-hidden="true" />
+                <AlertDescription>
+                  {abandoned.map((entry) => (
+                    <span key={entry.lmxId} className="block">
+                      Previous listing still live:{" "}
+                      {entry.title === null
+                        ? `Pinball Map entry #${String(entry.lmxId)}`
+                        : `“${entry.title}”`}
+                    </span>
+                  ))}
+                  {/* GOV.UK Details pattern: expands in place, no navigation,
+                      and it works on touch where a tooltip does not. Named for
+                      its topic rather than "Learn more", which NN/G flags as
+                      poor information scent. Native `<details>`, so this stays
+                      a server component. */}
+                  <details className="mt-2">
+                    <summary className="cursor-pointer text-xs font-medium text-primary hover:underline">
+                      Why is this here?
+                    </summary>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      This machine was listed on Pinball Map under that title,
+                      and changing its model left the old entry behind. Only
+                      someone with a pinballmap.com account can take it down.
+                    </p>
+                  </details>
+                </AlertDescription>
+              </Alert>
+            ) : null}
+          </>
+        ) : null}
       </section>
 
       {/* Danger zone — applies immediately. Machine deletion joins this

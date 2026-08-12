@@ -1,249 +1,363 @@
 "use client";
 
 import type React from "react";
-import { useActionState } from "react";
+import { useState, useTransition } from "react";
+import { CheckCircle2, MapPin, TriangleAlert } from "lucide-react";
+
 import {
-  AlertTriangle,
-  CheckCircle2,
-  ExternalLink,
-  MapPin,
-} from "lucide-react";
-import {
+  acceptMissingPinballmapListingAction,
   linkPinballmapEntryAction,
-  verifyPinballmapLinkAction,
+  listMachineOnPinballMapAction,
+  unlistMachineFromPinballMapAction,
 } from "~/app/(app)/m/pinballmap-actions";
-import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "~/components/ui/alert-dialog";
+import type { PbmListingState } from "~/lib/pinballmap/status";
+import type { Result } from "~/lib/result";
 
 /**
- * "Connect to PinballMap" — the state-aware control that replaces the old
- * disabled "List on PinballMap" checkbox (PP-o355.12, read side).
- *
- * A machine linked to a PBM catalog title is in one of four listing states; a
- * plain checkbox can't express them, and checking it for an already-on-PBM
- * machine would fire a duplicate WRITE when the right move is a read-only LINK.
- * This control resolves the machine's title against our stored location lineup
- * and branches:
- *
- *  1. **not listed / on-PBM-but-unlinked** (`!listed`, no lmx) → "Connect to
- *     PinballMap": one read-only lineup lookup that either captures the existing
- *     entry (→ listed) or reports the title isn't on the lineup yet.
- *  2. **listed + linked** (lmx set) → "Listed" + "Verify" (re-check the link).
- *  3. **link broken** (a Verify came back stale) → "⚠ Reconnect".
- *
- * Read-only: link/verify only READ PBM's public lineup (anonymous, no token) and
- * are gated by `machines.pinballmap.link`. The WRITE verbs (List a brand-new
- * machine, Unlist) need the operator token and land in the follow-up PR; until
- * then the deep link to pinballmap.com is the fallback (CORE-PBM-001 link-back).
- *
- * Designed as its own `<form>` region — NOT nested in the Details form (nested
- * forms are invalid HTML) — so it can sit in the Pinball Map section of the
- * machine edit page beside that form rather than inside it.
- *
- * NOT CURRENTLY RENDERED. PP-o355.19 replaced the machine edit modal (its only
- * former call site) with the Manage tab, which shows a "Listing controls are
- * coming soon" placeholder in that section instead. This component and its test
- * are kept as the intended implementation for PP-o355.21, which wires the
- * listing controls up for real.
- *
- * What still holds until then: no request body can SET `pinballmapListed` — the
- * create/update schemas reject the field outright (PP-o355.29), so listing is
- * never something a form submits. What changed: it is no longer true that
- * `linkPinballmapEntryAction` and `verifyPinballmapLinkAction` are its only
- * writers. Auto-link (PP-o355.20) added two more — `captureAutoLink`, called by
- * the hourly reconcile pass and by `updateMachineAction` after a save — but both
- * DERIVE the value from PinballMap's own lineup rather than accepting it from
- * the client, which is what the schema rule was actually protecting.
+ * The four listing actions share this shape. Widened to `Result<unknown,
+ * string>` deliberately: this component reads only `ok` and `message`, and
+ * naming the four concrete result types here would couple it to four error-code
+ * unions it never branches on.
  */
+type ListingAction = (
+  prev: undefined,
+  formData: FormData
+) => Promise<Result<unknown, string>>;
+
+/**
+ * The Manage tab's Pinball Map listing control (PP-o355.21) — a full rewrite of
+ * the #1683 control it replaces.
+ *
+ * **Derive, don't discover.** The state arrives already computed from stored
+ * columns and the stored snapshot (`derivePbmListingState`), so the control is
+ * painted before anyone clicks anything and no render reaches pinballmap.com
+ * (CORE-PBM-001). The old control made you press "Connect" to find out where
+ * you stood, and told APC's entire listed fleet "Not listed" while it waited.
+ * "Connect", "Verify" and "Reconnect" are retired outright — the Verify server
+ * action is deleted, and the drift it used to heal by hand is healed by the
+ * hourly reconcile pass instead.
+ *
+ * **Buttons, not a toggle.** Three of the four transitions change what the
+ * public map shows and need a confirm; a switch would promise instant and cheap
+ * and then argue with a modal. The status line carries the state, the button
+ * carries the weight. No trailing ellipsis on the labels — a confirm dialog is
+ * not the kind of "more input required" that an ellipsis promises (Tim,
+ * 2026-08-12).
+ *
+ * **No Pinball Map title row.** The Model / Edition control in Details owns that
+ * job; repeating it here would put two editors on one fact.
+ *
+ * Everything here applies immediately — nothing in this section rides the
+ * Details save.
+ */
+
 export interface PinballmapListingControlProps {
   machineId: string;
-  /** Machine is linked to a PBM catalog title (a listing presupposes a title). */
-  hasCatalogLink: boolean;
-  /** Persisted "listed on PinballMap" flag. */
+  /** Derived on the server; never discovered by pressing a button. */
+  state: PbmListingState;
+  /** Our local listing flag — the only thing `unsynced` can honestly report. */
   listed: boolean;
-  /** Persisted captured location_machine_xref id (null until captured). */
-  lmxId: number | null;
-  /** Viewer may link/verify (`machines.pinballmap.link` — owner/tech/admin). */
+  /**
+   * Viewer holds `machines.pinballmap.link`: the local-bookkeeping capability
+   * (owner of this machine / technician / admin). Claim and Accept write only
+   * to PinPoint, so they sit behind this rather than `push`.
+   */
   canLink: boolean;
-  /** Public pinballmap.com deep link for attribution + the write fallback. */
-  pinballmapUrl: string;
+  /** Viewer holds `machines.pinballmap.push` — writes to the public map (admin). */
+  canPush: boolean;
+  /**
+   * An operator credential is provisioned in Vault. Without one the outbound
+   * writes cannot run at all, so Add / Remove are absent rather than present
+   * and failing (CORE-ARCH-012). Read from `pinballmap_state` columns — the
+   * token itself is never decrypted to answer this.
+   */
+  writeEnabled: boolean;
+  /** Catalog title, so a confirm names the game rather than "this machine". */
+  modelName: string | null;
 }
 
-function PbmDeepLink({
-  href,
-  children,
+/** What the confirm dialog for each outbound action says. */
+interface ConfirmCopy {
+  title: string;
+  body: string;
+  action: string;
+  destructive?: boolean;
+}
+
+function ConfirmButton({
+  trigger,
+  copy,
+  onConfirm,
+  pending,
+  testId,
 }: {
-  href: string;
-  children: React.ReactNode;
+  trigger: React.ReactNode;
+  copy: ConfirmCopy;
+  onConfirm: () => void;
+  pending: boolean;
+  testId: string;
 }): React.JSX.Element {
   return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noreferrer"
-      className="inline-flex items-center gap-1 text-sm text-secondary underline-offset-2 hover:underline"
-    >
-      {children}
-      <ExternalLink aria-hidden="true" className="size-3.5" />
-    </a>
+    <AlertDialog>
+      <AlertDialogTrigger asChild>{trigger}</AlertDialogTrigger>
+      <AlertDialogContent data-testid={`${testId}-confirm`}>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{copy.title}</AlertDialogTitle>
+          <AlertDialogDescription>{copy.body}</AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={pending}>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            type="button"
+            variant={copy.destructive === true ? "destructive" : "default"}
+            disabled={pending}
+            onClick={onConfirm}
+          >
+            {copy.action}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }
 
 export function PinballmapListingControl({
   machineId,
-  hasCatalogLink,
+  state,
   listed,
-  lmxId,
   canLink,
-  pinballmapUrl,
-}: PinballmapListingControlProps): React.JSX.Element | null {
-  const [linkState, linkAction, linkPending] = useActionState(
-    linkPinballmapEntryAction,
-    undefined
+  canPush,
+  writeEnabled,
+  modelName,
+}: PinballmapListingControlProps): React.JSX.Element {
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  /**
+   * Every action here is `(prev, formData)`-shaped, but none of them is
+   * dispatched by a `<form>`: the trigger lives inside an AlertDialog that
+   * unmounts the moment it is confirmed, and a form that unmounts mid-submit is
+   * a race nobody needs. Calling the action inside a transition keeps the
+   * pending state and the failure message on THIS component, which outlives the
+   * dialog.
+   */
+  function run(action: ListingAction): void {
+    setError(null);
+    startTransition(async () => {
+      const formData = new FormData();
+      formData.set("machineId", machineId);
+      const result = await action(undefined, formData);
+      // A failure has to be visible: on success the page revalidates and the
+      // status line changes underneath, so a silent no-op would leave both
+      // outcomes looking identical (CORE-ARCH-012).
+      if (!result.ok) setError(result.message);
+    });
+  }
+
+  const game = modelName ?? "this machine";
+  const canWriteOut = canPush && writeEnabled;
+
+  const addButton = (
+    <ConfirmButton
+      testId="pbm-listing-add"
+      pending={pending}
+      onConfirm={() => {
+        run(listMachineOnPinballMapAction);
+      }}
+      copy={{
+        title: "Add to Pinball Map?",
+        body: `This adds ${game} to our location's lineup on pinballmap.com, where anyone can see it.`,
+        action: "Add to Pinball Map",
+      }}
+      trigger={
+        <Button
+          variant="outline"
+          size="sm"
+          loading={pending}
+          data-testid="pbm-listing-add"
+        >
+          <MapPin aria-hidden="true" className="size-4" />
+          Add to Pinball Map
+        </Button>
+      }
+    />
   );
-  const [verifyState, verifyAction, verifyPending] = useActionState(
-    verifyPinballmapLinkAction,
-    undefined
-  );
-
-  // A listing presupposes a catalog title; nothing to show until one is linked
-  // (the PinballMapLinkField above handles picking the title).
-  if (!hasCatalogLink) return null;
-
-  const linkAbsent = linkState && !linkState.ok && linkState.code === "ABSENT";
-  const verifiedStale =
-    verifyState?.ok === true && verifyState.value.state === "stale";
-  const verifiedHealed =
-    verifyState?.ok === true && verifyState.value.state === "healed";
-  const verifiedOk =
-    verifyState?.ok === true && verifyState.value.state === "ok";
-
-  const isListed = listed && lmxId !== null;
 
   return (
     <section
-      aria-label="PinballMap listing"
-      className="space-y-2 rounded-md border border-outline bg-surface p-3"
+      aria-label="Pinball Map listing"
+      className="space-y-3 rounded-md border border-outline bg-surface p-3"
+      data-testid="pbm-listing-control"
     >
-      <div className="flex items-center gap-2">
-        <MapPin aria-hidden="true" className="size-4 text-muted-foreground" />
-        <h3 className="text-sm font-medium text-foreground">
-          PinballMap listing
-        </h3>
+      <div className="flex items-start gap-2">
+        <StateIcon state={state} />
+        <p className="text-sm text-foreground" data-testid="pbm-listing-status">
+          {statusCopy(state, listed)}
+        </p>
       </div>
 
-      {isListed && !verifiedStale ? (
-        // State 3 — listed + linked (steady state).
-        <div className="space-y-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="default">
-              <CheckCircle2 aria-hidden="true" />
-              Listed
-            </Badge>
-            <PbmDeepLink href={pinballmapUrl}>Open on PinballMap</PbmDeepLink>
-          </div>
-          {canLink ? (
-            <form action={verifyAction}>
-              <input type="hidden" name="machineId" value={machineId} />
-              <Button
-                type="submit"
-                variant="outline"
-                size="sm"
-                loading={verifyPending}
-              >
-                Verify link
-              </Button>
-            </form>
-          ) : null}
-          {verifiedOk ? (
-            <p className="text-xs text-muted-foreground">
-              Link confirmed against PinballMap&apos;s current lineup.
-            </p>
-          ) : null}
-          {verifiedHealed ? (
-            <p className="text-xs text-success">
-              Link reconnected — PinballMap had re-issued this entry.
-            </p>
-          ) : null}
-        </div>
-      ) : verifiedStale ? (
-        // State 4 — link broken (a Verify came back stale).
-        <div className="space-y-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="destructive">
-              <AlertTriangle aria-hidden="true" />
-              Link may be broken
-            </Badge>
-            <PbmDeepLink href={pinballmapUrl}>Open on PinballMap</PbmDeepLink>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            This machine is no longer on PinballMap&apos;s lineup for our
-            location. If it was re-added, reconnect to restore the link.
-          </p>
-          {canLink ? (
-            <form action={verifyAction}>
-              <input type="hidden" name="machineId" value={machineId} />
-              <Button
-                type="submit"
-                variant="outline"
-                size="sm"
-                loading={verifyPending}
-              >
-                Reconnect
-              </Button>
-            </form>
-          ) : null}
-        </div>
-      ) : (
-        // States 1 & 2 — not listed / on-PBM-but-unlinked. One lookup branches.
-        <div className="space-y-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="outline">Not listed</Badge>
-            <PbmDeepLink href={pinballmapUrl}>Open on PinballMap</PbmDeepLink>
-          </div>
-          {canLink ? (
-            <form action={linkAction}>
-              <input type="hidden" name="machineId" value={machineId} />
-              <Button
-                type="submit"
-                variant="outline"
-                size="sm"
-                loading={linkPending}
-              >
-                <MapPin aria-hidden="true" className="size-4" />
-                Connect to PinballMap
-              </Button>
-            </form>
-          ) : (
-            <p className="text-xs text-muted-foreground">
-              Not listed on PinballMap.
-            </p>
-          )}
-          {linkAbsent ? (
-            <p className="text-xs text-muted-foreground" role="status">
-              This machine isn&apos;t on PinballMap&apos;s lineup for our
-              location yet. Listing it from PinPoint is coming soon — for now,
-              add it on PinballMap.
-            </p>
-          ) : null}
-        </div>
-      )}
+      {/* One row of actions, or none. Which ones appear is a permission
+          question first and a state question second — a member looking at a
+          machine they don't own sees the status and nothing else. */}
+      <div className="flex flex-wrap gap-2">
+        {state === "not_listed" && canWriteOut ? addButton : null}
 
-      {/* Failure feedback for every non-ABSENT link outcome and every failed
-          verify — a server error (incl. the duplicate-lister 23505 message),
-          an unauthorized/validation reject, or the manual-refresh throttle.
-          ABSENT is handled inline above with its own actionable copy. Without
-          this the actions could fail silently and leave the operator guessing. */}
-      {linkState && !linkState.ok && linkState.code !== "ABSENT" ? (
-        <p className="text-xs text-destructive" role="alert">
-          {linkState.message}
-        </p>
-      ) : null}
-      {verifyState && !verifyState.ok ? (
-        <p className="text-xs text-destructive" role="alert">
-          {verifyState.message}
+        {state === "unclaimed_on_pbm" && canLink ? (
+          // No confirm: this writes nothing to Pinball Map. It records the
+          // listing they already show, which is what auto-link would have done
+          // on its own if two same-title cabinets hadn't tied.
+          <Button
+            variant="outline"
+            size="sm"
+            loading={pending}
+            data-testid="pbm-listing-claim"
+            onClick={() => {
+              run(linkPinballmapEntryAction);
+            }}
+          >
+            Claim this listing
+          </Button>
+        ) : null}
+
+        {state === "listed" && canWriteOut ? (
+          <ConfirmButton
+            testId="pbm-listing-remove"
+            pending={pending}
+            onConfirm={() => {
+              run(unlistMachineFromPinballMapAction);
+            }}
+            copy={{
+              title: "Remove from Pinball Map?",
+              body: `This takes ${game} off our location's lineup on pinballmap.com. Anyone looking us up will stop seeing it.`,
+              action: "Remove from Pinball Map",
+              destructive: true,
+            }}
+            trigger={
+              <Button
+                variant="outline"
+                size="sm"
+                loading={pending}
+                data-testid="pbm-listing-remove"
+              >
+                Remove from Pinball Map
+              </Button>
+            }
+          />
+        ) : null}
+
+        {state === "missing_on_pbm" ? (
+          <>
+            {canLink ? (
+              <ConfirmButton
+                testId="pbm-listing-accept"
+                pending={pending}
+                onConfirm={() => {
+                  run(acceptMissingPinballmapListingAction);
+                }}
+                copy={{
+                  title: "Accept the removal?",
+                  body: "This only updates PinPoint to agree with Pinball Map. Nothing is sent to them — the entry is already gone from their lineup.",
+                  action: "Accept",
+                }}
+                trigger={
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    loading={pending}
+                    data-testid="pbm-listing-accept"
+                  >
+                    Accept
+                  </Button>
+                }
+              />
+            ) : null}
+            {/* Same action as `not_listed`, offered as the other resolution:
+                put it back rather than agree it is gone. */}
+            {canWriteOut ? addButton : null}
+          </>
+        ) : null}
+      </div>
+
+      {error !== null ? (
+        <p
+          className="text-xs text-destructive-text"
+          role="alert"
+          data-testid="pbm-listing-error"
+        >
+          {error}
         </p>
       ) : null}
     </section>
   );
+}
+
+/**
+ * Amber for the two states somebody has to resolve, a check for the settled
+ * listed state, and a neutral pin for everything else. The icon is decorative —
+ * the sentence beside it carries the meaning, so nothing here is colour-only.
+ */
+function StateIcon({ state }: { state: PbmListingState }): React.JSX.Element {
+  if (state === "missing_on_pbm" || state === "unclaimed_on_pbm") {
+    return (
+      <TriangleAlert
+        aria-hidden="true"
+        className="mt-0.5 size-4 shrink-0 text-warning"
+      />
+    );
+  }
+  if (state === "listed") {
+    return (
+      <CheckCircle2
+        aria-hidden="true"
+        className="mt-0.5 size-4 shrink-0 text-success"
+      />
+    );
+  }
+  return (
+    <MapPin
+      aria-hidden="true"
+      className="mt-0.5 size-4 shrink-0 text-muted-foreground"
+    />
+  );
+}
+
+/**
+ * One sentence per state, saying what is true rather than what to press.
+ *
+ * "Our location's lineup" instead of "APC's lineup" or a bare "listed": the
+ * thing being described is a row on someone else's public map, and every one of
+ * these sentences has to survive being read by someone who has never heard of
+ * an lmx. The word never appears (settled vocabulary, §4 of the refresher).
+ */
+function statusCopy(state: PbmListingState, listed: boolean): string {
+  switch (state) {
+    case "unmatched":
+      return "No model set yet, so there's nothing to list on Pinball Map.";
+    case "not_on_pbm":
+      return "Marked as not on Pinball Map, so it can't be listed there.";
+    case "unsynced":
+      return listed
+        ? "Listed on Pinball Map — PinPoint hasn't read their lineup yet, so this hasn't been checked against it."
+        : "PinPoint hasn't read Pinball Map's lineup yet, so this machine's listing there is unknown.";
+    case "not_listed":
+      return "Not on our location's lineup on Pinball Map.";
+    case "unclaimed_on_pbm":
+      return "Pinball Map shows this game on our location's lineup, but PinPoint isn't holding that listing.";
+    case "listed":
+      return "Listed on our location's lineup on Pinball Map.";
+    case "missing_on_pbm":
+      return "PinPoint has this listed, but it isn't on Pinball Map's lineup — someone removed it there.";
+  }
 }

@@ -5,12 +5,18 @@
  *  - linkPinballmapEntryAction: capture an existing lmx from the stored lineup
  *    (state 2 → 3), permission split (owner/tech/admin via .link), ABSENT when
  *    the title isn't on the lineup, timeline mirror.
- *  - verifyPinballmapLinkAction: confirm (ok) / heal (healed) / flag (stale) a
- *    stored lmx against a freshly-synced lineup.
+ *  - acceptMissingPinballmapListingAction: agree with PinballMap that an entry
+ *    is gone and clear our columns — and refuse to, while it is still there.
+ *
+ * `verifyPinballmapLinkAction` used to live here too. PP-o355.21 deleted it
+ * along with the Connect / Verify / Reconnect idiom: the drift it healed by
+ * hand is healed by the hourly reconcile pass, and the stale verdict it
+ * reported is now a state the Manage tab derives without asking anyone to
+ * press anything.
  *
  * The PinballMap client is pinned to an in-test controllable lineup at the seam
- * (CORE-TEST-006) — never reaches pinballmap.com. The lineup drives both the
- * "sync if absent" (link) and "force sync" (verify) snapshot reads.
+ * (CORE-TEST-006) — never reaches pinballmap.com. The lineup drives link's
+ * "sync if absent" snapshot read.
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -40,13 +46,10 @@ vi.mock("next/cache", () => ({
 }));
 
 // Controllable in-memory lineup pinned at the client seam. Tests mutate
-// `pbm.lineup`; both syncLocationSnapshot (link's sync-if-absent) and the
-// force-sync in verify read it. Never touches pinballmap.com.
+// `pbm.lineup`; syncLocationSnapshot (link's sync-if-absent) reads it. Never
+// touches pinballmap.com.
 const pbm = vi.hoisted(() => ({
   lineup: [] as { id: number; machineId: number }[],
-  // When set, the next fetch rejects — models a PBM/network failure so we can
-  // assert verify never resolves against a stale stored snapshot on a bad sync.
-  fail: false,
 }));
 
 function snapshotFor(
@@ -74,9 +77,7 @@ function snapshotFor(
 vi.mock("~/lib/pinballmap/client", () => ({
   getPinballMapClient: () => ({
     fetchLocation: (locationId: number) =>
-      pbm.fail
-        ? Promise.reject(new Error("PinballMap unreachable"))
-        : Promise.resolve(snapshotFor(locationId, pbm.lineup)),
+      Promise.resolve(snapshotFor(locationId, pbm.lineup)),
   }),
 }));
 
@@ -139,9 +140,10 @@ function fdFor(machineId: string): FormData {
 
 /**
  * Seed the singleton snapshot directly (not via syncLocationSnapshot), so a
- * stored lineup exists WITHOUT stamping `lastSyncAttemptAt`. That lets a
- * follow-up manual sync actually attempt (and, with `pbm.fail`, fail) instead of
- * tripping the manual-refresh throttle — the setup the stale-verify guard needs.
+ * stored lineup exists WITHOUT stamping `lastSyncAttemptAt` — a later manual
+ * sync then actually attempts instead of tripping the refresh throttle. The
+ * accept tests need it for a different reason: they assert against a STORED
+ * lineup and must never trigger a fetch at all.
  */
 async function seedState(
   lineup: { id: number; machineId: number }[]
@@ -160,7 +162,6 @@ async function seedState(
 
 beforeEach(() => {
   pbm.lineup = [];
-  pbm.fail = false;
 });
 
 describe("linkPinballmapEntryAction (PGlite)", () => {
@@ -287,16 +288,17 @@ describe("linkPinballmapEntryAction (PGlite)", () => {
   });
 });
 
-describe("verifyPinballmapLinkAction (PGlite)", () => {
+describe("acceptMissingPinballmapListingAction (PGlite)", () => {
   setupTestDb();
 
-  it("returns ok when the stored lmx is still present", async () => {
+  it("clears the listing locally and sends nothing to Pinball Map", async () => {
     const db = await getTestDb();
-    const { verifyPinballmapLinkAction } =
+    const { acceptMissingPinballmapListingAction } =
       await import("~/app/(app)/m/pinballmap-actions");
     const admin = await createUser("admin");
     await mockAuthAs(admin.id);
-    pbm.lineup = [{ id: 900, machineId: 42 }];
+    // Stored lineup no longer carries title 42 — somebody removed it there.
+    await seedState([{ id: 901, machineId: 77 }]);
     const machine = await seedMachine({
       initials: "GZ",
       pinballmapMachineId: 42,
@@ -304,99 +306,43 @@ describe("verifyPinballmapLinkAction (PGlite)", () => {
       pinballmapLmxId: 900,
     });
 
-    const res = await verifyPinballmapLinkAction(undefined, fdFor(machine.id));
+    const res = await acceptMissingPinballmapListingAction(
+      undefined,
+      fdFor(machine.id)
+    );
     expect(res.ok).toBe(true);
-    if (res.ok) expect(res.value.state).toBe("ok");
-
-    const row = await db.query.machines.findFirst({
-      where: eq(machines.id, machine.id),
-    });
-    expect(row?.pinballmapLmxId).toBe(900);
-    // No timeline event on a no-op verify.
-    const events = await db
-      .select()
-      .from(timelineEvents)
-      .where(eq(timelineEvents.machineId, machine.id));
-    expect(events).toHaveLength(0);
-  });
-
-  it("refuses (and does not list) a linked-but-unlisted machine", async () => {
-    // An unlisted row's lmx is null by schema CHECK, so it can never match the
-    // live lmx — without an explicit guard every verify here would fall into
-    // the heal branch and set `pinballmapListed`, putting the machine on
-    // Pinball Map as a side effect of a spot-check.
-    const db = await getTestDb();
-    const { verifyPinballmapLinkAction } =
-      await import("~/app/(app)/m/pinballmap-actions");
-    const admin = await createUser("admin");
-    await mockAuthAs(admin.id);
-    pbm.lineup = [{ id: 900, machineId: 42 }];
-    const machine = await seedMachine({
-      initials: "GZ",
-      pinballmapMachineId: 42,
-      pinballmapListed: false,
-    });
-
-    const res = await verifyPinballmapLinkAction(undefined, fdFor(machine.id));
-    expect(res.ok).toBe(false);
-    if (!res.ok) expect(res.code).toBe("VALIDATION");
 
     const row = await db.query.machines.findFirst({
       where: eq(machines.id, machine.id),
     });
     expect(row?.pinballmapListed).toBe(false);
     expect(row?.pinballmapLmxId).toBeNull();
+
+    // `accepted_removal`, not `unlisted`: no write left PinPoint, and crediting
+    // us with an edit to their map would make the timeline lie.
     const events = await db
       .select()
       .from(timelineEvents)
       .where(eq(timelineEvents.machineId, machine.id));
-    expect(events).toHaveLength(0);
-  });
-
-  it("heals the stored lmx when the title now maps to a new id", async () => {
-    const db = await getTestDb();
-    const { verifyPinballmapLinkAction } =
-      await import("~/app/(app)/m/pinballmap-actions");
-    const admin = await createUser("admin");
-    await mockAuthAs(admin.id);
-    pbm.lineup = [{ id: 950, machineId: 42 }]; // PBM re-minted the lmx
-    const machine = await seedMachine({
-      initials: "GZ",
-      pinballmapMachineId: 42,
-      pinballmapListed: true,
-      pinballmapLmxId: 900,
-    });
-
-    const res = await verifyPinballmapLinkAction(undefined, fdFor(machine.id));
-    expect(res.ok).toBe(true);
-    if (res.ok) expect(res.value.state).toBe("healed");
-
-    const row = await db.query.machines.findFirst({
-      where: eq(machines.id, machine.id),
-    });
-    expect(row?.pinballmapLmxId).toBe(950);
-    const events = await db
-      .select()
-      .from(timelineEvents)
-      .where(eq(timelineEvents.machineId, machine.id));
+    expect(events).toHaveLength(1);
     expect(events[0]?.eventData).toMatchObject({
       kind: "pinballmap_listing",
-      action: "reconnected",
-      lmxId: 950,
+      action: "accepted_removal",
+      lmxId: 900,
     });
   });
 
-  it("returns SERVER (not a stale ok) when the forced sync fails over a prior snapshot", async () => {
+  it("refuses while the title is still on the lineup", async () => {
+    // The safety of the whole action. Accepting here would clear our columns
+    // while the entry stayed live and unclaimed, and the next auto-link pass
+    // would re-list the machine — the click would appear to work and then undo
+    // itself (CORE-ARCH-012).
     const db = await getTestDb();
-    const { verifyPinballmapLinkAction } =
+    const { acceptMissingPinballmapListingAction } =
       await import("~/app/(app)/m/pinballmap-actions");
     const admin = await createUser("admin");
     await mockAuthAs(admin.id);
-    // A stored snapshot still lists the machine (lmx 900 present)...
     await seedState([{ id: 900, machineId: 42 }]);
-    // ...but the FRESH fetch fails. The naive path would resolve against the
-    // stale snapshot and claim "ok"; the guard must surface the sync failure.
-    pbm.fail = true;
     const machine = await seedMachine({
       initials: "GZ",
       pinballmapMachineId: 42,
@@ -404,75 +350,64 @@ describe("verifyPinballmapLinkAction (PGlite)", () => {
       pinballmapLmxId: 900,
     });
 
-    const res = await verifyPinballmapLinkAction(undefined, fdFor(machine.id));
+    const res = await acceptMissingPinballmapListingAction(
+      undefined,
+      fdFor(machine.id)
+    );
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.code).toBe("VALIDATION");
+
+    const row = await db.query.machines.findFirst({
+      where: eq(machines.id, machine.id),
+    });
+    expect(row?.pinballmapListed).toBe(true);
+  });
+
+  it("refuses with no stored lineup at all", async () => {
+    // Never synced means no evidence either way; clearing on that basis would
+    // be discovering the state by guessing.
+    const { acceptMissingPinballmapListingAction } =
+      await import("~/app/(app)/m/pinballmap-actions");
+    const admin = await createUser("admin");
+    await mockAuthAs(admin.id);
+    const machine = await seedMachine({
+      initials: "GZ",
+      pinballmapMachineId: 42,
+      pinballmapListed: true,
+      pinballmapLmxId: 900,
+    });
+
+    const res = await acceptMissingPinballmapListingAction(
+      undefined,
+      fdFor(machine.id)
+    );
     expect(res.ok).toBe(false);
     if (!res.ok) expect(res.code).toBe("SERVER");
-
-    // Stored link untouched; no verify verdict claimed.
-    const row = await db.query.machines.findFirst({
-      where: eq(machines.id, machine.id),
-    });
-    expect(row?.pinballmapLmxId).toBe(900);
-    const events = await db
-      .select()
-      .from(timelineEvents)
-      .where(eq(timelineEvents.machineId, machine.id));
-    expect(events).toHaveLength(0);
   });
 
-  it("returns THROTTLED when a second verify races inside the refresh window", async () => {
-    const { verifyPinballmapLinkAction } =
+  it("is refused for a member who doesn't own the machine", async () => {
+    // Gated on `machines.pinballmap.link`, which a member holds only for their
+    // own machines — the same split the capture action uses.
+    const { acceptMissingPinballmapListingAction } =
       await import("~/app/(app)/m/pinballmap-actions");
-    const admin = await createUser("admin");
-    await mockAuthAs(admin.id);
-    pbm.lineup = [{ id: 900, machineId: 42 }];
+    const member = await createUser("member");
+    const other = await createUser("member");
+    await mockAuthAs(member.id);
+    await seedState([]);
     const machine = await seedMachine({
       initials: "GZ",
       pinballmapMachineId: 42,
+      ownerId: other.id,
       pinballmapListed: true,
       pinballmapLmxId: 900,
     });
 
-    // First verify forces a fresh sync (stamps the attempt) and confirms.
-    const first = await verifyPinballmapLinkAction(
+    const res = await acceptMissingPinballmapListingAction(
       undefined,
       fdFor(machine.id)
     );
-    expect(first.ok).toBe(true);
-    // Second verify moments later is refused by the manual-refresh throttle —
-    // it must NOT silently re-confirm against the just-synced snapshot.
-    const second = await verifyPinballmapLinkAction(
-      undefined,
-      fdFor(machine.id)
-    );
-    expect(second.ok).toBe(false);
-    if (!second.ok) expect(second.code).toBe("THROTTLED");
-  });
-
-  it("flags the link stale (unchanged) when the title is absent", async () => {
-    const db = await getTestDb();
-    const { verifyPinballmapLinkAction } =
-      await import("~/app/(app)/m/pinballmap-actions");
-    const admin = await createUser("admin");
-    await mockAuthAs(admin.id);
-    pbm.lineup = []; // title 42 no longer on the lineup — link broke on PBM's side
-    const machine = await seedMachine({
-      initials: "GZ",
-      pinballmapMachineId: 42,
-      pinballmapListed: true,
-      pinballmapLmxId: 900,
-    });
-
-    const res = await verifyPinballmapLinkAction(undefined, fdFor(machine.id));
-    expect(res.ok).toBe(true);
-    if (res.ok) expect(res.value.state).toBe("stale");
-
-    // Stored id is LEFT so the UI can offer Reconnect — not cleared.
-    const row = await db.query.machines.findFirst({
-      where: eq(machines.id, machine.id),
-    });
-    expect(row?.pinballmapLmxId).toBe(900);
-    expect(row?.pinballmapListed).toBe(true);
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.code).toBe("UNAUTHORIZED");
   });
 });
 

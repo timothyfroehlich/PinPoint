@@ -120,6 +120,83 @@ export function isActionableDesync(status: PbmMachineStatus): boolean {
 }
 
 /**
+ * The state the Manage tab's listing control renders (PP-o355.21).
+ *
+ * "Derive, don't discover": every one of these comes from stored columns plus
+ * the stored snapshot, so the control paints itself at page load with no call
+ * to pinballmap.com. The control it replaces made you press "Connect" to find
+ * out which state you were in, and answered "Not listed" for a fleet that was
+ * in fact listed — the vocabulary of Connect / Verify / Reconnect went with it.
+ *
+ *  - `unmatched` — no model chosen yet, so there is nothing to list.
+ *  - `not_on_pbm` — deliberately marked as absent from their catalog (a
+ *    homebrew, a flipperless game). Same "nothing to list", different reason,
+ *    and the reason is what the reader needs.
+ *  - `unsynced` — we have never held a lineup, so we cannot claim either way.
+ *  - `not_listed` — matched, and the lineup does not carry the title.
+ *  - `unclaimed_on_pbm` — the lineup DOES carry the title but no PinPoint
+ *    machine holds the listing. Auto-link normally captures this within the
+ *    hour; it survives only where auto-link deliberately stands down (two
+ *    same-title cabinets tied at the top presence rank), which is exactly the
+ *    tie a person has to break. Claiming it writes nothing to Pinball Map.
+ *  - `listed` — matched, listed, and the lineup agrees.
+ *  - `missing_on_pbm` — we hold a listing the lineup no longer shows. Nothing
+ *    ever auto-unlists, so this persists until someone acts.
+ *
+ * `lmx_drifted` deliberately lands in `listed`: the machine IS listed, and the
+ * next hourly reconcile repairs the handle (see `isActionableDesync`).
+ */
+export type PbmListingState =
+  | "unmatched"
+  | "not_on_pbm"
+  | "unsynced"
+  | "not_listed"
+  | "unclaimed_on_pbm"
+  | "listed"
+  | "missing_on_pbm";
+
+/** Pure, same as `derivePbmMachineStatus` — the Manage tab page calls it directly. */
+export function derivePbmListingState(args: {
+  pinballmapMachineId: number | null;
+  pinballmapExcluded: boolean;
+  pinballmapListed: boolean;
+  pinballmapLmxId: number | null;
+  snapshot: LocationSnapshot | null;
+}): PbmListingState {
+  const {
+    pinballmapMachineId,
+    pinballmapExcluded,
+    pinballmapListed,
+    snapshot,
+  } = args;
+
+  // Matched or excluded, never both (DB CHECK) — so the excluded branch is
+  // only reachable with no title, and reading it first is not an ordering bug.
+  if (pinballmapMachineId === null) {
+    return pinballmapExcluded ? "not_on_pbm" : "unmatched";
+  }
+  // No lineup means no evidence. Saying "not listed" here would be the exact
+  // lie the old control told APC's whole fleet (CORE-ARCH-012).
+  if (snapshot === null) return "unsynced";
+
+  const status = derivePbmMachineStatus({
+    pinballmapMachineId,
+    pinballmapListed,
+    pinballmapLmxId: args.pinballmapLmxId,
+    snapshot,
+  });
+
+  switch (status.reason) {
+    case "listed_locally_absent_on_pbm":
+      return "missing_on_pbm";
+    case "on_pbm_not_listed_locally":
+      return "unclaimed_on_pbm";
+    default:
+      return pinballmapListed ? "listed" : "not_listed";
+  }
+}
+
+/**
  * Whether a machine should appear on PBM's lineup — our LOCAL listing intent
  * only. Deliberately independent of `presenceStatus`: the three-concept model
  * (linking / listing / availability) keeps availability from driving map

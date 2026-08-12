@@ -46,9 +46,20 @@ export type MachineTimelineEventData =
   // entirely, all while it was listed. The entry stays on PBM and `lmxId` is
   // the handle recorded for it. Unlike `unlisted`, nothing was written to
   // PinballMap.
+  // `accepted_removal` (PP-o355.21) records agreeing with PinballMap that the
+  // entry is gone — someone removed it over there and we cleared our columns to
+  // match. Distinct from `unlisted` for the same reason `abandoned` is: no write
+  // left PinPoint, so a timeline reading "Unlisted from Pinball Map" would
+  // credit us with an edit we did not make.
   | {
       kind: "pinballmap_listing";
-      action: "listed" | "unlisted" | "linked" | "reconnected" | "abandoned";
+      action:
+        | "listed"
+        | "unlisted"
+        | "linked"
+        | "reconnected"
+        | "abandoned"
+        | "accepted_removal";
       lmxId: number | null;
     }
   // === sourceType='issue' (duplicate-written from issue actions) ===

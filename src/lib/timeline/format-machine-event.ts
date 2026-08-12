@@ -71,6 +71,8 @@ export function formatMachineEvent(
           return "Reconnected PinballMap link";
         case "abandoned":
           return "Left an entry live on PinballMap";
+        case "accepted_removal":
+          return "Accepted that PinballMap no longer lists this machine";
       }
   }
 }
