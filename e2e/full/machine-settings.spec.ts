@@ -14,7 +14,9 @@
  * read-only affordance check (a distinct rendered UI state).
  *
  * TAF (addamsFamily) has no member owner in the seed, so: admin can edit it
- * (admin edits any machine), and the member test user sees it read-only.
+ * (admin edits any machine), and the member test user sees it read-only. Only
+ * the read-only check still uses TAF — it reads and never writes. Every test
+ * that CREATES a set seeds its own machine (see the editor-journey block).
  */
 
 import { test, expect, type Page } from "@playwright/test";
@@ -60,6 +62,16 @@ async function activateSectionMenuItem(
 }
 
 test.describe("Machine Settings (PP-43q3)", () => {
+  // Seeds its OWN machine per test, for the same reason the section-ops block
+  // below does. This block CREATES a settings set and never deleted it, so on a
+  // shared machine every run left one behind. The set-name assertion below
+  // reads `.first()`, and the settings route orders sets
+  // `[desc(isPreferred), asc(createdAt)]` (src/lib/machines/settings-queries.ts)
+  // — so after the reload `.first()` is the OLDEST set, i.e. the leftover from a
+  // previous run, not the one this test just made. That is invisible on a clean
+  // machine and fails on the second run against a dirty one, which is exactly
+  // how it presented: green in whichever browser project got scheduled first,
+  // red in the next two. (PP-168u.)
   test.describe("editor journey (admin)", () => {
     test.use({
       storageState: STORAGE_STATE.admin,
@@ -68,6 +80,27 @@ test.describe("Machine Settings (PP-43q3)", () => {
       // fixed-position Radix menu item can't be scrolled into view for a click
       // (PP-43q3 review casework).
       viewport: { width: 1280, height: 1800 },
+    });
+
+    let editorMachineId: string | null = null;
+    let editorMachine: string;
+
+    test.beforeEach(async () => {
+      editorMachineId = null;
+      const adminId = await getProfileIdByEmail("admin@test.com");
+      const created = await createTestMachine(adminId);
+      editorMachineId = created.id;
+      editorMachine = created.initials;
+    });
+
+    test.afterEach(async () => {
+      // Guarded: afterEach still runs when beforeEach threw, and calling
+      // deleteTestMachine with no id raises an invalid-uuid error that would
+      // replace the real setup failure in the report.
+      if (editorMachineId === null) return;
+      // ON DELETE CASCADE drops any set this journey created with the machine.
+      await deleteTestMachine(editorMachineId);
+      editorMachineId = null;
     });
 
     test("creates a set, auto-saves, and survives a reload", async ({
@@ -82,13 +115,12 @@ test.describe("Machine Settings (PP-43q3)", () => {
       page.on("dialog", (d) => void d.accept());
 
       const name = `${PREFIX} Tournament ${Date.now().toString()}`;
-      await page.goto(`/m/${machine}/settings`);
+      await page.goto(`/m/${editorMachine}/settings`);
 
       // New set opens straight into edit mode with the name field focused.
       await page.getByRole("button", { name: /new set/i }).click();
-      // New sets are prepended, so the just-created set is the first "set name"
-      // field. Scoping to .first() keeps this unambiguous if a retry re-runs
-      // against a machine that already holds the previous attempt's set.
+      // The machine is freshly seeded and holds no other set, so the one "set
+      // name" field on the page is this test's. `.first()` is belt-and-braces.
       const nameField = page
         .getByRole("textbox", { name: /set name/i })
         .first();
@@ -118,9 +150,9 @@ test.describe("Machine Settings (PP-43q3)", () => {
     test("reaches the Settings tab from the machine tab strip", async ({
       page,
     }) => {
-      await page.goto(`/m/${machine}`);
+      await page.goto(`/m/${editorMachine}`);
       await page.getByRole("link", { name: /^settings$/i }).click();
-      await expect(page).toHaveURL(new RegExp(`/m/${machine}/settings$`));
+      await expect(page).toHaveURL(new RegExp(`/m/${editorMachine}/settings$`));
     });
   });
 
@@ -140,10 +172,13 @@ test.describe("Machine Settings (PP-43q3)", () => {
       viewport: { width: 1280, height: 1800 },
     });
 
-    let machineId: string;
+    // "" rather than null so the tests below can keep passing `machineId`
+    // straight to seedSettingsSet without a null check.
+    let machineId = "";
     let machineInitials: string;
 
     test.beforeEach(async () => {
+      machineId = "";
       const adminId = await getProfileIdByEmail("admin@test.com");
       const created = await createTestMachine(adminId);
       machineId = created.id;
@@ -151,8 +186,14 @@ test.describe("Machine Settings (PP-43q3)", () => {
     });
 
     test.afterEach(async () => {
+      // Guarded for the same reason as the editor journey above: afterEach
+      // still runs when beforeEach threw, and deleteTestMachine("") raises an
+      // invalid-uuid error that would replace the real setup failure in the
+      // report.
+      if (machineId === "") return;
       // ON DELETE CASCADE drops the seeded settings sets with the machine.
       await deleteTestMachine(machineId);
+      machineId = "";
     });
 
     // The two named sections used by both tests: a software section (heading

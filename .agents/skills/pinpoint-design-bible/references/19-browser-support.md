@@ -6,7 +6,7 @@ The Baseline Widely available floor, what is in scope, what is deferred, and how
 
 PinPoint's UI is built on **Baseline Widely available** (CORE-UI-005) — features that have been cross-browser stable for ~2.5 years. This is the support floor for every new component, layout, animation, and form pattern.
 
-**shadcn/ui and Radix remain the design system.** The Baseline floor is the _platform layer underneath_ — what we trust to "just work" in our users' browsers. We don't migrate components off Radix to chase native primitives; we layer Widely-available web platform features (`:user-invalid`, `inert`, container queries, `:has()`, `fetchpriority`, `motion-reduce:`, `aspect-ratio`, `enterkeyhint`, autocomplete tokens, semantic `<table>` markup, native `required`/`pattern` validation, etc.) onto our shadcn-based components so they get the full benefit of the platform.
+**shadcn/ui and Radix remain the design system.** The Baseline floor is the _platform layer underneath_ — what we trust to "just work" in our users' browsers. We don't migrate components off Radix to chase native primitives; we layer Widely-available web platform features (`:user-invalid`, `inert`, container queries, `:has()`, `motion-reduce:`, `aspect-ratio`, `enterkeyhint`, autocomplete tokens, semantic `<table>` markup, native `required`/`pattern` validation, etc.) onto our shadcn-based components so they get the full benefit of the platform.
 
 ### What is in-scope today — and why there is no table of it
 
@@ -14,7 +14,7 @@ PinPoint's UI is built on **Baseline Widely available** (CORE-UI-005) — featur
 
 This section used to hold a sixteen-row table of features and Baseline dates. It was deleted deliberately. It was a hand-copied cache of data with an authoritative live source, it had silently rotted — several rows had drifted tier or date — and correcting them would only have restarted the clock on the rest. A wrong Baseline date is worse than no date, because it reads as authoritative and nobody re-checks it.
 
-The practical rule is unchanged and doesn't need the table: **if the guide says Widely available, use it directly** — no polyfill, no feature detection, no `@supports` gate. That covers the platform layer this project leans on (container queries, `:has()`, `:user-invalid`, `inert`, `aspect-ratio`, `fetchpriority`, `focus-visible`, `motion-reduce:`, `enterkeyhint`, logical properties, native `<dialog>` and `<details>`, native form validation).
+The practical rule is unchanged and doesn't need the table: **if the guide says Widely available, use it directly** — no polyfill, no feature detection, no `@supports` gate. That covers the platform layer this project leans on (container queries, `:has()`, `:user-invalid`, `inert`, `aspect-ratio`, `focus-visible`, `motion-reduce:`, `enterkeyhint`, logical properties, native `<dialog>` and `<details>`, native form validation).
 
 The deleted table also carried a "where it shows up in PinPoint" column. **To find a live example of a feature, grep its name in `src/`** — that answer is always current, which a list of filenames here would not be.
 
@@ -28,7 +28,6 @@ These are not in PinPoint today. They require a per-feature opt-in here in §19 
 - **View Transitions** (same-document and cross-document) — interesting for navigation polish; defer.
 - **CSS anchor positioning** — would simplify some popover/tooltip placement; Radix's JS-driven positioning already works.
 - **Scroll-driven animations** — `animation-timeline: scroll()` and friends. Defer.
-- **`text-wrap: balance`** — partially adopted (we use `text-balance` selectively per §9), but treat as Newly available and check support per use.
 - **`interestfor` attribute** for tooltips — Chrome-only as of late 2025; defer.
 - **`closedby` attribute** on `<dialog>` — Limited availability (no Safari).
 
@@ -40,10 +39,16 @@ Widely-available primitive already covers the same need as the floor. Each such
 feature is listed here with its status, why it degrades safely, and the
 cross-browser floor that carries the non-supporting browsers.
 
-| Feature                                         | Status                  | Degrades to                            | Cross-browser floor                                                 |
-| :---------------------------------------------- | :---------------------- | :------------------------------------- | :------------------------------------------------------------------ |
-| `interactive-widget=resizes-content` (viewport) | Limited (Chromium-only) | The browser default (`resizes-visual`) | `scrollIntoView`-on-focus + `scroll-margin` in the settings editors |
+| Feature                                         | Status                       | Degrades to                                 | Cross-browser floor                                                 |
+| :---------------------------------------------- | :--------------------------- | :------------------------------------------ | :------------------------------------------------------------------ |
+| `interactive-widget=resizes-content` (viewport) | Limited (Chromium-only)      | The browser default (`resizes-visual`)      | `scrollIntoView`-on-focus + `scroll-margin` in the settings editors |
+| `fetchpriority` (via `next/image` `priority`)   | Newly available (2024-10-29) | The browser's own image-priority heuristics | Next.js `<Image>` srcset/lazy-loading, which is unaffected          |
+| `text-wrap: balance`                            | Newly available (2024-05-13) | Normal line breaking                        | The `text-balance` utility is cosmetic-only (§9)                    |
+| `text-wrap: pretty` (`text-pretty`)             | Limited (no Firefox)         | Normal line breaking                        | The `text-pretty` utility is cosmetic-only (§9)                     |
 
+- **`fetchpriority`** — we never write the attribute by hand; it is emitted by Next.js `<Image priority>`, in use on the marketing hero (`src/app/(site)/page.tsx`). A browser that doesn't understand `fetchpriority` ignores the attribute and falls back to its own loading heuristics — exactly the behavior we'd get if we omitted it. So the downside of a non-supporting browser is "the LCP image loads at default priority", never a broken render. Firefox was the last engine to ship it (132, Oct 2024), which is what puts the Baseline date at 2024-10-29 and keeps it out of Widely available until ~Apr 2027. **This entry is the CORE-UI-005 opt-in**; removing `priority` instead would be a real LCP regression for no correctness gain. Usage discipline (one prioritized image per page, LCP candidate only) is §21 / CORE-PERF-003, and is the constraint that actually matters here.
+- **`text-wrap: balance`** — Newly available, Baseline since 2024-05-13 (Chrome 114, Edge 114, Firefox 121, Safari 17.5). Used selectively per §9. Non-supporting browsers get ordinary line breaking; nothing shifts or clips.
+- **`text-wrap: pretty`** — Limited availability, not Newly available: Chrome/Edge 117 and Safari 26 support it, but Firefox never has, so it carries no Baseline date. Still safe to adopt below the floor because the fallback is identical to `balance`'s — a non-supporting browser falls back to the default greedy wrap, never a broken or shifted layout. Used selectively per §9.
 - **`interactive-widget=resizes-content`** — exported once from the root layout (`src/app/layout.tsx`, PP-a0pl). On Chromium (Chrome/Edge/Android) the on-screen keyboard shrinks the **layout** viewport so content reflows above it; **iOS Safari and Firefox ignore it** and keep their own native focus-scroll. That's a strict improvement where honored and a no-op elsewhere — never a regression. The cross-browser floor that actually reaches a focused field on iOS is the `scrollIntoView({ block: "nearest" })` + `scroll-margin` on focus in `RowEditSheet`, `EditableCell`, and `InlineEditableField`. **Verification limit:** no headless tool has a real virtual keyboard, so the Playwright guard (`e2e/full/soft-keyboard-reflow.spec.ts`) proves reachability/reflow under a keyboard-open-height viewport, not pixel-exact keyboard geometry — the latter needs a real device (deferred; PP-a0pl Part 3).
 
 ### How to verify a feature's Baseline status
@@ -61,7 +66,7 @@ If the guide says "Baseline Widely available" — use directly. If "Baseline New
 
 If a Newly-available feature becomes load-bearing for a planned design:
 
-1. Open a PR that removes it from the "deferred" list above, with the reasoning.
+1. Open a PR that moves it out of the "deferred" list above — into the adopted-below-the-floor table if it degrades to a harmless no-op, otherwise into prose here — with the reasoning.
 2. Document the fallback strategy (e.g., "Use `@supports` to feature-detect; fall back to existing pattern X").
 3. Link the spec/explainer + the MWG guide id.
 

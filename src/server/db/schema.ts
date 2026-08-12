@@ -269,10 +269,62 @@ export const pinballmapCatalog = pgTable(
 ).enableRLS();
 
 /**
+ * A PinballMap entry PinPoint walked away from (PP-l81u).
+ *
+ * Written when a machine that is listed on PBM has its catalog title changed:
+ * the entry for the OLD title is still live on pinballmap.com, and `lmxId` is
+ * the only handle for finding or removing it later. Discarding it — which is
+ * what happened before this table existed — leaves a public listing nobody can
+ * see or clean up.
+ *
+ * This cannot live on `machines`. `machines_pinballmap_lmx_requires_listed`
+ * forbids an lmx without `pinballmap_listed`, and keeping `listed` true would
+ * claim the NEW title's slot via `machines_pinballmap_listed_unique`. A machine
+ * can also abandon more than one entry over time (retitle, auto-link re-lists
+ * under the new title within the hour, retitle again), so a single column set
+ * would overwrite the first — the same bug one level up.
+ *
+ * Rows are self-clearing: `reconcileAfterSync` deletes any whose `lmxId` is
+ * absent from a freshly synced lineup, which is what happens once someone
+ * removes the entry by hand on pinballmap.com. There is deliberately no dismiss
+ * action — the record verifies itself.
+ */
+export const pinballmapAbandonedListings = pgTable(
+  "pinballmap_abandoned_listings",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    machineId: uuid("machine_id")
+      .notNull()
+      .references(() => machines.id, { onDelete: "cascade" }),
+    // PBM's location_machine_xref id — the handle for the live entry.
+    lmxId: integer("lmx_id").notNull(),
+    // The catalog title the entry was listed under, so the UI can name it.
+    pinballmapMachineId: integer("pinballmap_machine_id").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    // One entry can only be abandoned once. A second row for the same lmx would
+    // mean two machines each believe they own the cleanup.
+    lmxUnique: uniqueIndex("pinballmap_abandoned_listings_lmx_unique").on(
+      t.lmxId
+    ),
+    machineIdx: index("idx_pinballmap_abandoned_listings_machine").on(
+      t.machineId
+    ),
+  })
+).enableRLS();
+
+/**
  * Issues Table
  *
  * Issues reported for pinball machines.
- * Every issue MUST have exactly one machine (enforced by CHECK constraint).
+ * Every issue MUST have exactly one machine (CORE-ARCH-004). Enforced by
+ * `machine_initials` being NOT NULL with a foreign key to `machines.initials`
+ * (ON DELETE CASCADE) — no CHECK constraint enforces the machine link, and
+ * there is no `machine_id` column. (The table does carry a CHECK constraint
+ * for something else — `reporter_check` below — that's unrelated to this.)
  */
 export const issues = pgTable(
   "issues",
@@ -1232,3 +1284,5 @@ export const pinballmapState = pgTable(
  * Type exports
  */
 export type IssueImage = typeof issueImages.$inferSelect;
+export type PinballmapAbandonedListing =
+  typeof pinballmapAbandonedListings.$inferSelect;

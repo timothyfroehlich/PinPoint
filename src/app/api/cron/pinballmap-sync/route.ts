@@ -51,13 +51,15 @@ export async function GET(request: Request): Promise<NextResponse> {
     return NextResponse.json({ ok: false, error }, { status: 502 });
   }
 
-  const { healed, linked, desynced } = await reconcileAfterSync();
+  const { healed, linked, desynced, abandonmentsCleared } =
+    await reconcileAfterSync();
   log.info(
     {
       machineCount: result.machineCount,
       healed,
       linked,
       desynced,
+      abandonmentsCleared,
       action: "pinballmap.syncLocationSnapshot",
     },
     "PinballMap snapshot synced"
@@ -68,5 +70,6 @@ export async function GET(request: Request): Promise<NextResponse> {
     healed,
     linked,
     desynced,
+    abandonmentsCleared,
   });
 }

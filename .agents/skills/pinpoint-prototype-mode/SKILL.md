@@ -1,6 +1,6 @@
 ---
 name: pinpoint-prototype-mode
-description: Opt-in rapid-iteration mode for UI/UX prototyping — layout, components, styling, page structure, interaction/flow. Relaxes test/lint/type rigor on presentational code in favor of speed while tracking the resulting debt. NOT for backend/internal work (data layer, server-action logic, auth, permissions, migrations). Use when the user says "prototype mode", "rapid iteration", "vibe", or asks to explore a UI/design idea quickly without worrying about tests passing. Also read this to EXIT the mode.
+description: Opt-in rapid-iteration mode for UI/UX prototyping — layout, components, styling, page structure, interaction/flow. Relaxes test/lint/type rigor on presentational code in favor of speed while tracking the resulting debt. NOT for backend/internal work (data layer, server-action logic, auth, permissions, migrations). What it never relaxes is as load-bearing as what it does: no commit, push or PR while the mode is on, no touching prod, no deleting or weakening a test, and every auth, permissions and data-privacy rule still applies in full. Use when the user says "prototype mode", "rapid iteration", "vibe", or asks to explore a UI/design idea quickly without worrying about tests passing. Also read this to EXIT the mode.
 ---
 
 # PinPoint Prototype Mode

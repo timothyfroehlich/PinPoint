@@ -1,6 +1,6 @@
 ---
 name: pinpoint-briefing
-description: Run a full project health review at session start or on demand — answers "what should I work on?" before the orchestrator answers "how do I work on it?". Carries the two audit-reading decisions a wrong reading turns into a phantom finding: why a stale local main makes `pnpm audit` report already-patched CVEs as regressions, and why `pnpm outdated` is deliberately never run (Dependabot's soak time is the supply-chain protection). Use when starting a new session, when the user asks for a briefing, or before deciding what to pick up next.
+description: Run a full project health review at session start or on demand — answers "what should I work on?" before the orchestrator answers "how do I work on it?". Sweeps five surfaces in parallel: open PRs / worktrees / ready beads / Dependabot alerts, `pnpm audit`, the last CI runs on main, GitHub issues filed in the last five days, and open security-review beads. Carries the two audit-reading decisions a wrong reading turns into a phantom finding: why a stale local main makes `pnpm audit` report already-patched CVEs as regressions, and why `pnpm outdated` is deliberately never run (Dependabot's soak time is the supply-chain protection). Use when starting a new session, when the user asks for a briefing, when main's CI or a new issue needs triage, or before deciding what to pick up next. The weekly maintenance pass is `pinpoint-chores`, not this.
 ---
 
 # PinPoint Session Briefing

@@ -442,6 +442,13 @@
       "when": 1785802179549,
       "tag": "0062_pinballmap_credentials_role_check",
       "breakpoints": true
+    },
+    {
+      "idx": 63,
+      "version": "7",
+      "when": 1786327875438,
+      "tag": "0063_lame_sinister_six",
+      "breakpoints": true
     }
   ]
 }

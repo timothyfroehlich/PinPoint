@@ -244,9 +244,12 @@ async function captureScreenshots(browserType, baseUrl, pages, workDir) {
             outPath,
           });
         } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
+          const message =
+            error instanceof Error ? error.message : String(error);
           if (/crash/i.test(message)) crashed = true;
-          console.error(`⚠️  Failed to capture ${vpName}/${page.id}: ${message}`);
+          console.error(
+            `⚠️  Failed to capture ${vpName}/${page.id}: ${message}`
+          );
         } finally {
           await pw.close().catch(() => {});
         }

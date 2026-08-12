@@ -1,6 +1,6 @@
 ---
 name: pinpoint-pr-workflow
-description: The PR-lifecycle decisions the scripts and gates do not state — why getting reviewed is a handoff (Tim runs `/code-review`; an agent cannot) and why the SHA-pinned marker you post is the only thing that satisfies the `reviewed` gate, which pushes let you re-attest versus needing a fresh review, the narrow trivial-change exception, why the merge handoff is a script you run rather than a summary you write, the `--pages` screenshot gotchas, and the Dependabot back-to-back lockfile trap. Use when committing, opening a PR, handing a branch to Tim for review, attesting a reviewed head, addressing review comments, posting screenshots, handing a PR over to merge, or landing the plane after Tim merges.
+description: The PR-lifecycle decisions the scripts and gates do not state — why getting reviewed is a handoff (Tim runs `/code-review`; an agent cannot) and why the SHA-pinned marker you post is the only thing that satisfies the `reviewed` gate, which pushes let you re-attest versus needing a fresh review, the narrow trivial-change exception, why the merge handoff is a script you run rather than a summary you write, the `--pages` screenshot gotchas, and the Dependabot back-to-back lockfile trap. Also the merge escape hatches (`--force`, `--bypass-merge-requirements`) and when each is and is not appropriate, what to do when `merge-pr.sh` itself is broken, and the GitHub MCP gotchas that silently do the wrong thing — snake_case field names, the pagination cap, label writes replacing the whole set rather than adding to it, `resolve_thread` ignoring owner/repo, and the thread-ID format. Use when committing, opening a PR, handing a branch to Tim for review, attesting a reviewed head, addressing review comments, posting screenshots, handing a PR over to merge, landing the plane after Tim merges, or when a GitHub MCP call does something you did not expect.
 ---
 
 # PinPoint PR Workflow
@@ -129,6 +129,23 @@ bash scripts/workflow/mark-claude-review.sh <PR> trivial "typo in a comment; no 
 This is a narrow exception and it is self-policing. "It's only a small change" is not the test — the test is whether there is any way for it to be wrong. If you're reaching for a justification, it isn't trivial.
 
 **The marker attests that a review actually happened.** Posting it otherwise is a false attestation, not a shortcut — the same honesty model as `merge-pr.sh --force`.
+
+#### Why the marker command carries a permission allow rule
+
+`.claude/settings.json` has one `permissions.allow` entry, and it is this script:
+
+```json
+"allow": ["Bash(bash scripts/workflow/mark-claude-review.sh *)"]
+```
+
+It is there because the command was intermittently denied. On 2026-08-03 an auto-mode session was refused with `Blocked by classifier` on PR #1815, while the same command succeeded four times across 2026-08-09/10 (PRs #1832, #1828, #1829, #1848). The block was contextual, not a standing rule — which is the worst shape for a required step, because it fails only sometimes and leaves the PR sitting at `unreviewed` with no path forward. A background subagent has no human to hand the command to at all. Rules are evaluated deny → ask → allow, and an explicit allow resolves the call before the classifier is consulted, so the entry makes the step deterministic. (PP-yx97. A new tool permission needs Tim's explicit approval each time; he gave it on 2026-08-11. This is not a CORE-SEC-010 surface — that rule governs prod-mutating Supabase tools, and its ban on `allow` applies to those.)
+
+**What the rule does not do is make the attestation true.** It removes the harness's opinion about whether you earned the marker, which means your own judgement is now the only thing standing between a false attestation and the merge gate. The honesty model above is not softened by the allow rule; it is the entire remaining check. Merging stays human-only regardless (PP-wi85), so a marker you should not have posted misleads Tim rather than merging anything by itself — that is a smaller failure, not a harmless one.
+
+Two limits worth knowing:
+
+- The rule matches the documented invocation, `bash scripts/workflow/mark-claude-review.sh …`, and only that shape. **Use the relative path** — an absolute one does not match and falls through to the classifier. Don't count on `normalize-workspace-paths.cjs` to rescue it: its rewrite regex is hardcoded to `/home/froeht/Code/…`, so it never fires on this Mac (`/Users/froeht/Code/PinPoint`), and its `pinpoint-worktrees/` alternative predates the current `.claude/worktrees/<branch>/` layout. Chaining (`… && something-else`) does not inherit the allow either — each subcommand is matched on its own.
+- A summary string containing an unbalanced quote makes the whole command unresolvable to `block-direct-merge.cjs`, which then scans the raw text and blocks on `merge-pr.sh` or `pr merge`. Rare, and it fails closed. Fix the quoting rather than working around it.
 
 #### Readiness is not review
 

@@ -486,8 +486,9 @@ describe("updateMachineAction listing carry-over (PGlite)", () => {
   setupTestDb();
 
   /**
-   * `resolvePbmLinkColumns` derives metadata from the catalog mirror rather than
-   * trusting the form, so any title the edit form submits must exist here.
+   * `resolvePbmLinkColumnsForUpdate` derives metadata from the catalog mirror
+   * rather than trusting the form, so any title the edit form submits must
+   * exist here.
    */
   async function seedCatalog(...ids: number[]): Promise<void> {
     const db = await getTestDb();

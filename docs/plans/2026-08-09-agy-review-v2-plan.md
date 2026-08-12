@@ -927,3 +927,215 @@ So the wave-2 design is now three rules, each earned from a specific failure:
    the failure modes a single angle cannot see.
 3. **A refutation is held to the claim's evidence standard**, including "name the escape and
    verify it is reachable" — the check that saved the killed finding.
+
+### v6.3 on #1856: the falsifiability rule works, and the miss moves somewhere new
+
+One round, clean JSON, no resume, no blocked slices, one `schedule` error of the benign kind.
+
+The rule under test was the one added after the previous run returned an inventory of the
+change instead of a list of requirements. It worked, and the effect is not subtle:
+
+|      | items | marked `missing` | of those, became findings |
+| :--- | ----: | ---------------: | ------------------------: |
+| v6.2 |    39 |                1 |                         — |
+| v6.3 |    36 |                4 |                         3 |
+
+The items are now requirements with citations. "When hourly sync receives an empty lineup with
+`machineCount > 0` from Pinball Map, reconciliation must refuse to clear abandoned listings",
+cited to `pinballmap-reconcile.test.ts:235`, is a sentence that could have come back `missing`.
+"A table storing the abandoned entry" — the previous run's shape — could not.
+
+One item marked `missing` produced no finding ("the notice must omit any dismiss control"),
+which is the leak the sixth scoring column exists to catch. Three of four is not four of four.
+
+**Recall against the key is still 0 of 3.** But the run produced a finding that is not in the
+key and is real, and the reason it missed A3 is now specific enough to fix.
+
+#### The new finding, and what two refuters did to it
+
+`clearResolvedAbandonments` guards against a broken payload by refusing to clear when the live
+lmx set comes back _empty_. A payload that is merely _partial_ — a 200 whose xref array has
+some malformed items — walks straight past it, because `parseLocation` drops the bad items
+silently and leaves the set non-empty but short. The delete then removes rows for listings
+that are still live on Pinball Map.
+
+| lens | question                                   | verdict                      |
+| :--- | :----------------------------------------- | :--------------------------- |
+| A    | is the mechanism real and reachable?       | **stands**, 0.95             |
+| B    | grant it happens — what does the user get? | **narrowed** to medium, 0.75 |
+
+Lens A checked six links and found no escape. The one that decides it: `parse.ts:92` is
+`machineCount: asNumber(r["machine_count"]) ?? lmxes.length`, so `machineCount` comes from the
+API independently and only falls back to the parsed length when the field is absent. Had it
+been derived from `lmxes.length`, the inequality the finding rests on could never hold and the
+finding would have been dead. Lens A also read the parser's own docstring — "Unparseable
+records are skipped, not coerced" — which makes the silent drop deliberate rather than
+incidental.
+
+Lens B granted the premise and moved the severity down, on two findings the author of the
+finding had not established. The row is deleted permanently: `recordAbandonedListing` has
+exactly two call sites, both in the human-triggered retitle path, and nothing in the sync loop
+ever re-creates a row, so there is no recovery. That argues _up_. But the notice is
+maintainer-only behind a `canLink` gate, and its disappearance is an omission rather than an
+assertion — there is no "all clear" message, the Alert simply stops rendering. Net: medium.
+
+Both refuters read files instead of asserting, both stayed in their lane, and the pair produced
+a bounded finding at a severity neither had been told to reach. That is the third consecutive
+pair to behave this way, so wave 2's three rules can be treated as settled.
+
+#### Why A3 was missed, which is the useful part
+
+A3 is the E2E worker-id collision: `const base = Date.now() % 1_000_000`, no worker scoping,
+two workers starting a millisecond apart landing on ids one apart — the same gap the test uses
+between its old and new title ids.
+
+The slice read that file. It then wrote, inside a _different_ and lower-severity finding about
+E2E concurrency, that "the newly added abandoned notice spec uses worker-scoped numeric IDs",
+and cleared the concern on that basis. The file contains no worker scoping of any kind; line 52
+is the `Date.now()` expression and nothing else touches the id.
+
+This is not the same failure as the previous two runs, and it is the one worth designing
+against, because **every evidence rule in the schema attaches to a claim that raises a concern
+and none attaches to a claim that closes one.** An `expected` item marked `implemented` owes an
+`at`. A finding owes a file and a line. A sentence in the middle of a finding body owes
+nothing — and that is precisely where the false clearance sat.
+
+Two rules follow.
+
+**In agy's skill: a statement that clears a concern needs a citation exactly as much as one
+that raises it**, everywhere it appears, including in passing. When it cannot be cited, the
+honest form is "I did not verify whether X", and X stays open.
+
+**In the dispatcher's skill: scan finding bodies for the shape "X cannot happen because Y" and
+check Y yourself.** It is a two-minute pass over five findings and it is the only audit that
+reaches this class.
+
+There is a second, narrower cause. The test slice's eight expectations are all coverage
+questions — what a correct suite must pin — and a defect in the test's own machinery is not
+reachable from that frame. A colliding fixture is not a gap in what the suite covers; it is the
+suite being wrong about itself. So a test slice now has to ask both: what the suite must pin,
+and what makes each new test trustworthy on its own.
+
+### The falsifiability rule flattens every concern into a behavioural one
+
+The rule added after #1856's inventory problem was re-run against #1807, which the previous
+prompt had scored 2 of 3 on. It scored **0 of 3**: zero findings, verdict `approve`, 28 of 28
+expectations `implemented`.
+
+All three defects are still in that tree — checked by hand, and the two on the other target
+were re-verified independently by a refuter shown neither the fix commit nor the key's
+reasoning. The zero is real.
+
+**The cause is visible without reference to the score, which is what makes it trustworthy on a
+single run.** The slice asked "what wrong program does each type still admit" returned eight
+expectation items, and **not one of them was about a type**. All eight were behavioural query
+assertions, most of them duplicating the query slice's list verbatim in substance.
+
+`when <situation>, <outcome> must happen` is a sentence about runtime behaviour. Given it as a
+requirement rather than a default, a slice whose concern is _not_ runtime behaviour converts
+the concern into the nearest behavioural question it can phrase that way — and the original
+concern is gone, with a full list of well-formed, correctly-cited items standing where it was.
+That is worse than the inventory failure it replaced, because an inventory is visibly hollow
+and this is not.
+
+It accounts for every miss on both targets:
+
+| defect                        | the question the slice needed to ask                | what it wrote                                      |
+| :---------------------------- | :-------------------------------------------------- | :------------------------------------------------- |
+| B3, type admits `[]`          | can I construct a value this type should not allow? | eight behavioural filter items                     |
+| B2, two descriptions disagree | do A and B state the same fact?                     | "must instruct the caller to re-query at offset 0" |
+| B1, drain never terminates    | if a caller follows this exactly, does it stop?     | the same item — found the sentence, cleared it     |
+| A3, fixture collision         | would this test fail if the behaviour regressed?    | what a correct suite must pin                      |
+
+The B1 and B2 citations were honest, which is worth saying because the obvious diagnosis is
+that they were not. `list-machines.ts:109` genuinely does instruct the caller to re-request at
+offset 0. The item was one level too shallow: it asked what the documentation _says_ rather
+than what following it _achieves_. Following it does not terminate — `total` is a plain
+`count()` over the where clause with no offset applied, so machines the caller deliberately
+leaves alone hold it above zero forever, and the documented stop condition of "drain to a
+total of 0" is unreachable. And the tool-level description, the more visible of the two, omits
+the "set offset to the number you have left alone" refinement entirely, which is B2.
+
+**v6.5 makes the template a default rather than a requirement**, with a falsifiable shape per
+kind of concern:
+
+| concern                  | item shape                                                                | how it is falsified           |
+| :----------------------- | :------------------------------------------------------------------------ | :---------------------------- |
+| a type or schema         | must make `<a specific wrong value>` unrepresentable                      | try to construct it           |
+| instructions to a caller | a caller following this exactly, in `<situation>`, must reach `<outcome>` | walk the procedure            |
+| two texts on one subject | A and B must state the same `<fact>`                                      | quote both, compare           |
+| a test's own machinery   | must fail if `<behaviour>` regresses; fixtures must not collide           | read how fixtures are derived |
+
+And the dispatcher's coverage audit gains a fourth failure shape: **read each slice's items
+against its own brief, not only against the falsifiability test.** A types slice with no item
+of the form "this type must make X unrepresentable" has flattened its concern, however
+well-formed its list looks.
+
+#### Honest limit
+
+v6.2 → v6.3 on #1807 is one run each, so the _score_ movement cannot be separated from
+run-to-run variance. The types-slice evidence does not have that problem — a slice returning
+zero items in its own subject is a defect in the prompt regardless of what the run scored —
+and that is why the fix is being made on the strength of it rather than on the 2 → 0.
+
+### The falsifiability rule flattens every concern into a behavioural one
+
+The rule added after #1856's inventory problem was re-run against #1807, which the previous
+prompt had scored 2 of 3 on. It scored **0 of 3**: zero findings, verdict `approve`, 28 of 28
+expectations `implemented`.
+
+All three defects are still in that tree — checked by hand, and the two on the other target
+were re-verified independently by a refuter shown neither the fix commit nor the key's
+reasoning. The zero is real.
+
+**The cause is visible without reference to the score, which is what makes it trustworthy on a
+single run.** The slice asked "what wrong program does each type still admit" returned eight
+expectation items, and **not one of them was about a type**. All eight were behavioural query
+assertions, most of them duplicating the query slice's list verbatim in substance.
+
+`when <situation>, <outcome> must happen` is a sentence about runtime behaviour. Given it as a
+requirement rather than a default, a slice whose concern is _not_ runtime behaviour converts
+the concern into the nearest behavioural question it can phrase that way — and the original
+concern is gone, with a full list of well-formed, correctly-cited items standing where it was.
+That is worse than the inventory failure it replaced, because an inventory is visibly hollow
+and this is not.
+
+It accounts for every miss on both targets:
+
+| defect                        | the question the slice needed to ask                | what it wrote                                      |
+| :---------------------------- | :-------------------------------------------------- | :------------------------------------------------- |
+| B3, type admits `[]`          | can I construct a value this type should not allow? | eight behavioural filter items                     |
+| B2, two descriptions disagree | do A and B state the same fact?                     | "must instruct the caller to re-query at offset 0" |
+| B1, drain never terminates    | if a caller follows this exactly, does it stop?     | the same item — found the sentence, cleared it     |
+| A3, fixture collision         | would this test fail if the behaviour regressed?    | what a correct suite must pin                      |
+
+The B1 and B2 citations were honest, which is worth saying because the obvious diagnosis is
+that they were not. `list-machines.ts:109` genuinely does instruct the caller to re-request at
+offset 0. The item was one level too shallow: it asked what the documentation _says_ rather
+than what following it _achieves_. Following it does not terminate — `total` is a plain
+`count()` over the where clause with no offset applied, so machines the caller deliberately
+leaves alone hold it above zero forever, and the documented stop condition of "drain to a
+total of 0" is unreachable. And the tool-level description, the more visible of the two, omits
+the "set offset to the number you have left alone" refinement entirely, which is B2.
+
+**v6.5 makes the template a default rather than a requirement**, with a falsifiable shape per
+kind of concern:
+
+| concern                  | item shape                                                                | how it is falsified           |
+| :----------------------- | :------------------------------------------------------------------------ | :---------------------------- |
+| a type or schema         | must make `<a specific wrong value>` unrepresentable                      | try to construct it           |
+| instructions to a caller | a caller following this exactly, in `<situation>`, must reach `<outcome>` | walk the procedure            |
+| two texts on one subject | A and B must state the same `<fact>`                                      | quote both, compare           |
+| a test's own machinery   | must fail if `<behaviour>` regresses; fixtures must not collide           | read how fixtures are derived |
+
+And the dispatcher's coverage audit gains a fourth failure shape: **read each slice's items
+against its own brief, not only against the falsifiability test.** A types slice with no item
+of the form "this type must make X unrepresentable" has flattened its concern, however
+well-formed its list looks.
+
+#### Honest limit
+
+v6.2 → v6.3 on #1807 is one run each, so the _score_ movement cannot be separated from
+run-to-run variance. The types-slice evidence does not have that problem — a slice returning
+zero items in its own subject is a defect in the prompt regardless of what the run scored —
+and that is why the fix is being made on the strength of it rather than on the 2 → 0.

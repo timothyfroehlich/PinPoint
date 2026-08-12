@@ -16,10 +16,10 @@
 // worst, and an agy review is dispatched by a Claude session that is already in
 // the huddle on its behalf. (PP-c6xz.)
 
-const { execFileSync } = require('child_process');
+const { execFileSync } = require("child_process");
 
 async function main() {
-  let inputData = '';
+  let inputData = "";
   for await (const chunk of process.stdin) {
     inputData += chunk;
   }
@@ -35,7 +35,8 @@ async function main() {
     process.exit(0);
   }
 
-  const initialNumSteps = typeof input.initialNumSteps === 'number' ? input.initialNumSteps : 0;
+  const initialNumSteps =
+    typeof input.initialNumSteps === "number" ? input.initialNumSteps : 0;
   // Antigravity seeds the trajectory with at least 1 system step before the
   // first model invocation, so initialNumSteps is 1 (not 0) on the genuine
   // first turn of a fresh conversation. Treat <= 1 as session-start.
@@ -47,19 +48,23 @@ async function main() {
     return;
   }
 
-  let beadsOutput = '';
+  let beadsOutput = "";
   try {
-    beadsOutput = execFileSync('bd', ['prime'], {
+    beadsOutput = execFileSync("bd", ["prime"], {
       cwd: workspacePath,
-      encoding: 'utf8'
+      encoding: "utf8",
     }).trim();
   } catch (err) {
-    process.stderr.write(`[antigravity-bootstrap] Error running bd prime: ${err.message}\n`);
+    process.stderr.write(
+      `[antigravity-bootstrap] Error running bd prime: ${err.message}\n`
+    );
   }
 
   process.stdout.write(
     JSON.stringify(
-      beadsOutput ? { injectSteps: [{ userMessage: beadsOutput }] } : { injectSteps: [] }
+      beadsOutput
+        ? { injectSteps: [{ userMessage: beadsOutput }] }
+        : { injectSteps: [] }
     )
   );
 }

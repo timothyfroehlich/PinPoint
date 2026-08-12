@@ -94,7 +94,7 @@ export default [
     },
     rules: {
       "no-undef": "off",
-      "no-empty-pattern": ["error", { "allowObjectPatternsAsParameters": true }],
+      "no-empty-pattern": ["error", { allowObjectPatternsAsParameters: true }],
 
       // TypeScript recommended rules
       ...typescriptEslint.configs["recommended-type-checked"].rules,
@@ -389,7 +389,13 @@ export default [
     // than `no-undef` violations. Until PP-ojv5 these files were never linted
     // at all (`lint` was `eslint src/`), which is why this block did not exist
     // — the 133 `no-undef` errors it clears were latent, not new.
-    files: ["scripts/**/*.mjs", "scripts/**/*.ts"],
+    //
+    // The extension list must stay a superset of every JS-family extension the
+    // relaxed-rules block above matches with `scripts/**/*`, or a new
+    // `scripts/foo.cjs` lands outside this block and re-triggers that wall
+    // (PP-ru2p). `.py`/`.sh` under scripts/ are deliberately excluded — ESLint
+    // would otherwise treat them as lintable source.
+    files: ["scripts/**/*.{mjs,cjs,js,jsx,ts,tsx}"],
     languageOptions: {
       globals: globals.node,
     },
@@ -435,11 +441,7 @@ export default [
     // and shortcut-wrapper sites are suppressed inline with `-- … PP-u4cp`
     // disables, so this PR ENABLES the rule cleanly.
     files: ["src/**/*.tsx"],
-    ignores: [
-      "**/*.test.tsx",
-      "**/*.spec.tsx",
-      "src/test/**",
-    ],
+    ignores: ["**/*.test.tsx", "**/*.spec.tsx", "src/test/**"],
     plugins: {
       "jsx-a11y": jsxA11y,
     },
@@ -475,12 +477,16 @@ export default [
         {
           restrict: [
             {
-              pattern: "^(?:[^:]+:)*(?:bg|text|border|ring|fill|stroke|outline|divide|placeholder|caret|accent|decoration|shadow|from|via|to)-(?:red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|slate|gray|zinc|neutral|stone)-[0-9]+(?:\\/[0-9]{1,3})?$",
-              message: "Raw Tailwind palette classes are forbidden. Please use semantic tokens instead (e.g. bg-primary, text-destructive). See pinpoint-ui §Color System and pinpoint-design-bible §1.",
+              pattern:
+                "^(?:[^:]+:)*(?:bg|text|border|ring|fill|stroke|outline|divide|placeholder|caret|accent|decoration|shadow|from|via|to)-(?:red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|slate|gray|zinc|neutral|stone)-[0-9]+(?:\\/[0-9]{1,3})?$",
+              message:
+                "Raw Tailwind palette classes are forbidden. Please use semantic tokens instead (e.g. bg-primary, text-destructive). See pinpoint-ui §Color System and pinpoint-design-bible §1.",
             },
             {
-              pattern: "^(?:[^:]+:)*[a-z0-9-]+-\\[(?:[^\\]]*?)#[0-9a-fA-F]{3,8}(?:[^\\]]*?)\\](?:\\/.*)?$",
-              message: "Hardcoded arbitrary hex values are forbidden. Please use semantic tokens instead (e.g. text-muted-foreground, bg-primary). See pinpoint-ui §Color System and pinpoint-design-bible §1.",
+              pattern:
+                "^(?:[^:]+:)*[a-z0-9-]+-\\[(?:[^\\]]*?)#[0-9a-fA-F]{3,8}(?:[^\\]]*?)\\](?:\\/.*)?$",
+              message:
+                "Hardcoded arbitrary hex values are forbidden. Please use semantic tokens instead (e.g. text-muted-foreground, bg-primary). See pinpoint-ui §Color System and pinpoint-design-bible §1.",
             },
           ],
         },
