@@ -20,6 +20,14 @@ import { RelativeTimeProvider } from "~/components/issues/RelativeTimeProvider";
  * This ships in production too. It is one attribute set once, and an attribute
  * that exists only under test is an attribute whose absence nobody notices when
  * it breaks.
+ *
+ * **What it actually asserts.** This effect runs when the ROOT layout's commit
+ * lands — not when every interactive descendant has handlers. Content inside a
+ * Suspense boundary (any segment with a `loading.tsx`, plus streamed segments)
+ * is still dehydrated at that moment, and an `ssr: false` dynamic import such
+ * as `RichTextEditor` has not started. So `data-hydrated` narrows the
+ * dropped-click window to the root commit; it does not close it for deeper
+ * subtrees. Waits for those belong on something the subtree itself renders.
  */
 function HydrationBeacon(): null {
   useEffect(() => {

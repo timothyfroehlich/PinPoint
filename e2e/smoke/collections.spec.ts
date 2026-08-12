@@ -12,7 +12,7 @@
  * spec — so it's a stable choice for the add-machine step.
  */
 
-import { test, expect } from "../support/fixtures.js";
+import { test, expect, attachHydrationWait } from "../support/fixtures.js";
 import { STORAGE_STATE } from "../support/auth-state.js";
 import { getTestPrefix } from "../support/test-isolation.js";
 
@@ -97,7 +97,7 @@ test.describe("Personal collections (PP-wqit.1)", () => {
       storageState: { cookies: [], origins: [] },
     });
     try {
-      const anonPage = await anon.newPage();
+      const anonPage = attachHydrationWait(await anon.newPage());
       await anonPage.goto(shareUrl);
       await expect(
         anonPage.getByTestId("collection-overview-body")

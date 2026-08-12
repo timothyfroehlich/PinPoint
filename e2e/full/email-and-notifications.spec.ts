@@ -5,7 +5,7 @@
  * and password reset test from auth-flows-extended.spec.ts.
  */
 
-import { test, expect } from "../support/fixtures.js";
+import { test, expect, attachHydrationWait } from "../support/fixtures.js";
 import { MailpitClient } from "../support/mailpit.js";
 import {
   ensureLoggedIn,
@@ -65,7 +65,7 @@ test.describe("Notifications", () => {
 
     // Login as owner
     const ownerContext = await browser.newContext();
-    const ownerPage = await ownerContext.newPage();
+    const ownerPage = attachHydrationWait(await ownerContext.newPage());
 
     await ownerPage.goto("/login");
     await ownerPage.getByLabel("Email").fill(ownerEmail);
@@ -75,7 +75,7 @@ test.describe("Notifications", () => {
 
     // 2. Action: Anonymous user reports issue on THIS machine
     const publicContext = await browser.newContext();
-    const publicPage = await publicContext.newPage();
+    const publicPage = attachHydrationWait(await publicContext.newPage());
 
     await publicPage.goto("/report");
     await selectMachine(publicPage, machine.id);
@@ -243,7 +243,7 @@ test.describe("Notifications", () => {
 
     // 2. Action: Admin (Owner) changes status
     const adminContext = await browser.newContext();
-    const adminPage = await adminContext.newPage();
+    const adminPage = attachHydrationWait(await adminContext.newPage());
 
     await adminPage.goto("/login");
     await adminPage.getByLabel("Email").fill(adminEmail);
@@ -280,7 +280,7 @@ test.describe("Notifications", () => {
     cleanupUserIds.push(watcher.id);
 
     const watcherContext = await browser.newContext();
-    const watcherPage = await watcherContext.newPage();
+    const watcherPage = attachHydrationWait(await watcherContext.newPage());
 
     await watcherPage.goto("/login");
     await watcherPage.getByLabel("Email").fill(globalWatcherEmail);
@@ -298,7 +298,7 @@ test.describe("Notifications", () => {
 
     // 2. Action: Anonymous user reports issue on ANY machine
     const publicContext = await browser.newContext();
-    const publicPage = await publicContext.newPage();
+    const publicPage = attachHydrationWait(await publicContext.newPage());
     await publicPage.goto("/report");
 
     // Use a seeded machine for convenience, or create one.
@@ -363,7 +363,7 @@ test.describe("Notifications", () => {
     // 2. Create notification via public report (as Anonymous/Other)
     // We need a separate context to avoid "actor == recipient" filter
     const publicContext = await browser.newContext();
-    const publicPage = await publicContext.newPage();
+    const publicPage = attachHydrationWait(await publicContext.newPage());
     await publicPage.goto("/report");
     // Select machine and verify state (Mobile Chrome hardening)
     await selectMachine(publicPage, machine.id);
@@ -421,7 +421,7 @@ test.describe("Notifications", () => {
     const member = await createTestUser(memberEmail);
     cleanupUserIds.push(member.id);
     const memberContext = await browser.newContext();
-    const memberPage = await memberContext.newPage();
+    const memberPage = attachHydrationWait(await memberContext.newPage());
     await ensureLoggedIn(memberPage, testInfo, {
       email: memberEmail,
       password: "TestPassword123",

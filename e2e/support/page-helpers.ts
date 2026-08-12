@@ -314,8 +314,17 @@ export async function fillReportForm(
   await selectOption(page, "issue-severity-select", severity);
 
   if (includePriority) {
+    // `isVisible()` samples; it never retries. Waiting first makes this an
+    // actual wait, so a priority select that is merely slow to render is set
+    // rather than silently skipped — which would leave the caller asserting
+    // against a default it believes it chose. The `catch` keeps the field
+    // genuinely optional (some report forms omit it).
     const prioritySelect = page.getByTestId("issue-priority-select");
-    if (await prioritySelect.isVisible()) {
+    const priorityRendered = await prioritySelect
+      .waitFor({ state: "visible", timeout: 5000 })
+      .then(() => true)
+      .catch(() => false);
+    if (priorityRendered) {
       await selectOption(page, "issue-priority-select", priority);
     }
   }
@@ -330,6 +339,15 @@ export async function fillReportForm(
 
 /** The Tailwind `md` breakpoint, which is what decides the layout below. */
 const MD_BREAKPOINT_PX = 768;
+
+// Budgets for the comment Sheet, bounded rather than inheriting the 30s CI
+// `actionTimeout`, so the worst path (click + wait + click + wait) stays inside
+// the 60s CI test timeout. The first click absorbs a trigger still becoming
+// actionable while the dev server compiles for other workers; the retry only
+// has to re-hit a control already proven actionable.
+const SHEET_FIRST_CLICK_TIMEOUT = process.env["CI"] ? 20_000 : 5_000;
+const SHEET_RETRY_CLICK_TIMEOUT = process.env["CI"] ? 10_000 : 3_000;
+const SHEET_OPEN_TIMEOUT = process.env["CI"] ? 10_000 : 3_000;
 
 /**
  * Resolves the issue-detail comment form for the current viewport, opening the
@@ -369,17 +387,39 @@ export async function openIssueCommentForm(
 
   const dialog = page.getByRole("dialog", { name: "Add a comment" });
 
-  // Click, confirm, click again if the first was dropped. The composer paints
-  // before React attaches its handler, and under `--workers=3` the dev server is
-  // busy compiling for other spec files, so a click can land on an inert button
-  // and vanish — the same lost-click race `openDropdownMenu` guards in
-  // `actions.ts`. Waiting longer cannot recover it, because nothing is pending.
-  await sheetTrigger.click();
-  try {
-    await dialog.waitFor({ state: "visible", timeout: 10000 });
-  } catch {
-    await sheetTrigger.click();
-    await dialog.waitFor({ state: "visible", timeout: 10000 });
+  // The composer paints before React attaches its handler, and under
+  // `--workers=3` the dev server is busy compiling for other spec files, so a
+  // click can land on an inert button and vanish. Waiting longer cannot
+  // recover that, because nothing is pending — it needs another click.
+  //
+  // But a BLIND second click is actively harmful: if the first one worked and
+  // the Sheet is merely slow, Radix has already marked the outside content
+  // `aria-hidden` and laid an overlay over it, so re-clicking either toggles
+  // the Sheet shut or is intercepted — turning a recoverable slow mount into a
+  // hard failure. So the retry is conditional on evidence the click did NOT
+  // register: the dialog is absent from the DOM entirely. If it is mounted but
+  // not yet visible, the click landed and the right move is to keep waiting.
+  //
+  // Note this deliberately does NOT go through `openDropdownMenu`. That helper
+  // decides on `aria-expanded`, and this trigger does not report it reliably —
+  // routing through it made the first click open the Sheet, the attribute stay
+  // "false", and the retry get eaten by the overlay. Verified on Mobile Chrome:
+  // `form-resets:190` and `rich-text:105` failed exactly that way.
+  await sheetTrigger.click({ timeout: SHEET_FIRST_CLICK_TIMEOUT });
+  const openedFirstTry = await dialog
+    .waitFor({ state: "visible", timeout: SHEET_OPEN_TIMEOUT })
+    .then(() => true)
+    .catch(() => false);
+
+  if (!openedFirstTry) {
+    if ((await dialog.count()) > 0) {
+      // Mounted but slow — the click registered. Re-clicking here is what
+      // would close it, so wait instead.
+      await dialog.waitFor({ state: "visible", timeout: SHEET_OPEN_TIMEOUT });
+    } else {
+      await sheetTrigger.click({ timeout: SHEET_RETRY_CLICK_TIMEOUT });
+      await dialog.waitFor({ state: "visible", timeout: SHEET_OPEN_TIMEOUT });
+    }
   }
   return { form: dialog, isSheet: true };
 }

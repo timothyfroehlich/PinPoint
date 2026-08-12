@@ -831,7 +831,14 @@ jobs:
     # Backstop only — the real limits are per-step (see the comment above the
     # Playwright steps). Must stay above setup + both step timeouts, or a job
     # cancellation silently swallows the verdict again. (PP-jxhy.)
-    timeout-minutes: 75
+    #
+    # 25 + 40 of step budget = 65, so this leaves 25 minutes for setup. Sized
+    # for the COLD-cache case, not the warm one: both caches key on
+    # `hashFiles('pnpm-lock.yaml')`, so every dependency bump that lands on
+    # main — the most frequent push there is — misses both and the job pays
+    # `pnpm install --frozen-lockfile` plus a full chromium+webkit browser
+    # download, realistically 8-12 minutes against ~2.5 warm.
+    timeout-minutes: 90
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920  # ratchet:step-security/harden-runner@v2.20.0
@@ -922,7 +929,27 @@ jobs:
             --project=chromium --project="Mobile Chrome" \
             --project="Mobile Safari" --workers=3
 
+      # Copied out because the Full run's HTML reporter calls removeFolders()
+      # on `playwright-report/` in its own onEnd, wiping everything the Smoke
+      # run left there. The verdict itself is unaffected — Smoke is evaluated
+      # below, before Full starts — but without this the uploaded artifact
+      # would contain no trace of the Smoke run at all.
+      - name: Preserve Smoke report
+        if: always()
+        run: |
+          mkdir -p e2e-verdicts
+          cp playwright-report/results-smoke.json e2e-verdicts/ 2>/dev/null || \
+            echo "no smoke report to preserve"
+
+      # Both evaluate steps are continue-on-error so that a gating Smoke
+      # failure does not abort the job before Full ever runs. Letting the
+      # script's `exit 1` end the step here would mean one red smoke spec
+      # leaves main's full-suite health unknown for that commit — the same
+      # class of missing verdict this PR exists to remove. The dedicated gate
+      # step after both suites is what actually fails the job.
       - name: Evaluate gating browser results (Smoke)
+        id: verdict-smoke
+        continue-on-error: true
         run: bash scripts/workflow/evaluate-e2e-results.sh Smoke playwright-report/results-smoke.json
 
       - name: Run Comprehensive Full Tests (all browsers)
@@ -941,14 +968,27 @@ jobs:
             --project="Mobile Safari" --workers=3
 
       - name: Evaluate gating browser results (Full)
+        id: verdict-full
+        continue-on-error: true
         run: bash scripts/workflow/evaluate-e2e-results.sh Full playwright-report/results-full.json
+
+      # The only step that fails the job. Both suites have produced a verdict
+      # by now, so a red Smoke and a red Full are both visible on the same run
+      # instead of the first one hiding the second.
+      - name: Gate on E2E verdicts
+        if: steps.verdict-smoke.outcome == 'failure' || steps.verdict-full.outcome == 'failure'
+        run: |
+          echo "::error::E2E comprehensive: Smoke=${{ steps.verdict-smoke.outcome }} Full=${{ steps.verdict-full.outcome }} — see the evaluate steps above."
+          exit 1
 
       - name: Upload Playwright report
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # ratchet:actions/upload-artifact@v7.0.1
         with:
           name: playwright-report-comprehensive
-          path: playwright-report/
+          path: |
+            playwright-report/
+            e2e-verdicts/
           retention-days: 7
 
   gitleaks:

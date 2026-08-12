@@ -30,16 +30,37 @@
  *
  * The victims span three unrelated surfaces and rotate by scheduling luck, so
  * guarding call sites means guarding every click in the suite — including ones
- * nobody has written yet. Waiting once per navigation covers all of them.
+ * nobody has written yet. Waiting once per navigation covers the specs that
+ * navigate through the `page` fixture.
  *
  * ## What it does not cover
  *
- * The beacon reports that the *page* hydrated, not that a lazily-imported
- * island mounted. `RichTextEditor` is a `ssr: false` dynamic import and is
- * genuinely outside this guarantee — specs already wait for `.ProseMirror` to
- * be visible, which is the right check for it.
+ * Two real gaps, both narrower than "it's handled":
+ *
+ * 1. **Pages this fixture never sees.** A page from
+ *    `browser.newContext().newPage()` is constructed by the spec, not by the
+ *    fixture, so it gets the stock `goto`/`reload`. Eleven such pages exist
+ *    (`email-and-notifications`, `collection-edit-sharing`, `collections`) and
+ *    several of them drive the very helpers this fixture was written for. Call
+ *    {@link attachHydrationWait} on them — see those specs for the pattern.
+ *
+ * 2. **Route handlers.** `/api/*` renders outside the root layout and has no
+ *    React root, so it is excluded rather than waited for — see `isAppPage`.
+ *
+ * 3. **Subtrees that hydrate after the root.** The beacon fires from an effect
+ *    in the root layout, so it reports that the root commit landed — not that
+ *    every interactive descendant has handlers. Anything inside a Suspense
+ *    boundary (any segment with a `loading.tsx`, plus streamed segments) is
+ *    still dehydrated at that moment, as is a `ssr: false` dynamic import such
+ *    as `RichTextEditor`. For those, keep waiting on something the subtree
+ *    itself produces — specs already wait for `.ProseMirror` to be visible,
+ *    which is the right shape of check.
+ *
+ * So this narrows the window; it does not close it. A dropped click on a
+ * Suspense-boundary child is still possible and is not evidence the fixture
+ * regressed.
  */
-import { test as base, expect } from "@playwright/test";
+import { test as base, expect, type Page } from "@playwright/test";
 
 export { expect };
 
@@ -62,22 +83,77 @@ const HYDRATED_SELECTOR = "html[data-hydrated]";
  */
 const HYDRATION_TIMEOUT = process.env["CI"] ? 30_000 : 15_000;
 
+/**
+ * Route handlers render their own HTML without the root layout, so they have
+ * no React root and never set the beacon.
+ *
+ * Checked against the URL the browser actually landed on rather than the one
+ * passed in, so a redirect into or out of `/api` is classified by where it
+ * ended up. `/api/unsubscribe` is the live example: it returns
+ * `text/html; charset=utf-8` from a hand-rendered template, which is why
+ * content-type cannot be the discriminator here.
+ */
+function isAppPage(page: Page): boolean {
+  try {
+    return !new URL(page.url()).pathname.startsWith("/api/");
+  } catch {
+    return true;
+  }
+}
+
+async function waitForHydration(page: Page, target: string): Promise<void> {
+  if (!isAppPage(page)) return;
+
+  try {
+    await page
+      .locator(HYDRATED_SELECTOR)
+      .waitFor({ state: "attached", timeout: HYDRATION_TIMEOUT });
+  } catch {
+    // Deliberately NOT swallowed. Every page rendered through the root layout
+    // carries the beacon, and the one surface that does not is excluded above.
+    // So a miss here is a real hydration break — a client component throwing
+    // during mount, say. Swallowing it would spend HYDRATION_TIMEOUT on every
+    // navigation and then fail later at whatever got clicked next, pointing at
+    // the wrong thing.
+    throw new Error(
+      `React never hydrated within ${String(HYDRATION_TIMEOUT)}ms after navigating to ${target}. ` +
+        `Expected \`${HYDRATED_SELECTOR}\` (set by HydrationBeacon in ClientProviders). ` +
+        `A client component most likely threw during mount — check the browser console in the trace.`
+    );
+  }
+}
+
+/**
+ * Make `goto` and `reload` on this page wait for hydration before returning.
+ *
+ * The `page` fixture below applies this for you. Call it directly on pages you
+ * construct yourself — `browser.newContext()` then `newPage()` — which the
+ * fixture never sees.
+ */
+export function attachHydrationWait(page: Page): Page {
+  const originalGoto = page.goto.bind(page);
+  const originalReload = page.reload.bind(page);
+
+  page.goto = async (url, options) => {
+    const response = await originalGoto(url, options);
+    await waitForHydration(page, url);
+    return response;
+  };
+
+  // A reload discards the document and with it `data-hydrated`, so the new
+  // page races hydration exactly as a fresh `goto` would. Eleven specs reload
+  // and then immediately interact.
+  page.reload = async (options) => {
+    const response = await originalReload(options);
+    await waitForHydration(page, `${page.url()} (reload)`);
+    return response;
+  };
+
+  return page;
+}
+
 export const test = base.extend({
   page: async ({ page }, use) => {
-    const originalGoto = page.goto.bind(page);
-
-    page.goto = async (url, options) => {
-      const response = await originalGoto(url, options);
-      // A `goto` that lands somewhere without our layout — an API route, a
-      // redirect to an external page — has no beacon to wait for and must not
-      // be turned into a failure. Only the app's own pages are guaranteed one.
-      await page
-        .locator(HYDRATED_SELECTOR)
-        .waitFor({ state: "attached", timeout: HYDRATION_TIMEOUT })
-        .catch(() => undefined);
-      return response;
-    };
-
-    await use(page);
+    await use(attachHydrationWait(page));
   },
 });

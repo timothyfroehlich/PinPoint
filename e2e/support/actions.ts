@@ -201,6 +201,28 @@ const PORTAL_MOUNT_TIMEOUT = process.env["CI"] ? 20_000 : 5_000;
 const DROPDOWN_OPEN_TIMEOUT = process.env["CI"] ? 10_000 : 3_000;
 
 /**
+ * The clicks inside `openDropdownMenu` are bounded explicitly rather than
+ * inheriting `use.actionTimeout` (30s in CI, `playwright.config.ts`).
+ *
+ * Without this the worst case is click(30) + assert(10) + click(30) +
+ * assert(10) = 80s against a 60s CI test timeout, so a genuinely stuck trigger
+ * would die as a bare "Test timeout of 60000ms exceeded" and the authored
+ * "dropdown never opened" message below — the whole point of the helper —
+ * would never print.
+ *
+ * The two clicks get different budgets because they are doing different jobs.
+ * The FIRST has to absorb a trigger that is still becoming actionable — under
+ * `--workers=3` the Mobile Chrome sticky-composer trigger genuinely needs more
+ * than 10s while the dev server compiles for other spec files, and bounding it
+ * at 10s turned `form-resets:190` and `rich-text:105` red. The RETRY only has
+ * to re-hit a control already proven actionable, so it can be tight.
+ *
+ * Worst case 20 + 10 + 10 + 10 = 50s, inside the 60s CI test timeout.
+ */
+const DROPDOWN_FIRST_CLICK_TIMEOUT = process.env["CI"] ? 20_000 : 5_000;
+const DROPDOWN_RETRY_CLICK_TIMEOUT = process.env["CI"] ? 10_000 : 3_000;
+
+/**
  * Click a Radix dropdown trigger and confirm it actually opened. Retries once
  * if the first click loses to a focus/overlay race.
  *
@@ -210,8 +232,10 @@ const DROPDOWN_OPEN_TIMEOUT = process.env["CI"] ? 10_000 : 3_000;
  * opened" failure rather than a missing-item failure downstream.
  */
 export async function openDropdownMenu(trigger: Locator): Promise<void> {
-  await trigger.click();
   try {
+    // The click sits inside the try so a trigger that never becomes actionable
+    // in time gets the retry too, instead of throwing straight past it.
+    await trigger.click({ timeout: DROPDOWN_FIRST_CLICK_TIMEOUT });
     await expect(trigger).toHaveAttribute("aria-expanded", "true", {
       timeout: DROPDOWN_OPEN_TIMEOUT,
     });
@@ -219,7 +243,7 @@ export async function openDropdownMenu(trigger: Locator): Promise<void> {
   } catch {
     // One retry — the first click sometimes loses to a focus race (e.g. a
     // ProseMirror editor still holding focus right after a form submit).
-    await trigger.click();
+    await trigger.click({ timeout: DROPDOWN_RETRY_CLICK_TIMEOUT });
     await expect(
       trigger,
       "Dropdown trigger did not open after two click attempts. aria-expanded never became 'true' — the click is likely being intercepted by an overlay (modal, editor focus trap, etc.)."
