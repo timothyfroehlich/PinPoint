@@ -6,7 +6,7 @@
  * Password reset email test is in e2e/full/email-and-notifications.spec.ts.
  */
 
-import { test, expect } from "../support/fixtures.js";
+import { test, expect } from "@playwright/test";
 import { loginAs, logout, assertNoA11yViolations } from "../support/actions.js";
 import { TEST_USERS } from "../support/constants.js";
 

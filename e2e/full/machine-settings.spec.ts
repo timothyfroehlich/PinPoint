@@ -19,7 +19,7 @@
  * that CREATES a set seeds its own machine (see the editor-journey block).
  */
 
-import { test, expect, type Page } from "../support/fixtures.js";
+import { test, expect, type Page } from "@playwright/test";
 import { STORAGE_STATE } from "../support/auth-state.js";
 import { seededMachines } from "../support/constants.js";
 import {

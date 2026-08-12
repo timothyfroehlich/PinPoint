@@ -5,7 +5,7 @@
  * from within the creation dialog, and that the new owner is auto-selected.
  */
 
-import { test, expect } from "../support/fixtures.js";
+import { test, expect } from "@playwright/test";
 import { cleanupTestEntities } from "../support/cleanup.js";
 import { STORAGE_STATE } from "../support/auth-state.js";
 

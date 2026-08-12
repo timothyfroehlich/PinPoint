@@ -4,7 +4,7 @@
  * Tests navigation bar behavior for authenticated and unauthenticated states.
  */
 
-import { test, expect } from "../support/fixtures.js";
+import { test, expect } from "@playwright/test";
 import {
   assertNoHorizontalOverflow,
   loginAs,

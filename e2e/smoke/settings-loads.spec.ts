@@ -6,7 +6,7 @@
  * tests (oauth-actions.test.ts, connected-accounts-section.test.tsx).
  */
 
-import { test, expect } from "../support/fixtures.js";
+import { test, expect } from "@playwright/test";
 import { STORAGE_STATE } from "../support/auth-state.js";
 import { assertNoA11yViolations } from "../support/actions.js";
 

@@ -9,7 +9,7 @@
  * 5. User is redirected to dashboard.
  */
 
-import { test, expect } from "../support/fixtures.js";
+import { test, expect } from "@playwright/test";
 import { ensureLoggedIn, logout } from "../support/actions.js";
 import { cleanupTestEntities } from "../support/cleanup.js";
 import { seededMachines, TEST_USERS } from "../support/constants.js";

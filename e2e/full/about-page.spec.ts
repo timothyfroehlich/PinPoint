@@ -4,7 +4,7 @@
  * Tests that the About page is accessible and renders correctly.
  */
 
-import { test, expect } from "../support/fixtures.js";
+import { test, expect } from "@playwright/test";
 import { STORAGE_STATE } from "../support/auth-state.js";
 
 test.describe("About Page - Authenticated", () => {

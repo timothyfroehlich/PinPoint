@@ -7,7 +7,7 @@
  * - CANNOT access admin panel
  */
 
-import { test, expect } from "../support/fixtures.js";
+import { test, expect } from "@playwright/test";
 import { STORAGE_STATE } from "../support/auth-state.js";
 import { seededMachines } from "../support/constants.js";
 
@@ -20,15 +20,7 @@ test.describe("Technician Role Permissions", () => {
     const heading = page.getByRole("heading", {
       name: seededMachines.addamsFamily.name,
     });
-    // Waited for, not sampled: `isVisible()` never retries, so a heading that
-    // had merely not painted yet read as "name was changed" and sent this
-    // afterEach down the restore branch — an unnecessary DB write on every
-    // slow render.
-    const nameIsCorrect = await heading
-      .waitFor({ state: "visible", timeout: 5000 })
-      .then(() => true)
-      .catch(() => false);
-    if (nameIsCorrect) {
+    if (await heading.isVisible()) {
       // Name is already correct — nothing to do
       return;
     }

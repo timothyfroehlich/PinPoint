@@ -9,7 +9,7 @@
  * 3. Is visible for authenticated (signed-in) members on mobile viewports.
  */
 
-import { test, expect } from "../support/fixtures.js";
+import { test, expect } from "@playwright/test";
 import { loginAs } from "../support/actions.js";
 import { seededIssue } from "../support/constants.js";
 

@@ -8,7 +8,7 @@
  * more reliable hydration on mobile viewports in CI.
  */
 
-import { test, expect } from "../support/fixtures.js";
+import { test, expect } from "@playwright/test";
 import { DEV_SHOW_COOKIE_BANNER_KEY } from "~/lib/cookies/constants.js";
 
 test.describe("Cookie Consent Banner", () => {

@@ -26,7 +26,7 @@
  *     so the button is gated on a selection instead).
  */
 
-import { test, expect } from "../support/fixtures.js";
+import { test, expect } from "@playwright/test";
 import { ensureLoggedIn, machineSelectValue } from "../support/actions.js";
 import { TEST_USERS } from "../support/constants.js";
 
@@ -41,36 +41,32 @@ test.describe("UnifiedReportForm — stale localStorage machineId (PP-lql)", () 
       password: TEST_USERS.admin.password,
     });
 
-    // Seed the stale draft as an init script, so it is in localStorage before
-    // any app code runs on the next navigation.
-    //
-    // This used to be a `goto` + `evaluate` + `reload`, which raced the draft
-    // store: once it has restored, its persist effect rewrites the key with the
-    // current (empty) state, so a draft written after navigation only survived
-    // if it landed after that effect. The spec won that race by luck rather
-    // than by construction — it started failing deterministically the moment
-    // anything shifted navigation timing. Seeding pre-navigation removes the
-    // window, and drops the reload with it. (PP-jxhy.)
-    //
-    // The legacy key is deliberate: this exercises the migration path, and the
-    // store reads `report_draft` first and falls back to `report_form_state`.
-    await page.addInitScript((staleId: string) => {
-      window.localStorage.setItem(
-        "report_form_state",
-        JSON.stringify({
-          machineId: staleId,
-          title: "PP-lql stale draft restoration",
-          description: null,
-          severity: "minor",
-          priority: "medium",
-          frequency: "constant",
-          watchIssue: true,
-        })
-      );
-    }, STALE_UUID);
-
-    // The machine select must NOT silently land on machinesList[0].
+    // Visit /report once so we are on the right origin to set localStorage.
     await page.goto("/report");
+
+    // Seed localStorage with a stale draft. The machineId UUID does not
+    // correspond to any machine in the seeded data set.
+    await page.evaluate(
+      ([staleId]) => {
+        window.localStorage.setItem(
+          "report_form_state",
+          JSON.stringify({
+            machineId: staleId,
+            title: "PP-lql stale draft restoration",
+            description: null,
+            severity: "minor",
+            priority: "medium",
+            frequency: "constant",
+            watchIssue: true,
+          })
+        );
+      },
+      [STALE_UUID]
+    );
+
+    // Reload so the form re-mounts and restoration runs against the seeded
+    // localStorage. The machine select must NOT silently land on machinesList[0].
+    await page.reload();
 
     const machineSelect = page.getByTestId("machine-select");
     await expect(machineSelect).toBeVisible();

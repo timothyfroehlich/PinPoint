@@ -24,7 +24,7 @@
  * and therefore exercises the cross-browser `scrollIntoView`-on-focus floor.
  */
 
-import { test, expect, type Locator } from "../support/fixtures.js";
+import { test, expect, type Locator } from "@playwright/test";
 import { STORAGE_STATE } from "../support/auth-state.js";
 import { seededMachines } from "../support/constants.js";
 import {

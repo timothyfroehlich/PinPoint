@@ -1,11 +1,10 @@
 // e2e/full/rich-text.spec.ts
-import { test, expect } from "../support/fixtures.js";
+import { test, expect } from "@playwright/test";
 import { loginAs } from "../support/actions.js";
 import {
   createTestUser,
   createTestMachine,
 } from "../support/supabase-admin.js";
-import { openIssueCommentForm } from "../support/page-helpers.js";
 import { getTestPrefix } from "../support/test-isolation.js";
 
 /**
@@ -122,8 +121,25 @@ test.describe("Rich Text and Mentions", () => {
 
     await expect(page).toHaveURL(new RegExp(`/m/${machine.initials}/i/1`));
 
+    // On mobile (md: breakpoint hidden), AddCommentForm lives inside the
+    // StickyCommentComposer Sheet — open it before interacting with the editor.
+    // The inline form is hidden (hidden md:flex) on mobile; scope locators to
+    // the open dialog to avoid resolving to the hidden inline ProseMirror.
     await page.waitForLoadState("domcontentloaded");
-    const { form: commentForm } = await openIssueCommentForm(page);
+    const sheetTrigger = page.getByRole("button", { name: "Add a comment" });
+    const isOnMobile = await sheetTrigger
+      .isVisible({ timeout: 3000 })
+      .catch(() => false);
+    if (isOnMobile) {
+      await sheetTrigger.click();
+      await page
+        .getByRole("dialog", { name: "Add a comment" })
+        .waitFor({ state: "visible", timeout: 10000 });
+    }
+
+    const commentForm = isOnMobile
+      ? page.getByRole("dialog", { name: "Add a comment" })
+      : page.getByTestId("issue-comment-form");
 
     // Add rich text comment
     const editor = commentForm.locator(".ProseMirror");

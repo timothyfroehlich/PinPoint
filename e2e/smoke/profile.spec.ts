@@ -6,7 +6,7 @@
  * Full edit-journey coverage is in e2e/full/profile-edit.spec.ts.
  */
 
-import { test, expect } from "../support/fixtures.js";
+import { test, expect } from "@playwright/test";
 import { STORAGE_STATE } from "../support/auth-state.js";
 
 test.describe("Profile smoke", () => {

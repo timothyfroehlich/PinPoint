@@ -5,7 +5,7 @@
  * Core reporting tests are in e2e/smoke/public-reporting.spec.ts.
  */
 
-import { test, expect } from "../support/fixtures.js";
+import { test, expect } from "@playwright/test";
 import { loginAs, selectMachine } from "../support/actions.js";
 import { cleanupTestEntities } from "../support/cleanup.js";
 import { TEST_USERS } from "../support/constants.js";

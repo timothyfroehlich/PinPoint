@@ -1,4 +1,4 @@
-import { test, expect } from "../support/fixtures.js";
+import { test, expect } from "@playwright/test";
 import {
   assertNoHorizontalOverflow,
   assertNoA11yViolations,

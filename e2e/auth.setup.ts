@@ -17,7 +17,7 @@
 
 import { mkdirSync } from "fs";
 import { dirname } from "path";
-import { expect, type Page, test as setup } from "./support/fixtures.js";
+import { expect, type Page, test as setup } from "@playwright/test";
 
 import { TEST_USERS } from "./support/constants.js";
 import { STORAGE_STATE } from "./support/auth-state.js";

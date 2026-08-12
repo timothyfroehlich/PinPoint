@@ -5,7 +5,7 @@
  * Requires Supabase to be running.
  */
 
-import { test, expect, type Page } from "../support/fixtures.js";
+import { test, expect, type Page } from "@playwright/test";
 import {
   assertNoHorizontalOverflow,
   updateIssueField,
