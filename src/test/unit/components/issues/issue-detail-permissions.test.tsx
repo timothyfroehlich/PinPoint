@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
+import { renderToString } from "react-dom/server";
 import type { ReactElement } from "react";
 import type { IssueWithAllRelations } from "~/lib/types";
 import type { ProseMirrorDoc } from "~/lib/tiptap/types";
@@ -257,5 +258,75 @@ describe("Issue detail permission-aware UI", () => {
 
     expect(screen.queryByText("Log in to comment")).not.toBeInTheDocument();
     expect(screen.getByTestId("mock-add-comment-form")).toBeInTheDocument();
+  });
+
+  it("names the timestamp triggers without a zone-dependent SSR attribute", () => {
+    // Regression (PP-h490). Two things have to hold at once here:
+    //
+    // 1. The buttons must have an accessible name even while `<RelativeTime>`
+    //    is still empty (pre-tick), or axe's `button-name` fires — that is the
+    //    bug this PR's first fix introduced.
+    // 2. That name must not be `formatDateTime(...)` evaluated during SSR.
+    //    `Intl.DateTimeFormat(undefined, …)` resolves the *runtime's* zone, so
+    //    a UTC-hosted server and a UTC-5 browser produce different strings, and
+    //    React does not patch a mismatched attribute the way it patches text.
+    //    The label would stay wrong for the life of the page.
+    //
+    // The server snapshot of the shared ticker is `null`, so this asserts the
+    // pre-tick label specifically.
+    // The default fixture has no comments, so it renders only the "issue"
+    // branch. Both timestamp-trigger branches have to be on screen for this to
+    // mean anything — a system event reaches the first, an edited comment the
+    // second and third.
+    const issue = createIssue({
+      comments: [
+        {
+          id: "comment-sys",
+          isSystem: true,
+          author: null,
+          content: null,
+          eventData: { kind: "status_changed", from: "new", to: "fixed" },
+          createdAt: new Date("2026-02-02T14:30:00.000Z"),
+          updatedAt: new Date("2026-02-02T14:30:00.000Z"),
+        },
+        {
+          id: "comment-1",
+          isSystem: false,
+          author: { id: "member-1", name: "Member User" },
+          content: {
+            type: "doc",
+            content: [
+              { type: "paragraph", content: [{ type: "text", text: "Hi" }] },
+            ],
+          },
+          eventData: null,
+          createdAt: new Date("2026-02-03T14:30:00.000Z"),
+          updatedAt: new Date("2026-02-03T15:45:00.000Z"),
+        },
+      ] as IssueWithAllRelations["comments"],
+    });
+
+    const html = renderToString(
+      <TooltipProvider>
+        <IssueTimeline
+          issue={issue}
+          currentUserId="member-1"
+          currentUserRole="member"
+          currentUserInitials="MU"
+        />
+      </TooltipProvider>
+    );
+
+    const labels = [...html.matchAll(/aria-label="([^"]*)"/g)].map((m) => m[1]);
+    // Three labelled triggers: the system row uses one branch, the issue row
+    // and the comment row the other. If this count drops, the fixture stopped
+    // covering a branch and the zone assertion below is no longer watching it.
+    const timestampLabels = labels.filter((l) => l === "Show exact time");
+    expect(timestampLabels).toHaveLength(3);
+    // No rendered label may carry a formatted absolute time. "2:30 PM" is the
+    // shape `formatDateTime` produces; matching it means SSR baked in a zone.
+    for (const label of labels) {
+      expect(label).not.toMatch(/\d{1,2}:\d{2}\s?(AM|PM)/i);
+    }
   });
 });
