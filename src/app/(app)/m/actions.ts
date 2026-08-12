@@ -22,7 +22,12 @@ import {
   invitedUsers,
 } from "~/server/db/schema";
 import { createMachineSchema, updateMachineSchema } from "./schemas";
-import { resolvePbmLinkColumns } from "~/lib/pinballmap/link-columns";
+import {
+  resolvePbmLinkColumnsForCreate,
+  resolvePbmLinkColumnsForUpdate,
+  type AbandonedListing,
+} from "~/lib/pinballmap/link-columns";
+import { recordAbandonedListing } from "~/lib/pinballmap/abandoned-listings";
 import {
   captureAutoLink,
   resolveAutoLinkForMachine,
@@ -324,7 +329,7 @@ export async function createMachineAction(
       "You do not have permission to link machines to Pinball Map."
     );
   }
-  const pbm = await resolvePbmLinkColumns(validation.data);
+  const pbm = await resolvePbmLinkColumnsForCreate(validation.data);
   if (!pbm.ok) return err("VALIDATION", pbm.message);
   const pbmColumns = pbm.columns;
 
@@ -687,7 +692,8 @@ export async function updateMachineAction(
         initials: true,
         presenceStatus: true,
         // Needed to decide whether an edit re-targets the PBM link — see the
-        // `pinballmapListed` carry-over at the `resolvePbmLinkColumns` call.
+        // `pinballmapListed` carry-over at the `resolvePbmLinkColumnsForUpdate`
+        // call.
         pinballmapMachineId: true,
         pinballmapListed: true,
         pinballmapLmxId: true,
@@ -716,6 +722,11 @@ export async function updateMachineAction(
     // link permission and derives metadata from the catalog mirror. When the
     // marker is absent, link columns are left untouched.
     let pbmColumns: MachinePbmColumns | null = null;
+    // A live PinballMap entry this save walks away from (PP-l81u), or null.
+    // Set alongside `pbmColumns` below and written in the same transaction as
+    // the columns — a retitle whose record does not land leaves a public
+    // listing nobody can find.
+    let abandonedListing: AbandonedListing | null = null;
     if (pbmFormPresent) {
       if (
         !checkPermission("machines.pinballmap.link", accessLevel, {
@@ -730,32 +741,17 @@ export async function updateMachineAction(
       }
       // `pinballmapListed` is not an input to this action at all: the edit form
       // renders no control for it, `readPbmLinkFormFields` does not read it, and
-      // `updateMachineSchema` does not accept it (PP-o355.29). It is flipped
-      // only by paths that talk to PBM — `linkPinballmapEntryAction` and the
-      // verify/heal action. So the value below comes from the STORED row, and
-      // without this carry-over `resolvePbmLinkColumns` would default it to
-      // `false` — silently unlisting a listed machine on every unrelated "Save
-      // details" (PP-o355.19 review).
-      //
-      // Carry the stored value only while the link target is unchanged;
-      // re-targeting the link makes the old listing meaningless, and the
-      // resolver already forces `false` on the unlinked/excluded branches.
-      const submittedPbmId = validation.data.pinballmapMachineId ?? null;
-      const linkUnchanged =
-        submittedPbmId === currentMachine.pinballmapMachineId;
-      const pbm = await resolvePbmLinkColumns({
-        ...validation.data,
-        ...(linkUnchanged && currentMachine.pinballmapListed
-          ? {
-              pinballmapListed: true,
-              ...(currentMachine.pinballmapLmxId === null
-                ? {}
-                : { pinballmapLmxId: currentMachine.pinballmapLmxId }),
-            }
-          : {}),
+      // `updateMachineSchema` does not accept it (PP-o355.29). The resolver
+      // takes the STORED row and owns the carry-over decision, so no caller can
+      // unlist a machine by leaving an argument out (PP-l81u).
+      const pbm = await resolvePbmLinkColumnsForUpdate(validation.data, {
+        pinballmapMachineId: currentMachine.pinballmapMachineId,
+        pinballmapListed: currentMachine.pinballmapListed,
+        pinballmapLmxId: currentMachine.pinballmapLmxId,
       });
       if (!pbm.ok) return err("VALIDATION", pbm.message);
       pbmColumns = pbm.columns;
+      abandonedListing = pbm.abandoned;
 
       // Auto-link (PP-o355.20): the moment a cabinet is matched to a title that
       // is already on Pinball Map's lineup, capture that listing alongside the
@@ -855,6 +851,10 @@ export async function updateMachineAction(
 
         if (!updatedMachine) {
           throw new Error("Machine update failed");
+        }
+
+        if (abandonedListing) {
+          await recordAbandonedListing(tx, id, abandonedListing, user.id);
         }
 
         // Add new owner as watcher if active user
@@ -1049,6 +1049,10 @@ export async function updateMachineAction(
 
       if (!updatedMachine) {
         throw new MachineNotFoundError();
+      }
+
+      if (abandonedListing) {
+        await recordAbandonedListing(tx, id, abandonedListing, user.id);
       }
 
       // Handle owner changes in machine_watchers (inside tx so they roll back

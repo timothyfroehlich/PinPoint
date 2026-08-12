@@ -18,6 +18,7 @@ import { createClient } from "~/lib/supabase/server";
 import { db, type Tx } from "~/server/db";
 import { machines, userProfiles, pinballmapState } from "~/server/db/schema";
 import { reconcileAfterSync } from "~/lib/pinballmap/sync";
+import { retireAbandonmentForLmx } from "~/lib/pinballmap/abandoned-listings";
 import { getPinballMapWriteCredentials } from "~/lib/pinballmap/credentials";
 import { withLmxAdded, withLmxRemoved } from "~/lib/pinballmap/snapshot-edit";
 import { getPinballMapClient } from "~/lib/pinballmap/client";
@@ -260,6 +261,7 @@ export async function linkPinballmapEntryAction(
         .update(machines)
         .set({ pinballmapLmxId: lmx.id, pinballmapListed: true })
         .where(eq(machines.id, machine.id));
+      await retireAbandonmentForLmx(tx, lmx.id);
       await createMachineTimelineEvent(
         machine.id,
         {
@@ -540,6 +542,9 @@ export async function listMachineOnPinballMapAction(
         .update(machines)
         .set({ pinballmapLmxId: lmxId, pinballmapListed: true })
         .where(eq(machines.id, machine.id));
+      // PBM returns the EXISTING lmx when the entry is already on the lineup,
+      // so an add can reclaim one a machine walked away from.
+      await retireAbandonmentForLmx(tx, lmxId);
       await editStoredSnapshot(tx, (snapshot) =>
         withLmxAdded(snapshot, lmxId, titleId)
       );
@@ -864,6 +869,9 @@ export async function verifyPinballmapLinkAction(
         .update(machines)
         .set({ pinballmapLmxId: lmx.id, pinballmapListed: true })
         .where(eq(machines.id, machine.id));
+      // A heal claims the lmx PBM re-minted, which can be one a machine
+      // abandoned.
+      await retireAbandonmentForLmx(tx, lmx.id);
       await createMachineTimelineEvent(
         machine.id,
         {
@@ -900,7 +908,12 @@ export async function verifyPinballmapLinkAction(
 
 /** Result of an on-demand "Sync now" — the machine count and writes applied. */
 export type SyncPinballMapNowResult = Result<
-  { machineCount: number; healed: number; linked: number },
+  {
+    machineCount: number;
+    healed: number;
+    linked: number;
+    abandonmentsCleared: number;
+  },
   "UNAUTHORIZED" | "SERVER" | "THROTTLED"
 >;
 
@@ -956,11 +969,16 @@ export async function syncPinballMapNowAction(
       return err("SERVER", result.error);
     }
 
-    const { healed, linked } = await reconcileAfterSync();
+    const { healed, linked, abandonmentsCleared } = await reconcileAfterSync();
     // Desync badges on machine Info cards derive from the stored snapshot, so
     // refresh the whole machine subtree after a successful sync.
     revalidatePath("/m", "layout");
-    return ok({ machineCount: result.machineCount, healed, linked });
+    return ok({
+      machineCount: result.machineCount,
+      healed,
+      linked,
+      abandonmentsCleared,
+    });
   } catch (error: unknown) {
     log.error({ err: error }, "Manual PinballMap sync failed");
     return err("SERVER", "Pinball Map sync failed. Please try again.");

@@ -2,6 +2,7 @@
 
 import React, { useTransition } from "react";
 import { formatDateTime } from "~/lib/dates";
+import { useRelativeNow } from "~/components/issues/RelativeTimeProvider";
 import { Avatar, AvatarFallback } from "~/components/ui/avatar";
 import { AddCommentForm } from "~/components/issues/AddCommentForm";
 import { OwnerBadge } from "~/components/issues/OwnerBadge";
@@ -202,6 +203,17 @@ function TimelineItem({
   const [isEditing, setIsEditing] = React.useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
 
+  // Subscribing here — not just inside the `<RelativeTime>` children — is what
+  // makes the timestamp buttons' `aria-label` safe. `formatDateTime` resolves
+  // the runtime's own locale and zone, so evaluating it during SSR and again in
+  // the browser yields different strings. React does not patch a mismatched
+  // *attribute* the way it patches text, and without this subscription nothing
+  // would ever re-render the button, so a UTC-hosted render would leave the
+  // server's zone announced to screen readers forever. Rendering a static label
+  // until the first tick keeps SSR and the client's first render in agreement,
+  // then swaps in the real timestamp once we are demonstrably client-side.
+  const now = useRelativeNow();
+
   const { currentUserId, currentUserRole } = userContext;
 
   const isSystem = event.type === "system";
@@ -260,8 +272,23 @@ function TimelineItem({
               )}
               <Tooltip>
                 <TooltipTrigger asChild>
+                  {/* The label names the absolute instant the tooltip reveals,
+                      rather than leaving the relative label as the accessible
+                      name. `<RelativeTime>` renders nothing until the client
+                      ticker mounts, so without a label the button is nameless
+                      on the pre-hydration paint (axe `button-name`, PP-h490) —
+                      and even hydrated, "3 minutes ago" is a poor name for a
+                      control whose whole purpose is to disclose the exact
+                      time. The pre-tick label is a static string because
+                      `formatDateTime` is zone-dependent; see the
+                      `useRelativeNow` comment above. */}
                   <button
                     type="button"
+                    aria-label={
+                      now === null
+                        ? "Show exact time"
+                        : formatDateTime(event.createdAt)
+                    }
                     className={cn(
                       "cursor-help bg-transparent p-0 text-[11px] text-muted-foreground",
                       timestampTooltipTriggerClassName
@@ -307,6 +334,11 @@ function TimelineItem({
                     <TooltipTrigger asChild>
                       <button
                         type="button"
+                        aria-label={
+                          now === null
+                            ? "Show exact time"
+                            : formatDateTime(event.createdAt)
+                        }
                         className={cn(
                           "cursor-help bg-transparent p-0 text-xs text-muted-foreground",
                           timestampTooltipTriggerClassName
@@ -322,6 +354,13 @@ function TimelineItem({
                   {isEdited && !isIssue && (
                     <Tooltip>
                       <TooltipTrigger asChild>
+                        {/* No `aria-label` here: unlike the two triggers above,
+                            this one carries visible text ("• edited"), so it is
+                            never nameless even while `<RelativeTime>` is empty.
+                            Leaving the content to name it also keeps the
+                            accessible name a superset of the visible label
+                            (WCAG 2.5.3), and avoids a zone-dependent
+                            attribute. */}
                         <button
                           type="button"
                           className={cn(
