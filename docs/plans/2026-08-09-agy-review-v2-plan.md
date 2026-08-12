@@ -1139,3 +1139,165 @@ v6.2 → v6.3 on #1807 is one run each, so the _score_ movement cannot be separa
 run-to-run variance. The types-slice evidence does not have that problem — a slice returning
 zero items in its own subject is a defect in the prompt regardless of what the run scored —
 and that is why the fix is being made on the strength of it rather than on the 2 → 0.
+
+# Fresh calibration targets — keys verified against the review-point tree
+
+Built to stop overfitting to #1856 and #1807. Every defect below was confirmed by reading the
+tree at the review point, not by trusting the fix commit's message.
+
+## Target C — PR #1809, review at `77d36312`, fix `575bf1cb`
+
+613 lines / 7 files. **The parent is a merge commit**, so the reviewer's diff must be
+`git diff --merge-base origin/main` — diffing from the parent drowns the change in main.
+
+| id  | class         | defect                                                                                                                                                                                                                                                                                                    |
+| :-- | :------------ | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| C1  | ABSENCE       | A `machineGroupId` lookup against an empty catalog mirror returns the same "no family has this id" error as a genuinely bad id, so a fresh or reset environment is told confidently that its id is wrong. `search-pinballmap-catalog.ts:119`, and the query-search branch has the same gap near :150.     |
+| C2  | ABSENCE       | The `machineGroupId` parameter description says only "not a pinballmapMachineId" and says nothing about standalone titles, which come back with `machineGroupId: null` and the `pinballmapMachineId` already being the answer — a caller following the text is steered into the wrong second call. `:40`. |
+| C3  | CONTRADICTION | Both result shapes expose a field named `count`, against the `total`/`hasMore` convention `list_machines` explicitly trains callers to use _instead_ of `count`. `:128` and `:150`.                                                                                                                       |
+| C4  | CONTRADICTION | `get_machine`'s description promises "availability"; the payload key is `presence`. Description at `get-machine.ts:99`, field at `:73`.                                                                                                                                                                   |
+
+Two absences and two contradictions, and the contradictions are only visible against sibling
+tools outside the diff — which is the comparison half this harness has historically skipped.
+
+## Target D — PR #1818, review at `2668f4ab`, fixed by #1825 / `9759f492`
+
+~1371 lines of real code and tests, over the size guideline, but all three defects sit in
+small isolable spots. Review point is PR #1818's own squash commit rather than the literal
+fix parent, because the fix branch forked after two unrelated PRs had landed on top.
+
+| id  | class              | defect                                                                                                                                                                                                                                                                                                                                                        |
+| :-- | :----------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| D1  | ABSENCE (security) | `get_pinballmap_credentials()` is `SECURITY DEFINER`, returns a decrypted Vault secret, and has no `auth.role()` check in its body — it relies entirely on `REVOKE`/`GRANT`, which Supabase's connection-time re-grant to `authenticated` defeats, and PostgREST exposes every public function as an RPC. `drizzle/0061_pinballmap_credentials_rpc.sql:9-27`. |
+| D2  | TYPE               | The prod opt-in flag is read with `Boolean(process.env[...])`, and `Boolean("0")` and `Boolean("false")` are both true — the two spellings an operator would use to turn the flag off are exactly the ones that enable writing dev credentials into prod's Vault. `supabase/seed-pinballmap-creds.mjs:46`.                                                    |
+| D3  | ABSENCE            | The unlist action deletes by the _stored_ lmx handle without re-checking it against the live lineup, so a re-minted id makes the delete 404 as "already gone", clears the local columns, and lets the next reconcile re-list the cabinet — the operator's unlist silently un-happens. `pinballmap-actions.ts:531`.                                            |
+
+D1 is the first genuinely high-severity security defect in the calibration set.
+
+## Target E — PR #1851, review at `e7ee7075`, fixed by #1859 / `a1b975bb`
+
+~2494 lines of real code and tests. Cleanest parent relationship of the four — a single-parent
+commit sitting almost directly on #1851's merge.
+
+| id  | class    | defect                                                                                                                                                                                                                                                                                                                                                        |
+| :-- | :------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| E1  | TYPE     | `NamedProfile.role` is plain `string` rather than `UserRole`, and three comparisons against string literals would compile fine with a typo and silently match nobody. `shared.ts:191`, comparisons near :239, :253, :265.                                                                                                                                     |
+| E2  | PRESENCE | The UUIDv8 content-addressing logic — digest, NUL-join, version and variant bit-stamping, hex rendering — is duplicated verbatim across two files, hand-rolled bit-stamping that must stay in sync for idempotency to hold. `create-issue.ts:107-120` vs `add-issue-comment.ts:75-88`.                                                                        |
+| E3  | ABSENCE  | The severity, priority and frequency zod schemas hardcode their own literal arrays instead of deriving from the app's source types, unlike `status`, which derives from `ISSUE_STATUS_VALUES` right next to them. A new value added elsewhere is silently rejected here with nothing failing to compile. `create-issue.ts:43`, `update-issue.ts:101/107/111`. |
+| E4  | ABSENCE  | `get_issue`'s comment window orders only by `desc(createdAt)` under a `LIMIT` — not a total order, so two comments sharing a timestamp at the boundary can swap between calls. `list-issues.ts` already breaks the tie with a second key for exactly this reason. `get-issue.ts:117`.                                                                         |
+
+## Target F — PR #1810, review at `23272cd1` (weakest, partially verified)
+
+1041 lines, parent is a merge commit. Two of five defects verified directly: the hourly
+reconcile wraps every machine's auto-link write in one transaction, so one collision rolls back
+the whole pass (`sync.ts:152`); and save-time capture never checks `pinballmap_state.enabled`,
+so a save with the integration switched off still lists a cabinet (`actions.ts:768`). The other
+three come from the fix message and are unconfirmed — do not score against them.
+
+Also noted: #1810 has a _second_ review round that found defects surviving the first fix. That
+is the target to use if the question is ever "does this reviewer catch what a previous reviewer
+missed" rather than "does it catch what a reviewer caught".
+
+## How to use these
+
+Run each prompt **at least twice** before concluding anything about a prompt change. The model
+is not deterministic, and the whole v6.3–v6.6 detour came from reading single runs as if they
+were measurements.
+
+## Target G — "survived a review": PR #1810 at `830012fd`, keyed against round two
+
+Every other key asks whether the harness can reproduce findings a reviewer already made. This
+one asks the question that actually matters for a second opinion: **can it find what a review
+missed?** PR #1810 had two review rounds. The review point is the tree immediately after round
+one landed — code a human reviewer had just signed off on — and the key is only what round
+two (`e8620fcf`) repaired.
+
+**Review point** `830012fd`, single-parent, not a merge commit. The reviewer diffs
+`git diff --merge-base origin/main` (merge base `695ec11e`), which reproduces the same 14-file,
+1206-insertion view a round-one reviewer had. Not the parent diff — that shows only round one's
+repairs, and the point is to look at the whole feature.
+
+| id  | class   | defect                                                                                                                                                                                                                                                                                                                                                                                                                                                  | in round one's own diff?                                                                                                                                         |
+| :-- | :------ | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | :--------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| G1  | ABSENCE | `captureAutoLink` is called with no wrapper, and its try/catch absorbs only the expected `23505`. Anything else — deadlock, dropped connection, a failed timeline receipt — reaches the action's outer catch, which reports "Failed to update machine" for an edit that **already committed**, sending the user to redo work that landed. `actions.ts:874-877` and `:1087-1090`; the outer catch at `:1155-1167` states the false premise in a comment. | **yes**                                                                                                                                                          |
+| G2  | ABSENCE | The collision handler checks a bare `23505` with no constraint name, while the same transaction also writes a `timeline_events` row under its own partial unique index. A collision there is misread as "someone else already listed it" and the function returns `false`: nothing linked, nothing logged, repeated hourly with no visible failure. `getPostgresErrorConstraint` already existed and is not used. `sync.ts:119`.                        | **yes**                                                                                                                                                          |
+| G3  | ABSENCE | `reconcileAfterSync` never checks `pinballmap_state.enabled` before writing listing state, so a stored snapshot outlives the integration toggle and "Sync now" with the integration off still auto-lists the fleet. `sync.ts:148-149`.                                                                                                                                                                                                                  | **no** — untouched since the original implementation. Round one gated the _other_ auto-link path on `state.enabled` in this same commit and left this one alone. |
+
+**G3 is the isolation case and the most valuable single item in the whole calibration set.** It
+is the only defect whose signal is absent from the diff a reviewer was reading — the only way
+to reach it is to re-read the feature rather than the patch. If the harness finds G1 and G2 but
+not G3, it reviews diffs; if it finds G3, it reviews code.
+
+**Do not score these as false positives.** Round two explicitly considered and declined two
+other candidates, leaving its reasoning in the code as comments: a stood-down write leaving a
+non-holder, which the counting loop already excludes; and an all-ineligible group staying
+counted because a human can resolve it. Raising either is defensible, not wrong.
+
+## Target F — PR #1810 at `23272cd1`, now fully verified
+
+All five key items confirmed by reading the tree; nothing dropped. The three that were
+previously taken from the fix message alone:
+
+- Save-time capture calls `emitAutoLinkReceipt(tx, …)` **inside** the `db.transaction` callback
+  (`actions.ts:900`, `:1110`), and the catch at `:1193` treats any `23505` in that transaction —
+  including one thrown by the receipt insert — as a listing collision, rolling back the human's
+  name, owner and presence edits over derived bookkeeping. ABSENCE.
+- The counting loop has no holder exclusion at this commit — that is what round one added — so
+  a non-holder same-title cabinet is counted `desynced` forever, including the ones the unique
+  index structurally forbids from ever holding the listing. ABSENCE.
+- `PinballmapListingControl.tsx:47-49` still says the only writers of `pinballmapListed` are two
+  named actions, while the same commit has already added auto-link as a third. CONTRADICTION.
+
+### v6.7 on a fresh target, run twice: 2 of 4 both times
+
+PR #1809 at `77d36312` — 613 lines, four defects verified in the tree, and the first target
+neither the prompt nor I had seen before. Run twice, per the rule that a single run is an
+anecdote. Scored by me and then independently by an agent that held the key and was told to
+disagree if it reached a different number.
+
+| key item                                                      | run A                  | run B               |
+| :------------------------------------------------------------ | :--------------------- | :------------------ |
+| C1 empty mirror indistinguishable from a bad id               | **hit**, both branches | **hit**, one branch |
+| C2 parameter description dead-ends standalone titles          | **hit**, high/0.95     | **hit**, high/0.95  |
+| C3 `count` field against the `total`/`hasMore` convention     | near miss              | near miss           |
+| C4 `get_machine` promises "availability", field is `presence` | miss                   | miss                |
+| false positives                                               | 0                      | 0                   |
+
+Two runs agreeing on which two they find and which two they miss is worth more than either
+run's score. The `expected` verdict counts, by contrast, were 7 `missing` of 24 in run A and 1
+of 24 in run B for identical results — **that list does not predict what a review finds**,
+which is one more reason to keep it cheap.
+
+#### The two misses are different failures, and only one is a blind spot
+
+The independent scoring corrected me here, and the correction is the useful part.
+
+**C3 is a near miss: both runs ran the exact comparison that exposes it and concluded the code
+was fine.** Run A's slice recorded reading `list-machines.ts` to compare "count/total reporting";
+run B's recorded comparing "how list-machines handles over-fetching / `hasMore` counts". Both
+then marked their `hasMore` expectation `implemented`. `hasMore` is present, so the item passes
+— and what is _absent_ is `total`, while the field that is present is named `count`, the exact
+name `list_machines`' own description tells callers never to answer counting questions from.
+Each run checked that a convention was present and missed that a neighbouring one was gone.
+
+**C4 is a clean miss.** Neither run mentions "availability" or `presence` anywhere in any field.
+Run A did read `get-machine.ts`, but for its PinballMap data block and field naming — a
+different part of the file than the tool description at :99 against the payload key at :73.
+
+So the harness's weak spot is now sayable in one line: **it finds absences in behaviour and
+misses absences in convention**, where the missing thing is only missing relative to a sibling.
+That matches the #1851 measurement from earlier in this doc, where every human finding cited a
+comparison target outside the diff and agy's subagents read almost none.
+
+#### One finding outside the key, and it is out of scope rather than wrong
+
+Run A raised `link-columns.ts:90` — the same mirror-state confusion as C1, in a function that
+reports "no longer in the catalog" when the mirror is merely unpopulated. Verified real. But
+`git diff 4325f8ad 77d36312 -- src/lib/pinballmap/link-columns.ts` is empty: the file is
+byte-identical across this change. The run generalised a defect it had correctly understood to
+a place this PR never touched.
+
+For "review this PR" that is out of scope. For a second opinion whose job is to catch what the
+first reviewer missed, it is arguably the most interesting thing either run produced. Which of
+those two things this harness is for is a real question, and the survived-a-review target
+(#1810 at `830012fd`) is the one that answers it.
