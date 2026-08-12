@@ -35,7 +35,7 @@
  *
  * ## What it does not cover
  *
- * Two real gaps, both narrower than "it's handled":
+ * Four real gaps, all narrower than "it's handled":
  *
  * 1. **Pages this fixture never sees.** A page from
  *    `browser.newContext().newPage()` is constructed by the spec, not by the
@@ -47,7 +47,14 @@
  * 2. **Route handlers.** `/api/*` renders outside the root layout and has no
  *    React root, so it is excluded rather than waited for — see `isAppPage`.
  *
- * 3. **Subtrees that hydrate after the root.** The beacon fires from an effect
+ * 3. **Navigations that are not `goto`/`reload`.** A form submit that redirects
+ *    is a real document navigation this fixture never sees, and
+ *    `submitFormAndWaitForRedirect` resolves at `waitUntil: "commit"` —
+ *    earlier still. That helper therefore calls {@link waitForHydration}
+ *    itself. Any future helper that resolves on a navigation must do the same;
+ *    a link click followed by `waitForURL` has the identical hole.
+ *
+ * 4. **Subtrees that hydrate after the root.** The beacon fires from an effect
  *    in the root layout, so it reports that the root commit landed — not that
  *    every interactive descendant has handlers. Anything inside a Suspense
  *    boundary (any segment with a `loading.tsx`, plus streamed segments) is
@@ -101,7 +108,27 @@ function isAppPage(page: Page): boolean {
   }
 }
 
-async function waitForHydration(page: Page, target: string): Promise<void> {
+/**
+ * Thrown when the beacon never appears. Named so that callers which catch
+ * broadly — `submitFormAndWaitForRedirect`'s branch races treat a `goto` throw
+ * as "a sibling branch got there first" — can re-throw this one instead of
+ * swallowing it into a bare test timeout.
+ */
+export class HydrationTimeoutError extends Error {
+  override readonly name = "HydrationTimeoutError";
+}
+
+/**
+ * Wait until React has hydrated the current document.
+ *
+ * Exported because navigation does not only happen through `goto`:
+ * `submitFormAndWaitForRedirect` resolves on a URL commit, which this fixture
+ * cannot see, so that helper calls this itself.
+ */
+export async function waitForHydration(
+  page: Page,
+  target: string
+): Promise<void> {
   if (!isAppPage(page)) return;
 
   try {
@@ -115,7 +142,7 @@ async function waitForHydration(page: Page, target: string): Promise<void> {
     // during mount, say. Swallowing it would spend HYDRATION_TIMEOUT on every
     // navigation and then fail later at whatever got clicked next, pointing at
     // the wrong thing.
-    throw new Error(
+    throw new HydrationTimeoutError(
       `React never hydrated within ${String(HYDRATION_TIMEOUT)}ms after navigating to ${target}. ` +
         `Expected \`${HYDRATED_SELECTOR}\` (set by HydrationBeacon in ClientProviders). ` +
         `A client component most likely threw during mount — check the browser console in the trace.`
@@ -124,13 +151,24 @@ async function waitForHydration(page: Page, target: string): Promise<void> {
 }
 
 /**
+ * Pages already wrapped. Wrapping twice nests the wrappers, so a single `goto`
+ * would wait for hydration twice — and on a genuinely broken page would burn
+ * `2 × HYDRATION_TIMEOUT` (60s in CI) against a 60s test timeout, replacing the
+ * authored diagnostic with a bare "Test timeout exceeded".
+ */
+const wrapped = new WeakSet<Page>();
+
+/**
  * Make `goto` and `reload` on this page wait for hydration before returning.
  *
  * The `page` fixture below applies this for you. Call it directly on pages you
  * construct yourself — `browser.newContext()` then `newPage()` — which the
- * fixture never sees.
+ * fixture never sees. Idempotent, so passing an already-wrapped page is safe.
  */
 export function attachHydrationWait(page: Page): Page {
+  if (wrapped.has(page)) return page;
+  wrapped.add(page);
+
   const originalGoto = page.goto.bind(page);
   const originalReload = page.reload.bind(page);
 

@@ -12,6 +12,7 @@
 
 import type { Page, Locator } from "@playwright/test";
 import { selectOption } from "./actions.js";
+import { HydrationTimeoutError, waitForHydration } from "./fixtures.js";
 
 declare global {
   interface Window {
@@ -167,7 +168,12 @@ export async function submitFormAndWaitForRedirect(
           try {
             await page.goto(target, { waitUntil: "domcontentloaded" });
             return;
-          } catch {
+          } catch (error: unknown) {
+            // A page from the `test` fixture has a `goto` that also waits for
+            // hydration, and that failure is a real broken page, not a race.
+            // Swallowing it here would strand the branch on the never-resolving
+            // promise below and surface as a bare test timeout.
+            if (error instanceof HydrationTimeoutError) throw error;
             // page.goto can race with sibling branches and throw (frame
             // detached, navigation already in progress). Release the claim
             // so Branch A's natural-nav or Branch C can still succeed.
@@ -192,34 +198,43 @@ export async function submitFormAndWaitForRedirect(
   // prefix (e.g., /m vs /m/whatever). waitForResponse() buffers the full body
   // before resolving, which is essential in WebKit (page.on('response') with
   // async .text() loses the body to a closed stream).
-  const responseNavPromise: Promise<void> = new Promise<void>((resolve) => {
-    void page
-      .waitForResponse(
-        (r) =>
-          r.request().method() === "POST" &&
-          new URL(r.url()).pathname === awayFrom,
-        { timeout }
-      )
-      .then(async (response) => {
-        const body = await response.text();
-        const match =
-          /"redirectTo":"(\/m\/[^/"\\]+\/i\/\d+)"/.exec(body) ??
-          /\\"redirectTo\\":\\"(\/m\/[^/"\\]+\/i\/\d+)\\"/.exec(body);
-        if (match?.[1] && claimNavigation()) {
-          try {
-            await page.goto(match[1], { waitUntil: "domcontentloaded" });
-            resolve();
-          } catch {
-            // Same race-with-sibling-branch handling as Branch B.
-            releaseClaim();
+  const responseNavPromise: Promise<void> = new Promise<void>(
+    (resolve, reject) => {
+      void page
+        .waitForResponse(
+          (r) =>
+            r.request().method() === "POST" &&
+            new URL(r.url()).pathname === awayFrom,
+          { timeout }
+        )
+        .then(async (response) => {
+          const body = await response.text();
+          const match =
+            /"redirectTo":"(\/m\/[^/"\\]+\/i\/\d+)"/.exec(body) ??
+            /\\"redirectTo\\":\\"(\/m\/[^/"\\]+\/i\/\d+)\\"/.exec(body);
+          if (match?.[1] && claimNavigation()) {
+            try {
+              await page.goto(match[1], { waitUntil: "domcontentloaded" });
+              resolve();
+            } catch (error: unknown) {
+              // Same reasoning as Branch B: a hydration failure is a broken
+              // page, not a lost race, and this branch is the only one that can
+              // report it.
+              if (error instanceof HydrationTimeoutError) {
+                reject(error);
+                return;
+              }
+              // Same race-with-sibling-branch handling as Branch B.
+              releaseClaim();
+            }
           }
-        }
-        // No match (or already claimed, or page.goto threw): stay quiet.
-      })
-      .catch(() => {
-        // waitForResponse timed out: stay quiet.
-      });
-  });
+          // No match (or already claimed, or page.goto threw): stay quiet.
+        })
+        .catch(() => {
+          // waitForResponse timed out: stay quiet.
+        });
+    }
+  );
 
   await submitButton.click();
 
@@ -252,6 +267,14 @@ export async function submitFormAndWaitForRedirect(
     interceptorNavPromise,
     responseNavPromise,
   ]);
+
+  // The `page` fixture only wraps `goto`/`reload`, and the branch that usually
+  // wins here is A — a natural navigation the fixture cannot observe, resolved
+  // at `waitUntil: "commit"`, which is earlier than `domcontentloaded`, let
+  // alone hydration. So callers of this helper would otherwise land on a fresh
+  // document and start clicking in exactly the window the fixture exists to
+  // close. Wait here instead, once, for whichever branch won.
+  await waitForHydration(page, `${page.url()} (after form submit)`);
 }
 
 /**
@@ -387,6 +410,18 @@ export async function openIssueCommentForm(
 
   const dialog = page.getByRole("dialog", { name: "Add a comment" });
 
+  // Same dialog, matched even while it is still ARIA-hidden. `getByRole`
+  // defaults to `includeHidden: false`, so the plain `dialog` locator above
+  // reports 0 both when the Sheet was never opened AND when it is mounted but
+  // not yet in the accessibility tree — which would make the "did the click
+  // register?" test below unable to tell those two apart, the one distinction
+  // it exists to make. Radix unmounts closed Sheet content outright, so with
+  // hidden elements included a non-zero count does mean "the click registered".
+  const mountedDialog = page.getByRole("dialog", {
+    name: "Add a comment",
+    includeHidden: true,
+  });
+
   // The composer paints before React attaches its handler, and under
   // `--workers=3` the dev server is busy compiling for other spec files, so a
   // click can land on an inert button and vanish. Waiting longer cannot
@@ -401,10 +436,17 @@ export async function openIssueCommentForm(
   // not yet visible, the click landed and the right move is to keep waiting.
   //
   // Note this deliberately does NOT go through `openDropdownMenu`. That helper
-  // decides on `aria-expanded`, and this trigger does not report it reliably —
-  // routing through it made the first click open the Sheet, the attribute stay
-  // "false", and the retry get eaten by the overlay. Verified on Mobile Chrome:
-  // `form-resets:190` and `rich-text:105` failed exactly that way.
+  // asserts `aria-expanded` on the trigger, and that assertion cannot pass for
+  // THIS trigger — not because the attribute is missing (Radix's dialog Trigger
+  // does set it, which is why the MetadataDrawer `-trigger` path in
+  // `selectOption` works through the same helper) but because opening a Radix
+  // dialog calls `hideOthers()`, which marks everything outside the content
+  // `aria-hidden`. The trigger is outside the content, so once the Sheet opens
+  // the `getByRole("button")` locator stops matching it altogether and the
+  // assertion fails as "no elements" — after which the retry click has nothing
+  // to click either. Verified on Mobile Chrome: routing through the helper made
+  // `form-resets:190` and `rich-text:105` fail exactly that way. The general
+  // rule: never assert on a role locator for a control an open modal aria-hides.
   await sheetTrigger.click({ timeout: SHEET_FIRST_CLICK_TIMEOUT });
   const openedFirstTry = await dialog
     .waitFor({ state: "visible", timeout: SHEET_OPEN_TIMEOUT })
@@ -412,7 +454,7 @@ export async function openIssueCommentForm(
     .catch(() => false);
 
   if (!openedFirstTry) {
-    if ((await dialog.count()) > 0) {
+    if ((await mountedDialog.count()) > 0) {
       // Mounted but slow — the click registered. Re-clicking here is what
       // would close it, so wait instead.
       await dialog.waitFor({ state: "visible", timeout: SHEET_OPEN_TIMEOUT });

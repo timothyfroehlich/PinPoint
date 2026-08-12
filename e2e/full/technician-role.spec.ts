@@ -23,9 +23,11 @@ test.describe("Technician Role Permissions", () => {
     // Waited for, not sampled: `isVisible()` never retries, so a heading that
     // had merely not painted yet read as "name was changed" and sent this
     // afterEach down the restore branch — an unnecessary DB write on every
-    // slow render.
+    // slow render. CI-aware because a flat 5s reopens the same hole under the
+    // conditions this suite actually fails in (Mobile Chrome, three workers, a
+    // dev server compiling routes for the other two).
     const nameIsCorrect = await heading
-      .waitFor({ state: "visible", timeout: 5000 })
+      .waitFor({ state: "visible", timeout: process.env["CI"] ? 15_000 : 5000 })
       .then(() => true)
       .catch(() => false);
     if (nameIsCorrect) {
