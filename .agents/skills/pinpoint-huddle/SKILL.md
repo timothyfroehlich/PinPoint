@@ -39,9 +39,13 @@ candidate. When the label is generic — `PinPoint`, `Orchestrating`, `Busywork`
 fall back to the task only when there is neither.
 
 **Then ask Tim to run `/rename <YourName>`,** one line at the end of your next
-response. That is the only way the display name gets set: `/rename` is a
-user-typed command, no tool writes it, and `--name` at launch is too early to
-know the task. Don't block on the answer.
+response. In Claude Code that is the only way the display name gets set, and you
+cannot do it yourself: `/rename` is registered `type: local-jsx` with
+`requires: {ink: true}`, so it needs the interactive terminal UI and no tool
+reaches it. (`--name` at launch would work but fires before the task is known.)
+Don't block on the answer. Confirmed to propagate to both surfaces: a peer that
+listed as `pinpoint-11 [a8cc65]` listed as `crabbox-lease-staleness-fix [a8cc65]`
+after its rename, and the terminal title changes in the same instant.
 
 The notice reads the label from **`$HERDR_WORKSPACE_ID`**, not by matching panes.
 Hooks inherit the environment herdr launched the agent in, so the variable is
@@ -49,12 +53,28 @@ right there and names the workspace directly. Both alternatives are traps:
 `herdr pane list`'s `agent_session.value` has been measured pointing at a
 _different live session_ (see the `herdr` skill), and `terminal_title` carries
 Claude Code's animating activity glyph, which `terminal_title_stripped` only
-partly removes — `✳` and the braille frames yes, `◐`/`◑` no. A forked session
-inherits a stale `$HERDR_WORKSPACE_ID`, which is tolerable here only because the
-result is a _suggestion_ you and Tim both read before it is registered.
+partly removes — `✳` and the braille frames yes, `◐`/`◑` no.
+
+`$HERDR_WORKSPACE_ID` goes stale in a forked session, after a handoff, and on a
+**moved pane**. The moved pane is the one that misleads: the lookup is
+live-by-id, so it returns the _current_ label of a _different_ workspace and the
+notice offers a plausible name belonging to someone else's task. Tolerable here
+and nowhere else in the huddle, because the result is a _suggestion_ you and Tim
+both read before it is registered — never a signature attributed silently.
+
+**Any hook that reads herdr needs a hard timeout.** `.claude/settings.json` caps
+this hook at 5000ms and it already runs ~4s. Exceeding the cap is not a degraded
+notice: Claude Code kills the hook and discards **all** of its stdout, so the
+session learns no session_id, never registers, and re-injects its own posts —
+the PP-2m3l breakage. The lookup is wrapped in `timeout 1` (the call itself
+measures ~9ms), and with neither `timeout` nor `gtimeout` present it is skipped
+rather than run unbounded.
 
 No herdr — a bare terminal, Bazzite, another harness — and the notice silently
-drops to bead-then-task. Nothing errors.
+drops to bead-then-task. Nothing errors. The notice is harness-neutral: it says
+`<Harness>-` rather than `Claude-`, and makes the rename step conditional on the
+harness having such a command, because Antigravity and Codex run this same hook
+through `.agents/hooks/antigravity-bootstrap.cjs`.
 
 **A session_id belongs to whoever registered it first.** `register` refuses to
 rebind a session_id that already holds a different name — no silent overwrite,

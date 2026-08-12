@@ -80,18 +80,35 @@ emit_work_digest() {
 # animating spinner glyph that terminal_title_stripped does not fully remove
 # (✳ and the braille frames yes, ◐/◑ no).
 #
-# A forked or handed-off session inherits a stale value, same caveat as
-# $HERDR_PANE_ID. That is tolerable here and nowhere else in the huddle: this
-# produces a *suggested* name that both the agent and Tim read before it is
-# registered, not a signature attributed silently.
+# $HERDR_WORKSPACE_ID goes stale in three ways, all inherited from
+# $HERDR_PANE_ID: a forked session, a handoff, and a **moved pane**. The moved
+# pane is the one that misleads, because the lookup is live-by-id: it returns the
+# *current* label of a *different* workspace, so the notice offers a perfectly
+# plausible name belonging to someone else's task rather than an obviously stale
+# one. Tolerable here and nowhere else in the huddle, because the output is a
+# *suggestion* the agent and Tim both read before it is registered — not a
+# signature attributed silently.
 #
-# Fail-open at every step — no herdr, a bare terminal, Bazzite, a non-herdr
-# harness: print nothing and the caller falls back to task-derived naming.
+# HARD TIMEOUT, and this is not optional. `.claude/settings.json` gives this hook
+# 5000ms and it already runs ~4s; `herdr workspace list` is a socket read against
+# a server that can wedge. Blowing the budget is not "no label" — Claude Code
+# kills the hook and discards ALL of its stdout, so the session gets no
+# session_id and no registration prompt and never registers, which is the
+# PP-2m3l self-filter breakage. The call measures ~9ms, so 1s is generous.
+# With neither timeout binary present we skip the lookup rather than run it
+# unbounded: a missing suggestion costs a nicer name, a hung hook costs identity.
 herdr_workspace_label() {
-  local out
+  local out timeout_bin
   [[ -n "${HERDR_WORKSPACE_ID:-}" ]] || return 0
   command -v herdr >/dev/null 2>&1 || return 0
-  out=$(herdr workspace list 2>/dev/null) || return 0
+  if command -v timeout >/dev/null 2>&1; then
+    timeout_bin=timeout
+  elif command -v gtimeout >/dev/null 2>&1; then
+    timeout_bin=gtimeout
+  else
+    return 0
+  fi
+  out=$("$timeout_bin" 1 herdr workspace list 2>/dev/null) || return 0
   [[ -n "$out" ]] || return 0
   printf '%s' "$out" | jq -r --arg ws "$HERDR_WORKSPACE_ID" '
     .result.workspaces[]? | select(.workspace_id == $ws) | .label // empty
@@ -387,21 +404,29 @@ else
   printf 'Your session_id: `%s`\n\n' "$SESSION_ID"
   printf 'You are not yet registered in the huddle self-filter map.\n\n'
   printf 'When you receive your first user prompt, pick a name in this order:\n\n'
+  # The label only earns first place if it survives CamelCasing into something
+  # usable. A label with no ASCII alphanumerics ("🔥") camelizes to the empty
+  # string, which rendered "becomes something like <Harness>-" — and
+  # huddle-whoami.sh's ^[A-Za-z0-9_-]+$ validator accepts a bare "Claude-", so an
+  # agent following that text could register a truncated name. Treat an empty
+  # camelization as no label at all.
   _WS_LABEL=$(herdr_workspace_label 2>/dev/null) || _WS_LABEL=""
-  if [[ -n "$_WS_LABEL" ]]; then
+  _WS_CAMEL=""
+  [[ -n "$_WS_LABEL" ]] && _WS_CAMEL=$(huddle_camelize "$_WS_LABEL")
+  if [[ -n "$_WS_CAMEL" ]]; then
     printf '1. **Your herdr workspace label, which is "%s".** Tim typed it for this\n' "$_WS_LABEL"
     printf '   session, so it already says what the session is for. CamelCase it and add\n'
-    printf '   your harness prefix — "%s" becomes something like Claude-%s.\n' "$_WS_LABEL" "$(huddle_camelize "$_WS_LABEL")"
+    printf '   your harness prefix — "%s" becomes <Harness>-%s.\n' "$_WS_LABEL" "$_WS_CAMEL"
     printf '2. **If that label is generic, use the bead instead.** Labels like "PinPoint",\n'
     printf '   "Orchestrating", "Busywork", "main", or a bare number say nothing about the\n'
     printf '   work. When Tim has pointed you at a bead, name yourself after the bead'\''s\n'
     printf '   subject (PP-355h "Derive huddle names from the workspace label" →\n'
-    printf '   Claude-HuddleNameSource).\n'
+    printf '   <Harness>-HuddleNameSource).\n'
     printf '3. **Otherwise** derive it from what you are being asked to do.\n\n'
   else
     printf '1. **Your bead, when Tim has pointed you at one** — name yourself after its\n'
     printf '   subject (PP-355h "Derive huddle names from the workspace label" →\n'
-    printf '   Claude-HuddleNameSource).\n'
+    printf '   <Harness>-HuddleNameSource).\n'
     printf '2. **Otherwise** derive it from what you are being asked to do.\n\n'
     printf '(No herdr workspace label available for this session — normally that label is\n'
     printf 'the first choice. Expected outside herdr: a bare terminal, Bazzite, a non-herdr\n'
@@ -417,12 +442,15 @@ else
   printf 'Register with:\n'
   printf '    bash scripts/hooks/huddle-whoami.sh register <YourName> %s\n\n' "$SESSION_ID"
   printf 'If the name is taken, the helper suggests variations.\n\n'
+  printf 'THEN, IF YOUR HARNESS HAS A SESSION-RENAME COMMAND, ask Tim to run it with this\n'
   # shellcheck disable=SC2016  # backticks are literal Markdown
-  printf 'THEN ASK TIM TO RUN `/rename <YourName>` in your next response. That sets the\n'
-  printf 'harness display name — the one peer sessions see in ListAgents and the one on\n'
-  printf 'the terminal title — so all three identities match. You cannot do this yourself:\n'
-  printf '/rename is user-typed only, and no tool sets it. One line at the end of your\n'
-  printf 'reply is enough; do not stop work waiting for it.\n\n'
+  printf 'name — in Claude Code that is `/rename <YourName>`. It sets the harness display\n'
+  printf 'name, which is both what peer sessions see when they list agents and what shows\n'
+  printf 'on the terminal title, so all three identities match. You cannot do it yourself\n'
+  # shellcheck disable=SC2016  # backticks are literal Markdown
+  printf 'in Claude Code: /rename is registered `type: local-jsx` with `requires: {ink}`,\n'
+  printf 'so it needs the interactive terminal UI and no tool can invoke it. One line at\n'
+  printf 'the end of your reply is enough; do not stop work waiting for it.\n\n'
   printf 'After registering, post a one-line kickoff to today'\''s bead describing what this\n'
   printf 'session is tackling (skip it for trivial questions or one-line fixes).\n'
   # shellcheck disable=SC2016  # backticks are literal Markdown
