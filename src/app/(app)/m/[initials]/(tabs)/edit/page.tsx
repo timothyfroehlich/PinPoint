@@ -195,6 +195,9 @@ export default async function MachineEditPage({
           pinballmapExcluded={machine.pinballmapExcluded}
           pinballmapExcludedReason={machine.pinballmapExcludedReason}
           pinballmapTitleName={pinballmapTitleName}
+          modelName={machine.modelName}
+          manufacturer={machine.manufacturer}
+          year={machine.year}
         />
       </section>
 

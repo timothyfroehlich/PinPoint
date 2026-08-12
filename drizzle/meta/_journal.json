@@ -449,6 +449,13 @@
       "when": 1786327875438,
       "tag": "0063_lame_sinister_six",
       "breakpoints": true
+    },
+    {
+      "idx": 64,
+      "version": "7",
+      "when": 1786578656063,
+      "tag": "0064_fair_blue_blade",
+      "breakpoints": true
     }
   ]
 }

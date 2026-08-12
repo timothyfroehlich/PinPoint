@@ -166,3 +166,80 @@ describe("resolvePbmLinkColumnsForUpdate", () => {
     expect(result.ok).toBe(false);
   });
 });
+
+/**
+ * Hand-entered model identity (PP-3bbr). One rule, enforced in three places:
+ * the DB CHECK `machines_model_name_requires_excluded`, the resolver below,
+ * and the picker's confirm dialog. This pins the middle one.
+ */
+describe("hand-entered model identity", () => {
+  const stored = {
+    pinballmapMachineId: null,
+    pinballmapListed: false,
+    pinballmapLmxId: null,
+  };
+
+  it("stores what was typed on the excluded branch", async () => {
+    const result = await resolvePbmLinkColumnsForUpdate(
+      {
+        pinballmapExcluded: true,
+        modelName: "Bordertown",
+        manufacturer: "homebrew",
+        year: 2019,
+      },
+      stored
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.columns.modelName).toBe("Bordertown");
+    expect(result.columns.manufacturer).toBe("homebrew");
+    expect(result.columns.year).toBe(2019);
+  });
+
+  it("clears fields the save omitted rather than keeping stale ones", async () => {
+    // The panel always submits all three together, so an absent field means
+    // someone emptied it.
+    const result = await resolvePbmLinkColumnsForUpdate(
+      { pinballmapExcluded: true, modelName: "Bordertown" },
+      stored
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.columns.manufacturer).toBeNull();
+    expect(result.columns.year).toBeNull();
+  });
+
+  it("drops them when a catalog title is chosen instead", async () => {
+    // Not merely ignored — actively nulled. Leaving a hand-entered model on a
+    // linked machine violates the CHECK, so the UPDATE would throw.
+    const result = await resolvePbmLinkColumnsForUpdate(
+      {
+        pinballmapMachineId: 6221,
+        modelName: "Bordertown",
+        manufacturer: "homebrew",
+        year: 2019,
+      },
+      stored
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.columns.modelName).toBeNull();
+    // The catalog wins outright — its own metadata, not a merge of the two.
+    expect(result.columns.manufacturer).toBe("Stern");
+    expect(result.columns.year).toBe(2021);
+  });
+
+  it("drops them for a machine that is neither linked nor excluded", async () => {
+    const result = await resolvePbmLinkColumnsForUpdate(
+      { modelName: "Bordertown" },
+      stored
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.columns.modelName).toBeNull();
+  });
+});

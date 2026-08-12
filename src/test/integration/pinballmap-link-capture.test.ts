@@ -575,4 +575,65 @@ describe("updateMachineAction listing carry-over (PGlite)", () => {
     expect(row?.pinballmapMachineId).toBeNull();
     expect(row?.pinballmapLmxId).toBeNull();
   });
+  it("stores a hand-entered model on a machine marked not-on-PBM", async () => {
+    // The whole PP-3bbr round trip through the real action: form fields the
+    // schema validates, the resolver's excluded branch, and the new CHECK
+    // `machines_model_name_requires_excluded` all having to agree. A resolver
+    // that set `modelName` on the wrong branch would throw here rather than
+    // quietly storing the wrong thing.
+    const db = await getTestDb();
+    const { updateMachineAction } = await import("~/app/(app)/m/actions");
+    const admin = await createUser("admin");
+    await mockAuthAs(admin.id);
+    const machine = await seedMachine({
+      initials: "BT",
+      pinballmapMachineId: null,
+    });
+
+    const fd = editFormData(machine.id, null);
+    fd.set("pinballmapExcluded", "on");
+    fd.set("modelName", "Bordertown");
+    fd.set("manufacturer", "homebrew");
+    fd.set("year", "2019");
+    expectOk(await updateMachineAction(undefined, fd));
+
+    const row = await db.query.machines.findFirst({
+      where: eq(machines.id, machine.id),
+    });
+    expect(row?.pinballmapExcluded).toBe(true);
+    expect(row?.modelName).toBe("Bordertown");
+    expect(row?.manufacturer).toBe("homebrew");
+    expect(row?.year).toBe(2019);
+  });
+
+  it("drops the hand-entered model when a catalog title is chosen later", async () => {
+    // The transition the picker warns about, verified end to end: the CHECK
+    // makes "linked AND hand-entered" unrepresentable, so a save that failed to
+    // clear it would error rather than leave two sources of one fact.
+    const db = await getTestDb();
+    const { updateMachineAction } = await import("~/app/(app)/m/actions");
+    const admin = await createUser("admin");
+    await mockAuthAs(admin.id);
+    await seedCatalog(42);
+    const machine = await seedMachine({
+      initials: "BT",
+      pinballmapMachineId: null,
+    });
+
+    const first = editFormData(machine.id, null);
+    first.set("pinballmapExcluded", "on");
+    first.set("modelName", "Bordertown");
+    expectOk(await updateMachineAction(undefined, first));
+
+    expectOk(
+      await updateMachineAction(undefined, editFormData(machine.id, 42))
+    );
+
+    const row = await db.query.machines.findFirst({
+      where: eq(machines.id, machine.id),
+    });
+    expect(row?.pinballmapExcluded).toBe(false);
+    expect(row?.modelName).toBeNull();
+    expect(row?.manufacturer).toBe("Stern");
+  });
 });

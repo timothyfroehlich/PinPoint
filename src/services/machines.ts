@@ -44,6 +44,11 @@ export interface MachinePbmColumns {
   // to move as part of this set — leaving a stale lmx behind when a machine is
   // unlinked or unlisted makes the UPDATE throw.
   pinballmapLmxId: number | null;
+  // Hand-entered model identity, and only ever alongside `pinballmapExcluded`
+  // (PP-3bbr). A linked machine's model comes from the catalog mirror, so this
+  // moves with the set for the same reason `pinballmapLmxId` does: a CHECK ties
+  // it to a sibling column, and leaving it behind makes the UPDATE throw.
+  modelName: string | null;
   manufacturer: string | null;
   year: number | null;
   opdbId: string | null;

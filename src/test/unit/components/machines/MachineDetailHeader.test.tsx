@@ -37,6 +37,7 @@ function makeMachine(
     owner: null,
     invitedOwner: null,
     watchers: [],
+    modelName: null,
     manufacturer: null,
     year: null,
     edition: null,

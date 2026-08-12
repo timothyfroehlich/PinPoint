@@ -98,13 +98,19 @@ export default async function MachineInfoTab({
   // a machine that is nonetheless linked. Naming the id beats claiming there is
   // no model at all; "Not specified" is reserved for a machine with no catalog
   // match, which is a different and correctable state (PP-3bbr).
+  //
+  // Two sources, never both at once — the DB CHECK
+  // `machines_model_name_requires_excluded` is what makes "never both" a fact
+  // rather than a convention, so there is no precedence rule to get wrong: a
+  // linked machine reads the catalog, an off-catalog one reads its own column
+  // (PP-3bbr).
   const linkedTitleEntry =
     machine.pinballmapMachineId !== null
       ? await getCatalogEntry(machine.pinballmapMachineId)
       : null;
   const modelName =
     machine.pinballmapMachineId === null
-      ? null
+      ? machine.modelName
       : (linkedTitleEntry?.name ??
         `Pinball Map title #${String(machine.pinballmapMachineId)}`);
 

@@ -310,7 +310,7 @@ export function CreateMachineForm({
 
         {/* Model — links the machine to its PinballMap catalog model/edition
             (bead B / PP-o355.2). */}
-        <PinballMapLinkField />
+        <PinballMapLinkField machineName={nameValue} />
 
         {/* Description */}
         <div className="space-y-1.5">

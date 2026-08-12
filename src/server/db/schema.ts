@@ -186,6 +186,15 @@ export const machines = pgTable(
     // .12). Nullable: only set once a machine is actually listed on PBM. An lmx
     // implies both a catalog link and pinballmap_listed (CHECKs below).
     pinballmapLmxId: integer("pinballmap_lmx_id"),
+    // Hand-entered model name for a machine PinballMap's catalog cannot cover —
+    // a homebrew, a flipperless game (PP-3bbr, folded into PP-o355.21). Set ONLY
+    // alongside `pinballmap_excluded` (CHECK below): a linked machine reads its
+    // model from the catalog mirror, and letting both exist would put two
+    // sources on one fact with no rule for which wins.
+    //
+    // Distinct from `name`, which is what APC calls the cabinet. They start out
+    // the same (the field seeds itself from the name) and are free to diverge.
+    modelName: text("model_name"),
     manufacturer: text("manufacturer"),
     year: integer("year"),
     opdbId: text("opdb_id"),
@@ -201,6 +210,13 @@ export const machines = pgTable(
     pinballmapLinkExclusiveCheck: check(
       "machines_pinballmap_link_exclusive",
       sql`NOT (pinballmap_machine_id IS NOT NULL AND pinballmap_excluded)`
+    ),
+    // A hand-entered model belongs only to a machine their catalog can't cover.
+    // Without this the two sources could coexist and every reader would need its
+    // own precedence rule (PP-3bbr).
+    modelNameRequiresExcludedCheck: check(
+      "machines_model_name_requires_excluded",
+      sql`NOT (model_name IS NOT NULL AND NOT pinballmap_excluded)`
     ),
     // Can't be listed on PinballMap without a catalog link — you can only appear
     // on the public map as a recognized title.

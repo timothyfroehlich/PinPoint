@@ -8,6 +8,21 @@ export interface PbmLinkSelection {
   pinballmapMachineId?: number | undefined;
   pinballmapExcluded?: boolean | undefined;
   pinballmapExcludedReason?: string | undefined;
+  /**
+   * Hand-entered model identity for a machine PinballMap's catalog cannot cover
+   * (PP-3bbr). Read ONLY on the excluded branch below — on any other branch the
+   * catalog is the source and these are silently dropped, which is what the DB
+   * CHECK enforces and what the UI warns about before switching away.
+   *
+   * This is the one place model metadata legitimately comes from a request. The
+   * "never trusted from the client" rule exists because a linked machine's
+   * manufacturer and year are a claim about a catalog row we can look up
+   * ourselves; for a homebrew there is nothing to look up, and a person typing
+   * it is the only source there will ever be.
+   */
+  modelName?: string | undefined;
+  manufacturer?: string | undefined;
+  year?: number | undefined;
 }
 
 /** The stored machine's PBM state, read from the row — never from a request. */
@@ -126,6 +141,10 @@ async function resolveCore(
     // The lmx describes a live PBM listing, so it cannot outlive one. Clearing
     // it here is also what keeps the two lmx CHECK constraints satisfiable.
     pinballmapLmxId: null,
+    // Same reasoning, different CHECK: `machines_model_name_requires_excluded`
+    // forbids a hand-entered model on anything but an excluded machine, so the
+    // linked and unlinked branches below must leave this null.
+    modelName: null,
     manufacturer: null,
     year: null,
     opdbId: null,
@@ -139,6 +158,13 @@ async function resolveCore(
         ...empty,
         pinballmapExcluded: true,
         pinballmapExcludedReason: input.pinballmapExcludedReason ?? null,
+        // The only branch where model metadata comes from the request — see
+        // `PbmLinkSelection.modelName`. Absent stays null rather than keeping a
+        // stored value: a save that omits these fields is a save that cleared
+        // them, and the sub-panel always submits all three together.
+        modelName: input.modelName ?? null,
+        manufacturer: input.manufacturer ?? null,
+        year: input.year ?? null,
       },
       abandoned,
     };

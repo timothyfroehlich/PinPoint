@@ -165,6 +165,7 @@ export async function resolveMachine(ref: string): Promise<MachineRef> {
       pinballmapExcludedReason: true,
       pinballmapListed: true,
       pinballmapLmxId: true,
+      modelName: true,
       manufacturer: true,
       year: true,
       opdbId: true,

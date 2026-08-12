@@ -18,6 +18,16 @@ import {
   PopoverTrigger,
 } from "~/components/ui/popover";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "~/components/ui/alert-dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -68,6 +78,17 @@ interface PinballMapLinkFieldProps {
   defaultName?: string | null;
   defaultExcluded?: boolean;
   defaultExcludedReason?: string | null;
+  /** Stored hand-entered model identity, for a machine already marked excluded. */
+  defaultModelName?: string | null;
+  defaultManufacturer?: string | null;
+  defaultYear?: number | null;
+  /**
+   * What APC calls this cabinet — used ONCE, to seed the Model name when the
+   * hand-entry panel first opens with nothing in it. A seed, not a mirror: the
+   * two are separate facts and are free to diverge the moment anyone edits
+   * either. Omit it and the panel simply opens empty.
+   */
+  machineName?: string;
   disabled?: boolean;
   /**
    * Called when the USER changes the selection. The picker's state lives in
@@ -91,12 +112,19 @@ export function PinballMapLinkField({
   defaultName = null,
   defaultExcluded = false,
   defaultExcludedReason = null,
+  defaultModelName = null,
+  defaultManufacturer = null,
+  defaultYear = null,
+  machineName = "",
   disabled = false,
   onDirty,
 }: PinballMapLinkFieldProps): React.JSX.Element {
   const reasonId = useId();
   const triggerId = useId();
   const editionId = useId();
+  const modelNameId = useId();
+  const manufacturerId = useId();
+  const yearId = useId();
 
   const [family, setFamily] = useState<CatalogFamily | null>(null);
   const [editions, setEditions] = useState<CatalogEdition[]>([]);
@@ -107,6 +135,31 @@ export function PinballMapLinkField({
 
   const [excluded, setExcluded] = useState(defaultExcluded);
   const [reason, setReason] = useState(defaultExcludedReason ?? "");
+
+  // Hand-entered model identity for a game the catalog can't cover (PP-3bbr).
+  // Kept in state rather than left uncontrolled so switching back to a catalog
+  // title can warn about losing them, and so the seed below can write one.
+  const [modelName, setModelName] = useState(defaultModelName ?? "");
+  const [manufacturer, setManufacturer] = useState(defaultManufacturer ?? "");
+  const [year, setYear] = useState(
+    defaultYear !== null ? String(defaultYear) : ""
+  );
+  const hasHandEntry =
+    modelName.trim().length > 0 ||
+    manufacturer.trim().length > 0 ||
+    year.trim().length > 0;
+
+  /**
+   * A catalog pick waiting on the "you'll lose what you typed" confirm.
+   *
+   * Only a machine with hand-entered values has anything to lose, and losing it
+   * is not a UI choice — the DB CHECK `machines_model_name_requires_excluded`
+   * means a linked machine cannot carry one. So the honest move is to say so
+   * before the pick lands, not to drop it silently on save.
+   */
+  const [pendingFamily, setPendingFamily] = useState<CatalogFamily | null>(
+    null
+  );
 
   // Whether the USER has changed the selection. Until they do, the form submits
   // the machine's STORED link — see `submittedId`.
@@ -170,9 +223,28 @@ export function PinballMapLinkField({
     };
   }, [query]);
 
+  /**
+   * Step 1 of a catalog pick: intercept it when there is hand-entered model
+   * identity to lose, otherwise apply it straight away.
+   */
   const handlePickFamily = (pick: CatalogFamily): void => {
+    if (excluded && hasHandEntry) {
+      setPendingFamily(pick);
+      setOpen(false);
+      return;
+    }
+    applyFamily(pick);
+  };
+
+  const applyFamily = (pick: CatalogFamily): void => {
     setFamily(pick);
     setExcluded(false); // mutual exclusion
+    // The catalog is the source for a linked machine, so what was typed here
+    // cannot survive the switch — clear it in the UI too rather than leave
+    // values on screen that the save is about to drop (CORE-ARCH-012).
+    setModelName("");
+    setManufacturer("");
+    setYear("");
     setOpen(false);
     setQuery("");
     setUserChanged(true);
@@ -214,6 +286,13 @@ export function PinballMapLinkField({
     setQuery("");
     setUserChanged(true);
     onDirty?.();
+
+    // Seed the Model name from what the cabinet is called, into an empty field
+    // only. Most homebrews are already named after the game, so the common case
+    // is that the panel opens finished and nobody types anything. Reaching this
+    // with a value already present means the user is re-picking "not on the
+    // map" after a detour through the catalog — leave what they wrote alone.
+    setModelName((current) => (current.length > 0 ? current : machineName));
   };
 
   // The edition step is shown only for an ambiguous (multi-edition) family.
@@ -510,6 +589,124 @@ export function PinballMapLinkField({
           )}
         </div>
       </div>
+
+      {/* Hand-entered model identity (PP-3bbr) — a full-width panel BELOW the
+          Model row rather than a third column, because it is three fields and
+          because it belongs to the choice made above it. The Reason input stays
+          exactly where it was, in the Edition slot: it answers "why isn't this
+          on the map", which is about the exclusion, not about the game.
+
+          Only rendered when excluded, so the inputs do not exist to be
+          submitted otherwise — the server drops these fields on every other
+          branch anyway, but not sending them at all is the cheaper truth. */}
+      {excluded && (
+        <div
+          data-testid="pinballmap-manual-model"
+          className="mt-4 space-y-1.5 rounded-md border border-outline bg-surface p-3"
+        >
+          <p className="text-xs text-muted-foreground">
+            Pinball Map has no entry for this game, so its details are ours to
+            keep.
+          </p>
+          <div className="grid gap-3 @xl:grid-cols-[2fr_1.5fr_1fr]">
+            <div className="space-y-1.5">
+              <Label htmlFor={modelNameId} className="text-xs">
+                Model name
+              </Label>
+              <Input
+                id={modelNameId}
+                name="modelName"
+                value={modelName}
+                onChange={(e) => {
+                  setModelName(e.target.value);
+                  onDirty?.();
+                }}
+                maxLength={200}
+                disabled={disabled}
+                placeholder="e.g. Bordertown"
+                className="border-outline bg-surface text-foreground placeholder:text-muted-foreground"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor={manufacturerId} className="text-xs">
+                Manufacturer
+              </Label>
+              <Input
+                id={manufacturerId}
+                name="manufacturer"
+                value={manufacturer}
+                onChange={(e) => {
+                  setManufacturer(e.target.value);
+                  onDirty?.();
+                }}
+                maxLength={100}
+                disabled={disabled}
+                placeholder="e.g. homebrew"
+                className="border-outline bg-surface text-foreground placeholder:text-muted-foreground"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor={yearId} className="text-xs">
+                Year
+              </Label>
+              {/* `inputMode="numeric"` rather than type="number": a spinner is
+                  useless for a four-digit year and Safari's stepper eats the
+                  field's width. The server enforces the 1930..next-year range;
+                  `min`/`max` here make the browser say so first. */}
+              <Input
+                id={yearId}
+                name="year"
+                type="number"
+                inputMode="numeric"
+                min={1930}
+                max={new Date().getFullYear() + 1}
+                value={year}
+                onChange={(e) => {
+                  setYear(e.target.value);
+                  onDirty?.();
+                }}
+                disabled={disabled}
+                placeholder="1994"
+                className="border-outline bg-surface text-foreground placeholder:text-muted-foreground"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Switching to a catalog title drops everything typed above — the DB
+          forbids a linked machine carrying a hand-entered model, so this is a
+          real consequence rather than a preference. Confirm before the pick
+          lands, not a toast after the save. */}
+      <AlertDialog
+        open={pendingFamily !== null}
+        onOpenChange={(next) => {
+          if (!next) setPendingFamily(null);
+        }}
+      >
+        <AlertDialogContent data-testid="pinballmap-overwrite-confirm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Use Pinball Map&apos;s details?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingFamily
+                ? `Linking this machine to “${pendingFamily.name}” replaces the model name, manufacturer and year you entered with Pinball Map's.`
+                : ""}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep what I entered</AlertDialogCancel>
+            <AlertDialogAction
+              type="button"
+              onClick={() => {
+                if (pendingFamily) applyFamily(pendingFamily);
+                setPendingFamily(null);
+              }}
+            >
+              Use Pinball Map&apos;s details
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

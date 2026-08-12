@@ -123,3 +123,158 @@ describe("PinballMapLinkField — what it submits", () => {
     expect(resolvePinballMapLinkAction).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * Hand-entered model identity (PP-3bbr, folded into PP-o355.21) — the panel for
+ * games PinballMap's catalog cannot cover.
+ */
+describe("PinballMapLinkField — manual model entry", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(searchPinballMapFamiliesAction).mockResolvedValue([]);
+    vi.mocked(resolvePinballMapLinkAction).mockResolvedValue(null);
+  });
+
+  /** Drive the "Not on Pinball Map" choice through the empty-search path. */
+  async function pickNotOnMap(
+    user: ReturnType<typeof userEvent.setup>
+  ): Promise<void> {
+    await user.click(screen.getByRole("combobox"));
+    await user.type(
+      screen.getByPlaceholderText(/medieval madness/i),
+      "nothing matches"
+    );
+    await user.click(
+      await screen.findByTestId("pinballmap-not-on-map", {}, { timeout: 3000 })
+    );
+  }
+
+  function field(name: string): HTMLInputElement | null {
+    return document.querySelector<HTMLInputElement>(`input[name="${name}"]`);
+  }
+
+  it("is absent until the machine is marked not-on-Pinball-Map", () => {
+    render(<PinballMapLinkField machineName="Bordertown" />);
+    expect(
+      screen.queryByTestId("pinballmap-manual-model")
+    ).not.toBeInTheDocument();
+    // The fields must not merely be hidden — a linked machine's save has no
+    // business carrying them at all.
+    expect(field("modelName")).toBeNull();
+  });
+
+  it("opens seeded from the machine's name", async () => {
+    const user = userEvent.setup();
+    render(<PinballMapLinkField machineName="Bordertown" />);
+
+    await pickNotOnMap(user);
+
+    expect(screen.getByTestId("pinballmap-manual-model")).toBeInTheDocument();
+    expect(field("modelName")?.value).toBe("Bordertown");
+  });
+
+  it("leaves a stored model name alone rather than re-seeding it", async () => {
+    // The seed is a starting point, not a mirror of the machine's name.
+    const user = userEvent.setup();
+    render(
+      <PinballMapLinkField
+        machineName="The Bordertown Cabinet"
+        defaultExcluded
+        defaultModelName="Bordertown"
+      />
+    );
+    expect(field("modelName")?.value).toBe("Bordertown");
+
+    await pickNotOnMap(user);
+    expect(field("modelName")?.value).toBe("Bordertown");
+  });
+
+  it("warns before a catalog title overwrites what was typed", async () => {
+    const user = userEvent.setup();
+    vi.mocked(searchPinballMapFamiliesAction).mockResolvedValue([
+      {
+        machineGroupId: null,
+        pinballmapMachineId: 77,
+        name: "Medieval Madness",
+        manufacturer: "Williams",
+        year: 1997,
+        editionCount: 1,
+      },
+    ]);
+    render(
+      <PinballMapLinkField
+        defaultExcluded
+        defaultModelName="Bordertown"
+        defaultManufacturer="homebrew"
+      />
+    );
+
+    await user.click(screen.getByRole("combobox"));
+    await user.type(screen.getByPlaceholderText(/medieval madness/i), "med");
+    await user.click(await screen.findByText("Medieval Madness"));
+
+    // Not applied yet: the DB forbids a linked machine carrying a hand-entered
+    // model, so the pick genuinely destroys what is on screen.
+    const confirm = await screen.findByTestId("pinballmap-overwrite-confirm");
+    expect(confirm).toHaveTextContent("Medieval Madness");
+    expect(field("modelName")?.value).toBe("Bordertown");
+
+    await user.click(
+      screen.getByRole("button", { name: /use pinball map's details/i })
+    );
+    expect(submittedLinkId()).toBe("77");
+    expect(field("modelName")).toBeNull();
+  });
+
+  it("keeps the entry when the warning is declined", async () => {
+    const user = userEvent.setup();
+    vi.mocked(searchPinballMapFamiliesAction).mockResolvedValue([
+      {
+        machineGroupId: null,
+        pinballmapMachineId: 77,
+        name: "Medieval Madness",
+        manufacturer: "Williams",
+        year: 1997,
+        editionCount: 1,
+      },
+    ]);
+    render(
+      <PinballMapLinkField defaultExcluded defaultModelName="Bordertown" />
+    );
+
+    await user.click(screen.getByRole("combobox"));
+    await user.type(screen.getByPlaceholderText(/medieval madness/i), "med");
+    await user.click(await screen.findByText("Medieval Madness"));
+    await user.click(
+      await screen.findByRole("button", { name: /keep what i entered/i })
+    );
+
+    expect(field("modelName")?.value).toBe("Bordertown");
+    expect(submittedLinkId()).toBe("");
+  });
+
+  it("picks a catalog title with no warning when nothing was entered", async () => {
+    // The warning is about losing work; with nothing typed there is none.
+    const user = userEvent.setup();
+    vi.mocked(searchPinballMapFamiliesAction).mockResolvedValue([
+      {
+        machineGroupId: null,
+        pinballmapMachineId: 77,
+        name: "Medieval Madness",
+        manufacturer: "Williams",
+        year: 1997,
+        editionCount: 1,
+      },
+    ]);
+    render(<PinballMapLinkField defaultExcluded />);
+
+    await user.click(screen.getByRole("combobox"));
+    await user.type(screen.getByPlaceholderText(/medieval madness/i), "med");
+    await user.click(await screen.findByText("Medieval Madness"));
+
+    expect(
+      screen.queryByTestId("pinballmap-overwrite-confirm")
+    ).not.toBeInTheDocument();
+    expect(submittedLinkId()).toBe("77");
+  });
+});

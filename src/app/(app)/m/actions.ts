@@ -187,18 +187,27 @@ function readPbmLinkFormFields(formData: FormData): {
   pinballmapMachineId: string | undefined;
   pinballmapExcluded: boolean | undefined;
   pinballmapExcludedReason: string | undefined;
+  modelName: string | undefined;
+  manufacturer: string | undefined;
+  year: string | undefined;
 } {
   const idRaw = formData.get("pinballmapMachineId");
-  const reasonRaw = formData.get("pinballmapExcludedReason");
+  const nonEmpty = (key: string): string | undefined => {
+    const raw = formData.get(key);
+    return typeof raw === "string" && raw.trim().length > 0 ? raw : undefined;
+  };
   return {
     pinballmapMachineId:
       typeof idRaw === "string" && idRaw.length > 0 ? idRaw : undefined,
     pinballmapExcluded:
       formData.get("pinballmapExcluded") === "on" ? true : undefined,
-    pinballmapExcludedReason:
-      typeof reasonRaw === "string" && reasonRaw.trim().length > 0
-        ? reasonRaw
-        : undefined,
+    pinballmapExcludedReason: nonEmpty("pinballmapExcludedReason"),
+    // Hand-entered model identity (PP-3bbr). Blank means "not given", which the
+    // excluded branch stores as null — the fields are optional, and an empty
+    // Year must not coerce to 0 and fail the 1930 floor.
+    modelName: nonEmpty("modelName"),
+    manufacturer: nonEmpty("manufacturer"),
+    year: nonEmpty("year"),
   };
 }
 
