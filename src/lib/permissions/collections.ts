@@ -1,12 +1,27 @@
+/**
+ * Collection access predicates.
+ *
+ * These live inside `src/lib/permissions/` because CORE-ARCH-008 puts them
+ * here: a permission helper outside this module is invisible to the
+ * auto-generated `/help/permissions` page. The *role* half of "who may view a
+ * collection" is a matrix lookup (`collections.view.private`); the ownership
+ * and collaborator halves are identity comparisons against a specific
+ * collection, which the matrix has no context for and so stay explicit here.
+ */
+
+import type { UserRole } from "~/lib/types";
+import { checkPermission, getAccessLevel } from "./helpers";
+
 export interface CollectionViewer {
   /** Current user's id (undefined if unauthenticated). */
   userId?: string | undefined;
   /** Current user's role (undefined/null if unauthenticated). */
-  role?: string | null | undefined;
+  role?: UserRole | null | undefined;
 }
 
 /**
- * Wave 0a: a collection is private to its owner; admins may also view.
+ * Wave 0a: a collection is private to its owner; `collections.view.private`
+ * widens that to whoever the matrix grants it (admins today).
  * Wave 0b extends this with view/edit link tokens.
  */
 export function canViewCollection(
@@ -16,10 +31,10 @@ export function canViewCollection(
   if (viewer.userId !== undefined && viewer.userId === collection.owner.id) {
     return true;
   }
-  // Wave 0a private-collection view invariant: admins may view any collection
-  // (spec §Wave 0a). This is a data-visibility rule, not a role-gated toggle.
-  // permissions-audit-allow: admin-may-view invariant
-  return viewer.role === "admin";
+  return checkPermission(
+    "collections.view.private",
+    getAccessLevel(viewer.role)
+  );
 }
 
 /**

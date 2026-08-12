@@ -627,3 +627,21 @@ describe("issues.report.quick", () => {
     expect(PERMISSIONS_BY_ID["issues.report.quick"]).toBeDefined();
   });
 });
+
+describe("collections.view.private", () => {
+  it("grants only admin access", () => {
+    expect(checkPermission("collections.view.private", "admin")).toBe(true);
+    expect(checkPermission("collections.view.private", "technician")).toBe(
+      false
+    );
+    expect(checkPermission("collections.view.private", "member")).toBe(false);
+    expect(checkPermission("collections.view.private", "guest")).toBe(false);
+    expect(checkPermission("collections.view.private", "unauthenticated")).toBe(
+      false
+    );
+  });
+
+  it("is registered in PERMISSIONS_BY_ID", () => {
+    expect(PERMISSIONS_BY_ID["collections.view.private"]).toBeDefined();
+  });
+});

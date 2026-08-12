@@ -3,11 +3,11 @@ import {
   canEditCollection,
   canManageCollection,
   canViewCollection,
-} from "./access";
+} from "./collections";
 
 const collection = { owner: { id: "owner-1" } };
 
-describe("canViewCollection (Wave 0a: owner or admin)", () => {
+describe("canViewCollection (Wave 0a: owner, or collections.view.private)", () => {
   it("allows the owner", () => {
     expect(
       canViewCollection(collection, { userId: "owner-1", role: "member" })
@@ -23,8 +23,23 @@ describe("canViewCollection (Wave 0a: owner or admin)", () => {
       canViewCollection(collection, { userId: "someone", role: "member" })
     ).toBe(false);
   });
+  it("denies a non-owner technician", () => {
+    expect(
+      canViewCollection(collection, { userId: "someone", role: "technician" })
+    ).toBe(false);
+  });
+  it("denies a non-owner guest", () => {
+    expect(
+      canViewCollection(collection, { userId: "someone", role: "guest" })
+    ).toBe(false);
+  });
   it("denies anonymous", () => {
     expect(canViewCollection(collection, {})).toBe(false);
+  });
+  it("denies a signed-in user with no role row", () => {
+    expect(
+      canViewCollection(collection, { userId: "someone", role: null })
+    ).toBe(false);
   });
 });
 

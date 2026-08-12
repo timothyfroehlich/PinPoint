@@ -10,8 +10,9 @@ import {
   canEditCollection,
   canManageCollection,
   canViewCollection,
-} from "~/lib/collections/access";
+} from "~/lib/permissions/collections";
 import { isEditorCollaborator } from "~/lib/collections/collaborators";
+import type { UserRole } from "~/lib/types";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
 import { machines as machinesTable, userProfiles } from "~/server/db/schema";
@@ -42,7 +43,7 @@ export interface CollectionForLayout {
 /** The current viewer: their id (undefined if unauthenticated) and role. */
 export interface Viewer {
   userId: string | undefined;
-  role: string | null;
+  role: UserRole | null;
 }
 
 const uuidSchema = z.uuid();
@@ -57,7 +58,7 @@ export const getViewer = cache(async (): Promise<Viewer> => {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  let role: string | null = null;
+  let role: UserRole | null = null;
   if (user) {
     const profile = await db.query.userProfiles.findFirst({
       where: eq(userProfiles.id, user.id),

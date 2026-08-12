@@ -578,12 +578,29 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
         id: "collections.view",
         label: "View collections",
         description:
-          "View a collection's Overview, Issues, and Timeline. Private collections are additionally restricted to their owner (and admins); link-based sharing is handled outside the role matrix.",
+          "View a collection's Overview, Issues, and Timeline. Collections are private to their owner — reaching someone else's also needs the permission below, an editor grant on that collection, or its share link (a per-collection capability URL, not a role).",
         access: {
           unauthenticated: true,
           guest: true,
           member: true,
           technician: true,
+          admin: true,
+        },
+      },
+      // The Wave 0a private-collection invariant ("admins may view any
+      // collection"), stated as a matrix entry so /help/permissions shows it
+      // instead of it living in a role comparison. `canViewCollection` in
+      // ./collections.ts is the only reader (CORE-ARCH-008).
+      {
+        id: "collections.view.private",
+        label: "View anyone's collection",
+        description:
+          "Open any member's collection from its /c/<id> URL without an owner grant or a share link. Owners always see their own.",
+        access: {
+          unauthenticated: false,
+          guest: false,
+          member: false,
+          technician: false,
           admin: true,
         },
       },
