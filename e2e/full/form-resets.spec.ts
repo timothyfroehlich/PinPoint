@@ -12,7 +12,7 @@
  * - Admin user invite dialog (InviteUserDialog)
  */
 
-import { test, expect } from "@playwright/test";
+import { test, expect } from "../support/fixtures.js";
 import {
   ensureLoggedIn,
   loginAs,

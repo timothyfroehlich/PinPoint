@@ -1,5 +1,5 @@
 // e2e/full/rich-text.spec.ts
-import { test, expect } from "@playwright/test";
+import { test, expect } from "../support/fixtures.js";
 import { loginAs } from "../support/actions.js";
 import {
   createTestUser,

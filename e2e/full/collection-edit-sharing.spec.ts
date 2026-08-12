@@ -9,7 +9,7 @@
  * `member` storageState; the editor runs in a second `technician` context.
  */
 
-import { test, expect } from "@playwright/test";
+import { test, expect } from "../support/fixtures.js";
 import { STORAGE_STATE } from "../support/auth-state.js";
 import { getTestPrefix } from "../support/test-isolation.js";
 

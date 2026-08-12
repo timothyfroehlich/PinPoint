@@ -5,7 +5,7 @@
  * and password reset test from auth-flows-extended.spec.ts.
  */
 
-import { test, expect } from "@playwright/test";
+import { test, expect } from "../support/fixtures.js";
 import { MailpitClient } from "../support/mailpit.js";
 import {
   ensureLoggedIn,

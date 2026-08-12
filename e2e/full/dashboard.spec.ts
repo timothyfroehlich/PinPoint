@@ -5,7 +5,7 @@
  * newest games, recently fixed games, and quick stats after login.
  */
 
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page } from "../support/fixtures.js";
 import { getTestPrefix } from "../support/test-isolation.js";
 import { STORAGE_STATE } from "../support/auth-state.js";
 
