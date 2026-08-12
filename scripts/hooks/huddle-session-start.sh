@@ -66,6 +66,48 @@ emit_work_digest() {
   printf '%s\n' "$digest_out"
 }
 
+# --- herdr workspace label (PP-355h) ---
+# The human-meaningful name for a session already exists: the label Tim typed on
+# its herdr workspace. Deriving the huddle name from it is what keeps the huddle
+# name, the Claude Code display name, and the sidebar entry recognizably the same
+# session instead of three unrelated strings.
+#
+# Read it from $HERDR_WORKSPACE_ID, NOT by matching panes. Hooks inherit the
+# environment of the shell herdr launched the agent in, so this variable is
+# present and identifies the workspace directly. The alternatives are both worse:
+# `herdr pane list`'s agent_session.value has been measured pointing at a
+# different live session (see the herdr skill), and terminal_title carries an
+# animating spinner glyph that terminal_title_stripped does not fully remove
+# (✳ and the braille frames yes, ◐/◑ no).
+#
+# A forked or handed-off session inherits a stale value, same caveat as
+# $HERDR_PANE_ID. That is tolerable here and nowhere else in the huddle: this
+# produces a *suggested* name that both the agent and Tim read before it is
+# registered, not a signature attributed silently.
+#
+# Fail-open at every step — no herdr, a bare terminal, Bazzite, a non-herdr
+# harness: print nothing and the caller falls back to task-derived naming.
+herdr_workspace_label() {
+  local out
+  [[ -n "${HERDR_WORKSPACE_ID:-}" ]] || return 0
+  command -v herdr >/dev/null 2>&1 || return 0
+  out=$(herdr workspace list 2>/dev/null) || return 0
+  [[ -n "$out" ]] || return 0
+  printf '%s' "$out" | jq -r --arg ws "$HERDR_WORKSPACE_ID" '
+    .result.workspaces[]? | select(.workspace_id == $ws) | .label // empty
+  ' 2>/dev/null || return 0
+}
+
+# CamelCase a workspace label for use as a name suffix ("main e2e failures" →
+# "MainE2eFailures"). Done in jq, not sed: BSD sed has no `\u`, so the obvious
+# `s/(^| )([a-z])/\1\u\2/g` emits a literal "u" on this Mac ("Agentunaming").
+huddle_camelize() {
+  jq -rn --arg s "$1" '
+    $s | [splits("[^A-Za-z0-9]+")] | map(select(length > 0))
+       | map((.[0:1] | ascii_upcase) + .[1:]) | join("")
+  ' 2>/dev/null || printf ''
+}
+
 # --- Per-machine Dolt sync (throttled, fail-open) ---
 # Pull peer machines' huddle updates (and push ours) before reading root notes,
 # so this session opens with the freshest cross-machine state. Throttled
@@ -344,10 +386,27 @@ else
   # shellcheck disable=SC2016  # backticks are literal Markdown, not command substitution
   printf 'Your session_id: `%s`\n\n' "$SESSION_ID"
   printf 'You are not yet registered in the huddle self-filter map.\n\n'
-  printf 'When you receive your first user prompt, derive a short descriptive name\n'
-  printf 'for yourself from what you'\''re being asked to do, prefixed with your\n'
-  printf 'harness name so Tim can recognize at a glance which agent stack each\n'
-  printf 'parallel session belongs to.\n\n'
+  printf 'When you receive your first user prompt, pick a name in this order:\n\n'
+  _WS_LABEL=$(herdr_workspace_label 2>/dev/null) || _WS_LABEL=""
+  if [[ -n "$_WS_LABEL" ]]; then
+    printf '1. **Your herdr workspace label, which is "%s".** Tim typed it for this\n' "$_WS_LABEL"
+    printf '   session, so it already says what the session is for. CamelCase it and add\n'
+    printf '   your harness prefix — "%s" becomes something like Claude-%s.\n' "$_WS_LABEL" "$(huddle_camelize "$_WS_LABEL")"
+    printf '2. **If that label is generic, use the bead instead.** Labels like "PinPoint",\n'
+    printf '   "Orchestrating", "Busywork", "main", or a bare number say nothing about the\n'
+    printf '   work. When Tim has pointed you at a bead, name yourself after the bead'\''s\n'
+    printf '   subject (PP-355h "Derive huddle names from the workspace label" →\n'
+    printf '   Claude-HuddleNameSource).\n'
+    printf '3. **Otherwise** derive it from what you are being asked to do.\n\n'
+  else
+    printf '1. **Your bead, when Tim has pointed you at one** — name yourself after its\n'
+    printf '   subject (PP-355h "Derive huddle names from the workspace label" →\n'
+    printf '   Claude-HuddleNameSource).\n'
+    printf '2. **Otherwise** derive it from what you are being asked to do.\n\n'
+    printf '(No herdr workspace label available for this session — normally that label is\n'
+    printf 'the first choice. Expected outside herdr: a bare terminal, Bazzite, a non-herdr\n'
+    printf 'harness.)\n\n'
+  fi
   printf 'Examples:\n'
   printf '  Claude-WorktreeHookFix       fixing a worktree hook in Claude Code\n'
   printf '  Antigravity-AgentsMdCleanup  cleaning up AGENTS.md in Antigravity\n'
@@ -358,6 +417,12 @@ else
   printf 'Register with:\n'
   printf '    bash scripts/hooks/huddle-whoami.sh register <YourName> %s\n\n' "$SESSION_ID"
   printf 'If the name is taken, the helper suggests variations.\n\n'
+  # shellcheck disable=SC2016  # backticks are literal Markdown
+  printf 'THEN ASK TIM TO RUN `/rename <YourName>` in your next response. That sets the\n'
+  printf 'harness display name — the one peer sessions see in ListAgents and the one on\n'
+  printf 'the terminal title — so all three identities match. You cannot do this yourself:\n'
+  printf '/rename is user-typed only, and no tool sets it. One line at the end of your\n'
+  printf 'reply is enough; do not stop work waiting for it.\n\n'
   printf 'After registering, post a one-line kickoff to today'\''s bead describing what this\n'
   printf 'session is tackling (skip it for trivial questions or one-line fixes).\n'
   # shellcheck disable=SC2016  # backticks are literal Markdown

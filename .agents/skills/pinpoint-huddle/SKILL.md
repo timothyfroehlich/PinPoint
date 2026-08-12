@@ -1,6 +1,6 @@
 ---
 name: pinpoint-huddle
-description: The conventions behind the inter-session coordination channel that the huddle hooks inject but do not state — which events are auto-posted versus the judgment calls only you can post (added scope is the most-skipped and most-needed), peer-response etiquette, the em-dash self-filter signature, why a session_id belongs to whoever registered it first, why a dispatched subagent is refused registration outright, and the rotation subagent dispatch the session-start notice routes here for. Also how to read the work digest, the env knobs that quiet the nudge and the poll (`HUDDLE_NUDGE_SECONDS`, `HUDDLE_THROTTLE_SECONDS`), and the multi-machine setup — one shared Dolt server, `config.json` as a rebuildable cache rather than a source of truth, `today_bead.id` as a hint that gets verified. Use when you see a rotation-needed notice, when deciding whether something is worth posting to the daily bead, when your own posts start re-injecting, when a peer's update scrolls by, when the huddle is too noisy, or when a huddle lookup returns null on a machine.
+description: The conventions behind the inter-session coordination channel that the huddle hooks inject but do not state — which events are auto-posted versus the judgment calls only you can post (added scope is the most-skipped and most-needed), peer-response etiquette, the em-dash self-filter signature, where a session's name comes from (the herdr workspace label, falling back to the bead) and why setting the matching harness display name means asking Tim to run `/rename`, why a session_id belongs to whoever registered it first, why a dispatched subagent is refused registration outright, and the rotation subagent dispatch the session-start notice routes here for. Also how to read the work digest, the env knobs that quiet the nudge and the poll (`HUDDLE_NUDGE_SECONDS`, `HUDDLE_THROTTLE_SECONDS`), and the multi-machine setup — one shared Dolt server, `config.json` as a rebuildable cache rather than a source of truth, `today_bead.id` as a hint that gets verified. Use when you see a rotation-needed notice, when deciding whether something is worth posting to the daily bead, when your own posts start re-injecting, when a peer's update scrolls by, when the huddle is too noisy, or when a huddle lookup returns null on a machine.
 ---
 
 # pinpoint-huddle
@@ -18,6 +18,43 @@ Read it as orientation, not as instructions: it tells you what kind of work this
 ## Identity
 
 Sign your huddle comments with `—<YourFullRegisteredName>` (em-dash + your full registered name). The self-filter matches this suffix to suppress your own echoes.
+
+### Where the name comes from
+
+A session carries three names, and they are set by three different things. The
+huddle name is the only one you control; keeping the other two in step is a
+handoff, not an API call.
+
+| Name                  | Set by                             | Seen in                            |
+| --------------------- | ---------------------------------- | ---------------------------------- |
+| Huddle name           | `huddle-whoami.sh register` — you  | Bead signatures, self-filter       |
+| Display name          | `/rename` — Tim only               | `ListAgents` peers, terminal title |
+| herdr workspace label | Tim, when he creates the workspace | herdr sidebar                      |
+
+**Derive the huddle name from the workspace label.** Tim already typed a name for
+this session when he made its workspace, so it says what the session is for
+without you guessing. The registration notice reads it and prints a CamelCased
+candidate. When the label is generic — `PinPoint`, `Orchestrating`, `Busywork`,
+`main`, a bare number — name yourself after the bead Tim pointed you at instead;
+fall back to the task only when there is neither.
+
+**Then ask Tim to run `/rename <YourName>`,** one line at the end of your next
+response. That is the only way the display name gets set: `/rename` is a
+user-typed command, no tool writes it, and `--name` at launch is too early to
+know the task. Don't block on the answer.
+
+The notice reads the label from **`$HERDR_WORKSPACE_ID`**, not by matching panes.
+Hooks inherit the environment herdr launched the agent in, so the variable is
+right there and names the workspace directly. Both alternatives are traps:
+`herdr pane list`'s `agent_session.value` has been measured pointing at a
+_different live session_ (see the `herdr` skill), and `terminal_title` carries
+Claude Code's animating activity glyph, which `terminal_title_stripped` only
+partly removes — `✳` and the braille frames yes, `◐`/`◑` no. A forked session
+inherits a stale `$HERDR_WORKSPACE_ID`, which is tolerable here only because the
+result is a _suggestion_ you and Tim both read before it is registered.
+
+No herdr — a bare terminal, Bazzite, another harness — and the notice silently
+drops to bead-then-task. Nothing errors.
 
 **A session_id belongs to whoever registered it first.** `register` refuses to
 rebind a session_id that already holds a different name — no silent overwrite,
