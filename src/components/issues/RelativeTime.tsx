@@ -17,10 +17,17 @@ interface RelativeTimeProps {
    * so the raw instant overflowed the row and was clipped until hydration
    * (PP-h490). Empty is both zone-independent and unable to overflow.
    *
-   * Pass a server-computed absolute label where the pre-hydration paint should
-   * still carry a date — `NotificationList`, `IssueList` and the issue detail
-   * page all pass `formatDateTime(...)`, which is stable because the string is
-   * built once on the server and handed down as a prop.
+   * Pass an absolute label where the pre-hydration paint should still carry a
+   * date. The pattern to copy is `IssueUpdatedTimestamp`, whose `fallback` is
+   * computed by the issue-detail *server* page and handed down as a prop — the
+   * string is then built once, in one zone, and cannot diverge.
+   *
+   * `NotificationList` and `IssueList` also pass `formatDateTime(...)`, but
+   * both are `"use client"` and call it inline, so the value is computed twice
+   * in two possibly-different zones. That is tolerable *here* only because a
+   * fallback is text that the ticker replaces on mount; the same inline call
+   * feeding an `aria-label` or any other attribute is a real bug, because
+   * React does not patch mismatched attributes (see `IssueTimeline`).
    */
   fallback?: string;
 }
