@@ -299,6 +299,12 @@ jobs:
       - name: Pytest (scripts)
         run: pytest scripts/tests/
 
+      # A spec no Playwright suite config collects type-checks and lints green
+      # while running nowhere (PP-stut). Pure glob + config parse — no browsers,
+      # no database, no Node.
+      - name: E2E suite coverage
+        run: python3 scripts/check_e2e_suite_coverage.py
+
       - name: ShellCheck
         run: find scripts/ .devcontainer/ -name '*.sh' -print0 | xargs -0 shellcheck
 
