@@ -18,9 +18,13 @@ export function resolveDefaultMachineId(
     return undefined;
   }
 
+  // Initials are stored uppercase, but the query param is hand-typeable
+  // (`/report?machine=afm`) — match case-insensitively rather than 404-ing
+  // into an unselected form. Same reasoning as `canonicalMachinePath`.
+  const requestedInitials = requestedMachineInitials?.toUpperCase();
   const byInitials =
-    requestedMachineInitials &&
-    machines.find((machine) => machine.initials === requestedMachineInitials);
+    requestedInitials &&
+    machines.find((machine) => machine.initials === requestedInitials);
 
   if (byInitials) return byInitials.id;
 

@@ -1,5 +1,6 @@
-import { type NextRequest, type NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { updateSession } from "~/lib/supabase/middleware";
+import { canonicalMachinePath } from "~/lib/machines/canonical-path";
 
 /**
  * Next.js middleware for Supabase SSR authentication and security headers
@@ -19,6 +20,16 @@ import { updateSession } from "~/lib/supabase/middleware";
  * See docs/SECURITY.md for the threat-model decisions and known gaps
  */
 export async function middleware(request: NextRequest): Promise<NextResponse> {
+  // 0. Canonicalize machine URLs: /m/afm -> /m/AFM. Initials are stored
+  //    uppercase, so a lowercased link would otherwise 404. Runs before the
+  //    session refresh because the redirected request will refresh anyway.
+  const canonicalPath = canonicalMachinePath(request.nextUrl.pathname);
+  if (canonicalPath) {
+    const url = request.nextUrl.clone();
+    url.pathname = canonicalPath;
+    return NextResponse.redirect(url);
+  }
+
   // 1. Run Supabase middleware first to handle session
   const response = await updateSession(request);
   // 2. Generate nonce for CSP using Web Crypto API (Edge Runtime compatible)

@@ -15,6 +15,11 @@ describe("resolveDefaultMachineId", () => {
     expect(resolveDefaultMachineId(machines, undefined, "BB")).toBe("b");
   });
 
+  it("matches machine initials case-insensitively", () => {
+    expect(resolveDefaultMachineId(machines, undefined, "bb")).toBe("b");
+    expect(resolveDefaultMachineId(machines, undefined, "Bb")).toBe("b");
+  });
+
   it("returns undefined when query missing or invalid", () => {
     expect(resolveDefaultMachineId(machines, "missing", "missing")).toBe(
       undefined
