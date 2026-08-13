@@ -9,7 +9,7 @@
  * `member` storageState; the editor runs in a second `technician` context.
  */
 
-import { test, expect } from "@playwright/test";
+import { test, expect, attachHydrationWait } from "../support/fixtures.js";
 import { STORAGE_STATE } from "../support/auth-state.js";
 import { getTestPrefix } from "../support/test-isolation.js";
 
@@ -53,7 +53,7 @@ test.describe("Collection edit sharing (PP-wqit.7)", () => {
       storageState: STORAGE_STATE.technician,
     });
     try {
-      const ed = await editorCtx.newPage();
+      const ed = attachHydrationWait(await editorCtx.newPage());
       await ed.goto("/c/collections");
       await expect(
         ed.getByRole("heading", { name: "Shared with you" })
@@ -99,7 +99,7 @@ test.describe("Collection edit sharing (PP-wqit.7)", () => {
       storageState: STORAGE_STATE.technician,
     });
     try {
-      const rv = await revokedCtx.newPage();
+      const rv = attachHydrationWait(await revokedCtx.newPage());
       await rv.goto("/c/collections");
       await expect(
         rv.getByRole("link", { name: new RegExp(name) })

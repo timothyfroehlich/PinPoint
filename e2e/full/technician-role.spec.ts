@@ -7,7 +7,7 @@
  * - CANNOT access admin panel
  */
 
-import { test, expect } from "@playwright/test";
+import { test, expect } from "../support/fixtures.js";
 import { STORAGE_STATE } from "../support/auth-state.js";
 import { seededMachines } from "../support/constants.js";
 
@@ -20,7 +20,17 @@ test.describe("Technician Role Permissions", () => {
     const heading = page.getByRole("heading", {
       name: seededMachines.addamsFamily.name,
     });
-    if (await heading.isVisible()) {
+    // Waited for, not sampled: `isVisible()` never retries, so a heading that
+    // had merely not painted yet read as "name was changed" and sent this
+    // afterEach down the restore branch — an unnecessary DB write on every
+    // slow render. CI-aware because a flat 5s reopens the same hole under the
+    // conditions this suite actually fails in (Mobile Chrome, three workers, a
+    // dev server compiling routes for the other two).
+    const nameIsCorrect = await heading
+      .waitFor({ state: "visible", timeout: process.env["CI"] ? 15_000 : 5000 })
+      .then(() => true)
+      .catch(() => false);
+    if (nameIsCorrect) {
       // Name is already correct — nothing to do
       return;
     }

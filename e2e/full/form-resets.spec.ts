@@ -12,7 +12,7 @@
  * - Admin user invite dialog (InviteUserDialog)
  */
 
-import { test, expect } from "@playwright/test";
+import { test, expect } from "../support/fixtures.js";
 import {
   ensureLoggedIn,
   loginAs,
@@ -25,6 +25,7 @@ import { cleanupTestEntities } from "../support/cleanup.js";
 import { seededMachines, TEST_USERS } from "../support/constants.js";
 import {
   fillReportForm,
+  openIssueCommentForm,
   submitFormAndWaitForRedirect,
 } from "../support/page-helpers.js";
 import {
@@ -217,27 +218,9 @@ test.describe("CREATE form resets", () => {
       timeout: 30000,
     });
 
-    // On mobile (md: breakpoint hidden), AddCommentForm lives inside the
-    // StickyCommentComposer Sheet — open it before interacting with the editor.
-    // The inline form is hidden (hidden md:flex) on mobile; scope locators to
-    // the open dialog to avoid resolving to the hidden inline ProseMirror.
-    // Wait for the page to settle after redirect before checking visibility.
     await page.waitForLoadState("domcontentloaded");
-    const sheetTrigger = page.getByRole("button", { name: "Add a comment" });
-    const isOnMobile = await sheetTrigger
-      .isVisible({ timeout: 3000 })
-      .catch(() => false);
-    if (isOnMobile) {
-      await sheetTrigger.click();
-      // Wait for the Sheet to fully animate open before interacting.
-      await page
-        .getByRole("dialog", { name: "Add a comment" })
-        .waitFor({ state: "visible", timeout: 10000 });
-    }
-
-    const commentForm = isOnMobile
-      ? page.getByRole("dialog", { name: "Add a comment" })
-      : page.getByTestId("issue-comment-form");
+    const { form: commentForm, isSheet: isOnMobile } =
+      await openIssueCommentForm(page);
     const editor = commentForm.locator(".ProseMirror");
     await editor.waitFor({ state: "visible", timeout: 15000 });
     await editor.click();
