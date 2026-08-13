@@ -7,6 +7,7 @@ import { NON_TEXT_TAGS } from "~/lib/sanitize-html-config";
 import { isInternalAccount } from "~/lib/auth/internal-accounts";
 import { getSiteUrl } from "~/lib/url";
 import { getThreadingHeaders } from "~/lib/notifications/email-threading";
+import { buildResourceUrl } from "~/lib/notifications/resource-url";
 import { reportError } from "~/lib/observability/report-error";
 import type {
   DeliveryChannel,
@@ -168,6 +169,7 @@ export interface EmailHtmlOptions {
   type: NotificationType;
   issueTitle?: string | undefined;
   machineName?: string | undefined;
+  machineInitials?: string | undefined;
   formattedIssueId?: string | undefined;
   commentContent?: string | undefined;
   newStatus?: string | undefined;
@@ -206,6 +208,7 @@ export function getEmailHtml({
   type,
   issueTitle,
   machineName,
+  machineInitials,
   formattedIssueId,
   commentContent,
   newStatus,
@@ -262,25 +265,17 @@ export function getEmailHtml({
     ? sanitizeHtml(formattedIssueId, EMAIL_SANITIZE_OPTIONS)
     : "";
 
-  let issueUrl = `${siteUrl}/issues`;
-  if (formattedIssueId) {
-    // Format is [INITIALS]-[NUMBER]; initials are 2-6 alphanumeric chars (no hyphens)
-    const parts = formattedIssueId.split("-");
-    if (parts.length >= 2) {
-      const numberPart = parts.pop();
-      const initialsPart = parts.join("-");
-      // Validate initialsPart matches schema: exactly 2-6 uppercase letters or digits
-      if (
-        numberPart &&
-        /^\d+$/.test(numberPart) &&
-        /^[A-Z0-9]{2,6}$/.test(initialsPart)
-      ) {
-        const issueNumber = parseInt(numberPart, 10);
-        // URL encode for defense-in-depth, even though validation ensures only safe characters
-        issueUrl = `${siteUrl}/m/${encodeURIComponent(initialsPart)}/i/${issueNumber}`;
-      }
-    }
-  }
+  // Machine-ownership emails are about a machine, not an issue — pointing them
+  // at the global issue list under a "View Issue" label was the email half of
+  // PP-gzq2. Every other type is issue-tied.
+  const isMachineResource = type === "machine_ownership_changed";
+  const resourceUrl = buildResourceUrl({
+    siteUrl,
+    resourceType: isMachineResource ? "machine" : "issue",
+    formattedIssueId,
+    machineInitials,
+  });
+  const resourceLinkLabel = isMachineResource ? "View Machine" : "View Issue";
 
   const sanitizedDescription =
     (type === "new_issue" || type === "issue_assigned") && issueDescription
@@ -293,7 +288,7 @@ export function getEmailHtml({
       ${eventLabel ? `<h3 style="color: #555; font-weight: 600; margin-bottom: 8px;">${eventLabel}</h3>` : ""}
       <div>${body}</div>
       ${showDescription ? `<blockquote>${sanitizedDescription}</blockquote>` : ""}
-      <p><a href="${issueUrl}">View Issue</a></p>
+      <p><a href="${resourceUrl}">${resourceLinkLabel}</a></p>
       ${getEmailFooter(userId)}
     `;
 }
@@ -365,6 +360,7 @@ export const emailChannel: DeliveryChannel = {
           type: ctx.type,
           issueTitle: ctx.issueTitle,
           machineName: ctx.machineName,
+          machineInitials: ctx.machineInitials,
           formattedIssueId: ctx.formattedIssueId,
           commentContent: ctx.commentContent,
           newStatus: ctx.newStatus,
