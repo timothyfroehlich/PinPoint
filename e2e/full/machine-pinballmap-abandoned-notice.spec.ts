@@ -41,7 +41,7 @@ import {
 test.describe("PinballMap abandoned-listing notice (PP-l81u)", () => {
   test.use({ storageState: STORAGE_STATE.technician });
 
-  test("retitling a listed machine shows the abandoned-listing notice on Info", async ({
+  test("retitling a listed machine leaves a notice on Manage and a warning on Info", async ({
     page,
     request,
   }) => {
@@ -117,12 +117,19 @@ test.describe("PinballMap abandoned-listing notice (PP-l81u)", () => {
       await expect(
         page.getByTestId("machine-pinballmap-abandoned")
       ).toContainText(`Previous listing still live: “${oldTitleName}”`);
-      // The listing control above it speaks for the machine's CURRENT title,
+      // The listing control above it speaks for the machine's CURRENT standing,
       // which is what keeps the notice from reading as a bug about the wrong
-      // game. A retitle clears `listed`, and the new title is not on the
-      // lineup, so the derived state is "not listed".
+      // game.
+      //
+      // "Unsynced" is the CORRECT expectation here, not a compromise: no test
+      // ever fetches a lineup from pinballmap.com (CORE-PBM-001 /
+      // CORE-TEST-006), so `pinballmap_state` carries no snapshot and PinPoint
+      // genuinely has no evidence either way. Asserting it is worth a line —
+      // "Not listed" in this exact situation is the lie the control this
+      // replaces told APC's entire fleet, and it would be an easy one to
+      // reintroduce by treating a missing snapshot as an empty lineup.
       await expect(page.getByTestId("pbm-listing-status")).toContainText(
-        "Not on our location's lineup"
+        "hasn't read Pinball Map's lineup yet"
       );
 
       // The other half of the trail: Info's warning is what sends a reader
