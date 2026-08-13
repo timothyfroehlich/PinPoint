@@ -255,14 +255,14 @@ describe("extractScriptPaths", () => {
     ).toEqual([".claude/hooks/block-direct-merge.cjs"]);
     expect(
       extractScriptPaths(
-        'bash "${CLAUDE_PROJECT_DIR:-.}"/scripts/hooks/huddle-poll.sh'
+        'bash "${CLAUDE_PROJECT_DIR:-.}"/scripts/hooks/prototype-mode-poll.sh'
       )
-    ).toEqual(["scripts/hooks/huddle-poll.sh"]);
+    ).toEqual(["scripts/hooks/prototype-mode-poll.sh"]);
     expect(
       extractScriptPaths(
-        'HUDDLE_THROTTLE_SECONDS=180 bash "$CLAUDE_PROJECT_DIR"/scripts/hooks/huddle-poll.sh'
+        'HUDDLE_THROTTLE_SECONDS=180 bash "$CLAUDE_PROJECT_DIR"/scripts/hooks/prototype-mode-poll.sh'
       )
-    ).toEqual(["scripts/hooks/huddle-poll.sh"]);
+    ).toEqual(["scripts/hooks/prototype-mode-poll.sh"]);
   });
 
   it("skips commands that are not repo-relative script paths", () => {
@@ -329,7 +329,7 @@ describe("evaluateGuardStack — registered-but-missing-from-disk", () => {
     // No `exists` override — this hits the real filesystem against the real
     // repo, and every basename below is a file that exists.
     const settings = settingsWithCommands("SessionStart", [
-      'bash "${CLAUDE_PROJECT_DIR:-.}"/scripts/hooks/huddle-session-start.sh',
+      'bash "${CLAUDE_PROJECT_DIR:-.}"/scripts/hooks/prototype-mode-poll.sh',
       "node .claude/hooks/verify-guard-stack.cjs",
     ]);
     expect(evaluateGuardStack(settings)).toEqual([]);

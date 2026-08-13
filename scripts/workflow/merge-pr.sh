@@ -328,12 +328,16 @@ echo "MERGED: PR #$PR"
 
 # --- Post huddle coordination notice (fail-open) ---
 # The merge is already done — a huddle failure must NEVER propagate an error.
-# shellcheck source=../hooks/huddle-lib.sh disable=SC1091
+#
+# The huddle lives in dotfiles (~/.claude/hooks/huddle/), not this repo, so the
+# absent-file guard below is now a real path: a machine without the dotfiles
+# stowed skips the notice instead of failing the merge.
+# shellcheck disable=SC1090,SC1091
 (
   set +e
   set +u
   set +o pipefail
-  _HUDDLE_LIB="$(dirname "$0")/../hooks/huddle-lib.sh"
+  _HUDDLE_LIB="$HOME/.claude/hooks/huddle/huddle-lib.sh"
   if [[ ! -f "$_HUDDLE_LIB" ]]; then
     exit 0
   fi
