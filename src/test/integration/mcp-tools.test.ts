@@ -26,6 +26,10 @@ import {
   userProfiles,
 } from "~/server/db/schema";
 import { docToPlainText } from "~/lib/tiptap/types";
+import {
+  VALID_MACHINE_PRESENCE_STATUSES,
+  type MachinePresenceStatus,
+} from "~/lib/machines/presence";
 import { getTestDb, setupTestDb } from "~/test/setup/pglite";
 import type * as NotificationsModule from "~/lib/notifications";
 import type { McpAuthContext } from "~/lib/mcp/verify-token";
@@ -57,7 +61,10 @@ import { runGetIssue } from "~/lib/mcp/tools/get-issue";
 import { runGetMachine } from "~/lib/mcp/tools/get-machine";
 import { registerPinpointTools } from "~/lib/mcp/tools";
 import { runListIssues } from "~/lib/mcp/tools/list-issues";
-import { runListMachines } from "~/lib/mcp/tools/list-machines";
+import {
+  listMachinesSchema,
+  runListMachines,
+} from "~/lib/mcp/tools/list-machines";
 import { runSearchPinballmapCatalog } from "~/lib/mcp/tools/search-pinballmap-catalog";
 import type {
   McpCatalogEditionResult,
@@ -125,7 +132,7 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
   async function seedMachine(overrides?: {
     name?: string;
     ownerId?: string | null;
-    presenceStatus?: "on_the_floor" | "off_the_floor";
+    presenceStatus?: MachinePresenceStatus;
     pbm?: SeedPbm;
   }): Promise<{ id: string; initials: string }> {
     const db = await getTestDb();
@@ -517,6 +524,198 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
         // only stable within a single query — not across the separate queries
         // paging actually issues — shows up here as a duplicate plus a miss.
         expect(seen).toEqual(expected);
+      });
+    });
+
+    describe("presence set filter (PP-u4ab.13)", () => {
+      interface PresencePage {
+        count: number;
+        total: number;
+        hasMore: boolean;
+        machines: { initials: string; presence: string }[];
+      }
+
+      async function list(
+        args: Parameters<typeof runListMachines>[0],
+        admin: string
+      ): Promise<PresencePage> {
+        const outcome = await runListMachines(args, ctx("admin", admin));
+        return outcome.result as PresencePage;
+      }
+
+      /**
+       * One cabinet in each presence state, all sharing a name so `search`
+       * isolates them from the rest of the worker-scoped database.
+       *
+       * The `Record<MachinePresenceStatus, …>` return annotation is what keeps
+       * this exhaustive: adding a sixth presence state fails to compile here
+       * rather than quietly leaving it unseeded and untested.
+       */
+      async function seedOnePerState(
+        name: string
+      ): Promise<Record<MachinePresenceStatus, string>> {
+        const seed = async (
+          presenceStatus: MachinePresenceStatus
+        ): Promise<string> =>
+          (await seedMachine({ name, presenceStatus })).initials;
+        return {
+          on_the_floor: await seed("on_the_floor"),
+          off_the_floor: await seed("off_the_floor"),
+          on_loan: await seed("on_loan"),
+          pending_arrival: await seed("pending_arrival"),
+          removed: await seed("removed"),
+        };
+      }
+
+      it("still accepts a single presence value", async () => {
+        const admin = await makeUser("admin");
+        const byState = await seedOnePerState("Single Presence");
+
+        const result = await list(
+          { search: "Single Presence", presence: "off_the_floor" },
+          admin
+        );
+
+        // The pre-PP-u4ab.13 call shape. Every existing caller sends this, so
+        // widening the parameter must not change what it means.
+        expect(result.machines.map((m) => m.initials)).toEqual([
+          byState.off_the_floor,
+        ]);
+        expect(result.total).toBe(1);
+      });
+
+      it("accepts a set and returns exactly the listed states", async () => {
+        const admin = await makeUser("admin");
+        const byState = await seedOnePerState("Set Presence");
+
+        const result = await list(
+          {
+            search: "Set Presence",
+            presence: ["on_the_floor", "on_loan", "off_the_floor"],
+          },
+          admin
+        );
+
+        // Set equality on the states, not just the row count: an OR that leaked
+        // an unlisted state in while dropping a listed one returns the same
+        // number of rows and would pass a length assertion.
+        expect(new Set(result.machines.map((m) => m.presence))).toEqual(
+          new Set(["on_the_floor", "on_loan", "off_the_floor"])
+        );
+        expect(result.machines.map((m) => m.initials).sort()).toEqual(
+          [byState.on_the_floor, byState.on_loan, byState.off_the_floor].sort()
+        );
+        expect(result.total).toBe(3);
+        expect(result.hasMore).toBe(false);
+      });
+
+      it("narrows the unlinked worklist to cabinets that are still around", async () => {
+        const admin = await makeUser("admin");
+        const db = await getTestDb();
+        const byState = await seedOnePerState("Worklist");
+        // A linked cabinet on the floor: in the presence set, out of the
+        // worklist. Without it the presence filter alone would produce the same
+        // answer as the two filters together.
+        const linked = await seedMachine({
+          name: "Worklist",
+          presenceStatus: "on_the_floor",
+        });
+        await db
+          .update(machines)
+          .set({ pinballmapMachineId: 910_001 })
+          .where(eq(machines.id, linked.id));
+
+        const wide = await list(
+          { search: "Worklist", pinballmap: "unlinked" },
+          admin
+        );
+        const narrowed = await list(
+          {
+            search: "Worklist",
+            pinballmap: "unlinked",
+            presence: ["on_the_floor", "on_loan", "off_the_floor"],
+          },
+          admin
+        );
+
+        // This is the bead: 'unlinked' alone keeps handing back the cabinets
+        // nobody will ever link, so they sit in every page of every sweep and
+        // hold `total` above zero permanently.
+        expect(wide.total).toBe(VALID_MACHINE_PRESENCE_STATUSES.length);
+        expect(wide.machines.map((m) => m.presence)).toContain("removed");
+        expect(wide.machines.map((m) => m.presence)).toContain(
+          "pending_arrival"
+        );
+
+        expect(narrowed.machines.map((m) => m.initials).sort()).toEqual(
+          [byState.on_the_floor, byState.on_loan, byState.off_the_floor].sort()
+        );
+        expect(narrowed.total).toBe(3);
+      });
+
+      it("counts the same set the page returns while paging a set filter", async () => {
+        const admin = await makeUser("admin");
+        const db = await getTestDb();
+
+        const rows: (typeof machines.$inferInsert)[] = [];
+        const expected: string[] = [];
+        const wanted: MachinePresenceStatus[] = [
+          "on_the_floor",
+          "on_loan",
+          "off_the_floor",
+        ];
+        for (let i = 0; i < 60; i += 1) {
+          const initials = nextInitials();
+          const presenceStatus =
+            VALID_MACHINE_PRESENCE_STATUSES[
+              i % VALID_MACHINE_PRESENCE_STATUSES.length
+            ];
+          if (presenceStatus === undefined) throw new Error("no state");
+          // Four cabinets per title, so page boundaries land inside tie groups.
+          const name = `Presence Fleet ${String(Math.floor(i / 4)).padStart(2, "0")}`;
+          rows.push({ name, initials, presenceStatus });
+          if (wanted.includes(presenceStatus)) expected.push(initials);
+        }
+        await db.insert(machines).values([...rows].reverse());
+
+        const seen: string[] = [];
+        const limit = 7;
+        let offset = 0;
+        let total = -1;
+        // Bounded: a `hasMore` that never clears is one of the failures this
+        // guards, and an unbounded loop would hang the suite instead.
+        for (let page = 0; page < 12; page += 1) {
+          const result = await list(
+            { search: "Presence Fleet", presence: wanted, limit, offset },
+            admin
+          );
+          total = result.total;
+          seen.push(...result.machines.map((m) => m.initials));
+          if (!result.hasMore) break;
+          offset += limit;
+        }
+
+        // The condition is pushed onto the shared array, so the count query and
+        // the page query see the same WHERE. A `total` the page can never reach
+        // is a sweep that never terminates (CORE-ARCH-012).
+        expect(total).toBe(expected.length);
+        expect(new Set(seen).size).toBe(seen.length);
+        expect([...seen].sort()).toEqual([...expected].sort());
+      });
+
+      it("rejects an empty presence set rather than matching nothing", () => {
+        // An empty array would type-check and produce `inArray(col, [])` — a
+        // predicate matching no row — so the tool would answer `total: 0` for
+        // the whole collection as if that were the truth (CORE-ARCH-012).
+        expect(listMachinesSchema.safeParse({ presence: [] }).success).toBe(
+          false
+        );
+        expect(
+          listMachinesSchema.safeParse({ presence: ["removed"] }).success
+        ).toBe(true);
+        expect(
+          listMachinesSchema.safeParse({ presence: "removed" }).success
+        ).toBe(true);
       });
     });
   });
