@@ -214,17 +214,11 @@ export async function runListMachines(
  * warning. It is stated once, there, for the model that has to follow it; this
  * comment is the rationale, not a second copy.
  *
- * `pinballmap` is the exception TODAY, and only by accident of what is not built
- * yet: no tool links or excludes an existing machine (`add_machine` takes the
- * link columns at creation only), and auto-link (PP-o355.20) considers only rows
- * that already carry a `pinballmapMachineId` — its query filters on
- * `isNotNull(pinballmapMachineId)`, and the CHECK
- * `machines_pinballmap_listed_requires_link` means anything setting `listed`
- * already implies a link. `add_machine` can still INSERT straight into the
- * `unlinked` bucket mid-sweep, which re-reads a machine rather than skipping one.
- * PP-u4ab.12 ships the link verb and makes link state mutable like the rest —
- * at which point `pinballmap` stops being an exception and the drain procedure
- * covers it unchanged, with no edit needed here.
+ * `pinballmap` used to be the exception, by accident of what was not built yet.
+ * `set_machine_pinballmap` (PP-u4ab.12) ships the link verb, so link state is
+ * now mutable like the rest and the fleet linking pass moves rows out of the
+ * `unlinked` bucket as it goes — exactly the shape the drain procedure exists
+ * for. No edit to the description was needed: it was written to cover this.
  */
 export function registerListMachines(server: McpServer): void {
   server.registerTool(
