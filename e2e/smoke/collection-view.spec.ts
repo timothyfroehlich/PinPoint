@@ -55,8 +55,18 @@ test.describe("Collection view (PP-slrd.1)", () => {
     // Scope to the owner block: the owner card can also contain a description
     // above the owner row, and a description with links would make a bare
     // getByRole("link") ambiguous.
-    await page.getByTestId("owner-block").getByRole("link").click();
-    await expect(page).toHaveURL(/\/u\//);
+    //
+    // Retry the click rather than clicking once (PP-j1qm). Playwright runs
+    // against `next dev`, and the trace from a CI failure shows the click
+    // landing and then `[Fast Refresh] done in 7608ms` — a rebuild remounts the
+    // React tree mid-navigation, the soft navigation is discarded, and the URL
+    // never changes. Nothing is wrong with the link; the click was thrown away.
+    // Waiting for the page to settle first cannot fix it, because the rebuild
+    // can land after any wait; only re-issuing the click can.
+    await expect(async () => {
+      await page.getByTestId("owner-block").getByRole("link").click();
+      await expect(page).toHaveURL(/\/u\//, { timeout: 5000 });
+    }).toPass({ timeout: 30_000 });
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   });
 });
