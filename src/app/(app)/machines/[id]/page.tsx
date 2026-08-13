@@ -1,7 +1,10 @@
 import { notFound, redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
+import { z } from "zod";
 import { db } from "~/server/db";
 import { machines } from "~/server/db/schema";
+
+const uuidSchema = z.uuid();
 
 /**
  * Legacy id-addressed machine link → canonical `/m/<INITIALS>`.
@@ -19,6 +22,10 @@ export default async function LegacyMachineRedirectPage({
   params: Promise<{ id: string }>;
 }): Promise<never> {
   const { id } = await params;
+
+  // See the `/issues/[id]` counterpart: a non-UUID segment against a uuid
+  // column is a 22P02 error, not an empty result.
+  if (!uuidSchema.safeParse(id).success) notFound();
 
   const machine = await db.query.machines.findFirst({
     where: eq(machines.id, id),

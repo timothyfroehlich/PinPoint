@@ -1,7 +1,10 @@
 import { notFound, redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
+import { z } from "zod";
 import { db } from "~/server/db";
 import { issues } from "~/server/db/schema";
+
+const uuidSchema = z.uuid();
 
 /**
  * Legacy id-addressed issue link → canonical `/m/<INITIALS>/i/<number>`.
@@ -21,6 +24,11 @@ export default async function LegacyIssueRedirectPage({
   params: Promise<{ id: string }>;
 }): Promise<never> {
   const { id } = await params;
+
+  // `issues.id` is a uuid column, so a non-UUID segment makes Postgres raise
+  // 22P02 rather than returning no rows — crawlers and truncated pastes would
+  // hit the error boundary and report to Sentry instead of 404ing.
+  if (!uuidSchema.safeParse(id).success) notFound();
 
   const issue = await db.query.issues.findFirst({
     where: eq(issues.id, id),

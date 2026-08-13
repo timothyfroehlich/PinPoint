@@ -44,4 +44,20 @@ test.describe("Legacy resource-id redirects", () => {
 
     expect(response?.status()).toBe(404);
   });
+
+  // A non-UUID segment reaches a `uuid` column, where Postgres raises 22P02
+  // instead of returning no rows — so without a shape check these 500 through
+  // the error boundary and report to Sentry. Crawlers and truncated pastes hit
+  // this far more often than a well-formed but unknown id.
+  for (const path of [
+    "/issues/not-a-uuid",
+    "/issues/robots.txt",
+    "/machines/not-a-uuid",
+  ]) {
+    test(`${path} 404s instead of erroring`, async ({ page }) => {
+      const response = await page.goto(path);
+
+      expect(response?.status()).toBe(404);
+    });
+  }
 });

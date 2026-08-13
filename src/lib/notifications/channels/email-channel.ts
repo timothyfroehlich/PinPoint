@@ -169,6 +169,7 @@ export interface EmailHtmlOptions {
   type: NotificationType;
   issueTitle?: string | undefined;
   machineName?: string | undefined;
+  machineInitials?: string | undefined;
   formattedIssueId?: string | undefined;
   commentContent?: string | undefined;
   newStatus?: string | undefined;
@@ -207,6 +208,7 @@ export function getEmailHtml({
   type,
   issueTitle,
   machineName,
+  machineInitials,
   formattedIssueId,
   commentContent,
   newStatus,
@@ -263,11 +265,17 @@ export function getEmailHtml({
     ? sanitizeHtml(formattedIssueId, EMAIL_SANITIZE_OPTIONS)
     : "";
 
-  const issueUrl = buildResourceUrl({
+  // Machine-ownership emails are about a machine, not an issue — pointing them
+  // at the global issue list under a "View Issue" label was the email half of
+  // PP-gzq2. Every other type is issue-tied.
+  const isMachineResource = type === "machine_ownership_changed";
+  const resourceUrl = buildResourceUrl({
     siteUrl,
-    resourceType: "issue",
+    resourceType: isMachineResource ? "machine" : "issue",
     formattedIssueId,
+    machineInitials,
   });
+  const resourceLinkLabel = isMachineResource ? "View Machine" : "View Issue";
 
   const sanitizedDescription =
     (type === "new_issue" || type === "issue_assigned") && issueDescription
@@ -280,7 +288,7 @@ export function getEmailHtml({
       ${eventLabel ? `<h3 style="color: #555; font-weight: 600; margin-bottom: 8px;">${eventLabel}</h3>` : ""}
       <div>${body}</div>
       ${showDescription ? `<blockquote>${sanitizedDescription}</blockquote>` : ""}
-      <p><a href="${issueUrl}">View Issue</a></p>
+      <p><a href="${resourceUrl}">${resourceLinkLabel}</a></p>
       ${getEmailFooter(userId)}
     `;
 }
@@ -352,6 +360,7 @@ export const emailChannel: DeliveryChannel = {
           type: ctx.type,
           issueTitle: ctx.issueTitle,
           machineName: ctx.machineName,
+          machineInitials: ctx.machineInitials,
           formattedIssueId: ctx.formattedIssueId,
           commentContent: ctx.commentContent,
           newStatus: ctx.newStatus,
