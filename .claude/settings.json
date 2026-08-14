@@ -66,11 +66,6 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/normalize-workspace-paths.cjs",
-            "timeout": 5000
-          },
-          {
-            "type": "command",
             "command": "node \"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/inject-beads-actor.cjs",
             "timeout": 5000
           }

@@ -1,5 +1,29 @@
 #!/usr/bin/env node
 /**
+ * DISABLED — not registered in .claude/settings.json since 2026-08-14 (PP-yv19).
+ *
+ * Kept on disk, with its tests, because re-enabling is one settings entry plus
+ * three expected-hook list entries (verify-guard-stack.cjs, its unit test,
+ * scripts/tests/test_node_hook_paths.py). Delete all of it if nothing misses it.
+ *
+ * Why it was turned off: what it buys is fewer permission prompts when an agent
+ * spells a repo path absolutely. What it cost, over three review rounds on
+ * PR #1880, was a silent path corruption that broke crabbox twice, two
+ * command mis-targeting bugs, and a `permissionDecision: "allow"` that skipped
+ * the `permissions.ask` prompt on `rm -rf` and `git reset --hard`. Rewriting
+ * arbitrary shell text is a poor trade for that.
+ *
+ * The prompt it dodged is also solvable without rewriting anything: Bash
+ * permission rules match the literal command string with `*` wildcards, so an
+ * absolute-path allow rule covers the case directly. The machine-local settings
+ * already carry one, of the shape `Bash(bash <abs repo root>WILDCARD/scripts/
+ * workflow/...)`, where the wildcard right after the repo root makes it cover
+ * worktrees too. (Written that way here because a literal `*` followed by a
+ * slash would end this comment block — which is exactly how this note first
+ * broke the file.)
+ *
+ * ---------------------------------------------------------------------------
+ *
  * PreToolUse hook: Rewrites unnecessary absolute workspace paths to relative.
  *
  * When an agent in a worktree runs a command with an absolute path like:

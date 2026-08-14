@@ -43,7 +43,6 @@ const fs = require("node:fs");
 
 // Keep in sync when adding/removing a PreToolUse guard hook.
 const EXPECTED_GUARD_HOOKS = [
-  "normalize-workspace-paths.cjs",
   "inject-beads-actor.cjs",
   "block-direct-merge.cjs",
   "block-main-worktree-branch-switch.cjs",
