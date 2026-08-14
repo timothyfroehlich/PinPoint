@@ -40,24 +40,16 @@ const {
   evaluateGuardStack,
   evaluateGuardBehavior,
   extractScriptPaths,
-  remediationFor,
   BEHAVIOR_PROBES,
 } = require(hookPath) as {
   evaluateGuardStack: (
     settings: unknown,
-    options?: { exists?: (relPath: string) => boolean; home?: string }
+    options?: { exists?: (relPath: string) => boolean }
   ) => string[];
-  remediationFor: (
-    stackProblems: string[],
-    behaviorProblems?: string[]
-  ) => string;
   evaluateGuardBehavior: (options?: {
     load?: (basename: string) => unknown;
   }) => string[];
-  extractScriptPaths: (
-    command: string,
-    options?: { home?: string }
-  ) => string[];
+  extractScriptPaths: (command: string) => string[];
   BEHAVIOR_PROBES: BehaviorProbe[];
 };
 
@@ -273,79 +265,21 @@ describe("extractScriptPaths", () => {
     ).toEqual(["scripts/hooks/prototype-mode-poll.sh"]);
   });
 
-  it("resolves $HOME-rooted hooks so the huddle stays verifiable", () => {
-    // The huddle hooks live in Tim's dotfiles, so their registrations are the
-    // one absolute form worth expanding rather than skipping — otherwise
-    // unstowing the dotfiles silently disables four hooks with nothing to say
-    // so. Every spelling settings.json could plausibly use resolves.
-    const home = "/home/tim";
-    for (const command of [
-      'bash "$HOME/.claude/hooks/huddle/huddle-poll.sh"',
-      'bash "$HOME"/.claude/hooks/huddle/huddle-poll.sh',
-      'bash "${HOME}/.claude/hooks/huddle/huddle-poll.sh"',
-      "bash ~/.claude/hooks/huddle/huddle-poll.sh",
-    ]) {
-      expect(extractScriptPaths(command, { home })).toEqual([
-        "/home/tim/.claude/hooks/huddle/huddle-poll.sh",
-      ]);
-    }
-  });
-
-  it("only expands what the shell would expand", () => {
-    // A quoted `~` stays literal at runtime, so resolving it here would make
-    // the canary pass on a registration that is broken — the exact false
-    // negative this check exists to prevent. Single quotes suppress `$HOME`
-    // too. Each of these is skipped rather than resolved.
-    for (const command of [
-      'bash "~/.claude/hooks/huddle/huddle-poll.sh"',
-      "bash '~/.claude/hooks/huddle/huddle-poll.sh'",
-      "bash '$HOME/.claude/hooks/huddle/huddle-poll.sh'",
-    ]) {
-      expect(extractScriptPaths(command, { home: "/home/tim" })).toEqual([]);
-    }
-    // ...while the forms the shell does expand still resolve.
-    expect(
-      extractScriptPaths("bash ~/.claude/hooks/huddle/huddle-poll.sh", {
-        home: "/home/tim",
-      })
-    ).toEqual(["/home/tim/.claude/hooks/huddle/huddle-poll.sh"]);
-  });
-
-  it("reports a guarded $HOME registration once, not once per mention", () => {
-    // The live registrations name the script twice — `test -f X || exit 0; bash X` —
-    // so that a missing dotfiles checkout is a silent no-op instead of a
-    // per-turn ENOENT. Both mentions are the same registration.
-    expect(
-      extractScriptPaths(
-        'test -f "$HOME/.claude/hooks/huddle/huddle-poll.sh" || exit 0; HUDDLE_THROTTLE_SECONDS=180 bash "$HOME/.claude/hooks/huddle/huddle-poll.sh"',
-        { home: "/home/tim" }
-      )
-    ).toEqual(["/home/tim/.claude/hooks/huddle/huddle-poll.sh"]);
-  });
-
-  it("skips commands that are not resolvable script paths", () => {
-    // Inline programs, bare binaries on $PATH, flags, absolute paths we cannot
-    // attribute, and unresolved shell expansion all yield nothing rather than
-    // a false alarm.
+  it("skips commands that are not repo-relative script paths", () => {
+    // Inline programs, bare binaries on $PATH, flags, absolute paths, and
+    // unresolved shell expansion all yield nothing rather than a false alarm.
     for (const command of [
       `node -e "console.log(1)"`,
       `bash -c 'echo hi'`,
       "bd sync --quiet",
       "echo 'scripts/hooks/nope'",
       "bash /usr/local/bin/something.sh",
+      "bash ~/dotfiles/thing.sh",
       'bash "$SOME_OTHER_DIR"/thing.sh',
       "bash ../outside-the-repo.sh",
     ]) {
       expect(extractScriptPaths(command)).toEqual([]);
     }
-  });
-
-  it("falls back to skipping a $HOME hook when there is no home to expand", () => {
-    expect(
-      extractScriptPaths('bash "$HOME/.claude/hooks/huddle/huddle-poll.sh"', {
-        home: "",
-      })
-    ).toEqual([]);
   });
 });
 
@@ -440,98 +374,14 @@ describe("evaluateGuardStack — registered-but-missing-from-disk", () => {
 // versa). Both canary directions, checked against the repo as it actually is.
 // ---------------------------------------------------------------------------
 describe("the repo's own .claude/settings.json", () => {
-  const realSettings = (): unknown =>
-    JSON.parse(
+  it("has a healthy guard stack in both directions", () => {
+    const settings: unknown = JSON.parse(
       fs.readFileSync(
         path.resolve(process.cwd(), ".claude/settings.json"),
         "utf8"
       )
     );
-
-  // The $HOME-rooted huddle registrations point into Tim's dotfiles, which are
-  // legitimately absent in CI and on any un-stowed checkout. Their absence is
-  // not a repo defect, so the repo-integrity assertion below treats them as
-  // present — and the next test pins that they are still PROBED, which is the
-  // whole point of resolving them rather than skipping them.
-  const repoRelativeOnly = (scriptPath: string): boolean =>
-    path.isAbsolute(scriptPath) ||
-    fs.existsSync(path.resolve(process.cwd(), scriptPath));
-
-  // Pin the home directory rather than inheriting it: os.homedir() is empty
-  // when HOME is unset and the user has no passwd entry (hardened containers),
-  // which would leave the $HOME tokens unresolved and pass this file's
-  // huddle assertions for an environmental reason rather than a real one.
-  const HOME = "/home/tim";
-
-  it("has a healthy guard stack in both directions", () => {
-    expect(
-      evaluateGuardStack(realSettings(), {
-        exists: repoRelativeOnly,
-        home: HOME,
-      })
-    ).toEqual([]);
-  });
-
-  it("still probes the out-of-repo huddle hooks for existence", () => {
-    // Pretend the dotfiles are not stowed: every huddle registration must be
-    // named. A silent pass here would mean four hooks could stop running with
-    // nothing to report it — the blind spot this check exists to close.
-    const problems = evaluateGuardStack(realSettings(), {
-      home: HOME,
-      exists: (scriptPath) =>
-        scriptPath.includes("/.claude/hooks/huddle/")
-          ? false
-          : repoRelativeOnly(scriptPath),
-    });
-    expect(problems).toHaveLength(1);
-    for (const script of [
-      "huddle-session-start.sh",
-      "huddle-poll.sh",
-      "huddle-pr-announce.sh",
-    ]) {
-      expect(problems[0]).toContain(script);
-    }
-    // The huddle paths must have actually expanded — a `$HOME` left literal
-    // would be skipped as unresolvable and quietly satisfy the assertion above
-    // if the message happened to name the scripts some other way.
-    expect(problems[0]).toContain(`${HOME}/.claude/hooks/huddle/`);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Remediation: the advice has to match the failure. "Restore settings.json"
-// is right for a bad rewrite and WRONG for un-stowed dotfiles, where
-// settings.json is already correct.
-// ---------------------------------------------------------------------------
-describe("remediationFor", () => {
-  const GENERIC = "Restore .claude/settings.json from git before continuing.";
-  const huddleDead =
-    "registered hooks missing from disk: /home/tim/.claude/hooks/huddle/huddle-poll.sh, /home/tim/.claude/hooks/huddle/huddle-poll.sh";
-
-  it("points at the dotfiles when only huddle hooks are missing", () => {
-    const advice = remediationFor([huddleDead]);
-    expect(advice).toContain("dotsync");
-    expect(advice).toContain("settings.json is fine");
-    expect(advice).not.toContain("Restore");
-  });
-
-  it("keeps the generic advice for anything else", () => {
-    // Un-stowed dotfiles explain ONLY a dead huddle registration. A repo hook
-    // missing, a degraded permissions block, or a guard that stopped blocking
-    // all mean settings.json is suspect again — even alongside the huddle one.
-    for (const [stack, behavior] of [
-      [
-        [
-          "registered hooks missing from disk: .claude/hooks/block-direct-merge.cjs",
-        ],
-      ],
-      [[`${huddleDead}, .claude/hooks/block-direct-merge.cjs`]],
-      [[huddleDead, "permissions.deny empty/absent"]],
-      [["missing PreToolUse hooks: block-direct-merge.cjs"]],
-      [[huddleDead], ['block-direct-merge.cjs allows "x"']],
-    ] as [string[], string[]?][]) {
-      expect(remediationFor(stack, behavior)).toBe(GENERIC);
-    }
+    expect(evaluateGuardStack(settings)).toEqual([]);
   });
 });
 
@@ -717,31 +567,6 @@ describe("verify-guard-stack.cjs subprocess — fail-open contract", () => {
     expect(stderr).toContain("GUARD STACK DEGRADED");
     expect(stderr).toContain("block-direct-merge.cjs");
     expect(stderr).toContain("permissions.deny empty/absent");
-  });
-
-  it("dead huddle registration → the dotfiles advice, not 'restore settings.json'", () => {
-    // End-to-end shape of the un-stowed-dotfiles case: $HOME expands against
-    // the real home, the fixture script under it does not exist.
-    const settings = settingsWithHooks(ALL_EXPECTED_HOOKS) as {
-      hooks: Record<string, unknown[]>;
-    };
-    settings.hooks.SessionStart = [
-      {
-        hooks: [
-          {
-            type: "command",
-            command:
-              'test -f "$HOME/.claude/hooks/huddle/huddle-absent-fixture.sh" || exit 0; bash "$HOME/.claude/hooks/huddle/huddle-absent-fixture.sh"',
-          },
-        ],
-      },
-    ];
-    const file = writeTmp("settings.json", JSON.stringify(settings, null, 2));
-    const { status, stderr } = runHook(file);
-    expect(status).toBe(0);
-    expect(stderr).toContain("huddle-absent-fixture.sh");
-    expect(stderr).toContain("dotsync");
-    expect(stderr).not.toContain("Restore .claude/settings.json");
   });
 
   it("dead registration → exit 0 (warn-only) naming the missing script", () => {

@@ -40,7 +40,6 @@
 
 const path = require("node:path");
 const fs = require("node:fs");
-const os = require("node:os");
 
 // Keep in sync when adding/removing a PreToolUse guard hook.
 const EXPECTED_GUARD_HOOKS = [
@@ -58,20 +57,15 @@ const EXPECTED_GUARD_HOOKS = [
 //   `bash "${CLAUDE_PROJECT_DIR:-.}"/scripts/hooks/x.sh`    → scripts/hooks/x.sh
 //   `HUDDLE_THROTTLE_SECONDS=180 bash "$CLAUDE_PROJECT_DIR"/x.sh` → x.sh
 //
-// DELIBERATELY CONSERVATIVE: anything we cannot resolve with confidence — a
-// bare binary on $PATH, an inline `node -e '…'` program, a token with
-// unresolved shell expansion or metacharacters — is SKIPPED, not flagged. A
-// missed exotic registration is far cheaper than a canary that cries wolf
-// every session.
+// DELIBERATELY CONSERVATIVE: anything we cannot resolve with confidence — an
+// absolute path, a bare binary on $PATH, an inline `node -e '…'` program, a
+// token with unresolved shell expansion or metacharacters — is SKIPPED, not
+// flagged. A missed exotic registration is far cheaper than a canary that
+// cries wolf every session.
 //
-// `$HOME` / `~` is the ONE absolute form resolved rather than skipped:
-//   `bash "$HOME/.claude/hooks/huddle/huddle-poll.sh"` → /Users/x/.claude/…
-// The huddle hooks live in Tim's dotfiles, not this repo, so skipping them
-// would leave the reverse check blind to exactly the failure it exists to
-// catch — a registration whose script isn't there. Unstow the dotfiles and
-// four hooks stop running; the settings.json commands are guarded so they no
-// longer error per-turn, which means this canary is the only thing that says
-// so. Any other absolute path stays skipped.
+// The four `"$HOME"/.claude/hooks/huddle/…` registrations land in that skipped
+// set by design: the huddle lives in dotfiles, not this repo, so there is no
+// repo-relative path to verify and its absence is not a repo defect.
 
 const SCRIPT_EXTENSIONS = new Set([".cjs", ".mjs", ".js", ".sh", ".py", ".ts"]);
 // Any of these in a token means shell machinery we won't try to interpret.
@@ -88,22 +82,11 @@ const INLINE_PROGRAM_FLAGS = new Set([
   "--command",
 ]);
 
-// `$HOME/…`, `${HOME}/…`, `~/…` — the one absolute prefix we expand.
-const HOME_PREFIX = /^(?:\$HOME|\$\{HOME\}|~)(?=\/)/;
-
-// Shared between the problem string and the remediation that reads it back.
-const DEAD_REGISTRATION_PREFIX = "registered hooks missing from disk: ";
-// Registrations under here are the huddle's, which lives in dotfiles.
-const HUDDLE_HOOK_DIR = "/.claude/hooks/huddle/";
-
 /**
- * Extract the script path(s) a hook command invokes — repo-relative, or
- * absolute when the command is rooted at `$HOME`.
+ * Extract the repo-relative script path(s) a hook command invokes.
  * Returns [] when nothing resolvable is present.
  */
-function extractScriptPaths(command, options = {}) {
-  const home =
-    typeof options.home === "string" ? options.home : os.homedir() || "";
+function extractScriptPaths(command) {
   const found = [];
   const rawTokens = String(command || "").split(/\s+/);
   if (rawTokens.some((t) => INLINE_PROGRAM_FLAGS.has(t.replace(/["']/g, "")))) {
@@ -113,58 +96,29 @@ function extractScriptPaths(command, options = {}) {
   for (const rawToken of rawTokens) {
     if (!rawToken) continue;
 
-    // Quoting decides which expansions the SHELL would actually perform, and
-    // this check has to agree with the shell or it reports the wrong thing:
-    //   unquoted        → `$HOME`, `${HOME}` and `~` all expand
-    //   "double quoted" → `$HOME` / `${HOME}` expand; `~` does NOT
-    //   'single quoted' → nothing expands
-    // Expanding a `~` the shell would leave literal would make this check pass
-    // on a registration that is broken at runtime — a false negative in the one
-    // place whose job is catching dead registrations.
-    const quote = rawToken.startsWith('"')
-      ? '"'
-      : rawToken.startsWith("'")
-        ? "'"
-        : "";
-
-    // Drop quoting, then substitute the variable forms our settings use.
-    let token = rawToken
+    // Drop quoting, then substitute the one variable form our settings use.
+    const token = rawToken
       .replace(/["']/g, "")
       .replace(/\$\{CLAUDE_PROJECT_DIR(?::-[^}]*)?\}/g, ".")
       .replace(/\$CLAUDE_PROJECT_DIR/g, ".");
 
-    // A `$HOME`-rooted hook is resolvable, so resolve it instead of skipping
-    // it as "absolute". Without a home directory to expand against — or under
-    // quoting that suppresses the expansion — it stays unresolvable and falls
-    // through to the absolute-path skip below.
-    const expandsHome =
-      quote === "'" ? false : quote === '"' ? !token.startsWith("~") : true;
-    let homeRooted = false;
-    if (home && expandsHome && HOME_PREFIX.test(token)) {
-      token = token.replace(HOME_PREFIX, home);
-      homeRooted = true;
-    }
-
     if (token.startsWith("-")) continue; // a flag, not a path
     if (!token.includes("/")) continue; // bare binary name / env assignment
-    if (!homeRooted && (token.startsWith("/") || token.startsWith("~"))) {
-      continue; // absolute, and not one we can attribute
-    }
+    if (token.startsWith("/") || token.startsWith("~")) continue; // absolute
     if (token.includes("$") || SHELL_METACHARS.test(token)) continue; // unresolvable
     if (!SCRIPT_EXTENSIONS.has(path.posix.extname(token))) continue;
 
     const normalized = path.posix.normalize(token);
-    if (!homeRooted && normalized.startsWith("..")) continue; // escapes the repo root
+    if (normalized.startsWith("..")) continue; // escapes the repo root
     if (!found.includes(normalized)) found.push(normalized);
   }
   return found;
 }
 
 /**
- * Does a registered script path exist on disk?
+ * Does a repo-relative script path exist on disk?
  *
- * An absolute path (the `$HOME`-rooted huddle hooks) is probed as-is.
- * A repo-relative path resolves against the candidate roots a hook itself uses
+ * Resolves against the candidate roots a hook itself would use
  * (CLAUDE_PROJECT_DIR → __dirname-relative → cwd) and counts the script as
  * present if ANY candidate root has it. Inside a worktree the hook runs from
  * the worktree's own .claude/hooks/, and CLAUDE_PROJECT_DIR may point at a
@@ -172,13 +126,6 @@ function extractScriptPaths(command, options = {}) {
  * registration.
  */
 function defaultScriptExists(relPath) {
-  if (path.isAbsolute(relPath)) {
-    try {
-      return fs.existsSync(relPath);
-    } catch {
-      return false;
-    }
-  }
   const roots = [
     process.env.CLAUDE_PROJECT_DIR,
     path.join(__dirname, "..", ".."),
@@ -215,9 +162,6 @@ function collectCommands(eventEntries) {
 //
 // `options.exists` overrides the on-disk probe with a `(relPath) => boolean`
 // predicate, so tests can exercise the reverse check without touching the fs.
-// `options.home` pins the directory `$HOME`/`~` expands to, so a test does not
-// depend on the ambient one (`os.homedir()` is empty when HOME is unset and
-// the user has no passwd home — a hardened container).
 //
 // Problems reported:
 //   - `missing PreToolUse hooks: <basename>, ...` when any EXPECTED_GUARD_HOOKS
@@ -230,8 +174,6 @@ function evaluateGuardStack(settings, options = {}) {
   const problems = [];
   const exists =
     typeof options.exists === "function" ? options.exists : defaultScriptExists;
-  const extractOptions =
-    typeof options.home === "string" ? { home: options.home } : {};
 
   // Forward: every expected guard hook must be wired under PreToolUse.
   const commands = collectCommands(settings?.hooks?.PreToolUse);
@@ -251,7 +193,7 @@ function evaluateGuardStack(settings, options = {}) {
   if (hooksByEvent && typeof hooksByEvent === "object") {
     for (const eventEntries of Object.values(hooksByEvent)) {
       for (const command of collectCommands(eventEntries)) {
-        for (const scriptPath of extractScriptPaths(command, extractOptions)) {
+        for (const scriptPath of extractScriptPaths(command)) {
           if (!exists(scriptPath) && !deadRegistrations.includes(scriptPath)) {
             deadRegistrations.push(scriptPath);
           }
@@ -260,7 +202,9 @@ function evaluateGuardStack(settings, options = {}) {
     }
   }
   if (deadRegistrations.length > 0) {
-    problems.push(DEAD_REGISTRATION_PREFIX + deadRegistrations.join(", "));
+    problems.push(
+      `registered hooks missing from disk: ${deadRegistrations.join(", ")}`,
+    );
   }
 
   // permissions.deny / permissions.ask must both be present, non-empty arrays.
@@ -369,37 +313,6 @@ function evaluateGuardBehavior(options = {}) {
   return problems;
 }
 
-// --- Remediation --------------------------------------------------------------
-/**
- * What to actually DO about the reported problems.
- *
- * "Restore .claude/settings.json from git" is right for every problem this
- * canary was built for — they all mean the file was rewritten wrongly. It is
- * WRONG for the one case the huddle move made reachable: the four huddle hooks
- * live in Tim's dotfiles, so on a checkout where those aren't stowed the
- * registrations are dead while settings.json is perfectly correct. Restoring it
- * would do nothing. Say "stow the dotfiles" instead, but only when that is the
- * whole story — any other problem alongside it means settings.json is suspect
- * again and the original advice wins.
- */
-function remediationFor(stackProblems, behaviorProblems = []) {
-  const generic = "Restore .claude/settings.json from git before continuing.";
-  if (behaviorProblems.length > 0 || stackProblems.length !== 1) return generic;
-
-  const [problem] = stackProblems;
-  if (!problem.startsWith(DEAD_REGISTRATION_PREFIX)) return generic;
-
-  const dead = problem.slice(DEAD_REGISTRATION_PREFIX.length).split(", ");
-  if (!dead.every((scriptPath) => scriptPath.includes(HUDDLE_HOOK_DIR))) {
-    return generic;
-  }
-  return (
-    "settings.json is fine — the huddle hooks live in Tim's dotfiles, " +
-    "which are not stowed here. Run `dotsync`, or ignore this if you do not " +
-    "want the huddle on this machine."
-  );
-}
-
 // --- Hook entrypoint ---------------------------------------------------------
 // Does the IO: resolve path (incl. VERIFY_GUARD_SETTINGS override), read/parse
 // settings, call evaluateGuardStack + evaluateGuardBehavior, print one warning
@@ -433,9 +346,7 @@ function main() {
     return;
   }
 
-  const stackProblems = evaluateGuardStack(settings);
-  const behaviorProblems = evaluateGuardBehavior();
-  const problems = [...stackProblems, ...behaviorProblems];
+  const problems = [...evaluateGuardStack(settings), ...evaluateGuardBehavior()];
   if (problems.length === 0) {
     // Healthy — stay silent.
     process.exit(0);
@@ -443,7 +354,7 @@ function main() {
 
   process.stderr.write(
     `⚠️  GUARD STACK DEGRADED — ${problems.join("; ")}. ` +
-      `${remediationFor(stackProblems, behaviorProblems)}\n`,
+      `Restore .claude/settings.json from git before continuing.\n`,
   );
   process.exit(0);
 }
@@ -452,7 +363,6 @@ module.exports = {
   evaluateGuardStack,
   evaluateGuardBehavior,
   extractScriptPaths,
-  remediationFor,
   main,
   BEHAVIOR_PROBES,
 };
