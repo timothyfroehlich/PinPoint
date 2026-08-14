@@ -19,8 +19,22 @@
 // shape and written to stdout.
 
 const { execFileSync } = require("child_process");
+const fs = require("fs");
 const os = require("os");
 const path = require("path");
+
+// The huddle scripts live in Tim's dotfiles (~/.claude/hooks/huddle/), not in
+// this repo, so they are no longer guaranteed to be next to this shim. On a
+// checkout without the dotfiles stowed, calling one throws ENOENT and writes a
+// stderr line on EVERY turn. Resolve to null instead, and let the caller skip.
+function huddleScript(name) {
+  const scriptPath = path.join(os.homedir(), ".claude/hooks/huddle", name);
+  try {
+    return fs.existsSync(scriptPath) ? scriptPath : null;
+  } catch {
+    return null;
+  }
+}
 
 async function main() {
   let inputData = "";
@@ -86,23 +100,22 @@ async function main() {
     }
 
     // 2. Run huddle-session-start.sh to announce session identity
-    try {
-      const huddleStartScript = path.join(
-        os.homedir(),
-        ".claude/hooks/huddle/huddle-session-start.sh"
-      );
-      const huddleOutput = execFileSync("bash", [huddleStartScript], {
-        input: payloadString,
-        cwd: workspacePath,
-        encoding: "utf8",
-      }).trim();
-      if (huddleOutput) {
-        combinedOutput += huddleOutput;
+    const huddleStartScript = huddleScript("huddle-session-start.sh");
+    if (huddleStartScript) {
+      try {
+        const huddleOutput = execFileSync("bash", [huddleStartScript], {
+          input: payloadString,
+          cwd: workspacePath,
+          encoding: "utf8",
+        }).trim();
+        if (huddleOutput) {
+          combinedOutput += huddleOutput;
+        }
+      } catch (err) {
+        process.stderr.write(
+          `[antigravity-bootstrap] Error running huddle-session-start.sh: ${err.message}\n`
+        );
       }
-    } catch (err) {
-      process.stderr.write(
-        `[antigravity-bootstrap] Error running huddle-session-start.sh: ${err.message}\n`
-      );
     }
 
     if (combinedOutput.trim()) {
@@ -119,11 +132,12 @@ async function main() {
     }
   } else {
     // Mid-trajectory: run huddle-poll.sh to fetch updates
+    const huddlePollScript = huddleScript("huddle-poll.sh");
+    if (!huddlePollScript) {
+      process.stdout.write(JSON.stringify({ injectSteps: [] }));
+      return;
+    }
     try {
-      const huddlePollScript = path.join(
-        os.homedir(),
-        ".claude/hooks/huddle/huddle-poll.sh"
-      );
       const huddleOutput = execFileSync("bash", [huddlePollScript], {
         input: payloadString,
         cwd: workspacePath,

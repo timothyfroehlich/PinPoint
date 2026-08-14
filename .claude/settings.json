@@ -133,7 +133,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"$HOME\"/.claude/hooks/huddle/huddle-pr-announce.sh",
+            "command": "test -f \"$HOME/.claude/hooks/huddle/huddle-pr-announce.sh\" && bash \"$HOME/.claude/hooks/huddle/huddle-pr-announce.sh\" || true",
             "timeout": 10000
           }
         ]
@@ -142,7 +142,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "HUDDLE_THROTTLE_SECONDS=180 bash \"$HOME\"/.claude/hooks/huddle/huddle-poll.sh",
+            "command": "test -f \"$HOME/.claude/hooks/huddle/huddle-poll.sh\" && HUDDLE_THROTTLE_SECONDS=180 bash \"$HOME/.claude/hooks/huddle/huddle-poll.sh\" || true",
             "timeout": 10000
           }
         ]
@@ -175,7 +175,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"$HOME\"/.claude/hooks/huddle/huddle-poll.sh",
+            "command": "test -f \"$HOME/.claude/hooks/huddle/huddle-poll.sh\" && bash \"$HOME/.claude/hooks/huddle/huddle-poll.sh\" || true",
             "timeout": 10000
           },
           {
@@ -192,7 +192,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"$HOME\"/.claude/hooks/huddle/huddle-session-start.sh",
+            "command": "test -f \"$HOME/.claude/hooks/huddle/huddle-session-start.sh\" && bash \"$HOME/.claude/hooks/huddle/huddle-session-start.sh\" || true",
             "timeout": 5000
           },
           {

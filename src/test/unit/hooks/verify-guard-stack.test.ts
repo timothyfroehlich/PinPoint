@@ -49,7 +49,10 @@ const {
   evaluateGuardBehavior: (options?: {
     load?: (basename: string) => unknown;
   }) => string[];
-  extractScriptPaths: (command: string) => string[];
+  extractScriptPaths: (
+    command: string,
+    options?: { home?: string }
+  ) => string[];
   BEHAVIOR_PROBES: BehaviorProbe[];
 };
 
@@ -265,21 +268,59 @@ describe("extractScriptPaths", () => {
     ).toEqual(["scripts/hooks/prototype-mode-poll.sh"]);
   });
 
-  it("skips commands that are not repo-relative script paths", () => {
-    // Inline programs, bare binaries on $PATH, flags, absolute paths, and
-    // unresolved shell expansion all yield nothing rather than a false alarm.
+  it("resolves $HOME-rooted hooks so the huddle stays verifiable", () => {
+    // The huddle hooks live in Tim's dotfiles, so their registrations are the
+    // one absolute form worth expanding rather than skipping — otherwise
+    // unstowing the dotfiles silently disables four hooks with nothing to say
+    // so. Every spelling settings.json could plausibly use resolves.
+    const home = "/home/tim";
+    for (const command of [
+      'bash "$HOME/.claude/hooks/huddle/huddle-poll.sh"',
+      'bash "$HOME"/.claude/hooks/huddle/huddle-poll.sh',
+      'bash "${HOME}/.claude/hooks/huddle/huddle-poll.sh"',
+      "bash ~/.claude/hooks/huddle/huddle-poll.sh",
+    ]) {
+      expect(extractScriptPaths(command, { home })).toEqual([
+        "/home/tim/.claude/hooks/huddle/huddle-poll.sh",
+      ]);
+    }
+  });
+
+  it("reports a guarded $HOME registration once, not once per mention", () => {
+    // The live registrations name the script twice — `test -f X && bash X` —
+    // so that a missing dotfiles checkout is a silent no-op instead of a
+    // per-turn ENOENT. Both mentions are the same registration.
+    expect(
+      extractScriptPaths(
+        'test -f "$HOME/.claude/hooks/huddle/huddle-poll.sh" && HUDDLE_THROTTLE_SECONDS=180 bash "$HOME/.claude/hooks/huddle/huddle-poll.sh" || true',
+        { home: "/home/tim" }
+      )
+    ).toEqual(["/home/tim/.claude/hooks/huddle/huddle-poll.sh"]);
+  });
+
+  it("skips commands that are not resolvable script paths", () => {
+    // Inline programs, bare binaries on $PATH, flags, absolute paths we cannot
+    // attribute, and unresolved shell expansion all yield nothing rather than
+    // a false alarm.
     for (const command of [
       `node -e "console.log(1)"`,
       `bash -c 'echo hi'`,
       "bd sync --quiet",
       "echo 'scripts/hooks/nope'",
       "bash /usr/local/bin/something.sh",
-      "bash ~/dotfiles/thing.sh",
       'bash "$SOME_OTHER_DIR"/thing.sh',
       "bash ../outside-the-repo.sh",
     ]) {
       expect(extractScriptPaths(command)).toEqual([]);
     }
+  });
+
+  it("falls back to skipping a $HOME hook when there is no home to expand", () => {
+    expect(
+      extractScriptPaths('bash "$HOME/.claude/hooks/huddle/huddle-poll.sh"', {
+        home: "",
+      })
+    ).toEqual([]);
   });
 });
 
@@ -374,14 +415,47 @@ describe("evaluateGuardStack — registered-but-missing-from-disk", () => {
 // versa). Both canary directions, checked against the repo as it actually is.
 // ---------------------------------------------------------------------------
 describe("the repo's own .claude/settings.json", () => {
-  it("has a healthy guard stack in both directions", () => {
-    const settings: unknown = JSON.parse(
+  const realSettings = (): unknown =>
+    JSON.parse(
       fs.readFileSync(
         path.resolve(process.cwd(), ".claude/settings.json"),
         "utf8"
       )
     );
-    expect(evaluateGuardStack(settings)).toEqual([]);
+
+  // The $HOME-rooted huddle registrations point into Tim's dotfiles, which are
+  // legitimately absent in CI and on any un-stowed checkout. Their absence is
+  // not a repo defect, so the repo-integrity assertion below treats them as
+  // present — and the next test pins that they are still PROBED, which is the
+  // whole point of resolving them rather than skipping them.
+  const repoRelativeOnly = (scriptPath: string): boolean =>
+    path.isAbsolute(scriptPath) ||
+    fs.existsSync(path.resolve(process.cwd(), scriptPath));
+
+  it("has a healthy guard stack in both directions", () => {
+    expect(
+      evaluateGuardStack(realSettings(), { exists: repoRelativeOnly })
+    ).toEqual([]);
+  });
+
+  it("still probes the out-of-repo huddle hooks for existence", () => {
+    // Pretend the dotfiles are not stowed: every huddle registration must be
+    // named. A silent pass here would mean four hooks could stop running with
+    // nothing to report it — the blind spot this check exists to close.
+    const problems = evaluateGuardStack(realSettings(), {
+      exists: (scriptPath) =>
+        scriptPath.includes("/.claude/hooks/huddle/")
+          ? false
+          : repoRelativeOnly(scriptPath),
+    });
+    expect(problems).toHaveLength(1);
+    for (const script of [
+      "huddle-session-start.sh",
+      "huddle-poll.sh",
+      "huddle-pr-announce.sh",
+    ]) {
+      expect(problems[0]).toContain(script);
+    }
   });
 });
 

@@ -40,6 +40,7 @@
 
 const path = require("node:path");
 const fs = require("node:fs");
+const os = require("node:os");
 
 // Keep in sync when adding/removing a PreToolUse guard hook.
 const EXPECTED_GUARD_HOOKS = [
@@ -57,15 +58,20 @@ const EXPECTED_GUARD_HOOKS = [
 //   `bash "${CLAUDE_PROJECT_DIR:-.}"/scripts/hooks/x.sh`    → scripts/hooks/x.sh
 //   `HUDDLE_THROTTLE_SECONDS=180 bash "$CLAUDE_PROJECT_DIR"/x.sh` → x.sh
 //
-// DELIBERATELY CONSERVATIVE: anything we cannot resolve with confidence — an
-// absolute path, a bare binary on $PATH, an inline `node -e '…'` program, a
-// token with unresolved shell expansion or metacharacters — is SKIPPED, not
-// flagged. A missed exotic registration is far cheaper than a canary that
-// cries wolf every session.
+// DELIBERATELY CONSERVATIVE: anything we cannot resolve with confidence — a
+// bare binary on $PATH, an inline `node -e '…'` program, a token with
+// unresolved shell expansion or metacharacters — is SKIPPED, not flagged. A
+// missed exotic registration is far cheaper than a canary that cries wolf
+// every session.
 //
-// The four `"$HOME"/.claude/hooks/huddle/…` registrations land in that skipped
-// set by design: the huddle lives in dotfiles, not this repo, so there is no
-// repo-relative path to verify and its absence is not a repo defect.
+// `$HOME` / `~` is the ONE absolute form resolved rather than skipped:
+//   `bash "$HOME/.claude/hooks/huddle/huddle-poll.sh"` → /Users/x/.claude/…
+// The huddle hooks live in Tim's dotfiles, not this repo, so skipping them
+// would leave the reverse check blind to exactly the failure it exists to
+// catch — a registration whose script isn't there. Unstow the dotfiles and
+// four hooks stop running; the settings.json commands are guarded so they no
+// longer error per-turn, which means this canary is the only thing that says
+// so. Any other absolute path stays skipped.
 
 const SCRIPT_EXTENSIONS = new Set([".cjs", ".mjs", ".js", ".sh", ".py", ".ts"]);
 // Any of these in a token means shell machinery we won't try to interpret.
@@ -82,11 +88,17 @@ const INLINE_PROGRAM_FLAGS = new Set([
   "--command",
 ]);
 
+// `$HOME/…`, `${HOME}/…`, `~/…` — the one absolute prefix we expand.
+const HOME_PREFIX = /^(?:\$HOME|\$\{HOME\}|~)(?=\/)/;
+
 /**
- * Extract the repo-relative script path(s) a hook command invokes.
+ * Extract the script path(s) a hook command invokes — repo-relative, or
+ * absolute when the command is rooted at `$HOME`.
  * Returns [] when nothing resolvable is present.
  */
-function extractScriptPaths(command) {
+function extractScriptPaths(command, options = {}) {
+  const home =
+    typeof options.home === "string" ? options.home : os.homedir() || "";
   const found = [];
   const rawTokens = String(command || "").split(/\s+/);
   if (rawTokens.some((t) => INLINE_PROGRAM_FLAGS.has(t.replace(/["']/g, "")))) {
@@ -96,29 +108,41 @@ function extractScriptPaths(command) {
   for (const rawToken of rawTokens) {
     if (!rawToken) continue;
 
-    // Drop quoting, then substitute the one variable form our settings use.
-    const token = rawToken
+    // Drop quoting, then substitute the variable forms our settings use.
+    let token = rawToken
       .replace(/["']/g, "")
       .replace(/\$\{CLAUDE_PROJECT_DIR(?::-[^}]*)?\}/g, ".")
       .replace(/\$CLAUDE_PROJECT_DIR/g, ".");
 
+    // A `$HOME`-rooted hook is resolvable, so resolve it instead of skipping
+    // it as "absolute". Without a home directory to expand against it stays
+    // unresolvable and falls through to the absolute-path skip below.
+    let homeRooted = false;
+    if (home && HOME_PREFIX.test(token)) {
+      token = token.replace(HOME_PREFIX, home);
+      homeRooted = true;
+    }
+
     if (token.startsWith("-")) continue; // a flag, not a path
     if (!token.includes("/")) continue; // bare binary name / env assignment
-    if (token.startsWith("/") || token.startsWith("~")) continue; // absolute
+    if (!homeRooted && (token.startsWith("/") || token.startsWith("~"))) {
+      continue; // absolute, and not one we can attribute
+    }
     if (token.includes("$") || SHELL_METACHARS.test(token)) continue; // unresolvable
     if (!SCRIPT_EXTENSIONS.has(path.posix.extname(token))) continue;
 
     const normalized = path.posix.normalize(token);
-    if (normalized.startsWith("..")) continue; // escapes the repo root
+    if (!homeRooted && normalized.startsWith("..")) continue; // escapes the repo root
     if (!found.includes(normalized)) found.push(normalized);
   }
   return found;
 }
 
 /**
- * Does a repo-relative script path exist on disk?
+ * Does a registered script path exist on disk?
  *
- * Resolves against the candidate roots a hook itself would use
+ * An absolute path (the `$HOME`-rooted huddle hooks) is probed as-is.
+ * A repo-relative path resolves against the candidate roots a hook itself uses
  * (CLAUDE_PROJECT_DIR → __dirname-relative → cwd) and counts the script as
  * present if ANY candidate root has it. Inside a worktree the hook runs from
  * the worktree's own .claude/hooks/, and CLAUDE_PROJECT_DIR may point at a
@@ -126,6 +150,13 @@ function extractScriptPaths(command) {
  * registration.
  */
 function defaultScriptExists(relPath) {
+  if (path.isAbsolute(relPath)) {
+    try {
+      return fs.existsSync(relPath);
+    } catch {
+      return false;
+    }
+  }
   const roots = [
     process.env.CLAUDE_PROJECT_DIR,
     path.join(__dirname, "..", ".."),
