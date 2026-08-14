@@ -91,6 +91,11 @@ const INLINE_PROGRAM_FLAGS = new Set([
 // `$HOME/…`, `${HOME}/…`, `~/…` — the one absolute prefix we expand.
 const HOME_PREFIX = /^(?:\$HOME|\$\{HOME\}|~)(?=\/)/;
 
+// Shared between the problem string and the remediation that reads it back.
+const DEAD_REGISTRATION_PREFIX = "registered hooks missing from disk: ";
+// Registrations under here are the huddle's, which lives in dotfiles.
+const HUDDLE_HOOK_DIR = "/.claude/hooks/huddle/";
+
 /**
  * Extract the script path(s) a hook command invokes — repo-relative, or
  * absolute when the command is rooted at `$HOME`.
@@ -193,6 +198,9 @@ function collectCommands(eventEntries) {
 //
 // `options.exists` overrides the on-disk probe with a `(relPath) => boolean`
 // predicate, so tests can exercise the reverse check without touching the fs.
+// `options.home` pins the directory `$HOME`/`~` expands to, so a test does not
+// depend on the ambient one (`os.homedir()` is empty when HOME is unset and
+// the user has no passwd home — a hardened container).
 //
 // Problems reported:
 //   - `missing PreToolUse hooks: <basename>, ...` when any EXPECTED_GUARD_HOOKS
@@ -205,6 +213,8 @@ function evaluateGuardStack(settings, options = {}) {
   const problems = [];
   const exists =
     typeof options.exists === "function" ? options.exists : defaultScriptExists;
+  const extractOptions =
+    typeof options.home === "string" ? { home: options.home } : {};
 
   // Forward: every expected guard hook must be wired under PreToolUse.
   const commands = collectCommands(settings?.hooks?.PreToolUse);
@@ -224,7 +234,7 @@ function evaluateGuardStack(settings, options = {}) {
   if (hooksByEvent && typeof hooksByEvent === "object") {
     for (const eventEntries of Object.values(hooksByEvent)) {
       for (const command of collectCommands(eventEntries)) {
-        for (const scriptPath of extractScriptPaths(command)) {
+        for (const scriptPath of extractScriptPaths(command, extractOptions)) {
           if (!exists(scriptPath) && !deadRegistrations.includes(scriptPath)) {
             deadRegistrations.push(scriptPath);
           }
@@ -233,9 +243,7 @@ function evaluateGuardStack(settings, options = {}) {
     }
   }
   if (deadRegistrations.length > 0) {
-    problems.push(
-      `registered hooks missing from disk: ${deadRegistrations.join(", ")}`,
-    );
+    problems.push(DEAD_REGISTRATION_PREFIX + deadRegistrations.join(", "));
   }
 
   // permissions.deny / permissions.ask must both be present, non-empty arrays.
@@ -344,6 +352,37 @@ function evaluateGuardBehavior(options = {}) {
   return problems;
 }
 
+// --- Remediation --------------------------------------------------------------
+/**
+ * What to actually DO about the reported problems.
+ *
+ * "Restore .claude/settings.json from git" is right for every problem this
+ * canary was built for — they all mean the file was rewritten wrongly. It is
+ * WRONG for the one case the huddle move made reachable: the four huddle hooks
+ * live in Tim's dotfiles, so on a checkout where those aren't stowed the
+ * registrations are dead while settings.json is perfectly correct. Restoring it
+ * would do nothing. Say "stow the dotfiles" instead, but only when that is the
+ * whole story — any other problem alongside it means settings.json is suspect
+ * again and the original advice wins.
+ */
+function remediationFor(stackProblems, behaviorProblems = []) {
+  const generic = "Restore .claude/settings.json from git before continuing.";
+  if (behaviorProblems.length > 0 || stackProblems.length !== 1) return generic;
+
+  const [problem] = stackProblems;
+  if (!problem.startsWith(DEAD_REGISTRATION_PREFIX)) return generic;
+
+  const dead = problem.slice(DEAD_REGISTRATION_PREFIX.length).split(", ");
+  if (!dead.every((scriptPath) => scriptPath.includes(HUDDLE_HOOK_DIR))) {
+    return generic;
+  }
+  return (
+    "settings.json is fine — the huddle hooks live in Tim's dotfiles, " +
+    "which are not stowed here. Run `dotsync`, or ignore this if you do not " +
+    "want the huddle on this machine."
+  );
+}
+
 // --- Hook entrypoint ---------------------------------------------------------
 // Does the IO: resolve path (incl. VERIFY_GUARD_SETTINGS override), read/parse
 // settings, call evaluateGuardStack + evaluateGuardBehavior, print one warning
@@ -377,7 +416,9 @@ function main() {
     return;
   }
 
-  const problems = [...evaluateGuardStack(settings), ...evaluateGuardBehavior()];
+  const stackProblems = evaluateGuardStack(settings);
+  const behaviorProblems = evaluateGuardBehavior();
+  const problems = [...stackProblems, ...behaviorProblems];
   if (problems.length === 0) {
     // Healthy — stay silent.
     process.exit(0);
@@ -385,7 +426,7 @@ function main() {
 
   process.stderr.write(
     `⚠️  GUARD STACK DEGRADED — ${problems.join("; ")}. ` +
-      `Restore .claude/settings.json from git before continuing.\n`,
+      `${remediationFor(stackProblems, behaviorProblems)}\n`,
   );
   process.exit(0);
 }
@@ -394,6 +435,7 @@ module.exports = {
   evaluateGuardStack,
   evaluateGuardBehavior,
   extractScriptPaths,
+  remediationFor,
   main,
   BEHAVIOR_PROBES,
 };

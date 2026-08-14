@@ -40,12 +40,17 @@ const {
   evaluateGuardStack,
   evaluateGuardBehavior,
   extractScriptPaths,
+  remediationFor,
   BEHAVIOR_PROBES,
 } = require(hookPath) as {
   evaluateGuardStack: (
     settings: unknown,
-    options?: { exists?: (relPath: string) => boolean }
+    options?: { exists?: (relPath: string) => boolean; home?: string }
   ) => string[];
+  remediationFor: (
+    stackProblems: string[],
+    behaviorProblems?: string[]
+  ) => string;
   evaluateGuardBehavior: (options?: {
     load?: (basename: string) => unknown;
   }) => string[];
@@ -432,9 +437,18 @@ describe("the repo's own .claude/settings.json", () => {
     path.isAbsolute(scriptPath) ||
     fs.existsSync(path.resolve(process.cwd(), scriptPath));
 
+  // Pin the home directory rather than inheriting it: os.homedir() is empty
+  // when HOME is unset and the user has no passwd entry (hardened containers),
+  // which would leave the $HOME tokens unresolved and pass this file's
+  // huddle assertions for an environmental reason rather than a real one.
+  const HOME = "/home/tim";
+
   it("has a healthy guard stack in both directions", () => {
     expect(
-      evaluateGuardStack(realSettings(), { exists: repoRelativeOnly })
+      evaluateGuardStack(realSettings(), {
+        exists: repoRelativeOnly,
+        home: HOME,
+      })
     ).toEqual([]);
   });
 
@@ -443,6 +457,7 @@ describe("the repo's own .claude/settings.json", () => {
     // named. A silent pass here would mean four hooks could stop running with
     // nothing to report it — the blind spot this check exists to close.
     const problems = evaluateGuardStack(realSettings(), {
+      home: HOME,
       exists: (scriptPath) =>
         scriptPath.includes("/.claude/hooks/huddle/")
           ? false
@@ -456,6 +471,59 @@ describe("the repo's own .claude/settings.json", () => {
     ]) {
       expect(problems[0]).toContain(script);
     }
+    // The huddle paths must have actually expanded — a `$HOME` left literal
+    // would be skipped as unresolvable and quietly satisfy the assertion above
+    // if the message happened to name the scripts some other way.
+    expect(problems[0]).toContain(`${HOME}/.claude/hooks/huddle/`);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Remediation: the advice has to match the failure. "Restore settings.json"
+// is right for a bad rewrite and WRONG for un-stowed dotfiles, where
+// settings.json is already correct.
+// ---------------------------------------------------------------------------
+describe("remediationFor", () => {
+  const GENERIC = "Restore .claude/settings.json from git before continuing.";
+  const huddleDead =
+    "registered hooks missing from disk: /home/tim/.claude/hooks/huddle/huddle-poll.sh, /home/tim/.claude/hooks/huddle/huddle-poll.sh";
+
+  it("points at the dotfiles when only huddle hooks are missing", () => {
+    const advice = remediationFor([huddleDead]);
+    expect(advice).toContain("dotsync");
+    expect(advice).toContain("settings.json is fine");
+    expect(advice).not.toContain("Restore");
+  });
+
+  it("keeps the generic advice for a repo hook missing from disk", () => {
+    expect(
+      remediationFor([
+        "registered hooks missing from disk: .claude/hooks/block-direct-merge.cjs",
+      ])
+    ).toBe(GENERIC);
+  });
+
+  it("keeps the generic advice when a repo hook is missing alongside", () => {
+    expect(
+      remediationFor([`${huddleDead}, .claude/hooks/block-direct-merge.cjs`])
+    ).toBe(GENERIC);
+  });
+
+  it("keeps the generic advice when settings.json is degraded too", () => {
+    // Un-stowed dotfiles cannot explain an emptied permissions block or a
+    // guard that stopped blocking — settings.json is suspect again.
+    expect(remediationFor([huddleDead, "permissions.deny empty/absent"])).toBe(
+      GENERIC
+    );
+    expect(
+      remediationFor([huddleDead], ['block-direct-merge.cjs allows "x"'])
+    ).toBe(GENERIC);
+  });
+
+  it("keeps the generic advice for problems that are not dead registrations", () => {
+    expect(
+      remediationFor(["missing PreToolUse hooks: block-direct-merge.cjs"])
+    ).toBe(GENERIC);
   });
 });
 
@@ -641,6 +709,31 @@ describe("verify-guard-stack.cjs subprocess — fail-open contract", () => {
     expect(stderr).toContain("GUARD STACK DEGRADED");
     expect(stderr).toContain("block-direct-merge.cjs");
     expect(stderr).toContain("permissions.deny empty/absent");
+  });
+
+  it("dead huddle registration → the dotfiles advice, not 'restore settings.json'", () => {
+    // End-to-end shape of the un-stowed-dotfiles case: $HOME expands against
+    // the real home, the fixture script under it does not exist.
+    const settings = settingsWithHooks(ALL_EXPECTED_HOOKS) as {
+      hooks: Record<string, unknown[]>;
+    };
+    settings.hooks.SessionStart = [
+      {
+        hooks: [
+          {
+            type: "command",
+            command:
+              'test -f "$HOME/.claude/hooks/huddle/huddle-absent-fixture.sh" && bash "$HOME/.claude/hooks/huddle/huddle-absent-fixture.sh" || true',
+          },
+        ],
+      },
+    ];
+    const file = writeTmp("settings.json", JSON.stringify(settings, null, 2));
+    const { status, stderr } = runHook(file);
+    expect(status).toBe(0);
+    expect(stderr).toContain("huddle-absent-fixture.sh");
+    expect(stderr).toContain("dotsync");
+    expect(stderr).not.toContain("Restore .claude/settings.json");
   });
 
   it("dead registration → exit 0 (warn-only) naming the missing script", () => {
