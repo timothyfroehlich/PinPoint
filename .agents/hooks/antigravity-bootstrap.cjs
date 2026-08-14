@@ -28,7 +28,13 @@ const path = require("path");
 // checkout without the dotfiles stowed, calling one throws ENOENT and writes a
 // stderr line on EVERY turn. Resolve to null instead, and let the caller skip.
 function huddleScript(name) {
-  const scriptPath = path.join(os.homedir(), ".claude/hooks/huddle", name);
+  // os.homedir() is "" when HOME is unset and the user has no passwd home
+  // entry (a hardened container). path.join would then yield a RELATIVE
+  // `.claude/hooks/huddle/<name>`, probed against the workspace repo — so an
+  // in-repo copy would be run as if it were the dotfiles one.
+  const home = os.homedir();
+  if (!home) return null;
+  const scriptPath = path.join(home, ".claude/hooks/huddle", name);
   try {
     return fs.existsSync(scriptPath) ? scriptPath : null;
   } catch {

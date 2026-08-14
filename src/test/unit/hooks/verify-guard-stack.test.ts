@@ -291,13 +291,33 @@ describe("extractScriptPaths", () => {
     }
   });
 
+  it("only expands what the shell would expand", () => {
+    // A quoted `~` stays literal at runtime, so resolving it here would make
+    // the canary pass on a registration that is broken — the exact false
+    // negative this check exists to prevent. Single quotes suppress `$HOME`
+    // too. Each of these is skipped rather than resolved.
+    for (const command of [
+      'bash "~/.claude/hooks/huddle/huddle-poll.sh"',
+      "bash '~/.claude/hooks/huddle/huddle-poll.sh'",
+      "bash '$HOME/.claude/hooks/huddle/huddle-poll.sh'",
+    ]) {
+      expect(extractScriptPaths(command, { home: "/home/tim" })).toEqual([]);
+    }
+    // ...while the forms the shell does expand still resolve.
+    expect(
+      extractScriptPaths("bash ~/.claude/hooks/huddle/huddle-poll.sh", {
+        home: "/home/tim",
+      })
+    ).toEqual(["/home/tim/.claude/hooks/huddle/huddle-poll.sh"]);
+  });
+
   it("reports a guarded $HOME registration once, not once per mention", () => {
-    // The live registrations name the script twice — `test -f X && bash X` —
+    // The live registrations name the script twice — `test -f X || exit 0; bash X` —
     // so that a missing dotfiles checkout is a silent no-op instead of a
     // per-turn ENOENT. Both mentions are the same registration.
     expect(
       extractScriptPaths(
-        'test -f "$HOME/.claude/hooks/huddle/huddle-poll.sh" && HUDDLE_THROTTLE_SECONDS=180 bash "$HOME/.claude/hooks/huddle/huddle-poll.sh" || true',
+        'test -f "$HOME/.claude/hooks/huddle/huddle-poll.sh" || exit 0; HUDDLE_THROTTLE_SECONDS=180 bash "$HOME/.claude/hooks/huddle/huddle-poll.sh"',
         { home: "/home/tim" }
       )
     ).toEqual(["/home/tim/.claude/hooks/huddle/huddle-poll.sh"]);
@@ -495,35 +515,23 @@ describe("remediationFor", () => {
     expect(advice).not.toContain("Restore");
   });
 
-  it("keeps the generic advice for a repo hook missing from disk", () => {
-    expect(
-      remediationFor([
-        "registered hooks missing from disk: .claude/hooks/block-direct-merge.cjs",
-      ])
-    ).toBe(GENERIC);
-  });
-
-  it("keeps the generic advice when a repo hook is missing alongside", () => {
-    expect(
-      remediationFor([`${huddleDead}, .claude/hooks/block-direct-merge.cjs`])
-    ).toBe(GENERIC);
-  });
-
-  it("keeps the generic advice when settings.json is degraded too", () => {
-    // Un-stowed dotfiles cannot explain an emptied permissions block or a
-    // guard that stopped blocking — settings.json is suspect again.
-    expect(remediationFor([huddleDead, "permissions.deny empty/absent"])).toBe(
-      GENERIC
-    );
-    expect(
-      remediationFor([huddleDead], ['block-direct-merge.cjs allows "x"'])
-    ).toBe(GENERIC);
-  });
-
-  it("keeps the generic advice for problems that are not dead registrations", () => {
-    expect(
-      remediationFor(["missing PreToolUse hooks: block-direct-merge.cjs"])
-    ).toBe(GENERIC);
+  it("keeps the generic advice for anything else", () => {
+    // Un-stowed dotfiles explain ONLY a dead huddle registration. A repo hook
+    // missing, a degraded permissions block, or a guard that stopped blocking
+    // all mean settings.json is suspect again — even alongside the huddle one.
+    for (const [stack, behavior] of [
+      [
+        [
+          "registered hooks missing from disk: .claude/hooks/block-direct-merge.cjs",
+        ],
+      ],
+      [[`${huddleDead}, .claude/hooks/block-direct-merge.cjs`]],
+      [[huddleDead, "permissions.deny empty/absent"]],
+      [["missing PreToolUse hooks: block-direct-merge.cjs"]],
+      [[huddleDead], ['block-direct-merge.cjs allows "x"']],
+    ] as [string[], string[]?][]) {
+      expect(remediationFor(stack, behavior)).toBe(GENERIC);
+    }
   });
 });
 
@@ -723,7 +731,7 @@ describe("verify-guard-stack.cjs subprocess — fail-open contract", () => {
           {
             type: "command",
             command:
-              'test -f "$HOME/.claude/hooks/huddle/huddle-absent-fixture.sh" && bash "$HOME/.claude/hooks/huddle/huddle-absent-fixture.sh" || true',
+              'test -f "$HOME/.claude/hooks/huddle/huddle-absent-fixture.sh" || exit 0; bash "$HOME/.claude/hooks/huddle/huddle-absent-fixture.sh"',
           },
         ],
       },

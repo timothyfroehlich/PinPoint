@@ -113,6 +113,20 @@ function extractScriptPaths(command, options = {}) {
   for (const rawToken of rawTokens) {
     if (!rawToken) continue;
 
+    // Quoting decides which expansions the SHELL would actually perform, and
+    // this check has to agree with the shell or it reports the wrong thing:
+    //   unquoted        → `$HOME`, `${HOME}` and `~` all expand
+    //   "double quoted" → `$HOME` / `${HOME}` expand; `~` does NOT
+    //   'single quoted' → nothing expands
+    // Expanding a `~` the shell would leave literal would make this check pass
+    // on a registration that is broken at runtime — a false negative in the one
+    // place whose job is catching dead registrations.
+    const quote = rawToken.startsWith('"')
+      ? '"'
+      : rawToken.startsWith("'")
+        ? "'"
+        : "";
+
     // Drop quoting, then substitute the variable forms our settings use.
     let token = rawToken
       .replace(/["']/g, "")
@@ -120,10 +134,13 @@ function extractScriptPaths(command, options = {}) {
       .replace(/\$CLAUDE_PROJECT_DIR/g, ".");
 
     // A `$HOME`-rooted hook is resolvable, so resolve it instead of skipping
-    // it as "absolute". Without a home directory to expand against it stays
-    // unresolvable and falls through to the absolute-path skip below.
+    // it as "absolute". Without a home directory to expand against — or under
+    // quoting that suppresses the expansion — it stays unresolvable and falls
+    // through to the absolute-path skip below.
+    const expandsHome =
+      quote === "'" ? false : quote === '"' ? !token.startsWith("~") : true;
     let homeRooted = false;
-    if (home && HOME_PREFIX.test(token)) {
+    if (home && expandsHome && HOME_PREFIX.test(token)) {
       token = token.replace(HOME_PREFIX, home);
       homeRooted = true;
     }
