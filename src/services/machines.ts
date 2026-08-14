@@ -726,6 +726,8 @@ export type UpdateMachinePbmLinkResult =
 /** The PBM + presence state a plan was decided against, for the CAS check. */
 type PbmLinkBasis = StoredPbmLinkState & {
   presenceStatus: MachinePresenceStatus;
+  pinballmapExcluded: boolean;
+  pinballmapExcludedReason: string | null;
 };
 
 const PBM_LINK_COLUMNS = {
@@ -748,8 +750,46 @@ function pbmLinkBasisUnchanged(a: PbmLinkBasis, b: PbmLinkBasis): boolean {
     a.pinballmapMachineId === b.pinballmapMachineId &&
     a.pinballmapListed === b.pinballmapListed &&
     a.pinballmapLmxId === b.pinballmapLmxId &&
-    a.presenceStatus === b.presenceStatus
+    a.presenceStatus === b.presenceStatus &&
+    // The exclusion pair is in the basis because {@link carryExcludedReason}
+    // reads it. Anything the plan is derived from has to be compared, or the
+    // CAS would wave through a write built on a value that has since moved.
+    a.pinballmapExcluded === b.pinballmapExcluded &&
+    a.pinballmapExcludedReason === b.pinballmapExcludedReason
   );
+}
+
+/**
+ * Keep a stored exclusion reason when the caller re-states the exclusion without
+ * one.
+ *
+ * `resolvePbmLinkColumnsForUpdate` writes `reason ?? null`, which is right for
+ * the edit form — that form always posts the field, so an absent one means a
+ * human emptied the box. An MCP caller re-confirming an exclusion it did not
+ * author has no such intent, and the fleet pass (PP-h059) does exactly that
+ * across the whole floor: `{ machine: "UM", pinballmapExcluded: true }` would
+ * have nulled "homebrew — one-off cabinet" on every machine it touched. Same
+ * shape as the listing carry-over, and the same rule behind it — a forgotten
+ * argument must not destroy stored state (CORE-ARCH-012).
+ *
+ * An explicit empty string is still a clear: it is a value the caller sent.
+ */
+function carryExcludedReason(
+  selection: PbmLinkSelection,
+  stored: Pick<PbmLinkBasis, "pinballmapExcluded" | "pinballmapExcludedReason">
+): PbmLinkSelection {
+  if (
+    selection.pinballmapExcluded !== true ||
+    selection.pinballmapExcludedReason !== undefined ||
+    !stored.pinballmapExcluded ||
+    stored.pinballmapExcludedReason === null
+  ) {
+    return selection;
+  }
+  return {
+    ...selection,
+    pinballmapExcludedReason: stored.pinballmapExcludedReason,
+  };
 }
 
 /**
@@ -780,7 +820,8 @@ function pbmLinkBasisUnchanged(a: PbmLinkBasis, b: PbmLinkBasis): boolean {
  * `m/pinballmap-actions.ts`, for the same reason.
  *
  * A missing row is reported as `not_found` rather than a success payload
- * describing a link that was never stored (CORE-ARCH-012).
+ * describing a link that was never stored (CORE-ARCH-012). An exclusion
+ * re-stated without a reason keeps the stored one ({@link carryExcludedReason}).
  *
  * Returns the machine's PBM columns AS STORED after everything settled, not as
  * planned: an auto-link that lands sets `pinballmapListed`/`pinballmapLmxId`
@@ -805,7 +846,7 @@ export async function updateMachinePbmLink({
 
     const planned = await planMachinePbmLink({
       machineId,
-      selection,
+      selection: carryExcludedReason(selection, basisRow),
       stored: {
         pinballmapMachineId: basisRow.pinballmapMachineId,
         pinballmapListed: basisRow.pinballmapListed,

@@ -1700,6 +1700,103 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
       expect(result).toMatchObject({ ok: false, reason: "not_found" });
     });
 
+    it("keeps a stored exclusion reason when the exclusion is re-confirmed without one", async () => {
+      // The fleet pass (PP-h059) re-confirms exclusions it did not author, and
+      // the natural call carries no reason. Writing `reason ?? null` there would
+      // erase someone else's note on every machine it walked past — the same
+      // "a forgotten argument must not destroy stored state" rule that stops a
+      // missing id from wiping a link (CORE-ARCH-012).
+      const admin = await makeUser("admin");
+      const machine = await seedMachine({
+        name: "Unicorn Magic",
+        pbm: {
+          pinballmapExcluded: true,
+          pinballmapExcludedReason: "homebrew — one-off cabinet",
+        },
+      });
+
+      await runSetMachinePinballmap(
+        { machine: machine.initials, pinballmapExcluded: true },
+        ctx("admin", admin)
+      );
+
+      expect(await pbmRow(machine.id)).toMatchObject({
+        pinballmapExcluded: true,
+        pinballmapExcludedReason: "homebrew — one-off cabinet",
+      });
+    });
+
+    it("replaces a stored exclusion reason when the caller sends a new one", async () => {
+      // The carry-over is a floor, not a lock: a caller that states a reason
+      // still overwrites whatever was there.
+      const admin = await makeUser("admin");
+      const machine = await seedMachine({
+        name: "Border Town",
+        pbm: {
+          pinballmapExcluded: true,
+          pinballmapExcludedReason: "homebrew — one-off cabinet",
+        },
+      });
+
+      await runSetMachinePinballmap(
+        {
+          machine: machine.initials,
+          pinballmapExcluded: true,
+          pinballmapExcludedReason: "1940 pre-flipper, not a catalog title",
+        },
+        ctx("admin", admin)
+      );
+
+      expect(await pbmRow(machine.id)).toMatchObject({
+        pinballmapExcluded: true,
+        pinballmapExcludedReason: "1940 pre-flipper, not a catalog title",
+      });
+    });
+
+    it("does not carry a reason onto a machine that was not already excluded", async () => {
+      // The carry-over reads the STORED exclusion, so a machine being excluded
+      // for the first time gets no reason invented for it — and a machine
+      // moving from excluded to LINKED keeps none either (the resolver clears
+      // the whole column set on that branch).
+      const admin = await makeUser("admin");
+      await seedElviraCatalog();
+      const machine = await seedMachine({
+        name: "Hyperball",
+        pbm: {
+          pinballmapExcluded: true,
+          pinballmapExcludedReason: "rapid-fire hybrid, not a pinball title",
+        },
+      });
+
+      await runSetMachinePinballmap(
+        { machine: machine.initials, pinballmapMachineId: ELVIRA_PREMIUM_ID },
+        ctx("admin", admin)
+      );
+
+      expect(await pbmRow(machine.id)).toMatchObject({
+        pinballmapExcluded: false,
+        pinballmapExcludedReason: null,
+        pinballmapMachineId: ELVIRA_PREMIUM_ID,
+      });
+    });
+
+    it("rejects an empty exclusion reason, which the edit form must accept", () => {
+      // Deliberate divergence, not drift: an emptied input is how a human
+      // clears a reason, but from a tool call "" is a field filled with
+      // nothing — and accepting it would make the carry-over hinge on whether
+      // the caller sent "" or nothing at all.
+      expect(
+        setMachinePinballmapSchema
+          .pick({ pinballmapExcludedReason: true })
+          .safeParse({ pinballmapExcludedReason: "   " }).success
+      ).toBe(false);
+      expect(
+        updateMachineSchema
+          .pick({ pinballmapExcludedReason: true })
+          .safeParse({ pinballmapExcludedReason: "" }).success
+      ).toBe(true);
+    });
+
     it("caps an exclusion reason exactly where the edit form caps it", () => {
       // Both schemas write `pinballmap_excluded_reason`, and the edit form
       // PREFILLS it. A reason accepted here but rejected there would render into

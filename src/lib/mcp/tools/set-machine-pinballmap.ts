@@ -45,6 +45,14 @@ export const setMachinePinballmapSchema = z.object({
   pinballmapExcludedReason: z
     .string()
     .trim()
+    // Rejecting the empty string is narrower than the edit form, deliberately.
+    // The form has to accept it — an emptied input IS how a human clears a
+    // reason — but here an empty string can only be a caller filling a field it
+    // had nothing to put in, and the service reads "no reason supplied" as
+    // "keep the stored one". Accepting it would make that carry-over depend on
+    // whether the caller sent "" or nothing, which is not a distinction any
+    // caller is making on purpose.
+    .min(1)
     // 200 to match the edit form's shared schema (`m/schemas.ts`), NOT a looser
     // MCP-only cap. The two write the same column and the form prefills it: a
     // 201–500 char reason written here would render into an input that then
@@ -53,7 +61,7 @@ export const setMachinePinballmapSchema = z.object({
     .max(200)
     .optional()
     .describe(
-      "Why the machine is excluded (max 200 characters). Only meaningful alongside pinballmapExcluded: true."
+      "Why the machine is excluded (max 200 characters). Only meaningful alongside pinballmapExcluded: true. Leaving it out when the machine is ALREADY excluded keeps the reason already stored — re-confirming an exclusion never erases someone else's note. This tool cannot clear a stored reason; use the machine's edit page."
     ),
 });
 
@@ -136,10 +144,7 @@ export async function runSetMachinePinballmap(
   });
 
   if (!updated.ok) {
-    throw new McpToolError(
-      updated.reason === "not_found" ? "not_found" : "invalid",
-      updated.message
-    );
+    throw new McpToolError(updated.reason, updated.message);
   }
 
   // Same block `get_machine` returns, built from the STORED columns — a read
