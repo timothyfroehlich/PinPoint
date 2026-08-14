@@ -11,9 +11,31 @@ on:
 
 permissions: read-all  # zizmor: ignore[excessive-permissions]
 
-# Cancel in-progress runs when a new run is triggered
+# Cancel superseded PR runs; never cancel a push to main.
+#
+# A PR push supersedes the one before it — same branch, same question, and the
+# older answer is worthless — so cancelling saves runners with nothing lost.
+# A push to main is the opposite: each one is a distinct commit whose result is
+# the thing we want, and `test-e2e-comprehensive` takes ~30 minutes to produce
+# it. Under a shared `${{ github.ref }}` group every merge cancelled the
+# previous merge's run, so on any evening with more than one merge per half
+# hour that job was cancelled far more often than it finished — leaving the
+# same silent non-verdict PP-jxhy set out to remove, reached by a different
+# route. (Observed on run 31755670441: Smoke evaluated clean, then the Full
+# step was cancelled 30 minutes in by two later merges, and both the Full
+# evaluate and the gating step skipped.)
+#
+# Appending the SHA on `push` gives every main commit its own group, so main
+# runs neither cancel nor queue behind each other. Pull-request runs keep the
+# ref-based group and the old behaviour exactly.
+#
+# Not job-level `concurrency` on that job: job-level groups govern queueing
+# between jobs, they do not exempt a job from the workflow-level cancel. Not
+# `cancel-in-progress: false` either — main runs would then serialize, so one
+# 30-minute comprehensive job delays the next main run by up to 30 minutes and
+# they pile up. (PP-tbhv.)
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'push' && github.sha || '' }}
   cancel-in-progress: true
 
 jobs:

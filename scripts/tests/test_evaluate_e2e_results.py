@@ -433,6 +433,22 @@ def test_both_evaluate_steps_are_continue_on_error() -> None:
         assert "continue-on-error: true" in block, step_id
 
 
+def test_a_push_to_main_is_not_cancelled_by_the_next_push() -> None:
+    """Every main commit needs its own concurrency group.
+
+    Under a group keyed only on `github.ref`, each merge cancelled the previous
+    merge's in-flight run. `test-e2e-comprehensive` takes ~30 minutes, so on any
+    evening with more than one merge per half hour it was cancelled more often
+    than it finished — a missing verdict, the class this gate exists to remove,
+    reached without ever hitting the timeout PP-jxhy fixed. (PP-tbhv.)
+    """
+    ci = _ci_yml()
+    group = next(line for line in ci.splitlines() if line.strip().startswith("group:"))
+    assert "github.event_name == 'push' && github.sha" in group, group
+    # PR runs must keep cancelling — that is the whole point of the setting.
+    assert "cancel-in-progress: true" in ci
+
+
 def test_a_dedicated_step_gates_on_both_verdicts() -> None:
     """Something still has to fail the job once both suites have reported."""
     ci = _ci_yml()
