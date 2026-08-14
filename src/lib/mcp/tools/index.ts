@@ -13,6 +13,7 @@ import { registerSearchPinballmapCatalog } from "./search-pinballmap-catalog";
 import { registerSetMachineAvailability } from "./set-machine-availability";
 import { registerSetMachineName } from "./set-machine-name";
 import { registerSetMachineOwner } from "./set-machine-owner";
+import { registerSetMachinePinballmap } from "./set-machine-pinballmap";
 import { registerUpdateIssue } from "./update-issue";
 
 /**
@@ -21,8 +22,9 @@ import { registerUpdateIssue } from "./update-issue";
  * `checkPermission`-gated per call.
  *
  * Two entities, each covered end to end: machines (list, read, add, rename,
- * set availability, set owner) and issues (list, read, file, comment, update),
- * plus the PinballMap catalog lookup that identifies a machine's title.
+ * set availability, set owner, set PinballMap title) and issues (list, read,
+ * file, comment, update), plus the PinballMap catalog lookup that identifies a
+ * machine's title.
  *
  * This function is the catalog — a tool that ships without a call here is
  * unreachable no matter how complete its handler is, which is what the
@@ -38,6 +40,7 @@ export function registerPinpointTools(server: McpServer): void {
   registerSetMachineName(server);
   registerAddMachine(server);
   registerSetMachineOwner(server);
+  registerSetMachinePinballmap(server);
   registerCreateIssue(server);
   registerAddIssueComment(server);
   registerUpdateIssue(server);

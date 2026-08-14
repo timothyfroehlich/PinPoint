@@ -38,7 +38,12 @@ import {
  */
 export class McpToolError extends Error {
   constructor(
-    readonly reason: "denied" | "not_found" | "invalid",
+    // `conflict` is its own reason, not a flavour of `invalid`: it means the row
+    // moved under a compare-and-set and nothing was written, which is a fact
+    // about concurrency, not about the arguments. Collapsing it into `invalid`
+    // would tell `mcp_tool_calls` — the only server-side record of MCP
+    // mutations — to blame the caller for a burst of failures it did not cause.
+    readonly reason: "denied" | "not_found" | "invalid" | "conflict",
     message: string
   ) {
     super(message);
