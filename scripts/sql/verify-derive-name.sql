@@ -10,8 +10,10 @@
 -- same order. Change one, change both.
 --
 -- Raises on the first mismatch, so a plain `psql -f` exits non-zero:
---   node scripts/query-readonly.mjs --file scripts/sql/verify-derive-name.sql
---   (or) psql "$POSTGRES_URL" -f scripts/sql/verify-derive-name.sql
+--   psql "$POSTGRES_URL" -f scripts/sql/verify-derive-name.sql
+--
+-- Reads nothing and writes nothing — `derive_profile_name` is IMMUTABLE — so it
+-- is safe to run inside a read-only transaction against any environment.
 
 DO $verify$
 DECLARE
