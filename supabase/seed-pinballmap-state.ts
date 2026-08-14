@@ -125,10 +125,14 @@ interface MachinePlan {
  * |------------------------|---------|--------|--------|------------------|
  * | GDZ Godzilla (Premium) | 3416    | yes    | yes    | listed           |
  * | SM  Spider-Man (Vault) | 2565    | yes    | yes    | listed           |
- * | BK  Black Knight       | 1055    | yes    | no     | unclaimed_on_pbm |
+ * | BK  Black Knight       | 1055    | yes    | no     | unclaimed_on_pbm*|
  * | MM  Medieval Madness   | 642     | no     | yes    | missing_on_pbm   |
  * | FB  Fireball           | none    | —      | no     | not_on_pbm       |
  * | AFM, EBD, TAF, HD, SC  | —       | —      | no     | unmatched        |
+ *
+ * `*` Black Knight is the one state here that a sync erases — auto-link claims
+ * it. See the note on its entry; a `listed` Black Knight is the product
+ * working, not a broken seed.
  *
  * `unclaimed_on_pbm` needs the machine LINKED to the title while not holding
  * the listing — an unlinked machine short-circuits to `unmatched` before the
@@ -172,14 +176,25 @@ const MACHINE_PLAN: MachinePlan[] = [
     initials: "BK",
     pinballmapMachineId: TITLE.blackKnight,
     // Linked but not holding the listing, while the lineup DOES carry the
-    // title. Auto-link (PP-o355.20) would normally capture this within the
-    // hour, so in production it survives only where auto-link stands down —
-    // two same-title cabinets tied at the top presence rank.
+    // title.
+    //
+    // THIS ONE DOES NOT SURVIVE A SYNC, and that is the product working. The
+    // reconcile pass behind "Sync now" and the hourly cron runs auto-link
+    // (PP-o355.20), which captures a lone eligible cabinet — so the first sync
+    // after seeding flips Black Knight to `listed` and writes a `linked`
+    // timeline event. Observed, not predicted: clicking Sync now during this
+    // seed's own verification claimed both BK and TAF within the same second.
+    //
+    // So do not read a `listed` Black Knight as a broken seed. Re-run the seed
+    // to get the state back. In production `unclaimed_on_pbm` survives only
+    // where auto-link deliberately stands down — two same-title cabinets tied
+    // at the top presence rank — which this fixture has no way to arrange
+    // without a second Black Knight.
     pinballmapListed: false,
     pinballmapLmxId: null,
     pinballmapExcluded: false,
     modelName: null,
-    state: "unclaimed_on_pbm",
+    state: "unclaimed_on_pbm (until the next sync auto-claims it)",
   },
   {
     initials: "MM",
