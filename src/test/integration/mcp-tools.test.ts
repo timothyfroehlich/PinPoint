@@ -1011,6 +1011,26 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
       );
     });
 
+    it("sets the owner by a single-token name", async () => {
+      // The PP-if48 regression: last name is optional, so a Discord signup has
+      // none. Matching on `first_name || ' ' || last_name` compares
+      // "PresidentNick " against "PresidentNick" and finds nobody — the picker
+      // silently reports "no such member" for exactly the users the fix exists
+      // to make findable. The generated `name` column is btrimmed; this asserts
+      // the lookup uses it.
+      const admin = await makeUser("admin");
+      await makeUser("member", "PresidentNick", "");
+      const machine = await seedMachine({ ownerId: null });
+
+      const outcome = await runSetMachineOwner(
+        { machine: machine.initials, owner: "PresidentNick" },
+        ctx("admin", admin)
+      );
+      expect((outcome.result as { owner: string | null }).owner).toBe(
+        "PresidentNick"
+      );
+    });
+
     it("clears the owner when owner is omitted", async () => {
       const admin = await makeUser("admin");
       const owner = await makeUser("member", "Gone", "Owner");

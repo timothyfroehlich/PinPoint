@@ -72,9 +72,10 @@ function stripDiscriminator(handle: string): string {
 /**
  * Best available name for a new profile, and whether the user chose it.
  *
- * Never returns an empty first name as long as an email is supplied — the email
- * local-part is the floor. That guarantee is what lets the DB enforce
- * `btrim(first_name) <> ''` without the trigger being able to fail a signup.
+ * Never returns an empty first name, for any input at all — the email local-part
+ * is the floor, and `"Member"` is the floor under that. The guarantee has to be
+ * unconditional: it is what lets the DB enforce `btrim(first_name) <> ''`
+ * without the check being able to fail a signup or an auto-heal.
  */
 export function deriveName(
   metadata: AuthMetadata | null | undefined,
@@ -112,8 +113,12 @@ export function deriveName(
     if (first) return { firstName: first, lastName: last, derived: true };
   }
 
-  // 5. Floor: the email local-part. Always non-empty for a valid address, which
-  //    is what keeps the NOT-BLANK check un-trippable.
+  // 5. Floor: the email local-part, then a literal. The local-part is non-empty
+  //    for any real address, but `"@x.com"` and `""` are strings this function
+  //    accepts, and returning `""` for them would push a
+  //    `user_profiles_first_name_not_blank` violation into the auto-heal path —
+  //    turning a cosmetic problem into a failed sign-in. `derive_profile_name()`
+  //    falls back to the same literal; keep them identical.
   const localPart = email.split("@")[0]?.trim() ?? "";
-  return { firstName: localPart, lastName: "", derived: true };
+  return { firstName: localPart || "Member", lastName: "", derived: true };
 }

@@ -92,6 +92,17 @@ describe("deriveName", () => {
       });
     });
 
+    it("strips the discriminator even with trailing whitespace", () => {
+      // The `$` anchor does not match across a trailing space, so this only
+      // passes if the trim happens before the strip — the order SQL originally
+      // had backwards.
+      expect(deriveName({ name: "pmuntner#0 " }, "p@example.com")).toEqual({
+        firstName: "pmuntner",
+        lastName: "",
+        derived: true,
+      });
+    });
+
     it("does not treat a non-object custom_claims as a lookup target", () => {
       expect(
         deriveName(
@@ -144,6 +155,19 @@ describe("deriveName", () => {
         { first_name: "", last_name: "" },
       ]) {
         expect(deriveName(meta, "fallback@example.com").firstName).not.toBe("");
+      }
+    });
+
+    it("falls back to 'Member' when the email has no usable local-part", () => {
+      // Without this the auto-heal path would insert `first_name = ''` and take
+      // a `user_profiles_first_name_not_blank` violation, turning a cosmetic
+      // problem into a failed sign-in. `derive_profile_name()` agrees.
+      for (const email of ["@example.com", "", "   "]) {
+        expect(deriveName({}, email)).toEqual({
+          firstName: "Member",
+          lastName: "",
+          derived: true,
+        });
       }
     });
   });

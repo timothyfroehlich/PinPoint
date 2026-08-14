@@ -56,7 +56,10 @@ BEGIN
   v_candidate := COALESCE(
     NULLIF(btrim(COALESCE(p_metadata->'custom_claims'->>'global_name', '')), ''),
     NULLIF(btrim(COALESCE(p_metadata->>'full_name', '')), ''),
-    NULLIF(btrim(regexp_replace(COALESCE(p_metadata->>'name', ''), '#\d+$', '')), '')
+    -- btrim BEFORE the strip, not after: the `$` anchor does not match across a
+    -- trailing space, so "pmuntner#0 " would keep its discriminator here while
+    -- deriveName() (which trims first) drops it.
+    NULLIF(btrim(regexp_replace(btrim(COALESCE(p_metadata->>'name', '')), '#\d+$', '')), '')
   );
 
   IF v_candidate IS NOT NULL THEN

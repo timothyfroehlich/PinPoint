@@ -55,11 +55,14 @@ function parseArgs(argv) {
  * where it lands in shell history and in this tool's own logs. Only the two
  * keys this script uses are read; everything else in the file is ignored.
  */
-function loadEnvFile(path) {
+function loadEnvFile(path, { required = true } = {}) {
   let contents;
   try {
     contents = readFileSync(path, "utf8");
   } catch (error) {
+    // A missing default file is not an error — the caller may have exported the
+    // variables instead. An explicitly named one that cannot be read is.
+    if (!required) return;
     console.error(`❌ Cannot read env file ${path}: ${error.message}`);
     process.exit(1);
   }
@@ -87,7 +90,12 @@ function resolveUrl() {
 }
 
 const args = parseArgs(process.argv.slice(2));
-if (args.envFile) loadEnvFile(args.envFile);
+// `.env.local` by default, so the documented invocations work in a checkout
+// without anyone having to remember `--env-file`; absent, it is skipped rather
+// than fatal. Values in the file override exported ones, which fails in the safe
+// direction — `.env.local` is the local stack, so the accident it can cause is
+// querying local while you meant prod, never the reverse.
+loadEnvFile(args.envFile ?? ".env.local", { required: args.envFile !== null });
 const sql = args.file ? readFileSync(args.file, "utf8") : args.sql;
 
 if (!sql?.trim()) {

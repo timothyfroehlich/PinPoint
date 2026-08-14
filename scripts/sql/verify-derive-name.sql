@@ -30,6 +30,9 @@ BEGIN
       ('discord-handle',    '{"full_name":"presidentnick","name":"presidentnick#0","custom_claims":{"global_name":"PresidentNick"}}', 'nickpereira.np@gmail.com', 'PresidentNick', '', true),
       ('no-globalname',     '{"full_name":"someuser","custom_claims":{}}',        'someuser@example.com',     'someuser',     '',                   true),
       ('discriminator',     '{"name":"pmuntner#4821"}',                           'p@example.com',            'pmuntner',     '',                   true),
+      -- The `$` anchor does not match across a trailing space, so this only
+      -- passes if the SQL trims BEFORE stripping, as deriveName() does.
+      ('discriminator-ws',  '{"name":"pmuntner#0 "}',                             'p@example.com',            'pmuntner',     '',                   true),
       ('non-object-claims', '{"custom_claims":"not-an-object","full_name":"Jane Roe"}', 'jane@example.com',   'Jane',         'Roe',                true),
       ('compound',          '{"full_name":"Mary Anne van der Berg"}',             'mary@example.com',         'Mary',         'Anne van der Berg',  true),
       ('whitespace',        '{"full_name":"  Ada   Lovelace  "}',                 'ada@example.com',          'Ada',          'Lovelace',           true),
@@ -69,6 +72,21 @@ BEGIN
     IF btrim(COALESCE(got.first_name, '')) = '' THEN
       failures := failures + 1;
       RAISE WARNING 'derive_profile_name returned a blank first name for %', c.metadata;
+    END IF;
+  END LOOP;
+
+  -- Same property from the other side: the email is the floor, so a degenerate
+  -- one has to fall through to the literal rather than out of the function with
+  -- a blank. Both implementations answer 'Member' here.
+  FOR c IN
+    SELECT * FROM (VALUES ('@example.com'), (''), ('   '), (NULL)) AS t(email)
+  LOOP
+    checked := checked + 1;
+    SELECT * INTO got FROM public.derive_profile_name('{}'::jsonb, c.email);
+    IF got.first_name <> 'Member' THEN
+      failures := failures + 1;
+      RAISE WARNING 'derive_profile_name: email % gave first_name %, want ''Member''',
+        quote_nullable(c.email), quote_literal(got.first_name);
     END IF;
   END LOOP;
 

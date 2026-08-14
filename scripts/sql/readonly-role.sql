@@ -10,10 +10,17 @@
 --        -f scripts/sql/readonly-role.sql
 --
 -- Then build the connection string for scripts/query-readonly.mjs:
---   postgres://pinpoint_readonly:<pw>@<same-host>:6543/postgres
--- and put it in .env.local as POSTGRES_URL_READONLY. It does NOT belong in the
--- Vercel env registry — the app never reads it, and the registry's membership
--- test is "PinPoint is broken without this".
+--   postgres://pinpoint_readonly.<project-ref>:<pw>@<same-host>:6543/postgres
+-- The `.<project-ref>` suffix on the USERNAME is not optional: port 6543 is
+-- Supavisor, which routes by tenant and reads it from there, so the bare role
+-- name fails authentication rather than failing to route. Put it in .env.local
+-- as POSTGRES_URL_READONLY. It does NOT belong in the Vercel env registry — the
+-- app never reads it, and the registry's membership test is "PinPoint is broken
+-- without this".
+--
+-- Note: the auth grants below are column-scoped, so `SELECT * FROM auth.users`
+-- is denied by design. Name the columns you want. That is the cost of the
+-- grant being narrow, and it is worth paying — see the comment on those grants.
 --
 -- Why this exists: agents investigating a bug need to read production, including
 -- `auth.users`. Handing them the service-role string means every read carries
@@ -49,18 +56,48 @@ ALTER ROLE pinpoint_readonly WITH BYPASSRLS NOCREATEDB NOCREATEROLE NOINHERIT;
 -- read-only transaction scripts/query-readonly.mjs opens.
 ALTER ROLE pinpoint_readonly SET default_transaction_read_only = on;
 
--- Read-only on the two schemas an investigation actually needs. `auth` is
--- included because provider metadata (raw_user_meta_data) lives there and was
--- the crux of PP-if48 — the app schema alone could not explain the bug.
-GRANT USAGE ON SCHEMA public, auth TO pinpoint_readonly;
-
+-- The app schema in full: it holds no credentials, and an investigation that
+-- has to guess which table it may read is an investigation that reaches for the
+-- service-role string instead.
+GRANT USAGE ON SCHEMA public TO pinpoint_readonly;
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO pinpoint_readonly;
-GRANT SELECT ON ALL TABLES IN SCHEMA auth   TO pinpoint_readonly;
 
 -- Tables added by future migrations, so the role does not silently go stale and
 -- start returning permission errors mid-investigation.
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO pinpoint_readonly;
-ALTER DEFAULT PRIVILEGES IN SCHEMA auth   GRANT SELECT ON TABLES TO pinpoint_readonly;
+
+-- `auth` gets named columns on two tables and nothing else. Read-only is not the
+-- same as harmless here: combined with BYPASSRLS, a schema-wide SELECT is an
+-- account-takeover path that needs no write at all.
+--
+--   auth.flow_state            provider_access_token, provider_refresh_token —
+--                              live Discord OAuth tokens, plaintext
+--   auth.custom_oauth_providers client_secret, also plaintext
+--   auth.users                 encrypted_password, recovery_token,
+--                              confirmation_token, reauthentication_token
+--   auth.sessions              refresh_token_hmac_key
+--   auth.refresh_tokens        token
+--   auth.mfa_factors           secret (TOTP seeds)
+--
+-- The connection string this file produces is meant to be handed to agents, so
+-- the grant has to be the smallest thing that answers "what did the provider
+-- send us" — which is `raw_user_meta_data` on auth.users and `identity_data` on
+-- auth.identities, the two fields PP-if48 turned on. `ALTER DEFAULT PRIVILEGES`
+-- is deliberately absent for auth: a future GoTrue migration adding another
+-- secret column must not be granted automatically.
+GRANT USAGE ON SCHEMA auth TO pinpoint_readonly;
+
+GRANT SELECT (
+  id, aud, role, email, email_confirmed_at, confirmed_at, invited_at,
+  last_sign_in_at, raw_app_meta_data, raw_user_meta_data, created_at,
+  updated_at, phone, phone_confirmed_at, banned_until, deleted_at,
+  is_sso_user, is_anonymous
+) ON auth.users TO pinpoint_readonly;
+
+GRANT SELECT (
+  id, user_id, provider, provider_id, identity_data, email,
+  last_sign_in_at, created_at, updated_at
+) ON auth.identities TO pinpoint_readonly;
 
 -- Explicitly withhold everything else. These are already absent by default;
 -- stating them means a future `GRANT ... TO PUBLIC` somewhere does not silently

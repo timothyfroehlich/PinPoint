@@ -45,16 +45,21 @@ export async function ensureUserProfile(user: User): Promise<void> {
     // Recreate profile
     const avatarUrl = (user.user_metadata["avatar_url"] as string) || null;
 
-    // Check for existing invited user to inherit role
+    // Check for existing invited user to inherit role and name
     // Default to "guest" for non-invited signups (least-privilege)
     let role: UserRole = "guest";
+    let invited: { firstName: string; lastName: string } | undefined;
     if (user.email) {
       const invitedUser = await db.query.invitedUsers.findFirst({
         where: eq(invitedUsers.email, user.email.toLowerCase()),
-        columns: { role: true },
+        columns: { role: true, firstName: true, lastName: true },
       });
       if (invitedUser) {
         role = invitedUser.role;
+        invited = {
+          firstName: invitedUser.firstName,
+          lastName: invitedUser.lastName,
+        };
       }
     }
 
@@ -71,7 +76,16 @@ export async function ensureUserProfile(user: User): Promise<void> {
     // trigger write the same row for the same user under different conditions,
     // and a divergence shows up as a name that depends on which ran first
     // (PP-if48).
-    const { firstName, lastName } = deriveName(user.user_metadata, email);
+    const derivedName = deriveName(user.user_metadata, email);
+
+    // Same precedence the trigger applies: an admin who sent the invite typed
+    // this person's name, which beats anything a provider handle can give us —
+    // but not a name the user typed themselves. `derived` is exactly that
+    // distinction. Narrow window (the trigger deletes the invited row on
+    // signup, so this only fires when the trigger did not run at all), but
+    // skipping it would reintroduce the divergence the comment above forbids.
+    const { firstName, lastName } =
+      invited && derivedName.derived ? invited : derivedName;
 
     await db.insert(userProfiles).values({
       id: user.id,
