@@ -11,9 +11,12 @@ import { after } from "next/server";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
 import {
+  applyMachinePbmLink,
+  captureMachineAutoLink,
   createMachine,
+  planMachinePbmLink,
   updateMachinePresence,
-  type MachinePbmColumns,
+  type MachinePbmLinkPlan,
 } from "~/services/machines";
 import {
   machines,
@@ -22,16 +25,7 @@ import {
   invitedUsers,
 } from "~/server/db/schema";
 import { createMachineSchema, updateMachineSchema } from "./schemas";
-import {
-  resolvePbmLinkColumnsForCreate,
-  resolvePbmLinkColumnsForUpdate,
-  type AbandonedListing,
-} from "~/lib/pinballmap/link-columns";
-import { recordAbandonedListing } from "~/lib/pinballmap/abandoned-listings";
-import {
-  captureAutoLink,
-  resolveAutoLinkForMachine,
-} from "~/lib/pinballmap/sync";
+import { resolvePbmLinkColumnsForCreate } from "~/lib/pinballmap/link-columns";
 import { type Result, ok, err } from "~/lib/result";
 import { z } from "zod";
 import { eq, and } from "drizzle-orm";
@@ -209,33 +203,6 @@ function readPbmLinkFormFields(formData: FormData): {
     manufacturer: nonEmpty("manufacturer"),
     year: nonEmpty("year"),
   };
-}
-
-/**
- * Apply a listing this save decided to auto-capture (PP-o355.20), best-effort.
- *
- * Runs AFTER the details transaction has committed, and swallows everything.
- * `captureAutoLink` already stands down on the one collision that is expected,
- * but a deadlock, a dropped connection, or a failure writing the receipt would
- * otherwise reach `updateMachineAction`'s catch and report "Failed to update
- * machine" for an edit that is already saved — sending the user to redo work
- * that landed. Auto-link is derived bookkeeping: it is allowed to not happen,
- * and the hourly reconcile pass picks it up next time round.
- */
-async function captureAutoLinkBestEffort(
-  machineId: string,
-  lmxId: number,
-  actorId: string
-): Promise<void> {
-  try {
-    await captureAutoLink({ machineId, lmxId, action: "linked" }, actorId);
-  } catch (autoLinkError: unknown) {
-    reportError(autoLinkError, {
-      action: "updateMachineAutoLink",
-      bestEffort: true,
-      machineId,
-    });
-  }
 }
 
 /**
@@ -682,11 +649,6 @@ export async function updateMachineAction(
   const { id, name, ownerId, presenceStatus, forcePromoteUserId } =
     validation.data;
 
-  // The listing this save decided to auto-capture (PP-o355.20), or null.
-  // Declared out here because it is decided in the PBM block and applied after
-  // whichever of the two update transactions ran.
-  let autoLink: { lmxId: number } | null = null;
-
   try {
     // Load current machine by id — permission check is authoritative.
     // Pre-load presenceStatus and the joined active-owner display name so
@@ -726,16 +688,16 @@ export async function updateMachineAction(
       );
     }
 
-    // Resolve PinballMap link columns when the picker is on this form. The
+    // Plan the PinballMap link change when the picker is on this form. The
     // submitted state is authoritative (clearing it unlinks), so it requires the
-    // link permission and derives metadata from the catalog mirror. When the
+    // link permission; the plan derives metadata from the catalog mirror, owns
+    // the listing carry-over, and decides any auto-link (PP-o355.20). When the
     // marker is absent, link columns are left untouched.
-    let pbmColumns: MachinePbmColumns | null = null;
-    // A live PinballMap entry this save walks away from (PP-l81u), or null.
-    // Set alongside `pbmColumns` below and written in the same transaction as
-    // the columns — a retitle whose record does not land leaves a public
-    // listing nobody can find.
-    let abandonedListing: AbandonedListing | null = null;
+    //
+    // Same seam as the MCP `set_machine_pinballmap` tool — the carry-over rule,
+    // the abandonment record and the auto-link choice exist once, in
+    // `~/services/machines` (PP-u4ab.12).
+    let pbmPlan: MachinePbmLinkPlan | null = null;
     if (pbmFormPresent) {
       if (
         !checkPermission("machines.pinballmap.link", accessLevel, {
@@ -750,44 +712,23 @@ export async function updateMachineAction(
       }
       // `pinballmapListed` is not an input to this action at all: the edit form
       // renders no control for it, `readPbmLinkFormFields` does not read it, and
-      // `updateMachineSchema` does not accept it (PP-o355.29). The resolver
-      // takes the STORED row and owns the carry-over decision, so no caller can
-      // unlist a machine by leaving an argument out (PP-l81u).
-      const pbm = await resolvePbmLinkColumnsForUpdate(validation.data, {
-        pinballmapMachineId: currentMachine.pinballmapMachineId,
-        pinballmapListed: currentMachine.pinballmapListed,
-        pinballmapLmxId: currentMachine.pinballmapLmxId,
+      // `updateMachineSchema` does not accept it (PP-o355.29). The planner takes
+      // the STORED row and owns the carry-over decision, so no caller can unlist
+      // a machine by leaving an argument out (PP-l81u).
+      const planned = await planMachinePbmLink({
+        machineId: id,
+        selection: validation.data,
+        stored: {
+          pinballmapMachineId: currentMachine.pinballmapMachineId,
+          pinballmapListed: currentMachine.pinballmapListed,
+          pinballmapLmxId: currentMachine.pinballmapLmxId,
+        },
+        // The prospective row: an edit can change availability in the same
+        // submit, and availability is what the tie guard ranks on.
+        presenceStatus: presenceStatus ?? currentMachine.presenceStatus,
       });
-      if (!pbm.ok) return err("VALIDATION", pbm.message);
-      pbmColumns = pbm.columns;
-      abandonedListing = pbm.abandoned;
-
-      // Auto-link (PP-o355.20): the moment a cabinet is matched to a title that
-      // is already on Pinball Map's lineup, capture that listing alongside the
-      // save. Matching is the human judgment; attaching the lmx is bookkeeping
-      // that mirrors what PBM already shows, so it is not a second button.
-      //
-      // DECIDED here, APPLIED after the details transaction commits (see
-      // `captureAutoLink` below). Keeping it out of that transaction is the
-      // point: the one-lister index makes the listing write the only statement
-      // here that can collide, and derived bookkeeping must never be able to
-      // discard the edit the human actually asked for.
-      //
-      // Only from unlisted → listed. A row the carry-over above kept listed is
-      // skipped entirely, which is also why this can never produce a heal: lmx
-      // drift belongs to the hourly pass, not to whoever happened to hit Save.
-      if (
-        pbmColumns.pinballmapMachineId !== null &&
-        !pbmColumns.pinballmapListed
-      ) {
-        autoLink = await resolveAutoLinkForMachine({
-          machineId: id,
-          pinballmapMachineId: pbmColumns.pinballmapMachineId,
-          // The prospective row: an edit can change availability in the same
-          // submit, and availability is what the tie guard ranks on.
-          presenceStatus: presenceStatus ?? currentMachine.presenceStatus,
-        });
-      }
+      if (!planned.ok) return err("VALIDATION", planned.message);
+      pbmPlan = planned.plan;
     }
 
     // Handle forcePromoteUserId path
@@ -850,7 +791,6 @@ export async function updateMachineAction(
             ...(presenceStatus !== undefined && { presenceStatus }),
             ownerId: machineOwnerId ?? null,
             invitedOwnerId: machineInvitedOwnerId ?? null,
-            ...(pbmColumns ?? {}),
             ...(descriptionColumn !== undefined && {
               description: descriptionColumn,
             }),
@@ -862,8 +802,8 @@ export async function updateMachineAction(
           throw new Error("Machine update failed");
         }
 
-        if (abandonedListing) {
-          await recordAbandonedListing(tx, id, abandonedListing, user.id);
+        if (pbmPlan) {
+          await applyMachinePbmLink(tx, id, pbmPlan, user.id);
         }
 
         // Add new owner as watcher if active user
@@ -906,8 +846,8 @@ export async function updateMachineAction(
         return [updatedMachine];
       });
 
-      if (autoLink) {
-        await captureAutoLinkBestEffort(id, autoLink.lmxId, user.id);
+      if (pbmPlan?.autoLink) {
+        await captureMachineAutoLink(id, pbmPlan.autoLink.lmxId, user.id);
       }
 
       // Post-commit side effects — best-effort: do not fail the action on notification errors
@@ -1036,32 +976,48 @@ export async function updateMachineAction(
 
     const oldOwnerId = currentMachine.ownerId;
 
+    // Every non-PinballMap column this submit touches. Each edit surface posts
+    // only the fields it renders, so this is routinely a subset — and on the PBM
+    // picker's own save it is EMPTY, which is why it cannot go straight into a
+    // `.set()`: Drizzle rejects an update with no values, and the link columns
+    // now travel separately (`applyMachinePbmLink`).
+    const detailValues = {
+      ...(name !== undefined && { name }),
+      ...(presenceStatus !== undefined && { presenceStatus }),
+      ...(shouldUpdateOwner && {
+        ownerId: finalOwnerId,
+        invitedOwnerId: finalInvitedOwnerId,
+      }),
+      ...(descriptionColumn !== undefined && {
+        description: descriptionColumn,
+      }),
+    };
+
     // Atomic: update machine + reconcile watcher rows + emit lifecycle events.
     // Notifications stay outside the tx as best-effort side effects.
     const [machine] = await db.transaction(async (tx) => {
-      const [updatedMachine] = await tx
-        .update(machines)
-        .set({
-          ...(name !== undefined && { name }),
-          ...(presenceStatus !== undefined && { presenceStatus }),
-          ...(shouldUpdateOwner && {
-            ownerId: finalOwnerId,
-            invitedOwnerId: finalInvitedOwnerId,
-          }),
-          ...(pbmColumns ?? {}),
-          ...(descriptionColumn !== undefined && {
-            description: descriptionColumn,
-          }),
-        })
-        .where(eq(machines.id, id))
-        .returning();
+      const [updatedMachine] =
+        Object.keys(detailValues).length > 0
+          ? await tx
+              .update(machines)
+              .set(detailValues)
+              .where(eq(machines.id, id))
+              .returning()
+          : // Nothing outside the PBM block changed. Read the row instead of
+            // writing it, so the NOT_FOUND check below still runs and the
+            // caller still gets a machine back.
+            await tx
+              .select()
+              .from(machines)
+              .where(eq(machines.id, id))
+              .limit(1);
 
       if (!updatedMachine) {
         throw new MachineNotFoundError();
       }
 
-      if (abandonedListing) {
-        await recordAbandonedListing(tx, id, abandonedListing, user.id);
+      if (pbmPlan) {
+        await applyMachinePbmLink(tx, id, pbmPlan, user.id);
       }
 
       // Handle owner changes in machine_watchers (inside tx so they roll back
@@ -1120,8 +1076,8 @@ export async function updateMachineAction(
       return [updatedMachine];
     });
 
-    if (autoLink) {
-      await captureAutoLinkBestEffort(id, autoLink.lmxId, user.id);
+    if (pbmPlan?.autoLink) {
+      await captureMachineAutoLink(id, pbmPlan.autoLink.lmxId, user.id);
     }
 
     // Post-commit side effects — best-effort: do not fail the action on notification errors
@@ -1190,7 +1146,7 @@ export async function updateMachineAction(
     // reach this point. Auto-link (PP-o355.20) made this action a writer of
     // `pinballmapListed` again, so the one-lister index
     // `machines_pinballmap_listed_unique` is reachable — but that write lives
-    // outside the details transaction and behind `captureAutoLinkBestEffort`,
+    // outside the details transaction and behind `captureMachineAutoLink`,
     // which stands down on a collision and reports anything else without
     // rethrowing. A save that reaches this catch therefore failed on its own
     // merits; derived bookkeeping is never allowed to discard a good edit.

@@ -1,5 +1,5 @@
 import { eq, and, type InferSelectModel } from "drizzle-orm";
-import { db } from "~/server/db";
+import { db, type DbTransaction } from "~/server/db";
 import {
   machines,
   machineWatchers,
@@ -24,6 +24,17 @@ import {
 } from "~/lib/notifications";
 import { type MachinePresenceStatus } from "~/lib/machines/presence";
 import { type ProseMirrorDoc } from "~/lib/tiptap/types";
+import { recordAbandonedListing } from "~/lib/pinballmap/abandoned-listings";
+import {
+  resolvePbmLinkColumnsForUpdate,
+  type AbandonedListing,
+  type PbmLinkSelection,
+  type StoredPbmLinkState,
+} from "~/lib/pinballmap/link-columns";
+import {
+  captureAutoLink,
+  resolveAutoLinkForMachine,
+} from "~/lib/pinballmap/sync";
 
 export type Machine = InferSelectModel<typeof machines>;
 
@@ -548,6 +559,389 @@ export async function updateMachinePresence({
   });
 
   return { changed: true };
+}
+
+// --- PinballMap link seam (PP-u4ab.12) --------------------------------------
+//
+// One seam, three steps, shared by `updateMachineAction` (the machine edit
+// page) and the MCP `set_machine_pinballmap` tool:
+//
+//   1. {@link planMachinePbmLink}  — decide, before any transaction opens.
+//   2. {@link applyMachinePbmLink} — write, inside the caller's transaction.
+//   3. {@link captureMachineAutoLink} — best-effort listing capture, after it
+//      commits.
+//
+// Split into three rather than one function because the two callers have
+// genuinely different transaction shapes: the edit form saves the link
+// alongside name/owner/presence/description and must keep all of that atomic,
+// while the MCP tool changes the link and nothing else. Collapsing them into
+// one `db.transaction` would either fork the seam or make a machine save
+// two transactions — and a half-saved edit is the regression this bead was
+// warned about. What is NOT split is every decision that carries a rule: the
+// carry-over, the abandonment record, and the auto-link choice each exist once.
+
+/** Everything a PBM link change decided, before anything is written. */
+export interface MachinePbmLinkPlan {
+  /** The full column set to write — catalog-derived, never caller-supplied. */
+  columns: MachinePbmColumns;
+  /** A live PBM entry this change walks away from (PP-l81u), or null. */
+  abandoned: AbandonedListing | null;
+  /**
+   * The listing this change decided to capture (PP-o355.20), or null.
+   *
+   * Decided here and applied AFTER the caller's transaction commits — the
+   * one-lister index makes the listing write the only statement that can
+   * collide, and derived bookkeeping must never discard the edit a human (or an
+   * MCP caller) actually asked for.
+   */
+  autoLink: { lmxId: number } | null;
+}
+
+export type PlanMachinePbmLinkResult =
+  { ok: true; plan: MachinePbmLinkPlan } | { ok: false; message: string };
+
+export interface PlanMachinePbmLinkParams {
+  machineId: string;
+  /** The requested link selection. Listing state is never part of it. */
+  selection: PbmLinkSelection;
+  /** The machine's STORED PBM state, read from the row — never from a request. */
+  stored: StoredPbmLinkState;
+  /**
+   * The machine's presence as it will be AFTER this change — the tie guard
+   * ranks on it, and an edit form can change availability in the same submit.
+   */
+  presenceStatus: MachinePresenceStatus;
+}
+
+/**
+ * Decide a machine's new PinballMap columns, plus the two follow-ups that ride
+ * with them. Pure decision-making: reads the catalog mirror and the stored PBM
+ * snapshot, writes nothing, and opens no transaction (so it is also the right
+ * side of CORE-ARCH-011 for the auto-link lookup).
+ *
+ * `pinballmapListed` is never an input. `resolvePbmLinkColumnsForUpdate` takes
+ * the STORED row and owns the carry-over decision, so no caller can unlist a
+ * machine by leaving an argument out (PP-l81u), and no caller can list one by
+ * putting it in a request body (PP-o355.29).
+ */
+export async function planMachinePbmLink({
+  machineId,
+  selection,
+  stored,
+  presenceStatus,
+}: PlanMachinePbmLinkParams): Promise<PlanMachinePbmLinkResult> {
+  const resolved = await resolvePbmLinkColumnsForUpdate(selection, stored);
+  if (!resolved.ok) {
+    return { ok: false, message: resolved.message };
+  }
+
+  // Only from unlinked/re-targeted → not-yet-listed. A row the carry-over kept
+  // listed is skipped entirely, which is also why this can never produce a heal:
+  // lmx drift belongs to the hourly reconcile pass, not to whoever hit Save.
+  const autoLink =
+    resolved.columns.pinballmapMachineId !== null &&
+    !resolved.columns.pinballmapListed
+      ? await resolveAutoLinkForMachine({
+          machineId,
+          pinballmapMachineId: resolved.columns.pinballmapMachineId,
+          presenceStatus,
+        })
+      : null;
+
+  return {
+    ok: true,
+    plan: {
+      columns: resolved.columns,
+      abandoned: resolved.abandoned,
+      autoLink,
+    },
+  };
+}
+
+/**
+ * Write a planned link change in the CALLER's transaction: the columns, and the
+ * record of any listing the change walks away from.
+ *
+ * Both must commit together — a retitle that lands without its abandonment
+ * record leaves a public PinballMap entry nobody can find (PP-l81u), which is
+ * exactly the defect this pairing closes. Both writes are local, so nothing here
+ * violates CORE-ARCH-011.
+ *
+ * The columns go out as their own UPDATE rather than being spread into a
+ * caller's statement, so the pairing cannot be half-adopted by a new caller.
+ * `machines_owner_not_guest` is the only trigger on this table and it fires only
+ * `OF owner_id, invited_owner_id`, so a second UPDATE in the same transaction
+ * costs a round trip and nothing else.
+ */
+export async function applyMachinePbmLink(
+  tx: DbTransaction,
+  machineId: string,
+  plan: MachinePbmLinkPlan,
+  actorUserId: string
+): Promise<void> {
+  await tx.update(machines).set(plan.columns).where(eq(machines.id, machineId));
+
+  if (plan.abandoned) {
+    await recordAbandonedListing(tx, machineId, plan.abandoned, actorUserId);
+  }
+}
+
+/**
+ * Apply a plan's auto-link, best-effort, AFTER the caller's transaction has
+ * committed. Swallows everything.
+ *
+ * `captureAutoLink` already stands down on the one collision that is expected
+ * (another cabinet of this title took the listing first), but a deadlock, a
+ * dropped connection, or a failure writing the receipt would otherwise surface
+ * as "failed to save" for a change that is already saved — sending the caller to
+ * redo work that landed. Auto-link is derived bookkeeping: it is allowed to not
+ * happen, and the hourly reconcile pass picks it up next time round.
+ */
+export async function captureMachineAutoLink(
+  machineId: string,
+  lmxId: number,
+  actorUserId: string
+): Promise<void> {
+  try {
+    await captureAutoLink({ machineId, lmxId, action: "linked" }, actorUserId);
+  } catch (error) {
+    reportError(error, {
+      action: "captureMachineAutoLink",
+      bestEffort: true,
+      machineId,
+    });
+  }
+}
+
+export interface UpdateMachinePbmLinkParams {
+  machineId: string;
+  actorUserId: string;
+  /** The requested link selection. Listing state is never part of it. */
+  selection: PbmLinkSelection;
+}
+
+export type UpdateMachinePbmLinkResult =
+  | { ok: true; columns: MachinePbmColumns; previous: MachinePbmColumns }
+  | {
+      ok: false;
+      reason: "invalid" | "not_found" | "conflict";
+      message: string;
+    };
+
+/** The PBM + presence state a plan was decided against, for the CAS check. */
+type PbmLinkBasis = StoredPbmLinkState & {
+  presenceStatus: MachinePresenceStatus;
+  pinballmapExcluded: boolean;
+  pinballmapExcludedReason: string | null;
+};
+
+const PBM_LINK_COLUMNS = {
+  pinballmapMachineId: true,
+  pinballmapExcluded: true,
+  pinballmapExcludedReason: true,
+  pinballmapListed: true,
+  pinballmapLmxId: true,
+  manufacturer: true,
+  year: true,
+  opdbId: true,
+  ipdbId: true,
+} as const;
+
+/** How many times a losing CAS attempt re-plans before giving up. */
+const PBM_LINK_MAX_ATTEMPTS = 3;
+
+function pbmLinkBasisUnchanged(a: PbmLinkBasis, b: PbmLinkBasis): boolean {
+  return (
+    a.pinballmapMachineId === b.pinballmapMachineId &&
+    a.pinballmapListed === b.pinballmapListed &&
+    a.pinballmapLmxId === b.pinballmapLmxId &&
+    a.presenceStatus === b.presenceStatus &&
+    // The exclusion pair is in the basis because {@link carryExcludedReason}
+    // reads it. Anything the plan is derived from has to be compared, or the
+    // CAS would wave through a write built on a value that has since moved.
+    a.pinballmapExcluded === b.pinballmapExcluded &&
+    a.pinballmapExcludedReason === b.pinballmapExcludedReason
+  );
+}
+
+/**
+ * Keep a stored exclusion reason when the caller re-states the exclusion without
+ * one.
+ *
+ * `resolvePbmLinkColumnsForUpdate` writes `reason ?? null`, which is right for
+ * the edit form — that form always posts the field, so an absent one means a
+ * human emptied the box. An MCP caller re-confirming an exclusion it did not
+ * author has no such intent, and the fleet pass (PP-h059) does exactly that
+ * across the whole floor: `{ machine: "UM", pinballmapExcluded: true }` would
+ * have nulled "homebrew — one-off cabinet" on every machine it touched. Same
+ * shape as the listing carry-over, and the same rule behind it — a forgotten
+ * argument must not destroy stored state (CORE-ARCH-012).
+ *
+ * An explicit empty string is still a clear: it is a value the caller sent.
+ */
+function carryExcludedReason(
+  selection: PbmLinkSelection,
+  stored: Pick<PbmLinkBasis, "pinballmapExcluded" | "pinballmapExcludedReason">
+): PbmLinkSelection {
+  if (
+    selection.pinballmapExcluded !== true ||
+    selection.pinballmapExcludedReason !== undefined ||
+    !stored.pinballmapExcluded ||
+    stored.pinballmapExcludedReason === null
+  ) {
+    return selection;
+  }
+  return {
+    ...selection,
+    pinballmapExcludedReason: stored.pinballmapExcludedReason,
+  };
+}
+
+/**
+ * Change a machine's PinballMap link and nothing else — the focused slice of
+ * `updateMachineAction`'s PBM logic, for the MCP `set_machine_pinballmap` tool.
+ *
+ * Runs the same three steps the edit page runs, in the same order, over the same
+ * seam: plan, apply in a transaction, then capture any auto-link post-commit.
+ * Authorization stays in the caller (`machines.pinballmap.link`).
+ *
+ * **Reads its own basis, and writes it back under compare-and-set.** The plan
+ * has to be decided before the transaction opens — it reads the catalog mirror
+ * and ranks auto-link candidates, and neither belongs inside a held row lock —
+ * so the snapshot it planned against can go stale in between. The hourly
+ * reconcile pass is the writer that does it: it sets `pinballmapListed` true and
+ * captures an lmx, and because {@link applyMachinePbmLink} writes the whole
+ * column set, a plan made from the pre-reconcile snapshot would put `listed:
+ * false, lmxId: null` back and — having seen no listing — record no abandonment,
+ * leaving a live pinballmap.com entry nobody tracks. That is the PP-l81u defect
+ * exactly. The fleet linking pass (PP-h059) drives this tool across ~100
+ * machines in one session, so the window is wide open in practice, not
+ * theoretically.
+ *
+ * The `FOR UPDATE` re-read inside the transaction closes it: whoever holds the
+ * lock sees the other writer's committed state, and a basis that moved means the
+ * plan is void, so it is thrown away and re-planned rather than written. Same
+ * read-modify-write serialization `editStoredSnapshot` uses in
+ * `m/pinballmap-actions.ts`, for the same reason.
+ *
+ * A missing row is reported as `not_found` rather than a success payload
+ * describing a link that was never stored (CORE-ARCH-012). An exclusion
+ * re-stated without a reason keeps the stored one ({@link carryExcludedReason}).
+ *
+ * Returns the machine's PBM columns AS STORED after everything settled, not as
+ * planned: an auto-link that lands sets `pinballmapListed`/`pinballmapLmxId`
+ * outside the plan, and reporting the planned values would tell the caller the
+ * machine is unlisted while the row says otherwise (CORE-ARCH-012). `previous`
+ * comes from the locked read, so it describes the state this change actually
+ * replaced — not whatever the caller happened to read earlier.
+ */
+export async function updateMachinePbmLink({
+  machineId,
+  actorUserId,
+  selection,
+}: UpdateMachinePbmLinkParams): Promise<UpdateMachinePbmLinkResult> {
+  for (let attempt = 1; ; attempt++) {
+    const basisRow = await db.query.machines.findFirst({
+      where: eq(machines.id, machineId),
+      columns: { ...PBM_LINK_COLUMNS, presenceStatus: true },
+    });
+    if (!basisRow) {
+      return { ok: false, reason: "not_found", message: MACHINE_GONE_MESSAGE };
+    }
+
+    const planned = await planMachinePbmLink({
+      machineId,
+      selection: carryExcludedReason(selection, basisRow),
+      stored: {
+        pinballmapMachineId: basisRow.pinballmapMachineId,
+        pinballmapListed: basisRow.pinballmapListed,
+        pinballmapLmxId: basisRow.pinballmapLmxId,
+      },
+      presenceStatus: basisRow.presenceStatus,
+    });
+    if (!planned.ok) {
+      return { ok: false, reason: "invalid", message: planned.message };
+    }
+
+    const outcome = await db.transaction(async (tx) => {
+      const [locked] = await tx
+        .select({
+          pinballmapMachineId: machines.pinballmapMachineId,
+          pinballmapExcluded: machines.pinballmapExcluded,
+          pinballmapExcludedReason: machines.pinballmapExcludedReason,
+          pinballmapListed: machines.pinballmapListed,
+          pinballmapLmxId: machines.pinballmapLmxId,
+          manufacturer: machines.manufacturer,
+          year: machines.year,
+          opdbId: machines.opdbId,
+          ipdbId: machines.ipdbId,
+          presenceStatus: machines.presenceStatus,
+        })
+        .from(machines)
+        .where(eq(machines.id, machineId))
+        .for("update");
+      if (!locked) return { state: "gone" } as const;
+      if (!pbmLinkBasisUnchanged(locked, basisRow)) {
+        return { state: "stale" } as const;
+      }
+
+      await applyMachinePbmLink(tx, machineId, planned.plan, actorUserId);
+      const { presenceStatus: _presence, ...previous } = locked;
+      return { state: "applied", previous } as const;
+    });
+
+    if (outcome.state === "gone") {
+      return { ok: false, reason: "not_found", message: MACHINE_GONE_MESSAGE };
+    }
+    if (outcome.state === "stale") {
+      if (attempt >= PBM_LINK_MAX_ATTEMPTS) {
+        return {
+          ok: false,
+          reason: "conflict",
+          message:
+            "This machine's Pinball Map state kept changing while the update was being applied. Nothing was written — read it back and try again.",
+        };
+      }
+      continue;
+    }
+
+    return finishMachinePbmLink(
+      machineId,
+      actorUserId,
+      planned.plan,
+      outcome.previous
+    );
+  }
+}
+
+const MACHINE_GONE_MESSAGE =
+  "That machine no longer exists — it was deleted while the update was being applied. Nothing was written.";
+
+/**
+ * The post-commit half: capture any auto-link, then report the columns AS
+ * STORED. Split out only so {@link updateMachinePbmLink}'s retry loop has a
+ * single exit.
+ */
+async function finishMachinePbmLink(
+  machineId: string,
+  actorUserId: string,
+  plan: MachinePbmLinkPlan,
+  previous: MachinePbmColumns
+): Promise<UpdateMachinePbmLinkResult> {
+  if (plan.autoLink === null) {
+    return { ok: true, columns: plan.columns, previous };
+  }
+
+  await captureMachineAutoLink(machineId, plan.autoLink.lmxId, actorUserId);
+
+  const row = await db.query.machines.findFirst({
+    where: eq(machines.id, machineId),
+    columns: PBM_LINK_COLUMNS,
+  });
+  // The row was updated moments ago in a committed transaction, so a miss means
+  // it was deleted concurrently. Fall back to the planned columns rather than
+  // throwing away a change that did commit.
+  return { ok: true, columns: row ?? plan.columns, previous };
 }
 
 export interface UpdateMachineNameParams {
