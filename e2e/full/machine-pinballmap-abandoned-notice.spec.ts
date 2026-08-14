@@ -121,15 +121,22 @@ test.describe("PinballMap abandoned-listing notice (PP-l81u)", () => {
       // which is what keeps the notice from reading as a bug about the wrong
       // game.
       //
-      // "Unsynced" is the CORRECT expectation here, not a compromise: no test
-      // ever fetches a lineup from pinballmap.com (CORE-PBM-001 /
-      // CORE-TEST-006), so `pinballmap_state` carries no snapshot and PinPoint
-      // genuinely has no evidence either way. Asserting it is worth a line —
-      // "Not listed" in this exact situation is the lie the control this
-      // replaces told APC's entire fleet, and it would be an easy one to
-      // reintroduce by treating a missing snapshot as an empty lineup.
+      // The seeded snapshot (supabase/seed-pinballmap-state.ts) is a captured
+      // fixture, never a live fetch — CORE-PBM-001 / CORE-TEST-006 still hold.
+      // This machine's NEW title is a run-scoped id in the 900,000,000 range
+      // that no capture contains, so with a lineup in hand PinPoint can say
+      // plainly that the title is not on it.
+      //
+      // Worth the line because "not listed" is only honest when a snapshot
+      // backs it. Before the seed existed this asserted the `unsynced` copy for
+      // the same machine, and both readings were right for their database —
+      // which is the distinction the old control collapsed when it answered
+      // "Not listed" for APC's entire listed fleet. Treating an ABSENT snapshot
+      // as an empty lineup would make this assertion pass for the wrong reason,
+      // so it pairs with the unit coverage in status.test.ts rather than
+      // standing alone.
       await expect(page.getByTestId("pbm-listing-status")).toContainText(
-        "hasn't read Pinball Map's lineup yet"
+        "Not on our location's lineup"
       );
 
       // The other half of the trail: Info's warning is what sends a reader

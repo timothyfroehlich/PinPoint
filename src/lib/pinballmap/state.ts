@@ -1,5 +1,5 @@
 import "server-only";
-import { eq, sql } from "drizzle-orm";
+import { eq, isNull, lt, sql } from "drizzle-orm";
 import { db } from "~/server/db";
 import { pinballmapState } from "~/server/db/schema";
 import { getPinballMapClient } from "./client";
@@ -106,13 +106,30 @@ async function stampSyncAttempt(
   }
 
   const threshold = new Date(attemptAt.getTime() - guardIntervalMs);
+  // `or(isNull(...), lt(...))` rather than an `sql` template, because a bare
+  // Date interpolated into `sql` is bound with NO type information: Drizzle
+  // applies a column's mapper only where it knows the column, which covers
+  // `values`/`set` but not an operand inside a raw fragment. postgres.js then
+  // gets a Date it cannot encode and throws `The "string" argument must be of
+  // type string or an instance of Buffer` — before the statement is ever sent.
+  //
+  // That threw on every MANUAL sync from 2026-07-21 (PP-hbi0, #1712) until this
+  // fix. Cron was unaffected and stayed green, because `guardIntervalMs === null`
+  // takes the unconditional branch above and never binds a threshold — which is
+  // why three weeks of hourly syncs succeeded while "Sync now" always failed.
+  // The comparison is identical; only the binding changes. (PP-o355.21.)
   const claimed = await db
     .insert(pinballmapState)
     .values(values)
     .onConflictDoUpdate({
       target: pinballmapState.id,
       set,
-      setWhere: sql`${pinballmapState.lastSyncAttemptAt} is null or ${pinballmapState.lastSyncAttemptAt} < ${threshold}`,
+      // `sql` wrapping two typed operands, not `or(...)`: under
+      // `exactOptionalPropertyTypes` Drizzle's `or()` is `SQL | undefined`
+      // (it accepts a spread that could be empty) and `setWhere` will not take
+      // the undefined. `lt()` still applies the column's timestamp mapper,
+      // which is the entire point of the change.
+      setWhere: sql`${isNull(pinballmapState.lastSyncAttemptAt)} or ${lt(pinballmapState.lastSyncAttemptAt, threshold)}`,
     })
     .returning({ id: pinballmapState.id });
   return claimed.length > 0;

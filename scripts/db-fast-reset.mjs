@@ -69,6 +69,11 @@ async function fastReset() {
       "pnpm run db:_seed-timeline-backfill",
       "pnpm run db:_seed-timeline-demo",
       "pnpm run db:_seed-pinballmap-catalog",
+      // Unlike the catalog, `pinballmap_state` IS reached by the TRUNCATE
+      // above — `machines` is truncated CASCADE and the state seed writes
+      // machine link columns — so this one is here for the original PP-tn6t
+      // reason as well as the never-seeded one.
+      "pnpm run db:_seed-pinballmap-state",
     ];
     for (const cmd of seedCommands) {
       execSync(cmd, { stdio: "inherit" });
