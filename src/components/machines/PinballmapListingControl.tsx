@@ -195,104 +195,122 @@ export function PinballmapListingControl({
     />
   );
 
+  // Which actions appear is a permission question first and a state question
+  // second — a member looking at a machine they don't own sees the status and
+  // nothing else. Computed up front so the actions row can be omitted entirely
+  // rather than rendered empty: an empty flex row is invisible but still takes
+  // the `space-y` margin above it, which is half of why this block used to
+  // look padded for no reason.
+  const actions = [
+    state === "not_listed" && canWriteOut,
+    state === "unclaimed_on_pbm" && canLink,
+    state === "listed" && canWriteOut,
+    state === "missing_on_pbm" && (canLink || canWriteOut),
+  ].some(Boolean);
+
   return (
-    <section
-      aria-label="Pinball Map listing"
-      className="space-y-3 rounded-md border border-outline bg-surface p-3"
-      data-testid="pbm-listing-control"
-    >
-      <div className="flex items-start gap-2">
+    // No card, no border, no background. This is one sentence and sometimes a
+    // button; a bordered box around that reads as a component when it is really
+    // a line of prose, and it stacked a second frame directly above the
+    // abandoned-listing Alert that follows (Tim, 2026-08-14: "the box is too
+    // big and misaligned, why not just a single line of text?"). The section
+    // heading and divider above already scope it.
+    <section aria-label="Pinball Map listing" data-testid="pbm-listing-control">
+      {/* `items-center`, not `items-start`. The copy is a single line at every
+          width the rail allows, so top-aligning put the icon visibly above the
+          text's optical centre. It wraps to two lines only on very narrow
+          phones, where a centred icon is still the lesser problem. */}
+      <div className="flex items-center gap-2">
         <StateIcon state={state} />
         <p className="text-sm text-foreground" data-testid="pbm-listing-status">
           {statusCopy(state, listed)}
         </p>
       </div>
 
-      {/* One row of actions, or none. Which ones appear is a permission
-          question first and a state question second — a member looking at a
-          machine they don't own sees the status and nothing else. */}
-      <div className="flex flex-wrap gap-2">
-        {state === "not_listed" && canWriteOut ? addButton : null}
+      {actions ? (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {state === "not_listed" && canWriteOut ? addButton : null}
 
-        {state === "unclaimed_on_pbm" && canLink ? (
-          // No confirm: this writes nothing to Pinball Map. It records the
-          // listing they already show, which is what auto-link would have done
-          // on its own if two same-title cabinets hadn't tied.
-          <Button
-            variant="outline"
-            size="sm"
-            loading={pending}
-            data-testid="pbm-listing-claim"
-            onClick={() => {
-              run(linkPinballmapEntryAction);
-            }}
-          >
-            Claim this listing
-          </Button>
-        ) : null}
+          {state === "unclaimed_on_pbm" && canLink ? (
+            // No confirm: this writes nothing to Pinball Map. It records the
+            // listing they already show, which is what auto-link would have done
+            // on its own if two same-title cabinets hadn't tied.
+            <Button
+              variant="outline"
+              size="sm"
+              loading={pending}
+              data-testid="pbm-listing-claim"
+              onClick={() => {
+                run(linkPinballmapEntryAction);
+              }}
+            >
+              Claim this listing
+            </Button>
+          ) : null}
 
-        {state === "listed" && canWriteOut ? (
-          <ConfirmButton
-            testId="pbm-listing-remove"
-            pending={pending}
-            onConfirm={() => {
-              run(unlistMachineFromPinballMapAction);
-            }}
-            copy={{
-              title: "Remove from Pinball Map?",
-              body: `This takes ${game} off our location's lineup on pinballmap.com. Anyone looking us up will stop seeing it.`,
-              action: "Remove from Pinball Map",
-              destructive: true,
-            }}
-            trigger={
-              <Button
-                variant="outline"
-                size="sm"
-                loading={pending}
-                data-testid="pbm-listing-remove"
-              >
-                Remove from Pinball Map
-              </Button>
-            }
-          />
-        ) : null}
+          {state === "listed" && canWriteOut ? (
+            <ConfirmButton
+              testId="pbm-listing-remove"
+              pending={pending}
+              onConfirm={() => {
+                run(unlistMachineFromPinballMapAction);
+              }}
+              copy={{
+                title: "Remove from Pinball Map?",
+                body: `This takes ${game} off our location's lineup on pinballmap.com. Anyone looking us up will stop seeing it.`,
+                action: "Remove from Pinball Map",
+                destructive: true,
+              }}
+              trigger={
+                <Button
+                  variant="outline"
+                  size="sm"
+                  loading={pending}
+                  data-testid="pbm-listing-remove"
+                >
+                  Remove from Pinball Map
+                </Button>
+              }
+            />
+          ) : null}
 
-        {state === "missing_on_pbm" ? (
-          <>
-            {canLink ? (
-              <ConfirmButton
-                testId="pbm-listing-accept"
-                pending={pending}
-                onConfirm={() => {
-                  run(acceptMissingPinballmapListingAction);
-                }}
-                copy={{
-                  title: "Accept the removal?",
-                  body: "This only updates PinPoint to agree with Pinball Map. Nothing is sent to them — the entry is already gone from their lineup.",
-                  action: "Accept",
-                }}
-                trigger={
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    loading={pending}
-                    data-testid="pbm-listing-accept"
-                  >
-                    Accept
-                  </Button>
-                }
-              />
-            ) : null}
-            {/* Same action as `not_listed`, offered as the other resolution:
+          {state === "missing_on_pbm" ? (
+            <>
+              {canLink ? (
+                <ConfirmButton
+                  testId="pbm-listing-accept"
+                  pending={pending}
+                  onConfirm={() => {
+                    run(acceptMissingPinballmapListingAction);
+                  }}
+                  copy={{
+                    title: "Accept the removal?",
+                    body: "This only updates PinPoint to agree with Pinball Map. Nothing is sent to them — the entry is already gone from their lineup.",
+                    action: "Accept",
+                  }}
+                  trigger={
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      loading={pending}
+                      data-testid="pbm-listing-accept"
+                    >
+                      Accept
+                    </Button>
+                  }
+                />
+              ) : null}
+              {/* Same action as `not_listed`, offered as the other resolution:
                 put it back rather than agree it is gone. */}
-            {canWriteOut ? addButton : null}
-          </>
-        ) : null}
-      </div>
+              {canWriteOut ? addButton : null}
+            </>
+          ) : null}
+        </div>
+      ) : null}
 
       {error !== null ? (
         <p
-          className="text-xs text-destructive-text"
+          className="mt-2 text-xs text-destructive-text"
           role="alert"
           data-testid="pbm-listing-error"
         >
