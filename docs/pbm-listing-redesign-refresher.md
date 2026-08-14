@@ -1,18 +1,14 @@
-# Pinball Map listing + machine edit page — morning refresher
+# Pinball Map listing + machine edit page — settled design spec
 
-_Written 2026-07-22 night, after three sessions of design work. Read this after compacting._
+_Canonical spec, not session scratch._ Settled across three design sessions ending 2026-07-22, amended 2026-07-23 (§6a) and 2026-07-25 (§7). **PP-o355.7 / .15 / .19 / .20 / .21 / .22 cite this file by path**, so amend it in place rather than superseding it elsewhere (AGENTS.md §8). Current build state is §11.
 
 ---
 
-## 1. The thing that changed under us
+## 1. What this redesigns
 
 **PR #1683 merged on 2026-07-21** — the as-built read-side listing control (Connect / Verify / Reconnect, "Not listed" badges, location-page links). Bead **PP-o355.12 is closed** ("Shipped in #1683").
 
-That control is the one we spent these sessions redesigning. So:
-
-- This work is now a **redesign of shipped code**, not a pre-merge rework.
-- It needs **its own bead(s)** and a **new branch off current main**.
-- The old worktree (`.claude/worktrees/pbm-list-unlist`, branch `feat/pbm-list-unlist-read-PP-o355.12`) is stale — fine for reading artifacts, wrong place to build.
+That control is what this spec replaces, so everything below is a **redesign of merged code**, not a pre-merge rework.
 
 ---
 
@@ -208,20 +204,16 @@ Edit «Machine Name»
 
 ---
 
-## 11. Next steps
+## 11. Build state (as of 2026-08-11)
 
-1. File two beads: **(a)** Pinball Map listing redesign against merged #1683, **(b)** edit modal → page conversion. Probably page first — the listing control's final shape assumes it lives on a page.
-2. New branch off **current** `origin/main` (not the stale worktree branch).
-3. Implementation notes: rebuild the control from `derivePbmMachineStatus`; `linkPinballmapEntryAction` becomes the auto-link path (sync + title-save); add the local Accept/unlink flag-flip; delete the verify action; `reconcileAfterSync` gains the tie check + timeline receipt.
+**Merged:**
 
----
+- **PP-o355.19** — machine edit modal → full-page Manage tab (§8). PR #1762, 2026-08-01. Landed first because the listing control's final shape assumes it lives on a page.
+- **PP-o355.15** — the tie rule (§7) as `resolveListingHolder()` / `findListingTies()`, plus the `23505` backstop on every listing write path. PR #1798.
+- **PP-o355.20** — auto-link + lmx self-heal, server-side (§5 "Key transitions"). `linkPinballmapEntryAction` became the auto-link path (sync + title-save) and `reconcileAfterSync` gained the tie check + timeline receipt. PR #1810.
 
-## 12. Housekeeping
+**Open:**
 
-- **Artifacts** live in `.claude/worktrees/pbm-list-unlist/.superpowers/brainstorm/*/content/` — canonical ones are `pbm-state-machine-v2.html`, `edit-page-v10.html`, `availability-matrix-v2.html`, `dupe-rank.html`. Restart the viewer with:
-  ```
-  ~/.claude/plugins/cache/claude-plugins-official/superpowers/6.1.1/skills/brainstorming/scripts/start-server.sh \
-    --project-dir /Users/froeht/Code/PinPoint/.claude/worktrees/pbm-list-unlist --idle-timeout-minutes 1440
-  ```
-  It reuses port 63524, so an open tab reconnects itself. (It auto-exits after idle — that's why it kept dying overnight at the old 4-hour default.)
-- **Heads-up from a peer session (PP-nw4k):** `origin/main`'s `pnpm-lock.yaml` has duplicate `@types/node@26.1.1` keys. pnpm rejects it, warns "Ignoring broken lockfile", and re-resolves from scratch — silently downgrading `@supabase/supabase-js`, tiptap and `@sentry/nextjs`, undoing the Dependabot bumps. Suspected cause of E2E `auth.setup` failures in fresh worktrees. **Don't commit lockfile churn you didn't cause.** Worth resolving before starting build work here.
+- **PP-o355.21** — rebuild the listing control on the edit page from `derivePbmMachineStatus` (§2, §4, §5, §8). Still carries the two pieces nothing else has done: the local Accept/unlink flag-flip out of MISSING_ON_PBM, and deleting `verifyPinballmapLinkAction` (still present in `src/app/(app)/m/pinballmap-actions.ts`).
+- **PP-o355.22** — availability × listing validity, advise / invalid (§6).
+- **PP-o355.7** — the dense fleet table that now **replaces** the control room this spec refers to; it consumes `findListingTies()` for the §7 reportable condition and the §6 hard flags. Read that bead before building anything §6/§7 calls "the control room".
