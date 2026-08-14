@@ -22,6 +22,9 @@ AS $$
 DECLARE
   v_invited_user_id uuid;
   v_role text;
+  v_first_name text;
+  v_last_name text;
+  v_derived boolean;
 BEGIN
   -- Handle legacy invited_users (if any exist) first to get role
   -- Find matching invited user by email
@@ -30,13 +33,31 @@ BEGIN
   WHERE lower(email) = lower(NEW.email)
   LIMIT 1;
 
+  -- Derive a usable name (PP-if48). This file re-defines handle_new_user on
+  -- every `supabase db reset`, AFTER the drizzle migrations have run — so if
+  -- this copy drifts back to COALESCE(...->>'first_name', ''), it silently
+  -- undoes 0064 on every local database while prod stays correct.
+  -- `derive_profile_name` is created by drizzle/0064.
+  SELECT d.first_name, d.last_name, d.derived
+  INTO v_first_name, v_last_name, v_derived
+  FROM public.derive_profile_name(NEW.raw_user_meta_data, NEW.email::text) d;
+
+  -- An invited user was named by the admin who invited them; that beats anything
+  -- we could derive from the provider, but not a name the user typed themselves.
+  IF v_invited_user_id IS NOT NULL AND v_derived THEN
+    SELECT iu.first_name, iu.last_name
+    INTO v_first_name, v_last_name
+    FROM public.invited_users iu
+    WHERE iu.id = v_invited_user_id;
+  END IF;
+
   -- Create user profile
   INSERT INTO public.user_profiles (id, email, first_name, last_name, avatar_url, role)
   VALUES (
     NEW.id,
     lower(NEW.email),
-    COALESCE(NEW.raw_user_meta_data->>'first_name', ''),
-    COALESCE(NEW.raw_user_meta_data->>'last_name', ''),
+    v_first_name,
+    v_last_name,
     NEW.raw_user_meta_data->>'avatar_url',
     COALESCE(v_role, 'guest') -- Use invited role if exists, else default to guest
   );

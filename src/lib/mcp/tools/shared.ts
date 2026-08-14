@@ -191,10 +191,6 @@ export interface ResolvedOwner {
   invitedOwnerId: string | null;
 }
 
-function fullName(user: { firstName: string; lastName: string }): string {
-  return `${user.firstName} ${user.lastName}`;
-}
-
 /**
  * A profile matched by name, with the role its caller may or may not gate on.
  *
@@ -205,13 +201,20 @@ function fullName(user: { firstName: string; lastName: string }): string {
  */
 interface NamedProfile {
   id: string;
-  firstName: string;
-  lastName: string;
+  name: string;
   role: UserRole;
 }
 
 /**
  * Case-insensitive exact match on the full name ("First Last").
+ *
+ * Matches the generated `name` column rather than rebuilding `first || ' ' ||
+ * last` here. Those two stopped being the same string in PP-if48: `name` is
+ * `btrim(first_name || ' ' || last_name)`, and a user with no surname — which
+ * is now legal, and is what every OAuth fallback produces — concatenates to
+ * `"presidentnick "` with a trailing space. Comparing against that would miss
+ * exactly the single-name users this whole change exists to make findable.
+ * `btrim` on the input for the same reason, from the other side.
  *
  * Capped at 5: the only use for more than one match is naming the candidates in
  * the ambiguity error, and an unbounded fetch would trade a longer message for a
@@ -219,15 +222,15 @@ interface NamedProfile {
  */
 function findProfilesByFullName(value: string): Promise<NamedProfile[]> {
   return db.query.userProfiles.findMany({
-    where: sql`lower(${userProfiles.firstName} || ' ' || ${userProfiles.lastName}) = lower(${value})`,
-    columns: { id: true, firstName: true, lastName: true, role: true },
+    where: sql`lower(${userProfiles.name}) = lower(btrim(${value}))`,
+    columns: { id: true, name: true, role: true },
     limit: 5,
   });
 }
 
 /** Same name, several people — name the candidates so the caller can pick one. */
 function ambiguousName(ref: string, matches: NamedProfile[]): McpToolError {
-  const candidates = matches.map((m) => `${fullName(m)} (${m.id})`).join(", ");
+  const candidates = matches.map((m) => `${m.name} (${m.id})`).join(", ");
   return new McpToolError(
     "invalid",
     `Multiple members named "${ref}": ${candidates}. Pass the specific UUID.`
@@ -566,19 +569,21 @@ export async function getOwnerNamesByMachine(
     activeIds.length
       ? db.query.userProfiles.findMany({
           where: inArray(userProfiles.id, activeIds),
-          columns: { id: true, firstName: true, lastName: true },
+          columns: { id: true, name: true },
         })
       : Promise.resolve([]),
     invitedIds.length
       ? db.query.invitedUsers.findMany({
           where: inArray(invitedUsers.id, invitedIds),
-          columns: { id: true, firstName: true, lastName: true },
+          columns: { id: true, name: true },
         })
       : Promise.resolve([]),
   ]);
 
-  const activeNames = new Map(activeRows.map((u) => [u.id, fullName(u)]));
-  const invitedNames = new Map(invitedRows.map((u) => [u.id, fullName(u)]));
+  // The generated column, not a re-concatenation — it is btrimmed, so a member
+  // with no surname does not come back with a trailing space (PP-if48).
+  const activeNames = new Map(activeRows.map((u) => [u.id, u.name]));
+  const invitedNames = new Map(invitedRows.map((u) => [u.id, u.name]));
 
   return new Map(
     rows.map((r) => {

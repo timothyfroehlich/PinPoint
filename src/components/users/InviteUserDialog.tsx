@@ -84,7 +84,10 @@ function InviteUserForm({
     // are always created with the member role.
     const newUser: OwnerSelectUser = {
       id: state.value.userId,
-      name: `${state.value.firstName} ${state.value.lastName}`,
+      // Trimmed to match the generated `name` column, which is
+      // btrim(first_name || ' ' || last_name) — a member with no surname would
+      // otherwise show a trailing space here but not after a refresh (PP-if48).
+      name: `${state.value.firstName} ${state.value.lastName}`.trim(),
       lastName: state.value.lastName,
       status: "invited",
       machineCount: 0,
@@ -124,18 +127,13 @@ function InviteUserForm({
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="invite-lastName">
-            Last Name{" "}
-            <span aria-hidden="true" className="text-destructive">
-              *
-            </span>
-          </Label>
+          {/* Not required: only a first name is (PP-if48). */}
+          <Label htmlFor="invite-lastName">Last Name</Label>
           <Input
             id="invite-lastName"
             name="lastName"
             type="text"
             autoComplete="family-name"
-            required
             enterKeyHint="next"
             maxLength={50}
           />

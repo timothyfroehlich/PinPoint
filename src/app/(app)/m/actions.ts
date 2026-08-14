@@ -395,7 +395,7 @@ export async function createMachineAction(
           {
             assignee: {
               id: activeOwner.id,
-              name: `${activeOwner.firstName} ${activeOwner.lastName}`,
+              name: activeOwner.name,
               role: "guest",
               type: "active",
             },
@@ -420,7 +420,7 @@ export async function createMachineAction(
           {
             assignee: {
               id: invitedOwner.id,
-              name: `${invitedOwner.firstName} ${invitedOwner.lastName}`,
+              name: invitedOwner.name,
               role: "guest",
               type: "invited",
             },
@@ -927,7 +927,7 @@ export async function updateMachineAction(
             {
               assignee: {
                 id: activeOwner.id,
-                name: `${activeOwner.firstName} ${activeOwner.lastName}`,
+                name: activeOwner.name,
                 role: "guest",
                 type: "active",
               },
@@ -953,7 +953,7 @@ export async function updateMachineAction(
             {
               assignee: {
                 id: invitedOwner.id,
-                name: `${invitedOwner.firstName} ${invitedOwner.lastName}`,
+                name: invitedOwner.name,
                 role: "guest",
                 type: "invited",
               },

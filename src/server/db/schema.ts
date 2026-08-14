@@ -57,9 +57,19 @@ export const userProfiles = pgTable(
     id: uuid("id").primaryKey(),
     email: citext("email").notNull().unique(),
     firstName: text("first_name").notNull(),
+    /**
+     * Optional by design: only a first name is required (PP-if48). Plenty of
+     * people go by one name, and every OAuth fallback in
+     * `derive_profile_name()` produces a single token.
+     */
     lastName: text("last_name").notNull(),
+    /**
+     * `btrim` matters: with `lastName` empty this would otherwise be
+     * "Furgers " with a trailing space, and every owner/assignee picker
+     * filters on this column.
+     */
     name: text("name")
-      .generatedAlwaysAs(sql`first_name || ' ' || last_name`)
+      .generatedAlwaysAs(sql`btrim(first_name || ' ' || last_name)`)
       .notNull(),
     avatarUrl: text("avatar_url"),
     bio: text("bio"),
@@ -81,6 +91,15 @@ export const userProfiles = pgTable(
       "user_profiles_role_check",
       sql`role IN ('guest', 'member', 'technician', 'admin')`
     ),
+    /**
+     * NOT NULL never forbade '', which is how every OAuth signup landed
+     * nameless (PP-if48). `derive_profile_name()` guarantees a non-empty first
+     * name, so this can never fail a signup.
+     */
+    firstNameNotBlank: check(
+      "user_profiles_first_name_not_blank",
+      sql`btrim(first_name) <> ''`
+    ),
   })
 );
 
@@ -97,7 +116,7 @@ export const invitedUsers = pgTable(
     firstName: text("first_name").notNull(),
     lastName: text("last_name").notNull(),
     name: text("name")
-      .generatedAlwaysAs(sql`first_name || ' ' || last_name`)
+      .generatedAlwaysAs(sql`btrim(first_name || ' ' || last_name)`)
       .notNull(),
     email: citext("email").notNull().unique(),
     role: text("role", { enum: ["guest", "member", "technician", "admin"] })
@@ -112,6 +131,10 @@ export const invitedUsers = pgTable(
     roleCheck: check(
       "invited_users_role_check",
       sql`role IN ('guest', 'member', 'technician', 'admin')`
+    ),
+    firstNameNotBlank: check(
+      "invited_users_first_name_not_blank",
+      sql`btrim(first_name) <> ''`
     ),
   })
 );

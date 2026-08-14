@@ -36,11 +36,13 @@ export const signupSchema = z
       .trim()
       .min(1, "First name is required")
       .max(50, "First name must be less than 50 characters"),
+    // Optional: only a first name is required (PP-if48). Plenty of people go by
+    // one name, and OAuth signups routinely yield a single token.
     lastName: z
       .string()
       .trim()
-      .min(1, "Last name is required")
-      .max(50, "Last name must be less than 50 characters"),
+      .max(50, "Last name must be less than 50 characters")
+      .default(""),
     email: z
       .string()
       .email("Please enter a valid email address")
