@@ -6,7 +6,7 @@
  * project matrix — catches overflow at both desktop and mobile viewports.
  */
 
-import { test } from "@playwright/test";
+import { test } from "../support/fixtures.js";
 import {
   assertNoHorizontalOverflow,
   ensureLoggedIn,

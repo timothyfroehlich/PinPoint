@@ -8,7 +8,7 @@
  * per the permission model: machines.view is public, machines.create is admin-only.
  */
 
-import { test, expect } from "@playwright/test";
+import { test, expect } from "../support/fixtures.js";
 import { seededMachines } from "../support/constants.js";
 
 test.describe("Machines Public Access", () => {

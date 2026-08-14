@@ -24,7 +24,7 @@
  * Reassign-flow selectors are stable per PP-3hb (issues-reassign-machine.spec.ts).
  */
 
-import { test, expect } from "@playwright/test";
+import { test, expect } from "../support/fixtures.js";
 import { openDropdownMenu } from "../support/actions.js";
 import { STORAGE_STATE } from "../support/auth-state.js";
 import { cleanupTestEntities } from "../support/cleanup.js";
