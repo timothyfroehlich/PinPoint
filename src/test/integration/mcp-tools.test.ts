@@ -21,7 +21,9 @@ import {
   issueComments,
   issues,
   machines,
+  pinballmapAbandonedListings,
   pinballmapCatalog,
+  pinballmapState,
   timelineEvents,
   userProfiles,
 } from "~/server/db/schema";
@@ -67,6 +69,12 @@ import type { McpMachinePinballmap } from "~/lib/mcp/tools/pinballmap-block";
 import { runSetMachineAvailability } from "~/lib/mcp/tools/set-machine-availability";
 import { runSetMachineName } from "~/lib/mcp/tools/set-machine-name";
 import { runSetMachineOwner } from "~/lib/mcp/tools/set-machine-owner";
+import {
+  runSetMachinePinballmap,
+  setMachinePinballmapSchema,
+} from "~/lib/mcp/tools/set-machine-pinballmap";
+import { updateMachineSchema } from "~/app/(app)/m/schemas";
+import { updateMachinePbmLink } from "~/services/machines";
 import { runUpdateIssue } from "~/lib/mcp/tools/update-issue";
 import {
   McpToolError,
@@ -1265,6 +1273,563 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
     });
   });
 
+  describe("set_machine_pinballmap (PP-u4ab.12)", () => {
+    /**
+     * A lineup the local snapshot already holds. Auto-link reads this table and
+     * never pinballmap.com (CORE-PBM-001, CORE-TEST-006); `enabled` is
+     * load-bearing, since save-time auto-link stands down while the integration
+     * is off.
+     */
+    async function seedLineup(
+      rows: { id: number; machineId: number }[]
+    ): Promise<void> {
+      const db = await getTestDb();
+      await db.insert(pinballmapState).values({
+        id: "singleton",
+        locationId: 26454,
+        enabled: true,
+        lastSyncStatus: "ok",
+        snapshotJson: {
+          locationId: 26454,
+          name: "APC",
+          dateLastUpdated: null,
+          lastUpdatedByUsername: null,
+          machineCount: rows.length,
+          lmxes: rows.map((r) => ({
+            ...r,
+            icEnabled: null,
+            lastUpdatedByUsername: null,
+            conditions: [],
+          })),
+          fetchedAtIso: "2026-08-02T00:00:00Z",
+          raw: {},
+        },
+      });
+    }
+
+    async function pbmRow(machineId: string): Promise<{
+      pinballmapMachineId: number | null;
+      pinballmapExcluded: boolean;
+      pinballmapExcludedReason: string | null;
+      pinballmapListed: boolean;
+      pinballmapLmxId: number | null;
+      manufacturer: string | null;
+      year: number | null;
+      opdbId: string | null;
+      ipdbId: number | null;
+    }> {
+      const db = await getTestDb();
+      const row = await db.query.machines.findFirst({
+        where: eq(machines.id, machineId),
+        columns: {
+          pinballmapMachineId: true,
+          pinballmapExcluded: true,
+          pinballmapExcludedReason: true,
+          pinballmapListed: true,
+          pinballmapLmxId: true,
+          manufacturer: true,
+          year: true,
+          opdbId: true,
+          ipdbId: true,
+        },
+      });
+      if (!row) throw new Error("machine vanished");
+      return row;
+    }
+
+    it("links an unlinked machine and derives the metadata from the catalog", async () => {
+      const admin = await makeUser("admin");
+      await seedElviraCatalog();
+      const machine = await seedMachine({ name: "Elvira" });
+
+      const outcome = await runSetMachinePinballmap(
+        { machine: machine.initials, pinballmapMachineId: ELVIRA_PREMIUM_ID },
+        ctx("admin", admin)
+      );
+
+      // The echo is the same shape `get_machine` returns — one description of a
+      // machine's PBM state, never a second one invented by the write path.
+      expect(outcome.result).toMatchObject({
+        initials: machine.initials,
+        previousPinballmap: null,
+        pinballmap: {
+          status: "linked",
+          pinballmapMachineId: ELVIRA_PREMIUM_ID,
+          catalogLookup: "found",
+          title: "Elvira's House of Horrors (Premium)",
+          manufacturer: "Stern",
+          year: 2019,
+          opdbId: "GRBN4-MQGE5",
+          ipdbId: 6587,
+          listed: false,
+          lmxId: null,
+        },
+      });
+
+      // Model metadata is copied from the mirror, not accepted from the caller —
+      // there is no argument that can write these four columns.
+      expect(await pbmRow(machine.id)).toMatchObject({
+        pinballmapMachineId: ELVIRA_PREMIUM_ID,
+        manufacturer: "Stern",
+        year: 2019,
+        opdbId: "GRBN4-MQGE5",
+        ipdbId: 6587,
+      });
+    });
+
+    it("clears listing state when a LISTED machine is re-targeted, and records the abandoned entry", async () => {
+      const db = await getTestDb();
+      const admin = await makeUser("admin");
+      await seedElviraCatalog();
+      const machine = await seedMachine({
+        name: "Elvira",
+        pbm: {
+          pinballmapMachineId: ELVIRA_PREMIUM_ID,
+          pinballmapListed: true,
+          pinballmapLmxId: 44_710,
+          manufacturer: "Stern",
+          year: 2019,
+        },
+      });
+
+      const outcome = await runSetMachinePinballmap(
+        { machine: machine.initials, pinballmapMachineId: 70_013 },
+        ctx("admin", admin)
+      );
+
+      // The old public entry describes the OLD title, so it cannot follow the
+      // machine to the new one (PP-l81u / PP-o355.19).
+      expect(outcome.result).toMatchObject({
+        pinballmap: {
+          status: "linked",
+          pinballmapMachineId: 70_013,
+          title: "Elvira's House of Horrors (LE)",
+          listed: false,
+          lmxId: null,
+        },
+      });
+      expect(await pbmRow(machine.id)).toMatchObject({
+        pinballmapMachineId: 70_013,
+        pinballmapListed: false,
+        pinballmapLmxId: null,
+      });
+
+      // Dropping the listing without writing down the live entry is what leaves
+      // an orphan on pinballmap.com that nobody can find.
+      const abandoned = await db
+        .select()
+        .from(pinballmapAbandonedListings)
+        .where(eq(pinballmapAbandonedListings.machineId, machine.id));
+      expect(abandoned).toHaveLength(1);
+      expect(abandoned[0]).toMatchObject({
+        lmxId: 44_710,
+        pinballmapMachineId: ELVIRA_PREMIUM_ID,
+      });
+    });
+
+    it("keeps listing state when the SAME title is re-sent", async () => {
+      const admin = await makeUser("admin");
+      await seedElviraCatalog();
+      const machine = await seedMachine({
+        pbm: {
+          pinballmapMachineId: ELVIRA_PREMIUM_ID,
+          pinballmapListed: true,
+          pinballmapLmxId: 44_710,
+        },
+      });
+
+      await runSetMachinePinballmap(
+        { machine: machine.initials, pinballmapMachineId: ELVIRA_PREMIUM_ID },
+        ctx("admin", admin)
+      );
+
+      // The carry-over is the whole reason listing state is read from the row
+      // rather than taken as an argument: a re-save that silently unlisted a
+      // listed machine is PP-o355.19.
+      expect(await pbmRow(machine.id)).toMatchObject({
+        pinballmapMachineId: ELVIRA_PREMIUM_ID,
+        pinballmapListed: true,
+        pinballmapLmxId: 44_710,
+      });
+    });
+
+    it("marks a machine excluded, clearing any existing link and its metadata", async () => {
+      const admin = await makeUser("admin");
+      await seedElviraCatalog();
+      const machine = await seedMachine({
+        pbm: {
+          pinballmapMachineId: ELVIRA_PREMIUM_ID,
+          manufacturer: "Stern",
+          year: 2019,
+        },
+      });
+
+      const outcome = await runSetMachinePinballmap(
+        {
+          machine: machine.initials,
+          pinballmapExcluded: true,
+          pinballmapExcludedReason: "Homebrew, not a catalog title",
+        },
+        ctx("admin", admin)
+      );
+
+      expect(outcome.result).toMatchObject({
+        pinballmap: {
+          status: "excluded",
+          reason: "Homebrew, not a catalog title",
+        },
+      });
+      // `machines_pinballmap_link_exclusive` forbids linked AND excluded, so the
+      // link has to come off in the same write — the row landing at all is the
+      // proof the CHECK held.
+      expect(await pbmRow(machine.id)).toMatchObject({
+        pinballmapMachineId: null,
+        pinballmapExcluded: true,
+        pinballmapExcludedReason: "Homebrew, not a catalog title",
+        manufacturer: null,
+        year: null,
+      });
+    });
+
+    it("captures the listing when the title is already on the synced lineup", async () => {
+      const admin = await makeUser("admin");
+      await seedElviraCatalog();
+      await seedLineup([{ id: 88_001, machineId: ELVIRA_PREMIUM_ID }]);
+      const machine = await seedMachine({ name: "Elvira" });
+
+      const outcome = await runSetMachinePinballmap(
+        { machine: machine.initials, pinballmapMachineId: ELVIRA_PREMIUM_ID },
+        ctx("admin", admin)
+      );
+
+      // Auto-link (PP-o355.20) lands AFTER the link transaction commits, so the
+      // echoed block is read back from the row rather than from the plan —
+      // reporting `listed: false` here while the row says otherwise is the
+      // confident wrong answer CORE-ARCH-012 forbids.
+      expect(outcome.result).toMatchObject({
+        pinballmap: { status: "linked", listed: true, lmxId: 88_001 },
+      });
+      expect(await pbmRow(machine.id)).toMatchObject({
+        pinballmapListed: true,
+        pinballmapLmxId: 88_001,
+      });
+    });
+
+    it("links a duplicate cabinet without disturbing the title's incumbent lister", async () => {
+      const admin = await makeUser("admin");
+      await seedElviraCatalog();
+      await seedLineup([{ id: 88_001, machineId: ELVIRA_PREMIUM_ID }]);
+      const incumbent = await seedMachine({
+        name: "Elvira (by the door)",
+        pbm: {
+          pinballmapMachineId: ELVIRA_PREMIUM_ID,
+          pinballmapListed: true,
+          pinballmapLmxId: 88_001,
+        },
+      });
+      const duplicate = await seedMachine({ name: "Elvira (back row)" });
+
+      // Two cabinets of one title is ordinary in a 100+ machine collection.
+      // `machines_pinballmap_listed_unique` allows only one LISTER, not one
+      // linked machine — so this must succeed quietly, not 23505 into a 500.
+      const outcome = await runSetMachinePinballmap(
+        { machine: duplicate.initials, pinballmapMachineId: ELVIRA_PREMIUM_ID },
+        ctx("admin", admin)
+      );
+
+      expect(outcome.result).toMatchObject({
+        pinballmap: {
+          status: "linked",
+          pinballmapMachineId: ELVIRA_PREMIUM_ID,
+          listed: false,
+          lmxId: null,
+        },
+      });
+      // The incumbent keeps the listing: an edit to one cabinet must never
+      // silently move another cabinet's public entry.
+      expect(await pbmRow(incumbent.id)).toMatchObject({
+        pinballmapListed: true,
+        pinballmapLmxId: 88_001,
+      });
+    });
+
+    it("denies a member who does not own the machine", async () => {
+      const member = await makeUser("member", "Not", "Owner");
+      await seedElviraCatalog();
+      const machine = await seedMachine({ name: "Elvira" });
+
+      await expect(
+        runSetMachinePinballmap(
+          { machine: machine.initials, pinballmapMachineId: ELVIRA_PREMIUM_ID },
+          ctx("member", member)
+        )
+      ).rejects.toMatchObject({ reason: "denied" });
+
+      // Denied means nothing was written, not "written and reported as denied".
+      expect(await pbmRow(machine.id)).toMatchObject({
+        pinballmapMachineId: null,
+      });
+    });
+
+    it("lets the machine's owner set its title", async () => {
+      const owner = await makeUser("member", "Pat", "Owner");
+      await seedElviraCatalog();
+      const machine = await seedMachine({ name: "Elvira", ownerId: owner });
+
+      await runSetMachinePinballmap(
+        { machine: machine.initials, pinballmapMachineId: ELVIRA_PREMIUM_ID },
+        ctx("member", owner)
+      );
+
+      expect(await pbmRow(machine.id)).toMatchObject({
+        pinballmapMachineId: ELVIRA_PREMIUM_ID,
+      });
+    });
+
+    it("refuses a call that states neither a title nor exclusion, instead of unlinking", async () => {
+      const admin = await makeUser("admin");
+      await seedElviraCatalog();
+      const machine = await seedMachine({
+        pbm: { pinballmapMachineId: ELVIRA_PREMIUM_ID, manufacturer: "Stern" },
+      });
+
+      await expect(
+        runSetMachinePinballmap(
+          { machine: machine.initials },
+          ctx("admin", admin)
+        )
+      ).rejects.toMatchObject({ reason: "invalid" });
+
+      // The resolver reads "neither" as "clear everything", which is right for a
+      // human emptying the picker and catastrophic for a forgotten argument.
+      expect(await pbmRow(machine.id)).toMatchObject({
+        pinballmapMachineId: ELVIRA_PREMIUM_ID,
+      });
+    });
+
+    it("refuses a call that is both linked and excluded", async () => {
+      const admin = await makeUser("admin");
+      await seedElviraCatalog();
+      const machine = await seedMachine();
+
+      await expect(
+        runSetMachinePinballmap(
+          {
+            machine: machine.initials,
+            pinballmapMachineId: ELVIRA_PREMIUM_ID,
+            pinballmapExcluded: true,
+          },
+          ctx("admin", admin)
+        )
+      ).rejects.toMatchObject({ reason: "invalid" });
+    });
+
+    it("rejects a catalog id the mirror does not have", async () => {
+      const admin = await makeUser("admin");
+      await seedElviraCatalog();
+      const machine = await seedMachine();
+
+      // The predictable mistake is passing a `machineGroupId` where a
+      // `pinballmapMachineId` belongs. A group id that matches no catalog row
+      // must fail rather than store a link to a title we cannot name.
+      await expect(
+        runSetMachinePinballmap(
+          { machine: machine.initials, pinballmapMachineId: ELVIRA_GROUP_ID },
+          ctx("admin", admin)
+        )
+      ).rejects.toMatchObject({ reason: "invalid" });
+      expect(await pbmRow(machine.id)).toMatchObject({
+        pinballmapMachineId: null,
+      });
+    });
+
+    it("throws not_found when the machine is unknown", async () => {
+      const admin = await makeUser("admin");
+      await expect(
+        runSetMachinePinballmap(
+          { machine: "NOPE", pinballmapMachineId: 1 },
+          ctx("admin", admin)
+        )
+      ).rejects.toMatchObject({ reason: "not_found" });
+    });
+
+    it("reports the state it actually replaced, read under the write's own lock", async () => {
+      const admin = await makeUser("admin");
+      await seedElviraCatalog();
+      const machine = await seedMachine({
+        name: "Elvira",
+        pbm: {
+          pinballmapMachineId: ELVIRA_PREMIUM_ID,
+          manufacturer: "Stern",
+          year: 2019,
+        },
+      });
+
+      const outcome = await runSetMachinePinballmap(
+        { machine: machine.initials, pinballmapMachineId: 70_013 },
+        ctx("admin", admin)
+      );
+
+      // `previousPinballmap` comes from the FOR UPDATE read inside the write,
+      // not from the resolve that ran before the permission check — so it names
+      // the state this call displaced even if something moved in between.
+      expect(outcome.result).toMatchObject({
+        previousPinballmap: {
+          status: "linked",
+          pinballmapMachineId: ELVIRA_PREMIUM_ID,
+        },
+        pinballmap: { status: "linked", pinballmapMachineId: 70_013 },
+      });
+    });
+
+    it("reports not_found, not a success payload, when the row is gone", async () => {
+      // Straight at the service: the tool's own `resolveMachine` would reject an
+      // unknown ref long before this guard, so the only way to exercise it is to
+      // hand the write a machineId that resolves to nothing. Without the guard
+      // this returned `ok` with the columns it MEANT to write — a confident
+      // wrong answer about a row that does not exist (CORE-ARCH-012).
+      const admin = await makeUser("admin");
+      await seedElviraCatalog();
+
+      const result = await updateMachinePbmLink({
+        machineId: randomUUID(),
+        actorUserId: admin,
+        selection: { pinballmapMachineId: ELVIRA_PREMIUM_ID },
+      });
+
+      expect(result).toMatchObject({ ok: false, reason: "not_found" });
+    });
+
+    it("keeps a stored exclusion reason when the exclusion is re-confirmed without one", async () => {
+      // The fleet pass (PP-h059) re-confirms exclusions it did not author, and
+      // the natural call carries no reason. Writing `reason ?? null` there would
+      // erase someone else's note on every machine it walked past — the same
+      // "a forgotten argument must not destroy stored state" rule that stops a
+      // missing id from wiping a link (CORE-ARCH-012).
+      const admin = await makeUser("admin");
+      const machine = await seedMachine({
+        name: "Unicorn Magic",
+        pbm: {
+          pinballmapExcluded: true,
+          pinballmapExcludedReason: "homebrew — one-off cabinet",
+        },
+      });
+
+      await runSetMachinePinballmap(
+        { machine: machine.initials, pinballmapExcluded: true },
+        ctx("admin", admin)
+      );
+
+      expect(await pbmRow(machine.id)).toMatchObject({
+        pinballmapExcluded: true,
+        pinballmapExcludedReason: "homebrew — one-off cabinet",
+      });
+    });
+
+    it("replaces a stored exclusion reason when the caller sends a new one", async () => {
+      // The carry-over is a floor, not a lock: a caller that states a reason
+      // still overwrites whatever was there.
+      const admin = await makeUser("admin");
+      const machine = await seedMachine({
+        name: "Border Town",
+        pbm: {
+          pinballmapExcluded: true,
+          pinballmapExcludedReason: "homebrew — one-off cabinet",
+        },
+      });
+
+      await runSetMachinePinballmap(
+        {
+          machine: machine.initials,
+          pinballmapExcluded: true,
+          pinballmapExcludedReason: "1940 pre-flipper, not a catalog title",
+        },
+        ctx("admin", admin)
+      );
+
+      expect(await pbmRow(machine.id)).toMatchObject({
+        pinballmapExcluded: true,
+        pinballmapExcludedReason: "1940 pre-flipper, not a catalog title",
+      });
+    });
+
+    it("does not carry a reason onto a machine that was not already excluded", async () => {
+      // The carry-over reads the STORED exclusion, so a machine being excluded
+      // for the first time gets no reason invented for it — and a machine
+      // moving from excluded to LINKED keeps none either (the resolver clears
+      // the whole column set on that branch).
+      const admin = await makeUser("admin");
+      await seedElviraCatalog();
+      const machine = await seedMachine({
+        name: "Hyperball",
+        pbm: {
+          pinballmapExcluded: true,
+          pinballmapExcludedReason: "rapid-fire hybrid, not a pinball title",
+        },
+      });
+
+      await runSetMachinePinballmap(
+        { machine: machine.initials, pinballmapMachineId: ELVIRA_PREMIUM_ID },
+        ctx("admin", admin)
+      );
+
+      expect(await pbmRow(machine.id)).toMatchObject({
+        pinballmapExcluded: false,
+        pinballmapExcludedReason: null,
+        pinballmapMachineId: ELVIRA_PREMIUM_ID,
+      });
+    });
+
+    it("rejects an empty exclusion reason, which the edit form must accept", () => {
+      // Deliberate divergence, not drift: an emptied input is how a human
+      // clears a reason, but from a tool call "" is a field filled with
+      // nothing — and accepting it would make the carry-over hinge on whether
+      // the caller sent "" or nothing at all.
+      expect(
+        setMachinePinballmapSchema
+          .pick({ pinballmapExcludedReason: true })
+          .safeParse({ pinballmapExcludedReason: "   " }).success
+      ).toBe(false);
+      expect(
+        updateMachineSchema
+          .pick({ pinballmapExcludedReason: true })
+          .safeParse({ pinballmapExcludedReason: "" }).success
+      ).toBe(true);
+    });
+
+    it("caps an exclusion reason exactly where the edit form caps it", () => {
+      // Both schemas write `pinballmap_excluded_reason`, and the edit form
+      // PREFILLS it. A reason accepted here but rejected there would render into
+      // an input that fails validation on every later save from that page,
+      // wedging the picker behind text the user never typed. Asserted against
+      // the form's own schema so the two cannot drift apart silently.
+      const tooLong = { pinballmapExcludedReason: "x".repeat(201) };
+      const atLimit = { pinballmapExcludedReason: "x".repeat(200) };
+
+      expect(
+        setMachinePinballmapSchema
+          .pick({ pinballmapExcludedReason: true })
+          .safeParse(tooLong).success
+      ).toBe(false);
+      expect(
+        updateMachineSchema
+          .pick({ pinballmapExcludedReason: true })
+          .safeParse(tooLong).success
+      ).toBe(false);
+
+      expect(
+        setMachinePinballmapSchema
+          .pick({ pinballmapExcludedReason: true })
+          .safeParse(atLimit).success
+      ).toBe(true);
+      expect(
+        updateMachineSchema
+          .pick({ pinballmapExcludedReason: true })
+          .safeParse(atLimit).success
+      ).toBe(true);
+    });
+  });
+
   describe("resolveIssue / resolveAssignee (PP-u4ab.14)", () => {
     it("resolves an issue by machine initials and number", async () => {
       const admin = await makeUser("admin");
@@ -1523,6 +2088,7 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
       "set_machine_availability",
       "set_machine_name",
       "set_machine_owner",
+      "set_machine_pinballmap",
       "update_issue",
     ]);
   });
