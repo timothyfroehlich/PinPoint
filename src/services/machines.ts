@@ -713,12 +713,44 @@ export interface UpdateMachinePbmLinkParams {
   actorUserId: string;
   /** The requested link selection. Listing state is never part of it. */
   selection: PbmLinkSelection;
-  /** The machine's STORED PBM + presence state, read from the row. */
-  current: StoredPbmLinkState & { presenceStatus: MachinePresenceStatus };
 }
 
 export type UpdateMachinePbmLinkResult =
-  { ok: true; columns: MachinePbmColumns } | { ok: false; message: string };
+  | { ok: true; columns: MachinePbmColumns; previous: MachinePbmColumns }
+  | {
+      ok: false;
+      reason: "invalid" | "not_found" | "conflict";
+      message: string;
+    };
+
+/** The PBM + presence state a plan was decided against, for the CAS check. */
+type PbmLinkBasis = StoredPbmLinkState & {
+  presenceStatus: MachinePresenceStatus;
+};
+
+const PBM_LINK_COLUMNS = {
+  pinballmapMachineId: true,
+  pinballmapExcluded: true,
+  pinballmapExcludedReason: true,
+  pinballmapListed: true,
+  pinballmapLmxId: true,
+  manufacturer: true,
+  year: true,
+  opdbId: true,
+  ipdbId: true,
+} as const;
+
+/** How many times a losing CAS attempt re-plans before giving up. */
+const PBM_LINK_MAX_ATTEMPTS = 3;
+
+function pbmLinkBasisUnchanged(a: PbmLinkBasis, b: PbmLinkBasis): boolean {
+  return (
+    a.pinballmapMachineId === b.pinballmapMachineId &&
+    a.pinballmapListed === b.pinballmapListed &&
+    a.pinballmapLmxId === b.pinballmapLmxId &&
+    a.presenceStatus === b.presenceStatus
+  );
+}
 
 /**
  * Change a machine's PinballMap link and nothing else — the focused slice of
@@ -728,63 +760,142 @@ export type UpdateMachinePbmLinkResult =
  * seam: plan, apply in a transaction, then capture any auto-link post-commit.
  * Authorization stays in the caller (`machines.pinballmap.link`).
  *
+ * **Reads its own basis, and writes it back under compare-and-set.** The plan
+ * has to be decided before the transaction opens — it reads the catalog mirror
+ * and ranks auto-link candidates, and neither belongs inside a held row lock —
+ * so the snapshot it planned against can go stale in between. The hourly
+ * reconcile pass is the writer that does it: it sets `pinballmapListed` true and
+ * captures an lmx, and because {@link applyMachinePbmLink} writes the whole
+ * column set, a plan made from the pre-reconcile snapshot would put `listed:
+ * false, lmxId: null` back and — having seen no listing — record no abandonment,
+ * leaving a live pinballmap.com entry nobody tracks. That is the PP-l81u defect
+ * exactly. The fleet linking pass (PP-h059) drives this tool across ~100
+ * machines in one session, so the window is wide open in practice, not
+ * theoretically.
+ *
+ * The `FOR UPDATE` re-read inside the transaction closes it: whoever holds the
+ * lock sees the other writer's committed state, and a basis that moved means the
+ * plan is void, so it is thrown away and re-planned rather than written. Same
+ * read-modify-write serialization `editStoredSnapshot` uses in
+ * `m/pinballmap-actions.ts`, for the same reason.
+ *
+ * A missing row is reported as `not_found` rather than a success payload
+ * describing a link that was never stored (CORE-ARCH-012).
+ *
  * Returns the machine's PBM columns AS STORED after everything settled, not as
  * planned: an auto-link that lands sets `pinballmapListed`/`pinballmapLmxId`
  * outside the plan, and reporting the planned values would tell the caller the
- * machine is unlisted while the row says otherwise (CORE-ARCH-012).
+ * machine is unlisted while the row says otherwise (CORE-ARCH-012). `previous`
+ * comes from the locked read, so it describes the state this change actually
+ * replaced — not whatever the caller happened to read earlier.
  */
 export async function updateMachinePbmLink({
   machineId,
   actorUserId,
   selection,
-  current,
 }: UpdateMachinePbmLinkParams): Promise<UpdateMachinePbmLinkResult> {
-  const planned = await planMachinePbmLink({
-    machineId,
-    selection,
-    stored: {
-      pinballmapMachineId: current.pinballmapMachineId,
-      pinballmapListed: current.pinballmapListed,
-      pinballmapLmxId: current.pinballmapLmxId,
-    },
-    presenceStatus: current.presenceStatus,
-  });
-  if (!planned.ok) {
-    return { ok: false, message: planned.message };
+  for (let attempt = 1; ; attempt++) {
+    const basisRow = await db.query.machines.findFirst({
+      where: eq(machines.id, machineId),
+      columns: { ...PBM_LINK_COLUMNS, presenceStatus: true },
+    });
+    if (!basisRow) {
+      return { ok: false, reason: "not_found", message: MACHINE_GONE_MESSAGE };
+    }
+
+    const planned = await planMachinePbmLink({
+      machineId,
+      selection,
+      stored: {
+        pinballmapMachineId: basisRow.pinballmapMachineId,
+        pinballmapListed: basisRow.pinballmapListed,
+        pinballmapLmxId: basisRow.pinballmapLmxId,
+      },
+      presenceStatus: basisRow.presenceStatus,
+    });
+    if (!planned.ok) {
+      return { ok: false, reason: "invalid", message: planned.message };
+    }
+
+    const outcome = await db.transaction(async (tx) => {
+      const [locked] = await tx
+        .select({
+          pinballmapMachineId: machines.pinballmapMachineId,
+          pinballmapExcluded: machines.pinballmapExcluded,
+          pinballmapExcludedReason: machines.pinballmapExcludedReason,
+          pinballmapListed: machines.pinballmapListed,
+          pinballmapLmxId: machines.pinballmapLmxId,
+          manufacturer: machines.manufacturer,
+          year: machines.year,
+          opdbId: machines.opdbId,
+          ipdbId: machines.ipdbId,
+          presenceStatus: machines.presenceStatus,
+        })
+        .from(machines)
+        .where(eq(machines.id, machineId))
+        .for("update");
+      if (!locked) return { state: "gone" } as const;
+      if (!pbmLinkBasisUnchanged(locked, basisRow)) {
+        return { state: "stale" } as const;
+      }
+
+      await applyMachinePbmLink(tx, machineId, planned.plan, actorUserId);
+      const { presenceStatus: _presence, ...previous } = locked;
+      return { state: "applied", previous } as const;
+    });
+
+    if (outcome.state === "gone") {
+      return { ok: false, reason: "not_found", message: MACHINE_GONE_MESSAGE };
+    }
+    if (outcome.state === "stale") {
+      if (attempt >= PBM_LINK_MAX_ATTEMPTS) {
+        return {
+          ok: false,
+          reason: "conflict",
+          message:
+            "This machine's Pinball Map state kept changing while the update was being applied. Nothing was written — read it back and try again.",
+        };
+      }
+      continue;
+    }
+
+    return finishMachinePbmLink(
+      machineId,
+      actorUserId,
+      planned.plan,
+      outcome.previous
+    );
+  }
+}
+
+const MACHINE_GONE_MESSAGE =
+  "That machine no longer exists — it was deleted while the update was being applied. Nothing was written.";
+
+/**
+ * The post-commit half: capture any auto-link, then report the columns AS
+ * STORED. Split out only so {@link updateMachinePbmLink}'s retry loop has a
+ * single exit.
+ */
+async function finishMachinePbmLink(
+  machineId: string,
+  actorUserId: string,
+  plan: MachinePbmLinkPlan,
+  previous: MachinePbmColumns
+): Promise<UpdateMachinePbmLinkResult> {
+  if (plan.autoLink === null) {
+    return { ok: true, columns: plan.columns, previous };
   }
 
-  await db.transaction(async (tx) => {
-    await applyMachinePbmLink(tx, machineId, planned.plan, actorUserId);
-  });
-
-  if (planned.plan.autoLink === null) {
-    return { ok: true, columns: planned.plan.columns };
-  }
-
-  await captureMachineAutoLink(
-    machineId,
-    planned.plan.autoLink.lmxId,
-    actorUserId
-  );
+  await captureMachineAutoLink(machineId, plan.autoLink.lmxId, actorUserId);
 
   const row = await db.query.machines.findFirst({
     where: eq(machines.id, machineId),
-    columns: {
-      pinballmapMachineId: true,
-      pinballmapExcluded: true,
-      pinballmapExcludedReason: true,
-      pinballmapListed: true,
-      pinballmapLmxId: true,
-      manufacturer: true,
-      year: true,
-      opdbId: true,
-      ipdbId: true,
-    },
+    columns: PBM_LINK_COLUMNS,
   });
   // The row was updated moments ago in a committed transaction, so a miss means
   // it was deleted concurrently. Fall back to the planned columns rather than
   // throwing away a change that did commit.
-  return { ok: true, columns: row ?? planned.plan.columns };
+  return { ok: true, columns: row ?? plan.columns, previous };
 }
 
 export interface UpdateMachineNameParams {

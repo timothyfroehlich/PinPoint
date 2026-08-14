@@ -69,7 +69,12 @@ import type { McpMachinePinballmap } from "~/lib/mcp/tools/pinballmap-block";
 import { runSetMachineAvailability } from "~/lib/mcp/tools/set-machine-availability";
 import { runSetMachineName } from "~/lib/mcp/tools/set-machine-name";
 import { runSetMachineOwner } from "~/lib/mcp/tools/set-machine-owner";
-import { runSetMachinePinballmap } from "~/lib/mcp/tools/set-machine-pinballmap";
+import {
+  runSetMachinePinballmap,
+  setMachinePinballmapSchema,
+} from "~/lib/mcp/tools/set-machine-pinballmap";
+import { updateMachineSchema } from "~/app/(app)/m/schemas";
+import { updateMachinePbmLink } from "~/services/machines";
 import { runUpdateIssue } from "~/lib/mcp/tools/update-issue";
 import {
   McpToolError,
@@ -1646,6 +1651,85 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
           ctx("admin", admin)
         )
       ).rejects.toMatchObject({ reason: "not_found" });
+    });
+
+    it("reports the state it actually replaced, read under the write's own lock", async () => {
+      const admin = await makeUser("admin");
+      await seedElviraCatalog();
+      const machine = await seedMachine({
+        name: "Elvira",
+        pbm: {
+          pinballmapMachineId: ELVIRA_PREMIUM_ID,
+          manufacturer: "Stern",
+          year: 2019,
+        },
+      });
+
+      const outcome = await runSetMachinePinballmap(
+        { machine: machine.initials, pinballmapMachineId: 70_013 },
+        ctx("admin", admin)
+      );
+
+      // `previousPinballmap` comes from the FOR UPDATE read inside the write,
+      // not from the resolve that ran before the permission check — so it names
+      // the state this call displaced even if something moved in between.
+      expect(outcome.result).toMatchObject({
+        previousPinballmap: {
+          status: "linked",
+          pinballmapMachineId: ELVIRA_PREMIUM_ID,
+        },
+        pinballmap: { status: "linked", pinballmapMachineId: 70_013 },
+      });
+    });
+
+    it("reports not_found, not a success payload, when the row is gone", async () => {
+      // Straight at the service: the tool's own `resolveMachine` would reject an
+      // unknown ref long before this guard, so the only way to exercise it is to
+      // hand the write a machineId that resolves to nothing. Without the guard
+      // this returned `ok` with the columns it MEANT to write — a confident
+      // wrong answer about a row that does not exist (CORE-ARCH-012).
+      const admin = await makeUser("admin");
+      await seedElviraCatalog();
+
+      const result = await updateMachinePbmLink({
+        machineId: randomUUID(),
+        actorUserId: admin,
+        selection: { pinballmapMachineId: ELVIRA_PREMIUM_ID },
+      });
+
+      expect(result).toMatchObject({ ok: false, reason: "not_found" });
+    });
+
+    it("caps an exclusion reason exactly where the edit form caps it", () => {
+      // Both schemas write `pinballmap_excluded_reason`, and the edit form
+      // PREFILLS it. A reason accepted here but rejected there would render into
+      // an input that fails validation on every later save from that page,
+      // wedging the picker behind text the user never typed. Asserted against
+      // the form's own schema so the two cannot drift apart silently.
+      const tooLong = { pinballmapExcludedReason: "x".repeat(201) };
+      const atLimit = { pinballmapExcludedReason: "x".repeat(200) };
+
+      expect(
+        setMachinePinballmapSchema
+          .pick({ pinballmapExcludedReason: true })
+          .safeParse(tooLong).success
+      ).toBe(false);
+      expect(
+        updateMachineSchema
+          .pick({ pinballmapExcludedReason: true })
+          .safeParse(tooLong).success
+      ).toBe(false);
+
+      expect(
+        setMachinePinballmapSchema
+          .pick({ pinballmapExcludedReason: true })
+          .safeParse(atLimit).success
+      ).toBe(true);
+      expect(
+        updateMachineSchema
+          .pick({ pinballmapExcludedReason: true })
+          .safeParse(atLimit).success
+      ).toBe(true);
     });
   });
 

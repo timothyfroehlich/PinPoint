@@ -22,7 +22,7 @@ import type { McpAuthContext } from "~/lib/mcp/verify-token";
  * The fleet linking pass (PP-h059) drives both tools in one session, and two
  * spellings of one concept is a mistake waiting to be made.
  */
-const setMachinePinballmapSchema = z.object({
+export const setMachinePinballmapSchema = z.object({
   machine: z
     .string()
     .trim()
@@ -45,10 +45,15 @@ const setMachinePinballmapSchema = z.object({
   pinballmapExcludedReason: z
     .string()
     .trim()
-    .max(500)
+    // 200 to match the edit form's shared schema (`m/schemas.ts`), NOT a looser
+    // MCP-only cap. The two write the same column and the form prefills it: a
+    // 201–500 char reason written here would render into an input that then
+    // fails validation on every later save from that page, wedging the picker
+    // behind text the user never typed.
+    .max(200)
     .optional()
     .describe(
-      "Why the machine is excluded. Only meaningful alongside pinballmapExcluded: true."
+      "Why the machine is excluded (max 200 characters). Only meaningful alongside pinballmapExcluded: true."
     ),
 });
 
@@ -124,22 +129,25 @@ export async function runSetMachinePinballmap(
       pinballmapExcluded: args.pinballmapExcluded,
       pinballmapExcludedReason: args.pinballmapExcludedReason,
     },
-    current: {
-      pinballmapMachineId: machine.pinballmapMachineId,
-      pinballmapListed: machine.pinballmapListed,
-      pinballmapLmxId: machine.pinballmapLmxId,
-      presenceStatus: machine.presenceStatus,
-    },
+    // The stored PBM state is NOT passed either. The service re-reads it under
+    // the row lock it writes through, so the snapshot resolved above cannot go
+    // stale between here and the write — the hourly reconcile pass is a real
+    // concurrent writer of these exact columns.
   });
 
   if (!updated.ok) {
-    throw new McpToolError("invalid", updated.message);
+    throw new McpToolError(
+      updated.reason === "not_found" ? "not_found" : "invalid",
+      updated.message
+    );
   }
 
   // Same block `get_machine` returns, built from the STORED columns — a read
   // and the write that followed it never describe one machine differently.
+  // `previous` comes from the locked read inside the write, not from the
+  // `resolveMachine` snapshot above, so it names the state actually replaced.
   const [previous, pinballmap] = await Promise.all([
-    buildMachinePinballmap(machine),
+    buildMachinePinballmap(updated.previous),
     buildMachinePinballmap(updated.columns),
   ]);
 
