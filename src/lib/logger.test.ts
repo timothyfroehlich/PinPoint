@@ -63,9 +63,15 @@ describe("logger redaction", () => {
     }
   );
 
-  it("redacts an email hanging off a serialized error", () => {
+  it("redacts an email-named property on a serialized error", () => {
     // `reportError` logs `{ ...context, err: error }`, so error properties land
-    // one level down under `err`.
+    // one level down under `err`. Pino's `err` serializer copies every own
+    // enumerable property, so a key named like an email is caught here the same
+    // as anywhere else.
+    //
+    // This proves only the key-name case. An address embedded in the error's
+    // `message`, `stack` or a provider field still reaches the log raw — see
+    // PP-45qx and the `EMAIL_LOG_KEYS` doc comment.
     const error = Object.assign(new Error("boom"), { email: EMAIL });
 
     expect(logLine({ err: error })).not.toContain(EMAIL);

@@ -14,10 +14,23 @@ const DEFAULT_LOG_ROOT = join(process.cwd(), "logs");
  * `maskEmail` (`~/lib/logging/mask`); this list is the backstop for the call
  * sites that forget.
  *
- * `email` and `reporterEmail` exist in the codebase today; `submittedEmail` is
- * the raw login-form value in `src/app/(auth)/actions.ts`. `userEmail` and
- * `contactEmail` do not exist yet and are here defensively — a backstop that
- * only covers names already in use is one commit away from being wrong.
+ * `email` and `reporterEmail` are the only two that reach `log.*` today. The
+ * other three are defensive: `submittedEmail` is the login-form value in
+ * `src/app/(auth)/actions.ts`, which is returned to the client in a `Result`
+ * error payload and never logged, and `userEmail` / `contactEmail` do not
+ * exist at all. A backstop that only covers names already in use is one commit
+ * away from being wrong.
+ *
+ * `to` is deliberately absent even though `src/lib/email/client.ts` logs it.
+ * The name is too generic — timeline events log `{ from, to }` for status,
+ * title and presence changes, and redacting those would cost real debugging
+ * signal to cover a call site that already masks with `maskEmail`. This list
+ * takes only names that can mean nothing but an email address.
+ *
+ * **What a key list cannot catch**: an address embedded in a *value*. A mail
+ * provider send failure carries the recipient in its `message`, `stack`,
+ * `rejected` and `envelope.to`, and reaches the log raw through `reportError`'s
+ * `err` serializer. That needs a serializer, not more key names — PP-45qx.
  */
 const EMAIL_LOG_KEYS = [
   "email",
