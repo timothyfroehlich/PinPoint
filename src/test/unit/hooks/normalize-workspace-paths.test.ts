@@ -1,19 +1,15 @@
-// Unit tests for `normalizeCommand` / `workspacePrefixes`, exported from
+// Unit tests for the pieces exported from
 // .claude/hooks/normalize-workspace-paths.cjs.
 //
-// The `exists` probe is injected, so these run without touching the filesystem.
+// Both filesystem probes (`exists`, `realpath`) are injected, so these run
+// without touching the disk and can model Bazzite from a Mac.
 //
-// The regression under test (PP-xbfn) had two halves, both visible from a Mac
-// session driving crabbox:
-//
-//   - The matcher hardcoded `/home/froeht/Code/PinPoint`, which on the Mac names
-//     no local directory — it is Bazzite's path. So it rewrote paths meant for
-//     the REMOTE box.
-//   - It was unanchored, so it matched in the MIDDLE of `/var/home/froeht/...`
-//     (Bazzite's canonical home; `/home` is a symlink to it) and stripped the
-//     inner span, leaving `/var` glued to the tail. A crabbox run carrying
-//     `CRABBOX_STATIC_WORK_ROOT=/var/home/froeht/Code/PinPoint/.claude/worktrees/...`
-//     died on `mkdir: cannot create directory '/var.claude'`.
+// The hook rewrites absolute workspace paths to relative so they match the
+// settings.json allowlist. Every test here covers one of the four guards that
+// keep a rewrite from changing what a command means — see the hook's header.
+// The original regression (PP-xbfn) was guards 1 and 2 missing: a crabbox run
+// carrying `/var/home/froeht/Code/PinPoint/.claude/worktrees/...` came out as
+// `/var.claude/worktrees/...` and died on `mkdir`.
 
 import { createRequire } from "node:module";
 import path from "node:path";
@@ -24,40 +20,78 @@ const hookPath = path.resolve(
   process.cwd(),
   ".claude/hooks/normalize-workspace-paths.cjs"
 );
-const { normalizeCommand, workspacePrefixes } = require(hookPath) as {
-  normalizeCommand: (
-    command: string,
-    repoRoot: string,
-    exists?: (p: string) => boolean
-  ) => { modified: string; rewrites: string[] };
-  workspacePrefixes: (repoRoot: string) => string[];
-};
+
+interface Probes {
+  exists?: (p: string) => boolean;
+  realpath?: (p: string) => string;
+}
+
+const { normalizeCommand, workspacePrefixes, shiftsContext, samePath } =
+  require(hookPath) as {
+    normalizeCommand: (
+      command: string,
+      repoRoot: string,
+      probes?: Probes
+    ) => { modified: string; rewrites: string[] };
+    workspacePrefixes: (
+      repoRoot: string,
+      realpath?: (p: string) => string
+    ) => string[];
+    shiftsContext: (command: string) => boolean;
+    samePath: (
+      a: string,
+      b: string,
+      realpath?: (p: string) => string
+    ) => boolean;
+  };
 
 /** A Mac session — the machine that drives crabbox. */
 const MAC_ROOT = "/Users/froeht/Code/PinPoint";
 /** A Bazzite session, where the repo really does live under /var/home. */
 const BAZZITE_ROOT = "/var/home/froeht/Code/PinPoint";
 
+const ENOENT = (p: string): never => {
+  throw new Error(`ENOENT: no such file or directory, '${p}'`);
+};
+
+/** macOS: /Users resolves to itself, nothing else exists. */
+const macRealpath = (p: string) => (p.startsWith("/Users/") ? p : ENOENT(p));
+
+/** Bazzite (Fedora Atomic): /home is a symlink to /var/home. */
+const bazziteRealpath = (p: string) => {
+  if (p.startsWith("/var/home/")) return p;
+  if (p.startsWith("/home/")) return `/var${p}`;
+  return ENOENT(p);
+};
+
+/** A plain Linux box with a real /home and no /var/home. */
+const plainLinuxRealpath = (p: string) =>
+  p.startsWith("/home/") ? p : ENOENT(p);
+
 /** Every candidate tail exists — the permissive case. */
 const allExist = () => true;
-/** Nothing exists — the guard should suppress every rewrite. */
-const noneExist = () => false;
 
 function run(
   command: string,
   repoRoot = MAC_ROOT,
-  exists: (p: string) => boolean = allExist
+  probes: Probes = {}
 ): string {
-  return normalizeCommand(command, repoRoot, exists).modified;
+  const realpath =
+    probes.realpath ??
+    (repoRoot.startsWith("/Users/") ? macRealpath : bazziteRealpath);
+  return normalizeCommand(command, repoRoot, {
+    exists: probes.exists ?? allExist,
+    realpath,
+  }).modified;
 }
 
 // ---------------------------------------------------------------------------
-// The regression: a Mac session must not touch Bazzite paths at all
+// Guard 1 — only prefixes that name THIS machine's repo root
 // ---------------------------------------------------------------------------
-describe("remote (Bazzite) paths seen from a Mac session", () => {
+describe("guard 1: remote paths seen from a Mac session", () => {
   it("leaves a crabbox work root untouched", () => {
     const cmd =
-      "CRABBOX_STATIC_WORK_ROOT=/var/home/froeht/Code/PinPoint/.claude/worktrees/crabbox-runner crabbox job run smoke";
+      "CRABBOX_STATIC_WORK_ROOT=/var/home/froeht/Code/PinPoint/.claude/worktrees/crabbox-runner env";
     expect(run(cmd)).toBe(cmd);
   });
 
@@ -66,40 +100,12 @@ describe("remote (Bazzite) paths seen from a Mac session", () => {
       run("ls /var/home/froeht/Code/PinPoint/.claude/worktrees")
     ).not.toContain("/var.claude");
   });
-
-  it("leaves an ssh command's remote path untouched", () => {
-    const cmd = "ssh bazzite 'ls /home/froeht/Code/PinPoint/scripts'";
-    expect(run(cmd)).toBe(cmd);
-  });
 });
 
 // ---------------------------------------------------------------------------
-// On Bazzite itself, both spellings of the local root still rewrite
+// Guard 2 — the match must start a path, not continue one
 // ---------------------------------------------------------------------------
-describe("a Bazzite session's own repo root", () => {
-  it("rewrites the canonical /var/home spelling in full", () => {
-    expect(
-      run("bash /var/home/froeht/Code/PinPoint/scripts/x.sh", BAZZITE_ROOT)
-    ).toBe("bash scripts/x.sh");
-  });
-
-  it("rewrites the symlinked /home spelling too", () => {
-    expect(
-      run("bash /home/froeht/Code/PinPoint/scripts/x.sh", BAZZITE_ROOT)
-    ).toBe("bash scripts/x.sh");
-  });
-
-  it("offers both spellings as prefixes", () => {
-    expect(workspacePrefixes(BAZZITE_ROOT)).toEqual(
-      expect.arrayContaining([BAZZITE_ROOT, "/home/froeht/Code/PinPoint"])
-    );
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Boundary: the match must start a path, not continue one
-// ---------------------------------------------------------------------------
-describe("path boundaries", () => {
+describe("guard 2: path boundaries", () => {
   it("ignores an unrelated prefix that merely contains the root", () => {
     const cmd = "ls /aaa/Users/froeht/Code/PinPoint/scripts/x.sh";
     expect(run(cmd)).toBe(cmd);
@@ -116,6 +122,127 @@ describe("path boundaries", () => {
 
   it("still matches after an = in an assignment", () => {
     expect(run(`P=${MAC_ROOT}/scripts/x.sh`)).toBe("P=scripts/x.sh");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Guard 3 — commands that move cwd out from under a relative path
+// ---------------------------------------------------------------------------
+describe("guard 3: commands that change directory", () => {
+  it("skips a command with a leading cd", () => {
+    const cmd = `cd /tmp && bash ${MAC_ROOT}/scripts/x.sh`;
+    expect(run(cmd)).toBe(cmd);
+  });
+
+  it("skips a cd that appears after the first command", () => {
+    const cmd = `echo hi; cd /tmp; bash ${MAC_ROOT}/scripts/x.sh`;
+    expect(run(cmd)).toBe(cmd);
+  });
+
+  it("skips a cd inside a subshell", () => {
+    const cmd = `(cd sub && bash ${MAC_ROOT}/scripts/x.sh)`;
+    expect(run(cmd)).toBe(cmd);
+  });
+
+  it("skips pushd", () => {
+    const cmd = `pushd /tmp && bash ${MAC_ROOT}/scripts/x.sh`;
+    expect(run(cmd)).toBe(cmd);
+  });
+
+  it("skips a -C flag (git, make, tar)", () => {
+    const cmd = `git -C /tmp apply ${MAC_ROOT}/patch.diff`;
+    expect(run(cmd)).toBe(cmd);
+  });
+
+  it("does not mistake a word merely containing cd for the command", () => {
+    expect(shiftsContext("bash scripts/cdrom-check.sh")).toBe(false);
+    expect(shiftsContext("echo abcd")).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Guard 4 — commands that hand the text to another machine
+// ---------------------------------------------------------------------------
+describe("guard 4: remote execution", () => {
+  // This is the case guard 1 CANNOT catch: on Bazzite the remote root is
+  // spelled exactly like the local one, so only the ssh verb distinguishes it.
+  it("leaves an ssh payload alone even when the spelling is local", () => {
+    const cmd = `ssh bazzite 'ls ${BAZZITE_ROOT}/scripts/x.sh'`;
+    expect(run(cmd, BAZZITE_ROOT)).toBe(cmd);
+  });
+
+  it("leaves an ssh payload alone on the Mac too", () => {
+    const cmd = "ssh bazzite 'ls /home/froeht/Code/PinPoint/scripts/x.sh'";
+    expect(run(cmd)).toBe(cmd);
+  });
+
+  it.each(["scp", "rsync", "crabbox", "docker", "podman", "kubectl"])(
+    "skips %s",
+    (verb) => {
+      const cmd = `${verb} run ${MAC_ROOT}/scripts/x.sh`;
+      expect(run(cmd)).toBe(cmd);
+    }
+  );
+});
+
+// ---------------------------------------------------------------------------
+// Prefix derivation, including the /home <-> /var/home sibling
+// ---------------------------------------------------------------------------
+describe("workspacePrefixes", () => {
+  it("offers both spellings on Bazzite, where they resolve to one directory", () => {
+    expect(workspacePrefixes(BAZZITE_ROOT, bazziteRealpath)).toEqual(
+      expect.arrayContaining([BAZZITE_ROOT, "/home/froeht/Code/PinPoint"])
+    );
+  });
+
+  it("does NOT synthesize /var/home on a plain Linux box", () => {
+    const prefixes = workspacePrefixes(
+      "/home/froeht/Code/PinPoint",
+      plainLinuxRealpath
+    );
+    expect(prefixes).toEqual(["/home/froeht/Code/PinPoint"]);
+  });
+
+  it("offers only the literal root on the Mac", () => {
+    expect(workspacePrefixes(MAC_ROOT, macRealpath)).toEqual([MAC_ROOT]);
+  });
+
+  it("orders longest first, so a worktree beats its parent", () => {
+    const prefixes = workspacePrefixes(BAZZITE_ROOT, bazziteRealpath);
+    expect(prefixes).toEqual([...prefixes].sort((a, b) => b.length - a.length));
+  });
+});
+
+describe("both spellings rewrite on Bazzite", () => {
+  it("rewrites the canonical /var/home spelling", () => {
+    expect(run(`bash ${BAZZITE_ROOT}/scripts/x.sh`, BAZZITE_ROOT)).toBe(
+      "bash scripts/x.sh"
+    );
+  });
+
+  it("rewrites the symlinked /home spelling", () => {
+    expect(
+      run("bash /home/froeht/Code/PinPoint/scripts/x.sh", BAZZITE_ROOT)
+    ).toBe("bash scripts/x.sh");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// samePath — the cwd guard's comparison
+// ---------------------------------------------------------------------------
+describe("samePath", () => {
+  it("matches two spellings of one directory through symlinks", () => {
+    expect(
+      samePath("/home/froeht/Code/PinPoint", BAZZITE_ROOT, bazziteRealpath)
+    ).toBe(true);
+  });
+
+  it("does not match genuinely different directories", () => {
+    expect(samePath(`${MAC_ROOT}/a`, `${MAC_ROOT}/b`, macRealpath)).toBe(false);
+  });
+
+  it("is false rather than throwing when a path does not resolve", () => {
+    expect(samePath("/nope/a", "/nope/b", macRealpath)).toBe(false);
   });
 });
 
@@ -137,14 +264,14 @@ describe("the allowlist rewrite it exists for", () => {
 
   it("leaves the path alone when the tail does not exist locally", () => {
     const cmd = `ls ${MAC_ROOT}/nope/missing`;
-    expect(run(cmd, MAC_ROOT, noneExist)).toBe(cmd);
+    expect(run(cmd, MAC_ROOT, { exists: () => false })).toBe(cmd);
   });
 
   it("reports what it rewrote", () => {
     const { rewrites } = normalizeCommand(
       `bash ${MAC_ROOT}/scripts/x.sh`,
       MAC_ROOT,
-      allExist
+      { exists: allExist, realpath: macRealpath }
     );
     expect(rewrites).toHaveLength(1);
     expect(rewrites[0]).toContain("-> scripts/x.sh");
@@ -153,7 +280,6 @@ describe("the allowlist rewrite it exists for", () => {
   it("leaves a command with no workspace path untouched", () => {
     const cmd = "pnpm run check";
     expect(run(cmd)).toBe(cmd);
-    expect(normalizeCommand(cmd, MAC_ROOT, allExist).rewrites).toHaveLength(0);
   });
 });
 

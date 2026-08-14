@@ -12,34 +12,88 @@
  * match, causing unnecessary permission prompts. This hook auto-fixes the
  * command and tells the agent to use relative paths next time.
  *
- * The prefixes it matches are derived from THIS machine's repo root, not
- * hardcoded. Three rules keep the rewrite from changing what a command means
- * (all three learned from PP-xbfn):
+ * ---------------------------------------------------------------------------
+ * What makes this hook dangerous, and the four guards that hold it back
+ * ---------------------------------------------------------------------------
  *
- * 1. **Only this machine's repo root.** The matcher used to hardcode
- *    `/home/froeht/Code/PinPoint`, which on the Mac names no local directory at
- *    all — it is Bazzite's path. So the hook rewrote paths that were meant for
- *    the *remote* box. A crabbox invocation carrying
- *    `CRABBOX_STATIC_WORK_ROOT=/var/home/froeht/Code/PinPoint/.claude/worktrees/...`
- *    is a remote path; relativizing it is wrong however it is spelled. Matching
- *    only the local root leaves it alone.
+ * An absolute path and a root-relative one only mean the same thing when the
+ * command runs from the root, on this machine. Every guard below exists because
+ * some case broke that assumption, and a broken rewrite is invisible: the
+ * transcript records what the agent wrote, not what ran (PP-xbfn).
  *
- * 2. **Match at a path boundary.** Bazzite's home is `/var/home/froeht` and
+ * 1. **Only prefixes that name THIS machine's repo root.** The matcher used to
+ *    hardcode `/home/froeht/Code/PinPoint`, which on the Mac names no local
+ *    directory at all — it is Bazzite's path. So the hook rewrote paths meant
+ *    for the *remote* box, e.g. a crabbox invocation carrying
+ *    `CRABBOX_STATIC_WORK_ROOT=/var/home/froeht/Code/PinPoint/.claude/...`.
+ *
+ * 2. **Only at a path boundary.** Bazzite's home is `/var/home/froeht` and
  *    `/home` is a symlink to it, so an unanchored matcher found
  *    `/home/froeht/Code/PinPoint/` in the MIDDLE of a `/var/home/...` path and
- *    stripped it, leaving the orphaned `/var` glued to the tail:
- *    `/var.claude/worktrees`. crabbox then died on
- *    `mkdir: cannot create directory '/var.claude'`. The transcript records the
- *    command the agent wrote — the rewrite happens after — so the corruption is
- *    invisible until something downstream fails.
+ *    stripped it, leaving `/var` glued to the tail: `/var.claude/worktrees`.
+ *    crabbox died on `mkdir: cannot create directory '/var.claude'`.
  *
- * 3. **Only when cwd IS the repo root.** A root-relative path is only equivalent
- *    to the absolute one when the command runs from the root. From a
- *    subdirectory the rewrite would silently retarget the file.
+ * 3. **Only when cwd IS the repo root**, and only for commands that keep it
+ *    that way. `cd /tmp && bash <root>/scripts/x.sh` would otherwise become
+ *    `cd /tmp && bash scripts/x.sh`, i.e. `/tmp/scripts/x.sh`.
+ *
+ * 4. **Never for a command that hands the text to another machine or
+ *    namespace.** `ssh bazzite 'ls <root>/scripts'` names the *remote* root,
+ *    which on Bazzite is spelled exactly like the local one — guard 1 cannot
+ *    tell them apart, so the whole command is skipped instead.
+ *
+ * Guards 3 and 4 are deliberately blunt: skipping a rewrite that would have been
+ * fine costs one permission prompt, while making a wrong one costs a silently
+ * mis-targeted command. Bias every judgement call toward skipping.
  */
 
 const fs = require("fs");
 const path = require("path");
+
+/**
+ * Command words that make a rewrite unsafe, because after them the path is no
+ * longer interpreted from this cwd on this machine.
+ *
+ * - directory changes: the relative path would resolve somewhere else
+ * - remote/namespace execution: the path names a filesystem we are not on
+ */
+const CONTEXT_SHIFTING_WORDS = [
+  // changes cwd
+  "cd",
+  "pushd",
+  "popd",
+  "chdir",
+  // hands the command to another host or namespace
+  "ssh",
+  "scp",
+  "sftp",
+  "rsync",
+  "crabbox",
+  "docker",
+  "podman",
+  "kubectl",
+  "nsenter",
+  "chroot",
+];
+
+// A context-shifting word in command position: start of string, or after a
+// separator (`;`, `&&`, `||`, `|`, a subshell paren, or a newline).
+const CONTEXT_SHIFT_REGEX = new RegExp(
+  String.raw`(?:^|[\n;&|(])\s*(?:${CONTEXT_SHIFTING_WORDS.join("|")})\b`
+);
+
+// `-C <dir>` — git, make and tar all use it to run somewhere else.
+const CHDIR_FLAG_REGEX = /(?:^|\s)-C(?:\s|=)/;
+
+/**
+ * True when the command changes where a relative path would resolve.
+ *
+ * @param {string} command
+ * @returns {boolean}
+ */
+function shiftsContext(command) {
+  return CONTEXT_SHIFT_REGEX.test(command) || CHDIR_FLAG_REGEX.test(command);
+}
 
 /** Escape a literal string for embedding in a RegExp. */
 function escapeRegExp(literal) {
@@ -47,16 +101,41 @@ function escapeRegExp(literal) {
 }
 
 /**
+ * True when two paths name the same directory on this machine.
+ *
+ * Compares resolved symlinks, not just lexical form: on Bazzite the repo root
+ * has two spellings (`/home/...` and `/var/home/...`), and on macOS `/tmp` and
+ * `/private/tmp` are the same place.
+ *
+ * @param {string} a
+ * @param {string} b
+ * @param {(p: string) => string} [realpath]
+ */
+function samePath(a, b, realpath = fs.realpathSync) {
+  if (path.resolve(a) === path.resolve(b)) return true;
+  try {
+    return realpath(a) === realpath(b);
+  } catch {
+    // One of them does not exist — they are not the same directory.
+    return false;
+  }
+}
+
+/**
  * The absolute prefixes that name `repoRoot` on this machine.
  *
- * Includes the symlinked spelling, so a Bazzite agent that types the
- * `/home/froeht/...` form still gets the rewrite even though git reports the
- * canonical `/var/home/froeht/...`.
+ * The `/home` <-> `/var/home` sibling is offered only when both spellings
+ * actually resolve to the same directory. On Bazzite (Fedora Atomic) they do,
+ * so an agent that types either form gets the rewrite. On any other Linux with
+ * the repo at `/home/...`, `/var/home/...` is a different — usually
+ * nonexistent — directory, and synthesizing it unchecked would reintroduce the
+ * original bug in mirror image.
  *
  * @param {string} repoRoot
+ * @param {(p: string) => string} [realpath]
  * @returns {string[]} deduped, longest first
  */
-function workspacePrefixes(repoRoot) {
+function workspacePrefixes(repoRoot, realpath = fs.realpathSync) {
   const roots = new Set();
 
   const add = (p) => {
@@ -66,15 +145,17 @@ function workspacePrefixes(repoRoot) {
 
   add(repoRoot);
   try {
-    add(fs.realpathSync(repoRoot));
+    add(realpath(repoRoot));
   } catch {
     // Root does not resolve — the literal spelling is all we have.
   }
 
-  // /home <-> /var/home are the same directory on Bazzite (Fedora Atomic).
   for (const root of [...roots]) {
-    if (root.startsWith("/var/home/")) add(root.slice("/var".length));
-    else if (root.startsWith("/home/")) add(`/var${root}`);
+    let sibling = null;
+    if (root.startsWith("/var/home/")) sibling = root.slice("/var".length);
+    else if (root.startsWith("/home/")) sibling = `/var${root}`;
+
+    if (sibling && samePath(sibling, root, realpath)) add(sibling);
   }
 
   return [...roots].sort((a, b) => b.length - a.length);
@@ -85,7 +166,7 @@ function workspacePrefixes(repoRoot) {
  *
  * `(?<![\w./@{}~-])` requires the match to START a path: the character before
  * it must not be one that could continue a path. That is what stops a prefix
- * from matching inside a longer, unrelated path.
+ * from matching inside a longer, unrelated path (guard 2).
  */
 function buildRegex(prefixes) {
   const alternation = prefixes.map(escapeRegExp).join("|");
@@ -97,17 +178,26 @@ function buildRegex(prefixes) {
 
 /**
  * Rewrite absolute workspace paths in `command` to paths relative to
- * `repoRoot`, but only where the target actually exists under `repoRoot`.
+ * `repoRoot`, but only where the target exists under `repoRoot` and the
+ * command does not move the ground out from under a relative path.
  *
- * Pure apart from the injected `exists` probe, so it is unit-testable.
+ * Pure apart from the injected probes, so it is unit-testable.
  *
  * @param {string} command
  * @param {string} repoRoot
- * @param {(p: string) => boolean} [exists]
+ * @param {{ exists?: (p: string) => boolean, realpath?: (p: string) => string }} [probes]
  * @returns {{ modified: string, rewrites: string[] }}
  */
-function normalizeCommand(command, repoRoot, exists = fs.existsSync) {
-  const prefixes = workspacePrefixes(repoRoot);
+function normalizeCommand(command, repoRoot, probes = {}) {
+  const { exists = fs.existsSync, realpath = fs.realpathSync } = probes;
+
+  // Guards 3 and 4: after a `cd` or an `ssh`, a relative path means something
+  // else. Leave the whole command alone rather than guess at its scope.
+  if (shiftsContext(command)) {
+    return { modified: command, rewrites: [] };
+  }
+
+  const prefixes = workspacePrefixes(repoRoot, realpath);
   if (prefixes.length === 0) {
     return { modified: command, rewrites: [] };
   }
@@ -166,9 +256,11 @@ async function main() {
     // Not in a git repo — fall back to cwd
   }
 
-  // A root-relative path only means the same thing as the absolute one when the
-  // command runs from the root. From a subdirectory, stay out of the way.
-  if (path.resolve(agentCwd) !== path.resolve(repoRoot)) {
+  // Guard 3: a root-relative path only means the same thing as the absolute one
+  // when the command starts at the root. From a subdirectory, stay out of the
+  // way. Compared through symlinks, since git and the agent can spell the same
+  // directory differently.
+  if (!samePath(agentCwd, repoRoot)) {
     process.exit(0);
   }
 
@@ -196,7 +288,12 @@ async function main() {
   process.exit(0);
 }
 
-module.exports = { normalizeCommand, workspacePrefixes };
+module.exports = {
+  normalizeCommand,
+  workspacePrefixes,
+  shiftsContext,
+  samePath,
+};
 
 if (require.main === module) {
   main().catch((err) => {
