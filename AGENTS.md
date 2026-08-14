@@ -30,6 +30,8 @@ That tier is Claude Code-specific. In any other tool, read the catalog directly.
 
 Load relevant skills for every task. If your tool doesn't support skills, read the file directly. All skills live at `.agents/skills/<name>/SKILL.md`.
 
+**The huddle is the exception, and it is not in this repo.** Inter-session coordination — the SessionStart identity notice, the poll, the daily bead — moved to Tim's dotfiles on 2026-08-12: scripts at `~/.claude/hooks/huddle/`, skill at `~/.claude/skills/huddle/`, tests alongside the scripts. Nothing about it was PinPoint-specific, and living outside the repo means editing it costs no PR. What stays here is the four hook registrations in `.claude/settings.json` and the channel itself — the huddle resolves `.agents/huddle/` and its beads from the cwd's repo, so the conversation is still per-project.
+
 ## 4. Environment
 
 ### Host prerequisites
