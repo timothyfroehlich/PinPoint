@@ -1360,3 +1360,188 @@ it incomplete and burned three resume rounds re-asking for work it already had. 
 `another active schedule task "…/task-55" has a conflicting early termination condition "any"`.
 It self-heals early and kills late, and the longer a wave runs the more likely it is to land
 fatally. Long waves should expect it.
+
+---
+
+## 2026-08-14 — Gemini 3.7 Flash, and a permission-to-find-nothing framing
+
+### 3.7 Flash + the no-quota framing: 0 of 4, and a confident approve
+
+Two variables moved at once — Gemini 3.7 Flash (High) replaced 3.6, and the prompt gained the
+"there is no quota, finding nothing is fine" framing (v6.8). The result on PR #1809 at
+`77d36312`, where 3.6 + v6.7 scored 2 of 4 on two separate runs:
+
+| run | model              | prompt   | findings | score                          |
+| :-- | :----------------- | :------- | -------: | :----------------------------- |
+| a   | 3.6-flash-high     | v6.7     |        2 | 2 of 4                         |
+| b   | 3.6-flash-high     | v6.7     |        2 | 2 of 4                         |
+| g37 | **3.7**-flash-high | **v6.8** |    **0** | **0 of 4**, `verdict: approve` |
+
+A confident clean is the most expensive way for a reviewer to be wrong, so the run is worth
+reading rather than just scoring.
+
+#### Every expectation item was discharged, and every trace was the happy path
+
+24 items across four slices. **All 24 marked `implemented`**, none `missing`, none
+`unverified`. That is the exact shape already recorded as the coverage-audit failure signature,
+at its limit.
+
+All four slices also traced the same sequence — search `elvira`, take the `machineGroupId`,
+list its editions, extract a `pinballmapMachineId` — which is the vanilla success path. The
+Trace obligation asks for "a retry, two actors on one record, a value that is stale by one sync
+cycle"; four slices out of four picked the path where nothing goes wrong. Three of the four
+keyed defects only appear when something does.
+
+#### One item landed on the defect's own line and cleared it
+
+Slice 2, item 3:
+
+> _Listing editions for a non-existent or invalid `machineGroupId` throws a clear not_found
+> error rather than returning an empty list disguised as a zero-edition family_ —
+> `implemented`, at `search-pinballmap-catalog.ts:119`
+
+C1 **is** line 119. The item read the right file, cited the right line, and was satisfied by it,
+because it asked whether an error is thrown at all. C1 is that an _empty catalog mirror_ throws
+the same "no family has this id" error as a genuinely bad id, so a fresh environment is told
+confidently that its id is wrong. One level deeper and the item finds it.
+
+This is the same shallowness that cost the #1807 v6.3 run, recurring: an item about what the
+code _does_ rather than about what following it _achieves_.
+
+#### What did not change
+
+Slice 3 read `list-machines.ts`, `get-machine.ts`, `add-machine.ts` and `shared.ts` — precisely
+the siblings C3 and C4 require — and reported nothing. 3.6 did the same thing twice. The
+naming-convention blind spot is not a 3.6 artefact.
+
+#### The confound, and the control
+
+Model and prompt moved together, so this run cannot attribute the drop. The disambiguating run
+is 3.6 + v6.8 on the same target:
+
+- 3.6 + v6.8 returns ~2 → the model is the regression.
+- 3.6 + v6.8 returns 0 → the no-quota framing is, and the plausible mechanism is that it makes
+  "everything holds" a comfortable place to stop. 24/24 discharged, four happy-path traces and
+  an `approve` is what a reviewer who has been told it is fine to find nothing looks like.
+
+#### The control: 3.6 + v6.8 scores 2 of 4, so the framing is exonerated
+
+| run      | model   | prompt   | findings | score                |
+| :------- | :------ | :------- | -------: | :------------------- |
+| a        | 3.6     | v6.7     |        2 | 2 of 4               |
+| b        | 3.6     | v6.7     |        2 | 2 of 4               |
+| **g36c** | **3.6** | **v6.8** |    **3** | **2 of 4** + a bonus |
+| g37      | 3.7     | v6.8     |        0 | 0 of 4, `approve`    |
+
+C2 at medium/0.95 and C1's query half at medium/0.85, plus a test-coverage finding not in the
+key: `search_pinballmap_catalog`'s seven integration cases all pass an admin context, so the
+`machines.view` check could be deleted with nothing failing, where sibling tools in the same
+file do cover it.
+
+The no-quota framing costs nothing at three runs across two prompts. That leaves the model.
+
+#### 3.7 run two reproduces run one exactly
+
+24 of 24 implemented, no `missing` items, three of four traces on `elvira`, `verdict:
+approve` — and four slices reported with none blocked, so it is a real review returning zero,
+not a lost wave.
+
+| model          | runs | findings | keyed            |
+| :------------- | ---: | :------- | :--------------- |
+| 3.6-flash-high |    3 | 2, 2, 3  | 2 of 4 every run |
+| 3.7-flash-high |    2 | 0, 0     | 0 of 4 both runs |
+
+Run two also walked C1's exact path and cleared it. Its slice-2 trace, in full:
+
+> `search_pinballmap_catalog({ machineGroupId: 70012 })` → `runSearchPinballmapCatalog` →
+> `listGroupEditions(70012)` **returning `[]`** → `throws McpToolError(not_found)` with hint to
+> use machineGroupId instead of pinballmapMachineId
+
+C1 is that the empty array has two causes — a bad id, and a catalog mirror with nothing in it —
+and the error only names one. The trace records the empty array and moves on. Never asking why
+it was empty is the whole miss.
+
+**Default stays 3.6-flash-high.** 3.7 is measured worse here and its failure mode is the
+expensive one: not a review that argues wrongly, a review that approves confidently.
+
+#### What actually separated the scoring run from the zero: which instance got traced
+
+This does not depend on comparing scores across runs, which is the part non-determinism makes
+unreliable. It is visible inside the runs.
+
+The control's two `missing` expectation items map one to one onto its two keyed findings:
+
+| item marked `missing`                                                      | finding |
+| :------------------------------------------------------------------------- | :------ |
+| description explains how standalone titles (`machineGroupId: null`) differ | C2      |
+| distinguishes an empty catalog mirror from a query returning 0 matches     | C1      |
+
+22 of 24 implemented, and both exceptions became findings. So the list worked — and the reason
+it produced items sharp enough to be violated is upstream of the list. That slice traced **"The
+Addams Family"**: a standalone title where `machineGroupId` is `null`. 3.7 traced `elvira`, an
+ordinary multi-edition family, in all four slices, marked 24 of 24 implemented, and found
+nothing.
+
+The Trace obligation currently asks for a concrete sequence and offers examples of awkward ones.
+Both runs complied. Only one picked an instance where a field is null. **Candidate v6.9 change:
+require the most awkward instance the change admits, not merely a specific one.** Held rather
+than applied — every revision made on one run's evidence has cost recall.
+
+#### The first control attempt was void, and nearly scored as a zero
+
+It returned `findings: []` — and all four slices in `blocked_slices`, each with _"Subagent
+execution interrupted by system restart before report could be delivered."_ Nothing restarted;
+that is the parent's own confabulation for having ended its turn after fanning out, already on
+record from an earlier wave. So it is a lost wave, not a clean review, and it settles nothing.
+
+The reporting rules did their job — the parent listed every dropped slice and returned
+`needs-attention` rather than `approve`. The harness did not. `run.sh` gates completeness on
+`findings` being an array, and **a wave that loses every slice emits exactly that**: a
+well-formed object with an empty array. It parses, it looks like a clean review, and it is the
+most dangerous possible false negative in a calibration set.
+
+`run.sh` now prints `findings=N blocked=N slices_reported=N` on every success and exits 3 when
+`coverage` is empty. A zero is only a zero when somebody reported.
+
+### #1810 run two: 2 of 3 again, and a different two
+
+Same target, same key, near-identical prompt (v6.8 differs from v6.7 only by the no-quota
+paragraph). 5 findings, 4 slices reported, 0 blocked.
+
+| key item                                                                                                                    | run 1 (v6.7)         | run 2 (v6.8)                                  |
+| :-------------------------------------------------------------------------------------------------------------------------- | :------------------- | :-------------------------------------------- |
+| G1 `captureAutoLink` unwrapped, a non-`23505` failure reports "Failed to update machine" for an edit that already committed | hit, high/0.9        | hit, high/0.9, **both** call sites separately |
+| G2 bare `23505` conflates a `timeline_events` collision with a listing collision                                            | **miss**             | **hit**, medium/0.9, `sync.ts:119`            |
+| G3 missing `enabled` gate on the manual sync path                                                                           | **hit**, medium/0.95 | **miss**                                      |
+
+**The union of two runs is 3 of 3.** Neither run alone gets there.
+
+This is the clearest evidence yet for running twice rather than tuning once. G2 had been the
+open question — the slice that owned it returned zero findings on run 1, and the candidate
+explanation was that the slice was mis-designed. It was not. The same slice on the same brief
+found it the next time, and named the mechanism the key calls the giveaway: the transaction
+also writes a `timeline_events` row under its own partial unique index, so a collision there is
+absorbed as "someone else already listed it".
+
+Read the other way: **run 1's G3 hit is not reproducible either.** The single most valuable item
+in the calibration set — the only one invisible in the diff a reviewer was reading — was found
+once in two attempts. "This harness reviews code rather than diffs" is a claim about one run,
+and the honest version is that it _can_, not that it _does_.
+
+#### The two unkeyed findings
+
+Neither is a false positive.
+
+- **`createMachineAction` never calls `resolveAutoLinkForMachine`** (medium/0.85). Verified: the
+  only call site is `actions.ts:751`, inside `updateMachineAction` which begins at `:576`;
+  `createMachineAction` runs `:211`–`:575` with no call. A cabinet created with a catalog title
+  already matched stays unlisted until the hourly cron. Not in the key because round two did not
+  address it, but it is the same shape as G3 — two sibling entry points into one job, one of
+  them missing a step.
+- **Snapshot freshness is never checked** before a save-time auto-link decision (low/0.8),
+  correctly hedged as "could be" rather than asserted.
+
+#### What this settles about the framing
+
+3.6 + v6.8 across two targets: 2 of 4 on #1809 plus a valid bonus, 2 of 3 on #1810 plus a valid
+bonus. Matches the v6.7 baseline on both. The no-quota paragraph is free — keep it.
