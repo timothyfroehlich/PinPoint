@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "../support/fixtures.js";
 import { loginAs } from "../support/actions.js";
 import { TEST_USERS } from "../support/constants.js";
 

@@ -5,7 +5,7 @@
  * page. NN #11 — every clickable element gets clicked in an E2E test.
  */
 
-import { test, expect, type Page, type TestInfo } from "@playwright/test";
+import { test, expect, type Page, type TestInfo } from "../support/fixtures.js";
 import { cleanupTestEntities } from "../support/cleanup.js";
 import { seededMachines } from "../support/constants.js";
 import {

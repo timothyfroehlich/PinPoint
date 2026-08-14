@@ -52,10 +52,10 @@ export function createDiscordChannel(config: DiscordConfig): DeliveryChannel {
         type: ctx.type,
         siteUrl: getSiteUrl(),
         resourceType: ctx.resourceType,
-        resourceId: ctx.resourceId,
         issueTitle: ctx.issueTitle,
         formattedIssueId: ctx.formattedIssueId,
         machineName: ctx.machineName,
+        machineInitials: ctx.machineInitials,
         newStatus: ctx.newStatus,
         commentContent: ctx.commentContent,
       });

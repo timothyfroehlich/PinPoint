@@ -26,7 +26,7 @@
  * covers /about, /privacy, /terms as public routes.
  */
 
-import { test, expect } from "@playwright/test";
+import { test, expect } from "../support/fixtures.js";
 import { seededMachines } from "../support/constants.js";
 
 test.describe("Public Routes — Class-A Residuals", () => {

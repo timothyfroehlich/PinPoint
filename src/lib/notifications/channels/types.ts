@@ -28,6 +28,13 @@ export interface ChannelContext {
   // Resolved at the top of planNotification before the fan-out
   issueTitle?: string | undefined;
   machineName?: string | undefined;
+  /**
+   * The machine's 2-6 char initials — the only handle that addresses a machine
+   * in a URL (`/m/<INITIALS>`); `resourceId` names no route. Resolved only for
+   * machine-resource notifications; issue links derive their initials from
+   * `formattedIssueId` instead. (PP-gzq2)
+   */
+  machineInitials?: string | undefined;
   formattedIssueId?: string | undefined;
   commentContent?: string | undefined;
   newStatus?: string | undefined;
