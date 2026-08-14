@@ -141,6 +141,29 @@ describe("Notification Formatting", () => {
       expect(html).toContain('href="http://test.com/m/TZ/i/42"');
     });
 
+    it("should link a machine-ownership email to the machine, not the issue list", () => {
+      const html = getEmailHtml({
+        type: "machine_ownership_changed",
+        machineName: "Medieval Madness",
+        machineInitials: "MM",
+        newStatus: "added",
+      });
+
+      expect(html).toContain('href="http://test.com/m/MM"');
+      expect(html).toContain("View Machine");
+      expect(html).not.toContain("View Issue");
+    });
+
+    it("should fallback to the machine list when ownership email lacks initials", () => {
+      const html = getEmailHtml({
+        type: "machine_ownership_changed",
+        machineName: "Medieval Madness",
+        newStatus: "added",
+      });
+
+      expect(html).toContain('href="http://test.com/m"');
+    });
+
     it("should fallback to generic link if ID is missing", () => {
       const html = getEmailHtml({
         type: "new_issue",
