@@ -6,6 +6,7 @@ import {
   count,
   eq,
   ilike,
+  inArray,
   isNotNull,
   isNull,
   or,
@@ -14,7 +15,10 @@ import {
 import { z } from "zod";
 
 import { checkPermission } from "~/lib/permissions/helpers";
-import { VALID_MACHINE_PRESENCE_STATUSES } from "~/lib/machines/presence";
+import {
+  VALID_MACHINE_PRESENCE_STATUSES,
+  type MachinePresenceStatus,
+} from "~/lib/machines/presence";
 import { db } from "~/server/db";
 import { machines } from "~/server/db/schema";
 
@@ -74,7 +78,39 @@ const PINBALLMAP_FILTER_CONDITIONS: Record<PinballmapFilter, [SQL, ...SQL[]]> =
     excluded: [eq(machines.pinballmapExcluded, true)],
   };
 
-const listMachinesSchema = z.object({
+/**
+ * `presence` takes a SET, not a single value (PP-u4ab.13).
+ *
+ * A single value cannot express the question the fleet linking pass (PP-h059)
+ * actually runs on: "unlinked AND still plausibly in the collection". Without
+ * it, `pinballmap: "unlinked"` also returns the cabinets that are `removed` or
+ * `pending_arrival` — rows nobody will ever link, which therefore sit in every
+ * page of that filter forever and hold `total` above zero permanently. The
+ * model was left to notice and skip them by hand on each page.
+ *
+ * The single-value form is kept, not deprecated: it is what every existing
+ * caller sends, and `presence: "off_the_floor"` stays the natural way to ask a
+ * one-state question.
+ *
+ * `.min(1)` on the array is deliberate. An empty set would type-check, produce
+ * `inArray(col, [])` — a predicate matching nothing — and hand back
+ * `total: 0` for the whole collection, which reads as an authoritative "there
+ * are none" rather than as the malformed filter it is (CORE-ARCH-012). Zod
+ * rejects it instead.
+ */
+const presenceFilterSchema = z.union([
+  z.enum(VALID_MACHINE_PRESENCE_STATUSES),
+  z.array(z.enum(VALID_MACHINE_PRESENCE_STATUSES)).min(1),
+]);
+
+type PresenceFilter = z.infer<typeof presenceFilterSchema>;
+
+function resolvePresence(filter: PresenceFilter): MachinePresenceStatus[] {
+  return Array.isArray(filter) ? filter : [filter];
+}
+
+/** Exported for the schema-level tests; the tool registers this same object. */
+export const listMachinesSchema = z.object({
   search: z
     .string()
     .trim()
@@ -83,10 +119,11 @@ const listMachinesSchema = z.object({
     .describe(
       "Filter by machine name or initials (case-insensitive substring)."
     ),
-  presence: z
-    .enum(VALID_MACHINE_PRESENCE_STATUSES)
+  presence: presenceFilterSchema
     .optional()
-    .describe("Only machines with this availability status."),
+    .describe(
+      "Which availability statuses to include: one status, or an array of them. The statuses are on_the_floor, off_the_floor, on_loan, pending_arrival, removed. A cabinet in any of the first three is still plausibly in the collection; removed is gone and pending_arrival has not arrived yet."
+    ),
   pinballmap: z
     .enum(PINBALLMAP_FILTERS)
     .optional()
@@ -123,8 +160,13 @@ export async function runListMachines(
   }
 
   const conditions = [];
-  if (args.presence) {
-    conditions.push(eq(machines.presenceStatus, args.presence));
+  if (args.presence !== undefined) {
+    // `inArray` for both forms — the single value is normalised to a one-element
+    // set rather than kept on a separate `eq` path, so there is one condition to
+    // keep in step with the count query instead of two (PP-u4ab.13).
+    conditions.push(
+      inArray(machines.presenceStatus, resolvePresence(args.presence))
+    );
   }
   if (args.search) {
     const like = `%${args.search}%`;
@@ -226,7 +268,7 @@ export function registerListMachines(server: McpServer): void {
     {
       title: "List machines",
       description:
-        "List machines with their initials, name, availability, owner name, and open-issue count. Use this to find a machine's initials before acting on it (e.g. disambiguate 'the Medieval Madness by the door'). Supports a name/initials search, a presence filter, and a PinballMap link-state filter (pinballmap: 'unlinked' | 'linked' | 'excluded') — use pinballmap: 'unlinked' to get the machines still needing a PinballMap catalog match. Returns 'count' (this page), 'total' (every match), 'offset', and 'hasMore'. Answer counting questions from 'total', never from 'count' or the array length. To enumerate a collection larger than one page, keep requesting with offset += limit until hasMore is false — raising limit alone caps at 100 and will not reach the rest. That works only while the matching set holds still, and your own calls can move it: set_machine_availability changes presence, set_machine_name changes name (the search target and the sort key), add_machine adds rows. So if you are ACTING on the machines as you page them — 'put every off-the-floor machine back on the floor' — do NOT advance the offset. Each machine you fix leaves the filter and the rest shift up, so offset += limit steps over exactly as many machines as you just fixed, and the sweep ends on hasMore:false having never shown them. Re-request offset 0 and let the list drain instead. Raise offset only past machines you deliberately left unchanged, so they don't keep coming back. You are done when a request returns EMPTY (count 0), NOT when total reaches 0 — machines you left unchanged hold total above 0 forever.",
+        "List machines with their initials, name, availability, owner name, and open-issue count. Use this to find a machine's initials before acting on it (e.g. disambiguate 'the Medieval Madness by the door'). Supports a name/initials search, a presence filter (one status, or an array of them to accept several at once), and a PinballMap link-state filter (pinballmap: 'unlinked' | 'linked' | 'excluded') — use pinballmap: 'unlinked' to get the machines still needing a PinballMap catalog match. For that linking pass, ask for pinballmap: 'unlinked' TOGETHER WITH presence: ['on_the_floor', 'on_loan', 'off_the_floor'], which is the actionable worklist. 'unlinked' on its own also returns cabinets that are 'removed' (no longer in the collection) or 'pending_arrival' (not here yet) — nobody will ever link those, so they come back on every page of every sweep and you would have to recognise and skip them by hand each time. Narrowing presence drops them from 'total' as well as from the page, so 'total' is the size of the work actually left. Returns 'count' (this page), 'total' (every match), 'offset', and 'hasMore'. Answer counting questions from 'total', never from 'count' or the array length. To enumerate a collection larger than one page, keep requesting with offset += limit until hasMore is false — raising limit alone caps at 100 and will not reach the rest. That works only while the matching set holds still, and your own calls can move it: set_machine_availability changes presence, set_machine_name changes name (the search target and the sort key), add_machine adds rows. So if you are ACTING on the machines as you page them — 'put every off-the-floor machine back on the floor' — do NOT advance the offset. Each machine you fix leaves the filter and the rest shift up, so offset += limit steps over exactly as many machines as you just fixed, and the sweep ends on hasMore:false having never shown them. Re-request offset 0 and let the list drain instead. Raise offset only past machines you deliberately left unchanged, so they don't keep coming back. You are done when a request returns EMPTY (count 0), NOT when total reaches 0 — machines you left unchanged hold total above 0 forever. Narrowing the filter so it matches only rows you can actually act on, as the presence set above does, is what lets total fall to 0 at all.",
       inputSchema: listMachinesSchema.shape,
     },
     (args, extra) =>
