@@ -9,7 +9,7 @@
  * All UI-state assertions (H-class) live in:
  *   src/test/unit/components/issues/issue-detail-permissions.test.tsx
  */
-import { test, expect } from "@playwright/test";
+import { test, expect } from "../support/fixtures.js";
 import { assertNoA11yViolations } from "../support/actions.js";
 import { seededIssue } from "../support/constants.js";
 

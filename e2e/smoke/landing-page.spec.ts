@@ -8,7 +8,7 @@
  * The middleware task (PinPoint-nm6) will update routing to allow public access.
  */
 
-import { test, expect } from "@playwright/test";
+import { test, expect } from "../support/fixtures.js";
 import { assertNoA11yViolations } from "../support/actions.js";
 
 test.describe("Landing Page", () => {

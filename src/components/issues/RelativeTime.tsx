@@ -6,8 +6,29 @@ import { useRelativeNow } from "./RelativeTimeProvider";
 
 interface RelativeTimeProps {
   value: Date | string;
-  /** Server/hydration label. Defaults to an ISO instant so SSR and browser
-   *  hydration do not diverge across different default locales/time zones. */
+  /**
+   * Server/hydration label, rendered until the client ticker mounts.
+   *
+   * Defaults to the empty string. It must not default to anything derived from
+   * `value` at render time: a locale- or zone-formatted label diverges between
+   * SSR and hydration, and the ISO instant this once defaulted to is 24
+   * characters — far wider than any relative label it stands in for. The
+   * timeline rows pin this into a `shrink-0` slot sized for "2 minutes ago",
+   * so the raw instant overflowed the row and was clipped until hydration
+   * (PP-h490). Empty is both zone-independent and unable to overflow.
+   *
+   * Pass an absolute label where the pre-hydration paint should still carry a
+   * date. The pattern to copy is `IssueUpdatedTimestamp`, whose `fallback` is
+   * computed by the issue-detail *server* page and handed down as a prop — the
+   * string is then built once, in one zone, and cannot diverge.
+   *
+   * `NotificationList` and `IssueList` also pass `formatDateTime(...)`, but
+   * both are `"use client"` and call it inline, so the value is computed twice
+   * in two possibly-different zones. That is tolerable *here* only because a
+   * fallback is text that the ticker replaces on mount; the same inline call
+   * feeding an `aria-label` or any other attribute is a real bug, because
+   * React does not patch mismatched attributes (see `IssueTimeline`).
+   */
   fallback?: string;
 }
 
@@ -19,11 +40,7 @@ export function RelativeTime({
   // After mount the shared ticker emits a number every 60s, causing a re-render.
   const now = useRelativeNow();
 
-  const resolvedFallback = (() => {
-    if (fallback !== undefined) return fallback;
-    const date = typeof value === "string" ? new Date(value) : value;
-    return Number.isNaN(date.getTime()) ? "" : date.toISOString();
-  })();
+  const resolvedFallback = fallback ?? "";
 
   // Pre-mount / SSR path: render fallback (matches original useEffect behaviour).
   if (now === null) {

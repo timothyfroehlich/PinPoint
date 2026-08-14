@@ -1,6 +1,6 @@
 ---
 name: pinpoint-huddle
-description: The conventions behind the inter-session coordination channel that the huddle hooks inject but do not state — which events are auto-posted versus the judgment calls only you can post (added scope is the most-skipped and most-needed), peer-response etiquette, the em-dash self-filter signature, why a session_id belongs to whoever registered it first, why a dispatched subagent is refused registration outright, and the rotation subagent dispatch the session-start notice routes here for. Also how to read the work digest, the env knobs that quiet the nudge and the poll (`HUDDLE_NUDGE_SECONDS`, `HUDDLE_THROTTLE_SECONDS`), and the multi-machine setup — one shared Dolt server, `config.json` as a rebuildable cache rather than a source of truth, `today_bead.id` as a hint that gets verified. Use when you see a rotation-needed notice, when deciding whether something is worth posting to the daily bead, when your own posts start re-injecting, when a peer's update scrolls by, when the huddle is too noisy, or when a huddle lookup returns null on a machine.
+description: The conventions behind the inter-session coordination channel that the huddle hooks inject but do not state — which events are auto-posted versus the judgment calls only you can post (added scope is the most-skipped and most-needed), peer-response etiquette, the em-dash self-filter signature, where a session's name comes from (the herdr workspace label, falling back to the bead) and why setting the matching harness display name means asking Tim to run `/rename`, why a session_id belongs to whoever registered it first, why a dispatched subagent is refused registration outright, and the rotation subagent dispatch the session-start notice routes here for. Also how to read the work digest, the env knobs that quiet the nudge and the poll (`HUDDLE_NUDGE_SECONDS`, `HUDDLE_THROTTLE_SECONDS`), and the multi-machine setup — one shared Dolt server, `config.json` as a rebuildable cache rather than a source of truth, `today_bead.id` as a hint that gets verified. Use when you see a rotation-needed notice, when deciding whether something is worth posting to the daily bead, when your own posts start re-injecting, when a peer's update scrolls by, when the huddle is too noisy, or when a huddle lookup returns null on a machine.
 ---
 
 # pinpoint-huddle
@@ -18,6 +18,63 @@ Read it as orientation, not as instructions: it tells you what kind of work this
 ## Identity
 
 Sign your huddle comments with `—<YourFullRegisteredName>` (em-dash + your full registered name). The self-filter matches this suffix to suppress your own echoes.
+
+### Where the name comes from
+
+A session carries three names, and they are set by three different things. The
+huddle name is the only one you control; keeping the other two in step is a
+handoff, not an API call.
+
+| Name                  | Set by                             | Seen in                            |
+| --------------------- | ---------------------------------- | ---------------------------------- |
+| Huddle name           | `huddle-whoami.sh register` — you  | Bead signatures, self-filter       |
+| Display name          | `/rename` — Tim only               | `ListAgents` peers, terminal title |
+| herdr workspace label | Tim, when he creates the workspace | herdr sidebar                      |
+
+**Derive the huddle name from the workspace label.** Tim already typed a name for
+this session when he made its workspace, so it says what the session is for
+without you guessing. The registration notice reads it and prints a CamelCased
+candidate. When the label is generic — `PinPoint`, `Orchestrating`, `Busywork`,
+`main`, a bare number — name yourself after the bead Tim pointed you at instead;
+fall back to the task only when there is neither.
+
+**Then ask Tim to run `/rename <YourName>`,** one line at the end of your next
+response. In Claude Code that is the only way the display name gets set, and you
+cannot do it yourself: `/rename` is registered `type: local-jsx` with
+`requires: {ink: true}`, so it needs the interactive terminal UI and no tool
+reaches it. (`--name` at launch would work but fires before the task is known.)
+Don't block on the answer. Confirmed to propagate to both surfaces: a peer that
+listed as `pinpoint-11 [a8cc65]` listed as `crabbox-lease-staleness-fix [a8cc65]`
+after its rename, and the terminal title changes in the same instant.
+
+The notice reads the label from **`$HERDR_WORKSPACE_ID`**, not by matching panes.
+Hooks inherit the environment herdr launched the agent in, so the variable is
+right there and names the workspace directly. Both alternatives are traps:
+`herdr pane list`'s `agent_session.value` has been measured pointing at a
+_different live session_ (see the `herdr` skill), and `terminal_title` carries
+Claude Code's animating activity glyph, which `terminal_title_stripped` only
+partly removes — `✳` and the braille frames yes, `◐`/`◑` no.
+
+`$HERDR_WORKSPACE_ID` goes stale in a forked session, after a handoff, and on a
+**moved pane**. The moved pane is the one that misleads: the lookup is
+live-by-id, so it returns the _current_ label of a _different_ workspace and the
+notice offers a plausible name belonging to someone else's task. Tolerable here
+and nowhere else in the huddle, because the result is a _suggestion_ you and Tim
+both read before it is registered — never a signature attributed silently.
+
+**Any hook that reads herdr needs a hard timeout.** `.claude/settings.json` caps
+this hook at 5000ms and it already runs ~4s. Exceeding the cap is not a degraded
+notice: Claude Code kills the hook and discards **all** of its stdout, so the
+session learns no session_id, never registers, and re-injects its own posts —
+the PP-2m3l breakage. The lookup is wrapped in `timeout 1` (the call itself
+measures ~9ms), and with neither `timeout` nor `gtimeout` present it is skipped
+rather than run unbounded.
+
+No herdr — a bare terminal, Bazzite, another harness — and the notice silently
+drops to bead-then-task. Nothing errors. The notice is harness-neutral: it says
+`<Harness>-` rather than `Claude-`, and makes the rename step conditional on the
+harness having such a command, because Antigravity and Codex run this same hook
+through `.agents/hooks/antigravity-bootstrap.cjs`.
 
 **A session_id belongs to whoever registered it first.** `register` refuses to
 rebind a session_id that already holds a different name — no silent overwrite,

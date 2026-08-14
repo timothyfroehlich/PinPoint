@@ -25,6 +25,26 @@ describe("RelativeTime", () => {
     expect(html).not.toMatch(/ago|just now|in /);
   });
 
+  it("renders nothing pre-hydration when no fallback is given", () => {
+    // Regression (PP-h490): the default used to be `value.toISOString()`, so a
+    // call site that omitted `fallback` painted "2026-04-25T10:00:00.000Z" —
+    // 24 characters — into a slot sized for "2 minutes ago". In the timeline
+    // rows that slot is right-pinned and `shrink-0`, so the raw instant pushed
+    // ~35px past the viewport on a 375px screen and was clipped by the row's
+    // own `overflow-hidden` until the client ticker mounted. Mobile Safari
+    // hydrates late enough for a user (and the responsive-overflow spec) to
+    // see it; Chrome usually did not.
+    //
+    // An empty default is hydration-safe for the same reason the ISO instant
+    // was chosen — it cannot vary by locale or time zone — and it cannot
+    // overflow any slot.
+    const html = renderToString(
+      <RelativeTime value={new Date("2026-04-25T10:00:00Z")} />
+    );
+    expect(html).not.toMatch(/\d{4}-\d{2}-\d{2}T/);
+    expect(html).toBe("");
+  });
+
   it("swaps to a relative label after mount", async () => {
     const recent = new Date(Date.now() - 5 * 60_000); // 5 minutes ago
     render(

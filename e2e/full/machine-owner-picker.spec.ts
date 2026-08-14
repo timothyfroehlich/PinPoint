@@ -17,7 +17,7 @@
  * `src/components/users/InviteUserDialog.test.tsx`.
  */
 
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page } from "../support/fixtures.js";
 import { cleanupTestEntities } from "../support/cleanup.js";
 import { STORAGE_STATE } from "../support/auth-state.js";
 import { createTestUser, deleteTestUser } from "../support/supabase-admin.js";

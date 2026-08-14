@@ -10,7 +10,7 @@
  * NOTE: Hover-card reveal is intentionally NOT asserted — hover is flaky in E2E.
  */
 
-import { test, expect } from "@playwright/test";
+import { test, expect } from "../support/fixtures.js";
 import { STORAGE_STATE } from "../support/auth-state.js";
 
 test.describe("Profile edit", () => {

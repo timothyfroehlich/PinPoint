@@ -66,12 +66,12 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node .claude/hooks/normalize-workspace-paths.cjs",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/normalize-workspace-paths.cjs",
             "timeout": 5000
           },
           {
             "type": "command",
-            "command": "node .claude/hooks/inject-beads-actor.cjs",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/inject-beads-actor.cjs",
             "timeout": 5000
           }
         ]
@@ -81,7 +81,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node .claude/hooks/block-direct-merge.cjs",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/block-direct-merge.cjs",
             "timeout": 5000
           }
         ]
@@ -91,7 +91,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node .claude/hooks/block-main-worktree-branch-switch.cjs",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/block-main-worktree-branch-switch.cjs",
             "timeout": 5000
           }
         ]
@@ -101,7 +101,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node .claude/hooks/block-worktree-dispatch-from-linked.cjs",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/block-worktree-dispatch-from-linked.cjs",
             "timeout": 5000
           }
         ]
@@ -123,7 +123,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node .claude/hooks/ui-screenshot-reminder.cjs",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/ui-screenshot-reminder.cjs",
             "timeout": 5000
           }
         ]
@@ -207,7 +207,7 @@
           },
           {
             "type": "command",
-            "command": "node .claude/hooks/verify-guard-stack.cjs",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/verify-guard-stack.cjs",
             "timeout": 5000
           },
           {
