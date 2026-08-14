@@ -86,6 +86,13 @@ export interface PinballmapListingControlProps {
   writeEnabled: boolean;
   /** Catalog title, so a confirm names the game rather than "this machine". */
   modelName: string | null;
+  /**
+   * Initials of the OTHER cabinets sharing this title, for the two states whose
+   * sentence has to name them. Empty for every other state, and the copy falls
+   * back to "another cabinet" rather than rendering a gap if it arrives empty
+   * when it shouldn't.
+   */
+  rivalInitials?: readonly string[];
 }
 
 /** What the confirm dialog for each outbound action says. */
@@ -141,6 +148,7 @@ export function PinballmapListingControl({
   canPush,
   writeEnabled,
   modelName,
+  rivalInitials = [],
 }: PinballmapListingControlProps): React.JSX.Element {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -201,9 +209,27 @@ export function PinballmapListingControl({
   // rather than rendered empty: an empty flex row is invisible but still takes
   // the `space-y` margin above it, which is half of why this block used to
   // look padded for no reason.
+  //
+  // The four unclaimed states do NOT share an action, which is the whole reason
+  // they are four states. Claim is offered where claiming is right — this
+  // machine is the pick, or the tie is this machine's to break. It is withheld
+  // for `unclaimed_unavailable`, where the entry should come down rather than be
+  // recorded, and for `unclaimed_elsewhere`, where claiming would move the
+  // listing onto the wrong cabinet.
+  //
+  // `unclaimed_unavailable` gets NO button, deliberately. Its copy says the
+  // entry should come down, and the obvious control would be Remove — but
+  // `unlistMachineFromPinballMapAction` needs `pinballmapListed` and a stored
+  // lmx id, and this state is defined by having neither: the listing is theirs,
+  // not ours. The button would fail every time with "This machine isn't listed
+  // on Pinball Map", which is precisely the control-that-cannot-do-what-it-says
+  // shape CORE-ARCH-012 forbids. Taking down an entry PinPoint does not hold is
+  // PP-o355.31 / PP-o355.32 work; until then the copy points at the map link
+  // directly above, which is a real route.
+  const claimable = state === "unclaimed_on_pbm" || state === "unclaimed_tie";
   const actions = [
     state === "not_listed" && canWriteOut,
-    state === "unclaimed_on_pbm" && canLink,
+    claimable && canLink,
     state === "listed" && canWriteOut,
     state === "missing_on_pbm" && (canLink || canWriteOut),
   ].some(Boolean);
@@ -223,7 +249,7 @@ export function PinballmapListingControl({
       <div className="flex items-center gap-2">
         <StateIcon state={state} />
         <p className="text-sm text-foreground" data-testid="pbm-listing-status">
-          {statusCopy(state, listed)}
+          {statusCopy(state, listed, rivalInitials)}
         </p>
       </div>
 
@@ -231,7 +257,7 @@ export function PinballmapListingControl({
         <div className="mt-3 flex flex-wrap gap-2">
           {state === "not_listed" && canWriteOut ? addButton : null}
 
-          {state === "unclaimed_on_pbm" && canLink ? (
+          {claimable && canLink ? (
             // No confirm: this writes nothing to Pinball Map. It records the
             // listing they already show, which is what auto-link would have done
             // on its own if two same-title cabinets hadn't tied.
@@ -322,12 +348,22 @@ export function PinballmapListingControl({
 }
 
 /**
- * Amber for the two states somebody has to resolve, a check for the settled
- * listed state, and a neutral pin for everything else. The icon is decorative —
- * the sentence beside it carries the meaning, so nothing here is colour-only.
+ * Amber for the states somebody has to resolve, a check for the settled listed
+ * state, and a neutral pin for everything else. The icon is decorative — the
+ * sentence beside it carries the meaning, so nothing here is colour-only.
+ *
+ * Plain `unclaimed_on_pbm` gets the neutral pin rather than amber: it resolves
+ * itself on the next reconcile, and an alert icon for something no one has to
+ * act on is the noise `isActionableDesync` exists to avoid. `unclaimed_elsewhere`
+ * is neutral for the same reason from the other direction — it is another
+ * cabinet's business and there is nothing to do here.
  */
 function StateIcon({ state }: { state: PbmListingState }): React.JSX.Element {
-  if (state === "missing_on_pbm" || state === "unclaimed_on_pbm") {
+  if (
+    state === "missing_on_pbm" ||
+    state === "unclaimed_tie" ||
+    state === "unclaimed_unavailable"
+  ) {
     return (
       <TriangleAlert
         aria-hidden="true"
@@ -359,7 +395,11 @@ function StateIcon({ state }: { state: PbmListingState }): React.JSX.Element {
  * these sentences has to survive being read by someone who has never heard of
  * an lmx. The word never appears (settled vocabulary, §4 of the refresher).
  */
-function statusCopy(state: PbmListingState, listed: boolean): string {
+function statusCopy(
+  state: PbmListingState,
+  listed: boolean,
+  rivals: readonly string[]
+): string {
   switch (state) {
     case "unmatched":
       return "No model set yet, so there's nothing to list on Pinball Map.";
@@ -372,10 +412,35 @@ function statusCopy(state: PbmListingState, listed: boolean): string {
     case "not_listed":
       return "Not on our location's lineup on Pinball Map.";
     case "unclaimed_on_pbm":
-      return "Pinball Map shows this game on our location's lineup, but PinPoint isn't holding that listing.";
+      return "Pinball Map shows this game on our location's lineup, but PinPoint isn't holding that listing yet. The next sync will pick this up on its own.";
+    // Names the other cabinets and says what breaks the tie, because "PinPoint
+    // won't choose" is only actionable if you know the choice is yours and
+    // where the alternative lives (Tim, 2026-08-14).
+    case "unclaimed_tie":
+      return `Pinball Map shows this game on our location's lineup, but ${describeRivals(rivals)} could hold that listing and PinPoint won't guess between them. Claim it here to settle it on this machine, or claim it on ${rivals.length === 1 ? "the other one" : "one of the others"} instead.`;
+    // The availability contradiction, stated as the contradiction: the entry is
+    // live on a public map for a game we record as not on the floor.
+    case "unclaimed_unavailable":
+      return "Pinball Map shows this game on our location's lineup, but no cabinet of it is on the floor — every one is marked as not yet arrived or removed. Their entry is out of date and should come down; PinPoint can't do it from here because the listing isn't ours to remove. Use the Pinball Map link above.";
+    case "unclaimed_elsewhere":
+      return `Pinball Map shows this game on our location's lineup, and that listing belongs to ${describeRivals(rivals)}. Nothing to do here.`;
     case "listed":
       return "Listed on our location's lineup on Pinball Map.";
     case "missing_on_pbm":
       return "PinPoint has this listed, but it isn't on Pinball Map's lineup — someone removed it there.";
   }
+}
+
+/**
+ * "AFM", "AFM or SM", "AFM, SM or BK" — the other cabinets of the same title.
+ *
+ * Falls back to a count when the caller could not resolve names, which is
+ * better than an empty phrase but is not expected in practice: the Manage page
+ * queries the group it passes.
+ */
+function describeRivals(rivals: readonly string[]): string {
+  if (rivals.length === 0) return "another cabinet";
+  if (rivals.length === 1) return `this one and ${rivals[0] ?? ""}`.trim();
+  const last = rivals[rivals.length - 1] ?? "";
+  return `this one, ${rivals.slice(0, -1).join(", ")} or ${last}`;
 }

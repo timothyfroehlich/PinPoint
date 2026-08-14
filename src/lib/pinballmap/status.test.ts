@@ -5,8 +5,11 @@ import {
   isActionableDesync,
   shouldBeListedOnPbm,
   type PbmMachineStatus,
+  type PbmListingState,
 } from "./status";
 import type { LocationSnapshot } from "./types";
+import type { ListingHolderCandidate } from "./listing-holder";
+import type { MachinePresenceStatus } from "~/lib/machines/presence";
 
 const snap = (rows: { id: number; machineId: number }[]): LocationSnapshot => ({
   locationId: 26454,
@@ -212,5 +215,89 @@ describe("shouldBeListedOnPbm", () => {
   it("reflects local listing intent, independent of presence", () => {
     expect(shouldBeListedOnPbm({ pinballmapListed: true })).toBe(true);
     expect(shouldBeListedOnPbm({ pinballmapListed: false })).toBe(false);
+  });
+});
+
+/**
+ * Why a lineup entry sits unclaimed (PP-o355.21).
+ *
+ * These four used to be one state answering "Claim this listing" to all of
+ * them, which is the wrong action for two. The split exists because Tim asked
+ * what actually causes the state — the honest answer was three causes, not the
+ * one the code comment claimed.
+ */
+describe("derivePbmListingState — why an entry is unclaimed", () => {
+  const TITLE = 4242;
+  const snapshot = snap([{ id: 900, machineId: TITLE }]);
+
+  const cabinet = (
+    id: string,
+    presenceStatus: MachinePresenceStatus,
+    pinballmapListed = false
+  ): ListingHolderCandidate => ({
+    id,
+    pinballmapMachineId: TITLE,
+    pinballmapListed,
+    presenceStatus,
+  });
+
+  const derive = (
+    machineId: string,
+    group: ListingHolderCandidate[]
+  ): PbmListingState =>
+    derivePbmListingState({
+      machineId,
+      pinballmapMachineId: TITLE,
+      pinballmapExcluded: false,
+      pinballmapListed: false,
+      pinballmapLmxId: null,
+      snapshot,
+      sameTitleGroup: group,
+    });
+
+  it("is the plain transient state when this machine is the lone candidate", () => {
+    // Auto-link takes this on the next reconcile, so the control says so and
+    // offers Claim as "do it now" rather than as a repair.
+    expect(derive("a", [cabinet("a", "on_the_floor")])).toBe(
+      "unclaimed_on_pbm"
+    );
+  });
+
+  it("is a tie when two cabinets share the top presence rank", () => {
+    const group = [cabinet("a", "on_the_floor"), cabinet("b", "on_the_floor")];
+    // Both sides see the tie — either one can break it.
+    expect(derive("a", group)).toBe("unclaimed_tie");
+    expect(derive("b", group)).toBe("unclaimed_tie");
+  });
+
+  it("is not a tie when one cabinet outranks the other", () => {
+    const group = [cabinet("a", "on_the_floor"), cabinet("b", "off_the_floor")];
+    // The floor cabinet is the pick; the off-floor one must not offer Claim,
+    // which would put the listing on the wrong machine.
+    expect(derive("a", group)).toBe("unclaimed_on_pbm");
+    expect(derive("b", group)).toBe("unclaimed_elsewhere");
+  });
+
+  it("is unavailable when no cabinet of the title may hold a listing", () => {
+    // The case Tim named: Pinball Map shows a game our own records say is not
+    // on the floor. Claiming would record a listing we believe should not
+    // exist, so the state exists to say the entry should come down instead.
+    expect(
+      derive("a", [cabinet("a", "removed"), cabinet("b", "pending_arrival")])
+    ).toBe("unclaimed_unavailable");
+  });
+
+  it("falls back to the undifferentiated state when no group is supplied", () => {
+    // Every caller outside the Manage tab passes no group and must keep
+    // getting the old single state rather than a crash or a wrong reason.
+    expect(
+      derivePbmListingState({
+        pinballmapMachineId: TITLE,
+        pinballmapExcluded: false,
+        pinballmapListed: false,
+        pinballmapLmxId: null,
+        snapshot,
+      })
+    ).toBe("unclaimed_on_pbm");
   });
 });

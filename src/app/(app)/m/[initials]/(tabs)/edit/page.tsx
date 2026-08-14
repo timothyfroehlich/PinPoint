@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import { AlertTriangle, ExternalLink } from "lucide-react";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
-import { userProfiles, pinballmapCatalog } from "~/server/db/schema";
+import { userProfiles, pinballmapCatalog, machines } from "~/server/db/schema";
 import {
   getAccessLevel,
   checkPermission,
@@ -13,6 +13,7 @@ import {
 import { pinballmapLocationUrl } from "~/lib/pinballmap/public-url";
 import { getPinballMapState } from "~/lib/pinballmap/state";
 import { derivePbmListingState } from "~/lib/pinballmap/status";
+import type { ListingHolderCandidate } from "~/lib/pinballmap/listing-holder";
 import { listAbandonedForMachine } from "~/lib/pinballmap/abandoned-listings";
 import { getCatalogEntry } from "~/lib/pinballmap/catalog";
 import { Alert, AlertDescription } from "~/components/ui/alert";
@@ -121,11 +122,35 @@ export default async function MachineEditPage({
           .then((linkedTitle) => linkedTitle?.name ?? null)
       : Promise.resolve(null);
 
-  const [pinballmapTitleName, pbmState, allUsersRaw] = await Promise.all([
-    pinballmapTitlePromise,
-    canLink ? getPinballMapState() : Promise.resolve(null),
-    getUnifiedUsers({ includeEmails: false }),
-  ]);
+  // Every cabinet sharing this title, which is what decides WHY a lineup entry
+  // is unclaimed — a tie between equals, nobody eligible, or another cabinet's
+  // to take (PP-o355.21). Small by construction: the group is keyed on one
+  // catalog title, so it is one cabinet in almost every case and a handful in
+  // the worst. Skipped entirely for an unmatched machine, which has no title to
+  // contend over, and for a viewer without `link`, who sees no control at all.
+  const sameTitlePromise: Promise<
+    (ListingHolderCandidate & { initials: string })[]
+  > =
+    canLink && machine.pinballmapMachineId !== null
+      ? db
+          .select({
+            id: machines.id,
+            initials: machines.initials,
+            pinballmapMachineId: machines.pinballmapMachineId,
+            pinballmapListed: machines.pinballmapListed,
+            presenceStatus: machines.presenceStatus,
+          })
+          .from(machines)
+          .where(eq(machines.pinballmapMachineId, machine.pinballmapMachineId))
+      : Promise.resolve([]);
+
+  const [pinballmapTitleName, pbmState, allUsersRaw, sameTitle] =
+    await Promise.all([
+      pinballmapTitlePromise,
+      canLink ? getPinballMapState() : Promise.resolve(null),
+      getUnifiedUsers({ includeEmails: false }),
+      sameTitlePromise,
+    ]);
 
   const allUsers = allUsersRaw.map((u) => ({
     id: u.id,
@@ -139,12 +164,23 @@ export default async function MachineEditPage({
   // The listing control's state is DERIVED here and handed down — nothing in it
   // discovers state by calling Pinball Map (CORE-PBM-001, PP-o355.21).
   const listingState = derivePbmListingState({
+    machineId: machine.id,
     pinballmapMachineId: machine.pinballmapMachineId,
     pinballmapExcluded: machine.pinballmapExcluded,
     pinballmapListed: machine.pinballmapListed,
     pinballmapLmxId: machine.pinballmapLmxId,
     snapshot: pbmState?.snapshotJson ?? null,
+    sameTitleGroup: sameTitle,
   });
+
+  // The OTHER cabinets, named for the two sentences that have to name them.
+  // Initials rather than names: they are what the machine is called everywhere
+  // else in this app, they are short enough to sit inside a sentence, and they
+  // are what someone would type to go find it.
+  const rivalInitials = sameTitle
+    .filter((m) => m.id !== machine.id)
+    .map((m) => m.initials)
+    .sort();
 
   // Whether an operator credential exists at all — read off the two columns the
   // state row already carries, never by decrypting the token. Without one the
@@ -245,6 +281,7 @@ export default async function MachineEditPage({
               canPush={canPush}
               writeEnabled={writeEnabled}
               modelName={pinballmapTitleName}
+              rivalInitials={rivalInitials}
             />
 
             {/* Entries this machine walked away from that are still live on the

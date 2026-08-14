@@ -1,4 +1,8 @@
 import type { LocationSnapshot } from "./types";
+import {
+  resolveListingHolder,
+  type ListingHolderCandidate,
+} from "./listing-holder";
 
 /**
  * Derived PinballMap status for a single machine (PP-o355.11).
@@ -134,11 +138,26 @@ export function isActionableDesync(status: PbmMachineStatus): boolean {
  *    and the reason is what the reader needs.
  *  - `unsynced` — we have never held a lineup, so we cannot claim either way.
  *  - `not_listed` — matched, and the lineup does not carry the title.
- *  - `unclaimed_on_pbm` — the lineup DOES carry the title but no PinPoint
- *    machine holds the listing. Auto-link normally captures this within the
- *    hour; it survives only where auto-link deliberately stands down (two
- *    same-title cabinets tied at the top presence rank), which is exactly the
- *    tie a person has to break. Claiming it writes nothing to Pinball Map.
+ *  - `unclaimed_on_pbm` — the lineup carries the title, no PinPoint machine
+ *    holds the listing, and THIS machine is the one auto-link will pick.
+ *    Transient: the next reconcile claims it. Claiming by hand writes nothing
+ *    to Pinball Map, it just does it now.
+ *  - `unclaimed_tie` — same, except two or more cabinets of this title are tied
+ *    at the top presence rank, so auto-link declines to guess and the state
+ *    persists until a person picks one.
+ *  - `unclaimed_unavailable` — same, except no cabinet of this title is
+ *    eligible to hold a listing at all: every one is `pending_arrival` or
+ *    `removed`. Pinball Map is showing a game our own records say is not on the
+ *    floor, so the answer is to take the entry down, not to claim it.
+ *  - `unclaimed_elsewhere` — the lineup entry belongs to a DIFFERENT cabinet of
+ *    the same title. Read-only here; claiming would put the listing on the
+ *    wrong machine.
+ *
+ * An earlier version of this comment claimed the tie was the only way an
+ * unclaimed entry survives a sync. That was wrong twice over — the
+ * all-ineligible case persists too, and so does every unclaimed entry while
+ * `pinballmap_state.enabled` is false, since `reconcileAfterSync` gates on it
+ * and auto-link never runs at all (PP-o355.35 proposes removing that flag).
  *  - `listed` — matched, listed, and the lineup agrees.
  *  - `missing_on_pbm` — we hold a listing the lineup no longer shows. Nothing
  *    ever auto-unlists, so this persists until someone acts.
@@ -152,16 +171,76 @@ export type PbmListingState =
   | "unsynced"
   | "not_listed"
   | "unclaimed_on_pbm"
+  | "unclaimed_tie"
+  | "unclaimed_unavailable"
+  | "unclaimed_elsewhere"
   | "listed"
   | "missing_on_pbm";
 
-/** Pure, same as `derivePbmMachineStatus` — the Manage tab page calls it directly. */
+/**
+ * Why a lineup entry is sitting unclaimed — which decides both the sentence and
+ * the button, and they are not the same answer in all four cases.
+ *
+ * The plain `unclaimed_on_pbm` is TRANSIENT: auto-link captures a lone eligible
+ * cabinet on the next reconcile, so a reader who waits an hour sees it resolve
+ * itself. The other three are the ones that persist, because each is a case
+ * where auto-link deliberately declines to choose. Collapsing them into one
+ * state — which this control did until Tim asked what actually causes it —
+ * meant offering "Claim this listing" as the answer to all four, and for two of
+ * them claiming is the wrong move.
+ */
+function classifyUnclaimed(
+  machineId: string,
+  group: readonly ListingHolderCandidate[]
+): PbmListingState {
+  const holder = resolveListingHolder(group);
+  switch (holder.kind) {
+    // Two or more cabinets of this title, none listed, tied at the top presence
+    // rank. Auto-link stands down because picking would be a guess; a person
+    // breaks the tie by claiming on one of them.
+    case "tie":
+      return holder.machineIds.includes(machineId)
+        ? "unclaimed_tie"
+        : "unclaimed_elsewhere";
+    // Nobody is ELIGIBLE — every cabinet of this title is `pending_arrival` or
+    // `removed` (INVALID_WHEN_LISTED). Pinball Map is showing a game that, by
+    // our own availability records, is not on the floor. Claiming would record
+    // a listing we believe should not exist; the honest action is to take the
+    // entry down.
+    case "none":
+      return "unclaimed_unavailable";
+    // Some OTHER cabinet is the rightful holder and auto-link will take it.
+    // Claiming here would put the listing on the wrong machine.
+    case "candidate":
+      return holder.machineId === machineId
+        ? "unclaimed_on_pbm"
+        : "unclaimed_elsewhere";
+    // Unreachable in practice: an incumbent means somebody IS listed, and then
+    // `derivePbmMachineStatus` would not have said `on_pbm_not_listed_locally`
+    // for this machine. Falls through to the transient reading rather than
+    // throwing — a wrong sentence beats a 500 on the Manage tab.
+    case "incumbent":
+      return "unclaimed_on_pbm";
+  }
+}
+
+/**
+ * Pure, same as `derivePbmMachineStatus` — the Manage tab page calls it directly.
+ *
+ * `sameTitleGroup` is every machine sharing this `pinballmapMachineId`,
+ * INCLUDING this one (what `resolveListingHolder` expects). Optional because
+ * only the unclaimed branch consults it: pass it and that branch tells you why
+ * the entry is unclaimed; omit it and you get the undifferentiated
+ * `unclaimed_on_pbm`, which is what every caller outside the Manage tab wants.
+ */
 export function derivePbmListingState(args: {
+  machineId?: string;
   pinballmapMachineId: number | null;
   pinballmapExcluded: boolean;
   pinballmapListed: boolean;
   pinballmapLmxId: number | null;
   snapshot: LocationSnapshot | null;
+  sameTitleGroup?: readonly ListingHolderCandidate[];
 }): PbmListingState {
   const {
     pinballmapMachineId,
@@ -190,7 +269,9 @@ export function derivePbmListingState(args: {
     case "listed_locally_absent_on_pbm":
       return "missing_on_pbm";
     case "on_pbm_not_listed_locally":
-      return "unclaimed_on_pbm";
+      return args.machineId !== undefined && args.sameTitleGroup !== undefined
+        ? classifyUnclaimed(args.machineId, args.sameTitleGroup)
+        : "unclaimed_on_pbm";
     default:
       return pinballmapListed ? "listed" : "not_listed";
   }
