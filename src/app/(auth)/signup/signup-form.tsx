@@ -101,20 +101,14 @@ export function SignupForm({
           />
         </div>
 
-        {/* Last Name */}
+        {/* Last Name — not required: only a first name is (PP-if48). */}
         <div className="space-y-2">
-          <Label htmlFor="lastName">
-            Last Name{" "}
-            <span aria-hidden="true" className="text-destructive">
-              *
-            </span>
-          </Label>
+          <Label htmlFor="lastName">Last Name</Label>
           <Input
             id="lastName"
             name="lastName"
             type="text"
             autoComplete="family-name"
-            required
             enterKeyHint="next"
             maxLength={50}
             className="bg-surface-variant"

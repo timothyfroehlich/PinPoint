@@ -11,6 +11,7 @@ import { eq, and, isNull } from "drizzle-orm";
 import type { User } from "@supabase/supabase-js";
 import { log } from "~/lib/logger";
 import { reportError } from "~/lib/observability/report-error";
+import { deriveName } from "~/lib/auth/derive-name";
 import type { UserRole } from "~/lib/types";
 
 /**
@@ -19,9 +20,11 @@ import type { UserRole } from "~/lib/types";
  * using metadata from the Supabase Auth user object.
  *
  * This replicates the logic from the `handle_new_user` SQL trigger
- * (drizzle/0007, updated by drizzle/0014). Notification preference defaults
- * come from the Drizzle schema, keeping a single source of truth.
- * If you change schema defaults, also update the SQL trigger to match.
+ * (drizzle/0007, updated by drizzle/0014 and drizzle/0064). Notification
+ * preference defaults come from the Drizzle schema, keeping a single source of
+ * truth. If you change schema defaults, also update the SQL trigger to match —
+ * and the name derivation lives in `~/lib/auth/derive-name`, mirrored by
+ * `derive_profile_name()` in SQL.
  */
 export async function ensureUserProfile(user: User): Promise<void> {
   try {
@@ -40,9 +43,6 @@ export async function ensureUserProfile(user: User): Promise<void> {
     );
 
     // Recreate profile
-    // Extract metadata safely
-    const firstName = (user.user_metadata["first_name"] as string) || "";
-    const lastName = (user.user_metadata["last_name"] as string) || "";
     const avatarUrl = (user.user_metadata["avatar_url"] as string) || null;
 
     // Check for existing invited user to inherit role
@@ -66,6 +66,12 @@ export async function ensureUserProfile(user: User): Promise<void> {
         `Cannot recreate user profile for ${user.id}: Supabase user has no email`
       );
     }
+
+    // Must match `derive_profile_name()` in drizzle/0064 — this path and the
+    // trigger write the same row for the same user under different conditions,
+    // and a divergence shows up as a name that depends on which ran first
+    // (PP-if48).
+    const { firstName, lastName } = deriveName(user.user_metadata, email);
 
     await db.insert(userProfiles).values({
       id: user.id,

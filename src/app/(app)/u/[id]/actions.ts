@@ -11,8 +11,17 @@ import { type Result, err } from "~/lib/result";
 import { serverActionError } from "~/lib/observability/report-error";
 
 const updateProfileSchema = z.object({
-  firstName: z.string().trim().min(1).max(50).optional(),
-  lastName: z.string().trim().min(1).max(50).optional(),
+  // A user may not blank out their own name — that is the state PP-if48 was
+  // about. `.optional()` still lets a partial update omit the field entirely;
+  // it is only an empty *submitted* value that is rejected.
+  firstName: z
+    .string()
+    .trim()
+    .min(1, "First name is required")
+    .max(50)
+    .optional(),
+  // Optional, and allowed to be cleared: only a first name is required.
+  lastName: z.string().trim().max(50).optional(),
   pronouns: z.string().trim().max(40).optional(),
   bio: z.string().trim().max(500).optional(),
 });
