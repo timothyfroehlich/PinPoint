@@ -1,8 +1,40 @@
 "use client";
 
 import type React from "react";
+import { useEffect } from "react";
 import { TooltipProvider } from "~/components/ui/tooltip";
 import { RelativeTimeProvider } from "~/components/issues/RelativeTimeProvider";
+
+/**
+ * Marks the document once React has hydrated, so tests can tell "painted" from
+ * "interactive".
+ *
+ * Playwright's actionability checks cover visible, stable, enabled and receives-
+ * events — none of which know whether React has attached a handler yet. A click
+ * in that window hits a live-looking control and is silently discarded, and the
+ * spec then fails wherever it next asserts the consequence: a Radix portal that
+ * never opened, a Sheet that never appeared, a navigation that never happened.
+ * Raising timeouts cannot help, because after a dropped click nothing is
+ * pending. (PP-jxhy.)
+ *
+ * This ships in production too. It is one attribute set once, and an attribute
+ * that exists only under test is an attribute whose absence nobody notices when
+ * it breaks.
+ *
+ * **What it actually asserts.** This effect runs when the ROOT layout's commit
+ * lands — not when every interactive descendant has handlers. Content inside a
+ * Suspense boundary (any segment with a `loading.tsx`, plus streamed segments)
+ * is still dehydrated at that moment, and an `ssr: false` dynamic import such
+ * as `RichTextEditor` has not started. So `data-hydrated` narrows the
+ * dropped-click window to the root commit; it does not close it for deeper
+ * subtrees. Waits for those belong on something the subtree itself renders.
+ */
+function HydrationBeacon(): null {
+  useEffect(() => {
+    document.documentElement.dataset["hydrated"] = "1";
+  }, []);
+  return null;
+}
 
 /**
  * Global client-side providers wrapper.
@@ -24,6 +56,7 @@ export function ClientProviders({
 }): React.JSX.Element {
   return (
     <TooltipProvider delayDuration={300}>
+      <HydrationBeacon />
       <RelativeTimeProvider>{children}</RelativeTimeProvider>
     </TooltipProvider>
   );

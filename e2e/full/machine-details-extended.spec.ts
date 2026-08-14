@@ -16,7 +16,7 @@
  * Layout and expando tests are in e2e/smoke/machine-details-redesign.spec.ts.
  */
 
-import { test, expect } from "@playwright/test";
+import { test, expect } from "../support/fixtures.js";
 import { ensureLoggedIn, logout, loginAs } from "../support/actions.js";
 import { seededMachines, TEST_USERS } from "../support/constants.js";
 import { clearMachineField } from "../support/supabase-admin.js";

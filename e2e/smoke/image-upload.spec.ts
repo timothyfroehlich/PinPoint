@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "../support/fixtures.js";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { cleanupTestEntities } from "../support/cleanup.js";

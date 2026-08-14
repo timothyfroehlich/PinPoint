@@ -6,7 +6,7 @@
  * returns, so the client-side localStorage cleanup never fires.
  */
 
-import { test, expect } from "@playwright/test";
+import { test, expect } from "../support/fixtures.js";
 import { STORAGE_STATE } from "../support/auth-state.js";
 import { cleanupTestEntities } from "../support/cleanup.js";
 import {

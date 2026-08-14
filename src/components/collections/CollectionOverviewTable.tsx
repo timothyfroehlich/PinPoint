@@ -14,6 +14,7 @@ import { MachineStatusBadge } from "~/components/machines/MachineStatusBadge";
 import { MachinePresenceBadge } from "~/components/machines/MachinePresenceBadge";
 import { RelativeTime } from "~/components/issues/RelativeTime";
 import { CompactAge } from "~/components/issues/CompactAge";
+import { useRelativeNow } from "~/components/issues/RelativeTimeProvider";
 import {
   useTableResponsiveColumns,
   type ColumnConfig,
@@ -158,6 +159,36 @@ function SortableHeader({
           ))}
       </button>
     </th>
+  );
+}
+
+/**
+ * "3 minutes ago — Comment" for the activity column.
+ *
+ * The separator has to be gated on the same tick as the time it separates.
+ * `<RelativeTime>` renders nothing until the shared ticker mounts, so emitting
+ * the em dash unconditionally left a bare " — Comment" on the pre-hydration
+ * paint (PP-h490). Subscribing here rather than in the row map keeps the 60s
+ * re-render scoped to this cell, which is what it already cost.
+ */
+function LastActivityCell({
+  at,
+  label,
+}: {
+  at: Date | string;
+  label: string;
+}): React.JSX.Element {
+  const now = useRelativeNow();
+  return (
+    <>
+      {now !== null && (
+        <>
+          <RelativeTime value={at} />
+          {" — "}
+        </>
+      )}
+      {label}
+    </>
   );
 }
 
@@ -381,11 +412,10 @@ export function CollectionOverviewTable({
                 {isShown("activity") && (
                   <td className="whitespace-nowrap px-3 py-2.5 text-muted-foreground">
                     {row.lastActivity ? (
-                      <>
-                        <RelativeTime value={row.lastActivity.createdAt} />
-                        {" — "}
-                        {getTagLabel(row.lastActivity.tag)}
-                      </>
+                      <LastActivityCell
+                        at={row.lastActivity.createdAt}
+                        label={getTagLabel(row.lastActivity.tag)}
+                      />
                     ) : (
                       "—"
                     )}

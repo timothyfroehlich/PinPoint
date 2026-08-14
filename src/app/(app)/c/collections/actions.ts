@@ -6,7 +6,7 @@ import { z } from "zod";
 
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import type { UserRole } from "~/lib/types";
-import { canManageCollection } from "~/lib/collections/access";
+import { canManageCollection } from "~/lib/permissions/collections";
 import { isEditorCollaborator } from "~/lib/collections/collaborators";
 import { generateViewToken } from "~/lib/collections/tokens";
 import { createClient } from "~/lib/supabase/server";
