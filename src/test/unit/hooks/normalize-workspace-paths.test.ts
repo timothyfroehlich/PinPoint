@@ -11,6 +11,7 @@
 // carrying `/var/home/froeht/Code/PinPoint/.claude/worktrees/...` came out as
 // `/var.claude/worktrees/...` and died on `mkdir`.
 
+import { execFileSync } from "node:child_process";
 import { createRequire } from "node:module";
 import path from "node:path";
 import { describe, it, expect } from "vitest";
@@ -158,6 +159,18 @@ describe("guard 3: commands that change directory", () => {
     expect(shiftsContext("bash scripts/cdrom-check.sh")).toBe(false);
     expect(shiftsContext("echo abcd")).toBe(false);
   });
+
+  // The word is matched anywhere, because command position is not detectable
+  // by regex — these all hide it somewhere an anchored pattern cannot see.
+  it("catches a cd inside a quoted -c payload", () => {
+    const cmd = `bash -c 'cd /tmp && bash ${MAC_ROOT}/scripts/x.sh'`;
+    expect(run(cmd)).toBe(cmd);
+  });
+
+  it("catches a cd inside a loop body", () => {
+    const cmd = `for f in a b; do cd /tmp; bash ${MAC_ROOT}/scripts/x.sh; done`;
+    expect(run(cmd)).toBe(cmd);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -181,6 +194,21 @@ describe("guard 4: remote execution", () => {
     (verb) => {
       const cmd = `${verb} run ${MAC_ROOT}/scripts/x.sh`;
       expect(run(cmd)).toBe(cmd);
+    }
+  );
+
+  // A leading assignment or wrapper word pushes the verb out of command
+  // position. The first of these is the command that motivated the whole PR.
+  it("catches a verb behind a leading env-var assignment", () => {
+    const cmd = `CRABBOX_STATIC_WORK_ROOT=${BAZZITE_ROOT}/.claude/wt crabbox run ${BAZZITE_ROOT}/scripts/x.sh`;
+    expect(run(cmd, BAZZITE_ROOT)).toBe(cmd);
+  });
+
+  it.each(["sudo", "env FOO=1", "time", "nohup"])(
+    "catches ssh behind the %s wrapper",
+    (wrapper) => {
+      const cmd = `${wrapper} ssh bazzite ls ${BAZZITE_ROOT}/scripts/x.sh`;
+      expect(run(cmd, BAZZITE_ROOT)).toBe(cmd);
     }
   );
 });
@@ -280,6 +308,32 @@ describe("the allowlist rewrite it exists for", () => {
   it("leaves a command with no workspace path untouched", () => {
     const cmd = "pnpm run check";
     expect(run(cmd)).toBe(cmd);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Guard 5 — the hook must never approve the command it rewrote
+// ---------------------------------------------------------------------------
+describe("guard 5: the decision payload", () => {
+  // Runs the real hook end to end, because the decision is built in main().
+  function runHook(command: string, cwd = process.cwd()) {
+    const out = execFileSync(process.execPath, [hookPath], {
+      input: JSON.stringify({ cwd, tool_input: { command } }),
+      encoding: "utf8",
+    });
+    return out.trim() ? JSON.parse(out).hookSpecificOutput : null;
+  }
+
+  it("rewrites without approving, so permissions.ask still applies", () => {
+    // `Bash(rm -rf:*)` is on permissions.ask. Returning "allow" here would skip
+    // that prompt for anyone who happened to spell the path absolutely.
+    const out = runHook(`rm -rf ${process.cwd()}/src/app`);
+    expect(out?.updatedInput?.command).toBe("rm -rf src/app");
+    expect(out).not.toHaveProperty("permissionDecision");
+  });
+
+  it("stays silent when there is nothing to rewrite", () => {
+    expect(runHook("pnpm run check")).toBeNull();
   });
 });
 

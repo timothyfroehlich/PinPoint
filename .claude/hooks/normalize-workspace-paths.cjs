@@ -42,6 +42,11 @@
  *    which on Bazzite is spelled exactly like the local one — guard 1 cannot
  *    tell them apart, so the whole command is skipped instead.
  *
+ * 5. **Never auto-allow.** The hook rewrites and then gets out of the way; the
+ *    rewritten command still goes through normal permission evaluation. Sending
+ *    `permissionDecision: "allow"` turned `rm -rf <root>/src/app` into an
+ *    auto-approved `rm -rf src/app`, skipping the `permissions.ask` prompt.
+ *
  * Guards 3 and 4 are deliberately blunt: skipping a rewrite that would have been
  * fine costs one permission prompt, while making a wrong one costs a silently
  * mis-targeted command. Bias every judgement call toward skipping.
@@ -76,10 +81,18 @@ const CONTEXT_SHIFTING_WORDS = [
   "chroot",
 ];
 
-// A context-shifting word in command position: start of string, or after a
-// separator (`;`, `&&`, `||`, `|`, a subshell paren, or a newline).
+// Matched as a whole word ANYWHERE in the command, not just in command
+// position. Command position is not detectable by regex: a leading
+// `VAR=value`, a wrapper (`sudo`, `env`, `time`, `xargs`, `nohup`), a quoted
+// `-c` payload, or a `do`/`then` keyword all put the word somewhere an
+// anchored pattern cannot see — and the first of those is the PR's own
+// motivating command, `CRABBOX_STATIC_WORK_ROOT=… crabbox …`.
+//
+// The cost is false positives: `cat docker-compose.yml` and `echo "cd there"`
+// both suppress the rewrite. That is one permission prompt, which is the
+// cheaper error — see the header.
 const CONTEXT_SHIFT_REGEX = new RegExp(
-  String.raw`(?:^|[\n;&|(])\s*(?:${CONTEXT_SHIFTING_WORDS.join("|")})\b`
+  String.raw`\b(?:${CONTEXT_SHIFTING_WORDS.join("|")})\b`
 );
 
 // `-C <dir>` — git, make and tar all use it to run somewhere else.
@@ -272,10 +285,23 @@ async function main() {
       rewrites.join("\n") +
       "\nUse relative paths from the start — they match the settings.json allowlist.";
 
+    // No `permissionDecision`. The hook rewrites the command and then gets out
+    // of the way, so the rewritten command goes through normal permission
+    // evaluation.
+    //
+    // It used to send `"allow"`, which short-circuits that evaluation. Harmless
+    // while the matcher hardcoded a path that names nothing on the Mac — the
+    // hook never fired here — but fixing the matcher made it reachable, and
+    // `rm -rf <root>/src/app` came back as an auto-allowed `rm -rf src/app`
+    // even though `Bash(rm -rf:*)` is on `permissions.ask`. Same for
+    // `git reset --hard`, `git clean`, `git branch -D`, `docker volume rm`.
+    //
+    // Auto-allow was never needed for the hook's purpose: the point is that the
+    // REWRITTEN path matches the allowlist, and the allowlist grants that by
+    // itself.
     const decision = {
       hookSpecificOutput: {
         hookEventName: "PreToolUse",
-        permissionDecision: "allow",
         permissionDecisionReason: reason,
         updatedInput: { ...input.tool_input, command: modified },
       },
