@@ -1,4 +1,5 @@
 import type { NotificationType } from "~/lib/notifications/dispatch";
+import { buildResourceUrl } from "~/lib/notifications/resource-url";
 
 const DISCORD_MAX_MESSAGE_LENGTH = 2000;
 
@@ -6,10 +7,10 @@ export interface DiscordMessageInput {
   type: NotificationType;
   siteUrl: string;
   resourceType: "issue" | "machine";
-  resourceId: string;
   issueTitle: string | undefined;
   formattedIssueId: string | undefined;
   machineName: string | undefined;
+  machineInitials: string | undefined;
   newStatus: string | undefined;
   /**
    * Comment text passed through from the dispatcher but intentionally NOT
@@ -23,7 +24,7 @@ export interface DiscordMessageInput {
 }
 
 export function formatDiscordMessage(input: DiscordMessageInput): string {
-  const link = buildResourceLink(input);
+  const link = buildResourceUrl(input);
   const body = buildBody(input);
   const footer = `Manage notifications: ${input.siteUrl}/settings/notifications`;
   const suffix = `\n${link}\n\n${footer}`;
@@ -44,13 +45,6 @@ export function formatDiscordMessage(input: DiscordMessageInput): string {
   return assembled.length > DISCORD_MAX_MESSAGE_LENGTH
     ? assembled.slice(0, DISCORD_MAX_MESSAGE_LENGTH - 1) + "…"
     : assembled;
-}
-
-function buildResourceLink(input: DiscordMessageInput): string {
-  if (input.resourceType === "issue") {
-    return `${input.siteUrl}/issues/${input.resourceId}`;
-  }
-  return `${input.siteUrl}/machines/${input.resourceId}`;
 }
 
 function buildBody(input: DiscordMessageInput): string {
