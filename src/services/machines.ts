@@ -741,6 +741,12 @@ const PBM_LINK_COLUMNS = {
   pinballmapExcludedReason: true,
   pinballmapListed: true,
   pinballmapLmxId: true,
+  // Hand-entered identity for a cabinet with no catalog title (PP-3bbr). It
+  // belongs in this set for the same reason manufacturer/year do: linking to a
+  // title CLEARS it — the `machines_model_name_requires_excluded` CHECK makes
+  // "linked and hand-entered" unrepresentable — so a plan that did not carry it
+  // would write a row the constraint rejects.
+  modelName: true,
   manufacturer: true,
   year: true,
   opdbId: true,
@@ -871,6 +877,13 @@ export async function updateMachinePbmLink({
           pinballmapExcludedReason: machines.pinballmapExcludedReason,
           pinballmapListed: machines.pinballmapListed,
           pinballmapLmxId: machines.pinballmapLmxId,
+          // Spelled out rather than spread from PBM_LINK_COLUMNS because this
+          // is a `db.select` over column refs, not a `findFirst` columns mask —
+          // the two shapes are not interchangeable. Keep them in step: this row
+          // becomes `previous`, the pre-change record the caller compares
+          // against, so a column missing here is a field that silently reads as
+          // unchanged. (PP-3bbr added `modelName`.)
+          modelName: machines.modelName,
           manufacturer: machines.manufacturer,
           year: machines.year,
           opdbId: machines.opdbId,

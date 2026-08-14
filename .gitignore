@@ -164,6 +164,10 @@ __pycache__/
 
 # Auto-generated test schema
 src/test/setup/schema.sql
+# Records which schema.ts produced the schema.sql beside it, so the freshness
+# check does not have to trust mtimes (which rsync preserves, making a synced
+# schema.ts look OLDER than a locally-generated schema.sql).
+src/test/setup/.schema.hash
 # Transient lock + temp files from concurrent schema regeneration (PP-3vdr.5)
 src/test/setup/.schema.lock
 src/test/setup/.schema.*.sql.tmp
