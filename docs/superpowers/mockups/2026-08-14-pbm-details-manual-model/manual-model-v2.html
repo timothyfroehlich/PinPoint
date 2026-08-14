@@ -1,0 +1,120 @@
+<style>
+  :root {
+    --bg-primary:#1d1d1f; --bg-secondary:#2d2d2f; --bg-tertiary:#3d3d3f;
+    --border:#424245; --text-primary:#f5f5f7; --text-secondary:#98989d;
+    --text-tertiary:#636366; --accent:#0a84ff; --accent-hover:#409cff;
+    --selected-bg:rgba(10,132,255,.15); --selected-border:#0a84ff;
+    --warning:#ff9f0a; --error:#ff453a; --success:#32d74b;
+  }
+  .brand-logo { filter:none !important; }
+  .panel { max-width:740px; border:1px solid #3a3a3d; border-radius:12px; background:#252527; padding:18px; }
+  .lab { font-size:13.5px; font-weight:500; color:#f5f5f7; display:flex; align-items:baseline; gap:8px; margin-bottom:6px; }
+  .lab.sm { font-size:12px; color:#98989d; font-weight:400; }
+  .lab .src { font-size:11.5px; font-weight:400; color:#98989d; }
+  .ctl { width:100%; border:1px solid #4a4a4d; border-radius:8px; background:#1f1f21; padding:8px 11px; font-size:13.5px; display:flex; justify-content:space-between; align-items:center; }
+  .ctl.ph { color:#636366; }
+  .ctl.typed { color:#f5f5f7; }
+  .two { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  .sub { margin-top:14px; border-top:1px solid #3a3a3d; padding-top:14px; }
+  .cap { font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:#98989d; font-weight:600; margin:0 0 8px; }
+  .opt { border:1px solid #3a3a3d; border-radius:10px; padding:15px; margin-bottom:18px; }
+  .opt h4 { margin:0 0 3px; font-size:14.5px; }
+  .opt p.why { margin:0 0 12px; font-size:12.5px; color:#98989d; line-height:1.5; }
+  .cost { font-size:12.5px; color:#98989d; margin:10px 0 0; }
+  .note { border-left:3px solid var(--warning); background:rgba(255,159,10,.08); padding:12px 14px; border-radius:0 8px 8px 0; margin:16px 0; font-size:13.5px; line-height:1.6; }
+  .fact { border-left:3px solid var(--accent); background:rgba(10,132,255,.08); padding:12px 14px; border-radius:0 8px 8px 0; margin:16px 0; font-size:13.5px; line-height:1.6; }
+  code { background:#1f1f21; padding:1px 5px; border-radius:4px; font-size:12.5px; }
+</style>
+
+<h2>Manual Model — against what the field actually does today</h2>
+
+<div class="fact"><strong>Current state I had wrong.</strong> The right-hand column is one always-present slot that is already three-way: the required <strong>Edition</strong> select for a multi-edition family, the <strong>Reason (optional)</strong> text input when the machine is marked <em>Not on Pinball Map</em>, and a disabled placeholder otherwise. It is deliberately never empty so the field doesn’t reflow. So there is no free column — in the exact state we’re designing for, Reason is already sitting in it.</div>
+
+<p class="cap">Today — “Not on Pinball Map” selected</p>
+<div class="panel">
+  <div class="two">
+    <div>
+      <div class="lab">Model <span class="src">source: Pinball Map</span></div>
+      <div class="ctl">Not on Pinball Map <span style="opacity:.5">⌄</span></div>
+    </div>
+    <div>
+      <div class="lab sm">Reason (optional)</div>
+      <div class="ctl ph">e.g. novelty game, not real pinball</div>
+    </div>
+  </div>
+</div>
+
+<div class="opt" style="margin-top:22px">
+  <h4>A · sub-panel below, Reason stays where it is</h4>
+  <p class="why">The Model/Reason row is untouched. Choosing “Not on Pinball Map” opens a group beneath it for the three model fields. Nothing existing moves or changes meaning.</p>
+  <div class="panel">
+    <div class="two">
+      <div>
+        <div class="lab">Model <span class="src">source: Pinball Map</span></div>
+        <div class="ctl">Not on Pinball Map <span style="opacity:.5">⌄</span></div>
+      </div>
+      <div>
+        <div class="lab sm">Reason (optional)</div>
+        <div class="ctl typed">Homebrew, one of a kind</div>
+      </div>
+    </div>
+    <div class="sub">
+      <div class="cap">Model details</div>
+      <div class="two">
+        <div><div class="lab sm">Manufacturer</div><div class="ctl typed">Adam Kirkland</div></div>
+        <div><div class="lab sm">Year</div><div class="ctl typed">2019</div></div>
+      </div>
+    </div>
+  </div>
+  <p class="cost">Cost: the section grows by one row, and the Manage tab currently fits above the fold at 1440×900 on purpose.</p>
+</div>
+
+<div class="opt">
+  <h4>B · Reason joins the sub-panel, second column goes back to being contextual</h4>
+  <p class="why">Reason isn’t an edition and never was — it was put in that slot to keep the row from reflowing. Move it down with the fields it belongs with, and the top row reads as one thing: “what game is this?”</p>
+  <div class="panel">
+    <div class="two">
+      <div>
+        <div class="lab">Model <span class="src">source: Pinball Map</span></div>
+        <div class="ctl">Not on Pinball Map <span style="opacity:.5">⌄</span></div>
+      </div>
+      <div>
+        <div class="lab sm">Edition</div>
+        <div class="ctl ph">Not on Pinball Map — see below</div>
+      </div>
+    </div>
+    <div class="sub">
+      <div class="cap">Model details</div>
+      <div class="two">
+        <div><div class="lab sm">Manufacturer</div><div class="ctl typed">Adam Kirkland</div></div>
+        <div><div class="lab sm">Year</div><div class="ctl typed">2019</div></div>
+      </div>
+      <div style="margin-top:12px"><div class="lab sm">Reason it isn’t on Pinball Map (optional)</div><div class="ctl typed">Homebrew, one of a kind</div></div>
+    </div>
+  </div>
+  <p class="cost">Cost: moves a shipped control, so anything keyed to its position (tests, muscle memory) changes. Tallest of the three.</p>
+</div>
+
+<div class="opt">
+  <h4>C · Reason absorbs the job — no new fields at all</h4>
+  <p class="why">The smallest possible change: keep one free-text Reason and don’t add structured model data. “Homebrew by Adam Kirkland, 2019” already tells a reader what they need.</p>
+  <div class="panel">
+    <div class="two">
+      <div>
+        <div class="lab">Model <span class="src">source: Pinball Map</span></div>
+        <div class="ctl">Not on Pinball Map <span style="opacity:.5">⌄</span></div>
+      </div>
+      <div>
+        <div class="lab sm">Reason (optional)</div>
+        <div class="ctl typed">Homebrew by Adam Kirkland, 2019</div>
+      </div>
+    </div>
+  </div>
+  <p class="cost">Cost: unsortable and unfilterable — the admin fleet table (PP-o355.7) can’t group by manufacturer or decade, and the Info tab’s Model row would show a sentence where every other machine shows a title. Probably disqualifying, but worth naming since it is zero work.</p>
+</div>
+
+<div class="note"><strong>Two things I need from you.</strong>
+<br><br>
+<strong>1. Is “Title” actually a field?</strong> PP-3bbr says hand-enter <em>Title / Manufacturer / Year</em>, but the machine already has a <strong>Name</strong> — and for a homebrew, Name <em>is</em> the title (“Bordertown”). A separate model Title would be the same string typed twice, and they’d drift. My mockups above drop Title and keep only Manufacturer + Year. Say if you want it back.
+<br><br>
+<strong>2. Precedence, still open from before.</strong> Someone hand-enters Bordertown / Homebrew / 2019; months later Pinball Map adds Bordertown and the machine gets matched. Does the catalog <strong>overwrite</strong> the typed values, <strong>fill only blanks</strong>, or <strong>prompt</strong>? Note the DB makes this sharper than I realised: <code>NOT (pinballmap_machine_id IS NOT NULL AND pinballmap_excluded)</code> — linked and excluded are mutually exclusive by CHECK constraint, so matching a hand-entered machine <em>necessarily</em> clears <code>pinballmapExcluded</code>, and with it the state the typed values live in.</div>

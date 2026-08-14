@@ -1,0 +1,120 @@
+<style>
+  /* Force dark regardless of OS setting. */
+  :root {
+    --bg-primary: #1d1d1f; --bg-secondary: #2d2d2f; --bg-tertiary: #3d3d3f;
+    --border: #424245; --text-primary: #f5f5f7; --text-secondary: #98989d;
+    --text-tertiary: #636366; --accent: #0a84ff; --accent-hover: #409cff;
+    --selected-bg: rgba(10,132,255,.15); --selected-border: #0a84ff;
+    --warning: #ff9f0a; --error: #ff453a; --success: #32d74b;
+  }
+  .brand-logo { filter: none !important; }
+
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 900px) { .grid2 { grid-template-columns: 1fr; } }
+  .card { border: 1px solid var(--border); border-radius: 10px; background: var(--bg-secondary); overflow: hidden; }
+  .card-h { font-size: 11px; letter-spacing: .09em; text-transform: uppercase; padding: 7px 12px; background: var(--bg-tertiary); color: var(--text-secondary); font-weight: 600; }
+  .card-b { padding: 14px; font-size: 13.5px; line-height: 1.55; }
+  .lbl { font-size: 11px; letter-spacing: .09em; text-transform: uppercase; color: var(--text-secondary); font-weight: 600; margin-bottom: 8px; }
+  .desc { color: var(--text-secondary); font-size: 13px; }
+  .div { border-top: 1px solid var(--border); margin: 10px 0; }
+  .kv { display: flex; gap: 8px; align-items: baseline; padding: 3px 0; }
+  .k { color: var(--text-secondary); min-width: 62px; }
+  .pbmline { display: flex; align-items: center; gap: 8px; padding: 3px 0; }
+  .link { color: var(--accent); }
+  .muted { color: var(--text-secondary); }
+  .tiny { font-size: 11.5px; }
+  .warnchip { margin-left: auto; display: inline-flex; align-items: center; gap: 5px; color: var(--warning); font-size: 12px; cursor: pointer; border-bottom: 1px dotted var(--warning); }
+  .btn { display: inline-block; border: 1px solid var(--border); border-radius: 6px; padding: 4px 11px; font-size: 12.5px; background: var(--bg-tertiary); }
+  .btn.danger { border-color: #7f1d1d; color: #ff7b72; }
+  .row { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+  .row:last-child { border-bottom: 0; }
+  .strike { text-decoration: line-through; color: var(--text-tertiary); }
+  .q { border-left: 3px solid var(--warning); background: rgba(255,159,10,.08); padding: 10px 12px; border-radius: 0 6px 6px 0; margin-top: 10px; font-size: 13px; }
+  .gone { color: var(--text-tertiary); font-style: italic; font-size: 12px; }
+</style>
+
+<h2>Info tab: Pinball Map box removed, its content folded into Details</h2>
+<p class="subtitle">Your design, drawn out. The standalone Pinball Map card is <span class="strike">deleted</span>; Details gains a <strong>Model</strong> row and one unlabeled line beneath it. Four states shown — check the ones I had to invent.</p>
+
+<div class="grid2">
+
+  <div class="card">
+    <div class="card-h">Info tab · Details card · listed</div>
+    <div class="card-b">
+      <div class="lbl">Details</div>
+      <div class="desc">Ramps rebuilt Jan 2026. Left orbit switch is finicky.</div>
+      <div class="div"></div>
+      <div class="kv"><span class="k">Model</span><span>Godzilla (Premium) — Stern, 2021</span></div>
+      <div class="pbmline"><span class="k"></span><span class="link">View on Pinball Map ↗</span></div>
+      <div class="div"></div>
+      <div class="kv"><span class="k">Owner</span><span>Tim F.</span></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-h">Info tab · Details card · not listed</div>
+    <div class="card-b">
+      <div class="lbl">Details</div>
+      <div class="desc">Ramps rebuilt Jan 2026. Left orbit switch is finicky.</div>
+      <div class="div"></div>
+      <div class="kv"><span class="k">Model</span><span>Godzilla (Premium) — Stern, 2021</span></div>
+      <div class="pbmline"><span class="k"></span><span class="muted">Not listed on Pinball Map</span></div>
+      <div class="div"></div>
+      <div class="kv"><span class="k">Owner</span><span>Tim F.</span></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-h">Info tab · previous listing · member and above</div>
+    <div class="card-b">
+      <div class="lbl">Details</div>
+      <div class="desc">Ramps rebuilt Jan 2026. Left orbit switch is finicky.</div>
+      <div class="div"></div>
+      <div class="kv"><span class="k">Model</span><span>Godzilla (Premium) — Stern, 2021</span></div>
+      <div class="pbmline"><span class="k"></span><span class="muted">Not listed on Pinball Map</span><span class="warnchip">⚠ Configuration issue</span></div>
+      <div class="div"></div>
+      <div class="kv"><span class="k">Owner</span><span>Tim F.</span></div>
+      <div class="tiny muted" style="margin-top:8px">↑ the chip links to the Manage tab</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-h">Info tab · previous listing · logged out / guest</div>
+    <div class="card-b">
+      <div class="lbl">Details</div>
+      <div class="desc">Ramps rebuilt Jan 2026. Left orbit switch is finicky.</div>
+      <div class="div"></div>
+      <div class="kv"><span class="k">Model</span><span>Godzilla (Premium) — Stern, 2021</span></div>
+      <div class="pbmline"><span class="k"></span><span class="muted">Not listed on Pinball Map</span></div>
+      <div class="div"></div>
+      <div class="kv"><span class="k">Owner</span><span>Tim F.</span></div>
+      <div class="tiny muted" style="margin-top:8px">identical to “not listed” — no chip</div>
+    </div>
+  </div>
+
+</div>
+
+<h3 style="margin-top:26px">Manage tab · Pinball Map section</h3>
+<p class="subtitle">Title row dropped (the Model / Edition box stays where it is and owns that). Ellipses removed from Add / Remove — confirms still fire.</p>
+
+<div class="card">
+  <div class="card-h">Manage tab · technician / admin</div>
+  <div class="card-b">
+    <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:6px">
+      <strong class="link">Pinball Map ↗</strong>
+      <span class="tiny muted">last synced 9:14 AM · Sync now</span>
+    </div>
+    <div class="tiny muted" style="margin-bottom:10px">Everything here applies immediately — it isn’t part of Save.</div>
+    <div class="gone" style="padding:4px 0">— Pinball Map title row: removed, Model / Edition box owns it —</div>
+    <div class="row"><span>Not on APC’s lineup</span><span class="btn">Add to Pinball Map</span></div>
+    <div class="row"><span>Previous listing <span class="muted tiny">— “Godzilla (Pro)” is still public</span></span><span class="btn danger">Remove from Pinball Map</span></div>
+  </div>
+</div>
+
+<h3 style="margin-top:26px">Three things I had to decide or can’t decide</h3>
+
+<div class="q"><strong>1. Attribution (CORE-PBM-001).</strong> Pinball Map’s licence requires a surface showing their data to link to <em>our location’s</em> listing. Today the card always renders that link. In the new design an unlisted machine shows “Not listed on Pinball Map” with <strong>no link at all</strong> — while the Model row above it is still catalog data sourced from Pinball Map. That may put the unlisted case out of compliance. Cheapest fix: make “Not listed on Pinball Map” itself the link to our location page.</div>
+
+<div class="q"><strong>2. Row order.</strong> I put Model + the Pinball Map line <em>above</em> Owner, under a divider from the description. Owner could just as easily come first.</div>
+
+<div class="q"><strong>3. Two states you didn’t name.</strong> A machine with <em>no</em> catalog match at all (homebrew, or never matched) — does the Model row disappear, or read “not set”? And a machine we’ve never synced, where we can’t honestly claim listed or not.</div>
