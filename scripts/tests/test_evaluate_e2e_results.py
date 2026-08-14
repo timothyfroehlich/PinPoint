@@ -443,10 +443,14 @@ def test_a_push_to_main_is_not_cancelled_by_the_next_push() -> None:
     reached without ever hitting the timeout PP-jxhy fixed. (PP-tbhv.)
     """
     ci = _ci_yml()
-    group = next(line for line in ci.splitlines() if line.strip().startswith("group:"))
-    assert "github.event_name == 'push' && github.sha" in group, group
+    # Scope to the workflow-level block. Both assertions are satisfiable by a
+    # job-level `concurrency:` somewhere else in the file, which would govern
+    # only that one job — so a whole-file substring check would keep passing
+    # while the setting it claims to pin had moved or been flipped.
+    block = ci.split("\nconcurrency:\n", 1)[1].split("\njobs:", 1)[0]
+    assert "github.event_name == 'push' && github.sha" in block, block
     # PR runs must keep cancelling — that is the whole point of the setting.
-    assert "cancel-in-progress: true" in ci
+    assert "cancel-in-progress: true" in block
 
 
 def test_a_dedicated_step_gates_on_both_verdicts() -> None:
