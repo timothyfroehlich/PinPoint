@@ -1301,3 +1301,62 @@ For "review this PR" that is out of scope. For a second opinion whose job is to 
 first reviewer missed, it is arguably the most interesting thing either run produced. Which of
 those two things this harness is for is a real question, and the survived-a-review target
 (#1810 at `830012fd`) is the one that answers it.
+
+### The survived-a-review target: 2 of 3, including the one the diff could not show
+
+PR #1810 at `830012fd` — the tree immediately after review round one landed, scored only
+against what round two repaired. Every other target in this set asks whether the harness can
+reproduce findings a reviewer already made. This one asks whether it finds what a reviewer
+missed, which is the only question that matters for a second opinion.
+
+| key item                                                                                                                     | in round one's diff? | result                                                |
+| :--------------------------------------------------------------------------------------------------------------------------- | :------------------- | :---------------------------------------------------- |
+| G1 `captureAutoLink` unwrapped — a non-`23505` failure reports "Failed to update machine" for an edit that already committed | yes                  | **hit**, high/0.9, named both call sites              |
+| G2 bare `23505` check misreads a timeline-receipt collision as "already listed"                                              | yes                  | miss — the slice that owned it returned zero findings |
+| G3 the enabled gate missing on the manual sync path                                                                          | **no**               | **hit**, medium/0.95                                  |
+
+**G3 is the result the whole exercise was built to get.** It is the only defect in the
+calibration set whose signal is absent from the diff the reviewer was reading — those lines had
+been untouched since the original implementation, and round one gated the _other_ auto-link
+path in that same commit while leaving this one alone.
+
+agy reached it by doing exactly the sibling comparison that was missing on #1809: it named the
+cron route and the single-machine save as the two callers that check `state?.enabled`, and this
+path as the one that does not.
+
+The fix's own comment, written independently, reproduces the argument almost line for line:
+
+> the two callers disagree: the cron route gates, and "Sync now" deliberately does not (a human
+> refresh owns its own decision). That asymmetry was fine while this pass only healed lmx ids.
+> Now that it also LISTS, ungated it would mean one technician clicking "Sync now" auto-lists
+> the whole fleet while the integration is switched off.
+
+The one divergence is where the check belongs. agy put it at the caller; the fix put it inside
+`reconcileAfterSync` _because_ the callers disagree. That is a fix-location choice, not a
+different defect. agy also over-claimed the blast radius slightly — it said the ungated path
+would trigger external HTTP requests, where the fix notes that fetching a snapshot while
+disabled is harmless and only writing listing state off it is not.
+
+#### This corrects the generalisation from #1809
+
+After #1809 I wrote that the harness misses defects requiring comparison outside the diff. That
+is too broad. The sharper statement, which both targets support:
+
+- **Behavioural preconditions compare well.** "These three callers do the same job and one of
+  them skips a check" is found, across files, outside the diff, at 0.95.
+- **Naming conventions compare badly.** "This field is called `count` where the sibling trains
+  callers to read `total`" is missed even when the slice records having opened the sibling
+  specifically to compare count reporting.
+
+#### Two harness bugs, both mine
+
+**The completeness check keyed on `verdict`.** The parent emitted a complete four-finding
+review with `coverage`, `blocked_slices` and `findings`, and no `verdict` — so `run.sh` called
+it incomplete and burned three resume rounds re-asking for work it already had. Now keyed on
+`findings` being an array, which is the payload; `verdict` is decoration.
+
+**The `schedule` conflict error is not benign after all.** This doc recorded it that morning as
+"one per wave, self-heals". At 556 status polls it became the run's terminal error:
+`another active schedule task "…/task-55" has a conflicting early termination condition "any"`.
+It self-heals early and kills late, and the longer a wave runs the more likely it is to land
+fatally. Long waves should expect it.
