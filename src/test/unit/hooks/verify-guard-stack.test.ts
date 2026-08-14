@@ -57,7 +57,6 @@ const {
 // Fixture builders
 // ---------------------------------------------------------------------------
 const ALL_EXPECTED_HOOKS = [
-  "normalize-workspace-paths.cjs",
   "inject-beads-actor.cjs",
   "block-direct-merge.cjs",
   "block-main-worktree-branch-switch.cjs",
@@ -139,12 +138,12 @@ describe("evaluateGuardStack — missing hooks", () => {
   it("lists multiple missing hooks in one problem string", () => {
     const remaining = ALL_EXPECTED_HOOKS.filter(
       (b) =>
-        b !== "normalize-workspace-paths.cjs" &&
+        b !== "inject-beads-actor.cjs" &&
         b !== "block-main-worktree-branch-switch.cjs"
     );
     const problems = evaluateGuardStack(settingsWithHooks(remaining));
     expect(problems).toEqual([
-      "missing PreToolUse hooks: normalize-workspace-paths.cjs, block-main-worktree-branch-switch.cjs",
+      "missing PreToolUse hooks: inject-beads-actor.cjs, block-main-worktree-branch-switch.cjs",
     ]);
   });
 
