@@ -1,7 +1,8 @@
 -- Does `pinpoint_readonly` actually have the shape readonly-role.sql intends?
 --
 -- Run as the admin/service role, against any database where the role has been
--- set up. Raises on the first failing batch, so a plain `psql -f` exits non-zero:
+-- set up. Raises on the first failing batch, so a plain `psql -f` exits non-zero
+-- BECAUSE of the \set below:
 --
 --   psql "$POSTGRES_URL_ADMIN" -f scripts/sql/verify-readonly-role.sql
 --
@@ -14,6 +15,11 @@
 -- the one thing it was built for. Only asserting the resulting privileges
 -- catches that class of failure. Every check below is a fact about the catalog,
 -- never a restatement of a statement that was issued.
+
+-- Make a RAISE EXCEPTION below actually exit non-zero. Without ON_ERROR_STOP,
+-- psql exits 0 even on an error — the exact false-success this script exists to
+-- prevent, so it must not fall into it itself.
+\set ON_ERROR_STOP on
 
 DO $verify$
 DECLARE
@@ -28,9 +34,7 @@ DECLARE
   v_config     text[];
   v_public_tbl text;
   v_leaky_cols text;
-
-  -- Records one assertion: bumps the counters and names the failure.
-  -- (PL/pgSQL has no local procedures, so this is spelled out at each site.)
+  v_defacl     int;
 BEGIN
   SELECT rolcanlogin, rolbypassrls, rolsuper, rolcreaterole, rolcreatedb, rolconfig
     INTO v_canlogin, v_bypassrls, v_super, v_createrole, v_createdb, v_config
@@ -64,8 +68,8 @@ BEGIN
       v_super, v_createrole, v_createdb;
   END IF;
 
-  -- The load-bearing write defense. A REVOKE can be undone by a later GRANT;
-  -- this cannot.
+  -- The weakest write layer, but it should still be pinned. The durable defense
+  -- is the absence of write grants, checked further down.
   checked := checked + 1;
   IF v_config IS NULL OR NOT ('default_transaction_read_only=on' = ANY(v_config)) THEN
     failures := failures + 1;
@@ -82,14 +86,15 @@ BEGIN
   END IF;
 
   -- Sample a real table rather than trusting the grant statement: what matters
-  -- is what the role ended up holding.
+  -- is what the role ended up holding. Exclude `collections`, which is
+  -- deliberately column-scoped (see below) and so fails a table-level check.
   SELECT c.relname INTO v_public_tbl
     FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
-   WHERE n.nspname = 'public' AND c.relkind = 'r'
+   WHERE n.nspname = 'public' AND c.relkind = 'r' AND c.relname <> 'collections'
    ORDER BY c.relname LIMIT 1;
 
   IF v_public_tbl IS NULL THEN
-    RAISE WARNING 'no tables in public — public grants not verified (unmigrated database?)';
+    RAISE WARNING 'no sampleable public table — public grants not verified (unmigrated database?)';
   ELSE
     checked := checked + 1;
     IF NOT has_table_privilege('pinpoint_readonly', 'public.' || quote_ident(v_public_tbl), 'SELECT') THEN
@@ -104,6 +109,57 @@ BEGIN
       failures := failures + 1;
       RAISE WARNING 'holds a WRITE privilege on public.%', v_public_tbl;
     END IF;
+  END IF;
+
+  -- Future tables must be auto-readable. Asserting ALTER DEFAULT PRIVILEGES from
+  -- the catalog, because it is the one statement in the setup script whose effect
+  -- is invisible until a later migration trips over its absence.
+  checked := checked + 1;
+  SELECT count(*) INTO v_defacl
+    FROM pg_default_acl d
+    JOIN pg_namespace n ON n.oid = d.defaclnamespace
+   WHERE n.nspname = 'public'
+     AND d.defaclobjtype = 'r'
+     AND array_to_string(d.defaclacl, ',') LIKE '%pinpoint_readonly=r%';
+  IF v_defacl = 0 THEN
+    failures := failures + 1;
+    RAISE WARNING 'no default SELECT privilege for pinpoint_readonly on future public tables (ALTER DEFAULT PRIVILEGES did not land, or was run by a different role)';
+  END IF;
+
+  ----------------------------------------------------------------------------
+  -- public credentials: view_token excluded, nothing else credential-shaped
+  ----------------------------------------------------------------------------
+  -- The capability token must NOT be readable.
+  checked := checked + 1;
+  IF to_regclass('public.collections') IS NOT NULL THEN
+    IF has_column_privilege('pinpoint_readonly', 'public.collections', 'view_token', 'SELECT') THEN
+      failures := failures + 1;
+      RAISE WARNING 'can read public.collections.view_token — that is a share capability token';
+    END IF;
+    -- …but the rest of the table must be, or the exclusion broke the whole table.
+    checked := checked + 1;
+    IF NOT has_column_privilege('pinpoint_readonly', 'public.collections', 'id', 'SELECT') THEN
+      failures := failures + 1;
+      RAISE WARNING 'cannot read public.collections.id — the column re-grant did not land';
+    END IF;
+  END IF;
+
+  -- Name-based sweep for any OTHER credential-shaped column the role can read in
+  -- public — a future token/secret column that the blanket grant would expose.
+  -- `*_vault_id` is deliberately allowed: it is a pointer, decryptable only with
+  -- vault access this role lacks.
+  checked := checked + 1;
+  SELECT string_agg(format('%I.%I', table_name, column_name), ', ')
+    INTO v_leaky_cols
+    FROM information_schema.columns c
+   WHERE table_schema = 'public'
+     AND column_name ~* '(token|secret|password|hmac)'
+     AND column_name !~* 'vault_id$'
+     AND has_column_privilege('pinpoint_readonly',
+           format('public.%I', table_name), column_name, 'SELECT');
+  IF v_leaky_cols IS NOT NULL THEN
+    failures := failures + 1;
+    RAISE WARNING 'role can read credential-shaped public column(s): %', v_leaky_cols;
   END IF;
 
   ----------------------------------------------------------------------------
@@ -150,7 +206,7 @@ BEGIN
   END IF;
 
   ----------------------------------------------------------------------------
-  -- No credential ever reaches the views
+  -- No credential ever reaches the auth views, and the raw tables stay hidden
   ----------------------------------------------------------------------------
   -- Name-based on purpose: it catches a column a future GoTrue release adds that
   -- someone then copies into the view without thinking about what it holds.
@@ -166,15 +222,20 @@ BEGIN
     RAISE WARNING 'readonly_auth exposes credential-shaped column(s): %', v_leaky_cols;
   END IF;
 
-  -- And the tables those columns live on stay unreachable directly.
+  -- And the tables those columns live on stay unreachable directly. Guarded on
+  -- the table existing: a non-Supabase Postgres has no auth.flow_state, and a
+  -- has_table_privilege on a missing relation errors and would abort every check
+  -- above it in this block.
   checked := checked + 1;
-  IF has_table_privilege('pinpoint_readonly', 'auth.flow_state', 'SELECT') THEN
+  IF to_regclass('auth.flow_state') IS NOT NULL
+     AND has_table_privilege('pinpoint_readonly', 'auth.flow_state', 'SELECT') THEN
     failures := failures + 1;
     RAISE WARNING 'can SELECT auth.flow_state — that is plaintext OAuth tokens';
   END IF;
 
   checked := checked + 1;
-  IF has_schema_privilege('pinpoint_readonly', 'vault', 'USAGE') THEN
+  IF to_regnamespace('vault') IS NOT NULL
+     AND has_schema_privilege('pinpoint_readonly', 'vault', 'USAGE') THEN
     failures := failures + 1;
     RAISE WARNING 'has USAGE on schema vault';
   END IF;

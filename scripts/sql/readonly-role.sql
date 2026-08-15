@@ -9,8 +9,13 @@
 -- protecting and would only accumulate a useless role, and putting `CREATE ROLE`
 -- into the migration history means every future `db:reset` re-runs it.
 --
---   psql "$POSTGRES_URL_ADMIN" -v pw="$(openssl rand -base64 24)" \
+--   psql "$POSTGRES_URL_ADMIN" -v pw="$(openssl rand -hex 24)" \
 --        -f scripts/sql/readonly-role.sql
+--
+-- Use `rand -hex`, NOT `-base64`: a base64 password can contain `/` or `+`, and
+-- a `/` in the password terminates the authority of the connection string below,
+-- so `new URL(...)` (what postgres.js parses it with) throws `ERR_INVALID_URL`
+-- with no hint that the password is the cause. Hex is URL-safe.
 --
 -- Then build the connection string for scripts/query-readonly.mjs:
 --   postgres://pinpoint_readonly.<project-ref>:<pw>@<same-host>:6543/postgres
@@ -30,11 +35,24 @@
 -- Reading auth data: query `readonly_auth.users` / `readonly_auth.identities`,
 -- NOT `auth.users`. The reason is in the "auth" section below — it is a Supabase
 -- platform constraint, not a stylistic choice.
+--
+-- Verify afterwards with scripts/sql/verify-readonly-role.sql, which asserts the
+-- resulting privileges from the catalog. Do not skip it: several statements here
+-- fail as WARNINGS rather than errors (see the auth section), and psql exits 0
+-- on a warning.
+
+-- Exit non-zero on the first SQL error. Without this, psql's exit status is 0
+-- even when a statement errors, so a failed CREATE VIEW or a missing password
+-- would leave a broken (or absent) role behind a "success" exit. This is also
+-- what makes the missing-password guard below actually stop the run.
+\set ON_ERROR_STOP on
 
 \if :{?pw}
 \else
   \echo 'ERROR: pass a password with  -v pw=...'
-  \quit 1
+  -- `\quit 1` does NOT exit non-zero — psql ignores the argument and exits 0.
+  -- A server error under ON_ERROR_STOP does exit non-zero, so raise one.
+  DO $$ BEGIN RAISE EXCEPTION 'missing required -v pw=...'; END $$;
 \endif
 
 DO $$
@@ -55,21 +73,56 @@ ALTER ROLE pinpoint_readonly WITH LOGIN PASSWORD :'pw';
 -- role holds no INSERT/UPDATE/DELETE anywhere, and Supabase forbids SUPERUSER.
 ALTER ROLE pinpoint_readonly WITH BYPASSRLS NOCREATEDB NOCREATEROLE NOINHERIT;
 
--- Every statement this role runs is read-only, belt to the braces of the
--- read-only transaction scripts/query-readonly.mjs opens. This is the load-
--- bearing write defense: unlike a REVOKE, it cannot be widened later by someone
--- granting a privilege to PUBLIC.
+-- Belt to the braces of the read-only transaction query-readonly.mjs opens.
+-- NOTE this is the WEAKEST layer, not the load-bearing one: it is a USERSET GUC,
+-- so any session can `SET default_transaction_read_only = off`. The durable
+-- write defense is the total absence of write grants below — that is what makes
+-- a write impossible, and it is what a future edit must not quietly relax.
 ALTER ROLE pinpoint_readonly SET default_transaction_read_only = on;
 
--- The app schema in full: it holds no credentials, and an investigation that
--- has to guess which table it may read is an investigation that reaches for the
--- service-role string instead.
+-- The app schema: readable, MINUS the columns that are themselves credentials.
 GRANT USAGE ON SCHEMA public TO pinpoint_readonly;
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO pinpoint_readonly;
 
 -- Tables added by future migrations, so the role does not silently go stale and
 -- start returning permission errors mid-investigation.
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO pinpoint_readonly;
+
+-- `public` is NOT credential-free, so the blanket grant above is too wide as-is.
+-- `collections.view_token` is a base64url share token whose possession grants
+-- anonymous read access to an otherwise-private collection — a capability, not a
+-- reference. A connection string built to be handed to agents must not expose
+-- every member's share token. So: drop the table-level grant on `collections`
+-- and re-grant every column of it EXCEPT view_token. Done dynamically, so a
+-- column added to `collections` later is still readable; a NEW credential column
+-- would be re-exposed, which is why verify-readonly-role.sql scans public for
+-- credential-shaped column names the role can read.
+--
+-- (`bot_token_vault_id` / `outbound_token_vault_id` elsewhere in public are UUID
+-- pointers into `vault`, not secrets — the secret is only decryptable with vault
+-- access, which this role does not have. They stay readable.)
+REVOKE SELECT ON public.collections FROM pinpoint_readonly;
+DO $$
+DECLARE
+  col_list text;
+BEGIN
+  SELECT string_agg(quote_ident(column_name), ', ' ORDER BY ordinal_position)
+    INTO col_list
+    FROM information_schema.columns
+   WHERE table_schema = 'public'
+     AND table_name = 'collections'
+     AND column_name <> 'view_token';
+
+  IF col_list IS NULL THEN
+    RAISE EXCEPTION 'public.collections not found — cannot scope the view_token exclusion';
+  END IF;
+
+  EXECUTE format(
+    'GRANT SELECT (%s) ON public.collections TO pinpoint_readonly',
+    col_list
+  );
+END
+$$;
 
 --------------------------------------------------------------------------------
 -- auth: reached through views, because it cannot be granted directly
@@ -80,12 +133,13 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO pinpoint_rea
 -- `postgres` role you run this as holds USAGE on it *without grant option*
 -- (`postgres=U/supabase_admin` in `pg_namespace.nspacl`). So
 -- `GRANT USAGE ON SCHEMA auth` emits `WARNING: no privileges were granted` —
--- a warning, not an error, so a script that only checks exit codes reports
--- success — and every column grant beneath it is then unreachable. Supabase does
--- not give `postgres` superuser (docs: "Roles, superuser access and unsupported
--- operations"), and `supabase_admin` is not connectable on a hosted project, so
--- there is no way to grant it. Verified against a local stack: the role got
--- `permission denied for schema auth` on every auth table.
+-- a warning, not an error (which is why this file sets ON_ERROR_STOP but that
+-- alone would not catch it, and why verify-readonly-role.sql exists) — and every
+-- column grant beneath it is then unreachable. Supabase does not give `postgres`
+-- superuser (docs: "Roles, superuser access and unsupported operations"), and
+-- `supabase_admin` is not connectable on a hosted project, so there is no way to
+-- grant it. Verified against a local stack: the role got `permission denied for
+-- schema auth` on every auth table.
 --
 -- A view owned by `postgres` is the way through. Views run with their OWNER's
 -- privileges unless created `security_invoker=true`, and `postgres` does hold
@@ -146,10 +200,18 @@ GRANT USAGE ON SCHEMA readonly_auth TO pinpoint_readonly;
 GRANT SELECT ON readonly_auth.users, readonly_auth.identities TO pinpoint_readonly;
 
 -- Vault holds the PinballMap operator credentials; a read-only investigation
--- role has no business decrypting them. Already absent by default — stated so
--- the intent survives someone reading only this file.
-REVOKE ALL ON SCHEMA vault FROM pinpoint_readonly;
+-- role has no business decrypting them. Guarded on the schema existing: a plain
+-- Postgres or a project without supabase_vault has no `vault` schema, and a
+-- REVOKE against a missing schema is a hard error that would (under
+-- ON_ERROR_STOP) abort the run on its last statement.
+DO $$
+BEGIN
+  IF to_regnamespace('vault') IS NOT NULL THEN
+    EXECUTE 'REVOKE ALL ON SCHEMA vault FROM pinpoint_readonly';
+  END IF;
+END
+$$;
 
 \echo ''
 \echo 'pinpoint_readonly configured. Verify with:'
-\echo '  \\i scripts/sql/verify-readonly-role.sql'
+\echo '  psql "$POSTGRES_URL_ADMIN" -f scripts/sql/verify-readonly-role.sql'
