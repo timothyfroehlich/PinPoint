@@ -71,6 +71,13 @@ ALTER ROLE pinpoint_readonly WITH LOGIN PASSWORD :'pw';
 -- end users hide most rows, and an investigation returns a confidently wrong
 -- "no rows" rather than an error. It grants visibility, never mutation — the
 -- role holds no INSERT/UPDATE/DELETE anywhere, and Supabase forbids SUPERUSER.
+--
+-- Granting BYPASSRLS requires the granting role to hold it too. On PG<=15 that
+-- meant SUPERUSER (which Supabase's `postgres` is not), so this statement would
+-- have aborted the whole run under ON_ERROR_STOP; on PG16+ a role with
+-- CREATEROLE + BYPASSRLS may grant it, and that is exactly what Supabase gives
+-- `postgres`. pinpoint-prod runs PG17, so this succeeds. A pre-16 project would
+-- fail here loudly rather than leave a half-built role behind.
 ALTER ROLE pinpoint_readonly WITH BYPASSRLS NOCREATEDB NOCREATEROLE NOINHERIT;
 
 -- Belt to the braces of the read-only transaction query-readonly.mjs opens.

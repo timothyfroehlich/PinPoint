@@ -23,9 +23,10 @@
 // caps each subprocess with a timeout so a misconfigured host cannot wedge CI.
 
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it } from "vitest";
 
 const repoRoot = process.cwd();
 const SCRIPT = "scripts/query-readonly.mjs";
@@ -65,6 +66,12 @@ function run(env: Record<string, string>, argv: string[] = []): RunResult {
 // "nothing configured" cases have to opt out of it explicitly or they pick up
 // the local stack's URL and assert nothing.
 const NO_ENV_FILE = ["--env", "/dev/null"];
+
+// Temp dirs holding throwaway env fixtures; removed after the suite.
+const tmpDirs: string[] = [];
+afterAll(() => {
+  for (const dir of tmpDirs) rmSync(dir, { recursive: true, force: true });
+});
 
 describe("query-readonly.mjs — refuses to run without a query", () => {
   it("exits 1 and shows both invocations", () => {
@@ -160,6 +167,25 @@ describe("query-readonly.mjs — env resolution", () => {
     expect(status).toBe(1);
     expect(stderr).toContain("Cannot read env file");
   });
+
+  it("lets an exported variable win over the env file (dotenv precedence)", () => {
+    // The which-DB footgun: an operator exports a prod URL, then runs from a
+    // worktree whose .env.local also defines one. The export must win, or the
+    // tool reads local while reporting prod. Here the file says local and the
+    // export says prod-like — prod must be what the banner names.
+    const dir = mkdtempSync(path.join(tmpdir(), "query-readonly-env-"));
+    tmpDirs.push(dir);
+    const envPath = path.join(dir, "local.env");
+    writeFileSync(envPath, `POSTGRES_URL_READONLY=${LOCAL_URL}\n`);
+
+    const { stderr } = run({ POSTGRES_URL_READONLY: PROD_LIKE_URL }, [
+      "--env",
+      envPath,
+      "select 1",
+    ]);
+    expect(stderr).toContain("PRODUCTION");
+    expect(stderr).not.toContain("non-production");
+  });
 });
 
 describe("query-readonly.mjs — --file input", () => {
@@ -181,6 +207,19 @@ describe("query-readonly.mjs — --file input", () => {
     ]);
     expect(status).toBe(1);
     expect(stderr).toContain("--file needs a value");
+  });
+
+  it("rejects --file together with an inline query rather than silently dropping one", () => {
+    // --file would win and the positional would vanish — the same "which
+    // statement ran?" ambiguity the parser is loud about everywhere else.
+    const { status, stderr } = run({ POSTGRES_URL_READONLY: LOCAL_URL }, [
+      ...NO_ENV_FILE,
+      "--file",
+      "query.sql",
+      "select 1",
+    ]);
+    expect(status).toBe(1);
+    expect(stderr).toContain("not both");
   });
 });
 

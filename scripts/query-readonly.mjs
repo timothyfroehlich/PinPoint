@@ -15,12 +15,16 @@
  *    write fails with 25006 and the session leaves nothing behind.
  *  - BUT a multi-statement query can defeat the transaction: `ROLLBACK; <write>`
  *    ends the block, and the write then runs in autocommit. The session-level
- *    read-only default still catches it — unless the same query also does
- *    `SET default_transaction_read_only = off` first, which any session may do.
+ *    read-only default is only a BEST-EFFORT catch for that, and over the
+ *    Supavisor transaction pooler (`:6543`) not even reliable: the pooler can
+ *    route the escaped autocommit statement to a different backend than the one
+ *    the `SET` ran on. Any query can also `SET … = off` first regardless.
  *
  * So on the FALLBACK path (`POSTGRES_URL`, a role that CAN write), a determined
  * multi-statement query can still write. That path is a convenience for before
- * the role exists, not a safe place to run untrusted SQL. Set up the role.
+ * the role exists, not a safe place to run untrusted SQL. Set up the role — its
+ * write-refusal depends on none of the above, because the privilege to write is
+ * simply absent.
  *
  * This exists because investigating a production bug means reading production,
  * and doing that over a service-role connection makes every read one typo away
@@ -92,6 +96,16 @@ function parseArgs(argv) {
       );
     }
   }
+
+  // `--file` plus an inline query is the same ambiguity a second positional is:
+  // `--file` would win and the positional would be dropped without a word. The
+  // parser is loud about which statement runs everywhere else, so be loud here.
+  if (args.file !== null && args.sql !== null) {
+    throw new UsageError(
+      "give a query OR --file, not both — --file would win and the inline query would be silently ignored"
+    );
+  }
+
   return args;
 }
 
@@ -116,7 +130,13 @@ function loadEnvFile(path, { required = true } = {}) {
     const match = /^\s*(POSTGRES_URL(?:_READONLY)?)\s*=\s*(.*)$/.exec(line);
     if (!match) continue;
     const value = match[2].trim().replace(/^["']|["']$/g, "");
-    if (value) process.env[match[1]] = value;
+    // Standard dotenv precedence: an already-exported variable wins over the
+    // file, so an explicit `export POSTGRES_URL_READONLY=<prod>` is never
+    // silently swapped out for a worktree's local `.env.local`. Getting which
+    // database this points at wrong is the one failure this tool cannot have.
+    if (value && process.env[match[1]] === undefined) {
+      process.env[match[1]] = value;
+    }
   }
 }
 
@@ -155,9 +175,9 @@ async function main() {
 
   // `.env.local` by default, so the documented invocations work in a checkout
   // without anyone having to remember `--env`; absent, it is skipped rather than
-  // fatal. Values in the file override exported ones, which fails in the safe
-  // direction — `.env.local` is the local stack, so the accident it can cause is
-  // querying local while you meant prod, never the reverse.
+  // fatal. An exported variable wins over the file (dotenv precedence, see
+  // loadEnvFile), so an operator who exported a prod URL and happens to run from
+  // a worktree gets prod, not the worktree's local stack silently swapped in.
   loadEnvFile(args.envFile ?? ".env.local", {
     required: args.envFile !== null,
   });
@@ -207,10 +227,11 @@ async function main() {
   try {
     const connection = await client.reserve();
     try {
-      // Session-level read-only extends the transaction's protection across a
-      // `ROLLBACK; …` escape (see the header): autocommit statements after such
-      // a break still inherit it. Not a wall — `SET … = off` defeats it — but it
-      // closes the accidental case on the fallback path.
+      // Session-level read-only is a best-effort catch for a `ROLLBACK; …`
+      // escape (see the header) on the fallback path — and only best-effort:
+      // over the :6543 transaction pooler the escaped autocommit statement may
+      // land on a different backend than this SET, and any query can SET it off.
+      // The dedicated role does not rely on it; its write-refusal is the grant.
       await connection.unsafe("SET SESSION default_transaction_read_only = on");
       // `.begin()` would COMMIT on success. This has to roll back
       // unconditionally, so the transaction is driven by hand.
