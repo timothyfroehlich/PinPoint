@@ -220,7 +220,7 @@ naming) — not coupling. The registry treats each pair as "any one satisfies":
 - `UPSTASH_REDIS_REST_TOKEN` ⇄ `KV_REST_API_TOKEN`
 - `MAILPIT_PORT` ⇄ `INBUCKET_PORT`, `MAILPIT_SMTP_PORT` ⇄ `INBUCKET_SMTP_PORT`
 - `POSTGRES_URL_NON_POOLING` is a **distinct** value (session pooler), not an
-  alias of `POSTGRES_URL` (transaction pooler) — see AGENTS.md §7.
+  alias of `POSTGRES_URL` (transaction pooler) — see AGENTS.md "Deployment".
 
 **Audit result:** no _dangerous_ couplings remain. The historical
 `UNSUBSCRIBE_SIGNING_SECRET` ↔ `SUPABASE_SERVICE_ROLE_KEY` reuse is fixed; all

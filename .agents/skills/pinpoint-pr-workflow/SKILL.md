@@ -20,8 +20,8 @@ End-to-end pipeline from "I have changes" to "merged in main".
 ## Phase 1: Commit
 
 Branch rules (never on `main`, never rebase, verify `git branch -vv` tracks your branch) are
-AGENTS.md §5 "Branches". Which gate to run before committing is AGENTS.md §2.2 "Process rules"
-and the §5 key-commands table; which tests to run is AGENTS.md §5 "Which tests to run" —
+AGENTS.md "Branches". Which gate to run before committing is AGENTS.md "Process rules"
+and the §5 key-commands table; which tests to run is AGENTS.md "Which tests to run" —
 canonical, don't duplicate here.
 
 ### Commit message
@@ -38,7 +38,7 @@ PinPoint scopes: `issues`, `machines`, `auth`, `ui`, `db`, `e2e`, `agents`, `wor
 ## Phase 2: PR
 
 Prefer MCP `create_pull_request` for typed argument handling, or `gh pr create` if you're
-already in a shell. Open **ready-for-review, not draft** (AGENTS.md §6).
+already in a shell. Open **ready-for-review, not draft** (AGENTS.md "Working style").
 
 ### PR description template
 
@@ -73,7 +73,7 @@ Read threads via `mcp__github__pull_request_read(method: "get_review_comments", 
 
 ### 3.3 Address review comments
 
-Fixing, declining with a one-sentence signed reply, and resolving the thread is AGENTS.md §5 "Review comments"; the rubric is `REVIEW.md`.
+Fixing, declining with a one-sentence signed reply, and resolving the thread is AGENTS.md "Review comments"; the rubric is `REVIEW.md`.
 
 Every unresolved thread counts, whoever opened it — the `threads` gate is author-agnostic. Resolve or decline each one before moving on.
 

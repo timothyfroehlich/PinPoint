@@ -2,7 +2,7 @@
 // .claude/hooks/block-main-worktree-branch-switch.cjs
 // PreToolUse hook: hard-blocks git branch switches in the MAIN worktree unless
 // the target branch is `main`. The root checkout is read-only and stays on main
-// (AGENTS.md §2.2.5). Branch work belongs in a dedicated worktree.
+// (AGENTS.md "Process rules"). Branch work belongs in a dedicated worktree.
 //
 // Incident (2026-05-31): a `git checkout <feature-branch>` ran in the MAIN
 // worktree, switching it off `main`; a later `git merge --ff-only origin/main`
@@ -230,7 +230,7 @@ if (require.main === module) {
     // 5. Block.
     console.error(
       `Branch switch blocked in the MAIN worktree: ${detail}. ` +
-        `The root checkout is read-only and stays on \`main\` (AGENTS.md §2.2.5) — ` +
+        `The root checkout is read-only and stays on \`main\` (AGENTS.md "Process rules") — ` +
         `switching it off main lets a later \`git merge\` advance the wrong branch and clobber another session's state. ` +
         `Do branch work in a dedicated worktree: \`git worktree add <path> -b <branch> origin/main\`, ` +
         `or dispatch an Agent(isolation:"worktree"). ` +

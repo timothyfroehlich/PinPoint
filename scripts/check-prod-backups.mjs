@@ -4,7 +4,7 @@
  * backups still exist and that retention is intact.
  *
  * Background: our disaster-recovery posture is "Supabase Pro takes daily
- * backups with 7-day retention" (AGENTS.md §7, bead PinPoint-dka). Nothing
+ * backups with 7-day retention" (AGENTS.md "Deployment", bead PinPoint-dka). Nothing
  * ever verified that claim, so a silently-failing backup job or a retention
  * change would only surface during a restore. This script is that verification.
  *
@@ -27,7 +27,7 @@ import { pathToFileURL } from "node:url";
 /** PinPoint-Prod. Same hardcoded ref as scripts/backup-production.sh. */
 const PROD_REF = "udhesuizjsgxfeotqybn";
 
-/** Documented retention (AGENTS.md §7): 7 daily backups. */
+/** Documented retention (AGENTS.md "Deployment"): 7 daily backups. */
 const EXPECTED_RETENTION = 7;
 
 /** Newest backup older than this warns (a day was likely skipped). */

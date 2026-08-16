@@ -55,7 +55,7 @@ See `pinpoint-orchestrator` skill Phase 2 for the full technical record.
 - **Dispatch**: `isolation: "worktree"` works out of the box — Claude Code creates the worktree, the `post-checkout` hook configures it (slot allocation, ports, `.env.local`, `.claude/launch.json`).
 - **Cleanup**: Claude Code's `WorktreeRemove` hook runs `scripts/worktree_cleanup.py` (stops Supabase, removes Docker volumes, deallocates slot) **when something removes a worktree** — it does not remove finished worktrees itself, and it never fires for a background agent that just commits, pushes and ends. Manual `git worktree remove /path` or `rm -rf` skips the hook entirely — slot manifest entry and Docker volumes leak. `scripts/worktree_orphan_sweep.py` reconciles the slot manifest, active worktrees, and Supabase Docker resources.
 - **Reaping**: `scripts/worktree_reap.py` is what actually removes worktrees whose work has landed (it delegates teardown to `worktree_cleanup.py`). The sweep cannot see them — a worktree still on disk is "active" by its definition. Reaps only on positive proof (merged PR with `HEAD == headRefOid` + clean tree, or zero commits ahead of `origin/main` with no PR); dry-run by default, `--apply` to reclaim. `merge-pr.sh` reaps the merged branch's worktree on merge. The SessionStart hook runs the sweep **and** the reap in dry-run mode every 6h and surfaces a one-line nudge when either finds something.
-- **Branch creation**: `Agent(isolation:"worktree")` handles branch creation automatically. AGENTS.md §5 "Branches" rules still apply if you create a branch manually inside an existing worktree.
+- **Branch creation**: `Agent(isolation:"worktree")` handles branch creation automatically. AGENTS.md "Branches" rules still apply if you create a branch manually inside an existing worktree.
 
 ### Parallel Subagent Workflow
 
@@ -63,7 +63,7 @@ For multiple independent tasks, use worktree-isolated subagents.
 
 **Primary**: Standalone subagents with `isolation: "worktree"` + `run_in_background: true`. Use `SendMessage` (by agent ID or `name`) for follow-up (review comments, CI fixes). The `post-checkout` hook automatically allocates ports and generates configs.
 
-**Quality Enforcement**: Hooks don't fire for subagents, so the dispatch prompt is the enforcement. Point the agent at AGENTS.md §5 "Which tests to run" — the tiered list — not at `pnpm run check` alone, which is a static gate that runs no tests.
+**Quality Enforcement**: Hooks don't fire for subagents, so the dispatch prompt is the enforcement. Point the agent at AGENTS.md "Which tests to run" — the tiered list — not at `pnpm run check` alone, which is a static gate that runs no tests.
 
 **Anti-patterns**:
 

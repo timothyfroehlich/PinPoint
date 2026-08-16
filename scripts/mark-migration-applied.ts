@@ -62,7 +62,7 @@ if (!migrationNumber) {
 // production, REFUSE to silently fall back to POSTGRES_URL (the :6543
 // TRANSACTION pooler) — it does not support prepared statements (the PP-d8l8
 // silent-COMMIT-loss hazard) and is the wrong endpoint for a migration write.
-// Mirrors scripts/migrate-production.ts. See AGENTS.md §7.
+// Mirrors scripts/migrate-production.ts. See AGENTS.md "Deployment".
 const isVercelProduction = process.env["VERCEL_ENV"] === "production";
 const nonPooling = process.env["POSTGRES_URL_NON_POOLING"];
 
@@ -102,7 +102,7 @@ if (isProductionTarget && !forceProduction) {
       `   Marking a migration applied without running it makes future\n` +
       `   \`migrate:production\` runs SKIP it — prod's schema then diverges from\n` +
       `   the migration history permanently, and nightly backups do not catch it.\n\n` +
-      `   This IS the documented stuck-migration recovery path (AGENTS.md §7).\n` +
+      `   This IS the documented stuck-migration recovery path (AGENTS.md "Deployment").\n` +
       `   To proceed intentionally, re-run with:\n` +
       `     MARK_MIGRATION_FORCE_PRODUCTION=1 POSTGRES_URL=<url> tsx scripts/mark-migration-applied.ts ${migrationNumber}`
   );

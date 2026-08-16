@@ -15,7 +15,7 @@ The superpowers plugin (`brainstorming → writing-plans → subagent-driven-dev
 
 ## 1. Field conventions — plans live in git, beads carry pointers
 
-Specs and plans stay as **files in git** (the superpowers default locations, kept as dated records — AGENTS.md §8). Beads do **not** duplicate their content; they carry **pointers** so any session can recover context:
+Specs and plans stay as **files in git** (the superpowers default locations, kept as dated records — AGENTS.md "Documentation"). Beads do **not** duplicate their content; they carry **pointers** so any session can recover context:
 
 | Bead field     | Holds                                                   | Example                                                             |
 | :------------- | :------------------------------------------------------ | :------------------------------------------------------------------ |
@@ -38,7 +38,7 @@ Specs and plans stay as **files in git** (the superpowers default locations, kep
 2. **After each plan is written** (`writing-plans`): update the child bead's `--design` with the plan path + branch name.
 3. **Epics vs single-PR work:** a multi-PR epic may decompose into child beads (and MAY use a beads formula for the workflow). **Single-PR work must NOT** spawn per-task child beads — that creates sliver-beads. One bead, plan-file checkboxes for the steps.
 
-Everything above happens **in a worktree** — the root checkout is read-only (AGENTS.md §2.2.5). `brainstorming`/`writing-plans` commit spec/plan files to git, so enter a worktree first (`EnterWorktree`, or dispatch an `Agent(isolation:"worktree")`).
+Everything above happens **in a worktree** — the root checkout is read-only (AGENTS.md "Process rules"). `brainstorming`/`writing-plans` commit spec/plan files to git, so enter a worktree first (`EnterWorktree`, or dispatch an `Agent(isolation:"worktree")`).
 
 ---
 
@@ -46,7 +46,7 @@ Everything above happens **in a worktree** — the root checkout is read-only (A
 
 ### `using-git-worktrees`
 
-- PinPoint has native worktree tooling — **prefer `EnterWorktree`** (or `Agent(isolation:"worktree")`) over raw `git worktree add`. Either way the `post-checkout` hook wires ports/env/config, so when you do need a manual worktree, `git worktree add /path -b branch origin/main` (AGENTS.md §4) is the supported fallback. 6.1.x already prefers native tools; this just names ours.
+- PinPoint has native worktree tooling — **prefer `EnterWorktree`** (or `Agent(isolation:"worktree")`) over raw `git worktree add`. Either way the `post-checkout` hook wires ports/env/config, so when you do need a manual worktree, `git worktree add /path -b branch origin/main` (AGENTS.md "Environment") is the supported fallback. 6.1.x already prefers native tools; this just names ours.
 - **Dispatch `Agent(isolation:"worktree")` only from the main worktree** (upstream bug #47548). See CLAUDE.md "Worktree Dispatch Safety".
 
 ### `writing-plans`
@@ -64,14 +64,14 @@ Everything above happens **in a worktree** — the root checkout is read-only (A
 
 - Superpowers' reviewer-subagent is fine as an **optional local self-check**. The **authoritative** review gate is **CI Gate + the head-commit review requirement** in `pinpoint-pr-workflow` (Tim runs `/code-review`; you attest with `mark-claude-review.sh`), not a plugin subagent. Running the plugin's review does **not** satisfy that requirement.
 - **`requesting-code-review` does not satisfy the merge gate.** No bot reviews this repo, and a review still gates the merge. Stop iterating, then ask Tim to run `/code-review` — an agent cannot launch it — and attest the head he reviewed with `mark-claude-review.sh`. Full rules: `pinpoint-pr-workflow` Phase 3.4.
-- **Reply to review comments via MCP** (`add_reply_to_pull_request_comment` + resolve the thread with `pull_request_review_write method:"resolve_thread"`), **signed with your agent name** (`—Claude` / `—Gemini` / `—Codex` / `—Antigravity`, per AGENTS.md §5 "Review comments"). Declined comments still get a one-sentence reply — no silent ignores. Do not use the plugin's own reply flow.
+- **Reply to review comments via MCP** (`add_reply_to_pull_request_comment` + resolve the thread with `pull_request_review_write method:"resolve_thread"`), **signed with your agent name** (`—Claude` / `—Gemini` / `—Codex` / `—Antigravity`, per AGENTS.md "Review comments"). Declined comments still get a one-sentence reply — no silent ignores. Do not use the plugin's own reply flow.
 
 ### `finishing-a-development-branch` — the biggest override
 
 Superpowers presents a 4-option menu led by "1. Merge back to `<base>` locally". **In PinPoint that menu does not apply.** There is exactly one finish path:
 
 - **Never merge locally, never push/merge to `main`, and never merge the PR yourself by any path.** Ship through a PR: push the branch, open it **ready-for-review**, let **CI** run the full suite, post UI screenshots if UI-touching, then hand Tim the exact command to run himself: `! scripts/workflow/merge-pr.sh <PR> --human` (never `gh pr merge` / MCP merge / running `merge-pr.sh` yourself — all three are blocked for agents, PP-wi85). Full pipeline: `pinpoint-pr-workflow` (Phases 4-5, "landing the plane").
-- **Tests:** use PinPoint's tiered commands, listed in **AGENTS.md §5 "Which tests to run"** (`pnpm run check` is the **static** floor and runs no tests; `pnpm run test` is the unit suite; `pnpm run check:python` covers `scripts/` and `.claude/hooks/`; `pnpm run preflight` for migrations/auth/server-actions/middleware/schema; `pnpm run smoke` for UI) — **not** `npm test` / `pytest`. The full E2E suite (`e2e:full` / `e2e:all`) is CI's job by default; it peaks at several GB, so run it locally only when the host has the headroom.
+- **Tests:** use PinPoint's tiered commands, listed in **AGENTS.md "Which tests to run"** (`pnpm run check` is the **static** floor and runs no tests; `pnpm run test` is the unit suite; `pnpm run check:python` covers `scripts/` and `.claude/hooks/`; `pnpm run preflight` for migrations/auth/server-actions/middleware/schema; `pnpm run smoke` for UI) — **not** `npm test` / `pytest`. The full E2E suite (`e2e:full` / `e2e:all`) is CI's job by default; it peaks at several GB, so run it locally only when the host has the headroom.
 - **Worktree cleanup is destructive → wait for explicit confirmation** (`pinpoint-pr-workflow` Phase 5.2 "Cleanup"). When confirmed, cleanup goes through the `WorktreeRemove` hook / `scripts/worktree_cleanup.py` (dealloc slot + Docker volumes) — **never raw `git worktree remove`/`rm -rf`**, which leaks the slot manifest and volumes.
 - **"Discard" is not a routine option.** Abandoning work is a deliberate, confirmed action, not a menu pick.
 - **Close the bead only after merge** (landing-the-plane) — not at push, not at PR-open.
@@ -88,7 +88,7 @@ Superpowers presents a 4-option menu led by "1. Merge back to `<base>` locally".
 | SDD dispatch             | clear the scale gate (count + cost, Tim's yes) first                                              |
 | Code review              | CI Gate + `pinpoint-pr-workflow` head-commit review; replies via MCP, signed with your agent name |
 | Finish: "merge locally"  | ❌ prohibited → PR + human-only `merge-pr.sh --human` handoff + landing-the-plane                 |
-| Finish: tests            | AGENTS.md §5's tiered `check`/`test`/`preflight`/`smoke`, not `npm test`                          |
+| Finish: tests            | AGENTS.md "Which tests to run"'s tiered `check`/`test`/`preflight`/`smoke`, not `npm test`        |
 | Finish: worktree cleanup | `WorktreeRemove` hook / `worktree_cleanup.py`, on confirmation                                    |
 | Close bead               | only after merge                                                                                  |
 

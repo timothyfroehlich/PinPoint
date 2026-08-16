@@ -133,6 +133,34 @@ class TestFindLegacyCitations:
             (1, "AGENTS.md §2.1")
         ]
 
+    def test_finds_any_top_level_section_citation(self):
+        # PP-z9m1 widened this from §2.1 alone to every section number: the
+        # numbering shifts whenever AGENTS.md gains or loses a section and
+        # nothing tells the citation.
+        assert find_legacy_citations("See AGENTS.md §7 for the pooler table") == [
+            (1, "AGENTS.md §7")
+        ]
+
+    def test_finds_multi_level_section_citation(self):
+        # "§2.2.5" is not a section at all -- it is item 5 of a numbered list
+        # under §2.2. Three sites cited it before PP-z9m1, so the pattern has
+        # to reach arbitrary depth rather than stopping at N.N.
+        assert find_legacy_citations("root checkout (AGENTS.md §2.2.5)") == [
+            (1, "AGENTS.md §2.2.5")
+        ]
+
+    def test_ignores_bare_section_mark_without_agents_md(self):
+        # docs/pbm-listing-redesign-refresher.md numbers its OWN sections and
+        # refers to them as "§7"/"§11". Those are not AGENTS.md citations and
+        # must not trip the gate.
+        assert (
+            find_legacy_citations("amended 2026-07-25 (§7). Build state is §11.") == []
+        )
+
+    def test_accepts_the_durable_heading_title_form(self):
+        # The replacement form this gate is steering people toward.
+        assert find_legacy_citations('per AGENTS.md "Which tests to run"') == []
+
     def test_tolerates_backtick_between_filename_and_keyword(self):
         # `AGENTS.md` §2.1 -- code-fenced filename immediately followed by
         # the section mark broke a naive "AGENTS\.md\s*§2\.1" regex on main

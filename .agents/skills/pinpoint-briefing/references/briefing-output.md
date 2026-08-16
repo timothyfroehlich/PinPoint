@@ -26,6 +26,12 @@ Highlight: any with failing CI or stale > 7 days
 ## 🐛 New GitHub Issues (last 5 days)
 [List: #NNN Title (created X days ago) — [in beads / NOT TRACKED]]
 
+## 🌙 Overnight
+Nightly ran:  [which night(s) since the last briefing, or "no run since <date>"]
+Reported:     [each `nightly-report` bead: ID, what it did, PR # if it opened one]
+Needs you:    [count from `bd list --status=open --label=human`, and the newest few]
+[Say plainly if the nightly did not run — a silent gap is a failed run, not an idle one.]
+
 ## 📦 Beads State
 Ready to pick up: [top 5 from `bd ready`]
 In progress:     [from `bd list --status=in_progress`]

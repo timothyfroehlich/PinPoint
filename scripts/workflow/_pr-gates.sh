@@ -239,7 +239,7 @@ check_unresolved_threads() {
   fi
   echo "FAIL: threads: $unresolved unresolved review threads"
   echo "  remedy: fix the code, or decline with a one-sentence reply — then resolve"
-  echo "          the thread. A silent ignore is not a resolution (AGENTS.md §5)."
+  echo "          the thread. A silent ignore is not a resolution (AGENTS.md \"Review comments\")."
   return 1
 }
 

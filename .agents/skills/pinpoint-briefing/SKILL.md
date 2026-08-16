@@ -1,6 +1,6 @@
 ---
 name: pinpoint-briefing
-description: Run a full project health review at session start or on demand — answers "what should I work on?" before the orchestrator answers "how do I work on it?". Sweeps five surfaces in parallel: open PRs / worktrees / ready beads / Dependabot alerts, `pnpm audit`, the last CI runs on main, GitHub issues filed in the last five days, and open security-review beads. Carries the two audit-reading decisions a wrong reading turns into a phantom finding: why a stale local main makes `pnpm audit` report already-patched CVEs as regressions, and why `pnpm outdated` is deliberately never run (Dependabot's soak time is the supply-chain protection). Use when starting a new session, when the user asks for a briefing, when main's CI or a new issue needs triage, or before deciding what to pick up next. The weekly maintenance pass is `pinpoint-chores`, not this.
+description: Run a full project health review at session start or on demand — answers "what should I work on?" before the orchestrator answers "how do I work on it?". Sweeps six surfaces in parallel: open PRs / worktrees / ready beads / Dependabot alerts, `pnpm audit`, the last CI runs on main, GitHub issues filed in the last five days, open security-review beads, and what the unattended nightly routine did overnight (`nightly-report` beads plus the `human` decision queue it built). Carries the two audit-reading decisions a wrong reading turns into a phantom finding: why a stale local main makes `pnpm audit` report already-patched CVEs as regressions, and why `pnpm outdated` is deliberately never run (Dependabot's soak time is the supply-chain protection). Use when starting a new session, when the user asks for a briefing, when main's CI or a new issue needs triage, or before deciding what to pick up next. The weekly maintenance pass is `pinpoint-chores`, not this.
 ---
 
 # PinPoint Session Briefing
@@ -43,7 +43,7 @@ fi
 
 ## Step 1 — Parallel Data Gathering
 
-Launch these five groups simultaneously:
+Launch these six groups simultaneously:
 
 ### Group A: Orchestration Baseline
 
@@ -94,6 +94,27 @@ bd list --status=open --label=security
 
 Read the severity and one-line summary of each open `security` bead. These beads stay **OPEN until the finding is addressed**, so open security beads are normal — surface them; don't treat their open state as an alarm by itself.
 
+### Group F: Overnight Work
+
+The nightly bead routine runs unattended, triages a batch of the backlog, and takes one bead as far as it can. It reports **on the bead itself**, flagged with the `nightly-report` label:
+
+```bash
+bd list --status=open --label=nightly-report --json
+bd list --status=open --label=human
+```
+
+Two separate queues, and they answer different questions:
+
+- **`nightly-report`** — what the nightly actually did since you last looked. Each bead's `notes` carry the PR number, what it changed, what it deliberately didn't, and anything it found that changes the bead's premise. Read the notes, not just the title.
+- **`human`** — beads the nightly could not decide on alone: a taste call, a scope question, a recommended close it isn't allowed to perform, or simply something it wasn't sure how to classify. This is Tim's decision queue. `bd human list` is the same set in a friendlier format; `bd human respond` / `bd human dismiss` clear it.
+
+Neither label clears itself. `nightly-report` is dropped once the work has been picked up or merged; `human` is dropped when Tim answers. So a growing count in either is the signal — surface both counts even when nothing else is notable.
+
+**Each `nightly-report` bead records the session that produced it**, in its notes:
+
+- `session_id:` — a durable handle. `claude --resume <id>` reopens that exact conversation with its full context, which is how you ask the nightly _why_ it did something rather than inferring it from the diff. Reach for this before re-deriving a half-finished bead's reasoning.
+- `session_name:` — `nightly-<YYYY-MM-DD>`, for identifying which night's run it was.
+
 ---
 
 ## Step 2 — Structured Briefing Output
@@ -106,6 +127,12 @@ Synthesize all gathered data into the format in [references/briefing-output.md](
 
 After the briefing, propose one specific bead to pick up (from `bd ready`, prioritized by P-level and
 relation to open PRs). Reference bead ID and title. Wait for user confirmation before claiming.
+
+**Don't propose a bead the nightly already claimed.** `bd ready` excludes in-progress work, so a
+claimed bead won't surface there — but a `nightly-report` bead with an open PR is work in flight, not
+work available, even though nobody is actively sitting on it. Reading the `nightly-report` queue first
+is what tells you which is which. If the most useful next move is finishing or reviewing what the
+nightly started, say that instead of proposing something new.
 
 ---
 

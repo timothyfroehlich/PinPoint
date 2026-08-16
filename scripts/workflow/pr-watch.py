@@ -289,7 +289,7 @@ def _unresolved_threads(threads: list[dict]) -> int:
 
     Author-agnostic since PP-4ric: the old Copilot-login filter would match
     nothing now that Copilot is retired, silently turning every thread check
-    into a pass. Threads come from Tim or another agent, and AGENTS.md §5
+    into a pass. Threads come from Tim or another agent, and AGENTS.md "Review comments"
     requires each to be fixed or declined-and-resolved either way.
     """
     return sum(1 for t in threads if not t["isResolved"])

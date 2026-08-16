@@ -2,7 +2,7 @@ import { assertNotPinPointProduction } from "./lib/db-target.mjs";
 import { createScriptClient } from "./lib/pg-client.mjs";
 
 // Use POSTGRES_URL (transaction pooler, :6543, IPv4) — NOT POSTGRES_URL_NON_POOLING
-// (the IPv6 direct host, unreachable from CI/preview runners). See AGENTS.md §7 (Deployment).
+// (the IPv6 direct host, unreachable from CI/preview runners). See AGENTS.md "Deployment".
 const databaseUrl = process.env.POSTGRES_URL;
 
 if (!databaseUrl) {

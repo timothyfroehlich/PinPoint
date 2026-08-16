@@ -1,6 +1,6 @@
 # Pinball Map listing + machine edit page — settled design spec
 
-_Canonical spec, not session scratch._ Settled across three design sessions ending 2026-07-22, amended 2026-07-23 (§6a) and 2026-07-25 (§7). **PP-o355.7 / .15 / .19 / .20 / .21 / .22 cite this file by path**, so amend it in place rather than superseding it elsewhere (AGENTS.md §8). Current build state is §11.
+_Canonical spec, not session scratch._ Settled across three design sessions ending 2026-07-22, amended 2026-07-23 (§6a) and 2026-07-25 (§7). **PP-o355.7 / .15 / .19 / .20 / .21 / .22 cite this file by path**, so amend it in place rather than superseding it elsewhere (AGENTS.md "Documentation"). Current build state is §11.
 
 ---
 

@@ -19,13 +19,15 @@ Three checks:
   ERROR  A cited CORE-* ID that does not exist in the catalog. Always a bug:
          either a typo or a rule that was renamed/removed without updating its
          citations. This is the check that runs in `pnpm run check`.
-  ERROR  A fragile "rule N" / "commandment N" / "AGENTS.md §2.1" citation
-         (PP-22e4). AGENTS.md §2.1 used to be the numbered non-negotiables
-         list; PP-22e4.4 moved the rules to .claude/rules/, so every citation
-         by rule number or to "§2.1" itself now points at nothing. Unlike a
-         CORE-* ID, neither form is machine-checkable against the catalog, so
-         the only sound gate is banning the pattern outright and requiring
-         the CORE-* ID instead.
+  ERROR  A fragile "rule N" / "commandment N" / "AGENTS.md §N" citation
+         (PP-22e4, PP-z9m1). Rule numbers stopped resolving when PP-22e4.4
+         moved the rules to .claude/rules/. Section numbers are the same
+         hazard on a slower clock: they shift whenever AGENTS.md gains or
+         loses a section, and nothing tells the citation -- PP-z9m1 found
+         three sites citing "§2.2.5", which is not a section at all. Neither
+         form is machine-checkable the way a CORE-* ID is, so the gate bans
+         the pattern. Cite the CORE-* ID for a rule, or the heading title
+         for a section: AGENTS.md "Which tests to run".
   AUDIT  (--orphans) A catalog rule cited nowhere. Opt-in, never fails the
          build: 17 of 67 catalog rules are "orphans" by this definition as of
          2026-08-07 (it was 42 of 62 before the .claude/rules/ tier, which
@@ -36,7 +38,7 @@ Three checks:
          you run deliberately, not a default warning.
 
 Exit codes: 0 clean, 1 unknown IDs found, 2 catalog missing, 3 descending
-range cited, 4 fragile rule-number/§2.1 citation found.
+range cited, 4 fragile rule-number/section-number citation found.
 """
 
 from __future__ import annotations
@@ -93,11 +95,18 @@ WRAPPED_RULE_CITATION = re.compile(
 )
 WRAPPED_CITATION_NUMBER = re.compile(r"^[ \t]*#?\d+\b")
 
-# "AGENTS.md §2.1" itself. That section no longer lists the rules -- PP-22e4.4
-# moved them to .claude/rules/ and left a pointer -- so citing it sends the
-# reader somewhere the rule is not. Tolerates the same optional backtick as
-# NUMBERED_RULE_CITATION.
-SECTION_21_CITATION = re.compile(r"AGENTS\.md`?[ \t]*§[ \t]*2\.1\b")
+# Any "AGENTS.md §N" section citation. This started as §2.1 alone -- that
+# section stopped listing the rules in PP-22e4.4, so citing it sent the reader
+# somewhere the rule is not -- but the whole numbering is the same hazard, just
+# slower: section numbers shift whenever AGENTS.md gains or loses a section, and
+# nothing tells the citation. PP-z9m1 found ~40 such citations across 25 files,
+# three of them pointing at "§2.2.5", which is not a section at all (it is item
+# 5 of a numbered list under §2.2) and never was.
+#
+# The durable form is the heading title: `AGENTS.md "Which tests to run"`.
+# Titles are edited far less often than numbers are renumbered, and a stale one
+# is greppable. Tolerates the same optional backtick as NUMBERED_RULE_CITATION.
+SECTION_CITATION = re.compile(r"AGENTS\.md`?[ \t]*§[ \t]*\d[\d.]*")
 
 CATALOG = "docs/NON_NEGOTIABLES.md"
 
@@ -262,7 +271,7 @@ def find_legacy_citations(text: str) -> list[tuple[int, str]]:
     offending line instead of just the file.
     """
     hits: list[tuple[int, str]] = []
-    for regex in (NUMBERED_RULE_CITATION, SECTION_21_CITATION):
+    for regex in (NUMBERED_RULE_CITATION, SECTION_CITATION):
         for match in regex.finditer(text):
             line_no = text.count("\n", 0, match.start()) + 1
             hits.append((line_no, match.group(0)))
@@ -339,25 +348,28 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 3
 
-    # ERROR: a fragile "rule N" / "commandment N" / "AGENTS.md §2.1" citation
-    # (PP-22e4). §2.1 no longer lists the rules -- PP-22e4.4 moved them to
-    # .claude/rules/ -- so both forms now point at nothing, and neither is
-    # machine-checkable against a catalog the way a CORE-* ID is: ban the
-    # pattern outright.
+    # ERROR: a fragile "rule N" / "commandment N" / "AGENTS.md §N" citation
+    # (PP-22e4, PP-z9m1). Rule numbers stopped resolving when PP-22e4.4 moved
+    # the rules to .claude/rules/; section numbers shift silently whenever
+    # AGENTS.md gains or loses a section. Neither is machine-checkable against
+    # a catalog the way a CORE-* ID is: ban the pattern outright.
     legacy = collect_legacy_citations(root)
     if legacy:
         print(
-            "check:rule-ids: fragile AGENTS.md rule-number/§2.1 citation(s) found\n",
+            "check:rule-ids: fragile AGENTS.md rule-number/section-number "
+            "citation(s) found\n",
             file=sys.stderr,
         )
         for rel in sorted(legacy):
             for line_no, matched_text in legacy[rel]:
                 print(f"  {rel}:{line_no}: {matched_text!r}", file=sys.stderr)
         print(
-            "\nAGENTS.md §2.1 no longer lists the rules (PP-22e4.4) -- they "
-            'moved to .claude/rules/, so a rule number or a "§2.1" citation '
-            "now points at nothing. Cite the CORE-* ID instead; look it up in "
-            f"{CATALOG}, which is the only catalog there is.",
+            "\nNeither form resolves on its own. A rule number points at "
+            "nothing since PP-22e4.4 moved the rules to .claude/rules/ -- "
+            f"cite the CORE-* ID instead, from {CATALOG}, which is the only "
+            "catalog there is. A section number goes stale the next time "
+            "AGENTS.md is restructured, and nothing tells the citation -- "
+            'cite the heading title instead: AGENTS.md "Which tests to run".',
             file=sys.stderr,
         )
         return 4

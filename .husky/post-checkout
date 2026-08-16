@@ -16,7 +16,7 @@ BRANCH_CHECKOUT=$3
 # We check the post-checkout state, not the pre-checkout state. This catches all
 # cases: switching from main to a feature branch, switching between two feature
 # branches, or landing on a detached HEAD — all forbidden in the root checkout
-# (AGENTS.md §2.2 "Root Checkout Is Read-Only").
+# (AGENTS.md "Process rules").
 
 if [ "$BRANCH_CHECKOUT" = "1" ] && [ -d ".git" ]; then
   # Detached HEAD returns empty from `symbolic-ref --short` — treat that as an

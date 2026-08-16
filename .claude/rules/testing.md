@@ -23,6 +23,6 @@ Full statements, severity, and do/don't: `docs/NON_NEGOTIABLES.md`.
   hostname reachable from an E2E run is a class-J violation — delete the spec
   and add an SDK-boundary mock.
 
-Which command to run for which change is `AGENTS.md` §5; Playwright technique
+Which command to run for which change is `AGENTS.md` "Which tests to run"; Playwright technique
 is the `pinpoint-e2e` skill; where the coverage for each bug class already
 lives is `pinpoint-testing`.

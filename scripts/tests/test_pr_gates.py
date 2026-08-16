@@ -323,7 +323,7 @@ def test_no_threads_at_all_passes() -> None:
 
 
 def test_thread_failure_names_the_two_ways_to_clear_it() -> None:
-    """AGENTS.md §5 allows declining, not ignoring. The gate should say so."""
+    """AGENTS.md "Review comments" allows declining, not ignoring. The gate should say so."""
     with gate_env(threads=[thread(resolved=False, author="timothyfroehlich")]) as env:
         result = run_gate("check_unresolved_threads", env)
     assert "decline" in result.stdout.lower(), result.stdout
