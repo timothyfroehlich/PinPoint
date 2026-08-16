@@ -20,11 +20,10 @@
 # exact pin fails LOUD ("routine refuses to run") — the safe direction; a version
 # floor would fail SILENT (a newer release migrates the shared DB before anyone
 # notices). The binary is already installed by the environment's setup script
-# (from releases/latest) before this runs, so this guard's job is to stop a wrong
-# binary from TOUCHING THE DB, not to control the download. The real download pin
-# belongs in that setup script — which lives in the claude.ai UI, not this repo,
-# and so cannot be reviewed or diffed. This in-repo guard is the reviewable
-# backstop.
+# before this runs — that script pins the same version (BD_VER), but its live
+# copy lives in the claude.ai UI, not this repo, and so cannot be reviewed or
+# diffed and can drift. This guard's job is to stop a wrong binary from TOUCHING
+# THE DB if that happens: it is the reviewable, enforced backstop to the UI pin.
 #
 # When Tim upgrades his machines past the pin, bump BD_PINNED_VERSION below. It is
 # a weekly-chores checklist item so the bump is a known recurring task, not a
@@ -56,12 +55,17 @@ die() { printf '[beads-cloud-init] ERROR: %s\n' "$*" >&2; exit 1; }
 
 # 1. bd must be installed and actually RUN. A version that will not print usually
 #    means the tarball binary is missing libicu (the setup script installs it on
-#    that failure).
+#    that failure). Capture stdout AND stderr (some CLIs print the banner to
+#    stderr), and keep the grep|head pipeline off the die path — under `set -o
+#    pipefail`, head closing the pipe early makes grep exit 141 (SIGPIPE), which
+#    would otherwise fire a false "will not run" abort on a healthy bd. The real
+#    gate is whether a version parsed at all.
 command -v bd >/dev/null 2>&1 \
   || die "bd not found on PATH — the environment setup script should install it"
-bd_ver="$(bd version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)" \
-  || die "bd is installed but will not run (missing libicu?) — check the setup script"
-[[ -n "$bd_ver" ]] || die "could not parse 'bd version' output"
+bd_raw="$(bd version 2>&1 || true)"
+bd_ver="$(printf '%s\n' "$bd_raw" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1 || true)"
+[[ -n "$bd_ver" ]] \
+  || die "bd is installed but 'bd version' produced no parseable version (missing libicu, or a broken binary): $bd_raw"
 
 # 2. THE GUARD. Exact-pin — refuse anything else, newer OR older.
 if [[ "$bd_ver" != "$BD_PINNED_VERSION" ]]; then
