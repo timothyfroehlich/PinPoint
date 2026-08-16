@@ -21,7 +21,7 @@ End-to-end pipeline from "I have changes" to "merged in main".
 
 Branch rules (never on `main`, never rebase, verify `git branch -vv` tracks your branch) are
 AGENTS.md "Branches". Which gate to run before committing is AGENTS.md "Process rules"
-and the §5 key-commands table; which tests to run is AGENTS.md "Which tests to run" —
+and the "Key commands" table; which tests to run is AGENTS.md "Which tests to run" —
 canonical, don't duplicate here.
 
 ### Commit message

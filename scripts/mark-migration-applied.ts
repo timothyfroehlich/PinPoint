@@ -32,8 +32,8 @@ interface MigrationJournal {
  * Usage (local):
  *   POSTGRES_URL=<url> tsx scripts/mark-migration-applied.ts <migration-number>
  *
- * Usage (production — the documented stuck-migration recovery path, AGENTS.md
- * §7). This script stays prod-capable on purpose, so it takes an explicit
+ * Usage (production — the documented stuck-migration recovery path,
+ * AGENTS.md "Deployment"). This script stays prod-capable on purpose, so it takes an explicit
  * opt-in token rather than a hard refusal:
  *   MARK_MIGRATION_FORCE_PRODUCTION=1 POSTGRES_URL=<prod_url> \
  *     tsx scripts/mark-migration-applied.ts <migration-number>
