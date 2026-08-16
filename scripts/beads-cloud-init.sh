@@ -35,7 +35,6 @@
 #   DOLT_CREDS_PUB     — the local file-stem handle for that credential
 #   BEADS_SYNC_REMOTE  — https://doltremoteapi.dolthub.com/advacar/pinpoint-beads
 # Optional env:
-#   BEADS_DIR          — where to clone (default: ~/beads)
 #   DOLT_USER_NAME     — Dolt commit author name (default: advacar)
 #   DOLT_USER_EMAIL    — Dolt commit author email; metadata only, NOT auth
 #                        (default: beads-cloud@pinpoint.invalid)
@@ -46,7 +45,10 @@ set -euo pipefail
 BD_PINNED_VERSION="1.2.2"
 # ------------------------------------------------------------------------------
 
-BEADS_DIR="${BEADS_DIR:-$HOME/beads}"
+# Fixed, not overridable: the runbook preamble cd's into ~/beads, so a
+# configurable clone target would let the two drift (clone one place, cd to an
+# empty other). Edit here if you ever need a different path.
+BEADS_DIR="$HOME/beads"
 DOLT_USER_NAME="${DOLT_USER_NAME:-advacar}"
 DOLT_USER_EMAIL="${DOLT_USER_EMAIL:-beads-cloud@pinpoint.invalid}"
 
@@ -63,9 +65,13 @@ die() { printf '[beads-cloud-init] ERROR: %s\n' "$*" >&2; exit 1; }
 command -v bd >/dev/null 2>&1 \
   || die "bd not found on PATH — the environment setup script should install it"
 bd_raw="$(bd version 2>&1 || true)"
-bd_ver="$(printf '%s\n' "$bd_raw" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1 || true)"
+# Anchor on bd's own "bd version X.Y.Z ..." line rather than the first semver-
+# shaped token anywhere in the output — a future banner that also prints a Go
+# runtime or build id in semver shape must not be able to feed the pin guard the
+# wrong number. If the prefix ever changes, this parses empty and dies loud.
+bd_ver="$(printf '%s\n' "$bd_raw" | sed -nE 's/^bd version ([0-9]+\.[0-9]+\.[0-9]+).*/\1/p' | head -n1 || true)"
 [[ -n "$bd_ver" ]] \
-  || die "bd is installed but 'bd version' produced no parseable version (missing libicu, or a broken binary): $bd_raw"
+  || die "could not parse a version from 'bd version' (missing libicu, a broken binary, or a changed output format): $bd_raw"
 
 # 2. THE GUARD. Exact-pin — refuse anything else, newer OR older.
 if [[ "$bd_ver" != "$BD_PINNED_VERSION" ]]; then
@@ -79,6 +85,17 @@ log "bd $bd_ver matches pin — proceeding"
 [[ -n "${DOLT_CREDS_JWK:-}" ]]    || die "DOLT_CREDS_JWK not set (claude.ai env var, agent-runtime only)"
 [[ -n "${DOLT_CREDS_PUB:-}" ]]    || die "DOLT_CREDS_PUB not set"
 [[ -n "${BEADS_SYNC_REMOTE:-}" ]] || die "BEADS_SYNC_REMOTE not set"
+
+# DOLT_CREDS_PUB becomes a file path; DOLT_USER_NAME/EMAIL are interpolated into
+# JSON. Defaults are safe, but a malformed override could traverse out of the
+# creds dir or produce invalid JSON — reject both. (if/then, not `&& die`, so a
+# false test does not trip `set -e`.)
+if [[ "$DOLT_CREDS_PUB" == *[/\\]* ]]; then
+  die "DOLT_CREDS_PUB must be a bare file stem with no path separators: $DOLT_CREDS_PUB"
+fi
+if [[ "$DOLT_USER_NAME$DOLT_USER_EMAIL" == *[\"\\]* ]]; then
+  die "DOLT_USER_NAME / DOLT_USER_EMAIL must not contain a double-quote or backslash — they would break config_global.json"
+fi
 
 # 4. Materialize the dedicated DoltHub credential. The private key stays off git —
 #    it comes from the env var each run. user.creds binds the private JWK to the
@@ -94,7 +111,12 @@ printf '{"user.creds":"%s","user.name":"%s","user.email":"%s"}' \
 
 # 5. Clone the shared beads DB (persists sync.remote; no hand-seeded config.yaml).
 if [[ -d "$BEADS_DIR/.beads" ]]; then
-  log "beads workspace already present in $BEADS_DIR — leaving it as-is"
+  # A surviving/reused workspace must be re-synced, not trusted — operating on a
+  # stale local snapshot of the shared DB (then pushing work computed against it)
+  # is the exact failure that motivated this script. Pull fails loud if it can't.
+  log "beads workspace already present in $BEADS_DIR — syncing from remote"
+  cd "$BEADS_DIR"
+  bd dolt pull
 else
   log "cloning shared beads DB into $BEADS_DIR"
   mkdir -p "$BEADS_DIR"
