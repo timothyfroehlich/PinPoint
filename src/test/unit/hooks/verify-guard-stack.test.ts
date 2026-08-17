@@ -57,7 +57,6 @@ const {
 // Fixture builders
 // ---------------------------------------------------------------------------
 const ALL_EXPECTED_HOOKS = [
-  "normalize-workspace-paths.cjs",
   "inject-beads-actor.cjs",
   "block-direct-merge.cjs",
   "block-main-worktree-branch-switch.cjs",
@@ -139,12 +138,12 @@ describe("evaluateGuardStack — missing hooks", () => {
   it("lists multiple missing hooks in one problem string", () => {
     const remaining = ALL_EXPECTED_HOOKS.filter(
       (b) =>
-        b !== "normalize-workspace-paths.cjs" &&
+        b !== "inject-beads-actor.cjs" &&
         b !== "block-main-worktree-branch-switch.cjs"
     );
     const problems = evaluateGuardStack(settingsWithHooks(remaining));
     expect(problems).toEqual([
-      "missing PreToolUse hooks: normalize-workspace-paths.cjs, block-main-worktree-branch-switch.cjs",
+      "missing PreToolUse hooks: inject-beads-actor.cjs, block-main-worktree-branch-switch.cjs",
     ]);
   });
 
@@ -255,14 +254,14 @@ describe("extractScriptPaths", () => {
     ).toEqual([".claude/hooks/block-direct-merge.cjs"]);
     expect(
       extractScriptPaths(
-        'bash "${CLAUDE_PROJECT_DIR:-.}"/scripts/hooks/huddle-poll.sh'
+        'bash "${CLAUDE_PROJECT_DIR:-.}"/scripts/hooks/prototype-mode-poll.sh'
       )
-    ).toEqual(["scripts/hooks/huddle-poll.sh"]);
+    ).toEqual(["scripts/hooks/prototype-mode-poll.sh"]);
     expect(
       extractScriptPaths(
-        'HUDDLE_THROTTLE_SECONDS=180 bash "$CLAUDE_PROJECT_DIR"/scripts/hooks/huddle-poll.sh'
+        'HUDDLE_THROTTLE_SECONDS=180 bash "$CLAUDE_PROJECT_DIR"/scripts/hooks/prototype-mode-poll.sh'
       )
-    ).toEqual(["scripts/hooks/huddle-poll.sh"]);
+    ).toEqual(["scripts/hooks/prototype-mode-poll.sh"]);
   });
 
   it("skips commands that are not repo-relative script paths", () => {
@@ -329,7 +328,7 @@ describe("evaluateGuardStack — registered-but-missing-from-disk", () => {
     // No `exists` override — this hits the real filesystem against the real
     // repo, and every basename below is a file that exists.
     const settings = settingsWithCommands("SessionStart", [
-      'bash "${CLAUDE_PROJECT_DIR:-.}"/scripts/hooks/huddle-session-start.sh',
+      'bash "${CLAUDE_PROJECT_DIR:-.}"/scripts/hooks/prototype-mode-poll.sh',
       "node .claude/hooks/verify-guard-stack.cjs",
     ]);
     expect(evaluateGuardStack(settings)).toEqual([]);

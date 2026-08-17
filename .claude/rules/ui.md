@@ -38,7 +38,6 @@ Full statements, severity, and do/don't: `docs/NON_NEGOTIABLES.md`.
   accessible name on data tables, real `<button>` (never
   `<div role="button">`), `title` is not a tooltip, `inert` on background
   regions when a modal opens.
-
 These are the broadest globs in this directory — roughly two-thirds of the
 source tree — and that is deliberate rather than sloppy: they still exclude
 `src/lib`, `src/server`, `src/services`, `scripts/`, and `drizzle/`, so a

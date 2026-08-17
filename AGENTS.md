@@ -30,6 +30,8 @@ That tier is Claude Code-specific. In any other tool, read the catalog directly.
 
 Load relevant skills for every task. If your tool doesn't support skills, read the file directly. All skills live at `.agents/skills/<name>/SKILL.md`.
 
+**The huddle is the exception, and it is not in this repo.** Inter-session coordination — the SessionStart identity notice, the poll, the daily bead — moved to Tim's dotfiles on 2026-08-12: scripts at `~/.claude/hooks/huddle/`, skill at `~/.claude/skills/huddle/`, tests alongside the scripts. Nothing about it was PinPoint-specific, and living outside the repo means editing it costs no PR. What stays here is the four hook registrations in `.claude/settings.json` and the channel itself — the huddle resolves `.agents/huddle/` and its beads from the cwd's repo, so the conversation is still per-project.
+
 ## 4. Environment
 
 ### Host prerequisites
@@ -178,12 +180,12 @@ Use worktree-isolated subagents for independent tasks. Tool-specific dispatch, h
 
 ### Superpowers lifecycle → beads
 
-When you run the superpowers plugin lifecycle (`brainstorming → writing-plans → subagent-driven-development → finishing-a-development-branch`), load `pinpoint-superpowers-bridge` — several superpowers steps conflict with PinPoint rules (local merge, raw `git worktree remove`, generic test commands, uncapped subagent dispatch, the plugin's own review-reply flow) and the skill spells out the overrides. Specs and plans stay as **files in git** (their superpowers default locations, kept as records — §8); beads carry **pointers**, not copies:
+When you run the superpowers plugin lifecycle (`brainstorming → writing-plans → subagent-driven-development → finishing-a-development-branch`), load `pinpoint-superpowers-bridge` — several superpowers steps conflict with PinPoint rules (local merge, raw `git worktree remove`, generic test commands, uncapped subagent dispatch, the plugin's own review-reply flow) and the skill spells out the overrides. Superpowers specs and plans are **working documents, not repo artifacts** (decision 2026-08-16): draft them outside the repo tree (the session scratchpad), store the content in the bead. Files under `docs/superpowers/` committed before the decision stay as records (§8); no new files go there. Durable requirements belong in `docs/feature-specs/` (§8), not in superpowers docs. Bead fields:
 
-- `--spec-id` = spec file path
-- `--design` = plan file path(s) **+ branch name** while unmerged (recover with `git show origin/<branch>:<path>`)
+- `--spec-id` = the feature spec path (`docs/feature-specs/<feature>.md`), when the work has one
+- `--design` = the **full plan text**, stored when the plan is written and refreshed when it materially changes
 - `--acceptance` = distilled success criteria
-- `--notes` = landing breadcrumbs (PR #, migration state, follow-ups)
+- `--notes` = landing breadcrumbs (PR #, branch, migration state, follow-ups)
 
 Plan-file checkboxes are within-PR execution state, **not** durable task tracking — the bead is the cross-session source of truth. Single-PR work gets one bead (no per-task sliver-beads); only multi-PR epics decompose into children.
 
@@ -233,3 +235,5 @@ When `pnpm audit --audit-level=high` goes RED on a freshly-published advisory **
 Actionable, "what" and "how" only. Skills carry the deep dives.
 
 **Canonical specs are authoritative** — particularly `pinpoint-design-bible` (§5 page archetypes, §17 modal archetypes). When implementation changes UI behavior covered there, **edit the spec in place**. Don't append divergence notes or "TODO: spec out of date" disclaimers. If you find one, fold it into canonical text and delete it. Dated artifacts in `docs/superpowers/specs/` are records — leave them alone.
+
+**Feature specs stay current as you work** (`docs/feature-specs/`, `spec-driven-development` skill): when a change touches behavior covered by one, the **same PR** updates the spec or adds a divergence-table row — never neither. Spec edits require Tim approving the exact diff first, even when he says "update the spec".

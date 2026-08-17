@@ -53,8 +53,9 @@ If a push 403s, DoltHub may be using region-scoped upload hosts — widen to
 see Reproducing / debugging). Avoid the broad `*.amazonaws.com`.
 
 Do **not** rely on `api.github.com` — it is rate-limited on shared cloud egress
-IPs (returns 403) and may not be allowlisted. Resolve the latest version off the
-`github.com` `/releases/latest` redirect instead (see setup script).
+IPs (returns 403) and may not be allowlisted. The setup script pins the `bd`
+version and downloads the release asset from `github.com` directly (no API call,
+no redirect resolution needed — see setup script).
 
 ### Environment variables
 
@@ -69,51 +70,48 @@ Values live in the claude.ai UI (never commit them). Names:
 Reminder: these are invisible to the setup script (#63541) — the agent consumes
 them.
 
-### Setup script (installs binaries; unpinned)
+### Setup script (installs binaries; a checked-in shim)
+
+The setup script's body lives in the repo at `scripts/beads-cloud-setup.sh`, so
+it is reviewable and diffable. The claude.ai UI "Setup script" field holds only a
+one-line shim that calls it — the repo is already cloned at container-provision
+time (verified 2026-08-16: the setup script's cwd is `$HOME`, and the checkout is
+at `~/PinPoint`):
 
 ```bash
-#!/usr/bin/env bash
-set -euo pipefail
-
-echo "=== ENV DISCOVERY ==="
-head -3 /etc/os-release 2>/dev/null || true
-echo "user=$(whoami) $(id)"
-for t in sudo apt-get brew curl tar jq go; do
-  printf '%s: %s\n' "$t" "$(command -v "$t" || echo MISSING)"
-done
-
-BIN=/usr/local/bin
-export PATH="$BIN:$PATH"
-
-echo "=== INSTALL DOLT (version-agnostic asset, no api.github.com) ==="
-curl -fsSL -o /tmp/dolt.tgz \
-  "https://github.com/dolthub/dolt/releases/latest/download/dolt-linux-amd64.tar.gz"
-tar xzf /tmp/dolt.tgz -C /tmp
-install /tmp/dolt-linux-amd64/bin/dolt "$BIN/dolt"
-
-echo "=== RESOLVE BEADS LATEST TAG (via github.com redirect) ==="
-BD_TAG=$(curl -fsSL -o /dev/null -w '%{url_effective}\n' \
-  https://github.com/steveyegge/beads/releases/latest | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+')
-BD_VER="${BD_TAG#v}"
-echo "=== INSTALL BEADS ${BD_TAG} ==="
-curl -fsSL -o /tmp/bd.tgz \
-  "https://github.com/steveyegge/beads/releases/download/${BD_TAG}/beads_${BD_VER}_linux_amd64.tar.gz"
-tar xzf /tmp/bd.tgz -C /tmp
-install /tmp/bd "$BIN/bd"
-
-echo "=== VERSIONS ==="
-dolt version
-if ! bd version; then
-  echo "bd failed to link — installing libicu"
-  apt-get update -qq && apt-get install -y libicu-dev
-  bd version
-fi
+bash ~/PinPoint/scripts/beads-cloud-setup.sh
 ```
 
-`bd` is intentionally **unpinned** (both cloud and local track latest stable).
-The drift risk — cloud `bd` schema-ahead of the DB — is handled by beads'
-remote-migrate gate, which refuses to auto-migrate a remote-backed DB and prints
-the fix rather than corrupting anything.
+That script installs `dolt` (latest) and `bd` (pinned); the agent then runs
+`scripts/beads-cloud-init.sh` (below) to materialize the credential and clone.
+
+**Why `bd` is pinned but `dolt` is not.** The 2026-08-16 lockout was a `bd`
+schema migration — `bd` owns `schema_migrations` and the additive migrations that
+broke it, so an accidental `bd` release is the live hazard the pin guards against.
+`dolt` is the storage engine underneath; its on-disk/wire format is stable and
+its releases are designed for cross-version client/server compatibility. The
+shared server on Bazzite runs its own `dolt`, and pinning the cloud client to a
+fixed version could actually _create_ a client/server mismatch when that server
+upgrades — so tracking latest is the safer choice for the client, not an
+oversight. (The old inline setup script installed `dolt` latest too; this is
+unchanged, now stated deliberately.)
+
+**The bd pin is single-source.** `beads-cloud-setup.sh` reads the version out of
+`BD_PINNED_VERSION` in `scripts/beads-cloud-init.sh` and installs exactly that, by
+exact release tag — so the installed binary and the runtime guard cannot disagree,
+and the UI field carries no version at all. Bumping the pin is a one-line edit to
+`beads-cloud-init.sh` (a weekly-chores item); the UI shim never changes.
+
+Why an exact pin: on 2026-08-16 an accidental newer release (1.2.1) migrated the
+shared DB to a schema no supported binary could read and locked every client out
+for two days. An exact pin fails loud (a drifted binary makes the init script
+refuse to run) rather than silent (a newer release migrating the shared DB before
+anyone notices).
+
+Caveat, now narrowed: only the one-line shim lives in the un-diffable UI — the
+install logic it calls is in git. The reviewable, enforced backstop remains the
+version guard in `scripts/beads-cloud-init.sh`, which refuses to touch the DB
+unless the installed `bd` equals its pin.
 
 ## Credential setup (one-time)
 
@@ -140,23 +138,30 @@ named `<handle>.jwk` and `user.creds` matches it.
 
 ## Agent preamble (prepend to each beads-writing routine prompt)
 
-```bash
-mkdir -p ~/.dolt/creds
-printf '%s' "$DOLT_CREDS_JWK" > ~/.dolt/creds/"$DOLT_CREDS_PUB".jwk
-chmod 600 ~/.dolt/creds/"$DOLT_CREDS_PUB".jwk
-printf '{"user.creds":"%s","user.email":"<dolthub-account-email>","user.name":"advacar"}' \
-  "$DOLT_CREDS_PUB" > ~/.dolt/config_global.json
+The credential-materialization, version guard, and clone all live in a
+checked-in script — `scripts/beads-cloud-init.sh`, present in the cloud
+checkout — so a routine's preamble is one line:
 
-# Clone + persist sync.remote in one step (no hand-seeded .beads/config.yaml):
-mkdir -p ~/beads && cd ~/beads
-bd init --remote "$BEADS_SYNC_REMOTE" --prefix PP --non-interactive
+```bash
+bash scripts/beads-cloud-init.sh && cd ~/beads
 
 # ... do work: bd ready / bd create / bd update ...
 bd dolt push
 ```
 
-`user.email` is Dolt commit metadata only (not used for authentication — the JWK
-handles that); use your DoltHub account email or any non-personal address.
+The script reads `DOLT_CREDS_JWK`, `DOLT_CREDS_PUB`, and `BEADS_SYNC_REMOTE` from
+the environment (agent-runtime only — see #55440 above), writes the DoltHub
+credential and `~/.dolt/config_global.json`, checks `bd version` against its pin,
+then clones into `~/beads`. It exits non-zero — refusing to touch the DB — on a
+version mismatch or any missing env var, so a routine fails fast instead of
+running against a wrong binary. The generated `user.name`/`user.email` are Dolt
+commit metadata only (not authentication — the JWK handles that); override with
+`DOLT_USER_NAME` / `DOLT_USER_EMAIL` for a specific address.
+
+Why a script and not inline preamble prose: a prompt instruction ("stop if `bd`
+isn't 1.2.2") is the weakest enforcement — a model can reason past it. A script
+that exits non-zero cannot. Keeping the logic in git also makes it reviewable,
+unlike the setup script in the claude.ai UI.
 
 ## Guardrails
 

@@ -166,6 +166,8 @@ export function ProfileEditor({
           />
         </div>
         <div className="space-y-1.5">
+          {/* Not required: only a first name is (PP-if48). Users backfilled
+              from an OAuth handle have no surname to supply. */}
           <label htmlFor="lastName" className="text-sm font-medium">
             Last name
           </label>
@@ -174,7 +176,6 @@ export function ProfileEditor({
             name="lastName"
             defaultValue={initial.lastName}
             autoComplete="family-name"
-            required
           />
         </div>
         <div className="space-y-1.5">

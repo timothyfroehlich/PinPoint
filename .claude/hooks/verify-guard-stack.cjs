@@ -43,7 +43,6 @@ const fs = require("node:fs");
 
 // Keep in sync when adding/removing a PreToolUse guard hook.
 const EXPECTED_GUARD_HOOKS = [
-  "normalize-workspace-paths.cjs",
   "inject-beads-actor.cjs",
   "block-direct-merge.cjs",
   "block-main-worktree-branch-switch.cjs",
@@ -53,15 +52,19 @@ const EXPECTED_GUARD_HOOKS = [
 // --- Registered-script extraction --------------------------------------------
 // Hook `command` values are shell strings. For the reverse check we only need
 // the repo-relative script path they invoke, e.g.
-//   `node .claude/hooks/block-direct-merge.cjs`                    → .claude/hooks/block-direct-merge.cjs
-//   `bash "${CLAUDE_PROJECT_DIR:-.}"/scripts/hooks/huddle-poll.sh` → scripts/hooks/huddle-poll.sh
-//   `HUDDLE_THROTTLE_SECONDS=180 bash "$CLAUDE_PROJECT_DIR"/x.sh`  → x.sh
+//   `node .claude/hooks/block-direct-merge.cjs`             → .claude/hooks/block-direct-merge.cjs
+//   `bash "${CLAUDE_PROJECT_DIR:-.}"/scripts/hooks/x.sh`    → scripts/hooks/x.sh
+//   `HUDDLE_THROTTLE_SECONDS=180 bash "$CLAUDE_PROJECT_DIR"/x.sh` → x.sh
 //
 // DELIBERATELY CONSERVATIVE: anything we cannot resolve with confidence — an
 // absolute path, a bare binary on $PATH, an inline `node -e '…'` program, a
 // token with unresolved shell expansion or metacharacters — is SKIPPED, not
 // flagged. A missed exotic registration is far cheaper than a canary that
 // cries wolf every session.
+//
+// The four `"$HOME"/.claude/hooks/huddle/…` registrations land in that skipped
+// set by design: the huddle lives in dotfiles, not this repo, so there is no
+// repo-relative path to verify and its absence is not a repo defect.
 
 const SCRIPT_EXTENSIONS = new Set([".cjs", ".mjs", ".js", ".sh", ".py", ".ts"]);
 // Any of these in a token means shell machinery we won't try to interpret.

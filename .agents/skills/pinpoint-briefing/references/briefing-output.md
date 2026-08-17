@@ -26,6 +26,11 @@ Highlight: any with failing CI or stale > 7 days
 ## 🐛 New GitHub Issues (last 5 days)
 [List: #NNN Title (created X days ago) — [in beads / NOT TRACKED]]
 
+## 🌙 Overnight
+Reported:     [each `nightly-report` bead: ID, what it did, PR # if it opened one — or "queue empty"]
+Needs you:    [count of open `human` beads, and the newest few — note which the nightly filed vs. which a session did]
+[An empty queue is not a failed run. Don't infer one; claude.ai's run history is the only place that says.]
+
 ## 📦 Beads State
 Ready to pick up: [top 5 from `bd ready`]
 In progress:     [from `bd list --status=in_progress`]

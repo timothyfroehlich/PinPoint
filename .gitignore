@@ -45,6 +45,11 @@ logs/
 # Beads issue tracker (Dolt DB — not tracked in git)
 .beads/
 .dolt/
+# bd's workspace gate lock lands *beside* the guarded root, i.e. at the repo
+# root as `.beads.gate.lock`, so `.beads/` above does not cover it. bd bundles
+# this same `*.gate.lock*` pattern, but only into `.beads/.gitignore`, which is
+# itself inside an ignored directory and therefore never consulted.
+*.gate.lock*
 
 # Environment variable files
 # Strategy: Ignore every .env* variant by default, then explicitly allow safe templates.

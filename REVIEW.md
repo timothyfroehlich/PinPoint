@@ -28,6 +28,15 @@ Cite the `CORE-*` rule ID (e.g. `CORE-SEC-007`) in a review comment when a chang
 - Flag any newly introduced org scoping, multi-tenant context wrapper, RLS policy, pgTAP test, or tRPC router — the app has none and should stay that way.
 - **`localhost`, never `127.0.0.1` (CORE-SEC-008).** Flag `127.0.0.1` in `supabase/config.toml`, `.env*`, Playwright config, or scripts — browser cookie isolation breaks Supabase SSR auth across the two hosts.
 
+## Spec conformance
+
+Some features have a living requirements spec in `docs/feature-specs/` (see the `spec-driven-development` skill). When a PR touches behavior covered by one:
+
+- **Review the code against the spec.** Cite requirement numbers (`spec §4.6`) the way you cite `CORE-*` IDs. A behavior change the spec doesn't sanction needs either a same-PR spec update or a new row in the spec's Known-divergences table — flag it if it has neither.
+- **If the PR edits the spec itself**, additionally review the divergence table both ways: are existing rows now stale given the spec change, and does the code diverge anywhere the table doesn't yet record?
+
+Divergence rows are a one-line todo list, not writeups.
+
 ## Help-page accuracy
 
 If a PR changes roles, statuses, permissions, or user-facing terminology, check `src/app/(app)/help/` for content that becomes stale. Role names must match `src/lib/permissions/matrix.ts` (Guest, Member, Technician, Admin). Status labels must use the display labels in `STATUS_CONFIG` (`src/lib/issues/status.ts`), not raw database values.

@@ -1,6 +1,6 @@
 {
-  "id": "d45975a9-68f8-4ca2-b0dd-1e68cb811d1e",
-  "prevId": "17b7a203-1bb8-42b4-ab5e-fba6fc877cbc",
+  "id": "99df6597-d1e4-4c8f-9e27-fae827b81127",
+  "prevId": "d45975a9-68f8-4ca2-b0dd-1e68cb811d1e",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -1565,6 +1565,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "model_name": {
+          "name": "model_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "manufacturer": {
           "name": "manufacturer",
           "type": "text",
@@ -1694,6 +1700,10 @@
         "machines_pinballmap_link_exclusive": {
           "name": "machines_pinballmap_link_exclusive",
           "value": "NOT (pinballmap_machine_id IS NOT NULL AND pinballmap_excluded)"
+        },
+        "machines_model_name_requires_excluded": {
+          "name": "machines_model_name_requires_excluded",
+          "value": "NOT (model_name IS NOT NULL AND NOT pinballmap_excluded)"
         },
         "machines_pinballmap_listed_requires_link": {
           "name": "machines_pinballmap_listed_requires_link",

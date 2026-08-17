@@ -4,7 +4,7 @@
 // harness-agnostic beads + huddle hook scripts.
 //
 // Antigravity's PreInvocation hook payload uses different field names than
-// the shape `scripts/hooks/huddle-*.sh` expect (which originated in Claude
+// the shape `~/.claude/hooks/huddle/huddle-*.sh` expect (which originated in Claude
 // Code's hook contract). This shim:
 //   1. Reads Antigravity's JSON payload (conversationId, workspacePaths,
 //      initialNumSteps, …).
@@ -19,6 +19,7 @@
 // shape and written to stdout.
 
 const { execFileSync } = require("child_process");
+const os = require("os");
 const path = require("path");
 
 async function main() {
@@ -87,8 +88,8 @@ async function main() {
     // 2. Run huddle-session-start.sh to announce session identity
     try {
       const huddleStartScript = path.join(
-        workspacePath,
-        "scripts/hooks/huddle-session-start.sh"
+        os.homedir(),
+        ".claude/hooks/huddle/huddle-session-start.sh"
       );
       const huddleOutput = execFileSync("bash", [huddleStartScript], {
         input: payloadString,
@@ -120,8 +121,8 @@ async function main() {
     // Mid-trajectory: run huddle-poll.sh to fetch updates
     try {
       const huddlePollScript = path.join(
-        workspacePath,
-        "scripts/hooks/huddle-poll.sh"
+        os.homedir(),
+        ".claude/hooks/huddle/huddle-poll.sh"
       );
       const huddleOutput = execFileSync("bash", [huddlePollScript], {
         input: payloadString,
