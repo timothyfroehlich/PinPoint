@@ -165,6 +165,17 @@ running against a wrong binary. The generated `user.name`/`user.email` are Dolt
 commit metadata only (not authentication — the JWK handles that); override with
 `DOLT_USER_NAME` / `DOLT_USER_EMAIL` for a specific address.
 
+After the clone (or re-sync pull), the script creates five tables the remote
+never carries: `events`, `bd_events_journal`, `bd_events_seq`, `leases`, and
+`wisps` are in bd's `dolt_ignore`, existing only in each machine's working set —
+and bd 1.2.2 does not lazily create them in an embedded clone, so without this
+step a routine's first write dies with `Error 1146: table not found: events`
+(incident 2026-08-17, PP-esqi). The schemas live in
+`scripts/beads-cloud-repair-tables.sql`; `dolt_ignore` keeps the created tables
+out of `bd dolt push`, so the repair cannot leak them into the shared remote.
+The SQL is a snapshot of the pinned bd version's schema — refresh it if a pin
+bump changes those tables.
+
 Why a script and not inline preamble prose: a prompt instruction ("stop if `bd`
 isn't 1.2.2") is the weakest enforcement — a model can reason past it. A script
 that exits non-zero cannot. Keeping the logic in git also makes it reviewable,
