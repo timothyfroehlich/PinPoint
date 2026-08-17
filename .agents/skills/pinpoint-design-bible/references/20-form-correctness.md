@@ -44,7 +44,7 @@ Append `<span aria-hidden="true">*</span>` to the `<Label>` of every required fi
 - **AT:** `aria-invalid="true"` synced on blur when `checkValidity()` fails (CORE-FORM-004). Both live in the primitive, once, never per form.
 - **The shadcn `Select` is deliberately outside both mechanisms** — a Radix trigger is a `<button>` with no native validity, so invalid state there is caller-driven via `aria-invalid`. Don't try to extend the primitives' treatment to it. Rationale: `pinpoint-ui` skill → `references/form-correctness.md`.
 - **Form-level errors:** `<Alert variant="destructive">` at the top of the form (per §13 Error State).
-- **Field-level errors:** `<FormMessage>` (react-hook-form) under the field, or inline `<p className="text-sm text-destructive">`.
+- **Field-level errors:** inline `<p className="text-sm text-destructive-text">` under the field. There is no form-library `<FormMessage>` — the app builds forms with plain `<form onSubmit>` + Server Actions.
 
 ### Submit-button enabled state
 

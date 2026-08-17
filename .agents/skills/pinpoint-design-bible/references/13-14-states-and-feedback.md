@@ -55,13 +55,13 @@ Prefer `<Skeleton>` rectangles shaped like the content that will appear. Skeleto
 
 Three tiers based on scope. Pick the narrowest one that fits.
 
-| Scope                           | Pattern                                                                     |
-| :------------------------------ | :-------------------------------------------------------------------------- |
-| Form-level (submission failed)  | `<Alert variant="destructive"><AlertDescription>` at top of form            |
-| Field-level (one field invalid) | `<FormMessage>` (react-hook-form) or inline `text-sm text-destructive-text` |
-| Inline list edit (cell update)  | `toast.error("Failed to update X")`                                         |
-| Entire route crashed            | `error.tsx` boundary (already implemented)                                  |
-| Route not found                 | `not-found.tsx` boundary (already implemented)                              |
+| Scope                           | Pattern                                                                |
+| :------------------------------ | :--------------------------------------------------------------------- |
+| Form-level (submission failed)  | `<Alert variant="destructive"><AlertDescription>` at top of form       |
+| Field-level (one field invalid) | Inline `<p className="text-sm text-destructive-text">` under the field |
+| Inline list edit (cell update)  | `toast.error("Failed to update X")`                                    |
+| Entire route crashed            | `error.tsx` boundary (already implemented)                             |
+| Route not found                 | `not-found.tsx` boundary (already implemented)                         |
 
 **Rules:**
 
@@ -78,8 +78,8 @@ When something happens in response to user action, where should they see feedbac
 | :------------------------------------------------ | :-------------------------------------------------------------------------------------------------- |
 | Form submit success → redirect                    | Server Action does the write, then `redirect(...)`; if needed, show success on the destination page |
 | Form submit success → stay on page (settings)     | Return success state from the Server Action; `<SaveCancelButtons>` green flash (3s "Saved!")        |
-| Form submit error                                 | `<Alert variant="destructive">` at top + `<FormMessage>` under fields                               |
-| Field validation error (Zod)                      | Inline `<FormMessage>`                                                                              |
+| Form submit error                                 | `<Alert variant="destructive">` at top + inline field messages                                      |
+| Field validation error (Zod)                      | Inline `<p className="text-sm text-destructive-text">` under the field                              |
 | Inline list edit (status change, priority change) | `toast` for both success and error                                                                  |
 | optimistic action (toggle, bookmark)              | Immediate UI update; `toast.error()` on failure                                                     |
 | Long-running background work (uploads)            | Toast with progress indicator                                                                       |

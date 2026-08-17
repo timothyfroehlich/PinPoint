@@ -67,9 +67,9 @@ describe("Input", () => {
 
   describe("caller-controlled aria-invalid", () => {
     it("preserves caller-provided aria-invalid=true on blur even when checkValidity() passes", async () => {
-      // Form libraries (react-hook-form, Radix FormControl) set aria-invalid
-      // from schema validation, not native constraints. The blur handler
-      // must not clobber that with checkValidity().
+      // A caller that owns aria-invalid sets it from schema or server-action
+      // validation, not native constraints. The blur handler must not clobber
+      // that with checkValidity().
       const user = userEvent.setup();
       render(<Input data-testid="inp" aria-invalid="true" />);
       const input = screen.getByTestId("inp");
