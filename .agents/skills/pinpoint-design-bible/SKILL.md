@@ -244,7 +244,7 @@ white-on-red case and made the untested inverse look checked — which is how
 79 usages accumulated before anyone measured.
 
 **This rule is ahead of the codebase.** Only the machine Manage tab has been
-converted; `src/components/ui/form.tsx` (`FormMessage`), `ui/alert.tsx`'s
-destructive variant, and the auth screens still carry the failing token.
+converted; `ui/alert.tsx`'s destructive variant and the auth screens still
+carry the failing token.
 **PP-mjms** sweeps them. Write new code to the rule above — don't take a
 neighbouring file as the example.

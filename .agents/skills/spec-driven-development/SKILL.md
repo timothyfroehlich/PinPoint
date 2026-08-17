@@ -1,6 +1,6 @@
 ---
 name: spec-driven-development
-description: How PinPoint feature specs work — the living, requirements-only documents in docs/feature-specs/ that are the intended truth for a feature, kept in sync with code through an explicit divergence table. Carries the format (numbered citable requirements, [shipped]/[designed] tags, a Concepts section, retired-number tombstones), the lifecycle rules (the spec changes alongside any design decision; code-vs-spec disagreement always resolves by amending one, never silently neither), and the hard editing rule — a feature spec is NEVER edited without Tim approving the exact diff first, even when he says "update the spec". Use when designing or changing a feature that has a spec, when starting substantial new feature design (offer to create one), when a review or bead needs to cite a requirement, when deciding whether something belongs in a spec versus a design record or the design bible, or when Tim says "spec", "feature spec", or "spec-driven".
+description: How PinPoint feature specs work — the living, requirements-only documents in docs/feature-specs/ that are the intended truth for a feature, kept in sync with code through an explicit divergence table. Carries the format (a draft/approved status line, numbered citable requirements, a Concepts section, retired-number tombstones, a changelog of amendments), the rule that a spec states the intended final state and never what the code does or used to do — build state lives only in the divergence table, which is why there are no shipped/designed tags — the lifecycle rules (the spec changes alongside any design decision; code-vs-spec disagreement always resolves by amending one, never silently neither), and the hard editing rule — a feature spec is NEVER edited without Tim approving the exact diff first, even when he says "update the spec". Use when designing or changing a feature that has a spec, when starting substantial new feature design (offer to create one), when a review or bead needs to cite a requirement, when deciding whether something belongs in a spec versus a design record or the design bible, or when Tim says "spec", "feature spec", or "spec-driven".
 ---
 
 # Spec-Driven Development
@@ -10,6 +10,20 @@ what users can do. It lives in `docs/feature-specs/<feature>.md`, it is
 **living** (edited in place as the design evolves), and it is the **intended
 truth** — when code and spec disagree, either the code is wrong or the spec
 gets amended, never silently neither.
+
+**A spec describes the intended final state and nothing else.** It never says
+what the code does today, what it used to do, which PR shipped a thing, or
+which design a section replaced. That belongs in exactly one place: the Known
+divergences table. Prose like "supersedes the shipped 10-state control (PR
+#1875)" is the failure mode — it dates instantly, and a reader cannot tell
+requirement from history. The one sanctioned exception is the spec's own
+decision history: retired-number tombstones and concept-death notes, which
+keep old citations resolvable.
+
+This is also why there are no `[shipped]`/`[designed]` tags. They were tried
+and dropped (2026-08-16): a tag is derivable from the table — tagged
+`[designed]` means "has a row" — so it is a second copy of one fact, and the
+copies disagreed within a day of being written.
 
 The exemplar is [docs/feature-specs/pinballmap.md](../../../docs/feature-specs/pinballmap.md),
 written during the PP-o355.21 redesign (2026-08-15/16). Read it before
@@ -56,11 +70,11 @@ Boundaries with the other document kinds:
 
 Every spec has, in order:
 
-1. **Preamble** — "what this document is," the amend-or-fix contract, and
-   the status-tag legend.
-2. **Status tags** — `[shipped]` (implemented, in production behavior) and
-   `[designed]` (agreed, not built). Tags sit on sections or individual
-   requirements; untagged requirements inherit the section tag.
+1. **Status line** — `**Status: draft.**` or `**Status: approved.**`, first
+   thing under the title. Draft means the design is still moving and the
+   document is not yet something to build against; approved means Tim has
+   finished a pass and it can be cited as settled. It is Tim's flag to set.
+2. **Preamble** — "what this document is" and the amend-or-fix contract.
 3. **Related records** — sibling documents and beads, one line.
 4. **Concepts (§1)** — the feature's nouns, each with one owner and one
    subject, stated as independent facts. Getting these right is most of the
@@ -77,7 +91,16 @@ Every spec has, in order:
    what disagrees and where it resolves — not detailed writeups.
    Because the table lives in the spec, adding or changing a row goes
    through the diff-approval rule: Tim sees every divergence before it
-   is recorded.
+   is recorded. **It is the only record of build state** — there are no
+   `[shipped]`/`[designed]` tags. A second encoding of the same fact drifts
+   from the first: review caught the draft pinballmap spec carrying a
+   `[shipped]` section whose newest requirement described unbuilt behavior,
+   and the table was the half that was right.
+7. **Changelog** — a dated table at the very bottom, newest first, logging
+   amendments to the document itself: what requirement changed, not what the
+   code did. **Divergence-table rows are excluded** — they are working state
+   that churns as code lands, and logging them would bury the amendments
+   worth finding. One row per editing session, not per edit.
 
 Rules that keep citations stable:
 
@@ -97,7 +120,7 @@ Rules that keep citations stable:
 - **A design decision lands in the spec when it is made**, in the same
   conversation — not after the code ships. The spec trails the discussion
   by minutes, not PRs. (Subject to the diff-approval rule above: propose
-  immediately, write on approval.)
+  immediately, write on approval.) Log it in the changelog in the same edit.
 - **When starting work on a bead that points at a spec, validate them
   against each other first.** If the bead asks for something the spec
   doesn't say — and you don't see a clear reason for the difference in your
