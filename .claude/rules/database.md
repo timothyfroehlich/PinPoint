@@ -21,7 +21,7 @@ Two things this rule does not say, both of which bite here:
   regenerate-don't-edit protocol is in the `pinpoint-deployment` skill.
 - **Local `db:reset` is fine; production `db:reset` never is.** Production has
   real user data, daily backups with 7-day retention and no PITR, so the
-  recovery floor is the previous nightly snapshot (`AGENTS.md` "Deployment").
+  recovery floor is the previous nightly snapshot (`AGENTS.md` "Supabase").
 
 Pooler and connection-string reference, and the PP-d8l8 silent-commit-loss
 incident behind `prepare:false` on every `:6543` client: `pinpoint-deployment`.

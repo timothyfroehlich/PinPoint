@@ -1,6 +1,6 @@
 ---
 name: pinpoint-briefing
-description: Run a full project health review at session start or on demand — answers "what should I work on?" before the orchestrator answers "how do I work on it?". Sweeps six surfaces in parallel: open PRs / worktrees / ready beads / Dependabot alerts, `pnpm audit`, the last CI runs on main, GitHub issues filed in the last five days, open security-review beads, and what the unattended nightly routine did overnight (`nightly-report` beads plus the `human` decision queue it built). Carries the two audit-reading decisions a wrong reading turns into a phantom finding: why a stale local main makes `pnpm audit` report already-patched CVEs as regressions, and why `pnpm outdated` is deliberately never run (Dependabot's soak time is the supply-chain protection). Use when starting a new session, when the user asks for a briefing, when main's CI or a new issue needs triage, or before deciding what to pick up next. The weekly maintenance pass is `pinpoint-chores`, not this.
+description: Run a full project health review at session start or on demand — answers "what should I work on?" before the orchestrator answers "how do I work on it?". Sweeps six surfaces in parallel: open PRs / worktrees / ready beads / Dependabot alerts, `pnpm audit`, the last CI runs on main, GitHub issues filed in the last five days, open security-review beads, and what the unattended nightly routine did overnight (`nightly-report` beads, plus the `human` decision queue the nightly is one writer to). Carries the two audit-reading decisions a wrong reading turns into a phantom finding: why a stale local main makes `pnpm audit` report already-patched CVEs as regressions, and why `pnpm outdated` is deliberately never run (Dependabot's soak time is the supply-chain protection). Use when starting a new session, when the user asks for a briefing, when main's CI or a new issue needs triage, or before deciding what to pick up next. The weekly maintenance pass is `pinpoint-chores`, not this.
 ---
 
 # PinPoint Session Briefing
@@ -99,16 +99,20 @@ Read the severity and one-line summary of each open `security` bead. These beads
 The nightly bead routine runs unattended, triages a batch of the backlog, and takes one bead as far as it can. It reports **on the bead itself**, flagged with the `nightly-report` label:
 
 ```bash
-bd list --status=open --label=nightly-report --json
-bd list --status=open --label=human
+bd list --status=open,in_progress --label=nightly-report --json
+bd human list
 ```
 
-Two separate queues, and they answer different questions:
+**`--status=open,in_progress` matters.** `open` and `in_progress` are separate statuses, and the nightly leaves the bead it worked **claimed** — so `--status=open` alone silently omits exactly the beads this group exists to surface.
+
+Two queues, answering different questions:
 
 - **`nightly-report`** — what the nightly actually did since you last looked. Each bead's `notes` carry the PR number, what it changed, what it deliberately didn't, and anything it found that changes the bead's premise. Read the notes, not just the title.
-- **`human`** — beads the nightly could not decide on alone: a taste call, a scope question, a recommended close it isn't allowed to perform, or simply something it wasn't sure how to classify. This is Tim's decision queue. `bd human list` is the same set in a friendlier format; `bd human respond` / `bd human dismiss` clear it.
+- **`human`** — the general "needs a human decision" flag. **It is not the nightly's queue**; any agent or session sets it, and most entries in it predate the nightly routine entirely. The nightly is simply one more writer: it flags a taste call, a scope question, a close it recommends but is not allowed to perform, or a bead it could not confidently classify. Don't attribute the queue's contents to the nightly — check each entry's author before saying who asked. `bd human list` is the canonical read (it shows resolution state, which the plain `--label=human` list does not, so the two return different sets); `bd human respond` / `bd human dismiss` clear it.
 
-Neither label clears itself. `nightly-report` is dropped once the work has been picked up or merged; `human` is dropped when Tim answers. So a growing count in either is the signal — surface both counts even when nothing else is notable.
+Neither label clears itself. `nightly-report` is dropped once the work has been picked up or merged; a `human` flag is dropped when Tim answers. So a growing count in either is the signal — surface both counts even when nothing else is notable.
+
+**Report each bead once.** A nightly bead is in-progress work with an open PR, so it would otherwise appear in "Overnight", in "Open PRs", and in "Beads State → In progress". Overnight is its home; the other two sections reference it by ID rather than restating it.
 
 **Each `nightly-report` bead records the session that produced it**, in its notes:
 

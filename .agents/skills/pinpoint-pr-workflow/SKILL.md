@@ -38,7 +38,7 @@ PinPoint scopes: `issues`, `machines`, `auth`, `ui`, `db`, `e2e`, `agents`, `wor
 ## Phase 2: PR
 
 Prefer MCP `create_pull_request` for typed argument handling, or `gh pr create` if you're
-already in a shell. Open **ready-for-review, not draft** (AGENTS.md "Working style").
+already in a shell. Open **ready-for-review, not draft** (AGENTS.md "Collaboration & decisions").
 
 ### PR description template
 

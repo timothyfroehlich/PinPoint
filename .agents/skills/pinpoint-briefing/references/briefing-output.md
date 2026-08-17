@@ -29,7 +29,7 @@ Highlight: any with failing CI or stale > 7 days
 ## 🌙 Overnight
 Nightly ran:  [which night(s) since the last briefing, or "no run since <date>"]
 Reported:     [each `nightly-report` bead: ID, what it did, PR # if it opened one]
-Needs you:    [count from `bd list --status=open --label=human`, and the newest few]
+Needs you:    [count from `bd human list`, and the newest few — note which the nightly filed vs. which a session did]
 [Say plainly if the nightly did not run — a silent gap is a failed run, not an idle one.]
 
 ## 📦 Beads State

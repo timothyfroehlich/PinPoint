@@ -150,7 +150,7 @@ def repo_with_pr(
         git("commit", "-qm", "branch work", cwd=work)
 
         if merge_main_in:
-            # Main moves, then is merged in — the shape §5 "sync with merge" produces.
+            # Main moves, then is merged in — the shape AGENTS.md "Branches" produces.
             git("checkout", "-q", "main", cwd=work)
             write(work, "docs/other.md", "# moved on\n")
             git("add", "-A", cwd=work)

@@ -44,7 +44,7 @@ if (process.env["VERCEL_ENV"] === "preview") {
 // possible over the IPv4 session pooler. We therefore REQUIRE NON_POOLING in
 // production and refuse to silently fall back to POSTGRES_URL, the `:6543`
 // TRANSACTION pooler: it does not support prepared statements (the PP-d8l8
-// hazard class) and is the wrong endpoint for DDL. See AGENTS.md "Deployment".
+// hazard class) and is the wrong endpoint for DDL. See AGENTS.md "Supabase".
 const isVercelProduction = process.env["VERCEL_ENV"] === "production";
 const nonPooling = process.env["POSTGRES_URL_NON_POOLING"];
 

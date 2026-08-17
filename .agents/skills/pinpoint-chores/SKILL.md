@@ -64,7 +64,7 @@ Then work the checklist. For each item, note findings as a comment on the bead (
    - Read `docs/plans/2026-06-27-typescript-7-upgrade-plan.md` for the current phase. Phases 1–3 are done (PP-xu96, PP-8mv1, PP-4zcj); the GA-pin bead PP-rl1l is closed.
    - **Only Phase 4 is left: `next build` type-checking on the native compiler**, gated on the **TS 7.1 stable JS API** (no announced date as of 2026-08-01). Check whether 7.1 has shipped and whether [vercel/next.js#81472](https://github.com/vercel/next.js/discussions/81472) has moved. Until then `next build` staying on TS6 is deliberate — it's our parity safety net.
    - When bumping the TS pin, re-validate 0-divergence parity vs `tsc 6`: `pnpm run typecheck:tsc6`.
-   - When bumping `oxlint` / `oxlint-tsgolint`, re-run the mirror fidelity check — `pnpm run lint` and `pnpm run lint:local` must agree (see `AGENTS.md` § "Lint engines").
+   - When bumping `oxlint` / `oxlint-tsgolint`, re-run the mirror fidelity check — `pnpm run lint` and `pnpm run lint:local` must agree (see `AGENTS.md` "Lint engines").
 
 3. **Dependabot updates**
    - Review open Dependabot PRs (`gh pr list --author "app/dependabot"`). Merge the safe ones via the normal PR workflow; file a bead for any that need real work.
@@ -92,7 +92,7 @@ Then work the checklist. For each item, note findings as a comment on the bead (
 9. **Prod backup validation**
    - Run `pnpm run chores:backups`. It calls `supabase backups list` against PinPoint-Prod and asserts the daily physical backups are still happening: newest COMPLETED backup < 48h old, at least 7 retained, `walg_enabled` true. It warns on a 24–48h-old newest backup, any non-`COMPLETED` entry, and a >36h gap inside the window; it reports `pitr_enabled` so a posture change is visible.
    - **What this proves and doesn't.** It attests that backups **exist** and are being **retained**. It does **not** prove they restore — a real restore drill means restoring a physical backup into a throwaway project, which isn't a weekly-cadence activity. Don't let a green run read as "DR is verified."
-   - On **FAIL**: check the Supabase dashboard and `status.supabase.com` before assuming the script is wrong, then file a **P1** bead. This is the only signal we have that the DR posture in `AGENTS.md` "Deployment" is still true.
+   - On **FAIL**: check the Supabase dashboard and `status.supabase.com` before assuming the script is wrong, then file a **P1** bead. This is the only signal we have that the DR posture in `AGENTS.md` "Supabase" is still true.
    - On **WARN**: note it as a comment on the chores bead; a single skipped day isn't an incident, a pattern across weeks is.
    - Requires the Supabase CLI to be logged in (`supabase login`) — auth comes from its stored token, not an env var. `pnpm run db:backup` is unrelated: that's a data-only `public`-schema dev-seeding dump with no schema and no `auth.users`, not a DR artifact.
 
