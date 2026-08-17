@@ -70,60 +70,48 @@ Values live in the claude.ai UI (never commit them). Names:
 Reminder: these are invisible to the setup script (#63541) — the agent consumes
 them.
 
-### Setup script (installs binaries; unpinned)
+### Setup script (installs binaries; a checked-in shim)
+
+The setup script's body lives in the repo at `scripts/beads-cloud-setup.sh`, so
+it is reviewable and diffable. The claude.ai UI "Setup script" field holds only a
+one-line shim that calls it — the repo is already cloned at container-provision
+time (verified 2026-08-16: the setup script's cwd is `$HOME`, and the checkout is
+at `~/PinPoint`):
 
 ```bash
-#!/usr/bin/env bash
-set -euo pipefail
-
-echo "=== ENV DISCOVERY ==="
-head -3 /etc/os-release 2>/dev/null || true
-echo "user=$(whoami) $(id)"
-for t in sudo apt-get brew curl tar jq go; do
-  printf '%s: %s\n' "$t" "$(command -v "$t" || echo MISSING)"
-done
-
-BIN=/usr/local/bin
-export PATH="$BIN:$PATH"
-
-echo "=== INSTALL DOLT (version-agnostic asset, no api.github.com) ==="
-curl -fsSL -o /tmp/dolt.tgz \
-  "https://github.com/dolthub/dolt/releases/latest/download/dolt-linux-amd64.tar.gz"
-tar xzf /tmp/dolt.tgz -C /tmp
-install /tmp/dolt-linux-amd64/bin/dolt "$BIN/dolt"
-
-echo "=== INSTALL BEADS (PINNED — keep in sync with the init-script guard) ==="
-BD_VER=1.2.2            # MUST match BD_PINNED_VERSION in scripts/beads-cloud-init.sh
-BD_TAG="v${BD_VER}"
-curl -fsSL -o /tmp/bd.tgz \
-  "https://github.com/steveyegge/beads/releases/download/${BD_TAG}/beads_${BD_VER}_linux_amd64.tar.gz"
-tar xzf /tmp/bd.tgz -C /tmp
-install /tmp/bd "$BIN/bd"
-
-echo "=== VERSIONS ==="
-dolt version
-if ! bd version; then
-  echo "bd failed to link — installing libicu"
-  apt-get update -qq && apt-get install -y libicu-dev
-  bd version
-fi
+bash ~/PinPoint/scripts/beads-cloud-setup.sh
 ```
 
-`bd` is **pinned** to an explicit version (`BD_VER` above), which MUST match
-`BD_PINNED_VERSION` in `scripts/beads-cloud-init.sh`. This reverses the earlier
-"track latest stable" policy: on 2026-08-16 an accidental newer release (1.2.1)
-migrated the shared DB to a schema no supported binary could read and locked
-every client out for two days. An exact pin fails loud (a drifted version makes
-the init script refuse to run) rather than silent (a newer release migrating the
-shared DB before anyone notices). Bumping the pin is a weekly-chores item —
-update this setup script (in the claude.ai UI) **and** the init-script constant
-together.
+That script installs `dolt` (latest) and `bd` (pinned); the agent then runs
+`scripts/beads-cloud-init.sh` (below) to materialize the credential and clone.
 
-Caveat, stated plainly: this setup script lives in the claude.ai environment UI,
-**not** in git, so it cannot be reviewed or diffed, and this embedded copy can
-drift from what actually runs. The reviewable, enforced backstop is the version
-guard in `scripts/beads-cloud-init.sh`, which refuses to touch the DB unless the
-installed `bd` equals its pin.
+**Why `bd` is pinned but `dolt` is not.** The 2026-08-16 lockout was a `bd`
+schema migration — `bd` owns `schema_migrations` and the additive migrations that
+broke it, so an accidental `bd` release is the live hazard the pin guards against.
+`dolt` is the storage engine underneath; its on-disk/wire format is stable and
+its releases are designed for cross-version client/server compatibility. The
+shared server on Bazzite runs its own `dolt`, and pinning the cloud client to a
+fixed version could actually _create_ a client/server mismatch when that server
+upgrades — so tracking latest is the safer choice for the client, not an
+oversight. (The old inline setup script installed `dolt` latest too; this is
+unchanged, now stated deliberately.)
+
+**The bd pin is single-source.** `beads-cloud-setup.sh` reads the version out of
+`BD_PINNED_VERSION` in `scripts/beads-cloud-init.sh` and installs exactly that, by
+exact release tag — so the installed binary and the runtime guard cannot disagree,
+and the UI field carries no version at all. Bumping the pin is a one-line edit to
+`beads-cloud-init.sh` (a weekly-chores item); the UI shim never changes.
+
+Why an exact pin: on 2026-08-16 an accidental newer release (1.2.1) migrated the
+shared DB to a schema no supported binary could read and locked every client out
+for two days. An exact pin fails loud (a drifted binary makes the init script
+refuse to run) rather than silent (a newer release migrating the shared DB before
+anyone notices).
+
+Caveat, now narrowed: only the one-line shim lives in the un-diffable UI — the
+install logic it calls is in git. The reviewable, enforced backstop remains the
+version guard in `scripts/beads-cloud-init.sh`, which refuses to touch the DB
+unless the installed `bd` equals its pin.
 
 ## Credential setup (one-time)
 
