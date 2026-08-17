@@ -1,6 +1,6 @@
 ---
 name: pinpoint-design-bible
-description: Design system rules, page archetypes, spacing rhythm, surface hierarchy, responsive strategy, and the player-centric issue severity vocabulary (cosmetic / minor / major / unplayable — never low/medium/high or critical). Sole owner of the browser-support policy (§19 — the Baseline Widely available floor and the per-feature opt-in for Newly available ones), the form-correctness conventions (§20), the picker pattern and component inventory (§12), and the modern-web-guidance lookup (§22). Also the shell contract (§3 — fixed header and tab-bar dimensions, and the z-index hierarchy every overlay sits inside) and the canonical token forms (§18), including the two reds: `bg-destructive` is the fill and is correct behind white, but that red as text on our dark background measures 3.96:1 and fails AA, so destructive text takes `text-destructive-text`. Use when building any new UI, page, or component; when naming or writing copy for issue severity; when positioning against the app shell or picking a z-index; when deciding whether a web platform feature is safe to use; or when writing a form or a single-select picker.
+description: Design system rules, page archetypes, spacing rhythm, surface hierarchy, responsive strategy, and the player-centric issue severity vocabulary (cosmetic / minor / major / unplayable — never low/medium/high or critical). Sole owner of the browser-support policy (§19 — the Baseline Widely available floor and the per-feature opt-in for Newly available ones), the form-correctness conventions (§20), the picker pattern and component inventory (§12), and the modern-web-guidance lookup (§22). Also the shell contract (§3 — fixed header and tab-bar dimensions, and the z-index hierarchy every overlay sits inside) and the canonical token forms (§18), including the two reds: `bg-destructive` is the fill and is correct behind white, but that red as text on our dark background measures 3.96:1 and fails AA, so destructive text takes `text-destructive-text`. Also the telegraphic status/error copy register (§25 — a bold 2–4 word label plus at most one supporting line, no prose sentences). Use when building any new UI, page, or component; when naming or writing copy for issue severity, a status line, an error reason, or a disabled-control explanation; when positioning against the app shell or picking a z-index; when deciding whether a web platform feature is safe to use; or when writing a form or a single-select picker.
 ---
 
 # PinPoint Design Bible
@@ -46,6 +46,7 @@ Sections keep their numbers wherever they live — `design-bible §17` resolves 
 | 22  | Modern Web Guidance Reference | `references/21-22-images-and-guidance.md`            |
 | 23  | Presenting Mockups for Review | `references/23-24-mockups-and-severity.md`           |
 | 24  | Severity Vocabulary           | `references/23-24-mockups-and-severity.md`           |
+| 25  | Status & Error Copy Register  | `references/25-copy-register.md`                     |
 
 ## 1. Visual Identity
 

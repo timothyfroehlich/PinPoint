@@ -13,20 +13,20 @@ The superpowers plugin (`brainstorming → writing-plans → subagent-driven-dev
 
 ---
 
-## 1. Field conventions — plans live in git, beads carry pointers
+## 1. Field conventions — plans live in beads, not git
 
-Specs and plans stay as **files in git** (the superpowers default locations, kept as dated records — AGENTS.md §8). Beads do **not** duplicate their content; they carry **pointers** so any session can recover context:
+Superpowers specs and plans are **working documents** (decision 2026-08-16): draft them in the session scratchpad, not the repo tree — the superpowers default `docs/superpowers/` locations are retired for new files (the ones committed before the decision stay as records). The durable copy is the **bead**; durable _requirements_ go in `docs/feature-specs/` (`spec-driven-development` skill), never in a superpowers doc:
 
-| Bead field     | Holds                                                   | Example                                                             |
-| :------------- | :------------------------------------------------------ | :------------------------------------------------------------------ |
-| `--spec-id`    | Spec file path                                          | `docs/superpowers/specs/2026-07-05-widget-design.md`                |
-| `--design`     | Plan file path(s) **+ branch name while unmerged**      | `docs/superpowers/plans/2026-07-05-widget.md @ feat/widget-PP-xxxx` |
-| `--acceptance` | Distilled success criteria (not the whole spec)         | `Widget renders; server action persists; RTL + integration green`   |
-| `--notes`      | Landing breadcrumbs (PR #, migration state, follow-ups) | `PR #1610; no migration; follow-up PP-yyyy for mobile layout`       |
+| Bead field     | Holds                                                           | Example                                                           |
+| :------------- | :-------------------------------------------------------------- | :---------------------------------------------------------------- |
+| `--spec-id`    | Feature spec path, when the work has one                        | `docs/feature-specs/pinballmap.md`                                |
+| `--design`     | The **full plan text**, refreshed when it materially changes    | (the whole plan document, not a path)                             |
+| `--acceptance` | Distilled success criteria (not the whole spec)                 | `Widget renders; server action persists; RTL + integration green` |
+| `--notes`      | Landing breadcrumbs (PR #, branch, migration state, follow-ups) | `PR #1610 @ feat/widget-PP-xxxx; no migration; follow-up PP-yyyy` |
 
-**Cross-session recovery:** while a branch is unmerged, its plan/spec files aren't on `main`. Read them with `git show origin/<branch>:<path>` (that's why `--design` records the branch). After merge, the files are on `main` at their path.
+**Cross-session recovery:** read the bead — `bd show <id>` returns the plan verbatim. There is no file on any branch to go looking for.
 
-**Plan-file checkboxes are within-PR execution state, not durable task tracking.** The `- [ ]` steps in a plan doc track one implementation session's progress; they are NOT the cross-session source of truth. Durable, shared, resumable task state lives in **beads**. Never create a markdown TODO file as the project's task source of truth (beads rule) — the plan doc is a scratch execution ledger that ships inside the PR and then becomes a record.
+**Plan-file checkboxes are within-PR execution state, not durable task tracking.** The `- [ ]` steps in a local plan doc track one implementation session's progress; they are NOT the cross-session source of truth. Durable, shared, resumable task state lives in **beads**. Never create a markdown TODO file as the project's task source of truth (beads rule) — the plan doc is a scratch execution ledger that is thrown away when the work lands.
 
 ---
 
@@ -34,11 +34,11 @@ Specs and plans stay as **files in git** (the superpowers default locations, kep
 
 `brainstorming` ends by writing a spec and handing off to `writing-plans`. Insert bead creation between them:
 
-1. **After the spec is approved and committed** (brainstorming step 6–8): create the bead (or epic) with `--spec-id=<spec path>` and `--acceptance=<distilled criteria>`. This is the durable anchor for the work.
-2. **After each plan is written** (`writing-plans`): update the child bead's `--design` with the plan path + branch name.
+1. **After brainstorming concludes** (its step 6–8; skip the plugin's "commit the spec" step — superpowers docs are not committed): create the bead (or epic) with `--acceptance=<distilled criteria>`, plus `--spec-id=<docs/feature-specs/ path>` if the work has a feature spec. If the design is substantial and durable, suggest a feature spec — Tim decides; if he says yes, it is written in the feature-spec format (`spec-driven-development` skill, diff-approved), never by promoting the superpowers doc as-is. Otherwise the bead description carries what matters from the brainstorm.
+2. **After each plan is written** (`writing-plans`): sync it into the child bead with `bd update <id> --design-file <plan path>`. Re-run the same command whenever the plan materially changes mid-work — the local file is the editing surface, the bead is the durable copy, and Dolt versions every update (`bd history <id>`).
 3. **Epics vs single-PR work:** a multi-PR epic may decompose into child beads (and MAY use a beads formula for the workflow). **Single-PR work must NOT** spawn per-task child beads — that creates sliver-beads. One bead, plan-file checkboxes for the steps.
 
-Everything above happens **in a worktree** — the root checkout is read-only (AGENTS.md §2.2.5). `brainstorming`/`writing-plans` commit spec/plan files to git, so enter a worktree first (`EnterWorktree`, or dispatch an `Agent(isolation:"worktree")`).
+Code work still happens **in a worktree** — the root checkout is read-only (AGENTS.md §2.2.5). The plan/spec drafts live in the scratchpad, outside any worktree; the bead is what survives.
 
 ---
 
@@ -51,7 +51,7 @@ Everything above happens **in a worktree** — the root checkout is read-only (A
 
 ### `writing-plans`
 
-- Keep the default plan location `docs/superpowers/plans/YYYY-MM-DD-<feature>.md`. Record its path in the bead's `--design` (§1).
+- Write the plan to the session scratchpad, not the superpowers default `docs/superpowers/plans/` path — plan files don't enter the repo tree. Sync it into the bead with `bd update <id> --design-file <plan path>` as soon as it's written (§1): the scratchpad is session-scoped and disposable; the bead is the durable copy.
 - On the execution-handoff prompt, if you pick **Subagent-Driven**, first clear the scale gate below.
 
 ### `subagent-driven-development`
@@ -82,8 +82,8 @@ Superpowers presents a 4-option menu led by "1. Merge back to `<base>` locally".
 
 | Superpowers step         | PinPoint override                                                                                 |
 | :----------------------- | :------------------------------------------------------------------------------------------------ |
-| Spec written             | + create bead with `--spec-id` + `--acceptance` (§2)                                              |
-| Plan written             | record path + branch in `--design` (§1)                                                           |
+| Spec written             | don't commit it; create bead with `--acceptance` (+ `--spec-id` if a feature spec exists) (§2)    |
+| Plan written             | don't commit it; paste full plan text into `--design` (§1)                                        |
 | Worktree create          | `EnterWorktree` / `Agent(isolation:"worktree")`, from main worktree                               |
 | SDD dispatch             | clear the scale gate (count + cost, Tim's yes) first                                              |
 | Code review              | CI Gate + `pinpoint-pr-workflow` head-commit review; replies via MCP, signed with your agent name |
@@ -98,5 +98,5 @@ Superpowers presents a 4-option menu led by "1. Merge back to `<base>` locally".
 - Running `git worktree remove` / `rm -rf` on a worktree by hand.
 - Dispatching subagents for SDD without stating the count and getting a yes.
 - Treating a plan-file's checkboxes (or any markdown TODO) as the durable task record instead of a bead.
-- Committing a spec/plan from the **root** checkout (it's read-only — be in a worktree).
+- Writing a new file under `docs/superpowers/` — drafts go in the scratchpad, the durable copy in the bead.
 - Closing the bead at push/PR-open instead of after merge.
