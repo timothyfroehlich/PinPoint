@@ -113,16 +113,17 @@ week bead**.
 
 Seeded from what `ci.yml` actually does (the real infra-heavy steps):
 
-| Class                         | Meaning                                                                                        |
-| ----------------------------- | ---------------------------------------------------------------------------------------------- |
-| `pnpm-install-network`        | `ETIMEDOUT` / `EAI_AGAIN` / `ECONNREFUSED` on `pnpm install`                                   |
-| `playwright-browser-download` | chromium/webkit binary download flake                                                          |
-| `supabase-start`              | Supabase container start failed **after** the 3-retry loop in `.github/actions/setup-supabase` |
-| `checkout-download`           | `actions/checkout` 5xx                                                                         |
-| `action-setup-download`       | `pnpm/action-setup` / `setup-node` / `setup-cli` download failure                              |
-| `registry-5xx`                | npm registry blips                                                                             |
-| `runner-lost`                 | runner died / job cancelled by GitHub infra                                                    |
-| `other`                       | unclassified — triage assigns a new class if a pattern emerges                                 |
+| Class                         | Meaning                                                                                                                                                                 |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm-install-network`        | `ETIMEDOUT` / `EAI_AGAIN` / `ECONNREFUSED` on `pnpm install`                                                                                                            |
+| `playwright-browser-download` | chromium/webkit binary download flake                                                                                                                                   |
+| `supabase-start`              | Supabase container start failed **after** the 3-retry loop in `.github/actions/setup-supabase`                                                                          |
+| `supabase-port-bind`          | `supabase start` failed to bind a 543xx host port (`address already in use`) — ephemeral-range steal; mitigated by `.github/actions/reserve-supabase-ports` (PP-3w32.2) |
+| `checkout-download`           | `actions/checkout` 5xx                                                                                                                                                  |
+| `action-setup-download`       | `pnpm/action-setup` / `setup-node` / `setup-cli` download failure                                                                                                       |
+| `registry-5xx`                | npm registry blips                                                                                                                                                      |
+| `runner-lost`                 | runner died / job cancelled by GitHub infra                                                                                                                             |
+| `other`                       | unclassified — triage assigns a new class if a pattern emerges                                                                                                          |
 
 ### Raw sighting schema
 

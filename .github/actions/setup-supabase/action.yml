@@ -16,13 +16,39 @@ runs:
       shell: bash
       run: cp supabase/config.toml.template supabase/config.toml
 
-    # NOTE: the ephemeral-port reservation that used to live here has been
-    # hoisted to the ./.github/actions/reserve-supabase-ports action, invoked
-    # as each job's FIRST step (PP-3w32.2). It ran too late here — after
-    # `pnpm install`, whose npm-registry traffic is the biggest source of
-    # 543xx-range steals — so a reservation inside this action could not win
-    # the race. Any job using this action must run reserve-supabase-ports
-    # before its dependency install.
+    - name: Reserve Supabase ports (fail-safe backstop)
+      shell: bash
+      run: |
+        # The PRIMARY reservation is ./.github/actions/reserve-supabase-ports,
+        # run as a job's first step so it beats `pnpm install`'s npm-registry
+        # traffic — the biggest source of 543xx-range steals (PP-3w32.2). A
+        # reservation here cannot win that race, because this action runs after
+        # install. So this step is NOT the primary fix and does not replace the
+        # hoisted one.
+        #
+        # It is a fail-safe backstop that keeps this action self-contained: if a
+        # future job adds `setup-supabase` but forgets the hoisted first step,
+        # this still reserves the block before `supabase start`, shielding its
+        # own docker-pull steals — so the action never silently regresses to
+        # worse than pre-PP-3w32.2. When the hoisted step already ran (every
+        # current caller), 54320-54329 is present and this is a no-op skip.
+        #
+        # Signature `supabase-port-bind`, docs/runbooks/gha-flake-log.md.
+        reserved=$(cat /proc/sys/net/ipv4/ip_local_reserved_ports 2>/dev/null || echo "")
+        case ",${reserved}," in
+          *,54320-54329,* | *"54320-54329"*)
+            echo "::notice::54320-54329 already reserved — hoisted reserve-supabase-ports ran; skipping backstop"
+            ;;
+          *)
+            want=54320-54329
+            [ -n "${reserved}" ] && want="${reserved},54320-54329"
+            if sudo sysctl -w "net.ipv4.ip_local_reserved_ports=${want}" >/dev/null 2>&1; then
+              echo "::warning::reserved 54320-54329 as a backstop — hoisted reserve-supabase-ports did not run for this job"
+            else
+              echo "::warning::could not reserve 54320-54329; supabase start may lose a port race"
+            fi
+            ;;
+        esac
 
     - name: Start Supabase (with retry)
       shell: bash
