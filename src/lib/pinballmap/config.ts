@@ -45,6 +45,17 @@ export const PBM_USER_AGENT =
 export const APC_LOCATION_ID = 26454;
 
 /**
+ * PBM region slug for the Austin metro — the `:region` path segment of the bulk
+ * region endpoints (lowercase region name, vendored llms.txt §Regions).
+ *
+ * Scope note (PP-o355.18): this is the whole metro, not just our location. The
+ * new-machine alert is region-wide discovery — "a game appeared somewhere in
+ * Austin" — which is a different question from the APC-location snapshot sync
+ * (PP-o355.11) and reads a different endpoint.
+ */
+export const PBM_AUSTIN_REGION = "austin";
+
+/**
  * Minimum interval between MANUAL ("Sync now") snapshot refreshes (PP-hbi0).
  *
  * The hourly cron is the sanctioned automated refresh (one location call/hour,

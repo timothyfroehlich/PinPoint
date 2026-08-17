@@ -340,6 +340,65 @@ export const pinballmapAbandonedListings = pgTable(
 ).enableRLS();
 
 /**
+ * Machine-at-location entries PinPoint has already seen in a PinballMap region
+ * (PP-o355.18) — the memory behind the "new machine in Austin" Discord alert.
+ *
+ * One row per (region, lmx id). The daily job reads the whole region in one bulk
+ * call and inserts every observed entry with ON CONFLICT DO NOTHING; the rows
+ * that actually insert ARE the newly-added machines, so the diff is a single
+ * statement rather than a set comparison in application memory.
+ *
+ * `announcedAt` is what keeps the announcement honest in both directions:
+ * - the FIRST run for a region back-fills the entire region with `announcedAt`
+ *   already set, so bootstrapping a few thousand existing entries announces
+ *   nothing (no flood);
+ * - afterwards a new row lands with `announcedAt` null and only clears once a
+ *   Discord post has actually succeeded, so a failed or unconfigured post retries
+ *   on the next run instead of silently swallowing the discovery.
+ *
+ * Rows are never deleted. An entry that disappears from PBM and comes back is
+ * re-minted under a NEW lmx id, so keeping the old id costs one dead row and
+ * buys idempotence — pruning would re-announce the same machine every time PBM
+ * omitted it from one payload.
+ *
+ * `locationName` / `machineName` are the labels captured at discovery time, kept
+ * so the announcement (and any later audit of it) reads the same text the job
+ * saw, independent of later PBM edits. Nullable: PBM's region payload is not
+ * field-by-field documented, and detection never depends on them.
+ */
+export const pinballmapRegionSeenMachines = pgTable(
+  "pinballmap_region_seen_machines",
+  {
+    // PBM region slug (lowercase name, e.g. 'austin') — the bulk endpoint's path
+    // segment. Part of the key so a second region can be added without a schema
+    // change.
+    region: text("region").notNull(),
+    // PBM's location_machine_xref id: the identity of "this machine at this
+    // location". Re-minted on remove+re-add, which is why a re-add is correctly a
+    // new entry.
+    lmxId: integer("lmx_id").notNull(),
+    locationId: integer("location_id").notNull(),
+    pinballmapMachineId: integer("pinballmap_machine_id").notNull(),
+    locationName: text("location_name"),
+    machineName: text("machine_name"),
+    firstSeenAt: timestamp("first_seen_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    // Null = discovered but not yet announced to Discord (retried next run).
+    announcedAt: timestamp("announced_at", { withTimezone: true }),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.region, t.lmxId] }),
+    // The job's hot read: "what is still waiting to be announced for this
+    // region". Partial, because the announced rows are the overwhelming majority
+    // and are never scanned again.
+    pendingIdx: index("idx_pinballmap_region_seen_pending")
+      .on(t.region, t.firstSeenAt)
+      .where(sql`announced_at is null`),
+  })
+).enableRLS();
+
+/**
  * Issues Table
  *
  * Issues reported for pinball machines.

@@ -1,0 +1,288 @@
+import "server-only";
+import { and, asc, count, eq, inArray, isNull } from "drizzle-orm";
+import { db } from "~/server/db";
+import { pinballmapRegionSeenMachines } from "~/server/db/schema";
+import { postChannelMessage } from "~/lib/discord/client";
+import { getDiscordConfig } from "~/lib/discord/config";
+import { log } from "~/lib/logger";
+import { getPinballMapClient } from "./client";
+import { PBM_AUSTIN_REGION } from "./config";
+import { formatRegionAlertMessage } from "./region-alert-message";
+import type { RegionAlertEntry } from "./region-alert-message";
+import type { PbmRegionLmx } from "./types";
+
+/**
+ * "A new machine appeared somewhere in Austin" → Discord (PP-o355.18).
+ *
+ * Blessed by PBM's maintainer ryantg (2026-07-19: "Lots of people make bots like
+ * that").
+ *
+ * Shape of a run:
+ *  1. ONE bulk region read through the client seam
+ *     (`GET /region/austin/location_machine_xrefs.json`). Never a per-location or
+ *     per-machine loop — that is the anti-pattern PBM's llms.txt calls out, and
+ *     one call a day sits far inside CORE-PBM-001's budget.
+ *  2. Insert every observed entry with ON CONFLICT DO NOTHING. The rows that
+ *     actually insert are, by definition, the machines we had not seen before, so
+ *     the diff is one statement and cannot drift from the stored set.
+ *  3. Announce the un-announced rows to one Discord channel and mark them.
+ *
+ * Deliberate properties:
+ * - **No flood on bootstrap.** The first run for a region back-fills the whole
+ *   region with `announcedAt` already stamped, so seeding a few thousand existing
+ *   entries posts nothing.
+ * - **No side effects in a transaction** (CORE-ARCH-011). This module opens no
+ *   `db.transaction` at all: the region fetch happens before any write, and the
+ *   Discord post happens strictly after the seen-set inserts have committed.
+ * - **Failed post retries, it does not vanish.** `announcedAt` only advances after
+ *   Discord accepted the message. A crash between the post and the mark
+ *   re-announces once on the next run — a duplicate message is a far better
+ *   failure than silently swallowing a discovery.
+ * - **Distinct from the location sync** (PP-o355.11), which reads our own
+ *   location's lineup for the listing control. This is region-wide discovery and
+ *   touches none of that state.
+ */
+
+/**
+ * Env var naming the channel the alert posts into. Absent → the feature is off and
+ * the job makes no PBM call at all, which is also what keeps the seen-set from
+ * being seeded (and then flooding) before anyone has chosen a destination.
+ *
+ * Not in the `next.config.ts` required-secret registry on purpose: PinPoint is not
+ * broken without it, so it must not fail a deploy (CORE-SEC-009's membership test).
+ */
+const ALERT_CHANNEL_ENV = "DISCORD_PBM_ALERT_CHANNEL_ID";
+
+/**
+ * Insert at most this many seen-rows per statement. A region is low thousands of
+ * entries at ~6 bound params each; this keeps us far under Postgres' 65535
+ * parameter ceiling (same reasoning as the catalog mirror's chunk).
+ */
+const INSERT_CHUNK = 1000;
+
+/**
+ * Cap on how many pending rows one run reads and announces. Reached only if
+ * Discord has been failing or unconfigured for a long stretch; the message itself
+ * lists a handful and collapses the rest into a count, so this bounds the DB read
+ * rather than the message.
+ */
+const PENDING_READ_LIMIT = 500;
+
+/** What a run did, for the cron route's log line and response body. */
+export interface RegionAlertRun {
+  region: string;
+  /** Set when the run intentionally did nothing; null when it ran normally. */
+  skipped: "not_configured" | "empty_payload" | null;
+  /** Entries PBM reported for the region. */
+  observed: number;
+  /** True when this run seeded an empty region (announces nothing by design). */
+  bootstrapped: boolean;
+  /** Rows newly recorded this run. */
+  discovered: number;
+  /** Rows this run announced to Discord. */
+  announced: number;
+  /** Rows still awaiting announcement when the run ended. */
+  pending: number;
+}
+
+function noop(
+  region: string,
+  skipped: "not_configured" | "empty_payload"
+): RegionAlertRun {
+  return {
+    region,
+    skipped,
+    observed: 0,
+    bootstrapped: false,
+    discovered: 0,
+    announced: 0,
+    pending: 0,
+  };
+}
+
+/** The configured alert channel, or null when the feature is unconfigured. */
+export function getRegionAlertChannelId(): string | null {
+  const raw = process.env[ALERT_CHANNEL_ENV]?.trim();
+  return raw !== undefined && raw.length > 0 ? raw : null;
+}
+
+/** "austin" → "Austin". PBM region slugs are lowercase single words. */
+function regionLabel(region: string): string {
+  return region.charAt(0).toUpperCase() + region.slice(1);
+}
+
+async function countSeen(region: string): Promise<number> {
+  const [row] = await db
+    .select({ n: count() })
+    .from(pinballmapRegionSeenMachines)
+    .where(eq(pinballmapRegionSeenMachines.region, region));
+  return row?.n ?? 0;
+}
+
+/**
+ * Record every observed entry, returning only the ones that were new.
+ *
+ * `announcedAt` is passed in rather than decided here: a bootstrap run stamps it
+ * so the back-fill is born already-announced, a normal run leaves it null so the
+ * row is queued for the post.
+ */
+async function recordObserved(
+  region: string,
+  observed: PbmRegionLmx[],
+  announcedAt: Date | null
+): Promise<number> {
+  // Dedupe by lmx id first: PBM should not repeat one, but a duplicate inside a
+  // single INSERT is the caller's problem to avoid, not the database's.
+  const unique = [...new Map(observed.map((o) => [o.lmxId, o])).values()];
+
+  let discovered = 0;
+  for (let i = 0; i < unique.length; i += INSERT_CHUNK) {
+    const chunk = unique.slice(i, i + INSERT_CHUNK).map((o) => ({
+      region,
+      lmxId: o.lmxId,
+      locationId: o.locationId,
+      pinballmapMachineId: o.machineId,
+      locationName: o.locationName,
+      machineName: o.machineName,
+      announcedAt,
+    }));
+    const inserted = await db
+      .insert(pinballmapRegionSeenMachines)
+      .values(chunk)
+      // DO NOTHING, never DO UPDATE: a row already here is already known, and
+      // re-writing its labels would rewrite history the announcement was based on.
+      .onConflictDoNothing()
+      .returning({ lmxId: pinballmapRegionSeenMachines.lmxId });
+    discovered += inserted.length;
+  }
+  return discovered;
+}
+
+async function readPending(region: string): Promise<
+  {
+    lmxId: number;
+    locationId: number;
+    locationName: string | null;
+    machineName: string | null;
+    pinballmapMachineId: number;
+  }[]
+> {
+  return db
+    .select({
+      lmxId: pinballmapRegionSeenMachines.lmxId,
+      locationId: pinballmapRegionSeenMachines.locationId,
+      locationName: pinballmapRegionSeenMachines.locationName,
+      machineName: pinballmapRegionSeenMachines.machineName,
+      pinballmapMachineId: pinballmapRegionSeenMachines.pinballmapMachineId,
+    })
+    .from(pinballmapRegionSeenMachines)
+    .where(
+      and(
+        eq(pinballmapRegionSeenMachines.region, region),
+        isNull(pinballmapRegionSeenMachines.announcedAt)
+      )
+    )
+    .orderBy(asc(pinballmapRegionSeenMachines.firstSeenAt))
+    .limit(PENDING_READ_LIMIT);
+}
+
+async function markAnnounced(region: string, lmxIds: number[]): Promise<void> {
+  if (lmxIds.length === 0) return;
+  await db
+    .update(pinballmapRegionSeenMachines)
+    .set({ announcedAt: new Date() })
+    .where(
+      and(
+        eq(pinballmapRegionSeenMachines.region, region),
+        inArray(pinballmapRegionSeenMachines.lmxId, lmxIds)
+      )
+    );
+}
+
+/**
+ * Run one detection pass for a region. Returns what it did; throws only on an
+ * unexpected failure (a PBM read error propagates to the caller, which logs it).
+ */
+export async function runRegionNewMachineAlerts(opts?: {
+  region?: string;
+}): Promise<RegionAlertRun> {
+  const region = opts?.region ?? PBM_AUSTIN_REGION;
+
+  // Checked before the fetch, not after: with no destination there is nothing to
+  // do with the answer, and spending a PBM call to learn that would be rude.
+  const channelId = getRegionAlertChannelId();
+  if (channelId === null) return noop(region, "not_configured");
+
+  const client = await getPinballMapClient();
+  const observed = await client.fetchRegionLmxes(region);
+  // An empty payload is a bad read (outage, wrong region slug), not "the region
+  // has no machines". Recording it would be harmless, but treating it as a
+  // bootstrap on a fresh install would silence the very first real run.
+  if (observed.length === 0) return noop(region, "empty_payload");
+
+  const bootstrapped = (await countSeen(region)) === 0;
+  const discovered = await recordObserved(
+    region,
+    observed,
+    bootstrapped ? new Date() : null
+  );
+
+  const pending = await readPending(region);
+  const base = {
+    region,
+    skipped: null,
+    observed: observed.length,
+    bootstrapped,
+    discovered,
+  } as const;
+  if (pending.length === 0) {
+    return { ...base, announced: 0, pending: 0 };
+  }
+
+  const entries: RegionAlertEntry[] = pending.map((p) => ({
+    locationId: p.locationId,
+    locationName: p.locationName,
+    machineName: p.machineName,
+    pinballmapMachineId: p.pinballmapMachineId,
+  }));
+  const content = formatRegionAlertMessage({
+    entries,
+    regionLabel: regionLabel(region),
+  });
+  if (content === null) return { ...base, announced: 0, pending: 0 };
+
+  const config = await getDiscordConfig();
+  if (!config) {
+    // Channel configured but the Discord integration is off or unprovisioned.
+    // The rows stay pending and the next run tries again.
+    log.warn(
+      { region, pending: pending.length, action: "pinballmap.regionAlerts" },
+      "New PinballMap machines pending: Discord integration unavailable"
+    );
+    return { ...base, announced: 0, pending: pending.length };
+  }
+
+  const sent = await postChannelMessage({
+    botToken: config.botToken,
+    channelId,
+    content,
+  });
+  if (!sent.ok) {
+    log.warn(
+      {
+        region,
+        pending: pending.length,
+        reason: sent.reason,
+        action: "pinballmap.regionAlerts",
+      },
+      "New PinballMap machines pending: Discord post failed"
+    );
+    return { ...base, announced: 0, pending: pending.length };
+  }
+
+  await markAnnounced(
+    region,
+    pending.map((p) => p.lmxId)
+  );
+  return { ...base, announced: pending.length, pending: 0 };
+}

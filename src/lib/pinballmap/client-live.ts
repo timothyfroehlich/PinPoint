@@ -2,11 +2,17 @@ import "server-only";
 import { log } from "~/lib/logger";
 import { assertNotInTransaction } from "~/server/db/transaction-context";
 import { PBM_API_BASE, PBM_USER_AGENT } from "./config";
-import { parseCatalog, parseLocation, parseMachineGroups } from "./parse";
+import {
+  parseCatalog,
+  parseLocation,
+  parseMachineGroups,
+  parseRegionLmxes,
+} from "./parse";
 import type {
   CatalogMachine,
   LocationSnapshot,
   MachineGroup,
+  PbmRegionLmx,
   PbmAddMachineResult,
   PbmAuthResult,
   PbmCredentials,
@@ -263,6 +269,21 @@ export function createLiveClient(apiToken: string | null): PinballMapClient {
       // store on the machine record (vendored llms.txt §no_details).
       const raw = await readJson(`/machines.json`, "fetchCatalog", apiToken);
       return parseCatalog(raw);
+    },
+
+    async fetchRegionLmxes(region: string): Promise<PbmRegionLmx[]> {
+      assertNotInTransaction("pinballmap.fetchRegionLmxes");
+      // ONE bulk request for the whole region — the documented replacement for
+      // looping over individual LMXes (vendored llms.txt §"Request Volume
+      // Anti-Patterns"; this endpoint's own limit is 120/min, and we spend one
+      // call a day). The region name is a lowercase path segment, encoded so a
+      // configured value can never break out of the path.
+      const raw = await readJson(
+        `/region/${encodeURIComponent(region)}/location_machine_xrefs.json`,
+        "fetchRegionLmxes",
+        apiToken
+      );
+      return parseRegionLmxes(raw);
     },
 
     async fetchMachineGroups(): Promise<MachineGroup[]> {

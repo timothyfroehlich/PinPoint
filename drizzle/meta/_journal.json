@@ -456,6 +456,13 @@
       "when": 1786666651189,
       "tag": "0064_last_cannonball",
       "breakpoints": true
+    },
+    {
+      "idx": 65,
+      "version": "7",
+      "when": 1786977519660,
+      "tag": "0065_pinballmap_region_seen_machines",
+      "breakpoints": true
     }
   ]
 }

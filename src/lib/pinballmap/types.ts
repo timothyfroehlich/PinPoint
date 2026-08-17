@@ -53,6 +53,31 @@ export interface LocationSnapshot {
   raw: unknown;
 }
 
+/**
+ * One entry of the region-wide LMX bulk read (`fetchRegionLmxes`, PP-o355.18).
+ *
+ * Deliberately flatter than `PbmLmx`: the region feed exists to answer "which
+ * machine-at-location pairs exist in this region right now", so it carries the
+ * location the entry belongs to and drops conditions/IC state, which only the
+ * per-location snapshot consumes.
+ *
+ * `lmxId` is the identity used for new-machine detection. It is PBM-minted per
+ * (location, machine) pair and re-minted when an entry is removed and re-added,
+ * so a re-add is correctly a NEW entry rather than a resurrection.
+ *
+ * `locationName` / `machineName` are best-effort display labels: PBM's region
+ * payload is not contract-documented field-by-field in the vendored llms.txt, so
+ * the parser reads them from whichever shape is present (flat or nested) and
+ * yields null when neither is. Detection never depends on them.
+ */
+export interface PbmRegionLmx {
+  lmxId: number;
+  locationId: number;
+  machineId: number;
+  locationName: string | null;
+  machineName: string | null;
+}
+
 /** A canonical machine in PBM's catalog, used by the linking picker (bead B). */
 export interface CatalogMachine {
   machineId: number;
@@ -144,6 +169,14 @@ export interface PinballMapClient {
   fetchLocation(locationId: number): Promise<LocationSnapshot>;
   /** Anonymous bulk read: the canonical machine catalog (for the local mirror). */
   fetchCatalog(): Promise<CatalogMachine[]>;
+  /**
+   * Anonymous bulk read: every machine-at-location entry in a PBM region, in ONE
+   * request (`GET /region/:region/location_machine_xrefs.json`). This is the
+   * endpoint PBM's llms.txt names as the correct replacement for looping over
+   * individual LMXes, and the only sanctioned way to see a whole region — never
+   * fan out per location or per machine (CORE-PBM-001).
+   */
+  fetchRegionLmxes(region: string): Promise<PbmRegionLmx[]>;
   /** Anonymous bulk read: machine groups (family names) for the linking picker. */
   fetchMachineGroups(): Promise<MachineGroup[]>;
   /** Exchange login+password for a long-lived API token. */

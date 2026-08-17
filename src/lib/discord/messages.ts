@@ -48,10 +48,10 @@ export function formatDiscordMessage(input: DiscordMessageInput): string {
 }
 
 function buildBody(input: DiscordMessageInput): string {
-  const id = sanitize(input.formattedIssueId ?? "");
-  const title = sanitize(input.issueTitle ?? "");
-  const machine = sanitize(input.machineName ?? "a machine");
-  const status = sanitize(input.newStatus ?? "updated");
+  const id = sanitizeDiscordText(input.formattedIssueId ?? "");
+  const title = sanitizeDiscordText(input.issueTitle ?? "");
+  const machine = sanitizeDiscordText(input.machineName ?? "a machine");
+  const status = sanitizeDiscordText(input.newStatus ?? "updated");
 
   switch (input.type) {
     case "issue_assigned":
@@ -102,7 +102,13 @@ function buildBody(input: DiscordMessageInput): string {
  */
 const ZERO_WIDTH_SPACE = "\u200B";
 
-function sanitize(value: string): string {
+/**
+ * Exported because every Discord surface interpolating text we did not author
+ * needs it, not just notification DMs \u2014 the PinballMap region alert renders venue
+ * and machine names typed by strangers on pinballmap.com (PP-o355.18). One shared
+ * implementation, so a hardening fix lands everywhere at once.
+ */
+export function sanitizeDiscordText(value: string): string {
   return value
     .replace(/@/g, `@${ZERO_WIDTH_SPACE}`)
     .replace(/</g, `<${ZERO_WIDTH_SPACE}`)

@@ -11,6 +11,7 @@ import type {
   MachineGroup,
   PbmCondition,
   PbmLmx,
+  PbmRegionLmx,
 } from "./types";
 
 function asRecord(v: unknown): Record<string, unknown> | null {
@@ -93,6 +94,58 @@ export function parseLocation(
     fetchedAtIso,
     raw,
   };
+}
+
+/**
+ * Read a display name that PBM may send either flat (`machine_name`) or nested
+ * (`machine: { name }`). The region LMX payload's exact field set is not
+ * documented field-by-field in the vendored llms.txt, so we accept both shapes
+ * and return null rather than guessing — the caller labels the entry from our own
+ * catalog mirror when PBM gave us nothing.
+ */
+function nameFrom(
+  r: Record<string, unknown>,
+  flatKey: string,
+  nestedKey: string
+): string | null {
+  const flat = asString(r[flatKey]);
+  if (flat !== null && flat.length > 0) return flat;
+  const nested = asRecord(r[nestedKey]);
+  if (!nested) return null;
+  const name = asString(nested["name"]);
+  return name !== null && name.length > 0 ? name : null;
+}
+
+function parseRegionLmx(raw: unknown): PbmRegionLmx | null {
+  const r = asRecord(raw);
+  if (!r) return null;
+  // Soft-deleted entries are not part of any live lineup — same rule as
+  // parseLmx: any non-null `deleted_at` means gone.
+  const deletedAt = r["deleted_at"];
+  if (deletedAt !== null && deletedAt !== undefined) return null;
+  const lmxId = asNumber(r["id"]);
+  const locationId = asNumber(r["location_id"]);
+  const machineId = asNumber(r["machine_id"]);
+  if (lmxId === null || locationId === null || machineId === null) return null;
+  return {
+    lmxId,
+    locationId,
+    machineId,
+    locationName: nameFrom(r, "location_name", "location"),
+    machineName: nameFrom(r, "machine_name", "machine"),
+  };
+}
+
+/**
+ * `region/:region/location_machine_xrefs.json` returns either a bare array or
+ * `{ location_machine_xrefs: [...] }`. Records missing an id, location or machine
+ * are skipped rather than coerced — a malformed entry must drop out of the diff,
+ * never announce a machine we cannot name a location for.
+ */
+export function parseRegionLmxes(raw: unknown): PbmRegionLmx[] {
+  const r = asRecord(raw);
+  const list = r ? asArray(r["location_machine_xrefs"]) : asArray(raw);
+  return list.map(parseRegionLmx).filter((l): l is PbmRegionLmx => l !== null);
 }
 
 function parseCatalogMachine(raw: unknown): CatalogMachine | null {

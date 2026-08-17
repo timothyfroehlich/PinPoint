@@ -130,6 +130,86 @@ describe("live client — reads", () => {
     expect(catalog[1]?.machineGroupId).toBeNull();
   });
 
+  it("fetchRegionLmxes makes ONE bulk region call, not a per-entry loop", async () => {
+    const calls = installFetchMock(() =>
+      json({
+        location_machine_xrefs: [
+          {
+            id: 501,
+            location_id: 26454,
+            machine_id: 6412,
+            machine_name: "Godzilla (Premium)",
+            location_name: "Austin Pinball Collective",
+          },
+          {
+            // Nested shape: PBM's region payload is not documented field-by-field,
+            // so the parser accepts flat or nested names.
+            id: 502,
+            location_id: 999,
+            machine_id: 7,
+            machine: { name: "Medieval Madness" },
+            location: { name: "Pinballz Arcade" },
+          },
+        ],
+      })
+    );
+
+    const entries = await createLiveClient(null).fetchRegionLmxes("austin");
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.url).toContain(
+      "/region/austin/location_machine_xrefs.json"
+    );
+    expect(entries).toEqual([
+      {
+        lmxId: 501,
+        locationId: 26454,
+        machineId: 6412,
+        locationName: "Austin Pinball Collective",
+        machineName: "Godzilla (Premium)",
+      },
+      {
+        lmxId: 502,
+        locationId: 999,
+        machineId: 7,
+        locationName: "Pinballz Arcade",
+        machineName: "Medieval Madness",
+      },
+    ]);
+  });
+
+  it("fetchRegionLmxes skips soft-deleted and unusable entries", async () => {
+    installFetchMock(() =>
+      json([
+        { id: 1, location_id: 2, machine_id: 3 },
+        // removed from the map — not a live entry
+        { id: 4, location_id: 2, machine_id: 3, deleted_at: "2026-01-01" },
+        // no location: we could not attribute or link it
+        { id: 5, machine_id: 3 },
+        "garbage",
+      ])
+    );
+
+    const entries = await createLiveClient(null).fetchRegionLmxes("austin");
+
+    expect(entries).toEqual([
+      {
+        lmxId: 1,
+        locationId: 2,
+        machineId: 3,
+        locationName: null,
+        machineName: null,
+      },
+    ]);
+  });
+
+  it("fetchRegionLmxes sends the api token and encodes the region", async () => {
+    const calls = installFetchMock(() => json([]));
+    await createLiveClient("tok-123").fetchRegionLmxes("new orleans");
+    expect(calls[0]?.url).toContain("/region/new%20orleans/");
+    expect(calls[0]?.init?.headers).toMatchObject({ "X-Api-Token": "tok-123" });
+  });
+
   it("fetchMachineGroups hits the endpoint and parses {machine_groups}", async () => {
     const calls = installFetchMock(() =>
       json({ machine_groups: [{ id: 9001, name: "Godzilla" }] })

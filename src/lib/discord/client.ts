@@ -5,17 +5,60 @@ import { assertNotInTransaction } from "~/server/db/transaction-context";
 const DISCORD_API = "https://discord.com/api/v10";
 const MAX_RETRY_AFTER_SECONDS = 5;
 
-export type SendDmResult =
+/**
+ * Outcome of any Discord message send.
+ *
+ * `blocked` means Discord refused this destination for a reason retrying will not
+ * fix: for a DM, the recipient has DMs off or blocked the bot; for a channel, the
+ * bot is not in the guild, cannot see the channel, or the channel is gone.
+ */
+export type DiscordSendResult =
   | { ok: true }
   | {
       ok: false;
       reason: "blocked" | "rate_limited" | "transient" | "not_configured";
     };
 
+/** Historical alias — `sendDm`'s return type. */
+export type SendDmResult = DiscordSendResult;
+
 export interface SendDmInput {
   botToken: string;
   discordUserId: string;
   content: string;
+}
+
+export interface PostChannelMessageInput {
+  botToken: string;
+  /** Discord channel snowflake to post into. */
+  channelId: string;
+  content: string;
+}
+
+/**
+ * Post a message to a Discord channel the bot can see.
+ *
+ * Distinct from `sendDm` only in the destination: a DM needs a channel opened for
+ * the recipient first, a guild channel is already addressable. Everything after
+ * that — auth header, `allowed_mentions: { parse: [] }`, the single in-budget 429
+ * retry, error classification — is the same code path, so a fix to any of it
+ * applies to both.
+ *
+ * Used by the PinballMap region new-machine alert (PP-o355.18), which broadcasts
+ * a public fact to one operator-chosen channel rather than DM-ing every member.
+ */
+export async function postChannelMessage(
+  input: PostChannelMessageInput
+): Promise<DiscordSendResult> {
+  // CORE-ARCH-011 tripwire: same rule as DMs — the HTTP call goes out post-commit,
+  // never inside a transaction (the Doodle Bug, PP-2053).
+  assertNotInTransaction("postChannelMessage");
+
+  if (!input.botToken || !input.channelId) {
+    return { ok: false, reason: "not_configured" };
+  }
+
+  return postMessage(input.botToken, input.channelId, input.content);
 }
 
 export async function sendDm(input: SendDmInput): Promise<SendDmResult> {

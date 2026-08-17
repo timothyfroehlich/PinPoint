@@ -17,6 +17,7 @@ import type {
   issueWatchers,
   issueImages,
   pinballmapCatalog,
+  pinballmapRegionSeenMachines,
   pinballmapState,
 } from "~/server/db/schema";
 
@@ -102,3 +103,11 @@ export type NewPinballmapCatalogEntry = InferInsertModel<
 // PinballMap integration state singleton (PP-o355.16)
 export type PinballmapState = InferSelectModel<typeof pinballmapState>;
 export type NewPinballmapState = InferInsertModel<typeof pinballmapState>;
+
+// Region-wide seen-machine memory behind the new-machine alert (PP-o355.18)
+export type PinballmapRegionSeenMachine = InferSelectModel<
+  typeof pinballmapRegionSeenMachines
+>;
+export type NewPinballmapRegionSeenMachine = InferInsertModel<
+  typeof pinballmapRegionSeenMachines
+>;
