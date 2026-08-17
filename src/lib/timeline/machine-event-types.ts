@@ -36,21 +36,29 @@ export type MachineTimelineEventData =
   | { kind: "settings_set_updated"; setName: string }
   | { kind: "settings_set_deleted"; setName: string }
   | { kind: "settings_set_preferred"; setName: string }
-  // === sourceType='lifecycle' — PinballMap listing link (PP-o355.12) ===
-  // Mirrors the outbound/link operations against a machine's PinballMap
-  // listing. `lmxId` is the captured location_machine_xref id at event time
-  // (null only for an unlisted → the handle was cleared). `linked`/`reconnected`
-  // are read-only captures; `listed`/`unlisted` are operator-token writes.
-  // `abandoned` fires whenever a local edit walks away from a still-live entry
-  // (PP-l81u) — a retitle, marking the machine excluded, or clearing the link
-  // entirely, all while it was listed. The entry stays on PBM and `lmxId` is
-  // the handle recorded for it. Unlike `unlisted`, nothing was written to
-  // PinballMap.
-  // `accepted_removal` (PP-o355.21) records agreeing with PinballMap that the
-  // entry is gone — someone removed it over there and we cleared our columns to
-  // match. Distinct from `unlisted` for the same reason `abandoned` is: no write
-  // left PinPoint, so a timeline reading "Unlisted from Pinball Map" would
-  // credit us with an edit we did not make.
+  // === sourceType='lifecycle' — Pinball Map (PP-o355.12, PP-o355.21) ===
+  //
+  // Two kinds, because the two facts are genuinely different and a reader needs
+  // to tell them apart: `pinballmap_intent` is what an operator DECIDED here,
+  // `pinballmap_listing` is what was written to somebody else's public map.
+  //
+  // `lmxId` on a listing event is the location_machine_xref id at event time.
+  // `listed`/`unlisted` are operator-token writes to pinballmap.com.
+  // `abandoned` fires when a local edit walks away from a still-live entry
+  // (PP-l81u) — a retitle, marking the machine uncataloged, or clearing the
+  // link, all while intent was On. The entry stays on Pinball Map and `lmxId`
+  // is the handle recorded for it; unlike `unlisted`, nothing was written
+  // there.
+  //
+  // `linked`, `reconnected` and `accepted_removal` are RETIRED (PP-o355.21) and
+  // kept only so historical rows still render: `linked`/`reconnected` were
+  // auto-link's captures, which spec 5.1 forbids outright, and
+  // `accepted_removal` was the Accept button, whose job the intent toggle now
+  // does directly. Nothing writes them any more.
+  | {
+      kind: "pinballmap_intent";
+      intent: "on" | "off" | "no_sync";
+    }
   | {
       kind: "pinballmap_listing";
       action:

@@ -32,31 +32,41 @@ interface InfoRailProps {
    * The machine's standing on Pinball Map, rendered as one unlabelled line
    * under Model.
    *
-   * The line is ALWAYS a link to our location's listing, in both the listed and
-   * the unlisted state. That is not decoration: listed-vs-not is a claim about
-   * APC's lineup derived from Pinball Map's location payload, which CORE-PBM-001
-   * says must carry a link to that location's listing — and with no row label,
-   * this line is the card's only attribution anchor.
+   * The line is ALWAYS a link to our location's page, whether or not the entry
+   * is there. That is not decoration: on-the-lineup-or-not is a claim derived
+   * from Pinball Map's location payload, which CORE-PBM-001 says must carry a
+   * link to that location — and with no row label, this line is the card's only
+   * attribution anchor.
    */
   pinballmap: {
     /** `pinballmapLocationUrl()` — the by_location_id form, never hand-written. */
     locationUrl: string;
-    listed: boolean;
+    /** Whether the location's lineup currently carries this machine's title. */
+    onLineup: boolean;
     /**
      * Show the "Config issue" warning. TWO different disagreements raise it:
-     * an entry this machine left live on the public map under a title it no
-     * longer uses (PP-l81u), and an actionable desync between our records and
-     * the stored snapshot (`isActionableDesync`).
+     * an entry this machine left on the public lineup under a title it no
+     * longer uses (PP-l81u), and intent disagreeing with what the lineup shows
+     * (spec §4's out-of-sync states).
      *
-     * That breadth is why the label is generic. "Previous listing" would be a
-     * lie for the desync case and "Needs cleanup" implies a chore when the
-     * answer may be to accept what the map says instead.
+     * That breadth is why the label is generic. "Previous entry" would be a lie
+     * for the out-of-sync case, and "Needs cleanup" implies a chore when the
+     * answer may be to change the intent instead.
      *
      * Gated on `machines.pinballmap.diagnose` by the caller — read-only here.
      */
     configIssue: boolean;
-    /** Where the warning sends the reader to resolve it (the Manage tab). */
-    manageHref: string;
+    /**
+     * Where the warning sends the reader to resolve it (the Manage tab), or
+     * null when this viewer cannot open that tab.
+     *
+     * `diagnose` is deliberately wider than `machines.edit` — any member may be
+     * the one to notice a wrong entry on a public map — so the two do come
+     * apart, and linking regardless would send those viewers to a route that
+     * redirects them straight back (CORE-ARCH-012). They still see the warning;
+     * it just is not a link.
+     */
+    manageHref: string | null;
   };
 }
 
@@ -138,9 +148,9 @@ export function InfoRail({
               className="text-primary hover:underline"
               data-testid="machine-pinballmap-line"
             >
-              {pinballmap.listed
+              {pinballmap.onLineup
                 ? "View on Pinball Map"
-                : "Not listed on Pinball Map"}
+                : "Not on Pinball Map"}
             </a>
 
             {/* One line or nothing. Below the container width where this fits,
@@ -156,17 +166,30 @@ export function InfoRail({
                 clear of AA, unlike the destructive red that needed its own
                 `-text` token (see globals.css). */}
             {pinballmap.configIssue ? (
-              <a
-                href={pinballmap.manageHref}
-                data-testid="machine-pinballmap-config-issue"
-                className="ml-auto hidden shrink-0 items-baseline gap-1 whitespace-nowrap text-warning hover:underline @[20rem]:inline-flex"
-              >
-                <TriangleAlert
-                  className="size-3.5 self-center"
-                  aria-hidden="true"
-                />
-                Config issue
-              </a>
+              pinballmap.manageHref !== null ? (
+                <a
+                  href={pinballmap.manageHref}
+                  data-testid="machine-pinballmap-config-issue"
+                  className="ml-auto hidden shrink-0 items-baseline gap-1 whitespace-nowrap text-warning hover:underline @[20rem]:inline-flex"
+                >
+                  <TriangleAlert
+                    className="size-3.5 self-center"
+                    aria-hidden="true"
+                  />
+                  Config issue
+                </a>
+              ) : (
+                <span
+                  data-testid="machine-pinballmap-config-issue"
+                  className="ml-auto hidden shrink-0 items-baseline gap-1 whitespace-nowrap text-warning @[20rem]:inline-flex"
+                >
+                  <TriangleAlert
+                    className="size-3.5 self-center"
+                    aria-hidden="true"
+                  />
+                  Config issue
+                </span>
+              )
             ) : null}
           </p>
         </div>

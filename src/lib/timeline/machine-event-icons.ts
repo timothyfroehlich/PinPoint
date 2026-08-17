@@ -66,7 +66,10 @@ export const MACHINE_EVENT_ICONS: Record<
   settings_set_deleted: { Icon: Trash2, colorClass: "text-muted-foreground" },
   settings_set_preferred: { Icon: Star, colorClass: "text-warning" },
 
-  // PinballMap listing link (PP-o355.12)
+  // Pinball Map (PP-o355.12, PP-o355.21). Same icon for both kinds: they are
+  // the same topic to a reader scanning the timeline, and the sentence beside
+  // it already says which happened.
+  pinballmap_intent: { Icon: MapPin, colorClass: "text-muted-foreground" },
   pinballmap_listing: { Icon: MapPin, colorClass: "text-muted-foreground" },
 
   // Issue events

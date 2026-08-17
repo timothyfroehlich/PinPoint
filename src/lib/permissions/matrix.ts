@@ -425,26 +425,33 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
       },
       {
         id: "machines.pinballmap.push",
-        label: "Push listing changes to PinballMap",
+        label: "Add or remove entries on Pinball Map",
         description:
-          "List or unlist a machine on PinballMap.com using the shared operator account",
+          "Add a machine to the location's public Pinball Map lineup, or remove it, using the shared operator account",
         access: {
           unauthenticated: false,
           guest: false,
-          member: false,
-          technician: false,
+          // Same tier as `machines.pinballmap.link` (spec 8.2). Pinball Map is
+          // publicly editable by anyone with an account, so gating our writes
+          // tighter than our own bookkeeping bought nothing — it just meant an
+          // owner who could set the intent had to find an admin to act on it.
+          member: "owner",
+          technician: true,
           admin: true,
         },
       },
       {
         id: "machines.pinballmap.sync",
-        label: "Trigger a Pinball Map sync",
+        label: "Refresh the Pinball Map lineup",
         description:
-          "Manually refresh the stored Pinball Map location snapshot ('Sync now'). The hourly cron does this automatically; this grants the on-demand action.",
+          "Re-read what Pinball Map shows for the location, from the Refresh button on a machine's Manage tab. The hourly cron does this automatically; this grants the on-demand read.",
         access: {
           unauthenticated: false,
           guest: false,
-          member: false,
+          // Reading needs only page access (spec 8.3). A refresh writes nothing
+          // anywhere and is throttled globally regardless of who clicks, so the
+          // only thing a tighter gate protected was the button itself.
+          member: true,
           technician: true,
           admin: true,
         },

@@ -2,13 +2,19 @@
 
 import type React from "react";
 import { useState, useTransition } from "react";
-import { CheckCircle2, MapPin, TriangleAlert } from "lucide-react";
+import {
+  CheckCircle2,
+  ExternalLink,
+  MapPin,
+  RefreshCw,
+  TriangleAlert,
+} from "lucide-react";
 
 import {
-  acceptMissingPinballmapListingAction,
-  linkPinballmapEntryAction,
-  listMachineOnPinballMapAction,
-  unlistMachineFromPinballMapAction,
+  addMachineToPinballMapAction,
+  refreshPinballmapLineupAction,
+  removeMachineFromPinballMapAction,
+  setPinballmapIntentAction,
 } from "~/app/(app)/m/pinballmap-actions";
 import { Button } from "~/components/ui/button";
 import {
@@ -22,317 +28,226 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "~/components/ui/alert-dialog";
-import type { PbmListingState } from "~/lib/pinballmap/status";
+import { formatRelative } from "~/lib/dates";
+import type {
+  PbmListingIntent,
+  PbmListingView,
+  PbmSibling,
+} from "~/lib/pinballmap/listing-state";
 import type { Result } from "~/lib/result";
+import { cn } from "~/lib/utils";
 
 /**
- * The four listing actions share this shape. Widened to `Result<unknown,
- * string>` deliberately: this component reads only `ok` and `message`, and
- * naming the four concrete result types here would couple it to four error-code
- * unions it never branches on.
+ * The Manage tab's Pinball Map control (PP-o355.21) — spec §4.
+ *
+ * **Two rows under one header, at one fixed height in every state** (4.1). The
+ * intent row is the operator's decision; the status row is what Pinball Map
+ * actually shows, with the push that would reconcile them on the right. States
+ * swap content, never geometry, so switching between machines does not reflow
+ * the tab.
+ *
+ * Splitting the two lines is what removed the old control's central confusion.
+ * When one button meant both "decide this should be listed" and "write that to
+ * pinballmap.com", every state had to answer both questions at once, and the
+ * add/remove verbs double-booked. Now the toggle is local and instant, the push
+ * appears only when the two lines disagree, and an in-sync machine has no
+ * buttons at all.
+ *
+ * **Derive, don't discover.** The whole view arrives computed from stored
+ * columns and the stored lineup (`derivePbmListingView`), so nothing here
+ * reaches pinballmap.com at render (CORE-PBM-001).
  */
+
+/** Every action here is `(prev, formData)`-shaped and read only for ok/message. */
 type ListingAction = (
   prev: undefined,
   formData: FormData
 ) => Promise<Result<unknown, string>>;
 
-/**
- * The Manage tab's Pinball Map listing control (PP-o355.21) — a full rewrite of
- * the #1683 control it replaces.
- *
- * **Derive, don't discover.** The state arrives already computed from stored
- * columns and the stored snapshot (`derivePbmListingState`), so the control is
- * painted before anyone clicks anything and no render reaches pinballmap.com
- * (CORE-PBM-001). The old control made you press "Connect" to find out where
- * you stood, and told APC's entire listed fleet "Not listed" while it waited.
- * "Connect", "Verify" and "Reconnect" are retired outright — the Verify server
- * action is deleted, and the drift it used to heal by hand is healed by the
- * hourly reconcile pass instead.
- *
- * **Buttons, not a toggle.** Three of the four transitions change what the
- * public map shows and need a confirm; a switch would promise instant and cheap
- * and then argue with a modal. The status line carries the state, the button
- * carries the weight. No trailing ellipsis on the labels — a confirm dialog is
- * not the kind of "more input required" that an ellipsis promises (Tim,
- * 2026-08-12).
- *
- * **No Pinball Map title row.** The Model / Edition control in Details owns that
- * job; repeating it here would put two editors on one fact.
- *
- * Everything here applies immediately — nothing in this section rides the
- * Details save.
- */
-
 export interface PinballmapListingControlProps {
   machineId: string;
   /** Derived on the server; never discovered by pressing a button. */
-  state: PbmListingState;
-  /** Our local listing flag — the only thing `unsynced` can honestly report. */
-  listed: boolean;
+  view: PbmListingView;
+  /** Location name from Pinball Map's own record; null before a first refresh. */
+  locationName: string | null;
+  /** The location's page on pinballmap.com — also the 9.1 attribution link. */
+  locationUrl: string;
+  /** When the stored lineup was last read, or null if it never has been. */
+  lastRefreshedAt: Date | null;
+  /** Refreshes left in the shared burst allowance, and when the next lands. */
+  refreshRemaining: number;
+  refreshAvailableAt: Date | null;
   /**
-   * Viewer holds `machines.pinballmap.link`: the local-bookkeeping capability
-   * (owner of this machine / technician / admin). Claim and Accept write only
-   * to PinPoint, so they sit behind this rather than `push`.
+   * Viewer holds `machines.pinballmap.link` (spec 8.1) — may set intent. False
+   * renders the whole control read-only (4.9), header Refresh excepted.
    */
-  canLink: boolean;
-  /** Viewer holds `machines.pinballmap.push` — writes to the public map (admin). */
+  canSetIntent: boolean;
+  /** Viewer holds `machines.pinballmap.push` (8.2) — may write to Pinball Map. */
   canPush: boolean;
+  /** Viewer holds `machines.pinballmap.sync` (8.3) — may press Refresh. */
+  canRefresh: boolean;
   /**
-   * An operator credential is provisioned in Vault. Without one the outbound
-   * writes cannot run at all, so Add / Remove are absent rather than present
-   * and failing (CORE-ARCH-012). Read from `pinballmap_state` columns — the
-   * token itself is never decrypted to answer this.
+   * An operator credential is provisioned. Without one the outbound writes
+   * cannot run, so the status row links out instead of showing a button that
+   * would fail (4.4, CORE-ARCH-012). Read off `pinballmap_state` columns — the
+   * token is never decrypted to answer this.
    */
   writeEnabled: boolean;
   /** Catalog title, so a confirm names the game rather than "this machine". */
   modelName: string | null;
-  /**
-   * Initials of the OTHER cabinets sharing this title, for the two states whose
-   * sentence has to name them. Empty for every other state, and the copy falls
-   * back to "another cabinet" rather than rendering a gap if it arrives empty
-   * when it shouldn't.
-   */
-  rivalInitials?: readonly string[];
+  /** Comments on the entry, for the remove confirm's consequence line (4.6). */
+  commentCount: number | null;
 }
 
-/** What the confirm dialog for each outbound action says. */
-interface ConfirmCopy {
-  title: string;
-  body: string;
-  action: string;
-  destructive?: boolean;
-}
-
-function ConfirmButton({
-  trigger,
-  copy,
-  onConfirm,
-  pending,
-  testId,
-}: {
-  trigger: React.ReactNode;
-  copy: ConfirmCopy;
-  onConfirm: () => void;
-  pending: boolean;
-  testId: string;
-}): React.JSX.Element {
-  return (
-    <AlertDialog>
-      <AlertDialogTrigger asChild>{trigger}</AlertDialogTrigger>
-      <AlertDialogContent data-testid={`${testId}-confirm`}>
-        <AlertDialogHeader>
-          <AlertDialogTitle>{copy.title}</AlertDialogTitle>
-          <AlertDialogDescription>{copy.body}</AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel disabled={pending}>Cancel</AlertDialogCancel>
-          <AlertDialogAction
-            type="button"
-            variant={copy.destructive === true ? "destructive" : "default"}
-            disabled={pending}
-            onClick={onConfirm}
-          >
-            {copy.action}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
-  );
-}
+const INTENT_OPTIONS: readonly { value: PbmListingIntent; label: string }[] = [
+  { value: "on", label: "On the lineup" },
+  { value: "off", label: "Off the lineup" },
+  { value: "no_sync", label: "Don't sync" },
+];
 
 export function PinballmapListingControl({
   machineId,
-  state,
-  listed,
-  canLink,
+  view,
+  locationName,
+  locationUrl,
+  lastRefreshedAt,
+  refreshRemaining,
+  refreshAvailableAt,
+  canSetIntent,
   canPush,
+  canRefresh,
   writeEnabled,
   modelName,
-  rivalInitials = [],
+  commentCount,
 }: PinballmapListingControlProps): React.JSX.Element {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
   /**
-   * Every action here is `(prev, formData)`-shaped, but none of them is
-   * dispatched by a `<form>`: the trigger lives inside an AlertDialog that
-   * unmounts the moment it is confirmed, and a form that unmounts mid-submit is
-   * a race nobody needs. Calling the action inside a transition keeps the
-   * pending state and the failure message on THIS component, which outlives the
-   * dialog.
+   * None of these actions is dispatched by a `<form>`: the push triggers live
+   * inside an AlertDialog that unmounts the moment it is confirmed, and a form
+   * that unmounts mid-submit is a race nobody needs. Running the action in a
+   * transition keeps the pending state and the failure message on THIS
+   * component, which outlives the dialog.
    */
-  function run(action: ListingAction): void {
+  function run(action: ListingAction, fields?: Record<string, string>): void {
     setError(null);
     startTransition(async () => {
       const formData = new FormData();
       formData.set("machineId", machineId);
+      for (const [k, v] of Object.entries(fields ?? {})) formData.set(k, v);
       const result = await action(undefined, formData);
       // A failure has to be visible: on success the page revalidates and the
-      // status line changes underneath, so a silent no-op would leave both
-      // outcomes looking identical (CORE-ARCH-012).
+      // rows change underneath, so a silent no-op would leave both outcomes
+      // looking identical (CORE-ARCH-012).
       if (!result.ok) setError(result.message);
     });
   }
 
   const game = modelName ?? "this machine";
   const canWriteOut = canPush && writeEnabled;
-
-  const addButton = (
-    <ConfirmButton
-      testId="pbm-listing-add"
-      pending={pending}
-      onConfirm={() => {
-        run(listMachineOnPinballMapAction);
-      }}
-      copy={{
-        title: "Add to Pinball Map?",
-        body: `This adds ${game} to our location's lineup on pinballmap.com, where anyone can see it.`,
-        action: "Add to Pinball Map",
-      }}
-      trigger={
-        <Button
-          variant="outline"
-          size="sm"
-          loading={pending}
-          data-testid="pbm-listing-add"
-        >
-          <MapPin aria-hidden="true" className="size-4" />
-          Add to Pinball Map
-        </Button>
-      }
-    />
-  );
-
-  // Which actions appear is a permission question first and a state question
-  // second — a member looking at a machine they don't own sees the status and
-  // nothing else. Computed up front so the actions row can be omitted entirely
-  // rather than rendered empty: an empty flex row is invisible but still takes
-  // the `space-y` margin above it, which is half of why this block used to
-  // look padded for no reason.
-  //
-  // The four unclaimed states do NOT share an action, which is the whole reason
-  // they are four states. Claim is offered where claiming is right — this
-  // machine is the pick, or the tie is this machine's to break. It is withheld
-  // for `unclaimed_unavailable`, where the entry should come down rather than be
-  // recorded, and for `unclaimed_elsewhere`, where claiming would move the
-  // listing onto the wrong cabinet.
-  //
-  // `unclaimed_unavailable` gets NO button, deliberately. Its copy says the
-  // entry should come down, and the obvious control would be Remove — but
-  // `unlistMachineFromPinballMapAction` needs `pinballmapListed` and a stored
-  // lmx id, and this state is defined by having neither: the listing is theirs,
-  // not ours. The button would fail every time with "This machine isn't listed
-  // on Pinball Map", which is precisely the control-that-cannot-do-what-it-says
-  // shape CORE-ARCH-012 forbids. Taking down an entry PinPoint does not hold is
-  // PP-o355.31 / PP-o355.32 work; until then the copy points at the map link
-  // directly above, which is a real route.
-  const claimable = state === "unclaimed_on_pbm" || state === "unclaimed_tie";
-  const actions = [
-    state === "not_listed" && canWriteOut,
-    claimable && canLink,
-    state === "listed" && canWriteOut,
-    state === "missing_on_pbm" && (canLink || canWriteOut),
-  ].some(Boolean);
+  const disabled = view.disabled !== null;
 
   return (
-    // No card, no border, no background. This is one sentence and sometimes a
-    // button; a bordered box around that reads as a component when it is really
-    // a line of prose, and it stacked a second frame directly above the
-    // abandoned-listing Alert that follows (Tim, 2026-08-14: "the box is too
-    // big and misaligned, why not just a single line of text?"). The section
-    // heading and divider above already scope it.
-    <section aria-label="Pinball Map listing" data-testid="pbm-listing-control">
-      {/* `items-center`, not `items-start`. The copy is a single line at every
-          width the rail allows, so top-aligning put the icon visibly above the
-          text's optical centre. It wraps to two lines only on very narrow
-          phones, where a centred icon is still the lesser problem. */}
-      <div className="flex items-center gap-2">
-        <StateIcon state={state} />
-        <p className="text-sm text-foreground" data-testid="pbm-listing-status">
-          {statusCopy(state, listed, rivalInitials)}
-        </p>
-      </div>
+    <section aria-label="Pinball Map" data-testid="pbm-listing-control">
+      <Header
+        locationName={locationName}
+        locationUrl={locationUrl}
+        lastRefreshedAt={lastRefreshedAt}
+        refreshRemaining={refreshRemaining}
+        refreshAvailableAt={refreshAvailableAt}
+        canRefresh={canRefresh}
+        outOfSync={view.outOfSync}
+        pending={pending}
+        onRefresh={() => {
+          run(refreshPinballmapLineupAction);
+        }}
+      />
 
-      {actions ? (
-        <div className="mt-3 flex flex-wrap gap-2">
-          {state === "not_listed" && canWriteOut ? addButton : null}
-
-          {claimable && canLink ? (
-            // No confirm: this writes nothing to Pinball Map. It records the
-            // listing they already show, which is what auto-link would have done
-            // on its own if two same-title cabinets hadn't tied.
-            <Button
-              variant="outline"
-              size="sm"
-              loading={pending}
-              data-testid="pbm-listing-claim"
-              onClick={() => {
-                run(linkPinballmapEntryAction);
-              }}
+      {/* One wrapper for both rows so the disabled states dim and inert the
+          pair together without changing the box's height (4.1). `inert` is the
+          platform answer to "visible but not interactive" — it removes the
+          subtree from the tab order and the a11y tree in one attribute, where
+          `pointer-events-none` would leave it keyboard-reachable. */}
+      <div
+        className={cn("space-y-2.5", disabled && "opacity-45")}
+        {...(disabled ? { inert: true } : {})}
+        data-testid="pbm-listing-rows"
+      >
+        <Row label="Intent">
+          <IntentToggle
+            value={view.intent}
+            blockedReason={view.onPositionBlockedReason}
+            readOnly={!canSetIntent || disabled}
+            pending={pending}
+            onChange={(intent) => {
+              run(setPinballmapIntentAction, { intent });
+            }}
+          />
+          {/* Tim, 2026-08-16: the Alert state gets BOTH placements — this note
+              beside the toggle and the warning on the status row. The toggle is
+              where the contradiction lives (this cabinet says it should be on a
+              public lineup while our own records say it is not here), so a
+              reader scanning the intent row has to see it there too. */}
+          {view.advisory === "alert" && view.advisoryDetail !== null ? (
+            <span
+              className="inline-flex items-center gap-1.5 text-xs text-warning"
+              data-testid="pbm-listing-alert"
             >
-              Claim this listing
-            </Button>
+              <TriangleAlert aria-hidden="true" className="size-3.5" />
+              Alert: Availability set to {view.advisoryDetail}
+            </span>
           ) : null}
+        </Row>
 
-          {state === "listed" && canWriteOut ? (
-            <ConfirmButton
-              testId="pbm-listing-remove"
-              pending={pending}
-              onConfirm={() => {
-                run(unlistMachineFromPinballMapAction);
-              }}
-              copy={{
-                title: "Remove from Pinball Map?",
-                body: `This takes ${game} off our location's lineup on pinballmap.com. Anyone looking us up will stop seeing it.`,
-                action: "Remove from Pinball Map",
-                destructive: true,
-              }}
-              trigger={
-                <Button
-                  variant="outline"
-                  size="sm"
-                  loading={pending}
-                  data-testid="pbm-listing-remove"
-                >
-                  Remove from Pinball Map
-                </Button>
-              }
-            />
-          ) : null}
+        <Row label="Status">
+          <div className="flex min-w-0 flex-1 items-center gap-2">
+            <StatusIcon view={view} />
+            <p
+              className="text-sm text-foreground"
+              data-testid="pbm-listing-status"
+            >
+              {statusSentence(view, locationUrl, canWriteOut)}
+            </p>
+          </div>
 
-          {state === "missing_on_pbm" ? (
-            <>
-              {canLink ? (
+          {view.pushAction !== null && canWriteOut ? (
+            <div className="ml-auto shrink-0">
+              {view.pushAction === "add" ? (
                 <ConfirmButton
-                  testId="pbm-listing-accept"
+                  testId="pbm-listing-add"
                   pending={pending}
                   onConfirm={() => {
-                    run(acceptMissingPinballmapListingAction);
+                    run(addMachineToPinballMapAction);
                   }}
                   copy={{
-                    title: "Accept the removal?",
-                    body: "This only updates PinPoint to agree with Pinball Map. Nothing is sent to them — the entry is already gone from their lineup.",
-                    action: "Accept",
+                    title: "Add to Pinball Map?",
+                    body: `Adds ${game} to the location's lineup on pinballmap.com, where it will be publicly visible.`,
+                    action: "Add machine",
                   }}
-                  trigger={
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      loading={pending}
-                      data-testid="pbm-listing-accept"
-                    >
-                      Accept
-                    </Button>
-                  }
+                  label="Add machine to Pinball Map"
                 />
-              ) : null}
-              {/* Same action as `not_listed`, offered as the other resolution:
-                put it back rather than agree it is gone. */}
-              {canWriteOut ? addButton : null}
-            </>
+              ) : (
+                <ConfirmButton
+                  testId="pbm-listing-remove"
+                  pending={pending}
+                  destructive
+                  onConfirm={() => {
+                    run(removeMachineFromPinballMapAction);
+                  }}
+                  copy={{
+                    title: "Remove from Pinball Map?",
+                    body: `Removes ${game} from the location's lineup on pinballmap.com. It will no longer be publicly visible.`,
+                    action: "Remove machine",
+                    consequence: removeConsequence(commentCount),
+                  }}
+                  label="Remove machine from Pinball Map"
+                />
+              )}
+            </div>
           ) : null}
-        </div>
-      ) : null}
+        </Row>
+      </div>
 
       {error !== null ? (
         <p
@@ -348,99 +263,428 @@ export function PinballmapListingControl({
 }
 
 /**
- * Amber for the states somebody has to resolve, a check for the settled listed
- * state, and a neutral pin for everything else. The icon is decorative — the
- * sentence beside it carries the meaning, so nothing here is colour-only.
- *
- * Plain `unclaimed_on_pbm` gets the neutral pin rather than amber: it resolves
- * itself on the next reconcile, and an alert icon for something no one has to
- * act on is the noise `isActionableDesync` exists to avoid. `unclaimed_elsewhere`
- * is neutral for the same reason from the other direction — it is another
- * cabinet's business and there is nothing to do here.
+ * "Pinball Map — {location}", last-refresh time, Refresh, and the Out of sync
+ * alert (4.1). Before the first refresh the location name is unknown — it comes
+ * from Pinball Map's own record — so the title renders bare rather than guessing.
  */
-function StateIcon({ state }: { state: PbmListingState }): React.JSX.Element {
-  if (
-    state === "missing_on_pbm" ||
-    state === "unclaimed_tie" ||
-    state === "unclaimed_unavailable"
-  ) {
+function Header({
+  locationName,
+  locationUrl,
+  lastRefreshedAt,
+  refreshRemaining,
+  refreshAvailableAt,
+  canRefresh,
+  outOfSync,
+  pending,
+  onRefresh,
+}: {
+  locationName: string | null;
+  locationUrl: string;
+  lastRefreshedAt: Date | null;
+  refreshRemaining: number;
+  refreshAvailableAt: Date | null;
+  canRefresh: boolean;
+  outOfSync: boolean;
+  pending: boolean;
+  onRefresh: () => void;
+}): React.JSX.Element {
+  const spent = refreshRemaining <= 0;
+  return (
+    <div className="mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-outline-variant pb-2">
+      <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        Pinball Map
+        {locationName !== null ? (
+          <>
+            {" — "}
+            <a
+              href={locationUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 normal-case tracking-normal text-primary underline underline-offset-2 hover:no-underline"
+            >
+              {locationName}
+              <ExternalLink className="size-3" aria-hidden="true" />
+            </a>
+          </>
+        ) : null}
+      </h3>
+
+      <div className="flex items-center gap-2.5">
+        {outOfSync ? (
+          <span
+            className="inline-flex items-center gap-1.5 rounded-full border border-warning/50 bg-warning-container/50 px-2 py-0.5 text-xs font-medium text-on-warning-container"
+            data-testid="pbm-listing-out-of-sync"
+          >
+            <TriangleAlert aria-hidden="true" className="size-3" />
+            Out of sync
+          </span>
+        ) : null}
+
+        <span
+          className={cn(
+            "text-xs",
+            lastRefreshedAt === null ? "text-warning" : "text-muted-foreground"
+          )}
+          data-testid="pbm-listing-refreshed-at"
+        >
+          {lastRefreshedAt === null
+            ? "Never refreshed"
+            : `Refreshed ${formatRelative(lastRefreshedAt)}`}
+        </span>
+
+        {canRefresh ? (
+          <Button
+            variant="outline"
+            size="sm"
+            loading={pending}
+            disabled={spent}
+            onClick={onRefresh}
+            data-testid="pbm-listing-refresh"
+            // The countdown lives in the title rather than the label so the
+            // button does not change width as it ticks — the header sits above
+            // a fixed-height box and a resizing control undoes that (4.1).
+            title={
+              spent && refreshAvailableAt !== null
+                ? `Refreshes again ${formatRelative(refreshAvailableAt)}`
+                : undefined
+            }
+          >
+            <RefreshCw aria-hidden="true" className="size-3.5" />
+            Refresh
+          </Button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+/** One labelled row. Fixed minimum height is what keeps 4.1's promise. */
+function Row({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}): React.JSX.Element {
+  return (
+    <div className="flex min-h-9 flex-wrap items-center gap-3">
+      <span className="w-20 shrink-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        {label}
+      </span>
+      {children}
+    </div>
+  );
+}
+
+/**
+ * The tri-state toggle (4.1). A segmented control rather than three buttons or a
+ * switch: the three positions are mutually exclusive settings, all three are
+ * always meaningful, and the current one has to be readable at a glance.
+ *
+ * Real `<button>` elements inside a radiogroup, so keyboard and screen-reader
+ * users get the same three choices (CORE-A11Y-004).
+ */
+function IntentToggle({
+  value,
+  blockedReason,
+  readOnly,
+  pending,
+  onChange,
+}: {
+  value: PbmListingIntent;
+  blockedReason: string | null;
+  readOnly: boolean;
+  pending: boolean;
+  onChange: (intent: PbmListingIntent) => void;
+}): React.JSX.Element {
+  return (
+    <>
+      <div
+        role="radiogroup"
+        aria-label="Pinball Map listing intent"
+        className="inline-flex overflow-hidden rounded-lg border border-outline-variant"
+        data-testid="pbm-listing-intent"
+      >
+        {INTENT_OPTIONS.map((option) => {
+          const selected = option.value === value;
+          // Only the On position is ever blocked by availability (6.2); Off and
+          // Don't sync are always reachable, which is what makes the block a
+          // guard rather than a trap.
+          const blocked = option.value === "on" && blockedReason !== null;
+          return (
+            <button
+              key={option.value}
+              type="button"
+              role="radio"
+              aria-checked={selected}
+              disabled={readOnly || pending || (blocked && !selected)}
+              onClick={() => {
+                if (!selected) onChange(option.value);
+              }}
+              data-testid={`pbm-listing-intent-${option.value}`}
+              className={cn(
+                "px-3 py-1.5 text-xs whitespace-nowrap transition-colors",
+                "border-l border-outline-variant first:border-l-0",
+                selected
+                  ? "bg-primary/15 font-semibold text-primary"
+                  : "text-muted-foreground hover:bg-muted/50",
+                "disabled:pointer-events-none disabled:opacity-40"
+              )}
+            >
+              {option.label}
+            </button>
+          );
+        })}
+      </div>
+      {blockedReason !== null && value !== "on" ? (
+        <span
+          className="text-xs text-muted-foreground"
+          data-testid="pbm-listing-blocked-reason"
+        >
+          {blockedReason}
+        </span>
+      ) : null}
+    </>
+  );
+}
+
+/**
+ * Amber where somebody has to act or look, a check where intent and lineup
+ * agree, a neutral pin otherwise. Decorative — the sentence beside it carries
+ * the meaning, so nothing here is colour-only (CORE-A11Y).
+ */
+function StatusIcon({ view }: { view: PbmListingView }): React.JSX.Element {
+  if (view.outOfSync || view.advisory === "alert") {
     return (
       <TriangleAlert
         aria-hidden="true"
-        className="mt-0.5 size-4 shrink-0 text-warning"
+        className="size-4 shrink-0 text-warning"
       />
     );
   }
-  if (state === "listed") {
+  if (view.name === "on" || view.name === "shared" || view.name === "flag") {
     return (
       <CheckCircle2
         aria-hidden="true"
-        className="mt-0.5 size-4 shrink-0 text-success"
+        className="size-4 shrink-0 text-success"
       />
     );
   }
   return (
     <MapPin
       aria-hidden="true"
-      className="mt-0.5 size-4 shrink-0 text-muted-foreground"
+      className="size-4 shrink-0 text-muted-foreground"
     />
   );
 }
 
 /**
- * One sentence per state, saying what is true rather than what to press.
+ * One sentence per state, saying what is true rather than what to press
+ * (spec 4.2, 4.8 — "listing" never appears; the object is an entry, the set is
+ * the lineup).
  *
- * "Our location's lineup" instead of "APC's lineup" or a bare "listed": the
- * thing being described is a row on someone else's public map, and every one of
- * these sentences has to survive being read by someone who has never heard of
- * an lmx. The word never appears (settled vocabulary, §4 of the refresher).
+ * Without credentials the sentence carries the action as a link out to Pinball
+ * Map instead (4.4): a control that cannot perform its action must not be shown
+ * (CORE-ARCH-012).
  */
-function statusCopy(
-  state: PbmListingState,
-  listed: boolean,
-  rivals: readonly string[]
-): string {
-  switch (state) {
-    case "unmatched":
-      return "No model set yet, so there's nothing to list on Pinball Map.";
-    case "not_on_pbm":
-      return "Marked as not on Pinball Map, so it can't be listed there.";
-    case "unsynced":
-      return listed
-        ? "Listed on Pinball Map — PinPoint hasn't read their lineup yet, so this hasn't been checked against it."
-        : "PinPoint hasn't read Pinball Map's lineup yet, so this machine's listing there is unknown.";
-    case "not_listed":
-      return "Not on our location's lineup on Pinball Map.";
-    case "unclaimed_on_pbm":
-      return "Pinball Map shows this game on our location's lineup, but PinPoint isn't holding that listing yet. The next sync will pick this up on its own.";
-    // Names the other cabinets and says what breaks the tie, because "PinPoint
-    // won't choose" is only actionable if you know the choice is yours and
-    // where the alternative lives (Tim, 2026-08-14).
-    case "unclaimed_tie":
-      return `Pinball Map shows this game on our location's lineup, but ${describeRivals(rivals)} could hold that listing and PinPoint won't guess between them. Claim it here to settle it on this machine, or claim it on ${rivals.length === 1 ? "the other one" : "one of the others"} instead.`;
-    // The availability contradiction, stated as the contradiction: the entry is
-    // live on a public map for a game we record as not on the floor.
-    case "unclaimed_unavailable":
-      return "Pinball Map shows this game on our location's lineup, but no cabinet of it is on the floor — every one is marked as not yet arrived or removed. Their entry is out of date and should come down; PinPoint can't do it from here because the listing isn't ours to remove. Use the Pinball Map link above.";
-    case "unclaimed_elsewhere":
-      return `Pinball Map shows this game on our location's lineup, and that listing belongs to ${describeRivals(rivals)}. Nothing to do here.`;
-    case "listed":
-      return "Listed on our location's lineup on Pinball Map.";
-    case "missing_on_pbm":
-      return "PinPoint has this listed, but it isn't on Pinball Map's lineup — someone removed it there.";
+function statusSentence(
+  view: PbmListingView,
+  locationUrl: string,
+  canWriteOut: boolean
+): React.ReactNode {
+  const sub = (text: string): React.JSX.Element => (
+    <span className="text-muted-foreground">{text}</span>
+  );
+  const linkOut = (text: string): React.JSX.Element => (
+    <>
+      {" "}
+      <a
+        href={locationUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-primary underline underline-offset-2 hover:no-underline"
+      >
+        {text}
+      </a>
+      , then Refresh to update.
+    </>
+  );
+
+  switch (view.name) {
+    case "no_model":
+      return (
+        <>
+          No model set. {sub("Set a model to add this machine to Pinball Map.")}
+        </>
+      );
+    case "uncataloged":
+      return <>Uncataloged game — not in Pinball Map&apos;s catalog.</>;
+    case "waiting":
+      return sub("Waiting for the first Pinball Map refresh.");
+    case "sync_off":
+      return (
+        <>
+          {view.observed
+            ? "On the location's lineup."
+            : "Not on the location's lineup."}{" "}
+          {sub("Sync off — differences not flagged.")}
+        </>
+      );
+    case "on":
+      return <>On the location&apos;s lineup.</>;
+    case "shared":
+      // Composed as elements rather than an interpolated string: the sibling
+      // names are links, so they cannot go through `sub`'s string argument.
+      return (
+        <>
+          On the location&apos;s lineup.{" "}
+          <span className="text-muted-foreground">
+            Shared with {nameSiblings(view.coveredBy)} — comments sync to all.
+          </span>
+        </>
+      );
+    case "covered":
+      return (
+        <>On the location&apos;s lineup via {nameSiblings(view.coveredBy)}.</>
+      );
+    case "off":
+    case "blocked":
+      return <>Not on the location&apos;s lineup.</>;
+    case "alert":
+      return (
+        <>
+          On the location&apos;s lineup.{" "}
+          {sub("Pinball Map only allows entries for games that are present.")}
+        </>
+      );
+    case "flag":
+      return (
+        <>
+          On the location&apos;s lineup.{" "}
+          {sub(
+            `Note: ${view.advisoryDetail ?? "away"} — if it will be away more than a week, consider removing it from the lineup.`
+          )}
+        </>
+      );
+    case "missing":
+      return (
+        <>
+          Not on the location&apos;s lineup.
+          {canWriteOut ? null : linkOut("Add it on Pinball Map")}
+        </>
+      );
+    case "lingering":
+      return (
+        <>
+          Still on the location&apos;s lineup.
+          {canWriteOut ? null : linkOut("Remove it on Pinball Map")}
+        </>
+      );
   }
 }
 
+/** "AFM", "AFM and MM", "AFM, MM and TZ" — the sibling cabinets, by initials. */
+function nameSiblings(siblings: readonly PbmSibling[]): React.ReactNode {
+  if (siblings.length === 0) return "another cabinet";
+  const links = siblings.map((s) => (
+    <a
+      key={s.id}
+      href={`/m/${s.initials}`}
+      className="text-primary underline underline-offset-2 hover:no-underline"
+    >
+      {s.initials}
+    </a>
+  ));
+  if (links.length === 1) return links[0];
+  return (
+    <>
+      {links.slice(0, -1).map((link, i) => (
+        <span key={siblings[i]?.id ?? i}>
+          {link}
+          {i < links.length - 2 ? ", " : " "}
+        </span>
+      ))}
+      and {links[links.length - 1]}
+    </>
+  );
+}
+
 /**
- * "AFM", "AFM or SM", "AFM, SM or BK" — the other cabinets of the same title.
+ * The remove confirmation's consequence line (4.6): the entry's comment count
+ * and what happens to it, stated accurately.
  *
- * Falls back to a count when the caller could not resolve names, which is
- * better than an empty phrase but is not expected in practice: the Manage page
- * queries the group it passes.
+ * A null count means the lineup has not been read recently enough to know. It
+ * says so rather than showing a number it cannot stand behind (CORE-ARCH-012).
  */
-function describeRivals(rivals: readonly string[]): string {
-  if (rivals.length === 0) return "another cabinet";
-  if (rivals.length === 1) return `this one and ${rivals[0] ?? ""}`.trim();
-  const last = rivals[rivals.length - 1] ?? "";
-  return `this one, ${rivals.slice(0, -1).join(", ")} or ${last}`;
+function removeConsequence(commentCount: number | null): string | null {
+  if (commentCount === null) {
+    return "PinPoint could not read this entry's comments just now, so it can't say how many would be lost. Refresh first if that matters.";
+  }
+  if (commentCount === 0) return null;
+  const plural = commentCount === 1 ? "comment" : "comments";
+  return `The entry has ${String(commentCount)} ${plural}. They are recoverable only if the game is re-added within 7 days; after that the history is permanently lost.`;
+}
+
+interface ConfirmCopy {
+  title: string;
+  body: string;
+  action: string;
+  consequence?: string | null;
+}
+
+/** Pushes confirm before acting, naming the game and the public effect (4.5). */
+function ConfirmButton({
+  copy,
+  onConfirm,
+  pending,
+  testId,
+  label,
+  destructive = false,
+}: {
+  copy: ConfirmCopy;
+  onConfirm: () => void;
+  pending: boolean;
+  testId: string;
+  label: string;
+  destructive?: boolean;
+}): React.JSX.Element {
+  return (
+    <AlertDialog>
+      <AlertDialogTrigger asChild>
+        <Button
+          variant="outline"
+          size="sm"
+          loading={pending}
+          data-testid={testId}
+        >
+          {label}
+        </Button>
+      </AlertDialogTrigger>
+      <AlertDialogContent data-testid={`${testId}-confirm`}>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{copy.title}</AlertDialogTitle>
+          <AlertDialogDescription>{copy.body}</AlertDialogDescription>
+        </AlertDialogHeader>
+        {copy.consequence != null ? (
+          <p
+            className="rounded-r-md border-l-[3px] border-warning bg-warning-container/40 px-3 py-2 text-sm text-on-warning-container"
+            data-testid={`${testId}-consequence`}
+          >
+            {copy.consequence}
+          </p>
+        ) : null}
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={pending}>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            type="button"
+            variant={destructive ? "destructive" : "default"}
+            disabled={pending}
+            onClick={onConfirm}
+          >
+            {copy.action}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
 }

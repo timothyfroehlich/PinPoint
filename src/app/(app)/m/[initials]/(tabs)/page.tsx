@@ -16,10 +16,7 @@ import {
 import { getMachineForLayout } from "../_data";
 import { pinballmapLocationUrl } from "~/lib/pinballmap/public-url";
 import { getPinballMapState } from "~/lib/pinballmap/state";
-import {
-  derivePbmMachineStatus,
-  isActionableDesync,
-} from "~/lib/pinballmap/status";
+import { derivePbmListingView } from "~/lib/pinballmap/listing-state";
 import { listAbandonedForMachine } from "~/lib/pinballmap/abandoned-listings";
 import { getCatalogEntry } from "~/lib/pinballmap/catalog";
 import { InfoHero } from "./info-hero";
@@ -133,17 +130,35 @@ export default async function MachineInfoTab({
   // public QR-scan landing pays for neither. The snapshot is a location-wide
   // singleton; the abandonment query is machine-scoped.
   const pbmState = canDiagnose ? await getPinballMapState() : null;
-  const desynced = isActionableDesync(
-    derivePbmMachineStatus({
-      pinballmapMachineId: machine.pinballmapMachineId,
-      pinballmapListed: machine.pinballmapListed,
-      pinballmapLmxId: machine.pinballmapLmxId,
-      snapshot: pbmState?.snapshotJson ?? null,
-    })
-  );
+  const snapshot = pbmState?.snapshotJson ?? null;
+  // Siblings are not queried here. The Info tab needs two facts — is the title
+  // on the lineup, and does anything disagree — and neither depends on who else
+  // covers it: coverage only ever turns Lingering into the quiet Covered state,
+  // and Covered is not an out-of-sync state. Passing no siblings is therefore
+  // the conservative read, not a shortcut. (The Manage tab, which renders the
+  // coverage sentences, does query them.)
+  const listingView = derivePbmListingView({
+    machineId: machine.id,
+    pinballmapMachineId: machine.pinballmapMachineId,
+    pinballmapExcluded: machine.pinballmapExcluded,
+    intent: machine.pinballmapIntent,
+    presenceStatus: machine.presenceStatus,
+    snapshot,
+    siblings: [],
+  });
   const configIssue =
     canDiagnose &&
-    (desynced || (await listAbandonedForMachine(machine.id)).length > 0);
+    (listingView.outOfSync ||
+      (await listAbandonedForMachine(machine.id)).length > 0);
+
+  // The Manage tab gates on `machines.edit`, which is a narrower grant than
+  // `diagnose` — so a member who can see the warning may not be able to open
+  // the page it would link to.
+  const canOpenManage = checkPermission(
+    "machines.edit",
+    accessLevel,
+    ownershipContext
+  );
 
   const rail = (
     <InfoRail
@@ -154,9 +169,9 @@ export default async function MachineInfoTab({
       modelName={modelName}
       pinballmap={{
         locationUrl: pinballmapLocationUrl(),
-        listed: machine.pinballmapListed,
+        onLineup: listingView.observed,
         configIssue,
-        manageHref: `/m/${machine.initials}/edit`,
+        manageHref: canOpenManage ? `/m/${machine.initials}/edit` : null,
       }}
     />
   );

@@ -1,7 +1,10 @@
 import type { MachinePbmColumns } from "~/services/machines";
 
 import { getCatalogEntry } from "./catalog";
+import type { PbmListingIntent } from "./listing-state";
 import { validatePbmLinkSelection } from "./linking";
+import { findLmxForMachine } from "./resolve-lmx";
+import { getPinballMapState } from "./state";
 
 /** The submitted link selection. Listing state is never part of it (PP-o355.29). */
 export interface PbmLinkSelection {
@@ -28,8 +31,7 @@ export interface PbmLinkSelection {
 /** The stored machine's PBM state, read from the row — never from a request. */
 export interface StoredPbmLinkState {
   pinballmapMachineId: number | null;
-  pinballmapListed: boolean;
-  pinballmapLmxId: number | null;
+  pinballmapIntent: PbmListingIntent;
 }
 
 /** A live PinballMap entry the machine no longer claims (PP-l81u). */
@@ -58,8 +60,7 @@ export async function resolvePbmLinkColumnsForCreate(
 ): Promise<ResolvePbmLinkResult> {
   return resolveCore(input, {
     pinballmapMachineId: null,
-    pinballmapListed: false,
-    pinballmapLmxId: null,
+    pinballmapIntent: "off",
   }).then((result) =>
     result.ok ? { ok: true, columns: result.columns } : result
   );
@@ -109,41 +110,49 @@ async function resolveCore(
     };
   }
 
-  // Carry the stored listing only while the link target is unchanged. Every
-  // other outcome — re-target, excluded, unlinked — leaves the old listing
-  // meaningless for this machine.
+  // Intent survives only while the link target is unchanged. Every other
+  // outcome — re-target, excluded, unlinked — leaves the old decision attached
+  // to a title this cabinet no longer claims (spec 2.3).
   const linkUnchanged =
     pinballmapMachineId !== null &&
     pinballmapMachineId === stored.pinballmapMachineId;
-  const keepsListing = linkUnchanged && stored.pinballmapListed;
 
-  // The stored listing survives only when the link target is unchanged. Every
-  // other outcome leaves a LIVE entry on pinballmap.com that this machine no
-  // longer claims — that is the thing to write down, not discard (PP-l81u).
+  // A Don't-sync setting is kept across a re-match (spec 2.3): it says "leave
+  // this cabinet out of the integration", which is a standing preference about
+  // the cabinet rather than a claim about one title. On does not survive — it
+  // would silently assert the NEW title belongs on the lineup, which is the
+  // automatic intent change 5.1 forbids.
+  const carriedIntent: PbmListingIntent = linkUnchanged
+    ? stored.pinballmapIntent
+    : stored.pinballmapIntent === "no_sync"
+      ? "no_sync"
+      : "off";
+
+  // Walking away from a title while intent was On leaves a LIVE entry on
+  // pinballmap.com that this machine no longer claims — that is the thing to
+  // write down, not discard (PP-l81u).
+  //
+  // The lmx is resolved from the stored lineup by the OLD title rather than
+  // read off the machine row: there is no per-machine handle any more (the
+  // column was a per-cabinet copy of a per-entry fact), and the snapshot is the
+  // one answer that cannot disagree with itself.
   const abandoned: AbandonedListing | null =
-    !keepsListing &&
-    stored.pinballmapListed &&
-    stored.pinballmapLmxId !== null &&
+    !linkUnchanged &&
+    stored.pinballmapIntent === "on" &&
     stored.pinballmapMachineId !== null
-      ? {
-          lmxId: stored.pinballmapLmxId,
-          pinballmapMachineId: stored.pinballmapMachineId,
-        }
+      ? await resolveAbandonedEntry(stored.pinballmapMachineId)
       : null;
 
   const empty: MachinePbmColumns = {
     pinballmapMachineId: null,
     pinballmapExcluded: false,
     pinballmapExcludedReason: null,
-    // Listing presupposes a link — only the linked branch below can set it true,
-    // so every not-linked outcome unlists the machine.
-    pinballmapListed: false,
-    // The lmx describes a live PBM listing, so it cannot outlive one. Clearing
-    // it here is also what keeps the two lmx CHECK constraints satisfiable.
-    pinballmapLmxId: null,
-    // Same reasoning, different CHECK: `machines_model_name_requires_excluded`
-    // forbids a hand-entered model on anything but an excluded machine, so the
-    // linked and unlinked branches below must leave this null.
+    // Intent On presupposes a link — only the linked branch below can keep it,
+    // so every not-linked outcome lands on Off (or a carried Don't sync).
+    pinballmapIntent: carriedIntent === "no_sync" ? "no_sync" : "off",
+    // `machines_model_name_requires_excluded` forbids a hand-entered model on
+    // anything but an excluded machine, so the linked and unlinked branches
+    // below must leave this null or the UPDATE throws.
     modelName: null,
     manufacturer: null,
     year: null,
@@ -184,8 +193,7 @@ async function resolveCore(
       columns: {
         ...empty,
         pinballmapMachineId,
-        pinballmapListed: keepsListing,
-        pinballmapLmxId: keepsListing ? stored.pinballmapLmxId : null,
+        pinballmapIntent: carriedIntent,
         manufacturer: entry.manufacturer,
         year: entry.year,
         opdbId: entry.opdbId,
@@ -197,4 +205,23 @@ async function resolveCore(
 
   // Neither linked nor excluded (requirement off): all PBM columns stay empty.
   return { ok: true, columns: empty, abandoned };
+}
+
+/**
+ * The lineup entry a cabinet is walking away from, if the stored lineup still
+ * shows one for its old title.
+ *
+ * Returns null when there is no snapshot or the title is not on it — in both
+ * cases there is no entry to record, and inventing an abandonment for one would
+ * put a warning on the machine's page pointing at nothing (CORE-ARCH-012).
+ */
+async function resolveAbandonedEntry(
+  oldPinballmapMachineId: number
+): Promise<AbandonedListing | null> {
+  const state = await getPinballMapState();
+  const snapshot = state?.snapshotJson ?? null;
+  if (!snapshot) return null;
+  const lmx = findLmxForMachine(snapshot, oldPinballmapMachineId);
+  if (!lmx) return null;
+  return { lmxId: lmx.id, pinballmapMachineId: oldPinballmapMachineId };
 }

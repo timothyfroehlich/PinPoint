@@ -12,7 +12,7 @@
 
 "use server";
 
-import { and, eq, ne } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { createClient } from "~/lib/supabase/server";
 import { db, type Tx } from "~/server/db";
@@ -35,12 +35,15 @@ import {
   getPinballMapState,
   syncLocationSnapshot,
 } from "~/lib/pinballmap/state";
-import { PBM_MANUAL_SYNC_MIN_INTERVAL_MS } from "~/lib/pinballmap/config";
+import { PBM_REFRESH_REFILL_MS } from "~/lib/pinballmap/config";
+import {
+  getMachinePresenceLabel,
+  type MachinePresenceStatus,
+} from "~/lib/machines/presence";
 import { findLmxForMachine } from "~/lib/pinballmap/resolve-lmx";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import { createMachineTimelineEvent } from "~/lib/timeline/machine-events";
-import { isPgErrorCode } from "~/lib/db/postgres-errors";
-import { pbmListingConflictMessage } from "~/lib/pinballmap/listing-conflict";
+import type { PbmListingIntent } from "~/lib/pinballmap/listing-state";
 import { type Result, ok, err } from "~/lib/result";
 
 export type { CatalogEdition, CatalogFamily } from "~/lib/pinballmap/catalog";
@@ -135,19 +138,23 @@ export async function resolvePinballMapLinkAction(
  * machine, and confirm the caller holds `permission` on it. Returns the machine
  * row when permitted, or a failed Result to short-circuit the caller.
  *
- * The caller chooses the gate, because the two halves of the listing controls
- * are deliberately different capabilities: `machines.pinballmap.link` for the
- * read-side capture actions (link / verify — no PBM write, so owner-own-machine
- * / technician / admin), and `machines.pinballmap.push` for the outbound writes
- * that change what PinballMap shows the public.
+ * The caller chooses the gate, because the two halves of the control are
+ * deliberately different capabilities: `machines.pinballmap.link` for setting
+ * intent, which writes only to PinPoint, and `machines.pinballmap.push` for the
+ * outbound writes that change what Pinball Map shows the public. Both resolve to
+ * the same tier today (spec 8.1/8.2) — they are kept separate because the
+ * credential requirement is not the same, and because a future tightening of one
+ * should not silently move the other.
  *
- * The machine must already carry a catalog link (`pinballmapMachineId`); a
- * listing handle presupposes a title (schema CHECK), and we resolve the lmx by
- * that title against the stored lineup.
+ * `requireLink` defaults to true: everything that touches the lineup resolves
+ * its entry by catalog title against the stored snapshot, so a machine with no
+ * title has nothing to act on. Setting intent Off or Don't sync is the exception
+ * and passes false.
  */
 async function authorizeListingAction(
   formData: FormData,
-  permission: "machines.pinballmap.link" | "machines.pinballmap.push"
+  permission: "machines.pinballmap.link" | "machines.pinballmap.push",
+  opts?: { requireLink?: boolean }
 ): Promise<
   | { ok: true; userId: string; machine: typeof machines.$inferSelect }
   | { ok: false; result: ListingActionError }
@@ -169,12 +176,12 @@ async function authorizeListingAction(
   });
   if (!machine)
     return { ok: false, result: err("NOT_FOUND", "Machine not found") };
-  if (machine.pinballmapMachineId === null)
+  if ((opts?.requireLink ?? true) && machine.pinballmapMachineId === null)
     return {
       ok: false,
       result: err(
         "VALIDATION",
-        "Machine isn't linked to a PinballMap title yet"
+        "Machine isn't linked to a Pinball Map title yet"
       ),
     };
 
@@ -201,104 +208,87 @@ type ListingActionError = Result<
   "VALIDATION" | "UNAUTHORIZED" | "NOT_FOUND"
 >;
 
-export type LinkPinballmapResult = Result<
-  { lmxId: number },
-  "VALIDATION" | "UNAUTHORIZED" | "NOT_FOUND" | "ABSENT" | "SERVER"
+export type SetPinballmapIntentResult = Result<
+  { intent: PbmListingIntent },
+  "VALIDATION" | "UNAUTHORIZED" | "NOT_FOUND" | "BLOCKED"
 >;
 
+/** Availability that forbids intent On (spec 6.2). Mirrors `listing-state.ts`. */
+const INTENT_ON_BLOCKED_BY: readonly MachinePresenceStatus[] = [
+  "pending_arrival",
+  "removed",
+];
+
 /**
- * Capture the durable PinballMap listing handle (lmx) for a machine already on
- * PinballMap's public lineup — the "Link to this entry" action for APC's
- * already-listed fleet (state 2 → state 3). Read-only: it resolves the lmx from
- * the STORED location snapshot (PP-o355.16), never a per-render PBM call
- * (CORE-PBM-001); it syncs once only if we've never fetched a lineup. No PBM
- * *write* happens here — this is the anonymous, token-free half of the split.
+ * Set a machine's listing intent — the tri-state toggle (spec 4.1, 8.1).
  *
- * On success: stores `pinballmapLmxId` + flips `pinballmapListed` true, mirrors
- * a `linked` timeline event, and returns the captured lmx. ABSENT means the
- * title isn't on our location's lineup yet (nothing to link — list it instead).
+ * Local only: nothing is sent to Pinball Map, so this needs no operator
+ * credential and no confirmation, and it is instantly reversible. Whether the
+ * lineup then agrees is a separate observation the control renders beside it,
+ * and a separate push to resolve (4.3).
+ *
+ * Refuses On while availability is pending arrival or removed (6.2). The control
+ * already disables that position, so reaching here means a stale page or a
+ * direct call; refusing beats writing a row the DB would have to allow and the
+ * UI would then have to explain.
+ *
+ * The reverse direction is deliberately NOT guarded: changing availability on an
+ * intent-On machine is allowed and renders the Alert state (6.2). Availability
+ * never rewrites intent, and intent never rewrites availability (6.1).
  */
-export async function linkPinballmapEntryAction(
-  _prev: LinkPinballmapResult | undefined,
+export async function setPinballmapIntentAction(
+  _prev: SetPinballmapIntentResult | undefined,
   formData: FormData
-): Promise<LinkPinballmapResult> {
+): Promise<SetPinballmapIntentResult> {
+  const raw = formData.get("intent");
+  const intent =
+    raw === "on" || raw === "off" || raw === "no_sync" ? raw : null;
+  if (intent === null) return err("VALIDATION", "Unknown listing setting");
+
   const authed = await authorizeListingAction(
     formData,
-    "machines.pinballmap.link"
+    "machines.pinballmap.link",
+    // Off and Don't sync are meaningful without a catalog title — they both say
+    // "this cabinet is not going on the lineup". Only On presupposes one.
+    { requireLink: intent === "on" }
   );
   if (!authed.ok) return authed.result;
   const { userId, machine } = authed;
-  // Narrowed by authorizeListingAction, but re-assert for the type checker.
-  if (machine.pinballmapMachineId === null)
-    return err("VALIDATION", "Machine isn't linked to a PinballMap title yet");
 
-  // Idempotency guard: an already-listed + linked machine must not be re-linked.
-  // A direct re-submit would rewrite the row and append a duplicate `linked`
-  // timeline event; no-op back to the captured handle instead (state 3 is a
-  // fixed point — nothing to capture that isn't already captured).
-  if (machine.pinballmapListed && machine.pinballmapLmxId !== null)
-    return ok({ lmxId: machine.pinballmapLmxId });
+  if (machine.pinballmapIntent === intent) return ok({ intent });
 
-  // Read the freshest stored lineup; sync once if we've never captured one.
-  let state = await getPinballMapState();
-  if (!state?.snapshotJson) {
-    await syncLocationSnapshot({ updatedBy: userId, trigger: "manual" });
-    state = await getPinballMapState();
-  }
-  const snapshot = state?.snapshotJson;
-  if (!snapshot) return err("SERVER", "Pinball Map lineup unavailable");
-
-  const lmx = findLmxForMachine(snapshot, machine.pinballmapMachineId);
-  if (!lmx)
+  if (
+    intent === "on" &&
+    INTENT_ON_BLOCKED_BY.includes(machine.presenceStatus)
+  ) {
     return err(
-      "ABSENT",
-      "This machine isn't on PinballMap's lineup for our location yet"
+      "BLOCKED",
+      `Current Availability (${getMachinePresenceLabel(machine.presenceStatus)}) disallows adding to the lineup.`
     );
-
-  try {
-    await db.transaction(async (tx) => {
-      await tx
-        .update(machines)
-        .set({ pinballmapLmxId: lmx.id, pinballmapListed: true })
-        .where(eq(machines.id, machine.id));
-      await retireAbandonmentForLmx(tx, lmx.id);
-      await createMachineTimelineEvent(
-        machine.id,
-        {
-          sourceType: "lifecycle",
-          tag: "lifecycle",
-          eventData: {
-            kind: "pinballmap_listing",
-            action: "linked",
-            lmxId: lmx.id,
-          },
-          actorId: userId,
-        },
-        tx
-      );
-    });
-  } catch (error) {
-    // Partial-unique (one lister per title at our location): a duplicate cabinet
-    // of this title is already the lister. VALIDATION, not SERVER — the user can
-    // fix it by unlisting the other cabinet, and `SERVER` makes the UI treat a
-    // correctable condition as a crash (PP-o355.15).
-    //
-    // The bare code is unambiguous here: this write touches only the listing
-    // columns, so the listing index is the sole unique constraint it can
-    // violate. This is the one action that reaches this collision in normal
-    // use — create can't (it never lists), and the edit carry-over only rewrites
-    // a value its own row already holds.
-    if (isPgErrorCode(error, "23505")) {
-      return err(
-        "VALIDATION",
-        await pbmListingConflictMessage(machine.pinballmapMachineId, machine.id)
-      );
-    }
-    throw error;
   }
+
+  await db.transaction(async (tx) => {
+    await tx
+      .update(machines)
+      .set({ pinballmapIntent: intent })
+      .where(eq(machines.id, machine.id));
+    await createMachineTimelineEvent(
+      machine.id,
+      {
+        sourceType: "lifecycle",
+        tag: "lifecycle",
+        eventData: { kind: "pinballmap_intent", intent },
+        actorId: userId,
+      },
+      tx
+    );
+  });
 
   revalidatePath(`/m/${machine.initials}`);
-  return ok({ lmxId: lmx.id });
+  // Coverage is a property of the whole same-title group, so a sibling's page
+  // reads differently now — it may have just gained or lost its cover (4.7).
+  revalidatePath("/m", "layout");
+  return ok({ intent });
 }
 
 /**
@@ -347,7 +337,7 @@ async function classifyRemoveNotFound(args: {
 
   const isFresh = (syncedAt: Date | null): boolean =>
     syncedAt !== null &&
-    Date.now() - syncedAt.getTime() < PBM_MANUAL_SYNC_MIN_INTERVAL_MS;
+    Date.now() - syncedAt.getTime() < PBM_REFRESH_REFILL_MS;
 
   if (!isFresh(snapshotSyncedAt)) {
     // Outcome is deliberately ignored: `throttled` means a concurrent refresh
@@ -430,33 +420,6 @@ async function editStoredSnapshot(
     .where(eq(pinballmapState.id, "singleton"));
 }
 
-/**
- * The other cabinet of `pinballmapMachineId` that already holds this title's
- * listing, if any.
- *
- * Checked BEFORE the PBM write, not just via the 23505 backstop after it.
- * `addMachine` is find-or-create, so when the incumbent's listing is itself
- * desynced (`listed_locally_absent_on_pbm` — someone deleted the entry on
- * pinballmap.com) the POST genuinely CREATES a row on PBM's public lineup; the
- * local transaction then trips `machines_pinballmap_listed_unique` and rolls
- * everything back, orphaning a listing PinPoint has no handle for. Refusing up
- * front also avoids spending a PBM write on a request we already know we will
- * decline (CORE-PBM-001).
- */
-async function findListingIncumbent(
-  pinballmapMachineId: number,
-  excludeMachineId: string
-): Promise<{ id: string } | undefined> {
-  return db.query.machines.findFirst({
-    where: and(
-      eq(machines.pinballmapMachineId, pinballmapMachineId),
-      eq(machines.pinballmapListed, true),
-      ne(machines.id, excludeMachineId)
-    ),
-    columns: { id: true },
-  });
-}
-
 export type ListPinballmapResult = Result<
   { lmxId: number },
   | "VALIDATION"
@@ -468,22 +431,31 @@ export type ListPinballmapResult = Result<
 >;
 
 /**
- * Add a matched machine to PinballMap's lineup for our location and capture the
- * lmx PBM mints (PP-o355.30). The genuine outbound write — distinct from
- * `linkPinballmapEntryAction`, which only captures a handle for an entry PBM
- * already shows.
+ * Add a machine's title to the location's Pinball Map lineup (spec 4.3), and
+ * record the entry PBM mints or hands back.
  *
- * Gated on `machines.pinballmap.push` (CORE-ARCH-008).
+ * Offered only from the Missing state — intent is already On and the lineup does
+ * not agree — so this action does NOT touch intent. That separation is the point
+ * of the two-line control: the toggle says what should be true, the push makes
+ * Pinball Map match, and neither silently performs the other.
+ *
+ * Gated on `machines.pinballmap.push` plus provisioned credentials (spec 8.2,
+ * CORE-ARCH-008).
  *
  * **Ordering is a hard requirement, not a style choice** (CORE-ARCH-011). Two
  * non-transactional effects run first — decrypting the operator credential and
  * the PBM HTTP call — and only their results enter the transaction. A tripwire
  * throws `SideEffectInTransactionError` if either is moved inside it.
  *
- * On a PBM rejection nothing is written locally: a listing we could not create
+ * On a PBM rejection nothing is written locally: an entry we could not create
  * must not be reported as created (CORE-ARCH-012).
+ *
+ * There is no incumbent check any more. Under the coverage model several
+ * same-title cabinets may be On at once and PBM's add is find-or-create, so a
+ * second cabinet pressing Add gets the existing entry back — which is the
+ * correct outcome, not a collision to refuse.
  */
-export async function listMachineOnPinballMapAction(
+export async function addMachineToPinballMapAction(
   _prev: ListPinballmapResult | undefined,
   formData: FormData
 ): Promise<ListPinballmapResult> {
@@ -495,22 +467,17 @@ export async function listMachineOnPinballMapAction(
   const { userId, machine } = authed;
   const titleId = machine.pinballmapMachineId;
   if (titleId === null)
-    return err("VALIDATION", "Machine isn't linked to a PinballMap title yet");
-
-  // Idempotent: a machine already holding a listing has nothing to add.
-  if (machine.pinballmapListed && machine.pinballmapLmxId !== null)
-    return ok({ lmxId: machine.pinballmapLmxId });
+    return err("VALIDATION", "Machine isn't linked to a Pinball Map title yet");
 
   const state = await getPinballMapState();
   if (!state) return err("SERVER", "Pinball Map isn't configured yet");
 
-  // One lister per title. Refuse BEFORE the PBM write — see
-  // `findListingIncumbent` for why the 23505 backstop alone is not enough here.
-  if (await findListingIncumbent(titleId, machine.id))
-    return err(
-      "VALIDATION",
-      await pbmListingConflictMessage(titleId, machine.id)
-    );
+  // Idempotent: the lineup already carries this title, so there is nothing to
+  // add and the entry it already has is the answer.
+  const existing = state.snapshotJson
+    ? findLmxForMachine(state.snapshotJson, titleId)
+    : null;
+  if (existing) return ok({ lmxId: existing.id });
 
   // --- non-transactional effects, both BEFORE the transaction ---
   const credentials = await getPinballMapWriteCredentials();
@@ -536,45 +503,31 @@ export async function listMachineOnPinballMapAction(
   const lmxId = written.lmxId;
   // --- transaction: local state only ---
 
-  try {
-    await db.transaction(async (tx) => {
-      await tx
-        .update(machines)
-        .set({ pinballmapLmxId: lmxId, pinballmapListed: true })
-        .where(eq(machines.id, machine.id));
-      // PBM returns the EXISTING lmx when the entry is already on the lineup,
-      // so an add can reclaim one a machine walked away from.
-      await retireAbandonmentForLmx(tx, lmxId);
-      await editStoredSnapshot(tx, (snapshot) =>
-        withLmxAdded(snapshot, lmxId, titleId)
-      );
-      await createMachineTimelineEvent(
-        machine.id,
-        {
-          sourceType: "lifecycle",
-          tag: "lifecycle",
-          eventData: { kind: "pinballmap_listing", action: "listed", lmxId },
-          actorId: userId,
-        },
-        tx
-      );
-    });
-  } catch (error) {
-    // One lister per title at our location. PBM's find-or-create already handed
-    // us the shared lmx, so the honest report is that another cabinet holds it.
-    if (isPgErrorCode(error, "23505")) {
-      return err(
-        "VALIDATION",
-        await pbmListingConflictMessage(titleId, machine.id)
-      );
-    }
-    throw error;
-  }
+  await db.transaction(async (tx) => {
+    // PBM returns the EXISTING lmx when the entry is already on the lineup, so
+    // an add can reclaim one a machine walked away from.
+    await retireAbandonmentForLmx(tx, lmxId);
+    // The stored lineup is what every control renders from, so it has to carry
+    // the entry we just created — otherwise the page repaints as still Missing
+    // and offers Add again, for up to an hour (CORE-ARCH-012).
+    await editStoredSnapshot(tx, (snapshot) =>
+      withLmxAdded(snapshot, lmxId, titleId)
+    );
+    await createMachineTimelineEvent(
+      machine.id,
+      {
+        sourceType: "lifecycle",
+        tag: "lifecycle",
+        eventData: { kind: "pinballmap_listing", action: "listed", lmxId },
+        actorId: userId,
+      },
+      tx
+    );
+  });
 
   revalidatePath(`/m/${machine.initials}`);
-  // The stored snapshot changed, and every machine's desync badge derives from
-  // it — a sibling cabinet of this title reads differently now (same reason
-  // `syncPinballMapNowAction` refreshes the whole subtree).
+  // The stored lineup changed, and every same-title cabinet's state derives
+  // from it — a sibling reads differently now.
   revalidatePath("/m", "layout");
   return ok({ lmxId });
 }
@@ -590,29 +543,35 @@ export type UnlistPinballmapResult = Result<
 >;
 
 /**
- * Remove a machine from PinballMap's lineup for our location and clear our
- * listing columns (PP-o355.30).
+ * Take a machine's title off the location's Pinball Map lineup (spec 4.3).
  *
- * Gated on `machines.pinballmap.push` (CORE-ARCH-008). Same ordering rule as
- * the list action: credential decrypt and PBM call before the transaction
+ * Offered from Lingering — intent is Off and the lineup still shows the entry —
+ * and from the abandoned-entry alert, where the cabinet has retitled away
+ * entirely. It does NOT touch intent, for the same reason the add action does
+ * not: the toggle is the operator's statement, this is the push that makes
+ * Pinball Map agree.
+ *
+ * **Removal does not require the entry to be covered** (4.3). An entry nobody
+ * wants is exactly the one worth taking down, and requiring coverage first would
+ * mean turning a cabinet On to remove it.
+ *
+ * Gated on `machines.pinballmap.push` plus credentials (spec 8.2). Same ordering
+ * rule as the add action: credential decrypt and PBM call before the transaction
  * (CORE-ARCH-011).
  *
  * **The stored-snapshot edit is not bookkeeping — it is the correctness of this
- * action.** Auto-link (PP-o355.20) re-lists any matched, unlisted cabinet whose
- * title appears on the stored lineup. Clearing our columns while leaving the
- * lmx in the snapshot means the next reconcile pass, or any save on this machine
- * inside the hour, silently re-lists it. Dropping the row we just deleted is
- * what makes an unlist stick.
+ * action.** Every control renders from the stored lineup, so leaving the deleted
+ * entry in it repaints the page as still Lingering and offers Remove again on an
+ * entry that is already gone (CORE-ARCH-012).
  *
- * **Which lmx we delete is also correctness**, for the same reason. PBM re-mints
- * a title's row after a delete + re-add, so the id we stored can be dead while
- * the title is still on the lineup. Deleting the dead id removes nothing, and
- * auto-link puts the cabinet straight back. Two things guard that (PP-rnup):
- * the id is resolved from the stored lineup by title rather than taken from the
- * machine row, and a `not_found` reply is checked against a freshly re-fetched
- * lineup instead of being read as "already gone" — see `classifyRemoveNotFound`.
+ * **Which lmx we delete is also correctness.** PBM re-mints a title's row after
+ * a delete plus a re-add outside their 7-day window, so a stale id deletes
+ * nothing while the title stays on the public lineup. Two things guard that
+ * (PP-rnup): the id is resolved from the stored lineup by title, and a
+ * `not_found` reply is checked against a freshly re-fetched lineup rather than
+ * read as "already gone" — see `classifyRemoveNotFound`.
  */
-export async function unlistMachineFromPinballMapAction(
+export async function removeMachineFromPinballMapAction(
   _prev: UnlistPinballmapResult | undefined,
   formData: FormData
 ): Promise<UnlistPinballmapResult> {
@@ -623,30 +582,30 @@ export async function unlistMachineFromPinballMapAction(
   if (!authed.ok) return authed.result;
   const { userId, machine } = authed;
 
-  const storedLmxId = machine.pinballmapLmxId;
-  if (!machine.pinballmapListed || storedLmxId === null)
-    return err("VALIDATION", "This machine isn't listed on Pinball Map.");
-
   const state = await getPinballMapState();
   if (!state) return err("SERVER", "Pinball Map isn't configured yet");
 
-  // Delete the lmx the lineup ACTUALLY carries, not the handle we happen to
-  // store. When PBM re-mints a row (delete + re-add outside its 7-day
-  // resurrection window) our stored id goes stale — the `lmx_drifted` state
-  // auto-link heals as `reconnected`. Unlisting on the stale id deletes nothing:
-  // PBM answers `not_found`, we clear the local flag, and the title is still on
-  // the public lineup, so the next auto-link pass re-lists the machine. The
-  // human's unlist silently un-happens and the cabinet never left PinballMap.
-  // Resolving through the snapshot by title is the same lookup auto-link uses,
-  // so the two agree on which row is live.
-  //
-  // This narrows the window; it does not close it, because the snapshot can be
-  // an hour stale and carry the same dead id as the machine row. `not_found` is
-  // where that residue is caught — see `classifyRemoveNotFound`.
+  // An explicit lmx wins: the abandoned-entry alert names an entry whose title
+  // this cabinet no longer carries, so resolving by the machine's CURRENT title
+  // would find the wrong row or none at all.
+  const explicitLmxRaw = formData.get("lmxId");
+  const explicitLmxId =
+    typeof explicitLmxRaw === "string" && /^\d+$/.test(explicitLmxRaw)
+      ? Number(explicitLmxRaw)
+      : null;
+
   const liveLmxId =
+    explicitLmxId ??
     (machine.pinballmapMachineId !== null && state.snapshotJson
-      ? findLmxForMachine(state.snapshotJson, machine.pinballmapMachineId)?.id
-      : undefined) ?? storedLmxId;
+      ? (findLmxForMachine(state.snapshotJson, machine.pinballmapMachineId)
+          ?.id ?? null)
+      : null);
+
+  if (liveLmxId === null)
+    return err(
+      "VALIDATION",
+      "That entry is not on the location's lineup, so there is nothing to remove."
+    );
 
   // --- non-transactional effects, both BEFORE the transaction ---
   const credentials = await getPinballMapWriteCredentials();
@@ -719,31 +678,28 @@ export async function unlistMachineFromPinballMapAction(
       }
     } else {
       // Confirmed absent from a lineup we just re-fetched. Finish the job
-      // rather than refuse: the desired end state (not on PBM, not listed
-      // locally) is already half-reached, and refusing would strand the
-      // machine — every retry hits the same 404 and
-      // `verifyPinballmapLinkAction` reports `stale` without clearing. Not
-      // honesty-washing (CORE-ARCH-012): we now have positive evidence of the
-      // state we are about to report, we just didn't have to do the deleting.
+      // rather than refuse: the desired end state — the entry off the lineup —
+      // is already reached, and refusing would strand the reader, since every
+      // retry hits the same 404. Not honesty-washing (CORE-ARCH-012): we now
+      // have positive evidence of the state we are about to report, we just
+      // did not have to do the deleting.
       log.info(
         {
           lmxId: deletedLmxId,
           machineId: machine.id,
           action: "pinballmap.removeMachine",
         },
-        "PinballMap lmx confirmed absent from the live lineup — clearing the local listing"
+        "PinballMap lmx confirmed absent from the live lineup — dropping it from the stored lineup"
       );
     }
   }
   // --- transaction: local state only ---
 
-  // No 23505 catch: this write only CLEARS `pinballmapListed`, and a row
-  // leaving the partial unique index cannot violate it.
+  // Intent is deliberately untouched. Removing is how the operator's existing
+  // Off decision gets carried out; writing intent here would make the push and
+  // the toggle two ways to do one thing, which is the conflation the two-line
+  // control exists to undo (spec 4.1).
   await db.transaction(async (tx) => {
-    await tx
-      .update(machines)
-      .set({ pinballmapListed: false, pinballmapLmxId: null })
-      .where(eq(machines.id, machine.id));
     await editStoredSnapshot(tx, (snapshot) =>
       withLmxRemoved(snapshot, deletedLmxId, machine.pinballmapMachineId)
     );
@@ -752,9 +708,9 @@ export async function unlistMachineFromPinballMapAction(
       {
         sourceType: "lifecycle",
         tag: "lifecycle",
-        // The lmx we actually deleted, which is the stored one except after a
-        // re-mint. Recording the stale handle would make the timeline disagree
-        // with what PinballMap saw.
+        // The lmx we actually deleted, which differs from the one we resolved
+        // when PBM had re-minted the row. Recording the stale handle would make
+        // the timeline disagree with what Pinball Map saw.
         eventData: {
           kind: "pinballmap_listing",
           action: "unlisted",
@@ -767,128 +723,43 @@ export async function unlistMachineFromPinballMapAction(
   });
 
   revalidatePath(`/m/${machine.initials}`);
-  // See the list action: the shared snapshot changed, so sibling cabinets'
-  // desync badges did too.
+  // See the add action: the shared lineup changed, so sibling cabinets read
+  // differently now.
   revalidatePath("/m", "layout");
   return ok({});
 }
 
-export type AcceptMissingListingResult = Result<
-  Record<string, never>,
-  "VALIDATION" | "UNAUTHORIZED" | "NOT_FOUND" | "SERVER"
->;
-
-/**
- * "Accept" — agree with Pinball Map that this machine is no longer on the
- * lineup, and clear our listing columns to match (PP-o355.21).
- *
- * The resolution for `missing_on_pbm`: we hold a listing, the lineup does not
- * show it, and somebody removed it over there. Nothing is sent to Pinball Map —
- * there is nothing left to delete — so this needs no operator credential and is
- * gated on `machines.pinballmap.link` (the local-bookkeeping capability) rather
- * than `push`.
- *
- * **Refusing when the title IS on the lineup is the whole safety of this
- * action.** Accepting a healthy listing would clear our columns while the entry
- * stayed live and unclaimed on the public map — and the next auto-link pass
- * would simply re-list the machine, so the click would appear to work and then
- * silently undo itself (CORE-ARCH-012). The stored snapshot can be an hour old,
- * which is fine here: this only ever fires from a control the same snapshot
- * painted, and the failure mode of a stale "still there" is a refusal the
- * reader can retry, not a wrong write.
- *
- * No snapshot edit, unlike the unlist path: the lmx we are dropping is already
- * absent from the lineup, so there is nothing to remove from our copy of it.
- */
-export async function acceptMissingPinballmapListingAction(
-  _prev: AcceptMissingListingResult | undefined,
-  formData: FormData
-): Promise<AcceptMissingListingResult> {
-  const authed = await authorizeListingAction(
-    formData,
-    "machines.pinballmap.link"
-  );
-  if (!authed.ok) return authed.result;
-  const { userId, machine } = authed;
-  const titleId = machine.pinballmapMachineId;
-  if (titleId === null)
-    return err("VALIDATION", "Machine isn't linked to a Pinball Map title yet");
-
-  const storedLmxId = machine.pinballmapLmxId;
-  if (!machine.pinballmapListed)
-    return err("VALIDATION", "This machine isn't listed on Pinball Map.");
-
-  const state = await getPinballMapState();
-  if (!state?.snapshotJson)
-    return err(
-      "SERVER",
-      "PinPoint hasn't read Pinball Map's lineup yet, so it can't confirm the listing is gone."
-    );
-
-  if (findLmxForMachine(state.snapshotJson, titleId))
-    return err(
-      "VALIDATION",
-      "This machine is still on Pinball Map's lineup, so there's nothing to accept. Use Remove from Pinball Map to take it down."
-    );
-
-  await db.transaction(async (tx) => {
-    await tx
-      .update(machines)
-      .set({ pinballmapListed: false, pinballmapLmxId: null })
-      .where(eq(machines.id, machine.id));
-    await createMachineTimelineEvent(
-      machine.id,
-      {
-        sourceType: "lifecycle",
-        tag: "lifecycle",
-        eventData: {
-          kind: "pinballmap_listing",
-          action: "accepted_removal",
-          lmxId: storedLmxId,
-        },
-        actorId: userId,
-      },
-      tx
-    );
-  });
-
-  revalidatePath(`/m/${machine.initials}`);
-  return ok({});
-}
-
-/** Result of an on-demand "Sync now" — the machine count and writes applied. */
-export type SyncPinballMapNowResult = Result<
-  {
-    machineCount: number;
-    healed: number;
-    linked: number;
-    abandonmentsCleared: number;
-  },
+export type RefreshPinballmapResult = Result<
+  { machineCount: number; abandonmentsCleared: number },
   "UNAUTHORIZED" | "SERVER" | "THROTTLED"
 >;
 
 /**
- * Manually refresh the stored PinballMap snapshot ("Sync now"), then reconcile
- * stored lmx drift. Technician+ (`machines.pinballmap.sync`, CORE-ARCH-008).
+ * Re-read what Pinball Map shows for the location — the control header's
+ * Refresh button (spec 3.2, 8.3).
  *
- * Unlike the hourly cron, this does NOT gate on `state.enabled`: it's an
- * explicit human-initiated refresh, so the human is the caller who owns the
- * decision. Rate-limiting is NOT left to "a click is naturally slow" — it's
- * enforced at the `syncLocationSnapshot` seam (`trigger: "manual"`, PP-hbi0),
- * which refuses repeat refreshes inside `PBM_MANUAL_SYNC_MIN_INTERVAL_MS` and
- * surfaces `THROTTLED` here (CORE-PBM-001). Form-action shaped
- * `(prevState, formData)` so a `<form action={...}>` + `useActionState` button
- * (control room, PP-o355.7) can drop it in directly (CORE-ARCH-005/007).
+ * Reading needs only page access, so this is gated on
+ * `machines.pinballmap.sync`, which every signed-in member holds. That is safe
+ * precisely because the rate limit does not depend on who asks: the token bucket
+ * at the `syncLocationSnapshot` seam is global, so widening the audience widens
+ * nobody's allowance (CORE-PBM-001). An empty bucket surfaces as `THROTTLED`,
+ * which the header shows as a disabled button with a countdown rather than an
+ * error nobody could have avoided.
+ *
+ * Unlike the hourly cron this does not gate on `state.enabled`: an explicit
+ * human refresh owns its own decision. Form-action shaped `(prevState,
+ * formData)` so a `useActionState` button drops it in directly
+ * (CORE-ARCH-005/007).
  */
-export async function syncPinballMapNowAction(
-  _prevState: SyncPinballMapNowResult | undefined,
+export async function refreshPinballmapLineupAction(
+  _prevState: RefreshPinballmapResult | undefined,
   _formData: FormData
-): Promise<SyncPinballMapNowResult> {
+): Promise<RefreshPinballmapResult> {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return err("UNAUTHORIZED", "Unauthorized. Please log in.");
+  if (!user) return err("UNAUTHORIZED", "Sign in required");
 
   const profile = await db.query.userProfiles.findFirst({
     where: eq(userProfiles.id, user.id),
@@ -896,13 +767,10 @@ export async function syncPinballMapNowAction(
   });
   if (!profile) return err("UNAUTHORIZED", "User profile not found.");
 
-  const accessLevel = getAccessLevel(profile.role);
-  if (!checkPermission("machines.pinballmap.sync", accessLevel)) {
-    return err(
-      "UNAUTHORIZED",
-      "Only technicians and admins can trigger a Pinball Map sync."
-    );
-  }
+  if (
+    !checkPermission("machines.pinballmap.sync", getAccessLevel(profile.role))
+  )
+    return err("UNAUTHORIZED", "Not allowed");
 
   try {
     const result = await syncLocationSnapshot({
@@ -911,26 +779,25 @@ export async function syncPinballMapNowAction(
     });
     if (!result.ok) {
       if (result.reason === "throttled") {
+        const minutes = Math.max(
+          1,
+          Math.ceil(result.retryAfterMs / (60 * 1000))
+        );
         return err(
           "THROTTLED",
-          "Pinball Map was just refreshed. Please wait a moment before syncing again."
+          `Pinball Map was refreshed recently. Try again in about ${String(minutes)} minute${minutes === 1 ? "" : "s"}.`
         );
       }
       return err("SERVER", result.error);
     }
 
-    const { healed, linked, abandonmentsCleared } = await reconcileAfterSync();
-    // Desync badges on machine Info cards derive from the stored snapshot, so
-    // refresh the whole machine subtree after a successful sync.
+    const { abandonmentsCleared } = await reconcileAfterSync();
+    // Every machine's state derives from the stored lineup, so the whole
+    // subtree is stale once it changes.
     revalidatePath("/m", "layout");
-    return ok({
-      machineCount: result.machineCount,
-      healed,
-      linked,
-      abandonmentsCleared,
-    });
+    return ok({ machineCount: result.machineCount, abandonmentsCleared });
   } catch (error: unknown) {
-    log.error({ err: error }, "Manual PinballMap sync failed");
-    return err("SERVER", "Pinball Map sync failed. Please try again.");
+    log.error({ err: error }, "Manual PinballMap refresh failed");
+    return err("SERVER", "Pinball Map refresh failed. Please try again.");
   }
 }

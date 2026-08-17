@@ -12,7 +12,6 @@ import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
 import {
   applyMachinePbmLink,
-  captureMachineAutoLink,
   createMachine,
   planMachinePbmLink,
   updateMachinePresence,
@@ -172,10 +171,9 @@ function wantsPbmLinkChange(input: {
  * `pinballmapMachineId` stays a string (the schema coerces it); the excluded
  * checkbox becomes `true`/`undefined`; a blank reason becomes `undefined`.
  *
- * `pinballmapListed` is **not** read here, on purpose — see the note in
- * `./schemas.ts` (PP-o355.29). Listing state comes from the paths that talk to
- * PinballMap, or from the stored row on the carry-over below; never from a
- * request body.
+ * Listing intent is **not** read here, on purpose — see the note in
+ * `./schemas.ts` (PP-o355.29). It comes from the toggle's own action, or from
+ * the stored row on the carry-over below; never from a request body.
  */
 function readPbmLinkFormFields(formData: FormData): {
   pinballmapMachineId: string | undefined;
@@ -663,11 +661,9 @@ export async function updateMachineAction(
         initials: true,
         presenceStatus: true,
         // Needed to decide whether an edit re-targets the PBM link — see the
-        // `pinballmapListed` carry-over at the `resolvePbmLinkColumnsForUpdate`
-        // call.
+        // intent carry-over at the `resolvePbmLinkColumnsForUpdate` call.
         pinballmapMachineId: true,
-        pinballmapListed: true,
-        pinballmapLmxId: true,
+        pinballmapIntent: true,
       },
     });
 
@@ -710,21 +706,21 @@ export async function updateMachineAction(
           "You do not have permission to link this machine to Pinball Map."
         );
       }
-      // `pinballmapListed` is not an input to this action at all: the edit form
-      // renders no control for it, `readPbmLinkFormFields` does not read it, and
-      // `updateMachineSchema` does not accept it (PP-o355.29). The planner takes
-      // the STORED row and owns the carry-over decision, so no caller can unlist
-      // a machine by leaving an argument out (PP-l81u).
+      // Listing intent is not an input to this action at all: the edit form
+      // renders no control for it here, `readPbmLinkFormFields` does not read
+      // it, and `updateMachineSchema` does not accept it (PP-o355.29). The
+      // planner takes the STORED row and owns the carry-over decision, so no
+      // caller can take a machine off the lineup by leaving an argument out
+      // (PP-l81u).
       const planned = await planMachinePbmLink({
         machineId: id,
         selection: validation.data,
         stored: {
           pinballmapMachineId: currentMachine.pinballmapMachineId,
-          pinballmapListed: currentMachine.pinballmapListed,
-          pinballmapLmxId: currentMachine.pinballmapLmxId,
+          pinballmapIntent: currentMachine.pinballmapIntent,
         },
         // The prospective row: an edit can change availability in the same
-        // submit, and availability is what the tie guard ranks on.
+        // submit.
         presenceStatus: presenceStatus ?? currentMachine.presenceStatus,
       });
       if (!planned.ok) return err("VALIDATION", planned.message);
@@ -845,10 +841,6 @@ export async function updateMachineAction(
 
         return [updatedMachine];
       });
-
-      if (pbmPlan?.autoLink) {
-        await captureMachineAutoLink(id, pbmPlan.autoLink.lmxId, user.id);
-      }
 
       // Post-commit side effects — best-effort: do not fail the action on notification errors
       try {
@@ -1076,10 +1068,6 @@ export async function updateMachineAction(
       return [updatedMachine];
     });
 
-    if (pbmPlan?.autoLink) {
-      await captureMachineAutoLink(id, pbmPlan.autoLink.lmxId, user.id);
-    }
-
     // Post-commit side effects — best-effort: do not fail the action on notification errors
     if (shouldUpdateOwner) {
       try {
@@ -1142,14 +1130,10 @@ export async function updateMachineAction(
     if (error instanceof MachineNotFoundError) {
       return err("NOT_FOUND", "Machine not found.");
     }
-    // NO listing-collision branch here, and no auto-link failure of any kind can
-    // reach this point. Auto-link (PP-o355.20) made this action a writer of
-    // `pinballmapListed` again, so the one-lister index
-    // `machines_pinballmap_listed_unique` is reachable — but that write lives
-    // outside the details transaction and behind `captureMachineAutoLink`,
-    // which stands down on a collision and reports anything else without
-    // rethrowing. A save that reaches this catch therefore failed on its own
-    // merits; derived bookkeeping is never allowed to discard a good edit.
+    // No listing-collision branch here, and none is possible: the one-lister
+    // unique index went with the coverage model (PP-o355.21), and nothing in
+    // this action writes listing intent except the carry-over, which only ever
+    // preserves or clears what the row already held.
     return serverActionError(
       error,
       "SERVER",
