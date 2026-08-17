@@ -89,11 +89,13 @@ describe("GET /api/cron/pinballmap-sync", () => {
     const body = (await res.json()) as {
       ok: boolean;
       machineCount?: number;
-      healed?: number;
+      abandonmentsCleared?: number;
     };
     expect(body.ok).toBe(true);
     expect(body.machineCount ?? 0).toBeGreaterThan(0);
-    expect(body.healed).toBe(0);
+    // The only effect the pass has left (PP-o355.21). It used to also report
+    // `healed` and `linked`, which were auto-link's — spec 5.1 deleted both.
+    expect(body.abandonmentsCleared).toBe(0);
 
     const { getPinballMapState } = await import("~/lib/pinballmap/state");
     const state = await getPinballMapState();

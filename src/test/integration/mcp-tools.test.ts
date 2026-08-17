@@ -1575,8 +1575,7 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
           year: 2019,
           opdbId: "GRBN4-MQGE5",
           ipdbId: 6587,
-          listed: false,
-          lmxId: null,
+          intent: "off",
         },
       });
 
@@ -1591,10 +1590,13 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
       });
     });
 
-    it("clears listing state when a LISTED machine is re-targeted, and records the abandoned entry", async () => {
+    it("resets intent when an intent-On machine is re-targeted, and records the abandoned entry", async () => {
       const db = await getTestDb();
       const admin = await makeUser("admin");
       await seedElviraCatalog();
+      // The entry the machine is about to walk away from has to be on the
+      // stored lineup, because that is where the abandonment is resolved from.
+      await seedLineup([{ id: 44_710, machineId: ELVIRA_PREMIUM_ID }]);
       const machine = await seedMachine({
         name: "Elvira",
         pbm: {
@@ -1617,18 +1619,16 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
           status: "linked",
           pinballmapMachineId: 70_013,
           title: "Elvira's House of Horrors (LE)",
-          listed: false,
-          lmxId: null,
+          intent: "off",
         },
       });
       expect(await pbmRow(machine.id)).toMatchObject({
         pinballmapMachineId: 70_013,
-        pinballmapListed: false,
-        pinballmapLmxId: null,
+        pinballmapIntent: "off",
       });
 
-      // Dropping the listing without writing down the live entry is what leaves
-      // an orphan on pinballmap.com that nobody can find.
+      // Resetting intent without writing down the live entry is what leaves an
+      // orphan on pinballmap.com that nobody can find.
       const abandoned = await db
         .select()
         .from(pinballmapAbandonedListings)
@@ -1640,7 +1640,7 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
       });
     });
 
-    it("keeps listing state when the SAME title is re-sent", async () => {
+    it("keeps intent when the SAME title is re-sent", async () => {
       const admin = await makeUser("admin");
       await seedElviraCatalog();
       const machine = await seedMachine({
@@ -1661,7 +1661,6 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
       expect(await pbmRow(machine.id)).toMatchObject({
         pinballmapMachineId: ELVIRA_PREMIUM_ID,
         pinballmapIntent: "on",
-        pinballmapLmxId: 44_710,
       });
     });
 
@@ -1703,7 +1702,15 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
       });
     });
 
-    it("captures the listing when the title is already on the synced lineup", async () => {
+    it("leaves intent Off even when the title is already on the lineup", async () => {
+      // Auto-link used to capture the entry here and flip the machine on. Spec
+      // 5.1 forbids it: matching a cabinet to a title says what game it is, not
+      // that somebody wants it on a public lineup, and inferring the second
+      // from the first is exactly how a deliberate Off gets overridden.
+      //
+      // The honest result is the machine reading as Lingering afterwards — an
+      // entry on the lineup that nothing covers — which is a state with a
+      // control attached rather than a decision made on the operator's behalf.
       const admin = await makeUser("admin");
       await seedElviraCatalog();
       await seedLineup([{ id: 88_001, machineId: ELVIRA_PREMIUM_ID }]);
@@ -1714,20 +1721,15 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
         ctx("admin", admin)
       );
 
-      // Auto-link (PP-o355.20) lands AFTER the link transaction commits, so the
-      // echoed block is read back from the row rather than from the plan —
-      // reporting `listed: false` here while the row says otherwise is the
-      // confident wrong answer CORE-ARCH-012 forbids.
       expect(outcome.result).toMatchObject({
-        pinballmap: { status: "linked", listed: true, lmxId: 88_001 },
+        pinballmap: { status: "linked", intent: "off" },
       });
       expect(await pbmRow(machine.id)).toMatchObject({
-        pinballmapListed: true,
-        pinballmapLmxId: 88_001,
+        pinballmapIntent: "off",
       });
     });
 
-    it("links a duplicate cabinet without disturbing the title's incumbent lister", async () => {
+    it("links a duplicate cabinet without disturbing the other one's intent", async () => {
       const admin = await makeUser("admin");
       await seedElviraCatalog();
       await seedLineup([{ id: 88_001, machineId: ELVIRA_PREMIUM_ID }]);
@@ -1755,11 +1757,10 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
           intent: "off",
         },
       });
-      // The incumbent keeps the listing: an edit to one cabinet must never
-      // silently move another cabinet's public entry.
+      // The other cabinet keeps its intent: an edit to one machine must never
+      // silently change what another says about the public lineup.
       expect(await pbmRow(incumbent.id)).toMatchObject({
-        pinballmapListed: true,
-        pinballmapLmxId: 88_001,
+        pinballmapIntent: "on",
       });
     });
 
