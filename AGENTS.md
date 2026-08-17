@@ -180,12 +180,12 @@ Use worktree-isolated subagents for independent tasks. Tool-specific dispatch, h
 
 ### Superpowers lifecycle → beads
 
-When you run the superpowers plugin lifecycle (`brainstorming → writing-plans → subagent-driven-development → finishing-a-development-branch`), load `pinpoint-superpowers-bridge` — several superpowers steps conflict with PinPoint rules (local merge, raw `git worktree remove`, generic test commands, uncapped subagent dispatch, the plugin's own review-reply flow) and the skill spells out the overrides. Specs and plans stay as **files in git** (their superpowers default locations, kept as records — "Documentation"); beads carry **pointers**, not copies:
+When you run the superpowers plugin lifecycle (`brainstorming → writing-plans → subagent-driven-development → finishing-a-development-branch`), load `pinpoint-superpowers-bridge` — several superpowers steps conflict with PinPoint rules (local merge, raw `git worktree remove`, generic test commands, uncapped subagent dispatch, the plugin's own review-reply flow) and the skill spells out the overrides. Superpowers specs and plans are **working documents, not repo artifacts** (decision 2026-08-16): draft them outside the repo tree (the session scratchpad), store the content in the bead. Files under `docs/superpowers/` committed before the decision stay as records ("Documentation"); no new files go there. Durable requirements belong in `docs/feature-specs/` ("Documentation"), not in superpowers docs. Bead fields:
 
-- `--spec-id` = spec file path
-- `--design` = plan file path(s) **+ branch name** while unmerged (recover with `git show origin/<branch>:<path>`)
+- `--spec-id` = the feature spec path (`docs/feature-specs/<feature>.md`), when the work has one
+- `--design` = the **full plan text**, stored when the plan is written and refreshed when it materially changes
 - `--acceptance` = distilled success criteria
-- `--notes` = landing breadcrumbs (PR #, migration state, follow-ups)
+- `--notes` = landing breadcrumbs (PR #, branch, migration state, follow-ups)
 
 Plan-file checkboxes are within-PR execution state, **not** durable task tracking — the bead is the cross-session source of truth. Single-PR work gets one bead (no per-task sliver-beads); only multi-PR epics decompose into children.
 
@@ -237,3 +237,5 @@ Actionable, "what" and "how" only. Skills carry the deep dives.
 **Cite a section of this file by its heading title, never its number** — `AGENTS.md "Which tests to run"`, not `AGENTS.md §<number>`. Section numbers shift whenever this file gains or loses a section and nothing tells the citation, so a stale number points confidently at the wrong content; PP-z9m1 found three sites citing a "§2.2.5" that was never a section at all. A title is checkable, and `scripts/check_rule_ids.py` checks it: it fails the build on any surviving `§<number>` / `section <number>` form, and on any cited title that resolves to no heading here. Cite the most specific heading that covers the claim (`"Supabase"`, not `"Deployment"`), and cite `CORE-*` IDs from `docs/NON_NEGOTIABLES.md` for rules rather than either. Dated records under `docs/superpowers/` and `docs/plans/` are out of scope — they are historical, not live citations.
 
 **Canonical specs are authoritative** — particularly `pinpoint-design-bible` (§5 page archetypes, §17 modal archetypes). When implementation changes UI behavior covered there, **edit the spec in place**. Don't append divergence notes or "TODO: spec out of date" disclaimers. If you find one, fold it into canonical text and delete it. Dated artifacts in `docs/superpowers/specs/` are records — leave them alone.
+
+**Feature specs stay current as you work** (`docs/feature-specs/`, `spec-driven-development` skill): when a change touches behavior covered by one, the **same PR** updates the spec or adds a divergence-table row — never neither. Spec edits require Tim approving the exact diff first, even when he says "update the spec".
