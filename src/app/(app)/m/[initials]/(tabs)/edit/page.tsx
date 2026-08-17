@@ -1,6 +1,6 @@
 import type React from "react";
 import { notFound, redirect } from "next/navigation";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
 import { userProfiles, pinballmapCatalog, machines } from "~/server/db/schema";
@@ -187,17 +187,36 @@ export default async function MachineEditPage({
   const writeEnabled =
     pbmState?.outboundEmail != null && pbmState.outboundTokenVaultId != null;
 
-  // Entries left live on the public map by an earlier retitle (PP-l81u). The
-  // catalog row can disappear while the entry on Pinball Map outlives it, so a
-  // null title falls back to naming the entry by id rather than inventing one.
+  // Entries left on the public lineup by an earlier re-match (PP-l81u).
+  //
+  // **Only the ones whose title has left the fleet entirely** (spec 2.5). While
+  // any cabinet is still matched to the old title, the entry is that title's
+  // ordinary business and already shows through those cabinets' own states —
+  // surfacing it here as well would put the same entry on two pages with two
+  // different explanations, and this is the page whose explanation is wrong
+  // (the machine here is not the one that title belongs to any more).
+  //
+  // Note the test is MATCHED, not covered: a sibling matched to the old title
+  // with intent Off renders Lingering and offers the same Remove, so it is
+  // already handled even though nothing covers the entry.
+  //
+  // The catalog row can disappear while the entry on Pinball Map outlives it,
+  // so a null title falls back to naming the entry by id rather than inventing
+  // one.
+  const abandonedRows = await listAbandonedForMachine(machine.id);
+  const stillMatchedTitles = await titlesStillInTheFleet(
+    abandonedRows.map((r) => r.pinballmapMachineId)
+  );
   const abandoned = await Promise.all(
-    (await listAbandonedForMachine(machine.id)).map(async (row) => ({
-      lmxId: row.lmxId,
-      title: (await getCatalogEntry(row.pinballmapMachineId))?.name ?? null,
-      commentCount:
-        snapshot?.lmxes.find((l) => l.id === row.lmxId)?.conditions.length ??
-        null,
-    }))
+    abandonedRows
+      .filter((row) => !stillMatchedTitles.has(row.pinballmapMachineId))
+      .map(async (row) => ({
+        lmxId: row.lmxId,
+        title: (await getCatalogEntry(row.pinballmapMachineId))?.name ?? null,
+        commentCount:
+          snapshot?.lmxes.find((l) => l.id === row.lmxId)?.conditions.length ??
+          null,
+      }))
   );
 
   const canEditAnyMachine =
@@ -303,5 +322,27 @@ export default async function MachineEditPage({
         </div>
       </section>
     </div>
+  );
+}
+
+/**
+ * Which of these catalog titles some cabinet is still matched to.
+ *
+ * The question spec 2.5 turns on: an abandoned entry belongs on the machine
+ * that walked away from it ONLY once nothing carries its title, because until
+ * then the entry has a page of its own to appear on.
+ */
+async function titlesStillInTheFleet(
+  titleIds: readonly number[]
+): Promise<Set<number>> {
+  if (titleIds.length === 0) return new Set();
+  const rows = await db
+    .selectDistinct({ pinballmapMachineId: machines.pinballmapMachineId })
+    .from(machines)
+    .where(inArray(machines.pinballmapMachineId, [...titleIds]));
+  return new Set(
+    rows.flatMap((r) =>
+      r.pinballmapMachineId === null ? [] : [r.pinballmapMachineId]
+    )
   );
 }
