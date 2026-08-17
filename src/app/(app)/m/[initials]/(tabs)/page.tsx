@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
-import { userProfiles } from "~/server/db/schema";
+import { machines, userProfiles } from "~/server/db/schema";
 import { deriveMachineStatus } from "~/lib/machines/status";
 import { RichTextDisplay } from "~/components/editor/RichTextDisplay";
 import { docIsEmpty } from "~/lib/tiptap/types";
@@ -16,7 +16,10 @@ import {
 import { getMachineForLayout } from "../_data";
 import { pinballmapLocationUrl } from "~/lib/pinballmap/public-url";
 import { getPinballMapState } from "~/lib/pinballmap/state";
-import { derivePbmListingView } from "~/lib/pinballmap/listing-state";
+import {
+  derivePbmListingView,
+  type PbmSiblingInput,
+} from "~/lib/pinballmap/listing-state";
 import { listAbandonedForMachine } from "~/lib/pinballmap/abandoned-listings";
 import { getCatalogEntry } from "~/lib/pinballmap/catalog";
 import { InfoHero } from "./info-hero";
@@ -131,12 +134,25 @@ export default async function MachineInfoTab({
   // singleton; the abandonment query is machine-scoped.
   const pbmState = canDiagnose ? await getPinballMapState() : null;
   const snapshot = pbmState?.snapshotJson ?? null;
-  // Siblings are not queried here. The Info tab needs two facts — is the title
-  // on the lineup, and does anything disagree — and neither depends on who else
-  // covers it: coverage only ever turns Lingering into the quiet Covered state,
-  // and Covered is not an out-of-sync state. Passing no siblings is therefore
-  // the conservative read, not a shortcut. (The Manage tab, which renders the
-  // coverage sentences, does query them.)
+
+  // The same-title group has to be read here too, even though this tab renders
+  // none of the coverage sentences. Coverage is what separates Covered (quiet)
+  // from Lingering (out of sync), so deriving without it would raise a Config
+  // issue on a machine whose entry a sibling covers — and send the reader to a
+  // Manage tab that says everything is fine (CORE-ARCH-012).
+  const sameTitle: PbmSiblingInput[] =
+    canDiagnose && machine.pinballmapMachineId !== null
+      ? await db
+          .select({
+            id: machines.id,
+            initials: machines.initials,
+            name: machines.name,
+            intent: machines.pinballmapIntent,
+          })
+          .from(machines)
+          .where(eq(machines.pinballmapMachineId, machine.pinballmapMachineId))
+      : [];
+
   const listingView = derivePbmListingView({
     machineId: machine.id,
     pinballmapMachineId: machine.pinballmapMachineId,
@@ -144,7 +160,7 @@ export default async function MachineInfoTab({
     intent: machine.pinballmapIntent,
     presenceStatus: machine.presenceStatus,
     snapshot,
-    siblings: [],
+    siblings: sameTitle,
   });
   const configIssue =
     canDiagnose &&
