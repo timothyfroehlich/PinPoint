@@ -1,8 +1,13 @@
 /**
- * Unit: the two PBM link-column entry points (PP-l81u).
+ * Unit: the two PBM link-column entry points (PP-l81u, PP-o355.21).
  *
- * The create variant cannot express listing state at all; the update variant
+ * The create variant cannot express listing intent at all; the update variant
  * owns the carry-over decision so no caller computes it.
+ *
+ * The abandonment half is the reason this file mocks the state row: since the
+ * per-machine lmx column went away (PP-o355.21), the entry a cabinet walks away
+ * from is resolved from the stored lineup by its OLD title. No lineup, no
+ * abandonment — the record has to name a real entry.
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -10,8 +15,12 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 vi.mock("./catalog", () => ({
   getCatalogEntry: vi.fn(),
 }));
+vi.mock("./state", () => ({
+  getPinballMapState: vi.fn(),
+}));
 
 import { getCatalogEntry } from "./catalog";
+import { getPinballMapState } from "./state";
 import {
   resolvePbmLinkColumnsForCreate,
   resolvePbmLinkColumnsForUpdate,
@@ -29,99 +38,126 @@ const entry = {
   refreshedAt: new Date(),
 };
 
+/** A lineup carrying title 6221 as entry 4471 — the entry to be abandoned. */
+const snapshot = {
+  locationId: 26454,
+  name: "Austin Pinball Collective",
+  dateLastUpdated: null,
+  lastUpdatedByUsername: null,
+  machineCount: 1,
+  lmxes: [
+    {
+      id: 4471,
+      machineId: 6221,
+      icEnabled: null,
+      lastUpdatedByUsername: null,
+      conditions: [],
+    },
+  ],
+  fetchedAtIso: "2026-08-17T00:00:00.000Z",
+  raw: null,
+};
+
 beforeEach(() => {
   vi.mocked(getCatalogEntry).mockResolvedValue(entry);
+  vi.mocked(getPinballMapState).mockResolvedValue({
+    snapshotJson: snapshot,
+  } as unknown as Awaited<ReturnType<typeof getPinballMapState>>);
 });
 
 describe("resolvePbmLinkColumnsForCreate", () => {
-  it("never marks a new machine as listed", async () => {
+  it("never puts a new machine on the lineup", async () => {
     const result = await resolvePbmLinkColumnsForCreate({
       pinballmapMachineId: 6221,
     });
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.columns.pinballmapListed).toBe(false);
-    expect(result.columns.pinballmapLmxId).toBeNull();
+    expect(result.columns.pinballmapIntent).toBe("off");
     expect(result.columns.pinballmapMachineId).toBe(6221);
   });
 });
 
 describe("resolvePbmLinkColumnsForUpdate", () => {
-  it("carries the listing forward when the title is unchanged", async () => {
+  it("carries intent forward when the title is unchanged", async () => {
     const result = await resolvePbmLinkColumnsForUpdate(
       { pinballmapMachineId: 6221 },
-      {
-        pinballmapMachineId: 6221,
-        pinballmapListed: true,
-        pinballmapLmxId: 4471,
-      }
+      { pinballmapMachineId: 6221, pinballmapIntent: "on" }
     );
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.columns.pinballmapListed).toBe(true);
-    expect(result.columns.pinballmapLmxId).toBe(4471);
+    expect(result.columns.pinballmapIntent).toBe("on");
   });
 
-  it("clears the listing when the title changes", async () => {
+  it("resets intent to Off when the title changes (spec 2.3)", async () => {
+    // Keeping On would silently assert the NEW title belongs on the lineup —
+    // an automatic intent change, which 5.1 forbids.
     const result = await resolvePbmLinkColumnsForUpdate(
       { pinballmapMachineId: 6222 },
-      {
-        pinballmapMachineId: 6221,
-        pinballmapListed: true,
-        pinballmapLmxId: 4471,
-      }
+      { pinballmapMachineId: 6221, pinballmapIntent: "on" }
     );
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.columns.pinballmapListed).toBe(false);
-    expect(result.columns.pinballmapLmxId).toBeNull();
+    expect(result.columns.pinballmapIntent).toBe("off");
   });
 
-  it("leaves an unlisted machine unlisted on an unchanged title", async () => {
+  it("keeps a Don't-sync setting across a re-match (spec 2.3)", async () => {
+    // Don't sync is a standing preference about the CABINET — leave it out of
+    // the integration — not a claim about any one title, so a re-match does not
+    // revoke it.
+    const result = await resolvePbmLinkColumnsForUpdate(
+      { pinballmapMachineId: 6222 },
+      { pinballmapMachineId: 6221, pinballmapIntent: "no_sync" }
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.columns.pinballmapIntent).toBe("no_sync");
+  });
+
+  it("keeps Don't sync even when the link is cleared entirely", async () => {
+    const result = await resolvePbmLinkColumnsForUpdate(
+      {},
+      { pinballmapMachineId: 6221, pinballmapIntent: "no_sync" }
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.columns.pinballmapMachineId).toBeNull();
+    expect(result.columns.pinballmapIntent).toBe("no_sync");
+  });
+
+  it("leaves an Off machine Off on an unchanged title", async () => {
     const result = await resolvePbmLinkColumnsForUpdate(
       { pinballmapMachineId: 6221 },
-      {
-        pinballmapMachineId: 6221,
-        pinballmapListed: false,
-        pinballmapLmxId: null,
-      }
+      { pinballmapMachineId: 6221, pinballmapIntent: "off" }
     );
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.columns.pinballmapListed).toBe(false);
+    expect(result.columns.pinballmapIntent).toBe("off");
   });
 
-  it("clears the listing when the machine is marked not on Pinball Map", async () => {
+  it("clears intent when the machine is marked not on Pinball Map", async () => {
     const result = await resolvePbmLinkColumnsForUpdate(
       { pinballmapExcluded: true, pinballmapExcludedReason: "Homebrew" },
-      {
-        pinballmapMachineId: 6221,
-        pinballmapListed: true,
-        pinballmapLmxId: 4471,
-      }
+      { pinballmapMachineId: 6221, pinballmapIntent: "on" }
     );
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.columns.pinballmapExcluded).toBe(true);
-    expect(result.columns.pinballmapListed).toBe(false);
-    expect(result.columns.pinballmapLmxId).toBeNull();
+    expect(result.columns.pinballmapIntent).toBe("off");
   });
 
-  it("records an abandonment when a listed machine is marked not on Pinball Map (PP-l81u)", async () => {
+  it("records an abandonment when an intent-On machine is marked not on Pinball Map (PP-l81u)", async () => {
     // The entry is still live on pinballmap.com no matter how PinPoint now
     // classifies the machine — excluding it must not discard the handle.
     const result = await resolvePbmLinkColumnsForUpdate(
       { pinballmapExcluded: true, pinballmapExcludedReason: "Homebrew" },
-      {
-        pinballmapMachineId: 6221,
-        pinballmapListed: true,
-        pinballmapLmxId: 4471,
-      }
+      { pinballmapMachineId: 6221, pinballmapIntent: "on" }
     );
 
     expect(result.ok).toBe(true);
@@ -132,14 +168,10 @@ describe("resolvePbmLinkColumnsForUpdate", () => {
     });
   });
 
-  it("records an abandonment when a listed machine's link is cleared entirely (PP-l81u)", async () => {
+  it("records an abandonment when an intent-On machine's link is cleared entirely (PP-l81u)", async () => {
     const result = await resolvePbmLinkColumnsForUpdate(
       {},
-      {
-        pinballmapMachineId: 6221,
-        pinballmapListed: true,
-        pinballmapLmxId: 4471,
-      }
+      { pinballmapMachineId: 6221, pinballmapIntent: "on" }
     );
 
     expect(result.ok).toBe(true);
@@ -156,14 +188,49 @@ describe("resolvePbmLinkColumnsForUpdate", () => {
 
     const result = await resolvePbmLinkColumnsForUpdate(
       { pinballmapMachineId: 9999 },
-      {
-        pinballmapMachineId: 6221,
-        pinballmapListed: false,
-        pinballmapLmxId: null,
-      }
+      { pinballmapMachineId: 6221, pinballmapIntent: "off" }
     );
 
     expect(result.ok).toBe(false);
+  });
+
+  it("records no abandonment when the old title is not on the lineup", async () => {
+    // Nothing was left behind, so an alert pointing at a nonexistent entry
+    // would be a warning about nothing (CORE-ARCH-012).
+    const result = await resolvePbmLinkColumnsForUpdate(
+      { pinballmapMachineId: 6222 },
+      { pinballmapMachineId: 9999, pinballmapIntent: "on" }
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.abandoned).toBeNull();
+  });
+
+  it("records no abandonment when the lineup has never been read", async () => {
+    vi.mocked(getPinballMapState).mockResolvedValue(null);
+
+    const result = await resolvePbmLinkColumnsForUpdate(
+      { pinballmapMachineId: 6222 },
+      { pinballmapMachineId: 6221, pinballmapIntent: "on" }
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.abandoned).toBeNull();
+  });
+
+  it("records no abandonment when intent was already Off", async () => {
+    // Nothing to walk away from: the operator had already said this cabinet
+    // does not belong on the lineup.
+    const result = await resolvePbmLinkColumnsForUpdate(
+      { pinballmapMachineId: 6222 },
+      { pinballmapMachineId: 6221, pinballmapIntent: "off" }
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.abandoned).toBeNull();
   });
 });
 
@@ -175,9 +242,8 @@ describe("resolvePbmLinkColumnsForUpdate", () => {
 describe("hand-entered model identity", () => {
   const stored = {
     pinballmapMachineId: null,
-    pinballmapListed: false,
-    pinballmapLmxId: null,
-  };
+    pinballmapIntent: "off",
+  } as const;
 
   it("stores what was typed on the excluded branch", async () => {
     const result = await resolvePbmLinkColumnsForUpdate(

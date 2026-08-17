@@ -4,7 +4,7 @@
  * Covers the two ways a snapshot sync is kicked off:
  *  - the CRON_SECRET-gated GET /api/cron/pinballmap-sync route (auth + the
  *    `enabled` dormancy gate)
- *  - the technician+ `syncPinballMapNowAction` server action (permission gate)
+ *  - the member+ `refreshPinballmapLineupAction` server action (permission gate)
  *
  * Real PGlite + real permission matrix + real sync/reconcile; the PBM client is
  * pinned to the in-memory mock at its seam (CORE-TEST-006) so nothing reaches
@@ -42,7 +42,7 @@ vi.mock("~/lib/pinballmap/client", async () => {
 
 // Import AFTER the db mock so route + action pick up PGlite.
 const { GET } = await import("~/app/api/cron/pinballmap-sync/route");
-const { syncPinballMapNowAction } =
+const { refreshPinballmapLineupAction } =
   await import("~/app/(app)/m/pinballmap-actions");
 
 const CRON_SECRET = "test-cron-secret";
@@ -112,32 +112,41 @@ describe("GET /api/cron/pinballmap-sync", () => {
   });
 });
 
-describe("syncPinballMapNowAction", () => {
+describe("refreshPinballmapLineupAction", () => {
   setupTestDb();
 
   it("denies an unauthenticated caller", async () => {
     mockGetUser.mockResolvedValueOnce({ data: { user: null } });
-    const result = await syncPinballMapNowAction(undefined, new FormData());
+    const result = await refreshPinballmapLineupAction(
+      undefined,
+      new FormData()
+    );
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.code).toBe("UNAUTHORIZED");
   });
 
-  it("denies a member (below technician+)", async () => {
+  it("denies a guest", async () => {
+    const id = await seedUser("guest");
+    mockGetUser.mockResolvedValueOnce({ data: { user: { id } } });
+    const result = await refreshPinballmapLineupAction(
+      undefined,
+      new FormData()
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.code).toBe("UNAUTHORIZED");
+  });
+
+  it("allows a member — reading needs only page access (spec 8.3)", async () => {
+    // This widened from technician+ deliberately. It is safe because the rate
+    // limit is global rather than per-caller (spec 3.2), so a wider audience
+    // does not widen anyone's allowance.
     const id = await seedUser("member");
     mockGetUser.mockResolvedValueOnce({ data: { user: { id } } });
-    const result = await syncPinballMapNowAction(undefined, new FormData());
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.code).toBe("UNAUTHORIZED");
-  });
-
-  it("allows a technician and returns the synced machine count", async () => {
-    const id = await seedUser("technician");
-    mockGetUser.mockResolvedValueOnce({ data: { user: { id } } });
-    const result = await syncPinballMapNowAction(undefined, new FormData());
+    const result = await refreshPinballmapLineupAction(
+      undefined,
+      new FormData()
+    );
     expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.value.machineCount).toBeGreaterThan(0);
-      expect(result.value.healed).toBe(0);
-    }
+    if (result.ok) expect(result.value.machineCount).toBeGreaterThan(0);
   });
 });

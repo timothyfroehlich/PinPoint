@@ -603,10 +603,10 @@ export interface PlanMachinePbmLinkParams {
 }
 
 /**
- * Decide a machine's new PinballMap columns, plus the two follow-ups that ride
- * with them. Pure decision-making: reads the catalog mirror and the stored PBM
- * snapshot, writes nothing, and opens no transaction (so it is also the right
- * side of CORE-ARCH-011 for the auto-link lookup).
+ * Decide a machine's new PinballMap columns, plus the abandonment that rides
+ * with them. Pure decision-making: reads the catalog mirror and the stored
+ * lineup, writes nothing, and opens no transaction (so it is also the right
+ * side of CORE-ARCH-011 for that lineup read).
  *
  * Listing intent is never an input. `resolvePbmLinkColumnsForUpdate` takes the
  * STORED row and owns the carry-over decision, so no caller can take a machine

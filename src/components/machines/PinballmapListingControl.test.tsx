@@ -1,37 +1,137 @@
+/**
+ * Unit: the two-line Pinball Map control (PP-o355.21, spec §4).
+ *
+ * The view is derived on the server (`listing-state.test.ts` owns that grid), so
+ * these tests take a view as given and assert what the component does with it:
+ * which controls appear, what the sentence says, and — most of all — that a
+ * control which cannot perform its action is never rendered (CORE-ARCH-012).
+ */
+
 import type React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom/vitest";
 
 import {
-  acceptMissingPinballmapListingAction,
-  linkPinballmapEntryAction,
-  listMachineOnPinballMapAction,
-  unlistMachineFromPinballMapAction,
+  addMachineToPinballMapAction,
+  refreshPinballmapLineupAction,
+  removeMachineFromPinballMapAction,
+  setPinballmapIntentAction,
 } from "~/app/(app)/m/pinballmap-actions";
+import type {
+  PbmListingStateName,
+  PbmListingView,
+} from "~/lib/pinballmap/listing-state";
 import { PinballmapListingControl } from "./PinballmapListingControl";
 
 vi.mock("~/app/(app)/m/pinballmap-actions", () => ({
-  acceptMissingPinballmapListingAction: vi.fn(),
-  linkPinballmapEntryAction: vi.fn(),
-  listMachineOnPinballMapAction: vi.fn(),
-  unlistMachineFromPinballMapAction: vi.fn(),
+  addMachineToPinballMapAction: vi.fn(),
+  refreshPinballmapLineupAction: vi.fn(),
+  removeMachineFromPinballMapAction: vi.fn(),
+  setPinballmapIntentAction: vi.fn(),
 }));
 
 type Props = React.ComponentProps<typeof PinballmapListingControl>;
 
-/** An admin with a provisioned credential — the case with every control armed. */
-function renderControl(overrides: Partial<Props> = {}): void {
-  render(
+/**
+ * The named frames from the mockup, as views. Written out rather than run
+ * through `derivePbmListingView` on purpose: this file is about rendering, and
+ * deriving the fixtures would make a change in the derivation silently rewrite
+ * what these tests assert.
+ */
+const VIEWS: Record<string, PbmListingView> = {
+  on: view({ name: "on", intent: "on", observed: true }),
+  off: view({ name: "off", intent: "off" }),
+  syncOff: view({ name: "sync_off", intent: "no_sync", observed: true }),
+  noModel: view({ name: "no_model", disabled: "no_model" }),
+  uncataloged: view({ name: "uncataloged", disabled: "uncataloged" }),
+  waiting: view({ name: "waiting", disabled: "waiting", intent: "on" }),
+  blocked: view({
+    name: "blocked",
+    intent: "off",
+    onPositionBlockedReason:
+      "Current Availability (Removed) disallows adding to the lineup",
+  }),
+  alert: view({
+    name: "alert",
+    intent: "on",
+    observed: true,
+    advisory: "alert",
+    advisoryDetail: "Removed",
+    onPositionBlockedReason:
+      "Current Availability (Removed) disallows adding to the lineup",
+  }),
+  flag: view({
+    name: "flag",
+    intent: "on",
+    observed: true,
+    advisory: "flag",
+    advisoryDetail: "on loan",
+  }),
+  missing: view({
+    name: "missing",
+    intent: "on",
+    outOfSync: true,
+    pushAction: "add",
+  }),
+  lingering: view({
+    name: "lingering",
+    intent: "off",
+    observed: true,
+    outOfSync: true,
+    pushAction: "remove",
+  }),
+  shared: view({
+    name: "shared",
+    intent: "on",
+    observed: true,
+    coveredBy: [{ id: "a", initials: "AFM", name: "Attack from Mars" }],
+  }),
+  covered: view({
+    name: "covered",
+    intent: "off",
+    observed: true,
+    coveredBy: [{ id: "a", initials: "AFM", name: "Attack from Mars" }],
+  }),
+};
+
+function view(
+  overrides: Partial<PbmListingView> & { name: PbmListingStateName }
+): PbmListingView {
+  return {
+    disabled: null,
+    intent: "off",
+    onPositionBlockedReason: null,
+    observed: false,
+    outOfSync: false,
+    advisory: null,
+    advisoryDetail: null,
+    coveredBy: [],
+    pushAction: null,
+    ...overrides,
+  };
+}
+
+/** An owner with a provisioned credential — every control armed. */
+function renderControl(overrides: Partial<Props> = {}): {
+  unmount: () => void;
+} {
+  return render(
     <PinballmapListingControl
       machineId="m-1"
-      state="listed"
-      listed={true}
-      canLink={true}
+      view={VIEWS.on}
+      locationName="Austin Pinball Collective"
+      locationUrl="https://pinballmap.com/map/?by_location_id=26454"
+      lastRefreshedAt={new Date(Date.now() - 12 * 60 * 1000)}
+      refreshRemaining={3}
+      refreshAvailableAt={null}
+      canSetIntent={true}
       canPush={true}
+      canRefresh={true}
       writeEnabled={true}
       modelName="Medieval Madness"
+      commentCount={12}
       {...overrides}
     />
   );
@@ -42,169 +142,308 @@ function status(): string {
 }
 
 beforeEach(() => {
-  vi.mocked(listMachineOnPinballMapAction).mockResolvedValue({
+  vi.mocked(addMachineToPinballMapAction).mockResolvedValue({
     ok: true,
     value: { lmxId: 1 },
   });
-  vi.mocked(unlistMachineFromPinballMapAction).mockResolvedValue({
+  vi.mocked(removeMachineFromPinballMapAction).mockResolvedValue({
     ok: true,
     value: {},
   });
-  vi.mocked(acceptMissingPinballmapListingAction).mockResolvedValue({
+  vi.mocked(setPinballmapIntentAction).mockResolvedValue({
     ok: true,
-    value: {},
+    value: { intent: "on" },
   });
-  vi.mocked(linkPinballmapEntryAction).mockResolvedValue({
+  vi.mocked(refreshPinballmapLineupAction).mockResolvedValue({
     ok: true,
-    value: { lmxId: 1 },
+    value: { machineCount: 40, abandonmentsCleared: 0 },
   });
 });
 
-describe("PinballmapListingControl", () => {
-  describe("derived states", () => {
-    it("offers Remove when listed", () => {
-      renderControl();
-      expect(status()).toContain("Listed on our location's lineup");
-      expect(screen.getByTestId("pbm-listing-remove")).toBeInTheDocument();
-      expect(screen.queryByTestId("pbm-listing-add")).not.toBeInTheDocument();
-    });
-
-    it("offers Add when not listed", () => {
-      renderControl({ state: "not_listed", listed: false });
-      expect(status()).toContain("Not on our location's lineup");
-      expect(screen.getByTestId("pbm-listing-add")).toBeInTheDocument();
-    });
-
-    it("offers both Accept and Add back when the listing went missing", () => {
-      renderControl({ state: "missing_on_pbm" });
-      expect(status()).toContain("someone removed it there");
-      expect(screen.getByTestId("pbm-listing-accept")).toBeInTheDocument();
-      expect(screen.getByTestId("pbm-listing-add")).toBeInTheDocument();
-    });
-
-    it("offers Claim when Pinball Map holds a listing we don't", () => {
-      renderControl({ state: "unclaimed_on_pbm", listed: false });
-      expect(status()).toContain("isn't holding that listing");
-      expect(screen.getByTestId("pbm-listing-claim")).toBeInTheDocument();
-    });
-
-    it("explains, and offers nothing, with no model set", () => {
-      renderControl({ state: "unmatched", listed: false });
-      expect(status()).toContain("No model set yet");
-      expect(screen.queryByRole("button")).not.toBeInTheDocument();
-    });
-
-    it("names the deliberate exclusion rather than reporting 'not listed'", () => {
-      // Two different reasons a machine can't be listed, and the reason is the
-      // useful half — "not listed" alone reads as something to go fix.
-      renderControl({ state: "not_on_pbm", listed: false });
-      expect(status()).toContain("Marked as not on Pinball Map");
-      expect(screen.queryByRole("button")).not.toBeInTheDocument();
-    });
-
-    it("admits it has never read the lineup rather than claiming not-listed", () => {
-      // The lie the old control told APC's whole fleet (CORE-ARCH-012).
-      renderControl({ state: "unsynced", listed: true });
-      expect(status()).toContain("hasn't read their lineup yet");
-      expect(status()).toContain("Listed on Pinball Map");
-      expect(screen.queryByRole("button")).not.toBeInTheDocument();
-    });
+describe("the status sentence", () => {
+  it.each([
+    ["on", "On the location's lineup."],
+    ["off", "Not on the location's lineup."],
+    ["blocked", "Not on the location's lineup."],
+    ["missing", "Not on the location's lineup."],
+    ["lingering", "Still on the location's lineup."],
+    ["noModel", "No model set."],
+    ["uncataloged", "Uncataloged game"],
+    ["waiting", "Waiting for the first Pinball Map refresh."],
+    ["syncOff", "Sync off — differences not flagged."],
+    ["alert", "only allows entries for games that are present"],
+    ["flag", "Note: on loan"],
+    ["shared", "Shared with"],
+    ["covered", "On the location's lineup via"],
+  ])("%s says %s", (key, expected) => {
+    renderControl({ view: VIEWS[key] });
+    expect(status()).toContain(expected);
   });
 
-  describe("permissions and provisioning", () => {
-    it("hides the outbound writes from someone without push", () => {
-      renderControl({ canPush: false });
+  it("never says 'listing' or 'listed' (spec 4.8)", () => {
+    // The vocabulary purge is a requirement, not a preference: the object is an
+    // entry and the set is the lineup, which are Pinball Map's own words.
+    for (const key of Object.keys(VIEWS)) {
+      const { unmount } = render(
+        <PinballmapListingControl
+          machineId="m-1"
+          view={VIEWS[key]}
+          locationName="APC"
+          locationUrl="https://example.test"
+          lastRefreshedAt={new Date()}
+          refreshRemaining={3}
+          refreshAvailableAt={null}
+          canSetIntent
+          canPush
+          canRefresh
+          writeEnabled
+          modelName="Medieval Madness"
+          commentCount={0}
+        />
+      );
+      expect(
+        screen.getByTestId("pbm-listing-control").textContent ?? ""
+      ).not.toMatch(/listing|listed/i);
+      unmount();
+    }
+  });
+});
+
+describe("push actions", () => {
+  it("offers Add only on Missing, and Remove only on Lingering", () => {
+    const missing = renderControl({
+      view: VIEWS.missing,
+    });
+    expect(screen.getByTestId("pbm-listing-add")).toBeInTheDocument();
+    expect(screen.queryByTestId("pbm-listing-remove")).not.toBeInTheDocument();
+    missing.unmount();
+
+    renderControl({ view: VIEWS.lingering });
+    expect(screen.getByTestId("pbm-listing-remove")).toBeInTheDocument();
+    expect(screen.queryByTestId("pbm-listing-add")).not.toBeInTheDocument();
+  });
+
+  it.each(["on", "off", "shared", "covered", "flag", "alert", "syncOff"])(
+    "shows no push button on %s",
+    (key) => {
+      renderControl({ view: VIEWS[key] });
+      expect(screen.queryByTestId("pbm-listing-add")).not.toBeInTheDocument();
       expect(
         screen.queryByTestId("pbm-listing-remove")
       ).not.toBeInTheDocument();
-      // The status still reads — seeing where a machine stands is not the same
-      // capability as changing it.
-      expect(status()).toContain("Listed on our location's lineup");
-    });
+    }
+  );
 
-    it("hides the outbound writes when no operator credential is provisioned", () => {
-      // Absent, not present-and-failing: the write cannot run at all, so a
-      // button here could only ever report an error (CORE-ARCH-012).
-      renderControl({ writeEnabled: false });
-      expect(
-        screen.queryByTestId("pbm-listing-remove")
-      ).not.toBeInTheDocument();
+  it("withholds the push and links out when no credential is provisioned", async () => {
+    // A control that cannot perform its action must not be rendered
+    // (CORE-ARCH-012, spec 4.4). The link is the real route.
+    renderControl({
+      view: VIEWS.missing,
+      writeEnabled: false,
     });
-
-    it("still offers Accept without a credential, because it writes nothing outward", () => {
-      renderControl({ state: "missing_on_pbm", writeEnabled: false });
-      expect(screen.getByTestId("pbm-listing-accept")).toBeInTheDocument();
-      expect(screen.queryByTestId("pbm-listing-add")).not.toBeInTheDocument();
-    });
-
-    it("hides Accept and Claim from someone without link", () => {
-      renderControl({ state: "missing_on_pbm", canLink: false });
-      expect(
-        screen.queryByTestId("pbm-listing-accept")
-      ).not.toBeInTheDocument();
-    });
+    expect(screen.queryByTestId("pbm-listing-add")).not.toBeInTheDocument();
+    expect(
+      await screen.findByRole("link", { name: "Add it on Pinball Map" })
+    ).toBeInTheDocument();
+    expect(status()).toContain("then Refresh to update");
   });
 
-  describe("confirms", () => {
-    it("does not remove until the confirm is accepted", async () => {
-      const user = userEvent.setup();
-      renderControl();
-
-      await user.click(screen.getByTestId("pbm-listing-remove"));
-      expect(unlistMachineFromPinballMapAction).not.toHaveBeenCalled();
-
-      const dialog = screen.getByTestId("pbm-listing-remove-confirm");
-      // The confirm names the game and says what the public sees, so nobody
-      // has to remember which machine they were looking at.
-      expect(dialog).toHaveTextContent("Medieval Madness");
-      expect(dialog).toHaveTextContent("pinballmap.com");
-
-      await user.click(
-        within(dialog).getByRole("button", { name: "Remove from Pinball Map" })
-      );
-      expect(unlistMachineFromPinballMapAction).toHaveBeenCalledOnce();
+  it("withholds the push from a viewer without the push capability", () => {
+    renderControl({
+      view: VIEWS.lingering,
+      canPush: false,
     });
-
-    it("carries no trailing ellipsis on the button labels", () => {
-      // A confirm dialog is not the "more input required" an ellipsis promises
-      // (Tim, 2026-08-12).
-      renderControl();
-      expect(screen.getByTestId("pbm-listing-remove")).toHaveTextContent(
-        /Remove from Pinball Map$/
-      );
-      renderControl({ state: "not_listed", listed: false });
-      expect(screen.getAllByTestId("pbm-listing-add")[0]).toHaveTextContent(
-        /Add to Pinball Map$/
-      );
-    });
-
-    it("claims a listing with no confirm, because nothing is sent to them", async () => {
-      const user = userEvent.setup();
-      renderControl({ state: "unclaimed_on_pbm", listed: false });
-      await user.click(screen.getByTestId("pbm-listing-claim"));
-      expect(linkPinballmapEntryAction).toHaveBeenCalledOnce();
-    });
+    expect(screen.queryByTestId("pbm-listing-remove")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "Remove it on Pinball Map" })
+    ).toBeInTheDocument();
   });
 
-  it("surfaces a failed action instead of looking like nothing happened", async () => {
+  it("confirms a remove with the comment count and the 7-day window", async () => {
     const user = userEvent.setup();
-    vi.mocked(unlistMachineFromPinballMapAction).mockResolvedValue({
+    renderControl({ view: VIEWS.lingering });
+    await user.click(screen.getByTestId("pbm-listing-remove"));
+
+    const consequence = await screen.findByTestId(
+      "pbm-listing-remove-consequence"
+    );
+    expect(consequence).toHaveTextContent("12 comments");
+    expect(consequence).toHaveTextContent("within 7 days");
+    expect(removeMachineFromPinballMapAction).not.toHaveBeenCalled();
+  });
+
+  it("says it cannot count the comments rather than showing a zero it invented", async () => {
+    const user = userEvent.setup();
+    renderControl({
+      view: VIEWS.lingering,
+      commentCount: null,
+    });
+    await user.click(screen.getByTestId("pbm-listing-remove"));
+    expect(
+      await screen.findByTestId("pbm-listing-remove-consequence")
+    ).toHaveTextContent("could not read this entry's comments");
+  });
+
+  it("surfaces a failed push instead of letting it look like a success", async () => {
+    const user = userEvent.setup();
+    vi.mocked(addMachineToPinballMapAction).mockResolvedValue({
       ok: false,
       code: "PBM_REJECTED",
-      message: "Pinball Map rejected the removal.",
+      message: "Pinball Map rejected the change.",
     });
-    renderControl();
-
-    await user.click(screen.getByTestId("pbm-listing-remove"));
-    await user.click(
-      within(screen.getByTestId("pbm-listing-remove-confirm")).getByRole(
-        "button",
-        { name: "Remove from Pinball Map" }
-      )
-    );
+    renderControl({ view: VIEWS.missing });
+    await user.click(screen.getByTestId("pbm-listing-add"));
+    await user.click(screen.getByRole("button", { name: "Add machine" }));
 
     expect(await screen.findByTestId("pbm-listing-error")).toHaveTextContent(
-      "Pinball Map rejected the removal."
+      "Pinball Map rejected the change."
     );
+  });
+});
+
+describe("the intent toggle", () => {
+  it("marks exactly the current position as checked", () => {
+    renderControl({ view: VIEWS.syncOff });
+    expect(screen.getByTestId("pbm-listing-intent-no_sync")).toBeChecked();
+    expect(screen.getByTestId("pbm-listing-intent-on")).not.toBeChecked();
+    expect(screen.getByTestId("pbm-listing-intent-off")).not.toBeChecked();
+  });
+
+  it("writes the chosen position with no confirmation", async () => {
+    // The toggle is local and instantly reversible, so a confirm would fight
+    // the idiom (spec 4.1).
+    const user = userEvent.setup();
+    renderControl({ view: VIEWS.off });
+    await user.click(screen.getByTestId("pbm-listing-intent-on"));
+
+    expect(setPinballmapIntentAction).toHaveBeenCalledOnce();
+    const formData = vi.mocked(setPinballmapIntentAction).mock.calls[0]?.[1];
+    expect(formData?.get("intent")).toBe("on");
+  });
+
+  it("disables the On position and states why when availability forbids it", () => {
+    renderControl({ view: VIEWS.blocked });
+    expect(screen.getByTestId("pbm-listing-intent-on")).toBeDisabled();
+    // Off and Don't sync stay reachable — the block is a guard, not a trap.
+    expect(screen.getByTestId("pbm-listing-intent-no_sync")).toBeEnabled();
+    expect(screen.getByTestId("pbm-listing-blocked-reason")).toHaveTextContent(
+      "Current Availability (Removed)"
+    );
+  });
+
+  it("leaves the On position clickable while it is already selected", () => {
+    // Alert is intent On with an invalid availability. Disabling the position
+    // the machine is IN would render the current state unselectable, which
+    // reads as a bug rather than a guard.
+    renderControl({ view: VIEWS.alert });
+    expect(screen.getByTestId("pbm-listing-intent-on")).toBeChecked();
+    expect(screen.getByTestId("pbm-listing-intent-on")).toBeEnabled();
+  });
+
+  it("renders read-only for a viewer without the linking capability (4.9)", () => {
+    renderControl({ view: VIEWS.on, canSetIntent: false });
+    for (const position of ["on", "off", "no_sync"]) {
+      expect(
+        screen.getByTestId(`pbm-listing-intent-${position}`)
+      ).toBeDisabled();
+    }
+    // …but Refresh stays available to them (8.3).
+    expect(screen.getByTestId("pbm-listing-refresh")).toBeEnabled();
+  });
+});
+
+describe("the header", () => {
+  it("links the location name to Pinball Map (9.1 attribution)", () => {
+    renderControl();
+    expect(
+      screen.getByRole("link", { name: /Austin Pinball Collective/ })
+    ).toHaveAttribute("href", expect.stringContaining("by_location_id=26454"));
+  });
+
+  it("renders a bare title before the first refresh", () => {
+    // The location name comes from Pinball Map's own record, so there is none
+    // to show yet — and inventing one would be a claim about their data.
+    renderControl({
+      view: VIEWS.waiting,
+      locationName: null,
+      lastRefreshedAt: null,
+    });
+    expect(screen.queryByRole("link", { name: /Collective/ })).toBeNull();
+    expect(screen.getByTestId("pbm-listing-refreshed-at")).toHaveTextContent(
+      "Never refreshed"
+    );
+  });
+
+  it("shows the Out of sync alert only when intent and lineup disagree", () => {
+    const missing = renderControl({
+      view: VIEWS.missing,
+    });
+    expect(screen.getByTestId("pbm-listing-out-of-sync")).toBeInTheDocument();
+    missing.unmount();
+
+    // Don't sync is the interesting negative: intent and lineup DO disagree
+    // here, and the third position is exactly the instruction not to say so.
+    renderControl({ view: VIEWS.syncOff });
+    expect(screen.queryByTestId("pbm-listing-out-of-sync")).toBeNull();
+  });
+
+  it("disables Refresh with a countdown when the allowance is spent (3.2)", () => {
+    const availableAt = new Date(Date.now() + 2 * 60 * 1000);
+    renderControl({ refreshRemaining: 0, refreshAvailableAt: availableAt });
+    const button = screen.getByTestId("pbm-listing-refresh");
+    expect(button).toBeDisabled();
+    expect(button).toHaveAttribute(
+      "title",
+      expect.stringContaining("Refreshes again")
+    );
+  });
+
+  it("keeps Refresh live in the disabled Waiting state, as the escape hatch", () => {
+    renderControl({
+      view: VIEWS.waiting,
+      lastRefreshedAt: null,
+    });
+    expect(screen.getByTestId("pbm-listing-refresh")).toBeEnabled();
+  });
+
+  it("hides Refresh from a viewer without the sync capability", () => {
+    renderControl({ canRefresh: false });
+    expect(screen.queryByTestId("pbm-listing-refresh")).toBeNull();
+  });
+});
+
+describe("the disabled states", () => {
+  it.each(["noModel", "uncataloged", "waiting"])(
+    "%s makes both rows inert",
+    (key) => {
+      renderControl({ view: VIEWS[key] });
+      expect(screen.getByTestId("pbm-listing-rows")).toHaveAttribute("inert");
+    }
+  );
+
+  it.each(["on", "off", "missing", "lingering", "syncOff"])(
+    "%s leaves the rows interactive",
+    (key) => {
+      renderControl({ view: VIEWS[key] });
+      expect(screen.getByTestId("pbm-listing-rows")).not.toHaveAttribute(
+        "inert"
+      );
+    }
+  );
+});
+
+describe("same-title coverage (4.7)", () => {
+  it("links the covering cabinets to their machine pages", () => {
+    renderControl({ view: VIEWS.covered });
+    expect(screen.getByRole("link", { name: "AFM" })).toHaveAttribute(
+      "href",
+      "/m/AFM"
+    );
+  });
+
+  it("names them in the Shared sentence too", () => {
+    renderControl({ view: VIEWS.shared });
+    expect(status()).toContain("comments sync to all");
+    expect(screen.getByRole("link", { name: "AFM" })).toBeInTheDocument();
   });
 });

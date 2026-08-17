@@ -129,8 +129,7 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
     pinballmapMachineId?: number;
     pinballmapExcluded?: boolean;
     pinballmapExcludedReason?: string;
-    pinballmapListed?: boolean;
-    pinballmapLmxId?: number;
+    pinballmapIntent?: "on" | "off" | "no_sync";
     manufacturer?: string;
     year?: number;
     opdbId?: string;
@@ -759,15 +758,14 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
     });
 
     describe("pinballmap block (PP-u4ab.8)", () => {
-      it("reports the linked catalog title, edition family, model metadata and listing state", async () => {
+      it("reports the linked catalog title, edition family, model metadata and listing intent", async () => {
         const admin = await makeUser("admin");
         await seedElviraCatalog();
         const machine = await seedMachine({
           name: "Elvira's House of Horrors",
           pbm: {
             pinballmapMachineId: ELVIRA_PREMIUM_ID,
-            pinballmapListed: true,
-            pinballmapLmxId: 55555,
+            pinballmapIntent: "on",
             manufacturer: "Stern",
             year: 2019,
             opdbId: "GRBN4-MQGE5",
@@ -796,8 +794,7 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
           year: 2019,
           opdbId: "GRBN4-MQGE5",
           ipdbId: 6587,
-          listed: true,
-          lmxId: 55555,
+          intent: "on",
         });
       });
 
@@ -1530,8 +1527,7 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
       pinballmapMachineId: number | null;
       pinballmapExcluded: boolean;
       pinballmapExcludedReason: string | null;
-      pinballmapListed: boolean;
-      pinballmapLmxId: number | null;
+      pinballmapIntent: "on" | "off" | "no_sync";
       manufacturer: string | null;
       year: number | null;
       opdbId: string | null;
@@ -1544,8 +1540,7 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
           pinballmapMachineId: true,
           pinballmapExcluded: true,
           pinballmapExcludedReason: true,
-          pinballmapListed: true,
-          pinballmapLmxId: true,
+          pinballmapIntent: true,
           manufacturer: true,
           year: true,
           opdbId: true,
@@ -1604,8 +1599,7 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
         name: "Elvira",
         pbm: {
           pinballmapMachineId: ELVIRA_PREMIUM_ID,
-          pinballmapListed: true,
-          pinballmapLmxId: 44_710,
+          pinballmapIntent: "on",
           manufacturer: "Stern",
           year: 2019,
         },
@@ -1652,8 +1646,7 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
       const machine = await seedMachine({
         pbm: {
           pinballmapMachineId: ELVIRA_PREMIUM_ID,
-          pinballmapListed: true,
-          pinballmapLmxId: 44_710,
+          pinballmapIntent: "on",
         },
       });
 
@@ -1662,12 +1655,12 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
         ctx("admin", admin)
       );
 
-      // The carry-over is the whole reason listing state is read from the row
-      // rather than taken as an argument: a re-save that silently unlisted a
-      // listed machine is PP-o355.19.
+      // The carry-over is the whole reason intent is read from the row rather
+      // than taken as an argument: a re-save that silently took a machine off
+      // the lineup is PP-o355.19.
       expect(await pbmRow(machine.id)).toMatchObject({
         pinballmapMachineId: ELVIRA_PREMIUM_ID,
-        pinballmapListed: true,
+        pinballmapIntent: "on",
         pinballmapLmxId: 44_710,
       });
     });
@@ -1742,15 +1735,14 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
         name: "Elvira (by the door)",
         pbm: {
           pinballmapMachineId: ELVIRA_PREMIUM_ID,
-          pinballmapListed: true,
-          pinballmapLmxId: 88_001,
+          pinballmapIntent: "on",
         },
       });
       const duplicate = await seedMachine({ name: "Elvira (back row)" });
 
-      // Two cabinets of one title is ordinary in a 100+ machine collection.
-      // `machines_pinballmap_listed_unique` allows only one LISTER, not one
-      // linked machine — so this must succeed quietly, not 23505 into a 500.
+      // Two cabinets of one title is ordinary in a 100+ machine collection, and
+      // under the coverage model (PP-o355.21) both may be On at once — there is
+      // no unique index left to trip. This must succeed quietly.
       const outcome = await runSetMachinePinballmap(
         { machine: duplicate.initials, pinballmapMachineId: ELVIRA_PREMIUM_ID },
         ctx("admin", admin)
@@ -1760,8 +1752,7 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
         pinballmap: {
           status: "linked",
           pinballmapMachineId: ELVIRA_PREMIUM_ID,
-          listed: false,
-          lmxId: null,
+          intent: "off",
         },
       });
       // The incumbent keeps the listing: an edit to one cabinet must never

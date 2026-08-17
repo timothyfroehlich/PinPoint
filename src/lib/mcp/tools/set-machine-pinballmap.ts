@@ -72,16 +72,16 @@ type SetMachinePinballmapArgs = z.infer<typeof setMachinePinballmapSchema>;
  * Pinball Map.
  *
  * The write half of the walk-the-floor flow (PP-u4ab.12), sharing one seam with
- * the machine edit page: `updateMachinePbmLink` owns the listing carry-over, the
- * abandoned-listing record, and the auto-link decision, so this tool cannot
- * disagree with the form about any of them.
+ * the machine edit page: `updateMachinePbmLink` owns the intent carry-over and
+ * the abandoned-listing record, so this tool cannot disagree with the form
+ * about either.
  *
  * Three things this tool deliberately cannot do:
  *
- *  - **Set listing state from its arguments.** `pinballmapListed` is not an
- *    input here any more than it is on the edit form (PP-o355.29). It moves only
- *    via the carry-over (same target kept ⇒ keep the listing) and via auto-link,
- *    which reads the STORED PinballMap snapshot — never a caller's claim.
+ *  - **Set listing intent from its arguments.** Intent is not an input here any
+ *    more than it is on the edit form (PP-o355.29). It moves only via the
+ *    carry-over — same title kept ⇒ keep the intent, spec 2.3 — and via the
+ *    toggle a person presses. Nothing infers it (spec 5.1).
  *  - **List or unlist a machine on pinballmap.com.** That is an outbound write
  *    gated on `machines.pinballmap.push` and owned by the web UI (PP-o355.21).
  *  - **Clear a link back to "nothing recorded".** Every accepted call states a

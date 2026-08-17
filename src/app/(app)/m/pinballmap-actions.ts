@@ -473,11 +473,24 @@ export async function addMachineToPinballMapAction(
   if (!state) return err("SERVER", "Pinball Map isn't configured yet");
 
   // Idempotent: the lineup already carries this title, so there is nothing to
-  // add and the entry it already has is the answer.
+  // add and the entry it already has is the answer. Spending a write call on
+  // PBM's find-or-create to be told the same thing would be traffic against
+  // someone else's service for no result (CORE-PBM-001).
+  //
+  // The abandonment still has to be retired, and this is the reason it is not
+  // left to the hourly pass: some machine walked away from this exact entry,
+  // and its page is telling its owner to take down an entry that a cabinet
+  // now covers (CORE-ARCH-012).
   const existing = state.snapshotJson
     ? findLmxForMachine(state.snapshotJson, titleId)
     : null;
-  if (existing) return ok({ lmxId: existing.id });
+  if (existing) {
+    await db.transaction(async (tx) => {
+      await retireAbandonmentForLmx(tx, existing.id);
+    });
+    revalidatePath(`/m/${machine.initials}`);
+    return ok({ lmxId: existing.id });
+  }
 
   // --- non-transactional effects, both BEFORE the transaction ---
   const credentials = await getPinballMapWriteCredentials();

@@ -82,128 +82,154 @@ const TITLE = {
 } as const;
 
 /**
- * The lmx handle the captured lineup gives a title.
+ * Fail loudly if the captured lineup stopped matching what the plan below
+ * assumes about it.
  *
- * Read out of the snapshot rather than hardcoded so that a
- * `scripts/pinballmap/refresh-fixture.ts` run cannot silently leave this seed
- * pointing at handles the lineup no longer contains — which is itself one of
- * the states being seeded (`missing_on_pbm`) and would be indistinguishable
- * from the real thing.
+ * Every state here is a comparison between intent and the lineup, so a fixture
+ * refresh that drops Godzilla — or adds Medieval Madness — silently turns
+ * Shared into Missing and Missing into On. That is indistinguishable from the
+ * real thing on the page, which is exactly why it is asserted rather than
+ * commented.
  */
-function lmxFor(machineId: number): number {
-  const lmx = snapshot.lmxes.find((l) => l.machineId === machineId);
-  if (!lmx) {
-    throw new Error(
-      `location-26454.json has no lineup entry for catalog id ${String(machineId)}. ` +
-        `The fixture was probably refreshed and this title left APC's lineup — ` +
-        `pick a different one in supabase/seed-pinballmap-state.ts.`
-    );
-  }
-  return lmx.id;
+function assertLineup(machineId: number, expected: boolean): void {
+  const present = snapshot.lmxes.some((l) => l.machineId === machineId);
+  if (present === expected) return;
+  throw new Error(
+    `location-26454.json ${present ? "now carries" : "no longer carries"} ` +
+      `catalog id ${String(machineId)}, which this seed assumes it does ` +
+      `${expected ? "" : "not "}. The fixture was probably refreshed — pick a ` +
+      `different title in supabase/seed-pinballmap-state.ts.`
+  );
 }
 
-/**
- * An lmx handle deliberately absent from the lineup: the shape of "somebody
- * removed our entry on pinballmap.com". Far outside PBM's real id range so it
- * cannot collide with a refreshed fixture.
- */
-const DEPARTED_LMX_ID = 999_000_001;
+assertLineup(TITLE.godzillaPremium, true);
+assertLineup(TITLE.spiderManVault, true);
+assertLineup(TITLE.blackKnight, true);
+assertLineup(TITLE.medievalMadness, false);
 
 interface MachinePlan {
   initials: string;
   pinballmapMachineId: number | null;
-  pinballmapListed: boolean;
-  pinballmapLmxId: number | null;
+  pinballmapIntent: "on" | "off" | "no_sync";
   pinballmapExcluded: boolean;
+  presenceStatus: string | null;
   modelName: string | null;
-  /** The state this row exists to produce. */
+  /** The state this row exists to produce (spec 4.2 names). */
   state: string;
 }
 
 /**
- * | machine                | catalog | lineup | listed | derives to       |
- * |------------------------|---------|--------|--------|------------------|
- * | GDZ Godzilla (Premium) | 3416    | yes    | yes    | listed           |
- * | SM  Spider-Man (Vault) | 2565    | yes    | yes    | listed           |
- * | BK  Black Knight       | 1055    | yes    | no     | unclaimed_on_pbm*|
- * | MM  Medieval Madness   | 642     | no     | yes    | missing_on_pbm   |
- * | FB  Fireball           | none    | —      | no     | not_on_pbm       |
- * | AFM, EBD, TAF, HD, SC  | —       | —      | no     | unmatched        |
+ * One machine per control state, so every frame of the two-line control can be
+ * walked locally before a review (spec §4).
  *
- * `*` Black Knight is the one state here that a sync erases — auto-link claims
- * it. See the note on its entry; a `listed` Black Knight is the product
- * working, not a broken seed.
+ * | machine                | catalog | on lineup | intent   | availability | renders as |
+ * |------------------------|---------|-----------|----------|--------------|------------|
+ * | GDZ Godzilla (Premium) | 3416    | yes       | on       | on the floor | on         |
+ * | SM  Spider-Man (Vault) | 2565    | yes       | on       | on loan      | flag       |
+ * | BK  Black Knight       | 1055    | yes       | off      | on the floor | lingering  |
+ * | MM  Medieval Madness   | 642     | no        | on       | on the floor | missing    |
+ * | TAF Addams Family      | 3416    | yes       | off      | on the floor | covered    |
+ * | HD  High Deposit       | 3416    | yes       | on       | on the floor | shared     |
+ * | EBD Eight Ball Deluxe  | 1055    | yes       | no_sync  | on the floor | sync_off   |
+ * | SC  Scared Stiff       | 642     | no        | off      | removed      | blocked    |
+ * | FB  Fireball           | none    | —         | off      | on the floor | uncataloged|
  *
- * `unclaimed_on_pbm` needs the machine LINKED to the title while not holding
- * the listing — an unlinked machine short-circuits to `unmatched` before the
- * snapshot is ever consulted (`derivePbmMachineStatus` returns `unlinked` on a
- * null `pinballmapMachineId`). So leaving Black Knight alone would NOT have
- * produced it, despite the lineup carrying Black Knight; it has to be linked
- * with `listed: false`. Verified by rendering, not by reading the code.
+ * **The Shared / Covered pair is why GDZ, TAF and HD all point at title 3416.**
+ * Coverage is a property of a same-title GROUP, so those two states cannot be
+ * produced by any single machine — three cabinets of one title is the smallest
+ * fixture that shows a covering sibling (HD, GDZ) and a covered one (TAF) at
+ * once. TAF and HD are not really Godzillas; the alternative was inventing
+ * catalog rows, and a wrong title on a dev fixture is cheaper than a wrong
+ * catalog.
  *
- * AFM, EBD and TAF have no entry in `catalog-apc.json` at all, so linking them
- * would mean inventing a title or pointing them at another game's. HD and SC
- * do have entries but are left unlinked so `unmatched` — the state every newly
- * added machine starts in — is not a one-machine case.
+ * Two states are deliberately not here. **Waiting** needs no stored lineup at
+ * all, which would take out every other row — clear `snapshot_json` by hand to
+ * see it. **Alert** needs intent On with an availability of Removed or Pending
+ * arrival, which the seed cannot write: `setPinballmapIntentAction` refuses
+ * that combination going in (spec 6.2), so the only honest way to reach it is
+ * the way a person does — set intent On, then change availability.
  *
- * `not_listed` (matched, lineup does not carry the title) has no honest row
- * here. It needs a machine whose real title is in the catalog but off the
- * lineup, and Medieval Madness is the only one — already spent on
- * `missing_on_pbm`, the state that has a control attached. Covering both would
- * mean linking a machine to a game it is not. Left uncovered rather than faked;
- * `status.test.ts` covers the derivation.
+ * **No machine here survives being edited into a different state and back.**
+ * Re-run the seed rather than reasoning about what the fixture became.
  */
 const MACHINE_PLAN: MachinePlan[] = [
   {
     initials: "GDZ",
     pinballmapMachineId: TITLE.godzillaPremium,
-    pinballmapListed: true,
-    pinballmapLmxId: lmxFor(TITLE.godzillaPremium),
+    pinballmapIntent: "on",
     pinballmapExcluded: false,
+    presenceStatus: "on_the_floor",
     modelName: null,
-    state: "listed",
+    state: "shared (with TAF off, HD on)",
+  },
+  {
+    initials: "HD",
+    pinballmapMachineId: TITLE.godzillaPremium,
+    pinballmapIntent: "on",
+    pinballmapExcluded: false,
+    presenceStatus: "on_the_floor",
+    modelName: null,
+    state: "shared",
+  },
+  {
+    initials: "TAF",
+    pinballmapMachineId: TITLE.godzillaPremium,
+    pinballmapIntent: "off",
+    pinballmapExcluded: false,
+    presenceStatus: "on_the_floor",
+    modelName: null,
+    state: "covered (by GDZ and HD)",
   },
   {
     initials: "SM",
     pinballmapMachineId: TITLE.spiderManVault,
-    pinballmapListed: true,
-    pinballmapLmxId: lmxFor(TITLE.spiderManVault),
+    pinballmapIntent: "on",
     pinballmapExcluded: false,
+    // The advise tier: in sync, green check, plus the quiet note (spec 6.5).
+    presenceStatus: "on_loan",
     modelName: null,
-    state: "listed",
+    state: "flag",
   },
   {
     initials: "BK",
     pinballmapMachineId: TITLE.blackKnight,
-    // Linked but not holding the listing, while the lineup DOES carry the
-    // title.
-    //
-    // THIS ONE DOES NOT SURVIVE A SYNC, and that is the product working. The
-    // reconcile pass behind "Sync now" and the hourly cron runs auto-link
-    // (PP-o355.20), which captures a lone eligible cabinet — so the first sync
-    // after seeding flips Black Knight to `listed` and writes a `linked`
-    // timeline event. Observed, not predicted: clicking Sync now during this
-    // seed's own verification claimed both BK and TAF within the same second.
-    //
-    // So do not read a `listed` Black Knight as a broken seed. Re-run the seed
-    // to get the state back. In production `unclaimed_on_pbm` survives only
-    // where auto-link deliberately stands down — two same-title cabinets tied
-    // at the top presence rank — which this fixture has no way to arrange
-    // without a second Black Knight.
-    pinballmapListed: false,
-    pinballmapLmxId: null,
+    // Intent Off with the entry present and nobody covering it — the mirror of
+    // Missing, and the state that offers Remove.
+    pinballmapIntent: "off",
     pinballmapExcluded: false,
+    presenceStatus: "on_the_floor",
     modelName: null,
-    state: "unclaimed_on_pbm (until the next sync auto-claims it)",
+    state: "lingering",
+  },
+  {
+    initials: "EBD",
+    pinballmapMachineId: TITLE.blackKnight,
+    // Same title as BK, so its entry IS on the lineup — which is the point:
+    // sync off still shows the observed fact, it just never flags it.
+    pinballmapIntent: "no_sync",
+    pinballmapExcluded: false,
+    presenceStatus: "on_the_floor",
+    modelName: null,
+    state: "sync_off",
   },
   {
     initials: "MM",
     pinballmapMachineId: TITLE.medievalMadness,
-    pinballmapListed: true,
-    pinballmapLmxId: DEPARTED_LMX_ID,
+    pinballmapIntent: "on",
     pinballmapExcluded: false,
+    presenceStatus: "on_the_floor",
     modelName: null,
-    state: "missing_on_pbm",
+    state: "missing",
+  },
+  {
+    initials: "SC",
+    pinballmapMachineId: TITLE.medievalMadness,
+    pinballmapIntent: "off",
+    pinballmapExcluded: false,
+    // Availability disallows the On position, with the reason beside it (6.2).
+    presenceStatus: "removed",
+    modelName: null,
+    state: "blocked",
   },
   {
     initials: "FB",
@@ -211,11 +237,20 @@ const MACHINE_PLAN: MachinePlan[] = [
     // `machines_model_name_requires_excluded` makes link + hand-entry mutually
     // exclusive, so this row also asserts the constraint holds.
     pinballmapMachineId: null,
-    pinballmapListed: false,
-    pinballmapLmxId: null,
+    pinballmapIntent: "off",
     pinballmapExcluded: true,
+    presenceStatus: "on_the_floor",
     modelName: "Fireball (home-brew conversion)",
-    state: "not_on_pbm",
+    state: "uncataloged",
+  },
+  {
+    initials: "AFM",
+    pinballmapMachineId: null,
+    pinballmapIntent: "off",
+    pinballmapExcluded: false,
+    presenceStatus: "on_the_floor",
+    modelName: null,
+    state: "no_model",
   },
 ];
 
@@ -246,17 +281,17 @@ try {
 
   let updated = 0;
   for (const m of MACHINE_PLAN) {
-    // All five columns in one UPDATE: the CHECK constraints
-    // (`..._link_exclusive`, `..._listed_requires_link`, `..._lmx_requires_
-    // listed`, `..._model_name_requires_excluded`) are row-level, so a
-    // clear-then-set pair would have to pass through a legal intermediate
-    // state anyway. One statement removes the need to reason about order.
+    // Every column in one UPDATE: the CHECK constraints
+    // (`..._link_exclusive`, `..._intent_requires_link`,
+    // `..._model_name_requires_excluded`) are row-level, so a clear-then-set
+    // pair would have to pass through a legal intermediate state anyway. One
+    // statement removes the need to reason about order.
     const rows = await sql`
       UPDATE machines SET
         pinballmap_machine_id = ${m.pinballmapMachineId},
-        pinballmap_listed = ${m.pinballmapListed},
-        pinballmap_lmx_id = ${m.pinballmapLmxId},
+        pinballmap_intent = ${m.pinballmapIntent},
         pinballmap_excluded = ${m.pinballmapExcluded},
+        presence_status = COALESCE(${m.presenceStatus}, presence_status),
         model_name = ${m.modelName}
       WHERE initials = ${m.initials}
       RETURNING initials

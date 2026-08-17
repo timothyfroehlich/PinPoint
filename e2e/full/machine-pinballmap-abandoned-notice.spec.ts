@@ -12,9 +12,9 @@
  * render a component directly or stop at the database.
  *
  * It is also the one layer that catches the state being wrong rather than
- * absent: a machine that just retitled off a listing is no longer
- * `pinballmapListed` and derives as plain "not listed", so nothing about its
- * own listing hints that it left something behind.
+ * absent: a machine that just re-matched has its intent reset to Off and
+ * derives as plain "not on the lineup", so nothing about its own state hints
+ * that it left something behind.
  *
  * Catalog entries and the "already listed" starting state are seeded
  * directly via `supabase-admin` helpers rather than through a real
@@ -36,6 +36,7 @@ import {
   seedPinballMapCatalogEntry,
   deletePinballMapCatalogEntries,
   linkMachineToPinballMap,
+  removeLmxFromStoredLineup,
 } from "../support/supabase-admin.js";
 
 test.describe("PinballMap abandoned-listing notice (PP-l81u)", () => {
@@ -48,7 +49,7 @@ test.describe("PinballMap abandoned-listing notice (PP-l81u)", () => {
     const prefix = getTestPrefix();
     const initials = getTestMachineInitials();
     // Run-scoped integer ids so parallel runs never collide on the catalog's
-    // primary key or the machines_pinballmap_listed_unique index. Randomised
+    // primary key or on each other's entries in the stored lineup. Randomised
     // rather than clock-derived, and each run claims a whole block of 10:
     // `Date.now() % 1_000_000` puts two workers that start 1 ms apart one
     // integer apart, which is exactly the gap between this test's OLD and NEW
@@ -116,27 +117,26 @@ test.describe("PinballMap abandoned-listing notice (PP-l81u)", () => {
       await page.reload();
       await expect(
         page.getByTestId("machine-pinballmap-abandoned")
-      ).toContainText(`Previous listing still live: “${oldTitleName}”`);
-      // The listing control above it speaks for the machine's CURRENT standing,
-      // which is what keeps the notice from reading as a bug about the wrong
-      // game.
+      ).toContainText(`Still on the location's lineup: “${oldTitleName}”`);
+      // The control above it speaks for the machine's CURRENT standing, which
+      // is what keeps the alert from reading as a bug about the wrong game.
       //
-      // The seeded snapshot (supabase/seed-pinballmap-state.ts) is a captured
+      // The seeded lineup (supabase/seed-pinballmap-state.ts) is a captured
       // fixture, never a live fetch — CORE-PBM-001 / CORE-TEST-006 still hold.
       // This machine's NEW title is a run-scoped id in the 900,000,000 range
       // that no capture contains, so with a lineup in hand PinPoint can say
       // plainly that the title is not on it.
       //
-      // Worth the line because "not listed" is only honest when a snapshot
-      // backs it. Before the seed existed this asserted the `unsynced` copy for
-      // the same machine, and both readings were right for their database —
+      // Worth the line because "not on the lineup" is only honest when a
+      // lineup backs it. Before the seed existed this asserted the Waiting copy
+      // for the same machine, and both readings were right for their database —
       // which is the distinction the old control collapsed when it answered
-      // "Not listed" for APC's entire listed fleet. Treating an ABSENT snapshot
-      // as an empty lineup would make this assertion pass for the wrong reason,
-      // so it pairs with the unit coverage in status.test.ts rather than
+      // "Not listed" for APC's entire listed fleet. Treating an ABSENT lineup
+      // as an empty one would make this assertion pass for the wrong reason, so
+      // it pairs with the unit coverage in listing-state.test.ts rather than
       // standing alone.
       await expect(page.getByTestId("pbm-listing-status")).toContainText(
-        "Not on our location's lineup"
+        "Not on the location's lineup"
       );
 
       // The other half of the trail: Info's warning is what sends a reader
@@ -148,6 +148,9 @@ test.describe("PinballMap abandoned-listing notice (PP-l81u)", () => {
     } finally {
       await cleanupTestEntities(request, { machineInitials: [initials] });
       await deletePinballMapCatalogEntries([oldTitleId, newTitleId]);
+      // The stored lineup is shared across every spec in the run, so an entry
+      // left in it would make some other machine's title look present.
+      await removeLmxFromStoredLineup([lmxId]);
     }
   });
 });

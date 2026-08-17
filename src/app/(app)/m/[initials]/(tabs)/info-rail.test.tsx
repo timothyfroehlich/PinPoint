@@ -29,7 +29,7 @@ function renderRail(overrides: Partial<RailProps> = {}): void {
       modelName="Medieval Madness"
       pinballmap={{
         locationUrl: LOCATION_URL,
-        listed: true,
+        onLineup: true,
         configIssue: false,
         manageHref: "/m/MM/edit",
       }}
@@ -110,7 +110,7 @@ describe("InfoRail", () => {
       expect(line).toHaveAttribute("href", LOCATION_URL);
     });
 
-    it("still links to our location listing when NOT listed", () => {
+    it("still links to our location page when the entry is absent", () => {
       // CORE-PBM-001: listed-vs-not is a claim about APC's lineup derived from
       // Pinball Map's location payload, and with no row label this line is the
       // card's only attribution anchor. Plain text here would silently drop the
@@ -118,13 +118,13 @@ describe("InfoRail", () => {
       renderRail({
         pinballmap: {
           locationUrl: LOCATION_URL,
-          listed: false,
+          onLineup: false,
           configIssue: false,
           manageHref: "/m/MM/edit",
         },
       });
       const line = screen.getByTestId("machine-pinballmap-line");
-      expect(line).toHaveTextContent("Not listed on Pinball Map");
+      expect(line).toHaveTextContent("Not on Pinball Map");
       expect(line).toHaveAttribute("href", LOCATION_URL);
     });
 
@@ -140,7 +140,7 @@ describe("InfoRail", () => {
     const withIssue: Partial<RailProps> = {
       pinballmap: {
         locationUrl: LOCATION_URL,
-        listed: false,
+        onLineup: false,
         configIssue: true,
         manageHref: "/m/TAF/edit",
       },
