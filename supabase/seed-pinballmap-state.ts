@@ -266,7 +266,7 @@ try {
       (id, enabled, location_id, snapshot_json, last_synced_at,
        last_sync_attempt_at, last_sync_status, last_sync_error)
     VALUES
-      ('singleton', true, ${snapshot.locationId}, ${JSON.stringify(snapshot)}::jsonb, now(),
+      ('singleton', true, ${snapshot.locationId}, ${JSON.stringify(snapshot)}::text::jsonb, now(),
        now(), 'ok', NULL)
     ON CONFLICT (id) DO UPDATE SET
       enabled = excluded.enabled,
@@ -278,6 +278,34 @@ try {
       last_sync_error = excluded.last_sync_error,
       updated_at = now()
   `;
+
+  // Read the row back rather than trusting the write.
+  //
+  // `${JSON.stringify(x)}::jsonb` — the obvious spelling, and what this used
+  // to say — stores a jsonb *string*: postgres.js infers the parameter's type
+  // from the cast that follows it, sends the already-serialized text as json,
+  // and the server stores `"{\"lmxes\":…}"` rather than an object. Every
+  // consumer then reads `snapshot.lmxes` as undefined. `::text::jsonb` pins
+  // the parameter to text so the jsonb cast parses it, which is why the double
+  // cast is deliberate and not redundant.
+  //
+  // Nothing about the failure is loud: the INSERT succeeds, this script prints
+  // its success line, and the first symptom is a TypeError several layers away
+  // in whichever page or spec touches the lineup first — it cost an E2E run to
+  // find. The shape is cheap to assert here and expensive to diagnose
+  // anywhere else.
+  const [stored] = await sql`
+    SELECT jsonb_typeof(snapshot_json) AS kind,
+           jsonb_typeof(snapshot_json -> 'lmxes') AS entries
+    FROM pinballmap_state WHERE id = 'singleton'
+  `;
+  if (stored?.["kind"] !== "object" || stored["entries"] !== "array") {
+    throw new Error(
+      `snapshot_json stored as ${String(stored?.["kind"])} with lmxes as ` +
+        `${String(stored?.["entries"])} — expected object/array. The jsonb ` +
+        `bind is double-encoding; keep the ::text::jsonb cast pair.`
+    );
+  }
 
   let updated = 0;
   for (const m of MACHINE_PLAN) {
