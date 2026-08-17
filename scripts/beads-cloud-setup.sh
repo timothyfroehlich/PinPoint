@@ -15,9 +15,14 @@
 # the literal, so it kept installing latest). Moving the body here makes it
 # reviewable and collapses the pin to a SINGLE source of truth. The UI field is
 # now just a one-line shim — the repo is already cloned at container-provision
-# time (verified 2026-08-16: setup cwd is $HOME, the checkout is at ~/PinPoint):
+# time, so the shim locates the checkout and runs this script:
 #
-#     bash ~/PinPoint/scripts/beads-cloud-setup.sh
+#     bash "$(ls -d ~/PinPoint /home/*/PinPoint /root/PinPoint 2>/dev/null | head -1)/scripts/beads-cloud-setup.sh"
+#
+# It locates rather than hardcodes because (verified 2026-08-17) setup runs as
+# root with $HOME=/root while the checkout is at /home/user/PinPoint — so a plain
+# ~/PinPoint resolves to /root/PinPoint and misses it. This script itself uses
+# BASH_SOURCE below, so it works no matter which of those paths invoked it.
 #
 # THE PIN IS READ, NOT DUPLICATED. bd is installed at exactly the version this
 # script parses out of beads-cloud-init.sh's BD_PINNED_VERSION. So bumping the pin

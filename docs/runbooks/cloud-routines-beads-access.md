@@ -75,12 +75,19 @@ them.
 The setup script's body lives in the repo at `scripts/beads-cloud-setup.sh`, so
 it is reviewable and diffable. The claude.ai UI "Setup script" field holds only a
 one-line shim that calls it — the repo is already cloned at container-provision
-time (verified 2026-08-16: the setup script's cwd is `$HOME`, and the checkout is
-at `~/PinPoint`):
+time, so the shim just locates the checkout and runs the script:
 
 ```bash
-bash ~/PinPoint/scripts/beads-cloud-setup.sh
+bash "$(ls -d ~/PinPoint /home/*/PinPoint /root/PinPoint 2>/dev/null | head -1)/scripts/beads-cloud-setup.sh"
 ```
+
+**Why the locator, not a plain `~/PinPoint`** (verified 2026-08-17): the setup
+script runs as `root` with `$HOME=/root`, but the checkout is at
+`/home/user/PinPoint` and the setup cwd is `/home/user`. So `~/PinPoint` resolves
+to `/root/PinPoint` and misses the checkout entirely — the plain form was tried
+first and failed. The `ls -d … | head -1` form finds the checkout regardless of
+whether `$HOME` is `/root` or the sandbox user's home, and regardless of the
+sandbox username. It fails loud (setup errors) if none of the candidates exist.
 
 That script installs `dolt` (latest) and `bd` (pinned); the agent then runs
 `scripts/beads-cloud-init.sh` (below) to materialize the credential and clone.
