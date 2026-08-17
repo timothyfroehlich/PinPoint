@@ -27,10 +27,9 @@ Highlight: any with failing CI or stale > 7 days
 [List: #NNN Title (created X days ago) — [in beads / NOT TRACKED]]
 
 ## 🌙 Overnight
-Nightly ran:  [which night(s) since the last briefing, or "no run since <date>"]
-Reported:     [each `nightly-report` bead: ID, what it did, PR # if it opened one]
-Needs you:    [count from `bd human list`, and the newest few — note which the nightly filed vs. which a session did]
-[Say plainly if the nightly did not run — a silent gap is a failed run, not an idle one.]
+Reported:     [each `nightly-report` bead: ID, what it did, PR # if it opened one — or "queue empty"]
+Needs you:    [count of open `human` beads, and the newest few — note which the nightly filed vs. which a session did]
+[An empty queue is not a failed run. Don't infer one; claude.ai's run history is the only place that says.]
 
 ## 📦 Beads State
 Ready to pick up: [top 5 from `bd ready`]

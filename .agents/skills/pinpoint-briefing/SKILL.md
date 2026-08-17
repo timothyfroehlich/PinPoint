@@ -99,16 +99,21 @@ Read the severity and one-line summary of each open `security` bead. These beads
 The nightly bead routine runs unattended, triages a batch of the backlog, and takes one bead as far as it can. It reports **on the bead itself**, flagged with the `nightly-report` label:
 
 ```bash
-bd list --status=open --label=nightly-report --json
-bd human list
+bd list --status=open,in_progress --label=nightly-report --json
+bd human list --status=open --json
 ```
+
+**Both status filters are load-bearing, and they are not spelled the same way.**
+`--status=open` alone drops a bead the moment anyone claims it — `open` and `in_progress` are separate statuses — so a nightly bead someone has started, but whose label nobody cleared, silently leaves the queue while still carrying it. `bd list` accepts the comma form. **`bd human list` does not**: `bd human list --status=open,in_progress` returns _no rows at all_ rather than erroring, so pass it the bare `--status=open`. Without any filter it includes **closed** beads, which inflates the count and — worse — inflates it permanently, since resolving a bead never lowers it. That breaks the "a growing count is the signal" reading below.
 
 Two queues, answering different questions:
 
 - **`nightly-report`** — what the nightly actually did since you last looked. Each bead's `notes` carry the PR number, what it changed, what it deliberately didn't, and anything it found that changes the bead's premise. Read the notes, not just the title.
 - **`human`** — the general "needs a human decision" flag. **It is not the nightly's queue**; any agent or session sets it, and most entries in it predate the nightly routine entirely. The nightly is simply one more writer: it flags a taste call, a scope question, a close it recommends but is not allowed to perform, or a bead it could not confidently classify. Don't attribute the queue's contents to the nightly — check each entry's author before saying who asked. `bd human list` is the canonical read (it shows resolution state, which the plain `--label=human` list does not, so the two return different sets); `bd human respond` / `bd human dismiss` clear it.
 
-Neither label clears itself. `nightly-report` is dropped once the work has been picked up or merged; a `human` flag is dropped when Tim answers. So a growing count in either is the signal — surface both counts even when nothing else is notable.
+Neither label clears itself, and nothing in the routine or this skill clears them either — both are manual. Tim drops `nightly-report` once he has picked the work up, and a `human` flag when he answers. So a growing count in either is the signal; surface both counts even when nothing else is notable.
+
+**An empty `nightly-report` queue is not evidence that the nightly failed.** It means the same thing as a cleared inbox: either the run had nothing worth handing off, or its output was already picked up and the label dropped. You cannot tell that apart from a run that never fired, because beads are the only surface Group F reads and a run that dies before its beads setup writes nothing at all. Report the queue as empty and stop there. If Tim actually needs to know whether last night ran, the routine's run history on claude.ai is the only place that answers it.
 
 **Report each bead once.** The nightly unclaims the bead before it exits, so the same work shows up in "Overnight", in "Open PRs", and in "Beads State → Ready to pick up". Overnight is its home; the other two sections reference it by ID rather than restating it.
 
