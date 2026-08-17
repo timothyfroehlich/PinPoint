@@ -38,8 +38,13 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 INIT_SCRIPT="$SCRIPT_DIR/beads-cloud-init.sh"
 
 # --- The pin: read it from the init script, the single source of truth. --------
+# Extract whatever literal is inside the quotes rather than re-validating its
+# shape here — a second version-format regex would have to stay byte-compatible
+# with the init script's guard, and a pin like "1.2.2-rc1" that one accepts and
+# the other rejects would reintroduce exactly the drift this indirection removes.
+# The init-script guard (bd version == pin) remains the sole shape validator.
 [[ -f "$INIT_SCRIPT" ]] || die "cannot find $INIT_SCRIPT — is this the PinPoint checkout?"
-BD_VER="$(sed -nE 's/^BD_PINNED_VERSION="([0-9]+\.[0-9]+\.[0-9]+)".*/\1/p' "$INIT_SCRIPT" | head -n1 || true)"
+BD_VER="$(sed -nE 's/^BD_PINNED_VERSION="([^"]+)".*/\1/p' "$INIT_SCRIPT" | head -n1 || true)"
 [[ -n "$BD_VER" ]] || die "could not parse BD_PINNED_VERSION from $INIT_SCRIPT"
 # ------------------------------------------------------------------------------
 

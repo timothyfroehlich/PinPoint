@@ -85,6 +85,17 @@ bash ~/PinPoint/scripts/beads-cloud-setup.sh
 That script installs `dolt` (latest) and `bd` (pinned); the agent then runs
 `scripts/beads-cloud-init.sh` (below) to materialize the credential and clone.
 
+**Why `bd` is pinned but `dolt` is not.** The 2026-08-16 lockout was a `bd`
+schema migration — `bd` owns `schema_migrations` and the additive migrations that
+broke it, so an accidental `bd` release is the live hazard the pin guards against.
+`dolt` is the storage engine underneath; its on-disk/wire format is stable and
+its releases are designed for cross-version client/server compatibility. The
+shared server on Bazzite runs its own `dolt`, and pinning the cloud client to a
+fixed version could actually _create_ a client/server mismatch when that server
+upgrades — so tracking latest is the safer choice for the client, not an
+oversight. (The old inline setup script installed `dolt` latest too; this is
+unchanged, now stated deliberately.)
+
 **The bd pin is single-source.** `beads-cloud-setup.sh` reads the version out of
 `BD_PINNED_VERSION` in `scripts/beads-cloud-init.sh` and installs exactly that, by
 exact release tag — so the installed binary and the runtime guard cannot disagree,
