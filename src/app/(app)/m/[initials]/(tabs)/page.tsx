@@ -129,17 +129,21 @@ export default async function MachineInfoTab({
     accessLevel,
     ownershipContext
   );
-  // Both reads are skipped for viewers who would not see the result, so the
-  // public QR-scan landing pays for neither. The snapshot is a location-wide
-  // singleton; the abandonment query is machine-scoped.
-  const pbmState = canDiagnose ? await getPinballMapState() : null;
+  // The lineup is read for EVERYONE, not just diagnosers: the rail's one
+  // Pinball Map line says whether the location's lineup carries this title, and
+  // that sentence is shown to the signed-out visitor who scanned the QR code.
+  // Gating it would make that line read "Not on Pinball Map" for every machine
+  // whenever the viewer lacked the capability — the same confident wrong answer
+  // the old control gave APC's whole fleet (CORE-ARCH-012). It is one
+  // location-wide singleton row.
+  const pbmState = await getPinballMapState();
   const snapshot = pbmState?.snapshotJson ?? null;
 
-  // The same-title group has to be read here too, even though this tab renders
-  // none of the coverage sentences. Coverage is what separates Covered (quiet)
-  // from Lingering (out of sync), so deriving without it would raise a Config
-  // issue on a machine whose entry a sibling covers — and send the reader to a
-  // Manage tab that says everything is fine (CORE-ARCH-012).
+  // The same-title group is diagnose-only, because coverage feeds nothing but
+  // the Config-issue warning. It has to be read for THAT, though: coverage is
+  // what separates Covered (quiet) from Lingering (out of sync), so deriving
+  // without it would raise a warning on a machine whose entry a sibling covers
+  // — and send the reader to a Manage tab that says everything is fine.
   const sameTitle: PbmSiblingInput[] =
     canDiagnose && machine.pinballmapMachineId !== null
       ? await db
