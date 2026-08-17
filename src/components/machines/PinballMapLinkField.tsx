@@ -649,17 +649,23 @@ export function PinballMapLinkField({
               <Label htmlFor={yearId} className="text-xs">
                 Year
               </Label>
-              {/* `inputMode="numeric"` rather than type="number": a spinner is
-                  useless for a four-digit year and Safari's stepper eats the
-                  field's width. The server enforces the 1930..next-year range;
-                  `min`/`max` here make the browser say so first. */}
+              {/* `inputMode="numeric"` rather than `type="number"`: a spinner
+                  is useless for a four-digit year and Safari's stepper eats the
+                  field's width. It also brings up the numeric keypad on mobile,
+                  which is the real win.
+
+                  That choice costs the browser-side range check — `min`/`max`
+                  are inert on anything but `type="number"`, so carrying them
+                  here would have been decoration. `pattern` gives the browser
+                  the one thing it can still enforce (four digits), and the
+                  1930..next-year range stays the server's, where it was
+                  authoritative anyway. */}
               <Input
                 id={yearId}
                 name="year"
-                type="number"
                 inputMode="numeric"
-                min={1930}
-                max={new Date().getFullYear() + 1}
+                pattern="\d{4}"
+                maxLength={4}
                 value={year}
                 onChange={(e) => {
                   setYear(e.target.value);
