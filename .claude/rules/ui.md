@@ -38,6 +38,10 @@ Full statements, severity, and do/don't: `docs/NON_NEGOTIABLES.md`.
   accessible name on data tables, real `<button>` (never
   `<div role="button">`), `title` is not a tooltip, `inert` on background
   regions when a modal opens.
+- **Telegraphic status copy** (CORE-UI-007): status lines, error reasons, and
+  state labels are a bold 2–4 word label + at most one supporting line — no
+  prose sentences, no articles/copulas, neutral voice. Full register:
+  `pinpoint-design-bible` §25. Confirm-dialog bodies are exempt.
 
 These are the broadest globs in this directory — roughly two-thirds of the
 source tree — and that is deliberate rather than sloppy: they still exclude

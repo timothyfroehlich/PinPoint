@@ -38,6 +38,7 @@
 21. Accessibility floor: skip link, semantic table markup, `motion-reduce:` paired with animations, no `<div role="button">`, `title` is not a tooltip (CORE-A11Y-001..006)
 22. Image priority and preconnect discipline: `priority` is for the LCP candidate only; preconnect to known image origins (CORE-PERF-003)
 23. External side effects (HTTP, email, Discord, blob, Vault RPC) never run inside a DB transaction; deliver them post-commit (CORE-ARCH-011)
+24. Status and error copy uses the telegraphic register: bold 2–4 word label + at most one supporting line (CORE-UI-007)
 
 ---
 
@@ -485,6 +486,14 @@
 - **Do:** At the start of any non-trivial UI work, search the catalog: `npx -y modern-web-guidance@latest search "<query>"`. Retrieve specific guides by id with `retrieve "<id>,<id2>"`. Check the guide's Browser Support section against CORE-UI-005 before adopting any recommendation.
 - **Don't:** Implement ad-hoc patterns when a Widely-available primitive exists for the same job. Don't pre-emptively pull every guide into context; search per task.
 - **Reference:** Plugin is installed at `~/.claude/plugins/marketplaces/googlechrome/skills/modern-web-guidance/`.
+
+**CORE-UI-007:** Status and error copy uses the telegraphic register
+
+- **Severity:** Required
+- **Why:** Status lines are scanned repeatedly, not read once. Prose sentences ("The sync is off, so differences aren't flagged") bury the fact; a label-first structure ("Sync off — differences not flagged") surfaces it. Settled during the PinballMap listing-control copy review (2026-08-15/16).
+- **Do:** Write status lines, inline error reasons, disabled-control explanations, and state labels as a short bold label (2–4 words) plus at most one muted supporting line. Drop articles and copulas. Neutral voice ("the location's", never "our"). Incomplete configuration gets the amber warning icon, not red — red stays reserved for destructive actions.
+- **Don't:** Write full prose sentences in a status line, even grammatical ones. Don't apply this register to confirm-dialog bodies — dialogs are read once with attention and carry consequences in full sentences.
+- **Reference:** `pinpoint-design-bible` §25 Status & Error Copy Register.
 
 ---
 

@@ -46,6 +46,7 @@ Sections keep their numbers wherever they live — `design-bible §17` resolves 
 | 22  | Modern Web Guidance Reference | `references/21-22-images-and-guidance.md`            |
 | 23  | Presenting Mockups for Review | `references/23-24-mockups-and-severity.md`           |
 | 24  | Severity Vocabulary           | `references/23-24-mockups-and-severity.md`           |
+| 25  | Status & Error Copy Register  | `references/25-copy-register.md`                     |
 
 ## 1. Visual Identity
 
