@@ -253,23 +253,13 @@ intent agrees with the lineup; _out of sync_ means they disagree.
 
 ## Known divergences (code vs spec)
 
-| Spec                                 | Code today                                                                | Resolution                                               |
-| :----------------------------------- | :------------------------------------------------------------------------ | :------------------------------------------------------- |
-| §4 two-line control                  | 10-state control with credential-gated Add/Remove (PR #1875)              | Rebuild in PP-o355.21                                    |
-| §1 coverage model                    | One holder per title, enforced by a partial unique index (migration 0052) | Drop the constraint; migration in the rebuild            |
-| 5.1 no automatic intent              | Auto-link claims the listing for a lone candidate (PP-o355.20)            | **Remove auto-link** in the rebuild — decided 2026-08-16 |
-| 7.1 comment fan-out                  | No comment import exists                                                  | PP-o355.4 (reshape to fan-out); PP-o355.36 depends on it |
-| Intent tri-state / Don't sync        | No per-machine sync opt-out column                                        | New column + migration                                   |
-| 3.5 disabled-until-refresh           | Unsynced renders an informational state                                   | Part of the rebuild                                      |
-| 3.5 enable triggers a refresh        | No enable surface exists to trigger from                                  | PP-o355.37 (admin enable surface)                        |
-| 4.6 comment-count confirm            | Plain confirm, no count, no freshness check                               | Part of the rebuild                                      |
-| 6.2 intent-side block                | Intent can be set regardless of availability                              | Part of the rebuild                                      |
-| 8.2 push permission tier             | Outbound writes are admin-only                                            | Widen to the 8.1 capability                              |
-| 8.3 refresh needs only page access   | Refresh is technician/admin                                               | Part of the rebuild                                      |
-| 3.2 header refresh + burst allowance | Sync now sits in the section header; flat 3-minute floor                  | Part of the rebuild (token bucket)                       |
-| 6.5 Flag advise state                | No advise-tier note                                                       | Part of the rebuild                                      |
-| 2.4 uncataloged / manual model       | No hand-entered model fields                                              | PP-3bbr, after PP-o355.21 merges                         |
-| 7.3 comment marking on removal       | Not implemented                                                           | PP-o355.36                                               |
+| Spec                           | Code today                                                                                                   | Resolution                                               |
+| :----------------------------- | :----------------------------------------------------------------------------------------------------------- | :------------------------------------------------------- |
+| 7.1 comment fan-out            | No comment import exists                                                                                     | PP-o355.4 (reshape to fan-out); PP-o355.36 depends on it |
+| 3.5 enable triggers a refresh  | No enable surface exists to trigger from                                                                     | PP-o355.37 (admin enable surface)                        |
+| 4.9 read-only viewer           | No surface reaches it — the only page carrying the control is the Manage tab, which gates on `machines.edit` | PP-o355.38                                               |
+| 2.4 uncataloged / manual model | Fields exist; the surface for them is not what it should be                                                  | PP-3bbr                                                  |
+| 7.3 comment marking on removal | Not implemented                                                                                              | PP-o355.36                                               |
 
 ---
 
