@@ -200,6 +200,7 @@ the degradation is a known, documented choice — not an oversight.
 | `MOCK_BLOB_STORAGE`                                                             | 🟢            | Dev/test | `src/lib/blob/client.ts`                   | feature flag                                                                   |
 | `DRIZZLE_FORCE_PRODUCTION`                                                      | 🟢            | Ops      | `drizzle.config.ts`                        | explicit opt-in guard for prod DDL — see the `*_FORCE_PRODUCTION` note below   |
 | `LOG_LEVEL` / `PINPOINT_LOG_DIR`                                                | 🟢            | All      | `src/lib/logger.ts`                        | defaults: `info` / `<cwd>/logs`                                                |
+| `POSTGRES_URL_READONLY`                                                         | 🔴            | Ops      | `scripts/query-readonly.mjs`               | `pinpoint_readonly` role; **never** in Vercel — the app never reads it         |
 | `SKIP_SUPABASE_RESET`, `E2E_DOCKER_READY_ATTEMPTS`, `E2E_DOCKER_READY_DELAY_MS` | 🟢            | CI/test  | `e2e/global-setup.ts`                      | E2E harness tuning                                                             |
 
 > **`*_FORCE_PRODUCTION` accepts `1` or `true`, and nothing else.**
