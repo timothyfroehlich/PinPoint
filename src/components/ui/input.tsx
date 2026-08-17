@@ -9,9 +9,9 @@ function Input({
   ...props
 }: React.ComponentProps<"input">): React.JSX.Element {
   function handleBlur(e: React.FocusEvent<HTMLInputElement>): void {
-    // Skip native-validity sync when the caller controls aria-invalid
-    // (e.g. react-hook-form, Radix FormControl) — otherwise blur would
-    // clobber schema/library-driven invalid state with checkValidity().
+    // Skip native-validity sync when the caller controls aria-invalid —
+    // otherwise blur would clobber a server-action or schema-driven invalid
+    // state with the browser's weaker checkValidity() result.
     if (!("aria-invalid" in props)) {
       e.currentTarget.setAttribute(
         "aria-invalid",

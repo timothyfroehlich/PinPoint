@@ -568,7 +568,7 @@
 
 - **Severity:** Required
 - **Why:** `:user-invalid` is a CSS pseudo-class — visual only. Screen readers need `aria-invalid="true"` to announce "invalid" alongside the field label. Without it, AT users get only the form-level alert after a server round-trip.
-- **Do:** Add the `onBlur` listener to `src/components/ui/input.tsx` and `textarea.tsx` **once** so every form picks it up automatically — same primitive that hosts CORE-FORM-003 styling. The listener sets `aria-invalid="true"` on inputs that fail `checkValidity()` after first interaction, and `aria-invalid="false"` when the value becomes valid again, and skips the sync when the caller already controls `aria-invalid` (react-hook-form / Radix `FormControl`). Do not copy the listener per form.
+- **Do:** Add the `onBlur` listener to `src/components/ui/input.tsx` and `textarea.tsx` **once** so every form picks it up automatically — same primitive that hosts CORE-FORM-003 styling. The listener sets `aria-invalid="true"` on inputs that fail `checkValidity()` after first interaction, and `aria-invalid="false"` when the value becomes valid again, and skips the sync when the caller already controls `aria-invalid` (a Server Action or schema verdict the browser can't see). Do not copy the listener per form.
 - **Don't:** Set `aria-invalid="true"` on initial render. Don't rely solely on the form-level `<Alert>` to communicate per-field errors.
 - **Reference:** modern-web-guidance `accessible-error-announcement`, `required-field-feedback`.
 - **Status:** Implemented in `input.tsx` and `textarea.tsx` (PP-kqbk.2, bundled with CORE-FORM-003). `select.tsx` (a Radix trigger) has no native `checkValidity()`; a caller-controlled `aria-invalid` is the mechanism there.

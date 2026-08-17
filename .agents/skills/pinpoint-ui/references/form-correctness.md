@@ -12,11 +12,11 @@ Two boundaries are decisions rather than facts you can read off, so they're reco
 
 **`select.tsx` is deliberately excluded, and "finishing the job" there is a mistake.** The shadcn `Select` trigger is a Radix `<button>`, not a form control: it has no native validity state, so `:user-invalid` can never match and `checkValidity()` has nothing to report. Invalid state on a Select is caller-driven — pass `aria-invalid` to `<SelectTrigger>`, which already styles it. If you find yourself adding a blur handler to `select.tsx`, stop; the mechanism you want is the caller's.
 
-**A caller that passes `aria-invalid` owns it end to end.** The primitives' blur handler stands down when the caller supplies the attribute, so react-hook-form and Radix `FormControl` keep their schema-driven verdict instead of having it overwritten by the browser's weaker `checkValidity()` result. Don't "fix" the guard — it exists because the two validation sources disagree, and the richer one should win.
+**A caller that passes `aria-invalid` owns it end to end.** The primitives' blur handler stands down when the caller supplies the attribute, so a Server Action's or schema's verdict survives instead of being overwritten by the browser's weaker `checkValidity()` result. Don't "fix" the guard — it exists because the two validation sources disagree, and the richer one should win.
 
 ## Native HTML primitives alongside shadcn/Radix
 
-**shadcn/Radix is the design system.** It owns Dialog, AlertDialog, Sheet, Drawer, Popover, Tooltip, DropdownMenu, Accordion, Form. Don't migrate components off Radix to chase native primitives — Radix delivers consistent variants, theming, focus trapping, animation, and one tested behavior across the app.
+**shadcn/Radix is the design system.** It owns Dialog, AlertDialog, Sheet, Drawer, Popover, Tooltip, DropdownMenu, Accordion. It does **not** own form state — the shadcn `Form` shim was deleted in PP-8hl8 along with `react-hook-form`, because nothing used it; forms are plain `<form onSubmit>` + Server Actions. Don't migrate components off Radix to chase native primitives — Radix delivers consistent variants, theming, focus trapping, animation, and one tested behavior across the app.
 
 The platform's Widely-available primitives **complement** that stack. Reach for them in two situations: a one-off use that doesn't deserve a new shadcn variant, or an attribute that drops straight onto a shadcn component and strengthens it.
 
