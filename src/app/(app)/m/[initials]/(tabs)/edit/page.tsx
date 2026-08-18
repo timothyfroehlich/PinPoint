@@ -1,22 +1,31 @@
 import type React from "react";
 import { notFound, redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
-import { ExternalLink, MapPin } from "lucide-react";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
-import { userProfiles, pinballmapCatalog } from "~/server/db/schema";
+import { userProfiles, pinballmapCatalog, machines } from "~/server/db/schema";
 import {
   getAccessLevel,
   checkPermission,
   type OwnershipContext,
 } from "~/lib/permissions/index";
 import { pinballmapLocationUrl } from "~/lib/pinballmap/public-url";
-import { getPinballMapState } from "~/lib/pinballmap/state";
-import { formatDateTime } from "~/lib/dates";
+import {
+  getPinballMapState,
+  getRefreshAllowance,
+} from "~/lib/pinballmap/state";
+import {
+  derivePbmListingView,
+  type PbmSiblingInput,
+} from "~/lib/pinballmap/listing-state";
+import { findLmxForMachine } from "~/lib/pinballmap/resolve-lmx";
+import { listSurfacingAbandonedForMachine } from "~/lib/pinballmap/abandoned-listings";
+import { getCatalogEntry } from "~/lib/pinballmap/catalog";
+import { PinballmapListingControl } from "~/components/machines/PinballmapListingControl";
+import { PinballmapAbandonedEntries } from "~/components/machines/PinballmapAbandonedEntries";
 import { getUnifiedUsers } from "~/lib/users/queries";
 import { getMachineForLayout } from "~/app/(app)/m/[initials]/_data";
 import { MachineDetailsForm } from "./machine-details-form";
-import { PinballmapSyncNow } from "./pinballmap-sync-now";
 import { MachineOwnerTransfer } from "./machine-owner-transfer";
 
 /**
@@ -57,6 +66,19 @@ export default async function MachineEditPage({
     notFound();
   }
 
+  // `getMachineForLayout` spreads `PBM_METADATA_PLACEHOLDER` over the row, which
+  // forces `manufacturer` and `year` to null — it predates those columns
+  // existing and is still right for the header, which has no real source for
+  // `edition`/`backboxImageUrl` either. It is wrong for THIS form: the
+  // hand-entered model fields (PP-3bbr) would open blank on a machine that has
+  // them, and saving that blank state writes the nulls back. `modelName` is not
+  // in the placeholder, so it survives — which is exactly what made the
+  // inconsistency easy to miss. Read the three together, from the row.
+  const modelFields = await db.query.machines.findFirst({
+    where: eq(machines.initials, initials),
+    columns: { modelName: true, manufacturer: true, year: true },
+  });
+
   const currentUserProfile = user
     ? await db.query.userProfiles.findFirst({
         where: eq(userProfiles.id, user.id),
@@ -80,23 +102,28 @@ export default async function MachineEditPage({
     redirect(`/m/${initials}`);
   }
 
-  const canLink = checkPermission(
+  // The three Pinball Map capabilities, spec 8.1 / 8.2 / 8.3. `link` and `push`
+  // resolve to the same tier today and `sync` is wider than both, but they are
+  // checked separately because they answer different questions and the matrix
+  // is free to move one without the others (CORE-ARCH-008).
+  const canSetIntent = checkPermission(
     "machines.pinballmap.link",
     accessLevel,
     ownershipContext
   );
-  // Sync is a stricter grant than Link — "machines.pinballmap.link" allows the
-  // owning member, but "machines.pinballmap.sync" is technician/admin only.
-  // Gating "Sync now" on `canLink` would show a button that 403s for an
-  // owner-only member (PP-o355.19 review).
-  const canSync = checkPermission(
+  const canRefresh = checkPermission(
     "machines.pinballmap.sync",
+    accessLevel,
+    ownershipContext
+  );
+  const canPush = checkPermission(
+    "machines.pinballmap.push",
     accessLevel,
     ownershipContext
   );
 
   const pinballmapTitlePromise: Promise<string | null> =
-    canLink && machine.pinballmapMachineId !== null
+    machine.pinballmapMachineId !== null
       ? db.query.pinballmapCatalog
           .findFirst({
             where: eq(
@@ -108,11 +135,31 @@ export default async function MachineEditPage({
           .then((linkedTitle) => linkedTitle?.name ?? null)
       : Promise.resolve(null);
 
-  const [pinballmapTitleName, pbmState, allUsersRaw] = await Promise.all([
-    pinballmapTitlePromise,
-    canLink ? getPinballMapState() : Promise.resolve(null),
-    getUnifiedUsers({ includeEmails: false }),
-  ]);
+  // Every cabinet sharing this title — what decides coverage (spec §1, 4.7).
+  // Small by construction: the group is keyed on one catalog title, so it is one
+  // cabinet in almost every case and a handful in the worst. Skipped for an
+  // unmatched machine, which has no title to share.
+  const sameTitlePromise: Promise<PbmSiblingInput[]> =
+    machine.pinballmapMachineId !== null
+      ? db
+          .select({
+            id: machines.id,
+            initials: machines.initials,
+            name: machines.name,
+            intent: machines.pinballmapIntent,
+          })
+          .from(machines)
+          .where(eq(machines.pinballmapMachineId, machine.pinballmapMachineId))
+      : Promise.resolve([]);
+
+  const [pinballmapTitleName, pbmState, allUsersRaw, sameTitle, allowance] =
+    await Promise.all([
+      pinballmapTitlePromise,
+      getPinballMapState(),
+      getUnifiedUsers({ includeEmails: false }),
+      sameTitlePromise,
+      getRefreshAllowance(),
+    ]);
 
   const allUsers = allUsersRaw.map((u) => ({
     id: u.id,
@@ -122,6 +169,63 @@ export default async function MachineEditPage({
     status: u.status,
     role: u.role,
   }));
+
+  const snapshot = pbmState?.snapshotJson ?? null;
+
+  // The control's whole view is DERIVED here and handed down — nothing in it
+  // discovers state by calling Pinball Map (CORE-PBM-001, PP-o355.21).
+  const listingView = derivePbmListingView({
+    machineId: machine.id,
+    pinballmapMachineId: machine.pinballmapMachineId,
+    pinballmapExcluded: machine.pinballmapExcluded,
+    intent: machine.pinballmapIntent,
+    presenceStatus: machine.presenceStatus,
+    snapshot,
+    siblings: sameTitle,
+  });
+
+  // The remove confirm's comment count (spec 4.6). Null when there is no entry
+  // to count comments on, which the confirm says outright rather than showing a
+  // zero it cannot stand behind.
+  const commentCount =
+    snapshot !== null && machine.pinballmapMachineId !== null
+      ? (findLmxForMachine(snapshot, machine.pinballmapMachineId)?.conditions
+          .length ?? null)
+      : null;
+
+  // Whether an operator credential exists at all — read off the two columns the
+  // state row already carries, never by decrypting the token. Without one the
+  // outbound writes cannot run, so Add / Remove are absent rather than present
+  // and failing (CORE-ARCH-012).
+  const writeEnabled =
+    pbmState?.outboundEmail != null && pbmState.outboundTokenVaultId != null;
+
+  // Entries left on the public lineup by an earlier re-match (PP-l81u).
+  //
+  // **Only the ones whose title has left the fleet entirely** (spec 2.5). While
+  // any cabinet is still matched to the old title, the entry is that title's
+  // ordinary business and already shows through those cabinets' own states —
+  // surfacing it here as well would put the same entry on two pages with two
+  // different explanations, and this is the page whose explanation is wrong
+  // (the machine here is not the one that title belongs to any more).
+  //
+  // Note the test is MATCHED, not covered: a sibling matched to the old title
+  // with intent Off renders Lingering and offers the same Remove, so it is
+  // already handled even though nothing covers the entry.
+  //
+  // The catalog row can disappear while the entry on Pinball Map outlives it,
+  // so a null title falls back to naming the entry by id rather than inventing
+  // one.
+  const abandonedRows = await listSurfacingAbandonedForMachine(machine.id);
+  const abandoned = await Promise.all(
+    abandonedRows.map(async (row) => ({
+      lmxId: row.lmxId,
+      title: (await getCatalogEntry(row.pinballmapMachineId))?.name ?? null,
+      commentCount:
+        snapshot?.lmxes.find((l) => l.id === row.lmxId)?.conditions.length ??
+        null,
+    }))
+  );
 
   const canEditAnyMachine =
     accessLevel === "admin" || accessLevel === "technician";
@@ -148,73 +252,58 @@ export default async function MachineEditPage({
           name={machine.name}
           presenceStatus={machine.presenceStatus}
           description={machine.description}
-          canLink={canLink}
+          canLink={canSetIntent}
           pinballmapMachineId={machine.pinballmapMachineId}
           pinballmapExcluded={machine.pinballmapExcluded}
           pinballmapExcludedReason={machine.pinballmapExcludedReason}
           pinballmapTitleName={pinballmapTitleName}
+          modelName={modelFields?.modelName ?? null}
+          manufacturer={modelFields?.manufacturer ?? null}
+          year={modelFields?.year ?? null}
         />
       </section>
 
-      {/* Pinball Map — no save bar: each control here acts on its own.
-          PP-o355.21 rebuilds the listing control and moves the catalog title
-          row in from Details, where it currently rides the Details save. */}
+      {/* Pinball Map — no save bar: every control here acts on its own, and
+          the section heading lives inside the control (its header carries the
+          location name, the refresh state and the out-of-sync alert). */}
       <section
         className="space-y-4 border-t border-outline-variant pt-6"
         aria-labelledby="section-pinballmap"
       >
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 id="section-pinballmap" className="text-base font-semibold">
-            <a
-              href={locationUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-primary underline underline-offset-2 hover:no-underline"
-            >
-              Pinball Map
-              <ExternalLink className="size-3.5" aria-hidden="true" />
-            </a>
-          </h2>
-          {canLink && (
-            <div className="text-sm text-muted-foreground">
-              {pbmState?.lastSyncedAt
-                ? `last synced ${formatDateTime(pbmState.lastSyncedAt)}`
-                : "never synced"}
-              {canSync && (
-                <>
-                  {" · "}
-                  <PinballmapSyncNow />
-                </>
-              )}
-            </div>
-          )}
-        </div>
+        <h2 id="section-pinballmap" className="sr-only">
+          Pinball Map
+        </h2>
 
-        {/* Placeholder, not the real control. PP-o355.21 replaces the #1683
-            listing control wholesale — its states are DERIVED from the last
-            sync snapshot rather than discovered by pressing "Connect", and
-            "Connect"/"Verify" are retired outright. Shipping the old control on
-            this new tab would teach an idiom we're about to take away, and its
-            "Not listed" badge is wrong for machines that are in fact on the
-            map. So the box holds its place and says nothing it would have to
-            walk back. "Sync now" above is real and still works. */}
-        <section
-          aria-label="Pinball Map listing"
-          className="space-y-2 rounded-md border border-outline bg-surface p-3"
-        >
-          <div className="flex items-center gap-2">
-            <MapPin
-              aria-hidden="true"
-              className="size-4 text-muted-foreground"
-            />
-            <h3 className="text-sm font-medium text-foreground">
-              Pinball Map listing
-            </h3>
-          </div>
-          <p className="text-sm text-muted-foreground">
-            Listing controls are coming soon.
-          </p>
-        </section>
+        <PinballmapListingControl
+          machineId={machine.id}
+          view={listingView}
+          locationName={snapshot?.name ?? null}
+          locationUrl={locationUrl}
+          lastRefreshedAt={pbmState?.lastSyncedAt ?? null}
+          refreshRemaining={allowance.remaining}
+          refreshAvailableAt={allowance.nextRefillAt}
+          canSetIntent={canSetIntent}
+          canPush={canPush}
+          canRefresh={canRefresh}
+          writeEnabled={writeEnabled}
+          modelName={pinballmapTitleName}
+          commentCount={commentCount}
+        />
+
+        {/* Entries this machine walked away from that are still live on the
+            public map (PP-l81u). Spec 2.5 routes them here only once NO cabinet
+            carries the old title any more — while one does, the entry is that
+            title's ordinary business and shows through those cabinets' own
+            states. The Info tab's "Config issue" warning links here, so this is
+            where that trail has to end. */}
+        {abandoned.length > 0 ? (
+          <PinballmapAbandonedEntries
+            machineId={machine.id}
+            entries={abandoned}
+            locationUrl={locationUrl}
+            canPush={canPush && writeEnabled}
+          />
+        ) : null}
       </section>
 
       {/* Danger zone — applies immediately. Machine deletion joins this

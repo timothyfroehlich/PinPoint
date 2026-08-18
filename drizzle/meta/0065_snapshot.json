@@ -1,5 +1,5 @@
 {
-  "id": "05d0aa8d-a3c3-4a1e-8c9b-2dd049116e4c",
+  "id": "99df6597-d1e4-4c8f-9e27-fae827b81127",
   "prevId": "d45975a9-68f8-4ca2-b0dd-1e68cb811d1e",
   "version": "7",
   "dialect": "postgresql",
@@ -1565,6 +1565,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "model_name": {
+          "name": "model_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "manufacturer": {
           "name": "manufacturer",
           "type": "text",
@@ -1694,6 +1700,10 @@
         "machines_pinballmap_link_exclusive": {
           "name": "machines_pinballmap_link_exclusive",
           "value": "NOT (pinballmap_machine_id IS NOT NULL AND pinballmap_excluded)"
+        },
+        "machines_model_name_requires_excluded": {
+          "name": "machines_model_name_requires_excluded",
+          "value": "NOT (model_name IS NOT NULL AND NOT pinballmap_excluded)"
         },
         "machines_pinballmap_listed_requires_link": {
           "name": "machines_pinballmap_listed_requires_link",
@@ -2174,84 +2184,6 @@
       },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": true
-    },
-    "public.pinballmap_region_seen_machines": {
-      "name": "pinballmap_region_seen_machines",
-      "schema": "",
-      "columns": {
-        "region": {
-          "name": "region",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "lmx_id": {
-          "name": "lmx_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "location_id": {
-          "name": "location_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "pinballmap_machine_id": {
-          "name": "pinballmap_machine_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "first_seen_at": {
-          "name": "first_seen_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "announced_at": {
-          "name": "announced_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {
-        "idx_pinballmap_region_seen_pending": {
-          "name": "idx_pinballmap_region_seen_pending",
-          "columns": [
-            {
-              "expression": "region",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "first_seen_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "where": "announced_at is null",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {},
-      "compositePrimaryKeys": {
-        "pinballmap_region_seen_machines_region_lmx_id_pk": {
-          "name": "pinballmap_region_seen_machines_region_lmx_id_pk",
-          "columns": ["region", "lmx_id"]
-        }
-      },
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},

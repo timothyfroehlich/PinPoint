@@ -1,14 +1,20 @@
 /**
- * Integration: retitling a listed machine records the listing it abandoned
- * (PP-l81u).
+ * Integration: re-matching an intent-On machine records the entry it walked away
+ * from (PP-l81u, PP-o355.21).
  *
  * The old title's entry stays live on pinballmap.com, and `lmxId` is the only
- * handle for it. Before this, the retitle discarded it silently. This covers
- * the wiring through `updateMachineAction` (same pattern as
- * `pinballmap-auto-link-on-save.test.ts`) and the ownership re-attribution
- * when two different machines abandon the same lmx in sequence. The
- * resolver's three abandon/don't-abandon decision branches (retitle, mark
- * excluded, unlink) are unit-tested in `link-columns.test.ts`.
+ * handle for it. Before this, the re-match discarded it silently.
+ *
+ * **Every test here seeds a stored lineup, and that is load-bearing.** Since
+ * PP-o355.21 dropped the per-machine lmx column, the entry being abandoned is
+ * resolved from the stored lineup by the OLD title. No lineup means no entry to
+ * name, and the record is correctly not written — so a test that forgot to seed
+ * one would pass its "no abandonment" assertions for the wrong reason.
+ *
+ * Covers the wiring through `updateMachineAction` and the ownership
+ * re-attribution when two machines abandon the same entry in sequence. The
+ * resolver's abandon/don't-abandon branches are unit-tested in
+ * `link-columns.test.ts`.
  */
 
 import { describe, it, expect, vi } from "vitest";
@@ -21,6 +27,7 @@ import {
   authUsers,
   pinballmapCatalog,
   pinballmapAbandonedListings,
+  pinballmapState,
 } from "~/server/db/schema";
 
 vi.mock("~/server/db", async () => {
@@ -96,6 +103,44 @@ async function seedCatalog(): Promise<void> {
   ]);
 }
 
+/**
+ * A stored lineup carrying entry 4471 for title 6221 and entry 5120 for title
+ * 6222 — the two entries these tests walk away from.
+ */
+async function seedLineup(): Promise<void> {
+  const db = await getTestDb();
+  await db.insert(pinballmapState).values({
+    id: "singleton",
+    locationId: 26454,
+    enabled: true,
+    snapshotJson: {
+      locationId: 26454,
+      name: "Austin Pinball Collective",
+      dateLastUpdated: null,
+      lastUpdatedByUsername: null,
+      machineCount: 2,
+      lmxes: [
+        {
+          id: 4471,
+          machineId: 6221,
+          icEnabled: null,
+          lastUpdatedByUsername: null,
+          conditions: [],
+        },
+        {
+          id: 5120,
+          machineId: 6222,
+          icEnabled: null,
+          lastUpdatedByUsername: null,
+          conditions: [],
+        },
+      ],
+      fetchedAtIso: "2026-08-17T00:00:00.000Z",
+      raw: null,
+    },
+  });
+}
+
 /** Submit an edit that re-targets the PBM link without touching the name. */
 function retitleForm(machineId: string, pinballmapMachineId: number): FormData {
   const fd = new FormData();
@@ -105,7 +150,7 @@ function retitleForm(machineId: string, pinballmapMachineId: number): FormData {
   return fd;
 }
 
-describe("retitling a listed machine", () => {
+describe("re-matching an intent-On machine", () => {
   setupTestDb();
 
   it("records exactly one abandonment, with the old title and lmx", async () => {
@@ -114,6 +159,7 @@ describe("retitling a listed machine", () => {
     const admin = await createAdmin();
     await mockAuthAs(admin.id);
     await seedCatalog();
+    await seedLineup();
 
     const [machine] = await db
       .insert(machines)
@@ -121,8 +167,7 @@ describe("retitling a listed machine", () => {
         name: "Godzilla",
         initials: "GZ",
         pinballmapMachineId: 6221,
-        pinballmapListed: true,
-        pinballmapLmxId: 4471,
+        pinballmapIntent: "on",
       })
       .returning();
 
@@ -144,8 +189,9 @@ describe("retitling a listed machine", () => {
       where: eq(machines.id, machine.id),
     });
     expect(after?.pinballmapMachineId).toBe(6222);
-    expect(after?.pinballmapListed).toBe(false);
-    expect(after?.pinballmapLmxId).toBeNull();
+    // Intent resets to Off (spec 2.3): keeping On would silently assert that
+    // the NEW title belongs on the lineup.
+    expect(after?.pinballmapIntent).toBe("off");
   });
 
   it("records a second abandonment without losing the first", async () => {
@@ -154,6 +200,7 @@ describe("retitling a listed machine", () => {
     const admin = await createAdmin();
     await mockAuthAs(admin.id);
     await seedCatalog();
+    await seedLineup();
 
     const [machine] = await db
       .insert(machines)
@@ -161,8 +208,7 @@ describe("retitling a listed machine", () => {
         name: "Godzilla",
         initials: "GZ2",
         pinballmapMachineId: 6221,
-        pinballmapListed: true,
-        pinballmapLmxId: 4471,
+        pinballmapIntent: "on",
       })
       .returning();
 
@@ -172,11 +218,11 @@ describe("retitling a listed machine", () => {
     );
     expect(first.ok).toBe(true);
 
-    // Auto-link re-lists the machine under the new title within the hour — no
-    // credentials involved, which is why this sequence is reachable at all.
+    // Somebody turns the machine back On under its new title — the entry for
+    // 6222 is on the seeded lineup, so it now covers that one too.
     await db
       .update(machines)
-      .set({ pinballmapListed: true, pinballmapLmxId: 5120 })
+      .set({ pinballmapIntent: "on" })
       .where(eq(machines.id, machine.id));
 
     const second = await updateMachineAction(
@@ -192,12 +238,13 @@ describe("retitling a listed machine", () => {
     expect(rows.map((r) => r.lmxId).sort()).toEqual([4471, 5120]);
   });
 
-  it("records nothing when the machine was not listed", async () => {
+  it("records nothing when intent was already Off", async () => {
     const db = await getTestDb();
     const { updateMachineAction } = await import("~/app/(app)/m/actions");
     const admin = await createAdmin();
     await mockAuthAs(admin.id);
     await seedCatalog();
+    await seedLineup();
 
     const [machine] = await db
       .insert(machines)
@@ -205,7 +252,7 @@ describe("retitling a listed machine", () => {
         name: "Godzilla",
         initials: "GZ3",
         pinballmapMachineId: 6221,
-        pinballmapListed: false,
+        pinballmapIntent: "off",
       })
       .returning();
 
@@ -225,6 +272,7 @@ describe("retitling a listed machine", () => {
     const admin = await createAdmin();
     await mockAuthAs(admin.id);
     await seedCatalog();
+    await seedLineup();
 
     const [machine] = await db
       .insert(machines)
@@ -232,8 +280,7 @@ describe("retitling a listed machine", () => {
         name: "Godzilla",
         initials: "GZ4",
         pinballmapMachineId: 6221,
-        pinballmapListed: true,
-        pinballmapLmxId: 4471,
+        pinballmapIntent: "on",
       })
       .returning();
 
@@ -248,21 +295,20 @@ describe("retitling a listed machine", () => {
     const after = await db.query.machines.findFirst({
       where: eq(machines.id, machine.id),
     });
-    expect(after?.pinballmapListed).toBe(true);
-    expect(after?.pinballmapLmxId).toBe(4471);
+    expect(after?.pinballmapIntent).toBe("on");
   });
 
   it("re-attributes ownership when a different machine later abandons the same lmx", async () => {
-    // A abandons lmx 4471 (title 6221). A later save auto-links a DIFFERENT
-    // machine B to that same still-live lmx under title 6221 — legal, since A's
-    // `pinballmapListed` is now false and the one-lister index only forbids two
-    // SIMULTANEOUS listers. B then abandons the same lmx a second time. The
-    // record must end up owned by B, not silently left pointing at A.
+    // A abandons entry 4471 (title 6221). A different machine B is then turned
+    // On for title 6221, so it covers that still-live entry. B is re-matched
+    // too, abandoning the same entry a second time. The record must end up
+    // owned by B, not silently left pointing at A.
     const db = await getTestDb();
     const { updateMachineAction } = await import("~/app/(app)/m/actions");
     const admin = await createAdmin();
     await mockAuthAs(admin.id);
     await seedCatalog();
+    await seedLineup();
 
     const [machineA] = await db
       .insert(machines)
@@ -270,8 +316,7 @@ describe("retitling a listed machine", () => {
         name: "Godzilla A",
         initials: "GZA",
         pinballmapMachineId: 6221,
-        pinballmapListed: true,
-        pinballmapLmxId: 4471,
+        pinballmapIntent: "on",
       })
       .returning();
 
@@ -281,16 +326,15 @@ describe("retitling a listed machine", () => {
     );
     expect(first.ok).toBe(true);
 
-    // Auto-link matches a different cabinet to the now-vacant title 6221 and
-    // captures the same lmx PinPoint just recorded as abandoned.
+    // A different cabinet is matched to title 6221 and turned On, covering the
+    // same entry PinPoint just recorded as abandoned.
     const [machineB] = await db
       .insert(machines)
       .values({
         name: "Godzilla B",
         initials: "GZB",
         pinballmapMachineId: 6221,
-        pinballmapListed: true,
-        pinballmapLmxId: 4471,
+        pinballmapIntent: "on",
       })
       .returning();
 

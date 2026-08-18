@@ -3,7 +3,11 @@ import { eq, sql } from "drizzle-orm";
 import { db } from "~/server/db";
 import { pinballmapState } from "~/server/db/schema";
 import { getPinballMapClient } from "./client";
-import { APC_LOCATION_ID, PBM_MANUAL_SYNC_MIN_INTERVAL_MS } from "./config";
+import {
+  APC_LOCATION_ID,
+  PBM_REFRESH_BURST,
+  PBM_REFRESH_REFILL_MS,
+} from "./config";
 import type { NewPinballmapState, PinballmapState } from "~/lib/types/database";
 
 /**
@@ -38,10 +42,10 @@ export async function getPinballMapState(): Promise<PinballmapState | null> {
  * - `"cron"`: the hourly automated refresh (the sanctioned one-call/hour,
  *   CORE-PBM-001). Never throttled; still records its attempt so a manual
  *   refresh right after respects the fresh snapshot.
- * - `"manual"`: any human-initiated refresh (Sync now, verify/reconnect, …).
- *   Rate-limited to at most one per `PBM_MANUAL_SYNC_MIN_INTERVAL_MS`. This is
- *   the default so every future live-fetch caller inherits the chokepoint
- *   unless it explicitly opts into the automated path.
+ * - `"manual"`: any human-initiated refresh (the control's Refresh button, the
+ *   remove path's freshness check, …). Draws a token from the shared bucket.
+ *   This is the default so every future live-fetch caller inherits the
+ *   chokepoint unless it explicitly opts into the automated path.
  */
 export type SyncTrigger = "manual" | "cron";
 
@@ -50,6 +54,51 @@ export type SyncResult =
   | { ok: true; machineCount: number; syncedAt: Date }
   | { ok: false; reason: "error"; error: string }
   | { ok: false; reason: "throttled"; retryAfterMs: number };
+
+/**
+ * What is left of the shared refresh allowance (spec 3.2), so the header's
+ * Refresh button can disable itself with a countdown instead of letting someone
+ * click into a refusal.
+ *
+ * Advisory only. It is read outside the claim, so a concurrent refresh can spend
+ * the last token between this call and the click; the claim in
+ * `stampSyncAttempt` stays the authority.
+ */
+export interface RefreshAllowance {
+  remaining: number;
+  /** When the next token lands. Null when the bucket is already full. */
+  nextRefillAt: Date | null;
+}
+
+/**
+ * Lazily refill the bucket in JS, mirroring the SQL in `stampSyncAttempt`.
+ *
+ * Nothing is written: tokens accrue with the passage of time, so a read can
+ * compute the current balance from the last claim without touching the row.
+ */
+function currentAllowance(
+  tokens: number,
+  tokensAt: Date,
+  now: Date
+): RefreshAllowance {
+  const elapsed = now.getTime() - tokensAt.getTime();
+  const periods = Math.max(0, Math.floor(elapsed / PBM_REFRESH_REFILL_MS));
+  const remaining = Math.min(PBM_REFRESH_BURST, tokens + periods);
+  if (remaining >= PBM_REFRESH_BURST) return { remaining, nextRefillAt: null };
+  // Time already served toward the next token is kept, which is the whole point
+  // of advancing `refreshTokensAt` by whole periods rather than to `now()`.
+  const nextAt = tokensAt.getTime() + (periods + 1) * PBM_REFRESH_REFILL_MS;
+  return { remaining, nextRefillAt: new Date(nextAt) };
+}
+
+/** Read the shared refresh allowance. A missing row means an untouched bucket. */
+export async function getRefreshAllowance(
+  now: Date = new Date()
+): Promise<RefreshAllowance> {
+  const state = await getPinballMapState();
+  if (!state) return { remaining: PBM_REFRESH_BURST, nextRefillAt: null };
+  return currentAllowance(state.refreshTokens, state.refreshTokensAt, now);
+}
 
 /**
  * Upsert the singleton, writing the given health fields. `id` is fixed and the
@@ -68,26 +117,48 @@ async function upsertState(
 }
 
 /**
- * Stamp `last_sync_attempt_at` at the START of a sync attempt.
+ * Whole refill periods elapsed since the bucket last moved, computed in SQL.
  *
- * This is the single throttle chokepoint (PP-hbi0). It's a conditional upsert,
- * so the read-check-then-write is done atomically in one statement — a row-level
- * lock on the singleton serializes concurrent double-clicks and only one wins the
- * claim (TOCTOU-safe; `lastSyncedAt`-style completion timestamps could not
- * express this because they only advance after the fetch returns).
+ * `now()` rather than the caller's `Date`: a bare Date interpolated into `sql`
+ * is bound with NO type information — Drizzle applies a column's mapper only
+ * where it knows the column, which covers `values`/`set` but not an operand
+ * inside a raw fragment, and postgres.js then throws `The "string" argument
+ * must be of type string or an instance of Buffer` before the statement is
+ * sent. That threw on every manual sync from 2026-07-21 (PP-hbi0, #1712);
+ * keeping the clock inside the database avoids the binding entirely, and a few
+ * milliseconds of skew against the caller's timestamp cannot matter to a
+ * three-minute refill.
+ */
+const ELAPSED_PERIODS = sql`floor(extract(epoch from (now() - ${pinballmapState.refreshTokensAt})) * 1000 / ${PBM_REFRESH_REFILL_MS})`;
+
+/** Tokens available right now: what is banked, plus what time has refilled. */
+const AVAILABLE_TOKENS = sql`least(${PBM_REFRESH_BURST}, ${pinballmapState.refreshTokens} + ${ELAPSED_PERIODS})`;
+
+/**
+ * Stamp the attempt and claim a refresh token, atomically.
  *
- * - `guardIntervalMs === null` (cron/automated): unconditional stamp, always
- *   proceeds — returns `true`.
- * - `guardIntervalMs` a number (manual): the `DO UPDATE` only fires when the
- *   prior attempt is older than the interval (or absent). `RETURNING` yields no
- *   row when the guard refuses → returns `false` (throttled). Crucially the
- *   guard is against the last ATTEMPT, not the last success, so a failed fetch
- *   (429/500) still blocks repeat clicks instead of fail-opening (CORE-PBM-001).
+ * This is the single throttle chokepoint (PP-hbi0, spec 3.2). One statement does
+ * the read-check-refill-decrement, so the row lock on the singleton serializes
+ * concurrent double-clicks and exactly one wins — a JS read-then-write could
+ * not, and neither could a completion timestamp like `lastSyncedAt`, which only
+ * advances after the fetch returns.
+ *
+ * - `guarded === false` (cron): unconditional stamp, no token spent. The hourly
+ *   refresh is separately sanctioned, and charging it to the human allowance
+ *   would let the cron lock people out of their own button.
+ * - `guarded === true` (manual): the `DO UPDATE` fires only while a token is
+ *   available; an empty `RETURNING` means throttled. The stamp is on the last
+ *   ATTEMPT, not the last success, so a failed fetch (429/500) still spends its
+ *   token rather than fail-opening into a retry loop (CORE-PBM-001).
+ *
+ * `refreshTokensAt` advances by whole refill periods rather than to `now()`, so
+ * the fraction of a period already served is not thrown away on every claim —
+ * otherwise a steady clicker could hold the bucket empty indefinitely.
  */
 async function stampSyncAttempt(
   locationId: number,
   attemptAt: Date,
-  guardIntervalMs: number | null
+  guarded: boolean
 ): Promise<boolean> {
   const values = {
     id: SINGLETON_ID,
@@ -95,34 +166,38 @@ async function stampSyncAttempt(
     lastSyncAttemptAt: attemptAt,
     updatedAt: attemptAt,
   };
-  const set = { lastSyncAttemptAt: attemptAt, updatedAt: attemptAt };
 
-  if (guardIntervalMs === null) {
+  if (!guarded) {
     await db
       .insert(pinballmapState)
       .values(values)
-      .onConflictDoUpdate({ target: pinballmapState.id, set });
+      .onConflictDoUpdate({
+        target: pinballmapState.id,
+        set: { lastSyncAttemptAt: attemptAt, updatedAt: attemptAt },
+      });
     return true;
   }
 
-  const threshold = new Date(attemptAt.getTime() - guardIntervalMs);
   const claimed = await db
     .insert(pinballmapState)
-    .values(values)
+    // A first-ever manual refresh creates the row with one token already spent.
+    .values({
+      ...values,
+      refreshTokens: PBM_REFRESH_BURST - 1,
+      refreshTokensAt: attemptAt,
+    })
     .onConflictDoUpdate({
       target: pinballmapState.id,
-      set,
-      setWhere: sql`${pinballmapState.lastSyncAttemptAt} is null or ${pinballmapState.lastSyncAttemptAt} < ${threshold}`,
+      set: {
+        lastSyncAttemptAt: attemptAt,
+        updatedAt: attemptAt,
+        refreshTokens: sql`${AVAILABLE_TOKENS} - 1`,
+        refreshTokensAt: sql`${pinballmapState.refreshTokensAt} + (interval '1 millisecond' * ${PBM_REFRESH_REFILL_MS} * ${ELAPSED_PERIODS})`,
+      },
+      setWhere: sql`${AVAILABLE_TOKENS} >= 1`,
     })
     .returning({ id: pinballmapState.id });
   return claimed.length > 0;
-}
-
-/** Milliseconds the caller should wait before a throttled manual retry. */
-function retryAfterMs(lastAttempt: Date | null | undefined, now: Date): number {
-  if (!lastAttempt) return PBM_MANUAL_SYNC_MIN_INTERVAL_MS;
-  const elapsed = now.getTime() - lastAttempt.getTime();
-  return Math.max(0, PBM_MANUAL_SYNC_MIN_INTERVAL_MS - elapsed);
 }
 
 /**
@@ -131,13 +206,12 @@ function retryAfterMs(lastAttempt: Date | null | undefined, now: Date): number {
  * singleton and returns `{ ok: false, reason: "error" }` so callers (cron, "Sync
  * now") can surface it without a 500.
  *
- * Throttle chokepoint (PP-hbi0): a `manual` trigger (the default) is rate-limited
- * to at most one call per `PBM_MANUAL_SYNC_MIN_INTERVAL_MS` and returns
- * `{ ok: false, reason: "throttled" }` when refused — enforced HERE so every
- * live-fetch caller (Sync now, verify/reconnect, any future caller) inherits one
- * guard. The `cron` trigger bypasses the interval (the sanctioned hourly refresh)
- * but still records its attempt, so a manual refresh moments after a cron respects
- * the just-fetched snapshot.
+ * Throttle chokepoint (PP-hbi0, spec 3.2): a `manual` trigger (the default)
+ * spends a token from the shared burst allowance and returns
+ * `{ ok: false, reason: "throttled" }` when the bucket is empty — enforced HERE
+ * so every live-fetch caller (the Refresh button, the remove path's freshness
+ * check, any future caller) inherits one guard. The `cron` trigger spends no
+ * token (the sanctioned hourly refresh) but still records its attempt.
  *
  * Does NOT gate on `state.enabled` — this is the pure read-path mechanism and the
  * caller owns the "should we sync at all" decision (the PP-o355.11 cron checks
@@ -156,18 +230,26 @@ export async function syncLocationSnapshot(opts?: {
   const syncedAt = new Date();
   const actor = opts?.updatedBy ? { updatedBy: opts.updatedBy } : {};
 
-  // Chokepoint: stamp the attempt before the fetch. Manual is guarded (throttled
-  // + TOCTOU-safe); cron records unconditionally.
+  // Chokepoint: stamp the attempt before the fetch. Manual spends a token
+  // (TOCTOU-safe); cron records unconditionally.
   const claimed = await stampSyncAttempt(
     locationId,
     syncedAt,
-    trigger === "manual" ? PBM_MANUAL_SYNC_MIN_INTERVAL_MS : null
+    trigger === "manual"
   );
   if (!claimed) {
+    // Re-read rather than reuse the row loaded above: the claim we just lost
+    // was won by somebody, so the bucket moved and the pre-claim copy would
+    // report a refill time that has already passed.
+    const { nextRefillAt } = await getRefreshAllowance(syncedAt);
     return {
       ok: false,
       reason: "throttled",
-      retryAfterMs: retryAfterMs(state?.lastSyncAttemptAt, syncedAt),
+      retryAfterMs: Math.max(
+        0,
+        (nextRefillAt?.getTime() ??
+          syncedAt.getTime() + PBM_REFRESH_REFILL_MS) - syncedAt.getTime()
+      ),
     };
   }
 

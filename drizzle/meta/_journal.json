@@ -460,8 +460,29 @@
     {
       "idx": 65,
       "version": "7",
-      "when": 1787010594838,
-      "tag": "0065_pinballmap_region_seen_machines",
+      "when": 1786939756334,
+      "tag": "0065_machine_model_name",
+      "breakpoints": true
+    },
+    {
+      "idx": 66,
+      "version": "7",
+      "when": 1786939958550,
+      "tag": "0066_pinballmap_listing_intent",
+      "breakpoints": true
+    },
+    {
+      "idx": 67,
+      "version": "7",
+      "when": 1786939983751,
+      "tag": "0067_drop_pinballmap_listed",
+      "breakpoints": true
+    },
+    {
+      "idx": 68,
+      "version": "7",
+      "when": 1787052885201,
+      "tag": "0068_pinballmap_region_seen_machines",
       "breakpoints": true
     }
   ]

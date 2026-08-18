@@ -791,7 +791,7 @@ async function seedUsersAndData() {
               ${comment.author},
               ${comment.eventData ? null : wrapTextInProseMirror(comment.content)},
               ${comment.isSystem},
-              ${comment.eventData ? JSON.stringify(comment.eventData) : null}::jsonb,
+              ${comment.eventData ? sql.json(comment.eventData) : null},
               NOW() - (${comment.daysAgo} || ' days')::INTERVAL,
               NOW() - (${comment.daysAgo} || ' days')::INTERVAL
             )

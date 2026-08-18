@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getCatalogEntry, isCatalogEmpty } from "~/lib/pinballmap/catalog";
+import type { PbmListingIntent } from "~/lib/pinballmap/listing-state";
 import type { MachinePbmColumns } from "~/services/machines";
 
 /**
@@ -22,8 +23,8 @@ import type { MachinePbmColumns } from "~/services/machines";
  *    to tell "no PBM state recorded" from "excluded", so the field is always
  *    present and explicitly `null` — never omitted.
  *
- * Within a variant, `null` means "not set" for that specific fact (no group, not
- * listed, no captured lmx). A field is never dropped to signal absence.
+ * Within a variant, `null` means "not set" for that specific fact (no group, no
+ * resolved title). A field is never dropped to signal absence.
  */
 export type McpMachinePinballmap =
   McpMachinePinballmapLinked | McpMachinePinballmapExcluded;
@@ -74,13 +75,16 @@ export interface McpMachinePinballmapLinked {
   year: number | null;
   opdbId: string | null;
   ipdbId: number | null;
-  /** Whether we consider the machine listed on Pinball Map's public map. */
-  listed: boolean;
   /**
-   * The captured PBM listing handle (`location_machine_xref` id); `null` when
-   * the machine is not listed.
+   * The operator's decision about the location's public lineup — `"on"`,
+   * `"off"`, or `"no_sync"` (this cabinet opts out of the integration).
+   *
+   * It is an INTENT, not an observation: it says what should be on the lineup,
+   * never what Pinball Map currently shows. Whether the entry is actually there
+   * comes from the stored location snapshot, and the two disagreeing is an
+   * ordinary state a person resolves (spec §1, §4).
    */
-  lmxId: number | null;
+  intent: PbmListingIntent;
 }
 
 /** A machine deliberately marked as not on Pinball Map. */
@@ -127,8 +131,7 @@ export async function buildMachinePinballmap(
       year: machine.year,
       opdbId: machine.opdbId,
       ipdbId: machine.ipdbId,
-      listed: machine.pinballmapListed,
-      lmxId: machine.pinballmapLmxId,
+      intent: machine.pinballmapIntent,
     };
   }
 

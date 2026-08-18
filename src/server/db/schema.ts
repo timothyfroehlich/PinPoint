@@ -197,18 +197,36 @@ export const machines = pgTable(
     pinballmapMachineId: integer("pinballmap_machine_id"),
     pinballmapExcluded: boolean("pinballmap_excluded").notNull().default(false),
     pinballmapExcludedReason: text("pinballmap_excluded_reason"),
-    // Whether we consider this machine listed on PinballMap's public map (bead C
-    // / PP-o355.3). A local, manually-maintained boolean — the source of truth
-    // for "show the View-on-PinballMap link". Decoupled from presence/availability
-    // by design (no hard link). Listing presupposes a catalog link, enforced by
-    // the CHECK below. Reconciling this against PBM's actual snapshot is a later
-    // feature (inbound sync); pushing the change to PBM is bead E (outbound).
-    pinballmapListed: boolean("pinballmap_listed").notNull().default(false),
-    // Durable captured PBM listing handle (the location_machine_xref id). We
-    // STORE AND HEAL this rather than re-resolving it per push (PP-o355.16 /
-    // .12). Nullable: only set once a machine is actually listed on PBM. An lmx
-    // implies both a catalog link and pinballmap_listed (CHECKs below).
-    pinballmapLmxId: integer("pinballmap_lmx_id"),
+    // Whether this machine SHOULD appear on the location's public Pinball Map
+    // lineup — an operator decision, owned by PinPoint, never inferred (spec
+    // §1, 5.1). Three positions, not a boolean, because "off" and "don't sync"
+    // are different intentions: off means take it down, `no_sync` means this
+    // cabinet opts out of alerts, reconciliation and comment import entirely
+    // while its observed status stays visible.
+    //
+    // What it is NOT is an observation. Whether the entry is actually on the
+    // lineup comes from the stored snapshot, and comparing the two is what
+    // produces every state the control renders (spec §4). The boolean this
+    // replaced (`pinballmap_listed`) conflated the two, which is why a cabinet
+    // could be "listed" while the lineup had no such entry.
+    //
+    // On presupposes a catalog link (CHECK below). No unique index: several
+    // same-title cabinets may all be On, and each of them covers the one entry
+    // Pinball Map keeps per title (spec §1 coverage).
+    pinballmapIntent: text("pinballmap_intent", {
+      enum: ["on", "off", "no_sync"],
+    })
+      .notNull()
+      .default("off"),
+    // Hand-entered model name for a machine PinballMap's catalog cannot cover —
+    // a homebrew, a flipperless game (PP-3bbr, folded into PP-o355.21). Set ONLY
+    // alongside `pinballmap_excluded` (CHECK below): a linked machine reads its
+    // model from the catalog mirror, and letting both exist would put two
+    // sources on one fact with no rule for which wins.
+    //
+    // Distinct from `name`, which is what APC calls the cabinet. They start out
+    // the same (the field seeds itself from the name) and are free to diverge.
+    modelName: text("model_name"),
     manufacturer: text("manufacturer"),
     year: integer("year"),
     opdbId: text("opdb_id"),
@@ -225,28 +243,27 @@ export const machines = pgTable(
       "machines_pinballmap_link_exclusive",
       sql`NOT (pinballmap_machine_id IS NOT NULL AND pinballmap_excluded)`
     ),
-    // Can't be listed on PinballMap without a catalog link — you can only appear
-    // on the public map as a recognized title.
-    pinballmapListedRequiresLinkCheck: check(
-      "machines_pinballmap_listed_requires_link",
-      sql`NOT (pinballmap_listed AND pinballmap_machine_id IS NULL)`
+    // A hand-entered model belongs only to a machine their catalog can't cover.
+    // Without this the two sources could coexist and every reader would need its
+    // own precedence rule (PP-3bbr).
+    modelNameRequiresExcludedCheck: check(
+      "machines_model_name_requires_excluded",
+      sql`NOT (model_name IS NOT NULL AND NOT pinballmap_excluded)`
     ),
-    // An lmx handle presupposes a catalog link.
-    pinballmapLmxRequiresLinkCheck: check(
-      "machines_pinballmap_lmx_requires_link",
-      sql`NOT (pinballmap_lmx_id IS NOT NULL AND pinballmap_machine_id IS NULL)`
+    // Intent On presupposes a catalog link — you can only appear on the public
+    // map as a recognized title. Off and `no_sync` are fine unmatched: they are
+    // both "this cabinet is not going on the lineup", which needs no title.
+    // Drizzle's `enum` on a text column is a TypeScript narrowing only; the
+    // database needs its own guard or a stray writer can store anything. Same
+    // pattern as `pinballmap_state_sync_status_check`.
+    pinballmapIntentCheck: check(
+      "machines_pinballmap_intent_check",
+      sql`pinballmap_intent IN ('on', 'off', 'no_sync')`
     ),
-    // An lmx handle presupposes we consider the machine listed.
-    pinballmapLmxRequiresListedCheck: check(
-      "machines_pinballmap_lmx_requires_listed",
-      sql`NOT (pinballmap_lmx_id IS NOT NULL AND NOT pinballmap_listed)`
+    pinballmapIntentRequiresLinkCheck: check(
+      "machines_pinballmap_intent_requires_link",
+      sql`NOT (pinballmap_intent = 'on' AND pinballmap_machine_id IS NULL)`
     ),
-    // One PBM lister per catalog title at our location — duplicate cabinets of
-    // the same title share one PBM lmx (PbmApiAudit finding #1). Partial: only
-    // listed rows participate.
-    pinballmapListedUnique: uniqueIndex("machines_pinballmap_listed_unique")
-      .on(t.pinballmapMachineId)
-      .where(sql`pinballmap_listed`),
     ownerIdIdx: index("idx_machines_owner_id").on(t.ownerId),
     invitedOwnerIdIdx: index("idx_machines_invited_owner_id").on(
       t.invitedOwnerId
@@ -300,12 +317,12 @@ export const pinballmapCatalog = pgTable(
  * what happened before this table existed — leaves a public listing nobody can
  * see or clean up.
  *
- * This cannot live on `machines`. `machines_pinballmap_lmx_requires_listed`
- * forbids an lmx without `pinballmap_listed`, and keeping `listed` true would
- * claim the NEW title's slot via `machines_pinballmap_listed_unique`. A machine
- * can also abandon more than one entry over time (retitle, auto-link re-lists
- * under the new title within the hour, retitle again), so a single column set
- * would overwrite the first — the same bug one level up.
+ * This cannot live on `machines`, which carries listing INTENT and not entry
+ * handles: intent is per-cabinet and forward-looking, while an abandoned entry
+ * is a specific row on someone else's map that this cabinet no longer relates
+ * to. A machine can also abandon more than one entry over time (retitle, list
+ * under the new title, retitle again), so a single column would overwrite the
+ * first.
  *
  * Rows are self-clearing: `reconcileAfterSync` deletes any whose `lmxId` is
  * absent from a freshly synced lineup, which is what happens once someone
@@ -1346,6 +1363,21 @@ export const pinballmapState = pgTable(
       .notNull()
       .default("unknown"),
     lastSyncError: text("last_sync_error"),
+    // Manual-refresh token bucket (spec 3.2). `refreshTokens` is what is left of
+    // the burst allowance; `refreshTokensAt` is the last refill instant, which
+    // advances by whole refill periods rather than to `now()` so partial
+    // progress toward the next token survives every claim.
+    //
+    // A bucket rather than a flat floor because both halves of the requirement
+    // are real: a person fixing several machines wants a few refreshes
+    // back-to-back, and the SUSTAINED rate still has to sit inside the 20/hour
+    // conduct cap (CORE-PBM-001). Burst 3 refilling one per 3 minutes gives
+    // exactly 20/hour sustained. Global, not per-user — the cap is on our
+    // traffic to Pinball Map, not on any one person's clicking.
+    refreshTokens: integer("refresh_tokens").notNull().default(3),
+    refreshTokensAt: timestamp("refresh_tokens_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
     outboundEmail: text("outbound_email"),
     outboundTokenVaultId: uuid("outbound_token_vault_id"),
     updatedAt: timestamp("updated_at", { withTimezone: true })

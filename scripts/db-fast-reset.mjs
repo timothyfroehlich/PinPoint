@@ -48,6 +48,18 @@ async function fastReset() {
     // with it — omitting their seeds left both permanently empty after any
     // fast-reset, so `preflight`, local E2E runs, and `pr-screenshots` all
     // silently rendered those pages in their empty state. (PP-tn6t.)
+    //
+    // `pinballmap_catalog` is here for the OTHER reason, and it is why "keep it
+    // complete" is not the same rule as "match the TRUNCATE". The catalog is
+    // NOT truncated above — it survives a fast-reset just fine. But E2E global
+    // setup is `db:migrate` + `db:fast-reset`, with a full `db:reset` only as a
+    // failure fallback, so a worktree whose database only ever went through E2E
+    // never runs the one step that CREATES those rows. The mirror then stays
+    // empty forever and the model picker on the machine edit page searches
+    // nothing — with no error, because an empty catalog and a no-match query
+    // look identical. The seed is an idempotent upsert keyed on
+    // pinballmap_machine_id, so running it when the rows already exist costs a
+    // refresh and nothing else. (PP-o355.21.)
     const seedCommands = [
       "pnpm run db:_seed",
       "pnpm run db:_seed-users",
@@ -56,6 +68,12 @@ async function fastReset() {
       "pnpm run db:_seed-discord",
       "pnpm run db:_seed-timeline-backfill",
       "pnpm run db:_seed-timeline-demo",
+      "pnpm run db:_seed-pinballmap-catalog",
+      // Unlike the catalog, `pinballmap_state` IS reached by the TRUNCATE
+      // above — `machines` is truncated CASCADE and the state seed writes
+      // machine link columns — so this one is here for the original PP-tn6t
+      // reason as well as the never-seeded one.
+      "pnpm run db:_seed-pinballmap-state",
     ];
     for (const cmd of seedCommands) {
       execSync(cmd, { stdio: "inherit" });

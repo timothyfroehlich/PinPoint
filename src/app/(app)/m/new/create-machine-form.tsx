@@ -310,7 +310,7 @@ export function CreateMachineForm({
 
         {/* Model — links the machine to its PinballMap catalog model/edition
             (bead B / PP-o355.2). */}
-        <PinballMapLinkField />
+        <PinballMapLinkField machineName={nameValue} />
 
         {/* Description */}
         <div className="space-y-1.5">
@@ -353,30 +353,24 @@ export function CreateMachineForm({
           </Select>
         </div>
 
-        {/* PinballMap listing — a brand-new machine always starts unlisted, and
-            create never lists it. What happens next depends on whether the
-            title is already on our location's lineup: auto-link (PP-o355.20)
-            captures the listing on the next hourly sync, or on the next save
-            from the edit form, but ONLY for a title Pinball Map already shows.
-            A title that isn't up there yet needs a person to add it, and this
-            copy is the only thing that says so — the failure mode being a
-            machine left silently unlisted forever because nobody thought they
-            had to act.
+        {/* A new machine always starts Off the lineup, and create never puts it
+            there — intent is the operator's to set, and PinPoint never sets it
+            for them in either direction (spec 5.1). This line is the only thing
+            that says a person has to act; without it the failure mode is a
+            machine left off the public lineup forever because nobody knew they
+            had to do anything.
 
-            NOTE the copy below now under-promises: "isn't automatic yet" is
-            false for a title already on the lineup, which auto-link will pick
-            up within the hour. Left for Tim — this is user-facing copy and the
-            same sentence needs rewriting anyway when PP-o355.21 ships the
-            six-state control it should point at (the Edit dialog is gone,
-            PP-o355.19, and the Manage tab's control is still a placeholder). */}
+            It used to describe auto-link (PP-o355.20) and promise "listing
+            controls are coming soon". PP-o355.21 deleted the first and shipped
+            the second, so both halves were false. */}
         <div className="flex items-start gap-2">
           <MapPin
             aria-hidden="true"
             className="mt-0.5 size-4 text-muted-foreground"
           />
           <p className="text-sm text-muted-foreground">
-            Not yet on Pinball Map. Listing it there isn&rsquo;t automatic yet —
-            machine-level listing controls are coming soon.
+            Not on the location&rsquo;s Pinball Map lineup. Put it there from
+            this machine&rsquo;s Manage tab once it&rsquo;s created.
           </p>
         </div>
 

@@ -1,0 +1,100 @@
+<style>
+  :root {
+    --bg-primary:#1d1d1f; --bg-secondary:#2d2d2f; --bg-tertiary:#3d3d3f;
+    --border:#424245; --text-primary:#f5f5f7; --text-secondary:#98989d;
+    --text-tertiary:#636366; --accent:#0a84ff; --accent-hover:#409cff;
+    --selected-bg:rgba(10,132,255,.15); --selected-border:#0a84ff;
+    --warning:#ff9f0a; --error:#ff453a; --success:#32d74b;
+  }
+  .brand-logo { filter:none !important; }
+  .panel { max-width:760px; border:1px solid #3a3a3d; border-radius:12px; background:#252527; padding:18px; }
+  .lab { font-size:13.5px; font-weight:500; color:#f5f5f7; display:flex; align-items:baseline; gap:8px; margin-bottom:6px; }
+  .lab .src { font-size:11.5px; font-weight:400; color:#98989d; }
+  .ctl { width:100%; border:1px solid #4a4a4d; border-radius:8px; background:#1f1f21; padding:8px 11px; font-size:13.5px; display:flex; justify-content:space-between; align-items:center; }
+  .ctl.dim { color:#98989d; }
+  .two { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  .three { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  .ph { border:1px dashed #4a4a4d; border-radius:8px; background:#232325; padding:8px 11px; font-size:13px; color:#636366; }
+  .sub { margin-top:14px; border-top:1px solid #3a3a3d; padding-top:14px; }
+  .cap { font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:#98989d; font-weight:600; margin:0 0 8px; }
+  .note { border-left:3px solid var(--warning); background:rgba(255,159,10,.08); padding:11px 13px; border-radius:0 8px 8px 0; margin:16px 0; font-size:13.5px; line-height:1.6; }
+  .ok { border-left:3px solid var(--success); background:rgba(50,215,75,.08); padding:11px 13px; border-radius:0 8px 8px 0; margin:16px 0; font-size:13.5px; line-height:1.6; }
+  .opt { border:1px solid #3a3a3d; border-radius:10px; padding:14px; margin-bottom:16px; }
+  .opt h4 { margin:0 0 4px; font-size:14px; }
+  .opt p.why { margin:0 0 12px; font-size:12.5px; color:#98989d; }
+</style>
+
+<h2>Manual Model entry (PP-3bbr, now inside this bead)</h2>
+<p class="subtitle">Today the Manage tab’s Model control is already labelled <em>Model · source: Pinball Map</em> and its dropdown already offers <strong>“Not on Pinball Map”</strong>. That option <em>is</em> the “use their data / don’t” switch the bead asked for — it just has nowhere to put typed values. Two ways to give it one.</p>
+
+<p class="cap">Today — matched to the catalog</p>
+<div class="panel">
+  <div class="two">
+    <div>
+      <div class="lab">Model <span class="src">source: Pinball Map</span></div>
+      <div class="ctl">Godzilla · Stern, 2021 <span style="opacity:.5">⌄</span></div>
+    </div>
+    <div>
+      <div class="lab">Edition</div>
+      <div class="ctl">Premium <span style="opacity:.5">⌄</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="opt" style="margin-top:22px">
+  <h4>A · the manual fields take over the Edition column</h4>
+  <p class="why">Edition is meaningless without a catalog match, so its column is free. Nothing moves; the right half just changes job.</p>
+  <div class="panel">
+    <div class="two">
+      <div>
+        <div class="lab">Model <span class="src">entered by hand</span></div>
+        <div class="ctl">Not on Pinball Map <span style="opacity:.5">⌄</span></div>
+        <div style="margin-top:10px"><div class="lab">Title</div><div class="ctl dim">Bordertown</div></div>
+      </div>
+      <div>
+        <div class="lab">Manufacturer</div>
+        <div class="ctl dim">Homebrew</div>
+        <div style="margin-top:10px"><div class="lab">Year</div><div class="ctl dim">2019</div></div>
+      </div>
+    </div>
+  </div>
+  <p style="font-size:12.5px;color:#98989d;margin:10px 0 0">Cost: at narrow container widths the grid collapses to one column and the four fields become a plain stack, which reads fine but loses the “these belong together” grouping.</p>
+</div>
+
+<div class="opt">
+  <h4>B · a sub-panel appears beneath the row</h4>
+  <p class="why">The Model/Edition row keeps its shape; picking “Not on Pinball Map” opens a bordered group under it. The grouping survives at every width.</p>
+  <div class="panel">
+    <div class="two">
+      <div>
+        <div class="lab">Model <span class="src">entered by hand</span></div>
+        <div class="ctl">Not on Pinball Map <span style="opacity:.5">⌄</span></div>
+      </div>
+      <div>
+        <div class="lab" style="color:#636366">Edition</div>
+        <div class="ph">Not applicable</div>
+      </div>
+    </div>
+    <div class="sub">
+      <div class="cap">Model details</div>
+      <div style="margin-bottom:12px"><div class="lab">Title</div><div class="ctl dim">Bordertown</div></div>
+      <div class="three">
+        <div><div class="lab">Manufacturer</div><div class="ctl dim">Homebrew</div></div>
+        <div><div class="lab">Year</div><div class="ctl dim">2019</div></div>
+      </div>
+    </div>
+  </div>
+  <p style="font-size:12.5px;color:#98989d;margin:10px 0 0">Cost: a dead “Not applicable” box sits there doing nothing, and the section grows taller — the Manage tab currently fits above the fold at 1440×900 and that is deliberate.</p>
+</div>
+
+<div class="ok"><strong>No checkbox either way.</strong> PP-3bbr proposed a “Use Pinball Map’s data” checkbox, but the Model dropdown already has “Not on Pinball Map” in it — two controls for one decision, and they could disagree. The dropdown wins; the checkbox is dropped.</div>
+
+<div class="note"><strong>The one thing I can’t decide for you.</strong> Suppose someone hand-enters <em>Bordertown / Homebrew / 2019</em>, and months later Pinball Map adds Bordertown to their catalog and the machine gets matched to it. What happens to the typed values?
+<br><br>
+<strong>Overwrite</strong> — the catalog wins outright, matching today’s rule that these fields are “never trusted from the client”. Simple, one source of truth, and it silently discards what a person typed.
+<br><br>
+<strong>Fill blanks only</strong> — the catalog supplies anything left empty and never overwrites a typed value. Respects the human, but leaves the machine permanently disagreeing with the catalog with nothing on screen saying so.
+<br><br>
+<strong>Ask at match time</strong> — the match surfaces as a prompt rather than applying itself. Honest, and the most work; it also means auto-link can no longer silently do this one.</div>
+
+<p style="font-size:13.5px;color:#98989d">Validation I’ll just pick unless you object: year 1930–next year, title/manufacturer trimmed and capped at the same length limits the catalog mirror uses.</p>
