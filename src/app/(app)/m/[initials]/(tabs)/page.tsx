@@ -20,7 +20,7 @@ import {
   derivePbmListingView,
   type PbmSiblingInput,
 } from "~/lib/pinballmap/listing-state";
-import { listAbandonedForMachine } from "~/lib/pinballmap/abandoned-listings";
+import { listSurfacingAbandonedForMachine } from "~/lib/pinballmap/abandoned-listings";
 import { getCatalogEntry } from "~/lib/pinballmap/catalog";
 import { InfoHero } from "./info-hero";
 import { InfoRail } from "./info-rail";
@@ -169,7 +169,11 @@ export default async function MachineInfoTab({
   const configIssue =
     canDiagnose &&
     (listingView.outOfSync ||
-      (await listAbandonedForMachine(machine.id)).length > 0);
+      // The SAME filter the Manage tab's alert applies (spec 2.5). The chip's
+      // only job is to send a reader there, so an unfiltered count here fires
+      // on entries the alert then hides and points at a page showing nothing
+      // wrong.
+      (await listSurfacingAbandonedForMachine(machine.id)).length > 0);
 
   // The Manage tab gates on `machines.edit`, which is a narrower grant than
   // `diagnose` — so a member who can see the warning may not be able to open

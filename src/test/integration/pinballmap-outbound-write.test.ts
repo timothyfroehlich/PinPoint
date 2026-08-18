@@ -154,6 +154,13 @@ function form(machineId: string): FormData {
   return fd;
 }
 
+/** What the abandoned-entry alert submits: a machine plus a specific entry. */
+function formWithLmx(machineId: string, lmxId: number): FormData {
+  const fd = form(machineId);
+  fd.append("lmxId", String(lmxId));
+  return fd;
+}
+
 describe("PinballMap outbound writes (PGlite)", () => {
   setupTestDb();
 
@@ -678,10 +685,19 @@ describe("PinballMap outbound writes (PGlite)", () => {
       })
       .returning();
     if (!machine) throw new Error("failed to seed machine");
+    // The record IS the abandoned-entry path — it is what says this entry is
+    // this machine's to clean up, and what names the title it was listed under
+    // (8080, not the TITLE_ID this cabinet carries now).
+    await db.insert(pinballmapAbandonedListings).values({
+      machineId: machine.id,
+      lmxId: 500,
+      pinballmapMachineId: 8080,
+    });
 
-    const fd = form(machine.id);
-    fd.set("lmxId", "500");
-    const result = await removeMachineFromPinballMapAction(undefined, fd);
+    const result = await removeMachineFromPinballMapAction(
+      undefined,
+      formWithLmx(machine.id, 500)
+    );
 
     expect(result.ok).toBe(true);
 
@@ -699,6 +715,127 @@ describe("PinballMap outbound writes (PGlite)", () => {
       action: "unlisted",
       lmxId: 500,
     });
+  });
+
+  // --- the abandoned-entry path (explicit lmxId) -------------------------
+  //
+  // These three guard the same mistake from three sides: the submitted lmx is
+  // attacker-controlled and the operator account behind it can edit the WHOLE
+  // location's lineup, so nothing may be taken on the form's word, and nothing
+  // downstream may assume the entry shares the cabinet's CURRENT title.
+
+  it("refuses an lmx this machine never abandoned", async () => {
+    // Push is `member: "owner"`, so without the allowlist an owner of any one
+    // cabinet could post any lmx on the lineup and delete a game they have
+    // nothing to do with, through the shared operator account.
+    const db = await getTestDb();
+    const { removeMachineFromPinballMapAction } =
+      await import("~/app/(app)/m/pinballmap-actions");
+    const admin = await createUser("admin");
+    await mockAuthAs(admin.id);
+
+    // Somebody else's entry, live on the lineup and not abandoned by anyone.
+    pbm.lineup = [{ id: 999, machineId: 4242 }];
+    await seedState([{ id: 999, machineId: 4242 }]);
+
+    const [machine] = await db
+      .insert(machines)
+      .values({ name: "Black Knight", initials: "BKX" })
+      .returning();
+    if (!machine) throw new Error("failed to seed machine");
+
+    const result = await removeMachineFromPinballMapAction(
+      undefined,
+      formWithLmx(machine.id, 999)
+    );
+
+    expect(result.ok).toBe(false);
+    // The assertion that matters is the public lineup, not the error code.
+    expect(pbm.lineup).toEqual([{ id: 999, machineId: 4242 }]);
+  });
+
+  it("removes an abandoned entry from an unlinked machine", async () => {
+    // Clearing the title is one of the ways an entry gets abandoned, so the
+    // machine holding the record often has no `pinballmapMachineId` at all. The
+    // link requirement exists because resolving an entry BY TITLE needs a
+    // title; this caller brought the entry's own id.
+    const db = await getTestDb();
+    const { removeMachineFromPinballMapAction } =
+      await import("~/app/(app)/m/pinballmap-actions");
+    const admin = await createUser("admin");
+    await mockAuthAs(admin.id);
+
+    pbm.lineup = [{ id: 321, machineId: 8080 }];
+    await seedState([{ id: 321, machineId: 8080 }]);
+
+    const [machine] = await db
+      .insert(machines)
+      .values({ name: "Fireball", initials: "FBX" })
+      .returning();
+    if (!machine) throw new Error("failed to seed machine");
+    await db.insert(pinballmapAbandonedListings).values({
+      machineId: machine.id,
+      lmxId: 321,
+      pinballmapMachineId: 8080,
+    });
+
+    const result = await removeMachineFromPinballMapAction(
+      undefined,
+      formWithLmx(machine.id, 321)
+    );
+
+    expect(result.ok).toBe(true);
+    expect(pbm.lineup).toEqual([]);
+  });
+
+  it("leaves the cabinet's own live entry alone when removing an abandoned one", async () => {
+    // `withLmxRemoved` drops rows matching EITHER the id or the title, so
+    // passing the cabinet's current title while deleting an entry under its OLD
+    // one takes its own live row out of the stored lineup — and every same-title
+    // cabinet then reads Missing until the next cron.
+    const db = await getTestDb();
+    const { removeMachineFromPinballMapAction } =
+      await import("~/app/(app)/m/pinballmap-actions");
+    const admin = await createUser("admin");
+    await mockAuthAs(admin.id);
+
+    // 111 is the abandoned entry (old title 8080); 222 is the cabinet's entry
+    // under the title it carries now.
+    pbm.lineup = [
+      { id: 111, machineId: 8080 },
+      { id: 222, machineId: TITLE_ID },
+    ];
+    await seedState([
+      { id: 111, machineId: 8080 },
+      { id: 222, machineId: TITLE_ID },
+    ]);
+
+    const [machine] = await db
+      .insert(machines)
+      .values({
+        name: "Godzilla",
+        initials: "GZQ",
+        pinballmapMachineId: TITLE_ID,
+        pinballmapIntent: "on",
+      })
+      .returning();
+    if (!machine) throw new Error("failed to seed machine");
+    await db.insert(pinballmapAbandonedListings).values({
+      machineId: machine.id,
+      lmxId: 111,
+      pinballmapMachineId: 8080,
+    });
+
+    const result = await removeMachineFromPinballMapAction(
+      undefined,
+      formWithLmx(machine.id, 111)
+    );
+
+    expect(result.ok).toBe(true);
+    expect(pbm.lineup).toEqual([{ id: 222, machineId: TITLE_ID }]);
+
+    const state = await db.query.pinballmapState.findFirst();
+    expect(state?.snapshotJson?.lmxes.map((l) => l.id)).toEqual([222]);
   });
 
   it("writes nothing locally when PinballMap rejects the removal", async () => {

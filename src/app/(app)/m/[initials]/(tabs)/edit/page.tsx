@@ -1,6 +1,6 @@
 import type React from "react";
 import { notFound, redirect } from "next/navigation";
-import { eq, inArray } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
 import { userProfiles, pinballmapCatalog, machines } from "~/server/db/schema";
@@ -19,7 +19,7 @@ import {
   type PbmSiblingInput,
 } from "~/lib/pinballmap/listing-state";
 import { findLmxForMachine } from "~/lib/pinballmap/resolve-lmx";
-import { listAbandonedForMachine } from "~/lib/pinballmap/abandoned-listings";
+import { listSurfacingAbandonedForMachine } from "~/lib/pinballmap/abandoned-listings";
 import { getCatalogEntry } from "~/lib/pinballmap/catalog";
 import { PinballmapListingControl } from "~/components/machines/PinballmapListingControl";
 import { PinballmapAbandonedEntries } from "~/components/machines/PinballmapAbandonedEntries";
@@ -65,6 +65,19 @@ export default async function MachineEditPage({
   if (!machine) {
     notFound();
   }
+
+  // `getMachineForLayout` spreads `PBM_METADATA_PLACEHOLDER` over the row, which
+  // forces `manufacturer` and `year` to null — it predates those columns
+  // existing and is still right for the header, which has no real source for
+  // `edition`/`backboxImageUrl` either. It is wrong for THIS form: the
+  // hand-entered model fields (PP-3bbr) would open blank on a machine that has
+  // them, and saving that blank state writes the nulls back. `modelName` is not
+  // in the placeholder, so it survives — which is exactly what made the
+  // inconsistency easy to miss. Read the three together, from the row.
+  const modelFields = await db.query.machines.findFirst({
+    where: eq(machines.initials, initials),
+    columns: { modelName: true, manufacturer: true, year: true },
+  });
 
   const currentUserProfile = user
     ? await db.query.userProfiles.findFirst({
@@ -203,20 +216,15 @@ export default async function MachineEditPage({
   // The catalog row can disappear while the entry on Pinball Map outlives it,
   // so a null title falls back to naming the entry by id rather than inventing
   // one.
-  const abandonedRows = await listAbandonedForMachine(machine.id);
-  const stillMatchedTitles = await titlesStillInTheFleet(
-    abandonedRows.map((r) => r.pinballmapMachineId)
-  );
+  const abandonedRows = await listSurfacingAbandonedForMachine(machine.id);
   const abandoned = await Promise.all(
-    abandonedRows
-      .filter((row) => !stillMatchedTitles.has(row.pinballmapMachineId))
-      .map(async (row) => ({
-        lmxId: row.lmxId,
-        title: (await getCatalogEntry(row.pinballmapMachineId))?.name ?? null,
-        commentCount:
-          snapshot?.lmxes.find((l) => l.id === row.lmxId)?.conditions.length ??
-          null,
-      }))
+    abandonedRows.map(async (row) => ({
+      lmxId: row.lmxId,
+      title: (await getCatalogEntry(row.pinballmapMachineId))?.name ?? null,
+      commentCount:
+        snapshot?.lmxes.find((l) => l.id === row.lmxId)?.conditions.length ??
+        null,
+    }))
   );
 
   const canEditAnyMachine =
@@ -249,9 +257,9 @@ export default async function MachineEditPage({
           pinballmapExcluded={machine.pinballmapExcluded}
           pinballmapExcludedReason={machine.pinballmapExcludedReason}
           pinballmapTitleName={pinballmapTitleName}
-          modelName={machine.modelName}
-          manufacturer={machine.manufacturer}
-          year={machine.year}
+          modelName={modelFields?.modelName ?? null}
+          manufacturer={modelFields?.manufacturer ?? null}
+          year={modelFields?.year ?? null}
         />
       </section>
 
@@ -322,27 +330,5 @@ export default async function MachineEditPage({
         </div>
       </section>
     </div>
-  );
-}
-
-/**
- * Which of these catalog titles some cabinet is still matched to.
- *
- * The question spec 2.5 turns on: an abandoned entry belongs on the machine
- * that walked away from it ONLY once nothing carries its title, because until
- * then the entry has a page of its own to appear on.
- */
-async function titlesStillInTheFleet(
-  titleIds: readonly number[]
-): Promise<Set<number>> {
-  if (titleIds.length === 0) return new Set();
-  const rows = await db
-    .selectDistinct({ pinballmapMachineId: machines.pinballmapMachineId })
-    .from(machines)
-    .where(inArray(machines.pinballmapMachineId, [...titleIds]));
-  return new Set(
-    rows.flatMap((r) =>
-      r.pinballmapMachineId === null ? [] : [r.pinballmapMachineId]
-    )
   );
 }

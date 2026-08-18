@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, eq, isNotNull, notInArray, or, sql } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, notInArray, or, sql } from "drizzle-orm";
 
 import { db, type DbTransaction } from "~/server/db";
 import { machines, pinballmapAbandonedListings } from "~/server/db/schema";
@@ -104,6 +104,46 @@ export async function listAbandonedForMachine(
     .from(pinballmapAbandonedListings)
     .where(eq(pinballmapAbandonedListings.machineId, machineId));
   return rows;
+}
+
+/**
+ * The abandoned entries that actually SURFACE on this machine's pages.
+ *
+ * `listAbandonedForMachine` returns every record; spec 2.5 says only some of
+ * them belong here. While any cabinet is still matched to the old title, the
+ * entry is that title's ordinary business and already shows through those
+ * cabinets' own states (as Lingering, which offers the same Remove) — surfacing
+ * it here as well would put one entry on two pages with two different
+ * explanations, and this is the page whose explanation is wrong, because this
+ * machine is not the one that title belongs to any more.
+ *
+ * Note the test is MATCHED, not covered: a sibling matched to the old title
+ * with intent Off is already handling it even though nothing covers the entry.
+ *
+ * **This lives here rather than beside either caller because both the Manage
+ * tab's alert and the Info tab's "Config issue" chip have to answer it the same
+ * way.** The chip's only job is to send a reader to the alert; when the filter
+ * lived on the Manage page alone the chip fired on entries the alert then hid,
+ * pointing at a page that showed nothing wrong.
+ */
+export async function listSurfacingAbandonedForMachine(
+  machineId: string
+): Promise<{ lmxId: number; pinballmapMachineId: number }[]> {
+  const rows = await listAbandonedForMachine(machineId);
+  if (rows.length === 0) return rows;
+
+  const titleIds = rows.map((r) => r.pinballmapMachineId);
+  const matched = await db
+    .selectDistinct({ pinballmapMachineId: machines.pinballmapMachineId })
+    .from(machines)
+    .where(inArray(machines.pinballmapMachineId, titleIds));
+  const stillInTheFleet = new Set(
+    matched.flatMap((r) =>
+      r.pinballmapMachineId === null ? [] : [r.pinballmapMachineId]
+    )
+  );
+
+  return rows.filter((r) => !stillInTheFleet.has(r.pinballmapMachineId));
 }
 
 /**

@@ -18,7 +18,10 @@ import { createClient } from "~/lib/supabase/server";
 import { db, type Tx } from "~/server/db";
 import { machines, userProfiles, pinballmapState } from "~/server/db/schema";
 import { reconcileAfterSync } from "~/lib/pinballmap/sync";
-import { retireAbandonmentForLmx } from "~/lib/pinballmap/abandoned-listings";
+import {
+  listAbandonedForMachine,
+  retireAbandonmentForLmx,
+} from "~/lib/pinballmap/abandoned-listings";
 import { getPinballMapWriteCredentials } from "~/lib/pinballmap/credentials";
 import { withLmxAdded, withLmxRemoved } from "~/lib/pinballmap/snapshot-edit";
 import { getPinballMapClient } from "~/lib/pinballmap/client";
@@ -588,16 +591,6 @@ export async function removeMachineFromPinballMapAction(
   _prev: UnlistPinballmapResult | undefined,
   formData: FormData
 ): Promise<UnlistPinballmapResult> {
-  const authed = await authorizeListingAction(
-    formData,
-    "machines.pinballmap.push"
-  );
-  if (!authed.ok) return authed.result;
-  const { userId, machine } = authed;
-
-  const state = await getPinballMapState();
-  if (!state) return err("SERVER", "Pinball Map isn't configured yet");
-
   // An explicit lmx wins: the abandoned-entry alert names an entry whose title
   // this cabinet no longer carries, so resolving by the machine's CURRENT title
   // would find the wrong row or none at all.
@@ -606,6 +599,50 @@ export async function removeMachineFromPinballMapAction(
     typeof explicitLmxRaw === "string" && /^\d+$/.test(explicitLmxRaw)
       ? Number(explicitLmxRaw)
       : null;
+
+  // A machine can reach the abandoned-entry path with no link at all — clearing
+  // the title or marking the cabinet uncataloged is one of the ways an entry
+  // gets abandoned in the first place — so the link requirement, which exists
+  // because title resolution needs a title, does not apply when the caller
+  // brought the entry's own id.
+  const authed = await authorizeListingAction(
+    formData,
+    "machines.pinballmap.push",
+    explicitLmxId !== null ? { requireLink: false } : undefined
+  );
+  if (!authed.ok) return authed.result;
+  const { userId, machine } = authed;
+
+  const state = await getPinballMapState();
+  if (!state) return err("SERVER", "Pinball Map isn't configured yet");
+
+  // The submitted id is attacker-controlled, and the operator account it would
+  // act through can edit the WHOLE location's lineup. Push is `member: "owner"`,
+  // so without this an owner of any one cabinet could post any lmx on the
+  // lineup and delete a game they have nothing to do with. The abandonment
+  // records are the allowlist: an entry is this machine's business only if this
+  // machine is the one that walked away from it.
+  //
+  // The record also carries the title the entry was listed under, which is the
+  // context the rest of this action needs — `machine.pinballmapMachineId` is
+  // the cabinet's CURRENT title and naming the wrong one here reaches the wrong
+  // entry twice over (see the two uses below).
+  const abandonedTitleId =
+    explicitLmxId === null
+      ? null
+      : ((await listAbandonedForMachine(machine.id)).find(
+          (a) => a.lmxId === explicitLmxId
+        )?.pinballmapMachineId ?? null);
+
+  if (explicitLmxId !== null && abandonedTitleId === null)
+    return err(
+      "NOT_FOUND",
+      "That entry is not one this machine left behind, so it is not this machine's to remove."
+    );
+
+  // Which title this removal is ABOUT: the abandoned entry's own, when we are
+  // acting on one, and otherwise the cabinet's current title.
+  const titleId = abandonedTitleId ?? machine.pinballmapMachineId;
 
   const liveLmxId =
     explicitLmxId ??
@@ -650,7 +687,11 @@ export async function removeMachineFromPinballMapAction(
   if (!written.ok) {
     const verdict = await classifyRemoveNotFound({
       attemptedLmxId: deletedLmxId,
-      pinballmapMachineId: machine.pinballmapMachineId,
+      // The abandoned entry's title, not the cabinet's current one. Passing the
+      // current title here would ask "has THIS machine's title been re-minted?"
+      // about an entry under a different title — and a `retry` verdict would
+      // then delete the cabinet's own live entry from the public lineup.
+      pinballmapMachineId: titleId,
       snapshotSyncedAt: state.lastSyncedAt,
       userId,
     });
@@ -714,7 +755,11 @@ export async function removeMachineFromPinballMapAction(
   // control exists to undo (spec 4.1).
   await db.transaction(async (tx) => {
     await editStoredSnapshot(tx, (snapshot) =>
-      withLmxRemoved(snapshot, deletedLmxId, machine.pinballmapMachineId)
+      // Same reason as above: `withLmxRemoved` drops rows matching EITHER the
+      // id or the title, so the cabinet's current title would take its own live
+      // row out of the stored lineup and leave every same-title cabinet reading
+      // Missing until the next cron.
+      withLmxRemoved(snapshot, deletedLmxId, titleId)
     );
     await createMachineTimelineEvent(
       machine.id,
