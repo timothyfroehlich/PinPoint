@@ -5,6 +5,7 @@ import { pinballmapRegionSeenMachines } from "~/server/db/schema";
 import { postChannelMessage } from "~/lib/discord/client";
 import { getDiscordConfig } from "~/lib/discord/config";
 import { log } from "~/lib/logger";
+import { reportError } from "~/lib/observability/report-error";
 import {
   getCatalogLastRefreshedAt,
   getCatalogNames,
@@ -39,9 +40,10 @@ import type { PbmRegionLmx } from "./types";
  * - **No flood on bootstrap.** The first run for a region back-fills the whole
  *   region with `announcedAt` already stamped, so seeding a few thousand existing
  *   entries posts nothing.
- * - **No side effects in a transaction** (CORE-ARCH-011). This module opens no
- *   `db.transaction` at all: the region fetch happens before any write, and the
- *   Discord post happens strictly after the seen-set inserts have committed.
+ * - **No side effects in a transaction** (CORE-ARCH-011). The one transaction this
+ *   module opens wraps the chunked seen-set inserts and nothing else — no HTTP, no
+ *   Discord, no PBM read. The region fetch happens before it, and the Discord post
+ *   strictly after it has committed.
  * - **Failed post retries, it does not vanish.** `announcedAt` only advances after
  *   Discord accepted the message. A crash between the post and the mark
  *   re-announces once on the next run — a duplicate message is a far better
@@ -188,12 +190,35 @@ async function countSeen(region: string): Promise<number> {
   return row?.n ?? 0;
 }
 
+/** How many rows are still queued for announcement — no `PENDING_READ_LIMIT`. */
+async function countPending(region: string): Promise<number> {
+  const [row] = await db
+    .select({ n: count() })
+    .from(pinballmapRegionSeenMachines)
+    .where(
+      and(
+        eq(pinballmapRegionSeenMachines.region, region),
+        isNull(pinballmapRegionSeenMachines.announcedAt)
+      )
+    );
+  return row?.n ?? 0;
+}
+
 /**
  * Record every observed entry, returning how many were new.
  *
  * `announcedAt` is passed in rather than decided here: a bootstrap run stamps it
  * so the back-fill is born already-announced, a normal run leaves it null so the
  * row is queued for the post.
+ *
+ * **All chunks commit together or none do.** The bootstrap decision is made once,
+ * from `countSeen(region) === 0`, but the write is chunked — so a partial write
+ * would be read by the NEXT run as "already bootstrapped", and every entry that
+ * never made it into the first run would then be announced as newly arrived. A
+ * region past `INSERT_CHUNK` entries dying mid-bootstrap (the 300s `maxDuration`
+ * cutoff, a deploy, a DB error) is the case: latent for Austin at ~487, which is
+ * exactly why the chunking is here at all. The transaction is safe under
+ * CORE-ARCH-011 — this function performs no external effects, only inserts.
  */
 async function recordObserved(
   region: string,
@@ -204,26 +229,28 @@ async function recordObserved(
   // single INSERT is the caller's problem to avoid, not the database's.
   const unique = [...new Map(observed.map((o) => [o.lmxId, o])).values()];
 
-  let discovered = 0;
-  for (let i = 0; i < unique.length; i += INSERT_CHUNK) {
-    const chunk = unique.slice(i, i + INSERT_CHUNK).map((o) => ({
-      region,
-      lmxId: o.lmxId,
-      locationId: o.locationId,
-      pinballmapMachineId: o.machineId,
-      announcedAt,
-    }));
-    const inserted = await db
-      .insert(pinballmapRegionSeenMachines)
-      .values(chunk)
-      // DO NOTHING, never DO UPDATE: a row already here is already known. This is
-      // also what makes PBM's 7-day revival a non-event — the revived xref keeps
-      // its id, conflicts, and is correctly not re-announced.
-      .onConflictDoNothing()
-      .returning({ lmxId: pinballmapRegionSeenMachines.lmxId });
-    discovered += inserted.length;
-  }
-  return discovered;
+  return db.transaction(async (tx) => {
+    let discovered = 0;
+    for (let i = 0; i < unique.length; i += INSERT_CHUNK) {
+      const chunk = unique.slice(i, i + INSERT_CHUNK).map((o) => ({
+        region,
+        lmxId: o.lmxId,
+        locationId: o.locationId,
+        pinballmapMachineId: o.machineId,
+        announcedAt,
+      }));
+      const inserted = await tx
+        .insert(pinballmapRegionSeenMachines)
+        .values(chunk)
+        // DO NOTHING, never DO UPDATE: a row already here is already known. This is
+        // also what makes PBM's 7-day revival a non-event — the revived xref keeps
+        // its id, conflicts, and is correctly not re-announced.
+        .onConflictDoNothing()
+        .returning({ lmxId: pinballmapRegionSeenMachines.lmxId });
+      discovered += inserted.length;
+    }
+    return discovered;
+  });
 }
 
 async function readPending(region: string): Promise<
@@ -284,6 +311,18 @@ async function markAnnounced(region: string, lmxIds: number[]): Promise<void> {
  * missing and STAYS missing — PBM has not catalogued it either. Without a cooldown
  * that id would trigger a full catalog fetch on every tick for as long as it stays
  * pending (which happens whenever Discord is failing and rows are not clearing).
+ *
+ * **What the cooldown does NOT cover, stated precisely.** Its clock is
+ * `max(refreshed_at)` over the mirror, and that only advances when a refresh
+ * SUCCEEDS and writes rows. So a refresh that throws, or that returns an empty
+ * upstream payload, leaves the clock where it was and the next tick tries again —
+ * hourly, with no backoff, for as long as the failure lasts. The expensive case is
+ * still covered (a large successful fetch stamps every row it upserts, so an id
+ * PBM has simply not catalogued is suppressed after one attempt), and a 429 is
+ * absorbed at the client seam, which honors Retry-After and reports `rate_limited`
+ * rather than retrying here. The residue is one cheap failed request per hour
+ * against an endpoint that is already failing. Closing it properly needs an
+ * attempt clock that persists across invocations — PP-o355.44.
  *
  * **A refresh failure is never fatal.** The alert is the product; the name is an
  * enhancement. Every failure path here returns the names we already had and lets
@@ -445,13 +484,12 @@ export async function runRegionNewMachineAlerts(opts?: {
     return { ...base, announced: 0, pending: 0 };
   }
 
-  const entries = await resolveLabels(region, pending);
-  const content = formatRegionAlertMessage({
-    entries,
-    regionLabel: regionLabel(region),
-  });
-  if (content === null) return { ...base, announced: 0, pending: 0 };
-
+  // BOTH Discord gates clear before any label lookup. Resolving labels costs a
+  // region-locations call and can cost a full catalog refresh, and a pending row
+  // never clears without a successful post — so checking this after the lookup
+  // would burn those requests on EVERY hourly run, forever, for an install whose
+  // Discord integration is off. Same reasoning as the channel-id check above; it
+  // is only correct once both gates sit on the same side of the fetch.
   const config = await getDiscordConfig();
   if (!config) {
     // Channel configured but the Discord integration is off or unprovisioned.
@@ -463,21 +501,41 @@ export async function runRegionNewMachineAlerts(opts?: {
     return { ...base, announced: 0, pending: pending.length };
   }
 
+  const entries = await resolveLabels(region, pending);
+  const content = formatRegionAlertMessage({
+    entries,
+    regionLabel: regionLabel(region),
+  });
+  if (content === null) return { ...base, announced: 0, pending: 0 };
+
   const sent = await postChannelMessage({
     botToken: config.botToken,
     channelId,
     content,
   });
   if (!sent.ok) {
-    log.warn(
-      {
-        region,
-        pending: pending.length,
-        reason: sent.reason,
-        action: "pinballmap.regionAlerts",
-      },
-      "New PinballMap machines pending: Discord post failed"
-    );
+    const detail = {
+      region,
+      pending: pending.length,
+      reason: sent.reason,
+      action: "pinballmap.regionAlerts",
+    };
+    if (sent.reason === "blocked") {
+      // `blocked` is DiscordSendResult's "retrying will not fix this" — a 404 for
+      // a channel that does not exist, or a bot that is not in the guild. Left at
+      // warn it is indistinguishable from Discord having a bad afternoon, so a
+      // mistyped channel snowflake would queue rows and spend PBM calls hourly
+      // and forever while looking like transient noise. Reported, not just logged
+      // (PP-a5y: a caught error is invisible to Sentry unless reported).
+      reportError(
+        new Error(
+          "New PinballMap machines pending: Discord post permanently rejected — check the configured channel"
+        ),
+        detail
+      );
+    } else {
+      log.warn(detail, "New PinballMap machines pending: Discord post failed");
+    }
     return { ...base, announced: 0, pending: pending.length };
   }
 
@@ -485,5 +543,10 @@ export async function runRegionNewMachineAlerts(opts?: {
     region,
     pending.map((p) => p.lmxId)
   );
-  return { ...base, announced: pending.length, pending: 0 };
+  // `readPending` caps at PENDING_READ_LIMIT, so "announced everything we read"
+  // is not "announced everything queued" — a long Discord outage can leave more
+  // rows behind than one run can drain. This log line is the monitoring signal
+  // for the job, so the remainder is measured rather than assumed to be zero.
+  const remaining = await countPending(region);
+  return { ...base, announced: pending.length, pending: remaining };
 }

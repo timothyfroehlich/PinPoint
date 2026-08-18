@@ -154,6 +154,15 @@ async function seedCatalog(
   );
 }
 
+/**
+ * Un-announce every seen row, so a bootstrap back-fill can be reused as a large
+ * pending backlog without fetching 600+ entries a second time.
+ */
+async function markAllPending(): Promise<void> {
+  const db = await getTestDb();
+  await db.update(pinballmapRegionSeenMachines).set({ announcedAt: null });
+}
+
 /** A mirror last written long enough ago that the cooldown has expired. */
 const STALE_MIRROR = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
@@ -465,6 +474,49 @@ describe("PinballMap region new-machine alerts (PGlite)", () => {
 
     expect(run).toMatchObject({ discovered: 1, announced: 0, pending: 1 });
     expect(discord.posts).toEqual([]);
+  });
+
+  it("spends no label lookups when the Discord integration is unavailable", async () => {
+    // The gate order is the point. A pending row never clears without a
+    // successful post, so if the integration check sat AFTER label resolution,
+    // an install with Discord off would spend a region-locations call — and
+    // possibly a full catalog refresh — on every hourly run, forever, and post
+    // nothing. Counting the calls is the only way to catch that; the run's
+    // return value looks identical either way.
+    // Bootstrap first: on a region's very first run everything is born
+    // already-announced, so nothing would be pending and the gate would never be
+    // reached. The counters are captured after it for the same reason.
+    pbm.entries = [lmx({ lmxId: 1 })];
+    await runRegionNewMachineAlerts();
+
+    discord.enabled = false;
+    pbm.entries = [lmx({ lmxId: 1 }), lmx({ lmxId: 2, machineId: 999 })];
+    const locationCallsBefore = pbm.locationCalls;
+    const refreshCallsBefore = catalog.refreshCalls;
+
+    const run = await runRegionNewMachineAlerts();
+
+    expect(run).toMatchObject({ announced: 0, pending: 1 });
+    expect(pbm.locationCalls).toBe(locationCallsBefore);
+    expect(catalog.refreshCalls).toBe(refreshCallsBefore);
+  });
+
+  it("reports the real remaining backlog when it exceeds one run's read limit", async () => {
+    // `readPending` caps at PENDING_READ_LIMIT (500), so a long Discord outage
+    // can queue more than one run can drain. `pending` is the job's monitoring
+    // signal, so it has to be counted, not inferred from "we announced them all".
+    discord.enabled = false;
+    pbm.entries = Array.from({ length: 620 }, (_, i) =>
+      lmx({ lmxId: i + 1, machineId: 1 })
+    );
+    await runRegionNewMachineAlerts(); // bootstrap: born announced
+    await markAllPending();
+
+    discord.enabled = true;
+    const run = await runRegionNewMachineAlerts();
+
+    expect(run.announced).toBe(500);
+    expect(run.pending).toBe(120);
   });
 
   it("makes no PBM call at all when no alert channel is configured", async () => {

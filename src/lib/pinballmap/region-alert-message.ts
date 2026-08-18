@@ -103,11 +103,18 @@ export function formatRegionAlertMessage(
       `• …and ${String(hidden)} more (see the map for the full picture)`
     );
   }
-  // Attribution: the data is Pinball Map's, under CC BY-SA 4.0.
-  lines.push("Data from Pinball Map (CC BY-SA 4.0).");
+  // Attribution: the data is Pinball Map's, under CC BY-SA 4.0. It is a licence
+  // term, not a courtesy, so it is budgeted for rather than appended and hoped
+  // for — trimming the assembled string from the end would drop THIS line first,
+  // publishing PBM's data with the attribution cut off. Venue names are attacker-
+  // adjacent free text (anyone can name a location on Pinball Map) and each line
+  // already carries ~50 characters of URL scaffolding plus backslash escapes, so
+  // exceeding 2000 needs no unusual luck.
+  const attribution = "Data from Pinball Map (CC BY-SA 4.0).";
+  const budget = DISCORD_MAX_MESSAGE_LENGTH - attribution.length - 1;
 
-  const assembled = [headline, ...lines].join("\n");
-  return assembled.length > DISCORD_MAX_MESSAGE_LENGTH
-    ? assembled.slice(0, DISCORD_MAX_MESSAGE_LENGTH - 1) + "…"
-    : assembled;
+  const body = [headline, ...lines].join("\n");
+  const trimmedBody =
+    body.length > budget ? body.slice(0, budget - 1) + "…" : body;
+  return `${trimmedBody}\n${attribution}`;
 }

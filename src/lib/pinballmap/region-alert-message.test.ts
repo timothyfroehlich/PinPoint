@@ -160,4 +160,22 @@ describe("formatRegionAlertMessage", () => {
     expect(message).not.toBeNull();
     expect((message ?? "").length).toBeLessThanOrEqual(2000);
   });
+
+  it("keeps the CC BY-SA attribution when the message has to be trimmed", () => {
+    // Attribution is a licence term, so it has to survive the case that would
+    // otherwise cut it: trimming from the end, where it is the last line.
+    const entries = Array.from({ length: REGION_ALERT_MAX_LINES }, () =>
+      entry({ machineName: "M".repeat(400), locationName: "L".repeat(400) })
+    );
+
+    const message = formatRegionAlertMessage({
+      entries,
+      regionLabel: "Austin",
+    });
+
+    expect((message ?? "").length).toBeLessThanOrEqual(2000);
+    expect(message).toContain("Data from Pinball Map (CC BY-SA 4.0).");
+    // And it is still the final line, not something the trim landed mid-way through.
+    expect(message ?? "").toMatch(/Data from Pinball Map \(CC BY-SA 4\.0\)\.$/);
+  });
 });
