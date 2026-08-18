@@ -1,7 +1,7 @@
 import { cache } from "react";
 import { eq, notInArray, sql } from "drizzle-orm";
 import { db } from "~/server/db";
-import { machines, issues, pinballmapCatalog } from "~/server/db/schema";
+import { machines, issues } from "~/server/db/schema";
 import { CLOSED_STATUSES } from "~/lib/issues/status";
 
 /**
@@ -75,6 +75,15 @@ export const getMachineForLayout = cache(async (initials: string) => {
         watchers: {
           columns: { userId: true, watchMode: true },
         },
+        // Joined rather than looked up afterwards. A second PK query would be
+        // sequential — it needs the machine row to know the id — so every one
+        // of the five `/m/[initials]/*` surfaces would pay a round-trip for a
+        // field two of them read. `with` folds it into the query already going
+        // out. Null here for an unmatched machine, and also for a matched one
+        // whose title has left the mirror; `resolveModelTitle` separates those.
+        pinballmapTitle: {
+          columns: { name: true },
+        },
       },
     }),
     db
@@ -88,7 +97,7 @@ export const getMachineForLayout = cache(async (initials: string) => {
       ? {
           ...machine,
           ...PBM_METADATA_PLACEHOLDER,
-          modelTitle: await resolveModelTitle(machine),
+          modelTitle: resolveModelTitle(machine),
         }
       : undefined,
     totalIssuesCount: totalIssuesCountResult[0]?.count ?? 0,
@@ -108,24 +117,21 @@ export const getMachineForLayout = cache(async (initials: string) => {
  * rather than reading as "no model": the match is a real, recorded decision and
  * hiding it would misreport the machine as unmatched (CORE-ARCH-012).
  *
- * One PK lookup on the mirror, made from inside the `cache()`d loader so the
- * layout and the Info tab share it. It replaces the copy the Info tab used to
- * run itself, so the busiest page issues no more queries than before.
+ * Pure. The catalog row arrives on the machine through the `pinballmapTitle`
+ * relation, so this costs no query of its own — deriving it here rather than in
+ * each page is what keeps the header and the Info tab's Model row saying the
+ * same thing. They rendered the same fact from two independent lookups before
+ * PP-3bbr.1, which could have disagreed with nobody able to see it.
  */
-async function resolveModelTitle(machine: {
+function resolveModelTitle(machine: {
   pinballmapMachineId: number | null;
   modelName: string | null;
-}): Promise<string | null> {
+  pinballmapTitle: { name: string } | null;
+}): string | null {
   if (machine.pinballmapMachineId === null) return machine.modelName;
-  const [entry] = await db
-    .select({ name: pinballmapCatalog.name })
-    .from(pinballmapCatalog)
-    .where(
-      eq(pinballmapCatalog.pinballmapMachineId, machine.pinballmapMachineId)
-    )
-    .limit(1);
   return (
-    entry?.name ?? `Pinball Map title #${String(machine.pinballmapMachineId)}`
+    machine.pinballmapTitle?.name ??
+    `Pinball Map title #${String(machine.pinballmapMachineId)}`
   );
 }
 

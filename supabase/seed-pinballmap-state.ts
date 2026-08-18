@@ -30,11 +30,11 @@
  * ## Why this also links machines
  *
  * A snapshot alone still leaves every seeded machine `unmatched` — the derived
- * state is a function of BOTH the snapshot and the machine's own columns. Five
- * seeded machines have genuine entries in the captured lineup and five do not,
- * which is enough of a natural spread to reach every state without inventing
- * data. Each id below was verified against both fixtures; see the table in
- * `MACHINE_PLAN`.
+ * state is a function of BOTH the snapshot and the machine's own columns. Of the
+ * ten, six are matched to a title the captured lineup carries, two to a title it
+ * does not, and two are matched to nothing at all — enough of a spread to reach
+ * every state the fixture can reach. Each id below was verified against both
+ * fixtures; see the table in `MACHINE_PLAN`.
  *
  * Idempotent: singleton upsert plus per-machine updates keyed on initials.
  *
@@ -131,17 +131,22 @@ interface MachinePlan {
  * One machine per control state, so every frame of the two-line control can be
  * walked locally before a review (spec §4).
  *
- * | machine                | catalog | on lineup | intent   | availability | renders as |
- * |------------------------|---------|-----------|----------|--------------|------------|
- * | GDZ Godzilla (Premium) | 3416    | yes       | on       | on the floor | on         |
- * | SM  Spider-Man (Vault) | 2565    | yes       | on       | on loan      | flag       |
- * | BK  Black Knight       | 1055    | yes       | off      | on the floor | lingering  |
- * | MM  Medieval Madness   | 642     | no        | on       | on the floor | missing    |
- * | TAF Addams Family      | 3416    | yes       | off      | on the floor | covered    |
- * | HD  High Deposit       | 3416    | yes       | on       | on the floor | shared     |
- * | EBD Eight Ball Deluxe  | 1055    | yes       | no_sync  | on the floor | sync_off   |
- * | SC  Scared Stiff       | 642     | no        | off      | removed      | blocked    |
- * | FB  Fireball           | none    | —         | off      | on the floor | uncataloged|
+ * | machine                | catalog | on lineup | intent   | availability | renders as  |
+ * |------------------------|---------|-----------|----------|--------------|-------------|
+ * | GDZ Godzilla           | 3416    | yes       | on       | on the floor | shared      |
+ * | HD  Humpty Dumpty      | 3416    | yes       | on       | on the floor | shared      |
+ * | TAF The Addams Family  | 3416    | yes       | off      | on the floor | covered     |
+ * | SM  Spider-Man         | 2565    | yes       | on       | on loan      | flag        |
+ * | BK  Black Knight       | 1055    | yes       | off      | on the floor | lingering   |
+ * | EBD Eight Ball Deluxe  | 1055    | yes       | no_sync  | on the floor | sync_off    |
+ * | MM  Medieval Madness   | 642     | no        | on       | on the floor | missing     |
+ * | SC  Slick Chick        | 642     | no        | off      | removed      | blocked     |
+ * | FB  Fireball           | none    | —         | off      | on the floor | uncataloged |
+ * | AFM Attack from Mars   | none    | —         | off      | on the floor | no_model    |
+ *
+ * The `initials`/`name` column is what `machines.json` calls the cabinet; the
+ * catalog column is the title it is matched to, which for four of them is a
+ * different game — see below.
  *
  * **The Shared / Covered pair is why GDZ, TAF and HD all point at title 3416.**
  * Coverage is a property of a same-title GROUP, so those two states cannot be
@@ -151,12 +156,21 @@ interface MachinePlan {
  * catalog rows, and a wrong title on a dev fixture is cheaper than a wrong
  * catalog.
  *
- * Two states are deliberately not here. **Waiting** needs no stored lineup at
- * all, which would take out every other row — clear `snapshot_json` by hand to
- * see it. **Alert** needs intent On with an availability of Removed or Pending
- * arrival, which the seed cannot write: `setPinballmapIntentAction` refuses
- * that combination going in (spec 6.2), so the only honest way to reach it is
- * the way a person does — set intent On, then change availability.
+ * **Waiting is deliberately not here.** It needs no stored lineup at all, which
+ * would take out every other row — clear `snapshot_json` by hand to see it.
+ *
+ * **Alert is not here either, but nothing stops it being seeded.** It needs
+ * intent On with an availability of Removed or Pending arrival. This file used
+ * to claim the seed "cannot write" that combination because
+ * `setPinballmapIntentAction` refuses it — which confused a constraint on one
+ * ACTION with the legitimacy of the STATE. Spec 6.2 blocks entering from the
+ * intent side and explicitly ALLOWS entering from the availability side, since
+ * changing where a machine physically is must never rewrite what the operator
+ * decided about the lineup (6.1). So a real machine reaches Alert by having
+ * intent On and then being marked Removed, and a row written straight to the
+ * end state is exactly equivalent. No CHECK constraint stands in the way either
+ * — none of the three on `machines` mentions `presence_status`. Alert is absent
+ * only because no cabinet was spare, not because it would be a fiction.
  *
  * **No machine here survives being edited into a different state and back.**
  * Re-run the seed rather than reasoning about what the fixture became.
@@ -369,6 +383,21 @@ try {
       throw new Error(
         `${m.initials} links to catalog title #${String(m.pinballmapMachineId)}, ` +
           `which is not in the mirror — run seed-pinballmap-catalog first.`
+      );
+    }
+    // A matched row's metadata comes from the mirror, so a hand-entered pair on
+    // one would be silently ignored — the ternary below never looks at it. Said
+    // out loud rather than left as a convention in the interface comment,
+    // because the failure is a plan row that looks like it configures something
+    // and does not.
+    if (
+      m.pinballmapMachineId !== null &&
+      (m.manufacturer !== undefined || m.year !== undefined)
+    ) {
+      throw new Error(
+        `${m.initials} is matched to a catalog title AND carries a hand-entered ` +
+          `manufacturer/year. Matched rows take both from the mirror — drop the ` +
+          `hand-entered pair, or drop the match.`
       );
     }
     const manufacturer = catalog

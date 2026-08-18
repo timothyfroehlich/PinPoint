@@ -38,6 +38,7 @@ function makeMachine(
     watchers: [],
     modelName: null,
     modelTitle: null,
+    pinballmapTitle: null,
     manufacturer: null,
     year: null,
     backboxImageUrl: null,
