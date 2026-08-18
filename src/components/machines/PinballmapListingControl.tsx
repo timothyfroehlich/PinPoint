@@ -170,7 +170,7 @@ export function PinballmapListingControl({
           subtree from the tab order and the a11y tree in one attribute, where
           `pointer-events-none` would leave it keyboard-reachable. */}
       <div
-        className={cn("space-y-3.5", disabled && "opacity-45")}
+        className={cn("space-y-2", disabled && "opacity-45")}
         {...(disabled ? { inert: true } : {})}
         data-testid="pbm-listing-rows"
       >
@@ -203,12 +203,17 @@ export function PinballmapListingControl({
         <Row label="Status">
           <div className="flex min-w-0 flex-1 items-center gap-2">
             <StatusIcon view={view} />
-            <p
+            {/* A span, not a <p>: globals.css gives every paragraph
+                `leading-7 not-first:mt-4` for prose, and both are wrong for one
+                line of UI text sitting beside a 16px icon — the margin pushed
+                the sentence 16px below the icon it belongs to, and the 28px
+                leading stretched the row past its fixed height (4.1). */}
+            <span
               className="text-sm text-foreground"
               data-testid="pbm-listing-status"
             >
               {statusSentence(view, locationUrl, canWriteOut)}
-            </p>
+            </span>
           </div>
 
           {view.pushAction !== null && canWriteOut ? (
@@ -290,7 +295,7 @@ function Header({
 }): React.JSX.Element {
   const spent = refreshRemaining <= 0;
   return (
-    <div className="mb-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+    <div className="mb-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
       <h3 className="text-base font-semibold">
         Pinball Map
         {locationName !== null ? (
