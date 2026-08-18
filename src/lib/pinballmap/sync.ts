@@ -44,6 +44,12 @@ export async function reconcileAfterSync(): Promise<ReconcileResult> {
   // Safe here because we only ever run on a freshly synced snapshot: both
   // callers return early unless the sync succeeded, and a failed sync leaves
   // `snapshotJson` untouched rather than emptying it.
-  const abandonmentsCleared = await clearResolvedAbandonments(snapshot);
+  //
+  // Scoped to the tracked location (spec 6.4): records kept for a location we no
+  // longer track must never be reconciled against this lineup.
+  const abandonmentsCleared = await clearResolvedAbandonments(
+    snapshot,
+    state.locationId
+  );
   return { abandonmentsCleared };
 }

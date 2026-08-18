@@ -291,3 +291,78 @@ describe("a failed sync clears nothing (PP-l81u)", () => {
     vi.unstubAllEnvs();
   });
 });
+
+/**
+ * Location-scoped reconcile (spec 6.4).
+ *
+ * `clearResolvedAbandonments` reads "this lmx is not on the lineup" as "a human
+ * removed the entry". After a location change, a record kept for the OLD
+ * location is absent from the NEW location's lineup by definition — so an
+ * unscoped clear would delete every old record and report a cleanup nobody
+ * performed (CORE-ARCH-012). The clear only ever touches records stamped with
+ * the location that was actually synced.
+ */
+describe("reconcile is scoped to the tracked location (spec 6.4)", () => {
+  setupTestDb();
+
+  it("clears same-location orphans but keeps cross-location records", async () => {
+    const db = await getTestDb();
+    const { machines, pinballmapAbandonedListings } =
+      await import("~/server/db/schema");
+    const { clearResolvedAbandonments } =
+      await import("~/lib/pinballmap/abandoned-listings");
+
+    const [machine] = await db
+      .insert(machines)
+      .values({ name: "Godzilla", initials: "GZ" })
+      .returning();
+    if (!machine) throw new Error("failed to seed machine");
+
+    // One record for the currently tracked location, one for a location we no
+    // longer track. Neither lmx is on the synced lineup.
+    await db.insert(pinballmapAbandonedListings).values([
+      {
+        machineId: machine.id,
+        lmxId: 111,
+        pinballmapMachineId: 6221,
+        locationId: 26454,
+      },
+      {
+        machineId: machine.id,
+        lmxId: 222,
+        pinballmapMachineId: 6222,
+        locationId: 99999,
+      },
+    ]);
+
+    // A valid, non-empty lineup for the tracked location that carries neither
+    // abandoned lmx and no covering intent-On machine exists — so absence would
+    // normally clear both records.
+    const snapshot: LocationSnapshot = {
+      locationId: 26454,
+      name: "APC",
+      dateLastUpdated: null,
+      lastUpdatedByUsername: null,
+      machineCount: 1,
+      lmxes: [
+        {
+          id: 333,
+          machineId: 6299,
+          icEnabled: null,
+          lastUpdatedByUsername: null,
+          conditions: [],
+        },
+      ],
+      fetchedAtIso: "2026-08-18T00:00:00Z",
+      raw: {},
+    };
+
+    const cleared = await clearResolvedAbandonments(snapshot, 26454);
+    expect(cleared).toBe(1);
+
+    const rows = await db.select().from(pinballmapAbandonedListings);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.lmxId).toBe(222);
+    expect(rows[0]?.locationId).toBe(99999);
+  });
+});

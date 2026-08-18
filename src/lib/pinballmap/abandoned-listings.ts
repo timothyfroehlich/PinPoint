@@ -194,10 +194,19 @@ export async function listSurfacingAbandonedForMachine(
  * there as "cleaned up" would wipe every record and report cleanup nobody
  * performed (CORE-ARCH-012).
  *
+ * Scoped to `trackedLocationId`: only records stamped with the location that was
+ * actually synced are eligible to clear. A record kept for a location PinPoint
+ * no longer tracks (spec 6.4) is absent from this lineup by definition, and
+ * reading that absence as "removed" would silently wipe every old-location
+ * record and report a cleanup nobody performed (CORE-ARCH-012). Cross-location
+ * records are left untouched — cleaned up only by their own explicit removal
+ * (spec 6.9).
+ *
  * Returns how many were cleared.
  */
 export async function clearResolvedAbandonments(
-  snapshot: LocationSnapshot
+  snapshot: LocationSnapshot,
+  trackedLocationId: number
 ): Promise<number> {
   const liveLmxIds = snapshot.lmxes.map((l) => l.id);
 
@@ -282,7 +291,12 @@ export async function clearResolvedAbandonments(
 
   const cleared = await db
     .delete(pinballmapAbandonedListings)
-    .where(or(...conditions))
+    .where(
+      and(
+        eq(pinballmapAbandonedListings.locationId, trackedLocationId),
+        or(...conditions)
+      )
+    )
     .returning({ id: pinballmapAbandonedListings.id });
 
   return cleared.length;
