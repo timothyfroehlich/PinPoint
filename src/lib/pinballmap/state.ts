@@ -1,5 +1,5 @@
 import "server-only";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db } from "~/server/db";
 import { pinballmapState } from "~/server/db/schema";
 import { getPinballMapClient } from "./client";
@@ -9,6 +9,7 @@ import {
   PBM_REFRESH_REFILL_MS,
 } from "./config";
 import type { NewPinballmapState, PinballmapState } from "~/lib/types/database";
+import type { LocationSnapshot } from "./types";
 
 /**
  * PinballMap location-snapshot read path (foundation — PP-o355.16).
@@ -108,12 +109,26 @@ export async function getRefreshAllowance(
  * untouched on an existing row rather than clobbered.
  */
 async function upsertState(
-  fields: Omit<NewPinballmapState, "id"> & { locationId: number }
+  fields: Omit<NewPinballmapState, "id"> & { locationId: number },
+  guardLocationId?: number
 ): Promise<void> {
   await db
     .insert(pinballmapState)
     .values({ id: SINGLETON_ID, ...fields })
-    .onConflictDoUpdate({ target: pinballmapState.id, set: fields });
+    .onConflictDoUpdate({
+      target: pinballmapState.id,
+      set: fields,
+      // Concurrency guard (spec 6.6). When a caller writes for a specific
+      // location, the update fires only while the singleton STILL tracks that
+      // location. A `changeLocation` that landed during a long PBM fetch has
+      // already moved the id and stored the new lineup; letting this write land
+      // would either revert the id or store an old-location snapshot under the
+      // new one. The guard makes the stale write a no-op instead. Absent on the
+      // first-ever insert, where there is no row to guard.
+      ...(guardLocationId === undefined
+        ? {}
+        : { setWhere: eq(pinballmapState.locationId, guardLocationId) }),
+    });
 }
 
 /**
@@ -257,27 +272,185 @@ export async function syncLocationSnapshot(opts?: {
     const snapshot = await (
       await getPinballMapClient()
     ).fetchLocation(locationId);
-    await upsertState({
-      locationId,
-      snapshotJson: snapshot,
-      lastSyncedAt: syncedAt,
-      lastSyncStatus: "ok",
-      lastSyncError: null,
-      updatedAt: syncedAt,
-      ...actor,
-    });
+    await upsertState(
+      {
+        locationId,
+        snapshotJson: snapshot,
+        lastSyncedAt: syncedAt,
+        lastSyncStatus: "ok",
+        lastSyncError: null,
+        updatedAt: syncedAt,
+        ...actor,
+      },
+      // Only persist if the singleton still tracks the location we fetched for;
+      // a concurrent location change supersedes this snapshot (spec 6.6). The
+      // fetch itself succeeded, so the caller still hears ok — the next sync
+      // reads the new location.
+      locationId
+    );
     return { ok: true, machineCount: snapshot.machineCount, syncedAt };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown sync error";
     // Note: no `lastSyncedAt` here — a failed attempt must not advance the
     // last-successful-sync clock. `updatedAt` still records that we wrote.
-    await upsertState({
-      locationId,
-      lastSyncStatus: "error",
-      lastSyncError: message,
-      updatedAt: syncedAt,
-      ...actor,
-    });
+    // Guarded too (spec 6.6): a failed sync for the old location must not write
+    // its error health — or its old id — over a location change that landed
+    // during the fetch.
+    await upsertState(
+      {
+        locationId,
+        lastSyncStatus: "error",
+        lastSyncError: message,
+        updatedAt: syncedAt,
+        ...actor,
+      },
+      locationId
+    );
     return { ok: false, reason: "error", error: message };
   }
+}
+
+/** Outcome of a location change. */
+export type ChangeLocationResult =
+  | { ok: true }
+  | { ok: false; reason: "unchanged" | "fetch_failed" | "concurrent_change" };
+
+/**
+ * Re-point the integration at a different Pinball Map location (spec 6).
+ *
+ * Validate-before-commit (spec 6.2, CORE-ARCH-011): the new location is fetched
+ * from Pinball Map FIRST, outside any transaction. A successful fetch is what
+ * makes the id valid; a failed fetch — unknown id, network/auth error, or a
+ * broken payload (machines reported but none parsed) — aborts with nothing
+ * changed and the old location still tracked. A legitimately empty venue (zero
+ * machines) is valid and proceeds. The commit is then a single guarded write
+ * that stores the new id, replaces the snapshot, and sets sync health.
+ *
+ * Guarded on the OLD id (spec 6.6): if a concurrent change or in-flight sync
+ * moved the id between the read and the write, the commit no-ops and the caller
+ * hears `concurrent_change` rather than clobbering the other writer.
+ *
+ * Deliberately does NOT touch abandoned-listing records (spec 6.4 — they are
+ * kept, location-scoped) or the refresh-token bucket (spec 6.5 — traffic
+ * shaping, not observed state). The validating fetch follows the cron/enable
+ * path and is not charged to the manual allowance.
+ *
+ * Disabled integration (spec 6.7): the id is changed but no fetch is made and
+ * the stored snapshot is left as-is; the next enable's refresh reads the new
+ * location.
+ */
+export async function changeLocation(args: {
+  newLocationId: number;
+  updatedBy?: string;
+}): Promise<ChangeLocationResult> {
+  const { newLocationId } = args;
+  const state = await getPinballMapState();
+  const oldId = state?.locationId ?? APC_LOCATION_ID;
+  if (newLocationId === oldId) return { ok: false, reason: "unchanged" };
+
+  const now = new Date();
+  const actor = args.updatedBy ? { updatedBy: args.updatedBy } : {};
+
+  // Disabled (or never configured): set the id only, no Pinball Map call (6.7).
+  // Upsert so a never-initialized singleton is created; the guard makes a
+  // concurrent change a no-op on an existing row.
+  if (!state?.enabled) {
+    const committed = await db
+      .insert(pinballmapState)
+      .values({
+        id: SINGLETON_ID,
+        locationId: newLocationId,
+        updatedAt: now,
+        ...actor,
+      })
+      .onConflictDoUpdate({
+        target: pinballmapState.id,
+        set: { locationId: newLocationId, updatedAt: now, ...actor },
+        setWhere: eq(pinballmapState.locationId, oldId),
+      })
+      .returning({ id: pinballmapState.id });
+    return committed.length > 0
+      ? { ok: true }
+      : { ok: false, reason: "concurrent_change" };
+  }
+
+  // Enabled: validate by fetching the new location BEFORE any write.
+  let snapshot: LocationSnapshot;
+  try {
+    snapshot = await (await getPinballMapClient()).fetchLocation(newLocationId);
+  } catch {
+    return { ok: false, reason: "fetch_failed" };
+  }
+  // A broken payload — machines reported present but none parsed — is not a
+  // valid empty venue; reject it rather than store an empty lineup that later
+  // reads as "everything was removed" (mirrors clearResolvedAbandonments).
+  if (snapshot.lmxes.length === 0 && snapshot.machineCount > 0) {
+    return { ok: false, reason: "fetch_failed" };
+  }
+
+  // Commit the switch in one guarded statement (6.2, 6.6).
+  const committed = await db
+    .update(pinballmapState)
+    .set({
+      locationId: newLocationId,
+      snapshotJson: snapshot,
+      lastSyncedAt: now,
+      lastSyncAttemptAt: now,
+      lastSyncStatus: "ok",
+      lastSyncError: null,
+      updatedAt: now,
+      ...actor,
+    })
+    .where(
+      and(
+        eq(pinballmapState.id, SINGLETON_ID),
+        eq(pinballmapState.locationId, oldId)
+      )
+    )
+    .returning({ id: pinballmapState.id });
+  return committed.length > 0
+    ? { ok: true }
+    : { ok: false, reason: "concurrent_change" };
+}
+
+/**
+ * Turn the integration on or off (spec 5).
+ *
+ * Enabling refreshes the stored snapshot so the lineup reflects the current
+ * location immediately (5.2). That refresh runs on the `cron` path so it is not
+ * charged to the human manual-refresh allowance (spec 3.5) — enabling is not a
+ * "Sync now" click. The `SyncResult` is returned so the caller can surface a
+ * fetch failure; the enable itself has already been persisted.
+ *
+ * Disabling makes no Pinball Map call and clears nothing — no snapshot wipe, no
+ * touching matches or intents (5.3). It is fully reversible: re-enabling
+ * refreshes from wherever the location now points.
+ */
+export async function setEnabled(args: {
+  enabled: boolean;
+  updatedBy?: string;
+}): Promise<SyncResult | { ok: true }> {
+  const now = new Date();
+  const actor = args.updatedBy ? { updatedBy: args.updatedBy } : {};
+
+  // Set the flag first, upserting so a never-configured singleton is created.
+  await db
+    .insert(pinballmapState)
+    .values({
+      id: SINGLETON_ID,
+      enabled: args.enabled,
+      updatedAt: now,
+      ...actor,
+    })
+    .onConflictDoUpdate({
+      target: pinballmapState.id,
+      set: { enabled: args.enabled, updatedAt: now, ...actor },
+    });
+
+  // Disable: no fetch, no clearing (5.3).
+  if (!args.enabled) return { ok: true };
+
+  // Enable: refresh the snapshot for the current location (5.2), on the cron
+  // path so it does not spend a manual token.
+  return syncLocationSnapshot({ trigger: "cron", ...actor });
 }

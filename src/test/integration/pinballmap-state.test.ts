@@ -13,6 +13,7 @@
  */
 
 import { describe, it, expect, vi } from "vitest";
+import { eq } from "drizzle-orm";
 import { getTestDb, setupTestDb } from "~/test/setup/pglite";
 import { pinballmapState } from "~/server/db/schema";
 import type { LocationSnapshot } from "~/lib/pinballmap/types";
@@ -364,5 +365,324 @@ describe("reconcile is scoped to the tracked location (spec 6.4)", () => {
     expect(rows).toHaveLength(1);
     expect(rows[0]?.lmxId).toBe(222);
     expect(rows[0]?.locationId).toBe(99999);
+  });
+});
+
+/**
+ * Sync/location-change concurrency (spec 6.6).
+ *
+ * A sync reads the location id, makes a slow PBM fetch, then writes the snapshot
+ * back under the id it read. If a location change lands during that fetch, the
+ * sync must not overwrite the new id or store the old location's snapshot under
+ * it. The upsert is guarded on the location it fetched for, so the stale write
+ * becomes a no-op.
+ */
+describe("an in-flight sync does not clobber a concurrent location change (spec 6.6)", () => {
+  setupTestDb();
+
+  it("drops the snapshot write when the location changed mid-fetch", async () => {
+    const db = await getTestDb();
+    const { getMockClient } = await import("~/lib/pinballmap/client-mock");
+    const { syncLocationSnapshot, getPinballMapState } =
+      await import("~/lib/pinballmap/state");
+
+    const originalSnapshot: LocationSnapshot = {
+      locationId: 26454,
+      name: "APC",
+      dateLastUpdated: null,
+      lastUpdatedByUsername: null,
+      machineCount: 1,
+      lmxes: [
+        {
+          id: 1,
+          machineId: 100,
+          icEnabled: null,
+          lastUpdatedByUsername: null,
+          conditions: [],
+        },
+      ],
+      fetchedAtIso: "2026-08-18T00:00:00Z",
+      raw: {},
+    };
+    await db.insert(pinballmapState).values({
+      id: "singleton",
+      locationId: 26454,
+      enabled: true,
+      snapshotJson: originalSnapshot,
+      lastSyncStatus: "ok",
+    });
+
+    // The fetch stands in for a slow PBM call during which a `changeLocation`
+    // commits: it flips the singleton to a new location, then returns the OLD
+    // location's snapshot as the sync's result.
+    const spy = vi
+      .spyOn(getMockClient(), "fetchLocation")
+      .mockImplementation(async () => {
+        await db
+          .update(pinballmapState)
+          .set({ locationId: 77777 })
+          .where(eq(pinballmapState.id, "singleton"));
+        return {
+          locationId: 26454,
+          name: "APC-old",
+          dateLastUpdated: null,
+          lastUpdatedByUsername: null,
+          machineCount: 2,
+          lmxes: [
+            {
+              id: 2,
+              machineId: 200,
+              icEnabled: null,
+              lastUpdatedByUsername: null,
+              conditions: [],
+            },
+          ],
+          fetchedAtIso: "2026-08-18T00:01:00Z",
+          raw: {},
+        };
+      });
+
+    const result = await syncLocationSnapshot({ trigger: "cron" });
+    // The fetch itself succeeded — the caller is not told this was a failure.
+    expect(result.ok).toBe(true);
+
+    const state = await getPinballMapState();
+    // The change won: the new id stands and the old-location snapshot was not
+    // written over it.
+    expect(state?.locationId).toBe(77777);
+    expect(state?.snapshotJson?.name).toBe("APC");
+    spy.mockRestore();
+  });
+});
+
+function snapshotAt(
+  locationId: number,
+  name: string,
+  lmxes: { id: number; machineId: number }[]
+): LocationSnapshot {
+  return {
+    locationId,
+    name,
+    dateLastUpdated: null,
+    lastUpdatedByUsername: null,
+    machineCount: lmxes.length,
+    lmxes: lmxes.map((l) => ({
+      ...l,
+      icEnabled: null,
+      lastUpdatedByUsername: null,
+      conditions: [],
+    })),
+    fetchedAtIso: "2026-08-18T00:00:00Z",
+    raw: {},
+  };
+}
+
+/**
+ * changeLocation (spec 6): validate-before-commit, keep-what-must-be-kept, and
+ * defer the fetch while disabled.
+ */
+describe("changeLocation (spec 6)", () => {
+  setupTestDb();
+
+  it("aborts on a failed fetch, leaving the old location and snapshot (6.2)", async () => {
+    const db = await getTestDb();
+    const { getMockClient } = await import("~/lib/pinballmap/client-mock");
+    const { changeLocation, getPinballMapState } =
+      await import("~/lib/pinballmap/state");
+
+    const original = snapshotAt(26454, "APC", [{ id: 1, machineId: 100 }]);
+    await db.insert(pinballmapState).values({
+      id: "singleton",
+      locationId: 26454,
+      enabled: true,
+      snapshotJson: original,
+      lastSyncStatus: "ok",
+    });
+
+    const spy = vi
+      .spyOn(getMockClient(), "fetchLocation")
+      .mockRejectedValueOnce(new Error("unknown location"));
+
+    const result = await changeLocation({ newLocationId: 99999 });
+    expect(result).toEqual({ ok: false, reason: "fetch_failed" });
+
+    const state = await getPinballMapState();
+    // Nothing moved — old id, old snapshot.
+    expect(state?.locationId).toBe(26454);
+    expect(state?.snapshotJson?.name).toBe("APC");
+    spy.mockRestore();
+  });
+
+  it("commits id + snapshot + health, keeping abandoned rows and the bucket (6.2–6.5)", async () => {
+    const db = await getTestDb();
+    const { machines, pinballmapAbandonedListings } =
+      await import("~/server/db/schema");
+    const { getMockClient } = await import("~/lib/pinballmap/client-mock");
+    const { changeLocation, getPinballMapState } =
+      await import("~/lib/pinballmap/state");
+
+    const tokensAt = new Date("2026-08-18T00:00:00Z");
+    await db.insert(pinballmapState).values({
+      id: "singleton",
+      locationId: 26454,
+      enabled: true,
+      snapshotJson: snapshotAt(26454, "APC", [{ id: 1, machineId: 100 }]),
+      lastSyncStatus: "ok",
+      refreshTokens: 2,
+      refreshTokensAt: tokensAt,
+    });
+    const [machine] = await db
+      .insert(machines)
+      .values({ name: "Godzilla", initials: "GZ" })
+      .returning();
+    if (!machine) throw new Error("failed to seed machine");
+    await db.insert(pinballmapAbandonedListings).values({
+      machineId: machine.id,
+      lmxId: 4471,
+      pinballmapMachineId: 6221,
+      locationId: 26454,
+    });
+
+    const spy = vi
+      .spyOn(getMockClient(), "fetchLocation")
+      .mockResolvedValueOnce(
+        snapshotAt(99999, "New Venue", [{ id: 9, machineId: 900 }])
+      );
+
+    const result = await changeLocation({ newLocationId: 99999 });
+    expect(result).toEqual({ ok: true });
+
+    const state = await getPinballMapState();
+    expect(state?.locationId).toBe(99999);
+    expect(state?.snapshotJson?.name).toBe("New Venue");
+    expect(state?.lastSyncStatus).toBe("ok");
+    // Abandoned rows are kept (6.4) — location-scoped, not wiped by the change.
+    const abandoned = await db.select().from(pinballmapAbandonedListings);
+    expect(abandoned).toHaveLength(1);
+    expect(abandoned[0]?.locationId).toBe(26454);
+    // The refresh bucket is untouched (6.5).
+    expect(state?.refreshTokens).toBe(2);
+    expect(state?.refreshTokensAt?.getTime()).toBe(tokensAt.getTime());
+    spy.mockRestore();
+  });
+
+  it("changes the id but makes no fetch while disabled (6.7)", async () => {
+    const db = await getTestDb();
+    const { getMockClient } = await import("~/lib/pinballmap/client-mock");
+    const { changeLocation, getPinballMapState } =
+      await import("~/lib/pinballmap/state");
+
+    const original = snapshotAt(26454, "APC", [{ id: 1, machineId: 100 }]);
+    await db.insert(pinballmapState).values({
+      id: "singleton",
+      locationId: 26454,
+      enabled: false,
+      snapshotJson: original,
+      lastSyncStatus: "ok",
+    });
+
+    const spy = vi.spyOn(getMockClient(), "fetchLocation");
+
+    const result = await changeLocation({ newLocationId: 99999 });
+    expect(result).toEqual({ ok: true });
+
+    const state = await getPinballMapState();
+    expect(state?.locationId).toBe(99999);
+    // The stored snapshot is left as-is until the next enable (6.7).
+    expect(state?.snapshotJson?.name).toBe("APC");
+    expect(spy).not.toHaveBeenCalled();
+    spy.mockRestore();
+  });
+
+  it("is a no-op when the id is unchanged", async () => {
+    const db = await getTestDb();
+    const { changeLocation } = await import("~/lib/pinballmap/state");
+    await db.insert(pinballmapState).values({
+      id: "singleton",
+      locationId: 26454,
+      enabled: true,
+    });
+    const result = await changeLocation({ newLocationId: 26454 });
+    expect(result).toEqual({ ok: false, reason: "unchanged" });
+  });
+});
+
+/**
+ * setEnabled (spec 5): the toggle refreshes on enable and clears nothing on
+ * disable.
+ */
+describe("setEnabled (spec 5)", () => {
+  setupTestDb();
+
+  it("refreshes the snapshot on enable, via the un-throttled path (5.2)", async () => {
+    const db = await getTestDb();
+    const { getMockClient } = await import("~/lib/pinballmap/client-mock");
+    const { setEnabled, getPinballMapState } =
+      await import("~/lib/pinballmap/state");
+
+    await db.insert(pinballmapState).values({
+      id: "singleton",
+      locationId: 26454,
+      enabled: false,
+    });
+
+    const spy = vi
+      .spyOn(getMockClient(), "fetchLocation")
+      .mockResolvedValueOnce(
+        snapshotAt(26454, "APC", [{ id: 1, machineId: 100 }])
+      );
+
+    const result = await setEnabled({ enabled: true });
+    expect(result.ok).toBe(true);
+
+    const state = await getPinballMapState();
+    expect(state?.enabled).toBe(true);
+    expect(state?.snapshotJson?.name).toBe("APC");
+    expect(state?.lastSyncStatus).toBe("ok");
+    // Exactly one refresh, and it did not spend a manual token.
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(state?.refreshTokens).toBe(3);
+    spy.mockRestore();
+  });
+
+  it("makes no fetch and clears nothing on disable (5.3)", async () => {
+    const db = await getTestDb();
+    const { machines } = await import("~/server/db/schema");
+    const { getMockClient } = await import("~/lib/pinballmap/client-mock");
+    const { setEnabled, getPinballMapState } =
+      await import("~/lib/pinballmap/state");
+
+    const original = snapshotAt(26454, "APC", [{ id: 1, machineId: 100 }]);
+    await db.insert(pinballmapState).values({
+      id: "singleton",
+      locationId: 26454,
+      enabled: true,
+      snapshotJson: original,
+      lastSyncStatus: "ok",
+    });
+    const [machine] = await db
+      .insert(machines)
+      .values({
+        name: "Godzilla",
+        initials: "GZ",
+        pinballmapMachineId: 6221,
+        pinballmapIntent: "on",
+      })
+      .returning();
+    if (!machine) throw new Error("failed to seed machine");
+
+    const spy = vi.spyOn(getMockClient(), "fetchLocation");
+
+    const result = await setEnabled({ enabled: false });
+    expect(result.ok).toBe(true);
+
+    const state = await getPinballMapState();
+    expect(state?.enabled).toBe(false);
+    // Snapshot kept, no fetch, intent untouched (5.3).
+    expect(state?.snapshotJson?.name).toBe("APC");
+    expect(spy).not.toHaveBeenCalled();
+    const after = await db.query.machines.findFirst();
+    expect(after?.pinballmapIntent).toBe("on");
+    spy.mockRestore();
   });
 });
