@@ -356,15 +356,17 @@ export const pinballmapAbandonedListings = pgTable(
  *   Discord post has actually succeeded, so a failed or unconfigured post retries
  *   on the next run instead of silently swallowing the discovery.
  *
- * Rows are never deleted. An entry that disappears from PBM and comes back is
- * re-minted under a NEW lmx id, so keeping the old id costs one dead row and
- * buys idempotence — pruning would re-announce the same machine every time PBM
- * omitted it from one payload.
+ * Rows are never deleted, and pruning would be actively wrong: PBM soft-deletes
+ * an xref and REVIVES THE SAME ROW, id intact, if the machine is re-added within
+ * seven days. Forgetting the id would turn that revival into a false "new
+ * machine". Past seven days a re-add mints a fresh id and is announced, which is
+ * the honest answer — by then it really is a new arrival.
  *
- * `locationName` / `machineName` are the labels captured at discovery time, kept
- * so the announcement (and any later audit of it) reads the same text the job
- * saw, independent of later PBM edits. Nullable: PBM's region payload is not
- * field-by-field documented, and detection never depends on them.
+ * No name columns. The region endpoint carries none (six columns: id, timestamps,
+ * location_id, machine_id, ic_enabled), so labels are resolved at announce time —
+ * the machine from our own catalog mirror, the venue from the bulk
+ * region-locations read. That also means the second PBM call happens only on days
+ * with something to announce.
  */
 export const pinballmapRegionSeenMachines = pgTable(
   "pinballmap_region_seen_machines",
@@ -374,13 +376,11 @@ export const pinballmapRegionSeenMachines = pgTable(
     // change.
     region: text("region").notNull(),
     // PBM's location_machine_xref id: the identity of "this machine at this
-    // location". Re-minted on remove+re-add, which is why a re-add is correctly a
-    // new entry.
+    // location". Stable across a re-add inside PBM's 7-day revival window, and
+    // re-minted after it — which is exactly the announce/don't-announce line.
     lmxId: integer("lmx_id").notNull(),
     locationId: integer("location_id").notNull(),
     pinballmapMachineId: integer("pinballmap_machine_id").notNull(),
-    locationName: text("location_name"),
-    machineName: text("machine_name"),
     firstSeenAt: timestamp("first_seen_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

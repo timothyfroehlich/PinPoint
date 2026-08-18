@@ -130,25 +130,28 @@ describe("live client — reads", () => {
     expect(catalog[1]?.machineGroupId).toBeNull();
   });
 
-  it("fetchRegionLmxes makes ONE bulk region call, not a per-entry loop", async () => {
+  it("fetchRegionLmxes makes ONE bulk region call and keeps the three ids", async () => {
+    // The real wire shape: exactly six columns, no machine or location object.
+    // (Api::V1::LocationMachineXrefsController#index serializes with includes: [],
+    // methods: [], except: [:deleted_at, :user_id].)
     const calls = installFetchMock(() =>
       json({
         location_machine_xrefs: [
           {
             id: 501,
+            created_at: "2026-08-01T00:00:00Z",
+            updated_at: "2026-08-01T00:00:00Z",
             location_id: 26454,
             machine_id: 6412,
-            machine_name: "Godzilla (Premium)",
-            location_name: "Austin Pinball Collective",
+            ic_enabled: null,
           },
           {
-            // Nested shape: PBM's region payload is not documented field-by-field,
-            // so the parser accepts flat or nested names.
             id: 502,
+            created_at: "2026-08-02T00:00:00Z",
+            updated_at: "2026-08-02T00:00:00Z",
             location_id: 999,
             machine_id: 7,
-            machine: { name: "Medieval Madness" },
-            location: { name: "Pinballz Arcade" },
+            ic_enabled: true,
           },
         ],
       })
@@ -160,54 +163,63 @@ describe("live client — reads", () => {
     expect(calls[0]?.url).toContain(
       "/region/austin/location_machine_xrefs.json"
     );
+    // No `limit` param: a cap plus PBM's `id desc` ordering would silently hide
+    // older entries from a diff that has to see all of them.
+    expect(calls[0]?.url).not.toContain("limit");
     expect(entries).toEqual([
-      {
-        lmxId: 501,
-        locationId: 26454,
-        machineId: 6412,
-        locationName: "Austin Pinball Collective",
-        machineName: "Godzilla (Premium)",
-      },
-      {
-        lmxId: 502,
-        locationId: 999,
-        machineId: 7,
-        locationName: "Pinballz Arcade",
-        machineName: "Medieval Madness",
-      },
+      { lmxId: 501, locationId: 26454, machineId: 6412 },
+      { lmxId: 502, locationId: 999, machineId: 7 },
     ]);
   });
 
-  it("fetchRegionLmxes skips soft-deleted and unusable entries", async () => {
+  it("fetchRegionLmxes skips entries it could not place", async () => {
     installFetchMock(() =>
       json([
         { id: 1, location_id: 2, machine_id: 3 },
-        // removed from the map — not a live entry
-        { id: 4, location_id: 2, machine_id: 3, deleted_at: "2026-01-01" },
         // no location: we could not attribute or link it
         { id: 5, machine_id: 3 },
+        // no machine
+        { id: 6, location_id: 2 },
         "garbage",
       ])
     );
 
     const entries = await createLiveClient(null).fetchRegionLmxes("austin");
 
-    expect(entries).toEqual([
-      {
-        lmxId: 1,
-        locationId: 2,
-        machineId: 3,
-        locationName: null,
-        machineName: null,
-      },
-    ]);
+    expect(entries).toEqual([{ lmxId: 1, locationId: 2, machineId: 3 }]);
   });
 
-  it("fetchRegionLmxes sends the api token and encodes the region", async () => {
+  it("fetchRegionLmxes lowercases the region before it reaches the URL", async () => {
+    // Not cosmetic: PBM's LMX region scope returns nil on a name miss, and a
+    // nil-returning has_scope leaves the query UNSCOPED — every xref on Earth.
     const calls = installFetchMock(() => json([]));
-    await createLiveClient("tok-123").fetchRegionLmxes("new orleans");
-    expect(calls[0]?.url).toContain("/region/new%20orleans/");
+    await createLiveClient("tok-123").fetchRegionLmxes("  AUSTIN  ");
+    expect(calls[0]?.url).toContain("/region/austin/");
     expect(calls[0]?.init?.headers).toMatchObject({ "X-Api-Token": "tok-123" });
+  });
+
+  it("fetchRegionLocations asks for no_details and returns id → name", async () => {
+    const calls = installFetchMock(() =>
+      json({
+        locations: [
+          { id: 26454, name: "Austin Pinball Collective", city: "Austin" },
+          { id: 999, name: "Pinballz Arcade", city: "Austin" },
+          // unnamed rows are useless as labels
+          { id: 1000 },
+        ],
+      })
+    );
+
+    const locations =
+      await createLiveClient(null).fetchRegionLocations("Austin");
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.url).toContain("/region/austin/locations.json");
+    expect(calls[0]?.url).toContain("no_details=1");
+    expect(locations).toEqual([
+      { locationId: 26454, name: "Austin Pinball Collective" },
+      { locationId: 999, name: "Pinballz Arcade" },
+    ]);
   });
 
   it("fetchMachineGroups hits the endpoint and parses {machine_groups}", async () => {

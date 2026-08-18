@@ -1,5 +1,5 @@
 {
-  "id": "f9ead061-3300-4fce-8d5d-29fb2434c22b",
+  "id": "05d0aa8d-a3c3-4a1e-8c9b-2dd049116e4c",
   "prevId": "d45975a9-68f8-4ca2-b0dd-1e68cb811d1e",
   "version": "7",
   "dialect": "postgresql",
@@ -2206,18 +2206,6 @@
           "type": "integer",
           "primaryKey": false,
           "notNull": true
-        },
-        "location_name": {
-          "name": "location_name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "machine_name": {
-          "name": "machine_name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
         },
         "first_seen_at": {
           "name": "first_seen_at",

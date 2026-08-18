@@ -3,8 +3,6 @@ CREATE TABLE "pinballmap_region_seen_machines" (
 	"lmx_id" integer NOT NULL,
 	"location_id" integer NOT NULL,
 	"pinballmap_machine_id" integer NOT NULL,
-	"location_name" text,
-	"machine_name" text,
 	"first_seen_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"announced_at" timestamp with time zone,
 	CONSTRAINT "pinballmap_region_seen_machines_region_lmx_id_pk" PRIMARY KEY("region","lmx_id")

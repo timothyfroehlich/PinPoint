@@ -7,12 +7,14 @@ import {
   parseLocation,
   parseMachineGroups,
   parseRegionLmxes,
+  parseRegionLocations,
 } from "./parse";
 import type {
   CatalogMachine,
   LocationSnapshot,
   MachineGroup,
   PbmRegionLmx,
+  PbmRegionLocation,
   PbmAddMachineResult,
   PbmAuthResult,
   PbmCredentials,
@@ -57,6 +59,21 @@ function buildUrl(path: string, query?: Record<string, string>): string {
     for (const [k, v] of Object.entries(query)) url.searchParams.set(k, v);
   }
   return url.toString();
+}
+
+/**
+ * Region name as a URL path segment: lowercased, then percent-encoded.
+ *
+ * The lowercasing is a safety measure, not a cosmetic one. PBM's route constraint
+ * matches region names case-insensitively, but the model scopes behind it do
+ * `Region.find_by_name(name.downcase)` and handle a miss badly in two different
+ * ways: `LocationMachineXref.region` returns nil, which leaves the relation
+ * completely UNSCOPED (every xref on Earth), and `Location.region` silently falls
+ * back to Portland. Either would poison a region diff. Callers normalize too;
+ * doing it here as well means no future caller can reintroduce the bug.
+ */
+function regionSegment(region: string): string {
+  return encodeURIComponent(region.trim().toLowerCase());
 }
 
 function credsQuery(
@@ -220,10 +237,11 @@ function toWriteResult(outcome: WriteOutcome): PbmWriteResult {
 async function readJson(
   path: string,
   label: string,
-  apiToken: string | null
+  apiToken: string | null,
+  query?: Record<string, string>
 ): Promise<unknown> {
   const res = await safeFetch(
-    buildUrl(path),
+    buildUrl(path, query),
     { method: "GET" },
     label,
     apiToken
@@ -276,14 +294,30 @@ export function createLiveClient(apiToken: string | null): PinballMapClient {
       // ONE bulk request for the whole region — the documented replacement for
       // looping over individual LMXes (vendored llms.txt §"Request Volume
       // Anti-Patterns"; this endpoint's own limit is 120/min, and we spend one
-      // call a day). The region name is a lowercase path segment, encoded so a
-      // configured value can never break out of the path.
+      // call a day). Unpaginated: this returns every non-deleted xref in the
+      // region. PBM also accepts `?limit=N`, which combined with their `id desc`
+      // ordering yields the N most recent — deliberately NOT used, because a cap
+      // would silently drop entries out of a diff that must see all of them.
       const raw = await readJson(
-        `/region/${encodeURIComponent(region)}/location_machine_xrefs.json`,
+        `/region/${regionSegment(region)}/location_machine_xrefs.json`,
         "fetchRegionLmxes",
         apiToken
       );
       return parseRegionLmxes(raw);
+    },
+
+    async fetchRegionLocations(region: string): Promise<PbmRegionLocation[]> {
+      assertNotInTransaction("pinballmap.fetchRegionLocations");
+      // `no_details=1` strips descriptions, timestamps and counts but keeps id +
+      // name, which is all the alert needs to label a venue. One request for the
+      // whole region; never a per-location lookup.
+      const raw = await readJson(
+        `/region/${regionSegment(region)}/locations.json`,
+        "fetchRegionLocations",
+        apiToken,
+        { no_details: "1" }
+      );
+      return parseRegionLocations(raw);
     },
 
     async fetchMachineGroups(): Promise<MachineGroup[]> {

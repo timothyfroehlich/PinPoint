@@ -56,26 +56,40 @@ export interface LocationSnapshot {
 /**
  * One entry of the region-wide LMX bulk read (`fetchRegionLmxes`, PP-o355.18).
  *
- * Deliberately flatter than `PbmLmx`: the region feed exists to answer "which
- * machine-at-location pairs exist in this region right now", so it carries the
- * location the entry belongs to and drops conditions/IC state, which only the
- * per-location snapshot consumes.
+ * **The region index carries no names.** Verified against PBM's source
+ * (`Api::V1::LocationMachineXrefsController#index`, which serializes with
+ * `includes: []`, `methods: []`, `except: [:deleted_at, :user_id]`): a record is
+ * exactly six columns — `id`, `created_at`, `updated_at`, `location_id`,
+ * `machine_id`, `ic_enabled`. No machine object, no location object, no names in
+ * any form; their own request spec asserts the absence. Only the `#show` action
+ * passes `methods: [:machine]`, which is where the nested machine object people
+ * expect actually lives.
  *
- * `lmxId` is the identity used for new-machine detection. It is PBM-minted per
- * (location, machine) pair and re-minted when an entry is removed and re-added,
- * so a re-add is correctly a NEW entry rather than a resurrection.
+ * So this type is ids only, and both display labels are resolved elsewhere at
+ * announce time — the machine from our catalog mirror, the venue from the bulk
+ * region-locations read (`fetchRegionLocations`).
  *
- * `locationName` / `machineName` are best-effort display labels: PBM's region
- * payload is not contract-documented field-by-field in the vendored llms.txt, so
- * the parser reads them from whichever shape is present (flat or nested) and
- * yields null when neither is. Detection never depends on them.
+ * `lmxId` is the identity used for new-machine detection. PBM mints it per
+ * (location, machine) pair, but **re-add within 7 days revives the same row with
+ * the same id** (`#create` un-deletes a soft-deleted xref whose `deleted_at` is
+ * inside `7.days.ago..Time.current`); past that window a re-add mints a fresh id.
+ * That asymmetry is the announce/don't-announce rule for re-adds — see
+ * `./region-alerts`.
  */
 export interface PbmRegionLmx {
   lmxId: number;
   locationId: number;
   machineId: number;
-  locationName: string | null;
-  machineName: string | null;
+}
+
+/**
+ * A location in a region, from the bulk region-locations read
+ * (`fetchRegionLocations`, PP-o355.18) — the only thing that can put a venue
+ * NAME on a region LMX entry without a per-location lookup.
+ */
+export interface PbmRegionLocation {
+  locationId: number;
+  name: string;
 }
 
 /** A canonical machine in PBM's catalog, used by the linking picker (bead B). */
@@ -175,8 +189,19 @@ export interface PinballMapClient {
    * endpoint PBM's llms.txt names as the correct replacement for looping over
    * individual LMXes, and the only sanctioned way to see a whole region — never
    * fan out per location or per machine (CORE-PBM-001).
+   *
+   * Unpaginated and uncapped: one call returns every non-deleted xref in the
+   * region, ordered `id desc`. Implementations must pass the region name
+   * lowercased — see `PBM_AUSTIN_REGION` in `./config` for why that matters.
    */
   fetchRegionLmxes(region: string): Promise<PbmRegionLmx[]>;
+  /**
+   * Anonymous bulk read: every location in a region with its name, in ONE request
+   * (`GET /region/:region/locations.json?no_details=1`). Exists solely so the
+   * region alert can name a venue without a per-location lookup, which would be
+   * the exact N+1 CORE-PBM-001 forbids.
+   */
+  fetchRegionLocations(region: string): Promise<PbmRegionLocation[]>;
   /** Anonymous bulk read: machine groups (family names) for the linking picker. */
   fetchMachineGroups(): Promise<MachineGroup[]>;
   /** Exchange login+password for a long-lived API token. */

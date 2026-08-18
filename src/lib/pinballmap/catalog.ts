@@ -1,5 +1,5 @@
 import "server-only";
-import { eq, sql } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import { db } from "~/server/db";
 import { pinballmapCatalog } from "~/server/db/schema";
 import { getPinballMapClient } from "./client";
@@ -230,6 +230,30 @@ export async function isCatalogEmpty(): Promise<boolean> {
     .from(pinballmapCatalog)
     .limit(1);
   return row === undefined;
+}
+
+/**
+ * Titles for a set of PBM machine ids, from the local mirror — one query, never a
+ * lookup per id.
+ *
+ * This is how the region new-machine alert (PP-o355.18) names a machine at all:
+ * PBM's region endpoint returns ids only, so the weekly-refreshed mirror is the
+ * only naming source that does not cost a request. An id the mirror has not seen
+ * (a title added upstream since the last refresh) is simply absent from the map,
+ * and the caller falls back to the id.
+ */
+export async function getCatalogNames(
+  machineIds: number[]
+): Promise<Map<number, string>> {
+  if (machineIds.length === 0) return new Map();
+  const rows = await db
+    .select({
+      machineId: pinballmapCatalog.pinballmapMachineId,
+      name: pinballmapCatalog.name,
+    })
+    .from(pinballmapCatalog)
+    .where(inArray(pinballmapCatalog.pinballmapMachineId, machineIds));
+  return new Map(rows.map((r) => [r.machineId, r.name]));
 }
 
 /** Look up a single catalog entry by its PBM machine id (for edit preselect). */

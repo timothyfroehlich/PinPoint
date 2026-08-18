@@ -11,11 +11,12 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
+  pinballmapCatalog,
   pinballmapRegionSeenMachines,
   pinballmapState,
 } from "~/server/db/schema";
 import { getTestDb, setupTestDb } from "~/test/setup/pglite";
-import type { PbmRegionLmx } from "~/lib/pinballmap/types";
+import type { PbmRegionLmx, PbmRegionLocation } from "~/lib/pinballmap/types";
 import type { DiscordSendResult } from "~/lib/discord/client";
 
 vi.mock("~/lib/logger", () => ({
@@ -28,10 +29,12 @@ vi.mock("~/server/db", async () => {
   return { db: await getTestDb() };
 });
 
-/** What PBM "currently shows" for the region, plus a call counter. */
+/** What PBM "currently shows" for the region, plus per-endpoint call counters. */
 const pbm = {
   entries: [] as PbmRegionLmx[],
+  locations: [] as PbmRegionLocation[],
   calls: 0,
+  locationCalls: 0,
   regions: [] as string[],
 };
 
@@ -42,6 +45,11 @@ vi.mock("~/lib/pinballmap/client", () => ({
         pbm.calls += 1;
         pbm.regions.push(region);
         return Promise.resolve(pbm.entries);
+      },
+      fetchRegionLocations: (region: string) => {
+        pbm.locationCalls += 1;
+        pbm.regions.push(region);
+        return Promise.resolve(pbm.locations);
       },
     }),
 }));
@@ -75,29 +83,37 @@ vi.mock("~/lib/discord/client", () => ({
 const { runRegionNewMachineAlerts } =
   await import("~/lib/pinballmap/region-alerts");
 
+/** The region endpoint carries ids only — no names, in any shape. */
 function lmx(
   overrides: Partial<PbmRegionLmx> & { lmxId: number }
 ): PbmRegionLmx {
-  return {
-    locationId: 26454,
-    machineId: 6412,
-    locationName: "Austin Pinball Collective",
-    machineName: "Godzilla (Premium)",
-    ...overrides,
-  };
+  return { locationId: 26454, machineId: 6412, ...overrides };
 }
 
 async function seenRows(): Promise<
-  { lmxId: number; announcedAt: Date | null; machineName: string | null }[]
+  { lmxId: number; announcedAt: Date | null }[]
 > {
   const db = await getTestDb();
   return db
     .select({
       lmxId: pinballmapRegionSeenMachines.lmxId,
       announcedAt: pinballmapRegionSeenMachines.announcedAt,
-      machineName: pinballmapRegionSeenMachines.machineName,
     })
     .from(pinballmapRegionSeenMachines);
+}
+
+/** Seed the catalog mirror — the only source of a machine's title. */
+async function seedCatalog(
+  entries: { machineId: number; name: string }[]
+): Promise<void> {
+  const db = await getTestDb();
+  await db.insert(pinballmapCatalog).values(
+    entries.map((e) => ({
+      pinballmapMachineId: e.machineId,
+      name: e.name,
+      refreshedAt: new Date(),
+    }))
+  );
 }
 
 describe("PinballMap region new-machine alerts (PGlite)", () => {
@@ -106,7 +122,12 @@ describe("PinballMap region new-machine alerts (PGlite)", () => {
   beforeEach(() => {
     vi.stubEnv("DISCORD_PBM_ALERT_CHANNEL_ID", "channel-1");
     pbm.entries = [];
+    pbm.locations = [
+      { locationId: 26454, name: "Austin Pinball Collective" },
+      { locationId: 999, name: "Pinballz Arcade" },
+    ];
     pbm.calls = 0;
+    pbm.locationCalls = 0;
     pbm.regions = [];
     discord.enabled = true;
     discord.result = { ok: true };
@@ -132,21 +153,21 @@ describe("PinballMap region new-machine alerts (PGlite)", () => {
     const rows = await seenRows();
     expect(rows).toHaveLength(2);
     expect(rows.every((r) => r.announcedAt !== null)).toBe(true);
+    // And a bootstrap never spends the second call — there is nothing to name.
+    expect(pbm.locationCalls).toBe(0);
   });
 
-  it("announces only entries it has not seen before", async () => {
+  it("announces only entries it has not seen before, named from our own data", async () => {
+    await seedCatalog([
+      { machineId: 6412, name: "Godzilla (Premium)" },
+      { machineId: 7, name: "Medieval Madness" },
+    ]);
     pbm.entries = [lmx({ lmxId: 1 })];
     await runRegionNewMachineAlerts();
 
     pbm.entries = [
       lmx({ lmxId: 1 }),
-      lmx({
-        lmxId: 2,
-        locationId: 999,
-        machineId: 7,
-        machineName: "Medieval Madness",
-        locationName: "Pinballz Arcade",
-      }),
+      lmx({ lmxId: 2, locationId: 999, machineId: 7 }),
     ];
     const run = await runRegionNewMachineAlerts();
 
@@ -159,28 +180,74 @@ describe("PinballMap region new-machine alerts (PGlite)", () => {
     });
     expect(discord.posts).toHaveLength(1);
     expect(discord.posts[0]?.channelId).toBe("channel-1");
+    // The title came from the catalog mirror and the venue from the bulk
+    // region-locations read — the LMX payload carries neither.
     expect(discord.posts[0]?.content).toContain("Medieval Madness");
     expect(discord.posts[0]?.content).toContain("Pinballz Arcade");
     // The already-seen entry is not re-announced.
     expect(discord.posts[0]?.content).not.toContain("Godzilla");
+    // Exactly one locations call, and only because there was news.
+    expect(pbm.locationCalls).toBe(1);
+  });
+
+  it("falls back to ids when neither lookup can name the entry", async () => {
+    pbm.entries = [lmx({ lmxId: 1 })];
+    await runRegionNewMachineAlerts();
+
+    // Catalog never seeded (a title added upstream since the last refresh), and
+    // the venue is absent from the region-locations payload.
+    pbm.entries = [
+      lmx({ lmxId: 1 }),
+      lmx({ lmxId: 2, locationId: 4242, machineId: 31337 }),
+    ];
+    const run = await runRegionNewMachineAlerts();
+
+    expect(run).toMatchObject({ discovered: 1, announced: 1 });
+    expect(discord.posts[0]?.content).toContain("PinballMap machine #31337");
+    expect(discord.posts[0]?.content).toContain("location #4242");
   });
 
   it("posts nothing when the region is unchanged", async () => {
     pbm.entries = [lmx({ lmxId: 1 })];
     await runRegionNewMachineAlerts();
     discord.posts = [];
+    pbm.locationCalls = 0;
 
     const run = await runRegionNewMachineAlerts();
 
     expect(run).toMatchObject({ discovered: 0, announced: 0, pending: 0 });
     expect(discord.posts).toEqual([]);
+    // A quiet day costs exactly one PBM request.
+    expect(pbm.locationCalls).toBe(0);
   });
 
-  it("treats a re-added machine as new — PBM mints a fresh lmx id", async () => {
+  it("does NOT announce a re-add inside PBM's 7-day window — same lmx id", async () => {
+    // PBM soft-deletes an xref and, on a re-add within 7 days, revives THAT row:
+    // same id, same created_at, only updated_at moves. The machine was not a new
+    // arrival, so the channel should stay quiet.
+    pbm.entries = [lmx({ lmxId: 1 }), lmx({ lmxId: 2, machineId: 7 })];
+    await runRegionNewMachineAlerts();
+    discord.posts = [];
+
+    // Removed: it simply stops appearing (deleted rows are invisible to the API).
+    pbm.entries = [lmx({ lmxId: 1 })];
+    const whileGone = await runRegionNewMachineAlerts();
+    expect(whileGone).toMatchObject({ discovered: 0, announced: 0 });
+
+    // Re-added within the window: PBM hands back the SAME id.
+    pbm.entries = [lmx({ lmxId: 1 }), lmx({ lmxId: 2, machineId: 7 })];
+    const revived = await runRegionNewMachineAlerts();
+
+    expect(revived).toMatchObject({ discovered: 0, announced: 0, pending: 0 });
+    expect(discord.posts).toEqual([]);
+  });
+
+  it("DOES announce a re-add past the window — PBM mints a fresh lmx id", async () => {
     pbm.entries = [lmx({ lmxId: 1 })];
     await runRegionNewMachineAlerts();
 
-    // Same machine at the same location, removed and re-added on PBM.
+    // Same machine, same location, but the revival window has expired so the
+    // re-add creates a new xref. By now it really is a return to the floor.
     pbm.entries = [lmx({ lmxId: 77 })];
     const run = await runRegionNewMachineAlerts();
 
@@ -248,6 +315,34 @@ describe("PinballMap region new-machine alerts (PGlite)", () => {
     expect(pbm.calls).toBe(1);
     expect(pbm.regions).toEqual(["austin"]);
   });
+
+  it("lowercases the region before anything can use it", async () => {
+    // A mis-cased region does not 404 on PBM — the LMX scope silently goes
+    // UNSCOPED and returns every xref on Earth. Normalizing is the fix.
+    pbm.entries = [lmx({ lmxId: 1 })];
+    const run = await runRegionNewMachineAlerts({ region: "  AuStIn " });
+    expect(run.region).toBe("austin");
+    expect(pbm.regions).toEqual(["austin"]);
+  });
+
+  it("aborts without writing when a payload is implausibly large", async () => {
+    // What an unscoped query looks like: far more entries than any real metro.
+    pbm.entries = Array.from({ length: 20_001 }, (_, i) =>
+      lmx({ lmxId: i + 1 })
+    );
+
+    const run = await runRegionNewMachineAlerts();
+
+    expect(run).toMatchObject({
+      skipped: "implausible_payload",
+      observed: 20_001,
+      discovered: 0,
+      announced: 0,
+    });
+    // Nothing stored: recording a global dump would poison the region forever.
+    expect(await seenRows()).toEqual([]);
+    expect(discord.posts).toEqual([]);
+  });
 });
 
 describe("GET /api/cron/pinballmap-region-alerts", () => {
@@ -260,7 +355,9 @@ describe("GET /api/cron/pinballmap-region-alerts", () => {
     vi.stubEnv("CRON_SECRET", CRON_SECRET);
     vi.stubEnv("DISCORD_PBM_ALERT_CHANNEL_ID", "channel-1");
     pbm.entries = [lmx({ lmxId: 1 })];
+    pbm.locations = [];
     pbm.calls = 0;
+    pbm.locationCalls = 0;
     discord.posts = [];
     discord.enabled = true;
     discord.result = { ok: true };

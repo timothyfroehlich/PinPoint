@@ -4,7 +4,7 @@ import { parseCatalog, parseLocation, parseMachineGroups } from "./parse";
 import locationFixture from "./fixtures/location-26454.json";
 import catalogFixture from "./fixtures/catalog-apc.json";
 import machineGroupsFixture from "./fixtures/machine-groups.json";
-import { APC_LOCATION_ID, PBM_AUSTIN_REGION } from "./config";
+import { APC_LOCATION_ID, PBM_AUSTIN_REGION, normalizeRegion } from "./config";
 import type {
   CatalogMachine,
   LocationSnapshot,
@@ -13,6 +13,7 @@ import type {
   PbmAuthResult,
   PbmCondition,
   PbmRegionLmx,
+  PbmRegionLocation,
   PbmToggleResult,
   PbmWriteResult,
   PinballMapClient,
@@ -95,19 +96,29 @@ export function createMockClient(): PinballMapClient {
      * (add a machine through the mock and it shows up here as a new lmx id);
      * tests that need several venues stub this method directly rather than have
      * the mock invent venues that do not exist.
+     *
+     * Ids only, mirroring the real endpoint — it carries no names.
      */
     fetchRegionLmxes(region: string): Promise<PbmRegionLmx[]> {
-      if (region !== PBM_AUSTIN_REGION) return Promise.resolve([]);
+      if (normalizeRegion(region) !== PBM_AUSTIN_REGION) {
+        return Promise.resolve([]);
+      }
       return Promise.resolve(
         lmxes.map((l) => ({
           lmxId: l.id,
           locationId: APC_LOCATION_ID,
           machineId: l.machineId,
-          locationName: "Austin Pinball Collective",
-          machineName:
-            catalog.find((m) => m.machineId === l.machineId)?.name ?? null,
         }))
       );
+    },
+
+    fetchRegionLocations(region: string): Promise<PbmRegionLocation[]> {
+      if (normalizeRegion(region) !== PBM_AUSTIN_REGION) {
+        return Promise.resolve([]);
+      }
+      return Promise.resolve([
+        { locationId: APC_LOCATION_ID, name: "Austin Pinball Collective" },
+      ]);
     },
 
     authDetails(login: string, password: string): Promise<PbmAuthResult> {

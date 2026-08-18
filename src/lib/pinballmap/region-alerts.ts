@@ -5,8 +5,9 @@ import { pinballmapRegionSeenMachines } from "~/server/db/schema";
 import { postChannelMessage } from "~/lib/discord/client";
 import { getDiscordConfig } from "~/lib/discord/config";
 import { log } from "~/lib/logger";
+import { getCatalogNames } from "./catalog";
 import { getPinballMapClient } from "./client";
-import { PBM_AUSTIN_REGION } from "./config";
+import { PBM_AUSTIN_REGION, normalizeRegion } from "./config";
 import { formatRegionAlertMessage } from "./region-alert-message";
 import type { RegionAlertEntry } from "./region-alert-message";
 import type { PbmRegionLmx } from "./types";
@@ -25,7 +26,9 @@ import type { PbmRegionLmx } from "./types";
  *  2. Insert every observed entry with ON CONFLICT DO NOTHING. The rows that
  *     actually insert are, by definition, the machines we had not seen before, so
  *     the diff is one statement and cannot drift from the stored set.
- *  3. Announce the un-announced rows to one Discord channel and mark them.
+ *  3. Only if something is waiting: resolve labels — machine titles from our
+ *     catalog mirror, venue names from ONE bulk region-locations read — then post
+ *     to Discord and mark the rows announced.
  *
  * Deliberate properties:
  * - **No flood on bootstrap.** The first run for a region back-fills the whole
@@ -38,9 +41,26 @@ import type { PbmRegionLmx } from "./types";
  *   Discord accepted the message. A crash between the post and the mark
  *   re-announces once on the next run — a duplicate message is a far better
  *   failure than silently swallowing a discovery.
+ * - **A quiet day costs one request.** The second (locations) call only happens
+ *   when there is actually something to name.
  * - **Distinct from the location sync** (PP-o355.11), which reads our own
  *   location's lineup for the listing control. This is region-wide discovery and
  *   touches none of that state.
+ *
+ * ## Re-adds: the 7-day rule
+ *
+ * PBM soft-deletes an xref on removal, and `#create` revives a soft-deleted row
+ * whose `deleted_at` falls inside `7.days.ago..Time.current` — same id, same
+ * `created_at`, only `updated_at` moves. So:
+ *
+ * - **Re-added within 7 days → no announcement.** The id is already in the
+ *   seen-set. This is the behavior we want: a machine that came back the same week
+ *   was not a new arrival, it was a blip, and announcing it would train people to
+ *   ignore the channel.
+ * - **Re-added after 7 days → announced.** PBM mints a fresh id, and by then the
+ *   game really did return to the floor after an absence.
+ *
+ * The line is PBM's to draw, not ours; we inherit it by keying on the lmx id.
  */
 
 /**
@@ -55,7 +75,7 @@ const ALERT_CHANNEL_ENV = "DISCORD_PBM_ALERT_CHANNEL_ID";
 
 /**
  * Insert at most this many seen-rows per statement. A region is low thousands of
- * entries at ~6 bound params each; this keeps us far under Postgres' 65535
+ * entries at ~4 bound params each; this keeps us far under Postgres' 65535
  * parameter ceiling (same reasoning as the catalog mirror's chunk).
  */
 const INSERT_CHUNK = 1000;
@@ -68,11 +88,26 @@ const INSERT_CHUNK = 1000;
  */
 const PENDING_READ_LIMIT = 500;
 
+/**
+ * Abort ceiling on a single region payload — the flood guard.
+ *
+ * PBM's region scope fails OPEN: `LocationMachineXref.region` does
+ * `Region.find_by_name(name.downcase)` and `return unless r`, and a nil-returning
+ * `has_scope` leaves the relation completely unscoped, so an unknown or mis-cased
+ * region hands back every xref on Earth — hundreds of thousands of rows, all of
+ * which this job would treat as brand new. `normalizeRegion` removes the usual
+ * trigger; this catches everything else, including PBM changing that behavior.
+ *
+ * The number is deliberately far above any real metro (Austin is low thousands)
+ * and far below a global dump, so it can only fire on something pathological.
+ */
+const MAX_REGION_ENTRIES = 20_000;
+
 /** What a run did, for the cron route's log line and response body. */
 export interface RegionAlertRun {
   region: string;
   /** Set when the run intentionally did nothing; null when it ran normally. */
-  skipped: "not_configured" | "empty_payload" | null;
+  skipped: "not_configured" | "empty_payload" | "implausible_payload" | null;
   /** Entries PBM reported for the region. */
   observed: number;
   /** True when this run seeded an empty region (announces nothing by design). */
@@ -87,12 +122,13 @@ export interface RegionAlertRun {
 
 function noop(
   region: string,
-  skipped: "not_configured" | "empty_payload"
+  skipped: "not_configured" | "empty_payload" | "implausible_payload",
+  observed = 0
 ): RegionAlertRun {
   return {
     region,
     skipped,
-    observed: 0,
+    observed,
     bootstrapped: false,
     discovered: 0,
     announced: 0,
@@ -120,7 +156,7 @@ async function countSeen(region: string): Promise<number> {
 }
 
 /**
- * Record every observed entry, returning only the ones that were new.
+ * Record every observed entry, returning how many were new.
  *
  * `announcedAt` is passed in rather than decided here: a bootstrap run stamps it
  * so the back-fill is born already-announced, a normal run leaves it null so the
@@ -142,15 +178,14 @@ async function recordObserved(
       lmxId: o.lmxId,
       locationId: o.locationId,
       pinballmapMachineId: o.machineId,
-      locationName: o.locationName,
-      machineName: o.machineName,
       announcedAt,
     }));
     const inserted = await db
       .insert(pinballmapRegionSeenMachines)
       .values(chunk)
-      // DO NOTHING, never DO UPDATE: a row already here is already known, and
-      // re-writing its labels would rewrite history the announcement was based on.
+      // DO NOTHING, never DO UPDATE: a row already here is already known. This is
+      // also what makes PBM's 7-day revival a non-event — the revived xref keeps
+      // its id, conflicts, and is correctly not re-announced.
       .onConflictDoNothing()
       .returning({ lmxId: pinballmapRegionSeenMachines.lmxId });
     discovered += inserted.length;
@@ -162,8 +197,6 @@ async function readPending(region: string): Promise<
   {
     lmxId: number;
     locationId: number;
-    locationName: string | null;
-    machineName: string | null;
     pinballmapMachineId: number;
   }[]
 > {
@@ -171,8 +204,6 @@ async function readPending(region: string): Promise<
     .select({
       lmxId: pinballmapRegionSeenMachines.lmxId,
       locationId: pinballmapRegionSeenMachines.locationId,
-      locationName: pinballmapRegionSeenMachines.locationName,
-      machineName: pinballmapRegionSeenMachines.machineName,
       pinballmapMachineId: pinballmapRegionSeenMachines.pinballmapMachineId,
     })
     .from(pinballmapRegionSeenMachines)
@@ -200,13 +231,50 @@ async function markAnnounced(region: string, lmxIds: number[]): Promise<void> {
 }
 
 /**
+ * Turn pending rows into announceable entries by resolving both labels.
+ *
+ * Machine titles come from our own catalog mirror (one query); venue names come
+ * from ONE bulk region-locations call. Either lookup missing a given id is fine —
+ * the message falls back to the id — which is why this never fails the run.
+ */
+async function resolveLabels(
+  region: string,
+  pending: { lmxId: number; locationId: number; pinballmapMachineId: number }[]
+): Promise<RegionAlertEntry[]> {
+  const machineNames = await getCatalogNames(
+    pending.map((p) => p.pinballmapMachineId)
+  );
+
+  let locationNames = new Map<number, string>();
+  try {
+    const client = await getPinballMapClient();
+    const locations = await client.fetchRegionLocations(region);
+    locationNames = new Map(locations.map((l) => [l.locationId, l.name]));
+  } catch (err) {
+    // A venue name is nice to have; the alert is still useful without it, and
+    // failing the whole run over a label would strand the discovery.
+    log.warn(
+      { err, region, action: "pinballmap.regionAlerts" },
+      "Region locations lookup failed; announcing with location ids"
+    );
+  }
+
+  return pending.map((p) => ({
+    locationId: p.locationId,
+    locationName: locationNames.get(p.locationId) ?? null,
+    machineName: machineNames.get(p.pinballmapMachineId) ?? null,
+    pinballmapMachineId: p.pinballmapMachineId,
+  }));
+}
+
+/**
  * Run one detection pass for a region. Returns what it did; throws only on an
  * unexpected failure (a PBM read error propagates to the caller, which logs it).
  */
 export async function runRegionNewMachineAlerts(opts?: {
   region?: string;
 }): Promise<RegionAlertRun> {
-  const region = opts?.region ?? PBM_AUSTIN_REGION;
+  const region = normalizeRegion(opts?.region ?? PBM_AUSTIN_REGION);
 
   // Checked before the fetch, not after: with no destination there is nothing to
   // do with the answer, and spending a PBM call to learn that would be rude.
@@ -219,6 +287,21 @@ export async function runRegionNewMachineAlerts(opts?: {
   // has no machines". Recording it would be harmless, but treating it as a
   // bootstrap on a fresh install would silence the very first real run.
   if (observed.length === 0) return noop(region, "empty_payload");
+
+  if (observed.length > MAX_REGION_ENTRIES) {
+    // Almost certainly an unscoped query (see MAX_REGION_ENTRIES). Write nothing:
+    // recording a global dump would permanently poison this region's seen-set.
+    log.error(
+      {
+        region,
+        observed: observed.length,
+        ceiling: MAX_REGION_ENTRIES,
+        action: "pinballmap.regionAlerts",
+      },
+      "PinballMap region payload is implausibly large; aborting without writing"
+    );
+    return noop(region, "implausible_payload", observed.length);
+  }
 
   const bootstrapped = (await countSeen(region)) === 0;
   const discovered = await recordObserved(
@@ -239,12 +322,7 @@ export async function runRegionNewMachineAlerts(opts?: {
     return { ...base, announced: 0, pending: 0 };
   }
 
-  const entries: RegionAlertEntry[] = pending.map((p) => ({
-    locationId: p.locationId,
-    locationName: p.locationName,
-    machineName: p.machineName,
-    pinballmapMachineId: p.pinballmapMachineId,
-  }));
+  const entries = await resolveLabels(region, pending);
   const content = formatRegionAlertMessage({
     entries,
     regionLabel: regionLabel(region),
