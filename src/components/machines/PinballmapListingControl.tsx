@@ -459,9 +459,14 @@ function IntentToggle({
       </div>
       {blockedReason !== null && value !== "on" ? (
         <span
-          className="text-xs text-muted-foreground"
+          className="inline-flex items-center gap-1.5 text-xs text-muted-foreground"
           data-testid="pbm-listing-blocked-reason"
         >
+          {/* Same triangle as the Alert note, in the note's own muted colour
+              rather than `text-warning`: this explains why one toggle position
+              is unavailable, which is ordinary, where Alert reports a
+              contradiction worth acting on. */}
+          <TriangleAlert aria-hidden="true" className="size-3.5 shrink-0" />
           {blockedReason}
         </span>
       ) : null}
