@@ -1,5 +1,5 @@
 import "server-only";
-import { and, eq, sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db } from "~/server/db";
 import { pinballmapState } from "~/server/db/schema";
 import { getPinballMapClient } from "./client";
@@ -342,6 +342,14 @@ export type ChangeLocationResult =
 export async function changeLocation(args: {
   newLocationId: number;
   updatedBy?: string;
+  /**
+   * Validate against Pinball Map even though the integration is currently
+   * disabled. Set when the caller enables and re-points in the same save: the
+   * end state is enabled, so taking the 6.7 no-fetch shortcut below would
+   * commit an unvalidated id and leave the previous venue's lineup stored
+   * under it.
+   */
+  validateWhileDisabled?: boolean;
 }): Promise<ChangeLocationResult> {
   const { newLocationId } = args;
   const state = await getPinballMapState();
@@ -354,7 +362,7 @@ export async function changeLocation(args: {
   // Disabled (or never configured): set the id only, no Pinball Map call (6.7).
   // Upsert so a never-initialized singleton is created; the guard makes a
   // concurrent change a no-op on an existing row.
-  if (!state?.enabled) {
+  if (!state?.enabled && !args.validateWhileDisabled) {
     const committed = await db
       .insert(pinballmapState)
       .values({
@@ -388,10 +396,15 @@ export async function changeLocation(args: {
     return { ok: false, reason: "fetch_failed" };
   }
 
-  // Commit the switch in one guarded statement (6.2, 6.6).
+  // Commit the switch in one guarded statement (6.2, 6.6). Upsert rather than
+  // update: `validateWhileDisabled` can reach here with no singleton row yet
+  // (enabling a never-initialized integration while re-pointing it), and a bare
+  // update would no-op and report that as a phantom concurrent change. The
+  // `setWhere` guard keeps the same concurrency semantics when the row exists.
   const committed = await db
-    .update(pinballmapState)
-    .set({
+    .insert(pinballmapState)
+    .values({
+      id: SINGLETON_ID,
       locationId: newLocationId,
       snapshotJson: snapshot,
       lastSyncedAt: now,
@@ -401,12 +414,20 @@ export async function changeLocation(args: {
       updatedAt: now,
       ...actor,
     })
-    .where(
-      and(
-        eq(pinballmapState.id, SINGLETON_ID),
-        eq(pinballmapState.locationId, oldId)
-      )
-    )
+    .onConflictDoUpdate({
+      target: pinballmapState.id,
+      set: {
+        locationId: newLocationId,
+        snapshotJson: snapshot,
+        lastSyncedAt: now,
+        lastSyncAttemptAt: now,
+        lastSyncStatus: "ok",
+        lastSyncError: null,
+        updatedAt: now,
+        ...actor,
+      },
+      setWhere: eq(pinballmapState.locationId, oldId),
+    })
     .returning({ id: pinballmapState.id });
   return committed.length > 0
     ? { ok: true }
@@ -429,6 +450,14 @@ export async function changeLocation(args: {
 export async function setEnabled(args: {
   enabled: boolean;
   updatedBy?: string;
+  /**
+   * Skip the enable refresh because the caller has just stored a fresh snapshot
+   * for this location. Set by a combined enable-and-re-point save, where
+   * `changeLocation` already fetched and committed the new venue's lineup —
+   * 5.2 is satisfied by that fetch, and refetching would spend a second Pinball
+   * Map call for one save (CORE-PBM-001).
+   */
+  skipRefresh?: boolean;
 }): Promise<SyncResult | { ok: true }> {
   const now = new Date();
   const actor = args.updatedBy ? { updatedBy: args.updatedBy } : {};
@@ -449,6 +478,9 @@ export async function setEnabled(args: {
 
   // Disable: no fetch, no clearing (5.3).
   if (!args.enabled) return { ok: true };
+
+  // The caller already refreshed this location in the same save.
+  if (args.skipRefresh) return { ok: true };
 
   // Enable: refresh the snapshot for the current location (5.2), on the cron
   // path so it does not spend a manual token.

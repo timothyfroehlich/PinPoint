@@ -136,13 +136,43 @@ describe("Admin Integrations — Pinball Map actions (PGlite)", () => {
       const result = await savePinballMapConfigAction(undefined, fd);
 
       expect(result.ok).toBe(true);
-      // One fetch total: changeLocation ran while still disabled (id-only, no
-      // fetch), then enable's refresh fetched the already-updated location.
+      // One fetch total, and it is the VALIDATING one: because the end state is
+      // enabled, changeLocation fetches location 222 and commits id+snapshot
+      // together (§6.2), then the enable skips its own refresh because that
+      // snapshot is already fresh. Previously the single fetch happened the
+      // other way round — the id was committed unvalidated and only then
+      // refreshed — which is what let a typo'd id land as a warning (see the
+      // next test).
       expect(fetchSpy).toHaveBeenCalledTimes(1);
+      expect(fetchSpy).toHaveBeenCalledWith(222);
       const state = await readState();
       expect(state.enabled).toBe(true);
       expect(state.locationId).toBe(222);
       expect(state.lastSyncStatus).toBe("ok");
+    });
+
+    it("enabling with an unreachable location id changes nothing and errors (§6.2)", async () => {
+      await asRole("admin");
+      await seedState({ enabled: false, locationId: 111 });
+      const { savePinballMapConfigAction } = await import(ACTIONS);
+
+      // A typo'd id: Pinball Map has no such location.
+      fetchSpy.mockRejectedValueOnce(new Error("404 Not Found"));
+
+      const fd = new FormData();
+      fd.set("enabled", "true");
+      fd.set("locationId", "999999");
+      const result = await savePinballMapConfigAction(undefined, fd);
+
+      // A hard error, not ok({warning}) — nothing about the request succeeded.
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.code).toBe("FETCH");
+
+      // And nothing was committed: still disabled, still pointed at 111, so no
+      // machine page can read a bogus location against the old venue's lineup.
+      const state = await readState();
+      expect(state.enabled).toBe(false);
+      expect(state.locationId).toBe(111);
     });
 
     it("disabling while changing location makes no Pinball Map call and keeps the old snapshot (§6.7)", async () => {

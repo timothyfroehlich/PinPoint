@@ -10,6 +10,7 @@ import {
   setEnabled,
   syncLocationSnapshot,
 } from "~/lib/pinballmap/state";
+import { reconcileAfterSync } from "~/lib/pinballmap/sync";
 import { verifyIntegrationsAdmin } from "./verify-admin";
 
 const INTEGRATIONS_PATH = "/admin/integrations";
@@ -86,6 +87,12 @@ export async function savePinballMapConfigAction(
     const result = await changeLocation({
       newLocationId: targetLocation,
       updatedBy: userId,
+      // Enable runs last (below), so at this point the integration is still
+      // disabled and changeLocation would take its no-fetch 6.7 branch —
+      // committing an unvalidated id and leaving the OLD venue's lineup stored
+      // under it, which machine pages then read as fact. When the end state is
+      // enabled, validate first regardless of the current flag.
+      validateWhileDisabled: targetEnabled,
     });
     if (!result.ok && result.reason === "fetch_failed") {
       revalidatePath(INTEGRATIONS_PATH);
@@ -96,18 +103,29 @@ export async function savePinballMapConfigAction(
     }
     if (!result.ok && result.reason === "concurrent_change") {
       revalidatePath(INTEGRATIONS_PATH);
+      // Honest failure (CORE-ARCH-012): a turn-off above has already committed,
+      // so "nothing changed" would be a lie in that case.
       return err(
         "CONFLICT",
-        "Another change landed first. Reload the page and try again."
+        enableChanged && !targetEnabled
+          ? "Pinball Map was turned off, but another change landed first so the location is unchanged. Reload the page."
+          : "Another change landed first. Reload the page and try again."
       );
     }
     // "unchanged" can't reach here — we diffed against stored state first.
   }
 
-  // Enable last so its refresh reads whatever location is now stored.
+  // Enable last so its refresh reads whatever location is now stored — unless
+  // the location also changed, in which case changeLocation above already
+  // fetched and stored that venue's lineup and a second fetch would be one
+  // extra Pinball Map call per save (CORE-PBM-001).
   let warning: string | undefined;
   if (enableChanged && targetEnabled) {
-    const result = await setEnabled({ enabled: true, updatedBy: userId });
+    const result = await setEnabled({
+      enabled: true,
+      updatedBy: userId,
+      skipRefresh: locationChanged,
+    });
     // The enable itself is already persisted; only the refresh can fail, and it
     // uses the cron trigger so it is never throttled.
     if (!result.ok && result.reason === "error") {
@@ -116,6 +134,10 @@ export async function savePinballMapConfigAction(
   }
 
   revalidatePath(INTEGRATIONS_PATH);
+  // Re-pointing the location replaces the snapshot every machine page derives
+  // Listed / Missing / Lingering from, and enabling refreshes it — so the whole
+  // /m subtree is stale either way.
+  if (locationChanged || enableChanged) revalidatePath("/m", "layout");
   return warning === undefined ? ok({}) : ok({ warning });
 }
 
@@ -147,6 +169,13 @@ export async function syncPinballMapNowAction(
   });
 
   if (result.ok) {
+    // Every other successful-sync call site reconciles and revalidates /m
+    // (m/pinballmap-actions.ts, api/cron/pinballmap-sync). Without it a listing
+    // an operator removed on pinballmap.com stays flagged as an abandoned
+    // entry, and every machine page keeps rendering the pre-sync lineup, until
+    // the hourly cron or a machine-page Refresh catches up.
+    await reconcileAfterSync();
+    revalidatePath("/m", "layout");
     revalidatePath(INTEGRATIONS_PATH);
     return ok({ machineCount: result.machineCount });
   }
