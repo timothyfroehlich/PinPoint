@@ -41,8 +41,17 @@ interface InfoRailProps {
   pinballmap: {
     /** `pinballmapLocationUrl()` — the by_location_id form, never hand-written. */
     locationUrl: string;
-    /** Whether the location's lineup currently carries this machine's title. */
-    onLineup: boolean;
+    /**
+     * Whether the location's lineup currently carries this machine's title —
+     * or `null` when PinPoint has never fetched a lineup and so cannot say.
+     *
+     * The null case is the Waiting state (spec 3.5). Collapsing it into `false`
+     * is the exact lie the old control told APC's whole listed fleet: a
+     * confident "Not on Pinball Map" derived from having no idea. It only
+     * arises before a first refresh — a fresh install, a preview branch DB —
+     * but there it is every machine on the site.
+     */
+    onLineup: boolean | null;
     /**
      * Show the "Config issue" warning. TWO different disagreements raise it:
      * an entry this machine left on the public lineup under a title it no
@@ -148,9 +157,14 @@ export function InfoRail({
               className="text-primary hover:underline"
               data-testid="machine-pinballmap-line"
             >
-              {pinballmap.onLineup
-                ? "View on Pinball Map"
-                : "Not on Pinball Map"}
+              {/* Three readings, not two. With no lineup fetched yet the link
+                  still goes somewhere useful — the location's page — so it
+                  names the destination and claims nothing about this machine. */}
+              {pinballmap.onLineup === null
+                ? "Pinball Map"
+                : pinballmap.onLineup
+                  ? "View on Pinball Map"
+                  : "Not on Pinball Map"}
             </a>
 
             {/* One line or nothing. Below the container width where this fits,

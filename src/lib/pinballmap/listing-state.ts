@@ -157,8 +157,13 @@ export function derivePbmListingView(args: {
     siblings,
   } = args;
 
+  // Names the field to change and its current value, in that order, because the
+  // fix is the Availability control on this same page. Label-then-value rather
+  // than a sentence: this sits beside a greyed-out toggle that already carries
+  // the "can't", so restating it costs a line and adds nothing (design bible
+  // §25 — a short label plus at most one supporting line).
   const blockedReason = INVALID_WHEN_ON.includes(presenceStatus)
-    ? `Current Availability (${getMachinePresenceLabel(presenceStatus)}) disallows adding to the lineup`
+    ? `Blocked by Availability: ${getMachinePresenceLabel(presenceStatus)}`
     : null;
 
   const inert = (disabled: PbmDisabledReason): PbmListingView => ({

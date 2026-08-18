@@ -348,6 +348,41 @@ describe("PinballMap outbound writes (PGlite)", () => {
     expect(events).toHaveLength(0);
   });
 
+  it("refuses to add a machine whose availability forbids the lineup", async () => {
+    // Intent On and presence Removed can coexist: the toggle was set while the
+    // machine was on the floor, and availability moved afterwards. That derives
+    // as Missing and offers Add, so without this guard one click publishes an
+    // absent machine to the public lineup — over copy saying Pinball Map only
+    // lists games that are present (spec 6.2).
+    const db = await getTestDb();
+    const { addMachineToPinballMapAction } =
+      await import("~/app/(app)/m/pinballmap-actions");
+    const admin = await createUser("admin");
+    await mockAuthAs(admin.id);
+    await seedState([]);
+
+    const [machine] = await db
+      .insert(machines)
+      .values({
+        name: "Slick Chick",
+        initials: "SCX",
+        pinballmapMachineId: TITLE_ID,
+        pinballmapIntent: "on",
+        presenceStatus: "removed",
+      })
+      .returning();
+    if (!machine) throw new Error("failed to seed machine");
+
+    const result = await addMachineToPinballMapAction(
+      undefined,
+      form(machine.id)
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.code).toBe("BLOCKED");
+    expect(pbm.lineup).toEqual([]);
+  });
+
   it("refuses without an operator credential, before calling PinballMap", async () => {
     const db = await getTestDb();
     const { getPinballMapWriteCredentials } =
@@ -786,6 +821,12 @@ describe("PinballMap outbound writes (PGlite)", () => {
 
     expect(result.ok).toBe(true);
     expect(pbm.lineup).toEqual([]);
+
+    // The alert reads the RECORD, not the snapshot. Leaving it behind repaints
+    // the page with the same "Still on the location's lineup" card after a
+    // removal that worked, and pressing Remove again 404s (CORE-ARCH-012).
+    const records = await db.select().from(pinballmapAbandonedListings);
+    expect(records).toHaveLength(0);
   });
 
   it("leaves the cabinet's own live entry alone when removing an abandoned one", async () => {

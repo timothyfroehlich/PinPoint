@@ -193,7 +193,10 @@ export default async function MachineInfoTab({
       modelName={modelName}
       pinballmap={{
         locationUrl: pinballmapLocationUrl(),
-        onLineup: listingView.observed,
+        // `observed` is false both for "the lineup does not carry it" and for
+        // "there is no lineup yet", and the rail would render the first as a
+        // fact. Waiting reports unknown instead.
+        onLineup: listingView.name === "waiting" ? null : listingView.observed,
         configIssue,
         manageHref: canOpenManage ? `/m/${machine.initials}/edit` : null,
       }}

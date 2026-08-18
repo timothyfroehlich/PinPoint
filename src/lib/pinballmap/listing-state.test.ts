@@ -272,13 +272,16 @@ describe("precedence", () => {
 });
 
 describe("the On position's availability block (spec 6.2)", () => {
-  it.each(["pending_arrival", "removed"] as const)(
-    "%s blocks the On position and says why",
-    (presenceStatus) => {
+  it.each([
+    ["pending_arrival", "Blocked by Availability: Pending Arrival"],
+    ["removed", "Blocked by Availability: Removed"],
+  ] as const)(
+    "%s blocks the On position and names the value",
+    (presenceStatus, expected) => {
       const view = derive({ presenceStatus });
-      expect(view.onPositionBlockedReason).toContain(
-        "disallows adding to the lineup"
-      );
+      // The VALUE, not just the phrase: naming which availability is in the way
+      // is the whole point — it is the field the reader has to change.
+      expect(view.onPositionBlockedReason).toBe(expected);
     }
   );
 

@@ -50,8 +50,7 @@ const VIEWS: Record<string, PbmListingView> = {
   blocked: view({
     name: "blocked",
     intent: "off",
-    onPositionBlockedReason:
-      "Current Availability (Removed) disallows adding to the lineup",
+    onPositionBlockedReason: "Blocked by Availability: Removed",
   }),
   alert: view({
     name: "alert",
@@ -59,8 +58,7 @@ const VIEWS: Record<string, PbmListingView> = {
     observed: true,
     advisory: "alert",
     advisoryDetail: "Removed",
-    onPositionBlockedReason:
-      "Current Availability (Removed) disallows adding to the lineup",
+    onPositionBlockedReason: "Blocked by Availability: Removed",
   }),
   flag: view({
     name: "flag",
@@ -327,7 +325,7 @@ describe("the intent toggle", () => {
     // Off and Don't sync stay reachable — the block is a guard, not a trap.
     expect(screen.getByTestId("pbm-listing-intent-no_sync")).toBeEnabled();
     expect(screen.getByTestId("pbm-listing-blocked-reason")).toHaveTextContent(
-      "Current Availability (Removed)"
+      "Blocked by Availability: Removed"
     );
   });
 

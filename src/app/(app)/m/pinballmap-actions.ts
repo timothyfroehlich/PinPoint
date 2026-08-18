@@ -19,7 +19,7 @@ import { db, type Tx } from "~/server/db";
 import { machines, userProfiles, pinballmapState } from "~/server/db/schema";
 import { reconcileAfterSync } from "~/lib/pinballmap/sync";
 import {
-  listAbandonedForMachine,
+  listSurfacingAbandonedForMachine,
   retireAbandonmentForLmx,
 } from "~/lib/pinballmap/abandoned-listings";
 import { getPinballMapWriteCredentials } from "~/lib/pinballmap/credentials";
@@ -264,9 +264,13 @@ export async function setPinballmapIntentAction(
     intent === "on" &&
     INTENT_ON_BLOCKED_BY.includes(machine.presenceStatus)
   ) {
+    // Same wording as the note beside the disabled toggle
+    // (`derivePbmListingView`'s `blockedReason`) — this is the backstop for a
+    // request that got past that toggle, so a reader who somehow sees both
+    // should not have to reconcile two descriptions of one rule.
     return err(
       "BLOCKED",
-      `Current Availability (${getMachinePresenceLabel(machine.presenceStatus)}) disallows adding to the lineup.`
+      `Blocked by Availability: ${getMachinePresenceLabel(machine.presenceStatus)}`
     );
   }
 
@@ -428,6 +432,9 @@ export type ListPinballmapResult = Result<
   | "VALIDATION"
   | "UNAUTHORIZED"
   | "NOT_FOUND"
+  // Availability forbids being on the lineup (6.2) — the same refusal the
+  // intent toggle gives, on the push that would otherwise get there anyway.
+  | "BLOCKED"
   | "NOT_PROVISIONED"
   | "PBM_REJECTED"
   | "SERVER"
@@ -471,6 +478,18 @@ export async function addMachineToPinballMapAction(
   const titleId = machine.pinballmapMachineId;
   if (titleId === null)
     return err("VALIDATION", "Machine isn't linked to a Pinball Map title yet");
+
+  // The same availability rule the intent toggle enforces (6.2). Setting intent
+  // On and pushing the entry are two steps, and only the first was guarded — so
+  // a cabinet set On while it was on the floor and later marked Removed derives
+  // as Missing (intent On, entry absent, checked before the advisory branch) and
+  // offers Add. One click would publish an absent machine to the public lineup,
+  // over copy that says Pinball Map only lists games that are present.
+  if (INTENT_ON_BLOCKED_BY.includes(machine.presenceStatus))
+    return err(
+      "BLOCKED",
+      `Blocked by Availability: ${getMachinePresenceLabel(machine.presenceStatus)}`
+    );
 
   const state = await getPinballMapState();
   if (!state) return err("SERVER", "Pinball Map isn't configured yet");
@@ -627,10 +646,16 @@ export async function removeMachineFromPinballMapAction(
   // context the rest of this action needs — `machine.pinballmapMachineId` is
   // the cabinet's CURRENT title and naming the wrong one here reaches the wrong
   // entry twice over (see the two uses below).
+  // The SURFACING list, not every record: an abandoned entry whose title some
+  // cabinet still carries is that cabinet's business (spec 2.5) and is not
+  // offered here, so accepting it from a stale page would remove an entry a
+  // sibling is actively covering — and `withLmxRemoved` would strip that title
+  // from the stored lineup too. Authorizing exactly what the UI offers keeps
+  // the two from drifting apart in the direction that matters.
   const abandonedTitleId =
     explicitLmxId === null
       ? null
-      : ((await listAbandonedForMachine(machine.id)).find(
+      : ((await listSurfacingAbandonedForMachine(machine.id)).find(
           (a) => a.lmxId === explicitLmxId
         )?.pinballmapMachineId ?? null);
 
@@ -761,6 +786,24 @@ export async function removeMachineFromPinballMapAction(
       // Missing until the next cron.
       withLmxRemoved(snapshot, deletedLmxId, titleId)
     );
+
+    // The abandoned-entry alert reads the RECORD, not the snapshot, so editing
+    // the snapshot alone leaves the alert standing after a removal that
+    // succeeded — press Remove, watch the page repaint with the same "Still on
+    // the location's lineup" card, press it again and 404 through the whole
+    // `classifyRemoveNotFound` refresh. That is the failure this action's
+    // docblock says the snapshot edit exists to prevent, on the other surface.
+    // `clearResolvedAbandonments` would get there eventually; eventually is an
+    // hour (CORE-ARCH-012).
+    //
+    // Both ids, because they can differ: the record holds the id we validated,
+    // while `deletedLmxId` is what PBM actually accepted after a re-mint. A
+    // delete by lmx that matches nothing is a no-op, so the Lingering path
+    // (no record, no explicit id) costs one statement and stays correct.
+    if (explicitLmxId !== null)
+      await retireAbandonmentForLmx(tx, explicitLmxId);
+    if (deletedLmxId !== explicitLmxId)
+      await retireAbandonmentForLmx(tx, deletedLmxId);
     await createMachineTimelineEvent(
       machine.id,
       {
@@ -841,6 +884,11 @@ export async function refreshPinballmapLineupAction(
           1,
           Math.ceil(result.retryAfterMs / (60 * 1000))
         );
+        // The bucket moved even though the lineup did not — a token was spent
+        // on the attempt (PP-hbi0), and the remove path spends them too. Without
+        // this the header keeps rendering the count it was built with, so the
+        // button says refreshes remain while every press is refused.
+        revalidatePath("/m", "layout");
         return err(
           "THROTTLED",
           `Pinball Map was refreshed recently. Try again in about ${String(minutes)} minute${minutes === 1 ? "" : "s"}.`

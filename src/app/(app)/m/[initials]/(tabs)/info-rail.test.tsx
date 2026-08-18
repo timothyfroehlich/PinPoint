@@ -128,6 +128,25 @@ describe("InfoRail", () => {
       expect(line).toHaveAttribute("href", LOCATION_URL);
     });
 
+    it("claims nothing when no lineup has ever been fetched", () => {
+      // `onLineup: null` is the Waiting state (spec 3.5). Rendering it as
+      // "Not on Pinball Map" would be the confident-wrong answer that state
+      // exists to prevent — and before a first refresh it is EVERY machine.
+      renderRail({
+        pinballmap: {
+          locationUrl: LOCATION_URL,
+          onLineup: null,
+          configIssue: false,
+          manageHref: "/m/MM/edit",
+        },
+      });
+      const line = screen.getByTestId("machine-pinballmap-line");
+      expect(line).toHaveTextContent("Pinball Map");
+      expect(line).not.toHaveTextContent("Not on Pinball Map");
+      // Still a link to the location, which is true regardless.
+      expect(line).toHaveAttribute("href", LOCATION_URL);
+    });
+
     it("points at the location listing, never the homepage", () => {
       renderRail();
       expect(
