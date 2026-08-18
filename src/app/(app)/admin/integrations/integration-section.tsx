@@ -24,11 +24,15 @@ export function IntegrationSection({
 }): React.JSX.Element {
   return (
     <section className="overflow-hidden rounded-lg border border-outline-variant/50 bg-card">
-      <div className="flex items-start justify-between gap-3 border-b border-outline-variant/50 bg-muted px-6 py-4">
-        <div className="space-y-1">
+      <div className="flex items-start justify-between gap-3 border-b border-outline-variant/50 bg-muted px-6 py-3">
+        <div>
           <h2 className="text-base font-semibold leading-none">{title}</h2>
+          {/* `mt-1 leading-snug` is deliberate, not decoration: globals.css gives
+              every bare <p> the prose defaults `leading-7` (28px) and
+              `not-first:mt-4` (16px). Inherited by a 12px label they made this
+              band 93px tall to show two short lines. Both are overridden here. */}
           {description && (
-            <p className="text-pretty text-xs text-muted-foreground">
+            <p className="mt-1 text-pretty text-xs leading-snug text-muted-foreground">
               {description}
             </p>
           )}
