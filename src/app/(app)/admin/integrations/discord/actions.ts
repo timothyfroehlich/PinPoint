@@ -493,7 +493,11 @@ export async function saveDiscordConfig(
     };
   }
 
-  revalidatePath("/admin/integrations/discord");
+  // The form renders at /admin/integrations now — the /discord route is a bare
+  // redirect() stub, so revalidating it refreshed nothing and left the saved
+  // props stale (no Saved badge, activation switch stuck disabled) until a hard
+  // reload. (Review finding 1, PP-o355.8.)
+  revalidatePath("/admin/integrations");
   return probedBotUsername
     ? { ok: true, botUsername: probedBotUsername }
     : { ok: true };

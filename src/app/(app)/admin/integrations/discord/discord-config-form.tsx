@@ -5,11 +5,14 @@ import { useActionState, useTransition } from "react";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
-import { Switch } from "~/components/ui/switch";
 import { Separator } from "~/components/ui/separator";
 import { Badge } from "~/components/ui/badge";
 import { CheckCircle2, AlertCircle, Loader2, Check } from "lucide-react";
 import { cn } from "~/lib/utils";
+import Link from "next/link";
+import { HelpCircle } from "lucide-react";
+import { IntegrationSection } from "../integration-section";
+import { SectionToggle } from "../section-toggle";
 import {
   saveDiscordConfigAction,
   validateBotToken,
@@ -104,10 +107,11 @@ export function DiscordConfigForm({
   const validationsPassed =
     tokenStatus.kind === "valid" && serverStatus.kind === "valid";
   const canTurnOn = validationsPassed || enabled;
-  const switchDisabled = !tokenAvailable || (!enabledInput && !canTurnOn);
-  const switchTitle = !tokenAvailable
+  // Why the toggle cannot be turned on, as visible text rather than a `title`
+  // tooltip (CORE-A11Y-005). Undefined once enabling is allowed.
+  const enableBlockedReason = !tokenAvailable
     ? "Set a bot token first."
-    : !enabledInput && !canTurnOn
+    : !canTurnOn
       ? "Validate the bot token and Server ID before enabling."
       : undefined;
 
@@ -173,107 +177,75 @@ export function DiscordConfigForm({
   }
 
   return (
-    <form action={saveFormAction} className="space-y-6">
-      <input
-        type="hidden"
-        name="enabled"
-        value={enabledInput ? "true" : "false"}
-      />
-
-      {/* Bot token */}
-      <section className="space-y-2">
-        <FieldLabel
-          htmlFor="newToken"
-          label="Bot token"
-          // Server schema treats newToken as optional ("" = no change when a
-          // token is already saved). Only flag the input as required when
-          // there's no saved token to fall back on, otherwise screen-reader
-          // required-field cues misrepresent the actual validation rule.
-          required={!hasToken}
-          hint="From Discord Developer Portal → your app → Bot → Reset Token."
-          savedBadge={hasToken && tokenInput === ""}
-        />
-        <div className="flex items-center gap-2 flex-wrap">
-          <Input
-            id="newToken"
-            name="newToken"
-            type="password"
-            autoComplete="off"
-            spellCheck={false}
-            placeholder={
-              hasToken ? "Paste new token to replace" : "Paste a token..."
-            }
-            value={tokenInput}
-            onChange={(e) => {
-              setTokenInput(e.target.value);
-              setTokenStatus({ kind: "idle" });
-              // Server status is also stale because the token affects
-              // server-membership validation.
-              setServerStatus({ kind: "idle" });
-            }}
-            className="flex-1 max-w-[360px]"
-          />
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            disabled={!canValidateToken || validatingToken}
-            onClick={handleValidateToken}
+    <IntegrationSection
+      title="Discord"
+      description="Bot notifications for issues and machine activity."
+      action={
+        <div className="flex items-start gap-4">
+          <Link
+            href="/help/discord"
+            className="flex items-center gap-1.5 pt-0.5 text-sm text-link"
           >
-            {validatingToken ? (
-              <>
-                <Loader2 className="mr-1.5 size-3 animate-spin motion-reduce:animate-none" />
-                Validating...
-              </>
-            ) : (
-              "Validate"
-            )}
-          </Button>
+            <HelpCircle className="size-4" aria-hidden />
+            <span>Help</span>
+          </Link>
+          <SectionToggle
+            id="enabled"
+            checked={enabledInput}
+            onCheckedChange={setEnabledInput}
+            disabledReason={enableBlockedReason}
+          />
         </div>
-        <ValidationStatus status={tokenStatus} />
-        {fieldErrors["newToken"] && (
-          <FieldError message={fieldErrors["newToken"]} />
-        )}
-      </section>
+      }
+    >
+      <form action={saveFormAction} className="space-y-6">
+        <input
+          type="hidden"
+          name="enabled"
+          value={enabledInput ? "true" : "false"}
+        />
 
-      <Separator />
-
-      {/* Discord server */}
-      <section className="space-y-4">
-        <div className="space-y-2">
+        {/* Bot token */}
+        <section className="space-y-2">
           <FieldLabel
-            htmlFor="guildId"
-            label="Server ID"
-            required
-            hint="Right-click the server in Discord → Copy Server ID. Enable Developer Mode in Settings → Advanced if hidden."
+            htmlFor="newToken"
+            label="Bot token"
+            // Server schema treats newToken as optional ("" = no change when a
+            // token is already saved). Only flag the input as required when
+            // there's no saved token to fall back on, otherwise screen-reader
+            // required-field cues misrepresent the actual validation rule.
+            required={!hasToken}
+            hint="From Discord Developer Portal → your app → Bot → Reset Token."
+            savedBadge={hasToken && tokenInput === ""}
           />
           <div className="flex items-center gap-2 flex-wrap">
             <Input
-              id="guildId"
-              name="guildId"
-              type="text"
-              inputMode="numeric"
-              pattern="[0-9]+"
-              placeholder="123456789012345678"
-              maxLength={64}
-              value={guildIdInput}
+              id="newToken"
+              name="newToken"
+              type="password"
+              autoComplete="off"
+              spellCheck={false}
+              placeholder={
+                hasToken ? "Paste new token to replace" : "Paste a token..."
+              }
+              value={tokenInput}
               onChange={(e) => {
-                setGuildIdInput(e.target.value);
+                setTokenInput(e.target.value);
+                setTokenStatus({ kind: "idle" });
+                // Server status is also stale because the token affects
+                // server-membership validation.
                 setServerStatus({ kind: "idle" });
               }}
-              required
-              aria-required="true"
               className="flex-1 max-w-[360px]"
             />
             <Button
               type="button"
               variant="outline"
               size="sm"
-              disabled={!canValidateServer || validatingServer}
-              onClick={handleValidateServer}
-              title={tokenAvailable ? undefined : "Set a bot token first"}
+              disabled={!canValidateToken || validatingToken}
+              onClick={handleValidateToken}
             >
-              {validatingServer ? (
+              {validatingToken ? (
                 <>
                   <Loader2 className="mr-1.5 size-3 animate-spin motion-reduce:animate-none" />
                   Validating...
@@ -283,62 +255,97 @@ export function DiscordConfigForm({
               )}
             </Button>
           </div>
-          <ValidationStatus status={serverStatus} />
-          {fieldErrors["guildId"] && (
-            <FieldError message={fieldErrors["guildId"]} />
+          <ValidationStatus status={tokenStatus} />
+          {fieldErrors["newToken"] && (
+            <FieldError message={fieldErrors["newToken"]} />
           )}
-        </div>
+        </section>
 
-        <div className="space-y-2">
-          <FieldLabel
-            htmlFor="inviteLink"
-            label="Invite link"
-            optional
-            hint="Shown to users when DMs fail because they're not in the server. Use a non-expiring invite from your server's Invite People dialog."
-          />
-          <Input
-            id="inviteLink"
-            name="inviteLink"
-            type="url"
-            placeholder="https://discord.gg/..."
-            maxLength={512}
-            value={inviteLinkInput}
-            onChange={(e) => {
-              setInviteLinkInput(e.target.value);
-            }}
-            className="max-w-[360px]"
-          />
-          {fieldErrors["inviteLink"] && (
-            <FieldError message={fieldErrors["inviteLink"]} />
-          )}
-        </div>
-      </section>
+        <Separator />
 
-      <Separator />
+        {/* Discord server */}
+        <section className="space-y-4">
+          <div className="space-y-2">
+            <FieldLabel
+              htmlFor="guildId"
+              label="Server ID"
+              required
+              hint="Right-click the server in Discord → Copy Server ID. Enable Developer Mode in Settings → Advanced if hidden."
+            />
+            <div className="flex items-center gap-2 flex-wrap">
+              <Input
+                id="guildId"
+                name="guildId"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]+"
+                placeholder="123456789012345678"
+                maxLength={64}
+                value={guildIdInput}
+                onChange={(e) => {
+                  setGuildIdInput(e.target.value);
+                  setServerStatus({ kind: "idle" });
+                }}
+                required
+                aria-required="true"
+                className="flex-1 max-w-[360px]"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={!canValidateServer || validatingServer}
+                onClick={handleValidateServer}
+                title={tokenAvailable ? undefined : "Set a bot token first"}
+              >
+                {validatingServer ? (
+                  <>
+                    <Loader2 className="mr-1.5 size-3 animate-spin motion-reduce:animate-none" />
+                    Validating...
+                  </>
+                ) : (
+                  "Validate"
+                )}
+              </Button>
+            </div>
+            <ValidationStatus status={serverStatus} />
+            {fieldErrors["guildId"] && (
+              <FieldError message={fieldErrors["guildId"]} />
+            )}
+          </div>
 
-      {/* Activation */}
-      <section className="flex items-center gap-3">
-        <Switch
-          id="enabled"
-          checked={enabledInput}
-          onCheckedChange={setEnabledInput}
-          disabled={switchDisabled}
+          <div className="space-y-2">
+            <FieldLabel
+              htmlFor="inviteLink"
+              label="Invite link"
+              optional
+              hint="Shown to users when DMs fail because they're not in the server. Use a non-expiring invite from your server's Invite People dialog."
+            />
+            <Input
+              id="inviteLink"
+              name="inviteLink"
+              type="url"
+              placeholder="https://discord.gg/..."
+              maxLength={512}
+              value={inviteLinkInput}
+              onChange={(e) => {
+                setInviteLinkInput(e.target.value);
+              }}
+              className="max-w-[360px]"
+            />
+            {fieldErrors["inviteLink"] && (
+              <FieldError message={fieldErrors["inviteLink"]} />
+            )}
+          </div>
+        </section>
+
+        <SaveResetFooter
+          isPending={isPending}
+          isSuccess={!!saveState?.ok}
+          onReset={handleReset}
         />
-        <Label
-          htmlFor="enabled"
-          className="text-sm font-medium"
-          title={switchTitle}
-        >
-          {enabledInput ? "Enabled" : "Disabled"}
-        </Label>
-      </section>
-
-      <SaveResetFooter
-        isPending={isPending}
-        isSuccess={!!saveState?.ok}
-        onReset={handleReset}
-      />
-    </form>
+      </form>
+    </IntegrationSection>
   );
 }
 

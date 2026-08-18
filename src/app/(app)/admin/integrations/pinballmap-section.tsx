@@ -13,7 +13,6 @@ import {
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
-import { Switch } from "~/components/ui/switch";
 import { Separator } from "~/components/ui/separator";
 import {
   AlertDialog,
@@ -26,6 +25,7 @@ import {
   AlertDialogTitle,
 } from "~/components/ui/alert-dialog";
 import { IntegrationSection } from "./integration-section";
+import { SectionToggle } from "./section-toggle";
 import {
   savePinballMapConfigAction,
   syncPinballMapNowAction,
@@ -146,24 +146,18 @@ export function PinballMapSection({
     <IntegrationSection
       title="Pinball Map"
       description="Public-lineup sync for the location PinPoint tracks."
+      action={
+        <SectionToggle
+          id="pbm-enabled"
+          checked={enabledInput}
+          onCheckedChange={setEnabledInput}
+        />
+      }
     >
       <div className="space-y-6">
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Enable (spec §5) */}
-          <section className="flex items-center gap-3">
-            <Switch
-              id="pbm-enabled"
-              checked={enabledInput}
-              onCheckedChange={setEnabledInput}
-            />
-            <Label htmlFor="pbm-enabled" className="text-sm font-medium">
-              {enabledInput ? "Enabled" : "Disabled"}
-            </Label>
-          </section>
-
-          <Separator />
-
-          {/* Location (spec §6) */}
+          {/* Enable (spec §5) lives on the section heading line — see
+              SectionToggle. Location (spec §6) */}
           <section className="space-y-2">
             <div className="flex items-baseline gap-2 flex-wrap">
               <Label htmlFor="pbm-location" className="text-sm font-medium">
