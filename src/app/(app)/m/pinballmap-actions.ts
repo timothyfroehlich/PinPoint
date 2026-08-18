@@ -652,14 +652,14 @@ export async function removeMachineFromPinballMapAction(
   // sibling is actively covering — and `withLmxRemoved` would strip that title
   // from the stored lineup too. Authorizing exactly what the UI offers keeps
   // the two from drifting apart in the direction that matters.
-  const abandonedTitleId =
+  const abandonedRecord =
     explicitLmxId === null
       ? null
       : ((await listSurfacingAbandonedForMachine(machine.id)).find(
           (a) => a.lmxId === explicitLmxId
-        )?.pinballmapMachineId ?? null);
+        ) ?? null);
 
-  if (explicitLmxId !== null && abandonedTitleId === null)
+  if (explicitLmxId !== null && abandonedRecord === null)
     return err(
       "NOT_FOUND",
       "That entry is not one this machine left behind, so it is not this machine's to remove."
@@ -667,7 +667,18 @@ export async function removeMachineFromPinballMapAction(
 
   // Which title this removal is ABOUT: the abandoned entry's own, when we are
   // acting on one, and otherwise the cabinet's current title.
-  const titleId = abandonedTitleId ?? machine.pinballmapMachineId;
+  const titleId =
+    abandonedRecord?.pinballmapMachineId ?? machine.pinballmapMachineId;
+
+  // A record stamped with a location PinPoint no longer tracks (spec 6.9). Its
+  // entry lives on a DIFFERENT location's lineup, so the re-mint recovery below
+  // — which re-resolves the title against the CURRENT lineup when a handle looks
+  // stale — must be suppressed: pointed at the new location it would find and
+  // delete an unrelated live entry that happens to share the title. The stored
+  // lmx is globally unique on Pinball Map, so the direct remove hits the right
+  // old-location entry, and a `not_found` means it is already gone.
+  const isCrossLocation =
+    abandonedRecord !== null && abandonedRecord.locationId !== state.locationId;
 
   const liveLmxId =
     explicitLmxId ??
@@ -709,7 +720,21 @@ export async function removeMachineFromPinballMapAction(
   // title is still listed under a re-minted id. `classifyRemoveNotFound` asks
   // the live lineup which one it is; taking the already-gone reading on faith
   // is what silently un-does a human unlist (PP-rnup).
-  if (!written.ok) {
+  //
+  // Except for a cross-location record: its title says nothing about the tracked
+  // lineup, so asking that lineup is exactly the destructive re-mint §6.9
+  // forbids. A `not_found` there is unambiguous — the old-location entry is
+  // gone — so it is taken at face value and the record simply dropped below.
+  if (!written.ok && isCrossLocation) {
+    log.info(
+      {
+        lmxId: deletedLmxId,
+        machineId: machine.id,
+        action: "pinballmap.removeMachine",
+      },
+      "PinballMap returned not_found for a cross-location abandoned entry — treating as already gone (spec 6.9)"
+    );
+  } else if (!written.ok) {
     const verdict = await classifyRemoveNotFound({
       attemptedLmxId: deletedLmxId,
       // The abandoned entry's title, not the cabinet's current one. Passing the
@@ -779,13 +804,18 @@ export async function removeMachineFromPinballMapAction(
   // the toggle two ways to do one thing, which is the conflation the two-line
   // control exists to undo (spec 4.1).
   await db.transaction(async (tx) => {
-    await editStoredSnapshot(tx, (snapshot) =>
-      // Same reason as above: `withLmxRemoved` drops rows matching EITHER the
-      // id or the title, so the cabinet's current title would take its own live
-      // row out of the stored lineup and leave every same-title cabinet reading
-      // Missing until the next cron.
-      withLmxRemoved(snapshot, deletedLmxId, titleId)
-    );
+    // A cross-location entry is not in the tracked lineup, so there is nothing
+    // to edit here — and editing by its title would strip an unrelated
+    // same-title entry the current location legitimately carries (spec 6.9).
+    // The record drop below is the whole local effect.
+    if (!isCrossLocation)
+      await editStoredSnapshot(tx, (snapshot) =>
+        // Same reason as above: `withLmxRemoved` drops rows matching EITHER the
+        // id or the title, so the cabinet's current title would take its own live
+        // row out of the stored lineup and leave every same-title cabinet reading
+        // Missing until the next cron.
+        withLmxRemoved(snapshot, deletedLmxId, titleId)
+      );
 
     // The abandoned-entry alert reads the RECORD, not the snapshot, so editing
     // the snapshot alone leaves the alert standing after a removal that

@@ -113,11 +113,14 @@ export async function retireAbandonmentForLmx(
  */
 export async function listAbandonedForMachine(
   machineId: string
-): Promise<{ lmxId: number; pinballmapMachineId: number }[]> {
+): Promise<
+  { lmxId: number; pinballmapMachineId: number; locationId: number }[]
+> {
   const rows = await db
     .select({
       lmxId: pinballmapAbandonedListings.lmxId,
       pinballmapMachineId: pinballmapAbandonedListings.pinballmapMachineId,
+      locationId: pinballmapAbandonedListings.locationId,
     })
     .from(pinballmapAbandonedListings)
     .where(eq(pinballmapAbandonedListings.machineId, machineId));
@@ -146,7 +149,9 @@ export async function listAbandonedForMachine(
  */
 export async function listSurfacingAbandonedForMachine(
   machineId: string
-): Promise<{ lmxId: number; pinballmapMachineId: number }[]> {
+): Promise<
+  { lmxId: number; pinballmapMachineId: number; locationId: number }[]
+> {
   const rows = await listAbandonedForMachine(machineId);
   if (rows.length === 0) return rows;
 

@@ -920,4 +920,68 @@ describe("PinballMap outbound writes (PGlite)", () => {
     // ways to do one thing (spec 4.1).
     expect(row?.pinballmapIntent).toBe("on");
   });
+
+  it("removes a cross-location orphan without re-minting into the current lineup (spec 6.9)", async () => {
+    // The destructive path §6.9 closes. An abandoned record was left at a
+    // location PinPoint no longer tracks; its lmx is long gone from Pinball Map.
+    // The CURRENT location happens to carry a live entry under the SAME catalog
+    // title (an unrelated game). If the remove's `not_found` reached
+    // `classifyRemoveNotFound`, it would re-resolve the title against the
+    // current lineup and delete that unrelated live entry.
+    const db = await getTestDb();
+    const { removeMachineFromPinballMapAction } =
+      await import("~/app/(app)/m/pinballmap-actions");
+    const admin = await createUser("admin");
+    await mockAuthAs(admin.id);
+
+    // Current location (26454) has a live entry lmx 500 under title 8080 — an
+    // unrelated game that must survive.
+    pbm.lineup = [{ id: 500, machineId: 8080 }];
+    await seedState([{ id: 500, machineId: 8080 }]);
+
+    // An unlinked cabinet holding a record for lmx 4040 (title 8080) abandoned
+    // at a DIFFERENT location (99999). Its title is not matched by any cabinet,
+    // so it surfaces for removal.
+    const [machine] = await db
+      .insert(machines)
+      .values({ name: "Orphan Owner", initials: "OO" })
+      .returning();
+    if (!machine) throw new Error("failed to seed machine");
+    await db.insert(pinballmapAbandonedListings).values({
+      machineId: machine.id,
+      lmxId: 4040,
+      pinballmapMachineId: 8080,
+      locationId: 99999,
+    });
+
+    const result = await removeMachineFromPinballMapAction(
+      undefined,
+      formWithLmx(machine.id, 4040)
+    );
+
+    // The removal is accepted: the stored lmx 404s (the old entry is gone), and
+    // a cross-location not_found is taken as already-gone.
+    expect(result.ok).toBe(true);
+
+    // The whole point: the unrelated current-location entry was NOT touched.
+    // Without the suppression, the re-mint retry deletes lmx 500 here.
+    expect(pbm.lineup).toEqual([{ id: 500, machineId: 8080 }]);
+
+    // The record is dropped so the alert stops surfacing it.
+    const rows = await db.select().from(pinballmapAbandonedListings);
+    expect(rows).toHaveLength(0);
+
+    // The current snapshot is left intact — a cross-location removal never
+    // edits the tracked location's lineup.
+    const state = await db.query.pinballmapState.findFirst();
+    expect(state?.snapshotJson?.lmxes).toEqual([
+      {
+        id: 500,
+        machineId: 8080,
+        icEnabled: null,
+        lastUpdatedByUsername: null,
+        conditions: [],
+      },
+    ]);
+  });
 });
