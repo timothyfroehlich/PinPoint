@@ -26,6 +26,7 @@ describe("pinballmap_abandoned_listings", () => {
       machineId: machine.id,
       lmxId: 4471,
       pinballmapMachineId: 6221,
+      locationId: 26454,
     });
 
     await db.delete(machines).where(eq(machines.id, machine.id));
@@ -49,6 +50,7 @@ describe("pinballmap_abandoned_listings", () => {
       machineId: a.id,
       lmxId: 4471,
       pinballmapMachineId: 6221,
+      locationId: 26454,
     });
 
     await expect(
@@ -56,6 +58,7 @@ describe("pinballmap_abandoned_listings", () => {
         machineId: b.id,
         lmxId: 4471,
         pinballmapMachineId: 6221,
+        locationId: 26454,
       })
     ).rejects.toThrow();
   });
@@ -68,8 +71,18 @@ describe("pinballmap_abandoned_listings", () => {
       .returning();
 
     await db.insert(pinballmapAbandonedListings).values([
-      { machineId: machine.id, lmxId: 4471, pinballmapMachineId: 6221 },
-      { machineId: machine.id, lmxId: 5120, pinballmapMachineId: 6222 },
+      {
+        machineId: machine.id,
+        lmxId: 4471,
+        pinballmapMachineId: 6221,
+        locationId: 26454,
+      },
+      {
+        machineId: machine.id,
+        lmxId: 5120,
+        pinballmapMachineId: 6222,
+        locationId: 26454,
+      },
     ]);
 
     const rows = await db

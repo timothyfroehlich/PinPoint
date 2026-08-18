@@ -194,6 +194,46 @@ describe("re-matching an intent-On machine", () => {
     expect(after?.pinballmapIntent).toBe("off");
   });
 
+  it("stamps the abandonment with the currently tracked location (spec 6.4)", async () => {
+    const db = await getTestDb();
+    const { updateMachineAction } = await import("~/app/(app)/m/actions");
+    const admin = await createAdmin();
+    await mockAuthAs(admin.id);
+    await seedCatalog();
+    await seedLineup();
+    // Move the tracked location to a non-default value so a pass proves the
+    // stamp is read from `pinballmap_state`, not a hardcoded APC default. The
+    // stored snapshot still carries the entries, so the abandonment still
+    // resolves the old title's lmx.
+    await db
+      .update(pinballmapState)
+      .set({ locationId: 55555 })
+      .where(eq(pinballmapState.id, "singleton"));
+
+    const [machine] = await db
+      .insert(machines)
+      .values({
+        name: "Godzilla",
+        initials: "GZ",
+        pinballmapMachineId: 6221,
+        pinballmapIntent: "on",
+      })
+      .returning();
+
+    const result = await updateMachineAction(
+      undefined,
+      retitleForm(machine.id, 6222)
+    );
+    expect(result.ok).toBe(true);
+
+    const rows = await db
+      .select()
+      .from(pinballmapAbandonedListings)
+      .where(eq(pinballmapAbandonedListings.machineId, machine.id));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.locationId).toBe(55555);
+  });
+
   it("records a second abandonment without losing the first", async () => {
     const db = await getTestDb();
     const { updateMachineAction } = await import("~/app/(app)/m/actions");

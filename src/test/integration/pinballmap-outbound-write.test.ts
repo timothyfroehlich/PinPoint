@@ -254,6 +254,7 @@ describe("PinballMap outbound writes (PGlite)", () => {
       machineId: abandoner.id,
       lmxId: 777,
       pinballmapMachineId: TITLE_ID,
+      locationId: 26454,
     });
 
     const [claimer] = await db
@@ -727,6 +728,7 @@ describe("PinballMap outbound writes (PGlite)", () => {
       machineId: machine.id,
       lmxId: 500,
       pinballmapMachineId: 8080,
+      locationId: 26454,
     });
 
     const result = await removeMachineFromPinballMapAction(
@@ -812,6 +814,7 @@ describe("PinballMap outbound writes (PGlite)", () => {
       machineId: machine.id,
       lmxId: 321,
       pinballmapMachineId: 8080,
+      locationId: 26454,
     });
 
     const result = await removeMachineFromPinballMapAction(
@@ -865,6 +868,7 @@ describe("PinballMap outbound writes (PGlite)", () => {
       machineId: machine.id,
       lmxId: 111,
       pinballmapMachineId: 8080,
+      locationId: 26454,
     });
 
     const result = await removeMachineFromPinballMapAction(

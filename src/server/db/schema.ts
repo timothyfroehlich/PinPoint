@@ -340,6 +340,13 @@ export const pinballmapAbandonedListings = pgTable(
     lmxId: integer("lmx_id").notNull(),
     // The catalog title the entry was listed under, so the UI can name it.
     pinballmapMachineId: integer("pinballmap_machine_id").notNull(),
+    // The PBM location tracked when the entry was abandoned. Records are
+    // location-scoped so a location change never reconciles or re-mints an
+    // entry belonging to a different location's lineup (spec 6.4/6.9) — the
+    // destructive path that would otherwise delete an unrelated machine's live
+    // entry. No default: the stamp is always read from `pinballmap_state` at
+    // record time, never guessed.
+    locationId: integer("location_id").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

@@ -3,8 +3,13 @@ import "server-only";
 import { and, eq, inArray, isNotNull, notInArray, or, sql } from "drizzle-orm";
 
 import { db, type DbTransaction } from "~/server/db";
-import { machines, pinballmapAbandonedListings } from "~/server/db/schema";
+import {
+  machines,
+  pinballmapAbandonedListings,
+  pinballmapState,
+} from "~/server/db/schema";
 import { createMachineTimelineEvent } from "~/lib/timeline/machine-events";
+import { APC_LOCATION_ID } from "./config";
 import type { LocationSnapshot } from "./types";
 import type { AbandonedListing } from "./link-columns";
 
@@ -30,18 +35,31 @@ export async function recordAbandonedListing(
   abandoned: AbandonedListing,
   actorId?: string
 ): Promise<void> {
+  // Which location this entry belonged to, read from the singleton inside the
+  // caller's transaction. A local read, so CORE-ARCH-011 (external effects only)
+  // is not in play. Falls back to the APC default only if the singleton row is
+  // somehow absent, which cannot happen while PBM is configured enough to have
+  // an entry to walk away from.
+  const [state] = await tx
+    .select({ locationId: pinballmapState.locationId })
+    .from(pinballmapState)
+    .where(eq(pinballmapState.id, "singleton"));
+  const locationId = state?.locationId ?? APC_LOCATION_ID;
+
   await tx
     .insert(pinballmapAbandonedListings)
     .values({
       machineId,
       lmxId: abandoned.lmxId,
       pinballmapMachineId: abandoned.pinballmapMachineId,
+      locationId,
     })
     .onConflictDoUpdate({
       target: pinballmapAbandonedListings.lmxId,
       set: {
         machineId,
         pinballmapMachineId: abandoned.pinballmapMachineId,
+        locationId,
         createdAt: new Date(),
       },
     });

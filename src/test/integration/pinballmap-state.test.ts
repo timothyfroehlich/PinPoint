@@ -233,6 +233,7 @@ describe("a failed sync clears nothing (PP-l81u)", () => {
       machineId: machine.id,
       lmxId: 4471,
       pinballmapMachineId: 6221,
+      locationId: 26454,
     });
 
     // A stale lineup that does NOT carry lmx 4471 — exactly the shape that
