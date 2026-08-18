@@ -170,7 +170,7 @@ export function PinballmapListingControl({
           subtree from the tab order and the a11y tree in one attribute, where
           `pointer-events-none` would leave it keyboard-reachable. */}
       <div
-        className={cn("space-y-2.5", disabled && "opacity-45")}
+        className={cn("space-y-3.5", disabled && "opacity-45")}
         {...(disabled ? { inert: true } : {})}
         data-testid="pbm-listing-rows"
       >
@@ -290,8 +290,8 @@ function Header({
 }): React.JSX.Element {
   const spent = refreshRemaining <= 0;
   return (
-    <div className="mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-outline-variant pb-2">
-      <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+    <div className="mb-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+      <h3 className="text-base font-semibold">
         Pinball Map
         {locationName !== null ? (
           <>
@@ -300,10 +300,10 @@ function Header({
               href={locationUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 normal-case tracking-normal text-primary underline underline-offset-2 hover:no-underline"
+              className="inline-flex items-center gap-1 text-primary underline underline-offset-2 hover:no-underline"
             >
               {locationName}
-              <ExternalLink className="size-3" aria-hidden="true" />
+              <ExternalLink className="size-3.5" aria-hidden="true" />
             </a>
           </>
         ) : null}
@@ -367,7 +367,7 @@ function Row({
   children: React.ReactNode;
 }): React.JSX.Element {
   return (
-    <div className="flex min-h-9 flex-wrap items-center gap-3">
+    <div className="flex min-h-10 flex-wrap items-center gap-3">
       <span className="w-20 shrink-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
         {label}
       </span>
