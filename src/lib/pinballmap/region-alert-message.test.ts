@@ -178,4 +178,58 @@ describe("formatRegionAlertMessage", () => {
     // And it is still the final line, not something the trim landed mid-way through.
     expect(message ?? "").toMatch(/Data from Pinball Map \(CC BY-SA 4\.0\)\.$/);
   });
+
+  it("drops whole lines when trimming, never cutting a masked link open", () => {
+    const entries = Array.from({ length: REGION_ALERT_MAX_LINES }, (_, i) =>
+      entry({
+        machineName: `Machine ${String(i)}`,
+        locationName: "L".repeat(400),
+      })
+    );
+
+    const message =
+      formatRegionAlertMessage({
+        entries,
+        regionLabel: "Austin",
+      }) ?? "";
+
+    expect(message.length).toBeLessThanOrEqual(2000);
+    // Every bullet that survived is a COMPLETE masked link: a character-offset
+    // slice could leave `[Venue](https://pinballmap…` unterminated, which Discord
+    // renders as raw text.
+    for (const line of message
+      .split("\n")
+      .filter((l) => l.startsWith("• ") && !l.includes("…and"))) {
+      expect(line).toMatch(/\[.*\]\(https:\/\/pinballmap\.com\/[^)]*\)$/);
+    }
+    // No line ends on a dangling escape, which would escape the newline and fold
+    // the next line into it.
+    for (const line of message.split("\n")) {
+      expect(line.endsWith("\\")).toBe(false);
+    }
+  });
+
+  it("keeps the overflow count when lines are dropped for length", () => {
+    const entries = Array.from({ length: REGION_ALERT_MAX_LINES }, (_, i) =>
+      entry({
+        machineName: `Machine ${String(i)}`,
+        locationName: "L".repeat(400),
+      })
+    );
+
+    const message =
+      formatRegionAlertMessage({
+        entries,
+        regionLabel: "Austin",
+      }) ?? "";
+
+    // The rows are marked announced either way, so a machine dropped here is
+    // never mentioned again — the count is its only trace.
+    expect(message).toMatch(/…and \d+ more/);
+    const shown = message
+      .split("\n")
+      .filter((l) => l.startsWith("• ") && !l.includes("…and")).length;
+    const claimed = Number(/…and (\d+) more/.exec(message)?.[1] ?? "0");
+    expect(shown + claimed).toBe(REGION_ALERT_MAX_LINES);
+  });
 });

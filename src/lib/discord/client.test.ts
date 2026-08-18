@@ -125,14 +125,37 @@ describe("sendDm", () => {
     expect(result).toEqual({ ok: false, reason: "blocked" });
   });
 
-  it("returns reason='transient' on 403 with a non-50007 code (bot misconfig)", async () => {
-    // 50001 = Missing Access — admin can fix, not the user's fault.
+  it.each([
+    [50001, "Missing Access"],
+    [50013, "Missing Permissions"],
+  ])(
+    "returns reason='blocked' on 403 code %i (%s) — a permission fault retrying cannot fix",
+    async (code, message) => {
+      // These used to classify as `transient`, on the reasoning that an admin
+      // could fix the misconfiguration so retrying was worthwhile. That is
+      // backwards for a scheduled channel post: `transient` means the hourly
+      // PinballMap region alert warns forever and never reaches Sentry, so
+      // nobody learns there is anything to fix. See PERMANENT_403_CODES.
+      installFetchMock((call) =>
+        call.url.endsWith("/users/@me/channels")
+          ? new Response(JSON.stringify({ code, message }), { status: 403 })
+          : new Response("{}", { status: 200 })
+      );
+      const result = await sendDm({
+        botToken: "t",
+        discordUserId: "u",
+        content: "hi",
+      });
+      expect(result).toEqual({ ok: false, reason: "blocked" });
+    }
+  );
+
+  it("still returns reason='transient' on a 403 whose code is unrecognized", async () => {
     installFetchMock((call) =>
       call.url.endsWith("/users/@me/channels")
-        ? new Response(
-            JSON.stringify({ code: 50001, message: "Missing Access" }),
-            { status: 403 }
-          )
+        ? new Response(JSON.stringify({ code: 40333, message: "Odd" }), {
+            status: 403,
+          })
         : new Response("{}", { status: 200 })
     );
     const result = await sendDm({

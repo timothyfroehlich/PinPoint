@@ -171,7 +171,13 @@ function pbmErrorMessage(body: Record<string, unknown> | null): string | null {
     const joined = raw.filter((e) => typeof e === "string").join("; ");
     return joined.length > 0 ? joined : PBM_UNKNOWN_ERROR;
   }
-  // An object, a number, a bool — unrecognized, but PBM put something in an
+  // `false` is the one non-string shape that means the OPPOSITE of an error:
+  // `{"error": false, …}` is a common success idiom, and failing closed on it
+  // would turn every good response from such an endpoint into a hard read
+  // failure. `true` gets no such carve-out — that one really does signal an
+  // error, just without a message.
+  if (raw === false) return null;
+  // An object, a number, `true` — unrecognized, but PBM put something in an
   // error field and we must not read the body as data.
   return PBM_UNKNOWN_ERROR;
 }

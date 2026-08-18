@@ -519,6 +519,42 @@ describe("PinballMap region new-machine alerts (PGlite)", () => {
     expect(run.pending).toBe(120);
   });
 
+  it("re-bootstraps instead of announcing when one run discovers a huge share of the region", async () => {
+    // The flood this guards: PBM returns a TRUNCATED first payload, the region
+    // bootstraps on a handful of entries, and the next run reads the rest of the
+    // region as brand-new arrivals. Neither existing guard catches it — the
+    // payload is neither empty nor implausibly large.
+    pbm.entries = [lmx({ lmxId: 1 })];
+    await runRegionNewMachineAlerts(); // truncated bootstrap: 1 of 300
+
+    pbm.entries = Array.from({ length: 300 }, (_, i) => lmx({ lmxId: i + 1 }));
+    const run = await runRegionNewMachineAlerts();
+
+    expect(run.discovered).toBe(299);
+    expect(run.announced).toBe(0);
+    expect(run.pending).toBe(0);
+    // Nothing posted, and the seen-set self-heals: every row is now announced,
+    // so the next genuine arrival is the only thing that can be announced.
+    expect(discord.posts).toEqual([]);
+    const rows = await seenRows();
+    expect(rows).toHaveLength(300);
+    expect(rows.every((r) => r.announcedAt !== null)).toBe(true);
+  });
+
+  it("still announces a normal day's arrivals, well under the re-bootstrap ceiling", async () => {
+    // The guard must not swallow real discoveries — this is the case it would
+    // break if the threshold were set anywhere near a plausible hour.
+    await seedCatalog([{ machineId: 6412, name: "Godzilla (Premium)" }]);
+    pbm.entries = Array.from({ length: 300 }, (_, i) => lmx({ lmxId: i + 1 }));
+    await runRegionNewMachineAlerts();
+
+    pbm.entries = [...pbm.entries, lmx({ lmxId: 901 }), lmx({ lmxId: 902 })];
+    const run = await runRegionNewMachineAlerts();
+
+    expect(run).toMatchObject({ discovered: 2, announced: 2, pending: 0 });
+    expect(discord.posts).toHaveLength(1);
+  });
+
   it("makes no PBM call at all when no alert channel is configured", async () => {
     vi.stubEnv("DISCORD_PBM_ALERT_CHANNEL_ID", "");
     pbm.entries = [lmx({ lmxId: 1 })];

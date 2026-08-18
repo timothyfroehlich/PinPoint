@@ -282,6 +282,33 @@ describe("live client — a 200 carrying an error body is a FAILED read", () => 
     ).resolves.toEqual([{ lmxId: 1, locationId: 2, machineId: 3 }]);
   });
 
+  it("treats `error: false` as success — it is a success idiom, not a complaint", async () => {
+    // The fail-closed rule for unrecognized shapes has exactly one exception:
+    // `false` means the opposite of an error, and failing closed on it would
+    // turn every good response from such an endpoint into a hard read failure.
+    installFetchMock(() =>
+      json({
+        error: false,
+        location_machine_xrefs: [{ id: 1, location_id: 2, machine_id: 3 }],
+      })
+    );
+    await expect(
+      createLiveClient(null).fetchRegionLmxes("austin")
+    ).resolves.toEqual([{ lmxId: 1, locationId: 2, machineId: 3 }]);
+  });
+
+  it("still fails closed on `error: true`, which does signal a fault", async () => {
+    installFetchMock(() =>
+      json({
+        error: true,
+        location_machine_xrefs: [{ id: 1, location_id: 2, machine_id: 3 }],
+      })
+    );
+    await expect(
+      createLiveClient(null).fetchRegionLmxes("austin")
+    ).rejects.toThrow(/reported an error/);
+  });
+
   it("applies to the locations read too, not just the lmx read", async () => {
     installFetchMock(() => json({ errors: ["boom"] }));
     await expect(

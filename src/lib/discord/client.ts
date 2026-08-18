@@ -131,19 +131,38 @@ async function postMessage(
 }
 
 /**
- * Discord error code 50007: "Cannot send messages to this user". Returned
- * when the recipient has DMs disabled, blocked the bot, or doesn't share a
- * server with the bot. Other 403s (e.g., 50001 "Missing Access") indicate
- * bot misconfiguration that an admin can fix — those are transient from
- * our perspective.
+ * 403 codes that mean "retrying will not fix this" rather than "try again later".
+ *
+ * - `50007` "Cannot send messages to this user" — the recipient has DMs disabled,
+ *   blocked the bot, or shares no server with it.
+ * - `50001` "Missing Access" / `50013` "Missing Permissions" — the bot cannot see
+ *   or post in the target channel.
+ *
+ * The permission pair used to be classified `transient`, on the reasoning that an
+ * admin can fix a misconfiguration so we may as well retry. That is exactly
+ * backwards for a channel post on a schedule: `postChannelMessage` backs the
+ * hourly PinballMap region alert, where `transient` means the job warns once an
+ * hour forever, queues rows that never drain, and spends PBM requests on each
+ * attempt — while `blocked` is reported to Sentry so someone actually fixes it.
+ * Retrying does not summon the admin; surfacing the failure does.
+ *
+ * Safe for the DM path too: `dispatch.ts` treats every non-`skipped` failure the
+ * same way (one warn line), so nothing about a user's notifications changes.
  */
 const DISCORD_ERROR_CANNOT_DM_USER = 50007;
+const DISCORD_ERROR_MISSING_ACCESS = 50001;
+const DISCORD_ERROR_MISSING_PERMISSIONS = 50013;
+const PERMANENT_403_CODES: readonly number[] = [
+  DISCORD_ERROR_CANNOT_DM_USER,
+  DISCORD_ERROR_MISSING_ACCESS,
+  DISCORD_ERROR_MISSING_PERMISSIONS,
+];
 
 async function classify(res: Response): Promise<SendDmResult> {
   if (res.status === 404) return { ok: false, reason: "blocked" };
   if (res.status === 403) {
     const code = await readDiscordErrorCode(res);
-    return code === DISCORD_ERROR_CANNOT_DM_USER
+    return code !== null && PERMANENT_403_CODES.includes(code)
       ? { ok: false, reason: "blocked" }
       : { ok: false, reason: "transient" };
   }

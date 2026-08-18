@@ -121,6 +121,18 @@ const PENDING_READ_LIMIT = 500;
 const MAX_REGION_ENTRIES = 20_000;
 
 /**
+ * How many entries one non-bootstrap run may discover before it is read as a
+ * re-sync against a bad seen-set rather than as real arrivals.
+ *
+ * Austin gains 1-3 machines on a busy DAY and measured 487 total entries, so 50
+ * sits roughly 20x above any believable hour and an order of magnitude below the
+ * region. The number only has to separate "a venue added a bank of games" from
+ * "our seen-set was seeded from a truncated payload"; those differ by two orders
+ * of magnitude, so its exact value is not load-bearing.
+ */
+const REBOOTSTRAP_THRESHOLD = 50;
+
+/**
  * Minimum gap between on-demand catalog refreshes triggered by an unknown machine
  * id (see {@link resolveMachineNames}).
  *
@@ -188,6 +200,26 @@ async function countSeen(region: string): Promise<number> {
     .from(pinballmapRegionSeenMachines)
     .where(eq(pinballmapRegionSeenMachines.region, region));
   return row?.n ?? 0;
+}
+
+/**
+ * Stamp every unannounced row for a region as announced, in one statement.
+ *
+ * By predicate, not by id list: the re-bootstrap path can face the whole region,
+ * and `markAnnounced`'s `inArray` would bind one parameter per row — the same
+ * 65535-parameter ceiling `INSERT_CHUNK` exists to stay under. Here there is no
+ * need to enumerate anything.
+ */
+async function markAllPendingAnnounced(region: string): Promise<void> {
+  await db
+    .update(pinballmapRegionSeenMachines)
+    .set({ announcedAt: new Date() })
+    .where(
+      and(
+        eq(pinballmapRegionSeenMachines.region, region),
+        isNull(pinballmapRegionSeenMachines.announcedAt)
+      )
+    );
 }
 
 /** How many rows are still queued for announcement — no `PENDING_READ_LIMIT`. */
@@ -472,7 +504,6 @@ export async function runRegionNewMachineAlerts(opts?: {
     bootstrapped ? new Date() : null
   );
 
-  const pending = await readPending(region);
   const base = {
     region,
     skipped: null,
@@ -480,6 +511,43 @@ export async function runRegionNewMachineAlerts(opts?: {
     bootstrapped,
     discovered,
   } as const;
+
+  // A run that "discovers" a large fraction of the whole region did not witness
+  // an arrival — it re-synced against a seen-set that was wrong. The way there is
+  // a TRUNCATED first payload: the empty and implausibly-large guards above catch
+  // 0 and >20k, but nothing catches PBM returning a partial region (an upstream
+  // default change, a partial outage). Bootstrap on 5 of 487 entries, and the
+  // next run reads the other 482 as brand-new and posts "482 new machines" — the
+  // exact flood the bootstrap stamp exists to prevent, and a Discord post is
+  // immutable.
+  //
+  // `discovered` is the right signal because it counts rows INSERTED this run.
+  // A genuine backlog behaves differently: a long Discord outage leaves many rows
+  // PENDING while each run still discovers only the day's 1-3, so draining one is
+  // untouched by this guard.
+  //
+  // Treated as a re-bootstrap rather than an abort: the rows are stamped
+  // announced so the region self-heals to a correct seen-set on the next tick,
+  // and it is reported, because a silent re-bootstrap would hide a real upstream
+  // change.
+  if (!bootstrapped && discovered > REBOOTSTRAP_THRESHOLD) {
+    await markAllPendingAnnounced(region);
+    reportError(
+      new Error(
+        "PinballMap region alert re-bootstrapped: one run discovered an implausible share of the region"
+      ),
+      {
+        region,
+        discovered,
+        observed: observed.length,
+        threshold: REBOOTSTRAP_THRESHOLD,
+        action: "pinballmap.regionAlerts",
+      }
+    );
+    return { ...base, announced: 0, pending: 0 };
+  }
+
+  const pending = await readPending(region);
   if (pending.length === 0) {
     return { ...base, announced: 0, pending: 0 };
   }

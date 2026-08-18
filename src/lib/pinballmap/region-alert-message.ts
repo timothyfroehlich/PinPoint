@@ -96,25 +96,52 @@ export function formatRegionAlertMessage(
       : `**${String(entries.length)} new machines on Pinball Map in ${region}**`;
 
   const shown = entries.slice(0, REGION_ALERT_MAX_LINES);
-  const hidden = entries.length - shown.length;
-  const lines = shown.map(formatEntry);
-  if (hidden > 0) {
-    lines.push(
-      `• …and ${String(hidden)} more (see the map for the full picture)`
-    );
-  }
+  const entryLines = shown.map(formatEntry);
+
   // Attribution: the data is Pinball Map's, under CC BY-SA 4.0. It is a licence
   // term, not a courtesy, so it is budgeted for rather than appended and hoped
-  // for — trimming the assembled string from the end would drop THIS line first,
+  // for — trimming an assembled string from the end would drop THIS line first,
   // publishing PBM's data with the attribution cut off. Venue names are attacker-
   // adjacent free text (anyone can name a location on Pinball Map) and each line
   // already carries ~50 characters of URL scaffolding plus backslash escapes, so
   // exceeding 2000 needs no unusual luck.
   const attribution = "Data from Pinball Map (CC BY-SA 4.0).";
-  const budget = DISCORD_MAX_MESSAGE_LENGTH - attribution.length - 1;
 
-  const body = [headline, ...lines].join("\n");
-  const trimmedBody =
-    body.length > budget ? body.slice(0, budget - 1) + "…" : body;
-  return `${trimmedBody}\n${attribution}`;
+  // Drop WHOLE LINES, never characters. A character-offset slice lands wherever
+  // it lands: mid-`[venue](https://…`, publishing an unterminated masked link;
+  // or straight after a lone backslash from sanitizeDiscordText, which then
+  // escapes the following newline and folds two lines into one. Dropping a line
+  // at a time cannot produce either, and it keeps the "…and N more" count — which
+  // a from-the-end trim would remove first, leaving a headline announcing N
+  // machines with no account of the missing ones. That count is the only trace
+  // they ever get: the rows are marked announced either way, so a line lost here
+  // is lost permanently.
+  const overflowLine = (n: number): string =>
+    `• …and ${String(n)} more (see the map for the full picture)`;
+  // Reserved unconditionally, sized for the largest count it could ever carry.
+  // Adding it after the budget was spent is how a line-based trim reintroduces
+  // the overflow it exists to prevent.
+  const overflowReserve =
+    entries.length > shown.length || entryLines.length > 0
+      ? overflowLine(entries.length).length + 1
+      : 0;
+  const budget =
+    DISCORD_MAX_MESSAGE_LENGTH -
+    attribution.length -
+    headline.length -
+    2 -
+    overflowReserve;
+
+  const kept: string[] = [];
+  let used = 0;
+  for (const line of entryLines) {
+    if (used + line.length + 1 > budget) break;
+    kept.push(line);
+    used += line.length + 1;
+  }
+
+  const omitted = entries.length - kept.length;
+  if (omitted > 0) kept.push(overflowLine(omitted));
+
+  return [headline, ...kept, attribution].join("\n");
 }
