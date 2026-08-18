@@ -1,6 +1,6 @@
 ---
 name: spec-driven-development
-description: How PinPoint feature specs work — the living, requirements-only documents in docs/feature-specs/ that are the intended truth for a feature, kept in sync with code through an explicit divergence table. Carries the format (a draft/approved status line, numbered citable requirements, a Concepts section, retired-number tombstones, a changelog of amendments), the rule that a spec states the intended final state and never what the code does or used to do — build state lives only in the divergence table, which is why there are no shipped/designed tags — the lifecycle rules (the spec changes alongside any design decision; code-vs-spec disagreement always resolves by amending one, never silently neither), and the hard editing rule — a feature spec is NEVER edited without Tim approving the exact diff first, even when he says "update the spec". Use when designing or changing a feature that has a spec, when starting substantial new feature design (offer to create one), when a review or bead needs to cite a requirement, when deciding whether something belongs in a spec versus a design record or the design bible, or when Tim says "spec", "feature spec", or "spec-driven".
+description: How PinPoint feature specs work — the living, requirements-only documents in docs/feature-specs/ that are the intended truth for a feature, kept in sync with code through an explicit divergence table. Carries the format (a draft/approved status line, numbered citable requirements, a Concepts section, retired-number tombstones, a changelog of amendments), the rule that a spec states the intended final state and never what the code does or used to do — build state lives only in the divergence table, which is why there are no shipped/designed tags — the lifecycle rules (the spec changes alongside any design decision; code-vs-spec disagreement always resolves by amending one, never silently neither), and the hard editing rule — a feature spec is NEVER edited without Tim approving the exact diff first, even when he says "update the spec", with one carve-out: a PR may strike the divergence rows it resolved, while a NEW divergence always goes to Tim. Use when designing or changing a feature that has a spec, when starting substantial new feature design (offer to create one), when a review or bead needs to cite a requirement, when deciding whether something belongs in a spec versus a design record or the design bible, or when Tim says "spec", "feature spec", or "spec-driven".
 ---
 
 # Spec-Driven Development
@@ -40,6 +40,31 @@ times… I need exact diffs for changes to the spec."
 This is the one place the usual proactive-edit posture inverts. Mockups,
 beads, and scratch documents you edit freely; the spec is Tim's document
 that you maintain.
+
+### The one carve-out: striking rows your own PR resolved
+
+**A PR that builds what a divergence row describes may delete that row without
+asking.** The table is ephemeral status rather than part of the document's
+meaning (Tim, 2026-08-17), the code in the same PR is the evidence, and git
+history has the row if anyone needs it back. Do it in the PR that does the
+work, not later — a row describing shipped behaviour is the same lie as a
+missing row describing unshipped behaviour.
+
+Everything else about the table still goes through the hard rule, and one case
+matters more than the rest:
+
+- **A NEW divergence always goes to Tim**, as a row you propose rather than a
+  row you add. Most of all when your own change caused it: "I built this and it
+  made something else disagree with the spec" is a decision about scope, and
+  quietly recording it in a table converts that decision into a note.
+- **Narrowing a row is not striking it.** A row you half-resolved gets its
+  "Code today" rewritten, which is a change to what the row claims — propose
+  it.
+- **Requirement wording is untouched by this.** The carve-out is about the
+  divergence table only; §1–§9 always need the diff.
+
+An empty table is the goal state and needs no ceremony. The changelog is for
+amendments to the document, so a PR that only strikes rows logs nothing.
 
 ## What goes in a spec (and what doesn't)
 
@@ -89,9 +114,10 @@ Every spec has, in order:
    amended. A divergence that lives in the table is honest; one that
    doesn't is a lie in the spec. Rows are a todo list — one line each,
    what disagrees and where it resolves — not detailed writeups.
-   Because the table lives in the spec, adding or changing a row goes
-   through the diff-approval rule: Tim sees every divergence before it
-   is recorded. **It is the only record of build state** — there are no
+   Adding or changing a row goes through the diff-approval rule, so Tim
+   sees every divergence before it is recorded; striking a row your own PR
+   resolved does not (see the carve-out above). **It is the only record of
+   build state** — there are no
    `[shipped]`/`[designed]` tags. A second encoding of the same fact drifts
    from the first: review caught the draft pinballmap spec carrying a
    `[shipped]` section whose newest requirement described unbuilt behavior,

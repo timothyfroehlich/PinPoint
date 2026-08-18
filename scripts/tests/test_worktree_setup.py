@@ -412,7 +412,13 @@ class TestGenerateLaunchJson:
         configs = data["configurations"]
         assert isinstance(configs, list)
         names = [c["name"] for c in configs]
-        assert names == ["next-dev", "brainstorm"]
+        assert names == ["next-dev", "brainstorm", "scotty"]
+
+        # Attach-only and on a fixed port: the beads viewer is one host-global
+        # server every worktree points at, so it is deliberately not slotted.
+        scotty = next(c for c in configs if c["name"] == "scotty")
+        assert scotty["port"] == 8765
+        assert "runtimeExecutable" not in scotty
 
         brainstorm = next(c for c in configs if c["name"] == "brainstorm")
         # slot 7 → 49007
@@ -443,7 +449,9 @@ class TestGenerateLaunchJson:
         configs = data["configurations"]
         assert isinstance(configs, list)
         names = [c["name"] for c in configs]
-        assert names == ["next-dev"]
+        # Scotty is unconditional — it attaches to a host-global server rather
+        # than starting one, so there is nothing for it to depend on.
+        assert names == ["next-dev", "scotty"]
         assert all(c["name"] != "brainstorm" for c in configs)
 
 

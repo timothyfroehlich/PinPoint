@@ -53,6 +53,10 @@ export interface MachineDetailsFormProps {
   pinballmapExcluded: boolean;
   pinballmapExcludedReason: string | null;
   pinballmapTitleName: string | null;
+  /** Hand-entered model identity, present only on an excluded machine (PP-3bbr). */
+  modelName: string | null;
+  manufacturer: string | null;
+  year: number | null;
 }
 
 /**
@@ -80,6 +84,9 @@ export function MachineDetailsForm({
   pinballmapExcluded,
   pinballmapExcludedReason,
   pinballmapTitleName,
+  modelName,
+  manufacturer,
+  year,
 }: MachineDetailsFormProps): React.JSX.Element {
   const [state, formAction, isPending] = useActionState<
     UpdateMachineResult | undefined,
@@ -365,6 +372,14 @@ export function MachineDetailsForm({
             defaultName={pinballmapTitleName}
             defaultExcluded={pinballmapExcluded}
             defaultExcludedReason={pinballmapExcludedReason}
+            defaultModelName={modelName}
+            defaultManufacturer={manufacturer}
+            defaultYear={year}
+            // Seeds the Model name when the hand-entry panel opens empty. The
+            // stored name, not the live input: renaming a cabinet and marking
+            // it off-catalog in the same edit is rare enough that reading the
+            // uncontrolled input's DOM value would cost more than it buys.
+            machineName={name}
             // The picker's controls are cmdk items and a Radix Select, so none of
             // them bubble `input` — without this the section would still claim
             // "No unsaved changes" after a model change, and Cancel would discard

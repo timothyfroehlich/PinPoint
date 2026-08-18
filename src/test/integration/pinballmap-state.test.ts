@@ -115,77 +115,90 @@ describe("PinballMap shared read path (PGlite)", () => {
 });
 
 /**
- * Manual-refresh throttle at the seam (PP-hbi0).
+ * Manual-refresh token bucket at the seam (PP-hbi0, reshaped for spec 3.2).
  *
- * The throttle is the single chokepoint every live-fetch caller inherits. These
- * cases nail the three flaws the #1704 review surfaced:
- *  (a) a 2nd manual sync inside the interval is refused AND never re-hits PBM,
- *  (b) the guard is against the last ATTEMPT, so it still refuses after a FAILED
- *      attempt (no fail-open on 429/500 — the critical CORE-PBM-001 fix),
- *  (c) the cron/automated path is never blocked, even right after a manual sync.
+ * The bucket is the single chokepoint every live-fetch caller inherits. These
+ * cases nail the flaws the #1704 review surfaced, restated for the bucket:
+ *  (a) once the allowance is spent the next call is refused AND never re-hits
+ *      PBM,
+ *  (b) a token is spent on the ATTEMPT, so a FAILED attempt still costs one (no
+ *      fail-open on 429/500 — the critical CORE-PBM-001 property),
+ *  (c) the cron/automated path is never blocked and never charged.
  */
-describe("manual-refresh throttle at the seam (PP-hbi0)", () => {
+describe("manual-refresh token bucket at the seam (PP-hbi0)", () => {
   setupTestDb();
 
-  it("refuses a 2nd manual sync inside the interval without re-hitting PBM", async () => {
+  it("allows the burst, then refuses without re-hitting PBM", async () => {
     const { getMockClient } = await import("~/lib/pinballmap/client-mock");
     const { syncLocationSnapshot } = await import("~/lib/pinballmap/state");
+    const { PBM_REFRESH_BURST } = await import("~/lib/pinballmap/config");
     const fetchSpy = vi.spyOn(getMockClient(), "fetchLocation");
 
-    const first = await syncLocationSnapshot({ trigger: "manual" });
-    expect(first.ok).toBe(true);
+    for (let i = 0; i < PBM_REFRESH_BURST; i++) {
+      expect((await syncLocationSnapshot({ trigger: "manual" })).ok).toBe(true);
+    }
 
-    const second = await syncLocationSnapshot({ trigger: "manual" });
-    expect(second.ok).toBe(false);
-    if (!second.ok) {
-      expect(second.reason).toBe("throttled");
-      if (second.reason === "throttled") {
-        expect(second.retryAfterMs).toBeGreaterThan(0);
+    const spent = await syncLocationSnapshot({ trigger: "manual" });
+    expect(spent.ok).toBe(false);
+    if (!spent.ok) {
+      expect(spent.reason).toBe("throttled");
+      if (spent.reason === "throttled") {
+        expect(spent.retryAfterMs).toBeGreaterThan(0);
       }
     }
 
-    // The guard refuses BEFORE the client seam — PBM was hit exactly once.
-    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    // The guard refuses BEFORE the client seam — PBM saw the burst and no more.
+    expect(fetchSpy).toHaveBeenCalledTimes(PBM_REFRESH_BURST);
     fetchSpy.mockRestore();
   });
 
-  it("still refuses after a FAILED manual attempt (throttle on attempt, not success)", async () => {
+  it("charges a FAILED attempt too (token spent on attempt, not success)", async () => {
     const { getMockClient } = await import("~/lib/pinballmap/client-mock");
     const { syncLocationSnapshot } = await import("~/lib/pinballmap/state");
+    const { getRefreshAllowance } = await import("~/lib/pinballmap/state");
+    const { PBM_REFRESH_BURST } = await import("~/lib/pinballmap/config");
     const fetchSpy = vi
       .spyOn(getMockClient(), "fetchLocation")
       .mockRejectedValueOnce(new Error("PBM 429"));
 
-    // First manual attempt fails at the fetch — but the attempt was recorded.
+    // The attempt fails at the fetch — but the token was already claimed.
     const first = await syncLocationSnapshot({ trigger: "manual" });
     expect(first.ok).toBe(false);
     if (!first.ok) expect(first.reason).toBe("error");
 
-    // Second manual click immediately after must be throttled, NOT fail-open.
-    const second = await syncLocationSnapshot({ trigger: "manual" });
-    expect(second.ok).toBe(false);
-    if (!second.ok) expect(second.reason).toBe("throttled");
-
-    // Only the first (failed) attempt reached PBM; the throttled retry did not.
-    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    // Fail-open here would be the CORE-PBM-001 inversion: a rate-limited or
+    // erroring PinballMap would get MORE traffic, not less.
+    expect((await getRefreshAllowance()).remaining).toBe(PBM_REFRESH_BURST - 1);
     fetchSpy.mockRestore();
   });
 
-  it("never blocks the cron path, even right after a manual sync", async () => {
+  it("never blocks the cron path, and never charges it", async () => {
     const { getMockClient } = await import("~/lib/pinballmap/client-mock");
-    const { syncLocationSnapshot } = await import("~/lib/pinballmap/state");
+    const { syncLocationSnapshot, getRefreshAllowance } =
+      await import("~/lib/pinballmap/state");
+    const { PBM_REFRESH_BURST } = await import("~/lib/pinballmap/config");
     const fetchSpy = vi.spyOn(getMockClient(), "fetchLocation");
 
-    // A manual sync stamps a fresh attempt...
-    const manual = await syncLocationSnapshot({ trigger: "manual" });
-    expect(manual.ok).toBe(true);
+    // Spend the whole human allowance...
+    for (let i = 0; i < PBM_REFRESH_BURST; i++) {
+      await syncLocationSnapshot({ trigger: "manual" });
+    }
 
-    // ...and the hourly cron immediately after is still allowed to refresh.
-    const cron = await syncLocationSnapshot({ trigger: "cron" });
-    expect(cron.ok).toBe(true);
-
-    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    // ...and the hourly cron is still allowed to refresh.
+    expect((await syncLocationSnapshot({ trigger: "cron" })).ok).toBe(true);
+    expect(fetchSpy).toHaveBeenCalledTimes(PBM_REFRESH_BURST + 1);
     fetchSpy.mockRestore();
+  });
+
+  it("does not spend a token on the cron path", async () => {
+    // Charging the hourly refresh to the human allowance would let the cron
+    // lock people out of their own button.
+    const { syncLocationSnapshot, getRefreshAllowance } =
+      await import("~/lib/pinballmap/state");
+    const { PBM_REFRESH_BURST } = await import("~/lib/pinballmap/config");
+
+    await syncLocationSnapshot({ trigger: "cron" });
+    expect((await getRefreshAllowance()).remaining).toBe(PBM_REFRESH_BURST);
   });
 });
 

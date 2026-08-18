@@ -59,18 +59,33 @@ export function formatMachineEvent(
       return `Settings set "${event.setName}" removed`;
     case "settings_set_preferred":
       return `Marked "${event.setName}" as the preferred settings set`;
+    // "Lineup" is Pinball Map's own word for the set of machines at a location,
+    // and "listing" never appears in user-facing copy (spec 4.8).
+    case "pinballmap_intent":
+      switch (event.intent) {
+        case "on":
+          return "Set to be on the Pinball Map lineup";
+        case "off":
+          return "Set to be off the Pinball Map lineup";
+        case "no_sync":
+          return "Set to not sync with Pinball Map";
+      }
+    // eslint-disable-next-line no-fallthrough -- every arm above returns
     case "pinballmap_listing":
       switch (event.action) {
         case "listed":
-          return "Listed on PinballMap";
+          return "Added to the Pinball Map lineup";
         case "unlisted":
-          return "Unlisted from PinballMap";
-        case "linked":
-          return "Linked to PinballMap entry";
-        case "reconnected":
-          return "Reconnected PinballMap link";
+          return "Removed from the Pinball Map lineup";
         case "abandoned":
-          return "Left an entry live on PinballMap";
+          return "Left an entry on the Pinball Map lineup";
+        // Retired actions (PP-o355.21), rendered only for historical rows.
+        case "linked":
+          return "Linked to a Pinball Map entry";
+        case "reconnected":
+          return "Reconnected a Pinball Map entry";
+        case "accepted_removal":
+          return "Accepted that Pinball Map no longer carries this machine";
       }
   }
 }

@@ -423,26 +423,35 @@ describe("Specific permission rules from design", () => {
       expect(getPermission("machines.pinballmap.link", "admin")).toBe(true);
     });
 
-    it("should restrict pushing listing changes to PinballMap to admins", () => {
-      // Writes go through the shared operator token, so unlike read-only
-      // linking (owner/tech/admin) this is admin-only in v1 (PP-o355.12).
+    it("should allow machine owners, technicians and admins to push to Pinball Map", () => {
+      // Widened from admin-only in PP-o355.21 (spec 8.2). Pinball Map is
+      // publicly editable by anyone with an account, so gating our writes
+      // tighter than our own bookkeeping (`machines.pinballmap.link`, the same
+      // tier) bought nothing — it just meant an owner who could set the intent
+      // had to find an admin to carry it out.
       expect(getPermission("machines.pinballmap.push", "unauthenticated")).toBe(
         false
       );
       expect(getPermission("machines.pinballmap.push", "guest")).toBe(false);
-      expect(getPermission("machines.pinballmap.push", "member")).toBe(false);
+      // "owner" — a member holds it on their own machines only, which is what
+      // makes it the same grant as `link` rather than a wider one.
+      expect(getPermission("machines.pinballmap.push", "member")).toBe("owner");
       expect(getPermission("machines.pinballmap.push", "technician")).toBe(
-        false
+        true
       );
       expect(getPermission("machines.pinballmap.push", "admin")).toBe(true);
     });
 
-    it("should restrict PinballMap sync to technicians and admins", () => {
+    it("should let any member refresh the Pinball Map lineup", () => {
+      // Spec 8.3: reading needs only page access. Safe to widen because the
+      // rate limit is global rather than per-caller (spec 3.2), so a bigger
+      // audience does not enlarge anyone's allowance — the only thing the old
+      // technician gate protected was the button.
       expect(getPermission("machines.pinballmap.sync", "unauthenticated")).toBe(
         false
       );
       expect(getPermission("machines.pinballmap.sync", "guest")).toBe(false);
-      expect(getPermission("machines.pinballmap.sync", "member")).toBe(false);
+      expect(getPermission("machines.pinballmap.sync", "member")).toBe(true);
       expect(getPermission("machines.pinballmap.sync", "technician")).toBe(
         true
       );

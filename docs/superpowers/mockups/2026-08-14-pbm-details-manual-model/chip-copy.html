@@ -1,0 +1,128 @@
+<style>
+  :root {
+    --bg-primary:#1d1d1f; --bg-secondary:#2d2d2f; --bg-tertiary:#3d3d3f;
+    --border:#424245; --text-primary:#f5f5f7; --text-secondary:#98989d;
+    --text-tertiary:#636366; --accent:#0a84ff; --accent-hover:#409cff;
+    --selected-bg:rgba(10,132,255,.15); --selected-border:#0a84ff;
+    --warning:#ff9f0a; --error:#ff453a; --success:#32d74b;
+  }
+  .brand-logo { filter:none !important; }
+
+  .rail { width:320px; }
+  .ppcard { border-radius:12px; border:1px solid #3a3a3d; background:#252527; padding:16px; }
+  .pplabel { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.1em; color:#98989d; margin-bottom:12px; }
+  .ppdesc { font-size:14px; color:#98989d; line-height:1.5; }
+  .ppdiv { margin-top:16px; padding-top:16px; border-top:1px solid #3a3a3d; }
+  .pprow { font-size:14px; display:flex; gap:8px; align-items:baseline; flex-wrap:wrap; }
+  .pprow .k { font-weight:600; color:#98989d; flex:0 0 auto; }
+  .pprow .v { color:#f5f5f7; }
+  .link { color:var(--accent); }
+  .dim { color:#98989d; }
+  .chip { color:var(--warning); font-size:13px; display:inline-flex; align-items:center; gap:4px; flex:0 0 auto; margin-left:auto; white-space:nowrap; }
+  .ppowner { font-size:14px; } .ppowner .k { font-weight:600; color:#98989d; } .ppowner .v { font-weight:600; color:var(--accent); }
+  .ppadded { margin-top:4px; font-size:11px; color:#98989d; }
+
+  .lane { display:grid; grid-template-columns:repeat(auto-fill,320px); gap:16px; }
+  .cap { font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:#98989d; font-weight:600; margin:0 0 6px; }
+  .fits { color:var(--success); font-size:11.5px; }
+  .wraps { color:var(--error); font-size:11.5px; }
+  .note { border-left:3px solid var(--warning); background:rgba(255,159,10,.08); padding:11px 13px; border-radius:0 8px 8px 0; margin:14px 0; font-size:13.5px; line-height:1.6; }
+  table.copy { width:100%; border-collapse:collapse; font-size:13.5px; margin-top:10px; }
+  table.copy th, table.copy td { text-align:left; padding:7px 10px; border-bottom:1px solid #3a3a3d; vertical-align:top; }
+  table.copy th { font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:#98989d; }
+  table.copy td.w { color:#98989d; }
+</style>
+
+<h2>Shorter than “Configuration issue”</h2>
+<p class="subtitle">Shape B, no label. Listed reads <em>View on Pinball Map</em>; unlisted reads <em>Not listed on Pinball Map</em>. The chip only exists for member and above. Rendered at the true 320&nbsp;px so you can see what actually fits on one line.</p>
+
+<div class="lane">
+
+  <div>
+    <p class="cap">“Configuration issue” <span class="wraps">— wraps</span></p>
+    <div class="rail"><div class="ppcard">
+      <div class="pplabel">Details</div><div class="ppdesc">Ramps rebuilt Jan 2026.</div>
+      <div class="ppdiv">
+        <div class="pprow"><span class="k">Model</span><span class="v">Godzilla (Premium)</span></div>
+        <div class="pprow" style="margin-top:4px"><span class="v link">Not listed on Pinball Map ↗</span><span class="chip">⚠ Configuration issue</span></div>
+      </div>
+      <div class="ppdiv"><div class="ppowner"><span class="k">Owner</span> <span class="v">Tim F.</span></div><div class="ppadded">Added Mar 4, 2025</div></div>
+    </div></div>
+  </div>
+
+  <div>
+    <p class="cap">“Needs cleanup” <span class="fits">— fits</span></p>
+    <div class="rail"><div class="ppcard">
+      <div class="pplabel">Details</div><div class="ppdesc">Ramps rebuilt Jan 2026.</div>
+      <div class="ppdiv">
+        <div class="pprow"><span class="k">Model</span><span class="v">Godzilla (Premium)</span></div>
+        <div class="pprow" style="margin-top:4px"><span class="v link">Not listed on Pinball Map ↗</span><span class="chip">⚠ Needs cleanup</span></div>
+      </div>
+      <div class="ppdiv"><div class="ppowner"><span class="k">Owner</span> <span class="v">Tim F.</span></div><div class="ppadded">Added Mar 4, 2025</div></div>
+    </div></div>
+  </div>
+
+  <div>
+    <p class="cap">“Old listing” <span class="fits">— fits</span></p>
+    <div class="rail"><div class="ppcard">
+      <div class="pplabel">Details</div><div class="ppdesc">Ramps rebuilt Jan 2026.</div>
+      <div class="ppdiv">
+        <div class="pprow"><span class="k">Model</span><span class="v">Godzilla (Premium)</span></div>
+        <div class="pprow" style="margin-top:4px"><span class="v link">Not listed on Pinball Map ↗</span><span class="chip">⚠ Old listing</span></div>
+      </div>
+      <div class="ppdiv"><div class="ppowner"><span class="k">Owner</span> <span class="v">Tim F.</span></div><div class="ppadded">Added Mar 4, 2025</div></div>
+    </div></div>
+  </div>
+
+  <div>
+    <p class="cap">“Needs attention” <span class="wraps">— borderline</span></p>
+    <div class="rail"><div class="ppcard">
+      <div class="pplabel">Details</div><div class="ppdesc">Ramps rebuilt Jan 2026.</div>
+      <div class="ppdiv">
+        <div class="pprow"><span class="k">Model</span><span class="v">Godzilla (Premium)</span></div>
+        <div class="pprow" style="margin-top:4px"><span class="v link">Not listed on Pinball Map ↗</span><span class="chip">⚠ Needs attention</span></div>
+      </div>
+      <div class="ppdiv"><div class="ppowner"><span class="k">Owner</span> <span class="v">Tim F.</span></div><div class="ppadded">Added Mar 4, 2025</div></div>
+    </div></div>
+  </div>
+
+  <div>
+    <p class="cap">“Resolve” <span class="fits">— fits easily</span></p>
+    <div class="rail"><div class="ppcard">
+      <div class="pplabel">Details</div><div class="ppdesc">Ramps rebuilt Jan 2026.</div>
+      <div class="ppdiv">
+        <div class="pprow"><span class="k">Model</span><span class="v">Godzilla (Premium)</span></div>
+        <div class="pprow" style="margin-top:4px"><span class="v link">Not listed on Pinball Map ↗</span><span class="chip">⚠ Resolve</span></div>
+      </div>
+      <div class="ppdiv"><div class="ppowner"><span class="k">Owner</span> <span class="v">Tim F.</span></div><div class="ppadded">Added Mar 4, 2025</div></div>
+    </div></div>
+  </div>
+
+  <div>
+    <p class="cap">icon only, label in the tooltip <span class="fits">— always fits</span></p>
+    <div class="rail"><div class="ppcard">
+      <div class="pplabel">Details</div><div class="ppdesc">Ramps rebuilt Jan 2026.</div>
+      <div class="ppdiv">
+        <div class="pprow"><span class="k">Model</span><span class="v">Godzilla (Premium)</span></div>
+        <div class="pprow" style="margin-top:4px"><span class="v link">Not listed on Pinball Map ↗</span><span class="chip" style="font-size:15px">⚠</span></div>
+      </div>
+      <div class="ppdiv"><div class="ppowner"><span class="k">Owner</span> <span class="v">Tim F.</span></div><div class="ppadded">Added Mar 4, 2025</div></div>
+    </div></div>
+    <p style="font-size:11.5px;color:#98989d;margin-top:6px">Rejected: a bare icon with meaning only in a tooltip fails CORE-A11Y-005 (title is not a tooltip) and is invisible on touch.</p>
+  </div>
+
+</div>
+
+<h3 style="margin-top:26px">What each one actually says</h3>
+<table class="copy">
+  <tr><th>Text</th><th>Reads as</th><th>Against it</th></tr>
+  <tr><td><strong>Needs cleanup</strong></td><td>A chore someone should do. Names the task, not a fault.</td><td class="w">“Cleanup” is mildly ops-flavoured.</td></tr>
+  <tr><td><strong>Old listing</strong></td><td>Names the thing rather than the task — closest to the Manage-tab row, which says “Previous listing”.</td><td class="w">Doesn’t say anything is expected of you.</td></tr>
+  <tr><td><strong>Resolve</strong></td><td>A verb; obviously clickable.</td><td class="w">Resolve <em>what</em>? Carries no information until you click.</td></tr>
+  <tr><td><strong>Needs attention</strong></td><td>Neutral, standard admin vocabulary.</td><td class="w">Vaguest of the set, and the longest that still nearly fits.</td></tr>
+  <tr><td><strong>Configuration issue</strong></td><td>Something is set up wrong.</td><td class="w">Wraps at 320&nbsp;px, and “issue” collides with PinPoint’s own noun for a machine fault.</td></tr>
+</table>
+
+<p style="font-size:13.5px;margin-top:14px"><strong>My pick: “Needs cleanup.”</strong> It fits, it names a task rather than a fault, and it doesn’t reuse “issue”, which already means a broken machine everywhere else in this app.</p>
+
+<div class="note"><strong>One consequence of dropping the label.</strong> With no “Pinball Map” key, the unlisted row has to carry the location link itself — hence <em>Not listed on Pinball Map ↗</em> as a link. That is the attribution anchor for the whole card, so it can’t be plain text.</div>

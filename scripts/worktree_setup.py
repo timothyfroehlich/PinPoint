@@ -616,6 +616,16 @@ def generate_launch_json(worktree_path: Path, port_config: PortConfig) -> None:
             }
         )
 
+    # Bead Me Up Scotty — host-global beads viewer, attach-only (no command:
+    # the server is started outside the worktree). Port is fixed, not slotted.
+    configurations.append(
+        {
+            "name": "scotty",
+            "url": "http://localhost:8765/p/pinpoint",
+            "port": 8765,
+        }
+    )
+
     content = json.dumps(
         {
             "version": "0.0.1",

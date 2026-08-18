@@ -1,7 +1,8 @@
 #!/usr/bin/env tsx
 /**
  * Ensures test schema is up-to-date with src/server/db/schema.ts
- * Regenerates only if schema.ts is newer than schema.sql
+ * Regenerates when schema.ts's content hash differs from the one that produced
+ * the current schema.sql (see schemaNeedsRegeneration for why not mtime)
  *
  * Concurrency safety:
  * - Writes to a temp file in the SAME directory as schema.sql, then renames
@@ -15,18 +16,18 @@
  *   proceeding to tests while the lock holder may still be exporting.
  */
 import {
-  statSync,
   existsSync,
   openSync,
   closeSync,
   writeFileSync,
   renameSync,
   unlinkSync,
+  readFileSync,
 } from "node:fs";
 import { execSync } from "node:child_process";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { randomBytes } from "node:crypto";
+import { randomBytes, createHash } from "node:crypto";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -36,27 +37,14 @@ const SCHEMA_TS = resolve(ROOT, "src/server/db/schema.ts");
 const SCHEMA_DIR = resolve(ROOT, "src/test/setup");
 const SCHEMA_SQL = resolve(SCHEMA_DIR, "schema.sql");
 const LOCK_FILE = resolve(SCHEMA_DIR, ".schema.lock");
+// Sidecar recording which schema.ts produced the current schema.sql. Gitignored
+// alongside it — it is a derived artifact, not a source of truth to review.
+const SCHEMA_HASH = resolve(SCHEMA_DIR, ".schema.hash");
 
 // How long a lock loser waits for the holder to finish regenerating before
 // giving up. drizzle-kit export takes a few seconds; 60s is a generous cap.
 const LOCK_WAIT_TIMEOUT_MS = 60_000;
 const LOCK_POLL_INTERVAL_MS = 250;
-
-function getModifiedTime(path: string): number {
-  try {
-    return statSync(path).mtimeMs;
-  } catch (error: unknown) {
-    if (
-      error &&
-      typeof error === "object" &&
-      "code" in error &&
-      error.code === "ENOENT"
-    ) {
-      return 0;
-    }
-    throw error;
-  }
-}
 
 /**
  * Block the current thread for `ms` milliseconds without spawning a child
@@ -123,7 +111,7 @@ function waitForLockToClear(): boolean {
  * 2. Write output to a uniquely-named temp file in the schema directory.
  * 3. Rename the temp file over schema.sql (atomic, same filesystem).
  */
-function regenerateSchemaAtomic(): void {
+function regenerateSchemaAtomic(hash: string): void {
   const suffix = randomBytes(6).toString("hex");
   const tmpFile = resolve(SCHEMA_DIR, `.schema.${suffix}.sql.tmp`);
 
@@ -134,6 +122,10 @@ function regenerateSchemaAtomic(): void {
     );
     writeFileSync(tmpFile, sql);
     renameSync(tmpFile, SCHEMA_SQL);
+    // AFTER the rename, so a crash between the two leaves no sidecar and the
+    // next run regenerates. The reverse order could record a hash for a
+    // schema.sql that was never written.
+    writeFileSync(SCHEMA_HASH, hash);
   } catch (error) {
     // Clean up temp file on failure
     try {
@@ -145,18 +137,63 @@ function regenerateSchemaAtomic(): void {
   }
 }
 
-/** Whether schema.sql is missing or older than schema.ts. */
-function schemaNeedsRegeneration(schemaTsTime: number): boolean {
+/**
+ * Whether schema.sql is missing, or was generated from a different schema.ts.
+ *
+ * Content hash, not mtime. The mtime version had a failure mode that produced
+ * a confident wrong answer on any machine that receives `schema.ts` over rsync:
+ *
+ *   - `src/test/setup/schema.sql` is gitignored, so it is never synced. The
+ *     remote runner keeps whatever it generated on its last run.
+ *   - rsync PRESERVES mtimes, so `schema.ts` arrives stamped with the time it
+ *     was edited on the laptop — which is EARLIER than the runner's last suite.
+ *   - `schemaTsTime > mtime(schema.sql)` is therefore false, and the check
+ *     prints "✓ Test schema up-to-date" over a schema.sql that predates the
+ *     column you just added.
+ *
+ * The symptom is `column "model_name" of relation "machines" does not exist`
+ * from PGlite, hundreds of tests in, on a branch whose migration is obviously
+ * present — and it survives a `git pull` on the runner, because the stale file
+ * is not in git. Twice in one session on PP-o355.21 before the cause was found;
+ * the crabbox skill's "reset the runner when you touch migrations" advice is a
+ * workaround for exactly this.
+ *
+ * A hash of `schema.ts` written beside `schema.sql` cannot drift the same way:
+ * it is derived from content, so it does not care what any clock says.
+ * CI is unaffected either way — a fresh clone has no schema.sql, so it always
+ * regenerated.
+ */
+function schemaTsHash(): string {
+  try {
+    return createHash("sha256").update(readFileSync(SCHEMA_TS)).digest("hex");
+  } catch {
+    // Unreadable schema.ts is not this script's error to report — fall through
+    // to regeneration, where drizzle-kit will fail with a real message.
+    return "";
+  }
+}
+
+function recordedHash(): string | null {
+  try {
+    return readFileSync(SCHEMA_HASH, "utf8").trim();
+  } catch {
+    return null;
+  }
+}
+
+function schemaNeedsRegeneration(hash: string): boolean {
   if (!existsSync(SCHEMA_SQL)) {
     return true;
   }
-  return schemaTsTime > getModifiedTime(SCHEMA_SQL);
+  // No sidecar means the file predates this check. Regenerate once to
+  // establish it rather than trusting an unverifiable schema.sql.
+  return recordedHash() !== hash;
 }
 
 function main(): void {
-  const schemaTsTime = getModifiedTime(SCHEMA_TS);
+  const hash = schemaTsHash();
 
-  if (!schemaNeedsRegeneration(schemaTsTime)) {
+  if (!schemaNeedsRegeneration(hash)) {
     console.log("✓ Test schema up-to-date");
     return;
   }
@@ -169,7 +206,7 @@ function main(): void {
     // racing ahead to Vitest with a missing/stale schema.sql.
     console.log("… Test schema regeneration in progress elsewhere, waiting…");
     const cleared = waitForLockToClear();
-    if (cleared && !schemaNeedsRegeneration(schemaTsTime)) {
+    if (cleared && !schemaNeedsRegeneration(hash)) {
       console.log("✓ Test schema up-to-date (regenerated by another process)");
       return;
     }
@@ -186,7 +223,7 @@ function main(): void {
 
   try {
     // Re-check inside the lock — another process may have just finished.
-    if (!schemaNeedsRegeneration(schemaTsTime)) {
+    if (!schemaNeedsRegeneration(hash)) {
       console.log("✓ Test schema up-to-date (regenerated by another process)");
       return;
     }
@@ -197,7 +234,7 @@ function main(): void {
       console.log("⚠️  Test schema stale, regenerating...");
     }
 
-    regenerateSchemaAtomic();
+    regenerateSchemaAtomic(hash);
     console.log("✅ Test schema updated");
   } catch (error) {
     console.error("❌ Failed to ensure test schema:");

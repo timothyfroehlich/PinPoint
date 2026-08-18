@@ -1,0 +1,83 @@
+<style>
+  :root {
+    --bg-primary:#1d1d1f; --bg-secondary:#2d2d2f; --bg-tertiary:#3d3d3f;
+    --border:#424245; --text-primary:#f5f5f7; --text-secondary:#98989d;
+    --text-tertiary:#636366; --accent:#0a84ff; --accent-hover:#409cff;
+    --selected-bg:rgba(10,132,255,.15); --selected-border:#0a84ff;
+    --warning:#ff9f0a; --error:#ff453a; --success:#32d74b;
+  }
+  .brand-logo { filter:none !important; }
+  .rail { width:320px; }
+  .ppcard { border-radius:12px; border:1px solid #3a3a3d; background:#252527; padding:16px; }
+  .pplabel { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.1em; color:#98989d; margin-bottom:12px; }
+  .ppdesc { font-size:14px; color:#98989d; line-height:1.5; }
+  .ppdiv { margin-top:16px; padding-top:16px; border-top:1px solid #3a3a3d; }
+  .pprow { font-size:14px; display:flex; gap:8px; align-items:baseline; flex-wrap:wrap; }
+  .pprow .k { font-weight:600; color:#98989d; flex:0 0 auto; }
+  .pprow .v { color:#f5f5f7; }
+  .link { color:var(--accent); }
+  .chip { color:var(--warning); font-size:13px; display:inline-flex; align-items:center; gap:4px; flex:0 0 auto; margin-left:auto; white-space:nowrap; }
+  .ppowner { font-size:14px; } .ppowner .k { font-weight:600; color:#98989d; } .ppowner .v { font-weight:600; color:var(--accent); }
+  .ppadded { margin-top:4px; font-size:11px; color:#98989d; }
+  .lane { display:grid; grid-template-columns:repeat(auto-fill,320px); gap:16px; }
+  .cap { font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:#98989d; font-weight:600; margin:0 0 6px; }
+  .fits { color:var(--success); font-size:11.5px; }
+  .wraps { color:var(--error); font-size:11.5px; }
+  .note { border-left:3px solid var(--warning); background:rgba(255,159,10,.08); padding:11px 13px; border-radius:0 8px 8px 0; margin:16px 0; font-size:13.5px; line-height:1.6; }
+  .ok { border-left:3px solid var(--success); background:rgba(50,215,75,.08); padding:11px 13px; border-radius:0 8px 8px 0; margin:16px 0; font-size:13.5px; line-height:1.6; }
+  .issuecard { border:1px solid #3a3a3d; border-radius:10px; padding:12px 14px; background:#252527; font-size:13.5px; }
+  .sev { display:inline-block; border:1px solid #7f1d1d; color:#ff7b72; border-radius:4px; padding:0 6px; font-size:11px; }
+</style>
+
+<h2>“Config issue” — it fits, and I’d still argue against it</h2>
+
+<div class="lane">
+  <div>
+    <p class="cap">“Config issue” <span class="fits">— fits</span></p>
+    <div class="rail"><div class="ppcard">
+      <div class="pplabel">Details</div><div class="ppdesc">Ramps rebuilt Jan 2026.</div>
+      <div class="ppdiv">
+        <div class="pprow"><span class="k">Model</span><span class="v">Godzilla (Premium)</span></div>
+        <div class="pprow" style="margin-top:4px"><span class="v link">Not listed on Pinball Map ↗</span><span class="chip">⚠ Config issue</span></div>
+      </div>
+      <div class="ppdiv"><div class="ppowner"><span class="k">Owner</span> <span class="v">Tim F.</span></div><div class="ppadded">Added Mar 4, 2025</div></div>
+    </div></div>
+  </div>
+  <div>
+    <p class="cap">“Needs cleanup” <span class="fits">— fits</span></p>
+    <div class="rail"><div class="ppcard">
+      <div class="pplabel">Details</div><div class="ppdesc">Ramps rebuilt Jan 2026.</div>
+      <div class="ppdiv">
+        <div class="pprow"><span class="k">Model</span><span class="v">Godzilla (Premium)</span></div>
+        <div class="pprow" style="margin-top:4px"><span class="v link">Not listed on Pinball Map ↗</span><span class="chip">⚠ Needs cleanup</span></div>
+      </div>
+      <div class="ppdiv"><div class="ppowner"><span class="k">Owner</span> <span class="v">Tim F.</span></div><div class="ppadded">Added Mar 4, 2025</div></div>
+    </div></div>
+  </div>
+  <div>
+    <p class="cap">“Old listing” <span class="fits">— fits</span></p>
+    <div class="rail"><div class="ppcard">
+      <div class="pplabel">Details</div><div class="ppdesc">Ramps rebuilt Jan 2026.</div>
+      <div class="ppdiv">
+        <div class="pprow"><span class="k">Model</span><span class="v">Godzilla (Premium)</span></div>
+        <div class="pprow" style="margin-top:4px"><span class="v link">Not listed on Pinball Map ↗</span><span class="chip">⚠ Old listing</span></div>
+      </div>
+      <div class="ppdiv"><div class="ppowner"><span class="k">Owner</span> <span class="v">Tim F.</span></div><div class="ppadded">Added Mar 4, 2025</div></div>
+    </div></div>
+  </div>
+</div>
+
+<div class="note"><strong>The word “issue” is taken.</strong> It is PinPoint’s core noun for a machine fault — this same machine page has an Issues tab, an issue list, issue severities, “Report an issue”. A warning chip on that page reading <em>Config issue</em> is a second, unrelated meaning of the word a few hundred pixels from the first. Someone scanning the page for what is wrong with the game finds a thing labelled “issue” that is not one.</div>
+
+<p style="font-size:13.5px;margin:6px 0 8px">For scale, this is the neighbourhood the word already lives in on the same machine:</p>
+<div class="issuecard">
+  <div style="font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#98989d;font-weight:600;margin-bottom:8px">Issues · 2 open</div>
+  <div style="padding:5px 0;border-bottom:1px solid #3a3a3d">#14 · Left orbit switch intermittent &nbsp;<span class="sev">major</span></div>
+  <div style="padding:5px 0">#11 · Backglass lamp flickering &nbsp;<span class="sev">minor</span></div>
+</div>
+
+<div class="ok"><strong>If you want the “something is set up wrong” framing</strong> rather than the “here is a chore” framing, <em>Setup issue</em> and <em>Needs fixing</em> both carry it without the collision — but <em>Needs cleanup</em> still says the true thing most plainly: nothing is misconfigured, there is simply a leftover entry on a public map that someone should take down.</div>
+
+<p style="font-size:13.5px"><strong>Also:</strong> “Config” is developer vocabulary. This chip is shown to every member, and APC members are pinball people, not sysadmins — “config” abbreviates a word that was already jargon.</p>
+
+<p style="font-size:13.5px;color:#98989d">Your call — it is copy, and copy is yours. Say the word and “Config issue” goes in.</p>
