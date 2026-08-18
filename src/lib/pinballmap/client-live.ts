@@ -147,12 +147,37 @@ async function readBody(
 /**
  * PBM puts logical-failure text in `errors` (HTTP 200) or `error` (the disabled
  * account 401). Returns that message, or null when the response is a success.
+ *
+ * **The TYPE of `errors` varies, and both shapes are live.** Real captures return
+ * a bare string (`{"errors":"Failed to find machine"}`), while PBM's own request
+ * specs build it as an array. We cannot control which one a given endpoint or a
+ * future version sends, so this treats ANY present, non-empty `errors`/`error` as
+ * an error regardless of type rather than pattern-matching one shape.
+ *
+ * That matters more than it looks. This function is the ONLY thing standing
+ * between a 200-with-an-error-body and the caller treating it as data: a shape
+ * this missed used to fall through to the parser, yield zero entries, and land in
+ * the region job as an "empty payload" — a failed read wearing a successful run's
+ * clothes. Unknown shapes therefore fail CLOSED with a generic message.
  */
 function pbmErrorMessage(body: Record<string, unknown> | null): string | null {
   if (!body) return null;
   const raw = body["errors"] ?? body["error"];
-  return typeof raw === "string" && raw.length > 0 ? raw : null;
+  if (raw === null || raw === undefined) return null;
+  if (typeof raw === "string") return raw.length > 0 ? raw : null;
+  if (Array.isArray(raw)) {
+    // An empty array carries no complaint; treat it as success.
+    if (raw.length === 0) return null;
+    const joined = raw.filter((e) => typeof e === "string").join("; ");
+    return joined.length > 0 ? joined : PBM_UNKNOWN_ERROR;
+  }
+  // An object, a number, a bool — unrecognized, but PBM put something in an
+  // error field and we must not read the body as data.
+  return PBM_UNKNOWN_ERROR;
 }
+
+/** Stand-in when PBM signals an error in a shape we cannot render. */
+const PBM_UNKNOWN_ERROR = "PinballMap reported an error";
 
 /** Map a PBM error message (+status) to a write-failure reason. */
 function writeReasonFor(status: number, message: string): WriteReason {
@@ -293,8 +318,8 @@ export function createLiveClient(apiToken: string | null): PinballMapClient {
       assertNotInTransaction("pinballmap.fetchRegionLmxes");
       // ONE bulk request for the whole region — the documented replacement for
       // looping over individual LMXes (vendored llms.txt §"Request Volume
-      // Anti-Patterns"; this endpoint's own limit is 120/min, and we spend one
-      // call a day). Unpaginated: this returns every non-deleted xref in the
+      // Anti-Patterns"; this endpoint's own limit is 120/min, and the region job
+      // spends one call an hour). Unpaginated: this returns every non-deleted xref in the
       // region. PBM also accepts `?limit=N`, which combined with their `id desc`
       // ordering yields the N most recent — deliberately NOT used, because a cap
       // would silently drop entries out of a diff that must see all of them.

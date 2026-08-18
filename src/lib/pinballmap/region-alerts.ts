@@ -5,7 +5,11 @@ import { pinballmapRegionSeenMachines } from "~/server/db/schema";
 import { postChannelMessage } from "~/lib/discord/client";
 import { getDiscordConfig } from "~/lib/discord/config";
 import { log } from "~/lib/logger";
-import { getCatalogNames } from "./catalog";
+import {
+  getCatalogLastRefreshedAt,
+  getCatalogNames,
+  refreshCatalog,
+} from "./catalog";
 import { getPinballMapClient } from "./client";
 import { PBM_AUSTIN_REGION, normalizeRegion } from "./config";
 import { formatRegionAlertMessage } from "./region-alert-message";
@@ -21,8 +25,9 @@ import type { PbmRegionLmx } from "./types";
  * Shape of a run:
  *  1. ONE bulk region read through the client seam
  *     (`GET /region/austin/location_machine_xrefs.json`). Never a per-location or
- *     per-machine loop — that is the anti-pattern PBM's llms.txt calls out, and
- *     one call a day sits far inside CORE-PBM-001's budget.
+ *     per-machine loop — that is the anti-pattern PBM's llms.txt calls out. At
+ *     hourly cadence that is ~24 requests a day, or ~48 on a day with news,
+ *     against an endpoint permitting 120 per MINUTE: far inside CORE-PBM-001.
  *  2. Insert every observed entry with ON CONFLICT DO NOTHING. The rows that
  *     actually insert are, by definition, the machines we had not seen before, so
  *     the diff is one statement and cannot drift from the stored set.
@@ -41,8 +46,10 @@ import type { PbmRegionLmx } from "./types";
  *   Discord accepted the message. A crash between the post and the mark
  *   re-announces once on the next run — a duplicate message is a far better
  *   failure than silently swallowing a discovery.
- * - **A quiet day costs one request.** The second (locations) call only happens
- *   when there is actually something to name.
+ * - **A quiet hour costs one request.** The second (locations) call only happens
+ *   when there is actually something to name — and since the region gains 1-3
+ *   machines on a typical DAY, the overwhelming majority of hourly runs stop
+ *   after the first call and announce nothing.
  * - **Distinct from the location sync** (PP-o355.11), which reads our own
  *   location's lineup for the listing control. This is region-wide discovery and
  *   touches none of that state.
@@ -110,6 +117,24 @@ const PENDING_READ_LIMIT = 500;
  * mistaken for one, and an unscoped PBM query returns hundreds of thousands.
  */
 const MAX_REGION_ENTRIES = 20_000;
+
+/**
+ * Minimum gap between on-demand catalog refreshes triggered by an unknown machine
+ * id (see {@link resolveMachineNames}).
+ *
+ * Six hours, chosen against the two failure shapes rather than picked round. The
+ * ceiling: an id PBM has not catalogued either stays missing forever, so this
+ * bounds the worst case at four extra `machines.json` fetches a day instead of one
+ * every hour. The floor: the whole point is naming a title that appeared since the
+ * weekly cron, so the window has to be far shorter than a week — six hours means a
+ * new release is named within a quarter-day of PBM listing it, against the up-to-7
+ * days it would otherwise wait.
+ *
+ * An hour would be too tight: it matches the alert cadence exactly, so a single
+ * permanently-unknown id would authorize a full catalog fetch on literally every
+ * run — the hourly-fetch outcome this guard exists to prevent.
+ */
+const CATALOG_REFRESH_COOLDOWN_MS = 6 * 60 * 60 * 1000;
 
 /** What a run did, for the cron route's log line and response body. */
 export interface RegionAlertRun {
@@ -239,6 +264,83 @@ async function markAnnounced(region: string, lmxIds: number[]): Promise<void> {
 }
 
 /**
+ * Machine titles for the ids being announced, refreshing the catalog mirror once
+ * if any of them is unknown to it.
+ *
+ * **Why a refresh at all.** Austin is close enough to several manufacturers that a
+ * surprise-announced game can be revealed and on a floor in the same week — Stern's
+ * Bon Jovi did exactly that. The mirror refreshes weekly, so a brand-new title can
+ * be missing from it for days, and a Discord post is immutable: without this, the
+ * one machine people most want named is announced forever as
+ * "PinballMap machine #4610".
+ *
+ * **Triggered by a MISS, never by a discovery.** On an ordinary run every id
+ * resolves from the mirror and this costs one query and nothing else. Only an
+ * unknown id reaches the refresh, which is why an hourly cadence does not turn
+ * into an hourly full-catalog fetch.
+ *
+ * **At most one refresh, at most one re-resolve, never a loop.** And guarded by
+ * {@link CATALOG_REFRESH_COOLDOWN_MS}, because the dangerous case is an id that is
+ * missing and STAYS missing — PBM has not catalogued it either. Without a cooldown
+ * that id would trigger a full catalog fetch on every tick for as long as it stays
+ * pending (which happens whenever Discord is failing and rows are not clearing).
+ *
+ * **A refresh failure is never fatal.** The alert is the product; the name is an
+ * enhancement. Every failure path here returns the names we already had and lets
+ * the caller announce with the id fallback — withholding the alert to wait for a
+ * name would mean the announcement never happens.
+ *
+ * Cost, stated honestly: `machines.json` is PBM's largest payload (~10k titles),
+ * so this trades one big fetch for correctly naming a new release. It runs outside
+ * any transaction — this module opens none (CORE-ARCH-011).
+ */
+async function resolveMachineNames(
+  machineIds: number[]
+): Promise<Map<number, string>> {
+  const names = await getCatalogNames(machineIds);
+  const missing = machineIds.filter((id) => !names.has(id));
+  if (missing.length === 0) return names;
+
+  const lastRefreshedAt = await getCatalogLastRefreshedAt();
+  const sinceRefresh =
+    lastRefreshedAt === null ? null : Date.now() - lastRefreshedAt.getTime();
+  if (sinceRefresh !== null && sinceRefresh < CATALOG_REFRESH_COOLDOWN_MS) {
+    log.warn(
+      {
+        missing,
+        sinceRefreshMs: sinceRefresh,
+        action: "pinballmap.regionAlerts",
+      },
+      "Unknown machine ids but catalog was refreshed recently; announcing with id fallback"
+    );
+    return names;
+  }
+
+  let refreshed: Map<number, string>;
+  try {
+    await refreshCatalog();
+    refreshed = await getCatalogNames(machineIds);
+  } catch (err) {
+    log.warn(
+      { err, missing, action: "pinballmap.regionAlerts" },
+      "Catalog refresh failed; announcing with id fallback"
+    );
+    return names;
+  }
+
+  const stillMissing = machineIds.filter((id) => !refreshed.has(id));
+  if (stillMissing.length > 0) {
+    // PBM has not catalogued these either. The cooldown now suppresses further
+    // attempts; the announcement goes out with ids rather than waiting.
+    log.warn(
+      { stillMissing, action: "pinballmap.regionAlerts" },
+      "Machine ids absent from PinballMap's catalog after refresh; announcing with id fallback"
+    );
+  }
+  return refreshed;
+}
+
+/**
  * Turn pending rows into announceable entries by resolving both labels.
  *
  * Machine titles come from our own catalog mirror (one query); venue names come
@@ -249,7 +351,7 @@ async function resolveLabels(
   region: string,
   pending: { lmxId: number; locationId: number; pinballmapMachineId: number }[]
 ): Promise<RegionAlertEntry[]> {
-  const machineNames = await getCatalogNames(
+  const machineNames = await resolveMachineNames(
     pending.map((p) => p.pinballmapMachineId)
   );
 
@@ -294,7 +396,20 @@ export async function runRegionNewMachineAlerts(opts?: {
   // An empty payload is a bad read (outage, wrong region slug), not "the region
   // has no machines". Recording it would be harmless, but treating it as a
   // bootstrap on a fresh install would silence the very first real run.
-  if (observed.length === 0) return noop(region, "empty_payload");
+  if (observed.length === 0) {
+    // ERROR, not warn: the line above calls this a bad read, so it is logged as
+    // one. A quiet hour and a broken integration must never look alike, and this
+    // is the branch where they otherwise would — the run still returns 200 to the
+    // cron, so the log level is the whole signal. The `skipped` field keeps the
+    // two distinguishable in the payload as well: a bad read is
+    // {skipped:"empty_payload", observed:0}, a genuinely quiet hour is
+    // {skipped:null, observed:487, discovered:0}.
+    log.error(
+      { region, action: "pinballmap.regionAlerts" },
+      "PinballMap region payload was empty; treating as a failed read"
+    );
+    return noop(region, "empty_payload");
+  }
 
   if (observed.length > MAX_REGION_ENTRIES) {
     // Almost certainly an unscoped query (see MAX_REGION_ENTRIES). Write nothing:

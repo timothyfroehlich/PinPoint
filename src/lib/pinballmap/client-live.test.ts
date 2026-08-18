@@ -232,6 +232,64 @@ describe("live client — reads", () => {
   });
 });
 
+describe("live client — a 200 carrying an error body is a FAILED read", () => {
+  // The silent-failure guard. PBM signals logical failures with HTTP 200 plus an
+  // `errors` field, and the TYPE varies — a bare string in real captures, an array
+  // in PBM's own request specs. An unrecognized shape used to fall through as
+  // success: the parser found no `location_machine_xrefs` key, returned zero
+  // entries, and the region job logged "empty payload" on what was actually a
+  // broken read. Every shape must throw so the caller can tell the difference.
+  it("throws when `errors` is a STRING", async () => {
+    installFetchMock(() => json({ errors: "Region not found" }));
+    await expect(
+      createLiveClient(null).fetchRegionLmxes("austin")
+    ).rejects.toThrow(/Region not found/);
+  });
+
+  it("throws when `errors` is an ARRAY — the shape that used to no-op", async () => {
+    installFetchMock(() => json({ errors: ["Region not found"] }));
+    await expect(
+      createLiveClient(null).fetchRegionLmxes("austin")
+    ).rejects.toThrow(/Region not found/);
+  });
+
+  it("joins a multi-element array into one message", async () => {
+    installFetchMock(() =>
+      json({ errors: ["first problem", "second problem"] })
+    );
+    await expect(
+      createLiveClient(null).fetchRegionLmxes("austin")
+    ).rejects.toThrow(/first problem; second problem/);
+  });
+
+  it("throws on an unrecognized error shape rather than reading the body", async () => {
+    // Fail CLOSED: PBM put something in an error field, so this is not data.
+    installFetchMock(() => json({ errors: { detail: "nope" } }));
+    await expect(
+      createLiveClient(null).fetchRegionLmxes("austin")
+    ).rejects.toThrow(/PinballMap reported an error/);
+  });
+
+  it("treats an EMPTY errors array as success, not an error", async () => {
+    installFetchMock(() =>
+      json({
+        errors: [],
+        location_machine_xrefs: [{ id: 1, location_id: 2, machine_id: 3 }],
+      })
+    );
+    await expect(
+      createLiveClient(null).fetchRegionLmxes("austin")
+    ).resolves.toEqual([{ lmxId: 1, locationId: 2, machineId: 3 }]);
+  });
+
+  it("applies to the locations read too, not just the lmx read", async () => {
+    installFetchMock(() => json({ errors: ["boom"] }));
+    await expect(
+      createLiveClient(null).fetchRegionLocations("austin")
+    ).rejects.toThrow(/boom/);
+  });
+});
+
 describe("live client — auth", () => {
   it("authDetails returns token+username on success", async () => {
     installFetchMock(() =>

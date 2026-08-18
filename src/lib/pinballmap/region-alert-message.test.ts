@@ -30,13 +30,64 @@ describe("formatRegionAlertMessage", () => {
 
     expect(message).toContain("**New on Pinball Map in Austin**");
     expect(message).toContain("Godzilla (Premium)");
-    expect(message).toContain("Austin Pinball Collective");
-    // Location deep link, not a per-machine URL: the lmx id is ephemeral and PBM's
-    // attribution terms require the specific listing (CORE-PBM-001).
+    // The venue is the LINK TEXT of a masked link, not a trailing bare URL: a bare
+    // one makes Discord stack a preview card under every line.
     expect(message).toContain(
-      "https://pinballmap.com/map/?by_location_id=26454"
+      "[Austin Pinball Collective](https://pinballmap.com/map/?by_location_id=26454)"
     );
     expect(message).toContain("CC BY-SA 4.0");
+  });
+
+  it("does not let a hostile venue name break out of the link label", () => {
+    // The injection this guards: `[label](url)` gives a `]` inside the label the
+    // power to close our mask early and publish an arbitrary link under the bot's
+    // name — the reader sees a plausible venue and never inspects the URL. Venue
+    // names are typed by strangers on pinballmap.com, so this is reachable by
+    // anyone who can edit a listing.
+    const message = formatRegionAlertMessage({
+      entries: [entry({ locationName: "Foo](https://evil.example)" })],
+      regionLabel: "Austin",
+    });
+
+    expect(message).not.toBeNull();
+    const body = message ?? "";
+    // The security property, stated exactly: only ONE mask actually closes, and
+    // it is ours. An escaped `\]` cannot close a label, so the test must count
+    // UNESCAPED `](` rather than the raw substring — the hostile text is still
+    // present in the string, defanged, and a substring check would confuse
+    // "neutralized" with "absent".
+    expect(body.match(/(?<!\\)\]\(/g)).toHaveLength(1);
+    expect(body).toContain(
+      "](https://pinballmap.com/map/?by_location_id=26454)"
+    );
+    // The hostile text survives as literal, escaped characters.
+    expect(body).toContain("Foo\\]");
+  });
+
+  it("neutralizes the same trick in a machine title", () => {
+    // The title sits outside the mask today, but it is the same untrusted source
+    // and one refactor away from the label position.
+    const message = formatRegionAlertMessage({
+      entries: [entry({ machineName: "Evil](https://evil.example) Pinball" })],
+      regionLabel: "Austin",
+    });
+
+    const body = message ?? "";
+    expect(body.match(/(?<!\\)\]\(/g)).toHaveLength(1);
+    expect(body).toContain(
+      "](https://pinballmap.com/map/?by_location_id=26454)"
+    );
+  });
+
+  it("keeps the id fallback in the label position so every line reads alike", () => {
+    const message = formatRegionAlertMessage({
+      entries: [entry({ locationName: null, locationId: 1234 })],
+      regionLabel: "Austin",
+    });
+
+    expect(message).toContain(
+      "[location #1234](https://pinballmap.com/map/?by_location_id=1234)"
+    );
   });
 
   it("pluralizes the headline with the count", () => {

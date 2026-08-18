@@ -9,7 +9,13 @@ import { pinballmapLocationUrl } from "./public-url";
  * Two constraints shape the output:
  * - Discord hard-rejects a message over 2000 characters with a 400, which the
  *   client classifies as transient and would retry forever. So the body is capped
- *   by line count first and by length second.
+ *   by line count first and by length second. The line cap is what actually binds:
+ *   a masked-link line carries the whole URL in the raw string (~60 chars of
+ *   scaffolding plus the names), so ten of them plus the headline and footer land
+ *   around 1000-1200 characters — comfortably inside the limit, with the length
+ *   slice remaining a backstop against pathologically long venue names rather than
+ *   a routine trim. Counting is against the RAW string, which is what Discord
+ *   measures; the rendered line the reader sees is much shorter.
  * - Every venue and title in here was typed by a stranger on pinballmap.com, so
  *   all of it goes through `sanitizeDiscordText` (mention + Markdown neutering).
  *   The only unsanitized text is our own literals and the URL we build ourselves.
@@ -35,12 +41,29 @@ export interface RegionAlertMessageInput {
 }
 
 /**
- * One line per new machine: title, venue, and the venue's own PinballMap page.
+ * One line per new machine: the title, then the venue as a MASKED LINK to its
+ * PinballMap page.
  *
  * The link is a LOCATION deep link, built by `pinballmapLocationUrl()` — PBM's
  * attribution terms require pointing at the specific listing the data came from,
  * and a per-machine URL would be wrong anyway because the lmx id is ephemeral
  * (CORE-PBM-001).
+ *
+ * **Masked rather than bare**, for two reasons. Discord stacks a link-preview
+ * card under every bare URL it finds, which at hourly cadence — where most posts
+ * are a single line — made each post several times taller than its own text. And
+ * the venue name is the natural link text anyway.
+ *
+ * **The label is attacker-controlled.** Both the venue name and the machine title
+ * were typed by strangers on pinballmap.com, and `[label](url)` gives a `]` inside
+ * the label the power to close the mask and publish an arbitrary link under our
+ * bot's name. `sanitizeDiscordText` escapes `[`, `]`, `(` and `)` for exactly this
+ * reason — see its docstring. Never interpolate a PBM string into this line
+ * without it, and never "simplify" by dropping the sanitize call because the value
+ * looks like a plain name.
+ *
+ * The id fallbacks (`location #123`) are our own literals, and they take the label
+ * position too so every line reads the same whether or not a name resolved.
  */
 function formatEntry(entry: RegionAlertEntry): string {
   const machine =
@@ -51,7 +74,7 @@ function formatEntry(entry: RegionAlertEntry): string {
     entry.locationName === null
       ? `location #${String(entry.locationId)}`
       : sanitizeDiscordText(entry.locationName);
-  return `• ${machine} — ${venue}: ${pinballmapLocationUrl(entry.locationId)}`;
+  return `• ${machine} — [${venue}](${pinballmapLocationUrl(entry.locationId)})`;
 }
 
 /**

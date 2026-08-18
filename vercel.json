@@ -10,7 +10,7 @@
     },
     {
       "path": "/api/cron/pinballmap-region-alerts",
-      "schedule": "0 15 * * *"
+      "schedule": "23 * * * *"
     }
   ]
 }

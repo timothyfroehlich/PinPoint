@@ -18,6 +18,7 @@ import {
 import { getTestDb, setupTestDb } from "~/test/setup/pglite";
 import type { PbmRegionLmx, PbmRegionLocation } from "~/lib/pinballmap/types";
 import type { DiscordSendResult } from "~/lib/discord/client";
+import type * as CatalogModule from "~/lib/pinballmap/catalog";
 
 vi.mock("~/lib/logger", () => ({
   log: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
@@ -56,6 +57,32 @@ vi.mock("~/lib/pinballmap/client", () => ({
       },
     }),
 }));
+
+/**
+ * The catalog mirror's refresh-on-miss seam. `refreshCatalog` is stubbed rather
+ * than run so nothing reaches pinballmap.com (CORE-TEST-006); `seeds` is what a
+ * successful refresh would have written.
+ */
+const catalog = {
+  refreshCalls: 0,
+  error: null as Error | null,
+  seeds: [] as { machineId: number; name: string }[],
+};
+
+vi.mock("~/lib/pinballmap/catalog", async () => {
+  const actual = await vi.importActual<typeof CatalogModule>(
+    "~/lib/pinballmap/catalog"
+  );
+  return {
+    ...actual,
+    refreshCatalog: async () => {
+      catalog.refreshCalls += 1;
+      if (catalog.error) throw catalog.error;
+      if (catalog.seeds.length > 0) await seedCatalog(catalog.seeds);
+      return catalog.seeds.length;
+    },
+  };
+});
 
 const discord = {
   enabled: true,
@@ -105,19 +132,30 @@ async function seenRows(): Promise<
     .from(pinballmapRegionSeenMachines);
 }
 
-/** Seed the catalog mirror — the only source of a machine's title. */
+/**
+ * Seed the catalog mirror — the only source of a machine's title.
+ *
+ * `refreshedAt` is a parameter because the refresh-on-miss cooldown reads
+ * `max(refreshedAt)`: seeding at the default "now" means the mirror was just
+ * refreshed, which correctly suppresses an on-demand refresh. Tests that want the
+ * refresh to fire must seed a mirror that is older than the cooldown.
+ */
 async function seedCatalog(
-  entries: { machineId: number; name: string }[]
+  entries: { machineId: number; name: string }[],
+  refreshedAt = new Date()
 ): Promise<void> {
   const db = await getTestDb();
   await db.insert(pinballmapCatalog).values(
     entries.map((e) => ({
       pinballmapMachineId: e.machineId,
       name: e.name,
-      refreshedAt: new Date(),
+      refreshedAt,
     }))
   );
 }
+
+/** A mirror last written long enough ago that the cooldown has expired. */
+const STALE_MIRROR = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
 describe("PinballMap region new-machine alerts (PGlite)", () => {
   setupTestDb();
@@ -133,6 +171,9 @@ describe("PinballMap region new-machine alerts (PGlite)", () => {
     pbm.calls = 0;
     pbm.locationCalls = 0;
     pbm.regions = [];
+    catalog.refreshCalls = 0;
+    catalog.error = null;
+    catalog.seeds = [];
     discord.enabled = true;
     discord.result = { ok: true };
     discord.posts = [];
@@ -237,6 +278,113 @@ describe("PinballMap region new-machine alerts (PGlite)", () => {
     expect(await seenRows()).toContainEqual(
       expect.objectContaining({ lmxId: 2, announcedAt: expect.any(Date) })
     );
+  });
+
+  it("refreshes the catalog when a discovered machine is unknown, then names it", async () => {
+    // The Bon Jovi case: a title revealed and on a floor inside one week, while
+    // our mirror only refreshes on Sundays. A Discord post is immutable, so
+    // getting the name right on the first try is the whole point.
+    await seedCatalog([{ machineId: 6412, name: "Godzilla" }], STALE_MIRROR);
+    pbm.entries = [lmx({ lmxId: 1 })];
+    await runRegionNewMachineAlerts();
+    catalog.refreshCalls = 0;
+
+    // 9999 is absent from the mirror; the refresh is what teaches it.
+    catalog.seeds = [{ machineId: 9999, name: "Bon Jovi (Premium)" }];
+    pbm.entries = [lmx({ lmxId: 1 }), lmx({ lmxId: 2, machineId: 9999 })];
+    const run = await runRegionNewMachineAlerts();
+
+    expect(catalog.refreshCalls).toBe(1);
+    expect(run).toMatchObject({ discovered: 1, announced: 1 });
+    expect(discord.posts[0]?.content).toContain("Bon Jovi (Premium)");
+    expect(discord.posts[0]?.content).not.toContain("PinballMap machine #9999");
+  });
+
+  it("does NOT refresh when every discovered machine already resolves", async () => {
+    // The assertion that stops this becoming an hourly full-catalog fetch. On an
+    // ordinary run the mirror answers and PBM's largest payload is never touched.
+    await seedCatalog(
+      [
+        { machineId: 6412, name: "Godzilla" },
+        { machineId: 7, name: "Medieval Madness" },
+      ],
+      STALE_MIRROR
+    );
+    pbm.entries = [lmx({ lmxId: 1 })];
+    await runRegionNewMachineAlerts();
+    catalog.refreshCalls = 0;
+
+    pbm.entries = [lmx({ lmxId: 1 }), lmx({ lmxId: 2, machineId: 7 })];
+    const run = await runRegionNewMachineAlerts();
+
+    expect(catalog.refreshCalls).toBe(0);
+    expect(run).toMatchObject({ announced: 1 });
+    expect(discord.posts[0]?.content).toContain("Medieval Madness");
+  });
+
+  it("announces with the id fallback when a refresh does not resolve the name", async () => {
+    // PBM has not catalogued it either. The alert must still go out — withholding
+    // it to wait for a name means it never happens.
+    await seedCatalog([{ machineId: 6412, name: "Godzilla" }], STALE_MIRROR);
+    pbm.entries = [lmx({ lmxId: 1 })];
+    await runRegionNewMachineAlerts();
+    catalog.refreshCalls = 0;
+
+    catalog.seeds = []; // refresh succeeds but teaches nothing
+    pbm.entries = [lmx({ lmxId: 1 }), lmx({ lmxId: 2, machineId: 9999 })];
+    const run = await runRegionNewMachineAlerts();
+
+    expect(catalog.refreshCalls).toBe(1);
+    expect(run).toMatchObject({ announced: 1, pending: 0 });
+    expect(discord.posts[0]?.content).toContain("PinballMap machine #9999");
+    // And the row is marked announced, so it is not retried forever.
+    expect(await seenRows()).toContainEqual(
+      expect.objectContaining({ lmxId: 2, announcedAt: expect.any(Date) })
+    );
+  });
+
+  it("does not re-trigger a refresh within the cooldown", async () => {
+    // The guard against an id that is missing and STAYS missing turning every
+    // hourly run into a full catalog fetch.
+    await seedCatalog([{ machineId: 6412, name: "Godzilla" }], STALE_MIRROR);
+    pbm.entries = [lmx({ lmxId: 1 })];
+    await runRegionNewMachineAlerts();
+
+    // First unknown id: refresh fires, writes rows stamped NOW, and resolves
+    // nothing for 9999.
+    catalog.seeds = [{ machineId: 4242, name: "Something Else" }];
+    pbm.entries = [lmx({ lmxId: 1 }), lmx({ lmxId: 2, machineId: 9999 })];
+    await runRegionNewMachineAlerts();
+    expect(catalog.refreshCalls).toBe(1);
+
+    // Second unknown id, same run window: the mirror is now fresh, so no refresh.
+    catalog.seeds = [];
+    pbm.entries = [
+      lmx({ lmxId: 1 }),
+      lmx({ lmxId: 2, machineId: 9999 }),
+      lmx({ lmxId: 3, machineId: 8888 }),
+    ];
+    const run = await runRegionNewMachineAlerts();
+
+    expect(catalog.refreshCalls).toBe(1);
+    expect(run).toMatchObject({ discovered: 1, announced: 1 });
+    expect(discord.posts.at(-1)?.content).toContain("PinballMap machine #8888");
+  });
+
+  it("still announces when the catalog refresh itself throws", async () => {
+    await seedCatalog([{ machineId: 6412, name: "Godzilla" }], STALE_MIRROR);
+    pbm.entries = [lmx({ lmxId: 1 })];
+    await runRegionNewMachineAlerts();
+    catalog.refreshCalls = 0;
+
+    catalog.error = new Error("PinballMap fetchCatalog failed");
+    pbm.entries = [lmx({ lmxId: 1 }), lmx({ lmxId: 2, machineId: 9999 })];
+    const run = await runRegionNewMachineAlerts();
+
+    expect(catalog.refreshCalls).toBe(1);
+    // The alert is the product; the name is an enhancement.
+    expect(run).toMatchObject({ announced: 1, pending: 0 });
+    expect(discord.posts[0]?.content).toContain("PinballMap machine #9999");
   });
 
   it("posts nothing when the region is unchanged", async () => {
