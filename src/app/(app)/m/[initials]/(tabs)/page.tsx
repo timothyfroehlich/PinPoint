@@ -15,6 +15,7 @@ import {
 } from "~/lib/permissions/index";
 import { getMachineForLayout } from "../_data";
 import { pinballmapLocationUrl } from "~/lib/pinballmap/public-url";
+import { APC_LOCATION_ID } from "~/lib/pinballmap/config";
 import { getPinballMapState } from "~/lib/pinballmap/state";
 import {
   derivePbmListingView,
@@ -192,7 +193,9 @@ export default async function MachineInfoTab({
       descriptionSlot={descriptionSlot}
       modelName={modelName}
       pinballmap={{
-        locationUrl: pinballmapLocationUrl(),
+        locationUrl: pinballmapLocationUrl(
+          pbmState?.locationId ?? APC_LOCATION_ID
+        ),
         // `observed` is false both for "the lineup does not carry it" and for
         // "there is no lineup yet", and the rail would render the first as a
         // fact. Waiting reports unknown instead.

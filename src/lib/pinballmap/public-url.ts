@@ -1,5 +1,3 @@
-import { APC_LOCATION_ID } from "./config";
-
 /**
  * Public PinballMap deep link for a location's page on pinballmap.com.
  *
@@ -21,9 +19,11 @@ import { APC_LOCATION_ID } from "./config";
  *
  * The trailing slash in `/map/` is incidental — PBM serves 200 for both `/map`
  * and `/map/` with no redirect (verified 2026-08-09).
+ *
+ * The location id is required — there is no default (spec 6.1). A hardcoded APC
+ * default silently pointed every link-back at APC even after the tracked
+ * location changed; callers now pass the location actually being tracked.
  */
-export function pinballmapLocationUrl(
-  locationId: number = APC_LOCATION_ID
-): string {
+export function pinballmapLocationUrl(locationId: number): string {
   return `https://pinballmap.com/map/?by_location_id=${locationId}`;
 }

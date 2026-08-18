@@ -10,6 +10,7 @@ import {
   type OwnershipContext,
 } from "~/lib/permissions/index";
 import { pinballmapLocationUrl } from "~/lib/pinballmap/public-url";
+import { APC_LOCATION_ID } from "~/lib/pinballmap/config";
 import {
   getPinballMapState,
   getRefreshAllowance,
@@ -232,7 +233,9 @@ export default async function MachineEditPage({
   const isOwner =
     user.id === machine.ownerId || user.id === machine.invitedOwnerId;
 
-  const locationUrl = pinballmapLocationUrl();
+  const locationUrl = pinballmapLocationUrl(
+    pbmState?.locationId ?? APC_LOCATION_ID
+  );
 
   return (
     // Capped at 4xl rather than filling the tab strip's width: these are form
