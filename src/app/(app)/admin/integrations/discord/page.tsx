@@ -1,39 +1,11 @@
-import type React from "react";
-import Link from "next/link";
-import { HelpCircle } from "lucide-react";
-import { db } from "~/server/db";
-import { discordIntegrationConfig } from "~/server/db/schema";
-import { eq } from "drizzle-orm";
-import { PageContainer } from "~/components/layout/PageContainer";
-import { PageHeader } from "~/components/layout/PageHeader";
-import { DiscordConfigForm } from "./discord-config-form";
+import { redirect } from "next/navigation";
 
-export default async function AdminDiscordIntegrationPage(): Promise<React.JSX.Element> {
-  const config = await db.query.discordIntegrationConfig.findFirst({
-    where: eq(discordIntegrationConfig.id, "singleton"),
-  });
-
-  return (
-    <PageContainer size="narrow">
-      <PageHeader
-        title="Discord Integration"
-        actions={
-          <Link
-            href="/help/discord"
-            className="flex items-center gap-1.5 text-sm text-link"
-          >
-            <HelpCircle className="size-4" aria-hidden />
-            <span>Help</span>
-          </Link>
-        }
-      />
-
-      <DiscordConfigForm
-        enabled={config?.enabled ?? false}
-        guildId={config?.guildId ?? ""}
-        inviteLink={config?.inviteLink ?? ""}
-        hasToken={!!config?.botTokenVaultId}
-      />
-    </PageContainer>
-  );
+/**
+ * The Discord admin config moved from its own page into a section on the
+ * combined Admin Integrations page (spec §2 — one page, no per-integration
+ * route). This route is kept only to redirect any bookmark or stale link to
+ * the new home; the form itself lives in `../discord-section.tsx`.
+ */
+export default function AdminDiscordIntegrationRedirect(): never {
+  redirect("/admin/integrations");
 }
