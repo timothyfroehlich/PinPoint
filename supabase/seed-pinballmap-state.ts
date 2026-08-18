@@ -114,6 +114,15 @@ interface MachinePlan {
   pinballmapExcluded: boolean;
   presenceStatus: string | null;
   modelName: string | null;
+  /**
+   * Hand-entered model metadata, for the uncataloged rows only. A MATCHED row
+   * leaves these unset — the seed copies them from the catalog mirror, the same
+   * way `resolveCore` does on a real link, so seeded machines and machines
+   * linked through the form carry identical columns. Setting them by hand here
+   * would let the seed drift from the catalog it is seeded beside.
+   */
+  manufacturer?: string;
+  year?: number;
   /** The state this row exists to produce (spec 4.2 names). */
   state: string;
 }
@@ -241,6 +250,13 @@ const MACHINE_PLAN: MachinePlan[] = [
     pinballmapExcluded: true,
     presenceStatus: "on_the_floor",
     modelName: "Fireball (home-brew conversion)",
+    // The hand-entered half of PP-3bbr, and the only row that exercises it: a
+    // manufacturer and year on a machine with no catalog row to derive them
+    // from. The machine header reads these exactly as it reads a matched
+    // machine's catalog-derived pair (PP-3bbr.1), so this row is what proves
+    // the two sources render identically.
+    manufacturer: "Bally",
+    year: 1972,
     state: "uncataloged",
   },
   {
@@ -307,8 +323,61 @@ try {
     );
   }
 
+  // Catalog metadata for every title the plan links to, read once.
+  //
+  // The seed used to leave `manufacturer` / `year` / `opdb_id` / `ipdb_id` null
+  // on matched machines, which made local data disagree with production: a
+  // machine linked through the edit form gets all four copied off the mirror by
+  // `resolveCore`, so the seed was producing a row shape the app never creates.
+  // Nothing noticed until the machine header started rendering those columns
+  // (PP-3bbr.1) and every seeded machine showed a blank sub-line.
+  //
+  // Copied from the mirror rather than typed into the plan above, so the seed
+  // cannot drift from the catalog it is seeded alongside.
+  interface CatalogMeta {
+    pinballmap_machine_id: number;
+    manufacturer: string | null;
+    year: number | null;
+    opdb_id: string | null;
+    ipdb_id: number | null;
+  }
+  const catalogIds = MACHINE_PLAN.map((m) => m.pinballmapMachineId).filter(
+    (id): id is number => id !== null
+  );
+  const catalogRows =
+    catalogIds.length > 0
+      ? await sql<CatalogMeta[]>`
+          SELECT pinballmap_machine_id, manufacturer, year, opdb_id, ipdb_id
+          FROM pinballmap_catalog
+          WHERE pinballmap_machine_id = ANY(${catalogIds})
+        `
+      : [];
+  const catalogById = new Map<number, CatalogMeta>(
+    catalogRows.map((r) => [r.pinballmap_machine_id, r])
+  );
+
   let updated = 0;
   for (const m of MACHINE_PLAN) {
+    // Matched reads the catalog; uncataloged reads the plan's hand-entered
+    // pair. Never both — `machines_model_name_requires_excluded` makes that a
+    // constraint rather than a convention (PP-3bbr).
+    const catalog =
+      m.pinballmapMachineId !== null
+        ? catalogById.get(m.pinballmapMachineId)
+        : undefined;
+    if (m.pinballmapMachineId !== null && catalog === undefined) {
+      throw new Error(
+        `${m.initials} links to catalog title #${String(m.pinballmapMachineId)}, ` +
+          `which is not in the mirror — run seed-pinballmap-catalog first.`
+      );
+    }
+    const manufacturer = catalog
+      ? catalog.manufacturer
+      : (m.manufacturer ?? null);
+    const year = catalog ? catalog.year : (m.year ?? null);
+    const opdbId = catalog ? catalog.opdb_id : null;
+    const ipdbId = catalog ? catalog.ipdb_id : null;
+
     // Every column in one UPDATE: the CHECK constraints
     // (`..._link_exclusive`, `..._intent_requires_link`,
     // `..._model_name_requires_excluded`) are row-level, so a clear-then-set
@@ -320,7 +389,11 @@ try {
         pinballmap_intent = ${m.pinballmapIntent},
         pinballmap_excluded = ${m.pinballmapExcluded},
         presence_status = COALESCE(${m.presenceStatus}, presence_status),
-        model_name = ${m.modelName}
+        model_name = ${m.modelName},
+        manufacturer = ${manufacturer},
+        year = ${year},
+        opdb_id = ${opdbId},
+        ipdb_id = ${ipdbId}
       WHERE initials = ${m.initials}
       RETURNING initials
     `;
