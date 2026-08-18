@@ -23,6 +23,7 @@ import type {
   PbmListingStateName,
   PbmListingView,
 } from "~/lib/pinballmap/listing-state";
+import { RelativeTimeProvider } from "~/components/issues/RelativeTimeProvider";
 import { PinballmapListingControl } from "./PinballmapListingControl";
 
 vi.mock("~/app/(app)/m/pinballmap-actions", () => ({
@@ -111,27 +112,38 @@ function view(
   };
 }
 
-/** An owner with a provisioned credential — every control armed. */
+/**
+ * An owner with a provisioned credential — every control armed.
+ *
+ * Wrapped in `RelativeTimeProvider` because the header reads the shared ticker:
+ * relative labels here go through it rather than being computed at render, so
+ * SSR and hydration cannot land on different sides of a minute boundary. The
+ * provider is mounted app-wide in `ClientProviders`, so this mirrors production
+ * rather than adding scaffolding — without it the ticker never starts and the
+ * header renders its pre-hydration state forever.
+ */
 function renderControl(overrides: Partial<Props> = {}): {
   unmount: () => void;
 } {
   return render(
-    <PinballmapListingControl
-      machineId="m-1"
-      view={VIEWS.on}
-      locationName="Austin Pinball Collective"
-      locationUrl="https://pinballmap.com/map/?by_location_id=26454"
-      lastRefreshedAt={new Date(Date.now() - 12 * 60 * 1000)}
-      refreshRemaining={3}
-      refreshAvailableAt={null}
-      canSetIntent={true}
-      canPush={true}
-      canRefresh={true}
-      writeEnabled={true}
-      modelName="Medieval Madness"
-      commentCount={12}
-      {...overrides}
-    />
+    <RelativeTimeProvider>
+      <PinballmapListingControl
+        machineId="m-1"
+        view={VIEWS.on}
+        locationName="Austin Pinball Collective"
+        locationUrl="https://pinballmap.com/map/?by_location_id=26454"
+        lastRefreshedAt={new Date(Date.now() - 12 * 60 * 1000)}
+        refreshRemaining={3}
+        refreshAvailableAt={null}
+        canSetIntent={true}
+        canPush={true}
+        canRefresh={true}
+        writeEnabled={true}
+        modelName="Medieval Madness"
+        commentCount={12}
+        {...overrides}
+      />
+    </RelativeTimeProvider>
   );
 }
 
@@ -280,6 +292,30 @@ describe("push actions", () => {
     expect(
       await screen.findByTestId("pbm-listing-remove-consequence")
     ).toHaveTextContent("could not read this entry's comments");
+  });
+
+  it("renders no Add button on a Missing machine whose availability blocks it", () => {
+    // The derivation withdraws `pushAction` when availability forbids the
+    // lineup, because the server refuses that push every time. This is the
+    // render-side half: with no pushAction there is no button, so the reader
+    // never gets a control whose only outcome is an error (CORE-ARCH-012). The
+    // reason still shows on the intent row.
+    renderControl({
+      view: {
+        ...VIEWS.missing,
+        pushAction: null,
+        onPositionBlockedReason: "Blocked by Availability: Removed",
+        advisory: "alert",
+        advisoryDetail: "Removed",
+      },
+    });
+
+    expect(screen.queryByTestId("pbm-listing-add")).toBeNull();
+    // The toggle's own blocked note is suppressed while On is the SELECTED
+    // position, so Alert's note is what carries the reason here.
+    expect(screen.getByTestId("pbm-listing-alert")).toHaveTextContent(
+      "Availability set to Removed"
+    );
   });
 
   it("surfaces a failed push instead of letting it look like a success", async () => {

@@ -1,4 +1,5 @@
 import type React from "react";
+import Link from "next/link";
 import { TriangleAlert } from "lucide-react";
 
 import { PersonHoverCard } from "~/components/people/PersonHoverCard";
@@ -181,7 +182,9 @@ export function InfoRail({
                 `-text` token (see globals.css). */}
             {pinballmap.configIssue ? (
               pinballmap.manageHref !== null ? (
-                <a
+                // Internal route, so `next/link` — the Manage tab is one
+                // client-side transition away, not a fresh document.
+                <Link
                   href={pinballmap.manageHref}
                   data-testid="machine-pinballmap-config-issue"
                   className="ml-auto hidden shrink-0 items-baseline gap-1 whitespace-nowrap text-warning hover:underline @[20rem]:inline-flex"
@@ -191,7 +194,7 @@ export function InfoRail({
                     aria-hidden="true"
                   />
                   Config issue
-                </a>
+                </Link>
               ) : (
                 <span
                   data-testid="machine-pinballmap-config-issue"

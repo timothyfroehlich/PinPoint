@@ -292,6 +292,41 @@ describe("the On position's availability block (spec 6.2)", () => {
     }
   );
 
+  it.each(["pending_arrival", "removed"] as const)(
+    "%s also withdraws Missing's Add push, which the server would refuse",
+    (presenceStatus) => {
+      // Intent On with a blocking availability is reachable — the toggle was
+      // set while the machine was on the floor and availability moved after —
+      // and it derives as Missing, which normally offers Add.
+      // `addMachineToPinballMapAction` refuses that combination every time, so
+      // rendering the button would be a control whose only outcome is an error
+      // (CORE-ARCH-012). The block itself still shows, on the intent row.
+      const view = derive({
+        intent: "on",
+        presenceStatus,
+        snapshot: snapshot([OTHER_TITLE]),
+      });
+      expect(view.name).toBe("missing");
+      expect(view.pushAction).toBeNull();
+      // And it says why, borrowing Alert's note — no button AND no reason
+      // would be a silent dead end, worse than the dead button.
+      expect(view.advisory).toBe("alert");
+      expect(view.advisoryDetail).not.toBeNull();
+    }
+  );
+
+  it("still offers Add on Missing when availability allows the lineup", () => {
+    // The other half of the pair: withdrawing the push must be scoped to the
+    // blocked availabilities, not to Missing.
+    const view = derive({
+      intent: "on",
+      presenceStatus: "on_the_floor",
+      snapshot: snapshot([OTHER_TITLE]),
+    });
+    expect(view.name).toBe("missing");
+    expect(view.pushAction).toBe("add");
+  });
+
   it("keeps the block on Lingering, where 6.3 requires it", () => {
     // Every same-title cabinet is ineligible and the entry is still up. The
     // resolution offered is removal, and the toggle must stay blocked so it is

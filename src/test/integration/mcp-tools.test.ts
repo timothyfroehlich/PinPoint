@@ -130,6 +130,7 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
     pinballmapExcluded?: boolean;
     pinballmapExcludedReason?: string;
     pinballmapIntent?: "on" | "off" | "no_sync";
+    modelName?: string;
     manufacturer?: string;
     year?: number;
     opdbId?: string;
@@ -1528,6 +1529,7 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
       pinballmapExcluded: boolean;
       pinballmapExcludedReason: string | null;
       pinballmapIntent: "on" | "off" | "no_sync";
+      modelName: string | null;
       manufacturer: string | null;
       year: number | null;
       opdbId: string | null;
@@ -1540,6 +1542,7 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
           pinballmapMachineId: true,
           pinballmapExcluded: true,
           pinballmapExcludedReason: true,
+          modelName: true,
           pinballmapIntent: true,
           manufacturer: true,
           year: true,
@@ -1934,6 +1937,41 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
       expect(await pbmRow(machine.id)).toMatchObject({
         pinballmapExcluded: true,
         pinballmapExcludedReason: "homebrew — one-off cabinet",
+      });
+    });
+
+    it("keeps a hand-entered model when the exclusion is re-confirmed", async () => {
+      // PP-3bbr put `modelName`/`manufacturer`/`year` in the same column set as
+      // the exclusion reason, and the resolver writes each as `value ?? null`.
+      // That is right for the edit form, which always posts all three — but
+      // `set_machine_pinballmap` has no field for ANY of them, so it cannot
+      // send them even in principle. Before the carry-over covered them, the
+      // fleet pass (PP-h059) re-confirming this machine's exclusion would have
+      // nulled the whole identity of a game whose only source is a person who
+      // typed it, flipping the Info tab's Model row to "Not specified".
+      const admin = await makeUser("admin");
+      const machine = await seedMachine({
+        name: "Fireball",
+        pbm: {
+          pinballmapExcluded: true,
+          pinballmapExcludedReason: "home-brew conversion",
+          modelName: "Fireball (home-brew conversion)",
+          manufacturer: "Bally",
+          year: 1972,
+        },
+      });
+
+      await runSetMachinePinballmap(
+        { machine: machine.initials, pinballmapExcluded: true },
+        ctx("admin", admin)
+      );
+
+      expect(await pbmRow(machine.id)).toMatchObject({
+        pinballmapExcluded: true,
+        pinballmapExcludedReason: "home-brew conversion",
+        modelName: "Fireball (home-brew conversion)",
+        manufacturer: "Bally",
+        year: 1972,
       });
     });
 

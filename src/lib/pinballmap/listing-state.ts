@@ -230,9 +230,23 @@ export function derivePbmListingView(args: {
       ...base,
       name: "missing",
       outOfSync: true,
-      advisory: null,
-      advisoryDetail: null,
-      pushAction: "add",
+      // Missing normally has no advisory, but a blocked availability here is
+      // the same contradiction Alert reports everywhere else — this cabinet
+      // says it should be on a public lineup while our own records say it is
+      // not here — so it borrows Alert's note rather than inventing a second
+      // way to say it. Without this the reader would get a Missing sentence,
+      // no Add button and no reason: a silent dead end, which is worse than the
+      // dead button it replaces.
+      advisory: blockedReason === null ? null : "alert",
+      advisoryDetail:
+        blockedReason === null ? null : getMachinePresenceLabel(presenceStatus),
+      // No Add when availability forbids the lineup (6.2). Intent On and
+      // presence Removed coexist — the toggle was set while the machine was on
+      // the floor and availability moved after — so this state is reachable
+      // with the push blocked. `addMachineToPinballMapAction` refuses it every
+      // time, and offering a button whose only outcome is an error is the
+      // dishonest control CORE-ARCH-012 forbids.
+      pushAction: blockedReason === null ? "add" : null,
     };
   }
   if (intent === "off" && observed && coveredBy.length === 0) {

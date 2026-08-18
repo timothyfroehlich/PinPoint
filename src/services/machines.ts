@@ -676,6 +676,12 @@ type PbmLinkBasis = StoredPbmLinkState & {
   presenceStatus: MachinePresenceStatus;
   pinballmapExcluded: boolean;
   pinballmapExcludedReason: string | null;
+  // The hand-entered identity, for the same reason the exclusion pair is here:
+  // {@link carryExcludedFields} reads it to decide what a caller's silence
+  // means, so it is part of what the plan is derived from.
+  modelName: string | null;
+  manufacturer: string | null;
+  year: number | null;
 };
 
 const PBM_LINK_COLUMNS = {
@@ -703,45 +709,78 @@ function pbmLinkBasisUnchanged(a: PbmLinkBasis, b: PbmLinkBasis): boolean {
     a.pinballmapMachineId === b.pinballmapMachineId &&
     a.pinballmapIntent === b.pinballmapIntent &&
     a.presenceStatus === b.presenceStatus &&
-    // The exclusion pair is in the basis because {@link carryExcludedReason}
+    // The exclusion group is in the basis because {@link carryExcludedFields}
     // reads it. Anything the plan is derived from has to be compared, or the
-    // CAS would wave through a write built on a value that has since moved.
+    // CAS would wave through a write built on a value that has since moved —
+    // a hand-entry save landing between the basis read and the locked re-read
+    // would be overwritten with no `conflict` and no retry.
     a.pinballmapExcluded === b.pinballmapExcluded &&
-    a.pinballmapExcludedReason === b.pinballmapExcludedReason
+    a.pinballmapExcludedReason === b.pinballmapExcludedReason &&
+    a.modelName === b.modelName &&
+    a.manufacturer === b.manufacturer &&
+    a.year === b.year
   );
 }
 
 /**
- * Keep a stored exclusion reason when the caller re-states the exclusion without
- * one.
+ * Keep the stored exclusion reason AND hand-entered model identity when the
+ * caller re-states the exclusion without supplying them.
  *
- * `resolvePbmLinkColumnsForUpdate` writes `reason ?? null`, which is right for
- * the edit form — that form always posts the field, so an absent one means a
- * human emptied the box. An MCP caller re-confirming an exclusion it did not
- * author has no such intent, and the fleet pass (PP-h059) does exactly that
- * across the whole floor: `{ machine: "UM", pinballmapExcluded: true }` would
- * have nulled "homebrew — one-off cabinet" on every machine it touched. Same
- * shape as the listing carry-over, and the same rule behind it — a forgotten
- * argument must not destroy stored state (CORE-ARCH-012).
+ * `resolvePbmLinkColumnsForUpdate` writes each field as `value ?? null`, which
+ * is right for the edit form — that form always posts all of them, so an absent
+ * one means a human emptied the box. An MCP caller re-confirming an exclusion it
+ * did not author has no such intent, and `set_machine_pinballmap`'s schema has
+ * no field for any of the four, so it *cannot* send them. The fleet pass
+ * (PP-h059) does exactly that across the whole floor:
+ * `{ machine: "FB", pinballmapExcluded: true }` would null both
+ * "homebrew — one-off cabinet" and the model identity — name, manufacturer and
+ * year — on every machine it touched, flipping the Info tab's Model row to
+ * "Not specified". Same shape as the listing carry-over, and the same rule
+ * behind it: a forgotten argument must not destroy stored state
+ * (CORE-ARCH-012).
  *
- * An explicit empty string is still a clear: it is a value the caller sent.
+ * An explicit empty string, or an explicit null, is still a clear: it is a
+ * value the caller sent. Only `undefined` — the field absent from the request —
+ * carries.
+ *
+ * The three model fields moved in with the reason (PP-3bbr shipped them into
+ * `MachinePbmColumns`) rather than getting their own helper, because they are
+ * one decision: what an omitted field means depends on the caller, not on which
+ * column it is.
  */
-function carryExcludedReason(
+function carryExcludedFields(
   selection: PbmLinkSelection,
-  stored: Pick<PbmLinkBasis, "pinballmapExcluded" | "pinballmapExcludedReason">
+  stored: Pick<
+    PbmLinkBasis,
+    | "pinballmapExcluded"
+    | "pinballmapExcludedReason"
+    | "modelName"
+    | "manufacturer"
+    | "year"
+  >
 ): PbmLinkSelection {
-  if (
-    selection.pinballmapExcluded !== true ||
-    selection.pinballmapExcludedReason !== undefined ||
-    !stored.pinballmapExcluded ||
-    stored.pinballmapExcludedReason === null
-  ) {
+  // Only a re-statement of an exclusion that was already stored can carry —
+  // turning exclusion ON for the first time has nothing to carry from, and a
+  // machine being linked to a title must clear all four (the
+  // `machines_model_name_requires_excluded` CHECK makes "linked and
+  // hand-entered" unrepresentable).
+  if (selection.pinballmapExcluded !== true || !stored.pinballmapExcluded) {
     return selection;
   }
-  return {
-    ...selection,
-    pinballmapExcludedReason: stored.pinballmapExcludedReason,
-  };
+
+  const carried: PbmLinkSelection = { ...selection };
+  if (
+    selection.pinballmapExcludedReason === undefined &&
+    stored.pinballmapExcludedReason !== null
+  )
+    carried.pinballmapExcludedReason = stored.pinballmapExcludedReason;
+  if (selection.modelName === undefined && stored.modelName !== null)
+    carried.modelName = stored.modelName;
+  if (selection.manufacturer === undefined && stored.manufacturer !== null)
+    carried.manufacturer = stored.manufacturer;
+  if (selection.year === undefined && stored.year !== null)
+    carried.year = stored.year;
+  return carried;
 }
 
 /**
@@ -772,7 +811,8 @@ function carryExcludedReason(
  *
  * A missing row is reported as `not_found` rather than a success payload
  * describing a link that was never stored (CORE-ARCH-012). An exclusion
- * re-stated without a reason keeps the stored one ({@link carryExcludedReason}).
+ * re-stated without them keeps the stored reason and hand-entered model
+ * ({@link carryExcludedFields}).
  *
  * Returns the planned columns, which are also the stored ones: the CAS above is
  * what makes those the same claim, since a write only lands when the basis it
@@ -796,7 +836,7 @@ export async function updateMachinePbmLink({
 
     const planned = await planMachinePbmLink({
       machineId,
-      selection: carryExcludedReason(selection, basisRow),
+      selection: carryExcludedFields(selection, basisRow),
       stored: {
         pinballmapMachineId: basisRow.pinballmapMachineId,
         pinballmapIntent: basisRow.pinballmapIntent,

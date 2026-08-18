@@ -2,6 +2,7 @@
 
 import type React from "react";
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import {
   CheckCircle2,
   ExternalLink,
@@ -29,6 +30,8 @@ import {
   AlertDialogTrigger,
 } from "~/components/ui/alert-dialog";
 import { formatRelative } from "~/lib/dates";
+import { RelativeTime } from "~/components/issues/RelativeTime";
+import { useRelativeNow } from "~/components/issues/RelativeTimeProvider";
 import type {
   PbmListingIntent,
   PbmListingView,
@@ -295,6 +298,8 @@ function Header({
   onRefresh: () => void;
 }): React.JSX.Element {
   const spent = refreshRemaining <= 0;
+  // `null` until the shared ticker's first tick, which is also every SSR pass.
+  const now = useRelativeNow();
   return (
     <div className="mb-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
       <h3 className="text-base font-semibold">
@@ -333,9 +338,19 @@ function Header({
           )}
           data-testid="pbm-listing-refreshed-at"
         >
-          {lastRefreshedAt === null
-            ? "Never refreshed"
-            : `Refreshed ${formatRelative(lastRefreshedAt)}`}
+          {/* Through the shared ticker, not `formatRelative` at render: this is
+              a client component, so it renders on the server too, and a
+              relative label computed independently on both sides diverges the
+              moment SSR and hydration land either side of a minute boundary.
+              `RelativeTime` renders its fallback until the ticker's first tick,
+              which is the same string in both passes. */}
+          {lastRefreshedAt === null ? (
+            "Never refreshed"
+          ) : (
+            <>
+              Refreshed <RelativeTime value={lastRefreshedAt} />
+            </>
+          )}
         </span>
 
         {canRefresh ? (
@@ -349,8 +364,13 @@ function Header({
             // The countdown lives in the title rather than the label so the
             // button does not change width as it ticks — the header sits above
             // a fixed-height box and a resizing control undoes that (4.1).
+            //
+            // Gated on the ticker having started, so the attribute is simply
+            // absent during SSR rather than carrying a label computed at a
+            // different minute than hydration's. React patches mismatched TEXT
+            // but not mismatched attributes, so this one would stick.
             title={
-              spent && refreshAvailableAt !== null
+              now !== null && spent && refreshAvailableAt !== null
                 ? `Refreshes again ${formatRelative(refreshAvailableAt)}`
                 : undefined
             }
@@ -612,14 +632,17 @@ function statusSentence(
 /** "AFM", "AFM and MM", "AFM, MM and TZ" — the sibling cabinets, by initials. */
 function nameSiblings(siblings: readonly PbmSibling[]): React.ReactNode {
   if (siblings.length === 0) return "another cabinet";
+  // `next/link`, not a bare anchor: these point at another machine page inside
+  // the app, and a plain href drops the client-side transition for a full
+  // document reload.
   const links = siblings.map((s) => (
-    <a
+    <Link
       key={s.id}
       href={`/m/${s.initials}`}
       className="text-primary underline underline-offset-2 hover:no-underline"
     >
       {s.initials}
-    </a>
+    </Link>
   ));
   if (links.length === 1) return links[0];
   return (
