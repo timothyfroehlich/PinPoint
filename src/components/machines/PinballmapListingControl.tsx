@@ -164,17 +164,18 @@ export function PinballmapListingControl({
         }}
       />
 
-      {/* One wrapper for both rows so the disabled states dim and inert the
-          pair together without changing the box's height (4.1). `inert` is the
+      {/* The disabled states dim and inert the INTENT row only. `inert` is the
           platform answer to "visible but not interactive" — it removes the
           subtree from the tab order and the a11y tree in one attribute, where
-          `pointer-events-none` would leave it keyboard-reachable. */}
-      <div
-        className={cn("space-y-2", disabled && "opacity-45")}
-        {...(disabled ? { inert: true } : {})}
-        data-testid="pbm-listing-rows"
-      >
-        <Row label="Intent">
+          `pointer-events-none` would leave it keyboard-reachable. It used to
+          wrap both rows, which was wrong twice over: in every disabled state
+          the status row is the only thing that says WHY the toggle is off
+          ("No model set", "Uncataloged game"), so dimming made the explanation
+          the hardest text on the row to read, and `inert` hid it from screen
+          readers outright. The row heights are fixed either way, so 4.1 is
+          unaffected. */}
+      <div className="space-y-2" data-testid="pbm-listing-rows">
+        <Row label="Intent" dimmed={disabled}>
           <IntentToggle
             value={view.intent}
             blockedReason={view.onPositionBlockedReason}
@@ -363,16 +364,31 @@ function Header({
   );
 }
 
-/** One labelled row. Fixed minimum height is what keeps 4.1's promise. */
+/**
+ * One labelled row. Fixed minimum height is what keeps 4.1's promise.
+ *
+ * `dimmed` both greys the row and makes it `inert`; the two always travel
+ * together, because a control that looks unavailable and still takes focus is
+ * the worst of both.
+ */
 function Row({
   label,
+  dimmed = false,
   children,
 }: {
   label: string;
+  dimmed?: boolean;
   children: React.ReactNode;
 }): React.JSX.Element {
   return (
-    <div className="flex min-h-10 flex-wrap items-center gap-3">
+    <div
+      className={cn(
+        "flex min-h-10 flex-wrap items-center gap-3",
+        dimmed && "opacity-45"
+      )}
+      {...(dimmed ? { inert: true } : {})}
+      data-testid={`pbm-listing-row-${label.toLowerCase()}`}
+    >
       <span className="w-20 shrink-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
         {label}
       </span>

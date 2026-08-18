@@ -414,10 +414,25 @@ describe("the header", () => {
 
 describe("the disabled states", () => {
   it.each(["noModel", "uncataloged", "waiting"])(
-    "%s makes both rows inert",
+    "%s makes the intent row inert",
     (key) => {
       renderControl({ view: VIEWS[key] });
-      expect(screen.getByTestId("pbm-listing-rows")).toHaveAttribute("inert");
+      expect(screen.getByTestId("pbm-listing-row-intent")).toHaveAttribute(
+        "inert"
+      );
+    }
+  );
+
+  // The status row carries the only explanation of WHY intent is unavailable,
+  // so dimming or inerting it alongside the toggle would hide the reason from
+  // sighted readers and screen readers at the same time.
+  it.each(["noModel", "uncataloged", "waiting"])(
+    "%s leaves the status row readable and exposed",
+    (key) => {
+      renderControl({ view: VIEWS[key] });
+      const status = screen.getByTestId("pbm-listing-row-status");
+      expect(status).not.toHaveAttribute("inert");
+      expect(status.className).not.toContain("opacity-");
     }
   );
 
@@ -425,7 +440,7 @@ describe("the disabled states", () => {
     "%s leaves the rows interactive",
     (key) => {
       renderControl({ view: VIEWS[key] });
-      expect(screen.getByTestId("pbm-listing-rows")).not.toHaveAttribute(
+      expect(screen.getByTestId("pbm-listing-row-intent")).not.toHaveAttribute(
         "inert"
       );
     }
