@@ -33,6 +33,8 @@ vi.mock("~/server/db", async () => {
 const pbm = {
   entries: [] as PbmRegionLmx[],
   locations: [] as PbmRegionLocation[],
+  /** When set, `fetchRegionLocations` rejects with it instead of returning. */
+  locationsError: null as Error | null,
   calls: 0,
   locationCalls: 0,
   regions: [] as string[],
@@ -49,6 +51,7 @@ vi.mock("~/lib/pinballmap/client", () => ({
       fetchRegionLocations: (region: string) => {
         pbm.locationCalls += 1;
         pbm.regions.push(region);
+        if (pbm.locationsError) return Promise.reject(pbm.locationsError);
         return Promise.resolve(pbm.locations);
       },
     }),
@@ -126,6 +129,7 @@ describe("PinballMap region new-machine alerts (PGlite)", () => {
       { locationId: 26454, name: "Austin Pinball Collective" },
       { locationId: 999, name: "Pinballz Arcade" },
     ];
+    pbm.locationsError = null;
     pbm.calls = 0;
     pbm.locationCalls = 0;
     pbm.regions = [];
@@ -205,6 +209,34 @@ describe("PinballMap region new-machine alerts (PGlite)", () => {
     expect(run).toMatchObject({ discovered: 1, announced: 1 });
     expect(discord.posts[0]?.content).toContain("PinballMap machine #31337");
     expect(discord.posts[0]?.content).toContain("location #4242");
+  });
+
+  it("still announces when the locations lookup THROWS, naming venues by id", async () => {
+    // Distinct from the case above: there the locations call succeeded and simply
+    // did not contain the venue. Here the call itself fails — a PBM outage or a
+    // 429 on the second request of the run. A venue label is nice to have, so
+    // `resolveLabels` swallows it; what must NOT happen is the whole run failing
+    // and stranding a discovery that the seen-set has already recorded.
+    await seedCatalog([{ machineId: 7, name: "Medieval Madness" }]);
+    pbm.entries = [lmx({ lmxId: 1 })];
+    await runRegionNewMachineAlerts();
+
+    pbm.locationsError = new Error("PinballMap fetchRegionLocations failed");
+    pbm.entries = [
+      lmx({ lmxId: 1 }),
+      lmx({ lmxId: 2, locationId: 999, machineId: 7 }),
+    ];
+    const run = await runRegionNewMachineAlerts();
+
+    expect(run).toMatchObject({ discovered: 1, announced: 1, pending: 0 });
+    // The machine title survives — it comes from our own mirror, not from PBM.
+    expect(discord.posts[0]?.content).toContain("Medieval Madness");
+    // The venue falls back to its id rather than taking the run down with it.
+    expect(discord.posts[0]?.content).toContain("location #999");
+    // And the row is marked announced, so it is not re-posted next run.
+    expect(await seenRows()).toContainEqual(
+      expect.objectContaining({ lmxId: 2, announcedAt: expect.any(Date) })
+    );
   });
 
   it("posts nothing when the region is unchanged", async () => {

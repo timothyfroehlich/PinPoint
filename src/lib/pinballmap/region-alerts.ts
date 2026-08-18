@@ -74,9 +74,14 @@ import type { PbmRegionLmx } from "./types";
 const ALERT_CHANNEL_ENV = "DISCORD_PBM_ALERT_CHANNEL_ID";
 
 /**
- * Insert at most this many seen-rows per statement. A region is low thousands of
- * entries at ~4 bound params each; this keeps us far under Postgres' 65535
- * parameter ceiling (same reasoning as the catalog mirror's chunk).
+ * Insert at most this many seen-rows per statement, keeping us far under
+ * Postgres' 65535 bound-parameter ceiling at ~4 params each (same reasoning as
+ * the catalog mirror's chunk).
+ *
+ * Austin measured 487 entries on 2026-08-17, so today the loop runs exactly once
+ * and this is dead weight. Kept anyway: the chunk costs nothing while the region
+ * is small, and it is the difference between a region that grows past the ceiling
+ * degrading gracefully and one failing outright.
  */
 const INSERT_CHUNK = 1000;
 
@@ -98,8 +103,11 @@ const PENDING_READ_LIMIT = 500;
  * which this job would treat as brand new. `normalizeRegion` removes the usual
  * trigger; this catches everything else, including PBM changing that behavior.
  *
- * The number is deliberately far above any real metro (Austin is low thousands)
- * and far below a global dump, so it can only fire on something pathological.
+ * The number is deliberately far above any real metro and far below a global
+ * dump, so it can only fire on something pathological. Austin measured 487
+ * entries on 2026-08-17 — roughly 40x of headroom, which is the point: the
+ * ceiling has to stay clear of a metro that grows for years without ever being
+ * mistaken for one, and an unscoped PBM query returns hundreds of thousands.
  */
 const MAX_REGION_ENTRIES = 20_000;
 

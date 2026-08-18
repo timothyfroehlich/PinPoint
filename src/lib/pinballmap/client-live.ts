@@ -308,9 +308,12 @@ export function createLiveClient(apiToken: string | null): PinballMapClient {
 
     async fetchRegionLocations(region: string): Promise<PbmRegionLocation[]> {
       assertNotInTransaction("pinballmap.fetchRegionLocations");
-      // `no_details=1` strips descriptions, timestamps and counts but keeps id +
-      // name, which is all the alert needs to label a venue. One request for the
-      // whole region; never a per-location lookup.
+      // `no_details=1` strips the HEAVY NESTED content (the machine list, the
+      // conditions, the description) — not the scalar columns. Each row still
+      // arrives with ~20 fields (city, lat/lon, machine_count, …); we read `id`
+      // and `name` and ignore the rest, which is all the alert needs to label a
+      // venue. Measured against the real Austin response 2026-08-17. One request
+      // for the whole region; never a per-location lookup.
       const raw = await readJson(
         `/region/${regionSegment(region)}/locations.json`,
         "fetchRegionLocations",
