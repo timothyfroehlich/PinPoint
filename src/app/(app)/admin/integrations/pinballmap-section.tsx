@@ -25,6 +25,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "~/components/ui/alert-dialog";
+import { IntegrationSection } from "./integration-section";
 import {
   savePinballMapConfigAction,
   syncPinballMapNowAction,
@@ -142,129 +143,134 @@ export function PinballMapSection({
   }
 
   return (
-    <div className="space-y-6">
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Enable (spec §5) */}
-        <section className="flex items-center gap-3">
-          <Switch
-            id="pbm-enabled"
-            checked={enabledInput}
-            onCheckedChange={setEnabledInput}
-          />
-          <Label htmlFor="pbm-enabled" className="text-sm font-medium">
-            {enabledInput ? "Enabled" : "Disabled"}
-          </Label>
-        </section>
+    <IntegrationSection
+      title="Pinball Map"
+      description="Public-lineup sync for the location PinPoint tracks."
+    >
+      <div className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Enable (spec §5) */}
+          <section className="flex items-center gap-3">
+            <Switch
+              id="pbm-enabled"
+              checked={enabledInput}
+              onCheckedChange={setEnabledInput}
+            />
+            <Label htmlFor="pbm-enabled" className="text-sm font-medium">
+              {enabledInput ? "Enabled" : "Disabled"}
+            </Label>
+          </section>
+
+          <Separator />
+
+          {/* Location (spec §6) */}
+          <section className="space-y-2">
+            <div className="flex items-baseline gap-2 flex-wrap">
+              <Label htmlFor="pbm-location" className="text-sm font-medium">
+                Location id
+              </Label>
+              <span className="text-xs text-muted-foreground text-pretty">
+                · The Pinball Map location PinPoint tracks. Changing it
+                re-points the whole app at a different venue.
+              </span>
+            </div>
+            <Input
+              id="pbm-location"
+              name="locationId"
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]+"
+              autoComplete="off"
+              value={locationInput}
+              onChange={(e) => {
+                setLocationInput(e.target.value);
+              }}
+              aria-invalid={trimmedLocation.length > 0 && !locationValid}
+              className="max-w-[200px]"
+            />
+            {trimmedLocation.length > 0 && !locationValid && (
+              <p className="text-xs text-destructive flex items-center gap-1">
+                <AlertCircle className="size-3" aria-hidden /> Enter a positive
+                whole number.
+              </p>
+            )}
+          </section>
+
+          <div className="flex items-center gap-3 pt-2 border-t border-outline-variant/50">
+            <Button type="submit" disabled={!canSave} className="min-w-[140px]">
+              {isSaving ? (
+                <>
+                  <Loader2 className="mr-2 size-4 animate-spin motion-reduce:animate-none" />
+                  Saving...
+                </>
+              ) : (
+                "Save changes"
+              )}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleReset}
+              disabled={!isDirty || isSaving}
+            >
+              Reset
+            </Button>
+          </div>
+        </form>
 
         <Separator />
 
-        {/* Location (spec §6) */}
-        <section className="space-y-2">
-          <div className="flex items-baseline gap-2 flex-wrap">
-            <Label htmlFor="pbm-location" className="text-sm font-medium">
-              Location id
-            </Label>
-            <span className="text-xs text-muted-foreground text-pretty">
-              · The Pinball Map location PinPoint tracks. Changing it re-points
-              the whole app at a different venue.
-            </span>
-          </div>
-          <Input
-            id="pbm-location"
-            name="locationId"
-            type="text"
-            inputMode="numeric"
-            pattern="[0-9]+"
-            autoComplete="off"
-            value={locationInput}
-            onChange={(e) => {
-              setLocationInput(e.target.value);
-            }}
-            aria-invalid={trimmedLocation.length > 0 && !locationValid}
-            className="max-w-[200px]"
-          />
-          {trimmedLocation.length > 0 && !locationValid && (
-            <p className="text-xs text-destructive flex items-center gap-1">
-              <AlertCircle className="size-3" aria-hidden /> Enter a positive
-              whole number.
-            </p>
-          )}
-        </section>
+        {/* Sync health (spec §4.2) + Sync now (§4.3) + link-out (§4.4) */}
+        <SyncPanel
+          health={health}
+          allowance={allowance}
+          locationUrl={locationUrl}
+        />
 
-        <div className="flex items-center gap-3 pt-2 border-t border-outline-variant/50">
-          <Button type="submit" disabled={!canSave} className="min-w-[140px]">
-            {isSaving ? (
-              <>
-                <Loader2 className="mr-2 size-4 animate-spin motion-reduce:animate-none" />
-                Saving...
-              </>
-            ) : (
-              "Save changes"
-            )}
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={handleReset}
-            disabled={!isDirty || isSaving}
-          >
-            Reset
-          </Button>
-        </div>
-      </form>
-
-      <Separator />
-
-      {/* Sync health (spec §4.2) + Sync now (§4.3) + link-out (§4.4) */}
-      <SyncPanel
-        health={health}
-        allowance={allowance}
-        locationUrl={locationUrl}
-      />
-
-      {/* Location-change confirm (spec §6.8) — controlled, opened from Save. */}
-      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              Change tracked location to {parsedLocation ?? ""}?
-            </AlertDialogTitle>
-            <AlertDialogDescription asChild>
-              <div className="space-y-2 text-sm">
-                {enabledInput ? (
+        {/* Location-change confirm (spec §6.8) — controlled, opened from Save. */}
+        <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                Change tracked location to {parsedLocation ?? ""}?
+              </AlertDialogTitle>
+              <AlertDialogDescription asChild>
+                <div className="space-y-2 text-sm">
+                  {enabledInput ? (
+                    <p>
+                      The stored lineup snapshot is replaced by a fresh read of
+                      the new location.
+                    </p>
+                  ) : (
+                    <p>
+                      Pinball Map is disabled, so the new location takes effect
+                      on the next enable — that enable&apos;s refresh reads it.
+                    </p>
+                  )}
                   <p>
-                    The stored lineup snapshot is replaced by a fresh read of
-                    the new location.
+                    Every intent-On machine whose title is not on the new lineup
+                    shows as <strong>Missing</strong> until someone pushes it
+                    there. Any intent-Off machine whose title is already on the
+                    new lineup shows as <strong>Lingering</strong>.
                   </p>
-                ) : (
-                  <p>
-                    Pinball Map is disabled, so the new location takes effect on
-                    the next enable — that enable&apos;s refresh reads it.
-                  </p>
-                )}
-                <p>
-                  Every intent-On machine whose title is not on the new lineup
-                  shows as <strong>Missing</strong> until someone pushes it
-                  there. Any intent-Off machine whose title is already on the
-                  new lineup shows as <strong>Lingering</strong>.
-                </p>
-                <p>Machine matches and listing intents are kept.</p>
-              </div>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isSaving}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleConfirmSave}
-              disabled={isSaving}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Change location
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </div>
+                  <p>Machine matches and listing intents are kept.</p>
+                </div>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isSaving}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                variant="destructive"
+                onClick={handleConfirmSave}
+                disabled={isSaving}
+              >
+                Change location
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
+    </IntegrationSection>
   );
 }
 
