@@ -1,0 +1,156 @@
+<style>
+  :root {
+    --bg-primary:#1d1d1f; --bg-secondary:#2d2d2f; --bg-tertiary:#3d3d3f;
+    --border:#424245; --text-primary:#f5f5f7; --text-secondary:#98989d;
+    --text-tertiary:#636366; --accent:#0a84ff; --accent-hover:#409cff;
+    --selected-bg:rgba(10,132,255,.15); --selected-border:#0a84ff;
+    --warning:#ff9f0a; --error:#ff453a; --success:#32d74b;
+  }
+  .brand-logo { filter:none !important; }
+
+  /* Authentic reproduction of InfoRail's Details card.
+     Rail is md:grid-cols-[minmax(0,1fr)_320px] -> the card is exactly 320px.
+     CARD = rounded-xl border border-outline-variant bg-card p-4 */
+  .rail { width:320px; max-width:100%; }
+  .ppcard { border-radius:12px; border:1px solid #3a3a3d; background:#252527; padding:16px; }
+  .pplabel { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.1em; color:#98989d; margin-bottom:12px; }
+  .ppdesc { font-size:14px; color:#98989d; line-height:1.5; }
+  .ppdiv { margin-top:16px; padding-top:16px; border-top:1px solid #3a3a3d; }
+  .ppowner { font-size:14px; }
+  .ppowner .k { font-weight:600; color:#98989d; }
+  .ppowner .v { font-weight:600; color:var(--accent); }
+  .ppadded { margin-top:4px; font-size:11px; color:#98989d; }
+  .ppbtn { margin-top:16px; display:block; text-align:center; border:1px solid #3a3a3d; border-radius:8px; padding:7px; font-size:13px; color:#f5f5f7; }
+  .pprow { font-size:14px; display:flex; gap:8px; align-items:baseline; }
+  .pprow .k { font-weight:600; color:#98989d; flex:0 0 auto; }
+  .pprow .v { color:#f5f5f7; }
+  .pprow .v.link { color:var(--accent); }
+  .pprow .v.dim { color:#98989d; }
+  .warnbtn { margin-left:auto; color:var(--warning); font-size:13px; display:inline-flex; align-items:center; gap:4px; flex:0 0 auto; }
+
+  .lane { display:grid; grid-template-columns:repeat(3,320px); gap:18px; overflow-x:auto; padding-bottom:6px; }
+  .lanecap { font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:#98989d; font-weight:600; margin:0 0 8px; }
+  .verdict { border-left:3px solid var(--success); background:rgba(50,215,75,.08); padding:12px 14px; border-radius:0 8px 8px 0; margin:10px 0; font-size:13.5px; line-height:1.6; }
+  .verdict.warn { border-left-color:var(--warning); background:rgba(255,159,10,.08); }
+  .verdict.stop { border-left-color:var(--error); background:rgba(255,69,58,.08); }
+  blockquote { border-left:2px solid #4a4a4d; margin:8px 0; padding:2px 0 2px 12px; color:#c7c7cc; font-size:13px; }
+  .tiny { font-size:11.5px; color:#98989d; }
+</style>
+
+<h2>Details card — authentic, 320&nbsp;px, three ways to write the Pinball Map row</h2>
+<p class="subtitle">Real geometry this time: the rail is <code>md:grid-cols-[minmax(0,1fr)_320px]</code>, the card is <code>rounded-xl border p-4</code>, the label is 10&nbsp;px bold uppercase. Model sits above the Pinball Map line, both above Owner.</p>
+
+<div class="lane">
+
+  <div>
+    <p class="lanecap">A · labelled row, state is the link</p>
+    <div class="rail"><div class="ppcard">
+      <div class="pplabel">Details</div>
+      <div class="ppdesc">Ramps rebuilt Jan 2026. Left orbit switch is finicky.</div>
+      <div class="ppdiv">
+        <div class="pprow"><span class="k">Model</span><span class="v">Godzilla (Premium)</span></div>
+        <div class="pprow" style="margin-top:4px"><span class="k">Pinball&nbsp;Map</span><span class="v link">Listed&nbsp;↗</span></div>
+      </div>
+      <div class="ppdiv">
+        <div class="ppowner"><span class="k">Owner</span> <span class="v">Tim F.</span></div>
+        <div class="ppadded">Added Mar 4, 2025</div>
+      </div>
+      <div class="ppbtn">Edit machine</div>
+    </div></div>
+    <p class="tiny" style="margin-top:8px">No repetition, and the link survives in the unlisted state (see below), which is what keeps attribution honest.</p>
+  </div>
+
+  <div>
+    <p class="lanecap">B · unlabelled, full sentence</p>
+    <div class="rail"><div class="ppcard">
+      <div class="pplabel">Details</div>
+      <div class="ppdesc">Ramps rebuilt Jan 2026. Left orbit switch is finicky.</div>
+      <div class="ppdiv">
+        <div class="pprow"><span class="k">Model</span><span class="v">Godzilla (Premium)</span></div>
+        <div class="pprow" style="margin-top:4px"><span class="v link">View on Pinball&nbsp;Map&nbsp;↗</span></div>
+      </div>
+      <div class="ppdiv">
+        <div class="ppowner"><span class="k">Owner</span> <span class="v">Tim F.</span></div>
+        <div class="ppadded">Added Mar 4, 2025</div>
+      </div>
+      <div class="ppbtn">Edit machine</div>
+    </div></div>
+    <p class="tiny" style="margin-top:8px">Your original. Reads fine, but the row loses its alignment with Model and Owner — it is the only value with no key.</p>
+  </div>
+
+  <div>
+    <p class="lanecap">C · their logo as the label</p>
+    <div class="rail"><div class="ppcard">
+      <div class="pplabel">Details</div>
+      <div class="ppdesc">Ramps rebuilt Jan 2026. Left orbit switch is finicky.</div>
+      <div class="ppdiv">
+        <div class="pprow"><span class="k">Model</span><span class="v">Godzilla (Premium)</span></div>
+        <div class="pprow" style="margin-top:4px"><span class="k" style="opacity:.45;border:1px dashed #6a6a6d;padding:1px 6px;border-radius:4px">[PBM logo]</span><span class="v link">Listed&nbsp;↗</span></div>
+      </div>
+      <div class="ppdiv">
+        <div class="ppowner"><span class="k">Owner</span> <span class="v">Tim F.</span></div>
+        <div class="ppadded">Added Mar 4, 2025</div>
+      </div>
+      <div class="ppbtn">Edit machine</div>
+    </div></div>
+    <p class="tiny" style="margin-top:8px">Blocked — see the trademark note below.</p>
+  </div>
+
+</div>
+
+<h3 style="margin-top:28px">The other states, in shape A</h3>
+<div class="lane">
+  <div>
+    <p class="lanecap">not listed</p>
+    <div class="rail"><div class="ppcard">
+      <div class="pplabel">Details</div>
+      <div class="ppdesc">Ramps rebuilt Jan 2026.</div>
+      <div class="ppdiv">
+        <div class="pprow"><span class="k">Model</span><span class="v">Godzilla (Premium)</span></div>
+        <div class="pprow" style="margin-top:4px"><span class="k">Pinball&nbsp;Map</span><span class="v link">Not&nbsp;listed&nbsp;↗</span></div>
+      </div>
+      <div class="ppdiv"><div class="ppowner"><span class="k">Owner</span> <span class="v">Tim F.</span></div><div class="ppadded">Added Mar 4, 2025</div></div>
+    </div></div>
+  </div>
+  <div>
+    <p class="lanecap">previous listing · member and above</p>
+    <div class="rail"><div class="ppcard">
+      <div class="pplabel">Details</div>
+      <div class="ppdesc">Ramps rebuilt Jan 2026.</div>
+      <div class="ppdiv">
+        <div class="pprow"><span class="k">Model</span><span class="v">Godzilla (Premium)</span></div>
+        <div class="pprow" style="margin-top:4px"><span class="k">Pinball&nbsp;Map</span><span class="v link">Not&nbsp;listed&nbsp;↗</span><span class="warnbtn">⚠ Configuration issue</span></div>
+      </div>
+      <div class="ppdiv"><div class="ppowner"><span class="k">Owner</span> <span class="v">Tim F.</span></div><div class="ppadded">Added Mar 4, 2025</div></div>
+    </div></div>
+    <p class="tiny" style="margin-top:8px">320&nbsp;px is tight — “Not listed ↗ ⚠ Configuration issue” wraps. It may have to drop to its own line under the row.</p>
+  </div>
+  <div>
+    <p class="lanecap">no catalog match (homebrew)</p>
+    <div class="rail"><div class="ppcard">
+      <div class="pplabel">Details</div>
+      <div class="ppdesc">Built by Adam, 2019. One of a kind.</div>
+      <div class="ppdiv">
+        <div class="pprow"><span class="k">Model</span><span class="v dim">Not specified</span></div>
+        <div class="pprow" style="margin-top:4px"><span class="k">Pinball&nbsp;Map</span><span class="v link">Not&nbsp;listed&nbsp;↗</span></div>
+      </div>
+      <div class="ppdiv"><div class="ppowner"><span class="k">Owner</span> <span class="v">Adam K.</span></div><div class="ppadded">Added Jun 2, 2024</div></div>
+    </div></div>
+  </div>
+</div>
+
+<h3 style="margin-top:28px">Strict reading of their <code>llms.txt</code> — you are mostly right</h3>
+
+<blockquote>“…if your app displays data for a specific location, the attribution link must point to that location’s listing, not just the homepage”</blockquote>
+
+<div class="verdict"><strong>The Model row: you’re right.</strong> The trigger in that sentence is <em>data for a specific location</em>. “Godzilla (Premium) — Stern, 2021” is catalog data — identical for every Godzilla Premium anywhere on earth, and it asserts nothing about APC. It does not trip the location-link clause.</div>
+
+<div class="verdict warn"><strong>The line beneath it: still does trip it.</strong> “Listed / Not listed” is a claim about <em>APC’s lineup</em>, and we only know it from their location payload. That is location-specific data by any reading, so that row needs the location link — in <em>both</em> states, which is why every mockup above links “Not listed” too. This is a different reason than I gave you last turn; I was wrong that the Model row was the trigger.</div>
+
+<div class="verdict warn"><strong>One residual on the catalog data.</strong> CC BY-SA 4.0 wants attribution for any use of the data, catalog included. Their own text says a generic <code>pinballmap.com</code> link “is fine for general credit (e.g. an about page)”. We link from the machine page today, so we’re covered either way — but if the Model row ever outlives the Pinball Map row on some surface, that surface needs a credit somewhere.</div>
+
+<div class="verdict stop"><strong>The logo: don’t.</strong> Their <code>llms.txt</code> says nothing about logos or brand assets, and we have no Pinball Map asset in the repo. More to the point, CC BY-SA licenses the <em>data</em>, not their marks — a logo is a trademark and we have no grant to use one as a UI label. I also can’t go look at their site to check (CORE-PBM-001 forbids crawling them). If you want it, it’s an email to them, not a design decision. <strong>A</strong> gets you the same “no repetition” outcome with no permission question.</div>
+
+<h3 style="margin-top:26px">Typing in a Model — the flow exists as a bead, not as code</h3>
+<p style="font-size:13.5px;line-height:1.6"><strong>PP-3bbr</strong> is exactly this: split model identity (title, manufacturer, year, opdb/ipdb) from the Pinball Map catalog match, with a “Use Pinball Map’s data” checkbox — checked means derived and read-only, unchecked means hand-entered and the machine isn’t listable. Today those fields are copied from the catalog on match and the schema comment says they are “never trusted from the client”, so there is no writable path at all. Two questions it leaves open: validation for client-supplied values, and what happens when a hand-entered model is later matched to a catalog title — do catalog values overwrite, or only fill blanks?</p>
+<p style="font-size:13.5px"><strong>So “Not specified” is honest but currently a dead end</strong> — nothing in the UI can change it until PP-3bbr ships. Want me to pull it into this bead, or keep it separate and let the row read “Not specified” for now?</p>

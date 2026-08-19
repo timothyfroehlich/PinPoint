@@ -1,0 +1,132 @@
+<h2>Where does the abandoned-listing notice and its removal control live?</h2>
+<p class="subtitle">PP-l81u shipped the read-only notice on the <strong>Info</strong> tab. PP-o355.32 will add a button that actually deletes the entry from pinballmap.com. The question is which tab gets which. Each option below shows <em>both</em> tabs so you can see what each reader ends up with.</p>
+
+<style>
+  .pbmwrap { display: grid; gap: 14px; }
+  .tabpair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 900px) { .tabpair { grid-template-columns: 1fr; } }
+  .tabbox { border: 1px solid rgba(128,128,128,.35); border-radius: 8px; overflow: hidden; }
+  .tabhdr { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; padding: 6px 10px; background: rgba(128,128,128,.12); font-weight: 600; }
+  .tabbody { padding: 12px; font-size: 13px; line-height: 1.5; }
+  .pbmcard { border: 1px solid rgba(128,128,128,.35); border-radius: 6px; padding: 10px; }
+  .pbmtitle { display: flex; align-items: center; gap: 6px; font-weight: 600; font-size: 13px; margin-bottom: 6px; }
+  .muted { opacity: .7; }
+  .tiny { font-size: 11.5px; }
+  .alertbox { border: 1px solid #b45309; background: rgba(180,83,9,.10); border-radius: 6px; padding: 8px 10px; margin-top: 8px; }
+  .alertbox .hd { color: #b45309; font-weight: 600; font-size: 12.5px; }
+  .btn { display: inline-block; border: 1px solid rgba(128,128,128,.5); border-radius: 5px; padding: 3px 9px; font-size: 12px; margin-top: 6px; }
+  .btn.danger { border-color: #b91c1c; color: #b91c1c; }
+  .row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding: 5px 0; border-bottom: 1px dashed rgba(128,128,128,.25); }
+  .row:last-child { border-bottom: 0; }
+  .none { opacity: .45; font-style: italic; font-size: 12px; padding: 6px 0; }
+  .flag { font-size: 11px; font-weight: 600; color: #b45309; }
+</style>
+
+<div class="options">
+
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Both tabs, different jobs</h3>
+      <p class="tiny muted">Info tab reports. Manage tab acts. Anyone visiting the machine learns something is unresolved; only someone with edit rights and working credentials gets the button.</p>
+      <div class="tabpair" style="margin-top:10px">
+        <div class="tabbox">
+          <div class="tabhdr">Info tab · everyone</div>
+          <div class="tabbody">
+            <div class="pbmcard">
+              <div class="pbmtitle">◆ Pinball Map</div>
+              <div>Linked as Godzilla (Premium) · not listed.</div>
+              <div class="alertbox">
+                <div class="hd">⚠ Previous listing still live: “Godzilla (Pro)”</div>
+                <div class="tiny muted">▸ Why is this here?</div>
+              </div>
+              <div class="tiny muted" style="margin-top:8px">View on Pinball Map ↗</div>
+            </div>
+          </div>
+        </div>
+        <div class="tabbox">
+          <div class="tabhdr">Manage tab · tech / admin</div>
+          <div class="tabbody">
+            <div class="pbmcard">
+              <div class="pbmtitle">Pinball Map ↗ <span class="tiny muted" style="margin-left:auto;font-weight:400">last synced 9:14 AM · Sync now</span></div>
+              <div class="row"><span>Pinball Map title</span><span class="muted">Godzilla (Premium) · Change…</span></div>
+              <div class="row"><span>Listing</span><span class="muted">Not on APC’s lineup · <span class="btn">Add to Pinball Map…</span></span></div>
+              <div class="row"><span><span class="flag">Previous listing</span><br><span class="tiny muted">“Godzilla (Pro)” — still public</span></span><span><span class="btn danger">Remove from Pinball Map…</span></span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Manage tab only</h3>
+      <p class="tiny muted">Pull the notice off the public card entirely. Visitors see a clean machine page; the leftover entry becomes purely a maintainer's chore. Cost: nobody without edit rights ever learns the public map is wrong about this machine.</p>
+      <div class="tabpair" style="margin-top:10px">
+        <div class="tabbox">
+          <div class="tabhdr">Info tab · everyone</div>
+          <div class="tabbody">
+            <div class="pbmcard">
+              <div class="pbmtitle">◆ Pinball Map</div>
+              <div>Linked as Godzilla (Premium) · not listed.</div>
+              <div class="none">— no notice —</div>
+              <div class="tiny muted">View on Pinball Map ↗</div>
+            </div>
+          </div>
+        </div>
+        <div class="tabbox">
+          <div class="tabhdr">Manage tab · tech / admin</div>
+          <div class="tabbody">
+            <div class="pbmcard">
+              <div class="pbmtitle">Pinball Map ↗ <span class="tiny muted" style="margin-left:auto;font-weight:400">last synced 9:14 AM · Sync now</span></div>
+              <div class="row"><span>Pinball Map title</span><span class="muted">Godzilla (Premium) · Change…</span></div>
+              <div class="row"><span>Listing</span><span class="muted">Not on APC’s lineup · <span class="btn">Add to Pinball Map…</span></span></div>
+              <div class="row"><span><span class="flag">Previous listing</span><br><span class="tiny muted">“Godzilla (Pro)” — still public</span></span><span><span class="btn danger">Remove from Pinball Map…</span></span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Info tab only, action inline</h3>
+      <p class="tiny muted">One place to look — the notice and its fix sit together. Cost: a button that writes to a public third-party map lives on the read-oriented tab, next to content shown to logged-out visitors, and has to hide itself for most readers.</p>
+      <div class="tabpair" style="margin-top:10px">
+        <div class="tabbox">
+          <div class="tabhdr">Info tab · everyone (button gated)</div>
+          <div class="tabbody">
+            <div class="pbmcard">
+              <div class="pbmtitle">◆ Pinball Map</div>
+              <div>Linked as Godzilla (Premium) · not listed.</div>
+              <div class="alertbox">
+                <div class="hd">⚠ Previous listing still live: “Godzilla (Pro)”</div>
+                <div class="tiny muted">▸ Why is this here?</div>
+                <div><span class="btn danger">Remove from Pinball Map…</span></div>
+              </div>
+              <div class="tiny muted" style="margin-top:8px">View on Pinball Map ↗</div>
+            </div>
+          </div>
+        </div>
+        <div class="tabbox">
+          <div class="tabhdr">Manage tab · tech / admin</div>
+          <div class="tabbody">
+            <div class="pbmcard">
+              <div class="pbmtitle">Pinball Map ↗ <span class="tiny muted" style="margin-left:auto;font-weight:400">last synced 9:14 AM · Sync now</span></div>
+              <div class="row"><span>Pinball Map title</span><span class="muted">Godzilla (Premium) · Change…</span></div>
+              <div class="row"><span>Listing</span><span class="muted">Not on APC’s lineup · <span class="btn">Add to Pinball Map…</span></span></div>
+              <div class="none">— nothing about the previous listing —</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<p class="tiny muted" style="margin-top:16px">Note on all three: when the operator credential isn’t provisioned, the removal button is simply absent — its absence must not read as an error, since manual removal on pinballmap.com plus the record self-clearing stays a valid path.</p>

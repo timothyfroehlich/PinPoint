@@ -65,6 +65,9 @@ const baseProps = {
   pinballmapExcluded: false,
   pinballmapExcludedReason: null,
   pinballmapTitleName: "Godzilla (Premium)",
+  modelName: null,
+  manufacturer: null,
+  year: null,
 };
 
 function hiddenDescription(): HTMLInputElement {

@@ -45,13 +45,25 @@ export const PBM_USER_AGENT =
 export const APC_LOCATION_ID = 26454;
 
 /**
- * Minimum interval between MANUAL ("Sync now") snapshot refreshes (PP-hbi0).
+ * Manual-refresh token bucket (PP-hbi0, reshaped for spec 3.2 in PP-o355.21).
  *
  * The hourly cron is the sanctioned automated refresh (one location call/hour,
- * CORE-PBM-001); human-initiated refreshes are throttled to at most one per this
- * interval — 3 minutes → a ceiling of 20 manual syncs/hour (approved by Tim,
- * 2026-07-19). Enforced at the `syncLocationSnapshot` seam so every live-fetch
- * caller (Sync now, verify/reconnect, any future caller) inherits one chokepoint;
- * the cron path bypasses it by passing `trigger: "cron"`.
+ * CORE-PBM-001); human-initiated refreshes draw from this bucket instead. It
+ * replaced a flat 3-minute floor, which enforced the same sustained rate but
+ * refused the thing people actually do — walking a few machines in a row and
+ * wanting each one's lineup current.
+ *
+ * `BURST` back-to-back refreshes are allowed, then one per `REFILL_MS`. The
+ * sustained rate is therefore 60/3 = **20 per hour exactly**, which is the
+ * ceiling Tim approved with PBM on 2026-07-19 and the number CORE-PBM-001
+ * records. Changing `REFILL_MS` changes that commitment; changing `BURST`
+ * changes only how bunched the same traffic is.
+ *
+ * Global, not per-user: the cap is on PinPoint's traffic to someone else's
+ * service, so ten people clicking once is the same load as one person clicking
+ * ten times. Enforced at the `syncLocationSnapshot` seam so every live-fetch
+ * caller inherits one chokepoint; the cron path bypasses it with
+ * `trigger: "cron"`.
  */
-export const PBM_MANUAL_SYNC_MIN_INTERVAL_MS = 3 * 60 * 1000;
+export const PBM_REFRESH_BURST = 3;
+export const PBM_REFRESH_REFILL_MS = 3 * 60 * 1000;

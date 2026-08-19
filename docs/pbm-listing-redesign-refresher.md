@@ -1,6 +1,18 @@
 # Pinball Map listing + machine edit page — settled design spec
 
-_Canonical spec, not session scratch._ Settled across three design sessions ending 2026-07-22, amended 2026-07-23 (§6a) and 2026-07-25 (§7). **PP-o355.7 / .15 / .19 / .20 / .21 / .22 cite this file by path**, so amend it in place rather than superseding it elsewhere (AGENTS.md §8). Current build state is §11.
+> **Superseded for the listing control by
+> [docs/feature-specs/pinballmap.md](feature-specs/pinballmap.md) (2026-08-16).**
+> Read that first. Where the two disagree, the feature spec wins — and they
+> disagree about the central thing: this document says linking is **automatic**
+> (§3, §6a), and the feature spec's 5.1 forbids PinPoint from changing listing
+> intent in either direction. The auto-link machinery that followed from §6a was
+> deleted in PP-o355.21.
+>
+> Kept because the beads below cite it by path and because §1–2 are the record
+> of why #1683 was replaced — the reasoning is still right, only the design it
+> arrived at was superseded.
+
+_Design record._ Settled across three design sessions ending 2026-07-22, amended 2026-07-23 (§6a) and 2026-07-25 (§7). PP-o355.7 / .15 / .19 / .20 / .21 / .22 cite this file by path.
 
 ---
 

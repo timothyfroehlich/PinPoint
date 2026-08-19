@@ -10,9 +10,17 @@ import { VALID_MACHINE_PRESENCE_STATUSES } from "~/lib/machines/presence";
 
 /**
  * PinballMap linking fields shared by create + edit (bead B / PP-o355.2).
- * The picker submits `pinballmapMachineId`; the "not on PinballMap" checkbox
- * submits `pinballmapExcluded` (+ optional reason). Model metadata is NOT taken
- * from the client — the server derives it from the catalog mirror on link.
+ * The picker submits `pinballmapMachineId`; the "not on PinballMap" choice
+ * submits `pinballmapExcluded` (+ optional reason) and, since PP-3bbr, the
+ * hand-entered `modelName` / `manufacturer` / `year` for a game the catalog
+ * cannot cover.
+ *
+ * **For a LINKED machine model metadata is still not taken from the client** —
+ * the server derives it from the catalog mirror. These three are read only on
+ * the excluded branch of `resolvePbmLinkColumns*`, where there is no catalog row
+ * to derive from and a person typing it is the only source there will be. A
+ * request that sends them alongside a title has them dropped, and the DB CHECK
+ * `machines_model_name_requires_excluded` is the backstop.
  *
  * **`pinballmapListed` is deliberately absent** and must not be added back
  * (PP-o355.29). It records that a listing exists on the public map, so only a
@@ -29,6 +37,29 @@ const pinballmapLinkFields = {
     .string()
     .trim()
     .max(200, "Reason must be less than 200 characters")
+    .optional(),
+  modelName: z
+    .string()
+    .trim()
+    // The catalog mirror's own `name` is unbounded `text`, so there is no
+    // upstream width to match — 200 is a cap on free text arriving from a
+    // request, sized well above any real game title.
+    .max(200, "Model name must be less than 200 characters")
+    .optional(),
+  manufacturer: z
+    .string()
+    .trim()
+    .max(100, "Manufacturer must be less than 100 characters")
+    .optional(),
+  // 1930 is a floor, not a guess: the first coin-operated pinball machines
+  // (Ballyhoo, Baffle Ball) date to 1931, and APC's collection is meant to span
+  // every era from the 1940s EMs on. The upper bound is next year rather than
+  // this one — a game announced for the coming season is a real thing to own.
+  year: z.coerce
+    .number()
+    .int()
+    .min(1930, "Year must be 1930 or later")
+    .max(new Date().getFullYear() + 1, "Year can't be that far in the future")
     .optional(),
 };
 

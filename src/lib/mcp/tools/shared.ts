@@ -135,8 +135,8 @@ const uuidSchema = z.string().uuid();
  * Extends {@link MachinePbmColumns} — the same column set the create/edit paths
  * write — so a resolved machine carries its full PinballMap state. That is what
  * `get_machine` reports (via `buildMachinePinballmap`) and what any future write
- * tool needs to carry `pinballmapListed`/`pinballmapLmxId` over from the STORED
- * row rather than from its arguments (PP-o355.29).
+ * tool needs to carry `pinballmapIntent` over from the STORED row rather than
+ * from its arguments (PP-o355.29).
  */
 export interface MachineRef extends MachinePbmColumns {
   id: string;
@@ -168,8 +168,8 @@ export async function resolveMachine(ref: string): Promise<MachineRef> {
       pinballmapMachineId: true,
       pinballmapExcluded: true,
       pinballmapExcludedReason: true,
-      pinballmapListed: true,
-      pinballmapLmxId: true,
+      pinballmapIntent: true,
+      modelName: true,
       manufacturer: true,
       year: true,
       opdbId: true,

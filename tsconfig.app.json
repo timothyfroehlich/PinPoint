@@ -42,6 +42,11 @@
     // `composite: true` every file pulled into the program must be listed
     // (TS6307), and the `**/*.ts` glob does not cover `.mjs`.
     "scripts/lib/db-target.mjs",
+    // Same rule, pulled in by supabase/seed-pinballmap-state.ts. That seed is
+    // .ts rather than .mjs like its siblings because it imports the real
+    // `parseLocation()` — the snapshot it writes must match what the cron
+    // writes, byte for byte, and a re-implemented mapping would drift.
+    "scripts/lib/pg-client.mjs",
     // JSON imports (resolveJsonModule). Same TS6307 rule as db-target.mjs above:
     // once `outDir` is set, composite requires every program file to be listed,
     // and JSON pulled in by an import is a program file. Globs rather than exact

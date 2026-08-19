@@ -1,0 +1,2 @@
+ALTER TABLE "machines" ADD COLUMN "model_name" text;--> statement-breakpoint
+ALTER TABLE "machines" ADD CONSTRAINT "machines_model_name_requires_excluded" CHECK (NOT (model_name IS NOT NULL AND NOT pinballmap_excluded));

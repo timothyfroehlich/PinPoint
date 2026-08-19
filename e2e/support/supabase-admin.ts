@@ -496,10 +496,18 @@ export async function deletePinballMapCatalogEntries(
 }
 
 /**
- * Mark a test machine as linked-and-listed on PinballMap, directly in the DB.
- * Mirrors what a prior save through the real edit form would have produced,
- * so a test can start from "already listed" without spending a whole extra
- * form round-trip getting there.
+ * Put a test machine on the Pinball Map lineup, directly in the DB: link it to
+ * a catalog title, set intent On, and add the entry to the STORED lineup.
+ *
+ * All three, because since PP-o355.21 they are three separate facts and the
+ * feature is the comparison between them. Setting intent alone would produce
+ * Missing (we want it on the lineup, it is not there), not the
+ * already-on-the-lineup state; and the abandonment a re-match records is
+ * resolved from the stored lineup by the old title, so without the entry there
+ * is nothing to abandon.
+ *
+ * The stored lineup is a captured fixture that this edits in place — no live
+ * fetch, so CORE-PBM-001 / CORE-TEST-006 still hold.
  */
 export async function linkMachineToPinballMap(
   machineInitials: string,
@@ -509,9 +517,80 @@ export async function linkMachineToPinballMap(
     .from("machines")
     .update({
       pinballmap_machine_id: link.pinballmapMachineId,
-      pinballmap_listed: true,
-      pinballmap_lmx_id: link.pinballmapLmxId,
+      pinballmap_intent: "on",
     })
     .eq("initials", machineInitials);
   if (error) throw error;
+
+  await addLmxToStoredLineup(link);
+}
+
+/**
+ * Add one entry to the stored lineup, leaving the rest of the capture alone.
+ *
+ * Read-modify-write rather than a JSON patch because `snapshot_json` is one
+ * blob and PostgREST has no array-append; the window is acceptable here because
+ * nothing else writes the singleton during an E2E run.
+ */
+export async function addLmxToStoredLineup(entry: {
+  pinballmapMachineId: number;
+  pinballmapLmxId: number;
+}) {
+  const { data, error } = await supabaseAdmin
+    .from("pinballmap_state")
+    .select("snapshot_json")
+    .eq("id", "singleton")
+    .single();
+  if (error) throw error;
+
+  const snapshot = data.snapshot_json as {
+    lmxes: { id: number; machineId: number }[];
+    machineCount: number;
+  } | null;
+  if (!snapshot) {
+    throw new Error(
+      "pinballmap_state has no stored lineup — run `pnpm run db:_seed-pinballmap-state` first."
+    );
+  }
+  if (snapshot.lmxes.some((l) => l.id === entry.pinballmapLmxId)) return;
+
+  snapshot.lmxes.push({
+    id: entry.pinballmapLmxId,
+    machineId: entry.pinballmapMachineId,
+    icEnabled: null,
+    lastUpdatedByUsername: null,
+    conditions: [],
+  } as never);
+  snapshot.machineCount = snapshot.lmxes.length;
+
+  const { error: writeError } = await supabaseAdmin
+    .from("pinballmap_state")
+    .update({ snapshot_json: snapshot })
+    .eq("id", "singleton");
+  if (writeError) throw writeError;
+}
+
+/** Undo {@link addLmxToStoredLineup}, so a run does not leak into the next. */
+export async function removeLmxFromStoredLineup(lmxIds: number[]) {
+  const { data, error } = await supabaseAdmin
+    .from("pinballmap_state")
+    .select("snapshot_json")
+    .eq("id", "singleton")
+    .single();
+  if (error) throw error;
+
+  const snapshot = data.snapshot_json as {
+    lmxes: { id: number }[];
+    machineCount: number;
+  } | null;
+  if (!snapshot) return;
+
+  snapshot.lmxes = snapshot.lmxes.filter((l) => !lmxIds.includes(l.id));
+  snapshot.machineCount = snapshot.lmxes.length;
+
+  const { error: writeError } = await supabaseAdmin
+    .from("pinballmap_state")
+    .update({ snapshot_json: snapshot })
+    .eq("id", "singleton");
+  if (writeError) throw writeError;
 }
