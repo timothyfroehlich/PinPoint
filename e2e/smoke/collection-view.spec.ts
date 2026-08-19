@@ -24,9 +24,18 @@ test.describe("Collection view (PP-slrd.1)", () => {
     page,
   }) => {
     await page.goto("/");
-    await page.getByTestId("user-menu-button").click();
-    await page.getByTestId("user-menu-my-machines").click();
-    await expect(page).toHaveURL(/\/c\/owner\//);
+    // Re-issue the menu navigation until it takes (PP-2b3r, same mechanism as
+    // the owner-block retry below). These specs reach the page by clicking
+    // through a client-side navigation, where a `next dev` Fast Refresh rebuild
+    // can remount the React tree mid-navigation and discard the soft nav — or
+    // the click can land before React attaches the handler and be dropped. Only
+    // re-issuing the click recovers it. PR #1873's post-navigation hydration
+    // wait narrows the window but does not close it.
+    await expect(async () => {
+      await page.getByTestId("user-menu-button").click();
+      await page.getByTestId("user-menu-my-machines").click();
+      await expect(page).toHaveURL(/\/c\/owner\//, { timeout: 5000 });
+    }).toPass({ timeout: 30_000 });
     await expect(page.getByTestId("collection-summary")).toBeVisible();
     await expect(page.getByTestId("collection-overview-body")).toBeVisible();
     await assertNoHorizontalOverflow(page);
@@ -35,14 +44,24 @@ test.describe("Collection view (PP-slrd.1)", () => {
 
   test("Issues and Timeline tabs render without 500", async ({ page }) => {
     await page.goto("/");
-    await page.getByTestId("user-menu-button").click();
-    await page.getByTestId("user-menu-my-machines").click();
-    await page.getByTestId("collection-tab-issues").click();
-    await expect(page).toHaveURL(/\/issues$/);
+    // Each hop is a client-side navigation that a Fast Refresh remount can
+    // discard; re-issue the click that owns each URL change until it takes
+    // (PP-2b3r — see the retry note on the Overview test above).
+    await expect(async () => {
+      await page.getByTestId("user-menu-button").click();
+      await page.getByTestId("user-menu-my-machines").click();
+      await expect(page).toHaveURL(/\/c\/owner\//, { timeout: 5000 });
+    }).toPass({ timeout: 30_000 });
+    await expect(async () => {
+      await page.getByTestId("collection-tab-issues").click();
+      await expect(page).toHaveURL(/\/issues$/, { timeout: 5000 });
+    }).toPass({ timeout: 30_000 });
     await expect(page.getByTestId("collection-summary")).toBeVisible();
     await assertNoA11yViolations(page);
-    await page.getByTestId("collection-tab-timeline").click();
-    await expect(page).toHaveURL(/\/timeline$/);
+    await expect(async () => {
+      await page.getByTestId("collection-tab-timeline").click();
+      await expect(page).toHaveURL(/\/timeline$/, { timeout: 5000 });
+    }).toPass({ timeout: 30_000 });
     await expect(page.getByTestId("collection-summary")).toBeVisible();
     await assertNoA11yViolations(page);
   });
