@@ -9,6 +9,10 @@
       "schedule": "17 3 * * 0"
     },
     {
+      "path": "/api/cron/pinballmap-sync",
+      "schedule": "0 * * * *"
+    },
+    {
       "path": "/api/cron/pinballmap-region-alerts",
       "schedule": "23 * * * *"
     }
