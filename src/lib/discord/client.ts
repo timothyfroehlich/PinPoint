@@ -146,8 +146,13 @@ async function postMessage(
  * attempt — while `blocked` is reported to Sentry so someone actually fixes it.
  * Retrying does not summon the admin; surfacing the failure does.
  *
- * Safe for the DM path too: `dispatch.ts` treats every non-`skipped` failure the
- * same way (one warn line), so nothing about a user's notifications changes.
+ * No behavior change on the DM path *today*: `dispatch.ts` collapses every
+ * non-`skipped` failure into one warn line (dispatch.ts:~382), so `blocked` and
+ * `transient` are indistinguishable to a DM caller as the code stands. That is a
+ * property of the current consumer, not an invariant of this classifier — a
+ * future retry/replay queue that treats `transient` as "try again later" would
+ * make missing-access DMs stop retrying. Whoever adds that distinction owns
+ * re-checking this mapping for the DM path.
  */
 const DISCORD_ERROR_CANNOT_DM_USER = 50007;
 const DISCORD_ERROR_MISSING_ACCESS = 50001;
@@ -167,6 +172,16 @@ async function classify(res: Response): Promise<SendDmResult> {
       : { ok: false, reason: "transient" };
   }
   if (res.status === 429) return { ok: false, reason: "rate_limited" };
+  // Any other 4xx is a client error retrying cannot fix — a malformed channel id
+  // (400), a bad bot token (401), a resource that isn't there. Same argument as
+  // the permanent-403 codes above: on the scheduled `postChannelMessage` path a
+  // `transient` verdict means the hourly job warns forever and never reaches
+  // Sentry, so nobody learns the channel is misconfigured. `blocked` surfaces it.
+  // 429 is handled above; 5xx and the synthetic 599 (network failure) fall
+  // through to `transient`, where retrying genuinely can recover.
+  if (res.status >= 400 && res.status < 500) {
+    return { ok: false, reason: "blocked" };
+  }
   log.warn(
     { status: res.status, action: "sendDm.classify" },
     "Discord API non-2xx"

@@ -177,8 +177,20 @@ function pbmErrorMessage(body: Record<string, unknown> | null): string | null {
   // failure. `true` gets no such carve-out — that one really does signal an
   // error, just without a message.
   if (raw === false) return null;
-  // An object, a number, `true` — unrecognized, but PBM put something in an
-  // error field and we must not read the body as data.
+  // An empty object carries no complaint, the same as an empty array: Rails
+  // serializes `errors` as a hash and sends `{"errors":{}}` on a valid record,
+  // so a present-but-empty object is success, not a failure. Failing closed on it
+  // would turn every good response from such an endpoint into a hard write
+  // failure (the symmetric bug to the empty-array carve-out above).
+  if (
+    typeof raw === "object" &&
+    !Array.isArray(raw) &&
+    Object.keys(raw).length === 0
+  ) {
+    return null;
+  }
+  // A non-empty object, a number, `true` — unrecognized, but PBM put something in
+  // an error field and we must not read the body as data.
   return PBM_UNKNOWN_ERROR;
 }
 

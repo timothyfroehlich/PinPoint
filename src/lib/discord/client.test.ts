@@ -166,6 +166,46 @@ describe("sendDm", () => {
     expect(result).toEqual({ ok: false, reason: "transient" });
   });
 
+  it.each([
+    [400, "malformed channel id / bad request body"],
+    [401, "bad bot token"],
+    [451, "unavailable for legal reasons"],
+  ])(
+    "returns reason='blocked' on a %i client error retrying cannot fix (%s)",
+    async (status) => {
+      // A 4xx other than 429 is a client error: looping the hourly channel post
+      // will keep failing and never reach Sentry if it reads as `transient`. The
+      // 403 path has its own code-based nuance above; every other 4xx is blocked.
+      installFetchMock((call) =>
+        call.url.endsWith("/users/@me/channels")
+          ? new Response("{}", { status })
+          : new Response("{}", { status: 200 })
+      );
+      const result = await sendDm({
+        botToken: "t",
+        discordUserId: "u",
+        content: "hi",
+      });
+      expect(result).toEqual({ ok: false, reason: "blocked" });
+    }
+  );
+
+  it("returns reason='transient' on a 500 server error", async () => {
+    // 5xx is server-side and may recover, so it stays retryable — the boundary
+    // the 4xx→blocked rule must not cross.
+    installFetchMock((call) =>
+      call.url.endsWith("/users/@me/channels")
+        ? new Response("{}", { status: 500 })
+        : new Response("{}", { status: 200 })
+    );
+    const result = await sendDm({
+      botToken: "t",
+      discordUserId: "u",
+      content: "hi",
+    });
+    expect(result).toEqual({ ok: false, reason: "transient" });
+  });
+
   it("returns reason='blocked' on 404 (DM channel does not exist)", async () => {
     installFetchMock((call) =>
       call.url.endsWith("/users/@me/channels")

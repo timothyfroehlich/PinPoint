@@ -282,6 +282,21 @@ describe("live client — a 200 carrying an error body is a FAILED read", () => 
     ).resolves.toEqual([{ lmxId: 1, locationId: 2, machineId: 3 }]);
   });
 
+  it("treats an EMPTY errors OBJECT as success — Rails serializes errors as a hash", async () => {
+    // The symmetric case to the empty array: Rails renders `errors` as a hash and
+    // sends `{"errors":{}}` on a valid record. A non-empty object still fails
+    // closed (see the unrecognized-shape test above); only the empty one is success.
+    installFetchMock(() =>
+      json({
+        errors: {},
+        location_machine_xrefs: [{ id: 1, location_id: 2, machine_id: 3 }],
+      })
+    );
+    await expect(
+      createLiveClient(null).fetchRegionLmxes("austin")
+    ).resolves.toEqual([{ lmxId: 1, locationId: 2, machineId: 3 }]);
+  });
+
   it("treats `error: false` as success — it is a success idiom, not a complaint", async () => {
     // The fail-closed rule for unrecognized shapes has exactly one exception:
     // `false` means the opposite of an error, and failing closed on it would
