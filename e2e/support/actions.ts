@@ -274,6 +274,52 @@ export async function openSidebarIfMobile(
   // No-op — mobile navigation is handled by the bottom tab bar
 }
 
+interface RetryNavClickOptions {
+  /** Outer `toPass` timeout. Default 15 000 ms. */
+  timeout?: number;
+  /** Inner assertion timeout (URL match or visibility). Default 5 000 ms. */
+  innerTimeout?: number;
+}
+
+/**
+ * Retry a client-side navigation click until the expected outcome holds.
+ *
+ * Under `next dev`, Fast Refresh rebuilds can remount the React tree
+ * mid-navigation. The soft navigation is discarded and the click is lost —
+ * only re-issuing it recovers (PP-2b3r). This helper wraps the click in an
+ * `expect().toPass()` retry loop with two safeguards:
+ *
+ * 1. Each attempt presses Escape first to dismiss any Radix dropdown or modal
+ *    that a prior failed attempt may have left open. Without this, retrying a
+ *    dropdown-menu sequence toggles the menu shut instead of re-opening it.
+ * 2. The outer timeout defaults to 15 s so that three sequential calls fit
+ *    comfortably inside the 60 s CI per-test budget.
+ *
+ * @param page     Playwright page
+ * @param click    Callback that performs the click(s)
+ * @param expected RegExp → asserts page URL; Locator → asserts visibility
+ */
+export async function retryNavClick(
+  page: Page,
+  click: () => Promise<void>,
+  expected: RegExp | Locator,
+  options?: RetryNavClickOptions
+): Promise<void> {
+  const timeout = options?.timeout ?? 15_000;
+  const innerTimeout = options?.innerTimeout ?? 5_000;
+  await expect(async () => {
+    // Dismiss any popup/dropdown left open by a previous attempt so the next
+    // click lands on the right target, not a toggle-closed menu (PP-2b3r).
+    await page.keyboard.press("Escape");
+    await click();
+    if (expected instanceof RegExp) {
+      await expect(page).toHaveURL(expected, { timeout: innerTimeout });
+    } else {
+      await expect(expected).toBeVisible({ timeout: innerTimeout });
+    }
+  }).toPass({ timeout });
+}
+
 /**
  * Selects an option from a shadcn/ui Select component.
  * Clicks the trigger, waits for the dropdown, then clicks the option.

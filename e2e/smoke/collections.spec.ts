@@ -31,18 +31,18 @@ test.describe("Personal collections (PP-wqit.1)", () => {
     await expect(page).toHaveURL(/\/c\/collections$/);
 
     // Create a collection via the "New collection" modal — redirects to its view.
-    // Re-issue the trigger click until the modal actually opens (PP-2b3r). This
-    // spec reaches the page through a client-side navigation, and under
-    // `next dev` a Fast Refresh rebuild can remount the tree so the trigger
-    // click lands before React attaches the handler and is dropped — the modal
-    // never opens and the fill below dies on a hidden field. Only re-issuing the
-    // click recovers it; the submit stays outside the retry because re-clicking
-    // it would create a duplicate collection.
+    // Re-issue the trigger click until the modal opens AND the fill sticks
+    // (PP-2b3r). The fill is inside the retry because a Fast Refresh remount
+    // between seeing the Name field and filling it re-triggers the exact
+    // dropped-click bug — the modal disappears and the fill dies on a hidden
+    // field. The submit stays outside: re-clicking it would create a duplicate.
     await expect(async () => {
+      await page.keyboard.press("Escape");
       await page.getByTestId("create-collection-trigger").click();
-      await expect(page.getByLabel("Name")).toBeVisible({ timeout: 5000 });
-    }).toPass({ timeout: 30_000 });
-    await page.getByLabel("Name").fill(name);
+      const nameField = page.getByLabel("Name");
+      await expect(nameField).toBeVisible({ timeout: 5_000 });
+      await nameField.fill(name);
+    }).toPass({ timeout: 15_000 });
     await page.getByTestId("create-collection-submit").click();
     await expect(page).toHaveURL(/\/c\/[0-9a-f-]{36}/);
 
@@ -80,13 +80,14 @@ test.describe("Personal collections (PP-wqit.1)", () => {
 
     // Owner creates a collection with a machine so the shared Overview has content.
     await page.goto("/c/collections");
-    // Re-issue the trigger click until the modal opens (PP-2b3r — see the
-    // create test above); the dropped-click mechanism is the same here.
+    // Same retry-with-fill pattern as the create test above (PP-2b3r).
     await expect(async () => {
+      await page.keyboard.press("Escape");
       await page.getByTestId("create-collection-trigger").click();
-      await expect(page.getByLabel("Name")).toBeVisible({ timeout: 5000 });
-    }).toPass({ timeout: 30_000 });
-    await page.getByLabel("Name").fill(name);
+      const nameField = page.getByLabel("Name");
+      await expect(nameField).toBeVisible({ timeout: 5_000 });
+      await nameField.fill(name);
+    }).toPass({ timeout: 15_000 });
     await page.getByTestId("create-collection-submit").click();
     await expect(page).toHaveURL(/\/c\/[0-9a-f-]{36}/);
     await page.getByTestId("collection-machines-multiselect").click();

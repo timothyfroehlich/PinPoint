@@ -14,6 +14,7 @@ import { STORAGE_STATE } from "../support/auth-state.js";
 import {
   assertNoA11yViolations,
   assertNoHorizontalOverflow,
+  retryNavClick,
 } from "../support/actions.js";
 import { seededMachines } from "../support/constants.js";
 
@@ -24,18 +25,18 @@ test.describe("Collection view (PP-slrd.1)", () => {
     page,
   }) => {
     await page.goto("/");
-    // Re-issue the menu navigation until it takes (PP-2b3r, same mechanism as
-    // the owner-block retry below). These specs reach the page by clicking
-    // through a client-side navigation, where a `next dev` Fast Refresh rebuild
-    // can remount the React tree mid-navigation and discard the soft nav — or
-    // the click can land before React attaches the handler and be dropped. Only
-    // re-issuing the click recovers it. PR #1873's post-navigation hydration
-    // wait narrows the window but does not close it.
-    await expect(async () => {
-      await page.getByTestId("user-menu-button").click();
-      await page.getByTestId("user-menu-my-machines").click();
-      await expect(page).toHaveURL(/\/c\/owner\//, { timeout: 5000 });
-    }).toPass({ timeout: 30_000 });
+    // Re-issue the menu navigation until it takes (PP-2b3r). retryNavClick
+    // presses Escape before each attempt to reset a Radix dropdown left open
+    // by a prior failed click, and caps the timeout so sequential retries fit
+    // inside the 60 s CI test budget.
+    await retryNavClick(
+      page,
+      async () => {
+        await page.getByTestId("user-menu-button").click();
+        await page.getByTestId("user-menu-my-machines").click();
+      },
+      /\/c\/owner\//
+    );
     await expect(page.getByTestId("collection-summary")).toBeVisible();
     await expect(page.getByTestId("collection-overview-body")).toBeVisible();
     await assertNoHorizontalOverflow(page);
@@ -45,23 +46,33 @@ test.describe("Collection view (PP-slrd.1)", () => {
   test("Issues and Timeline tabs render without 500", async ({ page }) => {
     await page.goto("/");
     // Each hop is a client-side navigation that a Fast Refresh remount can
-    // discard; re-issue the click that owns each URL change until it takes
-    // (PP-2b3r — see the retry note on the Overview test above).
-    await expect(async () => {
-      await page.getByTestId("user-menu-button").click();
-      await page.getByTestId("user-menu-my-machines").click();
-      await expect(page).toHaveURL(/\/c\/owner\//, { timeout: 5000 });
-    }).toPass({ timeout: 30_000 });
-    await expect(async () => {
-      await page.getByTestId("collection-tab-issues").click();
-      await expect(page).toHaveURL(/\/issues$/, { timeout: 5000 });
-    }).toPass({ timeout: 30_000 });
+    // discard; retryNavClick re-issues the click until it takes (PP-2b3r).
+    // Three sequential retries at 15 s each = 45 s worst case, well inside
+    // the 60 s CI per-test timeout.
+    await retryNavClick(
+      page,
+      async () => {
+        await page.getByTestId("user-menu-button").click();
+        await page.getByTestId("user-menu-my-machines").click();
+      },
+      /\/c\/owner\//
+    );
+    await retryNavClick(
+      page,
+      async () => {
+        await page.getByTestId("collection-tab-issues").click();
+      },
+      /\/issues$/
+    );
     await expect(page.getByTestId("collection-summary")).toBeVisible();
     await assertNoA11yViolations(page);
-    await expect(async () => {
-      await page.getByTestId("collection-tab-timeline").click();
-      await expect(page).toHaveURL(/\/timeline$/, { timeout: 5000 });
-    }).toPass({ timeout: 30_000 });
+    await retryNavClick(
+      page,
+      async () => {
+        await page.getByTestId("collection-tab-timeline").click();
+      },
+      /\/timeline$/
+    );
     await expect(page.getByTestId("collection-summary")).toBeVisible();
     await assertNoA11yViolations(page);
   });
@@ -89,10 +100,13 @@ test.describe("Collection view (PP-slrd.1)", () => {
     // click landing on an already-hydrated page that a later rebuild then
     // remounted. Its own docs draw the same line — it narrows the window
     // rather than closing it. Removing this retry re-opens PP-j1qm.
-    await expect(async () => {
-      await page.getByTestId("owner-block").getByRole("link").click();
-      await expect(page).toHaveURL(/\/u\//, { timeout: 5000 });
-    }).toPass({ timeout: 30_000 });
+    await retryNavClick(
+      page,
+      async () => {
+        await page.getByTestId("owner-block").getByRole("link").click();
+      },
+      /\/u\//
+    );
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   });
 });
