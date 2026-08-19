@@ -1123,6 +1123,21 @@ jobs:
   #   - Concurrency cancel-in-progress (when a new push supersedes an old run)
   #     marks queued jobs `cancelled`. The replacement run becomes the
   #     authoritative status, so it is safe to treat the cancelled run as pass.
+  #
+  # Post-merge full-matrix alarm (PP-x0ke):
+  #   `test-e2e-comprehensive` is push-to-main only (it runs the full E2E matrix
+  #   — chromium + Mobile Chrome + Mobile Safari, smoke + full — against one DB,
+  #   the only job that covers the Mobile-Chrome/Mobile-Safari a11y specs and
+  #   the seed-leak class). It is a tier-2 optional here: on a `pull_request`
+  #   event it is skipped, and `skipped` passes, so it never blocks a PR merge
+  #   (nor could it — it does not run on PRs, so it cannot be a ruleset-required
+  #   check without wedging every PR on a check that never reports). On a push
+  #   to main it runs, and its `failure` now fails CI Gate — turning a red
+  #   post-merge full-matrix verdict into a red required check on the main
+  #   commit, instead of a green main hiding a red non-required job. That is the
+  #   alarm; blocking is impossible post-merge. Catching a full-matrix-only
+  #   regression BEFORE merge would mean running comprehensive on `pull_request`
+  #   too (~30 min/PR) — deliberately not done; see PP-x0ke.
   # ==============================================================================
   ci-gate:
     name: CI Gate
@@ -1141,6 +1156,7 @@ jobs:
       - test-e2e-smoke
       - test-e2e-smoke-mobile-chrome
       - test-e2e-full-chromium
+      - test-e2e-comprehensive
       - pnpm-audit
     runs-on: ubuntu-latest
     steps:
@@ -1167,6 +1183,9 @@ jobs:
           TEST_E2E_SMOKE_RESULT: ${{ needs.test-e2e-smoke.result }}
           TEST_E2E_SMOKE_MOBILE_CHROME_RESULT: ${{ needs.test-e2e-smoke-mobile-chrome.result }}
           TEST_E2E_FULL_CHROMIUM_RESULT: ${{ needs.test-e2e-full-chromium.result }}
+          # Push-to-main only; skipped (→ pass) on PRs, `failure` fails the gate
+          # on main. See the Post-merge full-matrix alarm note above (PP-x0ke).
+          TEST_E2E_COMPREHENSIVE_RESULT: ${{ needs.test-e2e-comprehensive.result }}
           PNPM_AUDIT_RESULT: ${{ needs.pnpm-audit.result }}
         run: |
           # Tier 1: always-runs jobs - must be `success`.
@@ -1186,7 +1205,8 @@ jobs:
                     "$TEST_UNIT_RESULT" "$TEST_INTEGRATION_RESULT" \
                     "$TEST_MIGRATIONS_RESULT" "$TEST_INTEGRATION_SUPABASE_RESULT" \
                     "$TEST_E2E_SMOKE_RESULT" "$TEST_E2E_SMOKE_MOBILE_CHROME_RESULT" \
-                    "$TEST_E2E_FULL_CHROMIUM_RESULT" "$PNPM_AUDIT_RESULT")
+                    "$TEST_E2E_FULL_CHROMIUM_RESULT" "$TEST_E2E_COMPREHENSIVE_RESULT" \
+                    "$PNPM_AUDIT_RESULT")
           for r in "${optional[@]}"; do
             if [[ "$r" == "failure" ]]; then
               echo "::error::Path-filtered job failed (result=$r)"
