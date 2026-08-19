@@ -1056,6 +1056,16 @@ export const machinesRelations = relations(machines, ({ many, one }) => ({
   watchers: many(machineWatchers),
   settingsSets: many(machineSettingsSets),
   collectionMemberships: many(collectionMachines),
+  // The catalog title this machine is matched to, if any. No DB foreign key
+  // backs it — the mirror is refreshed wholesale on a weekly cron and a real FK
+  // would make a title's disappearance upstream fail the refresh rather than
+  // just orphan a match — so this is a Drizzle-level relation only, and a null
+  // `pinballmapTitle` on a machine with a non-null `pinballmapMachineId` is a
+  // reachable state that callers must handle (PP-3bbr.1).
+  pinballmapTitle: one(pinballmapCatalog, {
+    fields: [machines.pinballmapMachineId],
+    references: [pinballmapCatalog.pinballmapMachineId],
+  }),
 }));
 
 export const machineSettingsSetsRelations = relations(
