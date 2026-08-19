@@ -36,11 +36,33 @@ runs:
         #
         # Fails open: a runner that won't take the sysctl still starts Supabase.
         # Signature `supabase-port-bind`, docs/runbooks/gha-flake-log.md.
+        # Record that this step ran, no matter which path it takes below, so
+        # setup-supabase's guard can tell "the reserve step was skipped entirely"
+        # (the real coupling bug — a job that forgot to invoke this composite)
+        # apart from "the runner refused the sysctl" (a legitimate fail-open
+        # state this step already warns about). PP-3w32.6.
+        echo "RESERVE_SUPABASE_PORTS_RAN=1" >> "$GITHUB_ENV"
+
         range=$(cat /proc/sys/net/ipv4/ip_local_port_range 2>/dev/null || echo unknown)
         echo "::notice::ip_local_port_range=${range} — Supabase needs 54320-54329"
 
         want=54320-54329
         reserved=$(cat /proc/sys/net/ipv4/ip_local_reserved_ports 2>/dev/null || echo "")
+
+        # Idempotency / no-clobber guard. ip_local_reserved_ports is a single
+        # global value, so adding our block means rewriting the whole list with
+        # the existing reservations prepended (below). But the kernel rejects a
+        # list with duplicate or overlapping ranges (EINVAL), which would drop
+        # our reservation entirely. The one realistic non-empty case is this step
+        # running twice, leaving our own 54320-54329 already present — detect
+        # that and stop, rather than concatenating it into a duplicate. (Default
+        # GitHub runners start with an empty list, so this never fires there; an
+        # unrelated third-party reservation is disjoint and concatenates fine.)
+        if printf '%s' "$reserved" | grep -qE '(^|,)54320(-|,|$)'; then
+          echo "::notice::54320-54329 already reserved (${reserved}) — nothing to do"
+          exit 0
+        fi
+
         if [ -n "$reserved" ]; then
           want="${reserved},${want}"
         fi
