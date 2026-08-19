@@ -5,7 +5,7 @@
  * point, all three tabs render without 500, and the owner-name link on a
  * machine Info tab lands on that owner's collection.
  *
- * Fixtures: the seeded member user owns SC, FB, EBD, AFM, SM (see
+ * Fixtures: the seeded member user owns SC, HB, EBD, AFM, SM (see
  * supabase/seed-users.mjs ownerMap), so "My Machines" is non-empty.
  */
 

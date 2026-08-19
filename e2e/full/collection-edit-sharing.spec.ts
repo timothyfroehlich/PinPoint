@@ -76,13 +76,13 @@ test.describe("Collection edit sharing (PP-wqit.7)", () => {
       await ed.getByTestId("collection-edit-trigger").click();
       await expect(ed.getByTestId("collection-delete-trigger")).toHaveCount(0);
       await ed.getByTestId("collection-machines-multiselect").click();
-      await ed.getByPlaceholder("Search machines…").fill("Fireball");
-      await ed.getByRole("option", { name: /Fireball/ }).click();
+      await ed.getByPlaceholder("Search machines…").fill("Hyperball");
+      await ed.getByRole("option", { name: /Hyperball/ }).click();
       await ed.keyboard.press("Escape");
       await ed.getByTestId("collection-save").click();
       const overview = ed.getByTestId("collection-overview-body");
       await expect(overview).toBeVisible();
-      await expect(overview.getByText(/Fireball/)).toBeVisible();
+      await expect(overview.getByText(/Hyperball/)).toBeVisible();
     } finally {
       await editorCtx.close();
     }
