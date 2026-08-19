@@ -2,11 +2,19 @@ import "server-only";
 import { log } from "~/lib/logger";
 import { assertNotInTransaction } from "~/server/db/transaction-context";
 import { PBM_API_BASE, PBM_USER_AGENT } from "./config";
-import { parseCatalog, parseLocation, parseMachineGroups } from "./parse";
+import {
+  parseCatalog,
+  parseLocation,
+  parseMachineGroups,
+  parseRegionLmxes,
+  parseRegionLocations,
+} from "./parse";
 import type {
   CatalogMachine,
   LocationSnapshot,
   MachineGroup,
+  PbmRegionLmx,
+  PbmRegionLocation,
   PbmAddMachineResult,
   PbmAuthResult,
   PbmCredentials,
@@ -51,6 +59,21 @@ function buildUrl(path: string, query?: Record<string, string>): string {
     for (const [k, v] of Object.entries(query)) url.searchParams.set(k, v);
   }
   return url.toString();
+}
+
+/**
+ * Region name as a URL path segment: lowercased, then percent-encoded.
+ *
+ * The lowercasing is a safety measure, not a cosmetic one. PBM's route constraint
+ * matches region names case-insensitively, but the model scopes behind it do
+ * `Region.find_by_name(name.downcase)` and handle a miss badly in two different
+ * ways: `LocationMachineXref.region` returns nil, which leaves the relation
+ * completely UNSCOPED (every xref on Earth), and `Location.region` silently falls
+ * back to Portland. Either would poison a region diff. Callers normalize too;
+ * doing it here as well means no future caller can reintroduce the bug.
+ */
+function regionSegment(region: string): string {
+  return encodeURIComponent(region.trim().toLowerCase());
 }
 
 function credsQuery(
@@ -124,12 +147,55 @@ async function readBody(
 /**
  * PBM puts logical-failure text in `errors` (HTTP 200) or `error` (the disabled
  * account 401). Returns that message, or null when the response is a success.
+ *
+ * **The TYPE of `errors` varies, and both shapes are live.** Real captures return
+ * a bare string (`{"errors":"Failed to find machine"}`), while PBM's own request
+ * specs build it as an array. We cannot control which one a given endpoint or a
+ * future version sends, so this treats ANY present, non-empty `errors`/`error` as
+ * an error regardless of type rather than pattern-matching one shape.
+ *
+ * That matters more than it looks. This function is the ONLY thing standing
+ * between a 200-with-an-error-body and the caller treating it as data: a shape
+ * this missed used to fall through to the parser, yield zero entries, and land in
+ * the region job as an "empty payload" — a failed read wearing a successful run's
+ * clothes. Unknown shapes therefore fail CLOSED with a generic message.
  */
 function pbmErrorMessage(body: Record<string, unknown> | null): string | null {
   if (!body) return null;
   const raw = body["errors"] ?? body["error"];
-  return typeof raw === "string" && raw.length > 0 ? raw : null;
+  if (raw === null || raw === undefined) return null;
+  if (typeof raw === "string") return raw.length > 0 ? raw : null;
+  if (Array.isArray(raw)) {
+    // An empty array carries no complaint; treat it as success.
+    if (raw.length === 0) return null;
+    const joined = raw.filter((e) => typeof e === "string").join("; ");
+    return joined.length > 0 ? joined : PBM_UNKNOWN_ERROR;
+  }
+  // `false` is the one non-string shape that means the OPPOSITE of an error:
+  // `{"error": false, …}` is a common success idiom, and failing closed on it
+  // would turn every good response from such an endpoint into a hard read
+  // failure. `true` gets no such carve-out — that one really does signal an
+  // error, just without a message.
+  if (raw === false) return null;
+  // An empty object carries no complaint, the same as an empty array: Rails
+  // serializes `errors` as a hash and sends `{"errors":{}}` on a valid record,
+  // so a present-but-empty object is success, not a failure. Failing closed on it
+  // would turn every good response from such an endpoint into a hard write
+  // failure (the symmetric bug to the empty-array carve-out above).
+  if (
+    typeof raw === "object" &&
+    !Array.isArray(raw) &&
+    Object.keys(raw).length === 0
+  ) {
+    return null;
+  }
+  // A non-empty object, a number, `true` — unrecognized, but PBM put something in
+  // an error field and we must not read the body as data.
+  return PBM_UNKNOWN_ERROR;
 }
+
+/** Stand-in when PBM signals an error in a shape we cannot render. */
+const PBM_UNKNOWN_ERROR = "PinballMap reported an error";
 
 /** Map a PBM error message (+status) to a write-failure reason. */
 function writeReasonFor(status: number, message: string): WriteReason {
@@ -214,10 +280,11 @@ function toWriteResult(outcome: WriteOutcome): PbmWriteResult {
 async function readJson(
   path: string,
   label: string,
-  apiToken: string | null
+  apiToken: string | null,
+  query?: Record<string, string>
 ): Promise<unknown> {
   const res = await safeFetch(
-    buildUrl(path),
+    buildUrl(path, query),
     { method: "GET" },
     label,
     apiToken
@@ -263,6 +330,40 @@ export function createLiveClient(apiToken: string | null): PinballMapClient {
       // store on the machine record (vendored llms.txt §no_details).
       const raw = await readJson(`/machines.json`, "fetchCatalog", apiToken);
       return parseCatalog(raw);
+    },
+
+    async fetchRegionLmxes(region: string): Promise<PbmRegionLmx[]> {
+      assertNotInTransaction("pinballmap.fetchRegionLmxes");
+      // ONE bulk request for the whole region — the documented replacement for
+      // looping over individual LMXes (vendored llms.txt §"Request Volume
+      // Anti-Patterns"; this endpoint's own limit is 120/min, and the region job
+      // spends one call an hour). Unpaginated: this returns every non-deleted xref in the
+      // region. PBM also accepts `?limit=N`, which combined with their `id desc`
+      // ordering yields the N most recent — deliberately NOT used, because a cap
+      // would silently drop entries out of a diff that must see all of them.
+      const raw = await readJson(
+        `/region/${regionSegment(region)}/location_machine_xrefs.json`,
+        "fetchRegionLmxes",
+        apiToken
+      );
+      return parseRegionLmxes(raw);
+    },
+
+    async fetchRegionLocations(region: string): Promise<PbmRegionLocation[]> {
+      assertNotInTransaction("pinballmap.fetchRegionLocations");
+      // `no_details=1` strips the HEAVY NESTED content (the machine list, the
+      // conditions, the description) — not the scalar columns. Each row still
+      // arrives with ~20 fields (city, lat/lon, machine_count, …); we read `id`
+      // and `name` and ignore the rest, which is all the alert needs to label a
+      // venue. Measured against the real Austin response 2026-08-17. One request
+      // for the whole region; never a per-location lookup.
+      const raw = await readJson(
+        `/region/${regionSegment(region)}/locations.json`,
+        "fetchRegionLocations",
+        apiToken,
+        { no_details: "1" }
+      );
+      return parseRegionLocations(raw);
     },
 
     async fetchMachineGroups(): Promise<MachineGroup[]> {

@@ -48,10 +48,10 @@ export function formatDiscordMessage(input: DiscordMessageInput): string {
 }
 
 function buildBody(input: DiscordMessageInput): string {
-  const id = sanitize(input.formattedIssueId ?? "");
-  const title = sanitize(input.issueTitle ?? "");
-  const machine = sanitize(input.machineName ?? "a machine");
-  const status = sanitize(input.newStatus ?? "updated");
+  const id = sanitizeDiscordText(input.formattedIssueId ?? "");
+  const title = sanitizeDiscordText(input.issueTitle ?? "");
+  const machine = sanitizeDiscordText(input.machineName ?? "a machine");
+  const status = sanitizeDiscordText(input.newStatus ?? "updated");
 
   switch (input.type) {
     case "issue_assigned":
@@ -99,12 +99,37 @@ function buildBody(input: DiscordMessageInput): string {
  *     which has no `@`, plus belt-and-suspenders on `<@…>` forms).
  *   - Backslash-escape Markdown control characters so titles like
  *     `**foo**` render literally.
+ *
+ * **`[` and `]` are escaped because of MASKED LINKS.** Discord renders
+ * `[label](url)` in bot content as a hyperlink showing only the label, and the
+ * region alert (PP-o355.18) puts a stranger-supplied venue name in that label
+ * position. Unescaped, a venue called `Foo](https://evil.example)` closes our
+ * mask early and publishes an arbitrary link under the bot's name — the reader
+ * sees a plausible venue and a URL they never get to inspect.
+ *
+ * The brackets are the whole fix: a label cannot be closed without an unescaped
+ * `]`, so the parentheses that would follow are inert on their own. `(` and `)`
+ * are deliberately NOT escaped — pinball titles are full of them
+ * ("Godzilla (Premium)", "Medieval Madness (Remake)"), and escaping a character
+ * that cannot be exploited buys nothing while making every such title noisier.
+ *
+ * It is deliberately fixed HERE rather than at the one call site: this is the
+ * shared sanitizer precisely so a hardening fix lands on every Discord surface at
+ * once, and any surface that later gains a link inherits the protection instead
+ * of rediscovering the hole. Discord renders `\[` as a plain `[`, so escaping
+ * costs nothing on the surfaces that have no links today.
  */
 const ZERO_WIDTH_SPACE = "\u200B";
 
-function sanitize(value: string): string {
+/**
+ * Exported because every Discord surface interpolating text we did not author
+ * needs it, not just notification DMs \u2014 the PinballMap region alert renders venue
+ * and machine names typed by strangers on pinballmap.com (PP-o355.18). One shared
+ * implementation, so a hardening fix lands everywhere at once.
+ */
+export function sanitizeDiscordText(value: string): string {
   return value
     .replace(/@/g, `@${ZERO_WIDTH_SPACE}`)
     .replace(/</g, `<${ZERO_WIDTH_SPACE}`)
-    .replace(/[\\*_~`|>]/g, (m) => `\\${m}`);
+    .replace(/[\\*_~`|>[\]]/g, (m) => `\\${m}`);
 }

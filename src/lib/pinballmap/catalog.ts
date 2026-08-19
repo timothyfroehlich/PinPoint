@@ -1,5 +1,5 @@
 import "server-only";
-import { eq, sql } from "drizzle-orm";
+import { desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "~/server/db";
 import { pinballmapCatalog } from "~/server/db/schema";
 import { getPinballMapClient } from "./client";
@@ -230,6 +230,59 @@ export async function isCatalogEmpty(): Promise<boolean> {
     .from(pinballmapCatalog)
     .limit(1);
   return row === undefined;
+}
+
+/**
+ * Titles for a set of PBM machine ids, from the local mirror — one query, never a
+ * lookup per id.
+ *
+ * This is how the region new-machine alert (PP-o355.18) names a machine at all:
+ * PBM's region endpoint returns ids only, so the weekly-refreshed mirror is the
+ * only naming source that does not cost a request. An id the mirror has not seen
+ * (a title added upstream since the last refresh) is simply absent from the map,
+ * and the caller falls back to the id.
+ */
+export async function getCatalogNames(
+  machineIds: number[]
+): Promise<Map<number, string>> {
+  if (machineIds.length === 0) return new Map();
+  const rows = await db
+    .select({
+      machineId: pinballmapCatalog.pinballmapMachineId,
+      name: pinballmapCatalog.name,
+    })
+    .from(pinballmapCatalog)
+    .where(inArray(pinballmapCatalog.pinballmapMachineId, machineIds));
+  return new Map(rows.map((r) => [r.machineId, r.name]));
+}
+
+/**
+ * When the mirror was last written, or null when it has never been populated.
+ *
+ * `refreshedAt` is stamped on every row a refresh upserts, so the maximum is the
+ * completion time of the last successful `refreshCatalog()`. This exists so a
+ * caller can rate-limit its own on-demand refreshes without a new column or a
+ * process-local timer — the region alert (PP-o355.18) uses it as the cooldown
+ * behind refresh-on-miss, and serverless invocations share no memory, so the
+ * clock has to live in the database to mean anything.
+ *
+ * Note it advances on SUCCESS only. A refresh that threw leaves it where it was,
+ * so a caller guarding on it will retry on its next tick rather than being locked
+ * out by a failure — which is the behavior you want from a cooldown whose job is
+ * to prevent redundant work, not to punish an outage.
+ */
+export async function getCatalogLastRefreshedAt(): Promise<Date | null> {
+  // Top-1 by descending timestamp rather than `max()` in raw SQL: the column
+  // reference carries Drizzle's timestamp mapping, so this really is a Date. A
+  // `sql<Date>\`max(...)\`` would type-check identically and hand back the
+  // driver's raw string at runtime — the generic on `sql` is an assertion, not a
+  // conversion, and nothing would catch the difference until `.getTime()` threw.
+  const [row] = await db
+    .select({ refreshedAt: pinballmapCatalog.refreshedAt })
+    .from(pinballmapCatalog)
+    .orderBy(desc(pinballmapCatalog.refreshedAt))
+    .limit(1);
+  return row?.refreshedAt ?? null;
 }
 
 /** Look up a single catalog entry by its PBM machine id (for edit preselect). */

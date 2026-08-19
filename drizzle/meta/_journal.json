@@ -477,6 +477,13 @@
       "when": 1786939983751,
       "tag": "0067_drop_pinballmap_listed",
       "breakpoints": true
+    },
+    {
+      "idx": 68,
+      "version": "7",
+      "when": 1787052885201,
+      "tag": "0068_pinballmap_region_seen_machines",
+      "breakpoints": true
     }
   ]
 }

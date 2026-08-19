@@ -11,6 +11,8 @@ import type {
   MachineGroup,
   PbmCondition,
   PbmLmx,
+  PbmRegionLmx,
+  PbmRegionLocation,
 } from "./types";
 
 function asRecord(v: unknown): Record<string, unknown> | null {
@@ -48,9 +50,12 @@ function parseCondition(raw: unknown): PbmCondition | null {
 function parseLmx(raw: unknown): PbmLmx | null {
   const r = asRecord(raw);
   if (!r) return null;
-  // Skip soft-deleted entries — they are not part of the live lineup. PBM sends
-  // an ISO timestamp here when deleted and null otherwise; treat any non-null
-  // value as deleted so a non-string `deleted_at` can't slip a dead machine in.
+  // A belt-and-braces no-op, kept honest rather than removed. PBM soft-deletes
+  // xrefs, but `LocationMachineXref` carries `default_scope { where(deleted_at:
+  // nil) }`, so a deleted entry is invisible to EVERY endpoint — it does not come
+  // back marked, it simply stops appearing between one fetch and the next. This
+  // guard therefore never fires today; it exists so that if PBM ever relaxes that
+  // scope, a dead machine cannot silently enter a lineup.
   const deletedAt = r["deleted_at"];
   if (deletedAt !== null && deletedAt !== undefined) return null;
   const id = asNumber(r["id"]);
@@ -93,6 +98,67 @@ export function parseLocation(
     fetchedAtIso,
     raw,
   };
+}
+
+/**
+ * Region LMX record. The wire shape is exactly six columns — `id`, `created_at`,
+ * `updated_at`, `location_id`, `machine_id`, `ic_enabled` — verified against PBM's
+ * controller (`includes: []`, `methods: []`, `except: [:deleted_at, :user_id]`)
+ * and asserted by their own request spec, which expects the index to carry no
+ * `machine`, `location` or `machine_conditions` key. We keep the three ids and
+ * ignore the timestamps and the IC flag, which nothing downstream reads.
+ *
+ * No `deleted_at` guard here, unlike `parseLmx`: the controller strips that column
+ * outright on top of the model's default scope, so there is not even a field to
+ * test. Deleted entries simply stop appearing.
+ */
+function parseRegionLmx(raw: unknown): PbmRegionLmx | null {
+  const r = asRecord(raw);
+  if (!r) return null;
+  const lmxId = asNumber(r["id"]);
+  const locationId = asNumber(r["location_id"]);
+  const machineId = asNumber(r["machine_id"]);
+  if (lmxId === null || locationId === null || machineId === null) return null;
+  return { lmxId, locationId, machineId };
+}
+
+/**
+ * `region/:region/location_machine_xrefs.json` returns
+ * `{ location_machine_xrefs: [...] }` — an object with that single key, ordered
+ * `location_machine_xrefs.id desc`, unpaginated and uncapped. The bare-array
+ * branch is tolerance, not a shape PBM actually sends.
+ *
+ * Records missing an id, location or machine are skipped rather than coerced: an
+ * entry we cannot place is one we could never announce or link.
+ */
+export function parseRegionLmxes(raw: unknown): PbmRegionLmx[] {
+  const r = asRecord(raw);
+  const list = r ? asArray(r["location_machine_xrefs"]) : asArray(raw);
+  return list.map(parseRegionLmx).filter((l): l is PbmRegionLmx => l !== null);
+}
+
+/**
+ * `region/:region/locations.json?no_details=1` returns `{ locations: [...] }`,
+ * each row carrying `id` and `name` — `no_details` strips descriptions,
+ * timestamps and counts, never the name.
+ *
+ * Rows without a usable name are skipped; they are exactly the case the caller
+ * would have fallen back from anyway.
+ */
+export function parseRegionLocations(raw: unknown): PbmRegionLocation[] {
+  const r = asRecord(raw);
+  const list = r ? asArray(r["locations"]) : asArray(raw);
+  return list
+    .map((entry): PbmRegionLocation | null => {
+      const record = asRecord(entry);
+      if (!record) return null;
+      const locationId = asNumber(record["id"]);
+      const name = asString(record["name"]);
+      if (locationId === null || name === null || name.length === 0)
+        return null;
+      return { locationId, name };
+    })
+    .filter((l): l is PbmRegionLocation => l !== null);
 }
 
 function parseCatalogMachine(raw: unknown): CatalogMachine | null {

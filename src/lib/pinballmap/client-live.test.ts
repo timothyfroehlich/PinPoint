@@ -130,6 +130,98 @@ describe("live client — reads", () => {
     expect(catalog[1]?.machineGroupId).toBeNull();
   });
 
+  it("fetchRegionLmxes makes ONE bulk region call and keeps the three ids", async () => {
+    // The real wire shape: exactly six columns, no machine or location object.
+    // (Api::V1::LocationMachineXrefsController#index serializes with includes: [],
+    // methods: [], except: [:deleted_at, :user_id].)
+    const calls = installFetchMock(() =>
+      json({
+        location_machine_xrefs: [
+          {
+            id: 501,
+            created_at: "2026-08-01T00:00:00Z",
+            updated_at: "2026-08-01T00:00:00Z",
+            location_id: 26454,
+            machine_id: 6412,
+            ic_enabled: null,
+          },
+          {
+            id: 502,
+            created_at: "2026-08-02T00:00:00Z",
+            updated_at: "2026-08-02T00:00:00Z",
+            location_id: 999,
+            machine_id: 7,
+            ic_enabled: true,
+          },
+        ],
+      })
+    );
+
+    const entries = await createLiveClient(null).fetchRegionLmxes("austin");
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.url).toContain(
+      "/region/austin/location_machine_xrefs.json"
+    );
+    // No `limit` param: a cap plus PBM's `id desc` ordering would silently hide
+    // older entries from a diff that has to see all of them.
+    expect(calls[0]?.url).not.toContain("limit");
+    expect(entries).toEqual([
+      { lmxId: 501, locationId: 26454, machineId: 6412 },
+      { lmxId: 502, locationId: 999, machineId: 7 },
+    ]);
+  });
+
+  it("fetchRegionLmxes skips entries it could not place", async () => {
+    installFetchMock(() =>
+      json([
+        { id: 1, location_id: 2, machine_id: 3 },
+        // no location: we could not attribute or link it
+        { id: 5, machine_id: 3 },
+        // no machine
+        { id: 6, location_id: 2 },
+        "garbage",
+      ])
+    );
+
+    const entries = await createLiveClient(null).fetchRegionLmxes("austin");
+
+    expect(entries).toEqual([{ lmxId: 1, locationId: 2, machineId: 3 }]);
+  });
+
+  it("fetchRegionLmxes lowercases the region before it reaches the URL", async () => {
+    // Not cosmetic: PBM's LMX region scope returns nil on a name miss, and a
+    // nil-returning has_scope leaves the query UNSCOPED — every xref on Earth.
+    const calls = installFetchMock(() => json([]));
+    await createLiveClient("tok-123").fetchRegionLmxes("  AUSTIN  ");
+    expect(calls[0]?.url).toContain("/region/austin/");
+    expect(calls[0]?.init?.headers).toMatchObject({ "X-Api-Token": "tok-123" });
+  });
+
+  it("fetchRegionLocations asks for no_details and returns id → name", async () => {
+    const calls = installFetchMock(() =>
+      json({
+        locations: [
+          { id: 26454, name: "Austin Pinball Collective", city: "Austin" },
+          { id: 999, name: "Pinballz Arcade", city: "Austin" },
+          // unnamed rows are useless as labels
+          { id: 1000 },
+        ],
+      })
+    );
+
+    const locations =
+      await createLiveClient(null).fetchRegionLocations("Austin");
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.url).toContain("/region/austin/locations.json");
+    expect(calls[0]?.url).toContain("no_details=1");
+    expect(locations).toEqual([
+      { locationId: 26454, name: "Austin Pinball Collective" },
+      { locationId: 999, name: "Pinballz Arcade" },
+    ]);
+  });
+
   it("fetchMachineGroups hits the endpoint and parses {machine_groups}", async () => {
     const calls = installFetchMock(() =>
       json({ machine_groups: [{ id: 9001, name: "Godzilla" }] })
@@ -137,6 +229,106 @@ describe("live client — reads", () => {
     const groups = await createLiveClient(null).fetchMachineGroups();
     expect(calls[0]?.url).toContain("/machine_groups.json");
     expect(groups).toEqual([{ machineGroupId: 9001, name: "Godzilla" }]);
+  });
+});
+
+describe("live client — a 200 carrying an error body is a FAILED read", () => {
+  // The silent-failure guard. PBM signals logical failures with HTTP 200 plus an
+  // `errors` field, and the TYPE varies — a bare string in real captures, an array
+  // in PBM's own request specs. An unrecognized shape used to fall through as
+  // success: the parser found no `location_machine_xrefs` key, returned zero
+  // entries, and the region job logged "empty payload" on what was actually a
+  // broken read. Every shape must throw so the caller can tell the difference.
+  it("throws when `errors` is a STRING", async () => {
+    installFetchMock(() => json({ errors: "Region not found" }));
+    await expect(
+      createLiveClient(null).fetchRegionLmxes("austin")
+    ).rejects.toThrow(/Region not found/);
+  });
+
+  it("throws when `errors` is an ARRAY — the shape that used to no-op", async () => {
+    installFetchMock(() => json({ errors: ["Region not found"] }));
+    await expect(
+      createLiveClient(null).fetchRegionLmxes("austin")
+    ).rejects.toThrow(/Region not found/);
+  });
+
+  it("joins a multi-element array into one message", async () => {
+    installFetchMock(() =>
+      json({ errors: ["first problem", "second problem"] })
+    );
+    await expect(
+      createLiveClient(null).fetchRegionLmxes("austin")
+    ).rejects.toThrow(/first problem; second problem/);
+  });
+
+  it("throws on an unrecognized error shape rather than reading the body", async () => {
+    // Fail CLOSED: PBM put something in an error field, so this is not data.
+    installFetchMock(() => json({ errors: { detail: "nope" } }));
+    await expect(
+      createLiveClient(null).fetchRegionLmxes("austin")
+    ).rejects.toThrow(/PinballMap reported an error/);
+  });
+
+  it("treats an EMPTY errors array as success, not an error", async () => {
+    installFetchMock(() =>
+      json({
+        errors: [],
+        location_machine_xrefs: [{ id: 1, location_id: 2, machine_id: 3 }],
+      })
+    );
+    await expect(
+      createLiveClient(null).fetchRegionLmxes("austin")
+    ).resolves.toEqual([{ lmxId: 1, locationId: 2, machineId: 3 }]);
+  });
+
+  it("treats an EMPTY errors OBJECT as success — Rails serializes errors as a hash", async () => {
+    // The symmetric case to the empty array: Rails renders `errors` as a hash and
+    // sends `{"errors":{}}` on a valid record. A non-empty object still fails
+    // closed (see the unrecognized-shape test above); only the empty one is success.
+    installFetchMock(() =>
+      json({
+        errors: {},
+        location_machine_xrefs: [{ id: 1, location_id: 2, machine_id: 3 }],
+      })
+    );
+    await expect(
+      createLiveClient(null).fetchRegionLmxes("austin")
+    ).resolves.toEqual([{ lmxId: 1, locationId: 2, machineId: 3 }]);
+  });
+
+  it("treats `error: false` as success — it is a success idiom, not a complaint", async () => {
+    // The fail-closed rule for unrecognized shapes has exactly one exception:
+    // `false` means the opposite of an error, and failing closed on it would
+    // turn every good response from such an endpoint into a hard read failure.
+    installFetchMock(() =>
+      json({
+        error: false,
+        location_machine_xrefs: [{ id: 1, location_id: 2, machine_id: 3 }],
+      })
+    );
+    await expect(
+      createLiveClient(null).fetchRegionLmxes("austin")
+    ).resolves.toEqual([{ lmxId: 1, locationId: 2, machineId: 3 }]);
+  });
+
+  it("still fails closed on `error: true`, which does signal a fault", async () => {
+    installFetchMock(() =>
+      json({
+        error: true,
+        location_machine_xrefs: [{ id: 1, location_id: 2, machine_id: 3 }],
+      })
+    );
+    await expect(
+      createLiveClient(null).fetchRegionLmxes("austin")
+    ).rejects.toThrow(/reported an error/);
+  });
+
+  it("applies to the locations read too, not just the lmx read", async () => {
+    installFetchMock(() => json({ errors: ["boom"] }));
+    await expect(
+      createLiveClient(null).fetchRegionLocations("austin")
+    ).rejects.toThrow(/boom/);
   });
 });
 
