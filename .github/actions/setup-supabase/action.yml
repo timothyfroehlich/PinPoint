@@ -16,43 +16,28 @@ runs:
       shell: bash
       run: cp supabase/config.toml.template supabase/config.toml
 
-    - name: Reserve Supabase ports from the ephemeral range
-      shell: bash
-      run: |
-        # Supabase binds 54320-54329 (see supabase/config.toml.template). Linux
-        # allocates ephemeral source ports from ip_local_port_range, whose default
-        # (32768-60999) contains that whole block. So an ordinary outbound
-        # connection — the docker image pulls `supabase start` itself makes, for
-        # one — can be handed 54322 as its source port, and the subsequent bind()
-        # of the published host port then fails with "address already in use".
-        # A socket in TIME_WAIT holds the port for 60s, which outlives all three
-        # retries below, so the retry loop cannot recover from this.
-        #
-        # ip_local_reserved_ports excludes the block from automatic allocation:
-        # "Specify the ports which are reserved for known third-party
-        # applications. These ports will not be used by automatic port
-        # allocations." — Documentation/networking/ip-sysctl.rst
-        #
-        # Fails open: a runner that won't take the sysctl still starts Supabase.
-        # Signature `supabase-port-bind`, docs/runbooks/gha-flake-log.md.
-        range=$(cat /proc/sys/net/ipv4/ip_local_port_range 2>/dev/null || echo unknown)
-        echo "::notice::ip_local_port_range=${range} — Supabase needs 54320-54329"
-
-        want=54320-54329
-        reserved=$(cat /proc/sys/net/ipv4/ip_local_reserved_ports 2>/dev/null || echo "")
-        if [ -n "$reserved" ]; then
-          want="${reserved},${want}"
-        fi
-
-        if sudo sysctl -w "net.ipv4.ip_local_reserved_ports=${want}" >/dev/null 2>&1; then
-          echo "::notice::ip_local_reserved_ports=$(cat /proc/sys/net/ipv4/ip_local_reserved_ports)"
-        else
-          echo "::warning::could not reserve 54320-54329; supabase start may lose a port race"
-        fi
+    # NOTE: the ephemeral-port reservation (net.ipv4.ip_local_reserved_ports for
+    # 54320-54329) used to live here as step 2, but it ran after dependency
+    # install and so lost the port race against pnpm's registry traffic
+    # (PP-3w32.2). It now lives in ./.github/actions/reserve-supabase-ports and
+    # MUST be invoked as an early job step, before dependency install, by every
+    # job that calls this composite. If you add a new job that uses this action,
+    # add the reserve-supabase-ports step right after checkout too.
 
     - name: Start Supabase (with retry)
       shell: bash
       run: |
+        # Guard against the coupling introduced by moving the port reservation
+        # out to reserve-supabase-ports (PP-3w32.2): if a job forgot to invoke
+        # that composite before dependency install, the 54320-54329 block is not
+        # reserved and `supabase start` can silently lose the ephemeral-port race
+        # with no obvious cause. Warn loudly rather than fail — fails-open is the
+        # design (a runner that refused the sysctl is a legitimate unreserved
+        # state, already warned about by the reserve step itself).
+        if ! grep -q '54320' /proc/sys/net/ipv4/ip_local_reserved_ports 2>/dev/null; then
+          echo "::warning::Supabase ports 54320-54329 are not reserved (reserve-supabase-ports step missing, or the runner refused the sysctl). supabase start may lose the port race — see PP-3w32.2."
+        fi
+
         exclude="studio,realtime,storage-api,edge-runtime,logflare,vector,imgproxy,supavisor,postgres-meta"
         for attempt in 1 2 3; do
           if supabase start -x "$exclude"; then

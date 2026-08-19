@@ -497,6 +497,9 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Reserve Supabase ports
+        uses: ./.github/actions/reserve-supabase-ports
+
       - name: Setup pnpm
         uses: pnpm/action-setup@c5ba7f7862a0f64c1b1a05fbac13e0b8e86ba08c  # ratchet:pnpm/action-setup@v4
         with:
@@ -559,6 +562,9 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Reserve Supabase ports
+        uses: ./.github/actions/reserve-supabase-ports
+
       - name: Setup pnpm
         uses: pnpm/action-setup@c5ba7f7862a0f64c1b1a05fbac13e0b8e86ba08c  # ratchet:pnpm/action-setup@v4
         with:
@@ -614,6 +620,9 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # ratchet:actions/checkout@v7.0.1
         with:
           persist-credentials: false
+
+      - name: Reserve Supabase ports
+        uses: ./.github/actions/reserve-supabase-ports
 
       - name: Setup pnpm
         uses: pnpm/action-setup@c5ba7f7862a0f64c1b1a05fbac13e0b8e86ba08c  # ratchet:pnpm/action-setup@v4
@@ -697,6 +706,9 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Reserve Supabase ports
+        uses: ./.github/actions/reserve-supabase-ports
+
       - name: Setup pnpm
         uses: pnpm/action-setup@c5ba7f7862a0f64c1b1a05fbac13e0b8e86ba08c  # ratchet:pnpm/action-setup@v4
         with:
@@ -778,6 +790,9 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # ratchet:actions/checkout@v7.0.1
         with:
           persist-credentials: false
+
+      - name: Reserve Supabase ports
+        uses: ./.github/actions/reserve-supabase-ports
 
       - name: Setup pnpm
         uses: pnpm/action-setup@c5ba7f7862a0f64c1b1a05fbac13e0b8e86ba08c  # ratchet:pnpm/action-setup@v4
@@ -871,6 +886,9 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # ratchet:actions/checkout@v7.0.1
         with:
           persist-credentials: false
+
+      - name: Reserve Supabase ports
+        uses: ./.github/actions/reserve-supabase-ports
 
       - name: Setup pnpm
         uses: pnpm/action-setup@c5ba7f7862a0f64c1b1a05fbac13e0b8e86ba08c  # ratchet:pnpm/action-setup@v4
