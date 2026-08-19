@@ -34,8 +34,19 @@ runs:
         # with no obvious cause. Warn loudly rather than fail — fails-open is the
         # design (a runner that refused the sysctl is a legitimate unreserved
         # state, already warned about by the reserve step itself).
-        if ! grep -q '54320' /proc/sys/net/ipv4/ip_local_reserved_ports 2>/dev/null; then
-          echo "::warning::Supabase ports 54320-54329 are not reserved (reserve-supabase-ports step missing, or the runner refused the sysctl). supabase start may lose the port race — see PP-3w32.2."
+        #
+        # Separate the two "not reserved" causes so the coupling bug is not
+        # silent (PP-3w32.6): the reserve step sets RESERVE_SUPABASE_PORTS_RAN
+        # when it runs, so an unset marker means the step was skipped entirely
+        # (the actual bug — name the fix), whereas a set marker with the block
+        # still unreserved means the runner refused the sysctl (already warned by
+        # the reserve step; stay quiet here). The port test uses an anchored
+        # range match, not a bare '54320' substring, so an unrelated reserved
+        # entry cannot read as a false positive.
+        if [ -z "${RESERVE_SUPABASE_PORTS_RAN:-}" ]; then
+          echo "::warning::reserve-supabase-ports did not run before dependency install — this job is missing that step. supabase start may lose the ephemeral-port race; add reserve-supabase-ports right after checkout. See PP-3w32.2."
+        elif ! grep -qE '(^|,)54320(-|,|$)' /proc/sys/net/ipv4/ip_local_reserved_ports 2>/dev/null; then
+          echo "::warning::Supabase ports 54320-54329 are not reserved (the runner refused the sysctl). supabase start may lose the port race — see PP-3w32.2."
         fi
 
         exclude="studio,realtime,storage-api,edge-runtime,logflare,vector,imgproxy,supavisor,postgres-meta"
