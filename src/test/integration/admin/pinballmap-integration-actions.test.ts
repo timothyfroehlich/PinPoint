@@ -9,8 +9,10 @@
  *
  * The mock PBM client ignores the requested location id and is a singleton, so
  * save ORDERING is proven by fetch CALL COUNT: enabling while changing location
- * must fetch exactly once (id set first while disabled, then enable refreshes
- * the new location); disabling while changing location must fetch zero times.
+ * must fetch exactly once — `changeLocation` validates the new id and commits
+ * it together with that venue's lineup, then the enable skips its own refresh
+ * because the snapshot is already fresh. Disabling while changing location must
+ * fetch zero times.
  */
 
 import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
@@ -175,7 +177,7 @@ describe("Admin Integrations — Pinball Map actions (PGlite)", () => {
       expect(state.locationId).toBe(111);
     });
 
-    it("disabling while changing location makes no Pinball Map call and keeps the old snapshot (§6.7)", async () => {
+    it("disabling while changing location makes no Pinball Map call and clears the old snapshot (§6.7)", async () => {
       await asRole("admin");
       await seedState({
         enabled: true,
@@ -195,9 +197,41 @@ describe("Admin Integrations — Pinball Map actions (PGlite)", () => {
       const state = await readState();
       expect(state.enabled).toBe(false);
       expect(state.locationId).toBe(222);
-      // Snapshot untouched — the old location's lineup is preserved until the
-      // next enable reads the new one.
-      expect(state.snapshotJson?.locationId).toBe(111);
+      // Snapshot CLEARED. Keeping 111's lineup stored under location 222 is a
+      // row that disagrees with itself, and every reader treats it as fact —
+      // see the §6.7 case in pinballmap-state.test.ts for the full list. Nulled,
+      // they all fall into the "not synced yet" path they already have, which is
+      // the truth until the next enable's refresh.
+      expect(state.snapshotJson).toBeNull();
+      expect(state.lastSyncedAt).toBeNull();
+      expect(state.lastSyncStatus).toBe("unknown");
+    });
+
+    it("re-pointing while disabled leaves nothing for a machine page to misread (§6.7)", async () => {
+      await asRole("admin");
+      await seedState({
+        enabled: false,
+        locationId: 111,
+        snapshotJson: snapshotAt(111, 3),
+        lastSyncedAt: new Date(),
+        lastSyncStatus: "ok",
+      });
+      const { savePinballMapConfigAction } = await import(ACTIONS);
+
+      // Location only — the integration is already off, so this is the plain
+      // "re-point while disabled" save rather than a combined toggle.
+      const fd = new FormData();
+      fd.set("enabled", "false");
+      fd.set("locationId", "222");
+      const result = await savePinballMapConfigAction(undefined, fd);
+
+      expect(result.ok).toBe(true);
+      expect(fetchSpy).not.toHaveBeenCalled();
+      const state = await readState();
+      expect(state.locationId).toBe(222);
+      expect(state.snapshotJson).toBeNull();
+      expect(state.lastSyncStatus).toBe("unknown");
+      expect(state.lastSyncedAt).toBeNull();
     });
 
     it("a no-op save (nothing changed) does not fetch", async () => {

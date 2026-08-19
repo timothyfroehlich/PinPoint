@@ -655,9 +655,9 @@ export async function removeMachineFromPinballMapAction(
   const abandonedRecord =
     explicitLmxId === null
       ? null
-      : ((await listSurfacingAbandonedForMachine(machine.id)).find(
-          (a) => a.lmxId === explicitLmxId
-        ) ?? null);
+      : ((
+          await listSurfacingAbandonedForMachine(machine.id, state.locationId)
+        ).find((a) => a.lmxId === explicitLmxId) ?? null);
 
   if (explicitLmxId !== null && abandonedRecord === null)
     return err(
@@ -922,6 +922,17 @@ export async function refreshPinballmapLineupAction(
         return err(
           "THROTTLED",
           `Pinball Map was refreshed recently. Try again in about ${String(minutes)} minute${minutes === 1 ? "" : "s"}.`
+        );
+      }
+      if (result.reason === "superseded") {
+        // The fetch succeeded but an admin re-pointed the tracked location
+        // while it was running, so the 6.6 guard threw the snapshot away.
+        // Nothing was refreshed, and saying otherwise would put a machine count
+        // from the old venue on the page (CORE-ARCH-012).
+        revalidatePath("/m", "layout");
+        return err(
+          "SERVER",
+          "The tracked Pinball Map location changed while this refresh was running. Reload the page and try again."
         );
       }
       return err("SERVER", result.error);

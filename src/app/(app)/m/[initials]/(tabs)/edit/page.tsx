@@ -217,7 +217,11 @@ export default async function MachineEditPage({
   // The catalog row can disappear while the entry on Pinball Map outlives it,
   // so a null title falls back to naming the entry by id rather than inventing
   // one.
-  const abandonedRows = await listSurfacingAbandonedForMachine(machine.id);
+  const trackedLocationId = pbmState?.locationId ?? APC_LOCATION_ID;
+  const abandonedRows = await listSurfacingAbandonedForMachine(
+    machine.id,
+    trackedLocationId
+  );
   const abandoned = await Promise.all(
     abandonedRows.map(async (row) => ({
       lmxId: row.lmxId,
@@ -225,6 +229,12 @@ export default async function MachineEditPage({
       commentCount:
         snapshot?.lmxes.find((l) => l.id === row.lmxId)?.conditions.length ??
         null,
+      // Each record links to ITS OWN venue, not the tracked one. A record kept
+      // across a re-point (spec 6.4) describes an entry on a lineup PinPoint no
+      // longer syncs; sending someone to the current location's page to remove
+      // it points at a venue where the entry does not exist (spec 6.9).
+      locationUrl: pinballmapLocationUrl(row.locationId),
+      crossLocation: row.locationId !== trackedLocationId,
     }))
   );
 
@@ -303,7 +313,6 @@ export default async function MachineEditPage({
           <PinballmapAbandonedEntries
             machineId={machine.id}
             entries={abandoned}
-            locationUrl={locationUrl}
             canPush={canPush && writeEnabled}
           />
         ) : null}

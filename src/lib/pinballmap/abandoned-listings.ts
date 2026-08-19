@@ -3,13 +3,8 @@ import "server-only";
 import { and, eq, inArray, isNotNull, notInArray, or, sql } from "drizzle-orm";
 
 import { db, type DbTransaction } from "~/server/db";
-import {
-  machines,
-  pinballmapAbandonedListings,
-  pinballmapState,
-} from "~/server/db/schema";
+import { machines, pinballmapAbandonedListings } from "~/server/db/schema";
 import { createMachineTimelineEvent } from "~/lib/timeline/machine-events";
-import { APC_LOCATION_ID } from "./config";
 import type { LocationSnapshot } from "./types";
 import type { AbandonedListing } from "./link-columns";
 
@@ -35,16 +30,12 @@ export async function recordAbandonedListing(
   abandoned: AbandonedListing,
   actorId?: string
 ): Promise<void> {
-  // Which location this entry belonged to, read from the singleton inside the
-  // caller's transaction. A local read, so CORE-ARCH-011 (external effects only)
-  // is not in play. Falls back to the APC default only if the singleton row is
-  // somehow absent, which cannot happen while PBM is configured enough to have
-  // an entry to walk away from.
-  const [state] = await tx
-    .select({ locationId: pinballmapState.locationId })
-    .from(pinballmapState)
-    .where(eq(pinballmapState.id, "singleton"));
-  const locationId = state?.locationId ?? APC_LOCATION_ID;
+  // The location stamp travels with the entry (`AbandonedListing.locationId`),
+  // taken from the snapshot the lmx was resolved out of. Reading the
+  // singleton's `location_id` here instead would stamp an old-venue lmx with
+  // the currently-tracked id whenever the two disagree, and the cross-location
+  // guard in spec 6.9 reads exactly this field.
+  const { locationId } = abandoned;
 
   await tx
     .insert(pinballmapAbandonedListings)
@@ -146,16 +137,33 @@ export async function listAbandonedForMachine(
  * way.** The chip's only job is to send a reader to the alert; when the filter
  * lived on the Manage page alone the chip fired on entries the alert then hid,
  * pointing at a page that showed nothing wrong.
+ *
+ * The hiding rule applies **only to records at the tracked location**. Its whole
+ * premise is that a same-title cabinet is already handling the entry through its
+ * own Listed / Lingering state — and that premise is about THIS location's
+ * lineup. A record stamped with a location PinPoint no longer tracks (spec 6.4)
+ * lives on a different lineup entirely, so no cabinet here is handling it, and
+ * hiding it would strand the record: `clearResolvedAbandonments` is scoped to
+ * the tracked location too, so the only path that ever removes it is the
+ * explicit Remove on the page this filter just hid it from (spec 6.9). Invisible
+ * and unclearable, with the orphan still live on the old venue's public map.
  */
 export async function listSurfacingAbandonedForMachine(
-  machineId: string
+  machineId: string,
+  trackedLocationId: number
 ): Promise<
   { lmxId: number; pinballmapMachineId: number; locationId: number }[]
 > {
   const rows = await listAbandonedForMachine(machineId);
   if (rows.length === 0) return rows;
 
-  const titleIds = rows.map((r) => r.pinballmapMachineId);
+  const [sameLocation, crossLocation] = [
+    rows.filter((r) => r.locationId === trackedLocationId),
+    rows.filter((r) => r.locationId !== trackedLocationId),
+  ];
+  if (sameLocation.length === 0) return crossLocation;
+
+  const titleIds = sameLocation.map((r) => r.pinballmapMachineId);
   const matched = await db
     .selectDistinct({ pinballmapMachineId: machines.pinballmapMachineId })
     .from(machines)
@@ -166,7 +174,10 @@ export async function listSurfacingAbandonedForMachine(
     )
   );
 
-  return rows.filter((r) => !stillInTheFleet.has(r.pinballmapMachineId));
+  return [
+    ...sameLocation.filter((r) => !stillInTheFleet.has(r.pinballmapMachineId)),
+    ...crossLocation,
+  ];
 }
 
 /**

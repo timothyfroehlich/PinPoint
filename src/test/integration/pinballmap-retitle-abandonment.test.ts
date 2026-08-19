@@ -194,17 +194,25 @@ describe("re-matching an intent-On machine", () => {
     expect(after?.pinballmapIntent).toBe("off");
   });
 
-  it("stamps the abandonment with the currently tracked location (spec 6.4)", async () => {
+  it("stamps the abandonment with the location its lmx came from, not the tracked id (spec 6.4)", async () => {
     const db = await getTestDb();
     const { updateMachineAction } = await import("~/app/(app)/m/actions");
     const admin = await createAdmin();
     await mockAuthAs(admin.id);
     await seedCatalog();
     await seedLineup();
-    // Move the tracked location to a non-default value so a pass proves the
-    // stamp is read from `pinballmap_state`, not a hardcoded APC default. The
-    // stored snapshot still carries the entries, so the abandonment still
-    // resolves the old title's lmx.
+    // The row deliberately disagrees with itself: `location_id` says 55555
+    // while `snapshot_json` still holds 26454's lineup. Production reaches this
+    // only transiently now that a disabled re-point clears the snapshot (6.7),
+    // but the enabled path has the same shape narrowly — a record whose
+    // transaction opens just after `changeLocation` commits reads the NEW id
+    // against an lmx resolved from the OLD snapshot.
+    //
+    // Stamping from `location_id` here would label an APC lmx as belonging to
+    // 55555, `isCrossLocation` in `removeMachineFromPinballMapAction` would
+    // read false, and a `not_found` on Remove would re-mint against 55555's
+    // lineup — deleting a live entry that merely shares the title. That is the
+    // destructive path 6.9 exists to close.
     await db
       .update(pinballmapState)
       .set({ locationId: 55555 })
@@ -231,7 +239,8 @@ describe("re-matching an intent-On machine", () => {
       .from(pinballmapAbandonedListings)
       .where(eq(pinballmapAbandonedListings.machineId, machine.id));
     expect(rows).toHaveLength(1);
-    expect(rows[0]?.locationId).toBe(55555);
+    // 26454 — the snapshot the lmx was read out of — not 55555.
+    expect(rows[0]?.locationId).toBe(26454);
   });
 
   it("records a second abandonment without losing the first", async () => {

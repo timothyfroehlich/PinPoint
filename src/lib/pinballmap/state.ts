@@ -50,10 +50,19 @@ export async function getPinballMapState(): Promise<PinballmapState | null> {
  */
 export type SyncTrigger = "manual" | "cron";
 
-/** Outcome of a sync attempt. */
+/**
+ * Outcome of a sync attempt.
+ *
+ * `superseded` is the 6.6 guard firing: the fetch succeeded, but a location
+ * change landed while it was in flight, so the snapshot was discarded rather
+ * than stored under an id it does not describe. It is deliberately NOT `ok` —
+ * the caller would otherwise report a machine count from a venue nobody is
+ * tracking any more, and reconcile a lineup it never stored (CORE-ARCH-012).
+ */
 export type SyncResult =
   | { ok: true; machineCount: number; syncedAt: Date }
   | { ok: false; reason: "error"; error: string }
+  | { ok: false; reason: "superseded" }
   | { ok: false; reason: "throttled"; retryAfterMs: number };
 
 /**
@@ -111,8 +120,8 @@ export async function getRefreshAllowance(
 async function upsertState(
   fields: Omit<NewPinballmapState, "id"> & { locationId: number },
   guardLocationId?: number
-): Promise<void> {
-  await db
+): Promise<boolean> {
+  const written = await db
     .insert(pinballmapState)
     .values({ id: SINGLETON_ID, ...fields })
     .onConflictDoUpdate({
@@ -128,7 +137,12 @@ async function upsertState(
       ...(guardLocationId === undefined
         ? {}
         : { setWhere: eq(pinballmapState.locationId, guardLocationId) }),
-    });
+    })
+    .returning({ id: pinballmapState.id });
+  // Whether the write actually landed. An empty `RETURNING` means the guard
+  // rejected it, and the caller must not report a write that did not happen
+  // (CORE-ARCH-012).
+  return written.length > 0;
 }
 
 /**
@@ -272,7 +286,7 @@ export async function syncLocationSnapshot(opts?: {
     const snapshot = await (
       await getPinballMapClient()
     ).fetchLocation(locationId);
-    await upsertState(
+    const stored = await upsertState(
       {
         locationId,
         snapshotJson: snapshot,
@@ -283,11 +297,14 @@ export async function syncLocationSnapshot(opts?: {
         ...actor,
       },
       // Only persist if the singleton still tracks the location we fetched for;
-      // a concurrent location change supersedes this snapshot (spec 6.6). The
-      // fetch itself succeeded, so the caller still hears ok — the next sync
-      // reads the new location.
+      // a concurrent location change supersedes this snapshot (spec 6.6).
       locationId
     );
+    // The guard rejected the write, so nothing about this fetch is stored.
+    // Reporting `ok` here would hand the caller a machine count from the OLD
+    // venue while the row shows the new one, and send `reconcileAfterSync` at a
+    // lineup this call never wrote (CORE-ARCH-012).
+    if (!stored) return { ok: false, reason: "superseded" };
     return { ok: true, machineCount: snapshot.machineCount, syncedAt };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown sync error";
@@ -335,9 +352,25 @@ export type ChangeLocationResult =
  * shaping, not observed state). The validating fetch follows the cron/enable
  * path and is not charged to the manual allowance.
  *
- * Disabled integration (spec 6.7): the id is changed but no fetch is made and
- * the stored snapshot is left as-is; the next enable's refresh reads the new
- * location.
+ * Disabled integration (spec 6.7): the id is changed and no fetch is made, but
+ * the stored snapshot and its health are CLEARED rather than left behind. A
+ * snapshot describing the old venue under the new venue's id is a row that
+ * disagrees with itself, and every reader takes it as fact:
+ *
+ * - the admin page prints the old venue's "last synced / OK / N machines" under
+ *   the new id;
+ * - machine pages derive Listed / Missing / Lingering from the old lineup while
+ *   linking to the new venue;
+ * - `removeMachineFromPinballMapAction` resolves its lmx from that lineup and
+ *   deletes a live entry at the OLD location;
+ * - `addMachineToPinballMapAction` short-circuits on the old lineup and reports
+ *   a machine already listed at the new one;
+ * - a retitle records an abandonment whose lmx is the old venue's, and the
+ *   cross-location guard in 6.9 cannot see it.
+ *
+ * Cleared, every one of those readers falls into the "not synced yet" path it
+ * already has, which is the truth: nothing has been read for this location. The
+ * next enable's refresh (5.2) fills it in.
  */
 export async function changeLocation(args: {
   newLocationId: number;
@@ -359,21 +392,29 @@ export async function changeLocation(args: {
   const now = new Date();
   const actor = args.updatedBy ? { updatedBy: args.updatedBy } : {};
 
-  // Disabled (or never configured): set the id only, no Pinball Map call (6.7).
+  // Disabled (or never configured): move the id and clear the stale lineup, no
+  // Pinball Map call (6.7 — see the docblock for why "left as-is" was wrong).
   // Upsert so a never-initialized singleton is created; the guard makes a
   // concurrent change a no-op on an existing row.
   if (!state?.enabled && !args.validateWhileDisabled) {
+    // `lastSyncAttemptAt` is deliberately NOT cleared: it is the throttle's
+    // clock (pinballmap spec 3.2), not observed location state, and 6.5 keeps
+    // the allowance untouched across a location change.
+    const cleared = {
+      locationId: newLocationId,
+      snapshotJson: null,
+      lastSyncedAt: null,
+      lastSyncStatus: "unknown" as const,
+      lastSyncError: null,
+      updatedAt: now,
+      ...actor,
+    };
     const committed = await db
       .insert(pinballmapState)
-      .values({
-        id: SINGLETON_ID,
-        locationId: newLocationId,
-        updatedAt: now,
-        ...actor,
-      })
+      .values({ id: SINGLETON_ID, ...cleared })
       .onConflictDoUpdate({
         target: pinballmapState.id,
-        set: { locationId: newLocationId, updatedAt: now, ...actor },
+        set: cleared,
         setWhere: eq(pinballmapState.locationId, oldId),
       })
       .returning({ id: pinballmapState.id });
@@ -383,6 +424,16 @@ export async function changeLocation(args: {
   }
 
   // Enabled: validate by fetching the new location BEFORE any write.
+  //
+  // Record the attempt first. 6.5 says this fetch is not charged to the manual
+  // allowance, so the stamp is the unguarded cron-style one — no token spent —
+  // but it still has to be RECORDED, or an admin retrying a mistyped id drives
+  // traffic at Pinball Map that nothing in the system can see (CORE-PBM-001).
+  // Stamped against the OLD id: on an existing row `stampSyncAttempt` only
+  // writes the timestamps, and on a first-ever insert this must not be the
+  // unvalidated new id.
+  await stampSyncAttempt(oldId, now, false);
+
   let snapshot: LocationSnapshot;
   try {
     snapshot = await (await getPinballMapClient()).fetchLocation(newLocationId);

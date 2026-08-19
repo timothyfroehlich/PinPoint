@@ -26,6 +26,15 @@ export interface AbandonedEntry {
   title: string | null;
   /** Comments on the entry, for the remove confirm (spec 4.6). */
   commentCount: number | null;
+  /**
+   * Link-back to the venue THIS entry is on — which is not always the tracked
+   * one. A record kept across a re-point (spec 6.4) belongs to a lineup PinPoint
+   * no longer syncs, and pointing its "remove it yourself" link at the current
+   * location sends the reader to a page the entry is not on.
+   */
+  locationUrl: string;
+  /** True when the entry's venue is no longer the one PinPoint tracks. */
+  crossLocation: boolean;
 }
 
 /**
@@ -46,12 +55,10 @@ export interface AbandonedEntry {
 export function PinballmapAbandonedEntries({
   machineId,
   entries,
-  locationUrl,
   canPush,
 }: {
   machineId: string;
   entries: readonly AbandonedEntry[];
-  locationUrl: string;
   canPush: boolean;
 }): React.JSX.Element {
   const [pending, startTransition] = useTransition();
@@ -84,7 +91,9 @@ export function PinballmapAbandonedEntries({
             className="flex flex-wrap items-center gap-2 py-0.5"
           >
             <span className="flex-1">
-              Still on the location&apos;s lineup:{" "}
+              {entry.crossLocation
+                ? "Still on a previously tracked location's lineup: "
+                : "Still on the location's lineup: "}
               {entry.title === null
                 ? `Pinball Map entry #${String(entry.lmxId)}`
                 : `“${entry.title}”`}{" "}
@@ -100,7 +109,7 @@ export function PinballmapAbandonedEntries({
               />
             ) : (
               <a
-                href={locationUrl}
+                href={entry.locationUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-primary underline underline-offset-2 hover:no-underline"

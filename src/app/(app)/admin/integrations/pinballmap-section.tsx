@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useEffect, useId, useState } from "react";
 import { toast } from "sonner";
 import {
   CheckCircle2,
@@ -80,13 +80,22 @@ export function PinballMapSection({
   // After a successful save, revalidatePath re-renders the parent with the
   // stored values; reconcile local inputs to them so dirty state clears (the
   // same reconcile the Discord form does — useState only seeds from props once).
+  //
+  // Guarded on the result IDENTITY rather than on `saveState.ok`, because
+  // `enabled`/`locationId` are in the dep array and the save is what changes
+  // them. Without the ref, the revalidated props arriving in a later commit
+  // re-run this effect with the same successful result: a second toast, and a
+  // `setLocationInput` that overwrites whatever the admin has typed since.
+  const handledSaveState = React.useRef<PbmSaveResult | undefined>(undefined);
   useEffect(() => {
-    if (saveState?.ok) {
+    if (!saveState || handledSaveState.current === saveState) return;
+    handledSaveState.current = saveState;
+    if (saveState.ok) {
       setEnabledInput(enabled);
       setLocationInput(String(locationId));
       if (saveState.value.warning) toast.warning(saveState.value.warning);
       else toast.success("Pinball Map settings saved.");
-    } else if (saveState) {
+    } else {
       toast.error(saveState.message);
     }
   }, [saveState, enabled, locationId]);
@@ -98,7 +107,14 @@ export function PinballMapSection({
   const locationChanged =
     parsedLocation !== null && parsedLocation !== locationId;
   const enableChanged = enabledInput !== enabled;
-  const isDirty = enableChanged || trimmedLocation !== String(locationId);
+  // Dirty on the same terms Save uses. Comparing strings here while `canSave`
+  // compares numbers made "026454" against a stored 26454 read as an unsaved
+  // edit — Reset live, the unload guard armed — while Save stayed disabled with
+  // no validation error on screen to explain why. Leading zeros are the same
+  // number, so nothing is unsaved.
+  const isDirty =
+    enableChanged ||
+    (locationValid ? locationChanged : trimmedLocation !== String(locationId));
   const canSave =
     locationValid && (enableChanged || locationChanged) && !isSaving;
 
@@ -219,6 +235,11 @@ export function PinballMapSection({
           health={health}
           allowance={allowance}
           locationUrl={locationUrl}
+          // The STORED flag, not the local toggle: a disabled integration makes
+          // no Pinball Map calls (§5.3), and `syncLocationSnapshot` does not
+          // gate on `enabled` itself. Reading the unsaved toggle instead would
+          // let flipping the switch — without saving — arm a live fetch.
+          enabled={enabled}
         />
 
         {/* Location-change confirm (spec §6.8) — controlled, opened from Save. */}
@@ -274,15 +295,18 @@ function SyncPanel({
   health,
   allowance,
   locationUrl,
+  enabled,
 }: {
   health: PinballMapSectionProps["health"];
   allowance: PinballMapSectionProps["allowance"];
   locationUrl: string;
+  enabled: boolean;
 }): React.JSX.Element {
   const [syncState, syncDispatch, isSyncing] = useActionState<
     PbmSyncResult | undefined,
     FormData
   >(syncPinballMapNowAction, undefined);
+  const syncDisabledId = useId();
 
   // Throttle deadline (epoch ms) for the Sync now countdown. Seeded from the
   // server's advisory allowance, then re-set from a THROTTLED action result —
@@ -298,9 +322,21 @@ function SyncPanel({
     }
   }, [allowance.remaining, allowance.nextRefillAt]);
 
+  // Ticks only while a deadline is actually in the future, and clears the
+  // deadline once it passes — otherwise the first throttled Sync now leaves a
+  // 1s interval re-rendering this panel for as long as the admin page stays
+  // open, which on an admin page is indefinitely.
   useEffect(() => {
     if (throttleUntil === null) return;
-    const tick = (): void => setNowMs(Date.now());
+    if (throttleUntil <= Date.now()) {
+      setThrottleUntil(null);
+      return;
+    }
+    const tick = (): void => {
+      const now = Date.now();
+      setNowMs(now);
+      if (now >= throttleUntil) setThrottleUntil(null);
+    };
     tick();
     const id = window.setInterval(tick, 1000);
     return () => {
@@ -360,7 +396,8 @@ function SyncPanel({
           onClick={() => {
             syncDispatch(new FormData());
           }}
-          disabled={isSyncing || throttled}
+          disabled={isSyncing || throttled || !enabled}
+          aria-describedby={enabled ? undefined : syncDisabledId}
         >
           {isSyncing ? (
             <>
@@ -385,6 +422,15 @@ function SyncPanel({
           <span>View on Pinball Map</span>
         </a>
       </div>
+
+      {/* Visible text, not a `title` tooltip (CORE-A11Y-005), tied to the
+          button so the reason reaches a screen reader with the control. */}
+      {!enabled && (
+        <p id={syncDisabledId} className="text-xs text-muted-foreground">
+          Pinball Map is off, so PinPoint makes no calls to it. Turn the
+          integration on to sync.
+        </p>
+      )}
     </section>
   );
 }

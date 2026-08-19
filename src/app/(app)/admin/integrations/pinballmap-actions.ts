@@ -101,18 +101,27 @@ export async function savePinballMapConfigAction(
         `Pinball Map couldn't load location ${String(targetLocation)}. The tracked location is unchanged.`
       );
     }
-    if (!result.ok && result.reason === "concurrent_change") {
+    // `unchanged` is reachable despite the diff above: that diff and
+    // `changeLocation`'s own read are two separate statements, so a concurrent
+    // save landing the SAME id in between makes this one a no-op. Reporting it
+    // as a save is CORE-ARCH-012's dishonest-success shape — the admin would
+    // think their click did the work somebody else's did.
+    if (!result.ok && result.reason !== "fetch_failed") {
       revalidatePath(INTEGRATIONS_PATH);
-      // Honest failure (CORE-ARCH-012): a turn-off above has already committed,
-      // so "nothing changed" would be a lie in that case.
+      // A turn-off above has already committed, so "nothing changed" would
+      // itself be a lie in that case — say which half landed.
+      const turnedOff = enableChanged && !targetEnabled;
       return err(
         "CONFLICT",
-        enableChanged && !targetEnabled
-          ? "Pinball Map was turned off, but another change landed first so the location is unchanged. Reload the page."
-          : "Another change landed first. Reload the page and try again."
+        result.reason === "unchanged"
+          ? turnedOff
+            ? "Pinball Map was turned off. Another save had already moved the location there, so this one changed nothing further."
+            : "Another save had already moved the location there, so this one changed nothing. Reload the page."
+          : turnedOff
+            ? "Pinball Map was turned off, but another change landed first so the location is unchanged. Reload the page."
+            : "Another change landed first. Reload the page and try again."
       );
     }
-    // "unchanged" can't reach here — we diffed against stored state first.
   }
 
   // Enable last so its refresh reads whatever location is now stored — unless
@@ -130,8 +139,25 @@ export async function savePinballMapConfigAction(
     // uses the cron trigger so it is never throttled.
     if (!result.ok && result.reason === "error") {
       warning = `Enabled, but the lineup refresh failed: ${result.error}`;
+    } else if (!result.ok && result.reason === "superseded") {
+      warning =
+        "Enabled, but another change moved the location before the lineup could be stored. Sync now to read the new one.";
     }
   }
+
+  // A fresh snapshot was just stored — by `changeLocation`'s validating fetch,
+  // by the enable refresh, or both. Every other successful-sync call site
+  // reconciles (`syncPinballMapNowAction` below, the cron route, the machine
+  // Refresh); skipping it here leaves an abandoned-entry alert standing for up
+  // to an hour on a lineup that could answer right now. Concretely: someone
+  // takes an orphan down by hand on pinballmap.com while the integration is
+  // off, the admin re-enables, and every affected machine page keeps telling
+  // its owner to remove an entry that is already gone (CORE-ARCH-012).
+  const storedFreshSnapshot =
+    warning === undefined &&
+    targetEnabled &&
+    (locationChanged || enableChanged);
+  if (storedFreshSnapshot) await reconcileAfterSync();
 
   revalidatePath(INTEGRATIONS_PATH);
   // Re-pointing the location replaces the snapshot every machine page derives
@@ -185,5 +211,15 @@ export async function syncPinballMapNowAction(
     });
   }
   revalidatePath(INTEGRATIONS_PATH);
+  if (result.reason === "superseded") {
+    // The fetch worked; the 6.6 guard discarded it because the location moved
+    // underneath. Saying "refreshed" here would report a machine count for a
+    // venue nobody tracks any more (CORE-ARCH-012).
+    return err(
+      "SYNC",
+      "The tracked location changed while this refresh was running, so its result was discarded. Reload the page and sync again.",
+      { retryAfterMs: 0 }
+    );
+  }
   return err("SYNC", `Sync failed: ${result.error}`, { retryAfterMs: 0 });
 }

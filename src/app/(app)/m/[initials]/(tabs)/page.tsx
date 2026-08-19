@@ -174,7 +174,12 @@ export default async function MachineInfoTab({
       // only job is to send a reader there, so an unfiltered count here fires
       // on entries the alert then hides and points at a page showing nothing
       // wrong.
-      (await listSurfacingAbandonedForMachine(machine.id)).length > 0);
+      (
+        await listSurfacingAbandonedForMachine(
+          machine.id,
+          pbmState?.locationId ?? APC_LOCATION_ID
+        )
+      ).length > 0);
 
   // The Manage tab gates on `machines.edit`, which is a narrower grant than
   // `diagnose` — so a member who can see the warning may not be able to open

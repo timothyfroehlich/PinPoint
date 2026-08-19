@@ -165,6 +165,8 @@ describe("resolvePbmLinkColumnsForUpdate", () => {
     expect(result.abandoned).toEqual({
       lmxId: 4471,
       pinballmapMachineId: 6221,
+      // From the snapshot the lmx was read out of, not the singleton row.
+      locationId: 26454,
     });
   });
 
@@ -180,6 +182,8 @@ describe("resolvePbmLinkColumnsForUpdate", () => {
     expect(result.abandoned).toEqual({
       lmxId: 4471,
       pinballmapMachineId: 6221,
+      // From the snapshot the lmx was read out of, not the singleton row.
+      locationId: 26454,
     });
   });
 

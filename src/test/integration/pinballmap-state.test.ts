@@ -443,8 +443,12 @@ describe("an in-flight sync does not clobber a concurrent location change (spec 
       });
 
     const result = await syncLocationSnapshot({ trigger: "cron" });
-    // The fetch itself succeeded — the caller is not told this was a failure.
-    expect(result.ok).toBe(true);
+    // The fetch succeeded but its result was thrown away, so the caller hears
+    // `superseded` rather than ok. Reporting ok used to hand back a
+    // `machineCount` read off the DISCARDED snapshot — the old venue's 2 — while
+    // the row showed the new location, and sent `reconcileAfterSync` at a lineup
+    // this call never stored (CORE-ARCH-012).
+    expect(result).toEqual({ ok: false, reason: "superseded" });
 
     const state = await getPinballMapState();
     // The change won: the new id stands and the old-location snapshot was not
@@ -588,9 +592,16 @@ describe("changeLocation (spec 6)", () => {
 
     const state = await getPinballMapState();
     expect(state?.locationId).toBe(99999);
-    // The stored snapshot is left as-is until the next enable (6.7).
-    expect(state?.snapshotJson?.name).toBe("APC");
     expect(spy).not.toHaveBeenCalled();
+    // The old venue's lineup is CLEARED, not left behind (6.7). Keeping it made
+    // the row disagree with itself — location 99999 with APC's lmxes under it —
+    // and every reader took that at face value: machine pages derived
+    // Listed/Missing from APC's lineup, `removeMachineFromPinballMapAction`
+    // resolved an lmx out of it and deleted a live entry at APC, and a retitle
+    // recorded an abandonment the 6.9 cross-location guard could not see.
+    expect(state?.snapshotJson).toBeNull();
+    expect(state?.lastSyncedAt).toBeNull();
+    expect(state?.lastSyncStatus).toBe("unknown");
     spy.mockRestore();
   });
 

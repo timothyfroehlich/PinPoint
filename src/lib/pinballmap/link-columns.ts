@@ -38,6 +38,23 @@ export interface StoredPbmLinkState {
 export interface AbandonedListing {
   lmxId: number;
   pinballmapMachineId: number;
+  /**
+   * The location whose lineup this lmx was read from — carried with the entry
+   * rather than re-read from the singleton when the record is written.
+   *
+   * The singleton's `location_id` and its `snapshot_json` can legitimately
+   * describe different venues: a re-point while the integration is disabled
+   * moves the id and leaves the previous venue's lineup stored (spec 6.7).
+   * Stamping the record from the id would then label an OLD-location lmx with
+   * the NEW location, `isCrossLocation` in the remove path would read false,
+   * and a `not_found` would re-mint against the new lineup — deleting an
+   * unrelated live entry that happens to share the title. That is exactly the
+   * destructive re-mint 6.9 exists to prevent. Taking the stamp from the
+   * snapshot the lmx came from cannot disagree with itself, and it closes the
+   * narrower enabled-path race too (a record whose transaction starts after a
+   * `changeLocation` commits would otherwise read the new id).
+   */
+  locationId: number;
 }
 
 export type ResolvePbmLinkResult =
@@ -223,5 +240,11 @@ async function resolveAbandonedEntry(
   if (!snapshot) return null;
   const lmx = findLmxForMachine(snapshot, oldPinballmapMachineId);
   if (!lmx) return null;
-  return { lmxId: lmx.id, pinballmapMachineId: oldPinballmapMachineId };
+  return {
+    lmxId: lmx.id,
+    pinballmapMachineId: oldPinballmapMachineId,
+    // From the snapshot the lmx was just read out of, never from the row's
+    // `location_id` — see `AbandonedListing.locationId`.
+    locationId: snapshot.locationId,
+  };
 }

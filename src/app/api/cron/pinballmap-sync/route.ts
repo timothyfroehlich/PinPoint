@@ -43,7 +43,16 @@ export async function GET(request: Request): Promise<NextResponse> {
   const result = await syncLocationSnapshot({ trigger: "cron" });
   if (!result.ok) {
     // The cron path is never throttled, but narrow defensively for type safety.
-    const error = result.reason === "throttled" ? "throttled" : result.error;
+    // `superseded` is the 6.6 guard: an admin re-pointed the location while
+    // this hourly fetch was in flight, so its snapshot was discarded. Not an
+    // error to chase — the next run reads the new location — but it must not be
+    // logged as a success either.
+    const error =
+      result.reason === "throttled"
+        ? "throttled"
+        : result.reason === "superseded"
+          ? "superseded by a location change"
+          : result.error;
     log.error(
       { err: error, action: "pinballmap.syncLocationSnapshot" },
       "PinballMap snapshot sync failed"
