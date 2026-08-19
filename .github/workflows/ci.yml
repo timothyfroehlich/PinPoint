@@ -848,7 +848,10 @@ jobs:
     # ==============================================================================
     name: E2E Comprehensive Tests (Post-Merge)
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    # Explicit code/deps guard mirrors the three PR E2E siblings, rather than
+    # leaning on the `setup`-skip cascade to keep it off docs-only main pushes —
+    # an implicit guard a future refactor could break. (PP-x0ke.)
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && (needs.changes.outputs.code == 'true' || needs.changes.outputs.deps == 'true') }}
     needs: [changes, setup, typecheck, lint, format, linters, test-unit, test-integration, test-migrations]
     # Backstop only — the real limits are per-step (see the comment above the
     # Playwright steps). Must stay above setup + both step timeouts, or a job
@@ -1124,18 +1127,20 @@ jobs:
   #     marks queued jobs `cancelled`. The replacement run becomes the
   #     authoritative status, so it is safe to treat the cancelled run as pass.
   #
-  # Post-merge full-matrix alarm (PP-x0ke):
+  # Post-merge full-matrix alarm (PP-x0ke) — a tier-3 job, see below:
   #   `test-e2e-comprehensive` is push-to-main only (it runs the full E2E matrix
   #   — chromium + Mobile Chrome + Mobile Safari, smoke + full — against one DB,
   #   the only job that covers the Mobile-Chrome/Mobile-Safari a11y specs and
-  #   the seed-leak class). It is a tier-2 optional here: on a `pull_request`
-  #   event it is skipped, and `skipped` passes, so it never blocks a PR merge
-  #   (nor could it — it does not run on PRs, so it cannot be a ruleset-required
-  #   check without wedging every PR on a check that never reports). On a push
-  #   to main it runs, and its `failure` now fails CI Gate — turning a red
-  #   post-merge full-matrix verdict into a red required check on the main
-  #   commit, instead of a green main hiding a red non-required job. That is the
-  #   alarm; blocking is impossible post-merge. Catching a full-matrix-only
+  #   the seed-leak class). On a `pull_request` event it is skipped, and
+  #   `skipped` passes, so it never blocks a PR merge (nor could it — it does
+  #   not run on PRs, so it cannot be a ruleset-required check without wedging
+  #   every PR on a check that never reports). On a push to main it runs, and a
+  #   `failure` OR a `cancelled` (its 90-min backstop firing on a hang) now
+  #   fails CI Gate — turning a red or hung post-merge full-matrix verdict into
+  #   a red required check on the main commit, instead of a green main hiding a
+  #   red/hung non-required job. That is the alarm; blocking is impossible
+  #   post-merge. It gets its own tier-3 rule precisely because tier 2 passes
+  #   `cancelled` and comprehensive must not. Catching a full-matrix-only
   #   regression BEFORE merge would mean running comprehensive on `pull_request`
   #   too (~30 min/PR) — deliberately not done; see PP-x0ke.
   # ==============================================================================
@@ -1205,12 +1210,41 @@ jobs:
                     "$TEST_UNIT_RESULT" "$TEST_INTEGRATION_RESULT" \
                     "$TEST_MIGRATIONS_RESULT" "$TEST_INTEGRATION_SUPABASE_RESULT" \
                     "$TEST_E2E_SMOKE_RESULT" "$TEST_E2E_SMOKE_MOBILE_CHROME_RESULT" \
-                    "$TEST_E2E_FULL_CHROMIUM_RESULT" "$TEST_E2E_COMPREHENSIVE_RESULT" \
-                    "$PNPM_AUDIT_RESULT")
+                    "$TEST_E2E_FULL_CHROMIUM_RESULT" "$PNPM_AUDIT_RESULT")
           for r in "${optional[@]}"; do
             if [[ "$r" == "failure" ]]; then
               echo "::error::Path-filtered job failed (result=$r)"
               exit 1
             fi
           done
+
+          # Tier 3: test-e2e-comprehensive — like tier 2 but `cancelled` FAILS.
+          #
+          # The generic tier-2 rule passes `cancelled` so a concurrency-
+          # superseded run does not block. That is wrong for comprehensive: its
+          # 90-minute job backstop (PP-jxhy) surfaces a HANG — a stuck install,
+          # browser download, or runner stall in an untimed phase — as
+          # result=cancelled, and the entire point of PP-x0ke is that a hung or
+          # red post-merge full-matrix run must not leave a green CI Gate on
+          # main. Passing `cancelled` here would reopen that exact silent
+          # swallow. So `success` and `skipped` pass (skipped = a PR event or a
+          # docs-only main push, where it correctly does not run); everything
+          # else — `failure` and `cancelled` — fails the gate.
+          #
+          # Tradeoff: a manually-cancelled main run now alarms. That is
+          # acceptable and arguably correct (someone killed the verdict). It is
+          # NOT a false-alarm risk from concurrency: the workflow concurrency
+          # group appends github.sha on push (see top of file), so each main
+          # commit has its own group and a main run is never cancelled by a
+          # later main push. On push, `cancelled` therefore means the backstop
+          # (a real hang) or a manual cancel — both of which should alarm.
+          case "$TEST_E2E_COMPREHENSIVE_RESULT" in
+            success | skipped) ;;
+            *)
+              echo "::error::Post-merge E2E Comprehensive did not pass (result=$TEST_E2E_COMPREHENSIVE_RESULT)."
+              echo "::error::A hung (cancelled) or failed full-matrix run must not leave CI Gate green on main. See PP-x0ke."
+              exit 1
+              ;;
+          esac
+
           echo "All required jobs passed; path-filtered jobs passed, were skipped, or were cancelled"
