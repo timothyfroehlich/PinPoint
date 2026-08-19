@@ -74,13 +74,11 @@ Sign every review comment or reply with your agent name (`—Claude`, `—Gemini
 
 ## The merge boundary
 
-Reviewers never merge. Merging is human-only, via every path (PP-wi85) — no `gh pr merge`, no MCP `merge_pull_request`, no `scripts/workflow/merge-pr.sh`, not even to "just check the gates."
+Reviewers never merge. The merge decision is Tim's, always (PP-wi85) — the raw channels are off-limits to agents outright: no `gh pr merge`, no `gh api PUT .../merge`, no MCP `merge_pull_request`. The gate-enforced script `scripts/workflow/merge-pr.sh` is the one exception, and only in Claude Code: an agent MAY run it, but the merge is still Tim's call (see below).
 
-This is enforced two different ways depending on harness. In **Claude Code**, `block-direct-merge.cjs` is a PreToolUse hook that blocks these commands outright. It does **not** fire inside Antigravity, Codex, or Gemini — in those harnesses there is no hook backstop. What binds you instead is this written instruction plus `merge-pr.sh`'s own refusal to execute without a `--human` flag that only Tim should ever pass.
+This is enforced differently by harness. In **Claude Code**, `block-direct-merge.cjs` is a PreToolUse hook that **hard-blocks** the raw channels and turns any `merge-pr.sh` invocation into an **approval prompt Tim must accept** before it runs (PP-wi85, reversed for the script only, per Tim 2026-08-19). The hook does **not** fire inside Antigravity, Codex, or Gemini — in those harnesses there is no hook backstop and no approval prompt, so **do not run any merge path yourself**; what binds you is this written instruction plus `merge-pr.sh`'s own refusal to execute without a `--human` flag that only Tim should ever pass.
 
-Take note if you're not Claude Code: `.agents/skills/pinpoint-pr-workflow/SKILL.md`, under "Phase 4: Merge — human-only," says direct merge paths are "ALL blocked for an agent by the `block-direct-merge.cjs` PreToolUse hook" with "no agent-usable bypass." That statement is true in Claude Code and **false in every other harness** — the hook simply isn't there. Don't take it at face value if you're reviewing or acting from Antigravity, Codex, or Gemini; the instruction in this section is what actually binds you.
-
-An agent's terminal state on a PR is: ready-for-review, CI green, a review covering the head commit (see "How a review gets triggered"), review threads resolved, screenshots posted if UI-touching. Then hand Tim the exact command to run himself: `! scripts/workflow/merge-pr.sh <PR> --human`.
+An agent's terminal state on a PR is: ready-for-review, CI green, a review covering the head commit (see "How a review gets triggered"), review threads resolved, screenshots posted if UI-touching. Then either hand Tim the command to run himself, `! scripts/workflow/merge-pr.sh <PR> --human`, or (Claude Code only) run it and let him approve the prompt.
 
 ## Pointers, not copies
 

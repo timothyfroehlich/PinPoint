@@ -13,9 +13,10 @@ set -euo pipefail
 # or main moves. That is why the last two lines are commands rather than conclusions — the
 # first re-runs this report, the second merges. Both are `!`-prefixed because Tim types
 # them into the Claude Code prompt, where `!` runs a command outside the agent tool-call
-# path (which is also how merging stays human-only: `merge-pr.sh` is blocked for agents in
-# every invocation shape, so an agent cannot run either the merge or, indirectly, itself
-# into one).
+# path. An agent MAY also run `merge-pr.sh --human` itself, but the block-direct-merge hook
+# turns that into an approval prompt Tim must accept (PP-wi85, reversed for the script per
+# Tim 2026-08-19) — so the merge decision stays his either way. The raw channels (gh pr
+# merge, gh api, MCP merge) stay hard-blocked for agents.
 #
 # The merge command is only printed when all four merge gates actually pass. Handing over a
 # merge command while CI is still yellow invites a merge on a guess, and the gates would

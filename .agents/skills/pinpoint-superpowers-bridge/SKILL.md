@@ -70,7 +70,7 @@ Code work still happens **in a worktree** — the root checkout is read-only (AG
 
 Superpowers presents a 4-option menu led by "1. Merge back to `<base>` locally". **In PinPoint that menu does not apply.** There is exactly one finish path:
 
-- **Never merge locally, never push/merge to `main`, and never merge the PR yourself by any path.** Ship through a PR: push the branch, open it **ready-for-review**, let **CI** run the full suite, post UI screenshots if UI-touching, then hand Tim the exact command to run himself: `! scripts/workflow/merge-pr.sh <PR> --human` (never `gh pr merge` / MCP merge / running `merge-pr.sh` yourself — all three are blocked for agents, PP-wi85). Full pipeline: `pinpoint-pr-workflow` (Phases 4-5, "landing the plane").
+- **Never merge locally and never push/merge to `main`; the merge decision is Tim's.** Ship through a PR: push the branch, open it **ready-for-review**, let **CI** run the full suite, post UI screenshots if UI-touching, then hand Tim the command to run himself, `! scripts/workflow/merge-pr.sh <PR> --human` — or run that script yourself, which the `block-direct-merge.cjs` hook turns into an approval prompt Tim must accept before it merges (PP-wi85, reversed for the script per Tim 2026-08-19). The raw channels — `gh pr merge`, `gh api PUT .../merge`, MCP merge — stay hard-blocked for agents. Full pipeline: `pinpoint-pr-workflow` (Phases 4-5, "landing the plane").
 - **Tests:** use PinPoint's tiered commands, listed in **AGENTS.md §5 "Which tests to run"** (`pnpm run check` is the **static** floor and runs no tests; `pnpm run test` is the unit suite; `pnpm run check:python` covers `scripts/` and `.claude/hooks/`; `pnpm run preflight` for migrations/auth/server-actions/middleware/schema; `pnpm run smoke` for UI) — **not** `npm test` / `pytest`. The full E2E suite (`e2e:full` / `e2e:all`) is CI's job by default; it peaks at several GB, so run it locally only when the host has the headroom.
 - **Worktree cleanup is destructive → wait for explicit confirmation** (`pinpoint-pr-workflow` Phase 5.2 "Cleanup"). When confirmed, cleanup goes through the `WorktreeRemove` hook / `scripts/worktree_cleanup.py` (dealloc slot + Docker volumes) — **never raw `git worktree remove`/`rm -rf`**, which leaks the slot manifest and volumes.
 - **"Discard" is not a routine option.** Abandoning work is a deliberate, confirmed action, not a menu pick.
@@ -87,7 +87,7 @@ Superpowers presents a 4-option menu led by "1. Merge back to `<base>` locally".
 | Worktree create          | `EnterWorktree` / `Agent(isolation:"worktree")`, from main worktree                               |
 | SDD dispatch             | clear the scale gate (count + cost, Tim's yes) first                                              |
 | Code review              | CI Gate + `pinpoint-pr-workflow` head-commit review; replies via MCP, signed with your agent name |
-| Finish: "merge locally"  | ❌ prohibited → PR + human-only `merge-pr.sh --human` handoff + landing-the-plane                 |
+| Finish: "merge locally"  | ❌ prohibited → PR + `merge-pr.sh --human` (Tim approves the hook prompt) + landing-the-plane     |
 | Finish: tests            | AGENTS.md §5's tiered `check`/`test`/`preflight`/`smoke`, not `npm test`                          |
 | Finish: worktree cleanup | `WorktreeRemove` hook / `worktree_cleanup.py`, on confirmation                                    |
 | Close bead               | only after merge                                                                                  |
