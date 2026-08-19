@@ -343,7 +343,7 @@ export function InlineEditableField({
             className={openWhenEmpty ? "min-h-[88px]" : "min-h-[40px]"}
           />
           {error && (
-            <p className="text-xs text-destructive" role="alert">
+            <p className="text-xs text-destructive-text" role="alert">
               {error}
             </p>
           )}

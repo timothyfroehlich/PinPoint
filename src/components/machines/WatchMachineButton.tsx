@@ -141,7 +141,7 @@ export function WatchMachineButton({
         <DropdownMenuSeparator />
         <DropdownMenuItem
           onClick={handleToggleWatch}
-          className="text-destructive focus:text-destructive py-2"
+          className="text-destructive-text focus:text-destructive-text py-2"
         >
           <BellOff className="mr-2 size-4" />
           Stop watching

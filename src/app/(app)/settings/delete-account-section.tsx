@@ -83,7 +83,7 @@ export function DeleteAccountSection({
   return (
     <div className="space-y-4">
       {isSoleAdmin && (
-        <div className="rounded-md border border-destructive/20 bg-destructive/10 p-4 text-destructive">
+        <div className="rounded-md border border-destructive/20 bg-destructive/10 p-4 text-destructive-text">
           <p className="text-sm font-medium">
             You are the only admin. Promote another user to admin before
             deleting your account.
@@ -125,7 +125,7 @@ export function DeleteAccountSection({
             {state && !state.ok && (
               <div
                 role="alert"
-                className="rounded-md border border-destructive/20 bg-destructive/10 p-4 text-destructive"
+                className="rounded-md border border-destructive/20 bg-destructive/10 p-4 text-destructive-text"
               >
                 <p className="text-sm font-medium">{state.message}</p>
               </div>
@@ -136,7 +136,7 @@ export function DeleteAccountSection({
               <AlertDialogDescription asChild>
                 <div className="space-y-4 text-foreground">
                   {isSoleAdmin && (
-                    <div className="rounded-md border border-destructive/20 bg-destructive/10 p-3 text-destructive">
+                    <div className="rounded-md border border-destructive/20 bg-destructive/10 p-3 text-destructive-text">
                       <p className="text-sm font-semibold">
                         Critical Error: Sole Admin Constraint
                       </p>
@@ -151,7 +151,7 @@ export function DeleteAccountSection({
                   <div className="space-y-2">
                     <p>
                       This action is{" "}
-                      <strong className="text-destructive underline">
+                      <strong className="text-destructive-text underline">
                         permanent and cannot be undone
                       </strong>
                       . Your profile and preferences will be deleted.

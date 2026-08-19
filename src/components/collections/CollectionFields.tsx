@@ -45,7 +45,7 @@ export function CollectionFields({
       <div className="space-y-2">
         <Label htmlFor={nameId}>
           Name
-          <span aria-hidden="true" className="text-destructive">
+          <span aria-hidden="true" className="text-destructive-text">
             {" "}
             *
           </span>

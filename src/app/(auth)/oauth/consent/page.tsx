@@ -191,7 +191,7 @@ function ConsentNotice({
   return (
     <Card className="border-border/70 bg-card/90 shadow-lg">
       <CardHeader className="space-y-3">
-        <div className="flex size-12 items-center justify-center rounded-full bg-destructive/10 text-destructive">
+        <div className="flex size-12 items-center justify-center rounded-full bg-destructive/10 text-destructive-text">
           <ShieldAlert aria-hidden="true" className="size-6" />
         </div>
         <CardTitle className="text-2xl font-bold text-foreground">

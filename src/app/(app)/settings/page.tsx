@@ -179,7 +179,7 @@ export default async function SettingsPage(): Promise<React.JSX.Element> {
         <Separator />
 
         <div>
-          <h2 className="text-balance text-xl font-semibold mb-2 text-destructive">
+          <h2 className="text-balance text-xl font-semibold mb-2 text-destructive-text">
             Danger Zone
           </h2>
           <p className="text-pretty text-sm text-muted-foreground mb-4">

@@ -51,7 +51,7 @@ export async function ConnectedAccountsSection(): Promise<React.JSX.Element> {
     return (
       <div>
         {header}
-        <p className="text-sm text-destructive">
+        <p className="text-sm text-destructive-text">
           We couldn&apos;t load your connected accounts right now. Please
           refresh the page and try again.
         </p>

@@ -73,7 +73,7 @@ export function ConfirmingDeleteButton({
           variant="ghost"
           size="icon"
           className={cn(
-            "size-6 text-muted-foreground hover:text-destructive transition-colors motion-reduce:transition-none",
+            "size-6 text-muted-foreground hover:text-destructive-text transition-colors motion-reduce:transition-none",
             className
           )}
           aria-label={ariaLabel}
@@ -121,8 +121,8 @@ export function ConfirmingDeleteButton({
       className={cn(
         "transition-[width] focus-visible:opacity-100 motion-reduce:transition-none",
         armed
-          ? "w-auto px-2 h-6 bg-destructive/15 text-destructive hover:bg-destructive/25 hover:text-destructive"
-          : "size-6 text-muted-foreground hover:text-destructive",
+          ? "w-auto px-2 h-6 bg-destructive/15 text-destructive-text hover:bg-destructive/25 hover:text-destructive-text"
+          : "size-6 text-muted-foreground hover:text-destructive-text",
         className
       )}
       aria-label={armed ? `Tap again to delete — ${ariaLabel}` : ariaLabel}

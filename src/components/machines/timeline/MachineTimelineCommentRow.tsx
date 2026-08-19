@@ -183,7 +183,7 @@ export function MachineTimelineCommentRow({
                   ) : null}
                   {canDelete ? (
                     <DropdownMenuItem
-                      className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+                      className="text-destructive-text focus:bg-destructive/10 focus:text-destructive-text"
                       onSelect={() => {
                         setIsDeleteOpen(true);
                       }}
@@ -286,7 +286,9 @@ function CommentEditForm({
           </Button>
         </div>
       </div>
-      {error ? <p className="mt-2 text-sm text-destructive">{error}</p> : null}
+      {error ? (
+        <p className="mt-2 text-sm text-destructive-text">{error}</p>
+      ) : null}
     </div>
   );
 }
@@ -335,7 +337,9 @@ function DeleteCommentDialog({
             visible to others.
           </AlertDialogDescription>
         </AlertDialogHeader>
-        {error ? <p className="text-sm text-destructive">{error}</p> : null}
+        {error ? (
+          <p className="text-sm text-destructive-text">{error}</p>
+        ) : null}
         <AlertDialogFooter>
           <AlertDialogCancel disabled={pending}>Cancel</AlertDialogCancel>
           <AlertDialogAction

@@ -149,7 +149,7 @@ export function ProfileEditor({
         className="space-y-4 rounded-xl border border-outline-variant bg-card p-4"
       >
         {profileState && !profileState.ok ? (
-          <p role="alert" className="text-sm text-destructive">
+          <p role="alert" className="text-sm text-destructive-text">
             Could not save. Check your input.
           </p>
         ) : null}

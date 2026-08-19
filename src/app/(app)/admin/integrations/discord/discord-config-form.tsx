@@ -401,7 +401,7 @@ function FieldLabel({
       <Label htmlFor={htmlFor} className="text-sm font-medium">
         {label}
         {required && (
-          <span className="ml-1 text-destructive" aria-hidden>
+          <span className="ml-1 text-destructive-text" aria-hidden>
             *
           </span>
         )}
@@ -448,7 +448,7 @@ function ValidationStatus({
     );
   }
   return (
-    <p className="text-xs text-destructive flex items-center gap-1">
+    <p className="text-xs text-destructive-text flex items-center gap-1">
       <AlertCircle className="size-3" aria-hidden /> {status.message}
     </p>
   );
@@ -456,7 +456,7 @@ function ValidationStatus({
 
 function FieldError({ message }: { message: string }): React.JSX.Element {
   return (
-    <p className="text-xs text-destructive flex items-center gap-1">
+    <p className="text-xs text-destructive-text flex items-center gap-1">
       <AlertCircle className="size-3" aria-hidden /> {message}
     </p>
   );
