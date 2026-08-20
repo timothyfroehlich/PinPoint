@@ -293,7 +293,7 @@ interface RetryNavClickOptions {
  *    that a prior failed attempt may have left open. Without this, retrying a
  *    dropdown-menu sequence toggles the menu shut instead of re-opening it.
  * 2. The outer timeout defaults to 15 s so that three sequential calls fit
- *    comfortably inside the 60 s CI per-test budget.
+ *    comfortably inside the 120 s CI per-test budget.
  *
  * @param page     Playwright page
  * @param click    Callback that performs the click(s)

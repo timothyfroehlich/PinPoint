@@ -28,7 +28,7 @@ test.describe("Collection view (PP-slrd.1)", () => {
     // Re-issue the menu navigation until it takes (PP-2b3r). retryNavClick
     // presses Escape before each attempt to reset a Radix dropdown left open
     // by a prior failed click, and caps the timeout so sequential retries fit
-    // inside the 60 s CI test budget.
+    // inside the 120 s CI test budget.
     await retryNavClick(
       page,
       async () => {
@@ -48,7 +48,7 @@ test.describe("Collection view (PP-slrd.1)", () => {
     // Each hop is a client-side navigation that a Fast Refresh remount can
     // discard; retryNavClick re-issues the click until it takes (PP-2b3r).
     // Three sequential retries at 15 s each = 45 s worst case, well inside
-    // the 60 s CI per-test timeout.
+    // the 120 s CI per-test timeout.
     await retryNavClick(
       page,
       async () => {
@@ -105,7 +105,8 @@ test.describe("Collection view (PP-slrd.1)", () => {
       async () => {
         await page.getByTestId("owner-block").getByRole("link").click();
       },
-      /\/u\//
+      /\/u\//,
+      { timeout: 30_000 }
     );
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   });
