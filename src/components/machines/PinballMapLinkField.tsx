@@ -5,6 +5,7 @@ import { ChevronsUpDown } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { Label } from "~/components/ui/label";
 import { Input } from "~/components/ui/input";
+import { Switch } from "~/components/ui/switch";
 import {
   Command,
   CommandGroup,
@@ -125,6 +126,7 @@ export function PinballMapLinkField({
   const modelNameId = useId();
   const manufacturerId = useId();
   const yearId = useId();
+  const switchId = useId();
 
   const [family, setFamily] = useState<CatalogFamily | null>(null);
   const [editions, setEditions] = useState<CatalogEdition[]>([]);
@@ -140,12 +142,23 @@ export function PinballMapLinkField({
   // Kept in state rather than left uncontrolled so switching back to a catalog
   // title can warn about losing them, and so the seed below can write one.
   const [modelName, setModelName] = useState(defaultModelName ?? "");
-  const [manufacturer, setManufacturer] = useState(defaultManufacturer ?? "");
-  const [year, setYear] = useState(
-    defaultYear !== null ? String(defaultYear) : ""
+  // A linked machine's manufacturer/year came from the catalog, not the user.
+  // Don't load them — toggling to uncataloged must not inherit them (PP-3bbr.2).
+  const [manufacturer, setManufacturer] = useState(
+    defaultMachineId !== null ? "" : (defaultManufacturer ?? "")
   );
+  const [year, setYear] = useState(
+    defaultMachineId !== null
+      ? ""
+      : defaultYear !== null
+        ? String(defaultYear)
+        : ""
+  );
+  // Whether the model name was auto-seeded and never edited. A seed is not user
+  // work, so it must not count as "entered" for the confirm dialog (PP-3bbr.2).
+  const [modelNameSeeded, setModelNameSeeded] = useState(false);
   const hasHandEntry =
-    modelName.trim().length > 0 ||
+    (modelName.trim().length > 0 && !modelNameSeeded) ||
     manufacturer.trim().length > 0 ||
     year.trim().length > 0;
 
@@ -243,6 +256,7 @@ export function PinballMapLinkField({
     // cannot survive the switch — clear it in the UI too rather than leave
     // values on screen that the save is about to drop (CORE-ARCH-012).
     setModelName("");
+    setModelNameSeeded(false);
     setManufacturer("");
     setYear("");
     setOpen(false);
@@ -275,24 +289,23 @@ export function PinballMapLinkField({
     })();
   };
 
-  // Choosing "Not on PinballMap" from the Model dropdown. Mutually exclusive
-  // with a catalog link, and a machine that isn't on the map can't be listed.
-  const handlePickExcluded = (): void => {
-    setExcluded(true);
-    setFamily(null);
-    setEditions([]);
-    setSelectedEditionId(null);
-    setOpen(false);
-    setQuery("");
+  const handleToggleUncataloged = (checked: boolean): void => {
     setUserChanged(true);
     onDirty?.();
-
-    // Seed the Model name from what the cabinet is called, into an empty field
-    // only. Most homebrews are already named after the game, so the common case
-    // is that the panel opens finished and nobody types anything. Reaching this
-    // with a value already present means the user is re-picking "not on the
-    // map" after a detour through the catalog — leave what they wrote alone.
-    setModelName((current) => (current.length > 0 ? current : machineName));
+    if (checked) {
+      setExcluded(true);
+      setFamily(null);
+      setEditions([]);
+      setSelectedEditionId(null);
+      setOpen(false);
+      setQuery("");
+      if (modelName.length === 0 && machineName.length > 0) {
+        setModelName(machineName);
+        setModelNameSeeded(true);
+      }
+    } else {
+      setExcluded(false);
+    }
   };
 
   // The edition step is shown only for an ambiguous (multi-edition) family.
@@ -362,15 +375,25 @@ export function PinballMapLinkField({
           otherwise a placeholder reading "Pick a model first". Keeping them on
           one row is what makes that dependency legible. */}
         <div className="space-y-1.5">
-          <Label
-            htmlFor={triggerId}
-            className="flex items-baseline gap-2 text-foreground"
-          >
-            Model
-            <span className="text-xs font-normal text-muted-foreground">
-              source: Pinball Map
-            </span>
-          </Label>
+          <div className="flex items-center justify-between">
+            <Label
+              htmlFor={triggerId}
+              className="flex items-baseline gap-2 text-foreground"
+            >
+              Model
+              <span className="text-xs font-normal text-muted-foreground">
+                {excluded ? "Uncataloged game" : "source: Pinball Map"}
+              </span>
+            </Label>
+            <Switch
+              id={switchId}
+              checked={excluded}
+              onCheckedChange={handleToggleUncataloged}
+              disabled={disabled}
+              aria-label="Uncataloged game"
+              data-testid="pinballmap-uncataloged-toggle"
+            />
+          </div>
 
           <Popover open={open} onOpenChange={setOpen}>
             <PopoverTrigger asChild>
@@ -386,16 +409,12 @@ export function PinballMapLinkField({
               >
                 <span
                   className={
-                    family || excluded
-                      ? "text-foreground"
-                      : "text-muted-foreground"
+                    family ? "text-foreground" : "text-muted-foreground"
                   }
                 >
                   {family
                     ? `${family.name}${familyMeta ? ` · ${familyMeta}` : ""}`
-                    : excluded
-                      ? "Not on Pinball Map"
-                      : placeholderLabel}
+                    : placeholderLabel}
                 </span>
                 <ChevronsUpDown className="ml-2 size-4 shrink-0 opacity-50" />
               </Button>
@@ -457,32 +476,9 @@ export function PinballMapLinkField({
                       })}
                     </CommandGroup>
                   ) : (
-                    // Searched with no match → surface the "Not on PinballMap"
-                    // fallback here (not before someone has looked), so the choice
-                    // only appears once the catalog has actually come up empty.
-                    <>
-                      <p className="px-3 pt-3 pb-1 text-xs text-muted-foreground">
-                        No Pinball Map match for “{query.trim()}”.
-                      </p>
-                      <CommandGroup>
-                        <CommandItem
-                          value="__not_on_pinballmap__"
-                          onSelect={handlePickExcluded}
-                          data-testid="pinballmap-not-on-map"
-                        >
-                          <div className="flex flex-col">
-                            <span className="font-medium text-foreground">
-                              Not on Pinball Map
-                            </span>
-                            <span className="text-[10px] text-muted-foreground">
-                              Pinball Map only maps standard pinball machines —
-                              pick this for novelty or non-pinball games it
-                              won&apos;t list.
-                            </span>
-                          </div>
-                        </CommandItem>
-                      </CommandGroup>
-                    </>
+                    <p className="px-3 py-4 text-xs text-muted-foreground">
+                      No Pinball Map match for “{query.trim()}”.
+                    </p>
                   )}
                 </CommandList>
               </Command>
@@ -619,6 +615,7 @@ export function PinballMapLinkField({
                 value={modelName}
                 onChange={(e) => {
                   setModelName(e.target.value);
+                  setModelNameSeeded(false);
                   onDirty?.();
                 }}
                 maxLength={200}
