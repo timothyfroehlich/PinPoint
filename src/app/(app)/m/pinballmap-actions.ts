@@ -350,7 +350,7 @@ async function classifyRemoveNotFound(args: {
     // Outcome is deliberately ignored: `throttled` means a concurrent refresh
     // just landed and `error` means PBM is unreachable, and the freshness check
     // below answers both correctly without re-deriving them here.
-    await syncLocationSnapshot({ updatedBy: userId, trigger: "manual" });
+    await syncLocationSnapshot({ updatedBy: userId });
   }
 
   const refreshed = await getPinballMapState();
@@ -906,7 +906,6 @@ export async function refreshPinballmapLineupAction(
   try {
     const result = await syncLocationSnapshot({
       updatedBy: user.id,
-      trigger: "manual",
     });
     if (!result.ok) {
       if (result.reason === "throttled") {

@@ -86,9 +86,9 @@ export function normalizeRegion(region: string): string {
  *
  * Global, not per-user: the cap is on PinPoint's traffic to someone else's
  * service, so ten people clicking once is the same load as one person clicking
- * ten times. Enforced at the `syncLocationSnapshot` seam so every live-fetch
- * caller inherits one chokepoint; the cron path bypasses it with
- * `trigger: "cron"`.
+ * ten times. Enforced at the `stampSyncAttempt` seam so every Pinball Map
+ * fetch — manual, cron, enable, location-change validation — shares one
+ * chokepoint (spec 6.5).
  */
 export const PBM_REFRESH_BURST = 3;
 export const PBM_REFRESH_REFILL_MS = 3 * 60 * 1000;

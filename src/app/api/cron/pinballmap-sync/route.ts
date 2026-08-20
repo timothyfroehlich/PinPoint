@@ -38,11 +38,8 @@ export async function GET(request: Request): Promise<NextResponse> {
     return NextResponse.json({ ok: true, skipped: "disabled" });
   }
 
-  // Automated hourly refresh — the sanctioned one-call/hour path, exempt from
-  // the manual-refresh throttle (PP-hbi0, CORE-PBM-001).
-  const result = await syncLocationSnapshot({ trigger: "cron" });
+  const result = await syncLocationSnapshot();
   if (!result.ok) {
-    // The cron path is never throttled, but narrow defensively for type safety.
     // `superseded` is the 6.6 guard: an admin re-pointed the location while
     // this hourly fetch was in flight, so its snapshot was discarded. Not an
     // error to chase — the next run reads the new location — but it must not be

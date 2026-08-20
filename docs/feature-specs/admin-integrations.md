@@ -132,7 +132,13 @@ building a workflow around it.
   that absence as "the operator removed it" (pinballmap spec 2.5), which would
   silently delete every old record and report a cleanup nobody performed
   (CORE-ARCH-012). Requires stamping each record with its location; see the
-  divergence table.
+  divergence table. The stamp comes from the snapshot the lmx was read from, not
+  from the row's `location_id` — after a disabled re-point (6.7), the two
+  describe different venues, and stamping from the id would label an old-venue
+  lmx with the new location, breaking the cross-location guard in 6.9.
+- **6.4a** A kept cross-location record stays visible on the machine's pages and
+  links to the record's own venue. The same-title hiding filter (pinballmap spec
+  2.5) applies only to records from the tracked location.
 - **6.9** Removing an abandoned entry whose location PinPoint no longer tracks
   fires the **stored lmx only** and never re-resolves the machine's title against
   any lineup. An lmx is globally unique on Pinball Map, so the direct remove
@@ -142,19 +148,19 @@ building a workflow around it.
   live lineup when the handle looks stale) is **suppressed** for these records:
   pointed at the new location, it would find and delete a live entry belonging to
   an unrelated machine there. This is the destructive path §6.9 exists to close.
-- **6.5** The manual-refresh allowance (pinballmap spec 3.2) is traffic-shaping
-  toward Pinball Map, not observed location state; a location change does not
-  reset it. The validating fetch in 6.2 follows the cron/enable path — it is not
-  charged against the allowance.
+- **6.5** The refresh allowance (pinballmap spec 3.2) is a single rate limit
+  shared by all Pinball Map fetches — manual refreshes, cron syncs, enable
+  refreshes, and location-change validation. A location change does not reset
+  it.
 - **6.6** The switch is atomic with respect to any in-flight sync. A concurrent
   hourly cron or manual Sync now — which reads the location id, fetches, then
   writes the snapshot back under the id it read — must not overwrite the new id
   or store an old-location snapshot under it. The save is the authoritative
   writer for the duration of the change.
-- **6.7** Changing the location while the integration is disabled (§5) changes
-  the id but does not fetch — the disabled integration makes no Pinball Map
-  calls. The stored snapshot is left as-is until the next enable, whose refresh
-  (5.2) then reads the new location.
+- **6.7** Changing the location while disabled changes the id but does not
+  fetch. The stored snapshot and sync health (`last_synced_at`, status, error)
+  are cleared — a snapshot from the old venue is not valid for the new one. The
+  next enable's refresh (5.2) fills them in.
 - **6.8** Saving a changed location id confirms first, naming the consequences
   in plain terms: the snapshot is replaced by a fresh read of the new location,
   every intent-On machine whose title is not on the new lineup will show as
@@ -201,4 +207,5 @@ logged here.
 
 | Date       | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | :--------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-08-19 | §6.7 reversed — disabled re-point now clears the snapshot and health instead of leaving them (stale data caused downstream readers to act on the wrong venue, including a destructive entry-removal path). Added §6.4 stamp-source rule, §6.4a cross-location visibility, §6.5 single rate limit for all fetches.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | 2026-08-17 | Created. Combined Admin Integrations page (§2), Discord section preserved (§3), Pinball Map section with enable toggle / editable location / sync health / sync now / link-out (§4–§5), location-change behavior keeping matches and intents (§6), single admin capability (§7). Then, after a §6 review: §2.2 stated admin-only explicitly; §5.1 clarified seeds still set the initial enabled value; §6 rewritten to validate-before-wipe, forbid wrapping the fetch in a transaction (CORE-ARCH-011), keep the abandoned-listing rows (6.4), leave the refresh allowance untouched (6.5), guard against a concurrent sync (6.6), defer the refresh when disabled (6.7), and name both Missing and Lingering in the confirmation (6.8). Then closed a destructive bug the review surfaced: keeping the old rows exposed the entry-removal re-mint recovery, which re-resolves a title against the _current_ lineup and would delete a live entry at the new location — so abandoned records are now location-stamped, reconciled only same-location (6.4), and removed by stored lmx with re-mint recovery suppressed cross-location (6.9). |

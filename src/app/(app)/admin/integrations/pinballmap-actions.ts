@@ -34,7 +34,7 @@ const saveConfigSchema = z.object({
  */
 export type PbmSaveResult = Result<
   { warning?: string },
-  "VALIDATION" | "FETCH" | "CONFLICT" | "SERVER"
+  "VALIDATION" | "FETCH" | "CONFLICT" | "THROTTLED" | "SERVER"
 >;
 
 /**
@@ -94,6 +94,13 @@ export async function savePinballMapConfigAction(
       // enabled, validate first regardless of the current flag.
       validateWhileDisabled: targetEnabled,
     });
+    if (!result.ok && result.reason === "throttled") {
+      revalidatePath(INTEGRATIONS_PATH);
+      return err(
+        "THROTTLED",
+        "Rate limit reached — wait a moment and try again."
+      );
+    }
     if (!result.ok && result.reason === "fetch_failed") {
       revalidatePath(INTEGRATIONS_PATH);
       return err(
@@ -101,12 +108,7 @@ export async function savePinballMapConfigAction(
         `Pinball Map couldn't load location ${String(targetLocation)}. The tracked location is unchanged.`
       );
     }
-    // `unchanged` is reachable despite the diff above: that diff and
-    // `changeLocation`'s own read are two separate statements, so a concurrent
-    // save landing the SAME id in between makes this one a no-op. Reporting it
-    // as a save is CORE-ARCH-012's dishonest-success shape — the admin would
-    // think their click did the work somebody else's did.
-    if (!result.ok && result.reason !== "fetch_failed") {
+    if (!result.ok) {
       revalidatePath(INTEGRATIONS_PATH);
       // A turn-off above has already committed, so "nothing changed" would
       // itself be a lie in that case — say which half landed.
@@ -189,10 +191,7 @@ export async function syncPinballMapNowAction(
 ): Promise<PbmSyncResult> {
   const { userId } = await verifyIntegrationsAdmin();
 
-  const result = await syncLocationSnapshot({
-    trigger: "manual",
-    updatedBy: userId,
-  });
+  const result = await syncLocationSnapshot({ updatedBy: userId });
 
   if (result.ok) {
     // Every other successful-sync call site reconciles and revalidates /m

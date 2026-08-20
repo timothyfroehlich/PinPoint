@@ -7,9 +7,9 @@
  *  - getPinballMapState(): reads the singleton
  *  - the manual-refresh throttle at the seam (PP-hbi0)
  *
- * These mechanism cases drive the `cron` trigger, which is exempt from the
- * manual-refresh throttle, so back-to-back syncs exercise persistence directly.
- * The `manual`-trigger throttle has its own describe block below.
+ * All syncs share a single rate limit (spec 6.5). The throttle has its own
+ * describe block below; the mechanism cases pre-fill the bucket so back-to-back
+ * syncs exercise persistence directly.
  */
 
 import { describe, it, expect, vi } from "vitest";
@@ -37,7 +37,7 @@ describe("PinballMap shared read path (PGlite)", () => {
     const { syncLocationSnapshot, getPinballMapState } =
       await import("~/lib/pinballmap/state");
 
-    const result = await syncLocationSnapshot({ trigger: "cron" });
+    const result = await syncLocationSnapshot({});
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.machineCount).toBeGreaterThan(0);
 
@@ -55,8 +55,8 @@ describe("PinballMap shared read path (PGlite)", () => {
     const db = await getTestDb();
     const { syncLocationSnapshot } = await import("~/lib/pinballmap/state");
 
-    await syncLocationSnapshot({ trigger: "cron" });
-    await syncLocationSnapshot({ trigger: "cron" });
+    await syncLocationSnapshot({});
+    await syncLocationSnapshot({});
 
     const rows = await db.select().from(pinballmapState);
     expect(rows.length).toBe(1);
@@ -71,7 +71,7 @@ describe("PinballMap shared read path (PGlite)", () => {
       .spyOn(getMockClient(), "fetchLocation")
       .mockRejectedValueOnce(new Error("PBM unreachable"));
 
-    const result = await syncLocationSnapshot({ trigger: "cron" });
+    const result = await syncLocationSnapshot({});
     expect(result).toEqual({
       ok: false,
       reason: "error",
@@ -90,14 +90,14 @@ describe("PinballMap shared read path (PGlite)", () => {
       await import("~/lib/pinballmap/state");
 
     // Establish a good sync, then fail the next fetch.
-    await syncLocationSnapshot({ trigger: "cron" });
+    await syncLocationSnapshot({});
     const afterOk = await getPinballMapState();
     expect(afterOk?.lastSyncStatus).toBe("ok");
 
     const spy = vi
       .spyOn(getMockClient(), "fetchLocation")
       .mockRejectedValueOnce(new Error("PBM down"));
-    await syncLocationSnapshot({ trigger: "cron" });
+    await syncLocationSnapshot({});
 
     const afterErr = await getPinballMapState();
     // lastSyncedAt = "last SUCCESSFUL sync" — unchanged by the failed attempt.
@@ -116,17 +116,16 @@ describe("PinballMap shared read path (PGlite)", () => {
 });
 
 /**
- * Manual-refresh token bucket at the seam (PP-hbi0, reshaped for spec 3.2).
+ * Refresh token bucket at the seam (PP-hbi0, spec 3.2 + 6.5).
  *
- * The bucket is the single chokepoint every live-fetch caller inherits. These
- * cases nail the flaws the #1704 review surfaced, restated for the bucket:
+ * The bucket is the single chokepoint every Pinball Map fetch shares — manual,
+ * cron, enable, and location-change validation. These cases nail:
  *  (a) once the allowance is spent the next call is refused AND never re-hits
  *      PBM,
  *  (b) a token is spent on the ATTEMPT, so a FAILED attempt still costs one (no
- *      fail-open on 429/500 — the critical CORE-PBM-001 property),
- *  (c) the cron/automated path is never blocked and never charged.
+ *      fail-open on 429/500 — the critical CORE-PBM-001 property).
  */
-describe("manual-refresh token bucket at the seam (PP-hbi0)", () => {
+describe("refresh token bucket at the seam (PP-hbi0)", () => {
   setupTestDb();
 
   it("allows the burst, then refuses without re-hitting PBM", async () => {
@@ -136,10 +135,10 @@ describe("manual-refresh token bucket at the seam (PP-hbi0)", () => {
     const fetchSpy = vi.spyOn(getMockClient(), "fetchLocation");
 
     for (let i = 0; i < PBM_REFRESH_BURST; i++) {
-      expect((await syncLocationSnapshot({ trigger: "manual" })).ok).toBe(true);
+      expect((await syncLocationSnapshot({})).ok).toBe(true);
     }
 
-    const spent = await syncLocationSnapshot({ trigger: "manual" });
+    const spent = await syncLocationSnapshot({});
     expect(spent.ok).toBe(false);
     if (!spent.ok) {
       expect(spent.reason).toBe("throttled");
@@ -163,7 +162,7 @@ describe("manual-refresh token bucket at the seam (PP-hbi0)", () => {
       .mockRejectedValueOnce(new Error("PBM 429"));
 
     // The attempt fails at the fetch — but the token was already claimed.
-    const first = await syncLocationSnapshot({ trigger: "manual" });
+    const first = await syncLocationSnapshot({});
     expect(first.ok).toBe(false);
     if (!first.ok) expect(first.reason).toBe("error");
 
@@ -173,33 +172,13 @@ describe("manual-refresh token bucket at the seam (PP-hbi0)", () => {
     fetchSpy.mockRestore();
   });
 
-  it("never blocks the cron path, and never charges it", async () => {
-    const { getMockClient } = await import("~/lib/pinballmap/client-mock");
-    const { syncLocationSnapshot, getRefreshAllowance } =
-      await import("~/lib/pinballmap/state");
-    const { PBM_REFRESH_BURST } = await import("~/lib/pinballmap/config");
-    const fetchSpy = vi.spyOn(getMockClient(), "fetchLocation");
-
-    // Spend the whole human allowance...
-    for (let i = 0; i < PBM_REFRESH_BURST; i++) {
-      await syncLocationSnapshot({ trigger: "manual" });
-    }
-
-    // ...and the hourly cron is still allowed to refresh.
-    expect((await syncLocationSnapshot({ trigger: "cron" })).ok).toBe(true);
-    expect(fetchSpy).toHaveBeenCalledTimes(PBM_REFRESH_BURST + 1);
-    fetchSpy.mockRestore();
-  });
-
-  it("does not spend a token on the cron path", async () => {
-    // Charging the hourly refresh to the human allowance would let the cron
-    // lock people out of their own button.
+  it("every call spends a token — no free path (spec 6.5)", async () => {
     const { syncLocationSnapshot, getRefreshAllowance } =
       await import("~/lib/pinballmap/state");
     const { PBM_REFRESH_BURST } = await import("~/lib/pinballmap/config");
 
-    await syncLocationSnapshot({ trigger: "cron" });
-    expect((await getRefreshAllowance()).remaining).toBe(PBM_REFRESH_BURST);
+    await syncLocationSnapshot({});
+    expect((await getRefreshAllowance()).remaining).toBe(PBM_REFRESH_BURST - 1);
   });
 });
 
@@ -442,7 +421,7 @@ describe("an in-flight sync does not clobber a concurrent location change (spec 
         };
       });
 
-    const result = await syncLocationSnapshot({ trigger: "cron" });
+    const result = await syncLocationSnapshot({});
     // The fetch succeeded but its result was thrown away, so the caller hears
     // `superseded` rather than ok. Reporting ok used to hand back a
     // `machineCount` read off the DISCARDED snapshot — the old venue's 2 — while
@@ -525,7 +504,6 @@ describe("changeLocation (spec 6)", () => {
     const { changeLocation, getPinballMapState } =
       await import("~/lib/pinballmap/state");
 
-    const tokensAt = new Date("2026-08-18T00:00:00Z");
     await db.insert(pinballmapState).values({
       id: "singleton",
       locationId: 26454,
@@ -533,7 +511,7 @@ describe("changeLocation (spec 6)", () => {
       snapshotJson: snapshotAt(26454, "APC", [{ id: 1, machineId: 100 }]),
       lastSyncStatus: "ok",
       refreshTokens: 2,
-      refreshTokensAt: tokensAt,
+      refreshTokensAt: new Date(),
     });
     const [machine] = await db
       .insert(machines)
@@ -564,9 +542,8 @@ describe("changeLocation (spec 6)", () => {
     const abandoned = await db.select().from(pinballmapAbandonedListings);
     expect(abandoned).toHaveLength(1);
     expect(abandoned[0]?.locationId).toBe(26454);
-    // The refresh bucket is untouched (6.5).
-    expect(state?.refreshTokens).toBe(2);
-    expect(state?.refreshTokensAt?.getTime()).toBe(tokensAt.getTime());
+    // The validating fetch spends a token from the shared rate limit (6.5).
+    expect(state?.refreshTokens).toBe(1);
     spy.mockRestore();
   });
 
@@ -625,11 +602,12 @@ describe("changeLocation (spec 6)", () => {
 describe("setEnabled (spec 5)", () => {
   setupTestDb();
 
-  it("refreshes the snapshot on enable, via the un-throttled path (5.2)", async () => {
+  it("refreshes the snapshot on enable, spending a token (5.2, 6.5)", async () => {
     const db = await getTestDb();
     const { getMockClient } = await import("~/lib/pinballmap/client-mock");
     const { setEnabled, getPinballMapState } =
       await import("~/lib/pinballmap/state");
+    const { PBM_REFRESH_BURST } = await import("~/lib/pinballmap/config");
 
     await db.insert(pinballmapState).values({
       id: "singleton",
@@ -650,9 +628,8 @@ describe("setEnabled (spec 5)", () => {
     expect(state?.enabled).toBe(true);
     expect(state?.snapshotJson?.name).toBe("APC");
     expect(state?.lastSyncStatus).toBe("ok");
-    // Exactly one refresh, and it did not spend a manual token.
     expect(spy).toHaveBeenCalledTimes(1);
-    expect(state?.refreshTokens).toBe(3);
+    expect(state?.refreshTokens).toBe(PBM_REFRESH_BURST - 1);
     spy.mockRestore();
   });
 

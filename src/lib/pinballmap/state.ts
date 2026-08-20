@@ -38,19 +38,6 @@ export async function getPinballMapState(): Promise<PinballmapState | null> {
 }
 
 /**
- * Which caller kicked off a sync — decides throttle policy (PP-hbi0).
- *
- * - `"cron"`: the hourly automated refresh (the sanctioned one-call/hour,
- *   CORE-PBM-001). Never throttled; still records its attempt so a manual
- *   refresh right after respects the fresh snapshot.
- * - `"manual"`: any human-initiated refresh (the control's Refresh button, the
- *   remove path's freshness check, …). Draws a token from the shared bucket.
- *   This is the default so every future live-fetch caller inherits the
- *   chokepoint unless it explicitly opts into the automated path.
- */
-export type SyncTrigger = "manual" | "cron";
-
-/**
  * Outcome of a sync attempt.
  *
  * `superseded` is the 6.6 guard firing: the fetch succeeded, but a location
@@ -172,13 +159,10 @@ const AVAILABLE_TOKENS = sql`least(${PBM_REFRESH_BURST}, ${pinballmapState.refre
  * not, and neither could a completion timestamp like `lastSyncedAt`, which only
  * advances after the fetch returns.
  *
- * - `guarded === false` (cron): unconditional stamp, no token spent. The hourly
- *   refresh is separately sanctioned, and charging it to the human allowance
- *   would let the cron lock people out of their own button.
- * - `guarded === true` (manual): the `DO UPDATE` fires only while a token is
- *   available; an empty `RETURNING` means throttled. The stamp is on the last
- *   ATTEMPT, not the last success, so a failed fetch (429/500) still spends its
- *   token rather than fail-opening into a retry loop (CORE-PBM-001).
+ * All fetches share a single rate limit (spec 6.5). The `DO UPDATE` fires only
+ * while a token is available; an empty `RETURNING` means throttled. The stamp is
+ * on the last ATTEMPT, not the last success, so a failed fetch (429/500) still
+ * spends its token rather than fail-opening into a retry loop (CORE-PBM-001).
  *
  * `refreshTokensAt` advances by whole refill periods rather than to `now()`, so
  * the fraction of a period already served is not thrown away on every claim —
@@ -186,32 +170,15 @@ const AVAILABLE_TOKENS = sql`least(${PBM_REFRESH_BURST}, ${pinballmapState.refre
  */
 async function stampSyncAttempt(
   locationId: number,
-  attemptAt: Date,
-  guarded: boolean
+  attemptAt: Date
 ): Promise<boolean> {
-  const values = {
-    id: SINGLETON_ID,
-    locationId,
-    lastSyncAttemptAt: attemptAt,
-    updatedAt: attemptAt,
-  };
-
-  if (!guarded) {
-    await db
-      .insert(pinballmapState)
-      .values(values)
-      .onConflictDoUpdate({
-        target: pinballmapState.id,
-        set: { lastSyncAttemptAt: attemptAt, updatedAt: attemptAt },
-      });
-    return true;
-  }
-
   const claimed = await db
     .insert(pinballmapState)
-    // A first-ever manual refresh creates the row with one token already spent.
     .values({
-      ...values,
+      id: SINGLETON_ID,
+      locationId,
+      lastSyncAttemptAt: attemptAt,
+      updatedAt: attemptAt,
       refreshTokens: PBM_REFRESH_BURST - 1,
       refreshTokensAt: attemptAt,
     })
@@ -235,12 +202,9 @@ async function stampSyncAttempt(
  * singleton and returns `{ ok: false, reason: "error" }` so callers (cron, "Sync
  * now") can surface it without a 500.
  *
- * Throttle chokepoint (PP-hbi0, spec 3.2): a `manual` trigger (the default)
- * spends a token from the shared burst allowance and returns
- * `{ ok: false, reason: "throttled" }` when the bucket is empty — enforced HERE
- * so every live-fetch caller (the Refresh button, the remove path's freshness
- * check, any future caller) inherits one guard. The `cron` trigger spends no
- * token (the sanctioned hourly refresh) but still records its attempt.
+ * Throttle chokepoint (PP-hbi0, spec 3.2): every call spends a token from the
+ * shared burst allowance and returns `{ ok: false, reason: "throttled" }` when
+ * the bucket is empty. One rate limit, no free path (spec 6.5).
  *
  * Does NOT gate on `state.enabled` — this is the pure read-path mechanism and the
  * caller owns the "should we sync at all" decision (the PP-o355.11 cron checks
@@ -251,21 +215,13 @@ async function stampSyncAttempt(
  */
 export async function syncLocationSnapshot(opts?: {
   updatedBy?: string;
-  trigger?: SyncTrigger;
 }): Promise<SyncResult> {
-  const trigger = opts?.trigger ?? "manual";
   const state = await getPinballMapState();
   const locationId = state?.locationId ?? APC_LOCATION_ID;
   const syncedAt = new Date();
   const actor = opts?.updatedBy ? { updatedBy: opts.updatedBy } : {};
 
-  // Chokepoint: stamp the attempt before the fetch. Manual spends a token
-  // (TOCTOU-safe); cron records unconditionally.
-  const claimed = await stampSyncAttempt(
-    locationId,
-    syncedAt,
-    trigger === "manual"
-  );
+  const claimed = await stampSyncAttempt(locationId, syncedAt);
   if (!claimed) {
     // Re-read rather than reuse the row loaded above: the claim we just lost
     // was won by somebody, so the bucket moved and the pre-claim copy would
@@ -330,7 +286,11 @@ export async function syncLocationSnapshot(opts?: {
 /** Outcome of a location change. */
 export type ChangeLocationResult =
   | { ok: true }
-  | { ok: false; reason: "unchanged" | "fetch_failed" | "concurrent_change" };
+  | {
+      ok: false;
+      reason: "unchanged" | "fetch_failed" | "concurrent_change" | "throttled";
+      retryAfterMs?: number;
+    };
 
 /**
  * Re-point the integration at a different Pinball Map location (spec 6).
@@ -348,29 +308,12 @@ export type ChangeLocationResult =
  * hears `concurrent_change` rather than clobbering the other writer.
  *
  * Deliberately does NOT touch abandoned-listing records (spec 6.4 — they are
- * kept, location-scoped) or the refresh-token bucket (spec 6.5 — traffic
- * shaping, not observed state). The validating fetch follows the cron/enable
- * path and is not charged to the manual allowance.
+ * kept, location-scoped). The validating fetch spends a token from the shared
+ * rate limit like every other Pinball Map call (spec 6.5).
  *
- * Disabled integration (spec 6.7): the id is changed and no fetch is made, but
- * the stored snapshot and its health are CLEARED rather than left behind. A
- * snapshot describing the old venue under the new venue's id is a row that
- * disagrees with itself, and every reader takes it as fact:
- *
- * - the admin page prints the old venue's "last synced / OK / N machines" under
- *   the new id;
- * - machine pages derive Listed / Missing / Lingering from the old lineup while
- *   linking to the new venue;
- * - `removeMachineFromPinballMapAction` resolves its lmx from that lineup and
- *   deletes a live entry at the OLD location;
- * - `addMachineToPinballMapAction` short-circuits on the old lineup and reports
- *   a machine already listed at the new one;
- * - a retitle records an abandonment whose lmx is the old venue's, and the
- *   cross-location guard in 6.9 cannot see it.
- *
- * Cleared, every one of those readers falls into the "not synced yet" path it
- * already has, which is the truth: nothing has been read for this location. The
- * next enable's refresh (5.2) fills it in.
+ * Disabled integration (spec 6.7): the id is changed, no fetch is made, and the
+ * stored snapshot and health are cleared — a snapshot from the old venue is not
+ * valid for the new one. The next enable's refresh (5.2) fills them in.
  */
 export async function changeLocation(args: {
   newLocationId: number;
@@ -424,15 +367,21 @@ export async function changeLocation(args: {
   }
 
   // Enabled: validate by fetching the new location BEFORE any write.
-  //
-  // Record the attempt first. 6.5 says this fetch is not charged to the manual
-  // allowance, so the stamp is the unguarded cron-style one — no token spent —
-  // but it still has to be RECORDED, or an admin retrying a mistyped id drives
-  // traffic at Pinball Map that nothing in the system can see (CORE-PBM-001).
-  // Stamped against the OLD id: on an existing row `stampSyncAttempt` only
-  // writes the timestamps, and on a first-ever insert this must not be the
-  // unvalidated new id.
-  await stampSyncAttempt(oldId, now, false);
+  // Spends a token from the shared rate limit (spec 6.5). Stamped against the
+  // OLD id so a first-ever insert cannot persist an unvalidated new id.
+  const claimed = await stampSyncAttempt(oldId, now);
+  if (!claimed) {
+    const { nextRefillAt } = await getRefreshAllowance(now);
+    return {
+      ok: false,
+      reason: "throttled",
+      retryAfterMs: Math.max(
+        0,
+        (nextRefillAt?.getTime() ?? now.getTime() + PBM_REFRESH_REFILL_MS) -
+          now.getTime()
+      ),
+    };
+  }
 
   let snapshot: LocationSnapshot;
   try {
@@ -489,10 +438,9 @@ export async function changeLocation(args: {
  * Turn the integration on or off (spec 5).
  *
  * Enabling refreshes the stored snapshot so the lineup reflects the current
- * location immediately (5.2). That refresh runs on the `cron` path so it is not
- * charged to the human manual-refresh allowance (spec 3.5) — enabling is not a
- * "Sync now" click. The `SyncResult` is returned so the caller can surface a
- * fetch failure; the enable itself has already been persisted.
+ * location immediately (5.2). The refresh spends a token from the shared rate
+ * limit (spec 6.5). The `SyncResult` is returned so the caller can surface a
+ * fetch failure or throttle; the enable itself has already been persisted.
  *
  * Disabling makes no Pinball Map call and clears nothing — no snapshot wipe, no
  * touching matches or intents (5.3). It is fully reversible: re-enabling
@@ -533,7 +481,6 @@ export async function setEnabled(args: {
   // The caller already refreshed this location in the same save.
   if (args.skipRefresh) return { ok: true };
 
-  // Enable: refresh the snapshot for the current location (5.2), on the cron
-  // path so it does not spend a manual token.
-  return syncLocationSnapshot({ trigger: "cron", ...actor });
+  // Enable: refresh the snapshot for the current location (5.2).
+  return syncLocationSnapshot(actor);
 }
