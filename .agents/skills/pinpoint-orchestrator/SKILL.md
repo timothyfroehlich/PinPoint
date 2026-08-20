@@ -21,9 +21,12 @@ Coordinate multiple subagents working in parallel across isolated git worktrees.
 worktree health, beads, security alerts (`--prs-only`, `--worktrees-only`, `--beads-only`,
 `--security-only` narrow it). `pr-dashboard.sh [PRs...]` and `pr-watch.py <PR>` cover CI.
 
-**`merge-pr.sh` is human-only (PP-wi85)** — blocked for agents via ANY invocation shape,
-including `--dry-run`. The lead does NOT run it, even to preview gates. Once the PR is ready,
-hand Tim `! scripts/workflow/merge-pr.sh <PR> --human`.
+**The merge decision is Tim's (PP-wi85, reversed for the script per Tim 2026-08-19).** The
+lead MAY run `bash scripts/workflow/merge-pr.sh <PR> --human`, but `block-direct-merge.cjs`
+turns it into an approval prompt Tim must accept before it runs. The raw channels (`gh pr
+merge`, `gh api PUT .../merge`, MCP `merge_pull_request`) stay hard-blocked. Normal flow is
+still to finish the PR and hand it off — either you run the script and Tim approves the
+prompt, or you hand him `! scripts/workflow/merge-pr.sh <PR> --human` to run himself.
 
 ---
 

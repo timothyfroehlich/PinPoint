@@ -4,13 +4,17 @@
 # squash-merges with --match-head-commit if all pass, removes ready-for-review label on failure.
 #
 # Usage: merge-pr.sh <PR> --human [-a|--automerge] [--dry-run] [--force] [--bypass-merge-requirements]
-#   --human                       REQUIRED to actually merge. Merging is human-authorized
-#                                 only (PP-wi85) — this script refuses to execute a merge
-#                                 without it. Not required for --dry-run: a human or CI
-#                                 process previewing gate status without merging is fine.
-#                                 This is NOT an agent-preview allowance — inside Claude
-#                                 Code, block-direct-merge.cjs blocks an agent from
-#                                 invoking this script at all, --dry-run included.
+#   --human                       REQUIRED to actually merge — this script refuses to
+#                                 execute a merge without it. Not required for --dry-run.
+#                                 An agent MAY invoke this script (e.g.
+#                                 `bash scripts/workflow/merge-pr.sh <PR> --human`): inside
+#                                 Claude Code, block-direct-merge.cjs turns the invocation
+#                                 into a PreToolUse APPROVAL PROMPT, so Tim signs off before
+#                                 it runs (PP-wi85 reversed for this script only, per Tim
+#                                 2026-08-19). The merge decision is still Tim's — he
+#                                 approves the prompt. --human stays as a same-tool guard
+#                                 against scripted/non-interactive invocation and as
+#                                 best-effort coverage in tools that don't wire the hook.
 #   -a, --automerge               Poll the gates instead of evaluating them once, and merge
 #                                 as soon as they all pass. Fire it while CI is still
 #                                 running — that is what it is for. It does NOT wait out
@@ -45,12 +49,15 @@
 # Both --force and --bypass-merge-requirements require manual permission approval
 # (settings.json permissions.ask).
 #
-# Defense-in-depth note (PP-wi85): the --human flag is a same-tool guard against
-# non-interactive/scripted invocation — it does not (and cannot) verify a human is
-# actually typing the command. It stops accidental/scripted calls; the real
-# enforcement boundary is that Claude Code's block-direct-merge.cjs PreToolUse hook
-# refuses to let an agent invoke this script at all (any flags), in ANY harness that
-# wires the hook. Cross-tool (Codex/Gemini/Antigravity) coverage is best-effort only.
+# Defense-in-depth note (PP-wi85, reversed for this script per Tim 2026-08-19): the
+# --human flag is a same-tool guard against non-interactive/scripted invocation — it
+# does not (and cannot) verify a human is actually typing the command. It stops
+# accidental/scripted calls. The human-sign-off boundary is Claude Code's
+# block-direct-merge.cjs PreToolUse hook: it no longer refuses an agent invocation of
+# this script — it turns it into an APPROVAL PROMPT, so Tim approves before the merge
+# runs, in ANY harness that wires the hook. (The raw channels — gh pr merge, gh api
+# PUT .../merge, MCP merge — stay hard-blocked there, because they skip these gates.)
+# Cross-tool (Codex/Gemini/Antigravity) coverage is best-effort only.
 
 set -euo pipefail
 
@@ -92,12 +99,11 @@ if [ "$AUTOMERGE" = "true" ] && [ "$DRY_RUN" = "true" ]; then
   exit 1
 fi
 
-# Merges are human-authorized only (PP-wi85). --dry-run is exempt — it takes no
-# action, so a human or CI process previewing gate status without merging is
-# fine. This is NOT an agent-preview allowance: inside Claude Code, the
-# block-direct-merge.cjs PreToolUse hook blocks an agent from invoking this
-# script at all, --dry-run included — an agent should read PR state via MCP
-# (pull_request_read) instead of ever reaching this line.
+# --human is required to actually merge (PP-wi85, reversed for this script per Tim
+# 2026-08-19). --dry-run is exempt — it takes no action. An agent MAY invoke this
+# script with --human: inside Claude Code the block-direct-merge.cjs PreToolUse hook
+# turns the invocation into an approval prompt, so Tim signs off before the merge
+# runs. --human stays as a same-tool guard against scripted/non-interactive calls.
 if [ "$DRY_RUN" != "true" ] && [ "$HUMAN" != "true" ]; then
   echo "REFUSE: merges are human-authorized only. Canonical command: scripts/workflow/merge-pr.sh $PR --human" >&2
   echo "        (forgot --human? add it to merge. --dry-run previews gate status without merging.)" >&2
@@ -318,11 +324,11 @@ if [ "$DRY_RUN" = "true" ]; then
 fi
 
 # --- Execute merge ---
-# Reaching this line already required passing the --human gate above. The
-# block-direct-merge PreToolUse hook (Claude Code) additionally refuses to let
-# an agent invoke this script at all — see the header comment. This `gh pr
-# merge` runs as a subprocess of the script either way, so the hook does not
-# see it directly; --human is the guard for that layer.
+# Reaching this line already required passing the --human gate above. When an
+# agent invoked this script inside Claude Code, the block-direct-merge PreToolUse
+# hook already prompted Tim for approval before the script ran — see the header
+# comment. This `gh pr merge` runs as a subprocess of the script, so the hook does
+# not see it directly; --human is the guard for that layer.
 gh pr merge "$PR" "${MERGE_ARGS[@]}"
 echo "MERGED: PR #$PR"
 

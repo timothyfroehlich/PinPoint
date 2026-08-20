@@ -1,16 +1,27 @@
 #!/usr/bin/env node
 // .claude/hooks/block-direct-merge.cjs
-// PreToolUse hook: blocks ALL agent-initiated PR merges. There is no agent-usable
-// bypass — merging is human-only (PP-wi85). The only merge channel left is a human
-// typing a `!`-prefixed command in Claude Code, which does not generate a
-// PreToolUse event and so is never seen by this hook.
+// PreToolUse hook: governs every agent-initiated PR merge. Two outcomes, by
+// channel — an ASK prompt for the gate-enforcing script, a hard DENY for the
+// raw merge channels (PP-wi85 reversed for the script only, per Tim 2026-08-19).
 //
-// Blocks four shapes:
+// ASK (prompts Tim; exits 0 with a PreToolUse "ask" decision):
+//   3. `scripts/workflow/merge-pr.sh` — the gate-enforced merge script. An agent
+//      MAY invoke it; the hook turns the invocation into an approval prompt, so
+//      the merge decision is still Tim's (he approves the prompt). A hook "ask"
+//      prompts in EVERY permission mode, including bypassPermissions, so a
+//      bypassPermissions subagent cannot merge silently. The script re-checks all
+//      four merge gates (CI green, review marker pins head, threads resolved, no
+//      conflict) at merge time, so approving the prompt is not approving an
+//      un-gated merge.
+//
+// DENY (hard-blocks; exits 2 with a stderr message):
 //   1. `gh pr merge` (direct CLI merge)
 //   2. `gh api .../pulls/N/merge` with a write method (REST merge)
-//   3. `scripts/workflow/merge-pr.sh` (the gate-enforced merge script itself —
-//      gate-enforcement is not a substitute for human sign-off)
 //   4. mcp__github__merge_pull_request (MCP merge)
+//   These three stay human-only-via-`!` because they bypass merge-pr.sh's gate
+//   checks entirely — a raw merge runs no CI/review/threads/conflict
+//   re-evaluation, so there is no safe agent path through them. The only way an
+//   agent reaches a merge is the ask-gated script above.
 //
 // HOW IT MATCHES (PP-6t3c, PP-ar8a). This used to regex a quote-stripped copy of
 // the command, which had the boundary wide open: `eval "gh pr merge 123"`,
@@ -174,21 +185,39 @@ if (require.main === module) {
       process.exit(0);
     }
 
-    // No bypass sentinel — merging has no agent-usable escape hatch under the
-    // hard gate (PP-wi85). If merge-pr.sh itself is broken and a hotfix must
-    // ship, that is a human decision made in a human-run shell, not a hook bypass.
+    // merge-pr.sh: ask, don't deny. An agent may invoke the gate-enforced merge
+    // script, but the invocation is turned into an approval prompt so Tim signs
+    // off (PP-wi85 reversed for this channel only, per Tim 2026-08-19). A
+    // PreToolUse "ask" decision prompts in every permission mode — including
+    // bypassPermissions — so a bypassPermissions subagent cannot merge silently.
+    // The script re-checks all four merge gates at merge time, so approving the
+    // prompt is not approving an un-gated merge.
     if (kind === "merge-script") {
-      console.error(
-        "Merge is human-only. You cannot run merge-pr.sh. Finish the PR (CI green, reviews " +
-          "resolved, screenshots posted if UI), then hand Tim the exact command to run himself: " +
-          `! scripts/workflow/merge-pr.sh <PR> --human [matched: ${detail}]`
+      const reason =
+        "merge-pr.sh runs the gate-enforced merge (CI green, review marker pins " +
+        "head, threads resolved, no conflict — all re-checked at merge time). " +
+        `Approve to let Tim sign off on the merge. [matched: ${detail}]`;
+      process.stdout.write(
+        JSON.stringify({
+          hookSpecificOutput: {
+            hookEventName: "PreToolUse",
+            permissionDecision: "ask",
+            permissionDecisionReason: reason,
+          },
+        })
       );
-      process.exit(2);
+      process.exit(0);
     }
 
+    // gh pr merge / gh api PUT .../merge / MCP merge_pull_request stay hard-denied.
+    // They bypass merge-pr.sh's gate re-evaluation, so there is no safe agent path
+    // through them — merging via these channels is human-only, via a `!`-prefixed
+    // command a human types (which never generates a PreToolUse event).
     console.error(
-      `Direct merge blocked: ${detail}. Merging is human-only — hand Tim the exact command to ` +
-        "run himself: ! scripts/workflow/merge-pr.sh <PR> --human"
+      `Direct merge blocked: ${detail}. This channel skips merge-pr.sh's gate checks, so it ` +
+        "stays human-only. Either run the gate-enforced script yourself — " +
+        "`bash scripts/workflow/merge-pr.sh <PR> --human` (Tim approves the prompt) — or hand Tim " +
+        "the command to run himself: ! scripts/workflow/merge-pr.sh <PR> --human"
     );
     process.exit(2);
   });

@@ -2,7 +2,8 @@
 // scripts/workflow/pr-screenshots.mjs — desktop+mobile screenshots for a PR.
 //
 // PP-wi85: UI-touching PRs must have screenshots posted before handoff to Tim
-// so he can eyeball them before running the (human-only) merge. This script
+// so he can eyeball them before the merge (which is his decision — he approves
+// the merge-pr.sh prompt, PP-wi85). This script
 // shoots a manifest of key pages at two viewports, pushes the PNGs to a
 // dedicated orphan `pr-screenshots` branch (repo is public, so raw.githubusercontent.com
 // URLs render inline in the PR comment), and posts/updates one sticky PR comment.
