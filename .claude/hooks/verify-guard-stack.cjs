@@ -19,9 +19,12 @@
  *
  * It ALSO probes behaviour, not just registration (PP-6t3c). Registration is a
  * weak proxy: on 2026-07-26 the merge guard was fully registered, fully present
- * on disk — and allowed `eval "gh pr merge 123"`. A guard that no longer blocks
+ * on disk — and allowed `eval "gh pr merge 123"`. A guard that no longer acts on
  * a known-bad command is as degraded as a missing one, so each guard's exported
- * pure classifier is called here with a small BLOCK/ALLOW table.
+ * pure classifier is called here with a small DENY/ASK/ALLOW table. The merge
+ * guard's expected OUTCOME is per channel: the raw channels (gh pr merge, gh api
+ * PUT .../merge, MCP merge) must DENY, while merge-pr.sh must ASK — an approval
+ * prompt, not a block (PP-wi85 reversed for the script only, per Tim 2026-08-19).
  * It is PURELY INFORMATIONAL:
  *   - It NEVER blocks anything and NEVER exits non-zero.
  *   - Healthy path prints NOTHING (no session noise).
@@ -218,26 +221,50 @@ function evaluateGuardStack(settings, options = {}) {
 
 // --- Behaviour probes ---------------------------------------------------------
 // "Is the guard still wired?" is not the same question as "does the guard still
-// block?". Each entry names a guard, the pure classifier it exports, and a few
-// commands with their required verdicts. Probes run IN-PROCESS against the
-// exported classifier (no subprocess, no git, no fs) so this stays well inside
-// the SessionStart hook's 5 s budget.
+// act?". Each entry names a guard, the pure classifier it exports, an `outcome`
+// mapper that reduces the classifier's return to one of "deny" | "ask" |
+// "allow", and command tables for each expected outcome. Probes run IN-PROCESS
+// against the exported classifier (no subprocess, no git, no fs) so this stays
+// well inside the SessionStart hook's 5 s budget.
+//
+// The merge guard has TWO block outcomes that must not be confused: the raw
+// channels DENY (hard block, exit 2) and merge-pr.sh ASKS (approval prompt,
+// exit 0). Asserting "ask" for merge-pr.sh — not merely "some block" — is what
+// catches a regression in EITHER direction: the script silently reverting to a
+// hard deny (over-blocking), or silently ceasing to be recognized (guard off).
 //
 // Keep the ALLOW rows: a guard that starts blocking everything is also broken,
 // and these are the exact prose shapes agents legitimately type.
+//
+// MERGE_MCP_PROBE is a sentinel: when it is the probe input, the merge outcome
+// mapper feeds it as the TOOL NAME (not a Bash command) so the MCP merge channel
+// is exercised through the same table.
+const MERGE_MCP_PROBE = "mcp__github__merge_pull_request";
+
 const BEHAVIOR_PROBES = [
   {
     hook: "block-direct-merge.cjs",
     export: "classifyMerge",
-    // classifyMerge(toolName, command) → { block }
-    verdict: (fn, command) => fn("Bash", command).block,
-    mustBlock: [
+    // classifyMerge(toolName, command) → { block, kind }. Reduce to an outcome:
+    // block:false → allow; kind "merge-script" → ask; any other block → deny.
+    outcome: (fn, input) => {
+      const { block, kind } =
+        input === MERGE_MCP_PROBE ? fn(input, "") : fn("Bash", input);
+      if (!block) return "allow";
+      return kind === "merge-script" ? "ask" : "deny";
+    },
+    mustDeny: [
       "gh pr merge 123 --squash",
       'eval "gh pr merge 123 --squash"',
-      'sh -c "scripts/workflow/merge-pr.sh 123 --human"',
       "xargs -I{} gh pr merge {} < prs.txt",
       "env -S 'gh pr merge 123'",
       "gh api -X PUT repos/o/r/pulls/123/merge",
+      MERGE_MCP_PROBE,
+    ],
+    mustAsk: [
+      "scripts/workflow/merge-pr.sh 123 --human",
+      "bash scripts/workflow/merge-pr.sh 123",
+      'sh -c "scripts/workflow/merge-pr.sh 123 --human"',
     ],
     mustAllow: [
       "gh pr view 123",
@@ -248,8 +275,8 @@ const BEHAVIOR_PROBES = [
   {
     hook: "block-main-worktree-branch-switch.cjs",
     export: "classifyCommand",
-    verdict: (fn, command) => fn(command).block,
-    mustBlock: ["git checkout feature/x", 'eval "git switch feature/x"'],
+    outcome: (fn, command) => (fn(command).block ? "deny" : "allow"),
+    mustDeny: ["git checkout feature/x", 'eval "git switch feature/x"'],
     mustAllow: ["git checkout main", "echo git checkout feature/x"],
   },
 ];
@@ -285,27 +312,35 @@ function evaluateGuardBehavior(options = {}) {
       continue;
     }
 
+    // Each expected outcome ("deny" | "ask" | "allow") has its own command
+    // table; a missing table is simply skipped. A classifier that throws is
+    // read as the LEAST safe answer for the expectation — "allow" when we
+    // wanted a deny/ask, "deny" when we wanted an allow — so a crashing guard
+    // always reports as degraded rather than passing silently.
+    const expectations = [
+      ["deny", probe.mustDeny],
+      ["ask", probe.mustAsk],
+      ["allow", probe.mustAllow],
+    ];
     const failures = [];
-    for (const command of probe.mustBlock) {
-      let blocked;
-      try {
-        blocked = probe.verdict(fn, command) === true;
-      } catch {
-        blocked = false;
+    for (const [expected, commands] of expectations) {
+      if (!Array.isArray(commands)) continue;
+      for (const command of commands) {
+        let actual;
+        try {
+          actual = probe.outcome(fn, command);
+        } catch {
+          actual = expected === "allow" ? "deny" : "allow";
+        }
+        if (actual !== expected) {
+          failures.push(
+            `expected ${expected} for ${JSON.stringify(command)}, got ${actual}`,
+          );
+        }
       }
-      if (!blocked) failures.push(`allows ${JSON.stringify(command)}`);
-    }
-    for (const command of probe.mustAllow) {
-      let blocked;
-      try {
-        blocked = probe.verdict(fn, command) === true;
-      } catch {
-        blocked = true;
-      }
-      if (blocked) failures.push(`blocks ${JSON.stringify(command)}`);
     }
     if (failures.length > 0) {
-      problems.push(`${probe.hook} ${failures.join(", ")}`);
+      problems.push(`${probe.hook} ${failures.join("; ")}`);
     }
   }
 

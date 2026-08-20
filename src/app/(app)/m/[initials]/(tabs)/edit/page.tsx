@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
-import { userProfiles, pinballmapCatalog, machines } from "~/server/db/schema";
+import { userProfiles, machines } from "~/server/db/schema";
 import {
   getAccessLevel,
   checkPermission,
@@ -67,19 +67,6 @@ export default async function MachineEditPage({
     notFound();
   }
 
-  // `getMachineForLayout` spreads `PBM_METADATA_PLACEHOLDER` over the row, which
-  // forces `manufacturer` and `year` to null — it predates those columns
-  // existing and is still right for the header, which has no real source for
-  // `edition`/`backboxImageUrl` either. It is wrong for THIS form: the
-  // hand-entered model fields (PP-3bbr) would open blank on a machine that has
-  // them, and saving that blank state writes the nulls back. `modelName` is not
-  // in the placeholder, so it survives — which is exactly what made the
-  // inconsistency easy to miss. Read the three together, from the row.
-  const modelFields = await db.query.machines.findFirst({
-    where: eq(machines.initials, initials),
-    columns: { modelName: true, manufacturer: true, year: true },
-  });
-
   const currentUserProfile = user
     ? await db.query.userProfiles.findFirst({
         where: eq(userProfiles.id, user.id),
@@ -123,18 +110,11 @@ export default async function MachineEditPage({
     ownershipContext
   );
 
-  const pinballmapTitlePromise: Promise<string | null> =
-    machine.pinballmapMachineId !== null
-      ? db.query.pinballmapCatalog
-          .findFirst({
-            where: eq(
-              pinballmapCatalog.pinballmapMachineId,
-              machine.pinballmapMachineId
-            ),
-            columns: { name: true },
-          })
-          .then((linkedTitle) => linkedTitle?.name ?? null)
-      : Promise.resolve(null);
+  // The matched title's display name, joined onto the machine by the loader
+  // (PP-3bbr.1). This page used to query the mirror for it a second time; the
+  // header above this panel renders the same title, so a separate lookup was
+  // both a round-trip and a way for the two to disagree.
+  const pinballmapTitleName = machine.pinballmapTitle?.name ?? null;
 
   // Every cabinet sharing this title — what decides coverage (spec §1, 4.7).
   // Small by construction: the group is keyed on one catalog title, so it is one
@@ -153,14 +133,12 @@ export default async function MachineEditPage({
           .where(eq(machines.pinballmapMachineId, machine.pinballmapMachineId))
       : Promise.resolve([]);
 
-  const [pinballmapTitleName, pbmState, allUsersRaw, sameTitle, allowance] =
-    await Promise.all([
-      pinballmapTitlePromise,
-      getPinballMapState(),
-      getUnifiedUsers({ includeEmails: false }),
-      sameTitlePromise,
-      getRefreshAllowance(),
-    ]);
+  const [pbmState, allUsersRaw, sameTitle, allowance] = await Promise.all([
+    getPinballMapState(),
+    getUnifiedUsers({ includeEmails: false }),
+    sameTitlePromise,
+    getRefreshAllowance(),
+  ]);
 
   const allUsers = allUsersRaw.map((u) => ({
     id: u.id,
@@ -270,9 +248,16 @@ export default async function MachineEditPage({
           pinballmapExcluded={machine.pinballmapExcluded}
           pinballmapExcludedReason={machine.pinballmapExcludedReason}
           pinballmapTitleName={pinballmapTitleName}
-          modelName={modelFields?.modelName ?? null}
-          manufacturer={modelFields?.manufacturer ?? null}
-          year={modelFields?.year ?? null}
+          // Straight off the row. These used to come from a second query,
+          // because `getMachineForLayout` nulled `manufacturer` and `year` via
+          // `PBM_METADATA_PLACEHOLDER` and the hand-entry panel would have
+          // opened blank on a machine that had them — then written the nulls
+          // back on save. PP-3bbr.1 took those two fields out of the
+          // placeholder, so the loader carries the real values and the extra
+          // round-trip was pure cost.
+          modelName={machine.modelName}
+          manufacturer={machine.manufacturer}
+          year={machine.year}
         />
       </section>
 

@@ -110,6 +110,7 @@ the degradation is a known, documented choice — not an oversight.
 | `MCP_ADMIN_USER_ID`                                       | 🔴    | ⚪                  | `src/lib/mcp/verify-token.ts`             | as above                                                                                                                                                                                                                       |
 | `PINBALLMAP_OUTBOUND_EMAIL`                               | 🟢    | ⚪                  | `supabase/seed-pinballmap-creds.mjs`      | **Seed-time only, never read at runtime.** Absent → outbound list/unlist stays unprovisioned and both actions return `NOT_PROVISIONED`.                                                                                        |
 | `PINBALLMAP_OUTBOUND_TOKEN`                               | 🔴    | ⚪                  | `supabase/seed-pinballmap-creds.mjs`      | as above; the value lands in Supabase Vault, not in a column.                                                                                                                                                                  |
+| `DISCORD_PBM_ALERT_CHANNEL_ID`                            | 🟢    | ⚪                  | `src/lib/pinballmap/region-alerts.ts`     | region new-machine alert is off: the hourly cron makes **no** PBM call and records nothing, so nothing is queued and nothing floods when it is later set. Not a secret (a channel snowflake), but never `NEXT_PUBLIC_`.        |
 
 > **PinballMap api_token (PP-o355.23).** A **platform capability, not tenant
 > data** — PBM issues it to an approved account against a use-plan, i.e. to
@@ -171,6 +172,20 @@ the degradation is a known, documented choice — not an oversight.
 > `SEED_PINBALLMAP_CREDS_FORCE_PRODUCTION=1 POSTGRES_URL=<prod> PINBALLMAP_OUTBOUND_EMAIL=… PINBALLMAP_OUTBOUND_TOKEN=… node supabase/seed-pinballmap-creds.mjs`.
 > The script refuses a production target without that token, and refuses to
 > overwrite a credential that is already provisioned.
+>
+> **PinballMap region alert channel (PP-o355.18).** `DISCORD_PBM_ALERT_CHANNEL_ID`
+> is the Discord channel the hourly "new machines in Austin" alert posts into. It
+> reuses the existing Discord bot token from `discord_integration_config` (Vault),
+> so the only new thing is the destination — and the bot must be in that guild and
+> able to see the channel, or the post fails as `blocked` and the discoveries stay
+> queued.
+>
+> **Unset is the off switch, and it switches the whole job off, not just the post.**
+> The cron checks it before touching PinballMap, so an unconfigured install makes no
+> PBM request and stores no seen-machine rows. That ordering is what prevents the
+> obvious trap: if the job seeded its memory while unannounceable, whatever appeared
+> in the meantime would land as one flood the moment a channel was finally set.
+> Deliberately not build-gated (§4.1) — PinPoint is entirely functional without it.
 
 ### 4.3 Local / CI / test-only config
 

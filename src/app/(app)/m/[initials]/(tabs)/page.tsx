@@ -22,7 +22,6 @@ import {
   type PbmSiblingInput,
 } from "~/lib/pinballmap/listing-state";
 import { listSurfacingAbandonedForMachine } from "~/lib/pinballmap/abandoned-listings";
-import { getCatalogEntry } from "~/lib/pinballmap/catalog";
 import { InfoHero } from "./info-hero";
 import { InfoRail } from "./info-rail";
 
@@ -95,25 +94,11 @@ export default async function MachineInfoTab({
   // carries no CORE-PBM-001 link obligation of its own — the Pinball Map row
   // beneath it does, and always links.
   //
-  // The catalog row can be missing (never refreshed, or the title retired) for
-  // a machine that is nonetheless linked. Naming the id beats claiming there is
-  // no model at all; "Not specified" is reserved for a machine with no catalog
-  // match, which is a different and correctable state (PP-3bbr).
-  //
-  // Two sources, never both at once — the DB CHECK
-  // `machines_model_name_requires_excluded` is what makes "never both" a fact
-  // rather than a convention, so there is no precedence rule to get wrong: a
-  // linked machine reads the catalog, an off-catalog one reads its own column
-  // (PP-3bbr).
-  const linkedTitleEntry =
-    machine.pinballmapMachineId !== null
-      ? await getCatalogEntry(machine.pinballmapMachineId)
-      : null;
-  const modelName =
-    machine.pinballmapMachineId === null
-      ? machine.modelName
-      : (linkedTitleEntry?.name ??
-        `Pinball Map title #${String(machine.pinballmapMachineId)}`);
+  // Derived once in `getMachineForLayout` rather than here, because the header
+  // above this card renders the same fact and the two disagreeing would be a
+  // bug nobody could see (PP-3bbr.1). That loader is `cache()`d, so reading it
+  // here costs nothing the layout has not already paid.
+  const modelName = machine.modelTitle;
 
   // The Config-issue warning. Two unrelated disagreements raise it, which is
   // why its label is generic: an entry left live on the public map under a

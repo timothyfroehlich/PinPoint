@@ -5,17 +5,60 @@ import { assertNotInTransaction } from "~/server/db/transaction-context";
 const DISCORD_API = "https://discord.com/api/v10";
 const MAX_RETRY_AFTER_SECONDS = 5;
 
-export type SendDmResult =
+/**
+ * Outcome of any Discord message send.
+ *
+ * `blocked` means Discord refused this destination for a reason retrying will not
+ * fix: for a DM, the recipient has DMs off or blocked the bot; for a channel, the
+ * bot is not in the guild, cannot see the channel, or the channel is gone.
+ */
+export type DiscordSendResult =
   | { ok: true }
   | {
       ok: false;
       reason: "blocked" | "rate_limited" | "transient" | "not_configured";
     };
 
+/** Historical alias — `sendDm`'s return type. */
+export type SendDmResult = DiscordSendResult;
+
 export interface SendDmInput {
   botToken: string;
   discordUserId: string;
   content: string;
+}
+
+export interface PostChannelMessageInput {
+  botToken: string;
+  /** Discord channel snowflake to post into. */
+  channelId: string;
+  content: string;
+}
+
+/**
+ * Post a message to a Discord channel the bot can see.
+ *
+ * Distinct from `sendDm` only in the destination: a DM needs a channel opened for
+ * the recipient first, a guild channel is already addressable. Everything after
+ * that — auth header, `allowed_mentions: { parse: [] }`, the single in-budget 429
+ * retry, error classification — is the same code path, so a fix to any of it
+ * applies to both.
+ *
+ * Used by the PinballMap region new-machine alert (PP-o355.18), which broadcasts
+ * a public fact to one operator-chosen channel rather than DM-ing every member.
+ */
+export async function postChannelMessage(
+  input: PostChannelMessageInput
+): Promise<DiscordSendResult> {
+  // CORE-ARCH-011 tripwire: same rule as DMs — the HTTP call goes out post-commit,
+  // never inside a transaction (the Doodle Bug, PP-2053).
+  assertNotInTransaction("postChannelMessage");
+
+  if (!input.botToken || !input.channelId) {
+    return { ok: false, reason: "not_configured" };
+  }
+
+  return postMessage(input.botToken, input.channelId, input.content);
 }
 
 export async function sendDm(input: SendDmInput): Promise<SendDmResult> {
@@ -88,23 +131,57 @@ async function postMessage(
 }
 
 /**
- * Discord error code 50007: "Cannot send messages to this user". Returned
- * when the recipient has DMs disabled, blocked the bot, or doesn't share a
- * server with the bot. Other 403s (e.g., 50001 "Missing Access") indicate
- * bot misconfiguration that an admin can fix — those are transient from
- * our perspective.
+ * 403 codes that mean "retrying will not fix this" rather than "try again later".
+ *
+ * - `50007` "Cannot send messages to this user" — the recipient has DMs disabled,
+ *   blocked the bot, or shares no server with it.
+ * - `50001` "Missing Access" / `50013` "Missing Permissions" — the bot cannot see
+ *   or post in the target channel.
+ *
+ * The permission pair used to be classified `transient`, on the reasoning that an
+ * admin can fix a misconfiguration so we may as well retry. That is exactly
+ * backwards for a channel post on a schedule: `postChannelMessage` backs the
+ * hourly PinballMap region alert, where `transient` means the job warns once an
+ * hour forever, queues rows that never drain, and spends PBM requests on each
+ * attempt — while `blocked` is reported to Sentry so someone actually fixes it.
+ * Retrying does not summon the admin; surfacing the failure does.
+ *
+ * No behavior change on the DM path *today*: `dispatch.ts` collapses every
+ * non-`skipped` failure into one warn line (dispatch.ts:~382), so `blocked` and
+ * `transient` are indistinguishable to a DM caller as the code stands. That is a
+ * property of the current consumer, not an invariant of this classifier — a
+ * future retry/replay queue that treats `transient` as "try again later" would
+ * make missing-access DMs stop retrying. Whoever adds that distinction owns
+ * re-checking this mapping for the DM path.
  */
 const DISCORD_ERROR_CANNOT_DM_USER = 50007;
+const DISCORD_ERROR_MISSING_ACCESS = 50001;
+const DISCORD_ERROR_MISSING_PERMISSIONS = 50013;
+const PERMANENT_403_CODES: readonly number[] = [
+  DISCORD_ERROR_CANNOT_DM_USER,
+  DISCORD_ERROR_MISSING_ACCESS,
+  DISCORD_ERROR_MISSING_PERMISSIONS,
+];
 
 async function classify(res: Response): Promise<SendDmResult> {
   if (res.status === 404) return { ok: false, reason: "blocked" };
   if (res.status === 403) {
     const code = await readDiscordErrorCode(res);
-    return code === DISCORD_ERROR_CANNOT_DM_USER
+    return code !== null && PERMANENT_403_CODES.includes(code)
       ? { ok: false, reason: "blocked" }
       : { ok: false, reason: "transient" };
   }
   if (res.status === 429) return { ok: false, reason: "rate_limited" };
+  // Any other 4xx is a client error retrying cannot fix — a malformed channel id
+  // (400), a bad bot token (401), a resource that isn't there. Same argument as
+  // the permanent-403 codes above: on the scheduled `postChannelMessage` path a
+  // `transient` verdict means the hourly job warns forever and never reaches
+  // Sentry, so nobody learns the channel is misconfigured. `blocked` surfaces it.
+  // 429 is handled above; 5xx and the synthetic 599 (network failure) fall
+  // through to `transient`, where retrying genuinely can recover.
+  if (res.status >= 400 && res.status < 500) {
+    return { ok: false, reason: "blocked" };
+  }
   log.warn(
     { status: res.status, action: "sendDm.classify" },
     "Discord API non-2xx"

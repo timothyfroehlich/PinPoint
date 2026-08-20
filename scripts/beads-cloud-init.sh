@@ -45,6 +45,18 @@ set -euo pipefail
 BD_PINNED_VERSION="1.2.2"
 # ------------------------------------------------------------------------------
 
+# Resolve this script's own directory NOW, before any `cd`, and while
+# ${BASH_SOURCE[0]} still resolves against the invocation cwd. The runbook runs
+# `bash scripts/beads-cloud-init.sh` from the checkout root, so BASH_SOURCE[0] is
+# the RELATIVE path `scripts/beads-cloud-init.sh`. Step 5 later cd's into
+# $BEADS_DIR (~/beads); computing this there would run `cd scripts` from ~/beads,
+# which does not exist — the cd fails, `set -e` kills the script, and the repair
+# in step 6 never runs, so a fresh clone is left without its events table and the
+# first write dies "Error 1146: table not found: events" (the 2026-08-18 nightly
+# hit exactly this after #1908 shipped the repair but computed SCRIPT_DIR too
+# late). Resolving here, pre-cd, is the fix.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 # Fixed, not overridable: the runbook preamble cd's into ~/beads, so a
 # configurable clone target would let the two drift (clone one place, cd to an
 # empty other). Edit here if you ever need a different path.
@@ -133,7 +145,7 @@ fi
 #    PP-esqi). Idempotent (IF NOT EXISTS) and safe for the shared remote:
 #    dolt_ignore keeps these tables out of bd's commits and pushes. Runs on the
 #    pull path too — a reused workspace may predate this repair.
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+#    SCRIPT_DIR is resolved at the top of the script, before any cd (see there).
 REPAIR_SQL="$SCRIPT_DIR/beads-cloud-repair-tables.sql"
 DOLT_DB_DIR="$BEADS_DIR/.beads/embeddeddolt/PP"
 [[ -f "$REPAIR_SQL" ]] || die "repair SQL not found: $REPAIR_SQL"

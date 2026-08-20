@@ -1,8 +1,11 @@
-// Unit tests for .claude/hooks/block-direct-merge.cjs — the PreToolUse hook
-// that blocks ALL agent-initiated PR merges (PP-wi85). Merging is human-only:
-// there is no agent-usable bypass. The only merge channel is a human typing a
-// `!`-prefixed command in Claude Code, which never generates a PreToolUse
-// event and so is outside this hook's reach entirely.
+// Unit tests for .claude/hooks/block-direct-merge.cjs — the PreToolUse hook that
+// governs agent-initiated PR merges. Two outcomes, by channel (PP-wi85 reversed
+// for the script only, per Tim 2026-08-19):
+//   - merge-pr.sh (the gate-enforced script) → ASK: exit 0 with a PreToolUse
+//     "ask" decision on stdout, so Tim approves the prompt before it runs.
+//   - gh pr merge / gh api PUT .../merge / MCP merge_pull_request → DENY: exit 2,
+//     stderr message. These skip merge-pr.sh's gate checks, so they stay
+//     human-only-via-`!` (a `!`-prefixed human command never fires PreToolUse).
 //
 // Exercises the hook as a subprocess (spawnSync node hookPath, JSON on stdin)
 // — matches the pattern used by verify-guard-stack.test.ts.
@@ -34,6 +37,29 @@ function runHook(payload: unknown): {
 
 function bashPayload(command: string): unknown {
   return { tool_name: "Bash", tool_input: { command } };
+}
+
+/** Assert the hook emitted a PreToolUse "ask" decision (exit 0 + stdout JSON). */
+function expectAsk(result: { status: number; stdout: string }): void {
+  expect(result.status).toBe(0);
+  const parsed = JSON.parse(result.stdout) as {
+    hookSpecificOutput?: {
+      hookEventName?: string;
+      permissionDecision?: string;
+      permissionDecisionReason?: string;
+    };
+  };
+  expect(parsed.hookSpecificOutput?.hookEventName).toBe("PreToolUse");
+  expect(parsed.hookSpecificOutput?.permissionDecision).toBe("ask");
+  expect(parsed.hookSpecificOutput?.permissionDecisionReason).toContain(
+    "merge-pr.sh"
+  );
+}
+
+/** Assert the hook passed the command through (exit 0, no decision on stdout). */
+function expectAllow(result: { status: number; stdout: string }): void {
+  expect(result.status).toBe(0);
+  expect(result.stdout.trim()).toBe("");
 }
 
 describe("block-direct-merge.cjs — gh merge paths", () => {
@@ -87,110 +113,101 @@ describe("block-direct-merge.cjs — MCP merge", () => {
   });
 });
 
-describe("block-direct-merge.cjs — merge-pr.sh (PP-wi85 hard gate)", () => {
-  it("blocks a bare `merge-pr.sh <PR>` invocation", () => {
-    const { status, stderr } = runHook(bashPayload("merge-pr.sh 123"));
-    expect(status).toBe(2);
-    expect(stderr).toContain(
-      "Merge is human-only. You cannot run merge-pr.sh."
-    );
+describe("block-direct-merge.cjs — merge-pr.sh (PP-wi85 ask-gated)", () => {
+  // merge-pr.sh is the gate-enforced script; an agent MAY invoke it, and the
+  // hook turns each invocation into an approval prompt (exit 0 + "ask" JSON) so
+  // Tim signs off. Every shape below still has to be RECOGNIZED as merge-pr.sh —
+  // a wrapper/path form that slips past recognition would reach the merge
+  // un-prompted, so these are the same evasion cases the old hard gate covered,
+  // now asserting ask instead of deny.
+  it("asks on a bare `merge-pr.sh <PR>` invocation", () => {
+    expectAsk(runHook(bashPayload("merge-pr.sh 123")));
   });
 
-  it("blocks `bash scripts/workflow/merge-pr.sh <PR>`", () => {
-    const { status, stderr } = runHook(
-      bashPayload("bash scripts/workflow/merge-pr.sh 123")
-    );
-    expect(status).toBe(2);
-    expect(stderr).toContain("Merge is human-only.");
+  it("asks on `bash scripts/workflow/merge-pr.sh <PR>`", () => {
+    expectAsk(runHook(bashPayload("bash scripts/workflow/merge-pr.sh 123")));
   });
 
-  it("blocks `./scripts/workflow/merge-pr.sh <PR>`", () => {
-    const { status, stderr } = runHook(
-      bashPayload("./scripts/workflow/merge-pr.sh 123")
-    );
-    expect(status).toBe(2);
-    expect(stderr).toContain("Merge is human-only.");
+  it("asks on `./scripts/workflow/merge-pr.sh <PR>`", () => {
+    expectAsk(runHook(bashPayload("./scripts/workflow/merge-pr.sh 123")));
   });
 
-  it("blocks an absolute-path invocation", () => {
-    const { status } = runHook(
-      bashPayload(
-        "/Users/tim/PinPoint/scripts/workflow/merge-pr.sh 123 --human"
+  it("asks on an absolute-path invocation", () => {
+    expectAsk(
+      runHook(
+        bashPayload(
+          "/Users/tim/PinPoint/scripts/workflow/merge-pr.sh 123 --human"
+        )
       )
     );
-    expect(status).toBe(2);
   });
 
-  it("blocks `sh scripts/workflow/merge-pr.sh <PR>`", () => {
-    const { status } = runHook(
-      bashPayload("sh scripts/workflow/merge-pr.sh 123")
+  it("asks on `sh scripts/workflow/merge-pr.sh <PR>`", () => {
+    expectAsk(runHook(bashPayload("sh scripts/workflow/merge-pr.sh 123")));
+  });
+
+  it("asks when chained after another command", () => {
+    expectAsk(
+      runHook(
+        bashPayload(
+          "pnpm run check && scripts/workflow/merge-pr.sh 123 --human"
+        )
+      )
     );
-    expect(status).toBe(2);
   });
 
-  it("blocks chained after another command", () => {
-    const { status } = runHook(
-      bashPayload("pnpm run check && scripts/workflow/merge-pr.sh 123 --human")
-    );
-    expect(status).toBe(2);
-  });
-
-  it("blocks a bare leading VAR=val assignment (no env wrapper)", () => {
+  it("asks on a bare leading VAR=val assignment (no env wrapper)", () => {
     // Regression: the original regex only tolerated `env VAR=val ...`, so a
     // bare shell assignment like `DUMMY=1 scripts/workflow/merge-pr.sh ...`
-    // slipped through the hard gate entirely.
-    const { status } = runHook(
-      bashPayload("DUMMY=1 scripts/workflow/merge-pr.sh 123 --human")
+    // slipped past recognition entirely.
+    expectAsk(
+      runHook(bashPayload("DUMMY=1 scripts/workflow/merge-pr.sh 123 --human"))
     );
-    expect(status).toBe(2);
   });
 
-  it("blocks `env VAR=val bash scripts/workflow/merge-pr.sh <PR>`", () => {
-    const { status } = runHook(
-      bashPayload("env FOO=bar bash scripts/workflow/merge-pr.sh 123")
+  it("asks on `env VAR=val bash scripts/workflow/merge-pr.sh <PR>`", () => {
+    expectAsk(
+      runHook(bashPayload("env FOO=bar bash scripts/workflow/merge-pr.sh 123"))
     );
-    expect(status).toBe(2);
   });
 
-  it("does NOT block a quoted mention (echo)", () => {
-    const { status } = runHook(
-      bashPayload('echo "run merge-pr.sh when ready"')
+  it("does NOT act on a quoted mention (echo)", () => {
+    expectAllow(runHook(bashPayload('echo "run merge-pr.sh when ready"')));
+  });
+
+  it("does NOT act on a quoted mention (rg/docs search)", () => {
+    expectAllow(
+      runHook(bashPayload('rg "merge-pr.sh" docs/superpowers/specs/'))
     );
-    expect(status).toBe(0);
   });
 
-  it("does NOT block a quoted mention (rg/docs search)", () => {
-    const { status } = runHook(
-      bashPayload('rg "merge-pr.sh" docs/superpowers/specs/')
-    );
-    expect(status).toBe(0);
+  it("does NOT act on an unrelated command", () => {
+    expectAllow(runHook(bashPayload("gh pr view 123")));
   });
 
-  it("does NOT block an unrelated command", () => {
-    const { status } = runHook(bashPayload("gh pr view 123"));
-    expect(status).toBe(0);
-  });
-
-  it("does NOT block dry-run mention text inside a single-quoted string", () => {
-    const { status } = runHook(
-      bashPayload(
-        "echo 'canonical command: scripts/workflow/merge-pr.sh <PR> --human'"
+  it("does NOT act on dry-run mention text inside a single-quoted string", () => {
+    expectAllow(
+      runHook(
+        bashPayload(
+          "echo 'canonical command: scripts/workflow/merge-pr.sh <PR> --human'"
+        )
       )
     );
-    expect(status).toBe(0);
   });
 });
 
 describe("block-direct-merge.cjs — no bypass sentinel", () => {
-  it("still blocks merge-pr.sh even with a stray .claude-merge-bypass-shaped arg", () => {
-    // PP-wi85 removed the bypass sentinel entirely — the hook no longer reads
-    // any filesystem state, so there is nothing for a sentinel file to flip.
-    const { status } = runHook(
-      bashPayload(
-        "touch .claude-merge-bypass && scripts/workflow/merge-pr.sh 123"
+  it("still recognizes merge-pr.sh even with a stray .claude-merge-bypass-shaped arg", () => {
+    // PP-wi85 removed the bypass sentinel entirely — the hook reads no
+    // filesystem state, so there is nothing for a sentinel file to flip. The
+    // chained merge-pr.sh is still recognized and prompts for approval.
+    expectAsk(
+      runHook(
+        bashPayload(
+          "touch .claude-merge-bypass && scripts/workflow/merge-pr.sh 123"
+        )
       )
     );
-    expect(status).toBe(2);
   });
 });
 
@@ -229,6 +246,8 @@ describe("block-direct-merge.cjs — wrapped invocations (PP-6t3c, PP-ar8a)", ()
     expect(status).toBe(2);
   });
 
+  // merge-pr.sh is ask-gated: a wrapped invocation must still be recognized so
+  // it prompts (exit 0 + "ask") rather than slipping through un-prompted.
   it.each([
     'eval "scripts/workflow/merge-pr.sh 123 --human"',
     'sh -c "scripts/workflow/merge-pr.sh 123 --human"',
@@ -237,9 +256,8 @@ describe("block-direct-merge.cjs — wrapped invocations (PP-6t3c, PP-ar8a)", ()
     "time scripts/workflow/merge-pr.sh 123",
     "xargs -I{} scripts/workflow/merge-pr.sh {}",
     "sudo -u root scripts/workflow/merge-pr.sh 123",
-  ])("blocks %s", (command) => {
-    const { status } = runHook(bashPayload(command));
-    expect(status).toBe(2);
+  ])("asks on %s", (command) => {
+    expectAsk(runHook(bashPayload(command)));
   });
 
   it.each([
@@ -322,13 +340,20 @@ describe("block-direct-merge.cjs — env -S split-string", () => {
     "env -S'gh pr merge 123'",
     "env -i -S 'gh pr merge 123'",
     "env -iS 'gh pr merge 123'",
-    "env -u FOO -S 'scripts/workflow/merge-pr.sh 1 --human'",
     "env -S 'gh api -X PUT repos/o/r/pulls/1/merge'",
     "sudo env -S 'gh pr merge 1'",
     "xargs env -S 'gh pr merge 1'",
   ])("blocks %s", (command) => {
     const { status } = runHook(bashPayload(command));
     expect(status).toBe(2);
+  });
+
+  it("asks on a split-string merge-pr.sh payload (ask-gated, not denied)", () => {
+    expectAsk(
+      runHook(
+        bashPayload("env -u FOO -S 'scripts/workflow/merge-pr.sh 1 --human'")
+      )
+    );
   });
 
   it("blocks a dynamic split-string payload that names a merge elsewhere", () => {
@@ -366,22 +391,22 @@ describe("block-direct-merge.cjs — prose mentions still pass", () => {
     "gh api repos/o/r/pulls/123/merge",
     "gh pr view 123",
   ])("allows %s", (command) => {
-    const { status } = runHook(bashPayload(command));
-    expect(status).toBe(0);
+    expectAllow(runHook(bashPayload(command)));
   });
 
   it("allows a heredoc whose BODY names the merge command", () => {
-    const { status } = runHook(
-      bashPayload(
-        [
-          "cat > /tmp/handoff.md <<'EOF'",
-          "gh pr merge 123 --squash",
-          "scripts/workflow/merge-pr.sh 123 --human",
-          "EOF",
-        ].join("\n")
+    expectAllow(
+      runHook(
+        bashPayload(
+          [
+            "cat > /tmp/handoff.md <<'EOF'",
+            "gh pr merge 123 --squash",
+            "scripts/workflow/merge-pr.sh 123 --human",
+            "EOF",
+          ].join("\n")
+        )
       )
     );
-    expect(status).toBe(0);
   });
 });
 

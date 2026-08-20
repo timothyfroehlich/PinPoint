@@ -32,8 +32,9 @@ const hookPath = path.resolve(
 interface BehaviorProbe {
   hook: string;
   export: string;
-  mustBlock: string[];
-  mustAllow: string[];
+  mustDeny?: string[];
+  mustAsk?: string[];
+  mustAllow?: string[];
 }
 
 const {
@@ -394,27 +395,51 @@ describe("evaluateGuardBehavior — the real guards", () => {
     expect(evaluateGuardBehavior()).toEqual([]);
   });
 
-  it("covers the merge guard's wrapper bypasses", () => {
+  it("covers the merge guard's wrapper bypasses (deny) and the script (ask)", () => {
     const mergeProbe = BEHAVIOR_PROBES.find(
       (p) => p.hook === "block-direct-merge.cjs"
     );
     expect(mergeProbe).toBeDefined();
-    expect(mergeProbe?.mustBlock).toContain('eval "gh pr merge 123 --squash"');
+    // Raw channels stay a hard deny...
+    expect(mergeProbe?.mustDeny).toContain('eval "gh pr merge 123 --squash"');
+    // ...while the gate-enforced script is ask-gated, not denied.
+    expect(mergeProbe?.mustAsk).toContain(
+      "scripts/workflow/merge-pr.sh 123 --human"
+    );
   });
 });
 
 describe("evaluateGuardBehavior — degradation is reported, never thrown", () => {
-  it("reports a guard that stopped blocking", () => {
+  it("reports a guard that stopped acting (allows a known-bad command)", () => {
     const problems = evaluateGuardBehavior({
       load: () => ({
         classifyMerge: () => ({ block: false }),
         classifyCommand: () => ({ block: false }),
       }),
     });
-    expect(problems.join("\n")).toContain("block-direct-merge.cjs allows");
+    // block:false → outcome "allow", so the deny/ask rows fail with "got allow".
+    expect(problems.join("\n")).toContain("block-direct-merge.cjs expected");
+    expect(problems.join("\n")).toContain("got allow");
     expect(problems.join("\n")).toContain(
       'eval \\"gh pr merge 123 --squash\\"'
     );
+  });
+
+  it("reports the merge script silently reverting to a hard deny", () => {
+    // The reversal's own regression: merge-pr.sh must ASK, not deny. A guard
+    // that classifies it as a plain block (kind !== "merge-script") over-blocks,
+    // and the canary must catch that direction too.
+    const problems = evaluateGuardBehavior({
+      load: () => ({
+        classifyMerge: (toolName: string, command: string) =>
+          String(command).includes("merge-pr.sh")
+            ? { block: true, kind: "merge" } // wrong: should be "merge-script"
+            : { block: false },
+        classifyCommand: () => ({ block: false }),
+      }),
+    });
+    expect(problems.join("\n")).toContain("expected ask");
+    expect(problems.join("\n")).toContain("got deny");
   });
 
   it("reports a guard that started blocking everything", () => {
@@ -424,7 +449,8 @@ describe("evaluateGuardBehavior — degradation is reported, never thrown", () =
         classifyCommand: () => ({ block: true }),
       }),
     });
-    expect(problems.join("\n")).toContain("blocks");
+    // Everything reads as "deny": the allow rows now fail with "got deny".
+    expect(problems.join("\n")).toContain("got deny");
     expect(problems).toHaveLength(BEHAVIOR_PROBES.length);
   });
 

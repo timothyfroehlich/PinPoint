@@ -4,7 +4,7 @@ import { parseCatalog, parseLocation, parseMachineGroups } from "./parse";
 import locationFixture from "./fixtures/location-26454.json";
 import catalogFixture from "./fixtures/catalog-apc.json";
 import machineGroupsFixture from "./fixtures/machine-groups.json";
-import { APC_LOCATION_ID } from "./config";
+import { APC_LOCATION_ID, PBM_AUSTIN_REGION, normalizeRegion } from "./config";
 import type {
   CatalogMachine,
   LocationSnapshot,
@@ -12,6 +12,8 @@ import type {
   PbmAddMachineResult,
   PbmAuthResult,
   PbmCondition,
+  PbmRegionLmx,
+  PbmRegionLocation,
   PbmToggleResult,
   PbmWriteResult,
   PinballMapClient,
@@ -86,6 +88,37 @@ export function createMockClient(): PinballMapClient {
 
     fetchMachineGroups(): Promise<MachineGroup[]> {
       return Promise.resolve(parseMachineGroups(machineGroupsFixture));
+    },
+
+    /**
+     * The mock knows only our own location, so the "region" it reports is APC's
+     * lineup. That is enough to exercise the new-machine diff end to end in dev
+     * (add a machine through the mock and it shows up here as a new lmx id);
+     * tests that need several venues stub this method directly rather than have
+     * the mock invent venues that do not exist.
+     *
+     * Ids only, mirroring the real endpoint — it carries no names.
+     */
+    fetchRegionLmxes(region: string): Promise<PbmRegionLmx[]> {
+      if (normalizeRegion(region) !== PBM_AUSTIN_REGION) {
+        return Promise.resolve([]);
+      }
+      return Promise.resolve(
+        lmxes.map((l) => ({
+          lmxId: l.id,
+          locationId: APC_LOCATION_ID,
+          machineId: l.machineId,
+        }))
+      );
+    },
+
+    fetchRegionLocations(region: string): Promise<PbmRegionLocation[]> {
+      if (normalizeRegion(region) !== PBM_AUSTIN_REGION) {
+        return Promise.resolve([]);
+      }
+      return Promise.resolve([
+        { locationId: APC_LOCATION_ID, name: "Austin Pinball Collective" },
+      ]);
     },
 
     authDetails(login: string, password: string): Promise<PbmAuthResult> {

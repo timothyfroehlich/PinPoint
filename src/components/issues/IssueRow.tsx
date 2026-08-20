@@ -37,14 +37,19 @@ interface IssueRowProps {
 
 export function IssueRow({ issue }: IssueRowProps): React.JSX.Element {
   const reporter = resolveIssueReporter(issue);
+  const isClosed = (CLOSED_STATUSES as readonly string[]).includes(
+    issue.status
+  );
 
   return (
     <div
       className={cn(
         "group flex items-start gap-4 border-b border-border p-4 transition-colors duration-150",
-        (CLOSED_STATUSES as readonly string[]).includes(issue.status)
-          ? "bg-muted/30 opacity-60 hover:opacity-100"
-          : "hover:bg-muted/40"
+        // Closed issues read as de-emphasized via a persistent muted fill
+        // (matching IssueCard's bg-tint pattern), never a row-wide opacity:
+        // dimming the container multiplied the muted meta line below WCAG AA
+        // (~3.4:1). Background-only keeps every text token at full contrast. (PP-ha3p)
+        isClosed ? "bg-muted/30 hover:bg-muted/50" : "hover:bg-muted/40"
       )}
       role="article"
       aria-label={`Issue: ${issue.title} (${issue.status})`}

@@ -1,6 +1,6 @@
 {
-  "id": "1b5c87e3-f6e7-4cb8-862f-752b1223872c",
-  "prevId": "85068690-d259-480a-876f-14d288b9065b",
+  "id": "855de564-f17e-493d-b3e3-3d87ff7554e8",
+  "prevId": "1b5c87e3-f6e7-4cb8-862f-752b1223872c",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -2003,6 +2003,12 @@
         },
         "pinballmap_machine_id": {
           "name": "pinballmap_machine_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "location_id": {
+          "name": "location_id",
           "type": "integer",
           "primaryKey": false,
           "notNull": true

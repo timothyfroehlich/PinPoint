@@ -12,7 +12,7 @@ End-to-end pipeline from "I have changes" to "merged in main".
 - Uncommitted changes in tree → **Phase 1: Commit**
 - Local commits, no PR yet → **Phase 2: PR**
 - PR open, CI not yet green-and-clean → **Phase 3: Review**
-- `ready-for-review` label applied → **Phase 4: Merge** (human-only handoff — see below)
+- `ready-for-review` label applied → **Phase 4: Merge** (Tim's decision — hand off, or run the script and let him approve the prompt; see below)
 - Tim has merged the PR → **Phase 5: after the merge**
 
 ---
@@ -140,7 +140,7 @@ This is a narrow exception and it is self-policing. "It's only a small change" i
 
 It is there because the command was intermittently denied. On 2026-08-03 an auto-mode session was refused with `Blocked by classifier` on PR #1815, while the same command succeeded four times across 2026-08-09/10 (PRs #1832, #1828, #1829, #1848). The block was contextual, not a standing rule — which is the worst shape for a required step, because it fails only sometimes and leaves the PR sitting at `unreviewed` with no path forward. A background subagent has no human to hand the command to at all. Rules are evaluated deny → ask → allow, and an explicit allow resolves the call before the classifier is consulted, so the entry makes the step deterministic. (PP-yx97. A new tool permission needs Tim's explicit approval each time; he gave it on 2026-08-11. This is not a CORE-SEC-010 surface — that rule governs prod-mutating Supabase tools, and its ban on `allow` applies to those.)
 
-**What the rule does not do is make the attestation true.** It removes the harness's opinion about whether you earned the marker, which means your own judgement is now the only thing standing between a false attestation and the merge gate. The honesty model above is not softened by the allow rule; it is the entire remaining check. Merging stays human-only regardless (PP-wi85), so a marker you should not have posted misleads Tim rather than merging anything by itself — that is a smaller failure, not a harmless one.
+**What the rule does not do is make the attestation true.** It removes the harness's opinion about whether you earned the marker, which means your own judgement is now the only thing standing between a false attestation and the merge gate. The honesty model above is not softened by the allow rule; it is the entire remaining check. The merge decision stays Tim's regardless (PP-wi85) — even when an agent runs `merge-pr.sh`, the hook prompts him to approve — so a marker you should not have posted misleads Tim into approving rather than merging anything by itself. That is a smaller failure, not a harmless one: his approval at the prompt is the last backstop, and a false marker is exactly what erodes it.
 
 Two limits worth knowing:
 
@@ -177,13 +177,13 @@ The label is a hint to Tim that the PR is ready for **him** to merge — it does
 
 ---
 
-## Phase 4: Merge — human-only (PP-wi85)
+## Phase 4: Merge — Tim's decision (PP-wi85)
 
-**Merging is human-only, via ANY path.** Direct `gh pr merge`, MCP `merge_pull_request`, AND `scripts/workflow/merge-pr.sh` itself are ALL blocked for an agent by the `block-direct-merge.cjs` PreToolUse hook — including `merge-pr.sh --dry-run`. There is no agent-usable bypass; the old `.claude-merge-bypass` sentinel was removed entirely. If you want to sanity-check gate-relevant PR state without running the script, read it via MCP (`pull_request_read`) instead — you cannot invoke `merge-pr.sh` at all, not even to preview.
+**The merge decision is Tim's, always.** An agent MAY run the gate-enforced script `bash scripts/workflow/merge-pr.sh <PR> --human`, but the `block-direct-merge.cjs` PreToolUse hook turns that invocation into an **approval prompt** — Tim approves before the merge runs (PP-wi85, reversed for the script only, per Tim 2026-08-19). A hook `ask` decision prompts in **every** permission mode, including bypassPermissions, so a subagent cannot merge silently. The raw channels — `gh pr merge`, `gh api PUT .../merge`, MCP `merge_pull_request` — stay **hard-blocked** for agents, because they skip the script's gate re-checks (CI green, review pins head, threads resolved, no conflict); the old `.claude-merge-bypass` sentinel was removed entirely. To sanity-check gate state without merging, read the PR via MCP (`pull_request_read`), or run `merge-pr.sh <PR> --dry-run` — it also prompts for approval but takes no action.
 
-### 4.1 Agent's terminal state: handoff, not merge
+### 4.1 Agent's terminal state: hand off (the default), or run it and let Tim approve
 
-Once 3.1–3.6 are satisfied (CI green, a review whose `commit_id` matches head per 3.4, threads resolved, no conflict, screenshots posted if UI-touching), your job on this PR is done. Hand it over by **running the handoff report and pasting its output** — do not write the summary yourself:
+Once 3.1–3.6 are satisfied (CI green, a review whose `commit_id` matches head per 3.4, threads resolved, no conflict, screenshots posted if UI-touching), your job on this PR is done. The **default and preferred** close is a handoff: **run the handoff report and paste its output** — do not write the summary yourself. (You may instead run `bash scripts/workflow/merge-pr.sh <PR> --human` and let Tim approve the prompt; the handoff report is still the better hand-off because it shows him the state he is approving.)
 
 ```bash
 bash scripts/workflow/merge-handoff.sh <PR>
@@ -215,7 +215,7 @@ Never say "ready to push when you are" — you push. Never say a PR is "merged" 
 
 ### 4.3 If `merge-pr.sh` itself is broken
 
-There is no hook bypass — that channel was removed entirely (PP-wi85). If a hotfix genuinely can't wait for the script to be fixed, that's Tim's call, made in his own shell (`gh pr merge <PR> --squash` run by him directly, or a fixed `--human` run). Document why in the merge commit or a follow-up comment. An agent should not look for a workaround here — flag the breakage and let Tim decide.
+An agent can run `merge-pr.sh` (with Tim's approval at the prompt), but that does not help when the script _itself_ is broken — the raw channels stay hard-blocked, and there is no hook bypass (PP-wi85). If a hotfix genuinely can't wait for the script to be fixed, that's Tim's call, made in his own shell (`gh pr merge <PR> --squash` run by him directly, or a fixed `--human` run). Document why in the merge commit or a follow-up comment. An agent should not look for a workaround here — flag the breakage and let Tim decide.
 
 ### 4.4 Dependabot PRs: rebase before merging back-to-back
 

@@ -481,8 +481,15 @@
     {
       "idx": 68,
       "version": "7",
-      "when": 1787029726810,
-      "tag": "0068_lonely_ravenous",
+      "when": 1787052885201,
+      "tag": "0068_pinballmap_region_seen_machines",
+      "breakpoints": true
+    },
+    {
+      "idx": 69,
+      "version": "7",
+      "when": 1787139600000,
+      "tag": "0069_lonely_ravenous",
       "breakpoints": true
     }
   ]

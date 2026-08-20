@@ -45,6 +45,31 @@ export const PBM_USER_AGENT =
 export const APC_LOCATION_ID = 26454;
 
 /**
+ * PBM region slug for the Austin metro — the `:region` path segment of the bulk
+ * region endpoints (lowercase region name, vendored llms.txt §Regions).
+ *
+ * Scope note (PP-o355.18): this is the whole metro, not just our location. The
+ * new-machine alert is region-wide discovery — "a game appeared somewhere in
+ * Austin" — which is a different question from the APC-location snapshot sync
+ * (PP-o355.11) and reads a different endpoint.
+ *
+ * **Lowercase is load-bearing.** PBM's route matches the region name
+ * case-insensitively, but the scopes behind it look it up with
+ * `Region.find_by_name(name.downcase)` and fail open on a miss, in two different
+ * and equally bad ways: the LMX scope returns nil, which leaves the query
+ * UNSCOPED and hands back every xref on Earth; the locations scope silently
+ * substitutes Portland. So a mis-cased or unknown region does not 404 — it
+ * returns confident, wrong, enormous data. Normalize with `normalizeRegion`
+ * before it reaches a URL.
+ */
+export const PBM_AUSTIN_REGION = "austin";
+
+/** Canonical form of a region slug: trimmed and lowercased. */
+export function normalizeRegion(region: string): string {
+  return region.trim().toLowerCase();
+}
+
+/**
  * Manual-refresh token bucket (PP-hbi0, reshaped for spec 3.2 in PP-o355.21).
  *
  * The hourly cron is the sanctioned automated refresh (one location call/hour,
