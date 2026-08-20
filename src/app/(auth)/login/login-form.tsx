@@ -53,7 +53,7 @@ export function LoginForm({
         <div className="space-y-3">
           <Label htmlFor="email">
             Email or Username{" "}
-            <span aria-hidden="true" className="text-destructive">
+            <span aria-hidden="true" className="text-destructive-text">
               *
             </span>
           </Label>
@@ -80,7 +80,7 @@ export function LoginForm({
           <div className="flex items-center justify-between">
             <Label htmlFor="current-password">
               Password{" "}
-              <span aria-hidden="true" className="text-destructive">
+              <span aria-hidden="true" className="text-destructive-text">
                 *
               </span>
             </Label>

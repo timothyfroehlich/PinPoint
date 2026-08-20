@@ -84,7 +84,7 @@ export function SignupForm({
         <div className="space-y-2">
           <Label htmlFor="firstName">
             First Name{" "}
-            <span aria-hidden="true" className="text-destructive">
+            <span aria-hidden="true" className="text-destructive-text">
               *
             </span>
           </Label>
@@ -121,7 +121,7 @@ export function SignupForm({
       <div className="space-y-2">
         <Label htmlFor="email">
           Email{" "}
-          <span aria-hidden="true" className="text-destructive">
+          <span aria-hidden="true" className="text-destructive-text">
             *
           </span>
         </Label>
@@ -142,7 +142,7 @@ export function SignupForm({
       <div className="space-y-2">
         <Label htmlFor="password">
           Password{" "}
-          <span aria-hidden="true" className="text-destructive">
+          <span aria-hidden="true" className="text-destructive-text">
             *
           </span>
         </Label>
@@ -168,7 +168,7 @@ export function SignupForm({
       <div className="space-y-2">
         <Label htmlFor="confirmPassword">
           Confirm Password{" "}
-          <span aria-hidden="true" className="text-destructive">
+          <span aria-hidden="true" className="text-destructive-text">
             *
           </span>
         </Label>
@@ -209,7 +209,7 @@ export function SignupForm({
           >
             Terms of Service
           </Link>{" "}
-          <span aria-hidden="true" className="text-destructive">
+          <span aria-hidden="true" className="text-destructive-text">
             *
           </span>
         </Label>

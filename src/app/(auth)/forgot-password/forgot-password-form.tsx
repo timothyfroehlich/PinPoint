@@ -41,7 +41,7 @@ export function ForgotPasswordForm(): React.JSX.Element {
       <div className="space-y-2">
         <Label htmlFor="email">
           Email{" "}
-          <span aria-hidden="true" className="text-destructive">
+          <span aria-hidden="true" className="text-destructive-text">
             *
           </span>
         </Label>

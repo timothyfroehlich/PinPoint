@@ -229,7 +229,7 @@ export function NotificationPreferencesForm({
       {state && !state.ok && showFeedback && (
         <div
           className={cn(
-            "rounded-md border p-4 border-destructive/20 bg-destructive/10 text-destructive"
+            "rounded-md border p-4 border-destructive/20 bg-destructive/10 text-destructive-text"
           )}
         >
           <p className="text-sm font-medium">{state.message}</p>

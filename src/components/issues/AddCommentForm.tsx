@@ -114,7 +114,7 @@ export function AddCommentForm({
         </Button>
       </div>
       {state && !state.ok && (
-        <p className="text-sm text-destructive">{state.message}</p>
+        <p className="text-sm text-destructive-text">{state.message}</p>
       )}
     </form>
   );

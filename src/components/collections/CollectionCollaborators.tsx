@@ -127,7 +127,7 @@ export function CollectionCollaborators({
               disabled={pending}
               aria-label={`Remove ${e.name}`}
               data-testid={`collab-remove-${e.id}`}
-              className="rounded-md p-1 text-muted-foreground hover:bg-destructive/15 hover:text-destructive"
+              className="rounded-md p-1 text-muted-foreground hover:bg-destructive/15 hover:text-destructive-text"
             >
               <X className="size-4" aria-hidden="true" />
             </button>
@@ -181,7 +181,7 @@ export function CollectionCollaborators({
       </Popover>
 
       {error && (
-        <p className="mt-2 text-sm text-destructive" role="alert">
+        <p className="mt-2 text-sm text-destructive-text" role="alert">
           {error}
         </p>
       )}

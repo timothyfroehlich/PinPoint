@@ -155,7 +155,7 @@ export function CreateMachineForm({
         <div
           className={cn(
             "mb-6 rounded-md border p-4",
-            "border-destructive/20 bg-destructive/10 text-destructive"
+            "border-destructive/20 bg-destructive/10 text-destructive-text"
           )}
         >
           <p className="text-sm font-medium">{state.message}</p>
