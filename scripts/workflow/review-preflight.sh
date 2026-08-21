@@ -156,6 +156,11 @@ elif [[ "$(git rev-parse "$base")" != "$(git rev-parse "origin/${base}")" ]]; th
   # work, which is the same "the review was not about this PR" failure the wrong-directory
   # check exists to catch, just quieter. Measured on PR #1931: 34 files / 1138 lines
   # against a `main` 5 commits stale, versus the PR's actual 22 / 856.
+  #
+  # This blocks rather than fixes. PP-e74d is the fix: have `merge-pr.sh` fast-forward
+  # the root checkout's `main` after each merge, so it is level by default. Keep this
+  # check regardless — it covers the window between merges and drift from any other
+  # cause.
   behind=$(git rev-list --count "${base}..origin/${base}")
   holder=$(_worktree_holding "$base")
   if [[ -n "$holder" ]]; then

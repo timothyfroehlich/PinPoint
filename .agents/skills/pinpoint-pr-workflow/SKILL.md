@@ -109,6 +109,16 @@ Then wait. This is a real stop — don't fill the time with more commits, becaus
 
 **When Tim types `/codex:review`, pick foreground vs background yourself — don't ask.** The plugin's command file instructs you to settle it with `AskUserQuestion`. Tim's global `CLAUDE.md` forbids that tool outright: interrupting the picker to type something returns a _fabricated_ answer, reporting whichever option was labelled "(Recommended)" as his choice. So use the plugin's own heuristic instead — foreground only when the diff is roughly 1–2 files with no sign of a directory-sized change, background in every other case including unclear size — and say in one line which you picked and why. This is an operational call, not one of the taste decisions §6 reserves for him (Tim, 2026-08-20).
 
+**The Bash call behind it is subject to the same intermittent classifier block as
+`mark-review.sh`.** `/codex:review` expands into an instruction for you to run
+`node …/codex-companion.mjs review`, so the review does execute through your Bash tool
+— the `disable-model-invocation` flag only stops you invoking the _slash command_. On
+2026-08-21 that node call was refused with `Blocked by classifier` after succeeding
+twice earlier in the same session. There is no allow rule for it, because the path
+lives outside the repo in the plugin cache and would have to go in Tim's global
+settings. If it is denied, say so and ask him to type the command again; do not
+hand-roll the node invocation to get around it.
+
 4. Address the findings: fix → push → and note that head has moved (see below). Consciously decline the rest, with a reason. **A review that found nothing worth fixing skips straight to step 5** — there is no push, so head is already the SHA he read.
 5. Attest the head he reviewed — **this step is yours, always, and it is the only thing that satisfies the gate.** A clean review with an unposted marker reads to `merge-pr.sh` as `unreviewed`, so the review Tim ran buys nothing until you post it:
 
@@ -150,21 +160,31 @@ This is a narrow exception and it is self-policing. "It's only a small change" i
 
 **The marker attests that a review actually happened.** Posting it otherwise is a false attestation, not a shortcut — the same honesty model as `merge-pr.sh --force`.
 
-#### Why the marker command carries a permission allow rule
+#### Why the review-handoff commands carry permission allow rules
 
-`.claude/settings.json` has one `permissions.allow` entry, and it is this script:
+`.claude/settings.json` has two `permissions.allow` entries, and they are the two
+scripts in this phase:
 
 ```json
-"allow": ["Bash(bash scripts/workflow/mark-review.sh *)"]
+"allow": [
+  "Bash(bash scripts/workflow/mark-review.sh *)",
+  "Bash(bash scripts/workflow/review-preflight.sh *)"
+]
 ```
 
-It is there because the command was intermittently denied. On 2026-08-03 an auto-mode session was refused with `Blocked by classifier` on PR #1815, while the same command succeeded four times across 2026-08-09/10 (PRs #1832, #1828, #1829, #1848). The block was contextual, not a standing rule — which is the worst shape for a required step, because it fails only sometimes and leaves the PR sitting at `unreviewed` with no path forward. A background subagent has no human to hand the command to at all. Rules are evaluated deny → ask → allow, and an explicit allow resolves the call before the classifier is consulted, so the entry makes the step deterministic. (PP-yx97. A new tool permission needs Tim's explicit approval each time; he gave it on 2026-08-11. This is not a CORE-SEC-010 surface — that rule governs prod-mutating Supabase tools, and its ban on `allow` applies to those.)
+`review-preflight.sh` is read-only and is now mandated before every review handoff by
+AGENTS.md, `CLAUDE.md`, `REVIEW.md` and `_review_remedy` — so without the rule, a step
+that runs on every PR raises a prompt every time for a script that only reads. (Tim
+approved it on 2026-08-21, from the `/code-review medium` finding on #1931.)
+
+The `mark-review.sh` entry is there for a sharper reason: the command was intermittently
+denied. On 2026-08-03 an auto-mode session was refused with `Blocked by classifier` on PR #1815, while the same command succeeded four times across 2026-08-09/10 (PRs #1832, #1828, #1829, #1848). The block was contextual, not a standing rule — which is the worst shape for a required step, because it fails only sometimes and leaves the PR sitting at `unreviewed` with no path forward. A background subagent has no human to hand the command to at all. Rules are evaluated deny → ask → allow, and an explicit allow resolves the call before the classifier is consulted, so the entry makes the step deterministic. (PP-yx97. A new tool permission needs Tim's explicit approval each time; he gave it on 2026-08-11. This is not a CORE-SEC-010 surface — that rule governs prod-mutating Supabase tools, and its ban on `allow` applies to those.)
 
 **What the rule does not do is make the attestation true.** It removes the harness's opinion about whether you earned the marker, which means your own judgement is now the only thing standing between a false attestation and the merge gate. The honesty model above is not softened by the allow rule; it is the entire remaining check. The merge decision stays Tim's regardless (PP-wi85) — even when an agent runs `merge-pr.sh`, the hook prompts him to approve — so a marker you should not have posted misleads Tim into approving rather than merging anything by itself. That is a smaller failure, not a harmless one: his approval at the prompt is the last backstop, and a false marker is exactly what erodes it.
 
 Two limits worth knowing:
 
-- The rule matches the documented invocation, `bash scripts/workflow/mark-review.sh …`, and only that shape. **Use the relative path** — an absolute one does not match and falls through to the classifier. Don't count on `normalize-workspace-paths.cjs` to rescue it: its rewrite regex is hardcoded to `/home/froeht/Code/…`, so it never fires on this Mac (`/Users/froeht/Code/PinPoint`), and its `pinpoint-worktrees/` alternative predates the current `.claude/worktrees/<branch>/` layout. Chaining (`… && something-else`) does not inherit the allow either — each subcommand is matched on its own.
+- Each rule matches the documented invocation — `bash scripts/workflow/<script> …` — and only that shape. **Use the relative path** — an absolute one does not match and falls through to the classifier. Don't count on `normalize-workspace-paths.cjs` to rescue it: its rewrite regex is hardcoded to `/home/froeht/Code/…`, so it never fires on this Mac (`/Users/froeht/Code/PinPoint`), and its `pinpoint-worktrees/` alternative predates the current `.claude/worktrees/<branch>/` layout. Chaining (`… && something-else`) does not inherit the allow either — each subcommand is matched on its own.
 - A summary string containing an unbalanced quote makes the whole command unresolvable to `block-direct-merge.cjs`, which then scans the raw text and blocks on `merge-pr.sh` or `pr merge`. Rare, and it fails closed. Fix the quoting rather than working around it.
 
 #### Readiness is not review
