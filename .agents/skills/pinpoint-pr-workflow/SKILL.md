@@ -105,6 +105,8 @@ So getting reviewed is still a handoff, for a different reason than before. The 
 
    Then wait. This is a real stop — don't fill the time with more commits, because every push invalidates the review he is about to give you.
 
+   **When Tim types the command, pick foreground vs background yourself — don't ask.** The plugin's command file instructs you to settle it with `AskUserQuestion`. Tim's global `CLAUDE.md` forbids that tool outright: interrupting the picker to type something returns a _fabricated_ answer, reporting whichever option was labelled "(Recommended)" as his choice. So use the plugin's own heuristic instead — foreground only when the diff is roughly 1–2 files with no sign of a directory-sized change, background in every other case including unclear size — and say in one line which you picked and why. This is an operational call, not one of the taste decisions §6 reserves for him (Tim, 2026-08-20).
+
 4. Address the findings: fix → push → and note that head has moved (see below). Consciously decline the rest, with a reason. **A review that found nothing worth fixing skips straight to step 5** — there is no push, so head is already the SHA he read.
 5. Attest the head he reviewed — **this step is yours, always, and it is the only thing that satisfies the gate.** A clean review with an unposted marker reads to `merge-pr.sh` as `unreviewed`, so the review Tim ran buys nothing until you post it:
 
