@@ -82,10 +82,34 @@ if [[ $# -gt 1 ]]; then
   exit 2
 fi
 
-read -r head_branch head_oid pr_state base_branch <<<"$(
-  gh pr view "$pr" --json headRefName,headRefOid,state,baseRefName \
-    --jq '[.headRefName, .headRefOid, .state, .baseRefName] | @tsv' | tr '\t' ' '
-)"
+# Capture the `gh` call into a variable and check it, rather than reading a command
+# substitution straight into a here-string. `set -e` does NOT abort on a failing
+# substitution used that way (verified), so the earlier shape let a rate-limited,
+# unauthenticated, or wrong-PR-number `gh` leave all four variables EMPTY and carry on.
+# The script then printed four confident, wrong diagnoses — `PR #N is , not open`,
+# `targets '', not 'main'`, `no worktree has it checked out`, and a bogus pushed-head
+# mismatch — and never mentioned that the API call was what failed. It still failed
+# closed, so nothing unsafe got through; the cost was handing the reader four false
+# leads instead of the one true one. A preflight that exists to stop people acting on
+# a wrong picture of the world has no business generating one of its own.
+if ! pr_tsv=$(gh pr view "$pr" --json headRefName,headRefOid,state,baseRefName \
+      --jq '[.headRefName, .headRefOid, .state, .baseRefName] | @tsv' 2>/dev/null) \
+   || [[ -z "$pr_tsv" ]]; then
+  echo
+  echo "Review preflight — PR #${pr}"
+  echo "  ────────────────────────────────────────────────────────────────────────"
+  echo "  NOT READY — could not read PR #${pr} from GitHub."
+  echo "    'gh pr view' failed or returned nothing. Check the PR number, 'gh auth status',"
+  echo "    and network reachability, then re-run."
+  echo "  ────────────────────────────────────────────────────────────────────────"
+  echo
+  exit 1
+fi
+
+# Tab-to-space via parameter expansion rather than a `tr` pipe — one less spawn, and it
+# keeps the failure check above attached to `gh` alone instead of to a pipeline whose
+# exit status could come from `tr`.
+read -r head_branch head_oid pr_state base_branch <<<"${pr_tsv//$'\t'/ }"
 
 local_branch=$(git rev-parse --abbrev-ref HEAD)
 local_head=$(git rev-parse HEAD)
@@ -163,9 +187,19 @@ elif [[ "$(git rev-parse "$base")" != "$(git rev-parse "origin/${base}")" ]]; th
   # cause.
   behind=$(git rev-list --count "${base}..origin/${base}")
   holder=$(_worktree_holding "$base")
-  if [[ -n "$holder" ]]; then
-    # A branch checked out elsewhere cannot be fast-forwarded from here — `git fetch
-    # origin main:main` refuses outright — so the remedy has to name that worktree.
+  if [[ -z "$holder" ]]; then
+    # Nothing has `main` checked out, so it is an ordinary ref and can be advanced from
+    # right here.
+    remedy="git fetch origin ${base}:${base}"
+  elif [[ "$holder" == "$toplevel" ]]; then
+    # THIS worktree is the one holding `main` — reached when the preflight runs from the
+    # root checkout against some other branch's PR. The cross-directory form below would
+    # tell the reader to go elsewhere to run a command that works where they already are,
+    # which is the opposite of what that branch is for.
+    remedy="git pull --ff-only"
+  else
+    # A branch checked out in ANOTHER worktree cannot be fast-forwarded from here — `git
+    # fetch origin main:main` refuses outright — so the remedy has to name that worktree.
     #
     # And a worktree-isolated agent session cannot run it at all: Claude Code refuses
     # `git -C <other-checkout>` the same way it refuses `cd <other> && git ...`. The
@@ -173,8 +207,6 @@ elif [[ "$(git rev-parse "$base")" != "$(git rev-parse "origin/${base}")" ]]; th
     # says where to run it rather than pretending it is copy-pasteable from here.
     # (PP-e74d is the real fix: have `merge-pr.sh` do this itself after each merge.)
     remedy="git -C ${holder} pull --ff-only   (from a terminal outside this session)"
-  else
-    remedy="git fetch origin ${base}:${base}"
   fi
   if ((behind > 0)); then
     blocking+=("local '${base}' is ${behind} commit(s) behind 'origin/${base}' — the review would cover already-merged work; run: ${remedy}")

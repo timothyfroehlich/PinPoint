@@ -60,6 +60,7 @@ def preflight(
     state: str = "OPEN",
     base_branch: str = "main",
     stale_base: bool = False,
+    gh_fails: bool = False,
 ) -> Iterator[subprocess.CompletedProcess[str]]:
     """Run the preflight against a repo built to the described shape.
 
@@ -114,12 +115,21 @@ def preflight(
         }
         (tmp_path / "meta.json").write_text(json.dumps(meta))
 
+        # `gh_fails` mimics the real failure shape, which is what makes the test worth
+        # having: `gh` writes its diagnostic to stderr, prints NOTHING on stdout, and
+        # exits non-zero — the same as a rate limit, an expired token, or a PR number
+        # that does not exist.
+        pr_view_body = (
+            'printf "gh: could not resolve to a PullRequest\\n" >&2; exit 1'
+            if gh_fails
+            else 'jq -r "[.headRefName, .headRefOid, .state, .baseRefName] | @tsv" "$STUB_META"'
+        )
         gh_stub = tmp_path / "gh"
         gh_stub.write_text(
             "#!/usr/bin/env bash\n"
             'args="$*"\n'
             'case "$args" in\n'
-            '  *"pr view"*) jq -r "[.headRefName, .headRefOid, .state, .baseRefName] | @tsv" "$STUB_META" ;;\n'
+            f'  *"pr view"*) {pr_view_body} ;;\n'
             '  *) printf "UNEXPECTED gh call: %s\\n" "$args" >&2; exit 1 ;;\n'
             "esac\n"
         )
@@ -338,6 +348,46 @@ def test_a_stale_local_main_blocks_and_names_the_worktree_to_fix_it() -> None:
         # A branch checked out in another worktree cannot be fast-forwarded from here, so
         # the remedy has to name a directory rather than print a bare fetch.
         assert "pull --ff-only" in run.stdout or "fetch origin main:main" in run.stdout
+
+
+def test_the_stale_base_remedy_stays_local_when_this_worktree_holds_main() -> None:
+    """Don't send the reader elsewhere to run a command that works right here.
+
+    The cross-directory form exists because a branch checked out in ANOTHER worktree
+    cannot be fast-forwarded from here. When the holder is this very directory — the
+    shape you get running the preflight from the root checkout, which AGENTS.md 2.2.5
+    keeps on `main`, against some other branch's PR — that reasoning inverts and the
+    advice becomes actively wrong.
+    """
+    with preflight(on_branch=False, stale_base=True) as run:
+        assert run.returncode == 1, run.stdout
+        assert "behind 'origin/main'" in run.stdout, run.stdout
+        assert "git pull --ff-only" in run.stdout, run.stdout
+        assert "from a terminal outside this session" not in run.stdout, run.stdout
+        assert "git -C " not in run.stdout, run.stdout
+
+
+def test_a_failing_gh_is_reported_as_a_failing_gh() -> None:
+    """One honest message beats four confident wrong ones.
+
+    `set -e` does not abort on a failing command substitution consumed by a here-string,
+    so reading `gh` straight into `read -r a b c d` left every variable EMPTY and carried
+    on. The script then derived four separate blocking reasons from that emptiness — the
+    PR is "" not open, it targets "" not main, no worktree holds "", and the pushed head
+    doesn't match — none of which name the actual problem.
+
+    Failing closed was never the issue; the diagnosis was. A tool whose entire job is to
+    stop people acting on a wrong picture of the world must not manufacture one.
+    """
+    with preflight(gh_fails=True) as run:
+        assert run.returncode == 1, run.stdout
+        assert "could not read PR" in run.stdout, run.stdout
+        assert "gh auth status" in run.stdout, run.stdout
+        # None of the four bogus diagnoses the old shape produced.
+        assert "not open" not in run.stdout, run.stdout
+        assert "targets" not in run.stdout, run.stdout
+        assert "no worktree has it checked out" not in run.stdout, run.stdout
+        assert "is not the pushed head" not in run.stdout, run.stdout
 
 
 def test_a_pr_based_on_another_branch_is_refused() -> None:
