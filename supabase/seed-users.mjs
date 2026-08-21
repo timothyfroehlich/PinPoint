@@ -238,17 +238,17 @@ async function seedUsersAndData() {
     const machines = Object.values(machinesData);
 
     // Machine ownership distribution:
-    // Admin: Humpty Dumpty, Black Knight, Medieval Madness, Godzilla
-    // Member: Slick Chick, Eight Ball Deluxe, Attack from Mars, Fireball, Spider-Man
+    // Admin: Humpty Dumpty, Black Knight, Medieval Madness, Godzilla, Godzilla (GDZ3)
+    // Member: Slick Chick, Eight Ball Deluxe, Attack from Mars, Hyperball, Spider-Man, Godzilla (GDZ2)
     // Invited: The Addams Family
     //
-    // Note: Fireball (FB) and Spider-Man (SM) were previously owned by the guest user.
+    // Note: Hyperball (HB) and Spider-Man (SM) were previously owned by the guest user.
     // They are now assigned to the member user because machine owners must be member+
     // (enforced by the DB trigger from migration 0027_machine_owner_member_invariant).
     const ownerMap = {
       HD: userIds.admin,
       SC: userIds.member,
-      FB: userIds.member,
+      HB: userIds.member,
       BK: userIds.admin,
       EBD: userIds.member,
       TAF: null, // Will use invited owner
@@ -256,6 +256,8 @@ async function seedUsersAndData() {
       MM: userIds.admin,
       SM: userIds.member,
       GDZ: userIds.admin,
+      GDZ2: userIds.member,
+      GDZ3: userIds.admin,
     };
 
     for (const machine of machines) {
@@ -287,11 +289,29 @@ async function seedUsersAndData() {
       SET owner_requirements = ${wrapTextInProseMirror("Check the bridge lock opto alignment before opening the building assembly. Document any broken plastics with a photo.")}
       WHERE initials = 'GDZ'
     `;
-    await sql`
-      UPDATE machines
-      SET description = ${wrapTextInProseMirror("Bally 1995 DMD-era classic — blow up the mothership, rescue the cows, and save the planets across a fast, flowing layout. On free play; the left-ramp diverter can stick now and then, so give it a firm, committed shot.")}
-      WHERE initials = 'AFM'
-    `;
+    // Machine descriptions — one paragraph each: real game facts plus a bit of
+    // cabinet texture, in the club's own voice. Keyed by initials, so the three
+    // Godzilla cabinets (GDZ / GDZ2 / GDZ3) each read as their own machine.
+    const machineDescriptions = {
+      HD: "Gottlieb's October 1947 release started it all — Harry Mabs' six outward-facing flippers, mounted mid-playfield rather than at the bottom, gave players control over the ball for the first time in pinball history. Ten bumpers and a pair of kick-out holes round out the nursery-rhyme playfield. On free play; the electromechanical relays are original-era, so expect an honest clack and the odd stuck coil that clears with a gentle nudge.",
+      SC: "This 1963 Gottlieb wedgehead is a single-player electromechanical woodrail from the twilight of the two-flipper era, its pin-up-styled backglass and five pop bumpers backed by a gobble hole that swallows the ball for a bonus. Spelling out S-L-I-C-K C-H-I-C-K on the rollovers lights the specials. On free play; the woodrail cabinet shows honest handling wear, and the leg levelers need periodic re-snugging to keep the pitch true.",
+      BK: "Williams' 1980 Steve Ritchie design was a turning point for solid-state pinball: the first two-level playfield, the patented Magna-Save that lets players rescue a ball from the outlane with a button press, and synthesized speech taunting \"I am the Black Knight!\" True multiball rounds out the package. On free play; the upper playfield's ball troughs collect dust, so plan an occasional blow-out with compressed air.",
+      EBD: "Bally's 1981 sequel to the EM-era Eight Ball trades relays for solid-state electronics and adds voice synthesis, its pool-hall callouts novel for their time. Twelve drop targets across two banks carry the theme through combo shots and bonus building. On free play; the speech board's original chip is showing its age, so the callouts occasionally slur before clearing up.",
+      TAF: "Pat Lawlor's 1992 design for Bally remains the best-selling solid-state pinball ever built, with more than 20,000 units sold. The animatronic Thing's hand reaches from a mailbox to capture the ball and launch multiball, while the bookcase target bank and film dialogue from Raul Julia and Anjelica Huston tie the ruleset to the movie. On free play; Thing's hand grip loosens with heavy play, so it gets a spring check each season.",
+      AFM: "Bally 1995 DMD-era classic — blow up the mothership, rescue the cows, and save the planets across a fast, flowing layout. On free play; the left-ramp diverter can stick now and then, so give it a firm, committed shot.",
+      MM: 'Brian Eddy\'s 1997 widebody for Williams centers on a motorized castle whose towers "explode" and drawbridge drops as players catapult balls into it, building toward the four-ball Battle for the Kingdom multiball; a pair of pop-up troll heads add a satisfying target to bash between shots. On free play; the castle mechanism sees heavy use, so the gate motor gets a lubrication check every few months.',
+      SM: "Stern's 2016 Vault Edition reissues Steve Ritchie and Lyman Sheats' 2007 design, drawing its villain lineup from the Sam Raimi film trilogy: Doc Ock's magnet grabs the ball for a simulated \"fusion malfunction,\" the Green Goblin hovers over pumpkin-bomb targets, and Sandman's whirlwind of standup targets rounds out the rogues' gallery. On free play; the Doc Ock magnet's hold time can drift, so it gets recalibrated during routine maintenance.",
+      GDZ: "Keith Elwin's 2021 Stern design pits Godzilla against Mechagodzilla around a motorized, collapsing skyscraper bash toy and the debut of Magna Grab, a magnetic ball lock that releases the ball back into play on the player's cue. Stern's Insider Connected system layers online leaderboards and remote tournaments onto the ruleset. On free play; the building's collapse mechanism gets a monthly check to keep the motor timing crisp.",
+      GDZ2: "Keith Elwin's 2021 Stern design pits Godzilla against Mechagodzilla around a motorized, collapsing skyscraper bash toy and the debut of Magna Grab, a magnetic ball lock that releases the ball on the player's cue. This is the club's second cabinet, acquired newer than the original. On free play; its playfield glass rides looser in the channel than cabinet one's, so reseat it after opening the coin door.",
+      GDZ3: "Keith Elwin's 2021 Stern design pits Godzilla against Mechagodzilla around a motorized, collapsing skyscraper bash toy and the debut of Magna Grab, a magnetic ball lock that releases the ball on the player's cue. This is the club's third cabinet, added most recently to cover demand at busy tournament nights. On free play; the right ramp's diverter solenoid runs warm after long sessions, so give it a cooldown between back-to-back games.",
+      HB: "Williams' 1981 Steve Ritchie curiosity has no flippers at all — a hyper-cannon rapid-fires steel balls up the playfield at targets as fast as you can trigger it, pure volume-and-speed scoring rather than shot-making. Roughly 5,000 were built before the mechanical strain proved too much for most operators. On free play; the ball-return auger backs up under heavy play, so give it a moment to clear between games.",
+    };
+    for (const [initials, text] of Object.entries(machineDescriptions)) {
+      await sql`
+        UPDATE machines SET description = ${wrapTextInProseMirror(text)}
+        WHERE initials = ${initials}
+      `;
+    }
     console.log("✅ Machines seeded with distributed ownership.");
 
     // 3. Seed Issues (18 issues with comprehensive permutations)
@@ -337,13 +357,13 @@ async function seedUsersAndData() {
         reporterName: "Vintage Collector",
         reporterEmail: "collector@pinball.com",
       },
-      // FB (Fireball) - 1972
+      // HB (Hyperball) - 1981
       {
         id: "10000000-0000-4000-8000-000000000004",
-        initials: "FB",
+        initials: "HB",
         num: 1,
-        title: "Zipper flippers intermittent (with photo)",
-        desc: "The famous zipper flippers sometimes fail to activate when the ball rolls over them.",
+        title: "Ball cannon fires intermittently (with photo)",
+        desc: "The hyper-cannon sometimes fails to launch when triggered, stalling play until the feed clears and re-arms.",
         status: "confirmed",
         severity: "major",
         priority: "high",
@@ -352,7 +372,7 @@ async function seedUsersAndData() {
       },
       {
         id: "10000000-0000-4000-8000-000000000005",
-        initials: "FB",
+        initials: "HB",
         num: 2,
         title: "Backglass art fading",
         desc: "UV damage to backglass.",
@@ -577,7 +597,7 @@ async function seedUsersAndData() {
     // Update next issue numbers for all machines
     await sql`UPDATE machines SET next_issue_number = 3 WHERE initials = 'HD'`;
     await sql`UPDATE machines SET next_issue_number = 2 WHERE initials = 'SC'`;
-    await sql`UPDATE machines SET next_issue_number = 3 WHERE initials = 'FB'`;
+    await sql`UPDATE machines SET next_issue_number = 3 WHERE initials = 'HB'`;
     await sql`UPDATE machines SET next_issue_number = 3 WHERE initials = 'BK'`;
     await sql`UPDATE machines SET next_issue_number = 3 WHERE initials = 'EBD'`;
     await sql`UPDATE machines SET next_issue_number = 4 WHERE initials = 'TAF'`;
@@ -620,12 +640,12 @@ async function seedUsersAndData() {
             daysAgo: 1,
           },
         ],
-        // FB-01: Multiple comments showing active discussion
+        // HB-01: Multiple comments showing active discussion
         "10000000-0000-4000-8000-000000000004": [
           {
             author: userIds.admin,
             content:
-              "This is a known issue with Fireball. The zipper flippers use a complex relay system.",
+              "Known Hyperball quirk — the cannon feed auger jams when it gets dusty, so the launch misses.",
             isSystem: false,
             daysAgo: 5,
           },
@@ -638,7 +658,8 @@ async function seedUsersAndData() {
           },
           {
             author: userIds.member,
-            content: "I can take a look at the relay board this weekend.",
+            content:
+              "I can pull the cannon assembly and clean the feed this weekend.",
             isSystem: false,
             daysAgo: 2,
           },
@@ -806,7 +827,7 @@ async function seedUsersAndData() {
 
     const imageSeeds = [
       {
-        issueId: "10000000-0000-4000-8000-000000000004", // FB-01 (Fireball zipper flippers)
+        issueId: "10000000-0000-4000-8000-000000000004", // HB-01 (Hyperball cannon feed)
         uploadedBy: userIds.guest,
         filename: "impossible-flipper-loop.png",
         sizeBytes: 761755,
