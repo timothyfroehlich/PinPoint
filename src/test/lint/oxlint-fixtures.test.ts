@@ -5,6 +5,8 @@ import { promisify } from "node:util";
 
 import { describe, expect, it } from "vitest";
 
+import { RESTRICTED_DISABLE_PATTERNS } from "../../../eslint-rules/no-restricted-disable-directives.mjs";
+
 /**
  * Fixture harness for the rules oxlint runs through its JS-plugin API
  * (`jsPlugins` in `.oxlintrc.json`).
@@ -129,6 +131,11 @@ describe("oxlint jsPlugins fixtures", () => {
       new Set([
         "pinpoint/no-side-effects-in-transaction",
         "pinpoint/server-action-file-naming",
+        "pinpoint/no-restricted-disable-directives",
+        // Native, not a jsPlugin — but it is the rule that actually enforces
+        // the blanket-disable ban (see the directive-governance block below),
+        // so a config that lost it should fail here too.
+        "unicorn/no-abusive-eslint-disable",
         "better-tailwindcss/no-restricted-classes",
       ])
     );
@@ -173,5 +180,67 @@ describe("oxlint jsPlugins fixtures", () => {
     const findings = await findingsPromise;
     expect(forFile(findings, "clean-actions.ts")).toStrictEqual([]);
     expect(forFile(findings, "clean-tokens.tsx")).toStrictEqual([]);
+  });
+});
+
+/**
+ * Directive governance — the CORE-TS-007 enforcement teeth (PP-8k07).
+ *
+ * This is the rule that makes CORE-TS-007 a gate rather than a
+ * recommendation, and Phase 4 of the oxlint-only migration deletes ESLint (and
+ * with it `eslint-comments/no-restricted-disable`) on the strength of it. So it
+ * gets asserted case by case rather than in aggregate: a regression here is a
+ * silently open door to `any`, not a lint nit.
+ */
+describe("oxlint directive governance", () => {
+  const findingsPromise = runOxlint();
+
+  it("bans a restricted disable under every prefix and namespace it can wear", async () => {
+    const found = forFile(await findingsPromise, "restricted-disable.ts");
+    expect(
+      found.map((f) => ({ ruleId: f.ruleId, line: f.line }))
+    ).toStrictEqual([
+      // `oxlint-` prefix, oxlint's own `typescript/` namespace
+      { ruleId: "pinpoint/no-restricted-disable-directives", line: 7 },
+      // `eslint-` prefix, typescript-eslint's `@typescript-eslint/` namespace
+      { ruleId: "pinpoint/no-restricted-disable-directives", line: 10 },
+      // bare rule name, `no-unsafe-*` family
+      { ruleId: "pinpoint/no-restricted-disable-directives", line: 13 },
+      // restricted rule hiding in a comma-separated list
+      { ruleId: "pinpoint/no-restricted-disable-directives", line: 16 },
+      // disabling this rule to smuggle the next line past it
+      { ruleId: "pinpoint/no-restricted-disable-directives", line: 31 },
+    ]);
+    expect(found[0]?.message).toContain("CORE-TS-007");
+  });
+
+  it("exercises every pattern the rule actually enforces", async () => {
+    // Guards the list against growing a pattern with no fixture behind it: the
+    // rule's own export is the source of truth, not a copy in this file.
+    const reportedNames = forFile(
+      await findingsPromise,
+      "restricted-disable.ts"
+    ).map((f) => /'([^']+)'/.exec(f.message)?.[1] ?? "");
+
+    for (const pattern of RESTRICTED_DISABLE_PATTERNS) {
+      expect(
+        reportedNames.some((name) => pattern.test(name)),
+        `no fixture case covers ${pattern.source}`
+      ).toBe(true);
+    }
+  });
+
+  it("bans a blanket disable via the native rule (a jsPlugin cannot see one)", async () => {
+    // A blanket disable suppresses every jsPlugin diagnostic in the file,
+    // including the one `pinpoint/no-restricted-disable-directives` would
+    // report on the directive itself. `unicorn/no-abusive-eslint-disable` is
+    // exempt from that suppression, which is why it is the enforcing rule and
+    // why this assertion names it.
+    expect(
+      forFile(await findingsPromise, "blanket-disable.ts").map((f) => ({
+        ruleId: f.ruleId,
+        line: f.line,
+      }))
+    ).toStrictEqual([{ ruleId: "unicorn/no-abusive-eslint-disable", line: 1 }]);
   });
 });

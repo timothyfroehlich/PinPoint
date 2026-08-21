@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["typescript"],
+  "plugins": ["typescript", "unicorn"],
   "jsPlugins": [
     "./eslint-rules/pinpoint-plugin.mjs",
     "eslint-plugin-better-tailwindcss"
@@ -33,6 +33,8 @@
     "src/components/mockups/**"
   ],
   "rules": {
+    "pinpoint/no-restricted-disable-directives": "error",
+    "unicorn/no-abusive-eslint-disable": "error",
     "constructor-super": "error",
     "for-direction": "error",
     "getter-return": "error",
@@ -242,7 +244,8 @@
         "typescript/no-unsafe-return": "off",
         "typescript/no-unsafe-argument": "off",
         "typescript/unbound-method": "off",
-        "typescript/no-unnecessary-condition": "off"
+        "typescript/no-unnecessary-condition": "off",
+        "pinpoint/no-restricted-disable-directives": "off"
       },
       "plugins": ["typescript"]
     },
@@ -268,7 +271,8 @@
             "message": "Use Playwright assertions (auto-wait) instead of waitForTimeout"
           }
         ],
-        "typescript/no-unnecessary-condition": "off"
+        "typescript/no-unnecessary-condition": "off",
+        "pinpoint/no-restricted-disable-directives": "off"
       },
       "plugins": ["typescript"]
     },
@@ -283,7 +287,8 @@
       "rules": {
         "no-restricted-imports": "off",
         "typescript/no-explicit-any": "off",
-        "typescript/explicit-function-return-type": "off"
+        "typescript/explicit-function-return-type": "off",
+        "pinpoint/no-restricted-disable-directives": "off"
       },
       "plugins": ["typescript"]
     },
