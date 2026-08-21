@@ -166,7 +166,13 @@ elif [[ "$(git rev-parse "$base")" != "$(git rev-parse "origin/${base}")" ]]; th
   if [[ -n "$holder" ]]; then
     # A branch checked out elsewhere cannot be fast-forwarded from here — `git fetch
     # origin main:main` refuses outright — so the remedy has to name that worktree.
-    remedy="git -C ${holder} pull --ff-only"
+    #
+    # And a worktree-isolated agent session cannot run it at all: Claude Code refuses
+    # `git -C <other-checkout>` the same way it refuses `cd <other> && git ...`. The
+    # `!` prefix does not help, because that runs in the session too. So the remedy
+    # says where to run it rather than pretending it is copy-pasteable from here.
+    # (PP-e74d is the real fix: have `merge-pr.sh` do this itself after each merge.)
+    remedy="git -C ${holder} pull --ff-only   (from a terminal outside this session)"
   else
     remedy="git fetch origin ${base}:${base}"
   fi
