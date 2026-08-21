@@ -2,6 +2,8 @@ import pino from "pino";
 import { mkdirSync } from "fs";
 import { join } from "path";
 
+import { maskEmail } from "~/lib/logging/mask";
+
 const LOG_LEVEL = process.env["LOG_LEVEL"] ?? "info";
 const DEFAULT_LOG_ROOT = join(process.cwd(), "logs");
 
@@ -29,8 +31,9 @@ const DEFAULT_LOG_ROOT = join(process.cwd(), "logs");
  *
  * **What a key list cannot catch**: an address embedded in a *value*. A mail
  * provider send failure carries the recipient in its `message`, `stack`,
- * `rejected` and `envelope.to`, and reaches the log raw through `reportError`'s
- * `err` serializer. That needs a serializer, not more key names — PP-45qx.
+ * `rejected`, `envelope.to` and `response`, none under an email-named key. Those are masked
+ * by the `err` serializer below ({@link maskingErrSerializer}) — a serializer,
+ * not more key names, because the address is a value (PP-45qx).
  */
 const EMAIL_LOG_KEYS = [
   "email",
@@ -74,6 +77,83 @@ const EMAIL_REDACT_PATHS: string[] = Array.from(
 ).flatMap((prefix) => EMAIL_LOG_KEYS.map((key) => `${prefix}${key}`));
 
 /**
+ * Matches an email address embedded anywhere in a string.
+ *
+ * Delimiter-based rather than an allowlist of address characters: the runs on
+ * either side of the `@` are "any run of characters that cannot delimit an
+ * address" (no whitespace, quotes, brackets, or the punctuation that frames one
+ * in error text). The `u` flag makes those runs match by code point, so an
+ * internationalised domain (`user@exämple.com`) is caught too — an ASCII-only
+ * class would stop at the first non-ASCII byte and leak the whole address. Both
+ * a bare `a@b.com` and one wrapped in SMTP punctuation (`550 <a@b.com> unknown`)
+ * yield exactly the address, with no surrounding text swept in.
+ *
+ * Known gap: a quoted local part containing whitespace (`"john doe"@x.com`, a
+ * rare RFC 5321 shape mail providers normalise or reject) breaks the run before
+ * the `@` and is not matched. Widening the class to admit it would over-mask
+ * ordinary log prose, and no real recipient address takes that form.
+ */
+const EMBEDDED_EMAIL_RE =
+  /[^\s"'<>()[\],;:@]+@[^\s"'<>()[\],;:@]+\.[^\s"'<>()[\],;:@]+/gu;
+
+/** Replace every email-like substring of `value` with its {@link maskEmail} form. */
+function maskEmailsInText(value: string): string {
+  return value.replace(EMBEDDED_EMAIL_RE, (match) => maskEmail(match));
+}
+
+/**
+ * Mask email addresses in the string values of an already-serialized error,
+ * in place.
+ *
+ * The key-based {@link EMAIL_REDACT_PATHS} redaction cannot reach an address
+ * that lives in a *value* rather than under an email-named key. A mail-provider
+ * send failure carries the recipient exactly there — in `message`, `stack`,
+ * `rejected`, `envelope.to` and `response` — so without this the raw address
+ * reaches the log through `reportError`'s `err` serializer (PP-45qx). Masking
+ * the substrings keeps the diagnostic (`550 <vic***> unknown`) while dropping
+ * the address; it does not blank the error.
+ *
+ * Mutation is deliberate: `pino.stdSerializers.err` returns a fresh object per
+ * log call, and mutating string properties in place — rather than rebuilding
+ * from `Object.keys` — preserves the identity of the values it holds. A `Date`,
+ * `Buffer`, `Map` or class instance carried alongside the recipient survives
+ * untouched (a rebuild would flatten a `Date` to `{}`), as does the serializer's
+ * non-enumerable `raw` back-reference. Typed arrays hold bytes, never an
+ * address, so they are skipped outright. A `WeakSet` guards against a
+ * self-referential value cycling — there is no depth cap, so a string at any
+ * nesting is still masked.
+ */
+function maskEmailsDeep(value: unknown, seen: WeakSet<object>): unknown {
+  if (typeof value === "string") return maskEmailsInText(value);
+  if (value === null || typeof value !== "object") return value;
+  if (ArrayBuffer.isView(value)) return value;
+  if (seen.has(value)) return value;
+  seen.add(value);
+  if (Array.isArray(value)) {
+    const items = value as unknown[];
+    for (let i = 0; i < items.length; i += 1) {
+      items[i] = maskEmailsDeep(items[i], seen);
+    }
+    return value;
+  }
+  const record = value as Record<string, unknown>;
+  for (const key of Object.keys(record)) {
+    record[key] = maskEmailsDeep(record[key], seen);
+  }
+  return value;
+}
+
+/**
+ * Pino's `err` serializer, wrapped to also mask email addresses embedded in the
+ * serialized error's string values (see {@link maskEmailsDeep}). `stdSerializers.err`
+ * copies every own enumerable error property, so a provider send failure would
+ * otherwise carry the raw recipient into the log.
+ */
+function maskingErrSerializer(error: Error): unknown {
+  return maskEmailsDeep(pino.stdSerializers.err(error), new WeakSet<object>());
+}
+
+/**
  * Options shared by every logger instance. Exported so tests can exercise the
  * real redaction config against an in-memory stream rather than a copy of it.
  */
@@ -87,10 +167,12 @@ export const baseLoggerOptions: pino.LoggerOptions = {
       return { level: label };
     },
   },
-  // Pino's stdSerializers.err only fires for the `err` key. All call sites
-  // have been standardised to use `err` so this single mapping is sufficient.
+  // Pino's stdSerializers.err only fires for the `err` key. All call sites have
+  // been standardised to use `err`, so wrapping it here also catches addresses
+  // embedded in error values (message/stack/rejected/envelope.to/response) that
+  // the key-based redact list cannot reach (PP-45qx).
   serializers: {
-    err: pino.stdSerializers.err,
+    err: maskingErrSerializer,
   },
   timestamp: pino.stdTimeFunctions.isoTime,
 };
