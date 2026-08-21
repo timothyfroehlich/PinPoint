@@ -14,7 +14,7 @@ Usage: ./scripts/workflow/pr-watch.py [--check-ready | --force] [--verbose] <PR_
                  PR ready for human review right now?". The `review` line
                  is reported but is NOT part of the verdict: the whole
                  point of this mode is to decide whether the PR is worth
-                 `/codex:review --base main`, so requiring the review to have
+                 Tim's `/codex:review --base main`, so requiring the review to have
                  already happened would be circular. `merge-pr.sh`'s
                  `reviewed` gate is what refuses to merge an unreviewed
                  head.
@@ -71,7 +71,7 @@ REVIEW_MARKER_PREFIX = "<!-- pinpoint-review:"
 LEGACY_CLAUDE_MARKER_PREFIX = "<!-- pinpoint-claude-review:"
 
 REVIEW_HINT = (
-    "have Claude Code run /codex:review --base main, then attest with "
+    "ask Tim to run /codex:review --base main, then attest with "
     "scripts/workflow/mark-review.sh {pr} codex-plugin-cc base-main"
 )
 

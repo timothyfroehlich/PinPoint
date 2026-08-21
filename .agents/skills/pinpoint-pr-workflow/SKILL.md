@@ -1,6 +1,6 @@
 ---
 name: pinpoint-pr-workflow
-description: The PR-lifecycle decisions the scripts and gates do not state — why getting reviewed is a handoff (Claude Code runs `/codex:review --base main`) and why the SHA-pinned marker you post is the only thing that satisfies the `reviewed` gate, which pushes let you re-attest versus needing a fresh review, the narrow trivial-change exception, why the merge handoff is a script you run rather than a summary you write, the `--pages` screenshot gotchas, and the Dependabot back-to-back lockfile trap. Also the merge escape hatches (`--force`, `--bypass-merge-requirements`) and when each is and is not appropriate, what to do when `merge-pr.sh` itself is broken, and the GitHub MCP gotchas that silently do the wrong thing — snake_case field names, the pagination cap, label writes replacing the whole set rather than adding to it, `resolve_thread` ignoring owner/repo, and the thread-ID format. Use when committing, opening a PR, handing a branch to Claude Code for review, attesting a reviewed head, addressing review comments, posting screenshots, handing a PR over to merge, landing the plane after Tim merges, or when a GitHub MCP call does something you did not expect.
+description: The PR-lifecycle decisions the scripts and gates do not state — why getting reviewed is a handoff (Tim runs `/codex:review --base main`; the Codex plugin marks it `disable-model-invocation`, so an agent cannot) and why the SHA-pinned marker you post is the only thing that satisfies the `reviewed` gate, which pushes let you re-attest versus needing a fresh review, the narrow trivial-change exception, why the merge handoff is a script you run rather than a summary you write, the `--pages` screenshot gotchas, and the Dependabot back-to-back lockfile trap. Also the merge escape hatches (`--force`, `--bypass-merge-requirements`) and when each is and is not appropriate, what to do when `merge-pr.sh` itself is broken, and the GitHub MCP gotchas that silently do the wrong thing — snake_case field names, the pagination cap, label writes replacing the whole set rather than adding to it, `resolve_thread` ignoring owner/repo, and the thread-ID format. Use when committing, opening a PR, handing a branch to Tim for review, attesting a reviewed head, addressing review comments, posting screenshots, handing a PR over to merge, landing the plane after Tim merges, or when a GitHub MCP call does something you did not expect.
 ---
 
 # PinPoint PR Workflow
@@ -77,19 +77,23 @@ Fixing, declining with a one-sentence signed reply, and resolving the thread is 
 
 Every unresolved thread counts, whoever opened it — the `threads` gate is author-agnostic. Resolve or decline each one before moving on.
 
-### 3.4 Get the head commit reviewed — Claude Code runs Codex, you attest
+### 3.4 Get the head commit reviewed — Tim runs Codex, you attest
 
 **The merge bar has not moved: a PR cannot merge without a review covering the HEAD commit,** with all its threads resolved. Review is mandatory, not on-demand, not discretionary.
 
 **What changed on 2026-08-02 (PP-4ric) is who does it.** The bot reviewer this repo used was retired — its free tier was too small to review PinPoint's PRs, so quota outages were the normal state rather than the exception. No bot reviews this repo now, and there is nothing to request: a PR carries no pending reviewer, and any doc or habit that has you adding one is stale.
 
-The primary reviewer is **Codex, invoked by Claude Code with `/codex:review --base main`**. Claude is allowed to run that command itself, so the handoff is to Claude Code rather than to Tim. The command starts a real review; it does not make the marker true by itself. Read `/codex:result`, address every finding, then attest only the SHA Codex actually reviewed.
+The primary reviewer is **Codex, run by Tim typing `/codex:review --base main` in a Claude Code session**.
+
+**You cannot launch it yourself.** The Codex plugin declares `disable-model-invocation: true` on `review`, `adversarial-review`, `result`, and `status`, so none of those slash commands is model-invocable — not the review, and not the retrieval either. Tim types the command and pastes or leaves the result in the session; your job is to read it, fix what it found, and record it. (The plugin's underlying `codex-companion.mjs` is runnable from Bash, but that path is deliberately not the documented one — routing the review through Tim is what keeps the attestation witnessed by someone other than its author.)
+
+So getting reviewed is still a handoff, for a different reason than before. The command starts a real review; it does not make the marker true by itself. Address every finding, then attest only the SHA Codex actually reviewed.
 
 #### Sequencing
 
 1. Open the PR whenever you like and watch CI. Nothing is reviewing yet, so an early PR costs nothing.
 2. Finish **all** the work: the implementation, the CI fixes, the merge-from-main. Stop iterating.
-3. Have Claude Code run `/codex:review --base main --background` on the branch, then retrieve `/codex:result`. This is a real stop — don't fill the time with more commits, because every push invalidates the review it is about to give you.
+3. Ask Tim to run `/codex:review --base main` on the branch, and wait. This is a real stop — don't fill the time with more commits, because every push invalidates the review he is about to give you.
 4. Address the findings: fix → push → and note that head has moved (see below). Consciously decline the rest, with a reason. **A review that found nothing worth fixing skips straight to step 5** — there is no push, so head is already the SHA he read.
 5. Attest the head he reviewed — **this step is yours, always, and it is the only thing that satisfies the gate.** A clean review with an unposted marker reads to `merge-pr.sh` as `unreviewed`, so the review Tim ran buys nothing until you post it:
 
@@ -111,7 +115,7 @@ The primary reviewer is **Codex, invoked by Claude Code with `/codex:review --ba
 
 Which of two things you do next depends on what you pushed:
 
-- **The fixes Codex asked for.** Re-run `/codex:review --base main` at the new head, then attest and say so in the summary. A new review is cheap enough that it preserves an unambiguous SHA-to-result record.
+- **The fixes Codex asked for.** Ask Tim for a fresh `/codex:review --base main` at the new head, then attest and say so in the summary. A new review preserves an unambiguous SHA-to-result record.
 - **Anything else** — new work, a refactor you thought of, a scope addition. That also needs a fresh `/codex:review --base main`. Re-attesting over it is a false attestation.
 
 If you're unsure which bucket you're in, ask. The cost of asking is one message; the cost of guessing wrong is merging something nobody read.
@@ -149,9 +153,9 @@ Two limits worth knowing:
 
 #### Readiness is not review
 
-`pr-watch.py --check-ready` reports review state but does **not** gate on it. That check answers "is this PR worth `/codex:review --base main` right now?", and the review is what happens after that answer is yes — gating on it would be circular. Check-ready green means "review it", not "will merge".
+`pr-watch.py --check-ready` reports review state but does **not** gate on it. That check answers "is this PR worth Tim's `/codex:review --base main` right now?", and the review is what happens after that answer is yes — gating on it would be circular. Check-ready green means "hand it to Tim", not "will merge".
 
-Don't tell Tim a PR is "ready" or "done" while head is unreviewed — say it is ready for `/codex:review --base main`, which is a different claim.
+Don't tell Tim a PR is "ready" or "done" while head is unreviewed — say it is ready for his `/codex:review --base main`, which is a different claim.
 
 ### 3.5 Post UI screenshots (UI-touching PRs only)
 

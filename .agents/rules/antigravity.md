@@ -6,7 +6,7 @@ trigger: always_on
 
 This file provides workspace rules and context exclusive to the Google Antigravity CLI agent.
 
-Antigravity is Google's CLI agent harness (currently Gemini-based) with full local environment access. In this project its role is **code review** — a second opinion alongside the primary Codex review. The earlier autonomous bead-dispatch surface was retired (PP-22e4, #1761); Antigravity no longer picks up and executes beads independently.
+Antigravity is Google's CLI agent harness (currently Gemini-based) with full local environment access. In this project its role is **code review** — a second opinion alongside the primary Codex review Tim runs. The earlier autonomous bead-dispatch surface was retired (PP-22e4, #1761); Antigravity no longer picks up and executes beads independently.
 
 ## Core Mandates
 

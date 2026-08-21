@@ -4,8 +4,9 @@ These gates decide whether a PR may merge, so their edge cases are worth pinning
 
 PP-4ric retired Copilot review: its free tier was too small to be useful, so no bot
 reviews this repo now. The `reviewed` gate is satisfied only by the SHA-pinned marker
-`mark-claude-review.sh` posts, which attests that Tim ran `/code-review` (a harness
-built-in an agent cannot launch). Three states replace the old six — there is no
+`mark-review.sh` posts, which attests that Tim ran `/codex:review --base main` (the
+Codex plugin declares that command `disable-model-invocation`, so an agent cannot
+launch it either). Three states replace the old six — there is no
 request to wait on, so nothing here WAITs, and the whole request-timeline/quota-body
 apparatus (PP-lzaw, PP-jw0s) went with the reviewer it modelled.
 
@@ -207,10 +208,10 @@ def test_unreviewed_does_not_claim_a_review_exists() -> None:
 
 @pytest.mark.parametrize("comments", [[], [marker_comment(OTHER_SHA)]])
 def test_every_failing_state_names_the_remedy(comments: list[dict]) -> None:
-    """An agent cannot run /code-review, so the remedy has to name the handoff.
+    """An agent cannot run /codex:review, so the remedy has to name the handoff.
 
-    Printing only `mark-claude-review.sh` would read as "attest and move on", which is
-    exactly the false attestation the gate exists to prevent.
+    Printing only `mark-review.sh` would read as "attest and move on", which is exactly
+    the false attestation the gate exists to prevent.
     """
     with gate_env(comment_pages=[comments]) as env:
         result = run_gate("check_review_happened", env)
@@ -361,6 +362,27 @@ def test_marker_record_reports_the_reviewer_and_detail() -> None:
     )
     assert at == "2026-08-02T20:43:19Z"
     assert "/codex:review --base main" in summary
+
+
+def test_a_canonical_marker_without_metadata_reads_as_unrecorded() -> None:
+    """Absence of the reviewer/detail fields is absence, not a claim.
+
+    A hand-posted `<!-- pinpoint-review: … -->` still pins a head, and the gate honours
+    it. What it must NOT do is name a review method nobody recorded — merge-handoff.sh
+    renders this pair as "reviewer/detail unrecorded".
+    """
+    bare = {
+        "body": f"<!-- pinpoint-review: {HEAD_SHA} -->\nreviewed by hand",
+        "updated_at": "2026-08-02T20:43:19Z",
+    }
+    with gate_env(comment_pages=[[bare]]) as env:
+        state, sha, reviewer, detail, _at, _summary = marker_record(env)
+    assert (state, sha, reviewer, detail) == (
+        "marker",
+        HEAD_SHA,
+        "unrecorded",
+        "unrecorded",
+    )
 
 
 def test_legacy_claude_marker_remains_accepted() -> None:

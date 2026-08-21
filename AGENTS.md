@@ -155,13 +155,13 @@ Never resolve `drizzle/meta` conflicts manually — the folder holds binary-like
 
 **No bot reviews this repo.** Copilot review was retired on 2026-08-02 (PP-4ric) — the free tier was too small to review PinPoint's PRs, so quota outages were the normal state. The merge bar is unchanged: a PR still needs a review covering its **head commit**, with threads resolved.
 
-The primary reviewer is **Codex, invoked by Claude Code with `/codex:review --base main`**. Claude may trigger it itself. So getting reviewed is a handoff: **finish your churn first** (CI fixes, merge-from-main), stop iterating, then have Claude run the review and retrieve its result. Address every finding, then attest the head Codex read:
+The primary reviewer is **Codex, run by Tim typing `/codex:review --base main` in a Claude Code session** — the plugin declares that command `disable-model-invocation`, so an agent cannot launch it (nor `/codex:result`). So getting reviewed is a handoff: **finish your churn first** (CI fixes, merge-from-main), stop iterating, then tell Tim the branch is ready for review. Once he has run it, address every finding and attest the head Codex read:
 
 ```bash
 bash scripts/workflow/mark-review.sh <PR> codex-plugin-cc base-main "<one-line findings>"
 ```
 
-The marker records the exact method and pins a SHA, so any push invalidates it. Re-run Codex review after every changed head; do not re-attest an old result. A genuinely trivial change (typo, comment, one-line mechanical fix) can use `mark-review.sh <PR> claude-code trivial`, saying why it was trivial. The marker attests a review happened; posting it otherwise is a false attestation. Full rules: `pinpoint-pr-workflow` skill Phase 3.4.
+The marker records the exact method and pins a SHA, so any push invalidates it. Ask for a fresh Codex review after every changed head; do not re-attest an old result. A genuinely trivial change (typo, comment, one-line mechanical fix) can use `mark-review.sh <PR> claude-code trivial`, saying why it was trivial. The marker attests a review happened; posting it otherwise is a false attestation. Full rules: `pinpoint-pr-workflow` skill Phase 3.4.
 
 ### Handing a PR over to merge
 

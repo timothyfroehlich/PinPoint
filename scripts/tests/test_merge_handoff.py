@@ -90,6 +90,14 @@ class Scenario:
 
 
 def marker(sha: str, depth: str = "medium", reviewer: str = "claude-code") -> dict:
+    if reviewer == "unrecorded":
+        # A canonical marker with no reviewer/detail comments — hand-posted, or written
+        # by some future caller that forgot them. It still pins a head, so the gate
+        # honours it; the handoff must report the missing metadata as missing.
+        return {
+            "body": f"<!-- pinpoint-review: {sha} -->\nreviewed by hand",
+            "updated_at": "2026-08-02T20:43:19Z",
+        }
     if reviewer == "codex-plugin-cc":
         return {
             "body": (
@@ -472,6 +480,20 @@ def test_a_codex_review_covering_head_is_named_in_the_handoff() -> None:
         assert "/codex:review --base main" in run.stdout, run.stdout
 
 
+def test_a_marker_without_reviewer_metadata_reports_it_as_unrecorded() -> None:
+    """Missing metadata reads as missing — never as a review method it can't know.
+
+    The whole claim of this report is that nothing in it is recalled, so inventing a
+    reviewer for a marker that names none would be the one lie it cannot afford.
+    """
+    with repo_with_pr(
+        branch_changes={"src/lib/thing.ts": "x\n"},
+        scenario=Scenario(review="head", review_reviewer="unrecorded"),
+    ) as (_head, run):
+        assert "reviewer/detail unrecorded" in run.stdout, run.stdout
+        assert "/codex:review" not in run.stdout.split("NOT MERGEABLE")[0]
+
+
 def test_commits_pushed_after_the_review_are_counted_and_diffed() -> None:
     """ "How many revisions back" — the question that decides re-review vs re-attest."""
     with repo_with_pr(
@@ -581,7 +603,9 @@ def test_the_race_is_detected_by_sha_not_by_a_missing_object() -> None:
     [
         pytest.param("trivial", "attested trivial (no /code-review run)", id="trivial"),
         pytest.param(
-            "unrecorded", "depth unrecorded (marker predates PP-9onv)", id="unrecorded"
+            "unrecorded",
+            "depth unrecorded (legacy marker predates PP-9onv)",
+            id="unrecorded",
         ),
     ],
 )

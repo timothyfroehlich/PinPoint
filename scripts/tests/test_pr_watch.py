@@ -529,7 +529,7 @@ def test_pre_check_reports_unresolved_threads_without_blocking(monkeypatch, caps
     """Watching CI is a step INSIDE the address-the-findings loop, not after it.
 
     Threads became author-agnostic in PP-4ric, so they are now the reviewer's
-    `/code-review` findings. The documented loop is fix → push → watch CI →
+    `/codex:review` findings. The documented loop is fix → push → watch CI →
     resolve once green; blocking here would refuse to watch the very push that
     addresses them, leaving --force (which also drops the merge-state and
     already-failed-CI pre-checks) as the only way through.
@@ -919,7 +919,7 @@ def test_review_state_takes_the_newest_marker(monkeypatch):
 def test_run_audit_reports_the_review_state_without_gating_on_it(
     monkeypatch, capsys, state, comments
 ):
-    """--check-ready answers "is this worth Tim's /code-review?".
+    """--check-ready answers "is this worth Tim's /codex:review?".
 
     The review is what happens AFTER that answer is yes, so gating on it would be
     circular and permanently red. merge-pr.sh's `reviewed` gate is the one that
