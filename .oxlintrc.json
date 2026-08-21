@@ -23,7 +23,13 @@
     // of them. That is the SLIM-mirror lesson (`eslint.config.mjs`, PP-4zcj) in
     // a new place: when the mirror is blinder than the authority, the mirror is
     // what gets softened.
-    // REVISIT: promote to "error" in Phase 4, once those two plugins run here.
+    // Consequence to accept knowingly: seven warnings print on every
+    // `pnpm run check`, whose expected output is otherwise "All checks
+    // passed!". No `--max-warnings` — that would turn seven known-good
+    // warnings into a red gate, the opposite of the intent.
+    // REVISIT (PP-sc77.3, the Phase 4 cutover bead): promote to "error" once
+    // jsx-a11y and react-hooks run here, which is what makes these seven
+    // resolve on their own.
     "reportUnusedDisableDirectives": "warn"
   },
   "env": {

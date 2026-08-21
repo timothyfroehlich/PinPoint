@@ -1,8 +1,12 @@
-// Fixture: pinpoint/no-restricted-disable-directives — named CORE-TS-007 rules.
+// Fixture: pinpoint/no-restricted-disable-directives — the CORE-TS-007 rules.
 //
 // Every directive here carries a `-- description`, so
 // pinpoint/require-directive-description must stay silent on this file: the two
 // rules are independent and a fixture that violated both would not prove it.
+//
+// The rules that ENFORCE the gate rather than being part of it live in
+// `governance-disable.ts`; the core `no-unsafe-*` rules that must stay
+// disable-able live in `allowed-core-unsafe.ts`.
 
 // oxlint-disable-next-line typescript/no-explicit-any -- fixture: oxlint prefix, oxlint namespace
 export const fromOxlintNamespace = 1;
@@ -10,6 +14,9 @@ export const fromOxlintNamespace = 1;
 // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- fixture: eslint prefix, typescript-eslint namespace
 export const fromTypescriptEslintNamespace = 2;
 
+// A bare name is a WORKING suppression in oxlint, not a typo, so it must be
+// caught: `// oxlint-disable-next-line no-explicit-any` really does silence
+// `typescript/no-explicit-any` (verified against 1.79).
 // oxlint-disable-next-line no-unsafe-assignment -- fixture: bare name, the no-unsafe-* family
 export const bareUnsafeName = 3;
 
@@ -24,10 +31,3 @@ export const legitimate = 5;
 // prose after `--` is documentation, not a rule list.
 // oxlint-disable-next-line no-console -- fixture: mentions no-explicit-any in prose only
 export const proseMention = 6;
-
-// Disabling THIS rule one line above a restricted directive is the obvious
-// bypass, so the rule restricts its own name: the report lands on this line,
-// which the `-next-line` form below does not reach.
-// oxlint-disable-next-line pinpoint/no-restricted-disable-directives -- fixture: the self-disable bypass
-// oxlint-disable-next-line typescript/no-explicit-any -- fixture: what the line above tries to hide
-export const selfDisableBypass = 7;

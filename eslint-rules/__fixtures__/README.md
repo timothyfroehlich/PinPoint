@@ -17,10 +17,15 @@ Fixtures are still Prettier-formatted (Prettier does run repo-wide), so keep
 them formatted or the `format` gate goes red.
 
 **The directive fixtures are deliberately one concern per file.** A disable
-directive changes what the rest of the file reports, so
-`restricted-disable.ts`, `undescribed-directive.ts` and `blanket-disable.ts`
-each isolate one rule: the first describes every directive (so
-`require-directive-description` stays silent), the second only ever names
-`no-console` (so `no-restricted-disable-directives` stays silent), and the third
-is alone with its blanket disable because a blanket disable suppresses
-everything after it.
+directive changes what the rest of the file reports, so each isolates one thing:
+
+| Fixture                    | Proves                                                                                                                                                              |
+| :------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `restricted-disable.ts`    | the three CORE-TS-007 families are caught under every prefix and namespace. Every directive carries a description, so `require-directive-description` stays silent. |
+| `governance-disable.ts`    | the three rules that _enforce_ the gate cannot be disabled. Each case was a verified bypass before it was closed.                                                   |
+| `allowed-core-unsafe.ts`   | the three ESLint **core** `no-unsafe-*` rules stay disable-able. Must produce zero diagnostics.                                                                     |
+| `undescribed-directive.ts` | descriptions are required. Only ever names `no-console`, so `no-restricted-disable-directives` stays silent.                                                        |
+| `blanket-disable.ts`       | a blanket disable is caught — alone in its file, because a blanket disable suppresses everything after it.                                                          |
+
+Line numbers in these files are asserted by the test, so adding a case means
+updating the expected lines.

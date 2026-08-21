@@ -5,7 +5,10 @@ import { promisify } from "node:util";
 
 import { describe, expect, it } from "vitest";
 
-import { RESTRICTED_DISABLE_PATTERNS } from "../../../eslint-rules/no-restricted-disable-directives.mjs";
+import {
+  GOVERNANCE_DISABLE_PATTERNS,
+  RESTRICTED_DISABLE_PATTERNS,
+} from "../../../eslint-rules/no-restricted-disable-directives.mjs";
 
 /**
  * Fixture harness for the rules oxlint runs through its JS-plugin API
@@ -120,11 +123,16 @@ function forFile(findings: OxlintFinding[], basename: string): OxlintFinding[] {
     .sort((a, b) => a.line - b.line || a.column - b.column);
 }
 
-describe("oxlint jsPlugins fixtures", () => {
-  // One oxlint process for the whole suite — the binary is fast but process
-  // startup is not, and every assertion reads the same diagnostic set.
-  const findingsPromise = runOxlint();
+/**
+ * One oxlint process for this whole FILE — the binary is fast but process
+ * startup is not, and every assertion in every describe block below reads the
+ * same diagnostic set over the same fixture directory. Module scope, not
+ * describe scope: a second `runOxlint()` in the second block would spawn a
+ * second process for no new information.
+ */
+const findingsPromise = runOxlint();
 
+describe("oxlint jsPlugins fixtures", () => {
   it("loads every jsPlugin rule (a plugin that fails to load reports nothing)", async () => {
     const findings = await findingsPromise;
     expect(new Set(findings.map((f) => f.ruleId))).toEqual(
@@ -195,36 +203,65 @@ describe("oxlint jsPlugins fixtures", () => {
  * silently open door to `any`, not a lint nit.
  */
 describe("oxlint directive governance", () => {
-  const findingsPromise = runOxlint();
-
   it("bans a restricted disable under every prefix and namespace it can wear", async () => {
     const found = forFile(await findingsPromise, "restricted-disable.ts");
     expect(
       found.map((f) => ({ ruleId: f.ruleId, line: f.line }))
     ).toStrictEqual([
       // `oxlint-` prefix, oxlint's own `typescript/` namespace
-      { ruleId: "pinpoint/no-restricted-disable-directives", line: 7 },
+      { ruleId: "pinpoint/no-restricted-disable-directives", line: 11 },
       // `eslint-` prefix, typescript-eslint's `@typescript-eslint/` namespace
-      { ruleId: "pinpoint/no-restricted-disable-directives", line: 10 },
-      // bare rule name, `no-unsafe-*` family
-      { ruleId: "pinpoint/no-restricted-disable-directives", line: 13 },
+      { ruleId: "pinpoint/no-restricted-disable-directives", line: 14 },
+      // bare rule name, `no-unsafe-*` family — a working suppression in oxlint
+      { ruleId: "pinpoint/no-restricted-disable-directives", line: 20 },
       // restricted rule hiding in a comma-separated list
-      { ruleId: "pinpoint/no-restricted-disable-directives", line: 16 },
-      // disabling this rule to smuggle the next line past it
-      { ruleId: "pinpoint/no-restricted-disable-directives", line: 31 },
+      { ruleId: "pinpoint/no-restricted-disable-directives", line: 23 },
     ]);
     expect(found[0]?.message).toContain("CORE-TS-007");
   });
 
-  it("exercises every pattern the rule actually enforces", async () => {
-    // Guards the list against growing a pattern with no fixture behind it: the
-    // rule's own export is the source of truth, not a copy in this file.
-    const reportedNames = forFile(
-      await findingsPromise,
-      "restricted-disable.ts"
-    ).map((f) => /'([^']+)'/.exec(f.message)?.[1] ?? "");
+  it("bans disabling the rules that enforce the gate", async () => {
+    // Each of these was an exploitable bypass verified against oxlint 1.79
+    // before being restricted; the third silenced every rule in the file.
+    const found = forFile(await findingsPromise, "governance-disable.ts");
+    expect(
+      found.map((f) => ({ ruleId: f.ruleId, line: f.line }))
+    ).toStrictEqual([
+      // disabling this rule to smuggle the next line past it
+      { ruleId: "pinpoint/no-restricted-disable-directives", line: 11 },
+      // disabling its sibling to hide an undescribed directive
+      { ruleId: "pinpoint/no-restricted-disable-directives", line: 17 },
+      // disabling the only rule that can see a blanket disable
+      { ruleId: "pinpoint/no-restricted-disable-directives", line: 26 },
+    ]);
+    // The message must explain the real reason, not miscite CORE-TS-007 at a
+    // developer who disabled a lint-governance rule.
+    expect(found[0]?.message).toContain("silencing it silences the gate");
+  });
 
-    for (const pattern of RESTRICTED_DISABLE_PATTERNS) {
+  it("leaves the ESLint core `no-unsafe-*` rules disable-able", async () => {
+    // `no-unsafe-finally`, `no-unsafe-negation` and `no-unsafe-optional-chaining`
+    // share a prefix with the typescript-eslint family but are not CORE-TS-007,
+    // and authoritative ESLint restricts only the namespaced glob. Catching
+    // them would block a developer locally while CI stayed green.
+    expect(
+      forFile(await findingsPromise, "allowed-core-unsafe.ts")
+    ).toStrictEqual([]);
+  });
+
+  it("exercises every pattern the rule actually enforces", async () => {
+    // Guards both lists against growing a pattern with no fixture behind it:
+    // the rule's own exports are the source of truth, not a copy in this file.
+    const findings = await findingsPromise;
+    const reportedNames = [
+      ...forFile(findings, "restricted-disable.ts"),
+      ...forFile(findings, "governance-disable.ts"),
+    ].map((f) => /'([^']+)'/.exec(f.message)?.[1] ?? "");
+
+    for (const pattern of [
+      ...RESTRICTED_DISABLE_PATTERNS,
+      ...GOVERNANCE_DISABLE_PATTERNS,
+    ]) {
       expect(
         reportedNames.some((name) => pattern.test(name)),
         `no fixture case covers ${pattern.source}`

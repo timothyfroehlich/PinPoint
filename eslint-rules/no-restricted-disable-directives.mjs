@@ -42,6 +42,17 @@
 // (oxlint's plugin namespace), and bare `no-explicit-any`. All three must be
 // caught, so the matchers anchor on the end of the name and accept any
 // namespace, rather than enumerating prefixes that will change again.
+//
+// ── What can still get past this ────────────────────────────────────────────
+// One shape, and it is the same one authoritative ESLint has: a FILE-WIDE
+// `/* oxlint-disable pinpoint/no-restricted-disable-directives */`, which
+// suppresses this rule on the very line it sits on and everywhere below. Every
+// `-next-line` variant is closed (see GOVERNANCE_DISABLE_PATTERNS), and a
+// file-wide disable of only the unicorn rule is still caught, because this rule
+// survives to report it. Closing the last one needs an engine feature — a rule
+// that cannot be suppressed — which oxlint reserves for its own natives.
+// `eslint-comments/no-restricted-disable` has the identical hole, so this is
+// parity with the gate we already trust, not a regression introduced here.
 
 /**
  * A disable directive of either engine, capturing everything after the
@@ -54,23 +65,67 @@ const DISABLE_DIRECTIVE_RE =
   /^\s*(?:eslint|oxlint)-disable(?:-next-line|-line)?(?![\w-])([\s\S]*)$/;
 
 /**
- * Restricted rule-name matchers, engine-prefix-agnostic. Exported so the
- * fixture test can assert on the same list the rule enforces rather than a
- * copy of it.
+ * The three CORE-TS-007 rule families, matched engine-prefix-agnostically.
+ * Exported so the fixture test can assert on the same list the rule enforces
+ * rather than a copy of it.
+ *
+ * ── Why bare names are matched, not just namespaced ones ────────────────────
+ * A bare name is a WORKING suppression in oxlint, not a typo: verified against
+ * 1.79 that `// oxlint-disable-next-line no-explicit-any` silences
+ * `typescript/no-explicit-any` just as the namespaced form does. So dropping
+ * bare coverage would leave a real escape hatch open, which is why these anchor
+ * on `(?:^|\/)` rather than requiring a namespace.
  */
 export const RESTRICTED_DISABLE_PATTERNS = [
   /(?:^|\/)no-explicit-any$/,
   /(?:^|\/)no-non-null-assertion$/,
-  /(?:^|\/)no-unsafe-[a-z-]+$/,
-  // This rule itself. Without it, `// oxlint-disable-next-line
-  // pinpoint/no-restricted-disable-directives` on the line ABOVE a restricted
-  // directive silences the whole gate for one line — verified against oxlint
-  // 1.79. Listing it here makes that comment report on its own line, which the
-  // `-next-line` form does not cover. (A file-wide `/* oxlint-disable
-  // pinpoint/no-restricted-disable-directives */` still wins, because it
-  // suppresses the line it sits on; ESLint's `eslint-comments/no-restricted-disable`
-  // has exactly the same hole, so this is parity, not a regression.)
+  // The typescript-eslint `no-unsafe-*` family, MINUS the three ESLint core
+  // rules that share the prefix and have nothing to do with CORE-TS-007:
+  // `no-unsafe-finally`, `no-unsafe-negation`, `no-unsafe-optional-chaining`
+  // (all enabled in `.oxlintrc.json`). Without the exclusion a legitimate
+  // `// eslint-disable-next-line no-unsafe-optional-chaining -- reason` passes
+  // authoritative ESLint — whose original restricted only the namespaced
+  // `@typescript-eslint/no-unsafe-*` glob — and fails the local mirror with a
+  // misleading CORE-TS-007 message. That is mirror drift in the worst
+  // direction: blocking a developer locally while CI stays green.
+  //
+  // Excluding by name rather than requiring a `typescript/` namespace keeps the
+  // rule fail-closed: a future typescript-eslint `no-unsafe-<something>` is
+  // covered the day it ships, and only this explicit, verified list of three
+  // escapes. A new ESLint CORE `no-unsafe-*` rule would over-catch, which is
+  // both far less likely and far more visible than under-catching a TS rule.
+  /(?:^|\/)no-unsafe-(?!finally$|negation$|optional-chaining$)[a-z-]+$/,
+];
+
+/**
+ * Rule names that are not themselves CORE-TS-007, but whose suppression turns
+ * the gate off — so they are restricted for the same reason, with a message
+ * that says the actual reason.
+ *
+ * Each one was verified to be an exploitable bypass against oxlint 1.79 before
+ * being listed. The pattern is always the same: a `-next-line` directive
+ * naming a governance rule silences that rule on the line below, and the thing
+ * being silenced is what would have caught the directive below it. The report
+ * for a directive lands on the directive's OWN line, which `-next-line` does
+ * not cover, so restricting the name here is what closes each hole.
+ */
+export const GOVERNANCE_DISABLE_PATTERNS = [
+  // This rule. `// oxlint-disable-next-line pinpoint/no-restricted-disable-directives`
+  // above a restricted directive otherwise silences the whole gate for a line.
   /(?:^|\/)no-restricted-disable-directives$/,
+  // Its sibling. Same shape: disable it on one line and the undescribed
+  // directive below it goes unreported.
+  /(?:^|\/)require-directive-description$/,
+  // The blanket-disable ban. This is the sharpest of the three, because the
+  // native `unicorn/no-abusive-eslint-disable` is the ONLY rule that can see a
+  // blanket disable (a jsPlugin's own report is suppressed by it). So this pair
+  //
+  //     // oxlint-disable-next-line unicorn/no-abusive-eslint-disable -- any reason
+  //     /* oxlint-disable */
+  //
+  // turned off every rule in the file, all three CORE-TS-007 rules included,
+  // and produced zero diagnostics.
+  /(?:^|\/)no-abusive-eslint-disable$/,
 ];
 
 export const noRestrictedDisableDirectivesRule = {
@@ -84,6 +139,8 @@ export const noRestrictedDisableDirectivesRule = {
     messages: {
       restricted:
         "'{{rule}}' must not be disabled by comment — CORE-TS-007 (any / non-null assertions / unsafe-*) is a gate, not a recommendation (PP-8k07).",
+      governance:
+        "'{{rule}}' must not be disabled by comment — it is what enforces CORE-TS-007, so silencing it silences the gate (PP-8k07).",
       blanket:
         "Blanket disable directives are forbidden: name the specific rules being disabled (and none of them may be a CORE-TS-007 rule).",
     },
@@ -112,6 +169,14 @@ export const noRestrictedDisableDirectivesRule = {
               context.report({
                 loc: comment.loc,
                 messageId: "restricted",
+                data: { rule },
+              });
+            } else if (
+              GOVERNANCE_DISABLE_PATTERNS.some((re) => re.test(rule))
+            ) {
+              context.report({
+                loc: comment.loc,
+                messageId: "governance",
                 data: { rule },
               });
             }
