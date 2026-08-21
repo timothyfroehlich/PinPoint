@@ -85,8 +85,7 @@ describe("PinballMapLinkField — what it submits", () => {
     consoleError.mockRestore();
   });
 
-  it("submits an empty id once the user marks the machine not-on-PinballMap", async () => {
-    // The one case where clearing the stored link IS the user's intent.
+  it("submits an empty id once the user toggles uncataloged", async () => {
     vi.mocked(resolvePinballMapLinkAction).mockResolvedValue(null);
     const user = userEvent.setup();
 
@@ -95,21 +94,7 @@ describe("PinballMapLinkField — what it submits", () => {
       expect(resolvePinballMapLinkAction).toHaveBeenCalled();
     });
 
-    // The "Not on Pinball Map" choice only surfaces once a search has actually
-    // come up empty, so drive it through that path rather than reaching for it.
-    await user.click(screen.getByRole("combobox"));
-    await user.type(
-      screen.getByPlaceholderText(/medieval madness/i),
-      "nothing matches"
-    );
-    const notOnMap = await screen.findByTestId(
-      "pinballmap-not-on-map",
-      {},
-      {
-        timeout: 3000,
-      }
-    );
-    await user.click(notOnMap);
+    await user.click(screen.getByTestId("pinballmap-uncataloged-toggle"));
 
     expect(submittedLinkId()).toBe("");
     expect(
@@ -135,25 +120,17 @@ describe("PinballMapLinkField — manual model entry", () => {
     vi.mocked(resolvePinballMapLinkAction).mockResolvedValue(null);
   });
 
-  /** Drive the "Not on Pinball Map" choice through the empty-search path. */
-  async function pickNotOnMap(
+  async function toggleUncataloged(
     user: ReturnType<typeof userEvent.setup>
   ): Promise<void> {
-    await user.click(screen.getByRole("combobox"));
-    await user.type(
-      screen.getByPlaceholderText(/medieval madness/i),
-      "nothing matches"
-    );
-    await user.click(
-      await screen.findByTestId("pinballmap-not-on-map", {}, { timeout: 3000 })
-    );
+    await user.click(screen.getByTestId("pinballmap-uncataloged-toggle"));
   }
 
   function field(name: string): HTMLInputElement | null {
     return document.querySelector<HTMLInputElement>(`input[name="${name}"]`);
   }
 
-  it("is absent until the machine is marked not-on-Pinball-Map", () => {
+  it("is absent until the uncataloged toggle is on", () => {
     render(<PinballMapLinkField machineName="Bordertown" />);
     expect(
       screen.queryByTestId("pinballmap-manual-model")
@@ -167,14 +144,13 @@ describe("PinballMapLinkField — manual model entry", () => {
     const user = userEvent.setup();
     render(<PinballMapLinkField machineName="Bordertown" />);
 
-    await pickNotOnMap(user);
+    await toggleUncataloged(user);
 
     expect(screen.getByTestId("pinballmap-manual-model")).toBeInTheDocument();
     expect(field("modelName")?.value).toBe("Bordertown");
   });
 
   it("leaves a stored model name alone rather than re-seeding it", async () => {
-    // The seed is a starting point, not a mirror of the machine's name.
     const user = userEvent.setup();
     render(
       <PinballMapLinkField
@@ -185,7 +161,10 @@ describe("PinballMapLinkField — manual model entry", () => {
     );
     expect(field("modelName")?.value).toBe("Bordertown");
 
-    await pickNotOnMap(user);
+    // Toggle off and back on — stored value survives the round-trip,
+    // not re-seeded from the (different) machine name.
+    await user.click(screen.getByTestId("pinballmap-uncataloged-toggle"));
+    await user.click(screen.getByTestId("pinballmap-uncataloged-toggle"));
     expect(field("modelName")?.value).toBe("Bordertown");
   });
 
@@ -254,7 +233,6 @@ describe("PinballMapLinkField — manual model entry", () => {
   });
 
   it("picks a catalog title with no warning when nothing was entered", async () => {
-    // The warning is about losing work; with nothing typed there is none.
     const user = userEvent.setup();
     vi.mocked(searchPinballMapFamiliesAction).mockResolvedValue([
       {
@@ -276,5 +254,127 @@ describe("PinballMapLinkField — manual model entry", () => {
       screen.queryByTestId("pinballmap-overwrite-confirm")
     ).not.toBeInTheDocument();
     expect(submittedLinkId()).toBe("77");
+  });
+});
+
+describe("PinballMapLinkField — uncataloged toggle (PP-3bbr.2)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(searchPinballMapFamiliesAction).mockResolvedValue([]);
+    vi.mocked(resolvePinballMapLinkAction).mockResolvedValue(null);
+  });
+
+  function field(name: string): HTMLInputElement | null {
+    return document.querySelector<HTMLInputElement>(`input[name="${name}"]`);
+  }
+
+  it("does not inherit catalog manufacturer/year when toggling from a linked machine", async () => {
+    const user = userEvent.setup();
+    render(
+      <PinballMapLinkField
+        defaultMachineId={42}
+        defaultName="Godzilla (Premium)"
+        defaultManufacturer="Stern"
+        defaultYear={2021}
+      />
+    );
+
+    await user.click(screen.getByTestId("pinballmap-uncataloged-toggle"));
+
+    expect(field("manufacturer")?.value).toBe("");
+    expect(field("year")?.value).toBe("");
+  });
+
+  it("preserves stored hand-entered data across an off/on toggle cycle", async () => {
+    const user = userEvent.setup();
+    render(
+      <PinballMapLinkField
+        defaultExcluded
+        defaultModelName="Bordertown"
+        defaultManufacturer="homebrew"
+        defaultYear={2019}
+      />
+    );
+
+    expect(field("manufacturer")?.value).toBe("homebrew");
+    expect(field("year")?.value).toBe("2019");
+
+    await user.click(screen.getByTestId("pinballmap-uncataloged-toggle"));
+    expect(
+      screen.queryByTestId("pinballmap-manual-model")
+    ).not.toBeInTheDocument();
+
+    await user.click(screen.getByTestId("pinballmap-uncataloged-toggle"));
+    expect(field("manufacturer")?.value).toBe("homebrew");
+    expect(field("year")?.value).toBe("2019");
+  });
+
+  it("does not fire the confirm when only the seeded model name is present", async () => {
+    const user = userEvent.setup();
+    vi.mocked(searchPinballMapFamiliesAction).mockResolvedValue([
+      {
+        machineGroupId: null,
+        pinballmapMachineId: 77,
+        name: "Medieval Madness",
+        manufacturer: "Williams",
+        year: 1997,
+        editionCount: 1,
+      },
+    ]);
+    render(<PinballMapLinkField machineName="Bordertown" />);
+
+    await user.click(screen.getByTestId("pinballmap-uncataloged-toggle"));
+    expect(field("modelName")?.value).toBe("Bordertown");
+
+    await user.click(screen.getByRole("combobox"));
+    await user.type(screen.getByPlaceholderText(/medieval madness/i), "med");
+    await user.click(await screen.findByText("Medieval Madness"));
+
+    expect(
+      screen.queryByTestId("pinballmap-overwrite-confirm")
+    ).not.toBeInTheDocument();
+    expect(submittedLinkId()).toBe("77");
+  });
+
+  it("fires the confirm once the seeded name is edited", async () => {
+    const user = userEvent.setup();
+    vi.mocked(searchPinballMapFamiliesAction).mockResolvedValue([
+      {
+        machineGroupId: null,
+        pinballmapMachineId: 77,
+        name: "Medieval Madness",
+        manufacturer: "Williams",
+        year: 1997,
+        editionCount: 1,
+      },
+    ]);
+    render(<PinballMapLinkField machineName="Bordertown" />);
+
+    await user.click(screen.getByTestId("pinballmap-uncataloged-toggle"));
+    const modelInput = field("modelName");
+    expect(modelInput).not.toBeNull();
+    await user.clear(modelInput!);
+    await user.type(modelInput!, "Custom Game");
+
+    await user.click(screen.getByRole("combobox"));
+    await user.type(screen.getByPlaceholderText(/medieval madness/i), "med");
+    await user.click(await screen.findByText("Medieval Madness"));
+
+    expect(
+      screen.getByTestId("pinballmap-overwrite-confirm")
+    ).toBeInTheDocument();
+  });
+
+  it("flips the caption from 'source: Pinball Map' to 'Uncataloged game'", async () => {
+    const user = userEvent.setup();
+    render(<PinballMapLinkField />);
+
+    expect(screen.getByText("source: Pinball Map")).toBeInTheDocument();
+    expect(screen.queryByText("Uncataloged game")).not.toBeInTheDocument();
+
+    await user.click(screen.getByTestId("pinballmap-uncataloged-toggle"));
+
+    expect(screen.queryByText("source: Pinball Map")).not.toBeInTheDocument();
+    expect(screen.getByText("Uncataloged game")).toBeInTheDocument();
   });
 });
