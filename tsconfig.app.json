@@ -72,6 +72,12 @@
     // include), and under `composite: true` every file pulled into the program
     // must be listed (TS6307). Leaving it included keeps all three playwright
     // configs type-checked, exactly as before the PP-4k76 split.
+    // Lint fixtures for src/test/lint/oxlint-fixtures.test.ts. They are inputs
+    // to the linter, not app source: their whole job is to violate a rule, and
+    // later phases add fixtures that deliberately violate type-level rules too
+    // (an unused local is a `noUnusedLocals` error under @tsconfig/strictest).
+    // The root `**/*.ts(x)` include above would otherwise pull them in.
+    "eslint-rules/__fixtures__/**/*",
     "vitest.config.ts",
     "drizzle.config.ts",
     "postcss.config.mjs",
