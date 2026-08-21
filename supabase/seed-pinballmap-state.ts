@@ -12,8 +12,10 @@
  * be seen, reviewed, or screenshotted.
  *
  * The snapshot is the SAME offline fixture the mock client serves
- * (`fixtures/location-26454.json`, a real capture of APC's location with 101
- * lineup entries), so what dev renders is what the cron would have produced.
+ * (`fixtures/location-26454.json`, a capture of APC's location — 101 entries as
+ * captured, plus one seed-added row (Attack from Mars) so the AFM cabinet can
+ * render its correct match as `on`; see MACHINE_PLAN), so what dev renders is
+ * what the cron would have produced.
  *
  * ## Why this is .ts and runs under tsx
  *
@@ -30,11 +32,14 @@
  * ## Why this also links machines
  *
  * A snapshot alone still leaves every seeded machine `unmatched` — the derived
- * state is a function of BOTH the snapshot and the machine's own columns. Of the
- * ten, six are matched to a title the captured lineup carries, two to a title it
- * does not, and two are matched to nothing at all — enough of a spread to reach
- * every state the fixture can reach. Each id below was verified against both
- * fixtures; see the table in `MACHINE_PLAN`.
+ * state is a function of BOTH the snapshot and the machine's own columns. Every
+ * cabinet is matched to its OWN real title (so the machine header reads
+ * correctly); the spread across the listing states comes from intent and
+ * availability, not from mismatched titles. Of the twelve: seven are matched to
+ * a title the captured lineup carries, three to a title it does not, one is
+ * matched to nothing (the no-model fixture), and one is hand-entered (the
+ * uncataloged fixture). Each id below was verified against both fixtures; see
+ * the table in `MACHINE_PLAN`.
  *
  * Idempotent: singleton upsert plus per-machine updates keyed on initials.
  *
@@ -75,10 +80,14 @@ const snapshot = parseLocation(rawLocation, new Date().toISOString());
 
 /** Catalog ids, each verified present in `catalog-apc.json`. */
 const TITLE = {
-  godzillaPremium: 3416, // in the lineup
-  spiderManVault: 2565, // in the lineup
-  blackKnight: 1055, // in the lineup
-  medievalMadness: 642, // in the catalog, NOT in the lineup
+  godzillaPremium: 3416, // on the lineup → shared / covered
+  slickChick: 1513, // on the lineup → alert
+  blackKnight: 1055, // on the lineup → lingering
+  spiderManVault: 2565, // on the lineup → flag
+  medievalMadness: 642, // in the catalog, NOT on the lineup → missing
+  addamsFamily: 90002, // added to the mirror, NOT on the lineup → sync_off
+  eightBallDeluxe: 90003, // added to the mirror, NOT on the lineup → blocked
+  attackFromMars: 90001, // added to the mirror AND the lineup → on
 } as const;
 
 /**
@@ -103,9 +112,18 @@ function assertLineup(machineId: number, expected: boolean): void {
 }
 
 assertLineup(TITLE.godzillaPremium, true);
-assertLineup(TITLE.spiderManVault, true);
+assertLineup(TITLE.slickChick, true);
 assertLineup(TITLE.blackKnight, true);
+assertLineup(TITLE.spiderManVault, true);
 assertLineup(TITLE.medievalMadness, false);
+assertLineup(TITLE.addamsFamily, false);
+assertLineup(TITLE.eightBallDeluxe, false);
+// Attack from Mars is not in APC's real capture; the seed adds it to
+// location-26454.json so the AFM cabinet renders its correct match as `on`.
+// refresh-fixture.ts rewrites that file verbatim from the live API, so a future
+// refresh would drop this entry — at which point this assertion fails loudly at
+// db:reset (which is what it is for) and AFM must be re-pointed or re-added.
+assertLineup(TITLE.attackFromMars, true);
 
 interface MachinePlan {
   initials: string;
@@ -129,48 +147,51 @@ interface MachinePlan {
 
 /**
  * One machine per control state, so every frame of the two-line control can be
- * walked locally before a review (spec §4).
+ * walked locally before a review (spec §4). Every cabinet is matched to its own
+ * real title — the states come from intent and availability, not wrong titles.
  *
- * | machine                | catalog | on lineup | intent   | availability | renders as  |
- * |------------------------|---------|-----------|----------|--------------|-------------|
- * | GDZ Godzilla           | 3416    | yes       | on       | on the floor | shared      |
- * | HD  Humpty Dumpty      | 3416    | yes       | on       | on the floor | shared      |
- * | TAF The Addams Family  | 3416    | yes       | off      | on the floor | covered     |
- * | SM  Spider-Man         | 2565    | yes       | on       | on loan      | flag        |
- * | BK  Black Knight       | 1055    | yes       | off      | on the floor | lingering   |
- * | EBD Eight Ball Deluxe  | 1055    | yes       | no_sync  | on the floor | sync_off    |
- * | MM  Medieval Madness   | 642     | no        | on       | on the floor | missing     |
- * | SC  Slick Chick        | 642     | no        | off      | removed      | blocked     |
- * | FB  Fireball           | none    | —         | off      | on the floor | uncataloged |
- * | AFM Attack from Mars   | none    | —         | off      | on the floor | no_model    |
+ * | machine                | catalog | on lineup | intent  | availability | renders as  |
+ * |------------------------|---------|-----------|---------|--------------|-------------|
+ * | GDZ  Godzilla          | 3416    | yes       | on      | on the floor | shared      |
+ * | GDZ2 Godzilla          | 3416    | yes       | on      | on the floor | shared      |
+ * | GDZ3 Godzilla          | 3416    | yes       | off     | on the floor | covered     |
+ * | SM   Spider-Man        | 2565    | yes       | on      | on loan      | flag        |
+ * | BK   Black Knight      | 1055    | yes       | off     | on the floor | lingering   |
+ * | AFM  Attack from Mars  | 90001   | yes       | on      | on the floor | on          |
+ * | SC   Slick Chick       | 1513    | yes       | on      | removed      | alert       |
+ * | MM   Medieval Madness  | 642     | no        | on      | on the floor | missing     |
+ * | TAF  The Addams Family | 90002   | no        | no_sync | on the floor | sync_off    |
+ * | EBD  Eight Ball Deluxe | 90003   | no        | off     | removed      | blocked     |
+ * | HD   Humpty Dumpty     | none    | —         | off     | on the floor | no_model    |
+ * | HB   Hyperball         | none    | —         | off     | on the floor | uncataloged |
  *
- * The `initials`/`name` column is what `machines.json` calls the cabinet; the
- * catalog column is the title it is matched to, which for four of them is a
- * different game — see below.
+ * **Shared and Covered need three cabinets of one title**, so GDZ / GDZ2 / GDZ3
+ * are three genuine Godzillas the club owns (all matched to 3416): two intent-On
+ * cover each other (shared), the third intent-Off is covered by them (covered).
+ * Coverage is a property of a same-title GROUP, so no single machine can produce
+ * either state. Unlike the previous fixture these are not other games pretending
+ * to be Godzilla — they are real duplicate cabinets, so every machine header
+ * still reads its own correct title.
  *
- * **The Shared / Covered pair is why GDZ, TAF and HD all point at title 3416.**
- * Coverage is a property of a same-title GROUP, so those two states cannot be
- * produced by any single machine — three cabinets of one title is the smallest
- * fixture that shows a covering sibling (HD, GDZ) and a covered one (TAF) at
- * once. TAF and HD are not really Godzillas; the alternative was inventing
- * catalog rows, and a wrong title on a dev fixture is cheaper than a wrong
- * catalog.
+ * **AFM renders `on` — the plain, healthy state** — because Attack from Mars was
+ * added to the lineup fixture (see assertLineup above). MM stays `missing`:
+ * matched, intent On, but its title is not on the lineup.
  *
- * **Waiting is deliberately not here.** It needs no stored lineup at all, which
- * would take out every other row — clear `snapshot_json` by hand to see it.
+ * **HD is the no-model fixture** (matched to nothing) and **HB the uncataloged
+ * one** (hand-entered Williams / 1981 — Hyperball is a real flipperless Williams
+ * title with no pinball catalog entry). These two are the deliberate exceptions
+ * to "every game gets its correct match".
  *
- * **Alert is not here either, but nothing stops it being seeded.** It needs
- * intent On with an availability of Removed or Pending arrival. This file used
- * to claim the seed "cannot write" that combination because
- * `setPinballmapIntentAction` refuses it — which confused a constraint on one
- * ACTION with the legitimacy of the STATE. Spec 6.2 blocks entering from the
- * intent side and explicitly ALLOWS entering from the availability side, since
- * changing where a machine physically is must never rewrite what the operator
- * decided about the lineup (6.1). So a real machine reaches Alert by having
- * intent On and then being marked Removed, and a row written straight to the
- * end state is exactly equivalent. No CHECK constraint stands in the way either
- * — none of the three on `machines` mentions `presence_status`. Alert is absent
- * only because no cabinet was spare, not because it would be a fiction.
+ * **Alert is now seeded** (SC): intent On with availability Removed. Spec 6.2
+ * blocks entering that from the intent side but allows it from the availability
+ * side, and no CHECK constraint on `machines` mentions `presence_status`, so a
+ * row written straight to the end state is exactly what a real machine reaches
+ * by being marked Removed after intent was set On.
+ *
+ * **Two states are still not seeded.** `off` (intent Off, entry absent,
+ * availability fine) and `waiting` (needs no stored lineup at all, which would
+ * take out every other row — clear `snapshot_json` by hand to see it). Both are
+ * trivial to reach by hand; neither had a spare cabinet.
  *
  * **No machine here survives being edited into a different state and back.**
  * Re-run the seed rather than reasoning about what the fixture became.
@@ -183,10 +204,10 @@ const MACHINE_PLAN: MachinePlan[] = [
     pinballmapExcluded: false,
     presenceStatus: "on_the_floor",
     modelName: null,
-    state: "shared (with TAF off, HD on)",
+    state: "shared (with GDZ3 off, GDZ2 on)",
   },
   {
-    initials: "HD",
+    initials: "GDZ2",
     pinballmapMachineId: TITLE.godzillaPremium,
     pinballmapIntent: "on",
     pinballmapExcluded: false,
@@ -195,13 +216,13 @@ const MACHINE_PLAN: MachinePlan[] = [
     state: "shared",
   },
   {
-    initials: "TAF",
+    initials: "GDZ3",
     pinballmapMachineId: TITLE.godzillaPremium,
     pinballmapIntent: "off",
     pinballmapExcluded: false,
     presenceStatus: "on_the_floor",
     modelName: null,
-    state: "covered (by GDZ and HD)",
+    state: "covered (by GDZ and GDZ2)",
   },
   {
     initials: "SM",
@@ -225,15 +246,26 @@ const MACHINE_PLAN: MachinePlan[] = [
     state: "lingering",
   },
   {
-    initials: "EBD",
-    pinballmapMachineId: TITLE.blackKnight,
-    // Same title as BK, so its entry IS on the lineup — which is the point:
-    // sync off still shows the observed fact, it just never flags it.
-    pinballmapIntent: "no_sync",
+    initials: "AFM",
+    pinballmapMachineId: TITLE.attackFromMars,
+    // The plain, healthy state: matched, on the lineup, intent On, no same-title
+    // sibling. Attack from Mars is on the lineup only because the seed put it
+    // there (see assertLineup) — APC's real capture does not carry it.
+    pinballmapIntent: "on",
     pinballmapExcluded: false,
     presenceStatus: "on_the_floor",
     modelName: null,
-    state: "sync_off",
+    state: "on",
+  },
+  {
+    initials: "SC",
+    pinballmapMachineId: TITLE.slickChick,
+    // Intent On with availability Removed → Alert (spec 6.2, availability side).
+    pinballmapIntent: "on",
+    pinballmapExcluded: false,
+    presenceStatus: "removed",
+    modelName: null,
+    state: "alert",
   },
   {
     initials: "MM",
@@ -245,42 +277,67 @@ const MACHINE_PLAN: MachinePlan[] = [
     state: "missing",
   },
   {
-    initials: "SC",
-    pinballmapMachineId: TITLE.medievalMadness,
+    initials: "TAF",
+    pinballmapMachineId: TITLE.addamsFamily,
+    // Matched but intent no_sync: PinPoint holds the link and simply stops
+    // syncing this cabinet to PinballMap. Off-lineup here, but sync_off does not
+    // depend on the lineup. TAF stays On-the-floor so its seeded issues stay in
+    // the default issue list — much of the E2E suite (smoke/issue-list,
+    // issue-list-extended) treats TAF as the live machine with major issues, and
+    // a Removed machine drops out of that list entirely (filters-queries.ts).
+    pinballmapIntent: "no_sync",
+    pinballmapExcluded: false,
+    presenceStatus: "on_the_floor",
+    modelName: null,
+    state: "sync_off",
+  },
+  {
+    initials: "EBD",
+    pinballmapMachineId: TITLE.eightBallDeluxe,
+    // Off-lineup + intent Off + Removed → Blocked: availability disallows the On
+    // position, with the reason beside it (6.2). EBD carries Blocked rather than
+    // TAF because a Removed machine drops out of the default issue list, and the
+    // suite leans on TAF's issues staying listed while nothing lists EBD's. The
+    // reassign picker and direct /m/EBD routes ignore presence, so EBD stays
+    // usable as machine-timeline's reassign target and responsive-overflow's
+    // member-owned edit surface.
     pinballmapIntent: "off",
     pinballmapExcluded: false,
-    // Availability disallows the On position, with the reason beside it (6.2).
     presenceStatus: "removed",
     modelName: null,
     state: "blocked",
   },
   {
-    initials: "FB",
-    // The PP-3bbr shape: a cabinet with no catalog title, identified by hand.
-    // `machines_model_name_requires_excluded` makes link + hand-entry mutually
-    // exclusive, so this row also asserts the constraint holds.
-    pinballmapMachineId: null,
-    pinballmapIntent: "off",
-    pinballmapExcluded: true,
-    presenceStatus: "on_the_floor",
-    modelName: "Fireball (home-brew conversion)",
-    // The hand-entered half of PP-3bbr, and the only row that exercises it: a
-    // manufacturer and year on a machine with no catalog row to derive them
-    // from. The machine header reads these exactly as it reads a matched
-    // machine's catalog-derived pair (PP-3bbr.1), so this row is what proves
-    // the two sources render identically.
-    manufacturer: "Bally",
-    year: 1972,
-    state: "uncataloged",
-  },
-  {
-    initials: "AFM",
+    initials: "HD",
+    // The no-model fixture: a cabinet nobody has matched. "No model set" is the
+    // honest state, and a 1947 EM is a plausible thing to leave unmatched.
     pinballmapMachineId: null,
     pinballmapIntent: "off",
     pinballmapExcluded: false,
     presenceStatus: "on_the_floor",
     modelName: null,
     state: "no_model",
+  },
+  {
+    initials: "HB",
+    // The PP-3bbr shape: a cabinet with no catalog title, identified by hand.
+    // `machines_model_name_requires_excluded` makes link + hand-entry mutually
+    // exclusive, so this row also asserts the constraint holds. Hyperball is a
+    // real 1981 Williams title with no pinball catalog entry (it has no
+    // flippers), so it is genuinely uncataloged rather than a stand-in.
+    pinballmapMachineId: null,
+    pinballmapIntent: "off",
+    pinballmapExcluded: true,
+    presenceStatus: "on_the_floor",
+    modelName: "Hyperball",
+    // The hand-entered half of PP-3bbr, and the only row that exercises it: a
+    // manufacturer and year on a machine with no catalog row to derive them
+    // from. The machine header reads these exactly as it reads a matched
+    // machine's catalog-derived pair (PP-3bbr.1), so this row is what proves
+    // the two sources render identically.
+    manufacturer: "Williams",
+    year: 1981,
+    state: "uncataloged",
   },
 ];
 
