@@ -52,6 +52,17 @@ export default [
       "*.config.cjs",
       "src/app/(app)/mockup/**",
       "src/components/mockups/**",
+      // Lint fixtures for src/test/lint/oxlint-fixtures.test.ts. Their whole
+      // job is to violate the rules oxlint now runs through jsPlugins, so
+      // ESLint must not see them — and this is the ONE ignore entry that is
+      // deliberately NOT mirrored into `.oxlintrc.json`. The two lists are
+      // otherwise identical, which is precisely the problem: without this
+      // asymmetry there is no directory oxlint lints and ESLint skips, so the
+      // fixtures would have nowhere to live. `pnpm run lint` and `lint:_slim`
+      // never reach `eslint-rules/` anyway (they run over src/ e2e/ scripts/);
+      // this entry is what stops the lint-staged pre-commit pass, whose glob is
+      // repo-wide, from parsing them. No pre-existing file's coverage changes.
+      "eslint-rules/__fixtures__/**",
     ],
   },
   {
