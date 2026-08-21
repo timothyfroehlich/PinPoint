@@ -167,8 +167,8 @@ test.describe("Issue List Features", () => {
   test('should show and activate "My machines" quick-select in Machine filter', async ({
     page,
   }) => {
-    // Admin user owns: BK (Black Knight), GDZ (Godzilla), HD (Humpty Dumpty), MM (Medieval Madness)
-    // Clicking "My machines" should filter to those four machines (sorted alphabetically by initials)
+    // Admin user owns: BK (Black Knight), GDZ (Godzilla), GDZ3 (Godzilla), HD (Humpty Dumpty), MM (Medieval Madness)
+    // Clicking "My machines" should filter to those owned machines (sorted alphabetically by initials)
     await page.goto("/issues");
 
     // Open the Machine filter dropdown

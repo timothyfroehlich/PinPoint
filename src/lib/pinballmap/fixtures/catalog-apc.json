@@ -1024,5 +1024,32 @@
     "opdb_id": "GweeP-Ml9pZ-AOvNL",
     "ipdb_id": null,
     "machine_group_id": 88
+  },
+  {
+    "id": 90001,
+    "name": "Attack from Mars",
+    "manufacturer": "Bally",
+    "year": 1995,
+    "opdb_id": "G4do5-MDlN7",
+    "ipdb_id": 3781,
+    "machine_group_id": null
+  },
+  {
+    "id": 90002,
+    "name": "The Addams Family",
+    "manufacturer": "Bally",
+    "year": 1992,
+    "opdb_id": "G4ODR-MDXEy",
+    "ipdb_id": 20,
+    "machine_group_id": null
+  },
+  {
+    "id": 90003,
+    "name": "Eight Ball Deluxe",
+    "manufacturer": "Bally",
+    "year": 1981,
+    "opdb_id": "G5KXk-MLB9V",
+    "ipdb_id": 762,
+    "machine_group_id": null
   }
 ]
