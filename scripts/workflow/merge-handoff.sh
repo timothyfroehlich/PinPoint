@@ -146,12 +146,21 @@ rv_at=$(cut -f5 <<< "$record")
 # Review methods have distinct display names. In particular, the trivial exception must
 # never render as a `/code-review` run, and a legacy marker without depth must remain an
 # absence of metadata rather than a claim that a review never happened.
+#
+# The claude-code depths are enumerated rather than globbed. A glob rendered ANY detail as
+# `/code-review <detail>` — so a hand-posted `claude-code base-main` printed
+# "/code-review base-main", naming a review level nobody ran. `mark-review.sh` cannot emit
+# that pair, but this script already accommodates hand-posted markers (`unrecorded`), and
+# every line of its report is a claim Tim merges on. An unknown pair falls through to the
+# `*` arm, which shows it verbatim and asserts nothing.
 review_phrase() {
   case "$1:$2" in
     codex-plugin-cc:base-main) printf 'codex review, branch diff vs main\n' ;;
     claude-code:trivial) printf 'attested trivial (no /code-review run)\n' ;;
     claude-code:unrecorded) printf 'depth unrecorded (legacy marker predates PP-9onv)\n' ;;
-    claude-code:*) printf '/code-review %s\n' "$2" ;;
+    claude-code:low | claude-code:medium | claude-code:high | claude-code:xhigh | claude-code:max | claude-code:ultra)
+      printf '/code-review %s\n' "$2"
+      ;;
     unrecorded:*) printf 'reviewer/detail unrecorded\n' ;;
     *) printf '%s %s\n' "$1" "$2" ;;
   esac

@@ -19,13 +19,18 @@ Then self-review **by hand**: read your own diff (`git diff origin/main...HEAD`)
 
 A review covering the head commit is **required** to merge. Tim runs it — `/codex:review` or the built-in `/code-review`, his pick; getting reviewed is a handoff after all work is finished.
 
-Open the PR whenever you like and watch CI; it costs nothing. Then finish all of it — CI fixes, merge-from-main — stop iterating, and report the PR as needing Tim's review. Don't wait around for one to appear; nothing is coming on its own.
+Open the PR whenever you like and watch CI; it costs nothing. Then finish all of it — CI fixes, merge-from-main — stop iterating, and **check the review will actually see your diff** before you report the branch as ready:
 
-**Recording that review, though, IS a command you run.** Once Claude Code reports its completed Codex result, address what it found and attest the SHA it read:
+`bash scripts/workflow/review-preflight.sh <PR>`
 
-`bash scripts/workflow/mark-review.sh <PR> codex-plugin-cc base-main "<one-line findings>"`
+Both reviewers read local git state in the session's working directory; neither reads the PR. A review launched from the wrong worktree covers an empty diff, finds nothing, and reads exactly like a clean review. The preflight prints the commands only when every check passes, and names what is blocking when one doesn't. Then report the PR as needing Tim's review — don't wait around for one to appear; nothing is coming on its own.
 
-`<depth>` is the level he ran (`low`|`medium`|`high`|`xhigh`|`max`|`ultra`) — ask if you don't know, don't guess. This marker is the only thing that satisfies the `reviewed` gate, so a review nobody posted leaves the PR unmergeable. **A clean review still gets a marker** — that is the one agents drop, because there is nothing to fix and nothing to push, so it feels like there is nothing to do. Post it; that is what unblocks the merge. Of the workflow scripts, `merge-pr.sh` is the only one that prompts Tim for approval when you run it (the merge decision stays his); every other script runs freely.
+**Recording that review, though, IS a command you run.** Once the completed result comes back, address what it found and attest the SHA that was read, with the pair matching the reviewer Tim actually ran:
+
+`bash scripts/workflow/mark-review.sh <PR> codex-plugin-cc base-main "<one-line findings>"` ← `/codex:review`
+`bash scripts/workflow/mark-review.sh <PR> claude-code <depth> "<one-line findings>"` ← `/code-review <depth>`
+
+`<depth>` is the level he ran (`low`|`medium`|`high`|`xhigh`|`max`|`ultra`). **Ask which reviewer and which depth if you don't know — don't guess.** The marker records the method as well as the SHA, so picking the wrong line attests a review that never happened. This marker is the only thing that satisfies the `reviewed` gate, so a review nobody posted leaves the PR unmergeable. **A clean review still gets a marker** — that is the one agents drop, because there is nothing to fix and nothing to push, so it feels like there is nothing to do. Post it; that is what unblocks the merge. Of the workflow scripts, `merge-pr.sh` is the only one that prompts Tim for approval when you run it (the merge decision stays his); every other script runs freely.
 
 If the change is genuinely trivial (a typo, a comment, a one-line mechanical fix), attest it yourself and say why it was trivial:
 
@@ -48,7 +53,7 @@ If tests fail with `POSTGRES_URL is not set`:
 2. Push: `git push -u origin {branch_name}`
 3. Create PR: `gh pr create --title "..." --body "..."`
 4. Verify CI: `gh pr checks <PR>`
-5. Once CI is green and you have stopped iterating, hand the branch to Tim for review — unless it qualifies for the trivial-change exception above
+5. Once CI is green and you have stopped iterating, run `bash scripts/workflow/review-preflight.sh <PR>` and hand the branch to Tim for review — unless it qualifies for the trivial-change exception above
 
 ### Return Format
 

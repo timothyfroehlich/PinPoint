@@ -98,6 +98,20 @@ def marker(sha: str, depth: str = "medium", reviewer: str = "claude-code") -> di
             "body": f"<!-- pinpoint-review: {sha} -->\nreviewed by hand",
             "updated_at": "2026-08-02T20:43:19Z",
         }
+    if reviewer == "claude-code-canonical":
+        # Canonical marker, claude-code reviewer, detail passed through verbatim. The
+        # visible line deliberately does NOT interpolate the detail: this shape exists to
+        # test what `review_phrase` prints, and a fixture echoing the answer would pass
+        # whatever the script did.
+        return {
+            "body": (
+                f"<!-- pinpoint-review: {sha} -->\n"
+                "<!-- pinpoint-reviewer: claude-code -->\n"
+                f"<!-- pinpoint-review-detail: {depth} -->\n"
+                "reviewed"
+            ),
+            "updated_at": "2026-08-02T20:43:19Z",
+        }
     if reviewer == "codex-plugin-cc":
         return {
             "body": (
@@ -617,6 +631,9 @@ def test_a_stale_marker_does_not_invent_a_code_review_level(
     A stale `trivial` self-attestation rendered as `/code-review trivial`, and every
     pre-PP-9onv marker as `/code-review unrecorded` — this script asserting a review
     that never ran, in the one place whose whole claim is that nothing is recalled.
+
+    The depths are now enumerated rather than globbed, so an unrecognised detail falls
+    through to the arm that prints it verbatim and asserts nothing.
     """
     with repo_with_pr(
         branch_changes={"src/lib/thing.ts": "x\n"},
@@ -625,6 +642,34 @@ def test_a_stale_marker_does_not_invent_a_code_review_level(
     ) as (_head, run):
         assert expected in run.stdout, run.stdout
         assert f"/code-review {depth}" not in run.stdout
+
+
+def test_a_detail_from_the_other_reviewer_is_not_rendered_as_a_code_review_level() -> (
+    None
+):
+    """`claude-code` + a Codex detail must not print "/code-review base-main".
+
+    `mark-review.sh` cannot emit that pair — its `case` rejects it — but the marker is an
+    ordinary PR comment anyone can hand-post, and this script already accommodates
+    hand-posted markers (see the `unrecorded` case above). The arm was a `claude-code:*`
+    glob, so ANY detail became a `/code-review` level, naming a review depth nobody ran
+    in the one report Tim merges on.
+
+    The fixture uses the `claude-code-canonical` marker shape, whose visible line does
+    not echo the detail. The plain `claude-code` shape interpolates "/code-review
+    {depth}" into its own body, so asserting against it would catch the fixture's text
+    rather than what `review_phrase` produced.
+    """
+    with repo_with_pr(
+        branch_changes={"src/lib/thing.ts": "x\n"},
+        scenario=Scenario(
+            review="head",
+            review_reviewer="claude-code-canonical",
+            review_depth="base-main",
+        ),
+    ) as (_head, run):
+        assert "/code-review base-main" not in run.stdout, run.stdout
+        assert "claude-code base-main" in run.stdout, run.stdout
 
 
 def test_an_unknowable_review_distance_does_not_read_as_no_review() -> None:
