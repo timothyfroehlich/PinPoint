@@ -108,20 +108,27 @@ See `pinpoint-pr-workflow` Phase 3.6. Apply `ready-for-review` after CI green + 
 
 ### Ensure every PR is reviewed (lead backstop)
 
-The merge bar is unchanged: no PR merges without a review covering the **head commit**, recorded as a SHA-pinned marker (`<!-- pinpoint-claude-review: <head_sha> -->`), with threads resolved. What changed on 2026-08-02 (PP-4ric) is who reviews: **no bot does.** The reviewer is Tim running `/code-review`, which no agent — lead or subagent — can launch.
+The merge bar is unchanged: no PR merges without a review covering the **head commit**, recorded as a SHA-pinned marker (`<!-- pinpoint-review: <head_sha> -->`), with threads resolved. Tim runs the review — either `/codex:review` (marked `disable-model-invocation` by the plugin) or the built-in `/code-review` (user-triggered and billed). An agent can launch neither.
 
 That makes the lead's job here a scheduling one. A subagent that finishes and ends leaves a PR sitting unreviewed forever, because there is nothing to wait for. **Check the marker against head:**
 
 ```bash
 gh pr view <PR> --json headRefOid --jq .headRefOid
-gh api repos/timothyfroehlich/PinPoint/issues/<PR>/comments --jq '.[] | select(.body | startswith("<!-- pinpoint-claude-review:")) | .body' | head -1
+gh api --paginate repos/timothyfroehlich/PinPoint/issues/<PR>/comments \
+  --jq '.[] | select((.body // "") | startswith("<!-- pinpoint-review:") or startswith("<!-- pinpoint-claude-review:")) | .body' | tail -1
 ```
+
+Both prefixes, because `_pr-gates.sh` accepts both: a PR attested before the rename
+carries the legacy `pinpoint-claude-review:` marker and still passes the gate. Matching
+only the new one reports "no marker" for a PR that is genuinely reviewed, and the lead
+then asks Tim for a review he already did. `--paginate` for the same reason the marker
+lookup slurps — a busy PR pushes the marker past the first API page.
 
 Before applying `ready-for-review` or handing a PR to Tim for `merge-pr.sh --human`, confirm the marker pins head. If it doesn't, distinguish the cases:
 
-**No marker at all** → nobody has reviewed it. Batch it with the other PRs waiting on Tim rather than pinging him per-PR: tell him which branches are ready for `/code-review`, and let him work through them.
+**No marker at all** → nobody has reviewed it. Hand it to Tim for review once the branch has stopped changing.
 
-**A marker pinning an older SHA** → someone reviewed it, then pushed past the review. What was pushed decides the fix: if it was the review's own findings, re-attest at the new head and say so in the summary; if it was new work, it needs a fresh `/code-review`.
+**A marker pinning an older SHA** → someone reviewed it, then pushed past the review. Ask for a fresh review on the new head before attesting again.
 
 **A marker pinning head** → nothing to do. That review is legitimately terminal.
 

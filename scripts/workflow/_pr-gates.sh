@@ -13,17 +13,17 @@
 
 set -euo pipefail
 
-# SHA-pinned review marker, posted by mark-claude-review.sh. Since PP-4ric this is the
-# ONLY thing that satisfies the `reviewed` gate — Copilot review was retired on
-# 2026-08-02 (its free tier was too small to review PinPoint's PRs), and no bot reviews
-# this repo now. The marker attests that Tim ran `/code-review` over the diff, which an
-# agent cannot do for itself: `/code-review` is a harness built-in only he can trigger.
+# SHA-pinned review marker, posted by mark-review.sh. The primary accepted record is a
+# completed review Tim ran — `/codex:review` or the built-in `/code-review`, since
+# plugin declares it `disable-model-invocation` and an agent cannot launch it. Legacy
+# Claude markers remain readable so existing PRs do not lose their valid review history.
 #
 # What follows this prefix, up to the `-->`, is compared to the head SHA by STRING
-# EQUALITY. Nothing else may go inside this comment — the review depth mark-claude-review.sh
-# records lives in its own `<!-- pinpoint-review-depth: … -->` comment for exactly that
+# EQUALITY. Nothing else may go inside this comment — reviewer metadata lives in its own
+# HTML comments for exactly that
 # reason, since adding it here would fail every `reviewed` gate on every PR. (PP-9onv.)
-readonly CLAUDE_MARKER_PREFIX="<!-- pinpoint-claude-review:"
+readonly REVIEW_MARKER_PREFIX="<!-- pinpoint-review:"
+readonly LEGACY_CLAUDE_MARKER_PREFIX="<!-- pinpoint-claude-review:"
 
 # Parse owner/repo dynamically — avoid hardcoded slug. Memoized: several gates ask for
 # it and pr-dashboard.sh runs them once per open PR, so an unmemoized call was one
@@ -38,7 +38,7 @@ _repo_slug() {
 
 # The full record of the review marker that decides a head's state, as one TSV line:
 #
-#   <state>\t<sha>\t<depth>\t<updated_at>\t<summary line>
+#   <state>\t<sha>\t<reviewer>\t<detail>\t<updated_at>\t<summary line>
 #
 # `_marker_verdict` (the gate's question) is the first two fields; merge-handoff.sh
 # reports the rest, so this is the single place the pinning semantics live. Keeping one
@@ -46,12 +46,11 @@ _repo_slug() {
 # even slightly differently would let the gate and the handoff report disagree about
 # whether head was reviewed, which is the one thing neither may be wrong about.
 #
-# `depth` is the `/code-review` level recorded by mark-claude-review.sh in a second
-# HTML comment. Markers posted before PP-9onv have no such comment and read as
-# `unrecorded` — absence of the field, not a claim that no review ran.
+# `reviewer` and `detail` name the review method. Legacy markers map to `claude-code`
+# plus their former depth; incomplete metadata reads as `unrecorded`, never as a claim.
 #
 # Asked as "does ANY marker pin this head?", deliberately — not "does the newest one?".
-# mark-claude-review.sh keeps ONE sticky comment and rewrites it in place, so a PR
+# mark-review.sh keeps ONE sticky comment and rewrites it in place, so a PR
 # normally carries a single marker, but nothing enforces that: a second session, or a
 # hand-posted comment, can leave two. If the reader picks one comment and the writer
 # picks a different one, re-attesting rewrites a marker the gate never reads, and a
@@ -68,22 +67,26 @@ _repo_slug() {
 _marker_record() {
   local pr=$1 owner_repo=$2 head=$3
   gh api --paginate "repos/${owner_repo}/issues/${pr}/comments" \
-    | jq -rs --arg prefix "$CLAUDE_MARKER_PREFIX" --arg head "$head" \
+    | jq -rs --arg prefix "$REVIEW_MARKER_PREFIX" --arg legacy "$LEGACY_CLAUDE_MARKER_PREFIX" --arg head "$head" \
         '[ .[] | flatten | .[]
            | (.body // "") as $b
-           | select($b | startswith($prefix))
-           | { sha: ($b | ltrimstr($prefix) | split("-->")[0] | gsub("^\\s+|\\s+$"; "")),
-               depth: ($b | [scan("<!-- pinpoint-review-depth:\\s*([a-z]+)\\s*-->")]
-                          | flatten | (.[0] // "unrecorded")),
+           | select($b | startswith($prefix) or startswith($legacy))
+           | { sha: (if $b | startswith($prefix) then ($b | ltrimstr($prefix)) else ($b | ltrimstr($legacy)) end | split("-->")[0] | gsub("^\\s+|\\s+$"; "")),
+               reviewer: (if $b | startswith($prefix)
+                          then ($b | [scan("<!-- pinpoint-reviewer:\\s*([a-z0-9-]+)\\s*-->")] | flatten | (.[0] // "unrecorded"))
+                          else "claude-code" end),
+               detail: (if $b | startswith($prefix)
+                        then ($b | [scan("<!-- pinpoint-review-detail:\\s*([a-z0-9-]+)\\s*-->")] | flatten | (.[0] // "unrecorded"))
+                        else ($b | [scan("<!-- pinpoint-review-depth:\\s*([a-z]+)\\s*-->")] | flatten | (.[0] // "unrecorded")) end),
                at: (.updated_at // ""),
                summary: ($b | split("\n") | last | gsub("^\\s+|\\s+$"; "")) }
          ] as $markers
          | [ $markers[] | select(.sha == $head) ] as $pinned
          | if ($pinned | length) > 0 then ($pinned | last) + { state: "marker" }
            elif ($markers | length) > 0 then ($markers | last) + { state: "stale_marker" }
-           else { state: "unreviewed", sha: "", depth: "", at: "", summary: "" }
+           else { state: "unreviewed", sha: "", reviewer: "", detail: "", at: "", summary: "" }
            end
-         | [ .state, .sha, .depth, .at, .summary ] | @tsv'
+         | [ .state, .sha, .reviewer, .detail, .at, .summary ] | @tsv'
 }
 
 # The review markers' verdict on a given head, printed as "<state> <sha>" — the two
@@ -138,7 +141,7 @@ check_ci() {
 # ---------------------------------------------------------------------------------
 #
 # Three states. With the bot reviewer retired there is nobody to poll, no request to
-# wait on, and no timer to run out — Tim's `/code-review` runs on his machine and
+# wait on, and no timer to run out — the review runs on Tim's machine and
 # leaves no GitHub trace. The only observable fact is the marker, so the question
 # collapses to "does an attestation pin THIS head?":
 #
@@ -182,15 +185,18 @@ _compute_review_state() {
 }
 
 # The remedy every un-reviewed state prints. Two steps, in order, because the agent
-# cannot do the first one: `/code-review` is a Claude Code harness built-in that only
-# Tim can trigger, so the review is a handoff and the marker is what the agent posts
-# once he has run it and the findings are addressed.
+# cannot do the first one: `/codex:review` is declared `disable-model-invocation` by the
+# Codex plugin and the built-in `/code-review` is user-triggered, so only Tim can trigger
+# either. The review is a handoff and the marker is what the agent posts once he has run
+# it and the findings are addressed. Both attestation pairs are printed because Tim runs
+# both reviewers, and the pair has to match the one he actually ran.
 _review_remedy() {
   local pr=$1
-  echo "  remedy: ask Tim to run /code-review on this branch, address the findings,"
-  echo "          then attest the head he reviewed:"
-  echo "    bash scripts/workflow/mark-claude-review.sh $pr <depth> \"<one-line findings>\""
-  echo "          (<depth> is the /code-review level he ran: low|medium|high|xhigh|max|ultra)"
+  echo "  remedy: confirm the review will see this PR's diff, ask Tim to run it, address"
+  echo "          the findings, then attest the head he reviewed:"
+  echo "    bash scripts/workflow/review-preflight.sh $pr"
+  echo "    bash scripts/workflow/mark-review.sh $pr codex-plugin-cc base-main \"<one-line findings>\"   # /codex:review"
+  echo "    bash scripts/workflow/mark-review.sh $pr claude-code <depth> \"<one-line findings>\"         # /code-review <depth>"
 }
 
 # Gate 2: Zero unresolved review threads. Uses GraphQL with cursor pagination.
@@ -246,14 +252,14 @@ check_unresolved_threads() {
 # Gate 3: head commit has been reviewed. The hard backstop — a head nobody reviewed
 # cannot merge, and nothing here WAITs, because with no bot in the loop there is never
 # an answer already on its way. The marker is
-# `<!-- pinpoint-claude-review: <head_sha> -->` in a PR conversation comment (posted by
-# mark-claude-review.sh, alongside a `<!-- pinpoint-review-depth: … -->` comment this
+# `<!-- pinpoint-review: <head_sha> -->` in a PR conversation comment (posted by
+# mark-review.sh, alongside reviewer/detail comments this
 # gate ignores); the SHA pin makes it self-expiring, so a later fix changes the head SHA
 # and re-arms the gate.
 #
 #   marker        → PASS
 #   stale_marker  → FAIL   remedy: re-review the new head, re-attest
-#   unreviewed    → FAIL   remedy: Tim runs /code-review, then attest
+#   unreviewed    → FAIL   remedy: Tim runs a review, then attest
 check_review_happened() {
   local pr=$1
   _compute_review_state "$pr"

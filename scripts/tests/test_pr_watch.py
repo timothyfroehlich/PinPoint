@@ -89,8 +89,15 @@ def _ago(seconds: float) -> str:
 
 
 def marker_comment(sha=HEAD_SHA):
-    """A comment in the exact shape mark-claude-review.sh posts."""
-    return {"body": f"<!-- pinpoint-claude-review: {sha} -->\nClaude review of head"}
+    """A comment in the exact shape mark-review.sh posts for Codex."""
+    return {
+        "body": (
+            f"<!-- pinpoint-review: {sha} -->\n"
+            "<!-- pinpoint-reviewer: codex-plugin-cc -->\n"
+            "<!-- pinpoint-review-detail: base-main -->\n"
+            "Codex review of head"
+        )
+    }
 
 
 def make_gh(
@@ -522,7 +529,7 @@ def test_pre_check_reports_unresolved_threads_without_blocking(monkeypatch, caps
     """Watching CI is a step INSIDE the address-the-findings loop, not after it.
 
     Threads became author-agnostic in PP-4ric, so they are now the reviewer's
-    `/code-review` findings. The documented loop is fix → push → watch CI →
+    `/codex:review` findings. The documented loop is fix → push → watch CI →
     resolve once green; blocking here would refuse to watch the very push that
     addresses them, leaving --force (which also drops the merge-state and
     already-failed-CI pre-checks) as the only way through.
@@ -797,9 +804,25 @@ def test_marker_prefix_is_identical_to_the_bash_gate():
     answer alone, because whichever one you happen to read looks authoritative.
     """
     gates = GATES_PATH.read_text()
-    match = re.search(r'^readonly CLAUDE_MARKER_PREFIX="(.+)"$', gates, re.M)
-    assert match, "CLAUDE_MARKER_PREFIX not found in _pr-gates.sh"
-    assert match.group(1) == pr_watch.CLAUDE_MARKER_PREFIX
+    match = re.search(r'^readonly REVIEW_MARKER_PREFIX="(.+)"$', gates, re.M)
+    assert match, "REVIEW_MARKER_PREFIX not found in _pr-gates.sh"
+    assert match.group(1) == pr_watch.REVIEW_MARKER_PREFIX
+
+
+@pytest.mark.unit
+def test_legacy_marker_prefix_is_identical_to_the_bash_gate():
+    """The legacy prefix is duplicated too, so it needs the same pin.
+
+    `mark-claude-review.sh` is gone, but both implementations still READ the marker it
+    used to post: `main` can mint one until the rename lands, and merged PRs carry them.
+    A prefix edited in one file and not the other makes the readiness report and the merge
+    gate disagree about exactly the markers nobody is watching any more — the quietest
+    version of the drift the test above exists to prevent.
+    """
+    gates = GATES_PATH.read_text()
+    match = re.search(r'^readonly LEGACY_CLAUDE_MARKER_PREFIX="(.+)"$', gates, re.M)
+    assert match, "LEGACY_CLAUDE_MARKER_PREFIX not found in _pr-gates.sh"
+    assert match.group(1) == pr_watch.LEGACY_CLAUDE_MARKER_PREFIX
 
 
 @pytest.mark.unit
@@ -820,8 +843,8 @@ def test_review_state_unreviewed(monkeypatch):
     monkeypatch.setattr(pr_watch, "gh", make_gh(issue_comments=()))
     state, detail = pr_watch.review_state(PR)
     assert state == "unreviewed"
-    assert "/code-review" in detail
-    assert "mark-claude-review.sh" in detail
+    assert "/codex:review" in detail
+    assert "mark-review.sh" in detail
 
 
 @pytest.mark.unit
@@ -842,7 +865,7 @@ def test_review_state_stale_marker(monkeypatch):
     assert state == "stale_marker"
     assert OLD_SHA[:7] in detail
     assert HEAD_SHA[:7] in detail
-    assert "/code-review" in detail
+    assert "/codex:review" in detail
 
 
 @pytest.mark.unit
@@ -912,7 +935,7 @@ def test_review_state_takes_the_newest_marker(monkeypatch):
 def test_run_audit_reports_the_review_state_without_gating_on_it(
     monkeypatch, capsys, state, comments
 ):
-    """--check-ready answers "is this worth Tim's /code-review?".
+    """--check-ready answers "is this worth Tim's /codex:review?".
 
     The review is what happens AFTER that answer is yes, so gating on it would be
     circular and permanently red. merge-pr.sh's `reviewed` gate is the one that
