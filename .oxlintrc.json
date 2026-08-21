@@ -14,7 +14,17 @@
     "correctness": "off"
   },
   "options": {
-    "typeAware": true
+    "typeAware": true,
+    // "warn", not "error", and deliberately so — do NOT promote it, and do NOT
+    // delete the directives it flags. oxlint does not yet run jsx-a11y or
+    // react-hooks (Phase 4 of the oxlint-only migration ports them), so the
+    // seven `jsx-a11y/no-autofocus` and `react-hooks/exhaustive-deps` disables
+    // in src/ look unused here while authoritative ESLint still needs every one
+    // of them. That is the SLIM-mirror lesson (`eslint.config.mjs`, PP-4zcj) in
+    // a new place: when the mirror is blinder than the authority, the mirror is
+    // what gets softened.
+    // REVISIT: promote to "error" in Phase 4, once those two plugins run here.
+    "reportUnusedDisableDirectives": "warn"
   },
   "env": {
     "builtin": true
