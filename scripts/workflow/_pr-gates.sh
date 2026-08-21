@@ -190,8 +190,9 @@ _compute_review_state() {
 # the agent posts once he has run it and the findings are addressed.
 _review_remedy() {
   local pr=$1
-  echo "  remedy: ask Tim to run /codex:review --base main on this branch, address the"
-  echo "          findings, then attest the head he reviewed:"
+  echo "  remedy: confirm the review will see this PR's diff, ask Tim to run it, address"
+  echo "          the findings, then attest the head he reviewed:"
+  echo "    bash scripts/workflow/review-preflight.sh $pr"
   echo "    bash scripts/workflow/mark-review.sh $pr codex-plugin-cc base-main \"<one-line findings>\""
 }
 

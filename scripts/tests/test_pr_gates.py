@@ -211,11 +211,14 @@ def test_every_failing_state_names_the_remedy(comments: list[dict]) -> None:
     """An agent cannot run /codex:review, so the remedy has to name the handoff.
 
     Printing only `mark-review.sh` would read as "attest and move on", which is exactly
-    the false attestation the gate exists to prevent.
+    the false attestation the gate exists to prevent. The preflight is named too: a
+    review launched from the wrong worktree covers nothing and reads as clean, so
+    "ask Tim" alone is not enough of a remedy to be safe.
     """
     with gate_env(comment_pages=[comments]) as env:
         result = run_gate("check_review_happened", env)
-    assert "/codex:review --base main" in result.stdout, result.stdout
+    assert "ask Tim to run it" in result.stdout, result.stdout
+    assert "review-preflight.sh 123" in result.stdout
     assert "mark-review.sh 123 codex-plugin-cc base-main" in result.stdout
 
 

@@ -93,7 +93,18 @@ So getting reviewed is still a handoff, for a different reason than before. The 
 
 1. Open the PR whenever you like and watch CI. Nothing is reviewing yet, so an early PR costs nothing.
 2. Finish **all** the work: the implementation, the CI fixes, the merge-from-main. Stop iterating.
-3. Ask Tim to run `/codex:review --base main` on the branch, and wait. This is a real stop — don't fill the time with more commits, because every push invalidates the review he is about to give you.
+3. **Check the review will actually see the diff, then ask.**
+
+   ```bash
+   bash scripts/workflow/review-preflight.sh <PR>
+   ```
+
+   `/codex:review` reviews **local git state in the session's working directory**. It never reads the PR, doesn't know its head SHA, and won't object to being pointed somewhere else — so a review run from the wrong directory finds nothing and reports nothing, which is indistinguishable from a clean review. That is the one failure mode here that produces a false attestation nobody notices making.
+
+   The preflight checks the four things that have to hold — you're on the PR's branch, local HEAD is the SHA that's actually pushed, the tree is clean, and `main...HEAD` is non-empty — and prints the command for Tim only when all four pass. When one doesn't, it names it and prints no command; hand over the reasons, not a command you know is aimed at nothing.
+
+   Then wait. This is a real stop — don't fill the time with more commits, because every push invalidates the review he is about to give you.
+
 4. Address the findings: fix → push → and note that head has moved (see below). Consciously decline the rest, with a reason. **A review that found nothing worth fixing skips straight to step 5** — there is no push, so head is already the SHA he read.
 5. Attest the head he reviewed — **this step is yours, always, and it is the only thing that satisfies the gate.** A clean review with an unposted marker reads to `merge-pr.sh` as `unreviewed`, so the review Tim ran buys nothing until you post it:
 

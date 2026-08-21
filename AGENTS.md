@@ -157,6 +157,14 @@ Never resolve `drizzle/meta` conflicts manually — the folder holds binary-like
 
 The primary reviewer is **Codex, run by Tim typing `/codex:review --base main` in a Claude Code session** — the plugin declares that command `disable-model-invocation`, so an agent cannot launch it (nor `/codex:result`). So getting reviewed is a handoff: **finish your churn first** (CI fixes, merge-from-main), stop iterating, then tell Tim the branch is ready for review. Once he has run it, address every finding and attest the head Codex read:
 
+Before you ask, run the preflight — `/codex:review` reviews local git state in the session's working directory, so a review launched from the wrong worktree finds nothing and reads exactly like a clean review:
+
+```bash
+bash scripts/workflow/review-preflight.sh <PR>
+```
+
+It prints the command for Tim only when you're on the PR's branch, local HEAD is the pushed head, the tree is clean, and `main...HEAD` is non-empty. Then attest what he ran:
+
 ```bash
 bash scripts/workflow/mark-review.sh <PR> codex-plugin-cc base-main "<one-line findings>"
 ```

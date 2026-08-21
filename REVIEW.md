@@ -63,6 +63,7 @@ Reviewers read agent skills. Consult the relevant one for the area a PR touches 
 That did **not** loosen the merge bar. A PR still cannot merge without a review covering its **head commit**, recorded as the author's SHA-pinned marker (`<!-- pinpoint-review: <head_sha> -->`), with every thread resolved. The author finishes the work, hands the branch to Tim for the Codex review, addresses the findings, and attests the head that was read:
 
 ```bash
+bash scripts/workflow/review-preflight.sh <PR>   # confirms the review will see the diff
 bash scripts/workflow/mark-review.sh <PR> codex-plugin-cc base-main "<one-line findings>"
 ```
 
