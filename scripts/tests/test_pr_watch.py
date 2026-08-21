@@ -827,7 +827,7 @@ def test_review_state_unreviewed(monkeypatch):
     monkeypatch.setattr(pr_watch, "gh", make_gh(issue_comments=()))
     state, detail = pr_watch.review_state(PR)
     assert state == "unreviewed"
-    assert "/codex:review --base main" in detail
+    assert "/codex:review" in detail
     assert "mark-review.sh" in detail
 
 
@@ -849,7 +849,7 @@ def test_review_state_stale_marker(monkeypatch):
     assert state == "stale_marker"
     assert OLD_SHA[:7] in detail
     assert HEAD_SHA[:7] in detail
-    assert "/codex:review --base main" in detail
+    assert "/codex:review" in detail
 
 
 @pytest.mark.unit

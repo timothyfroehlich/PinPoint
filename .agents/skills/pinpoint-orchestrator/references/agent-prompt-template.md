@@ -15,9 +15,9 @@ Work bead {beads_id}. First run `bd show {beads_id}` && `bd update {beads_id} --
 
 Before returning, run the gates **AGENTS.md §5 "Which tests to run"** names for the layers you touched — that tiered list is the source of truth, so read it rather than assuming. Note in particular that `pnpm run check` is a **static** gate: it runs no unit tests and no pytest, so on its own it cannot fail on a broken test.
 
-Then self-review **by hand**: read your own diff (`git diff origin/main...HEAD`) against `REVIEW.md` — the canonical rubric — plus the bead's acceptance criteria and out-of-scope list, and fix what you find. Do not attest a review yourself: Tim runs `/codex:review --base main` after the final push.
+Then self-review **by hand**: read your own diff (`git diff origin/main...HEAD`) against `REVIEW.md` — the canonical rubric — plus the bead's acceptance criteria and out-of-scope list, and fix what you find. Do not attest a review yourself: Tim runs `/codex:review` after the final push.
 
-A review covering the head commit is **required** to merge. The primary reviewer is Codex, run by Tim with `/codex:review --base main`; getting reviewed is a handoff after all work is finished.
+A review covering the head commit is **required** to merge. The primary reviewer is Codex, run by Tim with `/codex:review`; getting reviewed is a handoff after all work is finished.
 
 Open the PR whenever you like and watch CI; it costs nothing. Then finish all of it — CI fixes, merge-from-main — stop iterating, and report the PR as needing Tim's review. Don't wait around for one to appear; nothing is coming on its own.
 
@@ -31,7 +31,7 @@ If the change is genuinely trivial (a typo, a comment, a one-line mechanical fix
 
 `bash scripts/workflow/mark-review.sh <PR> claude-code trivial "typo in a comment; no behavior change"`
 
-The marker pins a SHA, so any push after it invalidates it. Every changed head needs a fresh `/codex:review --base main` from Tim before re-attestation.
+The marker pins a SHA, so any push after it invalidates it. Every changed head needs a fresh `/codex:review` from Tim before re-attestation.
 
 The marker is an attestation that a review happened, never a way to skip one.
 
@@ -48,7 +48,7 @@ If tests fail with `POSTGRES_URL is not set`:
 2. Push: `git push -u origin {branch_name}`
 3. Create PR: `gh pr create --title "..." --body "..."`
 4. Verify CI: `gh pr checks <PR>`
-5. Once CI is green and you have stopped iterating, hand the branch to Tim for `/codex:review --base main` — unless it qualifies for the trivial-change exception above
+5. Once CI is green and you have stopped iterating, hand the branch to Tim for `/codex:review` — unless it qualifies for the trivial-change exception above
 
 ### Return Format
 
@@ -56,7 +56,7 @@ If tests fail with `POSTGRES_URL is not set`:
 - **PR**: #{number}
 - **CI**: passing/failing/pending
 - **Self-review**: findings addressed
-- **Review**: needs /codex:review --base main / attested at <sha> (trivial-change exception)
+- **Review**: needs /codex:review / attested at <sha> (trivial-change exception)
 - **Blockers**: none or description
 ```
 
@@ -66,7 +66,7 @@ If tests fail with `POSTGRES_URL is not set`:
 2. The bead is the source of truth — point the agent at `bd show`; don't restate scope/files in the prompt (two places to drift)
 3. Quality is self-enforced — hooks don't fire for subagents, so the prompt IS the enforcement. Point at AGENTS.md §5's tiered list, never at `pnpm run check` alone: `check` is static and cannot fail on a broken test (PP-lql4)
 4. Structured return format enables quick lead assessment
-5. Nothing reviews automatically — after work stabilizes, Tim runs `/codex:review --base main`. At handoff the lead checks the marker's pinned SHA against head (SKILL.md → "Ensure every PR is reviewed")
+5. Nothing reviews automatically — after work stabilizes, Tim runs `/codex:review`. At handoff the lead checks the marker's pinned SHA against head (SKILL.md → "Ensure every PR is reviewed")
 
 ## Follow-Up Prompt (via SendMessage)
 

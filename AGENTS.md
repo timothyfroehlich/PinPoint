@@ -155,7 +155,7 @@ Never resolve `drizzle/meta` conflicts manually — the folder holds binary-like
 
 **No bot reviews this repo.** Copilot review was retired on 2026-08-02 (PP-4ric) — the free tier was too small to review PinPoint's PRs, so quota outages were the normal state. The merge bar is unchanged: a PR still needs a review covering its **head commit**, with threads resolved.
 
-The primary reviewer is **Codex, run by Tim typing `/codex:review --base main` in a Claude Code session** — the plugin declares that command `disable-model-invocation`, so an agent cannot launch it (nor `/codex:result`). So getting reviewed is a handoff: **finish your churn first** (CI fixes, merge-from-main), stop iterating, then tell Tim the branch is ready for review. Once he has run it, address every finding and attest the head Codex read:
+The primary reviewer is **Codex, run by Tim typing `/codex:review` in a Claude Code session** — the plugin declares that command `disable-model-invocation`, so an agent cannot launch it (nor `/codex:result`). So getting reviewed is a handoff: **finish your churn first** (CI fixes, merge-from-main), stop iterating, then tell Tim the branch is ready for review. Once he has run it, address every finding and attest the head Codex read:
 
 Before you ask, run the preflight — `/codex:review` reviews local git state in the session's working directory, so a review launched from the wrong worktree finds nothing and reads exactly like a clean review:
 

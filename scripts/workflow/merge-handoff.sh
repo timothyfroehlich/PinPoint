@@ -148,7 +148,7 @@ rv_at=$(cut -f5 <<< "$record")
 # absence of metadata rather than a claim that a review never happened.
 review_phrase() {
   case "$1:$2" in
-    codex-plugin-cc:base-main) printf '/codex:review --base main\n' ;;
+    codex-plugin-cc:base-main) printf 'codex review, branch diff vs main\n' ;;
     claude-code:trivial) printf 'attested trivial (no /code-review run)\n' ;;
     claude-code:unrecorded) printf 'depth unrecorded (legacy marker predates PP-9onv)\n' ;;
     claude-code:*) printf '/code-review %s\n' "$2" ;;
@@ -394,7 +394,7 @@ add_block() { blocking+=("$1"); }
 if [[ "$(gate_token "$ci_out")" != "PASS" ]]; then add_block "ci: $(gate_state "$ci_out")"; fi
 if [[ "$(gate_token "$threads_out")" != "PASS" ]]; then add_block "threads: $(gate_state "$threads_out")"; fi
 if [[ "$(gate_token "$conflict_out")" != "PASS" ]]; then add_block "no_conflict: $(gate_state "$conflict_out")"; fi
-if [[ "$rv_state" != "marker" ]]; then add_block "reviewed: ${rv_state} — Tim runs /codex:review --base main, then the agent attests"; fi
+if [[ "$rv_state" != "marker" ]]; then add_block "reviewed: ${rv_state} — Tim runs /codex:review, then the agent attests"; fi
 if [[ "$is_draft" == "true" ]]; then add_block "draft: flip to ready-for-review"; fi
 if [[ "$pr_state" != "OPEN" ]]; then add_block "state: PR is ${pr_state}, not open"; fi
 # The gate answers came from `gh` at one SHA and the diff from git at another, so no

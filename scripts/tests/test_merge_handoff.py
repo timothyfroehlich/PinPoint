@@ -104,7 +104,7 @@ def marker(sha: str, depth: str = "medium", reviewer: str = "claude-code") -> di
                 f"<!-- pinpoint-review: {sha} -->\n"
                 "<!-- pinpoint-reviewer: codex-plugin-cc -->\n"
                 "<!-- pinpoint-review-detail: base-main -->\n"
-                f"Codex review of head {sha[:7]} — `/codex:review --base main`"
+                f"Codex review of head {sha[:7]} — branch diff vs main"
             ),
             "updated_at": "2026-08-02T20:43:19Z",
         }
@@ -477,7 +477,7 @@ def test_a_codex_review_covering_head_is_named_in_the_handoff() -> None:
         branch_changes={"src/lib/thing.ts": "x\n"},
         scenario=Scenario(review="head", review_reviewer="codex-plugin-cc"),
     ) as (_head, run):
-        assert "/codex:review --base main" in run.stdout, run.stdout
+        assert "codex review, branch diff vs main" in run.stdout, run.stdout
 
 
 def test_a_marker_without_reviewer_metadata_reports_it_as_unrecorded() -> None:
@@ -491,7 +491,7 @@ def test_a_marker_without_reviewer_metadata_reports_it_as_unrecorded() -> None:
         scenario=Scenario(review="head", review_reviewer="unrecorded"),
     ) as (_head, run):
         assert "reviewer/detail unrecorded" in run.stdout, run.stdout
-        assert "/codex:review" not in run.stdout.split("NOT MERGEABLE")[0]
+        assert "codex review" not in run.stdout.split("NOT MERGEABLE")[0]
 
 
 def test_commits_pushed_after_the_review_are_counted_and_diffed() -> None:

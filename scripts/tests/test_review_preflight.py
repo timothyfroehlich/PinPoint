@@ -126,7 +126,8 @@ def test_a_ready_branch_prints_the_review_and_attest_commands() -> None:
     with preflight() as run:
         assert run.returncode == 0, run.stdout + run.stderr
         assert "READY" in run.stdout
-        assert "/codex:review --base main" in run.stdout
+        assert "/codex:review" in run.stdout
+        assert "--base" not in run.stdout
         assert f"mark-review.sh {PR} codex-plugin-cc base-main" in run.stdout
 
 

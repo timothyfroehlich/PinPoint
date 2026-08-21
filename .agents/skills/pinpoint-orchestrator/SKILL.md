@@ -108,7 +108,7 @@ See `pinpoint-pr-workflow` Phase 3.6. Apply `ready-for-review` after CI green + 
 
 ### Ensure every PR is reviewed (lead backstop)
 
-The merge bar is unchanged: no PR merges without a review covering the **head commit**, recorded as a SHA-pinned marker (`<!-- pinpoint-review: <head_sha> -->`), with threads resolved. The primary reviewer is Codex, run by Tim with `/codex:review --base main`; the plugin marks that command `disable-model-invocation`, so an agent cannot launch it.
+The merge bar is unchanged: no PR merges without a review covering the **head commit**, recorded as a SHA-pinned marker (`<!-- pinpoint-review: <head_sha> -->`), with threads resolved. The primary reviewer is Codex, run by Tim with `/codex:review`; the plugin marks that command `disable-model-invocation`, so an agent cannot launch it.
 
 That makes the lead's job here a scheduling one. A subagent that finishes and ends leaves a PR sitting unreviewed forever, because there is nothing to wait for. **Check the marker against head:**
 
@@ -119,9 +119,9 @@ gh api repos/timothyfroehlich/PinPoint/issues/<PR>/comments --jq '.[] | select(.
 
 Before applying `ready-for-review` or handing a PR to Tim for `merge-pr.sh --human`, confirm the marker pins head. If it doesn't, distinguish the cases:
 
-**No marker at all** → nobody has reviewed it. Hand it to Tim for `/codex:review --base main` once the branch has stopped changing.
+**No marker at all** → nobody has reviewed it. Hand it to Tim for `/codex:review` once the branch has stopped changing.
 
-**A marker pinning an older SHA** → someone reviewed it, then pushed past the review. Ask for a fresh `/codex:review --base main` on the new head before attesting again.
+**A marker pinning an older SHA** → someone reviewed it, then pushed past the review. Ask for a fresh `/codex:review` on the new head before attesting again.
 
 **A marker pinning head** → nothing to do. That review is legitimately terminal.
 

@@ -4,7 +4,7 @@ These gates decide whether a PR may merge, so their edge cases are worth pinning
 
 PP-4ric retired Copilot review: its free tier was too small to be useful, so no bot
 reviews this repo now. The `reviewed` gate is satisfied only by the SHA-pinned marker
-`mark-review.sh` posts, which attests that Tim ran `/codex:review --base main` (the
+`mark-review.sh` posts, which attests that Tim ran `/codex:review` (the
 Codex plugin declares that command `disable-model-invocation`, so an agent cannot
 launch it either). Three states replace the old six — there is no
 request to wait on, so nothing here WAITs, and the whole request-timeline/quota-body
@@ -47,7 +47,7 @@ def marker_comment(
         f"<!-- pinpoint-review: {sha} -->",
         "<!-- pinpoint-reviewer: codex-plugin-cc -->",
         f"<!-- pinpoint-review-detail: {detail} -->",
-        f"Codex review of head {sha[:7]} — `/codex:review --base main` — {summary}",
+        f"Codex review of head {sha[:7]} — branch diff vs main — {summary}",
     ]
     return {"body": "\n".join(lines), "updated_at": "2026-08-02T20:43:19Z"}
 
@@ -364,7 +364,7 @@ def test_marker_record_reports_the_reviewer_and_detail() -> None:
         "base-main",
     )
     assert at == "2026-08-02T20:43:19Z"
-    assert "/codex:review --base main" in summary
+    assert "branch diff vs main" in summary
 
 
 def test_a_canonical_marker_without_metadata_reads_as_unrecorded() -> None:

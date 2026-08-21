@@ -19,10 +19,15 @@ set -euo pipefail
 #   2. local HEAD is the SHA that is actually pushed  — else you attest a commit Codex
 #                                                       never read (the marker pins the
 #                                                       REMOTE head, this checks they agree)
-#   3. the tree is clean                              — uncommitted work is not in the PR,
-#                                                       and a dirty tree makes `--scope
-#                                                       auto` review the working tree
-#                                                       instead of the branch
+#   3. the tree is clean                              — LOAD-BEARING. Tim types bare
+#                                                       `/codex:review`, whose default
+#                                                       `--scope auto` reviews the branch
+#                                                       diff only while the tree is clean
+#                                                       and silently switches to reviewing
+#                                                       the working tree when it isn't.
+#                                                       Nothing downstream can tell the
+#                                                       difference, and the marker would
+#                                                       claim a branch review either way.
 #   4. `<base>...HEAD` is non-empty                   — the silent-null case above
 #
 # Usage:
@@ -36,6 +41,11 @@ set -euo pipefail
 # nothing here reviews against anything else, and widening the attestation vocabulary
 # for a case that does not exist is how a record stops meaning one thing. (Codex review
 # of #1931.)
+#
+# The command handed over is bare `/codex:review`, not `--base main`. On a clean tree the
+# plugin resolves `--scope auto` to a branch diff against the detected default branch,
+# which is `main` here — so the flag was only ever restating the default, and this is one
+# fewer thing to type correctly every time. Check 3 is what makes the default safe.
 #
 # Exit status: 0 ready, 1 not ready (reasons on stdout), 2 usage error.
 #
@@ -125,7 +135,7 @@ fi
 # the command for him to run is the whole handoff.
 echo "  READY — ask Tim to run, from this directory:"
 echo
-echo "/codex:review --base ${base}"
+echo "/codex:review"
 echo
 # `base-main` is spelled out, not interpolated: it must match a pair mark-review.sh
 # accepts, and a printed attestation that drifts from that allowlist is a READY handoff

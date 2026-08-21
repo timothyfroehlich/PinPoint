@@ -16,7 +16,10 @@ set -euo pipefail
 #   bash scripts/workflow/mark-review.sh <PR> <reviewer> <detail> ["one-line findings"]
 #
 #   <reviewer>  codex-plugin-cc | claude-code
-#   <detail>    codex-plugin-cc: base-main
+#   <detail>    codex-plugin-cc: base-main   (i.e. Codex reviewed the branch diff against
+#                                             `main` — the target, not the flags; bare
+#                                             `/codex:review` on a clean tree resolves to
+#                                             exactly that)
 #               claude-code: low | medium | high | xhigh | max | ultra | trivial
 
 MARKER_PREFIX="<!-- pinpoint-review:"
@@ -61,7 +64,7 @@ detail_marker="${DETAIL_PREFIX} ${detail} -->"
 
 case "$reviewer:$detail" in
   codex-plugin-cc:base-main)
-    visible="Codex review of head ${short_sha} — \`/codex:review --base main\` — ${summary}"
+    visible="Codex review of head ${short_sha} — branch diff vs main — ${summary}"
     ;;
   claude-code:trivial)
     visible="Claude review of head ${short_sha} — trivial change, no /code-review run — ${summary}"

@@ -14,7 +14,7 @@
 set -euo pipefail
 
 # SHA-pinned review marker, posted by mark-review.sh. The primary accepted record is a
-# completed Codex Plugin CC `/codex:review --base main` — a command Tim types, since the
+# completed Codex Plugin CC `/codex:review` — a command Tim types, since the
 # plugin declares it `disable-model-invocation` and an agent cannot launch it. Legacy
 # Claude markers remain readable so existing PRs do not lose their valid review history.
 #
