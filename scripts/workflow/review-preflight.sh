@@ -118,7 +118,7 @@ elif [[ -z "$(git diff --name-only "${base}...HEAD")" ]]; then
 fi
 
 echo
-echo "Codex review preflight — PR #${pr} (${head_branch})"
+echo "Review preflight — PR #${pr} (${head_branch})"
 echo "  cwd           ${toplevel}"
 echo "  branch        ${local_branch}"
 echo "  head          ${local_head:0:7} (pushed: ${head_oid:0:7})"
