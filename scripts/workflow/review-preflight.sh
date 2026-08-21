@@ -13,7 +13,7 @@ set -euo pipefail
 # review. Attesting that is a false attestation nobody involved would notice making.
 #
 # So this is the step between "the branch is ready" and "Tim, please review it". It checks
-# the four things that have to hold for the review to be about this PR, and refuses to
+# the things that have to hold for the review to be about this PR, and refuses to
 # print the commands when one doesn't:
 #
 #   1. the working directory is the PR's branch      — else you review someone else's diff
@@ -34,6 +34,14 @@ set -euo pipefail
 #                                                       reads, uncommitted work is not part
 #                                                       of the PR.
 #   4. `<base>...HEAD` is non-empty                   — the silent-null case above
+#   5. local `main` == `origin/main`                  — the reviewer resolves the base to
+#                                                       the LOCAL branch, which the
+#                                                       merge-don't-rebase sync leaves
+#                                                       stale, so the review silently
+#                                                       covers already-merged work
+#
+# It also refuses when the PR is not based on `main`, since the attestation it prints
+# says `base-main`.
 #
 # Usage:
 #   bash scripts/workflow/review-preflight.sh <PR>
@@ -74,14 +82,29 @@ if [[ $# -gt 1 ]]; then
   exit 2
 fi
 
-read -r head_branch head_oid pr_state <<<"$(
-  gh pr view "$pr" --json headRefName,headRefOid,state \
-    --jq '[.headRefName, .headRefOid, .state] | @tsv' | tr '\t' ' '
+read -r head_branch head_oid pr_state base_branch <<<"$(
+  gh pr view "$pr" --json headRefName,headRefOid,state,baseRefName \
+    --jq '[.headRefName, .headRefOid, .state, .baseRefName] | @tsv' | tr '\t' ' '
 )"
 
 local_branch=$(git rev-parse --abbrev-ref HEAD)
 local_head=$(git rev-parse HEAD)
 toplevel=$(git rev-parse --show-toplevel)
+
+# Update remote-tracking refs so `origin/main` is current. Read-only in the sense that
+# matters: it moves no local branch and touches no working tree. Failure is not fatal —
+# check 5 compares `main` to whatever `origin/main` we have, and an unreachable remote
+# leaves a stale `origin/main` that either matches (silent, and no worse than before) or
+# blocks. Both fail closed.
+git fetch origin "$base" --quiet 2>/dev/null || true
+
+# Print the path of the worktree that has $1 checked out, if any.
+_worktree_holding() {
+  git worktree list --porcelain \
+    | awk -v want="refs/heads/$1" '
+        /^worktree /  { path = substr($0, 10) }
+        /^branch /    { if (substr($0, 8) == want) { print path; exit } }'
+}
 
 blocking=()
 
@@ -89,13 +112,17 @@ if [[ "$pr_state" != "OPEN" ]]; then
   blocking+=("PR #${pr} is ${pr_state}, not open")
 fi
 
+# The attestation pair this script prints is `base-main`, which claims the review covered
+# the branch diff against `main`. On a PR based on anything else that record is false, and
+# nothing downstream re-derives it — so refuse rather than attest a scope nobody checked.
+if [[ "$base_branch" != "$base" ]]; then
+  blocking+=("PR #${pr} targets '${base_branch}', not '${base}' — 'base-main' would record a scope that is false")
+fi
+
 if [[ "$local_branch" != "$head_branch" ]]; then
   # Name the worktree that IS on the branch, if one exists — "wrong directory" is only
   # half an answer, and the other half is one `git worktree list` away.
-  target=$(git worktree list --porcelain \
-    | awk -v want="refs/heads/${head_branch}" '
-        /^worktree /  { path = substr($0, 10) }
-        /^branch /    { if (substr($0, 8) == want) { print path; exit } }')
+  target=$(_worktree_holding "$head_branch")
   if [[ -n "$target" ]]; then
     blocking+=("on branch '${local_branch}', not '${head_branch}' — the PR's worktree is ${target}")
   else
@@ -112,7 +139,37 @@ if [[ -n "$(git status --porcelain)" ]]; then
 fi
 
 if ! git rev-parse --verify --quiet "${base}^{commit}" >/dev/null; then
-  blocking+=("no local ref '${base}' to diff against — fetch it first")
+  blocking+=("no local branch '${base}' to diff against")
+elif ! git rev-parse --verify --quiet "origin/${base}^{commit}" >/dev/null; then
+  blocking+=("no 'origin/${base}' ref — could not reach the remote to check the base is current")
+elif [[ "$(git rev-parse "$base")" != "$(git rev-parse "origin/${base}")" ]]; then
+  # LOCAL `main`, not `origin/main`, and that is not a typo. `/codex:review` resolves its
+  # own base through the plugin's `detectDefaultBranch`, which reads
+  # `refs/remotes/origin/HEAD`, then STRIPS the `refs/remotes/origin/` prefix and returns
+  # the bare name — so git resolves it as the local branch. Whatever this script measures
+  # has to be the ref the reviewer will actually use.
+  #
+  # And local `main` goes stale as a matter of routine: AGENTS.md §5 says sync with
+  # `git fetch origin && git merge origin/main`, which advances the feature branch and
+  # never the local `main` it merged from. Staleness only ever ENLARGES the diff, so
+  # check 4 below stays safe — but the review then covers other people's already-merged
+  # work, which is the same "the review was not about this PR" failure the wrong-directory
+  # check exists to catch, just quieter. Measured on PR #1931: 34 files / 1138 lines
+  # against a `main` 5 commits stale, versus the PR's actual 22 / 856.
+  behind=$(git rev-list --count "${base}..origin/${base}")
+  holder=$(_worktree_holding "$base")
+  if [[ -n "$holder" ]]; then
+    # A branch checked out elsewhere cannot be fast-forwarded from here — `git fetch
+    # origin main:main` refuses outright — so the remedy has to name that worktree.
+    remedy="git -C ${holder} pull --ff-only"
+  else
+    remedy="git fetch origin ${base}:${base}"
+  fi
+  if ((behind > 0)); then
+    blocking+=("local '${base}' is ${behind} commit(s) behind 'origin/${base}' — the review would cover already-merged work; run: ${remedy}")
+  else
+    blocking+=("local '${base}' has diverged from 'origin/${base}' — the review would be scoped to the wrong base; run: ${remedy}")
+  fi
 elif [[ -z "$(git diff --name-only "${base}...HEAD")" ]]; then
   blocking+=("'${base}...HEAD' is empty — a review here would find nothing and read as clean")
 fi

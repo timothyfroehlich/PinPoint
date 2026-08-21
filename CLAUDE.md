@@ -27,7 +27,7 @@ Finish your churn first, then check the review will actually see the diff before
 bash scripts/workflow/review-preflight.sh <PR>
 ```
 
-Both reviewers read **local git state in the session's working directory**, so a review launched from the wrong worktree finds nothing and reads exactly like a clean review. The preflight prints the commands for Tim only when you are on the PR's branch, local HEAD is the pushed head, the tree is clean, and `main...HEAD` is non-empty; otherwise it names what is blocking and prints no command.
+Both reviewers read **local git state in the session's working directory**, so a review launched from the wrong worktree finds nothing and reads exactly like a clean review. The preflight prints the commands for Tim only when you're on the PR's branch, local HEAD is the SHA that's actually pushed, the tree is clean, `main...HEAD` is non-empty, local `main` matches `origin/main`, and the PR is based on `main`; otherwise it names what is blocking and prints no command.
 
 Once he has reviewed and you have addressed the findings, attest with the pair matching what he ran — `codex-plugin-cc base-main` for `/codex:review`, `claude-code <depth>` for `/code-review <depth>`:
 

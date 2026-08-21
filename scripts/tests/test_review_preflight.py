@@ -58,12 +58,19 @@ def preflight(
     pushed_head: str | None = None,
     dirty: bool = False,
     state: str = "OPEN",
+    base_branch: str = "main",
+    stale_base: bool = False,
 ) -> Iterator[subprocess.CompletedProcess[str]]:
     """Run the preflight against a repo built to the described shape.
 
     `pushed_head` is what the stubbed GitHub claims the PR's head is; None means "match
     whatever the local HEAD turns out to be", since commit SHAs depend on commit time
     and a hard-coded one would be a different commit on every run.
+
+    `origin/main` is written as a real remote-tracking ref rather than by configuring a
+    remote, so no test reaches the network. `stale_base` advances it past local `main`,
+    which is the routine state of any repo following AGENTS.md 5 -- merging `origin/main`
+    into a feature branch never moves the local `main` it merged from.
     """
     with tempfile.TemporaryDirectory() as tmp:
         tmp_path = Path(tmp)
@@ -74,6 +81,7 @@ def preflight(
         (repo / "README.md").write_text("base\n")
         git("add", "-A", cwd=repo)
         git("commit", "-qm", "base", cwd=repo)
+        git("update-ref", "refs/remotes/origin/main", "main", cwd=repo)
 
         git("checkout", "-qb", BRANCH, cwd=repo)
         if branch_commit:
@@ -82,6 +90,16 @@ def preflight(
             git("commit", "-qm", "work", cwd=repo)
 
         local_head = git("rev-parse", "HEAD", cwd=repo)
+
+        if stale_base:
+            # A peer's work landed on the remote; local `main` never followed.
+            git("checkout", "-q", "main", cwd=repo)
+            (repo / "peer.ts").write_text("landed elsewhere\n")
+            git("add", "-A", cwd=repo)
+            git("commit", "-qm", "peer work", cwd=repo)
+            git("update-ref", "refs/remotes/origin/main", "main", cwd=repo)
+            git("reset", "-q", "--hard", "HEAD~1", cwd=repo)
+            git("checkout", "-q", BRANCH, cwd=repo)
 
         if not on_branch:
             git("checkout", "-q", "main", cwd=repo)
@@ -92,6 +110,7 @@ def preflight(
             "headRefName": BRANCH,
             "headRefOid": pushed_head or local_head,
             "state": state,
+            "baseRefName": base_branch,
         }
         (tmp_path / "meta.json").write_text(json.dumps(meta))
 
@@ -100,7 +119,7 @@ def preflight(
             "#!/usr/bin/env bash\n"
             'args="$*"\n'
             'case "$args" in\n'
-            '  *"pr view"*) jq -r "[.headRefName, .headRefOid, .state] | @tsv" "$STUB_META" ;;\n'
+            '  *"pr view"*) jq -r "[.headRefName, .headRefOid, .state, .baseRefName] | @tsv" "$STUB_META" ;;\n'
             '  *) printf "UNEXPECTED gh call: %s\\n" "$args" >&2; exit 1 ;;\n'
             "esac\n"
         )
@@ -165,6 +184,12 @@ def test_each_review_command_sits_alone_on_its_line() -> None:
             id="empty-diff",
         ),
         pytest.param({"state": "MERGED"}, "not open", id="pr-not-open"),
+        pytest.param({"stale_base": True}, "behind 'origin/main'", id="stale-base"),
+        pytest.param(
+            {"base_branch": "release/2.0"},
+            "targets 'release/2.0'",
+            id="pr-not-based-on-main",
+        ),
     ],
 )
 def test_each_way_the_review_would_miss_the_diff_blocks(
@@ -183,6 +208,8 @@ def test_each_way_the_review_would_miss_the_diff_blocks(
         pytest.param({"on_branch": False}, id="wrong-branch"),
         pytest.param({"branch_commit": False}, id="empty-diff"),
         pytest.param({"dirty": True}, id="dirty-tree"),
+        pytest.param({"stale_base": True}, id="stale-base"),
+        pytest.param({"base_branch": "release/2.0"}, id="pr-not-based-on-main"),
     ],
 )
 def test_a_blocked_preflight_never_prints_the_review_command(
@@ -287,3 +314,39 @@ def test_no_live_instruction_file_still_points_at_the_wrapper(relpath: str) -> N
     for a command that cannot run is dead config that outlives everyone's memory of it.
     """
     assert WRAPPER not in (REPO_ROOT / relpath).read_text()
+
+
+# --- The base ref the reviewer actually resolves ------------------------------------
+
+
+def test_a_stale_local_main_blocks_and_names_the_worktree_to_fix_it() -> None:
+    """The check is on LOCAL `main`, and that is not an oversight.
+
+    `/codex:review` resolves its base through the plugin's `detectDefaultBranch`, which
+    reads `refs/remotes/origin/HEAD` and then strips the `refs/remotes/origin/` prefix,
+    returning the bare name — so git resolves it as the local branch. Measuring anything
+    else would check a ref the reviewer never looks at.
+
+    Local `main` goes stale as a matter of routine, because AGENTS.md 5 says sync with
+    `git fetch origin && git merge origin/main`, which advances the feature branch and
+    never the `main` it merged from. On PR #1931 that inflated the reviewed diff from the
+    PR's 22 files to 34 — twelve files of a peer's already-merged work.
+    """
+    with preflight(stale_base=True) as run:
+        assert run.returncode == 1, run.stdout
+        assert "behind 'origin/main'" in run.stdout, run.stdout
+        # A branch checked out in another worktree cannot be fast-forwarded from here, so
+        # the remedy has to name a directory rather than print a bare fetch.
+        assert "pull --ff-only" in run.stdout or "fetch origin main:main" in run.stdout
+
+
+def test_a_pr_based_on_another_branch_is_refused() -> None:
+    """`base-main` is a claim about scope, and this is the only place it can be checked.
+
+    Nothing downstream re-derives the base: `mark-review.sh` takes the pair as given and
+    `merge-handoff.sh` renders it back verbatim. A PR based elsewhere would otherwise
+    collect a marker asserting a diff against `main` that nobody produced.
+    """
+    with preflight(base_branch="release/2.0") as run:
+        assert run.returncode == 1, run.stdout
+        assert "targets 'release/2.0'" in run.stdout, run.stdout

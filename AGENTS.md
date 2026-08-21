@@ -163,7 +163,7 @@ Before you ask, run the preflight — both reviewers read local git state in the
 bash scripts/workflow/review-preflight.sh <PR>
 ```
 
-It prints the commands for Tim only when you're on the PR's branch, local HEAD is the pushed head, the tree is clean, and `main...HEAD` is non-empty. Then attest with the pair matching what he ran:
+It prints the commands for Tim only when you're on the PR's branch, local HEAD is the SHA that's actually pushed, the tree is clean, `main...HEAD` is non-empty, local `main` matches `origin/main`, and the PR is based on `main`. (Local `main`, not `origin/main` — that is the ref the reviewer resolves, and merging `origin/main` into your branch never advances it.) Then attest with the pair matching what he ran:
 
 ```bash
 bash scripts/workflow/mark-review.sh <PR> codex-plugin-cc base-main "<one-line findings>"   # /codex:review

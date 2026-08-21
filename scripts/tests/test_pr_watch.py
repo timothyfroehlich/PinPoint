@@ -810,6 +810,22 @@ def test_marker_prefix_is_identical_to_the_bash_gate():
 
 
 @pytest.mark.unit
+def test_legacy_marker_prefix_is_identical_to_the_bash_gate():
+    """The legacy prefix is duplicated too, so it needs the same pin.
+
+    `mark-claude-review.sh` is gone, but both implementations still READ the marker it
+    used to post: `main` can mint one until the rename lands, and merged PRs carry them.
+    A prefix edited in one file and not the other makes the readiness report and the merge
+    gate disagree about exactly the markers nobody is watching any more — the quietest
+    version of the drift the test above exists to prevent.
+    """
+    gates = GATES_PATH.read_text()
+    match = re.search(r'^readonly LEGACY_CLAUDE_MARKER_PREFIX="(.+)"$', gates, re.M)
+    assert match, "LEGACY_CLAUDE_MARKER_PREFIX not found in _pr-gates.sh"
+    assert match.group(1) == pr_watch.LEGACY_CLAUDE_MARKER_PREFIX
+
+
+@pytest.mark.unit
 @pytest.mark.parametrize("state", ["marker", "stale_marker", "unreviewed"])
 def test_state_vocabulary_is_shared_with_the_bash_gate(state):
     """Both implementations name the same three states, so reports are comparable.
