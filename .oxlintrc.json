@@ -34,6 +34,7 @@
   ],
   "rules": {
     "pinpoint/no-restricted-disable-directives": "error",
+    "pinpoint/require-directive-description": "error",
     "unicorn/no-abusive-eslint-disable": "error",
     "constructor-super": "error",
     "for-direction": "error",

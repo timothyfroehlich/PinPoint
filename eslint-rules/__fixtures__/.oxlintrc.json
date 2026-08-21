@@ -14,6 +14,7 @@
     "pinpoint/no-side-effects-in-transaction": "error",
     "pinpoint/server-action-file-naming": "error",
     "pinpoint/no-restricted-disable-directives": "error",
+    "pinpoint/require-directive-description": "error",
     "unicorn/no-abusive-eslint-disable": "error",
     "better-tailwindcss/no-restricted-classes": [
       "error",

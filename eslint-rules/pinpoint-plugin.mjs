@@ -5,6 +5,7 @@
 // in the sibling modules and neither engine is authoritative over the other.
 import { pinpointRestrictedDisablePlugin } from "./no-restricted-disable-directives.mjs";
 import { pinpointTransactionPlugin } from "./no-side-effects-in-transaction.mjs";
+import { pinpointRequireDirectiveDescriptionPlugin } from "./require-directive-description.mjs";
 import { pinpointServerActionNamingPlugin } from "./server-action-file-naming.mjs";
 
 export default {
@@ -12,11 +13,13 @@ export default {
   rules: {
     ...pinpointTransactionPlugin.rules,
     ...pinpointServerActionNamingPlugin.rules,
-    // Directive governance. Deliberately oxlint-only: the ESLint counterpart
-    // (`eslint-comments/no-restricted-disable`) still runs from
-    // `eslint.config.mjs`, so registering this for ESLint too would
-    // double-report every violation. Phase 4 deletes ESLint; this is what keeps
-    // the CORE-TS-007 gate standing afterwards.
+    // Directive governance. These two are oxlint-only by design: their ESLint
+    // counterparts (`eslint-comments/no-restricted-disable` and
+    // `eslint-comments/require-description`) still run from
+    // `eslint.config.mjs`, so registering them for ESLint as well would
+    // double-report every violation. Phase 4 deletes ESLint; these are what
+    // keep the CORE-TS-007 gate standing afterwards.
     ...pinpointRestrictedDisablePlugin.rules,
+    ...pinpointRequireDirectiveDescriptionPlugin.rules,
   },
 };

@@ -132,6 +132,7 @@ describe("oxlint jsPlugins fixtures", () => {
         "pinpoint/no-side-effects-in-transaction",
         "pinpoint/server-action-file-naming",
         "pinpoint/no-restricted-disable-directives",
+        "pinpoint/require-directive-description",
         // Native, not a jsPlugin — but it is the rule that actually enforces
         // the blanket-disable ban (see the directive-governance block below),
         // so a config that lost it should fail here too.
@@ -186,10 +187,11 @@ describe("oxlint jsPlugins fixtures", () => {
 /**
  * Directive governance — the CORE-TS-007 enforcement teeth (PP-8k07).
  *
- * This is the rule that makes CORE-TS-007 a gate rather than a
+ * These are the rules that make CORE-TS-007 a gate rather than a
  * recommendation, and Phase 4 of the oxlint-only migration deletes ESLint (and
- * with it `eslint-comments/no-restricted-disable`) on the strength of it. So it
- * gets asserted case by case rather than in aggregate: a regression here is a
+ * with it `eslint-comments/no-restricted-disable` and
+ * `eslint-comments/require-description`) on the strength of them. So they get
+ * asserted case by case rather than in aggregate: a regression here is a
  * silently open door to `any`, not a lint nit.
  */
 describe("oxlint directive governance", () => {
@@ -242,5 +244,17 @@ describe("oxlint directive governance", () => {
         line: f.line,
       }))
     ).toStrictEqual([{ ruleId: "unicorn/no-abusive-eslint-disable", line: 1 }]);
+  });
+
+  it("requires a `-- reason` on directives of either prefix", async () => {
+    const found = forFile(await findingsPromise, "undescribed-directive.ts");
+    expect(
+      found.map((f) => ({ ruleId: f.ruleId, line: f.line }))
+    ).toStrictEqual([
+      { ruleId: "pinpoint/require-directive-description", line: 6 }, // oxlint-
+      { ruleId: "pinpoint/require-directive-description", line: 9 }, // eslint-
+      { ruleId: "pinpoint/require-directive-description", line: 13 }, // bare `--`
+      // line 16 carries a real description and must not appear.
+    ]);
   });
 });

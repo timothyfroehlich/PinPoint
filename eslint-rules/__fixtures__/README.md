@@ -15,3 +15,12 @@ lint inputs, not app source.
 
 Fixtures are still Prettier-formatted (Prettier does run repo-wide), so keep
 them formatted or the `format` gate goes red.
+
+**The directive fixtures are deliberately one concern per file.** A disable
+directive changes what the rest of the file reports, so
+`restricted-disable.ts`, `undescribed-directive.ts` and `blanket-disable.ts`
+each isolate one rule: the first describes every directive (so
+`require-directive-description` stays silent), the second only ever names
+`no-console` (so `no-restricted-disable-directives` stays silent), and the third
+is alone with its blanket disable because a blanket disable suppresses
+everything after it.
