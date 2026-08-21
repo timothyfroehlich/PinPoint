@@ -26,21 +26,36 @@ set -euo pipefail
 #   4. `<base>...HEAD` is non-empty                   — the silent-null case above
 #
 # Usage:
-#   bash scripts/workflow/review-preflight.sh <PR> [base]
+#   bash scripts/workflow/review-preflight.sh <PR>
 #
-#   [base] defaults to `main` and must match the `--base` you pass to /codex:review; the
-#   `codex-plugin-cc base-main` attestation names that base, so a different one is a
-#   different claim.
+# The base is always `main`, and is not a parameter. It briefly was: the earlier shape
+# took an optional `[base]` and printed `mark-review.sh … base-<that>` — an attestation
+# `mark-review.sh` rejects for every base but `main`, so the preflight would say READY
+# and hand over a command that cannot complete. The fix is this direction rather than
+# teaching the marker more pairs: PinPoint branches from `main` and merges back to it,
+# nothing here reviews against anything else, and widening the attestation vocabulary
+# for a case that does not exist is how a record stops meaning one thing. (Codex review
+# of #1931.)
 #
 # Exit status: 0 ready, 1 not ready (reasons on stdout), 2 usage error.
 #
 # Invoked via `bash …` — no executable bit required (committed mode 644).
 
+readonly base="main"
+
 pr="${1:-}"
-base="${2:-main}"
 
 if [[ -z "$pr" || ! "$pr" =~ ^[0-9]+$ ]]; then
-  echo "usage: review-preflight.sh <PR> [base]" >&2
+  echo "usage: review-preflight.sh <PR>" >&2
+  exit 2
+fi
+
+# Refuse a second argument rather than ignoring it. Silently dropping a base someone
+# meant would review against `main` while they believed otherwise — the same
+# looks-fine-covers-nothing shape this whole script exists to catch.
+if [[ $# -gt 1 ]]; then
+  echo "review-preflight.sh: unexpected argument '${2}' — the base is always 'main'" >&2
+  echo "usage: review-preflight.sh <PR>" >&2
   exit 2
 fi
 
@@ -112,7 +127,10 @@ echo "  READY — ask Tim to run, from this directory:"
 echo
 echo "/codex:review --base ${base}"
 echo
+# `base-main` is spelled out, not interpolated: it must match a pair mark-review.sh
+# accepts, and a printed attestation that drifts from that allowlist is a READY handoff
+# to a command that exits 2.
 echo "  Then attest the head he reviewed:"
-echo "! bash scripts/workflow/mark-review.sh ${pr} codex-plugin-cc base-${base} \"<one-line findings>\""
+echo "! bash scripts/workflow/mark-review.sh ${pr} codex-plugin-cc base-main \"<one-line findings>\""
 echo "  ────────────────────────────────────────────────────────────────────────"
 echo

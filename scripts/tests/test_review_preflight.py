@@ -192,3 +192,35 @@ def test_a_non_numeric_pr_is_a_usage_error() -> None:
     )
     assert result.returncode == 2
     assert "usage:" in result.stderr
+
+
+def test_a_base_argument_is_refused_rather_than_ignored() -> None:
+    """The base is `main` and is not a parameter.
+
+    It briefly was, and the printed attestation followed it — `mark-review.sh` accepts
+    only `codex-plugin-cc base-main`, so any other base produced a READY handoff to a
+    command that exits 2. Ignoring the argument instead would review against `main`
+    while the caller believed otherwise, which is the same looks-fine-covers-nothing
+    shape this script exists to catch.
+    """
+    result = subprocess.run(
+        ["bash", str(SCRIPT), str(PR), "develop"],
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 2
+    assert "the base is always 'main'" in result.stderr
+
+
+def test_the_printed_attestation_is_a_pair_mark_review_accepts() -> None:
+    """The two scripts have to agree on the vocabulary, so pin them together.
+
+    This is the coupling the Codex review of #1931 found broken: the preflight built
+    the detail string from its own input and never checked it against the marker's
+    allowlist.
+    """
+    marker = SCRIPT.parent / "mark-review.sh"
+    with preflight() as run:
+        assert "codex-plugin-cc base-main" in run.stdout, run.stdout
+    assert "codex-plugin-cc:base-main)" in marker.read_text()
