@@ -39,22 +39,23 @@ OTHER_SHA = "0000000000000000000000000000000000000000"
 
 
 def marker_comment(
-    sha: str, depth: str | None = None, summary: str = "no serious findings"
+    sha: str, detail: str = "base-main", summary: str = "no serious findings"
 ) -> dict:
-    """A comment in the exact shape mark-claude-review.sh posts.
+    """A canonical Codex marker in the exact shape mark-review.sh posts."""
+    lines = [
+        f"<!-- pinpoint-review: {sha} -->",
+        "<!-- pinpoint-reviewer: codex-plugin-cc -->",
+        f"<!-- pinpoint-review-detail: {detail} -->",
+        f"Codex review of head {sha[:7]} — `/codex:review --base main` — {summary}",
+    ]
+    return {"body": "\n".join(lines), "updated_at": "2026-08-02T20:43:19Z"}
 
-    `depth=None` is the pre-PP-9onv shape — two lines, no depth comment. Markers in that
-    shape are still live on merged PRs and on any branch attested before the change, so
-    it stays the default here: every existing test doubles as a backward-compat test.
-    """
+
+def legacy_claude_marker(sha: str, depth: str | None = None) -> dict:
     lines = [f"<!-- pinpoint-claude-review: {sha} -->"]
     if depth is not None:
         lines.append(f"<!-- pinpoint-review-depth: {depth} -->")
-        lines.append(
-            f"Claude review of head {sha[:7]} — `/code-review {depth}` — {summary}"
-        )
-    else:
-        lines.append(f"Claude review of head {sha[:7]} — {summary}")
+        lines.append(f"Claude review of head {sha[:7]} — `/code-review {depth}`")
     return {"body": "\n".join(lines), "updated_at": "2026-08-02T20:43:19Z"}
 
 
@@ -213,8 +214,8 @@ def test_every_failing_state_names_the_remedy(comments: list[dict]) -> None:
     """
     with gate_env(comment_pages=[comments]) as env:
         result = run_gate("check_review_happened", env)
-    assert "/code-review" in result.stdout, result.stdout
-    assert "mark-claude-review.sh 123" in result.stdout
+    assert "/codex:review --base main" in result.stdout, result.stdout
+    assert "mark-review.sh 123 codex-plugin-cc base-main" in result.stdout
 
 
 # --- Marker lookup: pagination and shape --------------------------------------------
@@ -333,7 +334,7 @@ def test_thread_failure_names_the_two_ways_to_clear_it() -> None:
 
 
 def marker_record(env: dict) -> list[str]:
-    """`_marker_record` for PR 123, split into its five TSV fields."""
+    """`_marker_record` for PR 123, split into its six TSV fields."""
     result = subprocess.run(
         [
             "bash",
@@ -349,46 +350,44 @@ def marker_record(env: dict) -> list[str]:
     return result.stdout.rstrip("\n").split("\t")
 
 
-def test_marker_record_reports_the_review_depth() -> None:
-    """Which /code-review ran is a separate fact from whether one ran.
-
-    Before PP-9onv only the second was written down, so the merge handoff could not
-    state the first without an agent recalling it.
-    """
-    with gate_env(comment_pages=[[marker_comment(HEAD_SHA, depth="high")]]) as env:
-        state, sha, depth, at, summary = marker_record(env)
-    assert (state, sha, depth) == ("marker", HEAD_SHA, "high")
+def test_marker_record_reports_the_reviewer_and_detail() -> None:
+    with gate_env(comment_pages=[[marker_comment(HEAD_SHA)]]) as env:
+        state, sha, reviewer, detail, at, summary = marker_record(env)
+    assert (state, sha, reviewer, detail) == (
+        "marker",
+        HEAD_SHA,
+        "codex-plugin-cc",
+        "base-main",
+    )
     assert at == "2026-08-02T20:43:19Z"
-    assert "/code-review high" in summary
+    assert "/codex:review --base main" in summary
 
 
-def test_a_marker_without_a_depth_comment_reads_as_unrecorded() -> None:
+def test_legacy_claude_marker_remains_accepted() -> None:
     """Absence of the field — not a claim that no review ran.
 
     Every marker posted before PP-9onv is this shape, and reading one as `trivial` (or
     as no review at all) would misreport a real review of a real head.
     """
-    with gate_env(comment_pages=[[marker_comment(HEAD_SHA)]]) as env:
-        state, _sha, depth, _at, _summary = marker_record(env)
-    assert (state, depth) == ("marker", "unrecorded")
+    with gate_env(comment_pages=[[legacy_claude_marker(HEAD_SHA, "high")]]) as env:
+        state, _sha, reviewer, detail, _at, _summary = marker_record(env)
+    assert (state, reviewer, detail) == ("marker", "claude-code", "high")
 
 
 def test_trivial_is_recorded_as_its_own_depth() -> None:
     """The typo/one-line carve-out the gate docs allow, made legible in the handoff."""
-    with gate_env(comment_pages=[[marker_comment(HEAD_SHA, depth="trivial")]]) as env:
-        _state, _sha, depth, _at, summary = marker_record(env)
-    assert depth == "trivial"
+    with gate_env(comment_pages=[[legacy_claude_marker(HEAD_SHA, "trivial")]]) as env:
+        _state, _sha, _reviewer, detail, _at, summary = marker_record(env)
+    assert detail == "trivial"
     assert "trivial" in summary
 
 
 @pytest.mark.parametrize(
     "comments,expected_state,expected_sha",
     [
+        pytest.param([marker_comment(HEAD_SHA)], "marker", HEAD_SHA, id="pins-head"),
         pytest.param(
-            [marker_comment(HEAD_SHA, depth="low")], "marker", HEAD_SHA, id="pins-head"
-        ),
-        pytest.param(
-            [marker_comment(OTHER_SHA, depth="low")],
+            [marker_comment(OTHER_SHA)],
             "stale_marker",
             OTHER_SHA,
             id="stale",
@@ -406,7 +405,7 @@ def test_record_and_gate_cannot_disagree_about_the_head(
     merge-pr.sh refused it (or worse, the other way round).
     """
     with gate_env(comment_pages=[comments]) as env:
-        state, sha, _depth, _at, _summary = marker_record(env)
+        state, sha, _reviewer, _detail, _at, _summary = marker_record(env)
         verdict = subprocess.run(
             [
                 "bash",

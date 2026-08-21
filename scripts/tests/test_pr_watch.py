@@ -89,8 +89,15 @@ def _ago(seconds: float) -> str:
 
 
 def marker_comment(sha=HEAD_SHA):
-    """A comment in the exact shape mark-claude-review.sh posts."""
-    return {"body": f"<!-- pinpoint-claude-review: {sha} -->\nClaude review of head"}
+    """A comment in the exact shape mark-review.sh posts for Codex."""
+    return {
+        "body": (
+            f"<!-- pinpoint-review: {sha} -->\n"
+            "<!-- pinpoint-reviewer: codex-plugin-cc -->\n"
+            "<!-- pinpoint-review-detail: base-main -->\n"
+            "Codex review of head"
+        )
+    }
 
 
 def make_gh(
@@ -797,9 +804,9 @@ def test_marker_prefix_is_identical_to_the_bash_gate():
     answer alone, because whichever one you happen to read looks authoritative.
     """
     gates = GATES_PATH.read_text()
-    match = re.search(r'^readonly CLAUDE_MARKER_PREFIX="(.+)"$', gates, re.M)
-    assert match, "CLAUDE_MARKER_PREFIX not found in _pr-gates.sh"
-    assert match.group(1) == pr_watch.CLAUDE_MARKER_PREFIX
+    match = re.search(r'^readonly REVIEW_MARKER_PREFIX="(.+)"$', gates, re.M)
+    assert match, "REVIEW_MARKER_PREFIX not found in _pr-gates.sh"
+    assert match.group(1) == pr_watch.REVIEW_MARKER_PREFIX
 
 
 @pytest.mark.unit
@@ -820,8 +827,8 @@ def test_review_state_unreviewed(monkeypatch):
     monkeypatch.setattr(pr_watch, "gh", make_gh(issue_comments=()))
     state, detail = pr_watch.review_state(PR)
     assert state == "unreviewed"
-    assert "/code-review" in detail
-    assert "mark-claude-review.sh" in detail
+    assert "/codex:review --base main" in detail
+    assert "mark-review.sh" in detail
 
 
 @pytest.mark.unit
@@ -842,7 +849,7 @@ def test_review_state_stale_marker(monkeypatch):
     assert state == "stale_marker"
     assert OLD_SHA[:7] in detail
     assert HEAD_SHA[:7] in detail
-    assert "/code-review" in detail
+    assert "/codex:review --base main" in detail
 
 
 @pytest.mark.unit

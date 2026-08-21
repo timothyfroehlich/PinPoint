@@ -81,6 +81,7 @@ class Scenario:
     draft: bool = False
     review: str | None = None
     review_depth: str = "medium"
+    review_reviewer: str = "claude-code"
     gh_head: str = "head"
     threads: list[dict] = field(default_factory=list)
     comments: list[dict] = field(default_factory=list)
@@ -88,7 +89,17 @@ class Scenario:
     branch: str = BRANCH
 
 
-def marker(sha: str, depth: str = "medium") -> dict:
+def marker(sha: str, depth: str = "medium", reviewer: str = "claude-code") -> dict:
+    if reviewer == "codex-plugin-cc":
+        return {
+            "body": (
+                f"<!-- pinpoint-review: {sha} -->\n"
+                "<!-- pinpoint-reviewer: codex-plugin-cc -->\n"
+                "<!-- pinpoint-review-detail: base-main -->\n"
+                f"Codex review of head {sha[:7]} — `/codex:review --base main`"
+            ),
+            "updated_at": "2026-08-02T20:43:19Z",
+        }
     return {
         "body": (
             f"<!-- pinpoint-claude-review: {sha} -->\n"
@@ -175,7 +186,13 @@ def repo_with_pr(
                 "previous": git("rev-parse", "HEAD~1", cwd=work),
                 "orphan": "0" * 40,
             }[scenario.review]
-            comments.append(marker(reviewed, depth=scenario.review_depth))
+            comments.append(
+                marker(
+                    reviewed,
+                    depth=scenario.review_depth,
+                    reviewer=scenario.review_reviewer,
+                )
+            )
 
         meta = {
             "number": PR,
@@ -445,6 +462,14 @@ def test_a_review_covering_head_reports_its_depth_and_no_delta() -> None:
     ) as (_head, run):
         assert "/code-review high" in run.stdout, run.stdout
         assert "since review  none — the review covers head" in run.stdout
+
+
+def test_a_codex_review_covering_head_is_named_in_the_handoff() -> None:
+    with repo_with_pr(
+        branch_changes={"src/lib/thing.ts": "x\n"},
+        scenario=Scenario(review="head", review_reviewer="codex-plugin-cc"),
+    ) as (_head, run):
+        assert "/codex:review --base main" in run.stdout, run.stdout
 
 
 def test_commits_pushed_after_the_review_are_counted_and_diffed() -> None:

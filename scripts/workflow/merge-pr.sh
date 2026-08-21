@@ -21,8 +21,8 @@
 #                                 an unreviewed head: `reviewed` never WAITs, because no
 #                                 bot reviews this repo and so no answer is ever already
 #                                 on its way. An unattested head hard-fails on the FIRST
-#                                 poll and the run ends. So run /code-review and let the
-#                                 agent attest head with mark-claude-review.sh BEFORE
+#                                 poll and the run ends. So run /codex:review --base main and
+#                                 attest head with mark-review.sh BEFORE
 #                                 firing this. Terminates on exactly three outcomes, each
 #                                 reported on exit:
 #                                   MERGED      — gates went green, PR squash-merged

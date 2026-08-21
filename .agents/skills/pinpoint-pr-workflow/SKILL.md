@@ -1,6 +1,6 @@
 ---
 name: pinpoint-pr-workflow
-description: The PR-lifecycle decisions the scripts and gates do not state — why getting reviewed is a handoff (Tim runs `/code-review`; an agent cannot) and why the SHA-pinned marker you post is the only thing that satisfies the `reviewed` gate, which pushes let you re-attest versus needing a fresh review, the narrow trivial-change exception, why the merge handoff is a script you run rather than a summary you write, the `--pages` screenshot gotchas, and the Dependabot back-to-back lockfile trap. Also the merge escape hatches (`--force`, `--bypass-merge-requirements`) and when each is and is not appropriate, what to do when `merge-pr.sh` itself is broken, and the GitHub MCP gotchas that silently do the wrong thing — snake_case field names, the pagination cap, label writes replacing the whole set rather than adding to it, `resolve_thread` ignoring owner/repo, and the thread-ID format. Use when committing, opening a PR, handing a branch to Tim for review, attesting a reviewed head, addressing review comments, posting screenshots, handing a PR over to merge, landing the plane after Tim merges, or when a GitHub MCP call does something you did not expect.
+description: The PR-lifecycle decisions the scripts and gates do not state — why getting reviewed is a handoff (Claude Code runs `/codex:review --base main`) and why the SHA-pinned marker you post is the only thing that satisfies the `reviewed` gate, which pushes let you re-attest versus needing a fresh review, the narrow trivial-change exception, why the merge handoff is a script you run rather than a summary you write, the `--pages` screenshot gotchas, and the Dependabot back-to-back lockfile trap. Also the merge escape hatches (`--force`, `--bypass-merge-requirements`) and when each is and is not appropriate, what to do when `merge-pr.sh` itself is broken, and the GitHub MCP gotchas that silently do the wrong thing — snake_case field names, the pagination cap, label writes replacing the whole set rather than adding to it, `resolve_thread` ignoring owner/repo, and the thread-ID format. Use when committing, opening a PR, handing a branch to Claude Code for review, attesting a reviewed head, addressing review comments, posting screenshots, handing a PR over to merge, landing the plane after Tim merges, or when a GitHub MCP call does something you did not expect.
 ---
 
 # PinPoint PR Workflow
@@ -77,29 +77,29 @@ Fixing, declining with a one-sentence signed reply, and resolving the thread is 
 
 Every unresolved thread counts, whoever opened it — the `threads` gate is author-agnostic. Resolve or decline each one before moving on.
 
-### 3.4 Get the head commit reviewed — Tim runs `/code-review`, you attest
+### 3.4 Get the head commit reviewed — Claude Code runs Codex, you attest
 
 **The merge bar has not moved: a PR cannot merge without a review covering the HEAD commit,** with all its threads resolved. Review is mandatory, not on-demand, not discretionary.
 
 **What changed on 2026-08-02 (PP-4ric) is who does it.** The bot reviewer this repo used was retired — its free tier was too small to review PinPoint's PRs, so quota outages were the normal state rather than the exception. No bot reviews this repo now, and there is nothing to request: a PR carries no pending reviewer, and any doc or habit that has you adding one is stale.
 
-The reviewer is **Tim, running `/code-review` on the branch**. You cannot do this for him — `/code-review` is a Claude Code harness built-in only he can trigger (`ultra` likewise, and billed). So the review is a **handoff**, and your job is to make the handoff at the right moment and record the result.
+The primary reviewer is **Codex, invoked by Claude Code with `/codex:review --base main`**. Claude is allowed to run that command itself, so the handoff is to Claude Code rather than to Tim. The command starts a real review; it does not make the marker true by itself. Read `/codex:result`, address every finding, then attest only the SHA Codex actually reviewed.
 
 #### Sequencing
 
 1. Open the PR whenever you like and watch CI. Nothing is reviewing yet, so an early PR costs nothing.
 2. Finish **all** the work: the implementation, the CI fixes, the merge-from-main. Stop iterating.
-3. Ask Tim for the review, naming the branch, and wait. This is a real stop — don't fill the time with more commits, because every push invalidates the review he is about to give you.
+3. Have Claude Code run `/codex:review --base main --background` on the branch, then retrieve `/codex:result`. This is a real stop — don't fill the time with more commits, because every push invalidates the review it is about to give you.
 4. Address the findings: fix → push → and note that head has moved (see below). Consciously decline the rest, with a reason. **A review that found nothing worth fixing skips straight to step 5** — there is no push, so head is already the SHA he read.
 5. Attest the head he reviewed — **this step is yours, always, and it is the only thing that satisfies the gate.** A clean review with an unposted marker reads to `merge-pr.sh` as `unreviewed`, so the review Tim ran buys nothing until you post it:
 
    ```bash
-   bash scripts/workflow/mark-claude-review.sh <PR> <depth> "<one-line findings summary>"
+   bash scripts/workflow/mark-review.sh <PR> codex-plugin-cc base-main "<one-line findings summary>"
    ```
 
-   That posts the sticky SHA-pinned marker `<!-- pinpoint-claude-review: <head_sha> -->` that the `reviewed` gate detects.
+   That posts the sticky SHA-pinned marker `<!-- pinpoint-review: <head_sha> -->` that the `reviewed` gate detects.
 
-   `<depth>` is the level Tim actually ran — `low | medium | high | xhigh | max | ultra` (or `trivial`, below). It is required and has no default: "a review happened" and "a `/code-review low` happened" are different facts, and the merge handoff report states which one. If you don't know which he ran, ask — guessing here writes a false claim into the record that reads exactly like a true one.
+   `codex-plugin-cc base-main` is the exact attestation for `/codex:review --base main`. Do not substitute a custom focus, a different base, or a result from before the final push. The marker records the review method as well as the SHA, so the merge handoff can state what actually ran.
 
 6. Then 3.5 / 3.6.
 
@@ -111,8 +111,8 @@ The reviewer is **Tim, running `/code-review` on the branch**. You cannot do thi
 
 Which of two things you do next depends on what you pushed:
 
-- **The fixes he asked for.** Re-attest at the new head and say so in the summary — `"applied review findings from <old_sha>"`. A reviewer's own requested changes are within what they reviewed; this is the same round-trip any human review has.
-- **Anything else** — new work, a refactor you thought of, a scope addition. That needs a fresh `/code-review`. Re-attesting over it is a false attestation.
+- **The fixes Codex asked for.** Re-run `/codex:review --base main` at the new head, then attest and say so in the summary. A new review is cheap enough that it preserves an unambiguous SHA-to-result record.
+- **Anything else** — new work, a refactor you thought of, a scope addition. That also needs a fresh `/codex:review --base main`. Re-attesting over it is a false attestation.
 
 If you're unsure which bucket you're in, ask. The cost of asking is one message; the cost of guessing wrong is merging something nobody read.
 
@@ -121,10 +121,10 @@ If you're unsure which bucket you're in, ask. The cost of asking is one message;
 A genuinely trivial change — a typo, a comment, a one-line mechanical fix — doesn't need to interrupt Tim. Attest it yourself and **say why it was trivial** in the marker summary, so the judgement is on the record and reviewable:
 
 ```bash
-bash scripts/workflow/mark-claude-review.sh <PR> trivial "typo in a comment; no behavior change"
+bash scripts/workflow/mark-review.sh <PR> claude-code trivial "typo in a comment; no behavior change"
 ```
 
-`trivial` is the depth for this case, and it is the only one that does not name a `/code-review` level — the report then says "attested trivial (no /code-review run)" rather than implying a review happened.
+`claude-code trivial` is the special record for this case, and it is the only accepted record that does not name a review command — the report then says "attested trivial (no /code-review run)" rather than implying a review happened.
 
 This is a narrow exception and it is self-policing. "It's only a small change" is not the test — the test is whether there is any way for it to be wrong. If you're reaching for a justification, it isn't trivial.
 
@@ -135,7 +135,7 @@ This is a narrow exception and it is self-policing. "It's only a small change" i
 `.claude/settings.json` has one `permissions.allow` entry, and it is this script:
 
 ```json
-"allow": ["Bash(bash scripts/workflow/mark-claude-review.sh *)"]
+"allow": ["Bash(bash scripts/workflow/mark-review.sh *)"]
 ```
 
 It is there because the command was intermittently denied. On 2026-08-03 an auto-mode session was refused with `Blocked by classifier` on PR #1815, while the same command succeeded four times across 2026-08-09/10 (PRs #1832, #1828, #1829, #1848). The block was contextual, not a standing rule — which is the worst shape for a required step, because it fails only sometimes and leaves the PR sitting at `unreviewed` with no path forward. A background subagent has no human to hand the command to at all. Rules are evaluated deny → ask → allow, and an explicit allow resolves the call before the classifier is consulted, so the entry makes the step deterministic. (PP-yx97. A new tool permission needs Tim's explicit approval each time; he gave it on 2026-08-11. This is not a CORE-SEC-010 surface — that rule governs prod-mutating Supabase tools, and its ban on `allow` applies to those.)
@@ -144,14 +144,14 @@ It is there because the command was intermittently denied. On 2026-08-03 an auto
 
 Two limits worth knowing:
 
-- The rule matches the documented invocation, `bash scripts/workflow/mark-claude-review.sh …`, and only that shape. **Use the relative path** — an absolute one does not match and falls through to the classifier. Don't count on `normalize-workspace-paths.cjs` to rescue it: its rewrite regex is hardcoded to `/home/froeht/Code/…`, so it never fires on this Mac (`/Users/froeht/Code/PinPoint`), and its `pinpoint-worktrees/` alternative predates the current `.claude/worktrees/<branch>/` layout. Chaining (`… && something-else`) does not inherit the allow either — each subcommand is matched on its own.
+- The rule matches the documented invocation, `bash scripts/workflow/mark-review.sh …`, and only that shape. **Use the relative path** — an absolute one does not match and falls through to the classifier. Don't count on `normalize-workspace-paths.cjs` to rescue it: its rewrite regex is hardcoded to `/home/froeht/Code/…`, so it never fires on this Mac (`/Users/froeht/Code/PinPoint`), and its `pinpoint-worktrees/` alternative predates the current `.claude/worktrees/<branch>/` layout. Chaining (`… && something-else`) does not inherit the allow either — each subcommand is matched on its own.
 - A summary string containing an unbalanced quote makes the whole command unresolvable to `block-direct-merge.cjs`, which then scans the raw text and blocks on `merge-pr.sh` or `pr merge`. Rare, and it fails closed. Fix the quoting rather than working around it.
 
 #### Readiness is not review
 
-`pr-watch.py --check-ready` reports review state but does **not** gate on it. That check answers "is this PR worth Tim's `/code-review` right now?", and the review is what happens after that answer is yes — gating on it would be circular. Check-ready green means "hand it to Tim", not "will merge".
+`pr-watch.py --check-ready` reports review state but does **not** gate on it. That check answers "is this PR worth `/codex:review --base main` right now?", and the review is what happens after that answer is yes — gating on it would be circular. Check-ready green means "review it", not "will merge".
 
-Don't tell Tim a PR is "ready" or "done" while head is unreviewed — say it's ready for his `/code-review`, which is a different claim.
+Don't tell Tim a PR is "ready" or "done" while head is unreviewed — say it is ready for `/codex:review --base main`, which is a different claim.
 
 ### 3.5 Post UI screenshots (UI-touching PRs only)
 
@@ -189,7 +189,7 @@ Once 3.1–3.6 are satisfied (CI green, a review whose `commit_id` matches head 
 bash scripts/workflow/merge-handoff.sh <PR>
 ```
 
-It prints what Tim needs to decide whether to merge — which `/code-review` ran and whether it covers head, how many commits landed since, CI, threads, mergeable + how far behind main, when main was last merged in, the diff split into src / tests / docs / other, migrations, newly-registered env vars, UI + screenshots — and ends with two `!`-prefixed commands: one to re-run the report, one to merge.
+It prints what Tim needs to decide whether to merge — which review ran and whether it covers head, how many commits landed since, CI, threads, mergeable + how far behind main, when main was last merged in, the diff split into src / tests / docs / other, migrations, newly-registered env vars, UI + screenshots — and ends with two `!`-prefixed commands: one to re-run the report, one to merge.
 
 **Why a script and not a format you fill in.** Every line of it is a fact you would otherwise be recalling: how many commits back the review was, what the line counts are, whether main has been merged in. Those are exactly the claims that drift, and Tim acts on them. `git` and `gh` already know all of it. Paste the block; add prose only for what the block cannot know (why a finding was declined, what to watch on deploy).
 

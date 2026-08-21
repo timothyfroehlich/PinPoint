@@ -14,7 +14,7 @@ Usage: ./scripts/workflow/pr-watch.py [--check-ready | --force] [--verbose] <PR_
                  PR ready for human review right now?". The `review` line
                  is reported but is NOT part of the verdict: the whole
                  point of this mode is to decide whether the PR is worth
-                 Tim's `/code-review`, so requiring the review to have
+                 `/codex:review --base main`, so requiring the review to have
                  already happened would be circular. `merge-pr.sh`'s
                  `reviewed` gate is what refuses to merge an unreviewed
                  head.
@@ -67,11 +67,12 @@ CI_GATE_NAME = "CI Gate"
 # script is the read-only reporter and _pr-gates.sh is sourced by merge-pr.sh,
 # which agents may not invoke at all. scripts/tests/test_pr_watch.py pins the
 # two vocabularies together.
-CLAUDE_MARKER_PREFIX = "<!-- pinpoint-claude-review:"
+REVIEW_MARKER_PREFIX = "<!-- pinpoint-review:"
+LEGACY_CLAUDE_MARKER_PREFIX = "<!-- pinpoint-claude-review:"
 
 REVIEW_HINT = (
-    "ask Tim to run /code-review, then attest with "
-    "scripts/workflow/mark-claude-review.sh {pr} <depth>"
+    "have Claude Code run /codex:review --base main, then attest with "
+    "scripts/workflow/mark-review.sh {pr} codex-plugin-cc base-main"
 )
 
 STARTUP_RETRIES = 6  # attempts to find runs for current SHA
@@ -239,16 +240,23 @@ def _gh_api_list(path: str) -> list[dict]:
 def _marker_shas(pr: int) -> list[str]:
     """Every SHA pinned by a review marker comment on the PR, oldest first.
 
-    A list rather than "the" marker: mark-claude-review.sh keeps one sticky
+    A list rather than "the" marker: mark-review.sh keeps one sticky
     comment, but nothing stops a second session or a hand-posted comment from
     leaving two, and a reader that picks one comment can disagree with the
     writer about which is canonical — see `_marker_verdict` in _pr-gates.sh.
     """
     repo = f"repos/{REPO_OWNER}/{REPO_NAME}"
     return [
-        (c.get("body") or "")[len(CLAUDE_MARKER_PREFIX) :].split("-->")[0].strip()
+        (c.get("body") or "")[
+            len(REVIEW_MARKER_PREFIX)
+            if (c.get("body") or "").startswith(REVIEW_MARKER_PREFIX)
+            else len(LEGACY_CLAUDE_MARKER_PREFIX) :
+        ]
+        .split("-->")[0]
+        .strip()
         for c in _gh_api_list(f"{repo}/issues/{pr}/comments")
-        if (c.get("body") or "").startswith(CLAUDE_MARKER_PREFIX)
+        if (c.get("body") or "").startswith(REVIEW_MARKER_PREFIX)
+        or (c.get("body") or "").startswith(LEGACY_CLAUDE_MARKER_PREFIX)
     ]
 
 
