@@ -7,10 +7,11 @@ set -euo pipefail
 # and posting it for a review that did not happen is a false attestation. The SHA in the
 # marker makes the record self-expiring: every push requires a new review of the new head.
 #
-# The review itself is Tim's to run: the Codex plugin declares `/codex:review` (and
-# `/codex:result`) `disable-model-invocation`, so an agent cannot launch either one. That
-# is what keeps the attestation witnessed by someone other than its author — this script
-# only records what he ran.
+# The review itself is Tim's to run, whichever of the two he picks: the Codex plugin
+# declares `/codex:review` (and `/codex:result`) `disable-model-invocation`, and the
+# built-in `/code-review` is user-triggered and billed, so an agent cannot launch either.
+# That is what keeps the attestation witnessed by someone other than its author — this
+# script only records what he ran.
 #
 # Usage:
 #   bash scripts/workflow/mark-review.sh <PR> <reviewer> <detail> ["one-line findings"]

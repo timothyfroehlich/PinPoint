@@ -58,7 +58,7 @@ Reviewers read agent skills. Consult the relevant one for the area a PR touches 
 
 ## How a review gets triggered
 
-**Every review on this repo is asked for.** GitHub Copilot code review was retired on 2026-08-02 (PP-4ric). The primary reviewer is Codex, run by Tim with `/codex:review` in a Claude Code session — the plugin marks that command `disable-model-invocation`, so an agent cannot launch it. Antigravity remains an optional second opinion.
+**Every review on this repo is asked for.** GitHub Copilot code review was retired on 2026-08-02 (PP-4ric). Tim runs the review, and he runs one of two: `/codex:review` (the plugin marks that command `disable-model-invocation`) and the built-in `/code-review` (user-triggered and billed). An agent can launch neither. Antigravity remains an optional second opinion.
 
 That did **not** loosen the merge bar. A PR still cannot merge without a review covering its **head commit**, recorded as the author's SHA-pinned marker (`<!-- pinpoint-review: <head_sha> -->`), with every thread resolved. The author finishes the work, hands the branch to Tim for the Codex review, addresses the findings, and attests the head that was read:
 

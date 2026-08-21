@@ -155,21 +155,22 @@ Never resolve `drizzle/meta` conflicts manually — the folder holds binary-like
 
 **No bot reviews this repo.** Copilot review was retired on 2026-08-02 (PP-4ric) — the free tier was too small to review PinPoint's PRs, so quota outages were the normal state. The merge bar is unchanged: a PR still needs a review covering its **head commit**, with threads resolved.
 
-The primary reviewer is **Codex, run by Tim typing `/codex:review` in a Claude Code session** — the plugin declares that command `disable-model-invocation`, so an agent cannot launch it (nor `/codex:result`). So getting reviewed is a handoff: **finish your churn first** (CI fixes, merge-from-main), stop iterating, then tell Tim the branch is ready for review. Once he has run it, address every finding and attest the head Codex read:
+**Tim runs the review, and he runs one of two.** `/codex:review` (Codex plugin) and the built-in `/code-review` are both in use; he picks. You cannot launch either — the Codex plugin declares its commands `disable-model-invocation`, and `/code-review` is user-triggered and billed. So getting reviewed is a handoff: **finish your churn first** (CI fixes, merge-from-main), stop iterating, then tell Tim the branch is ready for review. Once he has run it, address every finding and attest the head he read.
 
-Before you ask, run the preflight — `/codex:review` reviews local git state in the session's working directory, so a review launched from the wrong worktree finds nothing and reads exactly like a clean review:
+Before you ask, run the preflight — both reviewers read local git state in the session's working directory, so a review launched from the wrong worktree finds nothing and reads exactly like a clean review:
 
 ```bash
 bash scripts/workflow/review-preflight.sh <PR>
 ```
 
-It prints the command for Tim only when you're on the PR's branch, local HEAD is the pushed head, the tree is clean, and `main...HEAD` is non-empty. Then attest what he ran:
+It prints the commands for Tim only when you're on the PR's branch, local HEAD is the pushed head, the tree is clean, and `main...HEAD` is non-empty. Then attest with the pair matching what he ran:
 
 ```bash
-bash scripts/workflow/mark-review.sh <PR> codex-plugin-cc base-main "<one-line findings>"
+bash scripts/workflow/mark-review.sh <PR> codex-plugin-cc base-main "<one-line findings>"   # /codex:review
+bash scripts/workflow/mark-review.sh <PR> claude-code <depth> "<one-line findings>"         # /code-review <depth>
 ```
 
-The marker records the exact method and pins a SHA, so any push invalidates it. Ask for a fresh Codex review after every changed head; do not re-attest an old result. A genuinely trivial change (typo, comment, one-line mechanical fix) can use `mark-review.sh <PR> claude-code trivial`, saying why it was trivial. The marker attests a review happened; posting it otherwise is a false attestation. Full rules: `pinpoint-pr-workflow` skill Phase 3.4.
+The marker records the exact method and pins a SHA, so any push invalidates it. Ask for a fresh review after every changed head; do not re-attest an old result. A genuinely trivial change (typo, comment, one-line mechanical fix) can use `mark-review.sh <PR> claude-code trivial`, saying why it was trivial. The marker attests a review happened; posting it otherwise is a false attestation. Full rules: `pinpoint-pr-workflow` skill Phase 3.4.
 
 ### Handing a PR over to merge
 

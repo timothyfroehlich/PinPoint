@@ -1,6 +1,6 @@
 ---
 name: pinpoint-pr-workflow
-description: The PR-lifecycle decisions the scripts and gates do not state — why getting reviewed is a handoff (Tim runs `/codex:review`; the Codex plugin marks it `disable-model-invocation`, so an agent cannot) and why the SHA-pinned marker you post is the only thing that satisfies the `reviewed` gate, which pushes let you re-attest versus needing a fresh review, the narrow trivial-change exception, why the merge handoff is a script you run rather than a summary you write, the `--pages` screenshot gotchas, and the Dependabot back-to-back lockfile trap. Also the merge escape hatches (`--force`, `--bypass-merge-requirements`) and when each is and is not appropriate, what to do when `merge-pr.sh` itself is broken, and the GitHub MCP gotchas that silently do the wrong thing — snake_case field names, the pagination cap, label writes replacing the whole set rather than adding to it, `resolve_thread` ignoring owner/repo, and the thread-ID format. Use when committing, opening a PR, handing a branch to Tim for review, attesting a reviewed head, addressing review comments, posting screenshots, handing a PR over to merge, landing the plane after Tim merges, or when a GitHub MCP call does something you did not expect.
+description: The PR-lifecycle decisions the scripts and gates do not state — why getting reviewed is a handoff (Tim runs it — `/codex:review`, which the Codex plugin marks `disable-model-invocation`, or the built-in `/code-review`, which is user-triggered; an agent can launch neither) and why the SHA-pinned marker you post is the only thing that satisfies the `reviewed` gate, which pushes let you re-attest versus needing a fresh review, the narrow trivial-change exception, why the merge handoff is a script you run rather than a summary you write, the `--pages` screenshot gotchas, and the Dependabot back-to-back lockfile trap. Also the merge escape hatches (`--force`, `--bypass-merge-requirements`) and when each is and is not appropriate, what to do when `merge-pr.sh` itself is broken, and the GitHub MCP gotchas that silently do the wrong thing — snake_case field names, the pagination cap, label writes replacing the whole set rather than adding to it, `resolve_thread` ignoring owner/repo, and the thread-ID format. Use when committing, opening a PR, handing a branch to Tim for review, attesting a reviewed head, addressing review comments, posting screenshots, handing a PR over to merge, landing the plane after Tim merges, or when a GitHub MCP call does something you did not expect.
 ---
 
 # PinPoint PR Workflow
@@ -77,17 +77,17 @@ Fixing, declining with a one-sentence signed reply, and resolving the thread is 
 
 Every unresolved thread counts, whoever opened it — the `threads` gate is author-agnostic. Resolve or decline each one before moving on.
 
-### 3.4 Get the head commit reviewed — Tim runs Codex, you attest
+### 3.4 Get the head commit reviewed — Tim runs it, you attest
 
 **The merge bar has not moved: a PR cannot merge without a review covering the HEAD commit,** with all its threads resolved. Review is mandatory, not on-demand, not discretionary.
 
 **What changed on 2026-08-02 (PP-4ric) is who does it.** The bot reviewer this repo used was retired — its free tier was too small to review PinPoint's PRs, so quota outages were the normal state rather than the exception. No bot reviews this repo now, and there is nothing to request: a PR carries no pending reviewer, and any doc or habit that has you adding one is stale.
 
-The primary reviewer is **Codex, run by Tim typing `/codex:review` in a Claude Code session**.
+**Tim runs the review, and there are two he might run.** `/codex:review` (the Codex plugin) and the built-in `/code-review` are both in use. Which one he picks is his call, not yours — your job is the same either way, and the only thing that changes is the reviewer/detail pair you attest with.
 
-**You cannot launch it yourself.** The Codex plugin declares `disable-model-invocation: true` on `review`, `adversarial-review`, `result`, and `status`, so none of those slash commands is model-invocable — not the review, and not the retrieval either. Tim types the command and pastes or leaves the result in the session; your job is to read it, fix what it found, and record it. (The plugin's underlying `codex-companion.mjs` is runnable from Bash, but that path is deliberately not the documented one — routing the review through Tim is what keeps the attestation witnessed by someone other than its author.)
+**You cannot launch either.** The Codex plugin declares `disable-model-invocation: true` on `review`, `adversarial-review`, `result`, and `status`, so none of those slash commands is model-invocable — not the review, and not the retrieval either. The built-in `/code-review` is user-triggered and billed, and is likewise not yours to fire. Tim types the command and pastes or leaves the result in the session; your job is to read it, fix what it found, and record it. (The Codex plugin's underlying `codex-companion.mjs` is runnable from Bash, but that path is deliberately not the documented one — routing the review through Tim is what keeps the attestation witnessed by someone other than its author.)
 
-So getting reviewed is still a handoff, for a different reason than before. The command starts a real review; it does not make the marker true by itself. Address every finding, then attest only the SHA Codex actually reviewed.
+So getting reviewed is still a handoff, for a different reason than before. The command starts a real review; it does not make the marker true by itself. Address every finding, then attest only the SHA that was actually reviewed.
 
 #### Sequencing
 
@@ -99,24 +99,25 @@ So getting reviewed is still a handoff, for a different reason than before. The 
    bash scripts/workflow/review-preflight.sh <PR>
    ```
 
-   `/codex:review` reviews **local git state in the session's working directory**. It never reads the PR, doesn't know its head SHA, and won't object to being pointed somewhere else — so a review run from the wrong directory finds nothing and reports nothing, which is indistinguishable from a clean review. That is the one failure mode here that produces a false attestation nobody notices making.
+Both reviewers read **local git state in the session's working directory**. Neither reads the PR, neither knows its head SHA, and neither objects to being pointed somewhere else — so a review run from the wrong directory finds nothing and reports nothing, which is indistinguishable from a clean review. That is the one failure mode here that produces a false attestation nobody notices making.
 
-   The preflight checks the four things that have to hold — you're on the PR's branch, local HEAD is the SHA that's actually pushed, the tree is clean, and `main...HEAD` is non-empty — and prints the command for Tim only when all four pass. When one doesn't, it names it and prints no command; hand over the reasons, not a command you know is aimed at nothing.
+The preflight checks the four things that have to hold — you're on the PR's branch, local HEAD is the SHA that's actually pushed, the tree is clean, and `main...HEAD` is non-empty — and prints both commands for Tim only when all four pass. When one doesn't, it names it and prints no command; hand over the reasons, not a command you know is aimed at nothing.
 
-   Then wait. This is a real stop — don't fill the time with more commits, because every push invalidates the review he is about to give you.
+Then wait. This is a real stop — don't fill the time with more commits, because every push invalidates the review he is about to give you.
 
-   **When Tim types the command, pick foreground vs background yourself — don't ask.** The plugin's command file instructs you to settle it with `AskUserQuestion`. Tim's global `CLAUDE.md` forbids that tool outright: interrupting the picker to type something returns a _fabricated_ answer, reporting whichever option was labelled "(Recommended)" as his choice. So use the plugin's own heuristic instead — foreground only when the diff is roughly 1–2 files with no sign of a directory-sized change, background in every other case including unclear size — and say in one line which you picked and why. This is an operational call, not one of the taste decisions §6 reserves for him (Tim, 2026-08-20).
+**When Tim types `/codex:review`, pick foreground vs background yourself — don't ask.** The plugin's command file instructs you to settle it with `AskUserQuestion`. Tim's global `CLAUDE.md` forbids that tool outright: interrupting the picker to type something returns a _fabricated_ answer, reporting whichever option was labelled "(Recommended)" as his choice. So use the plugin's own heuristic instead — foreground only when the diff is roughly 1–2 files with no sign of a directory-sized change, background in every other case including unclear size — and say in one line which you picked and why. This is an operational call, not one of the taste decisions §6 reserves for him (Tim, 2026-08-20).
 
 4. Address the findings: fix → push → and note that head has moved (see below). Consciously decline the rest, with a reason. **A review that found nothing worth fixing skips straight to step 5** — there is no push, so head is already the SHA he read.
 5. Attest the head he reviewed — **this step is yours, always, and it is the only thing that satisfies the gate.** A clean review with an unposted marker reads to `merge-pr.sh` as `unreviewed`, so the review Tim ran buys nothing until you post it:
 
    ```bash
-   bash scripts/workflow/mark-review.sh <PR> codex-plugin-cc base-main "<one-line findings summary>"
+   bash scripts/workflow/mark-review.sh <PR> codex-plugin-cc base-main "<one-line findings summary>"   # /codex:review
+   bash scripts/workflow/mark-review.sh <PR> claude-code <depth> "<one-line findings summary>"         # /code-review <depth>
    ```
 
    That posts the sticky SHA-pinned marker `<!-- pinpoint-review: <head_sha> -->` that the `reviewed` gate detects.
 
-   `codex-plugin-cc base-main` is the exact attestation for `/codex:review`. Do not substitute a custom focus, a different base, or a result from before the final push. The marker records the review method as well as the SHA, so the merge handoff can state what actually ran.
+   **The pair has to match what Tim actually ran.** `codex-plugin-cc base-main` is the exact attestation for `/codex:review`; `claude-code <depth>` is the one for the built-in `/code-review`, where `<depth>` is the level he chose (`low`, `medium`, `high`, `xhigh`, `max`, `ultra`). Do not substitute a custom focus, a different base, a depth he didn't run, or a result from before the final push. The marker records the review method as well as the SHA, so the merge handoff can state what actually ran.
 
 6. Then 3.5 / 3.6.
 
@@ -128,8 +129,8 @@ So getting reviewed is still a handoff, for a different reason than before. The 
 
 Which of two things you do next depends on what you pushed:
 
-- **The fixes Codex asked for.** Ask Tim for a fresh `/codex:review` at the new head, then attest and say so in the summary. A new review preserves an unambiguous SHA-to-result record.
-- **Anything else** — new work, a refactor you thought of, a scope addition. That also needs a fresh `/codex:review`. Re-attesting over it is a false attestation.
+- **The fixes the review asked for.** Ask Tim for a fresh review at the new head, then attest and say so in the summary. A new review preserves an unambiguous SHA-to-result record.
+- **Anything else** — new work, a refactor you thought of, a scope addition. That also needs a fresh review. Re-attesting over it is a false attestation.
 
 If you're unsure which bucket you're in, ask. The cost of asking is one message; the cost of guessing wrong is merging something nobody read.
 
@@ -166,9 +167,9 @@ Two limits worth knowing:
 
 #### Readiness is not review
 
-`pr-watch.py --check-ready` reports review state but does **not** gate on it. That check answers "is this PR worth Tim's `/codex:review` right now?", and the review is what happens after that answer is yes — gating on it would be circular. Check-ready green means "hand it to Tim", not "will merge".
+`pr-watch.py --check-ready` reports review state but does **not** gate on it. That check answers "is this PR worth Tim's review right now?", and the review is what happens after that answer is yes — gating on it would be circular. Check-ready green means "hand it to Tim", not "will merge".
 
-Don't tell Tim a PR is "ready" or "done" while head is unreviewed — say it is ready for his `/codex:review`, which is a different claim.
+Don't tell Tim a PR is "ready" or "done" while head is unreviewed — say it is ready for his review, which is a different claim.
 
 ### 3.5 Post UI screenshots (UI-touching PRs only)
 

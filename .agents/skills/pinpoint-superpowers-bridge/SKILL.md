@@ -62,8 +62,8 @@ Code work still happens **in a worktree** — the root checkout is read-only (AG
 
 ### `requesting-code-review` / `receiving-code-review`
 
-- Superpowers' reviewer-subagent is fine as an **optional local self-check**. The **authoritative** review gate is **CI Gate + the head-commit review requirement** in `pinpoint-pr-workflow`: Tim runs `/codex:review`, then you record the completed current-head result with `mark-review.sh`. Running a superpowers review alone does not satisfy that requirement.
-- **`requesting-code-review` does not satisfy the merge gate by itself.** Stop iterating, then hand the branch to Tim for `/codex:review` and attest only that completed result. Full rules: `pinpoint-pr-workflow` Phase 3.4.
+- Superpowers' reviewer-subagent is fine as an **optional local self-check**. The **authoritative** review gate is **CI Gate + the head-commit review requirement** in `pinpoint-pr-workflow`: Tim runs the review (`/codex:review` or `/code-review`), then you record the completed current-head result with `mark-review.sh`. Running a superpowers review alone does not satisfy that requirement.
+- **`requesting-code-review` does not satisfy the merge gate by itself.** Stop iterating, then hand the branch to Tim for review and attest only that completed result. Full rules: `pinpoint-pr-workflow` Phase 3.4.
 - **Reply to review comments via MCP** (`add_reply_to_pull_request_comment` + resolve the thread with `pull_request_review_write method:"resolve_thread"`), **signed with your agent name** (`—Claude` / `—Gemini` / `—Codex` / `—Antigravity`, per AGENTS.md §5 "Review comments"). Declined comments still get a one-sentence reply — no silent ignores. Do not use the plugin's own reply flow.
 
 ### `finishing-a-development-branch` — the biggest override

@@ -14,7 +14,7 @@
 set -euo pipefail
 
 # SHA-pinned review marker, posted by mark-review.sh. The primary accepted record is a
-# completed Codex Plugin CC `/codex:review` — a command Tim types, since the
+# completed review Tim ran — `/codex:review` or the built-in `/code-review`, since
 # plugin declares it `disable-model-invocation` and an agent cannot launch it. Legacy
 # Claude markers remain readable so existing PRs do not lose their valid review history.
 #
@@ -141,7 +141,7 @@ check_ci() {
 # ---------------------------------------------------------------------------------
 #
 # Three states. With the bot reviewer retired there is nobody to poll, no request to
-# wait on, and no timer to run out — `/codex:review` runs on Tim's machine and
+# wait on, and no timer to run out — the review runs on Tim's machine and
 # leaves no GitHub trace. The only observable fact is the marker, so the question
 # collapses to "does an attestation pin THIS head?":
 #
@@ -186,14 +186,17 @@ _compute_review_state() {
 
 # The remedy every un-reviewed state prints. Two steps, in order, because the agent
 # cannot do the first one: `/codex:review` is declared `disable-model-invocation` by the
-# Codex plugin, so only Tim can trigger it. The review is a handoff and the marker is what
-# the agent posts once he has run it and the findings are addressed.
+# Codex plugin and the built-in `/code-review` is user-triggered, so only Tim can trigger
+# either. The review is a handoff and the marker is what the agent posts once he has run
+# it and the findings are addressed. Both attestation pairs are printed because Tim runs
+# both reviewers, and the pair has to match the one he actually ran.
 _review_remedy() {
   local pr=$1
   echo "  remedy: confirm the review will see this PR's diff, ask Tim to run it, address"
   echo "          the findings, then attest the head he reviewed:"
   echo "    bash scripts/workflow/review-preflight.sh $pr"
-  echo "    bash scripts/workflow/mark-review.sh $pr codex-plugin-cc base-main \"<one-line findings>\""
+  echo "    bash scripts/workflow/mark-review.sh $pr codex-plugin-cc base-main \"<one-line findings>\"   # /codex:review"
+  echo "    bash scripts/workflow/mark-review.sh $pr claude-code <depth> \"<one-line findings>\"         # /code-review <depth>"
 }
 
 # Gate 2: Zero unresolved review threads. Uses GraphQL with cursor pagination.
@@ -256,7 +259,7 @@ check_unresolved_threads() {
 #
 #   marker        → PASS
 #   stale_marker  → FAIL   remedy: re-review the new head, re-attest
-#   unreviewed    → FAIL   remedy: Tim runs /codex:review, then attest
+#   unreviewed    → FAIL   remedy: Tim runs a review, then attest
 check_review_happened() {
   local pr=$1
   _compute_review_state "$pr"

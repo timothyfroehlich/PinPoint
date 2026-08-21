@@ -4,9 +4,10 @@ These gates decide whether a PR may merge, so their edge cases are worth pinning
 
 PP-4ric retired Copilot review: its free tier was too small to be useful, so no bot
 reviews this repo now. The `reviewed` gate is satisfied only by the SHA-pinned marker
-`mark-review.sh` posts, which attests that Tim ran `/codex:review` (the
-Codex plugin declares that command `disable-model-invocation`, so an agent cannot
-launch it either). Three states replace the old six — there is no
+`mark-review.sh` posts, which attests a review Tim ran — `/codex:review` (the Codex
+plugin declares that command `disable-model-invocation`) or the built-in `/code-review`
+(user-triggered and billed), neither of which an agent can launch. Three states replace
+the old six — there is no
 request to wait on, so nothing here WAITs, and the whole request-timeline/quota-body
 apparatus (PP-lzaw, PP-jw0s) went with the reviewer it modelled.
 
@@ -250,7 +251,7 @@ def test_marker_on_a_later_page_is_still_found() -> None:
 def test_any_marker_pinning_head_passes_whatever_the_order(order: list[str]) -> None:
     """The gate asks "does ANY marker pin head?", not "does the newest one?".
 
-    Duplicate markers are a stray — mark-claude-review.sh rewrites one sticky comment —
+    Duplicate markers are a stray — mark-review.sh rewrites one sticky comment —
     but a second session or a hand-posted comment can leave two. Reading only one of
     them lets writer and reader disagree about which is canonical: re-attesting would
     rewrite a comment the gate never reads, and a genuinely reviewed head would report

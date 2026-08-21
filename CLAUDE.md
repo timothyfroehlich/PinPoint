@@ -19,7 +19,23 @@
 
 `REVIEW.md` at the repo root is the canonical review rubric, shared with Antigravity. Read it before launching the code-review skill.
 
-**No bot reviews this repo — Copilot review was retired 2026-08-02 (PP-4ric).** A review covering the head commit is still required to merge, and the reviewer is Tim running `/code-review`, which you cannot launch. Finish your churn first, then hand the branch over; once he has reviewed and you have addressed the findings, attest with `bash scripts/workflow/mark-claude-review.sh <PR> <depth> "<findings>"` (`<depth>` = the `/code-review` level he ran). The marker pins a SHA, so a later push invalidates it. Full rules: `pinpoint-pr-workflow` Phase 3.4.
+**No bot reviews this repo — Copilot review was retired 2026-08-02 (PP-4ric).** A review covering the head commit is still required to merge, and Tim runs it: either `/codex:review` or the built-in `/code-review`. You cannot launch either one — the Codex plugin declares its command `disable-model-invocation`, and `/code-review` is user-triggered and billed.
+
+Finish your churn first, then check the review will actually see the diff before you ask:
+
+```bash
+bash scripts/workflow/review-preflight.sh <PR>
+```
+
+Both reviewers read **local git state in the session's working directory**, so a review launched from the wrong worktree finds nothing and reads exactly like a clean review. The preflight prints the commands for Tim only when you are on the PR's branch, local HEAD is the pushed head, the tree is clean, and `main...HEAD` is non-empty; otherwise it names what is blocking and prints no command.
+
+Once he has reviewed and you have addressed the findings, attest with the pair matching what he ran — `codex-plugin-cc base-main` for `/codex:review`, `claude-code <depth>` for `/code-review <depth>`:
+
+```bash
+bash scripts/workflow/mark-review.sh <PR> <reviewer> <detail> "<findings>"
+```
+
+The marker pins a SHA, so a later push invalidates it. Full rules: `pinpoint-pr-workflow` Phase 3.4.
 
 ### Sandbox network isolation
 

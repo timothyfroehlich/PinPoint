@@ -1,12 +1,13 @@
 """Unit tests for scripts/workflow/review-preflight.sh.
 
-The script exists because `/codex:review` reviews local git state and has no idea which
-PR you meant. Every failure it catches is silent in the same way: the review runs, finds
-nothing, and a clean-looking result gets attested against a commit Codex never read.
+The script exists because both reviewers Tim runs — `/codex:review` and the built-in
+`/code-review` — read local git state and have no idea which PR you meant. Every failure
+it catches is silent in the same way: the review runs, finds nothing, and a clean-looking
+result gets attested against a commit nobody read.
 
-So the tests are about refusing to print the command. A preflight that prints
-`/codex:review` next to a "NOT READY" block is worse than no preflight, because the
-command is the only line anyone copies.
+So the tests are about refusing to print the commands. A preflight that prints a review
+command next to a "NOT READY" block is worse than no preflight, because the command is
+the only line anyone copies.
 
 Each test drives the real bash against a real temporary git repository and a stubbed
 `gh`, so the branch/HEAD/diff plumbing is exercised rather than mocked away.
@@ -123,12 +124,31 @@ def preflight(
 
 
 def test_a_ready_branch_prints_the_review_and_attest_commands() -> None:
+    """Both reviewers, and the attestation pair for each.
+
+    Tim picks which one he runs, and the preflight has no way to know in advance — so it
+    hands over both rather than guessing and being wrong half the time.
+    """
     with preflight() as run:
         assert run.returncode == 0, run.stdout + run.stderr
         assert "READY" in run.stdout
         assert "/codex:review" in run.stdout
+        assert "/code-review" in run.stdout
         assert "--base" not in run.stdout
         assert f"mark-review.sh {PR} codex-plugin-cc base-main" in run.stdout
+        assert f"mark-review.sh {PR} claude-code <depth>" in run.stdout
+
+
+def test_each_review_command_sits_alone_on_its_line() -> None:
+    """Tim copies a command by triple-clicking, which takes the whole line.
+
+    A command sharing its line with a label, indentation or a trailing period pastes all
+    of that into the prompt and stops being a working slash command.
+    """
+    with preflight() as run:
+        lines = run.stdout.splitlines()
+    assert "/codex:review" in lines, run.stdout
+    assert "/code-review" in lines, run.stdout
 
 
 @pytest.mark.parametrize(
@@ -175,6 +195,7 @@ def test_a_blocked_preflight_never_prints_the_review_command(
     """
     with preflight(**kwargs) as run:  # type: ignore[arg-type]
         assert "/codex:review" not in run.stdout, run.stdout
+        assert "/code-review" not in run.stdout, run.stdout
         assert "mark-review.sh" not in run.stdout, run.stdout
 
 
@@ -220,8 +241,49 @@ def test_the_printed_attestation_is_a_pair_mark_review_accepts() -> None:
     This is the coupling the Codex review of #1931 found broken: the preflight built
     the detail string from its own input and never checked it against the marker's
     allowlist.
+
+    The Codex pair is a literal on both sides. The Claude one cannot be — its detail is
+    the `/code-review` depth Tim chose, so the preflight prints a `<depth>` placeholder.
+    What is pinned there instead is that the marker still accepts a `claude-code:` detail
+    at all, which is what makes the printed line completable.
     """
-    marker = SCRIPT.parent / "mark-review.sh"
+    marker = (SCRIPT.parent / "mark-review.sh").read_text()
     with preflight() as run:
         assert "codex-plugin-cc base-main" in run.stdout, run.stdout
-    assert "codex-plugin-cc:base-main)" in marker.read_text()
+        assert "claude-code <depth>" in run.stdout, run.stdout
+    assert "codex-plugin-cc:base-main)" in marker
+    assert "claude-code:medium" in marker
+
+
+# --- The retired wrapper ------------------------------------------------------------
+
+WRAPPER = "mark-claude-review"
+
+# Live instruction surfaces only. `docs/superpowers/**` and `docs/plans/**` are dated
+# records of what was true when they were written (AGENTS.md §8) and keep their
+# references; a repo-wide grep would need an exclusion list that ages badly.
+INSTRUCTION_FILES = [
+    ".claude/settings.json",
+    "CLAUDE.md",
+    "AGENTS.md",
+    "scripts/workflow/AGENTS.md",
+]
+
+REPO_ROOT = SCRIPT.parent.parent.parent
+
+
+def test_the_claude_wrapper_script_is_gone() -> None:
+    """`mark-review.sh` is the single entrypoint; the wrapper was a migration step."""
+    assert not (SCRIPT.parent / "mark-claude-review.sh").exists()
+
+
+@pytest.mark.parametrize("relpath", INSTRUCTION_FILES)
+def test_no_live_instruction_file_still_points_at_the_wrapper(relpath: str) -> None:
+    """A deleted script named in a startup-loaded instruction file is worse than a stale
+    doc: the agent runs it, gets `No such file`, and the attestation step has no path
+    forward. `CLAUDE.md` naming it is exactly the defect the Codex review of #1931 found.
+
+    `.claude/settings.json` is here for a different reason — a `permissions.allow` entry
+    for a command that cannot run is dead config that outlives everyone's memory of it.
+    """
+    assert WRAPPER not in (REPO_ROOT / relpath).read_text()
