@@ -25,6 +25,7 @@ That tier is Claude Code-specific. In any other tool, read the catalog directly.
 5. **Root checkout is read-only.** It stays on `main`. All work — including planning docs — happens in a worktree. Dispatch a subagent or switch into an existing worktree. Tool-specific dispatch mechanics live in `CLAUDE.md`. (PP-46z, PP-bg45.)
 6. **Never `--no-verify`**, never wildcard tool permissions — without explicit user approval each time. **The merge decision is Tim's, always.** An agent MAY run the gate-enforced script `bash scripts/workflow/merge-pr.sh <PR> --human`, but the `block-direct-merge.cjs` PreToolUse hook turns that invocation into an **approval prompt** — Tim approves before it runs, so the merge is still his call (PP-wi85, reversed for the script only, per Tim 2026-08-19). The raw merge channels stay **hard-blocked** for agents — never `gh pr merge`, never `gh api PUT .../merge`, never MCP `merge_pull_request` — because they skip the script's gate re-checks (CI green, review pins head, threads resolved, no conflict). An agent's normal terminal state on a PR is still: ready-for-review, CI green, a review covering the head commit (see §5 "Getting a PR reviewed"), threads resolved, screenshots posted if UI-touching, then hand over with `bash scripts/workflow/merge-handoff.sh <PR>` — it prints the state Tim needs plus the merge command. (PP-wi85.)
 7. **Beads: `team-maintainer` policy** (not the conservative default).
+8. **New or restructured UI gets a prototyping phase with Tim before it is implemented** — see §5 "Prototyping before UI work". Bug fixes, token swaps, copy, and a11y attributes are exempt.
 
 **Beads in a cloud/ephemeral checkout:** if `.beads/` is absent (fresh cloud sandbox), run `bash scripts/beads-cloud-init.sh && cd ~/beads` before any `bd` write — the binaries are already installed by the environment setup script; this materializes the DoltHub credential and clones the shared DB. A discovery net; scheduled routines still carry the same line as a prompt preamble. Full setup: `docs/runbooks/cloud-routines-beads-access.md`.
 
@@ -201,9 +202,38 @@ When you run the superpowers plugin lifecycle (`brainstorming → writing-plans 
 
 Plan-file checkboxes are within-PR execution state, **not** durable task tracking — the bead is the cross-session source of truth. Single-PR work gets one bead (no per-task sliver-beads); only multi-PR epics decompose into children.
 
-### Surfacing visual or ambiguous decisions (playgrounds)
+### Prototyping before UI work
 
-When a decision is **visual or hard to convey in prose** — color/contrast, spacing, layout, component variants, or a tradeoff with several plausible answers — build a small interactive playground for the user instead of describing options in text or guessing on their behalf. A playground is a single self-contained HTML file with live controls, a real rendered preview, and a copy-out decision; the user adjusts it, sees the actual result, and hands the choice back. (Claude Code provides this via a `playground` plugin skill — it is **not** a checked-in `.agents/skills/` skill, so in any tool you can simply write the single-file HTML directly.) Prefer this over a wall of bullet-pointed options whenever the user would benefit from _seeing_ the thing — e.g. a contrast change is far easier to judge as rendered swatches with live WCAG ratios than as numbers. Keep using `AskUserQuestion`-style prompts for non-visual forks; reach for a playground when sight is the deciding factor.
+**New or restructured UI gets an interactive prototyping phase with Tim before it
+is implemented.** That covers a new page, component, or modal, and any layout,
+information-architecture, or flow change to an existing one. It does **not** cover
+bug fixes, token swaps, copy changes, or accessibility attributes — anything that
+changes pixels without changing structure. Tim reviews those after they are done.
+
+The failure this prevents: placement and alignment are what agents get wrong most
+often, and it surfaces late — Tim describes a screen in prose, the agent builds
+it, and only then does it become clear the description was not detailed enough to
+produce a good design. Settling the layout visually first closes that gap before
+the code exists.
+
+**Prefer the Claude Design canvas** (`/design` in Claude Code). It produces
+editable artboards Tim can rearrange directly, instead of him writing another
+paragraph describing where things go.
+
+**In a tool without it, build a playground**: a single self-contained HTML file
+with live controls, a real rendered preview, and a copy-out decision; the user
+adjusts it, sees the actual result, and hands the choice back. (Claude Code has a
+`playground` plugin skill — it is not a checked-in `.agents/skills/` skill, so in
+any tool you can simply write the single-file HTML directly.) A playground is
+also still the better tool inside Claude Code for a narrow single-variable
+question — contrast ratios, one spacing scale — where a full canvas is more than
+the decision needs.
+
+Either way, don't start implementing until Tim has signed off on a design. For
+non-visual forks, keep using a plain numbered question.
+
+Not to be confused with **prototype mode** above: that relaxes rigor _while_
+building presentational code; this settles the design _before_ building starts.
 
 ## 6. Working style
 
@@ -211,7 +241,7 @@ How Tim wants agents to behave. (§1 has the one-line version; this is the detai
 
 ### Collaboration & decisions
 
-- **Don't make my calls for me.** (a) When you ask me a multi-option question, wait for my answer before acting on one — even in auto/autonomous mode; deciding before I reply makes the question performative and removes my choice. (b) Auto/autonomous mode authorizes _operational_ calls (continuing work, tool choices, cleanup, re-publishing after a restart), **not** taste decisions — layout, color, copy, IA, or scope tradeoffs I surfaced. When I'm the taste-maker, ask (`AskUserQuestion` or a visual playground). While waiting on an answer, only do genuinely non-blocking parallel work.
+- **Don't make my calls for me.** (a) When you ask me a multi-option question, wait for my answer before acting on one — even in auto/autonomous mode; deciding before I reply makes the question performative and removes my choice. (b) Auto/autonomous mode authorizes _operational_ calls (continuing work, tool choices, cleanup, re-publishing after a restart), **not** taste decisions — layout, color, copy, IA, or scope tradeoffs I surfaced. When I'm the taste-maker, ask (a numbered prose question, or a design canvas / playground when sight is the deciding factor — see §5 "Prototyping before UI work"). While waiting on an answer, only do genuinely non-blocking parallel work.
 - **PRs ready-by-default.** Open PRs as ready-for-review, not draft. CI runs the same on drafts, so draft gates nothing — it just adds a "flip ready" step and signals WIP. Use draft only while still iterating, when you want title/description feedback first, or when you've told me you're pausing mid-task.
 - **Link markdown files by absolute path.** When you point me at a markdown file to read or review (a plan, spec, handoff doc, report), always give the full absolute path (e.g. `/Users/froeht/Code/PinPoint/docs/...`), never a relative one. Absolute paths open directly in a cmux pane.
 
