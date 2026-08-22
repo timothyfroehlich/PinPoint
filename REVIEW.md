@@ -60,7 +60,7 @@ Reviewers read agent skills. Consult the relevant one for the area a PR touches 
 
 **Every review on this repo is asked for.** Tim triggers Codex by commenting `@codex review` on the pull request. The GitHub integration uses the connected ChatGPT plan; no OpenAI API key is involved. Antigravity remains an optional second opinion.
 
-That did **not** loosen the merge bar. A PR cannot merge until Codex's native GitHub review is `APPROVED` for its **current head commit**, with every thread resolved. The gate verifies exact account `chatgpt-codex-connector[bot]` and a matching `commit_id`; any push requires a new `@codex review`. Local `/codex:review`, `/code-review`, and marker attestations do not satisfy the gate. **If you're reviewing, assume the commit you were handed is the one the author intends to be final.** Full author-side rules: `.agents/skills/pinpoint-pr-workflow/SKILL.md` Phase 3.4.
+That did **not** loosen the merge bar. A PR cannot merge without a review covering its **current head commit**, with every thread resolved. Either Codex's native GitHub review may be `APPROVED` by exact account `chatgpt-codex-connector[bot]` with a matching `commit_id`, or the existing SHA-pinned manual attestation may cover head. Any push requires a fresh review by the chosen path. **If you're reviewing, assume the commit you were handed is the one the author intends to be final.** Full author-side rules: `.agents/skills/pinpoint-pr-workflow/SKILL.md` Phase 3.4.
 
 ## Review mechanics
 

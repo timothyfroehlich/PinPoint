@@ -13,9 +13,9 @@
 
 `REVIEW.md` at the repo root is the canonical review rubric, shared with Antigravity. Read it before launching the code-review skill.
 
-**Codex GitHub review gates this repo.** Tim triggers it by commenting `@codex review` on the PR. The gate requires Codex's native GitHub `APPROVED` review of the current head; no OpenAI API key is involved.
+**Codex GitHub review is a valid review-gate path.** Tim triggers it by commenting `@codex review` on the PR. A native GitHub `APPROVED` review of the current head passes the gate alongside the existing SHA-pinned manual attestation; no OpenAI API key is involved.
 
-Finish churn first, then have Tim comment `@codex review`. Address findings and repeat the comment if the head changes. Local `/codex:review`, `/code-review`, and `mark-review.sh` attestations do not satisfy the gate. Full rules: `pinpoint-pr-workflow` Phase 3.4.
+Finish churn first, then have Tim comment `@codex review` or use the existing `/codex:review` / `/code-review` and `mark-review.sh` workflow. Address findings and repeat the chosen review path if the head changes. Full rules: `pinpoint-pr-workflow` Phase 3.4.
 
 ### Sandbox network isolation
 

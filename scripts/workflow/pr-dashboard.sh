@@ -104,7 +104,9 @@ for pr in $PRS; do
     elif _compute_review_state "$pr" 2>/dev/null; then
         case "$RS_STATE" in
             approval)       review_str="reviewed" ;;
+            marker)         review_str="reviewed" ;;
             stale_approval) review_str="RE-REVIEW" ;;
+            stale_marker)   review_str="RE-REVIEW" ;;
             not_approved)   review_str="NOT APPROVED" ;;
             unreviewed)     review_str="NOT REVIEWED" ;;
             *)            review_str="?" ;;

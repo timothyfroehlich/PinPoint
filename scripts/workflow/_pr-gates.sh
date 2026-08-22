@@ -18,6 +18,8 @@ set -euo pipefail
 # "codex" in a login) would let a review be forged. A qualifying approval must also name
 # the PR's exact current head SHA.
 readonly CODEX_REVIEW_BOT="chatgpt-codex-connector[bot]"
+readonly REVIEW_MARKER_PREFIX="<!-- pinpoint-review:"
+readonly LEGACY_CLAUDE_MARKER_PREFIX="<!-- pinpoint-claude-review:"
 
 # Parse owner/repo dynamically — avoid hardcoded slug. Memoized: several gates ask for
 # it and pr-dashboard.sh runs them once per open PR, so an unmemoized call was one
@@ -39,7 +41,7 @@ _repo_slug() {
 # timestamps are only ordering metadata.
 #
 # The slurp is required because gh emits one JSON array per page under --paginate.
-_review_record() {
+_codex_review_record() {
   local pr=$1 owner_repo=$2 head=$3
   gh api --paginate "repos/${owner_repo}/pulls/${pr}/reviews" \
     | jq -rs --arg bot "$CODEX_REVIEW_BOT" --arg head "$head" \
@@ -64,6 +66,53 @@ _review_record() {
                end
            end
          | [ .state, .sha, .reviewer, .detail, .at, .summary ] | @tsv'
+}
+
+# The manual attestation remains a valid, independent review path. A matching marker
+# covers head even when Codex has not reviewed the PR (or left a non-approval review).
+_marker_record() {
+  local pr=$1 owner_repo=$2 head=$3
+  gh api --paginate "repos/${owner_repo}/issues/${pr}/comments" \
+    | jq -rs --arg prefix "$REVIEW_MARKER_PREFIX" --arg legacy "$LEGACY_CLAUDE_MARKER_PREFIX" --arg head "$head" \
+        '[ .[] | flatten | .[]
+           | (.body // "") as $body
+           | select($body | startswith($prefix) or startswith($legacy))
+           | { sha: (if $body | startswith($prefix) then ($body | ltrimstr($prefix)) else ($body | ltrimstr($legacy)) end | split("-->")[0] | gsub("^\\s+|\\s+$"; "")),
+               reviewer: (if $body | startswith($prefix)
+                          then ($body | [scan("<!-- pinpoint-reviewer:\\s*([a-z0-9-]+)\\s*-->")] | flatten | (.[0] // "unrecorded"))
+                          else "claude-code" end),
+               detail: (if $body | startswith($prefix)
+                        then ($body | [scan("<!-- pinpoint-review-detail:\\s*([a-z0-9-]+)\\s*-->")] | flatten | (.[0] // "unrecorded"))
+                        else ($body | [scan("<!-- pinpoint-review-depth:\\s*([a-z]+)\\s*-->")] | flatten | (.[0] // "unrecorded")) end),
+               at: (.updated_at // ""),
+               summary: (($body | split("\n") | last) // "") }
+         ] as $markers
+         | [ $markers[] | select(.sha == $head) ] as $pinned
+         | if ($pinned | length) > 0 then ($pinned | last) + { state: "marker" }
+           elif ($markers | length) > 0 then ($markers | last) + { state: "stale_marker" }
+           else { state: "unreviewed", sha: "", reviewer: "", detail: "", at: "", summary: "" }
+           end
+         | [ .state, .sha, .reviewer, .detail, .at, .summary ] | @tsv'
+}
+
+# A Codex approval and a manual marker are independent valid records. Prefer the native
+# approval for reporting, but never let a later Codex non-approval invalidate a current
+# human-attested marker.
+_review_record() {
+  local codex marker codex_state marker_state
+  codex=$(_codex_review_record "$@")
+  marker=$(_marker_record "$@")
+  codex_state=$(cut -f1 <<< "$codex")
+  marker_state=$(cut -f1 <<< "$marker")
+  if [[ "$codex_state" == "approval" ]]; then
+    printf '%s\n' "$codex"
+  elif [[ "$marker_state" == "marker" ]]; then
+    printf '%s\n' "$marker"
+  elif [[ "$codex_state" != "unreviewed" ]]; then
+    printf '%s\n' "$codex"
+  else
+    printf '%s\n' "$marker"
+  fi
 }
 
 # The review verdict on a given head, printed as "<state> <sha>" — the two
@@ -114,13 +163,16 @@ check_ci() {
 }
 
 # ---------------------------------------------------------------------------------
-# Shared review state — a native Codex GitHub approval pinned to the PR head.
+# Shared review state — either a native Codex approval or a manual attestation pinned
+# to the PR head.
 # ---------------------------------------------------------------------------------
 #
 #   approval        Codex approved the current head SHA
+#   marker          A manual review marker pins the current head SHA
 #   stale_approval  Codex approved a different SHA — the current head was not reviewed
+#   stale_marker    A manual marker names a different SHA
 #   not_approved    Codex reviewed, but did not approve its most-recent review
-#   unreviewed      Codex has not reviewed this PR
+#   unreviewed      Neither review path has a record
 #
 # Sets globals: RS_STATE RS_HEAD_SHA RS_REVIEW_SHA
 RS_STATE=""
@@ -142,8 +194,8 @@ _compute_review_state() {
 
 _review_remedy() {
   local pr=$1
-  echo "  remedy: comment @codex review on PR #${pr}, address every finding, and ask"
-  echo "          Codex to review again after any push. The approval must name this head SHA."
+  echo "  remedy: either comment @codex review on PR #${pr} and obtain an approval of this"
+  echo "          head, or run the existing review-preflight + mark-review attestation path."
 }
 
 # Gate 2: Zero unresolved review threads. Uses GraphQL with cursor pagination.
@@ -196,9 +248,10 @@ check_unresolved_threads() {
   return 1
 }
 
-# Gate 3: the trusted Codex App must approve the exact current head commit.
+# Gate 3: a trusted Codex approval or manual review marker must cover the exact head.
 #
 #   approval        → PASS
+#   marker          → PASS
 #   stale_approval  → FAIL: Codex approved an earlier commit
 #   not_approved    → FAIL: Codex posted a non-approval review
 #   unreviewed      → FAIL: Codex has not reviewed the PR
@@ -211,6 +264,10 @@ check_review_happened() {
       echo "PASS: reviewed: Codex approved head SHA ${RS_HEAD_SHA:0:7}"
       return 0
       ;;
+    marker)
+      echo "PASS: reviewed: review marker pins head SHA ${RS_HEAD_SHA:0:7}"
+      return 0
+      ;;
     stale_approval)
       echo "FAIL: reviewed: Codex approved ${RS_REVIEW_SHA:0:7}, but head is ${RS_HEAD_SHA:0:7}"
       echo "  You pushed after that approval, so what is about to merge was never read."
@@ -219,6 +276,11 @@ check_review_happened() {
       ;;
     not_approved)
       echo "FAIL: reviewed: Codex last reviewed ${RS_REVIEW_SHA:0:7} without approval"
+      _review_remedy "$pr"
+      return 1
+      ;;
+    stale_marker)
+      echo "FAIL: reviewed: the review marker pins ${RS_REVIEW_SHA:0:7}, but head is ${RS_HEAD_SHA:0:7}"
       _review_remedy "$pr"
       return 1
       ;;

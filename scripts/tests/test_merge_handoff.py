@@ -81,6 +81,7 @@ class Scenario:
     draft: bool = False
     review: str | None = None
     review_state: str = "APPROVED"
+    manual_review: bool = False
     gh_head: str = "head"
     threads: list[dict] = field(default_factory=list)
     comments: list[dict] = field(default_factory=list)
@@ -168,6 +169,17 @@ def repo_with_pr(
 
         comments = list(scenario.comments)
         reviews: list[dict] = []
+        if scenario.manual_review:
+            comments.append(
+                {
+                    "body": (
+                        f"<!-- pinpoint-review: {head_sha} -->\n"
+                        "<!-- pinpoint-reviewer: claude-code -->\n"
+                        "<!-- pinpoint-review-detail: medium -->\nreviewed"
+                    ),
+                    "updated_at": "2026-08-02T20:43:19Z",
+                }
+            )
         if scenario.review is not None:
             reviewed = {
                 "head": head_sha,
@@ -447,6 +459,15 @@ def test_a_codex_approval_covering_head_is_named_in_the_handoff() -> None:
     ) as (_head, run):
         assert "Codex GitHub approval" in run.stdout, run.stdout
         assert "since review  none — the review covers head" in run.stdout
+
+
+def test_a_manual_attestation_covering_head_is_merge_ready() -> None:
+    with repo_with_pr(
+        branch_changes={"src/lib/thing.ts": "x\n"},
+        scenario=Scenario(manual_review=True),
+    ) as (_head, run):
+        assert MERGE_CMD in run.stdout, run.stdout
+        assert "Manual review attestation" in run.stdout, run.stdout
 
 
 def test_a_codex_review_that_did_not_approve_is_not_merge_ready() -> None:

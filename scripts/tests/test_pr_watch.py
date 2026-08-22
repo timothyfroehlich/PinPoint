@@ -97,6 +97,10 @@ def codex_review(sha=HEAD_SHA, state="APPROVED", submitted_at="2026-08-22T12:00:
     }
 
 
+def manual_marker(sha=HEAD_SHA):
+    return {"body": f"<!-- pinpoint-review: {sha} -->\nreviewed"}
+
+
 def make_gh(
     *,
     rollup=(),
@@ -105,6 +109,7 @@ def make_gh(
     threads=(),
     labels=(),
     reviews=(),
+    comments=(),
 ):
     """Build a fake `gh` that answers every call pr-watch makes.
 
@@ -136,6 +141,8 @@ def make_gh(
             path = args[2]
             if "/reviews" in path:
                 return json.dumps(list(reviews))
+            if "/comments" in path:
+                return json.dumps(list(comments))
         if args[:2] == ("api", "graphql"):
             return json.dumps(
                 {
@@ -802,7 +809,15 @@ def test_codex_login_is_identical_to_the_bash_gate():
 
 @pytest.mark.unit
 @pytest.mark.parametrize(
-    "state", ["approval", "stale_approval", "not_approved", "unreviewed"]
+    "state",
+    [
+        "approval",
+        "marker",
+        "stale_approval",
+        "stale_marker",
+        "not_approved",
+        "unreviewed",
+    ],
 )
 def test_state_vocabulary_is_shared_with_the_bash_gate(state):
     arms = re.findall(r"^    (\w+)\)$", GATES_PATH.read_text(), re.M)
@@ -823,6 +838,25 @@ def test_review_state_approval_pins_head(monkeypatch):
     state, detail = pr_watch.review_state(PR)
     assert state == "approval"
     assert HEAD_SHA[:7] in detail
+
+
+@pytest.mark.unit
+def test_review_state_manual_marker_pins_head(monkeypatch):
+    monkeypatch.setattr(pr_watch, "gh", make_gh(comments=[manual_marker()]))
+    assert pr_watch.review_state(PR)[0] == "marker"
+
+
+@pytest.mark.unit
+def test_review_state_manual_marker_survives_non_approval_codex_review(monkeypatch):
+    monkeypatch.setattr(
+        pr_watch,
+        "gh",
+        make_gh(
+            reviews=[codex_review(state="CHANGES_REQUESTED")],
+            comments=[manual_marker()],
+        ),
+    )
+    assert pr_watch.review_state(PR)[0] == "marker"
 
 
 @pytest.mark.unit
@@ -867,20 +901,21 @@ def test_review_state_uses_the_latest_codex_review(monkeypatch):
 
 @pytest.mark.unit
 @pytest.mark.parametrize(
-    "state,reviews",
+    "state,reviews,comments",
     [
-        ("unreviewed", ()),
-        ("stale_approval", (codex_review(OLD_SHA),)),
-        ("approval", (codex_review(),)),
+        ("unreviewed", (), ()),
+        ("stale_approval", (codex_review(OLD_SHA),), ()),
+        ("approval", (codex_review(),), ()),
+        ("marker", (), (manual_marker(),)),
     ],
 )
 def test_run_audit_reports_the_review_state_without_gating_on_it(
-    monkeypatch, capsys, state, reviews
+    monkeypatch, capsys, state, reviews, comments
 ):
     monkeypatch.setattr(
         pr_watch,
         "gh",
-        make_gh(rollup=[_gate("SUCCESS")], reviews=reviews),
+        make_gh(rollup=[_gate("SUCCESS")], reviews=reviews, comments=comments),
     )
     assert pr_watch.run_audit(PR) is True
     assert f"✓ review: {state}:" in capsys.readouterr().out

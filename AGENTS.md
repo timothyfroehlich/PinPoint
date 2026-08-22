@@ -155,9 +155,9 @@ Never resolve `drizzle/meta` conflicts manually — the folder holds binary-like
 
 **No bot reviews this repo.** Copilot review was retired on 2026-08-02 (PP-4ric) — the free tier was too small to review PinPoint's PRs, so quota outages were the normal state. The merge bar is unchanged: a PR still needs a review covering its **head commit**, with threads resolved.
 
-**Tim triggers GitHub-native Codex review.** Finish churn first (CI fixes, merge-from-main), stop iterating, then Tim comments `@codex review` on the PR. It uses the installed GitHub integration and does not use an OpenAI API key. Once Codex has reviewed, address every finding and have Tim comment `@codex review` again if the branch changed. The merge gate accepts only Codex's GitHub `APPROVED` review of the current head SHA.
+**Tim can trigger GitHub-native Codex review.** Finish churn first (CI fixes, merge-from-main), stop iterating, then Tim may comment `@codex review` on the PR. It uses the installed GitHub integration and does not use an OpenAI API key. Once Codex has reviewed, address every finding and have Tim comment `@codex review` again if the branch changed. A Codex GitHub `APPROVED` review of the current head SHA is valid alongside the existing manual attestation workflow.
 
-The gate verifies GitHub's native review record, not a local attestation: exact account `chatgpt-codex-connector[bot]`, state `APPROVED`, and `commit_id` equal to the PR head SHA. Manual `/codex:review`, `/code-review`, `review-preflight.sh`, and `mark-review.sh` do not satisfy it. Full rules: `pinpoint-pr-workflow` skill Phase 3.4.
+The gate accepts either GitHub's native Codex review record — exact account `chatgpt-codex-connector[bot]`, state `APPROVED`, and `commit_id` equal to the PR head SHA — or the existing SHA-pinned `mark-review.sh` attestation after `/codex:review` or `/code-review`. Full rules: `pinpoint-pr-workflow` skill Phase 3.4.
 
 ### Handing a PR over to merge
 

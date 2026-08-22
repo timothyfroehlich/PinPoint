@@ -1,6 +1,6 @@
 ---
 name: pinpoint-pr-workflow
-description: The PR-lifecycle decisions the scripts and gates do not state — why getting reviewed is a handoff (Tim comments `@codex review` on GitHub) and why Codex's native GitHub approval of the current SHA is the only thing that satisfies the `reviewed` gate, why every push needs a fresh review, why the merge handoff is a script you run rather than a summary you write, the `--pages` screenshot gotchas, and the Dependabot back-to-back lockfile trap. Also the merge escape hatches (`--force`, `--bypass-merge-requirements`) and when each is and is not appropriate, what to do when `merge-pr.sh` itself is broken, and the GitHub MCP gotchas that silently do the wrong thing — snake_case field names, the pagination cap, label writes replacing the whole set rather than adding to it, `resolve_thread` ignoring owner/repo, and the thread-ID format. Use when committing, opening a PR, handing a branch to Tim for review, addressing review comments, posting screenshots, handing a PR over to merge, landing the plane after Tim merges, or when a GitHub MCP call does something you did not expect.
+description: The PR-lifecycle decisions the scripts and gates do not state — why getting reviewed is a handoff (Tim may comment `@codex review` on GitHub) and why Codex's native GitHub approval of the current SHA is valid alongside the existing SHA-pinned manual attestation, why every push needs a fresh review, why the merge handoff is a script you run rather than a summary you write, the `--pages` screenshot gotchas, and the Dependabot back-to-back lockfile trap. Also the merge escape hatches (`--force`, `--bypass-merge-requirements`) and when each is and is not appropriate, what to do when `merge-pr.sh` itself is broken, and the GitHub MCP gotchas that silently do the wrong thing — snake_case field names, the pagination cap, label writes replacing the whole set rather than adding to it, `resolve_thread` ignoring owner/repo, and the thread-ID format. Use when committing, opening a PR, handing a branch to Tim for review, addressing review comments, posting screenshots, handing a PR over to merge, landing the plane after Tim merges, or when a GitHub MCP call does something you did not expect.
 ---
 
 # PinPoint PR Workflow
@@ -79,7 +79,7 @@ Every unresolved thread counts, whoever opened it — the `threads` gate is auth
 
 ### 3.4 Get the head commit reviewed — Tim triggers Codex on GitHub
 
-**Current policy (2026-08-22; supersedes the legacy marker workflow below):** finish all churn, then Tim comments `@codex review` on the PR. The merge gate accepts only the native GitHub review by `chatgpt-codex-connector[bot]` with state `APPROVED` and `commit_id` equal to the current PR head SHA. Address every finding; if you push, Tim comments `@codex review` again. No local `/codex:review`, `/code-review`, `review-preflight.sh`, `mark-review.sh`, or trivial-change exception satisfies this gate. The GitHub integration uses Tim's connected ChatGPT plan and does not require an OpenAI API key.
+**Current policy (2026-08-22):** finish all churn, then use either valid review path. Tim may comment `@codex review` on the PR; the gate accepts its native GitHub review only from `chatgpt-codex-connector[bot]` with state `APPROVED` and `commit_id` equal to the current PR head SHA. Or use the existing local `/codex:review` or `/code-review` plus SHA-pinned `mark-review.sh` attestation workflow below. Address every finding and repeat the chosen path after a push. The GitHub integration uses Tim's connected ChatGPT plan and does not require an OpenAI API key.
 
 **The merge bar has not moved: a PR cannot merge without a review covering the HEAD commit,** with all its threads resolved. Review is mandatory, not on-demand, not discretionary.
 
@@ -211,7 +211,7 @@ Requires the local dev server (`pnpm run dev`) and Supabase (`supabase start`) r
 
 ### 3.6 Apply `ready-for-review` label
 
-Once CI green + a native Codex approval of head (per 3.4) + zero unresolved review threads + no merge conflict + screenshots posted (if UI-touching, per 3.5), apply the label via `mcp__github__issue_write(method: "update", …)` or `gh pr edit <PR> --add-label ready-for-review`.
+Once CI green + either a native Codex approval or manual attestation of head (per 3.4) + zero unresolved review threads + no merge conflict + screenshots posted (if UI-touching, per 3.5), apply the label via `mcp__github__issue_write(method: "update", …)` or `gh pr edit <PR> --add-label ready-for-review`.
 
 The label is a hint to Tim that the PR is ready for **him** to merge — it does not authorize an agent to merge. `merge-pr.sh --human` re-checks all gates when Tim runs it.
 
@@ -251,7 +251,7 @@ Never say "ready to push when you are" — you push. Never say a PR is "merged" 
 
 **On any FAIL the script removes the `ready-for-review` label if present** (and likewise on the `--automerge` RED path). The label's contract is "click-merge-without-thinking"; if a gate fails at merge time that contract is broken, so the label goes. Practical consequence: after Tim reports a FAIL, fix the underlying issue, push, and **re-apply the label** (3.6) before re-handing him the `--human` command — don't assume it survived.
 
-**A `reviewed` FAIL is almost never a `--force` case.** `unreviewed` means Codex has not reviewed it, `stale_approval` means you pushed past its approval, and `not_approved` means its latest review did not approve — all describe an unfinished PR, not a broken gate. Take the honest path in 3.4 and obtain Codex's approval of head.
+**A `reviewed` FAIL is almost never a `--force` case.** `unreviewed` means neither path covers head, `stale_approval` / `stale_marker` mean you pushed past the review record, and `not_approved` means Codex's latest review did not approve — all describe an unfinished PR, not a broken gate. Take either honest path in 3.4 and cover head.
 
 `--bypass-merge-requirements` is for a required check failing for known-irrelevant reasons (infrastructure flake, unrelated job) where the change has been manually verified safe — log the flake first with `bash scripts/workflow/log-gha-flake.sh <pr> <run-id> <class> "<symptom>"` (see `docs/runbooks/gha-flake-log.md`) — or an emergency hotfix where waiting for CI is not acceptable. Do NOT suggest bypassing when a merge conflict exists, or when the underlying state hasn't been manually verified.
 

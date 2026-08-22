@@ -1,8 +1,7 @@
-"""Regression tests for the merge gate's Codex GitHub-review record.
-The reviewed gate accepts exactly one authority: an APPROVED review from the
-official Codex GitHub App that names the pull request's current head SHA.
-The checks below exercise the real Bash and jq logic through a stubbed gh
-client, so no test reaches GitHub (CORE-TEST-006).
+"""Regression tests for the merge gate's native and manual review records.
+
+Either an APPROVED review from the official Codex GitHub App or the existing
+SHA-pinned manual attestation may cover the pull request's current head.
 """
 
 import json
@@ -38,6 +37,17 @@ def codex_review(
     }
 
 
+def manual_marker(sha: str = HEAD_SHA) -> dict:
+    return {
+        "body": (
+            f"<!-- pinpoint-review: {sha} -->\n"
+            "<!-- pinpoint-reviewer: claude-code -->\n"
+            "<!-- pinpoint-review-detail: medium -->\nreviewed"
+        ),
+        "updated_at": "2026-08-22T12:00:00Z",
+    }
+
+
 def thread(*, resolved: bool, author: str) -> dict:
     return {
         "isResolved": resolved,
@@ -49,6 +59,7 @@ def thread(*, resolved: bool, author: str) -> dict:
 def gate_env(
     *,
     review_pages: list[list[dict]] | None = None,
+    comment_pages: list[list[dict]] | None = None,
     threads: list[dict] | None = None,
     head_sha: str = HEAD_SHA,
 ) -> Iterator[dict]:
@@ -57,6 +68,9 @@ def gate_env(
         tmp_path = Path(tmp)
         (tmp_path / "reviews.json").write_text(
             "\n".join(json.dumps(page) for page in (review_pages or [[]]))
+        )
+        (tmp_path / "comments.json").write_text(
+            "\n".join(json.dumps(page) for page in (comment_pages or [[]]))
         )
         (tmp_path / "threads.json").write_text(
             json.dumps(
@@ -87,6 +101,7 @@ def gate_env(
             '  *"nameWithOwner"*) printf "acme/widget\\n" ;;\n'
             '  *"api graphql"*) cat "$STUB_THREADS" ;;\n'
             '  *"/pulls/"*"/reviews"*) cat "$STUB_REVIEWS" ;;\n'
+            '  *"/issues/"*"/comments"*) cat "$STUB_COMMENTS" ;;\n'
             '  *) printf "UNEXPECTED gh call: %s\\n" "$args" >&2; exit 1 ;;\n'
             "esac\n"
         )
@@ -98,6 +113,7 @@ def gate_env(
         env["PATH"] = f"{tmp}{os.pathsep}{env.get('PATH', '')}"
         env["STUB_HEAD_SHA"] = head_sha
         env["STUB_REVIEWS"] = str(tmp_path / "reviews.json")
+        env["STUB_COMMENTS"] = str(tmp_path / "comments.json")
         env["STUB_THREADS"] = str(tmp_path / "threads.json")
         yield env
 
@@ -135,6 +151,23 @@ def test_codex_approval_of_head_passes() -> None:
     assert f"Codex approved head SHA {HEAD_SHA[:7]}" in result.stdout
 
 
+def test_manual_attestation_of_head_still_passes() -> None:
+    with gate_env(comment_pages=[[manual_marker()]]) as env:
+        result = run_gate("check_review_happened", env)
+    assert result.returncode == 0, result.stdout
+    assert f"review marker pins head SHA {HEAD_SHA[:7]}" in result.stdout
+
+
+def test_manual_attestation_remains_valid_after_non_approval_codex_review() -> None:
+    with gate_env(
+        review_pages=[[codex_review(state="CHANGES_REQUESTED")]],
+        comment_pages=[[manual_marker()]],
+    ) as env:
+        result = run_gate("check_review_happened", env)
+    assert result.returncode == 0, result.stdout
+    assert "review marker pins head SHA" in result.stdout
+
+
 @pytest.mark.parametrize(
     "reviews",
     [
@@ -144,7 +177,9 @@ def test_codex_approval_of_head_passes() -> None:
         pytest.param([codex_review(state="COMMENTED")], id="non-approval-review"),
     ],
 )
-def test_only_codex_approval_of_current_head_passes(reviews: list[dict]) -> None:
+def test_no_qualifying_codex_review_without_manual_attestation_fails(
+    reviews: list[dict],
+) -> None:
     with gate_env(review_pages=[reviews]) as env:
         result = run_gate("check_review_happened", env)
     assert result.returncode == 1, result.stdout
