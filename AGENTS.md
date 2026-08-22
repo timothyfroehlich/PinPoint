@@ -19,9 +19,6 @@
 - **Type safety (CORE-TS-007):** never use `any`, non-null `!`, or unsafe `as`; model or narrow the value instead. See `pinpoint-typescript` for PinPoint's database-typing guidance.
 - **Path aliases (CORE-TS-008):** import project code with `~/`, never deep relative paths.
 - **Rule of Three (CORE-ARCH-010):** do not abstract before the third real duplication.
-- **Email privacy (CORE-SEC-007):** show email addresses only in admin views and a user's own settings; elsewhere use a name, `Anonymous`, or a role. See `pinpoint-security` for security-sensitive work.
-- **Permissions (CORE-ARCH-008):** route every permission check through `checkPermission()` from `~/lib/permissions/helpers`, and keep the permission matrix and enforcement aligned. See `pinpoint-security`.
-- **Transactions (CORE-ARCH-011):** never perform HTTP, email, Discord, blob, or Vault-RPC effects inside `db.transaction`; commit first, then dispatch the planned effect. See `pinpoint-ui` for the transactional-service pattern.
 
 ### 2.2 Process rules
 
