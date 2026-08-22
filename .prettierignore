@@ -34,9 +34,6 @@ coverage/
 # Claude
 .claude/
 
-# Beads manages a marker-sensitive section in this file.
-AGENTS.md
-
 # Beads (issue tracker database)
 .beads/
 
