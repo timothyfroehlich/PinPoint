@@ -85,7 +85,7 @@ enable_anonymous_sign_ins = false
 # Required for supabase.auth.linkIdentity() — used by the Connected Accounts
 # settings UI when an email/password user clicks "Connect Discord". Automatic
 # link-by-verified-email is default Supabase behavior and is NOT controlled by
-# a config flag (resolved via context7 docs during PR 2 planning).
+# a configuration flag.
 enable_manual_linking = true
 minimum_password_length = 6
 

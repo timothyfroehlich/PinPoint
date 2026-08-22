@@ -4,11 +4,6 @@
 
 ## Claude Code-Specific
 
-### Context7 MCP Integration
-
-- **When**: Working with libraries (Drizzle, Supabase, Next.js, shadcn/ui, Vitest)
-- **Process**: `resolve-library-id` → `get-library-docs` → Apply current patterns
-
 ### Code review
 
 `REVIEW.md` at the repo root is the canonical review rubric, shared with Antigravity. Read it before launching the code-review skill.
