@@ -12,9 +12,16 @@
 
 **`docs/NON_NEGOTIABLES.md` is the catalog** — every implementation rule, with its canonical `CORE-*` ID, severity, rationale, and do/don't. Read it before writing code in an area you have not touched before, and cite rules by ID.
 
-This section used to restate all 20 rules as one-line summaries, loaded on every session regardless of what the session was doing. They now live in `.claude/rules/`, grouped by where they apply: files with a `paths:` glob list load when a matching file is opened, and `always.md` — the six rules no glob would narrow honestly — loads at launch. `.claude/rules/README.md` explains the split and how to add a rule.
+`AGENTS.md` is the portable, always-on project policy. Skills hold task-specific procedure; the catalog remains authoritative for complete rule statements.
 
-That tier is Claude Code-specific. In any other tool, read the catalog directly.
+#### Universal implementation policy
+
+- **Type safety (CORE-TS-007):** never use `any`, non-null `!`, or unsafe `as`; model or narrow the value instead. See `pinpoint-typescript` for PinPoint's database-typing guidance.
+- **Path aliases (CORE-TS-008):** import project code with `~/`, never deep relative paths.
+- **Rule of Three (CORE-ARCH-010):** do not abstract before the third real duplication.
+- **Email privacy (CORE-SEC-007):** show email addresses only in admin views and a user's own settings; elsewhere use a name, `Anonymous`, or a role. See `pinpoint-security` for security-sensitive work.
+- **Permissions (CORE-ARCH-008):** route every permission check through `checkPermission()` from `~/lib/permissions/helpers`, and keep the permission matrix and enforcement aligned. See `pinpoint-security`.
+- **Transactions (CORE-ARCH-011):** never perform HTTP, email, Discord, blob, or Vault-RPC effects inside `db.transaction`; commit first, then dispatch the planned effect. See `pinpoint-ui` for the transactional-service pattern.
 
 ### 2.2 Process rules
 
@@ -32,7 +39,7 @@ That tier is Claude Code-specific. In any other tool, read the catalog directly.
 
 ## 3. Agent Skills
 
-Load relevant skills for every task. If your tool doesn't support skills, read the file directly. All skills live at `.agents/skills/<name>/SKILL.md`.
+Before working in an area covered by a skill, read that skill. If your tool doesn't support skills, read its `SKILL.md` directly. All project skills live at `.agents/skills/<name>/SKILL.md`; they own task-specific procedure while this file stays agent-neutral.
 
 **The huddle is the exception, and it is not in this repo.** Inter-session coordination — the SessionStart identity notice, the poll, the daily bead — moved to Tim's dotfiles on 2026-08-12: scripts at `~/.claude/hooks/huddle/`, skill at `~/.claude/skills/huddle/`, tests alongside the scripts. Nothing about it was PinPoint-specific, and living outside the repo means editing it costs no PR. What stays here is the four hook registrations in `.claude/settings.json` and the channel itself — the huddle resolves `.agents/huddle/` and its beads from the cwd's repo, so the conversation is still per-project.
 
