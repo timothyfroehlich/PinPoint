@@ -2,6 +2,16 @@
 
 @AGENTS.md
 
+## Agent skills
+
+### Issue tracker
+
+PinPoint tracks durable project work in Beads. See `docs/agents/issue-tracker.md`.
+
+### Domain docs
+
+PinPoint uses single-context domain documentation. See `docs/agents/domain.md`.
+
 ## Claude Code-Specific
 
 ### Code review

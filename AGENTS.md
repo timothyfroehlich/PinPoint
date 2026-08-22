@@ -38,6 +38,11 @@
 
 Before working in an area covered by a skill, read that skill. If your tool doesn't support skills, read its `SKILL.md` directly. All project skills live at `.agents/skills/<name>/SKILL.md`; they own task-specific procedure while this file stays agent-neutral.
 
+Before exploring or changing non-mechanical product behavior, read
+`docs/agents/domain.md`; it routes the relevant glossary, feature spec, and
+ADRs. Skip it for mechanical changes that do not affect product behavior or
+domain language.
+
 **The huddle is the exception, and it is not in this repo.** Inter-session coordination — the SessionStart identity notice, the poll, the daily bead — moved to Tim's dotfiles on 2026-08-12: scripts at `~/.claude/hooks/huddle/`, skill at `~/.claude/skills/huddle/`, tests alongside the scripts. Nothing about it was PinPoint-specific, and living outside the repo means editing it costs no PR. What stays here is the four hook registrations in `.claude/settings.json` and the channel itself — the huddle resolves `.agents/huddle/` and its beads from the cwd's repo, so the conversation is still per-project.
 
 ## 4. Environment
