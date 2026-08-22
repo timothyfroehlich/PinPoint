@@ -1,5 +1,23 @@
 {/* This file is auto-updated by the weekly changelog workflow. Newest entries at top. */}
 
+## August 17, 2026
+
+### New Features
+
+- **Pinball Map Listing Control** — A machine's Manage tab now shows exactly where that machine stands on Pinball Map the moment the page opens, with only the actions that apply to it — no more pressing "Connect" to find out what state you were already in
+- **Model, Manufacturer and Year for Any Game** — Homebrews, flipperless games, and anything else Pinball Map doesn't carry can now have a model name, manufacturer, and year entered by hand, and they read the same everywhere as machines matched to the catalog
+- **Pinball Map Details on the Info Tab** — A machine's model and whether it's listed on Pinball Map are now plain rows in the Details card instead of a separate box, and members see a "Config issue" flag when our records and the public map disagree about that machine
+- **New Machine Alerts in Discord** — PinPoint now posts to Discord when a machine shows up anywhere in the Austin region on Pinball Map, naming the game and the venue
+
+### Bug Fixes
+
+- The manufacturer and year under a machine's name are visible again — a leftover placeholder had been blanking that line on every machine that had the data, which looked identical to a machine that had none
+- The Pinball Map listing status on machine pages now refreshes every hour on its own; the hourly sync had never actually been scheduled
+- Closed issues in the issue list are marked with a muted background instead of dimming the whole row, so the issue ID, machine, date, and reporter stay readable
+- Error messages, warnings, and destructive action labels throughout the app now use a red that meets WCAG AA contrast against the dark background
+
+---
+
 ## August 4, 2026
 
 ### New Features
