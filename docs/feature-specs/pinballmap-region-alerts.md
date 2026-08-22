@@ -1,6 +1,6 @@
 # Pinball Map Region Alerts — Feature Spec
 
-**Status: draft (pending approval).**
+**Status: approved.**
 
 Requirements for the region-alert feature: PinPoint watches a Pinball Map region
 and posts newly-appeared machines to a Discord channel. Describes the intended
@@ -82,36 +82,43 @@ Related: `docs/feature-specs/pinballmap.md` (the location-sync integration),
 - **4.4** The first run for a region records current state as already-seen
   without announcing, so enabling alerts (or switching region, §2.5) does not
   dump the region's existing activity into the channel.
-- **4.5** A bad upstream read (empty or implausibly large) is treated as a failed
-  read: nothing is recorded and nothing is announced.
-- **4.6** No outbound Discord call runs inside a database transaction
+- **4.5** A bad or partial upstream read does not produce alerts: an empty,
+  implausibly large, or truncated region payload is discarded rather than
+  announced.
+- **4.6** Each alert names the added or removed machine and its venue, links to
+  the venue's Pinball Map page (the location-specific link-back, CORE-PBM-001),
+  and carries the required Pinball Map attribution (CC BY-SA 4.0, CORE-PBM-001).
+- **4.7** No outbound Discord call runs inside a database transaction
   (CORE-ARCH-011).
 
 ## 5. Permissions
 
 - **5.1** Configuring region alerts requires the manage-integrations capability
   (admin-integrations spec §7).
+- **5.2** The region seen-set is server-only state, not readable by clients.
 
 ---
 
 ## Known divergences (code vs spec)
 
-| Spec                                         | Code today                                                                                              | Resolution                                                                                                                  |
-| :------------------------------------------- | :------------------------------------------------------------------------------------------------------ | :-------------------------------------------------------------------------------------------------------------------------- |
-| §2.1 region chosen from a list               | Region is the hardcoded `PBM_AUSTIN_REGION` constant                                                    | Add a regions-list read from Pinball Map; make it a stored field                                                            |
-| §2.1 alert channel in config                 | Channel is the `DISCORD_PBM_ALERT_CHANNEL_ID` env var (`getRegionAlertChannelId`)                       | Move to DB; configure in the admin card                                                                                     |
-| §2.2 no enable flag                          | Gated on `pinballmap_state.enabled` (the cron route checks it)                                          | Drop the flag; channel presence + bot token are the gate                                                                    |
-| §2.3 channel validated + status              | Channel is used blind; no validation, no stored status                                                  | Validate on save; store channel status                                                                                      |
-| §2.4 Send test message                       | No test action; the channel is only exercised by the hourly cron                                        | Add a Send test message button                                                                                              |
-| §3 stored status                             | No status surfaced anywhere in admin                                                                    | Build the status readout                                                                                                    |
-| §4.1 fixed hourly schedule                   | Hardcoded Vercel cron at `23 * * * *`                                                                   | Keep; spec documents the fixed cadence                                                                                      |
-| §4.1 added AND removed, typed filter         | Code diffs the full region machine list (`fetchRegionLmxes`) — additions only, removals never announced | Read the region activity feed filtered to machine add/remove (`submission_type[]=new_lmx&submission_type[]=remove_machine`) |
-| §4.2–4.4 dedup / bootstrap / bad-read guards | Built in `region-alerts.ts` for the list-diff approach (`pinballmap_region_seen_machines`)              | Keep the intent; rework the dedup store for the activity-feed model                                                         |
+| Spec                                         | Code today                                                                                                                                                                                 | Resolution                                                                                                                  |
+| :------------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :-------------------------------------------------------------------------------------------------------------------------- |
+| §2.1 region chosen from a list               | Region is the hardcoded `PBM_AUSTIN_REGION` constant                                                                                                                                       | Add a regions-list read from Pinball Map; make it a stored field                                                            |
+| §2.1 alert channel in config                 | Channel is the `DISCORD_PBM_ALERT_CHANNEL_ID` env var (`getRegionAlertChannelId`)                                                                                                          | Move to DB; configure in the admin card                                                                                     |
+| §2.2 no enable flag                          | Gated on `pinballmap_state.enabled` (the cron route checks it)                                                                                                                             | Drop the flag; channel presence + bot token are the gate                                                                    |
+| §2.3 channel validated + status              | Channel is used blind; no validation, no stored status                                                                                                                                     | Validate on save; store channel status                                                                                      |
+| §2.4 Send test message                       | No test action; the channel is only exercised by the hourly cron                                                                                                                           | Add a Send test message button                                                                                              |
+| §3 stored status                             | No status surfaced anywhere in admin                                                                                                                                                       | Build the status readout                                                                                                    |
+| §4.1 fixed hourly schedule                   | Hardcoded Vercel cron at `23 * * * *`                                                                                                                                                      | Keep; spec documents the fixed cadence                                                                                      |
+| §4.2 added AND removed, typed filter         | Code diffs the full region machine list (`fetchRegionLmxes`) — additions only, removals never announced                                                                                    | Read the region activity feed filtered to machine add/remove (`submission_type[]=new_lmx&submission_type[]=remove_machine`) |
+| §4.2 activity-feed assumptions               | Vendored docs scope `submission_type` to the index/location/list_within_range endpoints, not explicitly the region feed; and it is unconfirmed the feed carries venue/machine names inline | Verify at build time that the region feed accepts the filter, and whether the venue-naming second call is still needed      |
+| §4.3–4.5 dedup / bootstrap / bad-read guards | Built in `region-alerts.ts` for the list-diff approach (`pinballmap_region_seen_machines`)                                                                                                 | Keep the intent; rework the dedup store for the activity-feed model                                                         |
+| §4.6 message content + attribution           | `region-alert-message.ts` builds the post (masked venue links + CC BY-SA attribution) from the list-diff data                                                                              | Keep the attribution + location link-back; rebuild the message from the activity-feed model                                 |
 
 ---
 
 ## Changelog
 
-| Date      | Change   |
-| :-------- | :------- |
-| _(draft)_ | Created. |
+| Date       | Change   |
+| :--------- | :------- |
+| 2026-08-22 | Created. |
