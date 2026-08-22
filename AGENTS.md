@@ -26,6 +26,8 @@ That tier is Claude Code-specific. In any other tool, read the catalog directly.
 6. **Never `--no-verify`**, never wildcard tool permissions — without explicit user approval each time. **The merge decision is Tim's, always.** An agent MAY run the gate-enforced script `bash scripts/workflow/merge-pr.sh <PR> --human`, but the `block-direct-merge.cjs` PreToolUse hook turns that invocation into an **approval prompt** — Tim approves before it runs, so the merge is still his call (PP-wi85, reversed for the script only, per Tim 2026-08-19). The raw merge channels stay **hard-blocked** for agents — never `gh pr merge`, never `gh api PUT .../merge`, never MCP `merge_pull_request` — because they skip the script's gate re-checks (CI green, review pins head, threads resolved, no conflict). An agent's normal terminal state on a PR is still: ready-for-review, CI green, a review covering the head commit (see §5 "Getting a PR reviewed"), threads resolved, screenshots posted if UI-touching, then hand over with `bash scripts/workflow/merge-handoff.sh <PR>` — it prints the state Tim needs plus the merge command. (PP-wi85.)
 7. **Beads: `team-maintainer` policy** (not the conservative default).
 
+**Codex mutations:** use `bd --actor Codex <command>` so automated writes never fall back to Tim's identity.
+
 **Beads in a cloud/ephemeral checkout:** if `.beads/` is absent (fresh cloud sandbox), run `bash scripts/beads-cloud-init.sh && cd ~/beads` before any `bd` write — the binaries are already installed by the environment setup script; this materializes the DoltHub credential and clones the shared DB. A discovery net; scheduled routines still carry the same line as a prompt preamble. Full setup: `docs/runbooks/cloud-routines-beads-access.md`.
 
 ## 3. Agent Skills
