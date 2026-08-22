@@ -117,7 +117,17 @@
         "pinpoint/server-action-file-naming": "error",
         "no-implied-eval": "off",
         "no-unused-expressions": "error",
-        "no-unused-vars": "off",
+        "no-unused-vars": [
+          "error",
+          {
+            "args": "after-used",
+            "argsIgnorePattern": "^_",
+            "vars": "all",
+            "varsIgnorePattern": "^_",
+            "caughtErrors": "none",
+            "ignoreRestSiblings": true
+          }
+        ],
         "no-throw-literal": "off",
         "prefer-promise-reject-errors": "off",
         "require-await": "off",
@@ -250,6 +260,7 @@
       "rules": {
         "no-restricted-imports": "off",
         "no-empty-function": "off",
+        "no-unused-vars": "off",
         "typescript/no-explicit-any": "off",
         "typescript/no-floating-promises": "off",
         "typescript/explicit-function-return-type": "off",
@@ -269,6 +280,7 @@
       "rules": {
         "no-restricted-imports": "off",
         "no-empty-function": "off",
+        "no-unused-vars": "off",
         "typescript/no-explicit-any": "off",
         "typescript/no-floating-promises": "off",
         "typescript/explicit-function-return-type": "off",
@@ -302,6 +314,7 @@
       ],
       "rules": {
         "no-restricted-imports": "off",
+        "no-unused-vars": "off",
         "typescript/no-explicit-any": "off",
         "typescript/explicit-function-return-type": "off",
         "pinpoint/no-restricted-disable-directives": "off"

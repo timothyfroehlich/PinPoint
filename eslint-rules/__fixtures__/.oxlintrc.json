@@ -39,6 +39,13 @@
   },
   "overrides": [
     {
+      "files": ["**/*.ts", "**/*.tsx"],
+      "rules": {
+        "no-unused-vars": "error",
+        "typescript/no-non-null-assertion": "error"
+      }
+    },
+    {
       "files": ["*.test.ts", "*.test.tsx", "*.spec.ts", "*.spec.tsx"],
       "rules": {
         "typescript/no-non-null-assertion": "off"
