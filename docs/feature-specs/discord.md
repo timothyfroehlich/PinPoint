@@ -1,6 +1,6 @@
 # Discord Notifications — Feature Spec
 
-**Status: draft (pending approval).**
+**Status: approved.**
 
 Requirements for PinPoint's Discord bot, which DMs members about issue and
 machine activity, and its admin configuration surface. Describes the intended
@@ -96,6 +96,6 @@ records, a separate re-check, and a stored status line. It is not a toggle.
 
 ## Changelog
 
-| Date      | Change   |
-| :-------- | :------- |
-| _(draft)_ | Created. |
+| Date       | Change   |
+| :--------- | :------- |
+| 2026-08-22 | Created. |
