@@ -141,11 +141,15 @@ describe("oxlint jsPlugins fixtures", () => {
         "pinpoint/server-action-file-naming",
         "pinpoint/no-restricted-disable-directives",
         "pinpoint/require-directive-description",
-        // Native, not a jsPlugin — but it is the rule that actually enforces
-        // the blanket-disable ban (see the directive-governance block below),
-        // so a config that lost it should fail here too.
+        "pinpoint/no-test-com-literals",
+        // Native and plugin rules tested in the fixture suite:
         "unicorn/no-abusive-eslint-disable",
         "better-tailwindcss/no-restricted-classes",
+        "typescript/no-non-null-assertion",
+        "eslint/no-unused-vars",
+        "react-hooks/exhaustive-deps",
+        "jsx-a11y/click-events-have-key-events",
+        "promise/catch-or-return",
       ])
     );
   });
@@ -172,6 +176,16 @@ describe("oxlint jsPlugins fixtures", () => {
     ]);
   });
 
+  it("fires pinpoint/no-test-com-literals on hardcoded @test.com emails in e2e fixtures", async () => {
+    const found = forFile(await findingsPromise, "e2e-test-com.ts");
+    expect(
+      found.map((f) => ({ ruleId: f.ruleId, line: f.line }))
+    ).toStrictEqual([
+      { ruleId: "pinpoint/no-test-com-literals", line: 2 },
+      { ruleId: "pinpoint/no-test-com-literals", line: 3 },
+    ]);
+  });
+
   it("fires better-tailwindcss/no-restricted-classes on raw palette and hex classes", async () => {
     const found = forFile(await findingsPromise, "palette.tsx");
     expect(
@@ -183,6 +197,47 @@ describe("oxlint jsPlugins fixtures", () => {
     // Both `restrict` patterns must be live, not just the first.
     expect(found[0]?.message).toContain("Raw Tailwind palette classes");
     expect(found[1]?.message).toContain("Hardcoded arbitrary hex values");
+  });
+
+  it("fires typescript/no-non-null-assertion in source files and exempts test files", async () => {
+    const findings = await findingsPromise;
+    const srcFound = forFile(findings, "non-null-assertion.ts");
+    expect(
+      srcFound.map((f) => ({ ruleId: f.ruleId, line: f.line }))
+    ).toStrictEqual([{ ruleId: "typescript/no-non-null-assertion", line: 3 }]);
+
+    const testFound = forFile(findings, "non-null-assertion.test.ts");
+    expect(testFound).toStrictEqual([]);
+  });
+
+  it("fires eslint/no-unused-vars on unused imports", async () => {
+    const found = forFile(await findingsPromise, "unused-import.ts");
+    expect(
+      found.map((f) => ({ ruleId: f.ruleId, line: f.line }))
+    ).toStrictEqual([{ ruleId: "eslint/no-unused-vars", line: 2 }]);
+  });
+
+  it("fires react-hooks/exhaustive-deps on missing useEffect dependencies", async () => {
+    const found = forFile(await findingsPromise, "exhaustive-deps.tsx");
+    expect(
+      found.map((f) => ({ ruleId: f.ruleId, line: f.line }))
+    ).toStrictEqual([{ ruleId: "react-hooks/exhaustive-deps", line: 8 }]);
+  });
+
+  it("fires jsx-a11y/click-events-have-key-events on click handler without key listener", async () => {
+    const found = forFile(await findingsPromise, "click-events.tsx");
+    expect(
+      found.map((f) => ({ ruleId: f.ruleId, line: f.line }))
+    ).toStrictEqual([
+      { ruleId: "jsx-a11y/click-events-have-key-events", line: 4 },
+    ]);
+  });
+
+  it("fires promise/catch-or-return on unhandled promise then calls", async () => {
+    const found = forFile(await findingsPromise, "promise-catch.ts");
+    expect(
+      found.map((f) => ({ ruleId: f.ruleId, line: f.line }))
+    ).toStrictEqual([{ ruleId: "promise/catch-or-return", line: 3 }]);
   });
 
   it("stays silent on the conforming fixtures", async () => {
