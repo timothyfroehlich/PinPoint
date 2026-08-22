@@ -18,10 +18,10 @@ function setClientCookie(name: string, value: string, maxAge: number): void {
   // knows this and stays quiet; oxlint doesn't, so it is silenced here rather
   // than dropped from the mirror wholesale. Block form because the expression
   // wraps onto a continuation line and `-next-line` would miss it. (PP-4zcj.)
-  /* oxlint-disable typescript/prefer-optional-chain */
+  /* oxlint-disable typescript/prefer-optional-chain -- `window?.location` would still ReferenceError under SSR; see the note above */
   const secure =
     typeof window !== "undefined" && window.location.protocol === "https:";
-  /* oxlint-enable typescript/prefer-optional-chain */
+  /* oxlint-enable typescript/prefer-optional-chain -- end of the SSR-guard expression */
   document.cookie = `${name}=${encodeURIComponent(value)}; path=/; max-age=${maxAge}; SameSite=Lax${secure ? "; Secure" : ""}`;
 }
 

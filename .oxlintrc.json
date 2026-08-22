@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["typescript"],
+  "plugins": ["typescript", "unicorn"],
   "jsPlugins": [
     "./eslint-rules/pinpoint-plugin.mjs",
     "eslint-plugin-better-tailwindcss"
@@ -14,7 +14,23 @@
     "correctness": "off"
   },
   "options": {
-    "typeAware": true
+    "typeAware": true,
+    // "warn", not "error", and deliberately so — do NOT promote it, and do NOT
+    // delete the directives it flags. oxlint does not yet run jsx-a11y or
+    // react-hooks (Phase 4 of the oxlint-only migration ports them), so the
+    // seven `jsx-a11y/no-autofocus` and `react-hooks/exhaustive-deps` disables
+    // in src/ look unused here while authoritative ESLint still needs every one
+    // of them. That is the SLIM-mirror lesson (`eslint.config.mjs`, PP-4zcj) in
+    // a new place: when the mirror is blinder than the authority, the mirror is
+    // what gets softened.
+    // Consequence to accept knowingly: seven warnings print on every
+    // `pnpm run check`, whose expected output is otherwise "All checks
+    // passed!". No `--max-warnings` — that would turn seven known-good
+    // warnings into a red gate, the opposite of the intent.
+    // REVISIT (PP-sc77.3, the Phase 4 cutover bead): promote to "error" once
+    // jsx-a11y and react-hooks run here, which is what makes these seven
+    // resolve on their own.
+    "reportUnusedDisableDirectives": "warn"
   },
   "env": {
     "builtin": true
@@ -33,6 +49,9 @@
     "src/components/mockups/**"
   ],
   "rules": {
+    "pinpoint/no-restricted-disable-directives": "error",
+    "pinpoint/require-directive-description": "error",
+    "unicorn/no-abusive-eslint-disable": "error",
     "constructor-super": "error",
     "for-direction": "error",
     "getter-return": "error",
@@ -242,7 +261,8 @@
         "typescript/no-unsafe-return": "off",
         "typescript/no-unsafe-argument": "off",
         "typescript/unbound-method": "off",
-        "typescript/no-unnecessary-condition": "off"
+        "typescript/no-unnecessary-condition": "off",
+        "pinpoint/no-restricted-disable-directives": "off"
       },
       "plugins": ["typescript"]
     },
@@ -268,7 +288,8 @@
             "message": "Use Playwright assertions (auto-wait) instead of waitForTimeout"
           }
         ],
-        "typescript/no-unnecessary-condition": "off"
+        "typescript/no-unnecessary-condition": "off",
+        "pinpoint/no-restricted-disable-directives": "off"
       },
       "plugins": ["typescript"]
     },
@@ -283,7 +304,8 @@
       "rules": {
         "no-restricted-imports": "off",
         "typescript/no-explicit-any": "off",
-        "typescript/explicit-function-return-type": "off"
+        "typescript/explicit-function-return-type": "off",
+        "pinpoint/no-restricted-disable-directives": "off"
       },
       "plugins": ["typescript"]
     },
