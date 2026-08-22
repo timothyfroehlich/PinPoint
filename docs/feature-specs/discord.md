@@ -73,7 +73,10 @@ records, a separate re-check, and a stored status line. It is not a toggle.
   member — the Test DM response (settings §Connected accounts). A persistent
   member-facing surface for background notification failures is out of scope;
   ordinary notification sends are background fan-out and only log a failed DM.
-- **4.3** No outbound Discord call runs inside a database transaction
+- **4.3** Comment content is not rendered in the DM body — a notification links
+  to the resource, it does not quote it. The text is available to the channel
+  but deliberately withheld from the message (privacy).
+- **4.4** No outbound Discord call runs inside a database transaction
   (CORE-ARCH-011).
 
 ## 5. Permissions
@@ -85,15 +88,16 @@ records, a separate re-check, and a stored status line. It is not a toggle.
 
 ## Known divergences (code vs spec)
 
-| Spec                            | Code today                                                                        | Resolution                                                                             |
-| :------------------------------ | :-------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------- |
-| §2.2 no enable flag             | `discord_integration_config.enabled` gates sending (`config.ts` 73, 133)          | Drop the column; token presence is the gate                                            |
-| §2.3 save validates and records | An enabled save is rejected on a failed probe rather than recording it            | Always persist; write the outcome to status                                            |
-| §2.4 one Test connection        | Two per-field Validate buttons; results held in client state, lost on reload      | Collapse to Save-validates + a stored-config Test connection                           |
-| §3 stored status                | `bot_health_status` / `last_bot_check_at` columns exist but are never written     | Wire the write path; widen the enum (rejected vs unreachable)                          |
-| §3.3 traffic updates status     | `sendDm` 401s classified for the send result but never persisted to config health | On a 401, write Not working                                                            |
-| §2.5 invite-link format check   | Invite link saved with no validation                                              | Inline format check                                                                    |
-| §4.2 invite link on Test DM     | Invite link is stored but never surfaced                                          | Show it in the Test DM response; a general failed-notification surface is out of scope |
+| Spec                            | Code today                                                                                      | Resolution                                                                             |
+| :------------------------------ | :---------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------- |
+| §2.2 no enable flag             | `discord_integration_config.enabled` gates sending (`config.ts` 73, 133)                        | Drop the column; token presence is the gate                                            |
+| §2.3 save validates and records | An enabled save is rejected on a failed probe rather than recording it                          | Always persist; write the outcome to status                                            |
+| §2.4 one Test connection        | Two per-field Validate buttons; results held in client state, lost on reload                    | Collapse to Save-validates + a stored-config Test connection                           |
+| §3 stored status                | `bot_health_status` / `last_bot_check_at` columns exist but are never written                   | Wire the write path; widen the enum (rejected vs unreachable)                          |
+| §3.3 traffic updates status     | `sendDm` 401s classified for the send result but never persisted to config health               | On a 401, write Not working                                                            |
+| §2.5 invite-link inline check   | Validated on save (`schema.ts`: URL regex, max 512); no as-you-type check                       | Add the inline/as-you-type check                                                       |
+| §4.3 comment text excluded      | Already done — `commentContent` is passed through but deliberately not rendered (`messages.ts`) | Keep; spec documents existing behavior                                                 |
+| §4.2 invite link on Test DM     | Invite link is stored but never surfaced                                                        | Show it in the Test DM response; a general failed-notification surface is out of scope |
 
 ---
 
