@@ -98,7 +98,10 @@ def codex_review(sha=HEAD_SHA, state="APPROVED", submitted_at="2026-08-22T12:00:
 
 
 def manual_marker(sha=HEAD_SHA):
-    return {"body": f"<!-- pinpoint-review: {sha} -->\nreviewed"}
+    return {
+        "body": f"<!-- pinpoint-review: {sha} -->\nreviewed",
+        "updated_at": "2026-08-22T12:00:00Z",
+    }
 
 
 def make_gh(
@@ -857,6 +860,26 @@ def test_review_state_manual_marker_survives_non_approval_codex_review(monkeypat
         ),
     )
     assert pr_watch.review_state(PR)[0] == "marker"
+
+
+@pytest.mark.unit
+def test_review_state_reports_the_newer_stale_manual_marker(monkeypatch):
+    marker = manual_marker(OLD_SHA)
+    marker["updated_at"] = "2026-08-22T12:01:00Z"
+    monkeypatch.setattr(
+        pr_watch,
+        "gh",
+        make_gh(reviews=[codex_review(state="CHANGES_REQUESTED")], comments=[marker]),
+    )
+    assert pr_watch.review_state(PR)[0] == "stale_marker"
+
+
+@pytest.mark.unit
+def test_review_state_skips_marker_lookup_after_current_codex_approval(monkeypatch):
+    fake_gh = make_gh(reviews=[codex_review()])
+    monkeypatch.setattr(pr_watch, "gh", fake_gh)
+    assert pr_watch.review_state(PR)[0] == "approval"
+    assert not any("/comments" in args[-1] for args in fake_gh.calls)
 
 
 @pytest.mark.unit

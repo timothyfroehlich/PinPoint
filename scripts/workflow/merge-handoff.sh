@@ -138,6 +138,7 @@ conflict_out=$(check_no_merge_conflict "$pr" 2>&1) || true
 record=$(_review_record "$pr" "$(_repo_slug)" "$head_sha")
 rv_state=$(cut -f1 <<< "$record")
 rv_sha=$(cut -f2 <<< "$record")
+rv_reviewer=$(cut -f3 <<< "$record")
 rv_detail=$(cut -f4 <<< "$record")
 rv_at=$(cut -f5 <<< "$record")
 
@@ -149,7 +150,7 @@ case "$rv_state" in
     review_desc="Codex GitHub approval · ${rv_at} · covers head ${short_head}"
     ;;
   marker)
-    review_desc="Manual review attestation · ${rv_at} · covers head ${short_head}"
+    review_desc="Manual review attestation (${rv_reviewer} ${rv_detail}) · ${rv_at} · covers head ${short_head}"
     ;;
   stale_approval)
     if git cat-file -e "${rv_sha}^{commit}" 2>/dev/null \
@@ -169,10 +170,10 @@ case "$rv_state" in
     if git cat-file -e "${rv_sha}^{commit}" 2>/dev/null \
       && git merge-base --is-ancestor "$rv_sha" "$head_sha" 2>/dev/null; then
       behind=$(git rev-list --count "${rv_sha}..${head_sha}")
-      review_desc="Manual review attestation · ${rv_at} · STALE: ${behind} commit(s) back, reviewed ${rv_sha:0:7}, head is ${short_head}"
+      review_desc="Manual review attestation (${rv_reviewer} ${rv_detail}) · ${rv_at} · STALE: ${behind} commit(s) back, reviewed ${rv_sha:0:7}, head is ${short_head}"
       since_review_from=$rv_sha
     else
-      review_desc="Manual review attestation · ${rv_at} · STALE: reviewed ${rv_sha:0:7}, not an ancestor of head (force-push?)"
+      review_desc="Manual review attestation (${rv_reviewer} ${rv_detail}) · ${rv_at} · STALE: reviewed ${rv_sha:0:7}, not an ancestor of head (force-push?)"
       since_review_note="unknowable — the manually attested commit is not an ancestor of head"
     fi
     ;;

@@ -77,21 +77,31 @@ Fixing, declining with a one-sentence signed reply, and resolving the thread is 
 
 Every unresolved thread counts, whoever opened it — the `threads` gate is author-agnostic. Resolve or decline each one before moving on.
 
-### 3.4 Get the head commit reviewed — Tim triggers Codex on GitHub
+### 3.4 Get the head commit reviewed
 
-**Current policy (2026-08-22):** finish all churn, then use either valid review path. Tim may comment `@codex review` on the PR; the gate accepts its native GitHub review only from `chatgpt-codex-connector[bot]` with state `APPROVED` and `commit_id` equal to the current PR head SHA. Or use the existing local `/codex:review` or `/code-review` plus SHA-pinned `mark-review.sh` attestation workflow below. Address every finding and repeat the chosen path after a push. The GitHub integration uses Tim's connected ChatGPT plan and does not require an OpenAI API key.
+**Current policy (2026-08-22):** finish all churn, then use either valid review path. An agent may request the native GitHub review by commenting `@codex review` on the PR; the gate accepts its review only from `chatgpt-codex-connector[bot]` with state `APPROVED` and `commit_id` equal to the current PR head SHA. Or use the existing local `/codex:review` or `/code-review` plus SHA-pinned `mark-review.sh` attestation workflow below. Address every finding and repeat the chosen path after a push. The GitHub integration uses Tim's connected ChatGPT plan and does not require an OpenAI API key.
 
 **The merge bar has not moved: a PR cannot merge without a review covering the HEAD commit,** with all its threads resolved. Review is mandatory, not on-demand, not discretionary.
 
-**What changed on 2026-08-02 (PP-4ric) is who does it.** The bot reviewer this repo used was retired — its free tier was too small to review PinPoint's PRs, so quota outages were the normal state rather than the exception. No bot reviews this repo now, and there is nothing to request: a PR carries no pending reviewer, and any doc or habit that has you adding one is stale.
+**What changed on 2026-08-02 (PP-4ric) is who does it.** The previous generic bot reviewer was retired — its free tier was too small to review PinPoint's PRs, so quota outages were the normal state rather than the exception. Native Codex GitHub review is now an explicit per-head request, not a pending reviewer: do not add another reviewer or assume a review is queued until `@codex review` has been posted.
 
 **Tim runs the review, and there are two he might run.** `/codex:review` (the Codex plugin) and the built-in `/code-review` are both in use. Which one he picks is his call, not yours — your job is the same either way, and the only thing that changes is the reviewer/detail pair you attest with.
 
-**You cannot launch either.** The Codex plugin declares `disable-model-invocation: true` on `review`, `adversarial-review`, `result`, and `status`, so none of those slash commands is model-invocable — not the review, and not the retrieval either. The built-in `/code-review` is user-triggered and billed, and is likewise not yours to fire. Tim types the command and pastes or leaves the result in the session; your job is to read it, fix what it found, and record it. (The Codex plugin's underlying `codex-companion.mjs` is runnable from Bash, but that path is deliberately not the documented one — routing the review through Tim is what keeps the attestation witnessed by someone other than its author.)
+**You cannot launch either local command.** The Codex plugin declares `disable-model-invocation: true` on `review`, `adversarial-review`, `result`, and `status`, so none of those slash commands is model-invocable — not the review, and not the retrieval either. The built-in `/code-review` is user-triggered and billed, and is likewise not yours to fire. Tim types the command and pastes or leaves the result in the session; your job is to read it, fix what it found, and record it. (The Codex plugin's underlying `codex-companion.mjs` is runnable from Bash, but that path is deliberately not the documented one — routing the review through Tim is what keeps the attestation witnessed by someone other than its author.)
 
-So getting reviewed is still a handoff, for a different reason than before. The command starts a real review; it does not make the marker true by itself. Address every finding, then attest only the SHA that was actually reviewed.
+#### Native GitHub Codex review — agent-requestable
 
-#### Sequencing
+After the final head is pushed, an agent may request the native review directly on GitHub:
+
+```bash
+gh pr comment <PR> --body '@codex review'
+```
+
+Use this only once per head SHA, after CI fixes and merge-from-main churn have stopped. It asks the connected Codex GitHub App to review the PR; it does not allow a merge. Wait for its native `APPROVED` review on that exact SHA, then address every finding or hand off. That approval itself satisfies the review gate — do **not** add a manual marker for it. A later push requires a fresh request. This is the agent-requestable alternative to the local commands below — `review-preflight.sh` is for a local `/codex:review` or `/code-review` handoff, not the GitHub App review.
+
+For the local route, getting reviewed remains a handoff. The command starts a real review; it does not make the manual marker true by itself. Address every finding, then attest only the SHA that was actually reviewed.
+
+#### Local review and manual-attestation route
 
 1. Open the PR whenever you like and watch CI. Nothing is reviewing yet, so an early PR costs nothing.
 2. Finish **all** the work: the implementation, the CI fixes, the merge-from-main. Stop iterating.
@@ -122,7 +132,7 @@ settings. If it is denied, say so and ask him to type the command again; do not
 hand-roll the node invocation to get around it.
 
 4. Address the findings: fix → push → and note that head has moved (see below). Consciously decline the rest, with a reason. **A review that found nothing worth fixing skips straight to step 5** — there is no push, so head is already the SHA he read.
-5. Attest the head he reviewed — **this step is yours, always, and it is the only thing that satisfies the gate.** A clean review with an unposted marker reads to `merge-pr.sh` as `unreviewed`, so the review Tim ran buys nothing until you post it:
+5. Attest the head he reviewed — **this step is yours on the local route.** A clean review with an unposted marker reads to `merge-pr.sh` as `unreviewed`, so the review Tim ran buys nothing until you post it:
 
    ```bash
    bash scripts/workflow/mark-review.sh <PR> codex-plugin-cc base-main "<one-line findings summary>"   # /codex:review

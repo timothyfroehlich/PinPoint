@@ -241,19 +241,27 @@ def _codex_reviews(pr: int) -> list[dict]:
     return sorted(reviews, key=lambda review: review.get("submitted_at") or "")
 
 
-def _marker_shas(pr: int) -> list[str]:
-    """Return every SHA covered by the independent manual attestation path."""
+def _marker_records(pr: int) -> list[tuple[str, str]]:
+    """Return manual-attestation SHAs with their update time, oldest first."""
     repo = f"repos/{REPO_OWNER}/{REPO_NAME}"
-    shas: list[str] = []
+    markers: list[tuple[str, str]] = []
     for comment in _gh_api_list(f"{repo}/issues/{pr}/comments"):
         body = comment.get("body") or ""
         if body.startswith(REVIEW_MARKER_PREFIX):
-            shas.append(body[len(REVIEW_MARKER_PREFIX) :].split("-->", 1)[0].strip())
-        elif body.startswith(LEGACY_CLAUDE_MARKER_PREFIX):
-            shas.append(
-                body[len(LEGACY_CLAUDE_MARKER_PREFIX) :].split("-->", 1)[0].strip()
+            markers.append(
+                (
+                    body[len(REVIEW_MARKER_PREFIX) :].split("-->", 1)[0].strip(),
+                    comment.get("updated_at") or "",
+                )
             )
-    return shas
+        elif body.startswith(LEGACY_CLAUDE_MARKER_PREFIX):
+            markers.append(
+                (
+                    body[len(LEGACY_CLAUDE_MARKER_PREFIX) :].split("-->", 1)[0].strip(),
+                    comment.get("updated_at") or "",
+                )
+            )
+    return sorted(markers, key=lambda marker: marker[1])
 
 
 def review_state(pr: int) -> tuple[str, str]:
@@ -262,16 +270,27 @@ def review_state(pr: int) -> tuple[str, str]:
         "headRefOid"
     ]
     reviews = _codex_reviews(pr)
-    markers = _marker_shas(pr)
     if reviews:
         latest = reviews[-1]
         review_sha = latest.get("commit_id") or ""
         state = (latest.get("state") or "UNKNOWN").upper()
         if state == "APPROVED" and review_sha == head_sha:
             return "approval", f"Codex approved head {head_sha[:7]}"
-    if head_sha in markers:
+
+    # A passing native approval short-circuits the marker API call. Otherwise a
+    # marker can still independently cover head after a non-approval review.
+    markers = _marker_records(pr)
+    if any(marker_sha == head_sha for marker_sha, _at in markers):
         return "marker", f"manual review marker pins head {head_sha[:7]}"
+
+    latest_marker_sha, latest_marker_at = markers[-1] if markers else ("", "")
     if reviews:
+        if markers and latest_marker_at > (latest.get("submitted_at") or ""):
+            return (
+                "stale_marker",
+                f"manual review marker pins {latest_marker_sha[:7]} but head is "
+                f"{head_sha[:7]}",
+            )
         if state == "APPROVED":
             return (
                 "stale_approval",
@@ -286,7 +305,7 @@ def review_state(pr: int) -> tuple[str, str]:
     if markers:
         return (
             "stale_marker",
-            f"manual review marker pins {markers[-1][:7]} but head is {head_sha[:7]}",
+            f"manual review marker pins {latest_marker_sha[:7]} but head is {head_sha[:7]}",
         )
     return (
         "unreviewed",

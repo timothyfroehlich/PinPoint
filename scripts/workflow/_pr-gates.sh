@@ -99,19 +99,34 @@ _marker_record() {
 # approval for reporting, but never let a later Codex non-approval invalidate a current
 # human-attested marker.
 _review_record() {
-  local codex marker codex_state marker_state
+  local codex marker codex_state marker_state codex_at marker_at
   codex=$(_codex_review_record "$@")
-  marker=$(_marker_record "$@")
   codex_state=$(cut -f1 <<< "$codex")
-  marker_state=$(cut -f1 <<< "$marker")
+  # A current native approval already passes the gate. Do not spend a second
+  # paginated GitHub request looking up a marker that cannot change that result.
   if [[ "$codex_state" == "approval" ]]; then
     printf '%s\n' "$codex"
-  elif [[ "$marker_state" == "marker" ]]; then
+    return
+  fi
+
+  marker=$(_marker_record "$@")
+  marker_state=$(cut -f1 <<< "$marker")
+  if [[ "$marker_state" == "marker" ]]; then
     printf '%s\n' "$marker"
-  elif [[ "$codex_state" != "unreviewed" ]]; then
+  elif [[ "$codex_state" == "unreviewed" ]]; then
+    printf '%s\n' "$marker"
+  elif [[ "$marker_state" == "unreviewed" ]]; then
     printf '%s\n' "$codex"
   else
-    printf '%s\n' "$marker"
+    # Neither path covers head. Report the newest record so merge-handoff can
+    # show the real diff since review instead of an older, unrelated failure.
+    codex_at=$(cut -f5 <<< "$codex")
+    marker_at=$(cut -f5 <<< "$marker")
+    if [[ "$marker_at" > "$codex_at" ]]; then
+      printf '%s\n' "$marker"
+    else
+      printf '%s\n' "$codex"
+    fi
   fi
 }
 
