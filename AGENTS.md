@@ -155,22 +155,9 @@ Never resolve `drizzle/meta` conflicts manually — the folder holds binary-like
 
 **No bot reviews this repo.** Copilot review was retired on 2026-08-02 (PP-4ric) — the free tier was too small to review PinPoint's PRs, so quota outages were the normal state. The merge bar is unchanged: a PR still needs a review covering its **head commit**, with threads resolved.
 
-**Tim runs the review, and he runs one of two.** `/codex:review` (Codex plugin) and the built-in `/code-review` are both in use; he picks. You cannot launch either — the Codex plugin declares its commands `disable-model-invocation`, and `/code-review` is user-triggered and billed. So getting reviewed is a handoff: **finish your churn first** (CI fixes, merge-from-main), stop iterating, then tell Tim the branch is ready for review. Once he has run it, address every finding and attest the head he read.
+**Tim triggers GitHub-native Codex review.** Finish churn first (CI fixes, merge-from-main), stop iterating, then Tim comments `@codex review` on the PR. It uses the installed GitHub integration and does not use an OpenAI API key. Once Codex has reviewed, address every finding and have Tim comment `@codex review` again if the branch changed. The merge gate accepts only Codex's GitHub `APPROVED` review of the current head SHA.
 
-Before you ask, run the preflight — both reviewers read local git state in the session's working directory, so a review launched from the wrong worktree finds nothing and reads exactly like a clean review:
-
-```bash
-bash scripts/workflow/review-preflight.sh <PR>
-```
-
-It prints the commands for Tim only when you're on the PR's branch, local HEAD is the SHA that's actually pushed, the tree is clean, `main...HEAD` is non-empty, local `main` matches `origin/main`, and the PR is based on `main`. (Local `main`, not `origin/main` — that is the ref the reviewer resolves, and merging `origin/main` into your branch never advances it.) Then attest with the pair matching what he ran:
-
-```bash
-bash scripts/workflow/mark-review.sh <PR> codex-plugin-cc base-main "<one-line findings>"   # /codex:review
-bash scripts/workflow/mark-review.sh <PR> claude-code <depth> "<one-line findings>"         # /code-review <depth>
-```
-
-The marker records the exact method and pins a SHA, so any push invalidates it. Ask for a fresh review after every changed head; do not re-attest an old result. A genuinely trivial change (typo, comment, one-line mechanical fix) can use `mark-review.sh <PR> claude-code trivial`, saying why it was trivial. The marker attests a review happened; posting it otherwise is a false attestation. Full rules: `pinpoint-pr-workflow` skill Phase 3.4.
+The gate verifies GitHub's native review record, not a local attestation: exact account `chatgpt-codex-connector[bot]`, state `APPROVED`, and `commit_id` equal to the PR head SHA. Manual `/codex:review`, `/code-review`, `review-preflight.sh`, and `mark-review.sh` do not satisfy it. Full rules: `pinpoint-pr-workflow` skill Phase 3.4.
 
 ### Handing a PR over to merge
 

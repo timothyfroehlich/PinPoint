@@ -13,23 +13,9 @@
 
 `REVIEW.md` at the repo root is the canonical review rubric, shared with Antigravity. Read it before launching the code-review skill.
 
-**No bot reviews this repo — Copilot review was retired 2026-08-02 (PP-4ric).** A review covering the head commit is still required to merge, and Tim runs it: either `/codex:review` or the built-in `/code-review`. You cannot launch either one — the Codex plugin declares its command `disable-model-invocation`, and `/code-review` is user-triggered and billed.
+**Codex GitHub review gates this repo.** Tim triggers it by commenting `@codex review` on the PR. The gate requires Codex's native GitHub `APPROVED` review of the current head; no OpenAI API key is involved.
 
-Finish your churn first, then check the review will actually see the diff before you ask:
-
-```bash
-bash scripts/workflow/review-preflight.sh <PR>
-```
-
-Both reviewers read **local git state in the session's working directory**, so a review launched from the wrong worktree finds nothing and reads exactly like a clean review. The preflight prints the commands for Tim only when you're on the PR's branch, local HEAD is the SHA that's actually pushed, the tree is clean, `main...HEAD` is non-empty, local `main` matches `origin/main`, and the PR is based on `main`; otherwise it names what is blocking and prints no command.
-
-Once he has reviewed and you have addressed the findings, attest with the pair matching what he ran — `codex-plugin-cc base-main` for `/codex:review`, `claude-code <depth>` for `/code-review <depth>`:
-
-```bash
-bash scripts/workflow/mark-review.sh <PR> <reviewer> <detail> "<findings>"
-```
-
-The marker pins a SHA, so a later push invalidates it. Full rules: `pinpoint-pr-workflow` Phase 3.4.
+Finish churn first, then have Tim comment `@codex review`. Address findings and repeat the comment if the head changes. Local `/codex:review`, `/code-review`, and `mark-review.sh` attestations do not satisfy the gate. Full rules: `pinpoint-pr-workflow` Phase 3.4.
 
 ### Sandbox network isolation
 
