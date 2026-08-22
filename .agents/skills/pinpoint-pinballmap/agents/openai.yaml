@@ -1,0 +1,4 @@
+interface:
+  display_name: "PinPoint PinballMap"
+  short_description: "PinballMap integration conduct"
+  default_prompt: "Use $pinpoint-pinballmap to change a PinballMap integration safely."
