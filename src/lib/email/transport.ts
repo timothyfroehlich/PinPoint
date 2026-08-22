@@ -3,7 +3,6 @@ import "server-only";
 import { Resend } from "resend";
 import nodemailer from "nodemailer";
 import type Mail from "nodemailer/lib/mailer";
-import { reportError } from "~/lib/observability/report-error";
 
 export const EMAIL_FROM =
   "PinPoint <notifications@pinpoint.austinpinballcollective.org>";
@@ -85,18 +84,22 @@ export class ResendTransport implements EmailTransport {
 
       if (error) {
         // Wrap the Resend error object in a real Error (with the original as
-        // `cause`) so both the Sentry and log sinks get a message + stack, and
-        // mirror SMTPTransport's failure Result shape. (PP-okmw)
-        const sendError = new Error(`Resend rejected send: ${error.message}`, {
-          cause: error,
-        });
-        reportError(sendError, { action: "ResendTransport.send" });
-        return { success: false, error: sendError };
+        // `cause`) so the single report at the sendEmail boundary gets a
+        // message + stack — the Resend error is a plain object with neither.
+        // Transports never call reportError themselves: sendEmail (client.ts)
+        // is the sole report site, so a failure is captured exactly once.
+        // (PP-okmw, PP-l4fd)
+        return {
+          success: false,
+          error: new Error(`Resend rejected send: ${error.message}`, {
+            cause: error,
+          }),
+        };
       }
 
       return { success: true, data };
     } catch (error) {
-      reportError(error, { action: "ResendTransport.send" });
+      // Reporting is done once by sendEmail on any !success result. (PP-l4fd)
       return { success: false, error };
     }
   }
@@ -142,7 +145,7 @@ export class SMTPTransport implements EmailTransport {
 
       return { success: true, data: info };
     } catch (error) {
-      reportError(error, { action: "SMTPTransport.send" });
+      // Reporting is done once by sendEmail on any !success result. (PP-l4fd)
       return { success: false, error };
     }
   }

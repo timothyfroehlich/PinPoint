@@ -9,6 +9,11 @@ import { ResendTransport } from "./transport";
  * `{ data: null, error: {...} }` — so a rejected send was being reported as a
  * success and never logged. SMTPTransport's live path is covered by the
  * Mailpit integration test; here we only need the Resend response handling.
+ *
+ * The transport returns a failure Result but does NOT call reportError itself
+ * (PP-l4fd): `sendEmail` (client.ts) is the single report site, so a failure is
+ * captured exactly once. The `reportError` assertions below guard against a
+ * regression that re-adds self-reporting to the transport.
  */
 
 const mockSend = vi.fn();
@@ -48,7 +53,7 @@ describe("ResendTransport.send", () => {
     expect(mockReportError).not.toHaveBeenCalled();
   });
 
-  it("returns failure and reports when Resend resolves with an error (no throw)", async () => {
+  it("returns a failure Result (without self-reporting) when Resend resolves with an error (no throw)", async () => {
     // This is the PP-okmw case: the promise RESOLVES (never rejects), so the
     // catch block is never reached. The pre-fix code returned success here.
     const resendError = {
@@ -64,13 +69,11 @@ describe("ResendTransport.send", () => {
     expect((result.error as Error).message).toContain("Invalid `to` field.");
     // Original Resend error preserved (by reference) as the cause for context.
     expect((result.error as Error).cause).toBe(resendError);
-    expect(mockReportError).toHaveBeenCalledTimes(1);
-    expect(mockReportError).toHaveBeenCalledWith(expect.any(Error), {
-      action: "ResendTransport.send",
-    });
+    // sendEmail is the sole report site; the transport must not report. (PP-l4fd)
+    expect(mockReportError).not.toHaveBeenCalled();
   });
 
-  it("returns failure and reports when the SDK genuinely throws", async () => {
+  it("returns a failure Result (without self-reporting) when the SDK genuinely throws", async () => {
     const thrown = new Error("network down");
     mockSend.mockRejectedValue(thrown);
 
@@ -78,9 +81,8 @@ describe("ResendTransport.send", () => {
 
     expect(result.success).toBe(false);
     expect(result.error).toBe(thrown);
-    expect(mockReportError).toHaveBeenCalledWith(thrown, {
-      action: "ResendTransport.send",
-    });
+    // sendEmail is the sole report site; the transport must not report. (PP-l4fd)
+    expect(mockReportError).not.toHaveBeenCalled();
   });
 
   it("forwards threading and idempotency options to the SDK", async () => {
