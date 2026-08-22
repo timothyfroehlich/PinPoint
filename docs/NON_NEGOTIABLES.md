@@ -663,6 +663,6 @@ If all Yes → ship it. Perfect is the enemy of done.
 **Cross-References:**
 
 - Testing patterns: `pinpoint-testing` skill (`.agents/skills/pinpoint-testing/SKILL.md`)
-- Product features: `docs/PRODUCT_SPEC.md`
-- Technical architecture: `docs/TECH_SPEC.md`
+- Product requirements: approved documents in `docs/feature-specs/`
+- Technical architecture: the relevant `.agents/skills/` guidance and source code
 - Discipline guidelines: `docs/DISCIPLINE.md`
