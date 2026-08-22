@@ -9,12 +9,14 @@ The enforced rules live in `docs/NON_NEGOTIABLES.md` (`CORE-SEC-*`, `CORE-SSR-*`
 `CORE-ARCH-008`) and are checked by `pnpm run check`. This skill carries only the
 decisions behind them.
 
-## Which modules may touch `@supabase/ssr` (CORE-SSR-001)
+## SSR client creation and allowed imports (CORE-SSR-001/002)
 
 Nothing enforces this — it is a convention with a short allowlist, so it is worth
 stating.
 
 Always import and use the custom client creator from `~/lib/supabase/server`. Only a small allowlist of **non-test** modules touches `@supabase/ssr` directly: `src/lib/supabase/server.ts` (the SSR wrapper itself), `src/lib/supabase/middleware.ts` (token refresh in `updateSession`), and `src/app/(auth)/auth/callback/route.ts` (custom cookie handling so OAuth tokens are written to the response). App code outside this allowlist must go through `~/lib/supabase/server`. (Tests may mock `@supabase/ssr` — e.g. `src/lib/supabase/middleware.test.ts` — which is fine.)
+
+After creating an SSR client, call `await supabase.auth.getUser()` immediately; do not run other logic between client creation and that call (CORE-SSR-002).
 
 `src/lib/supabase/admin.ts` legitimately builds the server-only, service-role
 admin client from `@supabase/supabase-js`; importing types or specific utilities
