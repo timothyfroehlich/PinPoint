@@ -859,6 +859,22 @@ def test_review_state_manual_marker_survives_non_approval_codex_review(monkeypat
     assert pr_watch.review_state(PR)[0] == "marker"
 
 
+def test_review_state_reports_a_newer_stale_marker_over_an_older_codex_non_approval(
+    monkeypatch,
+):
+    marker = manual_marker(OLD_SHA)
+    marker["updated_at"] = "2026-08-22T12:01:00Z"
+    monkeypatch.setattr(
+        pr_watch,
+        "gh",
+        make_gh(
+            reviews=[codex_review(OLD_SHA, state="CHANGES_REQUESTED")],
+            comments=[marker],
+        ),
+    )
+    assert pr_watch.review_state(PR)[0] == "stale_marker"
+
+
 @pytest.mark.unit
 def test_review_state_stale_approval(monkeypatch):
     monkeypatch.setattr(pr_watch, "gh", make_gh(reviews=[codex_review(OLD_SHA)]))

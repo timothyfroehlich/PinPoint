@@ -37,12 +37,28 @@ def codex_review(
     }
 
 
-def manual_marker(sha: str = HEAD_SHA) -> dict:
+def manual_marker(
+    sha: str = HEAD_SHA,
+    *,
+    reviewer: str = "claude-code",
+    detail: str = "medium",
+    updated_at: str = "2026-08-22T12:00:00Z",
+) -> dict:
     return {
         "body": (
             f"<!-- pinpoint-review: {sha} -->\n"
-            "<!-- pinpoint-reviewer: claude-code -->\n"
-            "<!-- pinpoint-review-detail: medium -->\nreviewed"
+            f"<!-- pinpoint-reviewer: {reviewer} -->\n"
+            f"<!-- pinpoint-review-detail: {detail} -->\nreviewed"
+        ),
+        "updated_at": updated_at,
+    }
+
+
+def legacy_claude_marker(sha: str = HEAD_SHA, detail: str = "medium") -> dict:
+    return {
+        "body": (
+            f"<!-- pinpoint-claude-review: {sha} -->\n"
+            f"<!-- pinpoint-review-depth: {detail} -->\nreviewed"
         ),
         "updated_at": "2026-08-22T12:00:00Z",
     }
@@ -96,6 +112,7 @@ def gate_env(
         gh_stub.write_text(
             "#!/usr/bin/env bash\n"
             'args="$*"\n'
+            'printf "%s\\n" "$args" >> "$STUB_CALLS"\n'
             'case "$args" in\n'
             '  *"--jq .headRefOid"*) printf "%s\\n" "$STUB_HEAD_SHA" ;;\n'
             '  *"nameWithOwner"*) printf "acme/widget\\n" ;;\n'
@@ -115,6 +132,7 @@ def gate_env(
         env["STUB_REVIEWS"] = str(tmp_path / "reviews.json")
         env["STUB_COMMENTS"] = str(tmp_path / "comments.json")
         env["STUB_THREADS"] = str(tmp_path / "threads.json")
+        env["STUB_CALLS"] = str(tmp_path / "calls.log")
         yield env
 
 
@@ -151,6 +169,15 @@ def test_codex_approval_of_head_passes() -> None:
     assert f"Codex approved head SHA {HEAD_SHA[:7]}" in result.stdout
 
 
+def test_codex_approval_does_not_fetch_manual_markers() -> None:
+    with gate_env(review_pages=[[codex_review()]]) as env:
+        result = run_gate("check_review_happened", env)
+        calls = Path(env["STUB_CALLS"]).read_text()
+    assert result.returncode == 0, result.stdout
+    assert "/pulls/123/reviews" in calls
+    assert "/issues/123/comments" not in calls
+
+
 def test_manual_attestation_of_head_still_passes() -> None:
     with gate_env(comment_pages=[[manual_marker()]]) as env:
         result = run_gate("check_review_happened", env)
@@ -166,6 +193,15 @@ def test_manual_attestation_remains_valid_after_non_approval_codex_review() -> N
         result = run_gate("check_review_happened", env)
     assert result.returncode == 0, result.stdout
     assert "review marker pins head SHA" in result.stdout
+
+
+def test_newer_stale_manual_marker_is_reported_over_older_codex_non_approval() -> None:
+    with gate_env(
+        review_pages=[[codex_review(sha=OTHER_SHA, state="CHANGES_REQUESTED")]],
+        comment_pages=[[manual_marker(OTHER_SHA, updated_at="2026-08-22T12:01:00Z")]],
+    ) as env:
+        state, sha, _reviewer, _detail, _at, _summary = review_record(env)
+    assert (state, sha) == ("stale_marker", OTHER_SHA)
 
 
 @pytest.mark.parametrize(
@@ -245,6 +281,61 @@ def test_review_record_and_verdict_agree() -> None:
     assert at == "2026-08-22T12:00:00Z"
     assert summary == "Codex review summary"
     assert verdict.stdout.strip() == f"approval {HEAD_SHA}"
+
+
+def test_marker_record_preserves_reviewer_and_detail() -> None:
+    with gate_env(
+        comment_pages=[[manual_marker(reviewer="codex-plugin-cc", detail="base-main")]]
+    ) as env:
+        state, sha, reviewer, detail, _at, _summary = review_record(env)
+    assert (state, sha, reviewer, detail) == (
+        "marker",
+        HEAD_SHA,
+        "codex-plugin-cc",
+        "base-main",
+    )
+
+
+def test_canonical_marker_without_metadata_is_unrecorded() -> None:
+    bare = {"body": f"<!-- pinpoint-review: {HEAD_SHA} -->\nreviewed"}
+    with gate_env(comment_pages=[[bare]]) as env:
+        state, _sha, reviewer, detail, _at, _summary = review_record(env)
+    assert (state, reviewer, detail) == ("marker", "unrecorded", "unrecorded")
+
+
+def test_legacy_claude_marker_remains_accepted() -> None:
+    with gate_env(comment_pages=[[legacy_claude_marker(detail="high")]]) as env:
+        state, _sha, reviewer, detail, _at, _summary = review_record(env)
+    assert (state, reviewer, detail) == ("marker", "claude-code", "high")
+
+
+def test_trivial_marker_is_recorded_as_its_own_depth() -> None:
+    with gate_env(comment_pages=[[legacy_claude_marker(detail="trivial")]]) as env:
+        _state, _sha, _reviewer, detail, _at, _summary = review_record(env)
+    assert detail == "trivial"
+
+
+@pytest.mark.parametrize("order", [[OTHER_SHA, HEAD_SHA], [HEAD_SHA, OTHER_SHA]])
+def test_any_marker_pinning_head_passes_whatever_the_order(order: list[str]) -> None:
+    with gate_env(comment_pages=[[manual_marker(sha) for sha in order]]) as env:
+        result = run_gate("check_review_happened", env)
+    assert result.returncode == 0, result.stdout
+
+
+def test_stale_marker_names_the_newest_marker_when_none_pins_head() -> None:
+    older = "1111111111111111111111111111111111111111"
+    with gate_env(
+        comment_pages=[[manual_marker(older), manual_marker(OTHER_SHA)]]
+    ) as env:
+        state, sha, _reviewer, _detail, _at, _summary = review_record(env)
+    assert (state, sha) == ("stale_marker", OTHER_SHA)
+
+
+def test_a_comment_merely_mentioning_a_marker_is_not_an_attestation() -> None:
+    quote = {"body": f"maybe use <!-- pinpoint-review: {HEAD_SHA} -->"}
+    with gate_env(comment_pages=[[quote]]) as env:
+        result = run_gate("check_review_happened", env)
+    assert result.returncode == 1, result.stdout
 
 
 def test_unresolved_threads_block_regardless_of_author() -> None:
