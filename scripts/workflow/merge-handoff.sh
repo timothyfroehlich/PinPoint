@@ -139,18 +139,30 @@ conflict_out=$(check_no_merge_conflict "$pr" 2>&1) || true
 record=$(_marker_record "$pr" "$(_repo_slug)" "$head_sha")
 rv_state=$(cut -f1 <<< "$record")
 rv_sha=$(cut -f2 <<< "$record")
-rv_depth=$(cut -f3 <<< "$record")
-rv_at=$(cut -f4 <<< "$record")
+rv_reviewer=$(cut -f3 <<< "$record")
+rv_detail=$(cut -f4 <<< "$record")
+rv_at=$(cut -f5 <<< "$record")
 
-# Two of the depths do not name a `/code-review` level, and printing one for them would
-# be this script asserting a review that never ran — in the one place whose whole claim is
-# that nothing here is recalled. Shared by both marker branches: it was duplicated, and
-# the stale branch was the copy that forgot.
-depth_phrase() {
-  case "$1" in
-    trivial) printf 'attested trivial (no /code-review run)\n' ;;
-    unrecorded) printf 'depth unrecorded (marker predates PP-9onv)\n' ;;
-    *) printf '/code-review %s\n' "$1" ;;
+# Review methods have distinct display names. In particular, the trivial exception must
+# never render as a `/code-review` run, and a legacy marker without depth must remain an
+# absence of metadata rather than a claim that a review never happened.
+#
+# The claude-code depths are enumerated rather than globbed. A glob rendered ANY detail as
+# `/code-review <detail>` — so a hand-posted `claude-code base-main` printed
+# "/code-review base-main", naming a review level nobody ran. `mark-review.sh` cannot emit
+# that pair, but this script already accommodates hand-posted markers (`unrecorded`), and
+# every line of its report is a claim Tim merges on. An unknown pair falls through to the
+# `*` arm, which shows it verbatim and asserts nothing.
+review_phrase() {
+  case "$1:$2" in
+    codex-plugin-cc:base-main) printf 'codex review, branch diff vs main\n' ;;
+    claude-code:trivial) printf 'attested trivial (no /code-review run)\n' ;;
+    claude-code:unrecorded) printf 'depth unrecorded (legacy marker predates PP-9onv)\n' ;;
+    claude-code:low | claude-code:medium | claude-code:high | claude-code:xhigh | claude-code:max | claude-code:ultra)
+      printf '/code-review %s\n' "$2"
+      ;;
+    unrecorded:*) printf 'reviewer/detail unrecorded\n' ;;
+    *) printf '%s %s\n' "$1" "$2" ;;
   esac
 }
 
@@ -159,7 +171,7 @@ since_review_from=""
 since_review_note=""
 case "$rv_state" in
   marker)
-    review_desc="$(depth_phrase "$rv_depth") · ${rv_at} · covers head ${short_head}"
+    review_desc="$(review_phrase "$rv_reviewer" "$rv_detail") · ${rv_at} · covers head ${short_head}"
     ;;
   stale_marker)
     # "How many revisions back" only has an answer when the reviewed commit is still an
@@ -168,10 +180,10 @@ case "$rv_state" in
     if git cat-file -e "${rv_sha}^{commit}" 2>/dev/null \
       && git merge-base --is-ancestor "$rv_sha" "$head_sha" 2>/dev/null; then
       behind=$(git rev-list --count "${rv_sha}..${head_sha}")
-      review_desc="$(depth_phrase "$rv_depth") · ${rv_at} · STALE: ${behind} commit(s) back, reviewed ${rv_sha:0:7}, head is ${short_head}"
+      review_desc="$(review_phrase "$rv_reviewer" "$rv_detail") · ${rv_at} · STALE: ${behind} commit(s) back, reviewed ${rv_sha:0:7}, head is ${short_head}"
       since_review_from=$rv_sha
     else
-      review_desc="$(depth_phrase "$rv_depth") · ${rv_at} · STALE: reviewed ${rv_sha:0:7}, not an ancestor of head (force-push?)"
+      review_desc="$(review_phrase "$rv_reviewer" "$rv_detail") · ${rv_at} · STALE: reviewed ${rv_sha:0:7}, not an ancestor of head (force-push?)"
       since_review_note="unknowable — the reviewed commit is not an ancestor of head"
     fi
     ;;
@@ -391,7 +403,7 @@ add_block() { blocking+=("$1"); }
 if [[ "$(gate_token "$ci_out")" != "PASS" ]]; then add_block "ci: $(gate_state "$ci_out")"; fi
 if [[ "$(gate_token "$threads_out")" != "PASS" ]]; then add_block "threads: $(gate_state "$threads_out")"; fi
 if [[ "$(gate_token "$conflict_out")" != "PASS" ]]; then add_block "no_conflict: $(gate_state "$conflict_out")"; fi
-if [[ "$rv_state" != "marker" ]]; then add_block "reviewed: ${rv_state} — Tim runs /code-review, then the agent attests"; fi
+if [[ "$rv_state" != "marker" ]]; then add_block "reviewed: ${rv_state} — Tim runs /codex:review or /code-review, then the agent attests"; fi
 if [[ "$is_draft" == "true" ]]; then add_block "draft: flip to ready-for-review"; fi
 if [[ "$pr_state" != "OPEN" ]]; then add_block "state: PR is ${pr_state}, not open"; fi
 # The gate answers came from `gh` at one SHA and the diff from git at another, so no

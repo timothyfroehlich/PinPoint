@@ -1,6 +1,9 @@
 {
   "permissions": {
-    "allow": ["Bash(bash scripts/workflow/mark-claude-review.sh *)"],
+    "allow": [
+      "Bash(bash scripts/workflow/mark-review.sh *)",
+      "Bash(bash scripts/workflow/review-preflight.sh *)"
+    ],
     "deny": [
       "Bash(supabase db push:*)",
       "Bash(supabase projects delete:*)",

@@ -58,12 +58,14 @@ Reviewers read agent skills. Consult the relevant one for the area a PR touches 
 
 ## How a review gets triggered
 
-**Every review on this repo is asked for. No bot reviews it, and nothing fires a review automatically.** GitHub Copilot code review was retired on 2026-08-02 (PP-4ric) — its free tier was too small to review PinPoint's PRs, so quota outages were the normal state. The reviewer is now Tim, running `/code-review` on a branch; Antigravity likewise reviews when he asks.
+**Every review on this repo is asked for.** GitHub Copilot code review was retired on 2026-08-02 (PP-4ric). Tim runs the review, and he runs one of two: `/codex:review` (the plugin marks that command `disable-model-invocation`) and the built-in `/code-review` (user-triggered and billed). An agent can launch neither. Antigravity remains an optional second opinion.
 
-That did **not** loosen the merge bar. A PR still cannot merge without a review covering its **head commit**, recorded as the author's SHA-pinned marker (`<!-- pinpoint-claude-review: <head_sha> -->`), with every thread resolved. An agent cannot launch `/code-review`, so the author's job is to finish the work, hand the branch over, address the findings, and attest the head that was read:
+That did **not** loosen the merge bar. A PR still cannot merge without a review covering its **head commit**, recorded as the author's SHA-pinned marker (`<!-- pinpoint-review: <head_sha> -->`), with every thread resolved. The author finishes the work, hands the branch to Tim, addresses the findings, and attests the head that was read — with the pair matching whichever reviewer ran:
 
 ```bash
-bash scripts/workflow/mark-claude-review.sh <PR> <depth> "<one-line findings>"
+bash scripts/workflow/review-preflight.sh <PR>   # confirms the review will see the diff
+bash scripts/workflow/mark-review.sh <PR> codex-plugin-cc base-main "<one-line findings>"   # /codex:review
+bash scripts/workflow/mark-review.sh <PR> claude-code <depth> "<one-line findings>"         # /code-review <depth>
 ```
 
 The marker pins a SHA, so a later push invalidates it — deliberately, so a 3-commit fixup can't inherit the review of the commit before it. **If you're reviewing, assume the commit you were handed is the one the author intends to be final.** Full author-side rules: `.agents/skills/pinpoint-pr-workflow/SKILL.md` Phase 3.4.

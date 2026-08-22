@@ -409,7 +409,7 @@ function buildCommentBody(repoSlug, pr, shortSha, captured) {
 function postOrUpdateStickyComment(repoSlug, pr, body) {
   // `--paginate` concatenates one JSON array per page back-to-back, which isn't
   // valid single-document JSON — slurp+flatten via jq (same approach as
-  // mark-claude-review.sh) so a marker comment on page 2+ of a busy PR isn't missed.
+  // mark-review.sh) so a marker comment on page 2+ of a busy PR isn't missed.
   const raw = execFileSync(
     "gh",
     ["api", "--paginate", `repos/${repoSlug}/issues/${pr}/comments`],

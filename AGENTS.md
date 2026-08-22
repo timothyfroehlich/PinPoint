@@ -155,13 +155,22 @@ Never resolve `drizzle/meta` conflicts manually — the folder holds binary-like
 
 **No bot reviews this repo.** Copilot review was retired on 2026-08-02 (PP-4ric) — the free tier was too small to review PinPoint's PRs, so quota outages were the normal state. The merge bar is unchanged: a PR still needs a review covering its **head commit**, with threads resolved.
 
-The reviewer is **Tim, running `/code-review` on the branch** — a Claude Code harness built-in an agent cannot launch. So getting reviewed is a handoff: **finish your churn first** (CI fixes, merge-from-main), stop iterating, then tell Tim the branch is ready for review. Once he has, address the findings and attest the head he read:
+**Tim runs the review, and he runs one of two.** `/codex:review` (Codex plugin) and the built-in `/code-review` are both in use; he picks. You cannot launch either — the Codex plugin declares its commands `disable-model-invocation`, and `/code-review` is user-triggered and billed. So getting reviewed is a handoff: **finish your churn first** (CI fixes, merge-from-main), stop iterating, then tell Tim the branch is ready for review. Once he has run it, address every finding and attest the head he read.
+
+Before you ask, run the preflight — both reviewers read local git state in the session's working directory, so a review launched from the wrong worktree finds nothing and reads exactly like a clean review:
 
 ```bash
-bash scripts/workflow/mark-claude-review.sh <PR> <depth> "<one-line findings>"
+bash scripts/workflow/review-preflight.sh <PR>
 ```
 
-`<depth>` is the level he ran — `low | medium | high | xhigh | max | ultra`, or `trivial` for the carve-out below — and is required: "reviewed" and "reviewed at `low`" are different facts, and the handoff report states which. The marker pins a SHA, so any push invalidates it — re-attest if what you pushed was the review's own findings; get a fresh review if it was anything else. A genuinely trivial change (typo, comment, one-line mechanical fix) can be attested without interrupting him, saying why it was trivial. The marker attests a review happened; posting it otherwise is a false attestation. Full rules: `pinpoint-pr-workflow` skill Phase 3.4.
+It prints the commands for Tim only when you're on the PR's branch, local HEAD is the SHA that's actually pushed, the tree is clean, `main...HEAD` is non-empty, local `main` matches `origin/main`, and the PR is based on `main`. (Local `main`, not `origin/main` — that is the ref the reviewer resolves, and merging `origin/main` into your branch never advances it.) Then attest with the pair matching what he ran:
+
+```bash
+bash scripts/workflow/mark-review.sh <PR> codex-plugin-cc base-main "<one-line findings>"   # /codex:review
+bash scripts/workflow/mark-review.sh <PR> claude-code <depth> "<one-line findings>"         # /code-review <depth>
+```
+
+The marker records the exact method and pins a SHA, so any push invalidates it. Ask for a fresh review after every changed head; do not re-attest an old result. A genuinely trivial change (typo, comment, one-line mechanical fix) can use `mark-review.sh <PR> claude-code trivial`, saying why it was trivial. The marker attests a review happened; posting it otherwise is a false attestation. Full rules: `pinpoint-pr-workflow` skill Phase 3.4.
 
 ### Handing a PR over to merge
 
@@ -171,7 +180,7 @@ Don't write the handoff summary — **run it and paste it**:
 bash scripts/workflow/merge-handoff.sh <PR>
 ```
 
-It computes what Tim needs in order to merge without re-deriving anything: which `/code-review` covered head and how many commits back it was, CI, threads, mergeable + distance behind main, when main was last merged in, the diff split src / tests / docs / other, migrations, newly-registered env vars, UI + screenshots — then two `!`-prefixed commands, one to re-run the report (it is a snapshot) and one to merge. The merge command is printed **only** when all four gates pass; otherwise the block names what is blocking, so an un-ready PR cannot be handed over as ready. Every field is a claim an agent would otherwise be making from memory. (PP-9onv.)
+It computes what Tim needs in order to merge without re-deriving anything: which review covered head and how many commits back it was, CI, threads, mergeable + distance behind main, when main was last merged in, the diff split src / tests / docs / other, migrations, newly-registered env vars, UI + screenshots — then two `!`-prefixed commands, one to re-run the report (it is a snapshot) and one to merge. The merge command is printed **only** when all four gates pass; otherwise the block names what is blocking, so an un-ready PR cannot be handed over as ready. Every field is a claim an agent would otherwise be making from memory. (PP-9onv.)
 
 ### Review comments
 
