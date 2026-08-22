@@ -201,10 +201,6 @@ When you run the superpowers plugin lifecycle (`brainstorming → writing-plans 
 
 Plan-file checkboxes are within-PR execution state, **not** durable task tracking — the bead is the cross-session source of truth. Single-PR work gets one bead (no per-task sliver-beads); only multi-PR epics decompose into children.
 
-### Surfacing visual or ambiguous decisions (playgrounds)
-
-When a decision is **visual or hard to convey in prose** — color/contrast, spacing, layout, component variants, or a tradeoff with several plausible answers — build a small interactive playground for the user instead of describing options in text or guessing on their behalf. A playground is a single self-contained HTML file with live controls, a real rendered preview, and a copy-out decision; the user adjusts it, sees the actual result, and hands the choice back. (Claude Code provides this via a `playground` plugin skill — it is **not** a checked-in `.agents/skills/` skill, so in any tool you can simply write the single-file HTML directly.) Prefer this over a wall of bullet-pointed options whenever the user would benefit from _seeing_ the thing — e.g. a contrast change is far easier to judge as rendered swatches with live WCAG ratios than as numbers. Keep using `AskUserQuestion`-style prompts for non-visual forks; reach for a playground when sight is the deciding factor.
-
 ## 6. Working style
 
 How Tim wants agents to behave. (§1 has the one-line version; this is the detail.)
