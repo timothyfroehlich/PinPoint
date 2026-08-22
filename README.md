@@ -73,7 +73,7 @@ If you’re changing code, **start here**:
 - `AGENTS.md` – project rules, constraints, and expectations
 - `docs/NON_NEGOTIABLES.md` – things you must not break
 - `.agents/skills/` – how we structure code (and why); `pinpoint-ui`, `pinpoint-typescript`, `pinpoint-security`, `pinpoint-testing` are the ones you'll reach for most
-- `docs/PRODUCT_SPEC.md` and `docs/TECH_SPEC.md` – what the product should do, and how it is built
+- `docs/feature-specs/` – approved requirements for individual features
 
 ### Prerequisites
 
@@ -162,4 +162,4 @@ Future ideas:
 - Parts and inventory tracking
 - Additional locations and multi‑venue support
 
-See `docs/PRODUCT_SPEC.md` and `docs/V2_ROADMAP.md` for a more detailed roadmap.
+Individual feature requirements live in `docs/feature-specs/`.
