@@ -241,8 +241,8 @@ def _codex_reviews(pr: int) -> list[dict]:
     return sorted(reviews, key=lambda review: review.get("submitted_at") or "")
 
 
-def _marker_records(pr: int) -> list[tuple[str, str]]:
-    """Return manual-attestation SHAs with their update time, oldest first."""
+def _manual_markers(pr: int) -> list[tuple[str, str]]:
+    """Return (SHA, timestamp) records from the independent manual path."""
     repo = f"repos/{REPO_OWNER}/{REPO_NAME}"
     markers: list[tuple[str, str]] = []
     for comment in _gh_api_list(f"{repo}/issues/{pr}/comments"):
@@ -261,7 +261,7 @@ def _marker_records(pr: int) -> list[tuple[str, str]]:
                     comment.get("updated_at") or "",
                 )
             )
-    return sorted(markers, key=lambda marker: marker[1])
+    return markers
 
 
 def review_state(pr: int) -> tuple[str, str]:
@@ -277,19 +277,20 @@ def review_state(pr: int) -> tuple[str, str]:
         if state == "APPROVED" and review_sha == head_sha:
             return "approval", f"Codex approved head {head_sha[:7]}"
 
-    # A passing native approval short-circuits the marker API call. Otherwise a
-    # marker can still independently cover head after a non-approval review.
-    markers = _marker_records(pr)
+    # A current native approval is sufficient. Defer the paginated comments request
+    # unless it is needed to find the independent manual-attestation fallback.
+    markers = _manual_markers(pr)
     if any(marker_sha == head_sha for marker_sha, _at in markers):
         return "marker", f"manual review marker pins head {head_sha[:7]}"
 
-    latest_marker_sha, latest_marker_at = markers[-1] if markers else ("", "")
+    latest_marker_sha, latest_marker_at = max(
+        markers, key=lambda marker: marker[1], default=("", "")
+    )
     if reviews:
-        if markers and latest_marker_at > (latest.get("submitted_at") or ""):
+        if latest_marker_sha and latest_marker_at > (latest.get("submitted_at") or ""):
             return (
                 "stale_marker",
-                f"manual review marker pins {latest_marker_sha[:7]} but head is "
-                f"{head_sha[:7]}",
+                f"manual review marker pins {latest_marker_sha[:7]} but head is {head_sha[:7]}",
             )
         if state == "APPROVED":
             return (
@@ -302,7 +303,7 @@ def review_state(pr: int) -> tuple[str, str]:
             f"Codex last reviewed {review_sha[:7]} with {state}, not APPROVED; "
             f"{REVIEW_HINT.format(pr=pr)}",
         )
-    if markers:
+    if latest_marker_sha:
         return (
             "stale_marker",
             f"manual review marker pins {latest_marker_sha[:7]} but head is {head_sha[:7]}",

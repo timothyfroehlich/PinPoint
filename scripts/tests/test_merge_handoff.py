@@ -467,8 +467,7 @@ def test_a_manual_attestation_covering_head_is_merge_ready() -> None:
         scenario=Scenario(manual_review=True),
     ) as (_head, run):
         assert MERGE_CMD in run.stdout, run.stdout
-        assert "Manual review attestation" in run.stdout, run.stdout
-        assert "claude-code medium" in run.stdout, run.stdout
+        assert "/code-review medium" in run.stdout, run.stdout
 
 
 def test_a_codex_review_that_did_not_approve_is_not_merge_ready() -> None:

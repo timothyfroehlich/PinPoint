@@ -142,6 +142,22 @@ rv_reviewer=$(cut -f3 <<< "$record")
 rv_detail=$(cut -f4 <<< "$record")
 rv_at=$(cut -f5 <<< "$record")
 
+# Manual attestation metadata describes which review actually happened. Preserve it in
+# the handoff rather than flattening a `/code-review high` or the trivial exception into
+# the generic phrase "manual review attestation".
+review_phrase() {
+  case "$1:$2" in
+    codex-plugin-cc:base-main) printf 'codex review, branch diff vs main\n' ;;
+    claude-code:trivial) printf 'attested trivial (no /code-review run)\n' ;;
+    claude-code:unrecorded) printf 'depth unrecorded (legacy marker predates PP-9onv)\n' ;;
+    claude-code:low | claude-code:medium | claude-code:high | claude-code:xhigh | claude-code:max | claude-code:ultra)
+      printf '/code-review %s\n' "$2"
+      ;;
+    unrecorded:*) printf 'reviewer/detail unrecorded\n' ;;
+    *) printf '%s %s\n' "$1" "$2" ;;
+  esac
+}
+
 review_desc=""
 since_review_from=""
 since_review_note=""
@@ -150,7 +166,7 @@ case "$rv_state" in
     review_desc="Codex GitHub approval · ${rv_at} · covers head ${short_head}"
     ;;
   marker)
-    review_desc="Manual review attestation (${rv_reviewer} ${rv_detail}) · ${rv_at} · covers head ${short_head}"
+    review_desc="$(review_phrase "$rv_reviewer" "$rv_detail") · ${rv_at} · covers head ${short_head}"
     ;;
   stale_approval)
     if git cat-file -e "${rv_sha}^{commit}" 2>/dev/null \
@@ -170,15 +186,15 @@ case "$rv_state" in
     if git cat-file -e "${rv_sha}^{commit}" 2>/dev/null \
       && git merge-base --is-ancestor "$rv_sha" "$head_sha" 2>/dev/null; then
       behind=$(git rev-list --count "${rv_sha}..${head_sha}")
-      review_desc="Manual review attestation (${rv_reviewer} ${rv_detail}) · ${rv_at} · STALE: ${behind} commit(s) back, reviewed ${rv_sha:0:7}, head is ${short_head}"
+      review_desc="$(review_phrase "$rv_reviewer" "$rv_detail") · ${rv_at} · STALE: ${behind} commit(s) back, reviewed ${rv_sha:0:7}, head is ${short_head}"
       since_review_from=$rv_sha
     else
-      review_desc="Manual review attestation (${rv_reviewer} ${rv_detail}) · ${rv_at} · STALE: reviewed ${rv_sha:0:7}, not an ancestor of head (force-push?)"
+      review_desc="$(review_phrase "$rv_reviewer" "$rv_detail") · ${rv_at} · STALE: reviewed ${rv_sha:0:7}, not an ancestor of head (force-push?)"
       since_review_note="unknowable — the manually attested commit is not an ancestor of head"
     fi
     ;;
   *)
-    review_desc="NONE — no Codex approval on this PR"
+    review_desc="NONE — no Codex approval or manual review attestation on this PR"
     ;;
 esac
 # Diff shape
