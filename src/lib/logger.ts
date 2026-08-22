@@ -79,31 +79,42 @@ const EMAIL_REDACT_PATHS: string[] = Array.from(
 /**
  * Matches an email address embedded anywhere in a string.
  *
- * Delimiter-based rather than an allowlist of address characters: the runs on
- * either side of the `@` are "any run of characters that cannot delimit an
- * address" (no whitespace, quotes, brackets, or the punctuation that frames one
- * in error text). The `u` flag makes those runs match by code point, so an
- * internationalised domain (`user@exämple.com`) is caught too — an ASCII-only
- * class would stop at the first non-ASCII byte and leak the whole address. Both
- * a bare `a@b.com` and one wrapped in SMTP punctuation (`550 <a@b.com> unknown`)
- * yield exactly the address, with no surrounding text swept in.
+ * The runs either side of the `@` are "any run of characters that cannot
+ * delimit or path-separate an address" — no whitespace, quotes, brackets,
+ * braces, slashes, or the punctuation that frames one in error text — and the
+ * domain must end in an alphabetic TLD (`\p{L}{2,}`). Two forces shape this:
  *
- * Known gap: a quoted local part containing whitespace (`"john doe"@x.com`, a
- * rare RFC 5321 shape mail providers normalise or reject) breaks the run before
- * the `@` and is not matched. Widening the class to admit it would over-mask
- * ordinary log prose, and no real recipient address takes that form.
+ * - The `u` flag plus `\p{L}` match by code point, so an internationalised
+ *   domain (`user@exämple.com`, or a `.рф`/`.中国` TLD) is caught; an ASCII-only
+ *   class stops at the first non-ASCII byte and would leak the whole address.
+ * - Excluding `/` `\` and requiring a *letter* TLD keeps the pattern off things
+ *   that merely contain an `@` — pnpm's `.pnpm/@scope+pkg@1.2.3/…` stack-trace
+ *   frames (every `node_modules` frame in this repo) and version strings like
+ *   `runner@4.1.10` (numeric last segment) — so it does not shred the stack
+ *   traces it is meant to preserve.
+ *
+ * Both a bare `a@b.com` and one wrapped in SMTP punctuation (`550 <a@b.com>`)
+ * yield exactly the address. Two known, accepted gaps — neither a realistic
+ * recipient address, and closing either would over-mask ordinary log text:
+ * a quoted local part with whitespace (`"john doe"@x.com`), and an address
+ * literal domain (`user@[192.168.1.1]`, bracket-delimited on both sides).
  */
 const EMBEDDED_EMAIL_RE =
-  /[^\s"'<>()[\],;:@]+@[^\s"'<>()[\],;:@]+\.[^\s"'<>()[\],;:@]+/gu;
+  /[^\s"'<>()[\]{},;:@/\\]+@[^\s"'<>()[\]{},;:@/\\]+\.\p{L}{2,}/gu;
 
 /** Replace every email-like substring of `value` with its {@link maskEmail} form. */
 function maskEmailsInText(value: string): string {
   return value.replace(EMBEDDED_EMAIL_RE, (match) => maskEmail(match));
 }
 
+/** Recursion cap for {@link maskEmailsDeep} — a stack-overflow and cycle guard. */
+const MAX_MASK_DEPTH = 64;
+/** Placeholder for a value that is too deep, or that threw while being read. */
+const UNMASKABLE_PLACEHOLDER = "[unserializable]";
+
 /**
- * Mask email addresses in the string values of an already-serialized error,
- * in place.
+ * Return a copy of an already-serialized error with the email addresses in its
+ * string values masked.
  *
  * The key-based {@link EMAIL_REDACT_PATHS} redaction cannot reach an address
  * that lives in a *value* rather than under an email-named key. A mail-provider
@@ -113,34 +124,48 @@ function maskEmailsInText(value: string): string {
  * the substrings keeps the diagnostic (`550 <vic***> unknown`) while dropping
  * the address; it does not blank the error.
  *
- * Mutation is deliberate: `pino.stdSerializers.err` returns a fresh object per
- * log call, and mutating string properties in place — rather than rebuilding
- * from `Object.keys` — preserves the identity of the values it holds. A `Date`,
- * `Buffer`, `Map` or class instance carried alongside the recipient survives
- * untouched (a rebuild would flatten a `Date` to `{}`), as does the serializer's
- * non-enumerable `raw` back-reference. Typed arrays hold bytes, never an
- * address, so they are skipped outright. A `WeakSet` guards against a
- * self-referential value cycling — there is no depth cap, so a string at any
- * nesting is still masked.
+ * Rebuilds rather than mutating in place, and this matters for safety: a
+ * provider error can carry a frozen or getter-only nested value (an idiomatic
+ * `Object.freeze`d context, a class instance from an SDK), and assigning into
+ * one throws — pino does not catch serializer errors, so an in-place approach
+ * turns "an address leaked" into "the log call itself throws", inside the very
+ * catch block reporting the original failure. Reading a source value never
+ * throws for those shapes; a read that *does* throw (a throwing getter) is
+ * caught per-key. Opaque built-ins whose data lives in internal slots — `Date`,
+ * `Buffer`/typed arrays, `Map`, `RegExp`, `Set` — are passed through by
+ * reference so their serialization is preserved (rebuilding a `Date` from its
+ * keys would flatten it to `{}`); an address inside one is left as-is, which is
+ * not a realistic shape for a recipient. Recursion is depth-capped so a deeply
+ * nested (or self-referential) value cannot overflow the stack; past the cap the
+ * subtree is replaced by a placeholder, which fails safe (no raw remainder).
  */
-function maskEmailsDeep(value: unknown, seen: WeakSet<object>): unknown {
+function maskEmailsDeep(value: unknown, depth: number): unknown {
   if (typeof value === "string") return maskEmailsInText(value);
   if (value === null || typeof value !== "object") return value;
-  if (ArrayBuffer.isView(value)) return value;
-  if (seen.has(value)) return value;
-  seen.add(value);
-  if (Array.isArray(value)) {
-    const items = value as unknown[];
-    for (let i = 0; i < items.length; i += 1) {
-      items[i] = maskEmailsDeep(items[i], seen);
-    }
+  if (
+    value instanceof Date ||
+    value instanceof RegExp ||
+    value instanceof Map ||
+    value instanceof Set ||
+    ArrayBuffer.isView(value)
+  ) {
     return value;
   }
-  const record = value as Record<string, unknown>;
-  for (const key of Object.keys(record)) {
-    record[key] = maskEmailsDeep(record[key], seen);
+  if (depth >= MAX_MASK_DEPTH) return UNMASKABLE_PLACEHOLDER;
+  if (Array.isArray(value)) {
+    return value.map((item) => maskEmailsDeep(item, depth + 1));
   }
-  return value;
+  const source = value as Record<string, unknown>;
+  const result: Record<string, unknown> = {};
+  for (const key of Object.keys(source)) {
+    try {
+      result[key] = maskEmailsDeep(source[key], depth + 1);
+    } catch {
+      // A throwing getter (or any read failure) must not crash the log call.
+      result[key] = UNMASKABLE_PLACEHOLDER;
+    }
+  }
+  return result;
 }
 
 /**
@@ -150,7 +175,21 @@ function maskEmailsDeep(value: unknown, seen: WeakSet<object>): unknown {
  * otherwise carry the raw recipient into the log.
  */
 function maskingErrSerializer(error: Error): unknown {
-  return maskEmailsDeep(pino.stdSerializers.err(error), new WeakSet<object>());
+  try {
+    return maskEmailsDeep(pino.stdSerializers.err(error), 0);
+  } catch {
+    // `stdSerializers.err` reads every own enumerable error property, so a
+    // throwing getter on the error can fail here, before maskEmailsDeep runs.
+    // pino does not catch serializer errors, so fall back to a minimal masked
+    // shape rather than throwing out of the log call.
+    let message = UNMASKABLE_PLACEHOLDER;
+    try {
+      message = maskEmailsInText(String(error.message));
+    } catch {
+      // Keep the placeholder if even the message cannot be read.
+    }
+    return { type: "Error", message };
+  }
 }
 
 /**

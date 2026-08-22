@@ -176,4 +176,47 @@ describe("logger redaction", () => {
     expect(line).not.toContain("victim@example.com");
     expect(line).toContain("vic***");
   });
+
+  it("masks (and does not throw on) a frozen nested error value", () => {
+    // Mutating a frozen value in place throws; pino does not catch serializer
+    // errors, so that would turn a logged failure into a new crash. Rebuilding
+    // reads the frozen value without assigning into it.
+    const error = Object.assign(new Error("boom"), {
+      envelope: Object.freeze({ to: ["victim@example.com"] }),
+    });
+
+    const line = logLine({ err: error });
+
+    expect(line).not.toContain("victim@example.com");
+    expect(line).toContain("vic***");
+  });
+
+  it("does not crash on a throwing getter nested in the error", () => {
+    const detail: Record<string, unknown> = {};
+    Object.defineProperty(detail, "info", {
+      enumerable: true,
+      get() {
+        throw new Error("cannot read");
+      },
+    });
+    const error = Object.assign(new Error("boom"), { code: "EFAIL", detail });
+
+    const line = logLine({ err: error });
+
+    expect(line).toContain("EFAIL");
+    expect(line).toContain("[unserializable]");
+  });
+
+  it("does not shred a stack-trace path that merely contains an @", () => {
+    // pnpm's `.pnpm/@scope+pkg@version/` layout embeds `@` in every node_modules
+    // frame; the alphabetic-TLD anchor keeps the masker off them.
+    const frame =
+      "at x (/app/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/x.js:1:2)";
+    const error = new Error(frame);
+
+    const line = logLine({ err: error });
+
+    expect(line).toContain("@vitest+runner@4.1.10");
+    expect(line).not.toContain("***");
+  });
 });
