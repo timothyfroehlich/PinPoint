@@ -64,7 +64,13 @@ export class ResendTransport implements EmailTransport {
       if (inReplyTo) headers["In-Reply-To"] = inReplyTo;
       if (references) headers["References"] = references;
 
-      const data = await this.client.emails.send(
+      // The Resend SDK does NOT throw on API-level send failures (invalid
+      // recipient, unverified/bounced domain, validation errors). It resolves
+      // with `{ data: null, error: {...} }`, so the response must be inspected
+      // — only genuine JS/network faults reach the catch block below. Without
+      // this check a rejected send is reported as success and nothing is
+      // logged: a member email silently never arrives. (PP-okmw)
+      const { data, error } = await this.client.emails.send(
         {
           from: EMAIL_FROM,
           to,
@@ -76,6 +82,17 @@ export class ResendTransport implements EmailTransport {
         // `Idempotency-Key` header) within a 24h window. (PP-2053.7)
         idempotencyKey ? { idempotencyKey } : {}
       );
+
+      if (error) {
+        // Wrap the Resend error object in a real Error (with the original as
+        // `cause`) so both the Sentry and log sinks get a message + stack, and
+        // mirror SMTPTransport's failure Result shape. (PP-okmw)
+        const sendError = new Error(`Resend rejected send: ${error.message}`, {
+          cause: error,
+        });
+        reportError(sendError, { action: "ResendTransport.send" });
+        return { success: false, error: sendError };
+      }
 
       return { success: true, data };
     } catch (error) {
