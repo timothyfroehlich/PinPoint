@@ -32,6 +32,33 @@ TEMPLATE_ERROR = (
 )
 
 
+def test_git_inventory_keeps_all_harness_worktree_paths(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Claude, Codex, and Antigravity paths need no provider-specific filter."""
+    paths = {
+        str((tmp_path / ".claude/worktrees/agent-123").resolve()): "claude-task",
+        str((tmp_path / ".codex/worktrees/74f7/PinPoint").resolve()): "codex-task",
+        str(
+            (tmp_path / ".gemini/antigravity/worktrees/PinPoint/feature").resolve()
+        ): "antigravity-task",
+    }
+    porcelain = "".join(
+        f"worktree {path}\nHEAD deadbeef\nbranch refs/heads/{branch}\n\n"
+        for path, branch in paths.items()
+    )
+
+    monkeypatch.setattr(
+        sweep.subprocess,
+        "run",
+        lambda *_args, **_kwargs: subprocess.CompletedProcess(
+            _args[0], 0, porcelain, ""
+        ),
+    )
+
+    assert sweep.get_active_worktree_branches(tmp_path) == paths
+
+
 def _kind(args: list[str]) -> str:
     """Classify a docker argv so the stub can answer per-subcommand."""
     if not args or args[0] != "docker":

@@ -3,11 +3,9 @@
 This script deletes worktrees, so the only thing worth testing hard is the
 predicate that decides which ones. Two mistakes in it destroy real work:
 
-1. **Treating "no open PR + clean" as finished.** That is `stale-worktrees.sh`'s
-   rule, and it is indistinguishable from an agent that is working right now and
-   has not opened its PR yet. At the moment PP-49x5 was measured, zero worktrees
-   had an open PR while at least two agents were live. So a reap must rest on
-   *positive proof* — merged-SHA equality, or zero commits ahead of
+1. **Treating "no open PR + clean" as finished.** That rule is indistinguishable
+   from an agent that is working right now and has not opened its PR yet. A reap
+   must rest on *positive proof* — merged-SHA equality, or zero commits ahead of
    `origin/main` — never on the absence of a PR.
 2. **Testing mergedness with `git merge-base --is-ancestor`.** PinPoint
    squash-merges, so a merged branch's commits are never ancestors of `main`.
@@ -98,8 +96,9 @@ class World:
         git("commit", "-m", f"main: {name}", cwd=self.repo)
         return git("rev-parse", "HEAD", cwd=self.repo)
 
-    def add_worktree(self, branch: str) -> Path:
-        path = self.worktrees / branch.replace("/", "__")
+    def add_worktree(self, branch: str, path: Path | None = None) -> Path:
+        path = path or self.worktrees / branch.replace("/", "__")
+        path.parent.mkdir(parents=True, exist_ok=True)
         git("worktree", "add", str(path), "-b", branch, cwd=self.repo)
         return path
 
@@ -476,6 +475,29 @@ def test_this_scripts_own_exit_codes_never_collide_with_cleanups() -> None:
 
 
 class TestRepoContext:
+    def test_git_inventory_includes_every_harness_path_shape(
+        self,
+        world: World,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        paths = {
+            "claude-task": world.root / ".claude/worktrees/agent-123",
+            "codex-task": world.root / ".codex/worktrees/74f7/PinPoint",
+            "antigravity-task": (
+                world.root / ".gemini/antigravity/worktrees/PinPoint/feature"
+            ),
+        }
+        for branch, path in paths.items():
+            world.add_worktree(branch, path)
+
+        code, _, err = run_reap(world, monkeypatch, capsys)
+
+        assert code == reap.EXIT_OK, err
+        for branch, path in paths.items():
+            assert tier_of(err, branch) == reap.TIER_REAP
+            assert str(path.resolve()) in err
+
     def test_gh_is_asked_from_the_repo_not_the_callers_cwd(
         self,
         world: World,

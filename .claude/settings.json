@@ -162,7 +162,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/worktree-remove.sh",
+            "command": "python3 \"${CLAUDE_PROJECT_DIR:-.}/scripts/worktree_cleanup.py\" --claude-hook",
             "timeout": 60000
           }
         ]

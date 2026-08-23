@@ -159,7 +159,7 @@ Don't post a marker to paper over a review nobody ran, and don't ask Tim to `--f
 
 ### Cleanup
 
-The `WorktreeRemove` hook does NOT remove finished agent worktrees — it only runs cleanup when something else initiates removal, so a background agent that pushes and ends leaves its directory on disk forever. `python3 scripts/worktree_reap.py` is what removes them (PP-49x5; dry-run by default, `--apply` to reclaim). For manually created worktrees, run `python3 scripts/worktree_cleanup.py <path>` yourself — plain `git worktree remove` leaks slot entries and Docker volumes. `./scripts/workflow/stale-worktrees.sh` covers manually created `../pinpoint-worktrees/*` ONLY.
+The `WorktreeRemove` hook does not identify finished agent worktrees, so a background agent that pushes and ends can leave its directory on disk. `python3 scripts/worktree_reap.py` finds landed work across Git's full worktree inventory (Claude, Codex, Antigravity, or manual paths) and delegates removal to `worktree_cleanup.py` (PP-49x5; dry-run by default, `--apply` to reclaim). For direct cleanup, run `python3 scripts/worktree_cleanup.py <path>`; configure Codex's target-worktree cleanup as `python3 scripts/worktree_cleanup.py .`. Plain `git worktree remove` leaks slot entries and Docker volumes.
 
 ## Error Recovery
 
