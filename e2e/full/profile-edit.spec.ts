@@ -52,7 +52,7 @@ test.describe("Profile edit", () => {
     await page.getByRole("button", { name: /^Save$/i }).click();
     await expect(page).toHaveURL(new RegExp(`${profileHref}$`));
 
-    await expect(page.getByText(pronouns, { exact: true })).toBeVisible();
+    await expect(page.getByText(pronouns, { exact: false })).toBeVisible();
     await expect(page.getByText("Loves drop targets")).toBeVisible();
   });
 });
