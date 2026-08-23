@@ -174,8 +174,7 @@ describe("manual-refresh token bucket at the seam (PP-hbi0)", () => {
 
   it("never blocks the cron path, and never charges it", async () => {
     const { getMockClient } = await import("~/lib/pinballmap/client-mock");
-    const { syncLocationSnapshot, getRefreshAllowance } =
-      await import("~/lib/pinballmap/state");
+    const { syncLocationSnapshot } = await import("~/lib/pinballmap/state");
     const { PBM_REFRESH_BURST } = await import("~/lib/pinballmap/config");
     const fetchSpy = vi.spyOn(getMockClient(), "fetchLocation");
 

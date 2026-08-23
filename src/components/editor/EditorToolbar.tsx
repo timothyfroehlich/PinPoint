@@ -50,6 +50,7 @@ export function EditorToolbar({
   };
 
   return (
+    // oxlint-disable-next-line jsx-a11y/interactive-supports-focus -- toolbar container delegates focus to child toggle controls
     <div
       role="toolbar"
       className="flex flex-wrap items-center gap-1 border-b p-1 bg-muted/30"
