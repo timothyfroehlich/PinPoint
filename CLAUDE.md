@@ -16,7 +16,7 @@ PinPoint uses single-context domain documentation. See `docs/agents/domain.md`.
 
 ### Code review
 
-`REVIEW.md` at the repo root is the canonical review rubric, shared with Antigravity. Read it before launching the code-review skill.
+`REVIEW.md` at the repo root is the canonical review rubric. Read it before launching the code-review skill.
 
 **Codex GitHub review is a valid review-gate path.** Tim triggers it by commenting `@codex review` on the PR. A native GitHub `APPROVED` review of the current head passes the gate alongside the existing SHA-pinned manual attestation; no OpenAI API key is involved.
 
