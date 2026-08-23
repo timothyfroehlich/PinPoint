@@ -131,6 +131,10 @@ export function RouteTabStrip({
       ? `More ${ariaLabel.toLowerCase()}, current section: ${activeTab.label}`
       : `More ${ariaLabel.toLowerCase()}`;
 
+  useEffect(() => {
+    if (!hasOverflow) setIsOverflowMenuOpen(false);
+  }, [hasOverflow]);
+
   // The Manage form's unsaved-navigation guard runs on document capture and
   // intentionally stops propagation for an intercepted link. That prevents
   // Radix from receiving the click it normally uses to close this menu. A

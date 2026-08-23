@@ -32,6 +32,7 @@ describe("RouteTabStrip", () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
   });
 
   it("renders all routes directly when they fit", async () => {
@@ -83,6 +84,32 @@ describe("RouteTabStrip", () => {
     expect(manage).toHaveAttribute("href", "/m/TAF/edit");
   });
 
+  it("does not reopen the menu after overflow disappears and returns", async () => {
+    const setContainerWidth = mockElementWidths({
+      container: 230,
+      tabs: [60, 80, 100, 80, 80],
+      trigger: 48,
+    });
+    const user = userEvent.setup();
+
+    const { rerender } = renderStrip();
+    await user.click(
+      await screen.findByRole("button", { name: "More machine sections" })
+    );
+    expect(await screen.findByRole("menu")).toBeInTheDocument();
+
+    setContainerWidth(500);
+    rerender(strip([...tabs]));
+    await waitFor(() => {
+      expect(screen.queryByTestId("machine-tab-more")).not.toBeInTheDocument();
+    });
+
+    setContainerWidth(230);
+    rerender(strip([...tabs]));
+    await screen.findByRole("button", { name: "More machine sections" });
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+  });
+
   it("announces the current route when the trigger overlaps its label", async () => {
     pathnameMock.mockReturnValue("/m/TAF/edit");
     mockElementWidths({
@@ -111,11 +138,15 @@ describe("RouteTabStrip", () => {
   });
 });
 
-function renderStrip(): void {
-  render(
+function renderStrip() {
+  return render(strip(tabs));
+}
+
+function strip(tabsToRender: readonly RouteTab[]) {
+  return (
     <RouteTabStrip
       basePath="/m/TAF"
-      tabs={tabs}
+      tabs={tabsToRender}
       ariaLabel="Machine sections"
       testIdPrefix="machine-tab"
     />
@@ -130,12 +161,13 @@ function mockElementWidths({
   container: number;
   tabs: readonly number[];
   trigger: number;
-}): void {
+}): (width: number) => void {
+  let containerWidth = container;
   let measuredTabIndex = 0;
   vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(
     function (this: HTMLElement): DOMRect {
       if (this.dataset.testid === "machine-tab-strip") {
-        return DOMRect.fromRect({ width: container });
+        return DOMRect.fromRect({ width: containerWidth });
       }
       if (this.hasAttribute("data-overflow-trigger-measure")) {
         return DOMRect.fromRect({ width: trigger });
@@ -148,4 +180,7 @@ function mockElementWidths({
       return DOMRect.fromRect();
     }
   );
+  return (width: number): void => {
+    containerWidth = width;
+  };
 }
