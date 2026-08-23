@@ -40,6 +40,23 @@ PinPoint scopes: `issues`, `machines`, `auth`, `ui`, `db`, `e2e`, `agents`, `wor
 Prefer MCP `create_pull_request` for typed argument handling, or `gh pr create` if you're
 already in a shell. Open **ready-for-review, not draft** (AGENTS.md §6).
 
+### Agent origin
+
+Every PR opened by an agent carries exactly one origin label and a visible signature in
+its description. This is a lightweight way to find the implementing session; it is not
+a review, readiness, CI, or merge signal.
+
+1. Use the full registered huddle name as the final line of the PR description:
+   `—<huddle-name>`.
+2. Add one label for the implementing harness:
+   - `Claude-*` → `Claude`
+   - `Codex-*` → `Codex`
+   - `Antigravity-*` or `AGY-*` → `Agy`
+
+Preserve the PR's other labels and description content. Do not replace the origin label
+or signature on a PR another agent opened; its attribution remains with the original
+implementer.
+
 ### PR description template
 
 ```
@@ -54,6 +71,8 @@ already in a shell. Open **ready-for-review, not draft** (AGENTS.md §6).
 ## Related Issues
 
 Closes #N (if applicable)
+
+—<YourFullRegisteredHuddleName>
 ```
 
 ---
