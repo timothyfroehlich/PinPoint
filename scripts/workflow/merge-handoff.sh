@@ -88,7 +88,7 @@ fetched_head=$(fetch_pr_head)
 # ancestor of what was fetched — so an existence check always passes and the guard never
 # fires. That is the dangerous direction. The gate answers (review marker, CI, threads)
 # come from `gh` at one SHA while the diff comes from git at another, and the report would
-# then hand over a merge command for a head nobody reviewed, which is the exact false
+# then hand over a merge command for a head Codex never approved, which is the exact false
 # green this script exists to prevent.
 head_raced=""
 if [[ "$head_sha" != "$fetched_head" ]]; then
@@ -131,28 +131,20 @@ gate_state() {
 ci_out=$(check_ci "$pr" 2>&1) || true
 threads_out=$(check_unresolved_threads "$pr" 2>&1) || true
 conflict_out=$(check_no_merge_conflict "$pr" 2>&1) || true
-
 # ---------------------------------------------------------------------------------
-# Review state: which review, how long ago, and what has landed since
+# Review state: the Codex GitHub approval and what landed since
 # ---------------------------------------------------------------------------------
 
-record=$(_marker_record "$pr" "$(_repo_slug)" "$head_sha")
+record=$(_review_record "$pr" "$(_repo_slug)" "$head_sha")
 rv_state=$(cut -f1 <<< "$record")
 rv_sha=$(cut -f2 <<< "$record")
 rv_reviewer=$(cut -f3 <<< "$record")
 rv_detail=$(cut -f4 <<< "$record")
 rv_at=$(cut -f5 <<< "$record")
 
-# Review methods have distinct display names. In particular, the trivial exception must
-# never render as a `/code-review` run, and a legacy marker without depth must remain an
-# absence of metadata rather than a claim that a review never happened.
-#
-# The claude-code depths are enumerated rather than globbed. A glob rendered ANY detail as
-# `/code-review <detail>` — so a hand-posted `claude-code base-main` printed
-# "/code-review base-main", naming a review level nobody ran. `mark-review.sh` cannot emit
-# that pair, but this script already accommodates hand-posted markers (`unrecorded`), and
-# every line of its report is a claim Tim merges on. An unknown pair falls through to the
-# `*` arm, which shows it verbatim and asserts nothing.
+# Manual attestation metadata describes which review actually happened. Preserve it in
+# the handoff rather than flattening a `/code-review high` or the trivial exception into
+# the generic phrase "manual review attestation".
 review_phrase() {
   case "$1:$2" in
     codex-plugin-cc:base-main) printf 'codex review, branch diff vs main\n' ;;
@@ -170,13 +162,27 @@ review_desc=""
 since_review_from=""
 since_review_note=""
 case "$rv_state" in
+  approval)
+    review_desc="Codex GitHub approval · ${rv_at} · covers head ${short_head}"
+    ;;
   marker)
     review_desc="$(review_phrase "$rv_reviewer" "$rv_detail") · ${rv_at} · covers head ${short_head}"
     ;;
+  stale_approval)
+    if git cat-file -e "${rv_sha}^{commit}" 2>/dev/null \
+      && git merge-base --is-ancestor "$rv_sha" "$head_sha" 2>/dev/null; then
+      behind=$(git rev-list --count "${rv_sha}..${head_sha}")
+      review_desc="Codex GitHub approval · ${rv_at} · STALE: ${behind} commit(s) back, approved ${rv_sha:0:7}, head is ${short_head}"
+      since_review_from=$rv_sha
+    else
+      review_desc="Codex GitHub approval · ${rv_at} · STALE: approved ${rv_sha:0:7}, not an ancestor of head (force-push?)"
+      since_review_note="unknowable — the approved commit is not an ancestor of head"
+    fi
+    ;;
+  not_approved)
+    review_desc="Codex GitHub review (${rv_detail}) · ${rv_at} · did not approve ${rv_sha:0:7}"
+    ;;
   stale_marker)
-    # "How many revisions back" only has an answer when the reviewed commit is still an
-    # ancestor of head. After a force-push it is not, and the honest report is that the
-    # distance is unknowable — not a number computed from an unrelated commit.
     if git cat-file -e "${rv_sha}^{commit}" 2>/dev/null \
       && git merge-base --is-ancestor "$rv_sha" "$head_sha" 2>/dev/null; then
       behind=$(git rev-list --count "${rv_sha}..${head_sha}")
@@ -184,15 +190,13 @@ case "$rv_state" in
       since_review_from=$rv_sha
     else
       review_desc="$(review_phrase "$rv_reviewer" "$rv_detail") · ${rv_at} · STALE: reviewed ${rv_sha:0:7}, not an ancestor of head (force-push?)"
-      since_review_note="unknowable — the reviewed commit is not an ancestor of head"
+      since_review_note="unknowable — the manually attested commit is not an ancestor of head"
     fi
     ;;
   *)
-    review_desc="NONE — no review marker on this PR"
+    review_desc="NONE — no Codex approval or manual review attestation on this PR"
     ;;
 esac
-
-# ---------------------------------------------------------------------------------
 # Diff shape
 # ---------------------------------------------------------------------------------
 
@@ -258,7 +262,7 @@ elif [[ -n "$since_review_note" ]]; then
   # compare against" here would contradict the review line two rows above, which names
   # the reviewed SHA.
   diff_since_review=$since_review_note
-elif [[ "$rv_state" == "marker" ]]; then
+elif [[ "$rv_state" == "approval" || "$rv_state" == "marker" ]]; then
   diff_since_review="none — the review covers head"
 else
   diff_since_review="n/a — nothing reviewed to compare against"
@@ -403,7 +407,7 @@ add_block() { blocking+=("$1"); }
 if [[ "$(gate_token "$ci_out")" != "PASS" ]]; then add_block "ci: $(gate_state "$ci_out")"; fi
 if [[ "$(gate_token "$threads_out")" != "PASS" ]]; then add_block "threads: $(gate_state "$threads_out")"; fi
 if [[ "$(gate_token "$conflict_out")" != "PASS" ]]; then add_block "no_conflict: $(gate_state "$conflict_out")"; fi
-if [[ "$rv_state" != "marker" ]]; then add_block "reviewed: ${rv_state} — Tim runs /codex:review or /code-review, then the agent attests"; fi
+if [[ "$rv_state" != "approval" && "$rv_state" != "marker" ]]; then add_block "reviewed: ${rv_state} — comment @codex review and obtain a Codex approval of the current head, or use the existing manual attestation workflow"; fi
 if [[ "$is_draft" == "true" ]]; then add_block "draft: flip to ready-for-review"; fi
 if [[ "$pr_state" != "OPEN" ]]; then add_block "state: PR is ${pr_state}, not open"; fi
 # The gate answers came from `gh` at one SHA and the diff from git at another, so no

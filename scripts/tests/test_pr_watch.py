@@ -20,9 +20,9 @@ reporting a failure for something that was not one.
    not a verdict. (PP-qkl8)
 
 Review state (PP-4ric): Copilot review was retired on 2026-08-02, so no bot
-reviews this repo. `--check-ready` reports which of three marker states a PR is
+reviews this repo. `--check-ready` reports which native Codex-review state a PR is
 in without gating on it — "reviewed", "reviewed then pushed past", and "never
-reviewed" need different actions, and flattening `stale_marker` into "reviewed"
+reviewed" need different actions, and flattening a stale approval into "reviewed"
 is how a commit nobody read reaches the merge command.
 
 Everything is mocked at the `gh` CLI seam (`pr_watch.gh`) — these tests never
@@ -88,15 +88,19 @@ def _ago(seconds: float) -> str:
     return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() - seconds))
 
 
-def marker_comment(sha=HEAD_SHA):
-    """A comment in the exact shape mark-review.sh posts for Codex."""
+def codex_review(sha=HEAD_SHA, state="APPROVED", submitted_at="2026-08-22T12:00:00Z"):
     return {
-        "body": (
-            f"<!-- pinpoint-review: {sha} -->\n"
-            "<!-- pinpoint-reviewer: codex-plugin-cc -->\n"
-            "<!-- pinpoint-review-detail: base-main -->\n"
-            "Codex review of head"
-        )
+        "user": {"login": pr_watch.CODEX_REVIEW_BOT},
+        "state": state,
+        "commit_id": sha,
+        "submitted_at": submitted_at,
+    }
+
+
+def manual_marker(sha=HEAD_SHA):
+    return {
+        "body": f"<!-- pinpoint-review: {sha} -->\nreviewed",
+        "updated_at": "2026-08-22T12:00:00Z",
     }
 
 
@@ -107,13 +111,14 @@ def make_gh(
     merge_state="CLEAN",
     threads=(),
     labels=(),
-    issue_comments=(),
+    reviews=(),
+    comments=(),
 ):
     """Build a fake `gh` that answers every call pr-watch makes.
 
     Records each invocation on `.calls` so tests can assert what was queried.
 
-    `issue_comments` is what `review_state` reads. It defaults to empty — the
+    `reviews` is what `review_state` reads. It defaults to empty — the
     `unreviewed` state — which is deliberate: `unreviewed` is reported but does
     NOT gate readiness, so tests that don't care about the review stay unaffected.
     """
@@ -137,8 +142,10 @@ def make_gh(
                 return json.dumps({"headRefOid": HEAD_SHA})
         if args[:2] == ("api", "--paginate"):
             path = args[2]
+            if "/reviews" in path:
+                return json.dumps(list(reviews))
             if "/comments" in path:
-                return json.dumps(list(issue_comments))
+                return json.dumps(list(comments))
         if args[:2] == ("api", "graphql"):
             return json.dumps(
                 {
@@ -785,137 +792,133 @@ def test_run_audit_reports_cancelled_gate_as_superseded(monkeypatch, capsys):
 
 
 # ---------------------------------------------------------------------------
-# review_state — three states, pinned to the marker (PP-4ric)
+# review_state — native Codex review states, pinned to the reviewed SHA (PP-4ric)
 # ---------------------------------------------------------------------------
 #
-# Copilot is retired, so there is no reviewer to poll and no request to wait on.
-# The only observable fact is the SHA-pinned marker. Kept in lockstep with the
-# bash implementation in _pr-gates.sh (see scripts/tests/test_pr_gates.py).
+# ---------------------------------------------------------------------------
+# review_state — trusted Codex GitHub reviews
+# ---------------------------------------------------------------------------
 
 GATES_PATH = Path(__file__).parent.parent / "workflow" / "_pr-gates.sh"
 
 
 @pytest.mark.unit
-def test_marker_prefix_is_identical_to_the_bash_gate():
-    """pr-watch and _pr-gates.sh must recognise exactly the same marker.
-
-    A prefix changed in one and not the other makes the readiness report and the
-    merge gate disagree about whether a PR has been reviewed — worse than either
-    answer alone, because whichever one you happen to read looks authoritative.
-    """
+def test_codex_login_is_identical_to_the_bash_gate():
     gates = GATES_PATH.read_text()
-    match = re.search(r'^readonly REVIEW_MARKER_PREFIX="(.+)"$', gates, re.M)
-    assert match, "REVIEW_MARKER_PREFIX not found in _pr-gates.sh"
-    assert match.group(1) == pr_watch.REVIEW_MARKER_PREFIX
+    match = re.search(r'^readonly CODEX_REVIEW_BOT="(.+)"$', gates, re.M)
+    assert match, "CODEX_REVIEW_BOT not found in _pr-gates.sh"
+    assert match.group(1) == pr_watch.CODEX_REVIEW_BOT
 
 
 @pytest.mark.unit
-def test_legacy_marker_prefix_is_identical_to_the_bash_gate():
-    """The legacy prefix is duplicated too, so it needs the same pin.
-
-    `mark-claude-review.sh` is gone, but both implementations still READ the marker it
-    used to post: `main` can mint one until the rename lands, and merged PRs carry them.
-    A prefix edited in one file and not the other makes the readiness report and the merge
-    gate disagree about exactly the markers nobody is watching any more — the quietest
-    version of the drift the test above exists to prevent.
-    """
-    gates = GATES_PATH.read_text()
-    match = re.search(r'^readonly LEGACY_CLAUDE_MARKER_PREFIX="(.+)"$', gates, re.M)
-    assert match, "LEGACY_CLAUDE_MARKER_PREFIX not found in _pr-gates.sh"
-    assert match.group(1) == pr_watch.LEGACY_CLAUDE_MARKER_PREFIX
-
-
-@pytest.mark.unit
-@pytest.mark.parametrize("state", ["marker", "stale_marker", "unreviewed"])
+@pytest.mark.parametrize(
+    "state",
+    [
+        "approval",
+        "marker",
+        "stale_approval",
+        "stale_marker",
+        "not_approved",
+        "unreviewed",
+    ],
+)
 def test_state_vocabulary_is_shared_with_the_bash_gate(state):
-    """Both implementations name the same three states, so reports are comparable.
-
-    Pinned against the `case` arms of `check_review_happened` rather than the
-    assignments — the bash computes RS_STATE in one step from `_marker_verdict`,
-    so the arms are the only place each name is spelled out.
-    """
     arms = re.findall(r"^    (\w+)\)$", GATES_PATH.read_text(), re.M)
     assert state in arms, arms
 
 
 @pytest.mark.unit
 def test_review_state_unreviewed(monkeypatch):
-    monkeypatch.setattr(pr_watch, "gh", make_gh(issue_comments=()))
+    monkeypatch.setattr(pr_watch, "gh", make_gh(reviews=()))
     state, detail = pr_watch.review_state(PR)
     assert state == "unreviewed"
-    assert "/codex:review" in detail
-    assert "mark-review.sh" in detail
+    assert "@codex review" in detail
 
 
 @pytest.mark.unit
-def test_review_state_marker_pins_head(monkeypatch):
-    monkeypatch.setattr(pr_watch, "gh", make_gh(issue_comments=[marker_comment()]))
+def test_review_state_approval_pins_head(monkeypatch):
+    monkeypatch.setattr(pr_watch, "gh", make_gh(reviews=[codex_review()]))
     state, detail = pr_watch.review_state(PR)
-    assert state == "marker"
+    assert state == "approval"
     assert HEAD_SHA[:7] in detail
 
 
 @pytest.mark.unit
-def test_review_state_stale_marker(monkeypatch):
-    """Reviewed, then pushed past — the state a bare yes/no would call "reviewed"."""
-    monkeypatch.setattr(
-        pr_watch, "gh", make_gh(issue_comments=[marker_comment(OLD_SHA)])
-    )
-    state, detail = pr_watch.review_state(PR)
-    assert state == "stale_marker"
-    assert OLD_SHA[:7] in detail
-    assert HEAD_SHA[:7] in detail
-    assert "/codex:review" in detail
+def test_review_state_manual_marker_pins_head(monkeypatch):
+    monkeypatch.setattr(pr_watch, "gh", make_gh(comments=[manual_marker()]))
+    assert pr_watch.review_state(PR)[0] == "marker"
 
 
 @pytest.mark.unit
-@pytest.mark.parametrize(
-    "order",
-    [
-        pytest.param([OLD_SHA, HEAD_SHA], id="attestation-is-newest"),
-        pytest.param([HEAD_SHA, OLD_SHA], id="attestation-is-oldest"),
-    ],
-)
-def test_review_state_accepts_any_marker_pinning_head(monkeypatch, order):
-    """Parity with `_marker_verdict` in the bash: membership, not "the newest".
-
-    Duplicate markers are a stray, but if one lands, a reader that inspects only
-    one comment can disagree with mark-claude-review.sh about which is canonical
-    and report a reviewed head as stale forever.
-    """
-    monkeypatch.setattr(
-        pr_watch,
-        "gh",
-        make_gh(issue_comments=[marker_comment(sha) for sha in order]),
-    )
-    state, _detail = pr_watch.review_state(PR)
-    assert state == "marker"
-
-
-@pytest.mark.unit
-def test_review_state_ignores_a_comment_that_merely_quotes_the_marker(monkeypatch):
-    """The lookup anchors on the START of the body, so a quote attests nothing."""
+def test_review_state_manual_marker_survives_non_approval_codex_review(monkeypatch):
     monkeypatch.setattr(
         pr_watch,
         "gh",
         make_gh(
-            issue_comments=[
-                {"body": f"maybe post `<!-- pinpoint-claude-review: {HEAD_SHA} -->`?"}
-            ]
+            reviews=[codex_review(state="CHANGES_REQUESTED")],
+            comments=[manual_marker()],
         ),
     )
-    assert pr_watch.review_state(PR)[0] == "unreviewed"
+    assert pr_watch.review_state(PR)[0] == "marker"
 
 
-@pytest.mark.unit
-def test_review_state_takes_the_newest_marker(monkeypatch):
-    """One sticky comment is rewritten in place; a stray duplicate loses to the later."""
+def test_review_state_reports_a_newer_stale_marker_over_an_older_codex_non_approval(
+    monkeypatch,
+):
+    marker = manual_marker(OLD_SHA)
+    marker["updated_at"] = "2026-08-22T12:01:00Z"
     monkeypatch.setattr(
         pr_watch,
         "gh",
-        make_gh(issue_comments=[marker_comment(OLD_SHA), marker_comment(HEAD_SHA)]),
+        make_gh(
+            reviews=[codex_review(OLD_SHA, state="CHANGES_REQUESTED")],
+            comments=[marker],
+        ),
     )
-    assert pr_watch.review_state(PR)[0] == "marker"
+    assert pr_watch.review_state(PR)[0] == "stale_marker"
+
+
+@pytest.mark.unit
+def test_review_state_skips_marker_lookup_after_current_codex_approval(monkeypatch):
+    fake_gh = make_gh(reviews=[codex_review()])
+    monkeypatch.setattr(pr_watch, "gh", fake_gh)
+    assert pr_watch.review_state(PR)[0] == "approval"
+    assert not any("/comments" in args[-1] for args in fake_gh.calls)
+
+
+@pytest.mark.unit
+def test_review_state_stale_approval(monkeypatch):
+    monkeypatch.setattr(pr_watch, "gh", make_gh(reviews=[codex_review(OLD_SHA)]))
+    state, detail = pr_watch.review_state(PR)
+    assert state == "stale_approval"
+    assert OLD_SHA[:7] in detail
+    assert HEAD_SHA[:7] in detail
+
+
+@pytest.mark.unit
+def test_review_state_requires_an_approval(monkeypatch):
+    monkeypatch.setattr(
+        pr_watch, "gh", make_gh(reviews=[codex_review(state="COMMENTED")])
+    )
+    assert pr_watch.review_state(PR)[0] == "not_approved"
+
+
+@pytest.mark.unit
+def test_review_state_uses_the_latest_codex_review(monkeypatch):
+    monkeypatch.setattr(
+        pr_watch,
+        "gh",
+        make_gh(
+            reviews=[
+                codex_review(submitted_at="2026-08-22T12:00:00Z"),
+                codex_review(
+                    state="CHANGES_REQUESTED",
+                    submitted_at="2026-08-22T12:01:00Z",
+                ),
+            ]
+        ),
+    )
+    assert pr_watch.review_state(PR)[0] == "not_approved"
 
 
 # ---------------------------------------------------------------------------
@@ -925,26 +928,21 @@ def test_review_state_takes_the_newest_marker(monkeypatch):
 
 @pytest.mark.unit
 @pytest.mark.parametrize(
-    "state,comments",
+    "state,reviews,comments",
     [
-        ("unreviewed", ()),
-        ("stale_marker", (marker_comment(OLD_SHA),)),
-        ("marker", (marker_comment(),)),
+        ("unreviewed", (), ()),
+        ("stale_approval", (codex_review(OLD_SHA),), ()),
+        ("approval", (codex_review(),), ()),
+        ("marker", (), (manual_marker(),)),
     ],
 )
 def test_run_audit_reports_the_review_state_without_gating_on_it(
-    monkeypatch, capsys, state, comments
+    monkeypatch, capsys, state, reviews, comments
 ):
-    """--check-ready answers "is this worth Tim's /codex:review?".
-
-    The review is what happens AFTER that answer is yes, so gating on it would be
-    circular and permanently red. merge-pr.sh's `reviewed` gate is the one that
-    refuses to merge an unreviewed head; this line is a report, not a verdict.
-    """
     monkeypatch.setattr(
         pr_watch,
         "gh",
-        make_gh(rollup=[_gate("SUCCESS")], issue_comments=comments),
+        make_gh(rollup=[_gate("SUCCESS")], reviews=reviews, comments=comments),
     )
     assert pr_watch.run_audit(PR) is True
     assert f"✓ review: {state}:" in capsys.readouterr().out
@@ -952,7 +950,6 @@ def test_run_audit_reports_the_review_state_without_gating_on_it(
 
 @pytest.mark.unit
 def test_run_audit_still_fails_on_unresolved_threads(monkeypatch, capsys):
-    """Threads DO gate readiness — and are now counted regardless of author."""
     monkeypatch.setattr(
         pr_watch,
         "gh",
