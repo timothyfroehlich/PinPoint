@@ -30,7 +30,7 @@ const fs = require("fs");
 const path = require("path");
 
 // Resolve the agent's huddle name from <main-worktree>/.agents/huddle/session-names.json.
-// Mirrors huddle_state_dir() in ~/.claude/hooks/huddle/huddle-lib.sh. Fail-open: on ANY
+// Mirrors huddle_state_dir() in ~/.agents/huddle/huddle-lib.sh. Fail-open: on ANY
 // error or a missing/invalid name, return the literal "Claude" — never unset,
 // never "Tim Froehlich".
 function resolveActor(sessionId, cwd) {

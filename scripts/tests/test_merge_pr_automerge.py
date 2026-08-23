@@ -127,12 +127,8 @@ def stub_repo(
             gh_stub.stat().st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH
         )
 
-        # `bd` MUST be stubbed too. After a successful merge, merge-pr.sh posts a
-        # coordination notice to the live daily huddle bead via `bd comments add`.
-        # Stubbing only `gh` let a test merge write real comments to real shared state
-        # — six "Merged PR #123 (PP-test)" notices reached the huddle before this was
-        # caught. Any test that drives a script to completion has to shadow every
-        # outward-facing binary it can reach, not just the obvious one.
+        # Keep `bd` shadowed as a regression tripwire: merge-pr.sh must not post
+        # huddle notices itself. The neutral main watcher owns that side effect.
         bd_stub = tmp_path / "bd"
         bd_stub.write_text(
             '#!/usr/bin/env bash\nprintf "%s\\n" "$*" >> "$STUB_BD_CALLS"\nexit 0\n'
@@ -239,18 +235,8 @@ def test_automerge_merges_once_gates_are_green() -> None:
     assert f"--match-head-commit={HEAD_SHA}" in out.merge_args
 
 
-def test_bd_is_shadowed_so_a_test_merge_cannot_reach_the_real_huddle() -> None:
-    """`bd` must resolve to the stub for every command the script can reach.
-
-    After a successful merge, merge-pr.sh posts a coordination notice to the LIVE
-    daily huddle bead via `bd comments add`. An earlier version of this harness
-    stubbed only `gh`, and test merges wrote six real "Merged PR #123 (PP-test)"
-    notices into shared state before anyone noticed.
-
-    The notice itself is fail-open and usually bails before `bd` on a synthetic repo,
-    so asserting on recorded calls would pass for the wrong reason. What must hold —
-    and what actually broke — is that `bd` is shadowed at all.
-    """
+def test_merge_does_not_post_directly_to_huddle() -> None:
+    """The watcher, not the merge command, owns merge announcements."""
     with stub_repo(ci_rollup=CI_PASS) as ctx:
         resolved = subprocess.run(
             ["bash", "-c", "command -v bd"],
@@ -260,13 +246,12 @@ def test_bd_is_shadowed_so_a_test_merge_cannot_reach_the_real_huddle() -> None:
         ).stdout.strip()
         stub_dir = str(ctx["bd_calls"].parent)
         out = run_and_snapshot(ctx, "--human", "--automerge")
+        bd_calls = ctx["bd_calls"].read_text() if ctx["bd_calls"].exists() else ""
 
-    assert resolved.startswith(stub_dir), (
-        f"bd must resolve into the stub dir, got {resolved!r} — "
-        "a test merge could write to the real huddle bead"
-    )
+    assert resolved.startswith(stub_dir)
     assert out.returncode == 0, out.stdout + out.stderr
     assert "MERGED: PR #123" in out.stdout
+    assert bd_calls == ""
 
 
 def test_python3_is_shadowed_so_a_test_merge_cannot_reap_real_worktrees() -> None:
