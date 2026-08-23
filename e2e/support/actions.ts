@@ -20,6 +20,22 @@ interface LoginOptions {
 }
 
 /**
+ * Opens a machine's Manage route through whichever tab control fits. At
+ * narrow widths the shared tab strip puts Manage in its explicit overflow
+ * menu rather than leaving an off-screen scroll target.
+ */
+export async function openMachineManageTab(page: Page): Promise<void> {
+  const directTab = page.getByTestId("machine-tab-edit");
+  if ((await directTab.count()) > 0) {
+    await directTab.click();
+    return;
+  }
+
+  await page.getByTestId("machine-tab-more").click();
+  await page.getByTestId("machine-tab-overflow-edit").click();
+}
+
+/**
  * Shared E2E action to perform a UI login.
  *
  * @param page Playwright page object
