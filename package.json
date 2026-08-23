@@ -16,8 +16,8 @@
     "typecheck:tsc6": "tsc6 --noEmit -p tsconfig.app.json",
     "typecheck:tests": "tsc --noEmit -p tsconfig.tests.check.json",
     "typecheck:e2e": "tsc --noEmit -p e2e/tsconfig.json",
-    "lint": "oxlint src/ e2e/ scripts/",
-    "lint:fix": "oxlint src/ e2e/ scripts/ --fix --fix-suggestions",
+    "lint": "oxlint src/ e2e/ scripts/ supabase/ middleware.ts mdx-components.tsx",
+    "lint:fix": "oxlint src/ e2e/ scripts/ supabase/ middleware.ts mdx-components.tsx --fix --fix-suggestions",
     "fix:lint-format": "npm-run-all --sequential lint:fix format:fix",
     "format": "prettier --check \"**/*.{js,jsx,mjs,cjs,ts,tsx,json,css,md}\" --log-level warn",
     "format:fix": "prettier --write \"**/*.{js,jsx,mjs,cjs,ts,tsx,json,css,md}\" --log-level error",
@@ -192,13 +192,11 @@
     "webpack": "^5.106.1"
   },
   "lint-staged": {
-    "{src,e2e,scripts}/**/*.{ts,tsx}": [
-      "oxlint --fix --fix-suggestions"
+    "*.{ts,tsx,js,jsx,mjs,cjs}": [
+      "oxlint --fix --fix-suggestions",
+      "prettier --write"
     ],
-    "{src,e2e,scripts}/**/*.{mjs,cjs,js,jsx}": [
-      "oxlint --fix --fix-suggestions"
-    ],
-    "*.{js,jsx,mjs,cjs,ts,tsx,json,css,md}": [
+    "*.{json,css,md}": [
       "prettier --write"
     ]
   }
