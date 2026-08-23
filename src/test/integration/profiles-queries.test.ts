@@ -233,7 +233,6 @@ describe("profile queries", () => {
   });
 
   it("getOpenIssueCountsByInitials counts only open-status issues", async () => {
-    const db = await getTestDb();
     // OWN0 already has 2 reported issues (status 'new' = open from the base seed).
     const map = await getOpenIssueCountsByInitials(["OWN0", "OWN1"]);
     expect(map.get("OWN0")).toBe(2);
