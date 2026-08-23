@@ -6,7 +6,7 @@
  * project matrix — catches overflow at both desktop and mobile viewports.
  */
 
-import { test } from "../support/fixtures.js";
+import { expect, test } from "../support/fixtures.js";
 import {
   assertNoHorizontalOverflow,
   ensureLoggedIn,
@@ -81,6 +81,75 @@ test.describe("Responsive: no horizontal overflow", () => {
       });
     }
 
+    test("machine tabs remain mouse-reachable at desktop width", async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 1024, height: 768 });
+      await page.goto(`/m/${ownedMachineInitials}`);
+
+      await expect(page.getByTestId("machine-tab-more")).toHaveCount(0);
+      for (const tab of [
+        "info",
+        "settings",
+        "maintenance",
+        "timeline",
+        "edit",
+      ]) {
+        await expect(page.getByTestId(`machine-tab-${tab}`)).toBeVisible();
+      }
+    });
+
+    for (const width of [390, 393]) {
+      test(`machine overflow menu reaches Manage with a mouse at ${String(width)}px`, async ({
+        page,
+      }) => {
+        await page.setViewportSize({ width, height: 844 });
+        await page.goto(`/m/${ownedMachineInitials}`);
+
+        await page.getByTestId("machine-tab-more").click();
+        const manageLink = page.getByTestId("machine-tab-overflow-edit");
+        await expect(manageLink).toHaveAttribute(
+          "href",
+          `/m/${ownedMachineInitials}/edit`
+        );
+        await manageLink.click();
+
+        await expect(page).toHaveURL(
+          new RegExp(`/m/${ownedMachineInitials}/edit$`)
+        );
+        await expect(page.getByTestId("machine-tab-edit")).toHaveAttribute(
+          "aria-current",
+          "page"
+        );
+        await assertNoHorizontalOverflow(page);
+      });
+    }
+
+    test("the overflow trigger wins at 320px with 200% root text", async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 320, height: 640 });
+      await page.goto(`/m/${ownedMachineInitials}/edit`);
+      await page.addStyleTag({
+        content: "html { font-size: 200% !important; }",
+      });
+
+      const trigger = page.getByTestId("machine-tab-more");
+      await expect(trigger).toBeVisible();
+      await expect(trigger).toHaveAttribute(
+        "aria-label",
+        /current section: Manage/
+      );
+      await trigger.click();
+      const currentLink = page.getByTestId("machine-tab-overflow-edit");
+      await expect(currentLink).toHaveAttribute("aria-current", "page");
+      await expect(currentLink).toHaveAttribute(
+        "href",
+        `/m/${ownedMachineInitials}/edit`
+      );
+      await assertNoHorizontalOverflow(page);
+    });
+
     // Collection routes (PP-slrd.1) are keyed by a seed-time-generated user
     // uuid, so the owner id is resolved at runtime instead of hardcoded.
     test.describe("collection pages", () => {
@@ -107,6 +176,67 @@ test.describe("Responsive: no horizontal overflow", () => {
         await page.waitForLoadState("load");
         await assertNoHorizontalOverflow(page);
         await assertNoA11yViolations(page);
+      });
+
+      test("collection tabs remain directly reachable at desktop width", async ({
+        page,
+      }) => {
+        await page.setViewportSize({ width: 1024, height: 768 });
+        await page.goto(collectionBase);
+
+        await expect(page.getByTestId("collection-tab-more")).toHaveCount(0);
+        for (const tab of ["overview", "issues", "timeline"]) {
+          await expect(page.getByTestId(`collection-tab-${tab}`)).toBeVisible();
+        }
+      });
+
+      for (const width of [390, 393]) {
+        test(`collection tabs reach Timeline with a mouse at ${String(width)}px`, async ({
+          page,
+        }) => {
+          await page.setViewportSize({ width, height: 844 });
+          await page.goto(collectionBase);
+
+          const overflowTrigger = page.getByTestId("collection-tab-more");
+          let timeline = page.getByTestId("collection-tab-timeline");
+          if ((await overflowTrigger.count()) > 0) {
+            await overflowTrigger.click();
+            timeline = page.getByTestId("collection-tab-overflow-timeline");
+          }
+          await timeline.click();
+
+          await expect(page).toHaveURL(
+            new RegExp(`${collectionBase}/timeline$`)
+          );
+          await expect(
+            page.getByTestId("collection-tab-timeline")
+          ).toHaveAttribute("aria-current", "page");
+          await assertNoHorizontalOverflow(page);
+        });
+      }
+
+      test("collection tabs remain reachable at 320px with 200% root text", async ({
+        page,
+      }) => {
+        await page.setViewportSize({ width: 320, height: 640 });
+        await page.goto(collectionBase);
+        await page.addStyleTag({
+          content: "html { font-size: 200% !important; }",
+        });
+
+        const trigger = page.getByTestId("collection-tab-more");
+        await expect(trigger).toBeVisible();
+        await expect(trigger).toHaveAttribute(
+          "aria-label",
+          /current section: Overview/
+        );
+        await trigger.click();
+        const currentLink = page.getByTestId(
+          "collection-tab-overflow-overview"
+        );
+        await expect(currentLink).toHaveAttribute("aria-current", "page");
+        await expect(currentLink).toHaveAttribute("href", collectionBase);
+        await assertNoHorizontalOverflow(page);
       });
     });
   });

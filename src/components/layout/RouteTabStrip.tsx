@@ -1,15 +1,26 @@
 "use client";
 
 import type React from "react";
-import { useEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Button, buttonVariants } from "~/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "~/components/ui/dropdown-menu";
 import { cn } from "~/lib/utils";
 import {
   getMachineStatusLabel,
   getMachineStatusStyles,
   type MachineStatus,
 } from "~/lib/machines/status";
+import {
+  planTabLayout,
+  type TabLayoutPlan,
+} from "~/components/layout/route-tab-strip-layout";
 
 export interface RouteTab {
   /** URL slug appended to `basePath`; "" is the index tab. */
@@ -34,9 +45,8 @@ interface RouteTabStripProps {
 
 /**
  * Route-driven tab strip shared by the per-machine and collection pages (and
- * future collection sources like `/c/tag/[slug]`). Owns the horizontal
- * overflow-scroll, the right-edge fade, and active-tab centering; callers
- * supply only their tab list + badge config.
+ * future collection sources like `/c/tag/[slug]`). Owns the adaptive overflow
+ * menu; callers supply only their tab list + badge config.
  *
  * Route-driven navigation, not a stateful tabs widget. Per design bible §5
  * ("No shadcn `<Tabs>`") and the WAI-ARIA Tabs pattern's prerequisites (roving
@@ -50,9 +60,14 @@ export function RouteTabStrip({
   testIdPrefix,
 }: RouteTabStripProps): React.JSX.Element {
   const pathname = usePathname();
-  const scrollerRef = useRef<HTMLDivElement>(null);
-  const activeTabRef = useRef<HTMLAnchorElement>(null);
-  const [canScrollRight, setCanScrollRight] = useState(false);
+  const containerRef = useRef<HTMLElement>(null);
+  const measurementLaneRef = useRef<HTMLDivElement>(null);
+  const triggerMeasurementRef = useRef<HTMLSpanElement>(null);
+  const [layout, setLayout] = useState<TabLayoutPlan>(() => ({
+    visibleIndices: tabs.map((_, index) => index),
+    overflowIndices: [],
+    activeClipped: false,
+  }));
 
   // Return the matching slug only when the path matches a tab exactly —
   // sub-routes (e.g. `/m/[initials]/i/[issueNumber]`) should highlight no tab
@@ -64,101 +79,226 @@ export function RouteTabStrip({
     const first = rest.split("/")[0] ?? "";
     return tabs.some((t) => t.slug !== "" && t.slug === first) ? first : null;
   })();
+  const activeIndex = tabs.findIndex((tab) => tab.slug === activeSlug);
+  const normalizedActiveIndex = activeIndex === -1 ? null : activeIndex;
 
-  // Track whether more tab content exists to the right of the visible scroll
-  // window. We listen to scroll + ResizeObserver so the fade reflects both
-  // viewport changes and user scroll.
-  useEffect(() => {
-    const scroller = scrollerRef.current;
-    if (!scroller) return;
+  // CSS owns the row's presentation. Component-local observation is used only
+  // to derive semantic menu membership, which CSS cannot expose to React (see
+  // CORE-RESP-002). Observing the measured children also catches font, badge,
+  // and localization changes without consulting the viewport.
+  useLayoutEffect(() => {
+    const container = containerRef.current;
+    const lane = measurementLaneRef.current;
+    const trigger = triggerMeasurementRef.current;
+    if (!container || !lane || !trigger) return;
 
-    const update = (): void => {
-      const overflow =
-        scroller.scrollWidth - scroller.clientWidth - scroller.scrollLeft;
-      setCanScrollRight(overflow > 1);
+    const measuredTabs = Array.from(
+      lane.querySelectorAll<HTMLElement>("[data-tab-measure]")
+    );
+    if (measuredTabs.length !== tabs.length) return;
+
+    const measure = (): void => {
+      const nextLayout = planTabLayout({
+        availableWidth: container.getBoundingClientRect().width,
+        tabWidths: measuredTabs.map(
+          (element) => element.getBoundingClientRect().width
+        ),
+        overflowTriggerWidth: trigger.getBoundingClientRect().width,
+        activeIndex: normalizedActiveIndex,
+      });
+      setLayout((current) =>
+        layoutsMatch(current, nextLayout) ? current : nextLayout
+      );
     };
 
-    update();
-    scroller.addEventListener("scroll", update, { passive: true });
-    const ro = new ResizeObserver(update);
-    ro.observe(scroller);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(container);
+    observer.observe(trigger);
+    for (const measuredTab of measuredTabs) observer.observe(measuredTab);
 
     return () => {
-      scroller.removeEventListener("scroll", update);
-      ro.disconnect();
+      observer.disconnect();
     };
-  }, []);
+  }, [normalizedActiveIndex, tabs]);
 
-  // Center the active tab on mount if the strip overflows. CSS handles the
-  // visual layout — JS is only used to nudge scroll position on entry so the
-  // active tab isn't hidden off-screen on a deep-link.
-  useEffect(() => {
-    const scroller = scrollerRef.current;
-    const active = activeTabRef.current;
-    if (!scroller || !active) return;
-    if (scroller.scrollWidth <= scroller.clientWidth) return;
-    active.scrollIntoView({
-      behavior: "auto",
-      inline: "center",
-      block: "nearest",
-    });
-  }, [activeSlug]);
+  const hasOverflow = layout.overflowIndices.length > 0;
+  const activeTab =
+    normalizedActiveIndex === null ? undefined : tabs[normalizedActiveIndex];
+  const moreLabel =
+    layout.activeClipped && activeTab
+      ? `More ${ariaLabel.toLowerCase()}, current section: ${activeTab.label}`
+      : `More ${ariaLabel.toLowerCase()}`;
 
   return (
     <nav
-      className="relative border-b border-outline-variant"
+      ref={containerRef}
+      className="relative min-h-12 border-b border-outline-variant"
       aria-label={ariaLabel}
+      data-testid={`${testIdPrefix}-strip`}
     >
-      <div ref={scrollerRef} className="flex overflow-x-auto scrollbar-none">
-        {tabs.map((tab) => {
+      <div className="flex min-w-0 overflow-hidden">
+        {layout.visibleIndices.map((index) => {
+          const tab = tabs[index];
+          if (!tab) return null;
           const isActive = tab.slug === activeSlug;
-          const href = tab.slug ? `${basePath}/${tab.slug}` : basePath;
-          // Index tab (slug "") keys off its label so testids stay stable
-          // per strip ("info", "overview"); other tabs key off their slug.
-          const key = tab.slug || tab.label.toLowerCase();
-          const badge =
-            tab.badge && tab.badge.count > 0 ? tab.badge : undefined;
+          const key = getTabKey(tab);
           return (
             <Link
               key={key}
-              href={href}
-              ref={isActive ? activeTabRef : undefined}
+              href={getTabHref(basePath, tab)}
               aria-current={isActive ? "page" : undefined}
               data-testid={`${testIdPrefix}-${key}`}
               className={cn(
-                "inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap border-b-2 px-4 py-3 text-sm font-medium transition-colors",
+                tabControlClasses,
                 isActive
                   ? "border-primary text-primary"
-                  : "border-transparent text-muted-foreground hover:text-primary"
+                  : "border-transparent text-muted-foreground hover:text-primary",
+                layout.activeClipped &&
+                  isActive &&
+                  "min-w-0 max-w-full flex-1 shrink overflow-hidden"
               )}
             >
-              {tab.label}
-              {badge && (
-                <span
-                  className={cn(
-                    "rounded-md border px-1.5 py-0.5 text-xs font-semibold tabular-nums",
-                    getMachineStatusStyles(badge.status)
-                  )}
-                  title={`${String(badge.count)} open — ${getMachineStatusLabel(badge.status)}`}
-                  aria-label={`${String(badge.count)} open issues, status ${getMachineStatusLabel(badge.status)}`}
-                >
-                  {badge.count}
-                </span>
-              )}
+              <TabContent tab={tab} truncate={layout.activeClipped} />
             </Link>
           );
         })}
       </div>
 
-      {/* Right-edge fade — rendered only when the strip can scroll further
-          right. The gradient sits above the scroller; pointer-events:none
-          lets clicks pass through to tabs beneath. */}
-      {canScrollRight && (
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute right-0 top-0 h-full w-8 bg-gradient-to-l from-background to-transparent"
-        />
+      {hasOverflow && (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              aria-label={moreLabel}
+              data-testid={`${testIdPrefix}-more`}
+              className={cn(
+                overflowTriggerClasses,
+                layout.activeClipped
+                  ? "border-primary text-primary"
+                  : "border-transparent text-muted-foreground hover:text-primary"
+              )}
+            >
+              <span aria-hidden="true">…</span>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="min-w-40">
+            {layout.overflowIndices.map((index) => {
+              const tab = tabs[index];
+              if (!tab) return null;
+              const isActive = tab.slug === activeSlug;
+              const key = getTabKey(tab);
+              return (
+                <DropdownMenuItem key={key} asChild>
+                  <Link
+                    href={getTabHref(basePath, tab)}
+                    aria-current={isActive ? "page" : undefined}
+                    data-testid={`${testIdPrefix}-overflow-${key}`}
+                    className="cursor-pointer"
+                  >
+                    <TabContent tab={tab} />
+                  </Link>
+                </DropdownMenuItem>
+              );
+            })}
+          </DropdownMenuContent>
+        </DropdownMenu>
       )}
+
+      {/* Exact rendered widths without duplicate links or controls in the
+          accessibility tree. Clipping prevents this intrinsic-width lane from
+          contributing to page overflow. */}
+      <div
+        ref={measurementLaneRef}
+        aria-hidden="true"
+        className="pointer-events-none invisible absolute inset-x-0 top-0 h-0 overflow-hidden"
+      >
+        {tabs.map((tab) => (
+          <span
+            key={getTabKey(tab)}
+            data-tab-measure=""
+            className={tabControlClasses}
+          >
+            <TabContent tab={tab} />
+          </span>
+        ))}
+        <span
+          ref={triggerMeasurementRef}
+          data-overflow-trigger-measure=""
+          className={buttonVariants({
+            variant: "ghost",
+            className: overflowTriggerMeasurementClasses,
+          })}
+        >
+          …
+        </span>
+      </div>
     </nav>
+  );
+}
+
+const tabControlClasses =
+  "inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap border-b-2 px-4 py-3 text-sm font-medium transition-colors motion-reduce:transition-none";
+
+const overflowTriggerMeasurementClasses =
+  "h-full min-w-11 rounded-none border-b-2 px-4 py-3 text-lg leading-none motion-reduce:transition-none";
+
+const overflowTriggerClasses = cn(
+  overflowTriggerMeasurementClasses,
+  "absolute inset-y-0 right-0 z-10 bg-background"
+);
+
+function getTabKey(tab: RouteTab): string {
+  // Index tabs key off labels so test ids stay stable per strip ("info",
+  // "overview"); route tabs key off their slugs.
+  return tab.slug || tab.label.toLowerCase();
+}
+
+function getTabHref(basePath: string, tab: RouteTab): string {
+  return tab.slug ? `${basePath}/${tab.slug}` : basePath;
+}
+
+function TabContent({
+  tab,
+  truncate = false,
+}: {
+  tab: RouteTab;
+  truncate?: boolean;
+}): React.JSX.Element {
+  const badge = tab.badge && tab.badge.count > 0 ? tab.badge : undefined;
+  return (
+    <>
+      <span className={cn(truncate && "min-w-0 truncate")}>{tab.label}</span>
+      {badge && (
+        <span
+          className={cn(
+            "shrink-0 rounded-md border px-1.5 py-0.5 text-xs font-semibold tabular-nums",
+            getMachineStatusStyles(badge.status)
+          )}
+          aria-label={`${String(badge.count)} open issues, status ${getMachineStatusLabel(badge.status)}`}
+        >
+          {badge.count}
+        </span>
+      )}
+    </>
+  );
+}
+
+function layoutsMatch(left: TabLayoutPlan, right: TabLayoutPlan): boolean {
+  return (
+    left.activeClipped === right.activeClipped &&
+    indicesMatch(left.visibleIndices, right.visibleIndices) &&
+    indicesMatch(left.overflowIndices, right.overflowIndices)
+  );
+}
+
+function indicesMatch(
+  left: readonly number[],
+  right: readonly number[]
+): boolean {
+  return (
+    left.length === right.length &&
+    left.every((value, index) => value === right[index])
   );
 }
