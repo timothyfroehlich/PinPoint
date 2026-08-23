@@ -22,7 +22,7 @@
 #                                 bot reviews this repo and so no answer is ever already
 #                                 on its way. An unattested head hard-fails on the FIRST
 #                                 poll and the run ends. So get Tim's review and
-#                                 attest head with mark-review.sh BEFORE
+#                                 get a fresh Codex GitHub approval BEFORE
 #                                 firing this. Terminates on exactly three outcomes, each
 #                                 reported on exit:
 #                                   MERGED      — gates went green, PR squash-merged
