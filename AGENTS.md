@@ -19,6 +19,7 @@
 - **Type safety (CORE-TS-007):** never use `any`, non-null `!`, or unsafe `as`; model or narrow the value instead. See `pinpoint-typescript` for PinPoint's database-typing guidance.
 - **Path aliases (CORE-TS-008):** import project code with `~/`, never deep relative paths.
 - **Rule of Three (CORE-ARCH-010):** do not abstract before the third real duplication.
+- **Email privacy (CORE-SEC-007):** user emails only in admin views and the user's own settings page; everywhere else use names, "Anonymous", or roles.
 
 ### 2.2 Process rules
 

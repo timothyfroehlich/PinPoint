@@ -11,7 +11,6 @@ Every destination differs in **when you pay for it**:
 | `.claude/hooks/`               | zero                                              | always — mechanically |
 | `CLAUDE.md` (global + project) | every session                                     | always                |
 | `bd remember`                  | every session, unfiltered (~20 KB via `bd prime`) | always                |
-| `.claude/rules/*.md`           | on matching file open                             | path match            |
 | `.agents/skills/`              | on matching task                                  | task match            |
 | Claude auto-memories           | index always, body on demand                      | description match     |
 
@@ -30,17 +29,17 @@ Two consequences fall out of the table:
 
 **Claude auto-memories are the cheap resting place.** The body loads only on a description match, so an unused memory costs one index line. This is where accumulated knowledge belongs by default, which also means a weak `description:` is a real defect: it is the only thing standing between the fact and recall.
 
-## Two rules about the destinations themselves
+## Rules about the destinations themselves
 
-**`.claude/rules/` is conditional.** It arrives in PP-22e4 PR 8. Check that the directory exists before routing anything into it — `collect_stores.py` reports `rules.exists`. While absent, a path-scoped fact stays where it is and is flagged as _blocked on PR 8_, not forced into a worse tier.
+**Scoped guidance belongs in portable skills.** Route task- and domain-specific knowledge to `.agents/skills/`, or to mechanism (`.claude/hooks/`) when it can be mechanically enforced.
 
-**`AGENTS.md` is not a destination.** PP-22e4 reduces it to a ≤10-line stub with a CI gate that fails if it grows. Never promote into it. Its line count is collected only so a review notices the gate's state.
+**`AGENTS.md` is not a destination.** It is the always-on project policy. Never promote memories into it.
 
 ## The three defects
 
 ### 1. Too expensive for its value → demote
 
-A fact in an always-loaded tier that only matters sometimes. The tell: you can name the trigger. "Only when touching migrations", "only when writing an E2E spec", "only on the deploy path" — each of those is a `.claude/rules/` path glob or a skill, not a `CLAUDE.md` line.
+A fact in an always-loaded tier that only matters sometimes. The tell: you can name the trigger. "Only when touching migrations", "only when writing an E2E spec", "only on the deploy path" — each of those is a portable skill, not a `CLAUDE.md` line.
 
 The strongest form of this is demotion to **mechanism**: see defect 2.
 
@@ -66,7 +65,7 @@ Delete the redundant copies and keep the best-written one at the correct tier. *
 
 **Demotion to mechanism — `--no-verify`.** "Never use `--no-verify`" is prose in the global `CLAUDE.md`. There is already a hook stack enforcing commit gates. If a hook can reject the flag outright, the prose is redundant and should go; if it cannot, the prose stays and the gap is worth a bead. Either way the review's job is to _ask_, not to leave a rule sitting in prose because it has always been there.
 
-**Blocked on a destination — a path-scoped gotcha.** A fact that only matters when editing `drizzle/meta` is a textbook `.claude/rules/` candidate. Until PR 8 lands there is nowhere to put it, so it stays and gets flagged. Do not force it into a skill just to move it.
+**Targeting a portable skill — a scoped gotcha.** A fact that only matters when editing `drizzle/meta` is a textbook `pinpoint-deployment` candidate. It belongs in that skill, not in always-loaded `CLAUDE.md`.
 
 ## The exception: facts only Tim can adjudicate
 

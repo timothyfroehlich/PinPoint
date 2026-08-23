@@ -2,8 +2,8 @@
 /**
  * The redact list in `~/lib/logger` is the backstop that keeps user emails out
  * of `logs/<session>/app.log` and, on Vercel, production stdout —
- * `.claude/rules/always.md` scopes CORE-SEC-007 to display surfaces and points
- * here for logs. Pino's `*` matches exactly one level, so the list is easy to
+ * CORE-SEC-007 scopes email privacy to display surfaces and points here for
+ * logs. Pino's `*` matches exactly one level, so the list is easy to
  * silently under-reach (PP-tg9y: `{ ctx: { user: { email } } }` was written
  * raw). These tests pin the depth it actually reaches.
  *

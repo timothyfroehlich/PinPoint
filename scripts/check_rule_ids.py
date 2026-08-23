@@ -6,7 +6,7 @@ a different reader:
 
   docs/NON_NEGOTIABLES.md    canonical catalog -- the authoritative statement
   AGENTS.md / CLAUDE.md      always-loaded process context, authoring voice
-  .claude/rules/*.md         the rules themselves, path-scoped (Claude Code)
+  .agents/skills/**/*.md     task-specific procedure and context
   REVIEW.md                  review-agent entry map + rubric
 
 Generating those from one source would mean synthesising two registers from one
@@ -19,21 +19,17 @@ Three checks:
   ERROR  A cited CORE-* ID that does not exist in the catalog. Always a bug:
          either a typo or a rule that was renamed/removed without updating its
          citations. This is the check that runs in `pnpm run check`.
-  ERROR  A fragile "rule N" / "commandment N" / "AGENTS.md §2.1" citation
-         (PP-22e4). AGENTS.md §2.1 used to be the numbered non-negotiables
-         list; PP-22e4.4 moved the rules to .claude/rules/, so every citation
-         by rule number or to "§2.1" itself now points at nothing. Unlike a
-         CORE-* ID, neither form is machine-checkable against the catalog, so
-         the only sound gate is banning the pattern outright and requiring
-         the CORE-* ID instead.
+  ERROR  A fragile "rule N" / "commandment N" / "AGENTS.md §2.1" citation.
+         Rules must be cited by their canonical CORE-* ID. Citing by rule
+         number or section reference is not machine-checkable against the
+         catalog, so the gate bans the pattern outright and requires the
+         CORE-* ID instead.
   AUDIT  (--orphans) A catalog rule cited nowhere. Opt-in, never fails the
          build: 17 of 67 catalog rules are "orphans" by this definition as of
-         2026-08-07 (it was 42 of 62 before the .claude/rules/ tier, which
-         cites more of the catalog than the old AGENTS.md list did), because
-         the catalog is deliberately broader than the set promoted into an
-         always-loaded or path-scoped file. Printing that list on every run
-         would train everyone to ignore the gate, so it is a coverage audit
-         you run deliberately, not a default warning.
+         2026-08-07, because the catalog is deliberately broader than the set
+         promoted into an always-loaded or task-scoped file. Printing that
+         list on every run would train everyone to ignore the gate, so it is a
+         coverage audit you run deliberately, not a default warning.
 
 Exit codes: 0 clean, 1 unknown IDs found, 2 catalog missing, 3 descending
 range cited, 4 fragile rule-number/§2.1 citation found.
@@ -84,27 +80,24 @@ NUMBERED_RULE_CITATION = re.compile(
 #
 # It is a separate check because a plain `\s` in NUMBERED_RULE_CITATION cannot
 # distinguish it from a markdown heading that ends in "rule" followed by an
-# ordered list -- which .claude/rules/README.md contains. The blank line
-# between heading and list is what separates them: a wrapped sentence has none.
-# So this matches only when the number is on the *immediately* following line,
-# and never when the keyword line is itself a heading.
+# ordered list. The blank line between heading and list is what separates them:
+# a wrapped sentence has none. So this matches only when the number is on the
+# *immediately* following line, and never when the keyword line is itself a
+# heading.
 WRAPPED_RULE_CITATION = re.compile(
     r"\b(?:AGENTS\.md`?[ \t]+)?(?:[Rr]ule|[Cc]ommandment)[ \t]*$"
 )
 WRAPPED_CITATION_NUMBER = re.compile(r"^[ \t]*#?\d+\b")
 
-# "AGENTS.md §2.1" itself. That section no longer lists the rules -- PP-22e4.4
-# moved them to .claude/rules/ and left a pointer -- so citing it sends the
-# reader somewhere the rule is not. Tolerates the same optional backtick as
-# NUMBERED_RULE_CITATION.
+# "AGENTS.md §2.1" citation ban. Rules must be cited by CORE-* ID, not section
+# references. Tolerates the same optional backtick as NUMBERED_RULE_CITATION.
 SECTION_21_CITATION = re.compile(r"AGENTS\.md`?[ \t]*§[ \t]*2\.1\b")
 
 CATALOG = "docs/NON_NEGOTIABLES.md"
 
 # Files and globs whose CORE-* citations must resolve. Missing paths are fine
 # -- a glob that matches nothing is skipped, so this list can name a surface
-# before it exists (it named .claude/rules/ for two weeks before PP-22e4.4
-# created it) and can outlive one that is retired.
+# before it exists and can outlive one that is retired.
 #
 # .agents/skills/ is here because it is a first-class citation surface, not a
 # doc archive: AGENTS.md section 3 instructs every agent to load the relevant
@@ -120,8 +113,6 @@ CITING_SOURCES: tuple[str, ...] = (
     "CLAUDE.md",
     "AGENTS.md",
     "REVIEW.md",
-    ".claude/rules/*.md",
-    ".claude/rules/**/*.md",
     ".agents/rules/*.md",
     ".agents/skills/**/*.md",
     ".claude/hooks/*.cjs",
@@ -145,8 +136,6 @@ LEGACY_CITATION_SOURCES: tuple[str, ...] = (
     "CLAUDE.md",
     "docs/NON_NEGOTIABLES.md",
     "docs/ENV_VARS.md",
-    ".claude/rules/*.md",
-    ".claude/rules/**/*.md",
     "src/**/*.ts",
     "src/**/*.tsx",
     "scripts/**/*.mjs",
@@ -339,11 +328,9 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 3
 
-    # ERROR: a fragile "rule N" / "commandment N" / "AGENTS.md §2.1" citation
-    # (PP-22e4). §2.1 no longer lists the rules -- PP-22e4.4 moved them to
-    # .claude/rules/ -- so both forms now point at nothing, and neither is
-    # machine-checkable against a catalog the way a CORE-* ID is: ban the
-    # pattern outright.
+    # ERROR: a fragile "rule N" / "commandment N" / "AGENTS.md §2.1" citation.
+    # Rules must be cited by CORE-* ID from the catalog; number or section
+    # citations are not machine-checkable: ban the pattern outright.
     legacy = collect_legacy_citations(root)
     if legacy:
         print(
@@ -354,10 +341,8 @@ def main(argv: list[str] | None = None) -> int:
             for line_no, matched_text in legacy[rel]:
                 print(f"  {rel}:{line_no}: {matched_text!r}", file=sys.stderr)
         print(
-            "\nAGENTS.md §2.1 no longer lists the rules (PP-22e4.4) -- they "
-            'moved to .claude/rules/, so a rule number or a "§2.1" citation '
-            "now points at nothing. Cite the CORE-* ID instead; look it up in "
-            f"{CATALOG}, which is the only catalog there is.",
+            f"\nRules must be cited by CORE-* ID from {CATALOG}. Fragile "
+            'rule-number or "§2.1" citations are banned.',
             file=sys.stderr,
         )
         return 4

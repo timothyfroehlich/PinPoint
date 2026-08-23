@@ -145,6 +145,8 @@ export function MultiSelect({
     }));
   }, [groups, value]);
 
+  const listboxId = testId ? `${testId}-listbox` : "multi-select-listbox";
+
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -152,6 +154,7 @@ export function MultiSelect({
           variant="outline"
           role="combobox"
           aria-expanded={open}
+          aria-controls={open ? listboxId : undefined}
           aria-label={ariaLabel ?? placeholder}
           data-testid={testId}
           className={cn(
@@ -182,6 +185,7 @@ export function MultiSelect({
         </Button>
       </PopoverTrigger>
       <PopoverContent
+        id={listboxId}
         className="w-(--radix-popover-trigger-width) p-0"
         align="start"
       >

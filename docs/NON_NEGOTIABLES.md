@@ -3,7 +3,7 @@
 **Last Updated**: 2026-07-27
 **Version**: 2.5 (progressive-enhancement non-negotiable retired; CORE-ARCH-012 honest-failure added — PP-nw80)
 
-> **Sync contract**: the rule files in `.claude/rules/` are one-line summaries of these rules, grouped by the paths they apply to. Every summary cites the canonical `CORE-*` ID(s) here. When a rule changes, update both — `.claude/rules/README.md` says which file a rule belongs in. (`AGENTS.md` used to carry that index as one numbered list; PP-22e4.4 moved it.)
+> **Canonical catalog**: this document defines the canonical `CORE-*` rules for PinPoint. Portable skills (`.agents/skills/`) and agent context (`AGENTS.md`) cite rules by ID and provide domain/task-specific procedures.
 
 ## Overview
 
