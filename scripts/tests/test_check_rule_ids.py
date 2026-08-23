@@ -416,13 +416,13 @@ class TestMain:
 
     def test_fails_on_unknown_id_in_agents_rules(self, repo: Path, capsys):
         (repo / ".agents" / "rules").mkdir(parents=True)
-        (repo / ".agents" / "rules" / "antigravity.md").write_text(
+        (repo / ".agents" / "rules" / "sample_rule.md").write_text(
             "CORE-ARCH-999 is fake", encoding="utf-8"
         )
         assert main(["--root", str(repo)]) == 1
         err = capsys.readouterr().err
         assert "CORE-ARCH-999" in err
-        assert ".agents/rules/antigravity.md" in err
+        assert ".agents/rules/sample_rule.md" in err
 
 
 class TestFindRepoRoot:
