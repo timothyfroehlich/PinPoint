@@ -7,7 +7,6 @@
  */
 
 import { expect, test } from "../support/fixtures.js";
-import type { Page } from "@playwright/test";
 import {
   assertNoHorizontalOverflow,
   ensureLoggedIn,
@@ -67,18 +66,6 @@ const authenticatedRoutes = [
 
 const publicRoutes = ["/report", "/help", "/about", "/whats-new"];
 
-async function assertNoBodyHorizontalOverflow(page: Page): Promise<void> {
-  const dimensions = await page.evaluate(() => ({
-    bodyScrollWidth: document.body.scrollWidth,
-    documentScrollWidth: document.documentElement.scrollWidth,
-    viewportWidth: document.documentElement.clientWidth,
-  }));
-
-  expect(
-    Math.max(dimensions.bodyScrollWidth, dimensions.documentScrollWidth)
-  ).toBeLessThanOrEqual(dimensions.viewportWidth);
-}
-
 test.describe("Responsive: no horizontal overflow", () => {
   test.describe("authenticated pages", () => {
     test.beforeEach(async ({ page }, testInfo) => {
@@ -134,7 +121,9 @@ test.describe("Responsive: no horizontal overflow", () => {
           "aria-current",
           "page"
         );
-        await assertNoBodyHorizontalOverflow(page);
+        await assertNoHorizontalOverflow(page, {
+          scopeTestId: "machine-tab-strip",
+        });
       });
     }
 
@@ -162,7 +151,11 @@ test.describe("Responsive: no horizontal overflow", () => {
         "aria-current",
         "page"
       );
-      await assertNoBodyHorizontalOverflow(page);
+      await expect(page.getByTestId("machine-tab-edit")).toBeInViewport();
+      await expect(trigger).toBeInViewport();
+      await assertNoHorizontalOverflow(page, {
+        scopeTestId: "machine-tab-strip",
+      });
     });
 
     // Collection routes (PP-slrd.1) are keyed by a seed-time-generated user
@@ -226,7 +219,9 @@ test.describe("Responsive: no horizontal overflow", () => {
           await expect(
             page.getByTestId("collection-tab-timeline")
           ).toHaveAttribute("aria-current", "page");
-          await assertNoBodyHorizontalOverflow(page);
+          await assertNoHorizontalOverflow(page, {
+            scopeTestId: "collection-tab-strip",
+          });
         });
       }
 
@@ -260,7 +255,11 @@ test.describe("Responsive: no horizontal overflow", () => {
         );
         await expect(currentLink).toHaveAttribute("aria-current", "page");
         await expect(currentLink).toHaveAttribute("href", collectionBase);
-        await assertNoBodyHorizontalOverflow(page);
+        await expect(trigger).toBeInViewport();
+        await expect(currentLink).toBeInViewport();
+        await assertNoHorizontalOverflow(page, {
+          scopeTestId: "collection-tab-strip",
+        });
       });
     });
   });

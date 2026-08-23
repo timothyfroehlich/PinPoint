@@ -495,10 +495,24 @@ export async function updateIssueField(
  * than the viewport, the assertion fails with a diagnostic message showing
  * the overflow amount and viewport width.
  */
-export async function assertNoHorizontalOverflow(page: Page): Promise<void> {
-  const result = await page.evaluate(() => {
+interface HorizontalOverflowOptions {
+  /** Limit clipped-element detection to a component while retaining the page-width check. */
+  scopeTestId?: string;
+}
+
+export async function assertNoHorizontalOverflow(
+  page: Page,
+  { scopeTestId }: HorizontalOverflowOptions = {}
+): Promise<void> {
+  const result = await page.evaluate((scopeTestId) => {
     const doc = document.documentElement;
     const viewportWidth = doc.clientWidth;
+    const scope = scopeTestId
+      ? document.querySelector(`[data-testid="${scopeTestId}"]`)
+      : document.body;
+    if (!scope) {
+      throw new Error(`Overflow assertion scope not found: ${scopeTestId}`);
+    }
 
     // How far past a viewport edge an element must extend before we treat it as
     // a layout break rather than acceptable graceful clipping. Components that
@@ -559,7 +573,7 @@ export async function assertNoHorizontalOverflow(page: Page): Promise<void> {
     };
 
     const offenders: string[] = [];
-    for (const el of Array.from(document.body.querySelectorAll("*"))) {
+    for (const el of [scope, ...Array.from(scope.querySelectorAll("*"))]) {
       if (
         typeof el.checkVisibility === "function" &&
         !el.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true })
@@ -588,7 +602,7 @@ export async function assertNoHorizontalOverflow(page: Page): Promise<void> {
       clientWidth: viewportWidth,
       offenders,
     };
-  });
+  }, scopeTestId);
 
   // Kept as a cheap belt-and-suspenders for any surface rendered outside the
   // overflow-hidden app shell. Note: under the shell this can never fail (the

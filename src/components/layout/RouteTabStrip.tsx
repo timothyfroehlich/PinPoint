@@ -17,10 +17,7 @@ import {
   getMachineStatusStyles,
   type MachineStatus,
 } from "~/lib/machines/status";
-import {
-  planTabLayout,
-  type TabLayoutPlan,
-} from "~/components/layout/route-tab-strip-layout";
+import { planTabLayout } from "~/components/layout/route-tab-strip-layout";
 
 export interface RouteTab {
   /** URL slug appended to `basePath`; "" is the index tab. */
@@ -63,11 +60,9 @@ export function RouteTabStrip({
   const containerRef = useRef<HTMLElement>(null);
   const measurementLaneRef = useRef<HTMLDivElement>(null);
   const triggerMeasurementRef = useRef<HTMLSpanElement>(null);
-  const [layout, setLayout] = useState<TabLayoutPlan>(() => ({
-    visibleIndices: tabs.map((_, index) => index),
-    overflowIndices: [],
-    activeClipped: false,
-  }));
+  const [measurements, setMeasurements] = useState<TabMeasurements | null>(
+    null
+  );
   const [isOverflowMenuOpen, setIsOverflowMenuOpen] = useState(false);
 
   // Return the matching slug only when the path matches a tab exactly —
@@ -82,6 +77,10 @@ export function RouteTabStrip({
   })();
   const activeIndex = tabs.findIndex((tab) => tab.slug === activeSlug);
   const normalizedActiveIndex = activeIndex === -1 ? null : activeIndex;
+  const layout =
+    measurements?.tabWidths.length === tabs.length
+      ? planTabLayout({ ...measurements, activeIndex: normalizedActiveIndex })
+      : unmeasuredLayout(tabs.length, normalizedActiveIndex);
 
   // CSS owns the row's presentation. Component-local observation is used only
   // to derive semantic menu membership, which CSS cannot expose to React (see
@@ -99,16 +98,17 @@ export function RouteTabStrip({
     if (measuredTabs.length !== tabs.length) return;
 
     const measure = (): void => {
-      const nextLayout = planTabLayout({
+      const nextMeasurements = {
         availableWidth: container.getBoundingClientRect().width,
         tabWidths: measuredTabs.map(
           (element) => element.getBoundingClientRect().width
         ),
         overflowTriggerWidth: trigger.getBoundingClientRect().width,
-        activeIndex: normalizedActiveIndex,
-      });
-      setLayout((current) =>
-        layoutsMatch(current, nextLayout) ? current : nextLayout
+      };
+      setMeasurements((current) =>
+        measurementsMatch(current, nextMeasurements)
+          ? current
+          : nextMeasurements
       );
     };
 
@@ -121,7 +121,7 @@ export function RouteTabStrip({
     return () => {
       observer.disconnect();
     };
-  }, [normalizedActiveIndex, tabs]);
+  }, [tabs]);
 
   const hasOverflow = layout.overflowIndices.length > 0;
   const activeTab =
@@ -161,11 +161,11 @@ export function RouteTabStrip({
   return (
     <nav
       ref={containerRef}
-      className="relative min-h-12 border-b border-outline-variant"
+      className="relative flex min-h-12 min-w-0 border-b border-outline-variant"
       aria-label={ariaLabel}
       data-testid={`${testIdPrefix}-strip`}
     >
-      <div className="flex min-w-0 overflow-hidden">
+      <div className="flex min-w-0 flex-1 overflow-hidden">
         {layout.visibleIndices.map((index) => {
           const tab = tabs[index];
           if (!tab) return null;
@@ -278,7 +278,7 @@ const overflowTriggerMeasurementClasses =
 
 const overflowTriggerClasses = cn(
   overflowTriggerMeasurementClasses,
-  "absolute inset-y-0 right-0 z-10 bg-background"
+  "self-stretch"
 );
 
 function getTabKey(tab: RouteTab): string {
@@ -317,15 +317,53 @@ function TabContent({
   );
 }
 
-function layoutsMatch(left: TabLayoutPlan, right: TabLayoutPlan): boolean {
+interface TabMeasurements {
+  readonly availableWidth: number;
+  readonly tabWidths: readonly number[];
+  readonly overflowTriggerWidth: number;
+}
+
+function unmeasuredLayout(
+  tabCount: number,
+  activeIndex: number | null
+): {
+  visibleIndices: number[];
+  overflowIndices: number[];
+  activeClipped: boolean;
+} {
+  const indices = Array.from({ length: tabCount }, (_, index) => index);
+  if (activeIndex === null) {
+    return {
+      visibleIndices: indices,
+      overflowIndices: [],
+      activeClipped: false,
+    };
+  }
+
+  // A route transition remounts this client component before its local
+  // geometry is available. Keep the active route and More usable in that
+  // first render; useLayoutEffect replaces this with the exact measured plan
+  // before paint.
+  return {
+    visibleIndices: [activeIndex],
+    overflowIndices: indices,
+    activeClipped: true,
+  };
+}
+
+function measurementsMatch(
+  left: TabMeasurements | null,
+  right: TabMeasurements
+): boolean {
+  if (!left) return false;
   return (
-    left.activeClipped === right.activeClipped &&
-    indicesMatch(left.visibleIndices, right.visibleIndices) &&
-    indicesMatch(left.overflowIndices, right.overflowIndices)
+    left.availableWidth === right.availableWidth &&
+    left.overflowTriggerWidth === right.overflowTriggerWidth &&
+    widthsMatch(left.tabWidths, right.tabWidths)
   );
 }
 
-function indicesMatch(
+function widthsMatch(
   left: readonly number[],
   right: readonly number[]
 ): boolean {
