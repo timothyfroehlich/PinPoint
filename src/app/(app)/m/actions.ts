@@ -51,7 +51,6 @@ import {
   toMachineOwnerRef,
 } from "~/lib/timeline/machine-lifecycle-helpers";
 import { createMachineTimelineEvent } from "~/lib/timeline/machine-events";
-import { type MachineTimelineEventKind } from "~/lib/timeline/machine-event-types";
 import {
   VALID_MACHINE_PRESENCE_STATUSES,
   type MachinePresenceStatus,

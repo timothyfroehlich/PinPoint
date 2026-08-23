@@ -184,6 +184,8 @@ export function MachineCombobox({
     [machines, value]
   );
 
+  const listboxId = `${id}-listbox`;
+
   return (
     <>
       {name !== undefined && (
@@ -202,6 +204,7 @@ export function MachineCombobox({
             variant="outline"
             role="combobox"
             aria-expanded={open}
+            aria-controls={open ? listboxId : undefined}
             {...(ariaLabel ? { "aria-label": ariaLabel } : {})}
             disabled={disabled}
             data-testid={triggerTestId}
@@ -232,6 +235,7 @@ export function MachineCombobox({
           </Button>
         </PopoverTrigger>
         <PopoverContent
+          id={listboxId}
           className="w-(--radix-popover-trigger-width) p-0"
           align="start"
         >

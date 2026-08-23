@@ -178,7 +178,7 @@ describe("Dashboard Queries (PGlite)", () => {
 
       // Create 5 machines with staggered creation times
       const now = Date.now();
-      const machinesData = await db
+      await db
         .insert(machines)
         .values([
           createTestMachine({
@@ -444,7 +444,7 @@ describe("Dashboard Queries (PGlite)", () => {
       const db = await getTestDb();
 
       // Create 5 machines
-      const [machine1, machine2, machine3, machine4, machine5] = await db
+      const [machine1, machine2, machine3, _machine4, machine5] = await db
         .insert(machines)
         .values([
           createTestMachine({ name: "Machine 1", initials: "M1" }),

@@ -27,10 +27,10 @@ vi.mock("next/link", () => ({
 vi.mock("next/image", () => ({
   default: ({
     alt,
-    priority,
-    fill,
-    sizes,
-    quality,
+    priority: _priority,
+    fill: _fill,
+    sizes: _sizes,
+    quality: _quality,
     ...props
   }: React.ComponentProps<"img"> & {
     priority?: boolean;
