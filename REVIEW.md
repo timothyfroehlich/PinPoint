@@ -1,6 +1,6 @@
 # PinPoint — Code Review Brief
 
-This is the canonical review rubric for PinPoint. It is harness-neutral: Claude Code reads it via a pointer in `CLAUDE.md` (and via the `/code-review` skill), and the Antigravity adapter (`.agents/rules/antigravity.md`) pulls it in via `@REVIEW.md`. Any reviewer added later reads the same brief — edit only here.
+This is the canonical review rubric for PinPoint. It is harness-neutral: Claude Code reads it via a pointer in `CLAUDE.md` (and via the `/code-review` skill), and `AGENTS.md` points reviewers here. Any reviewer reads the same brief — edit only here.
 
 PinPoint is a **single-tenant** pinball issue tracker (Austin Pinball Collective), in live production with real user data. Stack: Next.js App Router (React Server Components by default), Drizzle ORM on Supabase Postgres, Supabase SSR auth, shadcn/ui + Tailwind CSS v4, TypeScript `ts-strictest`. There is no multi-tenancy, no RLS, and no tRPC — by design.
 
@@ -43,7 +43,7 @@ If a PR changes roles, statuses, permissions, or user-facing terminology, check 
 
 ## Scope of the review
 
-A default `/code-review` or Antigravity pass is aimed at smaller changes — Tim triggers deeper reviews (`/code-review ultra`) manually on bigger ones. In practice: prioritise the highest-priority rule violations above and genuine correctness defects. Don't editorialise about style a formatter or linter already owns (Prettier, ESLint, oxlint). A clean review — no comments — is a valid outcome; don't manufacture nits to justify the pass.
+A default `/code-review` pass is aimed at smaller changes — Tim triggers deeper reviews (`/code-review ultra`) manually on bigger ones. In practice: prioritise the highest-priority rule violations above and genuine correctness defects. Don't editorialise about style a formatter or linter already owns (Prettier, ESLint, oxlint). A clean review — no comments — is a valid outcome; don't manufacture nits to justify the pass.
 
 ## Reviewer-relevant skill pointers
 
@@ -58,7 +58,7 @@ Reviewers read agent skills. Consult the relevant one for the area a PR touches 
 
 ## How a review gets triggered
 
-**Every review on this repo is asked for.** GitHub Copilot code review was retired on 2026-08-02 (PP-4ric). Tim runs the review, and he runs one of two: `/codex:review` (the plugin marks that command `disable-model-invocation`) and the built-in `/code-review` (user-triggered and billed). An agent can launch neither. Antigravity remains an optional second opinion.
+**Every review on this repo is asked for.** GitHub Copilot code review was retired on 2026-08-02 (PP-4ric). Tim runs the review, and he runs one of two: `/codex:review` (the plugin marks that command `disable-model-invocation`) and the built-in `/code-review` (user-triggered and billed). An agent can launch neither.
 
 That did **not** loosen the merge bar. A PR still cannot merge without a review covering its **head commit**, recorded as the author's SHA-pinned marker (`<!-- pinpoint-review: <head_sha> -->`), with every thread resolved. The author finishes the work, hands the branch to Tim, addresses the findings, and attests the head that was read — with the pair matching whichever reviewer ran:
 

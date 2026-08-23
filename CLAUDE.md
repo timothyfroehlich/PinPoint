@@ -16,7 +16,7 @@ PinPoint uses single-context domain documentation. See `docs/agents/domain.md`.
 
 ### Code review
 
-`REVIEW.md` at the repo root is the canonical review rubric, shared with Antigravity. Read it before launching the code-review skill.
+`REVIEW.md` at the repo root is the canonical review rubric. Read it before launching the code-review skill.
 
 **No bot reviews this repo — Copilot review was retired 2026-08-02 (PP-4ric).** A review covering the head commit is still required to merge, and Tim runs it: either `/codex:review` or the built-in `/code-review`. You cannot launch either one — the Codex plugin declares its command `disable-model-invocation`, and `/code-review` is user-triggered and billed.
 
