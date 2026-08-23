@@ -58,8 +58,8 @@ def stub_repo(
     """Yield paths + env for a run against a fully stubbed `gh`.
 
     The PR is set up to satisfy every gate except CI: authored by the current user,
-    MERGEABLE, no unresolved threads, and carrying a Claude review marker pinned to
-    head. That isolates CI as the single lever each test moves.
+    MERGEABLE, no unresolved threads, and a Codex GitHub approval pinned to head. That
+    isolates CI as the single lever each test moves.
 
     `live_labels` models labels changing after startup (an agent labelling the PR
     while --automerge polls); it defaults to `labels`. Every `gh` invocation is
@@ -83,13 +83,20 @@ def stub_repo(
                 "mergeable": "MERGEABLE",
             }
         )
-        comments = json.dumps(
-            [{"body": f"<!-- pinpoint-claude-review: {HEAD_SHA} -->\nreviewed"}]
+        reviews = json.dumps(
+            [
+                {
+                    "commit_id": HEAD_SHA,
+                    "state": "APPROVED",
+                    "submitted_at": "2026-08-02T20:43:19Z",
+                    "user": {"login": "chatgpt-codex-connector[bot]"},
+                }
+            ]
         )
         head_date = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() - 60))
 
         (tmp_path / "pr_info.json").write_text(pr_info)
-        (tmp_path / "comments.json").write_text(comments)
+        (tmp_path / "reviews.json").write_text(reviews)
         (tmp_path / "threads.json").write_text(EMPTY_THREADS)
         (tmp_path / "rollup.json").write_text(ci_rollup)
 
@@ -112,8 +119,7 @@ def stub_repo(
             '  *"nameWithOwner"*) printf "acme/widget\\n" ;;\n'
             '  *graphql*) cat "$STUB_THREADS" ;;\n'
             '  *"/commits/"*) printf "%s\\n" "$STUB_HEAD_DATE" ;;\n'
-            '  *"/issues/"*"/comments") cat "$STUB_COMMENTS" ;;\n'
-            '  *"/pulls/"*"/reviews") printf "[]\\n" ;;\n'
+            '  *"/pulls/"*"/reviews") cat "$STUB_REVIEWS" ;;\n'
             '  *) printf "UNEXPECTED gh call: %s\\n" "$args" >&2; exit 1 ;;\n'
             "esac\n"
         )
@@ -156,7 +162,7 @@ def stub_repo(
         env["STUB_HEAD_SHA"] = HEAD_SHA
         env["STUB_HEAD_DATE"] = head_date
         env["STUB_PR_INFO"] = str(tmp_path / "pr_info.json")
-        env["STUB_COMMENTS"] = str(tmp_path / "comments.json")
+        env["STUB_REVIEWS"] = str(tmp_path / "reviews.json")
         env["STUB_THREADS"] = str(tmp_path / "threads.json")
         env["STUB_ROLLUP"] = str(tmp_path / "rollup.json")
         env["STUB_MERGED"] = str(merged_marker)

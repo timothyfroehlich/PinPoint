@@ -1,6 +1,6 @@
 ---
 name: pinpoint-pr-workflow
-description: The PR-lifecycle decisions the scripts and gates do not state — why getting reviewed is a handoff (Tim runs it — `/codex:review`, which the Codex plugin marks `disable-model-invocation`, or the built-in `/code-review`, which is user-triggered; an agent can launch neither) and why the SHA-pinned marker you post is the only thing that satisfies the `reviewed` gate, why every push past a review needs a fresh one rather than a re-attestation, the narrow trivial-change exception, why the merge handoff is a script you run rather than a summary you write, the `--pages` screenshot gotchas, and the Dependabot back-to-back lockfile trap. Also the merge escape hatches (`--force`, `--bypass-merge-requirements`) and when each is and is not appropriate, what to do when `merge-pr.sh` itself is broken, and the GitHub MCP gotchas that silently do the wrong thing — snake_case field names, the pagination cap, label writes replacing the whole set rather than adding to it, `resolve_thread` ignoring owner/repo, and the thread-ID format. Use when committing, opening a PR, handing a branch to Tim for review, attesting a reviewed head, addressing review comments, posting screenshots, handing a PR over to merge, landing the plane after Tim merges, or when a GitHub MCP call does something you did not expect.
+description: The PR-lifecycle decisions the scripts and gates do not state — why getting reviewed is a handoff (Tim may comment `@codex review` on GitHub) and why Codex's native GitHub approval of the current SHA is valid alongside the existing SHA-pinned manual attestation, why every push needs a fresh review, why the merge handoff is a script you run rather than a summary you write, the `--pages` screenshot gotchas, and the Dependabot back-to-back lockfile trap. Also the merge escape hatches (`--force`, `--bypass-merge-requirements`) and when each is and is not appropriate, what to do when `merge-pr.sh` itself is broken, and the GitHub MCP gotchas that silently do the wrong thing — snake_case field names, the pagination cap, label writes replacing the whole set rather than adding to it, `resolve_thread` ignoring owner/repo, and the thread-ID format. Use when committing, opening a PR, handing a branch to Tim for review, addressing review comments, posting screenshots, handing a PR over to merge, landing the plane after Tim merges, or when a GitHub MCP call does something you did not expect.
 ---
 
 # PinPoint PR Workflow
@@ -77,19 +77,31 @@ Fixing, declining with a one-sentence signed reply, and resolving the thread is 
 
 Every unresolved thread counts, whoever opened it — the `threads` gate is author-agnostic. Resolve or decline each one before moving on.
 
-### 3.4 Get the head commit reviewed — Tim runs it, you attest
+### 3.4 Get the head commit reviewed
+
+**Current policy (2026-08-22):** finish all churn, then use either valid review path. An agent may request the native GitHub review by commenting `@codex review` on the PR; the gate accepts its review only from `chatgpt-codex-connector[bot]` with state `APPROVED` and `commit_id` equal to the current PR head SHA. Or use the existing local `/codex:review` or `/code-review` plus SHA-pinned `mark-review.sh` attestation workflow below. Address every finding and repeat the chosen path after a push. The GitHub integration uses Tim's connected ChatGPT plan and does not require an OpenAI API key.
 
 **The merge bar has not moved: a PR cannot merge without a review covering the HEAD commit,** with all its threads resolved. Review is mandatory, not on-demand, not discretionary.
 
-**What changed on 2026-08-02 (PP-4ric) is who does it.** The bot reviewer this repo used was retired — its free tier was too small to review PinPoint's PRs, so quota outages were the normal state rather than the exception. No bot reviews this repo now, and there is nothing to request: a PR carries no pending reviewer, and any doc or habit that has you adding one is stale.
+**What changed on 2026-08-02 (PP-4ric) is who does it.** The previous generic bot reviewer was retired — its free tier was too small to review PinPoint's PRs, so quota outages were the normal state rather than the exception. Native Codex GitHub review is now an explicit per-head request, not a pending reviewer: do not add another reviewer or assume a review is queued until `@codex review` has been posted.
 
 **Tim runs the review, and there are two he might run.** `/codex:review` (the Codex plugin) and the built-in `/code-review` are both in use. Which one he picks is his call, not yours — your job is the same either way, and the only thing that changes is the reviewer/detail pair you attest with.
 
-**You cannot launch either.** The Codex plugin declares `disable-model-invocation: true` on `review`, `adversarial-review`, `result`, and `status`, so none of those slash commands is model-invocable — not the review, and not the retrieval either. The built-in `/code-review` is user-triggered and billed, and is likewise not yours to fire. Tim types the command and pastes or leaves the result in the session; your job is to read it, fix what it found, and record it. (The Codex plugin's underlying `codex-companion.mjs` is runnable from Bash, but that path is deliberately not the documented one — routing the review through Tim is what keeps the attestation witnessed by someone other than its author.)
+**You cannot launch either local command.** The Codex plugin declares `disable-model-invocation: true` on `review`, `adversarial-review`, `result`, and `status`, so none of those slash commands is model-invocable — not the review, and not the retrieval either. The built-in `/code-review` is user-triggered and billed, and is likewise not yours to fire. Tim types the command and pastes or leaves the result in the session; your job is to read it, fix what it found, and record it. (The Codex plugin's underlying `codex-companion.mjs` is runnable from Bash, but that path is deliberately not the documented one — routing the review through Tim is what keeps the attestation witnessed by someone other than its author.)
 
-So getting reviewed is still a handoff, for a different reason than before. The command starts a real review; it does not make the marker true by itself. Address every finding, then attest only the SHA that was actually reviewed.
+#### Native GitHub Codex review — agent-requestable
 
-#### Sequencing
+After the final head is pushed, an agent may request the native review directly on GitHub:
+
+```bash
+gh pr comment <PR> --body '@codex review'
+```
+
+Use this only once per head SHA, after CI fixes and merge-from-main churn have stopped. It asks the connected Codex GitHub App to review the PR; it does not allow a merge. Wait for its native `APPROVED` review on that exact SHA, then address every finding or hand off. That approval itself satisfies the review gate — do **not** add a manual marker for it. A later push requires a fresh request. This is the agent-requestable alternative to the local commands below — `review-preflight.sh` is for a local `/codex:review` or `/code-review` handoff, not the GitHub App review.
+
+For the local route, getting reviewed remains a handoff. The command starts a real review; it does not make the manual marker true by itself. Address every finding, then attest only the SHA that was actually reviewed.
+
+#### Local review and manual-attestation route
 
 1. Open the PR whenever you like and watch CI. Nothing is reviewing yet, so an early PR costs nothing.
 2. Finish **all** the work: the implementation, the CI fixes, the merge-from-main. Stop iterating.
@@ -120,7 +132,7 @@ settings. If it is denied, say so and ask him to type the command again; do not
 hand-roll the node invocation to get around it.
 
 4. Address the findings: fix → push → and note that head has moved (see below). Consciously decline the rest, with a reason. **A review that found nothing worth fixing skips straight to step 5** — there is no push, so head is already the SHA he read.
-5. Attest the head he reviewed — **this step is yours, always, and it is the only thing that satisfies the gate.** A clean review with an unposted marker reads to `merge-pr.sh` as `unreviewed`, so the review Tim ran buys nothing until you post it:
+5. Attest the head he reviewed — **this step is yours on the local route.** A clean review with an unposted marker reads to `merge-pr.sh` as `unreviewed`, so the review Tim ran buys nothing until you post it:
 
    ```bash
    bash scripts/workflow/mark-review.sh <PR> codex-plugin-cc base-main "<one-line findings summary>"   # /codex:review
@@ -209,7 +221,7 @@ Requires the local dev server (`pnpm run dev`) and Supabase (`supabase start`) r
 
 ### 3.6 Apply `ready-for-review` label
 
-Once CI green + a review marker pinning head (per 3.4) + zero unresolved review threads + no merge conflict + screenshots posted (if UI-touching, per 3.5), apply the label via `mcp__github__issue_write(method: "update", …)` or `gh pr edit <PR> --add-label ready-for-review`.
+Once CI green + either a native Codex approval or manual attestation of head (per 3.4) + zero unresolved review threads + no merge conflict + screenshots posted (if UI-touching, per 3.5), apply the label via `mcp__github__issue_write(method: "update", …)` or `gh pr edit <PR> --add-label ready-for-review`.
 
 The label is a hint to Tim that the PR is ready for **him** to merge — it does not authorize an agent to merge. `merge-pr.sh --human` re-checks all gates when Tim runs it.
 
@@ -249,7 +261,7 @@ Never say "ready to push when you are" — you push. Never say a PR is "merged" 
 
 **On any FAIL the script removes the `ready-for-review` label if present** (and likewise on the `--automerge` RED path). The label's contract is "click-merge-without-thinking"; if a gate fails at merge time that contract is broken, so the label goes. Practical consequence: after Tim reports a FAIL, fix the underlying issue, push, and **re-apply the label** (3.6) before re-handing him the `--human` command — don't assume it survived.
 
-**A `reviewed` FAIL is almost never a `--force` case.** `unreviewed` means nobody has reviewed it and `stale_marker` means you pushed past the review that happened — both describe an unfinished PR, not a broken gate. Take the honest path in 3.4 and hand off a PR whose marker pins head.
+**A `reviewed` FAIL is almost never a `--force` case.** `unreviewed` means neither path covers head, `stale_approval` / `stale_marker` mean you pushed past the review record, and `not_approved` means Codex's latest review did not approve — all describe an unfinished PR, not a broken gate. Take either honest path in 3.4 and cover head.
 
 `--bypass-merge-requirements` is for a required check failing for known-irrelevant reasons (infrastructure flake, unrelated job) where the change has been manually verified safe — log the flake first with `bash scripts/workflow/log-gha-flake.sh <pr> <run-id> <class> "<symptom>"` (see `docs/runbooks/gha-flake-log.md`) — or an emergency hotfix where waiting for CI is not acceptable. Do NOT suggest bypassing when a merge conflict exists, or when the underlying state hasn't been manually verified.
 
