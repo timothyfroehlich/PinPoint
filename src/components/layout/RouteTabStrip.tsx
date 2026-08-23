@@ -250,7 +250,7 @@ export function RouteTabStrip({
           <span
             key={getTabKey(tab)}
             data-tab-measure=""
-            className={tabControlClasses}
+            className={cn("absolute w-max", tabControlClasses)}
           >
             <TabContent tab={tab} />
           </span>
@@ -260,7 +260,7 @@ export function RouteTabStrip({
           data-overflow-trigger-measure=""
           className={buttonVariants({
             variant: "ghost",
-            className: overflowTriggerMeasurementClasses,
+            className: cn("absolute w-max", overflowTriggerMeasurementClasses),
           })}
         >
           …

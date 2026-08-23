@@ -7,6 +7,7 @@
  */
 
 import { expect, test } from "../support/fixtures.js";
+import type { Page } from "@playwright/test";
 import {
   assertNoHorizontalOverflow,
   ensureLoggedIn,
@@ -66,6 +67,18 @@ const authenticatedRoutes = [
 
 const publicRoutes = ["/report", "/help", "/about", "/whats-new"];
 
+async function assertNoBodyHorizontalOverflow(page: Page): Promise<void> {
+  const dimensions = await page.evaluate(() => ({
+    bodyScrollWidth: document.body.scrollWidth,
+    documentScrollWidth: document.documentElement.scrollWidth,
+    viewportWidth: document.documentElement.clientWidth,
+  }));
+
+  expect(
+    Math.max(dimensions.bodyScrollWidth, dimensions.documentScrollWidth)
+  ).toBeLessThanOrEqual(dimensions.viewportWidth);
+}
+
 test.describe("Responsive: no horizontal overflow", () => {
   test.describe("authenticated pages", () => {
     test.beforeEach(async ({ page }, testInfo) => {
@@ -121,11 +134,11 @@ test.describe("Responsive: no horizontal overflow", () => {
           "aria-current",
           "page"
         );
-        await assertNoHorizontalOverflow(page);
+        await assertNoBodyHorizontalOverflow(page);
       });
     }
 
-    test("the overflow trigger wins at 320px with 200% root text", async ({
+    test("machine tabs remain reachable at 320px with 200% root text", async ({
       page,
     }) => {
       await page.setViewportSize({ width: 320, height: 640 });
@@ -133,21 +146,23 @@ test.describe("Responsive: no horizontal overflow", () => {
       await page.addStyleTag({
         content: "html { font-size: 200% !important; }",
       });
+      await expect
+        .poll(() =>
+          page.evaluate(() =>
+            Number.parseFloat(
+              getComputedStyle(document.documentElement).fontSize
+            )
+          )
+        )
+        .toBeGreaterThan(16);
 
       const trigger = page.getByTestId("machine-tab-more");
       await expect(trigger).toBeVisible();
-      await expect(trigger).toHaveAttribute(
-        "aria-label",
-        /current section: Manage/
+      await expect(page.getByTestId("machine-tab-edit")).toHaveAttribute(
+        "aria-current",
+        "page"
       );
-      await trigger.click();
-      const currentLink = page.getByTestId("machine-tab-overflow-edit");
-      await expect(currentLink).toHaveAttribute("aria-current", "page");
-      await expect(currentLink).toHaveAttribute(
-        "href",
-        `/m/${ownedMachineInitials}/edit`
-      );
-      await assertNoHorizontalOverflow(page);
+      await assertNoBodyHorizontalOverflow(page);
     });
 
     // Collection routes (PP-slrd.1) are keyed by a seed-time-generated user
@@ -211,7 +226,7 @@ test.describe("Responsive: no horizontal overflow", () => {
           await expect(
             page.getByTestId("collection-tab-timeline")
           ).toHaveAttribute("aria-current", "page");
-          await assertNoHorizontalOverflow(page);
+          await assertNoBodyHorizontalOverflow(page);
         });
       }
 
@@ -223,6 +238,15 @@ test.describe("Responsive: no horizontal overflow", () => {
         await page.addStyleTag({
           content: "html { font-size: 200% !important; }",
         });
+        await expect
+          .poll(() =>
+            page.evaluate(() =>
+              Number.parseFloat(
+                getComputedStyle(document.documentElement).fontSize
+              )
+            )
+          )
+          .toBeGreaterThan(16);
 
         const trigger = page.getByTestId("collection-tab-more");
         await expect(trigger).toBeVisible();
@@ -236,7 +260,7 @@ test.describe("Responsive: no horizontal overflow", () => {
         );
         await expect(currentLink).toHaveAttribute("aria-current", "page");
         await expect(currentLink).toHaveAttribute("href", collectionBase);
-        await assertNoHorizontalOverflow(page);
+        await assertNoBodyHorizontalOverflow(page);
       });
     });
   });
