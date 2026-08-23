@@ -7,7 +7,7 @@
   // Without this, opening a colocated test file landed it in an INFERRED project
   // with no path aliases (=> spurious TS2307 on `~/...`), no node types
   // (=> TS2591 on `node:crypto`), and spurious implicit-any — none of which the
-  // real gates (`tsc`, vitest, ESLint) ever saw. See PP-4k76 DESIGN.
+  // real gates (`tsc`, vitest, oxlint) ever saw. See PP-4k76 DESIGN.
   //
   // The typecheck scripts point at the concrete projects directly
   // (`-p tsconfig.app.json`, `-p tsconfig.tests.json`); `next build` reads

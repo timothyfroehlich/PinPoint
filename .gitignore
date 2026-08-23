@@ -121,10 +121,6 @@ worktrees/
 *-output.log
 test-output-*.txt
 typescript-output.log
-eslint-test-output.log
-eslint-prod-errors.json
-eslint-results.sarif
-.eslintcache
 shellcheck-results.sarif
 betterer-output.log
 agent_workspace/
@@ -143,7 +139,6 @@ PROJECT_INDEX.json
 .betterer.results.backup
 .worktree-ports
 .env*.local
-.eslintcache
 .claude/recycle_bin/
 .playwright-mcp/
 logs_result.json

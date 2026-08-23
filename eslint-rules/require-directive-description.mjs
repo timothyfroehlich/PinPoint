@@ -1,8 +1,7 @@
 // ===== Every suppression explains itself =====
 //
-// Replaces `eslint-comments/require-description` (`eslint.config.mjs`), which
-// has no oxlint equivalent — oxc declined a built-in (oxc-project/oxc#22193)
-// and recommends a JS plugin, which is what this is.
+// Enforces directive descriptions under Oxlint (`.oxlintrc.json`).
+// Oxlint has no built-in equivalent and oxc recommends a JS plugin.
 //
 // A suppression without a reason is unreviewable: the next reader cannot tell
 // whether it was a considered exception or a way past a red gate. Requiring

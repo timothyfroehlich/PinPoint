@@ -34,7 +34,8 @@
     "*.config.ts",
     "*.config.cjs",
     "src/app/(app)/mockup/**",
-    "src/components/mockups/**"
+    "src/components/mockups/**",
+    "eslint-rules/__fixtures__/**"
   ],
   "rules": {
     "pinpoint/no-restricted-disable-directives": "error",

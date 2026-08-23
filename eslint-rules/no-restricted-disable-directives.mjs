@@ -2,10 +2,7 @@
 //
 // CORE-TS-007 (no `any`, no non-null `!`, no `no-unsafe-*`) is only a GATE
 // because the rules that implement it cannot be switched off by a one-line
-// comment. Under ESLint that guarantee came from
-// `eslint-comments/no-restricted-disable` (`eslint.config.mjs`, PP-8k07).
-// oxlint has no equivalent and oxc declined to add one (oxc-project/oxc#22193),
-// recommending exactly this: a JS plugin that reads the comment stream.
+// comment. This JS plugin provides that guarantee under Oxlint (`.oxlintrc.json`).
 //
 // Two deliberate differences from the ESLint original:
 //
@@ -51,8 +48,6 @@
 // file-wide disable of only the unicorn rule is still caught, because this rule
 // survives to report it. Closing the last one needs an engine feature — a rule
 // that cannot be suppressed — which oxlint reserves for its own natives.
-// `eslint-comments/no-restricted-disable` has the identical hole, so this is
-// parity with the gate we already trust, not a regression introduced here.
 
 /**
  * A disable directive of either engine, capturing everything after the

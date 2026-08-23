@@ -194,7 +194,7 @@ jobs:
         run: pnpm run typecheck:tests
 
   lint:
-    name: ESLint
+    name: Oxlint
     runs-on: ubuntu-latest
     needs: setup
     steps:

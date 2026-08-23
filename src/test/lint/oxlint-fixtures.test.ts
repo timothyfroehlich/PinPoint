@@ -11,16 +11,10 @@ import {
 } from "../../../eslint-rules/no-restricted-disable-directives.mjs";
 
 /**
- * Fixture harness for the rules oxlint runs through its JS-plugin API
- * (`jsPlugins` in `.oxlintrc.json`).
+ * Fixture harness for custom and plugin rules oxlint runs.
  *
- * Those rules cannot be exercised the way `src/test/eslint/*.test.ts` exercises
- * the same rule objects — ESLint's `Linter` runs the rule in-process, which
- * proves the rule's LOGIC but says nothing about whether oxlint loads it,
- * resolves its options, or scopes it correctly. That wiring is the thing most
- * likely to break silently (a plugin that fails to load reports nothing, which
- * is indistinguishable from a clean tree), so this harness shells out to the
- * real binary over real files and asserts on the diagnostics it emits.
+ * This harness shells out to the real oxlint binary over real fixture files and
+ * asserts on the diagnostics it emits.
  *
  * The fixtures live in `eslint-rules/__fixtures__/` rather than next to this
  * file: every lint script in the repo runs over `src/ e2e/ scripts/`, so a
@@ -159,10 +153,16 @@ describe("oxlint jsPlugins fixtures", () => {
     expect(
       found.map((f) => ({ ruleId: f.ruleId, line: f.line }))
     ).toStrictEqual([
-      // the bare `fetch(...)`
-      { ruleId: "pinpoint/no-side-effects-in-transaction", line: 11 },
-      // the `sendEmail(...)` helper
-      { ruleId: "pinpoint/no-side-effects-in-transaction", line: 12 },
+      { ruleId: "pinpoint/no-side-effects-in-transaction", line: 22 },
+      { ruleId: "pinpoint/no-side-effects-in-transaction", line: 23 },
+      { ruleId: "pinpoint/no-side-effects-in-transaction", line: 24 },
+      { ruleId: "pinpoint/no-side-effects-in-transaction", line: 25 },
+      { ruleId: "pinpoint/no-side-effects-in-transaction", line: 26 },
+      { ruleId: "pinpoint/no-side-effects-in-transaction", line: 27 },
+      { ruleId: "pinpoint/no-side-effects-in-transaction", line: 28 },
+      { ruleId: "pinpoint/no-side-effects-in-transaction", line: 29 },
+      { ruleId: "pinpoint/no-side-effects-in-transaction", line: 33 },
+      { ruleId: "pinpoint/no-side-effects-in-transaction", line: 40 },
     ]);
     expect(found[0]?.message).toContain("CORE-ARCH-011");
   });
@@ -250,6 +250,8 @@ describe("oxlint jsPlugins fixtures", () => {
     const findings = await findingsPromise;
     expect(forFile(findings, "clean-actions.ts")).toStrictEqual([]);
     expect(forFile(findings, "clean-tokens.tsx")).toStrictEqual([]);
+    expect(forFile(findings, "tx-clean.ts")).toStrictEqual([]);
+    expect(forFile(findings, "action-naming-clean.ts")).toStrictEqual([]);
   });
 });
 
@@ -257,11 +259,9 @@ describe("oxlint jsPlugins fixtures", () => {
  * Directive governance — the CORE-TS-007 enforcement teeth (PP-8k07).
  *
  * These are the rules that make CORE-TS-007 a gate rather than a
- * recommendation, and Phase 4 of the oxlint-only migration deletes ESLint (and
- * with it `eslint-comments/no-restricted-disable` and
- * `eslint-comments/require-description`) on the strength of them. So they get
- * asserted case by case rather than in aggregate: a regression here is a
- * silently open door to `any`, not a lint nit.
+ * recommendation, enforced solely by Oxlint. They get asserted case by case
+ * rather than in aggregate: a regression here is a silently open door to `any`,
+ * not a lint nit.
  */
 describe("oxlint directive governance", () => {
   it("bans a restricted disable under every prefix and namespace it can wear", async () => {
