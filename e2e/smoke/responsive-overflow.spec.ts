@@ -122,7 +122,7 @@ test.describe("Responsive: no horizontal overflow", () => {
           "page"
         );
         await assertNoHorizontalOverflow(page, {
-          scopeTestId: "machine-tab-strip",
+          scopeTestIds: ["machine-tab-strip"],
         });
       });
     }
@@ -154,7 +154,7 @@ test.describe("Responsive: no horizontal overflow", () => {
       await expect(page.getByTestId("machine-tab-edit")).toBeInViewport();
       await expect(trigger).toBeInViewport();
       await assertNoHorizontalOverflow(page, {
-        scopeTestId: "machine-tab-strip",
+        scopeTestIds: ["machine-tab-strip"],
       });
     });
 
@@ -220,7 +220,7 @@ test.describe("Responsive: no horizontal overflow", () => {
             page.getByTestId("collection-tab-timeline")
           ).toHaveAttribute("aria-current", "page");
           await assertNoHorizontalOverflow(page, {
-            scopeTestId: "collection-tab-strip",
+            scopeTestIds: ["collection-tab-strip"],
           });
         });
       }
@@ -258,7 +258,10 @@ test.describe("Responsive: no horizontal overflow", () => {
         await expect(trigger).toBeInViewport();
         await expect(currentLink).toBeInViewport();
         await assertNoHorizontalOverflow(page, {
-          scopeTestId: "collection-tab-strip",
+          scopeTestIds: [
+            "collection-tab-strip",
+            "collection-tab-overflow-overview",
+          ],
         });
       });
     });

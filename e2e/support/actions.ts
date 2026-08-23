@@ -497,21 +497,27 @@ export async function updateIssueField(
  */
 interface HorizontalOverflowOptions {
   /** Limit clipped-element detection to a component while retaining the page-width check. */
-  scopeTestId?: string;
+  scopeTestIds?: readonly string[];
 }
 
 export async function assertNoHorizontalOverflow(
   page: Page,
-  { scopeTestId }: HorizontalOverflowOptions = {}
+  { scopeTestIds }: HorizontalOverflowOptions = {}
 ): Promise<void> {
-  const result = await page.evaluate((scopeTestId) => {
+  const result = await page.evaluate((scopeTestIds) => {
     const doc = document.documentElement;
     const viewportWidth = doc.clientWidth;
-    const scope = scopeTestId
-      ? document.querySelector(`[data-testid="${scopeTestId}"]`)
-      : document.body;
-    if (!scope) {
-      throw new Error(`Overflow assertion scope not found: ${scopeTestId}`);
+    const scopes = scopeTestIds
+      ? scopeTestIds.map((testId) => {
+          const scope = document.querySelector(`[data-testid="${testId}"]`);
+          if (!scope) {
+            throw new Error(`Overflow assertion scope not found: ${testId}`);
+          }
+          return scope;
+        })
+      : [document.body];
+    if (scopes.length === 0) {
+      throw new Error("Overflow assertion requires at least one scope");
     }
 
     // How far past a viewport edge an element must extend before we treat it as
@@ -573,7 +579,10 @@ export async function assertNoHorizontalOverflow(
     };
 
     const offenders: string[] = [];
-    for (const el of [scope, ...Array.from(scope.querySelectorAll("*"))]) {
+    for (const el of scopes.flatMap((scope) => [
+      scope,
+      ...Array.from(scope.querySelectorAll("*")),
+    ])) {
       if (
         typeof el.checkVisibility === "function" &&
         !el.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true })
@@ -602,7 +611,7 @@ export async function assertNoHorizontalOverflow(
       clientWidth: viewportWidth,
       offenders,
     };
-  }, scopeTestId);
+  }, scopeTestIds);
 
   // Kept as a cheap belt-and-suspenders for any surface rendered outside the
   // overflow-hidden app shell. Note: under the shell this can never fail (the
