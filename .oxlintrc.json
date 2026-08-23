@@ -260,7 +260,6 @@
       "rules": {
         "no-restricted-imports": "off",
         "no-empty-function": "off",
-        "no-unused-vars": "off",
         "typescript/no-explicit-any": "off",
         "typescript/no-floating-promises": "off",
         "typescript/explicit-function-return-type": "off",
@@ -280,7 +279,6 @@
       "rules": {
         "no-restricted-imports": "off",
         "no-empty-function": "off",
-        "no-unused-vars": "off",
         "typescript/no-explicit-any": "off",
         "typescript/no-floating-promises": "off",
         "typescript/explicit-function-return-type": "off",
@@ -314,7 +312,6 @@
       ],
       "rules": {
         "no-restricted-imports": "off",
-        "no-unused-vars": "off",
         "typescript/no-explicit-any": "off",
         "typescript/explicit-function-return-type": "off",
         "pinpoint/no-restricted-disable-directives": "off"

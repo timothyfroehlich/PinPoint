@@ -210,10 +210,16 @@ describe("oxlint jsPlugins fixtures", () => {
     expect(testFound).toStrictEqual([]);
   });
 
-  it("fires eslint/no-unused-vars on unused imports", async () => {
-    const found = forFile(await findingsPromise, "unused-import.ts");
+  it("fires eslint/no-unused-vars on unused imports across source and test scopes", async () => {
+    const findings = await findingsPromise;
+    const srcFound = forFile(findings, "unused-import.ts");
     expect(
-      found.map((f) => ({ ruleId: f.ruleId, line: f.line }))
+      srcFound.map((f) => ({ ruleId: f.ruleId, line: f.line }))
+    ).toStrictEqual([{ ruleId: "eslint/no-unused-vars", line: 2 }]);
+
+    const testFound = forFile(findings, "unused-import.test.ts");
+    expect(
+      testFound.map((f) => ({ ruleId: f.ruleId, line: f.line }))
     ).toStrictEqual([{ ruleId: "eslint/no-unused-vars", line: 2 }]);
   });
 

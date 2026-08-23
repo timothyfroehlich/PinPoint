@@ -27,7 +27,6 @@ import { randomUUID } from "node:crypto";
 const {
   mockExecute,
   mockReturning,
-  mockUpdateWhere,
   mockUpdateSet,
   mockUpdate,
   mockFindFirst,
