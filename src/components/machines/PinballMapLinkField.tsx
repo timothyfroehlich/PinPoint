@@ -380,6 +380,7 @@ export function PinballMapLinkField({
                 variant="outline"
                 role="combobox"
                 aria-expanded={open}
+                aria-controls={open ? `${triggerId}-listbox` : undefined}
                 disabled={disabled}
                 data-testid="pinballmap-link-select"
                 className="w-full justify-between border-outline bg-surface text-foreground font-normal"
@@ -401,6 +402,7 @@ export function PinballMapLinkField({
               </Button>
             </PopoverTrigger>
             <PopoverContent
+              id={`${triggerId}-listbox`}
               className="w-(--radix-popover-trigger-width) p-0"
               align="start"
             >

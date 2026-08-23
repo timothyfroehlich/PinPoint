@@ -151,7 +151,7 @@ export function createMockSupabaseClient(
     },
 
     // Database query builder mock (for direct Supabase queries, not Drizzle)
-    from: vi.fn((table: string) => ({
+    from: vi.fn((_table: string) => ({
       select: vi.fn().mockReturnThis(),
       insert: vi.fn().mockReturnThis(),
       update: vi.fn().mockReturnThis(),

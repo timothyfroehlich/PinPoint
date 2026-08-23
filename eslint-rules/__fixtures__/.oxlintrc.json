@@ -1,6 +1,6 @@
 {
   "$schema": "../../node_modules/oxlint/configuration_schema.json",
-  "plugins": ["unicorn"],
+  "plugins": ["typescript", "unicorn", "react", "jsx-a11y", "promise"],
   "categories": {
     "correctness": "off"
   },
@@ -16,6 +16,11 @@
     "pinpoint/no-restricted-disable-directives": "error",
     "pinpoint/require-directive-description": "error",
     "unicorn/no-abusive-eslint-disable": "error",
+    "typescript/no-non-null-assertion": "error",
+    "no-unused-vars": "error",
+    "react/exhaustive-deps": "error",
+    "jsx-a11y/click-events-have-key-events": "error",
+    "promise/catch-or-return": "error",
     "better-tailwindcss/no-restricted-classes": [
       "error",
       {
@@ -31,5 +36,26 @@
         ]
       }
     ]
-  }
+  },
+  "overrides": [
+    {
+      "files": ["**/*.ts", "**/*.tsx"],
+      "rules": {
+        "no-unused-vars": "error",
+        "typescript/no-non-null-assertion": "error"
+      }
+    },
+    {
+      "files": ["*.test.ts", "*.test.tsx", "*.spec.ts", "*.spec.tsx"],
+      "rules": {
+        "typescript/no-non-null-assertion": "off"
+      }
+    },
+    {
+      "files": ["*e2e*"],
+      "rules": {
+        "pinpoint/no-test-com-literals": "warn"
+      }
+    }
+  ]
 }

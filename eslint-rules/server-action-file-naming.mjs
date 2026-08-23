@@ -16,11 +16,8 @@
 // file-CONTENT question, and several things that need to answer it can only
 // match on PATH:
 //
-//   - `.claude/rules/*.md` frontmatter (`paths:` globs) — the path-scoped rule
-//     tier that loads CORE-ARCH-005 / CORE-ARCH-008 / CORE-ARCH-011 / CORE-ARCH-012
-//     when an agent opens an action file. Globs cannot read a directive.
-//   - Any future CODEOWNERS entry, path filter in CI, or reviewer checklist
-//     keyed on actions.
+//   - Tooling, linters, CODEOWNERS entries, CI path filters, or reviewer
+//     checklists keyed on actions.
 //
 // Those consumers all use the same four globs:
 //
@@ -30,9 +27,9 @@
 //     src/server/actions/**
 //
 // A new action named `foo.ts` would silently fall out of every one of them, and
-// nothing would fail — the rules just quietly stop loading. This rule is what
-// makes that failure loud. It does NOT enforce where the file lives, only what
-// it is called; moving actions around stays a free choice.
+// nothing would fail. This rule is what makes that failure loud. It does NOT
+// enforce where the file lives, only what it is called; moving actions around
+// stays a free choice.
 //
 // ── Scope: module-level directive only ───────────────────────────────────────
 // Only a `"use server"` in the module's directive prologue marks the whole file
@@ -63,10 +60,8 @@ export const SHARED_ACTIONS_DIR_PATTERN =
 export const SERVER_ACTION_FILE_NAMING_MESSAGE =
   'A module with a top-level "use server" directive must be named ' +
   "`actions.ts` or `<name>-action.ts` / `<name>-actions.ts`, or live under " +
-  "`src/server/actions/`. Path-based consumers — the `.claude/rules/` " +
-  "`paths:` globs that load the Server Action rules (CORE-ARCH-005/008/011/012) " +
-  "— match on filename, not on the directive, so an off-pattern name silently " +
-  "drops the file out of them.";
+  "`src/server/actions/`. Path-based tooling and conventions match on filename, " +
+  "not on the directive, so an off-pattern name silently drops the file out of them.";
 
 /**
  * Returns true when `filename` satisfies the Server Action naming convention.

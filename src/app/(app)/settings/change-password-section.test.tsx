@@ -17,7 +17,7 @@ vi.mock("react", async (importOriginal) => {
 });
 
 // Spy on the server action to prevent module-level execution
-const changePasswordSpy = vi.spyOn(actions, "changePasswordAction");
+vi.spyOn(actions, "changePasswordAction");
 
 describe("ChangePasswordSection", () => {
   beforeEach(() => {

@@ -265,7 +265,7 @@ describe("Invited Users Integration", () => {
     });
     try {
       await db.insert(machines).values(machine);
-    } catch (e) {
+    } catch (_e) {
       // If it throws, the constraint worked!
       return;
     }
