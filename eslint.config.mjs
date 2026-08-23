@@ -175,10 +175,9 @@ export default [
       // A module-level `"use server"` file must be named `actions.ts` /
       // `*-action(s).ts`, or live in `src/server/actions/`. Server Actions are
       // deliberately scattered (route-local colocation), so "is this an action
-      // module?" is a content question — but the `.claude/rules/` `paths:`
-      // globs that load CORE-ARCH-005/008/011/012 can only match on filename.
-      // Without this rule an off-pattern name silently drops out of them and
-      // nothing fails. Rationale + globs:
+      // module?" is a content question — but path-based tooling and conventions
+      // match on filename. Without this rule an off-pattern name silently drops
+      // out of them and nothing fails. Rationale + globs:
       // ./eslint-rules/server-action-file-naming.mjs.
       "pinpoint/server-action-file-naming": "error",
 

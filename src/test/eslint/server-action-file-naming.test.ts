@@ -15,8 +15,8 @@ import {
  * `parserOptions.project` — so fixtures need not be members of any tsconfig.
  * The rule is purely syntactic, so this faithfully exercises it.
  *
- * The rule exists because the `.claude/rules/` `paths:` globs that route the
- * Server Action rules to action files match on FILENAME, while "is this an
+ * The rule exists because path-based consumers and tooling that route or
+ * check Server Action conventions match on FILENAME, while "is this an
  * action module?" is answered by a directive. This test is what proves the two
  * still agree.
  */
