@@ -399,6 +399,9 @@ describe("MachineDetailsForm", () => {
       expect(
         await screen.findByText("Discard unsaved changes?")
       ).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+      });
       expect(pushMock).not.toHaveBeenCalled();
     });
 

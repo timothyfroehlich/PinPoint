@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Button, buttonVariants } from "~/components/ui/button";
@@ -68,6 +68,7 @@ export function RouteTabStrip({
     overflowIndices: [],
     activeClipped: false,
   }));
+  const [isOverflowMenuOpen, setIsOverflowMenuOpen] = useState(false);
 
   // Return the matching slug only when the path matches a tab exactly —
   // sub-routes (e.g. `/m/[initials]/i/[issueNumber]`) should highlight no tab
@@ -130,6 +131,29 @@ export function RouteTabStrip({
       ? `More ${ariaLabel.toLowerCase()}, current section: ${activeTab.label}`
       : `More ${ariaLabel.toLowerCase()}`;
 
+  // The Manage form's unsaved-navigation guard runs on document capture and
+  // intentionally stops propagation for an intercepted link. That prevents
+  // Radix from receiving the click it normally uses to close this menu. A
+  // document-capture listener on the same target is not stopped by
+  // stopPropagation(), so close our controlled menu before the discard dialog
+  // can supersede it.
+  useEffect(() => {
+    if (!isOverflowMenuOpen) return;
+
+    const closeForOverflowNavigation = (event: MouseEvent): void => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      if (target.closest("[data-route-tab-overflow-item]")) {
+        setIsOverflowMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("click", closeForOverflowNavigation, true);
+    return () => {
+      document.removeEventListener("click", closeForOverflowNavigation, true);
+    };
+  }, [isOverflowMenuOpen]);
+
   return (
     <nav
       ref={containerRef}
@@ -166,7 +190,10 @@ export function RouteTabStrip({
       </div>
 
       {hasOverflow && (
-        <DropdownMenu>
+        <DropdownMenu
+          open={isOverflowMenuOpen}
+          onOpenChange={setIsOverflowMenuOpen}
+        >
           <DropdownMenuTrigger asChild>
             <Button
               type="button"
@@ -194,6 +221,7 @@ export function RouteTabStrip({
                   <Link
                     href={getTabHref(basePath, tab)}
                     aria-current={isActive ? "page" : undefined}
+                    data-route-tab-overflow-item=""
                     data-testid={`${testIdPrefix}-overflow-${key}`}
                     className="cursor-pointer"
                   >
