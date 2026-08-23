@@ -60,19 +60,15 @@ REPO_OWNER = "timothyfroehlich"
 REPO_NAME = "PinPoint"
 READY_LABEL = "ready-for-review"
 CI_GATE_NAME = "CI Gate"
-
-# --- Review state (PP-lzaw, rewritten for marker-only review in PP-4ric) -----
-# Kept deliberately in sync with scripts/workflow/_pr-gates.sh, which is the
-# canonical implementation. Duplicated rather than shelled out to because this
-# script is the read-only reporter and _pr-gates.sh is sourced by merge-pr.sh,
-# which agents may not invoke at all. scripts/tests/test_pr_watch.py pins the
-# two vocabularies together.
+CODEX_REVIEW_BOT = "chatgpt-codex-connector[bot]"
 REVIEW_MARKER_PREFIX = "<!-- pinpoint-review:"
 LEGACY_CLAUDE_MARKER_PREFIX = "<!-- pinpoint-claude-review:"
 
+# --- Review state ---------------------------------------------------------------
+# Kept deliberately in sync with scripts/workflow/_pr-gates.sh. This watcher only
+# reports the state; merge-pr.sh is the enforcement point.
 REVIEW_HINT = (
-    "ask Tim to run a review (/codex:review or /code-review), then attest with "
-    "scripts/workflow/mark-review.sh {pr} <reviewer> <detail>"
+    "comment @codex review on PR #{pr}; the approval must cover the current head"
 )
 
 STARTUP_RETRIES = 6  # attempts to find runs for current SHA
@@ -90,9 +86,6 @@ SUPERSEDED_GATE_GRACE = 180  # seconds
 # so retrying past this is pointless — better to stop and say why. (PP-qkl8)
 RUN_STATE_ATTEMPTS = 4
 RUN_STATE_BACKOFF = 5  # seconds
-
-# Exit code for "we could not find out" — distinct from 1 ("it failed") so a
-# caller can tell an unobserved outcome from an observed bad one. (PP-qkl8)
 EXIT_UNDETERMINED = 2
 
 _lock = threading.Lock()
@@ -237,57 +230,87 @@ def _gh_api_list(path: str) -> list[dict]:
     return items
 
 
-def _marker_shas(pr: int) -> list[str]:
-    """Every SHA pinned by a review marker comment on the PR, oldest first.
-
-    A list rather than "the" marker: mark-review.sh keeps one sticky
-    comment, but nothing stops a second session or a hand-posted comment from
-    leaving two, and a reader that picks one comment can disagree with the
-    writer about which is canonical — see `_marker_verdict` in _pr-gates.sh.
-    """
+def _codex_reviews(pr: int) -> list[dict]:
+    """Return trusted Codex reviews in submission order."""
     repo = f"repos/{REPO_OWNER}/{REPO_NAME}"
-    return [
-        (c.get("body") or "")[
-            len(REVIEW_MARKER_PREFIX)
-            if (c.get("body") or "").startswith(REVIEW_MARKER_PREFIX)
-            else len(LEGACY_CLAUDE_MARKER_PREFIX) :
-        ]
-        .split("-->")[0]
-        .strip()
-        for c in _gh_api_list(f"{repo}/issues/{pr}/comments")
-        if (c.get("body") or "").startswith(REVIEW_MARKER_PREFIX)
-        or (c.get("body") or "").startswith(LEGACY_CLAUDE_MARKER_PREFIX)
+    reviews = [
+        review
+        for review in _gh_api_list(f"{repo}/pulls/{pr}/reviews")
+        if review.get("user", {}).get("login") == CODEX_REVIEW_BOT
     ]
+    return sorted(reviews, key=lambda review: review.get("submitted_at") or "")
+
+
+def _manual_markers(pr: int) -> list[tuple[str, str]]:
+    """Return (SHA, timestamp) records from the independent manual path."""
+    repo = f"repos/{REPO_OWNER}/{REPO_NAME}"
+    markers: list[tuple[str, str]] = []
+    for comment in _gh_api_list(f"{repo}/issues/{pr}/comments"):
+        body = comment.get("body") or ""
+        if body.startswith(REVIEW_MARKER_PREFIX):
+            markers.append(
+                (
+                    body[len(REVIEW_MARKER_PREFIX) :].split("-->", 1)[0].strip(),
+                    comment.get("updated_at") or "",
+                )
+            )
+        elif body.startswith(LEGACY_CLAUDE_MARKER_PREFIX):
+            markers.append(
+                (
+                    body[len(LEGACY_CLAUDE_MARKER_PREFIX) :].split("-->", 1)[0].strip(),
+                    comment.get("updated_at") or "",
+                )
+            )
+    return markers
 
 
 def review_state(pr: int) -> tuple[str, str]:
-    """Return (state, human-readable detail) for the PR's review situation.
-
-    Mirrors `_compute_review_state` in scripts/workflow/_pr-gates.sh — same three
-    states, same ordering. States: marker, stale_marker, unreviewed.
-
-    The distinction that matters is `stale_marker`: the PR visibly HAS a review,
-    so the reflex is to read it as reviewed, when in fact the commit about to
-    merge was never looked at. Nothing re-attests automatically.
-    """
+    """Return the current-head state across both valid review paths."""
     head_sha = json.loads(gh("pr", "view", str(pr), "--json", "headRefOid"))[
         "headRefOid"
     ]
-    pinned = _marker_shas(pr)
+    reviews = _codex_reviews(pr)
+    if reviews:
+        latest = reviews[-1]
+        review_sha = latest.get("commit_id") or ""
+        state = (latest.get("state") or "UNKNOWN").upper()
+        if state == "APPROVED" and review_sha == head_sha:
+            return "approval", f"Codex approved head {head_sha[:7]}"
 
-    if head_sha in pinned:
-        return "marker", f"review marker pins head {head_sha[:7]}"
-    if not pinned:
+    # A current native approval is sufficient. Defer the paginated comments request
+    # unless it is needed to find the independent manual-attestation fallback.
+    markers = _manual_markers(pr)
+    if any(marker_sha == head_sha for marker_sha, _at in markers):
+        return "marker", f"manual review marker pins head {head_sha[:7]}"
+
+    latest_marker_sha, latest_marker_at = max(
+        markers, key=lambda marker: marker[1], default=("", "")
+    )
+    if reviews:
+        if latest_marker_sha and latest_marker_at > (latest.get("submitted_at") or ""):
+            return (
+                "stale_marker",
+                f"manual review marker pins {latest_marker_sha[:7]} but head is {head_sha[:7]}",
+            )
+        if state == "APPROVED":
+            return (
+                "stale_approval",
+                f"Codex approved {review_sha[:7]} but head is {head_sha[:7]} — "
+                f"{REVIEW_HINT.format(pr=pr)}",
+            )
         return (
-            "unreviewed",
-            f"no review marker — head {head_sha[:7]} is unreviewed; "
+            "not_approved",
+            f"Codex last reviewed {review_sha[:7]} with {state}, not APPROVED; "
             f"{REVIEW_HINT.format(pr=pr)}",
         )
-    marker_sha = pinned[-1]
+    if latest_marker_sha:
+        return (
+            "stale_marker",
+            f"manual review marker pins {latest_marker_sha[:7]} but head is {head_sha[:7]}",
+        )
     return (
-        "stale_marker",
-        f"the marker pins {marker_sha[:7]} but head is {head_sha[:7]} — you "
-        f"pushed after the review, so what would merge was never read; "
+        "unreviewed",
+        f"no Codex review or manual attestation — head {head_sha[:7]} is unreviewed; "
         f"{REVIEW_HINT.format(pr=pr)}",
     )
 
@@ -477,10 +500,10 @@ def run_audit(pr: int) -> bool:
     )
 
     # Reported, but NOT part of the verdict. This mode answers "is this PR worth
-    # Tim's /code-review right now?", and the review is what happens AFTER that
+    # Tim's Codex review right now?", and the review is what happens AFTER that
     # answer is yes — gating on it would make the check circular and permanently
     # red. merge-pr.sh's `reviewed` gate is the one that refuses to merge an
-    # unreviewed head. `stale_marker` is worth seeing here anyway: it means the
+    # unreviewed head. A stale Codex approval is worth seeing here anyway: it means the
     # PR looks reviewed and is not.
     try:
         state, review_detail = review_state(pr)

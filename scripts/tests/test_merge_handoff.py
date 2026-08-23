@@ -65,13 +65,13 @@ def write(repo: Path, path: str, body: str) -> None:
 class Scenario:
     """What the stubbed GitHub says about the PR. Defaults describe a mergeable PR.
 
-    `review` names WHICH commit the marker pins, rather than a SHA: commit hashes depend
+    `review` names WHICH commit Codex approved, rather than a SHA: commit hashes depend
     on commit time, so a fixture built twice does not produce the same head, and a test
     that hard-codes one would attest a commit that no longer exists.
 
-      "head"      the marker covers head — the reviewed case
-      "previous"  the marker covers head~1 — a commit was pushed after the review
-      "orphan"    the marker pins a commit unrelated to the branch — post-force-push
+      "head"      the approval covers head — the reviewed case
+      "previous"  the approval covers head~1 — a commit was pushed after the review
+      "orphan"    the approval covers a commit unrelated to the branch — post-force-push
     """
 
     ci_status: str = "COMPLETED"
@@ -80,8 +80,8 @@ class Scenario:
     state: str = "OPEN"
     draft: bool = False
     review: str | None = None
-    review_depth: str = "medium"
-    review_reviewer: str = "claude-code"
+    review_state: str = "APPROVED"
+    manual_review: bool = False
     gh_head: str = "head"
     threads: list[dict] = field(default_factory=list)
     comments: list[dict] = field(default_factory=list)
@@ -89,46 +89,12 @@ class Scenario:
     branch: str = BRANCH
 
 
-def marker(sha: str, depth: str = "medium", reviewer: str = "claude-code") -> dict:
-    if reviewer == "unrecorded":
-        # A canonical marker with no reviewer/detail comments — hand-posted, or written
-        # by some future caller that forgot them. It still pins a head, so the gate
-        # honours it; the handoff must report the missing metadata as missing.
-        return {
-            "body": f"<!-- pinpoint-review: {sha} -->\nreviewed by hand",
-            "updated_at": "2026-08-02T20:43:19Z",
-        }
-    if reviewer == "claude-code-canonical":
-        # Canonical marker, claude-code reviewer, detail passed through verbatim. The
-        # visible line deliberately does NOT interpolate the detail: this shape exists to
-        # test what `review_phrase` prints, and a fixture echoing the answer would pass
-        # whatever the script did.
-        return {
-            "body": (
-                f"<!-- pinpoint-review: {sha} -->\n"
-                "<!-- pinpoint-reviewer: claude-code -->\n"
-                f"<!-- pinpoint-review-detail: {depth} -->\n"
-                "reviewed"
-            ),
-            "updated_at": "2026-08-02T20:43:19Z",
-        }
-    if reviewer == "codex-plugin-cc":
-        return {
-            "body": (
-                f"<!-- pinpoint-review: {sha} -->\n"
-                "<!-- pinpoint-reviewer: codex-plugin-cc -->\n"
-                "<!-- pinpoint-review-detail: base-main -->\n"
-                f"Codex review of head {sha[:7]} — branch diff vs main"
-            ),
-            "updated_at": "2026-08-02T20:43:19Z",
-        }
+def codex_review(sha: str, state: str = "APPROVED") -> dict:
     return {
-        "body": (
-            f"<!-- pinpoint-claude-review: {sha} -->\n"
-            f"<!-- pinpoint-review-depth: {depth} -->\n"
-            f"Claude review of head {sha[:7]} — `/code-review {depth}` — no serious findings"
-        ),
-        "updated_at": "2026-08-02T20:43:19Z",
+        "commit_id": sha,
+        "state": state,
+        "submitted_at": "2026-08-02T20:43:19Z",
+        "user": {"login": "chatgpt-codex-connector[bot]"},
     }
 
 
@@ -202,19 +168,25 @@ def repo_with_pr(
         git("push", "-q", "origin", f"HEAD:refs/pull/{PR}/head", cwd=work)
 
         comments = list(scenario.comments)
+        reviews: list[dict] = []
+        if scenario.manual_review:
+            comments.append(
+                {
+                    "body": (
+                        f"<!-- pinpoint-review: {head_sha} -->\n"
+                        "<!-- pinpoint-reviewer: claude-code -->\n"
+                        "<!-- pinpoint-review-detail: medium -->\nreviewed"
+                    ),
+                    "updated_at": "2026-08-02T20:43:19Z",
+                }
+            )
         if scenario.review is not None:
             reviewed = {
                 "head": head_sha,
                 "previous": git("rev-parse", "HEAD~1", cwd=work),
                 "orphan": "0" * 40,
             }[scenario.review]
-            comments.append(
-                marker(
-                    reviewed,
-                    depth=scenario.review_depth,
-                    reviewer=scenario.review_reviewer,
-                )
-            )
+            reviews.append(codex_review(reviewed, scenario.review_state))
 
         meta = {
             "number": PR,
@@ -258,6 +230,7 @@ def repo_with_pr(
         (tmp_path / "rollup.json").write_text(rollup)
         (tmp_path / "threads.json").write_text(json.dumps(threads_payload))
         (tmp_path / "comments.json").write_text(json.dumps(comments))
+        (tmp_path / "reviews.json").write_text(json.dumps(reviews))
 
         # Dispatches on the joined argument string, most specific first: `gh pr view`
         # carries a different --json set per caller and they must not collide.
@@ -272,6 +245,7 @@ def repo_with_pr(
             '  *"--jq .headRefOid"*) jq -r .headRefOid "$STUB_META" ;;\n'
             '  *"pr view"*) cat "$STUB_META" ;;\n'
             '  *"api graphql"*) cat "$STUB_THREADS" ;;\n'
+            '  *"/reviews"*) cat "$STUB_REVIEWS" ;;\n'
             '  *"/comments"*) cat "$STUB_COMMENTS" ;;\n'
             '  *) printf "UNEXPECTED gh call: %s\\n" "$args" >&2; exit 1 ;;\n'
             "esac\n"
@@ -288,6 +262,7 @@ def repo_with_pr(
             "STUB_ROLLUP": str(tmp_path / "rollup.json"),
             "STUB_THREADS": str(tmp_path / "threads.json"),
             "STUB_COMMENTS": str(tmp_path / "comments.json"),
+            "STUB_REVIEWS": str(tmp_path / "reviews.json"),
             "STUB_MERGEABLE": scenario.mergeable,
         }
         run = subprocess.run(
@@ -477,35 +452,32 @@ def test_screenshots_older_than_the_last_ui_commit_are_flagged_stale() -> None:
 # --- Review distance ----------------------------------------------------------------
 
 
-def test_a_review_covering_head_reports_its_depth_and_no_delta() -> None:
+def test_a_codex_approval_covering_head_is_named_in_the_handoff() -> None:
     with repo_with_pr(
         branch_changes={"src/lib/thing.ts": "x\n"},
-        scenario=Scenario(review="head", review_depth="high"),
+        scenario=Scenario(review="head"),
     ) as (_head, run):
-        assert "/code-review high" in run.stdout, run.stdout
+        assert "Codex GitHub approval" in run.stdout, run.stdout
         assert "since review  none — the review covers head" in run.stdout
 
 
-def test_a_codex_review_covering_head_is_named_in_the_handoff() -> None:
+def test_a_manual_attestation_covering_head_is_merge_ready() -> None:
     with repo_with_pr(
         branch_changes={"src/lib/thing.ts": "x\n"},
-        scenario=Scenario(review="head", review_reviewer="codex-plugin-cc"),
+        scenario=Scenario(manual_review=True),
     ) as (_head, run):
-        assert "codex review, branch diff vs main" in run.stdout, run.stdout
+        assert MERGE_CMD in run.stdout, run.stdout
+        assert "/code-review medium" in run.stdout, run.stdout
 
 
-def test_a_marker_without_reviewer_metadata_reports_it_as_unrecorded() -> None:
-    """Missing metadata reads as missing — never as a review method it can't know.
-
-    The whole claim of this report is that nothing in it is recalled, so inventing a
-    reviewer for a marker that names none would be the one lie it cannot afford.
-    """
+def test_a_codex_review_that_did_not_approve_is_not_merge_ready() -> None:
     with repo_with_pr(
         branch_changes={"src/lib/thing.ts": "x\n"},
-        scenario=Scenario(review="head", review_reviewer="unrecorded"),
+        scenario=Scenario(review="head", review_state="COMMENTED"),
     ) as (_head, run):
-        assert "reviewer/detail unrecorded" in run.stdout, run.stdout
-        assert "codex review" not in run.stdout.split("NOT MERGEABLE")[0]
+        assert "Codex GitHub review (COMMENTED)" in run.stdout, run.stdout
+        assert "reviewed: not_approved" in run.stdout, run.stdout
+        assert MERGE_CMD not in run.stdout
 
 
 def test_commits_pushed_after_the_review_are_counted_and_diffed() -> None:
@@ -579,7 +551,7 @@ def test_a_pr_with_no_bead_says_so_rather_than_inventing_one() -> None:
 def test_a_head_that_moved_mid_report_blocks_the_merge_command() -> None:
     """`gh` and the pull ref naming different commits means no single tree was reported.
 
-    The gate answers (review marker, CI, threads) come from `gh` at one SHA while the
+    The gate answers (Codex approval, CI, threads) come from `gh` at one SHA while the
     diff comes from git at another, so the block is not a statement about anything
     mergeable — even when every individual gate reads green.
     """
@@ -607,69 +579,6 @@ def test_the_race_is_detected_by_sha_not_by_a_missing_object() -> None:
         # The commit gh reported is a real, locally-present ancestor of head.
         assert head not in run.stdout.split("HEAD MOVED")[0]
         assert "HEAD MOVED" in run.stdout, run.stdout
-
-
-# --- Depths that name no /code-review level -----------------------------------------
-
-
-@pytest.mark.parametrize(
-    "depth,expected",
-    [
-        pytest.param("trivial", "attested trivial (no /code-review run)", id="trivial"),
-        pytest.param(
-            "unrecorded",
-            "depth unrecorded (legacy marker predates PP-9onv)",
-            id="unrecorded",
-        ),
-    ],
-)
-def test_a_stale_marker_does_not_invent_a_code_review_level(
-    depth: str, expected: str
-) -> None:
-    """The stale branch used to hardcode `/code-review <depth>`.
-
-    A stale `trivial` self-attestation rendered as `/code-review trivial`, and every
-    pre-PP-9onv marker as `/code-review unrecorded` — this script asserting a review
-    that never ran, in the one place whose whole claim is that nothing is recalled.
-
-    The depths are now enumerated rather than globbed, so an unrecognised detail falls
-    through to the arm that prints it verbatim and asserts nothing.
-    """
-    with repo_with_pr(
-        branch_changes={"src/lib/thing.ts": "x\n"},
-        extra_branch_commit={"src/lib/other.ts": "y\n"},
-        scenario=Scenario(review="previous", review_depth=depth),
-    ) as (_head, run):
-        assert expected in run.stdout, run.stdout
-        assert f"/code-review {depth}" not in run.stdout
-
-
-def test_a_detail_from_the_other_reviewer_is_not_rendered_as_a_code_review_level() -> (
-    None
-):
-    """`claude-code` + a Codex detail must not print "/code-review base-main".
-
-    `mark-review.sh` cannot emit that pair — its `case` rejects it — but the marker is an
-    ordinary PR comment anyone can hand-post, and this script already accommodates
-    hand-posted markers (see the `unrecorded` case above). The arm was a `claude-code:*`
-    glob, so ANY detail became a `/code-review` level, naming a review depth nobody ran
-    in the one report Tim merges on.
-
-    The fixture uses the `claude-code-canonical` marker shape, whose visible line does
-    not echo the detail. The plain `claude-code` shape interpolates "/code-review
-    {depth}" into its own body, so asserting against it would catch the fixture's text
-    rather than what `review_phrase` produced.
-    """
-    with repo_with_pr(
-        branch_changes={"src/lib/thing.ts": "x\n"},
-        scenario=Scenario(
-            review="head",
-            review_reviewer="claude-code-canonical",
-            review_depth="base-main",
-        ),
-    ) as (_head, run):
-        assert "/code-review base-main" not in run.stdout, run.stdout
-        assert "claude-code base-main" in run.stdout, run.stdout
 
 
 def test_an_unknowable_review_distance_does_not_read_as_no_review() -> None:
