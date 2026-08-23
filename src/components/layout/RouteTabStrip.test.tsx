@@ -110,6 +110,28 @@ describe("RouteTabStrip", () => {
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
   });
 
+  it("closes the menu when sibling route navigation changes the pathname", async () => {
+    mockElementWidths({
+      container: 230,
+      tabs: [60, 80, 100, 80, 80],
+      trigger: 48,
+    });
+    const user = userEvent.setup();
+
+    const { rerender } = renderStrip();
+    await user.click(
+      await screen.findByRole("button", { name: "More machine sections" })
+    );
+    expect(await screen.findByRole("menu")).toBeInTheDocument();
+
+    pathnameMock.mockReturnValue("/m/TAF/settings");
+    rerender(strip([...tabs]));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    });
+  });
+
   it("announces the current route when the trigger overlaps its label", async () => {
     pathnameMock.mockReturnValue("/m/TAF/edit");
     mockElementWidths({

@@ -135,6 +135,13 @@ export function RouteTabStrip({
     if (!hasOverflow) setIsOverflowMenuOpen(false);
   }, [hasOverflow]);
 
+  // Browser history can change sibling routes without unmounting the shared
+  // `(tabs)` layout. Never carry an open menu or its focus scope onto that
+  // destination route.
+  useEffect(() => {
+    setIsOverflowMenuOpen(false);
+  }, [pathname]);
+
   // The Manage form's unsaved-navigation guard runs on document capture and
   // intentionally stops propagation for an intercepted link. That prevents
   // Radix from receiving the click it normally uses to close this menu. A
