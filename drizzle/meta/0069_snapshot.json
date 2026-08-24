@@ -1,5 +1,5 @@
 {
-  "id": "05b165ea-a303-4bfb-b6dd-11e3d26c0f17",
+  "id": "1e202e3b-ecc5-4438-9a2f-92990e326897",
   "prevId": "1b5c87e3-f6e7-4cb8-862f-752b1223872c",
   "version": "7",
   "dialect": "postgresql",
@@ -310,6 +310,13 @@
           "primaryKey": true,
           "notNull": true,
           "default": "'singleton'"
+        },
+        "enabled": {
+          "name": "enabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
         },
         "guild_id": {
           "name": "guild_id",
@@ -2244,6 +2251,13 @@
           "primaryKey": true,
           "notNull": true,
           "default": "'singleton'"
+        },
+        "enabled": {
+          "name": "enabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
         },
         "location_id": {
           "name": "location_id",

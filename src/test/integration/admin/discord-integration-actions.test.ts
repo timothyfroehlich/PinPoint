@@ -37,7 +37,13 @@ const {
   const mockReturning = vi.fn().mockResolvedValue([{ id: "singleton" }]);
   const mockUpdateWhere = vi.fn(() => ({ returning: mockReturning }));
   const mockUpdateSet = vi.fn(
-    (_payload: { botTokenVaultId?: string | null }) => ({
+    (_payload: {
+      botTokenVaultId?: string | null;
+      enabled?: boolean;
+      guildId?: string | null;
+      botHealthStatus?: string;
+      lastBotCheckAt?: Date | null;
+    }) => ({
       where: mockUpdateWhere,
     })
   );
@@ -106,6 +112,7 @@ vi.mock("~/server/db", () => ({
 // ── Import the actions under test (after mocks are registered) ────────────────
 
 import {
+  clearDiscordBotTokenAction,
   saveDiscordConfig,
   validateBotToken,
   validateServerId,
@@ -136,7 +143,6 @@ function mockFetch(
 }
 
 interface FormDataOverrides {
-  enabled?: string;
   newToken?: string;
   guildId?: string;
   inviteLink?: string;
@@ -145,7 +151,6 @@ interface FormDataOverrides {
 /** Build a FormData for saveDiscordConfig with sensible defaults. */
 function makeFormData(overrides: FormDataOverrides = {}): FormData {
   const fd = new FormData();
-  fd.set("enabled", overrides.enabled ?? "false");
   fd.set("newToken", overrides.newToken ?? "");
   fd.set("guildId", overrides.guildId ?? "123456789012345678");
   fd.set("inviteLink", overrides.inviteLink ?? "");
@@ -232,13 +237,19 @@ describe("saveDiscordConfig", () => {
   });
 
   describe("schema validation", () => {
-    it("returns field error for missing guildId", async () => {
+    it("allows an empty guildId to turn notifications off", async () => {
       const fd = makeFormData({ guildId: "" });
       const result = await saveDiscordConfig(fd);
-      expect(result.ok).toBe(false);
-      if (!result.ok) {
-        expect(result.errors.some((e) => e.field === "guildId")).toBe(true);
-      }
+      expect(result.ok).toBe(true);
+      expect(globalThis.fetch).not.toHaveBeenCalled();
+      expect(mockUpdateSet).toHaveBeenCalledWith(
+        expect.objectContaining({
+          guildId: null,
+          enabled: false,
+          botHealthStatus: "unknown",
+          lastBotCheckAt: null,
+        })
+      );
     });
 
     it("returns field error for non-numeric guildId", async () => {
@@ -251,7 +262,7 @@ describe("saveDiscordConfig", () => {
     });
 
     it("returns field error for too-short token", async () => {
-      const fd = makeFormData({ newToken: "short", enabled: "true" });
+      const fd = makeFormData({ newToken: "short" });
       const result = await saveDiscordConfig(fd);
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -260,20 +271,20 @@ describe("saveDiscordConfig", () => {
     });
   });
 
-  describe("disabled save (no Discord probes required)", () => {
-    it("saves successfully when enabled=false even with no token", async () => {
-      // No fetch mock needed — probes are skipped when disabling.
+  describe("unconfigured save (no Discord probes required)", () => {
+    it("saves successfully when the server ID is empty", async () => {
+      // No fetch mock needed — server membership is irrelevant while the
+      // notification integration is unconfigured.
       const fd = makeFormData({
-        enabled: "false",
         newToken: "",
-        guildId: "123456789012345678",
+        guildId: "",
       });
       const result = await saveDiscordConfig(fd);
       expect(result.ok).toBe(true);
     });
   });
 
-  describe("enabled save — probeBotToken outcomes", () => {
+  describe("configured save — probeBotToken outcomes", () => {
     it("returns ok:true when token is valid and bot is in the server (happy path)", async () => {
       mockFetch((url) => {
         if (url.includes("/users/@me")) {
@@ -288,7 +299,6 @@ describe("saveDiscordConfig", () => {
       });
 
       const fd = makeFormData({
-        enabled: "true",
         newToken: VALID_TOKEN,
         guildId: "123456789012345678",
       });
@@ -297,6 +307,9 @@ describe("saveDiscordConfig", () => {
       if (result.ok) {
         expect(result.botUsername).toBe("TestBot");
       }
+      expect(mockUpdateSet).toHaveBeenCalledWith(
+        expect.objectContaining({ enabled: true })
+      );
 
       // Assert that fetch was called as expected (method + auth header)
       expect(globalThis.fetch).toHaveBeenCalledTimes(2);
@@ -322,7 +335,6 @@ describe("saveDiscordConfig", () => {
       mockFetch(() => new Response("{}", { status: 401 }));
 
       const fd = makeFormData({
-        enabled: "true",
         newToken: VALID_TOKEN,
         guildId: "123456789012345678",
       });
@@ -338,7 +350,6 @@ describe("saveDiscordConfig", () => {
       mockFetch(() => new Response("{}", { status: 503 }));
 
       const fd = makeFormData({
-        enabled: "true",
         newToken: VALID_TOKEN,
         guildId: "123456789012345678",
       });
@@ -351,7 +362,7 @@ describe("saveDiscordConfig", () => {
     });
   });
 
-  describe("enabled save — probeServerMembership outcomes", () => {
+  describe("configured save — probeServerMembership outcomes", () => {
     it("returns guildId field error when bot is not in the server (404)", async () => {
       mockFetch((url) => {
         if (url.includes("/users/@me")) {
@@ -364,7 +375,6 @@ describe("saveDiscordConfig", () => {
       });
 
       const fd = makeFormData({
-        enabled: "true",
         newToken: VALID_TOKEN,
         guildId: "123456789012345678",
       });
@@ -384,7 +394,6 @@ describe("saveDiscordConfig", () => {
       mockFetch(() => new Response("{}", { status: 401 }));
 
       const fd = makeFormData({
-        enabled: "true",
         newToken: "", // no rotation — uses saved token
         guildId: "123456789012345678",
       });
@@ -399,14 +408,17 @@ describe("saveDiscordConfig", () => {
   describe("partial configuration — no token configured", () => {
     it("saves the server ID without treating the integration as configured", async () => {
       vi.mocked(getDiscordTokenForAdmin).mockResolvedValue(null);
+      mockFindFirst.mockResolvedValue({ botTokenVaultId: null });
 
       const fd = makeFormData({
-        enabled: "true",
         newToken: "",
         guildId: "123456789012345678",
       });
       const result = await saveDiscordConfig(fd);
       expect(result.ok).toBe(true);
+      expect(mockUpdateSet).toHaveBeenCalledWith(
+        expect.objectContaining({ enabled: false })
+      );
     });
   });
 
@@ -446,7 +458,6 @@ describe("saveDiscordConfig", () => {
       });
 
       const fd = makeFormData({
-        enabled: "true",
         newToken: VALID_TOKEN,
         guildId: "123456789012345678",
       });
@@ -471,7 +482,6 @@ describe("saveDiscordConfig", () => {
       mockExecute.mockResolvedValue([{ id: "new-vault-id" }]);
 
       const fd = makeFormData({
-        enabled: "true",
         newToken: VALID_TOKEN,
         guildId: "123456789012345678",
       });
@@ -512,7 +522,6 @@ describe("saveDiscordConfig", () => {
       mockExecute.mockRejectedValue(new Error("vault unavailable"));
 
       const fd = makeFormData({
-        enabled: "true",
         newToken: VALID_TOKEN,
         guildId: "123456789012345678",
       });
@@ -533,6 +542,84 @@ describe("saveDiscordConfig", () => {
       // The transaction never opened (vault RPC failed first).
       expect(mockTransaction).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe("clearDiscordBotTokenAction", () => {
+  it("returns a structured error when the token pointer cannot be read", async () => {
+    mockFindFirst.mockRejectedValue(new Error("database unavailable"));
+
+    const result = await clearDiscordBotTokenAction();
+
+    expect(result).toEqual({
+      ok: false,
+      message: "Failed to remove the token. Try again.",
+    });
+    expect(reportError).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({ action: "clearDiscordBotToken.read" })
+    );
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it("unlinks the exact saved token, resets health, and deletes its Vault row", async () => {
+    mockFindFirst.mockResolvedValue({ botTokenVaultId: "existing-vault-id" });
+
+    const result = await clearDiscordBotTokenAction();
+
+    expect(result).toEqual({ ok: true });
+    expect(mockUpdateSet).toHaveBeenCalledWith(
+      expect.objectContaining({
+        botTokenVaultId: null,
+        enabled: false,
+        botHealthStatus: "unknown",
+        lastBotCheckAt: null,
+      })
+    );
+    expect(JSON.stringify(mockExecute.mock.calls[0]?.[0])).toContain(
+      "vault.secrets"
+    );
+  });
+
+  it("does not delete when a concurrent rotation wins the guarded unlink", async () => {
+    mockFindFirst.mockResolvedValue({ botTokenVaultId: "existing-vault-id" });
+    mockReturning.mockResolvedValue([]);
+
+    const result = await clearDiscordBotTokenAction();
+
+    expect(result).toEqual({
+      ok: false,
+      message: "The saved token changed. Refresh and try again.",
+    });
+    expect(mockExecute).not.toHaveBeenCalled();
+  });
+
+  it("remains off when best-effort Vault cleanup fails", async () => {
+    mockFindFirst.mockResolvedValue({ botTokenVaultId: "existing-vault-id" });
+    mockExecute.mockRejectedValue(new Error("vault unavailable"));
+
+    const result = await clearDiscordBotTokenAction();
+
+    expect(result).toEqual({ ok: true });
+    expect(reportError).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        action: "clearDiscordBotToken.vaultCleanup",
+        bestEffort: true,
+      })
+    );
+  });
+
+  it("is idempotent when no token is saved", async () => {
+    mockFindFirst.mockResolvedValue({ botTokenVaultId: null });
+
+    const result = await clearDiscordBotTokenAction();
+
+    expect(result).toEqual({ ok: true });
+    expect(mockUpdateSet).toHaveBeenCalledWith(
+      expect.objectContaining({ enabled: false })
+    );
+    expect(mockExecute).not.toHaveBeenCalled();
   });
 });
 

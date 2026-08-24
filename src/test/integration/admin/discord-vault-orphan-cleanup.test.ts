@@ -129,7 +129,7 @@ vi.mock("~/server/db", async () => {
 });
 
 // Import the action AFTER the db mock so it binds to PGlite.
-const { saveDiscordConfig } =
+const { clearDiscordBotTokenAction, saveDiscordConfig } =
   await import("~/app/(app)/admin/integrations/discord/actions");
 
 // ── Vault stand-in ───────────────────────────────────────────────────────────
@@ -237,11 +237,21 @@ async function seedSingleton(botTokenVaultId: string | null): Promise<void> {
   });
 }
 
-async function readSingleton(): Promise<{ botTokenVaultId: string | null }> {
+async function readSingleton(): Promise<{
+  botTokenVaultId: string | null;
+  enabled: boolean;
+  botHealthStatus: "unknown" | "healthy" | "degraded";
+  lastBotCheckAt: Date | null;
+}> {
   const db = await getTestDb();
   const row = await db.query.discordIntegrationConfig.findFirst({
     where: eq(discordIntegrationConfig.id, "singleton"),
-    columns: { botTokenVaultId: true },
+    columns: {
+      botTokenVaultId: true,
+      enabled: true,
+      botHealthStatus: true,
+      lastBotCheckAt: true,
+    },
   });
   if (!row) throw new Error("singleton row missing");
   return row;
@@ -353,5 +363,33 @@ describe("saveDiscordConfig Vault orphan compensation (real SQL, PGlite)", () =>
     expect(stored[0]?.id).toBe(existingId);
     expect(stored[0]?.secret).toBe(ROTATED_TOKEN);
     expect((await readSingleton()).botTokenVaultId).toBe(existingId);
+  });
+
+  it("explicit removal unlinks and deletes only the referenced secret", async () => {
+    const referencedId = await seedVaultSecret("saved-token");
+    const unrelatedId = await seedVaultSecret("unrelated-token");
+    await seedSingleton(referencedId);
+    const db = await getTestDb();
+    await db
+      .update(discordIntegrationConfig)
+      .set({
+        enabled: true,
+        botHealthStatus: "healthy",
+        lastBotCheckAt: new Date(),
+      })
+      .where(eq(discordIntegrationConfig.id, "singleton"));
+
+    const result = await clearDiscordBotTokenAction();
+
+    expect(result).toEqual({ ok: true });
+    const singleton = await readSingleton();
+    expect(singleton).toMatchObject({
+      botTokenVaultId: null,
+      enabled: false,
+      botHealthStatus: "unknown",
+      lastBotCheckAt: null,
+    });
+    const remaining = await readVaultSecrets();
+    expect(remaining.map((row) => row.id)).toEqual([unrelatedId]);
   });
 });

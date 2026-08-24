@@ -7,10 +7,29 @@ import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { Separator } from "~/components/ui/separator";
 import { Badge } from "~/components/ui/badge";
-import { CheckCircle2, AlertCircle, Loader2, Check } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "~/components/ui/alert-dialog";
+import {
+  CheckCircle2,
+  AlertCircle,
+  Loader2,
+  Check,
+  Trash2,
+} from "lucide-react";
+import { useRouter } from "next/navigation";
 import { cn } from "~/lib/utils";
 import {
   saveDiscordConfigAction,
+  clearDiscordBotTokenAction,
   validateBotToken,
   validateServerId,
   type SaveDiscordConfigResult,
@@ -35,6 +54,7 @@ export function DiscordConfigForm({
   inviteLink,
   hasToken,
 }: DiscordConfigFormProps): React.JSX.Element {
+  const router = useRouter();
   // Local form state — controlled inputs so we can drive the inline Validate
   // buttons off the *unsaved* values (e.g. validate a freshly-pasted token
   // before it hits Vault).
@@ -52,6 +72,10 @@ export function DiscordConfigForm({
   });
   const [validatingToken, startTokenTransition] = useTransition();
   const [validatingServer, startServerTransition] = useTransition();
+  const [clearingToken, startClearTokenTransition] = useTransition();
+  const [clearTokenError, setClearTokenError] = React.useState<string | null>(
+    null
+  );
 
   // Save action — useActionState wraps the server action so we get pending
   // state and the structured result back. Form-level submission goes through
@@ -147,6 +171,25 @@ export function DiscordConfigForm({
     setServerStatus({ kind: "idle" });
   }
 
+  function handleClearToken(): void {
+    setClearTokenError(null);
+    startClearTokenTransition(async () => {
+      try {
+        const result = await clearDiscordBotTokenAction();
+        if (!result.ok) {
+          setClearTokenError(result.message);
+          return;
+        }
+        setTokenInput("");
+        setTokenStatus({ kind: "idle" });
+        setServerStatus({ kind: "idle" });
+        router.refresh();
+      } catch {
+        setClearTokenError("Failed to remove the token. Try again.");
+      }
+    });
+  }
+
   return (
     <form action={saveFormAction} className="space-y-6">
       {/* Bot token */}
@@ -154,12 +197,8 @@ export function DiscordConfigForm({
         <FieldLabel
           htmlFor="newToken"
           label="Bot token"
-          // Server schema treats newToken as optional ("" = no change when a
-          // token is already saved). Only flag the input as required when
-          // there's no saved token to fall back on, otherwise screen-reader
-          // required-field cues misrepresent the actual validation rule.
-          required={!hasToken}
-          hint="From Discord Developer Portal → your app → Bot → Reset Token."
+          optional
+          hint="Required for Discord notifications and region alerts. Get it from Discord Developer Portal → your app → Bot → Reset Token."
           savedBadge={hasToken && tokenInput === ""}
         />
         <div className="flex items-center gap-2 flex-wrap">
@@ -203,6 +242,51 @@ export function DiscordConfigForm({
         {fieldErrors["newToken"] && (
           <FieldError message={fieldErrors["newToken"]} />
         )}
+        {hasToken && (
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={isPending || clearingToken}
+              >
+                {clearingToken ? (
+                  <Loader2 className="mr-1.5 size-3 animate-spin motion-reduce:animate-none" />
+                ) : (
+                  <Trash2 className="mr-1.5 size-3" aria-hidden />
+                )}
+                Remove saved token
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>
+                  Remove the Discord bot token?
+                </AlertDialogTitle>
+                <AlertDialogDescription>
+                  This turns off Discord notifications and Pinball Map region
+                  alerts. You will need to save and validate a token again to
+                  restore either feature.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={isPending || clearingToken}>
+                  Cancel
+                </AlertDialogCancel>
+                <AlertDialogAction
+                  type="button"
+                  variant="destructive"
+                  disabled={isPending || clearingToken}
+                  onClick={handleClearToken}
+                >
+                  Remove token
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        )}
+        {clearTokenError && <FieldError message={clearTokenError} />}
       </section>
 
       <Separator />
@@ -213,8 +297,8 @@ export function DiscordConfigForm({
           <FieldLabel
             htmlFor="guildId"
             label="Server ID"
-            required
-            hint="Right-click the server in Discord → Copy Server ID. Enable Developer Mode in Settings → Advanced if hidden."
+            optional
+            hint="Right-click the server in Discord → Copy Server ID. Clear it to turn notifications off while retaining the shared bot token."
           />
           <div className="flex items-center gap-2 flex-wrap">
             <Input
@@ -222,7 +306,7 @@ export function DiscordConfigForm({
               name="guildId"
               type="text"
               inputMode="numeric"
-              pattern="[0-9]+"
+              pattern="[0-9]*"
               placeholder="123456789012345678"
               maxLength={64}
               value={guildIdInput}
@@ -230,8 +314,6 @@ export function DiscordConfigForm({
                 setGuildIdInput(e.target.value);
                 setServerStatus({ kind: "idle" });
               }}
-              required
-              aria-required="true"
               className="flex-1 max-w-[360px]"
             />
             <Button
@@ -284,7 +366,7 @@ export function DiscordConfigForm({
       </section>
 
       <SaveResetFooter
-        isPending={isPending}
+        isPending={isPending || clearingToken}
         isSuccess={!!saveState?.ok}
         onReset={handleReset}
       />

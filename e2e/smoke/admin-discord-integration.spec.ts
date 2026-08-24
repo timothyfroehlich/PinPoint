@@ -3,7 +3,7 @@
  *
  * Covers the redesigned single-form admin surface (PR 4 / PP-2n5):
  * - Page renders with the heading and key form fields
- * - Activation switch is disabled when no token is set in DB
+ * - No distinct integration enable switch is rendered
  * - Navigation from the user menu lands on the Discord page
  * - Unauthenticated visitors don't see the page heading
  *
@@ -14,6 +14,10 @@
 import { test, expect } from "../support/fixtures.js";
 import { STORAGE_STATE } from "../support/auth-state.js";
 import { assertNoA11yViolations } from "../support/actions.js";
+import {
+  configureDiscordIntegrationForTest,
+  unconfigureDiscordIntegrationForTest,
+} from "../support/supabase-admin.js";
 
 test.describe("Admin Discord integration page", () => {
   test.use({ storageState: STORAGE_STATE.admin });
@@ -27,6 +31,7 @@ test.describe("Admin Discord integration page", () => {
     await expect(page.getByLabel("Bot token")).toBeVisible();
     await expect(page.getByLabel("Server ID")).toBeVisible();
     await expect(page.getByLabel("Invite link")).toBeVisible();
+    await expect(page.getByRole("checkbox")).toHaveCount(0);
     // Save / Reset footer.
     await expect(
       page.getByRole("button", { name: "Save changes" })
@@ -41,6 +46,25 @@ test.describe("Admin Discord integration page", () => {
     await page.getByTestId("user-menu-button").click();
     await page.getByTestId("user-menu-admin-integrations").click();
     await expect(page).toHaveURL(/\/admin\/integrations\/discord$/);
+  });
+
+  test("removes a saved token only after confirmation", async ({ page }) => {
+    await configureDiscordIntegrationForTest();
+    try {
+      await page.goto("/admin/integrations/discord");
+      await page.getByRole("button", { name: "Remove saved token" }).click();
+      await expect(
+        page.getByRole("alertdialog", {
+          name: "Remove the Discord bot token?",
+        })
+      ).toBeVisible();
+      await page.getByRole("button", { name: "Remove token" }).click();
+      await expect(
+        page.getByRole("button", { name: "Remove saved token" })
+      ).toHaveCount(0);
+    } finally {
+      await unconfigureDiscordIntegrationForTest();
+    }
   });
 });
 

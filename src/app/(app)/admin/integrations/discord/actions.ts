@@ -111,9 +111,8 @@ async function probeServerMembership(
  * the saved Vault token via getDiscordTokenForAdmin(). Returns null if
  * neither source has a token.
  *
- * Uses the admin-only accessor so a saved-but-disabled integration's token
- * is still surfaced for validation. (Validating before enabling is the whole
- * point of the chicken-and-egg flow: env-seeded → admin validates → enables.)
+ * Uses the admin-only accessor so a token remains available for validation
+ * even when the notification server ID is not configured.
  */
 async function resolveTokenForValidation(
   typed: string | undefined
@@ -210,13 +209,12 @@ export async function saveDiscordConfigAction(
 
 /**
  * Atomic save for the Discord admin form. Validates token and server
- * membership server-side before any DB write. Both must pass.
+ * membership server-side before any DB write when a server ID is present.
  *
  * - `newToken`: empty/absent ⇒ no change. Non-empty ⇒ rotate to this value
  *   (validated against `/users/@me` first; rejected on 401).
- * - `guildId`: required and validated against `/guilds/{id}` (Bot-token
- *   endpoint). Hard-required to pass — saves are rejected if the bot
- *   isn't in the server.
+ * - `guildId`: empty ⇒ turn off Discord notifications while retaining the
+ *   shared token. Non-empty ⇒ validate against `/guilds/{id}`.
  * - `inviteLink`: optional, no Discord-side validation.
  */
 export async function saveDiscordConfig(
@@ -244,6 +242,7 @@ export async function saveDiscordConfig(
   const validated = parsed.data;
   const hasTypedNewToken =
     validated.newToken !== undefined && validated.newToken.length > 0;
+  const hasGuildId = validated.guildId.length > 0;
 
   // Resolve the saved-or-typed token. With no token the saved server ID remains
   // partial configuration; with one, every save verifies that the chosen server
@@ -288,11 +287,10 @@ export async function saveDiscordConfig(
       probedBotUsername = tokenResult.botUsername;
     }
 
-    const serverResult = await probeServerMembership(
-      tokenForProbes,
-      validated.guildId
-    );
-    if (!serverResult.ok) {
+    const serverResult = hasGuildId
+      ? await probeServerMembership(tokenForProbes, validated.guildId)
+      : null;
+    if (serverResult && !serverResult.ok) {
       // Field attribution matters because the form renders a per-field error.
       // - not_member / transient: about this guild → guildId.
       // - invalid_token: the token Discord rejected. Attach to newToken so
@@ -423,8 +421,17 @@ export async function saveDiscordConfig(
       await tx
         .update(discordIntegrationConfig)
         .set({
-          guildId: validated.guildId,
+          guildId: hasGuildId ? validated.guildId : null,
           inviteLink: validated.inviteLink === "" ? null : validated.inviteLink,
+          // Expand/contract compatibility only. The current runtime uses
+          // configuration presence; the previous deployment still reads this
+          // column until the contract migration lands.
+          enabled:
+            Boolean(existing?.botTokenVaultId ?? newVaultId) && hasGuildId,
+          ...(!hasGuildId && {
+            botHealthStatus: "unknown" as const,
+            lastBotCheckAt: null,
+          }),
           updatedAt: new Date(),
           updatedBy: userId,
         })
@@ -507,4 +514,111 @@ export async function saveDiscordConfig(
   return probedBotUsername
     ? { ok: true, botUsername: probedBotUsername }
     : { ok: true };
+}
+
+export type ClearDiscordBotTokenResult =
+  { ok: true } | { ok: false; message: string };
+
+/**
+ * Unlink the saved bot token before deleting its exact Vault secret.
+ *
+ * The unlink is the authoritative off switch and is guarded by the current
+ * Vault id so a concurrent rotation cannot make us delete a newly-referenced
+ * credential. Vault cleanup is best-effort after the integration is safely
+ * unconfigured; a cleanup failure is reported without pretending the unlink
+ * failed.
+ */
+export async function clearDiscordBotTokenAction(): Promise<ClearDiscordBotTokenResult> {
+  const { userId } = await verifyIntegrationsAdmin();
+  let existing: { botTokenVaultId: string | null } | undefined;
+  try {
+    existing = await db.query.discordIntegrationConfig.findFirst({
+      where: eq(discordIntegrationConfig.id, "singleton"),
+      columns: { botTokenVaultId: true },
+    });
+  } catch (error) {
+    log.error(
+      { action: "clearDiscordBotToken.read", userId, err: error },
+      "Failed to read Discord bot token pointer"
+    );
+    reportError(error, {
+      action: "clearDiscordBotToken.read",
+      bestEffort: false,
+      userId,
+    });
+    return { ok: false, message: "Failed to remove the token. Try again." };
+  }
+  const vaultId = existing?.botTokenVaultId;
+
+  if (!vaultId) {
+    await db
+      .update(discordIntegrationConfig)
+      .set({
+        enabled: false,
+        botHealthStatus: "unknown",
+        lastBotCheckAt: null,
+        updatedAt: new Date(),
+        updatedBy: userId,
+      })
+      .where(eq(discordIntegrationConfig.id, "singleton"));
+    revalidatePath("/admin/integrations/discord");
+    return { ok: true };
+  }
+
+  try {
+    const unlinked = await db
+      .update(discordIntegrationConfig)
+      .set({
+        botTokenVaultId: null,
+        enabled: false,
+        botHealthStatus: "unknown",
+        lastBotCheckAt: null,
+        updatedAt: new Date(),
+        updatedBy: userId,
+      })
+      .where(
+        and(
+          eq(discordIntegrationConfig.id, "singleton"),
+          eq(discordIntegrationConfig.botTokenVaultId, vaultId)
+        )
+      )
+      .returning({ id: discordIntegrationConfig.id });
+
+    if (unlinked.length === 0) {
+      return {
+        ok: false,
+        message: "The saved token changed. Refresh and try again.",
+      };
+    }
+  } catch (error) {
+    log.error(
+      { action: "clearDiscordBotToken", userId, err: error },
+      "Failed to unlink Discord bot token"
+    );
+    reportError(error, {
+      action: "clearDiscordBotToken",
+      bestEffort: false,
+      userId,
+    });
+    return { ok: false, message: "Failed to remove the token. Try again." };
+  }
+
+  try {
+    await db.execute(
+      sql`DELETE FROM vault.secrets WHERE id = ${vaultId}::uuid`
+    );
+  } catch (error) {
+    log.error(
+      { action: "clearDiscordBotToken.vaultCleanup", vaultId, err: error },
+      "Discord bot token was unlinked but Vault cleanup failed"
+    );
+    reportError(error, {
+      action: "clearDiscordBotToken.vaultCleanup",
+      bestEffort: true,
+      vaultId,
+    });
+  }
+
+  revalidatePath("/admin/integrations/discord");
+  return { ok: true };
 }

@@ -138,5 +138,8 @@ describe("Discord integration config RLS", () => {
     expect(error).toBeNull();
     expect(Array.isArray(data)).toBe(true);
     expect(data?.length).toBe(1);
+    // Expand migration compatibility: the previous serving deployment still
+    // expects this return column until the follow-up contract migration.
+    expect(data?.[0]).toHaveProperty("enabled");
   });
 });
