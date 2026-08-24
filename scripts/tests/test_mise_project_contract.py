@@ -37,9 +37,23 @@ def _parse_mise_version(raw: str) -> tuple[int, ...]:
     return tuple(int(x) for x in match.groups())
 
 
+def _get_mise_bin() -> str:
+    """Return the absolute path to the mise binary, failing loudly if absent from PATH."""
+    mise_bin = shutil.which("mise")
+    assert mise_bin is not None, (
+        "mise binary must be installed and available on PATH to run project contract tests"
+    )
+    return mise_bin
+
+
 def test_mise_toml_exists_and_is_valid() -> None:
     assert MISE_TOML_PATH.is_file(), f"expected {MISE_TOML_PATH} to exist"
     data = tomllib.loads(MISE_TOML_PATH.read_text(encoding="utf-8"))
+
+    # Top-level min_version must be enforced
+    assert data.get("min_version") == "2026.8.11", (
+        f"mise.toml must enforce min_version = '2026.8.11', got {data.get('min_version')!r}"
+    )
 
     # Node development runtime must be pinned
     tools = data.get("tools", {})
@@ -93,9 +107,7 @@ def test_mise_lock_exists_and_captures_tools() -> None:
 
 
 def test_mise_cli_version_meets_minimum() -> None:
-    mise_bin = shutil.which("mise")
-    if not mise_bin:
-        return
+    mise_bin = _get_mise_bin()
 
     proc = subprocess.run(
         [mise_bin, "--version"],
@@ -110,9 +122,7 @@ def test_mise_cli_version_meets_minimum() -> None:
 
 
 def test_mise_ls_resolves_sources_correctly() -> None:
-    mise_bin = shutil.which("mise")
-    if not mise_bin:
-        return
+    mise_bin = _get_mise_bin()
 
     proc = subprocess.run(
         [mise_bin, "ls", "--json"],
@@ -152,13 +162,12 @@ def test_mise_ls_resolves_sources_correctly() -> None:
 
 
 def test_negative_checksum_mismatch_rejected(tmp_path: Path) -> None:
-    mise_bin = shutil.which("mise")
-    if not mise_bin:
-        return
+    mise_bin = _get_mise_bin()
 
     # Create an isolated sandbox with mise.toml and a package.json with a bad sha512
     test_mise_toml = tmp_path / "mise.toml"
     test_mise_toml.write_text(
+        'min_version = "2026.8.11"\n\n'
         '[tools]\nnode = "24.16.0"\n\n'
         '[settings]\nidiomatic_version_file_enable_tools = ["pnpm"]\n',
         encoding="utf-8",
@@ -210,9 +219,7 @@ def test_negative_checksum_mismatch_rejected(tmp_path: Path) -> None:
 
 
 def test_mise_install_locked_succeeds() -> None:
-    mise_bin = shutil.which("mise")
-    if not mise_bin:
-        return
+    mise_bin = _get_mise_bin()
 
     proc = subprocess.run(
         [mise_bin, "install", "--locked"],
@@ -227,9 +234,7 @@ def test_mise_install_locked_succeeds() -> None:
 
 
 def test_offline_corepack_free_resolution() -> None:
-    mise_bin = shutil.which("mise")
-    if not mise_bin:
-        return
+    mise_bin = _get_mise_bin()
 
     # Ensure preinstallation has completed via locked install
     subprocess.run(

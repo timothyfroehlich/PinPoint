@@ -5,6 +5,7 @@
 # via idiomatic_version_file_enable_tools without duplicating the pnpm version here.
 #
 # Minimum mise version: 2026.8.11 (verifies Corepack-style sha512 checksums).
+min_version = "2026.8.11"
 
 [tools]
 node = "24.16.0"
