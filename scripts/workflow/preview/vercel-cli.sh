@@ -8,6 +8,6 @@ set -euo pipefail
 # Usage:
 #   scripts/workflow/preview/vercel-cli.sh <command> [args...]
 
-VERCEL_CLI_VERSION="${VERCEL_CLI_VERSION:-57.0.0}"
+VERCEL_CLI_VERSION="57.0.0"
 
 exec npx --yes "vercel@${VERCEL_CLI_VERSION}" "$@"

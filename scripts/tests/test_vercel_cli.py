@@ -9,7 +9,6 @@ Acceptance criteria:
 
 import json
 import os
-import re
 import stat
 import subprocess
 from pathlib import Path
@@ -31,10 +30,36 @@ def test_vercel_cli_wrapper_exists_and_is_executable() -> None:
 def test_vercel_cli_wrapper_pins_exact_version() -> None:
     content = VERCEL_WRAPPER.read_text(encoding="utf-8")
     assert "vercel@" + "latest" not in content
-    match = re.search(r"VERCEL_CLI_VERSION=[^\n]*?(\d+\.\d+\.\d+)", content)
-    assert match is not None, "Failed to find pinned semver in vercel-cli.sh"
-    pinned_version = match.group(1)
-    assert pinned_version == "57.0.0"
+    assert 'VERCEL_CLI_VERSION="57.0.0"' in content
+
+
+def test_vercel_cli_wrapper_ignores_ambient_version_override(tmp_path: Path) -> None:
+    mock_npx = tmp_path / "npx"
+    log_file = tmp_path / "npx.log"
+    mock_npx.write_text(
+        f"""#!/usr/bin/env bash
+echo "$@" >> "{log_file}"
+""",
+        encoding="utf-8",
+    )
+    mock_npx.chmod(0o755)
+
+    env = os.environ.copy()
+    env["PATH"] = f"{tmp_path}:{env.get('PATH', '')}"
+    env["VERCEL_CLI_VERSION"] = "latest"
+
+    result = subprocess.run(
+        [str(VERCEL_WRAPPER), "--version"],
+        capture_output=True,
+        text=True,
+        env=env,
+        check=False,
+    )
+    assert result.returncode == 0, f"Wrapper failed: {result.stderr}"
+
+    log_content = log_file.read_text(encoding="utf-8")
+    assert "--yes vercel@57.0.0 --version" in log_content
+    assert "latest" not in log_content
 
 
 def test_vercel_cli_wrapper_execution_with_mock_npx(tmp_path: Path) -> None:
