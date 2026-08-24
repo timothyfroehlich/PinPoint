@@ -220,3 +220,47 @@ def test_hook_malformed_json(mock_git: dict, tmp_path: Path) -> None:
 
     assert return_code != 0
     assert "invalid JSON" in stderr
+
+
+def test_hook_fails_closed_when_worktree_add_fails(
+    mock_git: dict, tmp_path: Path
+) -> None:
+    """When git worktree add fails (e.g. post-checkout hook failure), hook must fail closed."""
+    # Configure mock git to fail on worktree add
+    git_script = mock_git["bin_dir"] / "git"
+    git_script.write_text(f"""#!/bin/bash
+echo "$@" >> {mock_git["log_path"]}
+sub=""
+skip_next=0
+for arg in "$@"; do
+  if [ "$skip_next" = "1" ]; then skip_next=0; continue; fi
+  case "$arg" in
+    -C) skip_next=1 ;;
+    -*) : ;;
+    *) sub="$arg"; break ;;
+  esac
+done
+case "$sub" in
+  fetch) exit 0 ;;
+  rev-parse) echo "{MOCK_FETCH_SHA}"; exit 0 ;;
+  worktree) echo "fatal: post-checkout hook failed" >&2; exit 1 ;;
+  *) exit 0 ;;
+esac
+""")
+
+    stdin_data = {
+        "session_id": "test-session",
+        "transcript_path": "test-path",
+        "cwd": str(tmp_path),
+        "hook_event_name": "WorktreeCreate",
+        "name": "agent-setup-fail",
+    }
+
+    env_mods = {"PATH": f"{mock_git['bin_dir']}:{os.environ['PATH']}"}
+
+    return_code, stdout, stderr = run_hook(stdin_data, tmp_path, env_mods)
+
+    assert return_code != 0
+    assert stdout.strip() == ""  # Must NOT print the worktree path on stdout
+    assert "permanent error (not retrying)" in stderr
+    assert "fatal: post-checkout hook failed" in stderr
