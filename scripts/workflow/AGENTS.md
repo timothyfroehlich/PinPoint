@@ -49,17 +49,17 @@ Scripts are designed for the **PinPoint orchestrator workflow** where multiple s
 
 `_compute_review_state` in `_pr-gates.sh` reports nine states:
 
-| State                 | Meaning                                                    | `reviewed` |
-| --------------------- | ---------------------------------------------------------- | ---------- |
-| `approval`            | Latest Codex review approved the current head SHA          | PASS       |
-| `clean_comment`       | Trusted Codex clean comment pins the current head          | PASS       |
-| `reviewed`            | Finding-bearing review pins head; threads own adjudication | PASS       |
-| `marker`              | Manual review marker pins the current head SHA             | PASS       |
-| `stale_approval`      | Latest Codex approval names a different SHA                | FAIL       |
-| `stale_clean_comment` | Trusted Codex clean comment names another SHA              | FAIL       |
-| `stale_marker`        | Manual review marker names a different SHA                 | FAIL       |
-| `not_approved`        | Latest non-approval review names another SHA               | FAIL       |
-| `unreviewed`          | Neither review path covers this PR                         | FAIL       |
+| State                 | Meaning                                                                    | `reviewed` |
+| --------------------- | -------------------------------------------------------------------------- | ---------- |
+| `approval`            | Latest Codex review approved the current head SHA                          | PASS       |
+| `clean_comment`       | Trusted Codex clean comment pins the current head                          | PASS       |
+| `reviewed`            | `COMMENTED`/`CHANGES_REQUESTED` review pins head; threads own adjudication | PASS       |
+| `marker`              | Manual review marker pins the current head SHA                             | PASS       |
+| `stale_approval`      | Latest Codex approval names a different SHA                                | FAIL       |
+| `stale_clean_comment` | Trusted Codex clean comment names another SHA                              | FAIL       |
+| `stale_marker`        | Manual review marker names a different SHA                                 | FAIL       |
+| `not_approved`        | Non-approval review is stale or unusable (`DISMISSED`/`PENDING`/unknown)   | FAIL       |
+| `unreviewed`          | Neither review path covers this PR                                         | FAIL       |
 
 Within the automatic Codex path, compare precedence only among records for the same head. A later `CHANGES_REQUESTED` or `COMMENTED` review of that head overrides an earlier clean comment; a delayed review of an older SHA cannot invalidate a clean current-head result. A current manual marker remains independently valid.
 

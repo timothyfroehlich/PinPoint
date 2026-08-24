@@ -113,9 +113,10 @@ the PR head, or the connector's no-major-issues issue comment naming a 10- or
 `chatgpt-codex-connector` and the known clean-result prefix. An older result is stale.
 Among records for the same head, a later native finding overrides an earlier clean
 comment; a delayed review of an older SHA cannot invalidate a clean current-head result.
-A native finding-bearing review also completes review coverage for its exact head once
-every associated thread has been replied to and resolved. That adjudicated terminal
-state needs no manual re-review when a finding is explicitly declined without a push.
+A native `COMMENTED` or `CHANGES_REQUESTED` review also completes review coverage for
+its exact head once every associated thread has been replied to and resolved. Dismissed,
+pending, or unknown review states fail closed. The adjudicated terminal state needs no
+manual re-review when a finding is explicitly declined without a push.
 
 The owning agent stays assigned through the whole loop: monitor current-head CI and
 review, address or explicitly decline every finding, resolve every thread, push fixes,

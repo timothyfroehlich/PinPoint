@@ -116,9 +116,11 @@ pushes. For later uploads, it must apply the 51-line pre-push re-draft rule in
 `pinpoint-pr-workflow` Phase 3.4. Keep that session alive or resume it; do not treat PR
 creation or a green CI run as completion.
 
-Before applying `ready-for-review` or handing the PR to Tim, confirm a trusted clean
-Codex result covers the exact current head SHA and all threads are resolved. A stale
-result means the automatic replacement review is still pending. Never comment
+Before applying `ready-for-review` or handing the PR to Tim, confirm automatic Codex
+review covers the exact current head SHA and all finding threads are adjudicated and
+resolved. Coverage may be an approval, a trusted clean connector comment, or a native
+finding review with every thread resolved. A stale result means the automatic replacement
+review is still pending. Never comment
 `@codex review` because automation is slow; do so only when Tim explicitly asks. A
 SHA-pinned manual marker remains valid only when Tim explicitly ran the named local
 review. Do not create new `claude-code:trivial` self-attestations.

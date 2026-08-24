@@ -64,7 +64,7 @@ _codex_review_record() {
                  $latest + { state: "approval" }
                elif $latest.detail == "APPROVED" then
                  $latest + { state: "stale_approval" }
-               elif $latest.sha == $head then
+               elif $latest.sha == $head and ($latest.detail == "COMMENTED" or $latest.detail == "CHANGES_REQUESTED") then
                  $latest + { state: "reviewed" }
                else
                  $latest + { state: "not_approved" }

@@ -366,6 +366,14 @@ def test_latest_current_head_finding_completes_review_coverage() -> None:
     assert "thread gate owns findings" in result.stdout
 
 
+@pytest.mark.parametrize("state", ["DISMISSED", "PENDING", "UNKNOWN"])
+def test_unusable_current_head_review_state_fails_closed(state: str) -> None:
+    with gate_env(review_pages=[[codex_review(state=state)]]) as env:
+        result = run_gate("check_review_happened", env)
+    assert result.returncode == 1, result.stdout
+    assert "without approval" in result.stdout
+
+
 def test_delayed_old_head_review_does_not_override_current_native_approval() -> None:
     reviews = [
         codex_review(submitted_at="2026-08-22T12:00:00Z"),

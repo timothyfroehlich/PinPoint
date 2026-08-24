@@ -327,7 +327,11 @@ def review_state(pr: int) -> tuple[str, str]:
         ):
             return "clean_comment", f"Codex found no major issues on head {clean_sha}"
 
-    if reviews and review_sha == head_sha:
+    if (
+        reviews
+        and review_sha == head_sha
+        and state in {"COMMENTED", "CHANGES_REQUESTED"}
+    ):
         return (
             "reviewed",
             f"Codex reviewed head {head_sha[:7]} with {state}; thread gate owns findings",
