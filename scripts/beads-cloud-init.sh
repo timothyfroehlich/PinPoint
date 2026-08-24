@@ -13,20 +13,19 @@
 #
 #     bash scripts/beads-cloud-init.sh && cd ~/beads
 #
-# THE VERSION PIN (loud, exact, deliberate). This refuses to proceed unless bd is
-# EXACTLY BD_PINNED_VERSION — newer or older. Rationale: an accidental *newer*
-# beads release (1.2.1, 2026-08-16) migrated the shared DB to a schema no
-# supported binary could read and locked every client out for two days. A stale
-# exact pin fails LOUD ("routine refuses to run") — the safe direction; a version
-# floor would fail SILENT (a newer release migrates the shared DB before anyone
-# notices). The binary is already installed by the environment's setup script
-# before this runs — that script pins the same version (BD_VER), but its live
-# copy lives in the claude.ai UI, not this repo, and so cannot be reviewed or
-# diffed and can drift. This guard's job is to stop a wrong binary from TOUCHING
-# THE DB if that happens: it is the reviewable, enforced backstop to the UI pin.
+# THE VERSION PINS (loud, exact, deliberate). This refuses to proceed unless bd
+# and dolt are EXACTLY the versions declared in scripts/beads-compatibility.json.
+# Rationale: an accidental newer beads release (1.2.1, 2026-08-16) migrated the
+# shared DB to a schema no supported binary could read and locked every client out
+# for two days. A stale exact pin fails LOUD ("routine refuses to run") — the safe
+# direction; a version floor would fail SILENT (a newer release migrates the shared
+# DB before anyone notices). The binaries are installed by the environment's setup
+# script before this runs — that script pins the same versions, but its invocation
+# shim in the claude.ai UI cannot be diffed. These guards are the reviewable,
+# enforced backstop.
 #
-# When Tim upgrades his machines past the pin, bump BD_PINNED_VERSION below. It is
-# a weekly-chores checklist item so the bump is a known recurring task, not a
+# When upgrading past the pins, bump scripts/beads-compatibility.json. It is a
+# weekly-chores checklist item so the bump is a known recurring task, not a
 # surprise Saturday outage.
 #
 # Required env (materialized by claude.ai environment config; agent-runtime only):
@@ -41,10 +40,6 @@
 
 set -euo pipefail
 
-# --- The pin. Bump when Tim's machines move past it (weekly chores item). ------
-BD_PINNED_VERSION="1.2.2"
-# ------------------------------------------------------------------------------
-
 # Resolve this script's own directory NOW, before any `cd`, and while
 # ${BASH_SOURCE[0]} still resolves against the invocation cwd. The runbook runs
 # `bash scripts/beads-cloud-init.sh` from the checkout root, so BASH_SOURCE[0] is
@@ -56,6 +51,18 @@ BD_PINNED_VERSION="1.2.2"
 # hit exactly this after #1908 shipped the repair but computed SCRIPT_DIR too
 # late). Resolving here, pre-cd, is the fix.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+COMPAT_FILE="$SCRIPT_DIR/beads-compatibility.json"
+
+log() { printf '[beads-cloud-init] %s\n' "$*" >&2; }
+die() { printf '[beads-cloud-init] ERROR: %s\n' "$*" >&2; exit 1; }
+
+# --- Read pins from compatibility contract (single source of truth). ----------
+[[ -f "$COMPAT_FILE" ]] || die "compatibility manifest not found at $COMPAT_FILE"
+BD_PINNED_VERSION="$(sed -nE 's/^[[:space:]]*"bd"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/p' "$COMPAT_FILE" | head -n1 || true)"
+[[ -n "$BD_PINNED_VERSION" ]] || die "could not parse \"bd\" version from $COMPAT_FILE"
+DOLT_PINNED_VERSION="$(sed -nE 's/^[[:space:]]*"dolt"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/p' "$COMPAT_FILE" | head -n1 || true)"
+[[ -n "$DOLT_PINNED_VERSION" ]] || die "could not parse \"dolt\" version from $COMPAT_FILE"
+# ------------------------------------------------------------------------------
 
 # Fixed, not overridable: the runbook preamble cd's into ~/beads, so a
 # configurable clone target would let the two drift (clone one place, cd to an
@@ -63,9 +70,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BEADS_DIR="$HOME/beads"
 DOLT_USER_NAME="${DOLT_USER_NAME:-advacar}"
 DOLT_USER_EMAIL="${DOLT_USER_EMAIL:-beads-cloud@pinpoint.invalid}"
-
-log() { printf '[beads-cloud-init] %s\n' "$*" >&2; }
-die() { printf '[beads-cloud-init] ERROR: %s\n' "$*" >&2; exit 1; }
 
 # 1. bd must be installed and actually RUN. A version that will not print usually
 #    means the tarball binary is missing libicu (the setup script installs it on
@@ -85,13 +89,28 @@ bd_ver="$(printf '%s\n' "$bd_raw" | sed -nE 's/^bd version ([0-9]+\.[0-9]+\.[0-9
 [[ -n "$bd_ver" ]] \
   || die "could not parse a version from 'bd version' (missing libicu, a broken binary, or a changed output format): $bd_raw"
 
-# 2. THE GUARD. Exact-pin — refuse anything else, newer OR older.
+# 2. bd GUARD. Exact-pin — refuse anything else, newer OR older.
 if [[ "$bd_ver" != "$BD_PINNED_VERSION" ]]; then
   die "bd $bd_ver != pinned $BD_PINNED_VERSION — refusing to touch the shared beads DB.
-       If this is a deliberate upgrade, bump BD_PINNED_VERSION in scripts/beads-cloud-init.sh.
+       If this is a deliberate upgrade, bump \"bd\" in scripts/beads-compatibility.json.
        Do NOT install, build, or 'upgrade' bd inside a cloud routine to get past this."
 fi
 log "bd $bd_ver matches pin — proceeding"
+
+# 2b. dolt must be installed and match exact pinned version.
+command -v dolt >/dev/null 2>&1 \
+  || die "dolt not found on PATH — the environment setup script should install it"
+dolt_raw="$(dolt version 2>&1 || true)"
+dolt_ver="$(printf '%s\n' "$dolt_raw" | sed -nE 's/^dolt version ([0-9]+\.[0-9]+\.[0-9]+).*/\1/p' | head -n1 || true)"
+[[ -n "$dolt_ver" ]] \
+  || die "could not parse a version from 'dolt version' (a broken binary or changed output format): $dolt_raw"
+
+if [[ "$dolt_ver" != "$DOLT_PINNED_VERSION" ]]; then
+  die "dolt $dolt_ver != pinned $DOLT_PINNED_VERSION — refusing to touch the shared beads DB.
+       If this is a deliberate upgrade, bump \"dolt\" in scripts/beads-compatibility.json.
+       Do NOT install, build, or 'upgrade' dolt inside a cloud routine to get past this."
+fi
+log "dolt $dolt_ver matches pin — proceeding"
 
 # 3. Required env for credential materialization.
 [[ -n "${DOLT_CREDS_JWK:-}" ]]    || die "DOLT_CREDS_JWK not set (claude.ai env var, agent-runtime only)"

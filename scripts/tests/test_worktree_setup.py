@@ -11,20 +11,35 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from worktree_setup import (
+    DEFAULT_INSTALL_TIMEOUT,
+    EXIT_INCOMPLETE,
+    EXIT_READY,
+    FAILURE_CLASS_INSTALL,
+    FAILURE_CLASS_MISSING_TOOL,
+    FAILURE_CLASS_NETWORK,
+    FAILURE_CLASS_TIMEOUT,
     LOCAL_SUPABASE_PUBLISHABLE_KEY,
     LOCAL_SUPABASE_SERVICE_ROLE_KEY,
     MANAGED_ENV_KEYS,
+    MAX_INSTALL_TIMEOUT,
     PortConfig,
+    RuntimeDiagnostics,
+    RuntimeInfo,
     allocate_slot,
     branch_to_project_id,
+    classify_install_failure,
+    collect_runtime_diagnostics,
     generate_config_toml,
     generate_launch_json,
+    install_dependencies,
     load_manifest,
+    main,
     merge_env_local,
     parse_env_file,
     prune_manifest,
     read_pinned_project_id,
     resolve_brainstorm_server_path,
+    resolve_install_timeout,
     resolve_project_id,
 )
 
@@ -723,6 +738,286 @@ class TestPinnedProjectId:
 
         assert first.project_id == "pinpoint-worktree-agent-abc"
         assert resolve_project_id(tmp_path, "feat/renamed") == first.project_id
+
+
+class TestRuntimeDiagnostics:
+    """Test runtime path and version diagnostics collection."""
+
+    def test_collect_returns_all_runtimes(self) -> None:
+        diag = collect_runtime_diagnostics()
+        assert isinstance(diag.python, RuntimeInfo)
+        assert diag.python.path is not None
+        assert diag.python.version is not None
+        assert isinstance(diag.node, RuntimeInfo)
+        assert isinstance(diag.pnpm, RuntimeInfo)
+        assert isinstance(diag.git, RuntimeInfo)
+
+    def test_format_summary_with_all_runtimes(self) -> None:
+        diag = RuntimeDiagnostics(
+            python=RuntimeInfo(path="/usr/bin/python3", version="3.14.0"),
+            node=RuntimeInfo(path="/usr/local/bin/node", version="v24.0.0"),
+            pnpm=RuntimeInfo(path="/usr/local/bin/pnpm", version="10.0.0"),
+            git=RuntimeInfo(path="/usr/bin/git", version="2.48.0"),
+        )
+        summary = diag.format_summary()
+        assert "python=/usr/bin/python3 (3.14.0)" in summary
+        assert "node=/usr/local/bin/node (v24.0.0)" in summary
+        assert "pnpm=/usr/local/bin/pnpm (10.0.0)" in summary
+        assert "git=/usr/bin/git (2.48.0)" in summary
+
+    def test_format_summary_with_missing_tool(self) -> None:
+        diag = RuntimeDiagnostics(
+            python=RuntimeInfo(path="/usr/bin/python3", version="3.14.0"),
+            node=RuntimeInfo(path=None, version=None),
+            pnpm=RuntimeInfo(path=None, version=None),
+            git=RuntimeInfo(path="/usr/bin/git", version="2.48.0"),
+        )
+        summary = diag.format_summary()
+        assert "node=<not found>" in summary
+        assert "pnpm=<not found>" in summary
+
+
+class TestClassifyInstallFailure:
+    """Test failure classification of install outcomes."""
+
+    @pytest.mark.parametrize(
+        "error_snippet",
+        [
+            "getaddrinfo ENOTFOUND registry.npmjs.org",
+            "ETIMEDOUT connecting to registry",
+            "ECONNREFUSED 127.0.0.1:4873",
+            "ECONNRESET by peer",
+            "EAI_AGAIN failed to resolve host",
+            "ERR_PNPM_FETCH_404 registry error",
+            "TypeError: fetch failed",
+            "network error while downloading tarball",
+            "request to https://registry.npmjs.org failed",
+            "CERT_HAS_EXPIRED",
+        ],
+    )
+    def test_classifies_network_failures(self, error_snippet: str) -> None:
+        result = classify_install_failure(1, "", error_snippet)
+        assert result == FAILURE_CLASS_NETWORK
+
+    def test_classifies_general_install_failure(self) -> None:
+        result = classify_install_failure(
+            1, "", "ERR_PNPM_OUTDATED_LOCKFILE Cannot install with --frozen-lockfile"
+        )
+        assert result == FAILURE_CLASS_INSTALL
+
+
+class TestInstallDependencies:
+    """Test dependency installation logic."""
+
+    def test_existing_node_modules_is_ready_immediately(self, tmp_path: Path) -> None:
+        nm = tmp_path / "node_modules"
+        nm.mkdir()
+        (nm / ".modules.yaml").touch()
+        is_ready, failure_class, detail = install_dependencies(tmp_path)
+        assert is_ready is True
+        assert failure_class is None
+        assert detail is None
+
+    def test_partial_node_modules_runs_install(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        import subprocess
+
+        # node_modules exists without .modules.yaml (interrupted install)
+        (tmp_path / "node_modules").mkdir()
+        monkeypatch.setattr(
+            "worktree_setup.shutil.which", lambda tool: "/usr/local/bin/pnpm"
+        )
+        mock_res = subprocess.CompletedProcess(
+            args=["pnpm", "install"], returncode=0, stdout="Done", stderr=""
+        )
+        monkeypatch.setattr(
+            "worktree_setup.subprocess.run", lambda *args, **kwargs: mock_res
+        )
+
+        is_ready, failure_class, detail = install_dependencies(tmp_path)
+        assert is_ready is True
+        assert failure_class is None
+
+    def test_missing_pnpm_returns_missing_tool_failure(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(
+            "worktree_setup.shutil.which",
+            lambda tool: None if tool == "pnpm" else f"/bin/{tool}",
+        )
+        is_ready, failure_class, detail = install_dependencies(tmp_path)
+        assert is_ready is False
+        assert failure_class == FAILURE_CLASS_MISSING_TOOL
+        assert "pnpm executable not found in PATH" in (detail or "")
+
+    def test_successful_pnpm_install_returns_ready(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        import subprocess
+
+        monkeypatch.setattr(
+            "worktree_setup.shutil.which", lambda tool: "/usr/local/bin/pnpm"
+        )
+        mock_res = subprocess.CompletedProcess(
+            args=["pnpm", "install"], returncode=0, stdout="Done", stderr=""
+        )
+        monkeypatch.setattr(
+            "worktree_setup.subprocess.run", lambda *args, **kwargs: mock_res
+        )
+
+        is_ready, failure_class, detail = install_dependencies(tmp_path)
+        assert is_ready is True
+        assert failure_class is None
+        assert detail is None
+
+    def test_nonzero_install_returns_install_failure(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        import subprocess
+
+        monkeypatch.setattr(
+            "worktree_setup.shutil.which", lambda tool: "/usr/local/bin/pnpm"
+        )
+        mock_res = subprocess.CompletedProcess(
+            args=["pnpm", "install"],
+            returncode=1,
+            stdout="",
+            stderr="ERR_PNPM_LOCKFILE_MISSING: lockfile is missing\n",
+        )
+        monkeypatch.setattr(
+            "worktree_setup.subprocess.run", lambda *args, **kwargs: mock_res
+        )
+
+        is_ready, failure_class, detail = install_dependencies(tmp_path)
+        assert is_ready is False
+        assert failure_class == FAILURE_CLASS_INSTALL
+        assert "pnpm install failed (exit 1)" in (detail or "")
+
+    def test_network_failure_classified(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        import subprocess
+
+        monkeypatch.setattr(
+            "worktree_setup.shutil.which", lambda tool: "/usr/local/bin/pnpm"
+        )
+        mock_res = subprocess.CompletedProcess(
+            args=["pnpm", "install"],
+            returncode=1,
+            stdout="",
+            stderr="getaddrinfo ENOTFOUND registry.npmjs.org\n",
+        )
+        monkeypatch.setattr(
+            "worktree_setup.subprocess.run", lambda *args, **kwargs: mock_res
+        )
+
+        is_ready, failure_class, detail = install_dependencies(tmp_path)
+        assert is_ready is False
+        assert failure_class == FAILURE_CLASS_NETWORK
+
+    def test_timeout_returns_timeout_failure(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        import subprocess
+
+        monkeypatch.setattr(
+            "worktree_setup.shutil.which", lambda tool: "/usr/local/bin/pnpm"
+        )
+
+        def _mock_run(*args, **kwargs):
+            raise subprocess.TimeoutExpired(cmd=["pnpm", "install"], timeout=10)
+
+        monkeypatch.setattr("worktree_setup.subprocess.run", _mock_run)
+
+        is_ready, failure_class, detail = install_dependencies(tmp_path, timeout=10)
+        assert is_ready is False
+        assert failure_class == FAILURE_CLASS_TIMEOUT
+        assert "timed out after 10s" in (detail or "")
+
+    def test_resolve_install_timeout_uses_env_and_caps(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("PINPOINT_WORKTREE_INSTALL_TIMEOUT", "45")
+        assert resolve_install_timeout() == 45
+
+        # Capped at MAX_INSTALL_TIMEOUT
+        monkeypatch.setenv("PINPOINT_WORKTREE_INSTALL_TIMEOUT", "300")
+        assert resolve_install_timeout() == MAX_INSTALL_TIMEOUT
+
+        monkeypatch.delenv("PINPOINT_WORKTREE_INSTALL_TIMEOUT", raising=False)
+        monkeypatch.setenv("WORKTREE_INSTALL_TIMEOUT", "75")
+        assert resolve_install_timeout() == 75
+
+        monkeypatch.delenv("WORKTREE_INSTALL_TIMEOUT", raising=False)
+        assert resolve_install_timeout() == DEFAULT_INSTALL_TIMEOUT
+
+
+class TestWorktreeSetupMainReadiness:
+    """Test full worktree setup execution and exit codes."""
+
+    @pytest.fixture(autouse=True)
+    def _setup_env(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        self.manifest_path = tmp_path / "worktree-slots.json"
+        monkeypatch.setattr("worktree_setup.MANIFEST_PATH", self.manifest_path)
+        self.main_wt = tmp_path / "main_wt"
+        self.main_wt.mkdir()
+        self.linked_wt = tmp_path / "linked_wt"
+        self.linked_wt.mkdir()
+        # Create template in linked_wt
+        supa = self.linked_wt / "supabase"
+        supa.mkdir()
+        (supa / "config.toml.template").write_text(
+            'project_id = "pinpoint"\n[api]\nport = 54321\n'
+        )
+
+        monkeypatch.setattr("worktree_setup.get_main_worktree", lambda: self.main_wt)
+        monkeypatch.setattr("worktree_setup.get_branch", lambda: "feat/my-branch")
+        monkeypatch.setattr(
+            "worktree_setup.configure_branch_tracking", lambda branch, path: None
+        )
+        monkeypatch.setattr("worktree_setup.Path.cwd", lambda: self.linked_wt)
+
+    def test_main_worktree_noop_returns_ready(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr("worktree_setup.Path.cwd", lambda: self.main_wt)
+        assert main() == EXIT_READY
+
+    def test_linked_worktree_ready_when_deps_exist(
+        self, capsys: pytest.CaptureFixture
+    ) -> None:
+        nm = self.linked_wt / "node_modules"
+        nm.mkdir()
+        (nm / ".modules.yaml").touch()
+        code = main()
+        assert code == EXIT_READY
+        captured = capsys.readouterr()
+        assert "status=ready" in captured.err
+        assert "runtimes:" in captured.err
+        assert (self.linked_wt / ".env.local").exists()
+        assert (self.linked_wt / "supabase/config.toml").exists()
+        assert (self.linked_wt / ".claude/launch.json").exists()
+
+    def test_linked_worktree_incomplete_on_install_failure(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+    ) -> None:
+        monkeypatch.setattr(
+            "worktree_setup.install_dependencies",
+            lambda path, timeout=None: (
+                False,
+                FAILURE_CLASS_MISSING_TOOL,
+                "pnpm not found",
+            ),
+        )
+        code = main()
+        assert code == EXIT_INCOMPLETE
+        captured = capsys.readouterr()
+        assert "status=incomplete" in captured.err
+        assert "failure_class=missing-tool" in captured.err
+        # Generated files must still be written with 444 permissions
+        assert (self.linked_wt / ".env.local").exists()
+        assert (self.linked_wt / "supabase" / "config.toml").exists()
 
 
 if __name__ == "__main__":
