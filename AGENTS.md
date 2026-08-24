@@ -86,7 +86,7 @@ Only stop services you started in this session, by specific PID or via worktree-
 
 | Command                                   | What                                                                                                                                                                                                                                                                                                                               |
 | :---------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pnpm run check`                          | Fast **static** gate: types, lint (via the `lint:local` oxlint mirror), format, yamllint, actionlint, ruff, shellcheck (~9s; `format:fix` is the long pole). **No unit tests** (see `pnpm run test`), **no pytest** (see `check:python`).                                                                                          |
+| `pnpm run check`                          | Fast **static** gate: types, lint (oxlint), format, yamllint, actionlint, ruff, shellcheck (~9s; `format:fix` is the long pole). **No unit tests** (see `pnpm run test`), **no pytest** (see `check:python`).                                                                                                                      |
 | `pnpm run check:python`                   | ruff + `pytest scripts/tests/` (~14s). Split out of `check` because Python changes are rare; CI's required `Fast Linters` job runs it on every push regardless. Run after touching `scripts/` or `.claude/hooks/`.                                                                                                                 |
 | `pnpm run preflight`                      | Full: check + build + integration. **For non-trivial changes** (migrations, auth, server actions, middleware, DB schema) — not every commit. Host-wide cap of 2 concurrent runs (via `sem`); use `preflight:unlocked` to bypass.                                                                                                   |
 | `pnpm run smoke`                          | Smoke E2E (~60s)                                                                                                                                                                                                                                                                                                                   |
@@ -103,30 +103,16 @@ Only stop services you started in this session, by specific PID or via worktree-
 
 ### Type-check engine (TS 7 GA dual-install)
 
-TypeScript 7.0 (the Go-native compiler) is GA and installed via Microsoft's recommended dual-install: `@typescript/native` (alias of `typescript@^7`) ships the native `tsc` binary that runs the `typecheck`, `typecheck:tests`, and `typecheck:e2e` gates (~4–6× faster than TS6's `tsc`), while the `typescript` package name is aliased to `@typescript/typescript6` — the TS6 JS compiler API + a `tsc6` binary. **ESLint type-aware linting and `next build` still type-check on that TS6 API** — TS7 doesn't ship a stable JS API until 7.1, so do not remove the `typescript` alias. Bin names are unambiguous: `tsc` = native 7, `tsc6` = JS 6. `pnpm run typecheck:tsc6` runs the TS6 engine for A/B comparison. PP-8mv1 moved the test/e2e configs onto native `tsc` (0 divergences vs `tsc6` on `tsconfig.tests.check.json` and `e2e/tsconfig.json`) and retired the `tsc-baseline` gate. History and validation record: `docs/plans/2026-06-27-typescript-7-upgrade-plan.md` (PRs #1586, PP-xu96, PP-8mv1).
+TypeScript 7.0 (the Go-native compiler) is GA and installed via Microsoft's recommended dual-install: `@typescript/native` (alias of `typescript@^7`) ships the native `tsc` binary that runs the `typecheck`, `typecheck:tests`, and `typecheck:e2e` gates (~4–6× faster than TS6's `tsc`), while the `typescript` package name is aliased to `@typescript/typescript6` — the TS6 JS compiler API + a `tsc6` binary. `next build` still type-checks on that TS6 API (PP-sc77.5 migrates Next onto TS7 CLI mode). Bin names are unambiguous: `tsc` = native 7, `tsc6` = JS 6. `pnpm run typecheck:tsc6` runs the TS6 engine for A/B comparison. PP-8mv1 moved the test/e2e configs onto native `tsc` (0 divergences vs `tsc6` on `tsconfig.tests.check.json` and `e2e/tsconfig.json`) and retired the `tsc-baseline` gate. History and validation record: `docs/plans/2026-06-27-typescript-7-upgrade-plan.md` (PRs #1586, PP-xu96, PP-8mv1).
 
-### Lint engines (authoritative ESLint + local oxlint mirror)
+### Lint engine (Oxlint)
 
-`pnpm run lint` (full ESLint, type-aware via the TS6 JS API) is **authoritative** and is what CI runs — unchanged. `pnpm run check` runs `lint:local` instead: a faster **mirror** of the same rules, split in two because no single engine covers them all.
+`oxlint` is the sole, authoritative lint engine (PP-sc77). It runs type-aware via `oxlint-tsgolint`, alongside native plugins (`typescript`, `unicorn`, `react`, `jsx-a11y`, `promise`) and JS plugins (`pinpoint`, `eslint-plugin-better-tailwindcss`).
 
-- `lint:_oxlint` — `oxlint` with `options.typeAware`, backed by the Go-native tsgolint engine. Owns the type-checked bulk plus the syntactic TypeScript rules. ~0.9s / ~930 MB.
-- `lint:_slim` — `PINPOINT_LINT_SLIM=1 eslint src/ e2e/ scripts/`. The same `eslint.config.mjs`, with typescript-eslint's `disable-type-checked` spread in and the project service off, so it costs nothing to build a Program. Owns the plugins oxlint can't run: the local `pinpoint` custom rule, `better-tailwindcss`, `eslint-comments`, `unused-imports`, `react-hooks`, `promise`, `jsx-a11y`. ~3.5s / ~1.2 GB.
-
-Together ~3.8s vs full ESLint's ~14.9s, and peak RSS ~1.2 GB vs ~3.2 GB. The memory drop is the point, not the wall-clock.
-
-**The mirror is a speed optimization, never a coverage bet.** Drift fails safe: whatever it misses, CI's full ESLint still catches, so the worst case is a CI-only failure, never silent loss. Two maintenance rules follow:
-
-1. Add a type-aware rule to `eslint.config.mjs` → add it to `.oxlintrc.json` too, **including any per-override `"off"`**. Rules oxlint still classifies as nursery (e.g. `no-unnecessary-condition`) are skipped by `@oxlint/migrate` and must be listed by hand.
-2. A lint failure that reproduces only in CI means the mirror drifted. Fix the mirror; don't treat it as flake.
-
-**`typescript/prefer-optional-chain` is stricter in oxlint than in typescript-eslint.** It is enabled in both, but oxlint fires on two shapes ESLint stays silent on, and they needed opposite treatment:
+**`typescript/prefer-optional-chain` is stricter in oxlint than in typescript-eslint.** It is enabled, but oxlint fires on two shapes typescript-eslint stayed silent on, and they needed opposite treatment:
 
 - `src/lib/cookies/client.ts` — `typeof window !== "undefined" && window.location…`. **oxlint is wrong here**: `?.` guards a nullish _value_, not an undeclared _binding_, so `window?.location` still throws `ReferenceError` under SSR (verified: `undeclared?.foo` throws). Silenced with a scoped `/* oxlint-disable */` … `/* oxlint-enable */` pair — block form, because the expression wraps and `-next-line` would miss it. The suppression is narrow: a violation elsewhere in that file is still caught.
-- `src/components/machines/PinballMapLinkField.tsx` — a `family !== null && family.x === null && family.y > 1` chain. **oxlint was right and typescript-eslint merely conservative**: the rewrite is semantically equivalent and type-checks clean, because TS narrows `family` to non-null once `family?.x === null` holds. Rewritten.
-
-The general rule this illustrates: when the mirror is stricter than authoritative ESLint, fix or suppress the specific site — don't drop the rule, which would silently widen the coverage gap. (PP-4zcj.)
-
-(PP-4zcj.)
+- `src/components/machines/PinballMapLinkField.tsx` — a `family !== null && family.x === null && family.y > 1` chain. **oxlint was right and typescript-eslint merely conservative**: the rewrite is semantically equivalent and type-checks clean, because TS narrows `family` to non-null once `family?.x === null` holds. Rewritten. (PP-4zcj.)
 
 ### Prototype mode (rapid iteration)
 

@@ -96,8 +96,7 @@ const nextConfig: NextConfig = {
     // same missing-tscPath path also silently drops tsconfig `paths`,
     // vercel/next.js#97015). `false` keeps the TS6 JS-API path, which the shim
     // fully provides. No-op on Next 16.2.x (already the default there).
-    // REVISIT: flips to `true` when `typescript` becomes real TS7 (PP-bfnb
-    // epic Phase 4) or when typescript-eslint ships TS7 support.
+    // REVISIT: flips to `true` when `typescript` becomes real TS7 (PP-sc77.5).
     useTypeScriptCli: false,
   },
   typescript: {

@@ -103,9 +103,7 @@ export const serverActionFileNamingRule = {
 };
 
 /**
- * Flat-config plugin object. Merge its `rules` into the `pinpoint` plugin entry
- * in `eslint.config.mjs`, then enable
- * `"pinpoint/server-action-file-naming": "error"`.
+ * Plugin object exported for Oxlint (via `pinpoint-plugin.mjs`).
  */
 export const pinpointServerActionNamingPlugin = {
   rules: { "server-action-file-naming": serverActionFileNamingRule },

@@ -150,7 +150,7 @@ export async function submitFormAndWaitForRedirect(
   // window.__E2E_REDIRECT_TARGET. We then call page.goto() to perform the
   // actual navigation, bypassing Mobile Safari's location.assign stall.
   // We use a setTimeout-based delay rather than page.waitForTimeout because
-  // ESLint forbids waitForTimeout (Playwright auto-wait is preferred for app
+  // the linter forbids waitForTimeout (Playwright auto-wait is preferred for app
   // assertions, but here we genuinely need a fixed poll interval).
   const interceptorNavPromise: Promise<void> = (async () => {
     const deadline = Date.now() + timeout;

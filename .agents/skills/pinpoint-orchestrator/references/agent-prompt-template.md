@@ -44,7 +44,7 @@ The marker is an attestation that a review happened, never a way to skip one.
 
 If tests fail with `POSTGRES_URL is not set`:
 
-- Verify changes pass typecheck and lint: `pnpm exec tsc --noEmit && pnpm exec eslint .`
+- Verify changes pass static gate: `pnpm run check`
 - CI will have proper env vars — proceed with commit if typecheck/lint pass
 
 ### Completion

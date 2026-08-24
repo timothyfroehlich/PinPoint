@@ -228,14 +228,20 @@ function buildRegex(prefixes) {
 function normalizeCommand(command, repoRoot, probes = {}) {
   const { exists = fs.existsSync, realpath = fs.realpathSync } = probes;
 
-  // Guards 3 and 4: after a `cd` or an `ssh`, a relative path means something
-  // else. Leave the whole command alone rather than guess at its scope.
-  if (shiftsContext(command)) {
+  const prefixes = workspacePrefixes(repoRoot, realpath);
+  if (prefixes.length === 0) {
     return { modified: command, rewrites: [] };
   }
 
-  const prefixes = workspacePrefixes(repoRoot, realpath);
-  if (prefixes.length === 0) {
+  // Guards 3 and 4: after a `cd` or an `ssh`, a relative path means something
+  // else. Leave the whole command alone rather than guess at its scope.
+  // Strip known workspace prefixes first so a worktree directory named
+  // `crabbox-runner` or `docker-stack` does not trip the guard on local commands.
+  let cmdToCheck = command;
+  for (const prefix of prefixes) {
+    cmdToCheck = cmdToCheck.split(prefix).join("");
+  }
+  if (shiftsContext(cmdToCheck)) {
     return { modified: command, rewrites: [] };
   }
 

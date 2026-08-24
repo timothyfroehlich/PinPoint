@@ -4,7 +4,7 @@ Token-driven styling and the conventions around the shadcn primitives. The primi
 
 ## Styling with Tailwind CSS v4
 
-**Semantic tokens only.** Raw Tailwind palette classes and hardcoded hex are forbidden in component code and enforced by ESLint (`better-tailwindcss/no-restricted-classes`). The vocabulary and the design-layer exemptions are `pinpoint-design-bible` §1. Separately, §18 says which spelling is canonical where two exist — the MD-era names in `globals.css` are kept for backward compatibility but are not for new code.
+**Semantic tokens only.** Raw Tailwind palette classes and hardcoded hex are forbidden in component code and enforced by Oxlint (`better-tailwindcss/no-restricted-classes`). The vocabulary and the design-layer exemptions are `pinpoint-design-bible` §1. Separately, §18 says which spelling is canonical where two exist — the MD-era names in `globals.css` are kept for backward compatibility but are not for new code.
 
 **Merge classNames with `cn()`** from `~/lib/utils` — never template-string concatenation. `cn()` runs `tailwind-merge`, which drops the losing half of a conflicting pair so the last class you pass wins. Raw concatenation leaves both on the element, and since Tailwind utilities all carry the same specificity, the winner is whichever one sits later in the generated stylesheet — not the one you wrote last. A component that accepts `className` merges it last so callers can override. No inline `style={{…}}`.
 

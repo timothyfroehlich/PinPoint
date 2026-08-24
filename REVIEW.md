@@ -43,7 +43,7 @@ If a PR changes roles, statuses, permissions, or user-facing terminology, check 
 
 ## Scope of the review
 
-A default `/code-review` pass is aimed at smaller changes — Tim triggers deeper reviews (`/code-review ultra`) manually on bigger ones. In practice: prioritise the highest-priority rule violations above and genuine correctness defects. Don't editorialise about style a formatter or linter already owns (Prettier, ESLint, oxlint). A clean review — no comments — is a valid outcome; don't manufacture nits to justify the pass.
+A default `/code-review` pass is aimed at smaller changes — Tim triggers deeper reviews (`/code-review ultra`) manually on bigger ones. In practice: prioritise the highest-priority rule violations above and genuine correctness defects. Don't editorialise about style a formatter or linter already owns (Prettier, oxlint). A clean review — no comments — is a valid outcome; don't manufacture nits to justify the pass.
 
 ## Reviewer-relevant skill pointers
 

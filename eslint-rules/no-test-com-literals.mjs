@@ -3,8 +3,8 @@
 // Static backstop for e2e tests discouraging hardcoded `@test.com` emails in
 // favor of `TEST_USERS` constants.
 //
-// Replaces ESLint's `no-restricted-syntax` configuration in `eslint.config.mjs`
-// block 5, which oxlint cannot evaluate with regex selector queries.
+// Custom AST rule for Oxlint (since oxlint cannot evaluate regex selector queries
+// in no-restricted-syntax).
 //
 // Two node types:
 //  1. String Literal containing `@test.com`
