@@ -20,6 +20,22 @@ interface LoginOptions {
 }
 
 /**
+ * Opens a machine's Manage route through whichever tab control fits. At
+ * narrow widths the shared tab strip puts Manage in its explicit overflow
+ * menu rather than leaving an off-screen scroll target.
+ */
+export async function openMachineManageTab(page: Page): Promise<void> {
+  const directTab = page.getByTestId("machine-tab-edit");
+  if ((await directTab.count()) > 0) {
+    await directTab.click();
+    return;
+  }
+
+  await page.getByTestId("machine-tab-more").click();
+  await page.getByTestId("machine-tab-overflow-edit").click();
+}
+
+/**
  * Shared E2E action to perform a UI login.
  *
  * @param page Playwright page object
@@ -479,10 +495,30 @@ export async function updateIssueField(
  * than the viewport, the assertion fails with a diagnostic message showing
  * the overflow amount and viewport width.
  */
-export async function assertNoHorizontalOverflow(page: Page): Promise<void> {
-  const result = await page.evaluate(() => {
+interface HorizontalOverflowOptions {
+  /** Limit clipped-element detection to a component while retaining the page-width check. */
+  scopeTestIds?: readonly string[];
+}
+
+export async function assertNoHorizontalOverflow(
+  page: Page,
+  { scopeTestIds }: HorizontalOverflowOptions = {}
+): Promise<void> {
+  const result = await page.evaluate((scopeTestIds) => {
     const doc = document.documentElement;
     const viewportWidth = doc.clientWidth;
+    const scopes = scopeTestIds
+      ? scopeTestIds.map((testId) => {
+          const scope = document.querySelector(`[data-testid="${testId}"]`);
+          if (!scope) {
+            throw new Error(`Overflow assertion scope not found: ${testId}`);
+          }
+          return scope;
+        })
+      : [document.body];
+    if (scopes.length === 0) {
+      throw new Error("Overflow assertion requires at least one scope");
+    }
 
     // How far past a viewport edge an element must extend before we treat it as
     // a layout break rather than acceptable graceful clipping. Components that
@@ -543,7 +579,10 @@ export async function assertNoHorizontalOverflow(page: Page): Promise<void> {
     };
 
     const offenders: string[] = [];
-    for (const el of Array.from(document.body.querySelectorAll("*"))) {
+    for (const el of scopes.flatMap((scope) => [
+      scope,
+      ...Array.from(scope.querySelectorAll("*")),
+    ])) {
       if (
         typeof el.checkVisibility === "function" &&
         !el.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true })
@@ -572,7 +611,7 @@ export async function assertNoHorizontalOverflow(page: Page): Promise<void> {
       clientWidth: viewportWidth,
       offenders,
     };
-  });
+  }, scopeTestIds);
 
   // Kept as a cheap belt-and-suspenders for any surface rendered outside the
   // overflow-hidden app shell. Note: under the shell this can never fail (the

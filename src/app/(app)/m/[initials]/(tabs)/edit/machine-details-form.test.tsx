@@ -1,10 +1,18 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { act, render, screen, waitFor } from "@testing-library/react";
+import type React from "react";
+import { afterEach, describe, it, expect, vi, beforeEach } from "vitest";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MachineDetailsForm } from "./machine-details-form";
 import { updateMachineAction } from "~/app/(app)/m/actions";
 import { err, ok } from "~/lib/result";
 import type { UpdateMachineResult } from "~/app/(app)/m/actions";
+import { RouteTabStrip } from "~/components/layout/RouteTabStrip";
 
 vi.mock("~/app/(app)/m/actions", () => ({
   updateMachineAction: vi.fn(),
@@ -13,6 +21,19 @@ vi.mock("~/app/(app)/m/actions", () => ({
 const pushMock = vi.hoisted(() => vi.fn());
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: pushMock, replace: pushMock }),
+  usePathname: () => "/m/TAF/edit",
+}));
+
+vi.mock("next/link", () => ({
+  default: ({
+    href,
+    children,
+    ...props
+  }: React.ComponentProps<"a"> & { href: string }) => (
+    <a href={href} {...props}>
+      {children}
+    </a>
+  ),
 }));
 
 // The real editor is a dynamic TipTap import. Swap it for a textarea that
@@ -82,6 +103,10 @@ describe("MachineDetailsForm", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     pushMock.mockClear();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   /** Dispatch a cancelable beforeunload and report whether anything blocked it. */
@@ -374,6 +399,52 @@ describe("MachineDetailsForm", () => {
       expect(
         await screen.findByText("Discard unsaved changes?")
       ).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+      });
+      expect(pushMock).not.toHaveBeenCalled();
+    });
+
+    it("intercepts a real anchor selected from the tab overflow menu", async () => {
+      mockOverflowingTabStrip();
+      const user = userEvent.setup();
+      render(
+        <>
+          <RouteTabStrip
+            basePath="/m/TAF"
+            ariaLabel="Machine sections"
+            testIdPrefix="machine-tab"
+            tabs={[
+              { slug: "", label: "Info" },
+              { slug: "settings", label: "Settings" },
+              { slug: "edit", label: "Manage" },
+            ]}
+          />
+          <MachineDetailsForm {...baseProps} />
+        </>
+      );
+
+      await user.click(
+        await screen.findByRole("button", { name: "More machine sections" })
+      );
+      fireEvent.input(screen.getByLabelText(/Machine Name/), {
+        target: { value: `${baseProps.name}!` },
+      });
+      expect(screen.getByTestId("details-dirty-note")).toHaveTextContent(
+        "Unsaved changes"
+      );
+      const settingsLink = await screen.findByTestId(
+        "machine-tab-overflow-settings"
+      );
+      expect(settingsLink.tagName).toBe("A");
+      await act(async () => {
+        settingsLink.click();
+        await Promise.resolve();
+      });
+
+      expect(
+        await screen.findByText("Discard unsaved changes?")
+      ).toBeInTheDocument();
       expect(pushMock).not.toHaveBeenCalled();
     });
 
@@ -460,3 +531,24 @@ describe("MachineDetailsForm", () => {
     });
   });
 });
+
+function mockOverflowingTabStrip(): void {
+  let measuredTabIndex = 0;
+  const tabWidths = [60, 80, 80];
+  vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(
+    function (this: HTMLElement): DOMRect {
+      if (this.dataset.testid === "machine-tab-strip") {
+        return DOMRect.fromRect({ width: 170 });
+      }
+      if (this.hasAttribute("data-overflow-trigger-measure")) {
+        return DOMRect.fromRect({ width: 48 });
+      }
+      if (this.hasAttribute("data-tab-measure")) {
+        const width = tabWidths[measuredTabIndex] ?? 0;
+        measuredTabIndex = (measuredTabIndex + 1) % tabWidths.length;
+        return DOMRect.fromRect({ width });
+      }
+      return DOMRect.fromRect();
+    }
+  );
+}
