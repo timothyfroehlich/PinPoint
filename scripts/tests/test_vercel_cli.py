@@ -9,6 +9,7 @@ Acceptance criteria:
 
 import json
 import os
+import re
 import stat
 import subprocess
 from pathlib import Path
@@ -21,6 +22,17 @@ PACKAGE_JSON = REPO_ROOT / "package.json"
 THIS_FILE = Path(__file__).resolve()
 
 
+def _get_pinned_vercel_version() -> str:
+    content = VERCEL_WRAPPER.read_text(encoding="utf-8")
+    match = re.search(r'VERCEL_CLI_VERSION="([^"]+)"', content)
+    assert match is not None, "Failed to parse VERCEL_CLI_VERSION from vercel-cli.sh"
+    version = match.group(1)
+    assert re.match(r"^\d+\.\d+\.\d+$", version), (
+        f"Invalid semver '{version}' in vercel-cli.sh"
+    )
+    return version
+
+
 def test_vercel_cli_wrapper_exists_and_is_executable() -> None:
     assert VERCEL_WRAPPER.is_file(), f"Missing wrapper at {VERCEL_WRAPPER}"
     mode = VERCEL_WRAPPER.stat().st_mode
@@ -30,10 +42,12 @@ def test_vercel_cli_wrapper_exists_and_is_executable() -> None:
 def test_vercel_cli_wrapper_pins_exact_version() -> None:
     content = VERCEL_WRAPPER.read_text(encoding="utf-8")
     assert "vercel@" + "latest" not in content
-    assert 'VERCEL_CLI_VERSION="57.0.0"' in content
+    version = _get_pinned_vercel_version()
+    assert version
 
 
 def test_vercel_cli_wrapper_ignores_ambient_version_override(tmp_path: Path) -> None:
+    version = _get_pinned_vercel_version()
     mock_npx = tmp_path / "npx"
     log_file = tmp_path / "npx.log"
     mock_npx.write_text(
@@ -58,12 +72,12 @@ echo "$@" >> "{log_file}"
     assert result.returncode == 0, f"Wrapper failed: {result.stderr}"
 
     log_content = log_file.read_text(encoding="utf-8")
-    assert "--yes vercel@57.0.0 --version" in log_content
+    assert f"--yes vercel@{version} --version" in log_content
     assert "latest" not in log_content
 
 
 def test_vercel_cli_wrapper_execution_with_mock_npx(tmp_path: Path) -> None:
-    # Create a mock npx binary in tmp_path to verify argument forwarding
+    version = _get_pinned_vercel_version()
     mock_npx = tmp_path / "npx"
     log_file = tmp_path / "npx.log"
     mock_npx.write_text(
@@ -89,7 +103,9 @@ cat >> "{log_file}"
     assert result.returncode == 0, f"Wrapper failed: {result.stderr}"
 
     log_content = log_file.read_text(encoding="utf-8")
-    assert "--yes vercel@57.0.0 env add FOO preview feat/branch --force" in log_content
+    assert (
+        f"--yes vercel@{version} env add FOO preview feat/branch --force" in log_content
+    )
     assert "secret_value" in log_content
 
 
