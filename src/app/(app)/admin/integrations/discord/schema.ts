@@ -10,7 +10,6 @@ import { z } from "zod";
  * on write).
  */
 export const saveDiscordConfigSchema = z.object({
-  enabled: z.boolean(),
   newToken: z
     .string()
     .trim()

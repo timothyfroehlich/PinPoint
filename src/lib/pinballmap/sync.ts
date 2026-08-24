@@ -32,12 +32,13 @@ export interface ReconcileResult {
  * Drop abandoned-listing records whose entry has left the lineup.
  *
  * No PBM HTTP (CORE-ARCH-011 / CORE-PBM-001): it reads the already-stored
- * snapshot. A `null` snapshot (never synced) is a no-op, and so is a disabled
- * integration — a stale lineup must not be read as "the entry is gone".
+ * snapshot. A `null` snapshot (never synced) is a no-op, and so is an
+ * unconfigured integration — a stale lineup must not be read as "the entry is gone".
  */
 export async function reconcileAfterSync(): Promise<ReconcileResult> {
   const state = await getPinballMapState();
-  if (!state?.enabled) return { abandonmentsCleared: 0 };
+  if (state?.locationId === null || state?.locationId === undefined)
+    return { abandonmentsCleared: 0 };
   const snapshot = state.snapshotJson ?? null;
   if (!snapshot) return { abandonmentsCleared: 0 };
 

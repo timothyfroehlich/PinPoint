@@ -5,7 +5,6 @@ import { useActionState, useTransition } from "react";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
-import { Switch } from "~/components/ui/switch";
 import { Separator } from "~/components/ui/separator";
 import { Badge } from "~/components/ui/badge";
 import { CheckCircle2, AlertCircle, Loader2, Check } from "lucide-react";
@@ -26,14 +25,12 @@ type ValidationState =
   | { kind: "invalid"; message: string };
 
 interface DiscordConfigFormProps {
-  enabled: boolean;
   guildId: string;
   inviteLink: string;
   hasToken: boolean;
 }
 
 export function DiscordConfigForm({
-  enabled,
   guildId,
   inviteLink,
   hasToken,
@@ -44,7 +41,6 @@ export function DiscordConfigForm({
   const [tokenInput, setTokenInput] = React.useState("");
   const [guildIdInput, setGuildIdInput] = React.useState(guildId);
   const [inviteLinkInput, setInviteLinkInput] = React.useState(inviteLink);
-  const [enabledInput, setEnabledInput] = React.useState(enabled);
 
   // Per-field validation status — transient, cleared on input change ("Stale"
   // state per the design spec D8).
@@ -77,11 +73,10 @@ export function DiscordConfigForm({
       setTokenInput("");
       setGuildIdInput(guildId);
       setInviteLinkInput(inviteLink);
-      setEnabledInput(enabled);
       setTokenStatus({ kind: "idle" });
       setServerStatus({ kind: "idle" });
     }
-  }, [saveState, guildId, inviteLink, enabled]);
+  }, [saveState, guildId, inviteLink]);
 
   // Activation rule: switch is interactive iff a token exists somewhere —
   // either committed in DB or freshly typed (Save will commit them together).
@@ -92,25 +87,6 @@ export function DiscordConfigForm({
   const canValidateToken = tokenAvailable;
   const canValidateServer = tokenAvailable && guildIdInput.trim().length > 0;
 
-  // Switch gating: turning the integration ON requires fresh validation,
-  // OR the saved state was already enabled (so the admin can flip back to
-  // a known-good state without re-running probes). Note this is a UI gate
-  // only — the server action re-runs `probeServerMembership` on every
-  // enabled save and rejects bad config regardless of what the client
-  // permitted, so an admin who flips OFF, edits a field to something
-  // invalid, and flips back ON will be rejected on submit.
-  //
-  // Turning OFF is always allowed.
-  const validationsPassed =
-    tokenStatus.kind === "valid" && serverStatus.kind === "valid";
-  const canTurnOn = validationsPassed || enabled;
-  const switchDisabled = !tokenAvailable || (!enabledInput && !canTurnOn);
-  const switchTitle = !tokenAvailable
-    ? "Set a bot token first."
-    : !enabledInput && !canTurnOn
-      ? "Validate the bot token and Server ID before enabling."
-      : undefined;
-
   // Unsaved-changes guard. Browser-level beforeunload fires on tab close,
   // refresh, and external navigation. (App Router does not expose router
   // events, so internal client-side nav via <Link> will not trigger this —
@@ -119,7 +95,7 @@ export function DiscordConfigForm({
     tokenInput.length > 0 ||
     guildIdInput !== guildId ||
     inviteLinkInput !== inviteLink ||
-    enabledInput !== enabled;
+    false;
 
   React.useEffect(() => {
     if (!isDirty) return;
@@ -167,19 +143,12 @@ export function DiscordConfigForm({
     setTokenInput("");
     setGuildIdInput(guildId);
     setInviteLinkInput(inviteLink);
-    setEnabledInput(enabled);
     setTokenStatus({ kind: "idle" });
     setServerStatus({ kind: "idle" });
   }
 
   return (
     <form action={saveFormAction} className="space-y-6">
-      <input
-        type="hidden"
-        name="enabled"
-        value={enabledInput ? "true" : "false"}
-      />
-
       {/* Bot token */}
       <section className="space-y-2">
         <FieldLabel
@@ -312,25 +281,6 @@ export function DiscordConfigForm({
             <FieldError message={fieldErrors["inviteLink"]} />
           )}
         </div>
-      </section>
-
-      <Separator />
-
-      {/* Activation */}
-      <section className="flex items-center gap-3">
-        <Switch
-          id="enabled"
-          checked={enabledInput}
-          onCheckedChange={setEnabledInput}
-          disabled={switchDisabled}
-        />
-        <Label
-          htmlFor="enabled"
-          className="text-sm font-medium"
-          title={switchTitle}
-        >
-          {enabledInput ? "Enabled" : "Disabled"}
-        </Label>
       </section>
 
       <SaveResetFooter

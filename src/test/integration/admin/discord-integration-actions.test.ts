@@ -84,7 +84,7 @@ vi.mock("~/lib/supabase/server", () => ({
 vi.mock("~/lib/discord/config", () => ({
   getDiscordTokenForAdmin: vi.fn(),
   getDiscordConfig: vi.fn(),
-  isDiscordIntegrationEnabled: vi.fn(),
+  isDiscordIntegrationConfigured: vi.fn(),
 }));
 
 vi.mock("~/lib/observability/report-error", () => ({
@@ -396,8 +396,8 @@ describe("saveDiscordConfig", () => {
     });
   });
 
-  describe("enabled save — no token configured", () => {
-    it("returns newToken field error when enabled=true but no token is available", async () => {
+  describe("partial configuration — no token configured", () => {
+    it("saves the server ID without treating the integration as configured", async () => {
       vi.mocked(getDiscordTokenForAdmin).mockResolvedValue(null);
 
       const fd = makeFormData({
@@ -406,11 +406,7 @@ describe("saveDiscordConfig", () => {
         guildId: "123456789012345678",
       });
       const result = await saveDiscordConfig(fd);
-      expect(result.ok).toBe(false);
-      if (!result.ok) {
-        expect(result.errors.some((e) => e.field === "newToken")).toBe(true);
-        expect(result.errors[0]?.message).toMatch(/required to enable/i);
-      }
+      expect(result.ok).toBe(true);
     });
   });
 

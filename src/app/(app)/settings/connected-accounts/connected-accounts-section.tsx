@@ -6,7 +6,7 @@ import { log } from "~/lib/logger";
 import { getLoginUrl } from "~/lib/login-url";
 import { providers, type ProviderKey } from "~/lib/auth/providers";
 import { canUnlinkIdentity } from "~/lib/auth/identity-guards";
-import { isDiscordIntegrationEnabled } from "~/lib/discord/config";
+import { isDiscordIntegrationConfigured } from "~/lib/discord/config";
 import { db } from "~/server/db";
 import { userProfiles } from "~/server/db/schema";
 import { ConnectedAccountRow } from "./connected-account-row";
@@ -69,7 +69,7 @@ export async function ConnectedAccountsSection(): Promise<React.JSX.Element> {
 
   // Test DM is only meaningful when the bot integration is wired up. Only
   // need the boolean — skip the Vault decrypt that getDiscordConfig() does.
-  const discordIntegrationEnabled = await isDiscordIntegrationEnabled();
+  const discordIntegrationEnabled = await isDiscordIntegrationConfigured();
 
   // The test-DM button needs to know whether THIS user can receive DMs, which
   // is gated on the mirror column (`user_profiles.discord_user_id`) — that's

@@ -12,7 +12,7 @@
  * The `manual`-trigger throttle has its own describe block below.
  */
 
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { getTestDb, setupTestDb } from "~/test/setup/pglite";
 import { pinballmapState } from "~/server/db/schema";
 import type { LocationSnapshot } from "~/lib/pinballmap/types";
@@ -31,6 +31,13 @@ vi.mock("~/lib/pinballmap/client", async () => {
 
 describe("PinballMap shared read path (PGlite)", () => {
   setupTestDb();
+
+  beforeEach(async () => {
+    const db = await getTestDb();
+    await db
+      .insert(pinballmapState)
+      .values({ id: "singleton", locationId: 26454 });
+  });
 
   it("syncLocationSnapshot stores the snapshot and marks health ok", async () => {
     const { syncLocationSnapshot, getPinballMapState } =
@@ -127,6 +134,31 @@ describe("PinballMap shared read path (PGlite)", () => {
  */
 describe("manual-refresh token bucket at the seam (PP-hbi0)", () => {
   setupTestDb();
+
+  beforeEach(async () => {
+    const db = await getTestDb();
+    await db
+      .insert(pinballmapState)
+      .values({ id: "singleton", locationId: 26454 });
+  });
+
+  it("returns not_configured before allowance or client work", async () => {
+    const db = await getTestDb();
+    const { getMockClient } = await import("~/lib/pinballmap/client-mock");
+    const { syncLocationSnapshot, getRefreshAllowance } =
+      await import("~/lib/pinballmap/state");
+    const { PBM_REFRESH_BURST } = await import("~/lib/pinballmap/config");
+    const fetchSpy = vi.spyOn(getMockClient(), "fetchLocation");
+
+    await db.update(pinballmapState).set({ locationId: null });
+    await expect(syncLocationSnapshot({ trigger: "manual" })).resolves.toEqual({
+      ok: false,
+      reason: "not_configured",
+    });
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect((await getRefreshAllowance()).remaining).toBe(PBM_REFRESH_BURST);
+    fetchSpy.mockRestore();
+  });
 
   it("allows the burst, then refuses without re-hitting PBM", async () => {
     const { getMockClient } = await import("~/lib/pinballmap/client-mock");
@@ -257,7 +289,6 @@ describe("a failed sync clears nothing (PP-l81u)", () => {
     await db.insert(pinballmapState).values({
       id: "singleton",
       locationId: 26454,
-      enabled: true,
       snapshotJson: staleSnapshot,
       lastSyncStatus: "ok",
     });

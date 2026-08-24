@@ -72,7 +72,7 @@ vi.mock("~/lib/observability/report-error", () => ({
 vi.mock("~/lib/discord/config", () => ({
   getDiscordTokenForAdmin: vi.fn().mockResolvedValue(null),
   getDiscordConfig: vi.fn(),
-  isDiscordIntegrationEnabled: vi.fn(),
+  isDiscordIntegrationConfigured: vi.fn(),
 }));
 
 const mockGetUser = vi.fn();
@@ -218,14 +218,11 @@ const ROTATED_TOKEN =
   "Bot.Rotated.12345678901234567890123456789012345678901234567890123456";
 
 /**
- * `enabled: "false"` keeps Discord's REST probes out of the picture entirely
- * (the action only probes when enabling), so these tests exercise nothing but
- * the Vault + row-write path. A non-empty `newToken` still selects the
- * create/rotate branch.
+ * The tests exercise the Vault + row-write path. A non-empty `newToken`
+ * selects the create/rotate branch.
  */
 function makeFormData(newToken: string): FormData {
   const fd = new FormData();
-  fd.set("enabled", "false");
   fd.set("newToken", newToken);
   fd.set("guildId", "123456789012345678");
   fd.set("inviteLink", "");
@@ -236,7 +233,6 @@ async function seedSingleton(botTokenVaultId: string | null): Promise<void> {
   const db = await getTestDb();
   await db.insert(discordIntegrationConfig).values({
     id: "singleton",
-    enabled: false,
     botTokenVaultId,
   });
 }
@@ -269,6 +265,21 @@ describe("saveDiscordConfig Vault orphan compensation (real SQL, PGlite)", () =>
     await db.execute(sql`DELETE FROM vault.secrets`);
 
     mockGetUser.mockResolvedValue({ data: { user: { id: ADMIN_USER_ID } } });
+    globalThis.fetch = vi.fn((input: RequestInfo | URL) => {
+      const url =
+        typeof input === "string"
+          ? input
+          : input instanceof URL
+            ? input.href
+            : input.url;
+      return Promise.resolve(
+        url.endsWith("/users/@me")
+          ? new Response(JSON.stringify({ username: "pinpoint" }), {
+              status: 200,
+            })
+          : new Response(JSON.stringify({ name: "APC" }), { status: 200 })
+      );
+    });
     await db.insert(userProfiles).values(
       createTestUser({
         id: ADMIN_USER_ID,

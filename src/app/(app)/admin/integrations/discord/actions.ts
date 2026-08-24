@@ -218,8 +218,6 @@ export async function saveDiscordConfigAction(
  *   endpoint). Hard-required to pass — saves are rejected if the bot
  *   isn't in the server.
  * - `inviteLink`: optional, no Discord-side validation.
- * - `enabled`: written through; the form-level disable rule (no token →
- *   switch greyed out) is enforced on the client and re-checked here.
  */
 export async function saveDiscordConfig(
   formData: FormData
@@ -227,7 +225,6 @@ export async function saveDiscordConfig(
   const { userId } = await verifyIntegrationsAdmin();
 
   const raw = {
-    enabled: formData.get("enabled") === "true",
     newToken: formField(formData, "newToken"),
     guildId: formField(formData, "guildId"),
     inviteLink: formField(formData, "inviteLink"),
@@ -248,31 +245,27 @@ export async function saveDiscordConfig(
   const hasTypedNewToken =
     validated.newToken !== undefined && validated.newToken.length > 0;
 
-  // Resolve the saved-or-typed token. Only required if we're enabling (the
-  // server can save a disabled config without any token at all) or if the
-  // admin typed a new token to rotate.
-  let tokenForProbes: string | null = null;
-  if (validated.enabled || hasTypedNewToken) {
-    tokenForProbes = await resolveTokenForValidation(validated.newToken);
-    if (validated.enabled && !tokenForProbes) {
-      return {
-        ok: false,
-        errors: [
-          {
-            field: "newToken",
-            message:
-              "Bot token is required to enable the integration. Paste one or seed via DISCORD_BOT_TOKEN.",
-          },
-        ],
-      };
-    }
+  // Resolve the saved-or-typed token. With no token the saved server ID remains
+  // partial configuration; with one, every save verifies that the chosen server
+  // is reachable before the row can be treated as configured.
+  const tokenForProbes = await resolveTokenForValidation(validated.newToken);
+  if (hasTypedNewToken && !tokenForProbes) {
+    return {
+      ok: false,
+      errors: [
+        {
+          field: "newToken",
+          message:
+            "Bot token is required. Paste one or seed via DISCORD_BOT_TOKEN.",
+        },
+      ],
+    };
   }
 
-  // Discord-side probes only run when enabling. Saving as disabled never
-  // calls Discord — admins can fix a broken config without needing the bot
-  // online or in the right server.
+  // A token-bearing save validates both the token and server membership before
+  // it becomes usable as notification configuration.
   let probedBotUsername: string | undefined;
-  if (validated.enabled && tokenForProbes) {
+  if (tokenForProbes) {
     // Token rotation: probe the new typed value before committing to Vault.
     // When not rotating, the saved token's validity gets verified implicitly
     // by probeServerMembership (any 401 surfaces as `invalid_token`).
@@ -430,7 +423,6 @@ export async function saveDiscordConfig(
       await tx
         .update(discordIntegrationConfig)
         .set({
-          enabled: validated.enabled,
           guildId: validated.guildId,
           inviteLink: validated.inviteLink === "" ? null : validated.inviteLink,
           updatedAt: new Date(),

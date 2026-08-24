@@ -1300,7 +1300,6 @@ export const discordIntegrationConfig = pgTable(
   "discord_integration_config",
   {
     id: text("id").primaryKey().default("singleton"),
-    enabled: boolean("enabled").notNull().default(false),
     guildId: text("guild_id"),
     inviteLink: text("invite_link"),
     // UUID reference to vault.secrets.id — no FK (Drizzle cannot cross-schema)
@@ -1354,8 +1353,9 @@ export const pinballmapState = pgTable(
   "pinballmap_state",
   {
     id: text("id").primaryKey().default("singleton"),
-    enabled: boolean("enabled").notNull().default(false),
-    locationId: integer("location_id").notNull().default(26454),
+    // A configured location is the integration's sole activation signal.
+    // Null retains the dormant state without permitting any Pinball Map calls.
+    locationId: integer("location_id"),
     snapshotJson: jsonb("snapshot_json").$type<LocationSnapshot>(),
     lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
     // Timestamp of the last sync ATTEMPT (success OR failure), stamped at the
