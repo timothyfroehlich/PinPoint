@@ -69,7 +69,8 @@ if [ "$SHOW_WORKTREES" = "true" ]; then
     echo " Worktree Health"
     echo "========================================"
     echo ""
-    bash "$SCRIPT_DIR/stale-worktrees.sh" 2>/dev/null || echo "  (no ephemeral worktrees or error)"
+    python3 "$SCRIPT_DIR/../worktree_reap.py" \
+        --repo-dir "$SCRIPT_DIR/../.." || echo "  (worktree report unavailable)"
     echo ""
 fi
 
