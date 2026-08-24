@@ -65,7 +65,7 @@ const EXPECTED_GUARD_HOOKS = [
 // flagged. A missed exotic registration is far cheaper than a canary that
 // cries wolf every session.
 //
-// The four `"$HOME"/.claude/hooks/huddle/…` registrations land in that skipped
+// The huddle registrations target `$HOME/.agents/huddle/`, outside the project
 // set by design: the huddle lives in dotfiles, not this repo, so there is no
 // repo-relative path to verify and its absence is not a repo defect.
 
