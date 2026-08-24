@@ -60,11 +60,10 @@ Then work the checklist. For each item, note findings as a comment on the bead (
      - If it's newer than the current pin (mind major bumps — read the pnpm release notes/migration guide first), bump via `corepack use pnpm@<version>`, then verify no lockfile churn (`pnpm install --frozen-lockfile` → only `package.json` should change), `pnpm audit --audit-level=high` still resolves, and `pnpm run check` is green. PR it through the normal workflow; file a bead if a major bump needs real migration work.
    - **bd cloud version pin** (from the 2026-08-16 shared-DB schema incident). Cloud beads routines pin `bd` to an exact version at a **single source**: `BD_PINNED_VERSION` in `scripts/beads-cloud-init.sh`. The setup script (`scripts/beads-cloud-setup.sh`) reads that constant and installs exactly it, and the runtime guard checks against it, so both move with one edit; the claude.ai UI holds only a version-free one-line shim and never needs touching. When Tim's local/Bazzite `bd` moves past the pin, bump **that one line** — every cloud routine refuses to run until the installed binary matches. Exact-pin is deliberate: an accidental _newer_ release migrated the shared DB and locked every client out for two days, so a loud refusal is the safe failure. Compare the pin against the installed `bd version`; bump only once the newer version is running clean locally.
 
-2. **TypeScript-7 rollout status**
-   - Read `docs/plans/2026-06-27-typescript-7-upgrade-plan.md` for the current phase. Phases 1–3 are done (PP-xu96, PP-8mv1, PP-4zcj); the GA-pin bead PP-rl1l is closed.
-   - **Only Phase 4 is left: `next build` type-checking on the native compiler**, gated on the **TS 7.1 stable JS API** (no announced date as of 2026-08-01). Check whether 7.1 has shipped and whether [vercel/next.js#81472](https://github.com/vercel/next.js/discussions/81472) has moved. Until then `next build` staying on TS6 is deliberate — it's our parity safety net.
-   - When bumping the TS pin, re-validate 0-divergence parity vs `tsc 6`: `pnpm run typecheck:tsc6`.
-   - When bumping `oxlint` / `oxlint-tsgolint`, re-run the mirror fidelity check — `pnpm run lint` and `pnpm run lint:local` must agree (see `AGENTS.md` § "Lint engines").
+2. **TypeScript compiler maintenance**
+   - TypeScript 7 is installed as `typescript`; its native `tsc` runs the app, test, E2E, and Next build type checks. Read `docs/plans/2026-06-27-typescript-7-upgrade-plan.md` only for the rollout record.
+   - When bumping `typescript`, run `pnpm run typecheck`, `pnpm run typecheck:tests`, `pnpm run typecheck:e2e`, and `pnpm run build`.
+   - When bumping `oxlint` / `oxlint-tsgolint`, run `pnpm run lint` (the sole lint engine; see `AGENTS.md` § "Lint engine (Oxlint)").
 
 3. **Dependabot updates**
    - Review open Dependabot PRs (`gh pr list --author "app/dependabot"`). Merge the safe ones via the normal PR workflow; file a bead for any that need real work.
