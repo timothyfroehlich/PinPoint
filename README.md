@@ -89,10 +89,10 @@ git clone https://github.com/timothyfroehlich/PinPoint.git
 cd PinPoint
 
 mise install --locked           # installs pinned Node and pnpm via package.json
-pnpm install
+mise exec -- pnpm install       # (or plain `pnpm install` if mise shell hook is active)
 cp .env.example .env.local      # then fill in Supabase + DB vars
 
-pnpm run dev                    # automatically ensures Supabase is running
+mise exec -- pnpm run dev       # automatically ensures Supabase is running
 ```
 
 Open `http://localhost:<PORT>` (see `.env.local`) to use the app.
