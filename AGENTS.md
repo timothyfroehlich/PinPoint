@@ -154,9 +154,9 @@ Never resolve `drizzle/meta` conflicts manually — the folder holds binary-like
 
 **Automatic Codex review is the default.** Open every agent-created PR as a GitHub draft; promote it only after the current-head `CI Gate` succeeds. Before a later upload that changes more than 50 executable-code lines, return the PR to draft **before** pushing, then promote it again after the replacement `CI Gate` succeeds.
 
-The owning agent monitors CI, draft promotion, automatic review, findings, and corrective pushes until Codex has approved the exact current head and every review thread is resolved. Use `@codex review` only when Tim explicitly asks for a manual trigger; it is not the fallback when automation is slow.
+The owning agent monitors CI, draft promotion, automatic review, findings, and corrective pushes until Codex has returned a clean result for the exact current head and every review thread is resolved. Use `@codex review` only when Tim explicitly asks for a manual trigger; it is not the fallback when automation is slow.
 
-The gate accepts either Codex's native GitHub review — exact account `chatgpt-codex-connector[bot]`, state `APPROVED`, and `commit_id` equal to the PR head SHA — or the existing SHA-pinned manual attestation after Tim runs `/codex:review` or `/code-review`. Exact upload counting, state transitions, and fallback rules: `pinpoint-pr-workflow` skill Phase 3.
+The gate accepts Codex's native GitHub approval, its exact-bot/exact-app clean comment pinned to head, or the existing SHA-pinned manual attestation after Tim runs `/codex:review` or `/code-review`. Exact upload counting, state transitions, and fallback rules: `pinpoint-pr-workflow` skill Phase 3.
 
 ### Handing a PR over to merge
 

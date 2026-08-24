@@ -1,7 +1,7 @@
-"""Regression tests for the merge gate's native and manual review records.
+"""Regression tests for the merge gate's automatic and manual review records.
 
-Either an APPROVED review from the official Codex GitHub App or the existing
-SHA-pinned manual attestation may cover the pull request's current head.
+A native approval or trusted clean connector comment from the official Codex GitHub
+App, or the existing SHA-pinned manual attestation, may cover the current head.
 """
 
 import json
@@ -17,6 +17,7 @@ import pytest
 
 GATES_PATH = Path(__file__).parent.parent / "workflow" / "_pr-gates.sh"
 CODEX_BOT = "chatgpt-codex-connector[bot]"
+CODEX_APP = "chatgpt-codex-connector"
 HEAD_SHA = "d084c14a43af3ac021f0838f5c7bf4b77f72fb62"
 OTHER_SHA = "0000000000000000000000000000000000000000"
 
@@ -50,6 +51,23 @@ def manual_marker(
             f"<!-- pinpoint-reviewer: {reviewer} -->\n"
             f"<!-- pinpoint-review-detail: {detail} -->\nreviewed"
         ),
+        "updated_at": updated_at,
+    }
+
+
+def clean_codex_comment(
+    sha: str = HEAD_SHA[:10],
+    *,
+    login: str = CODEX_BOT,
+    app: str = CODEX_APP,
+    prefix: str = "Codex Review: Didn't find any major issues. Hooray!",
+    updated_at: str = "2026-08-22T12:00:00Z",
+) -> dict:
+    return {
+        "user": {"login": login},
+        "performed_via_github_app": {"slug": app},
+        "body": f"{prefix}\n\n**Reviewed commit:** `{sha}`",
+        "created_at": updated_at,
         "updated_at": updated_at,
     }
 
@@ -172,6 +190,64 @@ def test_codex_approval_of_head_passes() -> None:
     assert f"Codex approved head SHA {HEAD_SHA[:7]}" in result.stdout
 
 
+def test_clean_codex_comment_of_head_passes() -> None:
+    with gate_env(comment_pages=[[clean_codex_comment()]]) as env:
+        result = run_gate("check_review_happened", env)
+    assert result.returncode == 0, result.stdout
+    assert f"Codex found no major issues on head SHA {HEAD_SHA[:7]}" in result.stdout
+
+
+def test_clean_codex_comment_accepts_full_head_sha() -> None:
+    with gate_env(comment_pages=[[clean_codex_comment(HEAD_SHA)]]) as env:
+        state, sha, reviewer, detail, *_rest = review_record(env)
+    assert (state, sha, reviewer, detail) == (
+        "clean_comment",
+        HEAD_SHA,
+        CODEX_BOT,
+        "NO_FINDINGS",
+    )
+
+
+@pytest.mark.parametrize(
+    "comment",
+    [
+        pytest.param(clean_codex_comment(login="other[bot]"), id="wrong-bot"),
+        pytest.param(clean_codex_comment(app="other-app"), id="wrong-app"),
+        pytest.param(
+            clean_codex_comment(prefix="Codex Review: Looks good."), id="wrong-prefix"
+        ),
+        pytest.param(clean_codex_comment(HEAD_SHA[:9]), id="short-sha"),
+        pytest.param(clean_codex_comment(OTHER_SHA[:10]), id="stale-sha"),
+    ],
+)
+def test_untrusted_or_stale_clean_comments_do_not_cover_head(comment: dict) -> None:
+    with gate_env(comment_pages=[[comment]]) as env:
+        result = run_gate("check_review_happened", env)
+    assert result.returncode == 1, result.stdout
+
+
+def test_later_native_finding_overrides_earlier_clean_comment() -> None:
+    with gate_env(
+        review_pages=[
+            [codex_review(state="COMMENTED", submitted_at="2026-08-22T12:01:00Z")]
+        ],
+        comment_pages=[[clean_codex_comment(updated_at="2026-08-22T12:00:00Z")]],
+    ) as env:
+        state, *_rest = review_record(env)
+    assert state == "not_approved"
+
+
+def test_later_clean_comment_supersedes_earlier_native_nonapproval() -> None:
+    with gate_env(
+        review_pages=[
+            [codex_review(state="COMMENTED", submitted_at="2026-08-22T12:00:00Z")]
+        ],
+        comment_pages=[[clean_codex_comment(updated_at="2026-08-22T12:01:00Z")]],
+    ) as env:
+        state, *_rest = review_record(env)
+    assert state == "clean_comment"
+
+
 def test_manual_attestation_of_head_still_passes() -> None:
     with gate_env(comment_pages=[[manual_marker()]]) as env:
         result = run_gate("check_review_happened", env)
@@ -234,6 +310,12 @@ def test_manual_markers_are_read_across_all_pages() -> None:
     assert result.returncode == 0, result.stdout
 
 
+def test_clean_codex_comments_are_read_across_all_pages() -> None:
+    with gate_env(comment_pages=[[], [clean_codex_comment()]]) as env:
+        result = run_gate("check_review_happened", env)
+    assert result.returncode == 0, result.stdout
+
+
 @pytest.mark.parametrize(
     "reviews",
     [
@@ -277,7 +359,7 @@ def test_stale_approval_reports_both_commits_and_the_automatic_review_remedy() -
         result = run_gate("check_review_happened", env)
     assert OTHER_SHA[:7] in result.stdout
     assert HEAD_SHA[:7] in result.stdout
-    assert "await automatic Codex approval" in result.stdout
+    assert "await a clean automatic Codex result" in result.stdout
     assert "only when Tim explicitly requests it" in result.stdout
 
 

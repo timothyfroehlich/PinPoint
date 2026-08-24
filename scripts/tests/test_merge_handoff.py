@@ -81,6 +81,7 @@ class Scenario:
     draft: bool = False
     review: str | None = None
     review_state: str = "APPROVED"
+    clean_comment: bool = False
     manual_review: bool = False
     gh_head: str = "head"
     threads: list[dict] = field(default_factory=list)
@@ -169,6 +170,18 @@ def repo_with_pr(
 
         comments = list(scenario.comments)
         reviews: list[dict] = []
+        if scenario.clean_comment:
+            comments.append(
+                {
+                    "user": {"login": "chatgpt-codex-connector[bot]"},
+                    "performed_via_github_app": {"slug": "chatgpt-codex-connector"},
+                    "body": (
+                        "Codex Review: Didn't find any major issues. Hooray!\n\n"
+                        f"**Reviewed commit:** `{head_sha[:10]}`"
+                    ),
+                    "updated_at": "2026-08-02T20:43:19Z",
+                }
+            )
         if scenario.manual_review:
             comments.append(
                 {
@@ -459,6 +472,16 @@ def test_a_codex_approval_covering_head_is_named_in_the_handoff() -> None:
     ) as (_head, run):
         assert "Codex GitHub approval" in run.stdout, run.stdout
         assert "since review  none — the review covers head" in run.stdout
+
+
+def test_a_clean_codex_comment_covering_head_is_merge_ready() -> None:
+    with repo_with_pr(
+        branch_changes={"src/lib/thing.ts": "x\n"},
+        scenario=Scenario(clean_comment=True),
+    ) as (_head, run):
+        assert "Codex clean review comment" in run.stdout, run.stdout
+        assert "since review  none — the review covers head" in run.stdout
+        assert MERGE_CMD in run.stdout, run.stdout
 
 
 def test_a_manual_attestation_covering_head_is_merge_ready() -> None:

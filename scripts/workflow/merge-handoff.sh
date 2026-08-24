@@ -165,6 +165,9 @@ case "$rv_state" in
   approval)
     review_desc="Codex GitHub approval · ${rv_at} · covers head ${short_head}"
     ;;
+  clean_comment)
+    review_desc="Codex clean review comment · ${rv_at} · covers head ${short_head}"
+    ;;
   marker)
     review_desc="$(review_phrase "$rv_reviewer" "$rv_detail") · ${rv_at} · covers head ${short_head}"
     ;;
@@ -177,6 +180,17 @@ case "$rv_state" in
     else
       review_desc="Codex GitHub approval · ${rv_at} · STALE: approved ${rv_sha:0:7}, not an ancestor of head (force-push?)"
       since_review_note="unknowable — the approved commit is not an ancestor of head"
+    fi
+    ;;
+  stale_clean_comment)
+    if git cat-file -e "${rv_sha}^{commit}" 2>/dev/null \
+      && git merge-base --is-ancestor "$rv_sha" "$head_sha" 2>/dev/null; then
+      behind=$(git rev-list --count "${rv_sha}..${head_sha}")
+      review_desc="Codex clean review comment · ${rv_at} · STALE: ${behind} commit(s) back, reviewed ${rv_sha:0:7}, head is ${short_head}"
+      since_review_from=$rv_sha
+    else
+      review_desc="Codex clean review comment · ${rv_at} · STALE: reviewed ${rv_sha:0:7}, not an ancestor of head (force-push?)"
+      since_review_note="unknowable — the reviewed commit is not an ancestor of head"
     fi
     ;;
   not_approved)
@@ -194,7 +208,7 @@ case "$rv_state" in
     fi
     ;;
   *)
-    review_desc="NONE — no Codex approval or manual review attestation on this PR"
+    review_desc="NONE — no clean Codex result or manual review attestation on this PR"
     ;;
 esac
 # Diff shape
@@ -262,7 +276,7 @@ elif [[ -n "$since_review_note" ]]; then
   # compare against" here would contradict the review line two rows above, which names
   # the reviewed SHA.
   diff_since_review=$since_review_note
-elif [[ "$rv_state" == "approval" || "$rv_state" == "marker" ]]; then
+elif [[ "$rv_state" == "approval" || "$rv_state" == "clean_comment" || "$rv_state" == "marker" ]]; then
   diff_since_review="none — the review covers head"
 else
   diff_since_review="n/a — nothing reviewed to compare against"
@@ -407,7 +421,7 @@ add_block() { blocking+=("$1"); }
 if [[ "$(gate_token "$ci_out")" != "PASS" ]]; then add_block "ci: $(gate_state "$ci_out")"; fi
 if [[ "$(gate_token "$threads_out")" != "PASS" ]]; then add_block "threads: $(gate_state "$threads_out")"; fi
 if [[ "$(gate_token "$conflict_out")" != "PASS" ]]; then add_block "no_conflict: $(gate_state "$conflict_out")"; fi
-if [[ "$rv_state" != "approval" && "$rv_state" != "marker" ]]; then add_block "reviewed: ${rv_state} — await automatic Codex approval of the current head; use a manual trigger only when Tim explicitly requests it"; fi
+if [[ "$rv_state" != "approval" && "$rv_state" != "clean_comment" && "$rv_state" != "marker" ]]; then add_block "reviewed: ${rv_state} — await a clean automatic Codex result on the current head; use a manual trigger only when Tim explicitly requests it"; fi
 if [[ "$is_draft" == "true" ]]; then add_block "draft: wait for current-head CI Gate success, then mark the PR ready"; fi
 if [[ "$pr_state" != "OPEN" ]]; then add_block "state: PR is ${pr_state}, not open"; fi
 # The gate answers came from `gh` at one SHA and the diff from git at another, so no

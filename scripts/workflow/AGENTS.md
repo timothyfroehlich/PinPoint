@@ -6,7 +6,7 @@ Bash/Node scripts for managing GitHub PR lifecycle: CI monitoring, UI screenshot
 
 Scripts are designed for the **PinPoint orchestrator workflow** where multiple subagents work in parallel worktrees. The orchestrator (or a human) uses these from the main repo to monitor and manage PRs created by agents.
 
-**The merge decision is Tim's (PP-wi85, reversed for the script per Tim 2026-08-19).** An agent MAY run `merge-pr.sh`, but the `block-direct-merge.cjs` PreToolUse hook turns any invocation of it (including `--dry-run`) into an approval prompt Tim must accept before it runs — the merge is still his call. The raw channels (`gh pr merge`, `gh api PUT .../merge`, MCP `merge_pull_request`) stay hard-blocked, because they skip the script's gate re-checks. Agents run every other script in this directory freely, including `pr-screenshots.mjs` and `merge-handoff.sh` (which _prints_ the merge command). The normal close follows `pinpoint-pr-workflow`: draft PR, current-head CI, automatic Codex approval, resolved threads, final label, then handoff.
+**The merge decision is Tim's (PP-wi85, reversed for the script per Tim 2026-08-19).** An agent MAY run `merge-pr.sh`, but the `block-direct-merge.cjs` PreToolUse hook turns any invocation of it (including `--dry-run`) into an approval prompt Tim must accept before it runs — the merge is still his call. The raw channels (`gh pr merge`, `gh api PUT .../merge`, MCP `merge_pull_request`) stay hard-blocked, because they skip the script's gate re-checks. Agents run every other script in this directory freely, including `pr-screenshots.mjs` and `merge-handoff.sh` (which _prints_ the merge command). The normal close follows `pinpoint-pr-workflow`: draft PR, current-head CI, clean automatic Codex result, resolved threads, final label, then handoff.
 
 ## Scripts
 
@@ -36,29 +36,31 @@ Scripts are designed for the **PinPoint orchestrator workflow** where multiple s
 
 ### Gates (evaluated by `merge-pr.sh`, defined in `_pr-gates.sh`)
 
-| Gate          | Passes when                                                                                                                       | Bypass kind |
-| ------------- | --------------------------------------------------------------------------------------------------------------------------------- | ----------- |
-| `ci`          | `CI Gate` check is SUCCESS/NEUTRAL/SKIPPED                                                                                        | `admin`     |
-| `threads`     | Zero unresolved review threads, from any author                                                                                   | `force`     |
-| `reviewed`    | Hard backstop — a Codex approval or manual marker must cover head. PASS on `approval` / `marker`; FAIL on stale or absent records | `force`     |
-| `no_conflict` | PR is MERGEABLE (never bypassable — GitHub rejects conflicting merges)                                                            | `none`      |
+| Gate          | Passes when                                                                                                                            | Bypass kind |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
+| `ci`          | `CI Gate` check is SUCCESS/NEUTRAL/SKIPPED                                                                                             | `admin`     |
+| `threads`     | Zero unresolved review threads, from any author                                                                                        | `force`     |
+| `reviewed`    | Hard backstop — a clean Codex result or manual marker must cover head. PASS on `approval` / `clean_comment` / `marker`; FAIL otherwise | `force`     |
+| `no_conflict` | PR is MERGEABLE (never bypassable — GitHub rejects conflicting merges)                                                                 | `none`      |
 
 ### Review state (`reviewed`)
 
-**Automatic Codex GitHub review is the default path.** The gate accepts its native review record only from exact account `chatgpt-codex-connector[bot]`, with `APPROVED` and a `commit_id` equal to the current PR head SHA. The existing SHA-pinned `mark-review.sh` route remains valid after Tim explicitly runs a local review. Every push needs a fresh review; comment `@codex review` only when Tim explicitly asks for a manual trigger.
+**Automatic Codex GitHub review is the default path.** The gate accepts either a native `APPROVED` review pinned to the exact head, or the connector's no-major-issues issue comment pinned to a 10- or 40-character prefix of that head. Both must come from exact account `chatgpt-codex-connector[bot]`; the comment must also carry exact app slug `chatgpt-codex-connector` and the known clean-result prefix. The existing SHA-pinned `mark-review.sh` route remains valid after Tim explicitly runs a local review. Every push needs a fresh review; comment `@codex review` only when Tim explicitly asks for a manual trigger.
 
-`_compute_review_state` in `_pr-gates.sh` reports six states:
+`_compute_review_state` in `_pr-gates.sh` reports eight states:
 
-| State            | Meaning                                           | `reviewed` |
-| ---------------- | ------------------------------------------------- | ---------- |
-| `approval`       | Latest Codex review approved the current head SHA | PASS       |
-| `marker`         | Manual review marker pins the current head SHA    | PASS       |
-| `stale_approval` | Latest Codex approval names a different SHA       | FAIL       |
-| `stale_marker`   | Manual review marker names a different SHA        | FAIL       |
-| `not_approved`   | Latest Codex review did not approve               | FAIL       |
-| `unreviewed`     | Neither review path covers this PR                | FAIL       |
+| State                 | Meaning                                           | `reviewed` |
+| --------------------- | ------------------------------------------------- | ---------- |
+| `approval`            | Latest Codex review approved the current head SHA | PASS       |
+| `clean_comment`       | Trusted Codex clean comment pins the current head | PASS       |
+| `marker`              | Manual review marker pins the current head SHA    | PASS       |
+| `stale_approval`      | Latest Codex approval names a different SHA       | FAIL       |
+| `stale_clean_comment` | Trusted Codex clean comment names another SHA     | FAIL       |
+| `stale_marker`        | Manual review marker names a different SHA        | FAIL       |
+| `not_approved`        | Latest Codex review did not approve               | FAIL       |
+| `unreviewed`          | Neither review path covers this PR                | FAIL       |
 
-Within the Codex path, the latest trusted review is authoritative. A later `CHANGES_REQUESTED` or `COMMENTED` review overrides an earlier approval, and an approval of an older commit is stale. A current manual marker remains independently valid.
+Within the automatic Codex path, the latest trusted record is authoritative. A later `CHANGES_REQUESTED` or `COMMENTED` review overrides an earlier clean comment, and a result naming an older commit is stale. A current manual marker remains independently valid.
 
 Nothing here WAITs. The gate reports the current snapshot and fails on an unreviewed or stale head; the owning agent waits for automatic review outside the merge script. `merge-pr.sh --automerge` must stop rather than hide that unfinished state.
 
@@ -76,7 +78,7 @@ Scripts emit machine-parseable status with these prefixes:
 | `WARN:`  | Soft gate proceeding with a notice                          | Read the notice; not blocking |
 | `BLOCK:` | State mismatch requiring user action (e.g., merge conflict) | Resolve, push, retry          |
 
-The agent reads these tokens from script stdout to decide next steps. The `reviewed` remedy says to await automatic current-head approval and reserves `@codex review` or local attestation for Tim's explicit request. Continuation lines are indented and carry no status token, so token parsing is unaffected.
+The agent reads these tokens from script stdout to decide next steps. The `reviewed` remedy says to await a clean automatic current-head result and reserves `@codex review` or local attestation for Tim's explicit request. Continuation lines are indented and carry no status token, so token parsing is unaffected.
 
 ## MCP vs Script — When to use which
 

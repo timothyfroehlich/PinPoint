@@ -60,7 +60,7 @@ Reviewers read agent skills. Consult the relevant one for the area a PR touches 
 
 **Codex reviews every eligible PR update automatically.** Authors open agent-created PRs as drafts, promote them after current-head CI succeeds, and then stay with the PR through the resulting review/fix cycle. Comment `@codex review` only when Tim explicitly asks for a manual trigger; automation being slow is not a reason to comment.
 
-A PR cannot merge without a review covering its **current head commit**, with every thread resolved. Either Codex's native GitHub review may be `APPROVED` by exact account `chatgpt-codex-connector[bot]` with a matching `commit_id`, or the existing SHA-pinned manual attestation may cover head after Tim explicitly runs a local review. Any push requires a fresh review. **If you're reviewing, assume the commit you were handed is the one the author intends to be final.** Full author-side rules: `.agents/skills/pinpoint-pr-workflow/SKILL.md` Phase 3.4.
+A PR cannot merge without a review covering its **current head commit**, with every thread resolved. Codex may provide either a native `APPROVED` review or its trusted connector clean comment; both must be from exact account `chatgpt-codex-connector[bot]` and pin the current head, while the comment must also identify the connector app. The existing SHA-pinned manual attestation may cover head after Tim explicitly runs a local review. Any push requires a fresh review. **If you're reviewing, assume the commit you were handed is the one the author intends to be final.** Full author-side rules: `.agents/skills/pinpoint-pr-workflow/SKILL.md` Phase 3.4.
 
 ## Review mechanics
 
