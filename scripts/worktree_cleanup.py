@@ -435,11 +435,14 @@ def cleanup_worktree(worktree_path: Path) -> int:
                     text=True,
                 )
                 if rm_result.returncode != 0:
+                    err_msg = (
+                        rm_result.stderr.strip() or f"exit code {rm_result.returncode}"
+                    )
                     print(
-                        f"Warning: `docker volume rm` exited {rm_result.returncode}: "
-                        f"{rm_result.stderr.strip()}",
+                        f"Warning: `docker volume rm` exited {rm_result.returncode}: {err_msg}",
                         file=sys.stderr,
                     )
+                    volumes_unknown_reason = f"`docker volume rm` failed: {err_msg}"
                 else:
                     print(
                         f"Removed {len(query.volumes)} Docker volume(s)",
@@ -450,6 +453,7 @@ def cleanup_worktree(worktree_path: Path) -> int:
                     f"Warning: failed to invoke `docker volume rm` ({exc})",
                     file=sys.stderr,
                 )
+                volumes_unknown_reason = f"failed to invoke `docker volume rm`: {exc}"
 
     # Unlock first. Claude Code agent runtimes lock worktrees while in use,
     # and the lock persists after the agent finishes; `git worktree remove

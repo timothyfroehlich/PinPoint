@@ -362,3 +362,85 @@ esac
     calls = mock_git["log_path"].read_text().splitlines()
     # Must NOT run git branch -D because branch existed before
     assert not any("branch -D" in c for c in calls)
+
+
+def test_hook_cleans_up_failed_worktree_in_preexisting_empty_dir(
+    mock_git: dict, tmp_path: Path
+) -> None:
+    """Pre-existing empty directory is not a pre-existing worktree registration; rollback must clean it up."""
+    empty_target = tmp_path / ".claude" / "worktrees" / "agent-empty-dir"
+    empty_target.mkdir(parents=True)
+
+    scripts_dir = tmp_path / "scripts"
+    scripts_dir.mkdir(exist_ok=True)
+    cleanup_log = tmp_path / "cleanup_calls_empty_dir.txt"
+    cleanup_script = scripts_dir / "worktree_cleanup.py"
+    cleanup_script.write_text(f"""#!/usr/bin/env python3
+import sys
+from pathlib import Path
+Path("{cleanup_log}").write_text(" ".join(sys.argv[1:]))
+""")
+
+    branch_marker = tmp_path / "branch_created_empty_dir.marker"
+    git_script = mock_git["bin_dir"] / "git"
+    git_script.write_text(f"""#!/bin/bash
+echo "$@" >> {mock_git["log_path"]}
+sub=""
+skip_next=0
+target=""
+for arg in "$@"; do
+  if [ "$skip_next" = "1" ]; then skip_next=0; continue; fi
+  case "$arg" in
+    -C|-b) skip_next=1 ;;
+    -*) : ;;
+    add) : ;;
+    *)
+      if [ -z "$sub" ]; then
+        sub="$arg"
+      elif [ -z "$target" ]; then
+        target="$arg"
+      fi
+      ;;
+  esac
+done
+case "$sub" in
+  fetch) exit 0 ;;
+  rev-parse)
+    case "$*" in
+      *refs/heads*)
+        if [ -f "{branch_marker}" ]; then
+          exit 0
+        fi
+        exit 1
+        ;;
+    esac
+    echo "{MOCK_FETCH_SHA}"
+    exit 0
+    ;;
+  worktree)
+    touch "{branch_marker}"
+    echo "fatal: post-checkout hook failed" >&2
+    exit 1
+    ;;
+  *) exit 0 ;;
+esac
+""")
+
+    stdin_data = {
+        "session_id": "test-session",
+        "transcript_path": "test-path",
+        "cwd": str(tmp_path),
+        "hook_event_name": "WorktreeCreate",
+        "name": "agent-empty-dir",
+    }
+
+    env_mods = {"PATH": f"{mock_git['bin_dir']}:{os.environ['PATH']}"}
+
+    return_code, stdout, stderr = run_hook(stdin_data, tmp_path, env_mods)
+
+    assert return_code != 0
+    assert "permanent error (not retrying)" in stderr
+
+    # Verify worktree_cleanup.py was invoked
+    assert cleanup_log.exists()
+    assert ".claude/worktrees/agent-empty-dir" in cleanup_log.read_text()

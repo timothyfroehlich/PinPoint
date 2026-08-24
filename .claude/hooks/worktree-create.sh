@@ -150,13 +150,13 @@ do_worktree_add() {
   local attempt
   local last_stderr=""
   local branch_existed_before=0
-  local path_existed_before=0
+  local worktree_registered_before=0
 
   if git -C "$BASE_PATH" rev-parse --verify --quiet "refs/heads/$BRANCH" >/dev/null 2>&1; then
     branch_existed_before=1
   fi
-  if [ -e "$WORKTREE_PATH" ]; then
-    path_existed_before=1
+  if git -C "$BASE_PATH" worktree list --porcelain 2>/dev/null | grep -Fx "worktree $WORKTREE_PATH" >/dev/null 2>&1; then
+    worktree_registered_before=1
   fi
 
   for attempt in $(seq 1 "$max_retries"); do
@@ -169,7 +169,7 @@ do_worktree_add() {
     if ! is_lock_contention "$last_stderr"; then
       echo "worktree-create.sh: permanent error (not retrying):" >&2
       echo "$last_stderr" >&2
-      if [ "$path_existed_before" -eq 0 ] && [ -e "$WORKTREE_PATH" ] && [ -f "$BASE_PATH/scripts/worktree_cleanup.py" ]; then
+      if [ "$worktree_registered_before" -eq 0 ] && [ -f "$BASE_PATH/scripts/worktree_cleanup.py" ]; then
         python3 "$BASE_PATH/scripts/worktree_cleanup.py" "$WORKTREE_PATH" >&2 || true
       fi
       if [ "$branch_existed_before" -eq 0 ] && git -C "$BASE_PATH" rev-parse --verify --quiet "refs/heads/$BRANCH" >/dev/null 2>&1; then
@@ -190,7 +190,7 @@ do_worktree_add() {
   echo "worktree-create.sh: FAILED to create worktree after $max_retries attempts" >&2
   echo "  cwd=$BASE_PATH  branch=$BRANCH  target=$WORKTREE_PATH" >&2
   echo "  Last error: $last_stderr" >&2
-  if [ "$path_existed_before" -eq 0 ] && [ -e "$WORKTREE_PATH" ] && [ -f "$BASE_PATH/scripts/worktree_cleanup.py" ]; then
+  if [ "$worktree_registered_before" -eq 0 ] && [ -f "$BASE_PATH/scripts/worktree_cleanup.py" ]; then
     python3 "$BASE_PATH/scripts/worktree_cleanup.py" "$WORKTREE_PATH" >&2 || true
   fi
   if [ "$branch_existed_before" -eq 0 ] && git -C "$BASE_PATH" rev-parse --verify --quiet "refs/heads/$BRANCH" >/dev/null 2>&1; then
