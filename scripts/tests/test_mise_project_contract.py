@@ -224,3 +224,51 @@ def test_mise_install_locked_succeeds() -> None:
     assert proc.returncode == 0, (
         f"Expected mise install --locked to succeed, got:\n{proc.stderr}\n{proc.stdout}"
     )
+
+
+def test_offline_corepack_free_resolution() -> None:
+    mise_bin = shutil.which("mise")
+    if not mise_bin:
+        return
+
+    # Ensure preinstallation has completed via locked install
+    subprocess.run(
+        [mise_bin, "install", "--locked"],
+        cwd=REPO_ROOT,
+        check=True,
+        capture_output=True,
+    )
+
+    # Verify mise which pnpm resolves directly to mise install directory, not Corepack
+    which_proc = subprocess.run(
+        [mise_bin, "which", "pnpm"],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    pnpm_path = which_proc.stdout.strip()
+    assert "corepack" not in pnpm_path.lower(), (
+        f"pnpm path must not be a Corepack shim, got {pnpm_path}"
+    )
+    assert "/installs/pnpm/" in pnpm_path, (
+        f"pnpm path must point to mise-managed install directory, got {pnpm_path}"
+    )
+
+    # Verify offline resolution: mise exec -- pnpm --version executes cleanly with MISE_OFFLINE=1
+    env = os.environ.copy()
+    env["MISE_OFFLINE"] = "1"
+    exec_proc = subprocess.run(
+        [mise_bin, "exec", "--", "pnpm", "--version"],
+        cwd=REPO_ROOT,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert exec_proc.returncode == 0, (
+        f"Expected offline mise exec -- pnpm --version to succeed, got:\n{exec_proc.stderr}"
+    )
+    assert exec_proc.stdout.strip() == "11.11.0", (
+        f"Expected pnpm version 11.11.0, got {exec_proc.stdout.strip()}"
+    )

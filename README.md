@@ -88,7 +88,7 @@ If you’re changing code, **start here**:
 git clone https://github.com/timothyfroehlich/PinPoint.git
 cd PinPoint
 
-mise install                    # installs pinned Node and pnpm via package.json
+mise install --locked           # installs pinned Node and pnpm via package.json
 pnpm install
 cp .env.example .env.local      # then fill in Supabase + DB vars
 
