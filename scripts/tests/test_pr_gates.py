@@ -272,12 +272,13 @@ def test_reviews_are_read_across_all_pages() -> None:
     assert result.returncode == 0, result.stdout
 
 
-def test_stale_approval_reports_both_commits_and_the_codex_remedy() -> None:
+def test_stale_approval_reports_both_commits_and_the_automatic_review_remedy() -> None:
     with gate_env(review_pages=[[codex_review(sha=OTHER_SHA)]]) as env:
         result = run_gate("check_review_happened", env)
     assert OTHER_SHA[:7] in result.stdout
     assert HEAD_SHA[:7] in result.stdout
-    assert "@codex review" in result.stdout
+    assert "await automatic Codex approval" in result.stdout
+    assert "only when Tim explicitly requests it" in result.stdout
 
 
 def test_review_gate_never_waits() -> None:

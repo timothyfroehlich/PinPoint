@@ -104,35 +104,24 @@ gh run rerun <run-id> --failed
 
 ### Label Ready PRs
 
-See `pinpoint-pr-workflow` Phase 3.6. Apply `ready-for-review` after CI green + a marker pinning head + zero unresolved review threads. The label does **not** get the PR reviewed (see the backstop below).
+See `pinpoint-pr-workflow` Phase 3.6. Apply `ready-for-review` only after current-head
+CI, review, thread, conflict, and screenshot gates pass. This label is the final merge-ready
+signal; it is separate from GitHub's draft/ready state.
 
 ### Ensure every PR is reviewed (lead backstop)
 
-The merge bar is unchanged: no PR merges without a review covering the **head commit**, recorded as a SHA-pinned marker (`<!-- pinpoint-review: <head_sha> -->`), with threads resolved. Tim runs the review — either `/codex:review` (marked `disable-model-invocation` by the plugin) or the built-in `/code-review` (user-triggered and billed). An agent can launch neither.
+Every agent-created PR opens as a draft. The owning session monitors current-head CI,
+promotes the PR, handles automatic Codex findings, and repeats the loop after corrective
+pushes. For later uploads, it must apply the 51-line pre-push re-draft rule in
+`pinpoint-pr-workflow` Phase 3.4. Keep that session alive or resume it; do not treat PR
+creation or a green CI run as completion.
 
-That makes the lead's job here a scheduling one. A subagent that finishes and ends leaves a PR sitting unreviewed forever, because there is nothing to wait for. **Check the marker against head:**
-
-```bash
-gh pr view <PR> --json headRefOid --jq .headRefOid
-gh api --paginate repos/timothyfroehlich/PinPoint/issues/<PR>/comments \
-  --jq '.[] | select((.body // "") | startswith("<!-- pinpoint-review:") or startswith("<!-- pinpoint-claude-review:")) | .body' | tail -1
-```
-
-Both prefixes, because `_pr-gates.sh` accepts both: a PR attested before the rename
-carries the legacy `pinpoint-claude-review:` marker and still passes the gate. Matching
-only the new one reports "no marker" for a PR that is genuinely reviewed, and the lead
-then asks Tim for a review he already did. `--paginate` for the same reason the marker
-lookup slurps — a busy PR pushes the marker past the first API page.
-
-Before applying `ready-for-review` or handing a PR to Tim for `merge-pr.sh --human`, confirm the marker pins head. If it doesn't, distinguish the cases:
-
-**No marker at all** → nobody has reviewed it. Hand it to Tim for review once the branch has stopped changing.
-
-**A marker pinning an older SHA** → someone reviewed it, then pushed past the review. Ask for a fresh review on the new head before attesting again.
-
-**A marker pinning head** → nothing to do. That review is legitimately terminal.
-
-Don't post a marker to paper over a review nobody ran, and don't ask Tim to `--force`. The `reviewed` gate in `merge-pr.sh` is the hard enforcement — it FAILs on both un-reviewed states and never WAITs, since with no bot in the loop there is no answer already on its way. Satisfying it honestly before handoff is the lead's job.
+Before applying `ready-for-review` or handing the PR to Tim, confirm the trusted Codex
+review is `APPROVED` on the exact current head SHA and all threads are resolved. A stale
+approval means the automatic replacement review is still pending. Never comment
+`@codex review` because automation is slow; do so only when Tim explicitly asks. A
+SHA-pinned manual marker remains valid only when Tim explicitly ran the named local
+review. Do not create new `claude-code:trivial` self-attestations.
 
 ---
 

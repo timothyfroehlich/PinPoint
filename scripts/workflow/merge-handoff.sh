@@ -407,8 +407,8 @@ add_block() { blocking+=("$1"); }
 if [[ "$(gate_token "$ci_out")" != "PASS" ]]; then add_block "ci: $(gate_state "$ci_out")"; fi
 if [[ "$(gate_token "$threads_out")" != "PASS" ]]; then add_block "threads: $(gate_state "$threads_out")"; fi
 if [[ "$(gate_token "$conflict_out")" != "PASS" ]]; then add_block "no_conflict: $(gate_state "$conflict_out")"; fi
-if [[ "$rv_state" != "approval" && "$rv_state" != "marker" ]]; then add_block "reviewed: ${rv_state} — comment @codex review and obtain a Codex approval of the current head, or use the existing manual attestation workflow"; fi
-if [[ "$is_draft" == "true" ]]; then add_block "draft: flip to ready-for-review"; fi
+if [[ "$rv_state" != "approval" && "$rv_state" != "marker" ]]; then add_block "reviewed: ${rv_state} — await automatic Codex approval of the current head; use a manual trigger only when Tim explicitly requests it"; fi
+if [[ "$is_draft" == "true" ]]; then add_block "draft: wait for current-head CI Gate success, then mark the PR ready"; fi
 if [[ "$pr_state" != "OPEN" ]]; then add_block "state: PR is ${pr_state}, not open"; fi
 # The gate answers came from `gh` at one SHA and the diff from git at another, so no
 # combination of them is a statement about a single tree. Nothing is merged on that.

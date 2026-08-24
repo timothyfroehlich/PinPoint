@@ -209,8 +209,9 @@ _compute_review_state() {
 
 _review_remedy() {
   local pr=$1
-  echo "  remedy: either comment @codex review on PR #${pr} and obtain an approval of this"
-  echo "          head, or run the existing review-preflight + mark-review attestation path."
+  echo "  remedy: await automatic Codex approval of this head on PR #${pr}. Use @codex"
+  echo "          review only when Tim explicitly requests it; use review-preflight +"
+  echo "          mark-review only after Tim explicitly runs a local review."
 }
 
 # Gate 2: Zero unresolved review threads. Uses GraphQL with cursor pagination.

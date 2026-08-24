@@ -19,9 +19,8 @@ reporting a failure for something that was not one.
    a healthy run whose jobs were all still pending. "We could not find out" is
    not a verdict. (PP-qkl8)
 
-Review state (PP-4ric): Copilot review was retired on 2026-08-02, so no bot
-reviews this repo. `--check-ready` reports which native Codex-review state a PR is
-in without gating on it — "reviewed", "reviewed then pushed past", and "never
+Review state: `--check-ready` reports which automatic Codex-review state a PR is
+in without gating on it — "reviewed", "reviewed then pushed past", and "not yet
 reviewed" need different actions, and flattening a stale approval into "reviewed"
 is how a commit nobody read reaches the merge command.
 
@@ -832,7 +831,8 @@ def test_review_state_unreviewed(monkeypatch):
     monkeypatch.setattr(pr_watch, "gh", make_gh(reviews=()))
     state, detail = pr_watch.review_state(PR)
     assert state == "unreviewed"
-    assert "@codex review" in detail
+    assert "automatic Codex review" in detail
+    assert "only when Tim explicitly requests it" in detail
 
 
 @pytest.mark.unit

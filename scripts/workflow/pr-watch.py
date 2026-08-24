@@ -68,7 +68,8 @@ LEGACY_CLAUDE_MARKER_PREFIX = "<!-- pinpoint-claude-review:"
 # Kept deliberately in sync with scripts/workflow/_pr-gates.sh. This watcher only
 # reports the state; merge-pr.sh is the enforcement point.
 REVIEW_HINT = (
-    "comment @codex review on PR #{pr}; the approval must cover the current head"
+    "await automatic Codex review of PR #{pr} at the current head; use @codex review "
+    "only when Tim explicitly requests it"
 )
 
 STARTUP_RETRIES = 6  # attempts to find runs for current SHA
@@ -499,10 +500,9 @@ def run_audit(pr: int) -> bool:
         "applied" if READY_LABEL in labels else "not applied (orchestrator applies)"
     )
 
-    # Reported, but NOT part of the verdict. This mode answers "is this PR worth
-    # Tim's Codex review right now?", and the review is what happens AFTER that
-    # answer is yes — gating on it would make the check circular and permanently
-    # red. merge-pr.sh's `reviewed` gate is the one that refuses to merge an
+    # Reported, but NOT part of the verdict. This mode answers "can this head leave
+    # draft and enter automatic review?"; gating on review here would make the check
+    # circular and permanently red. merge-pr.sh's `reviewed` gate refuses to merge an
     # unreviewed head. A stale Codex approval is worth seeing here anyway: it means the
     # PR looks reviewed and is not.
     try:
