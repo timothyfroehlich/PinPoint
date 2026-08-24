@@ -225,7 +225,18 @@ def test_hook_malformed_json(mock_git: dict, tmp_path: Path) -> None:
 def test_hook_fails_closed_when_worktree_add_fails(
     mock_git: dict, tmp_path: Path
 ) -> None:
-    """When git worktree add fails (e.g. post-checkout hook failure), hook must fail closed."""
+    """When git worktree add fails, hook must fail closed, run cleanup, and delete branch."""
+    # Create mock worktree_cleanup.py in tmp_path/scripts
+    scripts_dir = tmp_path / "scripts"
+    scripts_dir.mkdir()
+    cleanup_log = tmp_path / "cleanup_calls.txt"
+    cleanup_script = scripts_dir / "worktree_cleanup.py"
+    cleanup_script.write_text(f"""#!/usr/bin/env python3
+import sys
+from pathlib import Path
+Path("{cleanup_log}").write_text(" ".join(sys.argv[1:]))
+""")
+
     # Configure mock git to fail on worktree add
     git_script = mock_git["bin_dir"] / "git"
     git_script.write_text(f"""#!/bin/bash
@@ -264,3 +275,11 @@ esac
     assert stdout.strip() == ""  # Must NOT print the worktree path on stdout
     assert "permanent error (not retrying)" in stderr
     assert "fatal: post-checkout hook failed" in stderr
+
+    # Verify worktree_cleanup.py was invoked
+    assert cleanup_log.exists()
+    assert ".claude/worktrees/agent-setup-fail" in cleanup_log.read_text()
+
+    # Verify git branch -D was invoked
+    calls = mock_git["log_path"].read_text().splitlines()
+    assert any("branch -D worktree-agent-setup-fail" in c for c in calls)
