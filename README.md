@@ -77,8 +77,9 @@ If you’re changing code, **start here**:
 
 ### Prerequisites
 
-- Node.js **24** (pinned in `.nvmrc`; `22.22+` or `26+` also satisfy `engines`)
-- pnpm (see `packageManager` in `package.json`)
+- [mise](https://mise.jdx.dev/) **2026.8.11+** (manages development Node and pnpm)
+- Node.js **24** (pinned in `mise.toml`; `22.22+` or `26+` also satisfy `engines`)
+- pnpm (exact version and sha512 integrity pinned in `packageManager` in `package.json`)
 - Supabase account (for local dev / preview / prod)
 
 ### Local Setup (Short Version)
@@ -87,10 +88,11 @@ If you’re changing code, **start here**:
 git clone https://github.com/timothyfroehlich/PinPoint.git
 cd PinPoint
 
-pnpm install
-cp .env.example .env.local   # then fill in Supabase + DB vars
+mise install --locked           # installs pinned Node and pnpm via package.json
+mise exec -- pnpm install       # (or plain `pnpm install` if mise shell hook is active)
+cp .env.example .env.local      # then fill in Supabase + DB vars
 
-pnpm run dev                  # automatically ensures Supabase is running
+mise exec -- pnpm run dev       # automatically ensures Supabase is running
 ```
 
 Open `http://localhost:<PORT>` (see `.env.local`) to use the app.

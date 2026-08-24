@@ -299,6 +299,12 @@ jobs:
       - name: Install pytest
         run: pipx install "pytest==9.0.3"
 
+      - name: Setup mise
+        uses: jdx/mise-action@3c2e0cf82a5b2e5249f0d3635a4d83d0ae861518  # ratchet:jdx/mise-action@v4.2.5
+        with:
+          version: "2026.8.11"
+          install: false
+
       - name: YAML lint
         run: yamllint .github/workflows/
 
