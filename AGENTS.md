@@ -44,7 +44,7 @@ Before exploring or changing non-mechanical product behavior, read
 ADRs. Skip it for mechanical changes that do not affect product behavior or
 domain language.
 
-**The huddle is the exception, and it is not in this repo.** Inter-session coordination — the SessionStart identity notice, the poll, the daily bead, and the main watcher — moved to Tim's dotfiles on 2026-08-12: scripts at `~/.agents/huddle/`, skill at `~/.claude/skills/huddle/`, tests alongside the scripts. Nothing about it was PinPoint-specific, and living outside the repo means editing it costs no PR. What stays here is the harness hook registrations in `.claude/settings.json` and `.codex/hooks.json` and the channel itself — the huddle resolves `.agents/huddle/` and its beads from the cwd's repo, so the conversation is still per-project.
+**The huddle is global, not a PinPoint subsystem.** Its implementation lives in Tim's dotfiles, with scripts at `~/.agents/huddle/` and the skill at `~/.claude/skills/huddle/`; harnesses call those shared adapters. The channel remains per-project: it resolves its `.agents/huddle/` state and beads from the cwd's repository.
 
 ## 4. Environment
 
