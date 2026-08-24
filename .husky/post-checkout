@@ -72,9 +72,10 @@ if [ "$BRANCH_CHECKOUT" = "1" ]; then
     MAIN_WT=$(git worktree list --porcelain | head -1 | sed 's/^worktree //')
     SETUP="$MAIN_WT/scripts/worktree_setup.py"
     if [ -f "$SETUP" ]; then
-      python3 "$SETUP" || true
+      python3 "$SETUP"
     fi
   fi
 fi
+
 
 
