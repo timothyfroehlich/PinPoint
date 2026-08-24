@@ -180,9 +180,9 @@ echo "::endgroup::"
 #   deploy (API):   POST /v13/deployments  gitSource:{github, org, repo, ref}
 #   auth:           VERCEL_TOKEN + VERCEL_ORG_ID (teamId)
 # The CLI is invoked via the pinned wrapper (vercel-cli.sh) through npx so no
-# global install or pnpm prerequisite is needed; override $VERCEL for a custom binary.
+# global install or pnpm prerequisite is needed.
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-VERCEL="${VERCEL:-${HERE}/vercel-cli.sh}"
+VERCEL="${HERE}/vercel-cli.sh"
 
 # The publishable/anon key may arrive under either name from `branches get`.
 # env.ts reads NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? NEXT_PUBLIC_SUPABASE_ANON_KEY.

@@ -114,7 +114,12 @@ def test_preview_scripts_use_pinned_wrapper() -> None:
     for script in (PREVIEW_CREATE, PREVIEW_DESTROY):
         content = script.read_text(encoding="utf-8")
         assert target_substr not in content, f"{script} still contains vercel@latest"
-        assert "vercel-cli.sh" in content, f"{script} does not reference vercel-cli.sh"
+        assert 'VERCEL="${HERE}/vercel-cli.sh"' in content, (
+            f"{script} does not bind VERCEL unconditionally to vercel-cli.sh"
+        )
+        assert "${VERCEL:-" not in content, (
+            f"{script} still contains ambient VERCEL override"
+        )
 
 
 def test_no_floating_vercel_references_in_repo() -> None:
