@@ -87,17 +87,12 @@ const nextConfig: NextConfig = {
       // to account for multipart FormData overhead (~20% buffer) and avoid 413s at 1MB default.
       bodySizeLimit: "12mb",
     },
-    // Next 16.3 flipped this default to true, which makes `next build` resolve
-    // `typescript/bin/tsc`. Our TS7 dual install aliases the `typescript`
-    // package name to @typescript/typescript6 (bin: tsc6 — deliberately, to
-    // coexist with TS7's tsc), so CLI mode finds nothing and the build dies
-    // with "trying to use TypeScript but do not have the required package(s)
-    // installed" (our exact setup is the repro in vercel/next.js#96589; the
-    // same missing-tscPath path also silently drops tsconfig `paths`,
-    // vercel/next.js#97015). `false` keeps the TS6 JS-API path, which the shim
-    // fully provides. No-op on Next 16.2.x (already the default there).
-    // REVISIT: flips to `true` when `typescript` becomes real TS7 (PP-sc77.5).
-    useTypeScriptCli: false,
+    // TypeScript 7 is the real `typescript` package, so CLI mode runs its
+    // native `tsc` for the build type check. Next 16.2.x needs CLI mode because
+    // API mode requires a JavaScript compiler API; 16.3+ uses this by default.
+    // It checks `typescript.tsconfigPath` (tsconfig.app.json) and reports raw
+    // tsc diagnostics rather than Next code frames.
+    useTypeScriptCli: true,
   },
   typescript: {
     // App-source project. The root tsconfig.json is references-only after the
