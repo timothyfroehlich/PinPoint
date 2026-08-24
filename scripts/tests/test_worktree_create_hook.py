@@ -344,6 +344,16 @@ case "$sub" in
 esac
 """)
 
+    scripts_dir = tmp_path / "scripts"
+    scripts_dir.mkdir(exist_ok=True)
+    cleanup_log = tmp_path / "cleanup_calls_existing.txt"
+    cleanup_script = scripts_dir / "worktree_cleanup.py"
+    cleanup_script.write_text(f"""#!/usr/bin/env python3
+import sys
+from pathlib import Path
+Path("{cleanup_log}").write_text(" ".join(sys.argv[1:]))
+""")
+
     stdin_data = {
         "session_id": "test-session",
         "transcript_path": "test-path",
@@ -358,6 +368,9 @@ esac
 
     assert return_code != 0
     assert "permanent error (not retrying)" in stderr
+
+    # Must NOT run worktree_cleanup.py because git worktree add did not create the worktree
+    assert not cleanup_log.exists()
 
     calls = mock_git["log_path"].read_text().splitlines()
     # Must NOT run git branch -D because branch existed before
