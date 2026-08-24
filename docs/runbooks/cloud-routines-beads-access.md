@@ -89,27 +89,24 @@ first and failed. The `ls -d … | head -1` form finds the checkout regardless o
 whether `$HOME` is `/root` or the sandbox user's home, and regardless of the
 sandbox username. It fails loud (setup errors) if none of the candidates exist.
 
-That script installs `dolt` (latest) and `bd` (pinned); the agent then runs
+That script installs `dolt` (pinned) and `bd` (pinned); the agent then runs
 `scripts/beads-cloud-init.sh` (below) to materialize the credential and clone.
 
-**Why `bd` is pinned but `dolt` is not.** The 2026-08-16 lockout was a `bd`
-schema migration — `bd` owns `schema_migrations` and the additive migrations that
-broke it, so an accidental `bd` release is the live hazard the pin guards against.
-`dolt` is the storage engine underneath; its on-disk/wire format is stable and
-its releases are designed for cross-version client/server compatibility. The
-shared server on Bazzite runs its own `dolt`, and pinning the cloud client to a
-fixed version could actually _create_ a client/server mismatch when that server
-upgrades — so tracking latest is the safer choice for the client, not an
-oversight. (The old inline setup script installed `dolt` latest too; this is
-unchanged, now stated deliberately.)
+**The compatibility contract pins both `bd` and `dolt`.** The 2026-08-16
+lockout was a `bd` schema migration — `bd` owns `schema_migrations` and the
+additive migrations that broke it, while `dolt` is the storage engine. Pinning
+both `bd` and `dolt` to exact versions in `scripts/beads-compatibility.json`
+guarantees consistent schema handling, client-server wire compatibility, and
+reproducibility across cloud sandboxes, Mac laptops, and Bazzite hosts.
 
-**The bd pin is single-source.** `beads-cloud-setup.sh` reads the version out of
-`BD_PINNED_VERSION` in `scripts/beads-cloud-init.sh` and installs exactly that, by
-exact release tag — so the installed binary and the runtime guard cannot disagree,
-and the UI field carries no version at all. Bumping the pin is a one-line edit to
-`beads-cloud-init.sh` (a weekly-chores item); the UI shim never changes.
+**The toolchain pins are single-source.** `beads-cloud-setup.sh` reads both
+`bd` and `dolt` versions from `scripts/beads-compatibility.json` and installs
+exactly those by exact release tags — so installed binaries and runtime guards
+cannot disagree, and the UI field carries no versions at all. Bumping the pins
+is an edit to `scripts/beads-compatibility.json` (a weekly-chores item); the UI
+shim never changes.
 
-Why an exact pin: on 2026-08-16 an accidental newer release (1.2.1) migrated the
+Why exact pins: on 2026-08-16 an accidental newer release (1.2.1) migrated the
 shared DB to a schema no supported binary could read and locked every client out
 for two days. An exact pin fails loud (a drifted binary makes the init script
 refuse to run) rather than silent (a newer release migrating the shared DB before
@@ -118,7 +115,8 @@ anyone notices).
 Caveat, now narrowed: only the one-line shim lives in the un-diffable UI — the
 install logic it calls is in git. The reviewable, enforced backstop remains the
 version guard in `scripts/beads-cloud-init.sh`, which refuses to touch the DB
-unless the installed `bd` equals its pin.
+unless both the installed `bd` and `dolt` equal their pins in
+`scripts/beads-compatibility.json`.
 
 ## Credential setup (one-time)
 
@@ -158,12 +156,13 @@ bd dolt push
 
 The script reads `DOLT_CREDS_JWK`, `DOLT_CREDS_PUB`, and `BEADS_SYNC_REMOTE` from
 the environment (agent-runtime only — see #55440 above), writes the DoltHub
-credential and `~/.dolt/config_global.json`, checks `bd version` against its pin,
-then clones into `~/beads`. It exits non-zero — refusing to touch the DB — on a
-version mismatch or any missing env var, so a routine fails fast instead of
-running against a wrong binary. The generated `user.name`/`user.email` are Dolt
-commit metadata only (not authentication — the JWK handles that); override with
-`DOLT_USER_NAME` / `DOLT_USER_EMAIL` for a specific address.
+credential and `~/.dolt/config_global.json`, checks `bd version` and
+`dolt version` against `scripts/beads-compatibility.json`, then clones into
+`~/beads`. It exits non-zero — refusing to touch the DB — on a version mismatch
+or any missing env var, so a routine fails fast instead of running against a
+wrong binary. The generated `user.name`/`user.email` are Dolt commit metadata
+only (not authentication — the JWK handles that); override with `DOLT_USER_NAME`
+/ `DOLT_USER_EMAIL` for a specific address.
 
 After the clone (or re-sync pull), the script creates five tables the remote
 never carries: `events`, `bd_events_journal`, `bd_events_seq`, `leases`, and

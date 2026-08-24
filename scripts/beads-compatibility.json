@@ -1,0 +1,6 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "PinPoint compatibility contract for bd (Beads CLI) and Dolt database engine",
+  "bd": "1.2.2",
+  "dolt": "2.3.1"
+}
