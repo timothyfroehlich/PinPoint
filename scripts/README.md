@@ -25,7 +25,7 @@ Main worktree uses default ports (slot 0). All others get dynamically allocated 
 ## Scripts
 
 - **`worktree_setup.py`** — Called by post-checkout hook. Allocates ports, generates configs.
-- **`worktree_cleanup.py`** — Called by Claude Code's WorktreeRemove hook. Stops Supabase, removes Docker volumes, deallocates slot. Exit 0 means cleanup actually completed; `1` failed, `2` refused (main worktree), `3` the target path is gone but residue remains (PP-omz3), `4` Supabase volume state was unknown so volumes may have leaked (PP-3w4g). Don't read a non-zero exit as noise — it's the only signal a worktree leaked.
+- **`worktree_cleanup.py`** — The complete teardown entry point for Claude, Codex, reap, and manual callers: `python3 scripts/worktree_cleanup.py <worktree-path>`. Claude uses `--claude-hook`; configure Codex cleanup as `python3 scripts/worktree_cleanup.py .`. It stops Supabase, removes volumes, removes/prunes the Git worktree, then releases the slot. Exit `0` means complete; `1` failed, `2` refused the main worktree, `3` found a missing target with residue, and `4` removed the worktree while Docker state was unknown. Preserve non-zero codes as the leak diagnostic.
 
 ## Testing
 
