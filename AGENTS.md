@@ -101,9 +101,9 @@ Only stop services you started in this session, by specific PID or via worktree-
 | `./scripts/workflow/pr-watch.py <PR>`     | Watch CI for a PR (Monitor-compatible). Never hand-roll a polling loop.                                                                                                                                                                                                                                                            |
 | `pnpm run dev:status`                     | Check whether Next.js / Supabase / Postgres are up — one command, worktree-port aware. Use it instead of ad-hoc `curl` health checks against localhost.                                                                                                                                                                            |
 
-### Type-check engine (TS 7 GA dual-install)
+### Type-check engine (TS 7)
 
-TypeScript 7.0 (the Go-native compiler) is GA and installed via Microsoft's recommended dual-install: `@typescript/native` (alias of `typescript@^7`) ships the native `tsc` binary that runs the `typecheck`, `typecheck:tests`, and `typecheck:e2e` gates (~4–6× faster than TS6's `tsc`), while the `typescript` package name is aliased to `@typescript/typescript6` — the TS6 JS compiler API + a `tsc6` binary. `next build` still type-checks on that TS6 API (PP-sc77.5 migrates Next onto TS7 CLI mode). Bin names are unambiguous: `tsc` = native 7, `tsc6` = JS 6. `pnpm run typecheck:tsc6` runs the TS6 engine for A/B comparison. PP-8mv1 moved the test/e2e configs onto native `tsc` (0 divergences vs `tsc6` on `tsconfig.tests.check.json` and `e2e/tsconfig.json`) and retired the `tsc-baseline` gate. History and validation record: `docs/plans/2026-06-27-typescript-7-upgrade-plan.md` (PRs #1586, PP-xu96, PP-8mv1).
+`typescript` is TypeScript 7.0, whose Go-native `tsc` runs the `typecheck`, `typecheck:tests`, and `typecheck:e2e` gates. `next build` uses CLI mode to run the same compiler against `tsconfig.app.json`; Next 16.2.x needs this because its API mode requires a JavaScript compiler API, while 16.3+ defaults to CLI mode. The CLI emits raw `tsc` diagnostics rather than Next code frames. History and validation record: `docs/plans/2026-06-27-typescript-7-upgrade-plan.md` (PRs #1586, PP-xu96, PP-8mv1, PP-sc77.5).
 
 ### Lint engine (Oxlint)
 
