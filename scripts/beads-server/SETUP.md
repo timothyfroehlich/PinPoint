@@ -35,15 +35,17 @@ Bazzite bd ──MySQL────────┘        systemd --user, DB "PP"
 | File                           | Installs to                                           | Purpose                                          |
 | ------------------------------ | ----------------------------------------------------- | ------------------------------------------------ |
 | `server.yaml`                  | `~/.beads-server/server.yaml`                         | dolt sql-server config (bind IP, port, data_dir) |
+| `dolt-sql-server.sh`           | `~/.beads-server/dolt-sql-server.sh`                  | dolt sql-server wrapper with manifest guard      |
 | `dolt-sql-server.service`      | `~/.config/systemd/user/dolt-sql-server.service`      | runs the server headless                         |
 | `beads-dolthub-bridge.sh`      | `~/.beads-server/beads-dolthub-bridge.sh`             | one commit/pull/push cycle (loud on conflict)    |
 | `beads-dolthub-bridge.service` | `~/.config/systemd/user/beads-dolthub-bridge.service` | oneshot wrapper for the bridge script            |
 | `beads-dolthub-bridge.timer`   | `~/.config/systemd/user/beads-dolthub-bridge.timer`   | fires the bridge every ~15 min                   |
 
 > **chmod note (Claude Code sandbox):** the executable bit cannot be set from an
-> agent session. After copying `beads-dolthub-bridge.sh` into place, **Tim must
-> run** `chmod +x ~/.beads-server/beads-dolthub-bridge.sh` manually. The unit
-> invokes it via `bash …/beads-dolthub-bridge.sh`, so the exec bit is belt-and-
+> agent session. After copying `dolt-sql-server.sh` and `beads-dolthub-bridge.sh`
+> into place, **Tim must run**
+> `chmod +x ~/.beads-server/dolt-sql-server.sh ~/.beads-server/beads-dolthub-bridge.sh`
+> manually. The units invoke them via `bash …`, so the exec bit is belt-and-
 > suspenders, but set it anyway.
 
 ## Preflight (BLOCKER-GRADE — do not skip)
@@ -63,24 +65,40 @@ Bazzite bd ──MySQL────────┘        systemd --user, DB "PP"
 
 ## Cutover steps
 
-### 1. Install dolt on Bazzite
+### 1. Install dolt and bd on Bazzite (via user-global mise)
 
-Bazzite is immutable Fedora Atomic; use Homebrew (linuxbrew):
+`dolt` and `bd` are pinned to exact versions governed by the repository compatibility contract at `scripts/beads-compatibility.json` (e.g. `bd` 1.2.2, `dolt` 2.3.1).
+
+On Bazzite (and Mac), these tools are managed through user-global `mise` (declared in Stow-managed dotfiles `~/.config/mise/config.toml` per PP-h2ui.10), rather than mutable Homebrew packages or OS layers:
 
 ```bash
-brew install dolt
-which dolt   # expect /home/linuxbrew/.linuxbrew/bin/dolt
+# Verify mise execution and exact version alignment against scripts/beads-compatibility.json:
+mise exec -- dolt version   # expect exact pinned version, e.g. 2.3.1
+mise exec -- bd version     # expect exact pinned version, e.g. 1.2.2
 ```
 
-The systemd `--user` units hardcode `/home/linuxbrew/.linuxbrew/bin` on `PATH`
-because `--user` units do **not** inherit an interactive shell's PATH (same gotcha
-as `claude-rc.service`).
+The systemd `--user` units invoke `%h/.local/bin/mise exec -- ...` explicitly with `MISE_NOT_FOUND_AUTO_INSTALL=false` and `MISE_NOT_FOUND_SYSTEM_FALLBACK=false` so the service fails closed on missing tools and does not depend on interactive shell PATH activation.
 
-### 2. Seed the data dir from DoltHub
+### 2. Disposable compatibility testing
+
+Before starting the persistent service (or after any version bump in `scripts/beads-compatibility.json`), perform a disposable smoke test in a temporary directory on a non-standard port:
+
+```bash
+mkdir -p /tmp/dolt-compat-test && cd /tmp/dolt-compat-test
+mise exec -- dolt init --name test --email test@pinpoint.invalid
+mise exec -- dolt sql-server --host 127.0.0.1 --port 3307 --data-dir /tmp/dolt-compat-test &
+TEST_PID=$!
+sleep 2
+mise exec -- dolt --host 127.0.0.1 --port 3307 --user root --password "" --no-tls sql -q "SHOW DATABASES;"
+kill "$TEST_PID"
+rm -rf /tmp/dolt-compat-test
+```
+
+### 3. Seed the data dir from DoltHub
 
 ```bash
 mkdir -p ~/.beads-server/dolt && cd ~/.beads-server/dolt
-dolt clone https://doltremoteapi.dolthub.com/advacar/pinpoint-beads PP
+mise exec -- dolt clone https://doltremoteapi.dolthub.com/advacar/pinpoint-beads PP
 # → ~/.beads-server/dolt/PP with its `origin` remote already registered
 # Remove any stray `.dolt/` the clone leaves in the PARENT data dir — otherwise the
 # server exposes a phantom empty database named after the dir alongside `PP`.
@@ -90,7 +108,7 @@ rm -rf ~/.beads-server/dolt/.dolt
 Point `data_dir` in `server.yaml` at `~/.beads-server/dolt` (the parent that
 contains the `PP` database directory).
 
-### 3. First boot (localhost) to create the `beads` user
+### 4. First boot (localhost) to create the `beads` user
 
 Boot once WITHOUT `--skip-root-user-initialization` so the passwordless root can
 create the app user, bound to loopback only. (We use `127.0.0.1` rather than the
@@ -104,7 +122,7 @@ to a DB admin connection.)
 cd ~/.beads-server/dolt
 # Boot with the SAME --privilege-file the hardened server will read, or the user
 # won't persist into it.
-dolt sql-server --host 127.0.0.1 --port 3306 \
+mise exec -- dolt sql-server --host 127.0.0.1 --port 3306 \
   --data-dir ~/.beads-server/dolt --privilege-file ~/.beads-server/privileges.db &
 THROWAWAY_PID=$!
 sleep 5
@@ -112,7 +130,7 @@ sleep 5
 # `dolt sql --host …` errors with "unknown option host"). Passwordless root needs an
 # explicit `--password ""` (no TTY to prompt otherwise). `--no-tls` for the plaintext
 # first boot.
-dolt --host 127.0.0.1 --port 3306 --user root --password "" --no-tls sql -q \
+mise exec -- dolt --host 127.0.0.1 --port 3306 --user root --password "" --no-tls sql -q \
   "CREATE USER 'beads'@'%' IDENTIFIED BY '<PASSWORD>'; GRANT ALL PRIVILEGES ON *.* TO 'beads'@'%' WITH GRANT OPTION; FLUSH PRIVILEGES;"
 kill "$THROWAWAY_PID"   # stop the throwaway localhost server (PID, not %1 — job control isn't reliable in scripts)
 ```
@@ -127,13 +145,16 @@ re-grant later, the hardened server binds only the Tailscale IP where root is de
 Pick a strong `<PASSWORD>`; it goes ONLY into env (next steps), never into any
 committed file.
 
-### 4. Restart hardened via the unit
+### 5. Restart hardened via the unit
 
-Copy the templates into place, edit paths, then:
+> **NOTE:** Merging changes to unit templates in PinPoint does **not** touch or restart
+> the running service on Bazzite. Service installation/restart is an explicit operator
+> handoff.
+
+Copy the templates into place, edit paths if needed, then:
 
 ```bash
-cp server.yaml ~/.beads-server/server.yaml            # edit data_dir/privilege_file/host
-cp beads-dolthub-bridge.sh ~/.beads-server/            # then: chmod +x (Tim, manual)
+cp server.yaml dolt-sql-server.sh beads-dolthub-bridge.sh ~/.beads-server/ # then: chmod +x (Tim, manual)
 cp dolt-sql-server.service beads-dolthub-bridge.service beads-dolthub-bridge.timer \
    ~/.config/systemd/user/
 loginctl enable-linger "$USER"     # already on for Tim; idempotent
@@ -145,7 +166,7 @@ systemctl --user enable --now dolt-sql-server.service
 `--skip-root-user-initialization`, so the hardened server never re-mints a
 passwordless root. `privilege_file` persists the `beads` grant across restarts.
 
-### 5. Repoint both machines to server mode
+### 6. Repoint both machines to server mode
 
 Per machine, edit `.beads/metadata.json` (gitignored, per-machine). Do **not** put
 `dolt_server_port` here — it's deprecated (bd warns "can cause cross-project data
@@ -191,7 +212,7 @@ bd show PP-0fwz        # a real read over the wire
 `bd doctor --server` is the drift check — trust it over hand-parsing
 `metadata.json` for anything beyond the mode string.
 
-### 6. Register the DoltHub remote + enable the bridge
+### 7. Register the DoltHub remote + enable the bridge
 
 The cloned data dir arrives with `origin` set, but confirm from the server SQL:
 
@@ -202,7 +223,7 @@ systemctl --user enable --now beads-dolthub-bridge.timer
 journalctl --user -u beads-dolthub-bridge -f       # watch one full cycle land
 ```
 
-### 7. Keep the rollback asset
+### 8. Keep the rollback asset
 
 Rename the old embedded data dir on both machines (do NOT delete until burn-in ≈ 1
 week is clean):

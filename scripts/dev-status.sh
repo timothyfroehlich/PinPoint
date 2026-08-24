@@ -21,14 +21,9 @@ TIMEOUT=90
 POLL_INTERVAL=0.5
 SUMMARY_INTERVAL=5
 
-# Preflight: fail fast if Supabase hasn't been started at all
-if command -v supabase &>/dev/null; then
-  sb_status=$(supabase status 2>&1 || true)
-  if ! echo "$sb_status" | grep -q "is running"; then
-    echo "❌ Supabase is not started. Run: supabase start"
-    exit 1
-  fi
-fi
+# Supabase CLI status text is not a health contract: its format changes and it lists
+# intentionally disabled optional services. The worktree-local API and Postgres probes
+# below are the authoritative readiness checks.
 
 nextjs_up=false
 supabase_up=false
