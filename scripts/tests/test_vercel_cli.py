@@ -1,0 +1,101 @@
+"""Tests for the pinned Vercel CLI wrapper and preview caller bindings (PP-h2ui.7).
+
+Acceptance criteria:
+- Every privileged Vercel CLI invocation uses one reviewed exact version and no
+  caller resolves latest at runtime.
+- Preview creation and destruction default to the pinned vercel-cli.sh wrapper.
+- Production deployment retains `migrate:production && next build` without mise coupling.
+"""
+
+import json
+import os
+import re
+import stat
+import subprocess
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).parent.parent.parent
+VERCEL_WRAPPER = REPO_ROOT / "scripts" / "workflow" / "preview" / "vercel-cli.sh"
+PREVIEW_CREATE = REPO_ROOT / "scripts" / "workflow" / "preview" / "preview-create.sh"
+PREVIEW_DESTROY = REPO_ROOT / "scripts" / "workflow" / "preview" / "preview-destroy.sh"
+PACKAGE_JSON = REPO_ROOT / "package.json"
+THIS_FILE = Path(__file__).resolve()
+
+
+def test_vercel_cli_wrapper_exists_and_is_executable() -> None:
+    assert VERCEL_WRAPPER.is_file(), f"Missing wrapper at {VERCEL_WRAPPER}"
+    mode = VERCEL_WRAPPER.stat().st_mode
+    assert bool(mode & stat.S_IXUSR), f"{VERCEL_WRAPPER} is not executable"
+
+
+def test_vercel_cli_wrapper_pins_exact_version() -> None:
+    content = VERCEL_WRAPPER.read_text(encoding="utf-8")
+    assert "vercel@" + "latest" not in content
+    match = re.search(r"VERCEL_CLI_VERSION=[^\n]*?(\d+\.\d+\.\d+)", content)
+    assert match is not None, "Failed to find pinned semver in vercel-cli.sh"
+    pinned_version = match.group(1)
+    assert pinned_version == "57.0.0"
+
+
+def test_vercel_cli_wrapper_execution_with_mock_npx(tmp_path: Path) -> None:
+    # Create a mock npx binary in tmp_path to verify argument forwarding
+    mock_npx = tmp_path / "npx"
+    log_file = tmp_path / "npx.log"
+    mock_npx.write_text(
+        f"""#!/usr/bin/env bash
+echo "$@" >> "{log_file}"
+cat >> "{log_file}"
+""",
+        encoding="utf-8",
+    )
+    mock_npx.chmod(0o755)
+
+    env = os.environ.copy()
+    env["PATH"] = f"{tmp_path}:{env.get('PATH', '')}"
+
+    result = subprocess.run(
+        [str(VERCEL_WRAPPER), "env", "add", "FOO", "preview", "feat/branch", "--force"],
+        input="secret_value",
+        text=True,
+        capture_output=True,
+        env=env,
+        check=False,
+    )
+    assert result.returncode == 0, f"Wrapper failed: {result.stderr}"
+
+    log_content = log_file.read_text(encoding="utf-8")
+    assert "--yes vercel@57.0.0 env add FOO preview feat/branch --force" in log_content
+    assert "secret_value" in log_content
+
+
+def test_preview_scripts_use_pinned_wrapper() -> None:
+    target_substr = "vercel@" + "latest"
+    for script in (PREVIEW_CREATE, PREVIEW_DESTROY):
+        content = script.read_text(encoding="utf-8")
+        assert target_substr not in content, f"{script} still contains vercel@latest"
+        assert "vercel-cli.sh" in content, f"{script} does not reference vercel-cli.sh"
+
+
+def test_no_floating_vercel_references_in_repo() -> None:
+    # Walk repository files and ensure no active script/workflow uses vercel@latest
+    target_substr = "vercel@" + "latest"
+    patterns = ["*.sh", "*.yaml", "*.yml", "*.ts", "*.mjs", "*.py"]
+    for pattern in patterns:
+        for path in REPO_ROOT.glob(f"**/{pattern}"):
+            if (
+                "node_modules" in path.parts
+                or ".git" in path.parts
+                or ".dolt" in path.parts
+                or path.resolve() == THIS_FILE
+            ):
+                continue
+            text = path.read_text(encoding="utf-8", errors="ignore")
+            assert target_substr not in text, f"Found {target_substr} in {path}"
+
+
+def test_package_json_vercel_build_contract() -> None:
+    pkg = json.loads(PACKAGE_JSON.read_text(encoding="utf-8"))
+    scripts = pkg.get("scripts", {})
+    assert scripts.get("vercel-build") == "pnpm run migrate:production && next build"
+    assert "mise" not in scripts.get("vercel-build", "")
+    assert scripts.get("migrate:production") == "tsx scripts/migrate-production.ts"

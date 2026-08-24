@@ -51,8 +51,9 @@ echo "::endgroup::"
 # PENDING LIVE VERIFICATION (same caveat as preview-create.sh). Best-effort:
 # missing vars are not an error. `vercel env rm NAME preview <git-branch> --yes`.
 
-# Invoked via npx so no global install is needed; override $VERCEL to pin.
-VERCEL="${VERCEL:-npx --yes vercel@latest}"
+# Invoked via the pinned wrapper (vercel-cli.sh) through npx so no global install is needed; override $VERCEL to pin.
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+VERCEL="${VERCEL:-${HERE}/vercel-cli.sh}"
 
 remove_vercel_env() {
   echo "::group::Remove Vercel env vars for branch '${GIT_BRANCH}'"
