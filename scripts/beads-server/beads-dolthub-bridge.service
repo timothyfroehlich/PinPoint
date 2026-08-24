@@ -26,6 +26,7 @@ Type=oneshot
 # Without this the bridge runs from $HOME and every `bd dolt` call fails.
 WorkingDirectory=%h/Code/PinPoint
 Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+Environment=MISE_EXEC_AUTO_INSTALL=false
 Environment=MISE_NOT_FOUND_AUTO_INSTALL=false
 Environment=MISE_NOT_FOUND_SYSTEM_FALLBACK=false
 # Secret lives here, mode 600, outside git. See SETUP.md.

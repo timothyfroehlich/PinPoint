@@ -175,20 +175,125 @@ class TestCloudInitGuards:
         assert proc.returncode != 0
 
 
+DOLT_LAUNCHER = REPO_ROOT / "scripts" / "beads-server" / "dolt-sql-server.sh"
+BRIDGE_SCRIPT = REPO_ROOT / "scripts" / "beads-server" / "beads-dolthub-bridge.sh"
+
+
 class TestBazziteServiceTemplates:
-    def test_dolt_service_uses_mise_exec(self):
+    def test_dolt_service_uses_mise_exec_and_launcher(self):
         content = DOLT_SERVICE.read_text(encoding="utf-8")
-        assert "mise exec -- dolt sql-server" in content
+        assert (
+            "mise exec -- /usr/bin/bash %h/.beads-server/dolt-sql-server.sh" in content
+        )
+        assert "MISE_EXEC_AUTO_INSTALL=false" in content
         assert "MISE_NOT_FOUND_AUTO_INSTALL=false" in content
         assert "MISE_NOT_FOUND_SYSTEM_FALLBACK=false" in content
         assert "linuxbrew" not in content
 
     def test_bridge_service_uses_mise_exec(self):
         content = BRIDGE_SERVICE.read_text(encoding="utf-8")
-        assert "mise exec -- /usr/bin/bash" in content
+        assert (
+            "mise exec -- /usr/bin/bash %h/.beads-server/beads-dolthub-bridge.sh"
+            in content
+        )
+        assert "MISE_EXEC_AUTO_INSTALL=false" in content
         assert "MISE_NOT_FOUND_AUTO_INSTALL=false" in content
         assert "MISE_NOT_FOUND_SYSTEM_FALLBACK=false" in content
         assert "linuxbrew" not in content
+
+
+class TestBazziteServiceGuards:
+    def test_dolt_launcher_validates_manifest(self, tmp_path: Path):
+        bin_dir = tmp_path / "bin"
+        bin_dir.mkdir()
+
+        data = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
+        dolt_ver = data["dolt"]
+
+        dolt_bin = bin_dir / "dolt"
+        dolt_bin.write_text(
+            f"#!/bin/sh\nif [ \"$1\" = 'version' ]; then echo 'dolt version {dolt_ver}'; exit 0; fi\necho \"server mock $@\"\n",
+            encoding="utf-8",
+        )
+        dolt_bin.chmod(0o755)
+
+        env = {
+            "PATH": f"{bin_dir}:/usr/bin:/bin",
+            "HOME": str(tmp_path),
+            "PINPOINT_DIR": str(REPO_ROOT),
+        }
+
+        proc = subprocess.run(
+            ["bash", str(DOLT_LAUNCHER), "--help"],
+            env=env,
+            capture_output=True,
+            text=True,
+        )
+        assert proc.returncode == 0
+        assert "matches compatibility contract" in proc.stderr
+
+    def test_dolt_launcher_fails_on_version_mismatch(self, tmp_path: Path):
+        bin_dir = tmp_path / "bin"
+        bin_dir.mkdir()
+
+        dolt_bin = bin_dir / "dolt"
+        dolt_bin.write_text(
+            "#!/bin/sh\necho 'dolt version 9.9.9'\n",
+            encoding="utf-8",
+        )
+        dolt_bin.chmod(0o755)
+
+        env = {
+            "PATH": f"{bin_dir}:/usr/bin:/bin",
+            "HOME": str(tmp_path),
+            "PINPOINT_DIR": str(REPO_ROOT),
+        }
+
+        proc = subprocess.run(
+            ["bash", str(DOLT_LAUNCHER), "--help"],
+            env=env,
+            capture_output=True,
+            text=True,
+        )
+        assert proc.returncode != 0
+        assert "refusing to start server" in proc.stderr
+
+    def test_bridge_script_fails_on_bd_version_mismatch(self, tmp_path: Path):
+        bin_dir = tmp_path / "bin"
+        bin_dir.mkdir()
+
+        data = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
+        dolt_ver = data["dolt"]
+
+        bd_bin = bin_dir / "bd"
+        bd_bin.write_text(
+            "#!/bin/sh\necho 'bd version 0.0.1'\n",
+            encoding="utf-8",
+        )
+        bd_bin.chmod(0o755)
+
+        dolt_bin = bin_dir / "dolt"
+        dolt_bin.write_text(
+            f"#!/bin/sh\necho 'dolt version {dolt_ver}'\n",
+            encoding="utf-8",
+        )
+        dolt_bin.chmod(0o755)
+
+        env = {
+            "PATH": f"{bin_dir}:/usr/bin:/bin",
+            "HOME": str(tmp_path),
+            "PINPOINT_DIR": str(REPO_ROOT),
+            "BEADS_DOLT_PASSWORD": "dummy",
+        }
+
+        proc = subprocess.run(
+            ["bash", str(BRIDGE_SCRIPT)],
+            env=env,
+            capture_output=True,
+            text=True,
+        )
+        assert proc.returncode != 0
+        assert "refusing bridge cycle" in proc.stderr
 
 
 class TestDocumentationReferences:

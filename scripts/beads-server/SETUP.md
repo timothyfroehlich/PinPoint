@@ -35,15 +35,17 @@ Bazzite bd ──MySQL────────┘        systemd --user, DB "PP"
 | File                           | Installs to                                           | Purpose                                          |
 | ------------------------------ | ----------------------------------------------------- | ------------------------------------------------ |
 | `server.yaml`                  | `~/.beads-server/server.yaml`                         | dolt sql-server config (bind IP, port, data_dir) |
+| `dolt-sql-server.sh`           | `~/.beads-server/dolt-sql-server.sh`                  | dolt sql-server wrapper with manifest guard      |
 | `dolt-sql-server.service`      | `~/.config/systemd/user/dolt-sql-server.service`      | runs the server headless                         |
 | `beads-dolthub-bridge.sh`      | `~/.beads-server/beads-dolthub-bridge.sh`             | one commit/pull/push cycle (loud on conflict)    |
 | `beads-dolthub-bridge.service` | `~/.config/systemd/user/beads-dolthub-bridge.service` | oneshot wrapper for the bridge script            |
 | `beads-dolthub-bridge.timer`   | `~/.config/systemd/user/beads-dolthub-bridge.timer`   | fires the bridge every ~15 min                   |
 
 > **chmod note (Claude Code sandbox):** the executable bit cannot be set from an
-> agent session. After copying `beads-dolthub-bridge.sh` into place, **Tim must
-> run** `chmod +x ~/.beads-server/beads-dolthub-bridge.sh` manually. The unit
-> invokes it via `bash …/beads-dolthub-bridge.sh`, so the exec bit is belt-and-
+> agent session. After copying `dolt-sql-server.sh` and `beads-dolthub-bridge.sh`
+> into place, **Tim must run**
+> `chmod +x ~/.beads-server/dolt-sql-server.sh ~/.beads-server/beads-dolthub-bridge.sh`
+> manually. The units invoke them via `bash …`, so the exec bit is belt-and-
 > suspenders, but set it anyway.
 
 ## Preflight (BLOCKER-GRADE — do not skip)
@@ -152,8 +154,7 @@ committed file.
 Copy the templates into place, edit paths if needed, then:
 
 ```bash
-cp server.yaml ~/.beads-server/server.yaml            # edit data_dir/privilege_file/host
-cp beads-dolthub-bridge.sh ~/.beads-server/            # then: chmod +x (Tim, manual)
+cp server.yaml dolt-sql-server.sh beads-dolthub-bridge.sh ~/.beads-server/ # then: chmod +x (Tim, manual)
 cp dolt-sql-server.service beads-dolthub-bridge.service beads-dolthub-bridge.timer \
    ~/.config/systemd/user/
 loginctl enable-linger "$USER"     # already on for Tim; idempotent

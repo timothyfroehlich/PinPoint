@@ -18,11 +18,12 @@ Wants=network-online.target
 [Service]
 Type=simple
 Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+Environment=MISE_EXEC_AUTO_INSTALL=false
 Environment=MISE_NOT_FOUND_AUTO_INSTALL=false
 Environment=MISE_NOT_FOUND_SYSTEM_FALLBACK=false
 # Absolute path to the seeded Dolt data dir (holds the `PP` database).
 WorkingDirectory=%h/.beads-server/dolt
-ExecStart=%h/.local/bin/mise exec -- dolt sql-server --config %h/.beads-server/server.yaml --skip-root-user-initialization
+ExecStart=%h/.local/bin/mise exec -- /usr/bin/bash %h/.beads-server/dolt-sql-server.sh --config %h/.beads-server/server.yaml --skip-root-user-initialization
 Restart=on-failure
 RestartSec=5
 
