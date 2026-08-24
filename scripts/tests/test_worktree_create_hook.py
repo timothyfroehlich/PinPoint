@@ -237,24 +237,51 @@ from pathlib import Path
 Path("{cleanup_log}").write_text(" ".join(sys.argv[1:]))
 """)
 
-    # Configure mock git to fail on worktree add
+    # Configure mock git to create target directory and branch before failing on post-checkout
+    branch_marker = tmp_path / "branch_created.marker"
     git_script = mock_git["bin_dir"] / "git"
     git_script.write_text(f"""#!/bin/bash
 echo "$@" >> {mock_git["log_path"]}
 sub=""
 skip_next=0
+target=""
 for arg in "$@"; do
   if [ "$skip_next" = "1" ]; then skip_next=0; continue; fi
   case "$arg" in
-    -C) skip_next=1 ;;
+    -C|-b) skip_next=1 ;;
     -*) : ;;
-    *) sub="$arg"; break ;;
+    add) : ;;
+    *)
+      if [ -z "$sub" ]; then
+        sub="$arg"
+      elif [ -z "$target" ]; then
+        target="$arg"
+      fi
+      ;;
   esac
 done
 case "$sub" in
   fetch) exit 0 ;;
-  rev-parse) echo "{MOCK_FETCH_SHA}"; exit 0 ;;
-  worktree) echo "fatal: post-checkout hook failed" >&2; exit 1 ;;
+  rev-parse)
+    case "$*" in
+      *refs/heads*)
+        if [ -f "{branch_marker}" ]; then
+          exit 0
+        fi
+        exit 1
+        ;;
+    esac
+    echo "{MOCK_FETCH_SHA}"
+    exit 0
+    ;;
+  worktree)
+    if [ -n "$target" ]; then
+      mkdir -p "$target"
+    fi
+    touch "{branch_marker}"
+    echo "fatal: post-checkout hook failed" >&2
+    exit 1
+    ;;
   *) exit 0 ;;
 esac
 """)
@@ -283,3 +310,55 @@ esac
     # Verify git branch -D was invoked
     calls = mock_git["log_path"].read_text().splitlines()
     assert any("branch -D worktree-agent-setup-fail" in c for c in calls)
+
+
+def test_hook_does_not_delete_preexisting_branch_on_add_failure(
+    mock_git: dict, tmp_path: Path
+) -> None:
+    """When a branch existed before, rollback must not delete it."""
+    git_script = mock_git["bin_dir"] / "git"
+    git_script.write_text(f"""#!/bin/bash
+echo "$@" >> {mock_git["log_path"]}
+sub=""
+skip_next=0
+for arg in "$@"; do
+  if [ "$skip_next" = "1" ]; then skip_next=0; continue; fi
+  case "$arg" in
+    -C) skip_next=1 ;;
+    -*) : ;;
+    *) sub="$arg"; break ;;
+  esac
+done
+case "$sub" in
+  fetch) exit 0 ;;
+  rev-parse)
+    # Return 0 for verifying branch exists
+    echo "existing-sha"
+    exit 0
+    ;;
+  worktree)
+    echo "fatal: a branch named 'worktree-agent-existing' already exists" >&2
+    exit 1
+    ;;
+  *) exit 0 ;;
+esac
+""")
+
+    stdin_data = {
+        "session_id": "test-session",
+        "transcript_path": "test-path",
+        "cwd": str(tmp_path),
+        "hook_event_name": "WorktreeCreate",
+        "name": "agent-existing",
+    }
+
+    env_mods = {"PATH": f"{mock_git['bin_dir']}:{os.environ['PATH']}"}
+
+    return_code, stdout, stderr = run_hook(stdin_data, tmp_path, env_mods)
+
+    assert return_code != 0
+    assert "permanent error (not retrying)" in stderr
+
+    calls = mock_git["log_path"].read_text().splitlines()
+    # Must NOT run git branch -D because branch existed before
+    assert not any("branch -D" in c for c in calls)
