@@ -298,7 +298,10 @@ def review_state(pr: int) -> tuple[str, str]:
     ]
     reviews = _codex_reviews(pr)
     if reviews:
-        latest = reviews[-1]
+        head_reviews = [
+            review for review in reviews if (review.get("commit_id") or "") == head_sha
+        ]
+        latest = head_reviews[-1] if head_reviews else reviews[-1]
         review_sha = latest.get("commit_id") or ""
         state = (latest.get("state") or "UNKNOWN").upper()
         if state == "APPROVED" and review_sha == head_sha:

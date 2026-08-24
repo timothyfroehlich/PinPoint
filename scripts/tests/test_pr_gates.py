@@ -367,6 +367,21 @@ def test_latest_codex_review_overrides_an_earlier_approval() -> None:
     assert "without approval" in result.stdout
 
 
+def test_delayed_old_head_review_does_not_override_current_native_approval() -> None:
+    reviews = [
+        codex_review(submitted_at="2026-08-22T12:00:00Z"),
+        codex_review(
+            sha=OTHER_SHA,
+            state="COMMENTED",
+            submitted_at="2026-08-22T12:01:00Z",
+        ),
+    ]
+    with gate_env(review_pages=[reviews]) as env:
+        result = run_gate("check_review_happened", env)
+    assert result.returncode == 0, result.stdout
+    assert f"Codex approved head SHA {HEAD_SHA[:7]}" in result.stdout
+
+
 def test_reviews_are_read_across_all_pages() -> None:
     with gate_env(review_pages=[[], [codex_review()]]) as env:
         result = run_gate("check_review_happened", env)

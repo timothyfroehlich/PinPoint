@@ -129,7 +129,8 @@ lockfiles, generated snapshots/assets, or binaries:
 
 ```bash
 remote_head=$(gh pr view <PR> --json headRefOid --jq .headRefOid)
-upload_code_lines=$(
+if ! upload_code_lines=$(
+  set -o pipefail
   git diff --no-renames --numstat "$remote_head"..HEAD |
     awk -F '\t' '
       ($3 ~ /\.(ts|tsx|js|jsx|mjs|cjs|py|sh|sql|css)$/ ||
@@ -139,7 +140,9 @@ upload_code_lines=$(
       $1 ~ /^[0-9]+$/ && $2 ~ /^[0-9]+$/ { total += $1 + $2 }
       END { print total + 0 }
     '
-)
+); then
+  upload_code_lines=51
+fi
 ```
 
 - **51 or more lines:** if the PR is ready, run `gh pr ready <PR> --undo` **before**

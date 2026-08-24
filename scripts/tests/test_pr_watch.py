@@ -1016,6 +1016,25 @@ def test_review_state_uses_the_latest_codex_review(monkeypatch):
     assert pr_watch.review_state(PR)[0] == "not_approved"
 
 
+@pytest.mark.unit
+def test_review_state_ignores_delayed_old_head_native_review(monkeypatch):
+    monkeypatch.setattr(
+        pr_watch,
+        "gh",
+        make_gh(
+            reviews=[
+                codex_review(submitted_at="2026-08-22T12:00:00Z"),
+                codex_review(
+                    OLD_SHA,
+                    state="COMMENTED",
+                    submitted_at="2026-08-22T12:01:00Z",
+                ),
+            ]
+        ),
+    )
+    assert pr_watch.review_state(PR)[0] == "approval"
+
+
 # ---------------------------------------------------------------------------
 # run_audit — the review state is reported, but does not gate readiness
 # ---------------------------------------------------------------------------

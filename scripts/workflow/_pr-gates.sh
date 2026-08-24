@@ -55,10 +55,11 @@ _codex_review_record() {
                at: (.submitted_at // ""),
                summary: (((.body? // "") | tostring | split("\n")[0] // "") | gsub("^\\s+|\\s+$"; "")) }
          ] | sort_by(.at) as $reviews
+         | [ $reviews[] | select(.sha == $head) ] as $head_reviews
          | if ($reviews | length) == 0 then
              { state: "unreviewed", sha: "", reviewer: "", detail: "", at: "", summary: "" }
            else
-             $reviews[-1] as $latest
+             (if ($head_reviews | length) > 0 then $head_reviews[-1] else $reviews[-1] end) as $latest
              | if $latest.detail == "APPROVED" and $latest.sha == $head then
                  $latest + { state: "approval" }
                elif $latest.detail == "APPROVED" then
