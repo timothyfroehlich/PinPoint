@@ -1,6 +1,6 @@
 ---
 name: pinpoint-orchestrator
-description: Coordinating parallel subagent work in git worktrees — the lead's coordinator-not-implementer boundary, the two upstream Claude Code worktree bugs and what each one actually requires (dispatch only from the main worktree for #47548; the `WorktreeCreate` lock relaxes the old N=1 rule for #47266), why the bead rather than the prompt carries scope and what a mechanical-refactor bead must name out-of-scope, the lead's review backstop now that no bot reviews this repo and a finished subagent leaves a PR unreviewed forever, the beads-close-on-merge lifecycle, and what actually removes a finished subagent's worktree (`worktree_reap.py` reaps on proof, `worktree_cleanup.py` tears down, and neither fires for an agent that just commits and ends). Use when dispatching subagents, when a parent branch flips after dispatch, when deciding whether a PR is ready to hand Tim, when finished worktrees are piling up on disk, or when the user says "spin up agents", "orchestrate", or "parallel work".
+description: Coordinating parallel subagent work in git worktrees — the lead's coordinator-not-implementer boundary, the two upstream Claude Code worktree bugs and what each one actually requires (dispatch only from the main worktree for #47548; the `WorktreeCreate` lock relaxes the old N=1 rule for #47266), why the bead rather than the prompt carries scope and what a mechanical-refactor bead must name out-of-scope, the lead's backstop when an owning session exits before automatic review completes, the beads-close-on-merge lifecycle, and what actually removes a finished subagent's worktree (`worktree_reap.py` reaps on proof, `worktree_cleanup.py` tears down, and neither fires for an agent that just commits and ends). Use when dispatching subagents, when a parent branch flips after dispatch, when deciding whether a PR is ready to hand Tim, when finished worktrees are piling up on disk, or when the user says "spin up agents", "orchestrate", or "parallel work".
 ---
 
 # Pinpoint Orchestrator
@@ -116,9 +116,9 @@ pushes. For later uploads, it must apply the 51-line pre-push re-draft rule in
 `pinpoint-pr-workflow` Phase 3.4. Keep that session alive or resume it; do not treat PR
 creation or a green CI run as completion.
 
-Before applying `ready-for-review` or handing the PR to Tim, confirm the trusted Codex
-review is `APPROVED` on the exact current head SHA and all threads are resolved. A stale
-approval means the automatic replacement review is still pending. Never comment
+Before applying `ready-for-review` or handing the PR to Tim, confirm a trusted clean
+Codex result covers the exact current head SHA and all threads are resolved. A stale
+result means the automatic replacement review is still pending. Never comment
 `@codex review` because automation is slow; do so only when Tim explicitly asks. A
 SHA-pinned manual marker remains valid only when Tim explicitly ran the named local
 review. Do not create new `claude-code:trivial` self-attestations.

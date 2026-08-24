@@ -23,7 +23,8 @@ Follow `pinpoint-pr-workflow` Phase 2–3 through completion: open the PR as a G
 draft, monitor current-head CI, promote it only after `CI Gate` succeeds, and stay active
 through automatic Codex review. Address or explicitly decline every finding, resolve
 every thread, and repeat after each corrective push until Codex has approved the exact
-current head. Before any later push, apply the skill's per-upload 51-line re-draft rule.
+current head or posted its trusted clean connector comment for that head. Before any
+later push, apply the skill's per-upload 51-line re-draft rule.
 
 Do not comment `@codex review` unless Tim explicitly asks for a manual trigger. Do not
 self-attest a trivial change. If Tim explicitly runs `/codex:review` or `/code-review`,
@@ -41,7 +42,7 @@ If tests fail with `POSTGRES_URL is not set`:
 1. Commit with conventional commit message
 2. Push: `git push -u origin {branch_name}`
 3. Create draft PR: `gh pr create --draft --title "..." --body "..."`
-4. Monitor CI, promote after current-head `CI Gate`, and own automatic review to clean approval
+4. Monitor CI, promote after current-head `CI Gate`, and own automatic review to a clean exact-head result
 5. Apply `ready-for-review` only after every Phase 3 gate passes
 
 ### Return Format
@@ -50,7 +51,7 @@ If tests fail with `POSTGRES_URL is not set`:
 - **PR**: #{number}
 - **CI**: passing/failing/pending
 - **Self-review**: findings addressed
-- **Review**: automatic Codex approval at <sha> / pending, with thread count
+- **Review**: clean automatic Codex result at <sha> / pending, with thread count
 - **Blockers**: none or description
 ```
 
@@ -60,7 +61,7 @@ If tests fail with `POSTGRES_URL is not set`:
 2. The bead is the source of truth — point the agent at `bd show`; don't restate scope/files in the prompt (two places to drift)
 3. Quality is self-enforced — hooks don't fire for subagents, so the prompt IS the enforcement. Point at AGENTS.md §5's tiered list, never at `pnpm run check` alone: `check` is static and cannot fail on a broken test (PP-lql4)
 4. Structured return format enables quick lead assessment
-5. Automatic review covers each update; the owning agent remains active until approval pins head and threads are resolved
+5. Automatic review covers each update; the owning agent remains active until a clean result pins head and threads are resolved
 
 ## Follow-Up Prompt (via SendMessage)
 
