@@ -120,8 +120,8 @@ Use the harness's Monitor/wait mechanism rather than a hand-written polling loop
 
 Before pushing an update to an existing PR, compare the remote PR head with the local
 head you are about to upload. Count additions plus deletions in source, tests, scripts,
-SQL/migrations, CSS, and GitHub workflow code. Do not count docs, lockfiles, generated
-snapshots/assets, or binaries:
+SQL/migrations, CSS, and GitHub workflow or composite-action code. Do not count docs,
+lockfiles, generated snapshots/assets, or binaries:
 
 ```bash
 remote_head=$(gh pr view <PR> --json headRefOid --jq .headRefOid)
@@ -129,7 +129,9 @@ upload_code_lines=$(
   git diff --no-renames --numstat "$remote_head"..HEAD |
     awk -F '\t' '
       ($3 ~ /\.(ts|tsx|js|jsx|mjs|cjs|py|sh|sql|css)$/ ||
-       $3 ~ /^\.github\/workflows\/.*\.ya?ml$/) &&
+       ($3 ~ /^(scripts\/|\.claude\/hooks\/|\.husky\/)/ &&
+        $3 ~ /(^|\/)[^\/.]+$/) ||
+       $3 ~ /^\.github\/(workflows|actions)\/.*\.ya?ml$/) &&
       $1 ~ /^[0-9]+$/ && $2 ~ /^[0-9]+$/ { total += $1 + $2 }
       END { print total + 0 }
     '
