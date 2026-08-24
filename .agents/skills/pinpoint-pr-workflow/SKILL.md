@@ -110,8 +110,9 @@ eligible. The gate accepts either a native `APPROVED` review whose `commit_id` e
 the PR head, or the connector's no-major-issues issue comment naming a 10- or
 40-character prefix of that head. Both require exact account
 `chatgpt-codex-connector[bot]`; the comment also requires exact app slug
-`chatgpt-codex-connector` and the known clean-result prefix. An older result is stale,
-and a later native finding overrides an earlier clean comment.
+`chatgpt-codex-connector` and the known clean-result prefix. An older result is stale.
+Among records for the same head, a later native finding overrides an earlier clean
+comment; a delayed review of an older SHA cannot invalidate a clean current-head result.
 
 The owning agent stays assigned through the whole loop: monitor current-head CI and
 review, address or explicitly decline every finding, resolve every thread, push fixes,

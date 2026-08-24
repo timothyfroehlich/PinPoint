@@ -237,6 +237,25 @@ def test_later_native_finding_overrides_earlier_clean_comment() -> None:
     assert state == "not_approved"
 
 
+def test_delayed_native_review_of_old_head_does_not_override_current_clean_comment() -> (
+    None
+):
+    with gate_env(
+        review_pages=[
+            [
+                codex_review(
+                    sha=OTHER_SHA,
+                    state="COMMENTED",
+                    submitted_at="2026-08-22T12:01:00Z",
+                )
+            ]
+        ],
+        comment_pages=[[clean_codex_comment(updated_at="2026-08-22T12:00:00Z")]],
+    ) as env:
+        state, *_rest = review_record(env)
+    assert state == "clean_comment"
+
+
 def test_later_clean_comment_supersedes_earlier_native_nonapproval() -> None:
     with gate_env(
         review_pages=[

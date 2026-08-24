@@ -905,6 +905,25 @@ def test_review_state_later_native_finding_overrides_clean_comment(monkeypatch):
 
 
 @pytest.mark.unit
+def test_review_state_ignores_delayed_native_review_of_old_head(monkeypatch):
+    monkeypatch.setattr(
+        pr_watch,
+        "gh",
+        make_gh(
+            reviews=[
+                codex_review(
+                    OLD_SHA,
+                    state="COMMENTED",
+                    submitted_at="2026-08-22T12:01:00Z",
+                )
+            ],
+            comments=[clean_codex_comment(updated_at="2026-08-22T12:00:00Z")],
+        ),
+    )
+    assert pr_watch.review_state(PR)[0] == "clean_comment"
+
+
+@pytest.mark.unit
 def test_review_state_later_clean_comment_supersedes_native_finding(monkeypatch):
     monkeypatch.setattr(
         pr_watch,

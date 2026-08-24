@@ -125,7 +125,7 @@ _comment_review_record() {
 # comments are two representations of the automatic Codex path; when they disagree,
 # the newer automatic record wins so a later finding cannot inherit an earlier clean.
 _review_record() {
-  local codex comment codex_state comment_state codex_at comment_at
+  local head=$3 codex comment codex_state comment_state codex_sha codex_at comment_at
   codex=$(_codex_review_record "$@")
   codex_state=$(cut -f1 <<< "$codex")
   # A current native approval already passes the gate. Do not spend a second
@@ -140,9 +140,10 @@ _review_record() {
   if [[ "$comment_state" == "marker" ]]; then
     printf '%s\n' "$comment"
   elif [[ "$comment_state" == "clean_comment" ]]; then
+    codex_sha=$(cut -f2 <<< "$codex")
     codex_at=$(cut -f5 <<< "$codex")
     comment_at=$(cut -f5 <<< "$comment")
-    if [[ "$codex_state" == "unreviewed" || "$comment_at" > "$codex_at" ]]; then
+    if [[ "$codex_state" == "unreviewed" || "$codex_sha" != "$head" || "$comment_at" > "$codex_at" ]]; then
       printf '%s\n' "$comment"
     else
       printf '%s\n' "$codex"

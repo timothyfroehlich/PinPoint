@@ -317,7 +317,11 @@ def review_state(pr: int) -> tuple[str, str]:
     )
     if current_clean[0]:
         clean_sha, clean_at = current_clean
-        if not reviews or clean_at > (latest.get("submitted_at") or ""):
+        if (
+            not reviews
+            or review_sha != head_sha
+            or clean_at > (latest.get("submitted_at") or "")
+        ):
             return "clean_comment", f"Codex found no major issues on head {clean_sha}"
 
     latest_marker_sha, latest_marker_at = max(

@@ -60,7 +60,7 @@ Scripts are designed for the **PinPoint orchestrator workflow** where multiple s
 | `not_approved`        | Latest Codex review did not approve               | FAIL       |
 | `unreviewed`          | Neither review path covers this PR                | FAIL       |
 
-Within the automatic Codex path, the latest trusted record is authoritative. A later `CHANGES_REQUESTED` or `COMMENTED` review overrides an earlier clean comment, and a result naming an older commit is stale. A current manual marker remains independently valid.
+Within the automatic Codex path, compare precedence only among records for the same head. A later `CHANGES_REQUESTED` or `COMMENTED` review of that head overrides an earlier clean comment; a delayed review of an older SHA cannot invalidate a clean current-head result. A current manual marker remains independently valid.
 
 Nothing here WAITs. The gate reports the current snapshot and fails on an unreviewed or stale head; the owning agent waits for automatic review outside the merge script. `merge-pr.sh --automerge` must stop rather than hide that unfinished state.
 
