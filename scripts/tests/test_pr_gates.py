@@ -256,6 +256,19 @@ def test_delayed_native_review_of_old_head_does_not_override_current_clean_comme
     assert state == "clean_comment"
 
 
+def test_delayed_stale_clean_comment_does_not_override_current_finding_review() -> None:
+    with gate_env(
+        review_pages=[
+            [codex_review(state="COMMENTED", submitted_at="2026-08-22T12:00:00Z")]
+        ],
+        comment_pages=[
+            [clean_codex_comment(OTHER_SHA[:10], updated_at="2026-08-22T12:01:00Z")]
+        ],
+    ) as env:
+        state, *_rest = review_record(env)
+    assert state == "reviewed"
+
+
 def test_later_clean_comment_supersedes_earlier_native_nonapproval() -> None:
     with gate_env(
         review_pages=[
@@ -284,7 +297,7 @@ def test_manual_attestation_remains_valid_after_non_approval_codex_review() -> N
     assert "review marker pins head SHA" in result.stdout
 
 
-def test_newer_stale_manual_marker_is_reported_over_older_codex_nonapproval() -> None:
+def test_stale_manual_marker_does_not_override_current_finding_review() -> None:
     with gate_env(
         review_pages=[[codex_review(state="CHANGES_REQUESTED")]],
         comment_pages=[
@@ -297,7 +310,7 @@ def test_newer_stale_manual_marker_is_reported_over_older_codex_nonapproval() ->
         ],
     ) as env:
         state, sha, *_rest = review_record(env)
-    assert (state, sha) == ("stale_marker", OTHER_SHA)
+    assert (state, sha) == ("reviewed", HEAD_SHA)
 
 
 def test_newest_stale_manual_marker_is_reported_when_no_marker_pins_head() -> None:

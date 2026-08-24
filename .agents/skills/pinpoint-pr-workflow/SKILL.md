@@ -112,7 +112,8 @@ the PR head, or the connector's no-major-issues issue comment naming a 10- or
 `chatgpt-codex-connector[bot]`; the comment also requires exact app slug
 `chatgpt-codex-connector` and the known clean-result prefix. An older result is stale.
 Among records for the same head, a later native finding overrides an earlier clean
-comment; a delayed review of an older SHA cannot invalidate a clean current-head result.
+comment; no delayed review, clean comment, or manual marker for an older SHA can
+invalidate current-head coverage.
 A native `COMMENTED` or `CHANGES_REQUESTED` review also completes review coverage for
 its exact head once every associated thread has been replied to and resolved. Dismissed,
 pending, or unknown review states fail closed. The adjudicated terminal state needs no

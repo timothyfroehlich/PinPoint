@@ -940,6 +940,23 @@ def test_review_state_later_clean_comment_supersedes_native_finding(monkeypatch)
 
 
 @pytest.mark.unit
+def test_review_state_current_finding_outranks_delayed_stale_clean_comment(monkeypatch):
+    monkeypatch.setattr(
+        pr_watch,
+        "gh",
+        make_gh(
+            reviews=[
+                codex_review(state="COMMENTED", submitted_at="2026-08-22T12:00:00Z")
+            ],
+            comments=[
+                clean_codex_comment(OLD_SHA[:10], updated_at="2026-08-22T12:01:00Z")
+            ],
+        ),
+    )
+    assert pr_watch.review_state(PR)[0] == "reviewed"
+
+
+@pytest.mark.unit
 def test_review_state_manual_marker_pins_head(monkeypatch):
     monkeypatch.setattr(pr_watch, "gh", make_gh(comments=[manual_marker()]))
     assert pr_watch.review_state(PR)[0] == "marker"

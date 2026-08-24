@@ -153,6 +153,10 @@ _review_record() {
     fi
   elif [[ "$codex_state" == "unreviewed" ]]; then
     printf '%s\n' "$comment"
+  elif [[ "$codex_state" == "reviewed" ]]; then
+    # A current-head native finding review is coverage. A delayed comment for an
+    # older SHA cannot invalidate it; current clean comments were handled above.
+    printf '%s\n' "$codex"
   elif [[ "$comment_state" == "unreviewed" ]]; then
     printf '%s\n' "$codex"
   else
