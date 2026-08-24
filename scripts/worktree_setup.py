@@ -749,29 +749,45 @@ def classify_install_failure(returncode: int, stdout: str, stderr: str) -> str:
     return FAILURE_CLASS_INSTALL
 
 
+DEFAULT_INSTALL_TIMEOUT: int = 120
+MAX_INSTALL_TIMEOUT: int = 150
+
+
 def resolve_install_timeout() -> int:
-    """Determine the install timeout budget in seconds."""
+    """Determine the install timeout budget in seconds (capped at MAX_INSTALL_TIMEOUT)."""
     env_val = os.environ.get("PINPOINT_WORKTREE_INSTALL_TIMEOUT") or os.environ.get(
         "WORKTREE_INSTALL_TIMEOUT"
     )
     if env_val:
         try:
-            return max(1, int(env_val))
+            val = int(env_val)
+            if val > 0:
+                return min(val, MAX_INSTALL_TIMEOUT)
         except ValueError:
             pass
     return DEFAULT_INSTALL_TIMEOUT
 
 
+def are_dependencies_ready(worktree_path: Path) -> bool:
+    """Verify that dependencies are fully installed and linked.
+
+    Checks for node_modules/.modules.yaml (pnpm's completion marker written
+    only when linking finishes) rather than node_modules directory existence alone,
+    preventing partial installs from falsely reporting ready.
+    """
+    modules_yaml = worktree_path / "node_modules" / ".modules.yaml"
+    return modules_yaml.is_file()
+
+
 def install_dependencies(
     worktree_path: Path, timeout: int | None = None
 ) -> tuple[bool, str | None, str | None]:
-    """Ensure node_modules exists and is installed.
+    """Ensure node_modules exists and is completely installed.
 
     Returns (is_ready, failure_class, detail).
-    If node_modules is already present (e.g. branch switch), returns (True, None, None).
+    If node_modules is already present and complete, returns (True, None, None).
     """
-    node_modules = worktree_path / "node_modules"
-    if node_modules.is_dir():
+    if are_dependencies_ready(worktree_path):
         return True, None, None
 
     pnpm_path = shutil.which("pnpm")

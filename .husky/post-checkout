@@ -47,7 +47,7 @@ fi
 # This section is managed by beads. Do not remove these markers.
 if command -v bd >/dev/null 2>&1; then
   export BD_GIT_HOOK=1
-  _bd_timeout=${BEADS_HOOK_TIMEOUT:-300}
+  _bd_timeout=${BEADS_HOOK_TIMEOUT:-15}
   _bd_exit=0
   if command -v timeout >/dev/null 2>&1; then
     timeout "$_bd_timeout" bd hooks run post-checkout "$@" || _bd_exit=$?

@@ -21,6 +21,7 @@ from worktree_setup import (
     LOCAL_SUPABASE_PUBLISHABLE_KEY,
     LOCAL_SUPABASE_SERVICE_ROLE_KEY,
     MANAGED_ENV_KEYS,
+    MAX_INSTALL_TIMEOUT,
     PortConfig,
     RuntimeDiagnostics,
     RuntimeInfo,
@@ -809,11 +810,34 @@ class TestInstallDependencies:
     """Test dependency installation logic."""
 
     def test_existing_node_modules_is_ready_immediately(self, tmp_path: Path) -> None:
-        (tmp_path / "node_modules").mkdir()
+        nm = tmp_path / "node_modules"
+        nm.mkdir()
+        (nm / ".modules.yaml").touch()
         is_ready, failure_class, detail = install_dependencies(tmp_path)
         assert is_ready is True
         assert failure_class is None
         assert detail is None
+
+    def test_partial_node_modules_runs_install(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        import subprocess
+
+        # node_modules exists without .modules.yaml (interrupted install)
+        (tmp_path / "node_modules").mkdir()
+        monkeypatch.setattr(
+            "worktree_setup.shutil.which", lambda tool: "/usr/local/bin/pnpm"
+        )
+        mock_res = subprocess.CompletedProcess(
+            args=["pnpm", "install"], returncode=0, stdout="Done", stderr=""
+        )
+        monkeypatch.setattr(
+            "worktree_setup.subprocess.run", lambda *args, **kwargs: mock_res
+        )
+
+        is_ready, failure_class, detail = install_dependencies(tmp_path)
+        assert is_ready is True
+        assert failure_class is None
 
     def test_missing_pnpm_returns_missing_tool_failure(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -911,11 +935,15 @@ class TestInstallDependencies:
         assert failure_class == FAILURE_CLASS_TIMEOUT
         assert "timed out after 10s" in (detail or "")
 
-    def test_resolve_install_timeout_uses_env(
+    def test_resolve_install_timeout_uses_env_and_caps(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setenv("PINPOINT_WORKTREE_INSTALL_TIMEOUT", "45")
         assert resolve_install_timeout() == 45
+
+        # Capped at MAX_INSTALL_TIMEOUT
+        monkeypatch.setenv("PINPOINT_WORKTREE_INSTALL_TIMEOUT", "300")
+        assert resolve_install_timeout() == MAX_INSTALL_TIMEOUT
 
         monkeypatch.delenv("PINPOINT_WORKTREE_INSTALL_TIMEOUT", raising=False)
         monkeypatch.setenv("WORKTREE_INSTALL_TIMEOUT", "75")
@@ -959,15 +987,17 @@ class TestWorktreeSetupMainReadiness:
     def test_linked_worktree_ready_when_deps_exist(
         self, capsys: pytest.CaptureFixture
     ) -> None:
-        (self.linked_wt / "node_modules").mkdir()
+        nm = self.linked_wt / "node_modules"
+        nm.mkdir()
+        (nm / ".modules.yaml").touch()
         code = main()
         assert code == EXIT_READY
         captured = capsys.readouterr()
         assert "status=ready" in captured.err
         assert "runtimes:" in captured.err
         assert (self.linked_wt / ".env.local").exists()
-        assert (self.linked_wt / "supabase" / "config.toml").exists()
-        assert (self.linked_wt / ".claude" / "launch.json").exists()
+        assert (self.linked_wt / "supabase/config.toml").exists()
+        assert (self.linked_wt / ".claude/launch.json").exists()
 
     def test_linked_worktree_incomplete_on_install_failure(
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
