@@ -234,7 +234,7 @@ def test_later_native_finding_overrides_earlier_clean_comment() -> None:
         comment_pages=[[clean_codex_comment(updated_at="2026-08-22T12:00:00Z")]],
     ) as env:
         state, *_rest = review_record(env)
-    assert state == "not_approved"
+    assert state == "reviewed"
 
 
 def test_delayed_native_review_of_old_head_does_not_override_current_clean_comment() -> (
@@ -341,7 +341,6 @@ def test_clean_codex_comments_are_read_across_all_pages() -> None:
         pytest.param([], id="no-codex-review"),
         pytest.param([codex_review(login="other-reviewer[bot]")], id="untrusted-bot"),
         pytest.param([codex_review(sha=OTHER_SHA)], id="approval-of-old-head"),
-        pytest.param([codex_review(state="COMMENTED")], id="non-approval-review"),
     ],
 )
 def test_no_qualifying_codex_review_without_manual_attestation_fails(
@@ -353,7 +352,7 @@ def test_no_qualifying_codex_review_without_manual_attestation_fails(
     assert "FAIL: reviewed:" in result.stdout
 
 
-def test_latest_codex_review_overrides_an_earlier_approval() -> None:
+def test_latest_current_head_finding_completes_review_coverage() -> None:
     reviews = [
         codex_review(submitted_at="2026-08-22T12:00:00Z"),
         codex_review(
@@ -363,8 +362,8 @@ def test_latest_codex_review_overrides_an_earlier_approval() -> None:
     ]
     with gate_env(review_pages=[reviews]) as env:
         result = run_gate("check_review_happened", env)
-    assert result.returncode == 1, result.stdout
-    assert "without approval" in result.stdout
+    assert result.returncode == 0, result.stdout
+    assert "thread gate owns findings" in result.stdout
 
 
 def test_delayed_old_head_review_does_not_override_current_native_approval() -> None:

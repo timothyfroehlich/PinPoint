@@ -837,6 +837,7 @@ def test_codex_login_is_identical_to_the_bash_gate():
     [
         "approval",
         "clean_comment",
+        "reviewed",
         "marker",
         "stale_approval",
         "stale_clean_comment",
@@ -901,7 +902,7 @@ def test_review_state_later_native_finding_overrides_clean_comment(monkeypatch):
             comments=[clean_codex_comment(updated_at="2026-08-22T12:00:00Z")],
         ),
     )
-    assert pr_watch.review_state(PR)[0] == "not_approved"
+    assert pr_watch.review_state(PR)[0] == "reviewed"
 
 
 @pytest.mark.unit
@@ -991,11 +992,11 @@ def test_review_state_stale_approval(monkeypatch):
 
 
 @pytest.mark.unit
-def test_review_state_requires_an_approval(monkeypatch):
+def test_review_state_current_head_finding_completes_review_coverage(monkeypatch):
     monkeypatch.setattr(
         pr_watch, "gh", make_gh(reviews=[codex_review(state="COMMENTED")])
     )
-    assert pr_watch.review_state(PR)[0] == "not_approved"
+    assert pr_watch.review_state(PR)[0] == "reviewed"
 
 
 @pytest.mark.unit
@@ -1013,7 +1014,7 @@ def test_review_state_uses_the_latest_codex_review(monkeypatch):
             ]
         ),
     )
-    assert pr_watch.review_state(PR)[0] == "not_approved"
+    assert pr_watch.review_state(PR)[0] == "reviewed"
 
 
 @pytest.mark.unit

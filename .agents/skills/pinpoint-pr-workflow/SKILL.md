@@ -113,6 +113,9 @@ the PR head, or the connector's no-major-issues issue comment naming a 10- or
 `chatgpt-codex-connector` and the known clean-result prefix. An older result is stale.
 Among records for the same head, a later native finding overrides an earlier clean
 comment; a delayed review of an older SHA cannot invalidate a clean current-head result.
+A native finding-bearing review also completes review coverage for its exact head once
+every associated thread has been replied to and resolved. That adjudicated terminal
+state needs no manual re-review when a finding is explicitly declined without a push.
 
 The owning agent stays assigned through the whole loop: monitor current-head CI and
 review, address or explicitly decline every finding, resolve every thread, push fixes,
@@ -270,7 +273,7 @@ Requires the local dev server (`pnpm run dev`) and Supabase (`supabase start`) r
 
 ### 3.6 Apply `ready-for-review` label
 
-Once CI green + either a trusted clean Codex result (native approval or connector clean comment) or manual attestation of head (per 3.4) + zero unresolved review threads + no merge conflict + screenshots posted (if UI-touching, per 3.5), apply the label via `mcp__github__issue_write(method: "update", …)` or `gh pr edit <PR> --add-label ready-for-review`.
+Once CI green + either exact-head automatic Codex coverage (including an adjudicated finding-bearing review per 3.4) or manual attestation of head + zero unresolved review threads + no merge conflict + screenshots posted (if UI-touching, per 3.5), apply the label via `mcp__github__issue_write(method: "update", …)` or `gh pr edit <PR> --add-label ready-for-review`.
 
 The label is a hint to Tim that the PR is ready for **him** to merge — it does not authorize an agent to merge. `merge-pr.sh --human` re-checks all gates when Tim runs it.
 
@@ -310,7 +313,7 @@ Never say "ready to push when you are" — you push. Never say a PR is "merged" 
 
 **On any FAIL the script removes the `ready-for-review` label if present** (and likewise on the `--automerge` RED path). The label's contract is "click-merge-without-thinking"; if a gate fails at merge time that contract is broken, so the label goes. Practical consequence: after Tim reports a FAIL, fix the underlying issue, push, and **re-apply the label** (3.6) before re-handing him the `--human` command — don't assume it survived.
 
-**A `reviewed` FAIL is almost never a `--force` case.** `unreviewed` means neither path covers head, `stale_approval` / `stale_clean_comment` / `stale_marker` mean you pushed past the review record, and `not_approved` means Codex's latest review did not approve — all describe an unfinished PR, not a broken gate. Take either honest path in 3.4 and cover head.
+**A `reviewed` FAIL is almost never a `--force` case.** `unreviewed` means neither path covers head, `stale_approval` / `stale_clean_comment` / `stale_marker` mean you pushed past the review record, and `not_approved` means the latest non-approval review covers another SHA — all describe an unfinished PR, not a broken gate. Take either honest path in 3.4 and cover head.
 
 `--bypass-merge-requirements` is for a required check failing for known-irrelevant reasons (infrastructure flake, unrelated job) where the change has been manually verified safe — log the flake first with `bash scripts/workflow/log-gha-flake.sh <pr> <run-id> <class> "<symptom>"` (see `docs/runbooks/gha-flake-log.md`) — or an emergency hotfix where waiting for CI is not acceptable. Do NOT suggest bypassing when a merge conflict exists, or when the underlying state hasn't been manually verified.
 

@@ -6,16 +6,16 @@ Bash/Node scripts for managing GitHub PR lifecycle: CI monitoring, UI screenshot
 
 Scripts are designed for the **PinPoint orchestrator workflow** where multiple subagents work in parallel worktrees. The orchestrator (or a human) uses these from the main repo to monitor and manage PRs created by agents.
 
-**The merge decision is Tim's (PP-wi85, reversed for the script per Tim 2026-08-19).** An agent MAY run `merge-pr.sh`, but the `block-direct-merge.cjs` PreToolUse hook turns any invocation of it (including `--dry-run`) into an approval prompt Tim must accept before it runs — the merge is still his call. The raw channels (`gh pr merge`, `gh api PUT .../merge`, MCP `merge_pull_request`) stay hard-blocked, because they skip the script's gate re-checks. Agents run every other script in this directory freely, including `pr-screenshots.mjs` and `merge-handoff.sh` (which _prints_ the merge command). The normal close follows `pinpoint-pr-workflow`: draft PR, current-head CI, clean automatic Codex result, resolved threads, final label, then handoff.
+**The merge decision is Tim's (PP-wi85, reversed for the script per Tim 2026-08-19).** An agent MAY run `merge-pr.sh`, but the `block-direct-merge.cjs` PreToolUse hook turns any invocation of it (including `--dry-run`) into an approval prompt Tim must accept before it runs — the merge is still his call. The raw channels (`gh pr merge`, `gh api PUT .../merge`, MCP `merge_pull_request`) stay hard-blocked, because they skip the script's gate re-checks. Agents run every other script in this directory freely, including `pr-screenshots.mjs` and `merge-handoff.sh` (which _prints_ the merge command). The normal close follows `pinpoint-pr-workflow`: draft PR, current-head CI, exact-head automatic Codex coverage, resolved threads, final label, then handoff.
 
 ## Scripts
 
 ### PR Monitoring
 
-| Script                    | Purpose                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `pr-dashboard.sh [PR...]` | Status table: CI checks, review state, merge state, draft state. All open PRs if no args. The Review column shows unresolved threads when there are any, otherwise: `reviewed`, `RE-REVIEW` (`stale_approval`), `NOT APPROVED` (`not_approved`), or `NOT REVIEWED` (`unreviewed`).                                                                                                                                                                                                                                 |
-| `pr-watch.py <PR>`        | Stream CI run events. One timestamped line per event. Use with the Claude Code Monitor tool. Writes failure artifacts to `tmp/gh-monitor/`. Unresolved threads print a reminder but do **not** stop the watch — watching CI is a step _inside_ the fix→push→resolve loop. `--check-ready` also reports a `review` line naming the review state (the three below, or `unknown` if the API calls fail) — reported, not gated: this mode answers whether the current head can leave draft and enter automatic review. |
+| Script                    | Purpose                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pr-dashboard.sh [PR...]` | Status table: CI checks, review state, merge state, draft state. All open PRs if no args. The Review column shows unresolved threads when there are any, otherwise: `reviewed`, `RE-REVIEW` (`stale_approval`), `NOT APPROVED` (`not_approved`), or `NOT REVIEWED` (`unreviewed`).                                                                                                                                                                                                                                           |
+| `pr-watch.py <PR>`        | Stream CI run events. One timestamped line per event. Use with the Claude Code Monitor tool. Writes failure artifacts to `tmp/gh-monitor/`. Unresolved threads print a reminder but do **not** stop the watch — watching CI is a step _inside_ the fix→push→resolve loop. `--check-ready` also reports a `review` line naming the review state (from the vocabulary below, or `unknown` if the API calls fail) — reported, not gated: this mode answers whether the current head can leave draft and enter automatic review. |
 
 `pr-watch.py` exit codes: **0** passed, **1** a run or the CI Gate actually failed, **2** the outcome could not be determined — the GitHub API was unreachable (rate-limit 403, network drop, auth failure), so nothing was observed. Exit 2 is not a red CI: re-run the watch once the API is back rather than hunting for a broken test. (PP-qkl8)
 
@@ -36,29 +36,30 @@ Scripts are designed for the **PinPoint orchestrator workflow** where multiple s
 
 ### Gates (evaluated by `merge-pr.sh`, defined in `_pr-gates.sh`)
 
-| Gate          | Passes when                                                                                                                            | Bypass kind |
-| ------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
-| `ci`          | `CI Gate` check is SUCCESS/NEUTRAL/SKIPPED                                                                                             | `admin`     |
-| `threads`     | Zero unresolved review threads, from any author                                                                                        | `force`     |
-| `reviewed`    | Hard backstop — a clean Codex result or manual marker must cover head. PASS on `approval` / `clean_comment` / `marker`; FAIL otherwise | `force`     |
-| `no_conflict` | PR is MERGEABLE (never bypassable — GitHub rejects conflicting merges)                                                                 | `none`      |
+| Gate          | Passes when                                                                                                                                              | Bypass kind |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
+| `ci`          | `CI Gate` check is SUCCESS/NEUTRAL/SKIPPED                                                                                                               | `admin`     |
+| `threads`     | Zero unresolved review threads, from any author                                                                                                          | `force`     |
+| `reviewed`    | Hard backstop — an automatic Codex review or manual marker must cover head. PASS on `approval` / `clean_comment` / `reviewed` / `marker`; FAIL otherwise | `force`     |
+| `no_conflict` | PR is MERGEABLE (never bypassable — GitHub rejects conflicting merges)                                                                                   | `none`      |
 
 ### Review state (`reviewed`)
 
-**Automatic Codex GitHub review is the default path.** The gate accepts either a native `APPROVED` review pinned to the exact head, or the connector's no-major-issues issue comment pinned to a 10- or 40-character prefix of that head. Both must come from exact account `chatgpt-codex-connector[bot]`; the comment must also carry exact app slug `chatgpt-codex-connector` and the known clean-result prefix. The existing SHA-pinned `mark-review.sh` route remains valid after Tim explicitly runs a local review. Every push needs a fresh review; comment `@codex review` only when Tim explicitly asks for a manual trigger.
+**Automatic Codex GitHub review is the default path.** The gate accepts a native review pinned to the exact head, or the connector's no-major-issues issue comment pinned to a 10- or 40-character prefix of that head. A finding-bearing native review relies on the separate thread gate: every finding must be fixed or explicitly declined, replied to, and resolved. Both automatic records must come from exact account `chatgpt-codex-connector[bot]`; the comment must also carry exact app slug `chatgpt-codex-connector` and the known clean-result prefix. The existing SHA-pinned `mark-review.sh` route remains valid after Tim explicitly runs a local review. Every push needs a fresh review; comment `@codex review` only when Tim explicitly asks for a manual trigger.
 
-`_compute_review_state` in `_pr-gates.sh` reports eight states:
+`_compute_review_state` in `_pr-gates.sh` reports nine states:
 
-| State                 | Meaning                                           | `reviewed` |
-| --------------------- | ------------------------------------------------- | ---------- |
-| `approval`            | Latest Codex review approved the current head SHA | PASS       |
-| `clean_comment`       | Trusted Codex clean comment pins the current head | PASS       |
-| `marker`              | Manual review marker pins the current head SHA    | PASS       |
-| `stale_approval`      | Latest Codex approval names a different SHA       | FAIL       |
-| `stale_clean_comment` | Trusted Codex clean comment names another SHA     | FAIL       |
-| `stale_marker`        | Manual review marker names a different SHA        | FAIL       |
-| `not_approved`        | Latest Codex review did not approve               | FAIL       |
-| `unreviewed`          | Neither review path covers this PR                | FAIL       |
+| State                 | Meaning                                                    | `reviewed` |
+| --------------------- | ---------------------------------------------------------- | ---------- |
+| `approval`            | Latest Codex review approved the current head SHA          | PASS       |
+| `clean_comment`       | Trusted Codex clean comment pins the current head          | PASS       |
+| `reviewed`            | Finding-bearing review pins head; threads own adjudication | PASS       |
+| `marker`              | Manual review marker pins the current head SHA             | PASS       |
+| `stale_approval`      | Latest Codex approval names a different SHA                | FAIL       |
+| `stale_clean_comment` | Trusted Codex clean comment names another SHA              | FAIL       |
+| `stale_marker`        | Manual review marker names a different SHA                 | FAIL       |
+| `not_approved`        | Latest non-approval review names another SHA               | FAIL       |
+| `unreviewed`          | Neither review path covers this PR                         | FAIL       |
 
 Within the automatic Codex path, compare precedence only among records for the same head. A later `CHANGES_REQUESTED` or `COMMENTED` review of that head overrides an earlier clean comment; a delayed review of an older SHA cannot invalidate a clean current-head result. A current manual marker remains independently valid.
 

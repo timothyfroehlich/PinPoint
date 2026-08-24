@@ -327,6 +327,12 @@ def review_state(pr: int) -> tuple[str, str]:
         ):
             return "clean_comment", f"Codex found no major issues on head {clean_sha}"
 
+    if reviews and review_sha == head_sha:
+        return (
+            "reviewed",
+            f"Codex reviewed head {head_sha[:7]} with {state}; thread gate owns findings",
+        )
+
     latest_marker_sha, latest_marker_at = max(
         markers, key=lambda marker: marker[1], default=("", "")
     )

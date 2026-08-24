@@ -64,6 +64,8 @@ _codex_review_record() {
                  $latest + { state: "approval" }
                elif $latest.detail == "APPROVED" then
                  $latest + { state: "stale_approval" }
+               elif $latest.sha == $head then
+                 $latest + { state: "reviewed" }
                else
                  $latest + { state: "not_approved" }
                end
@@ -220,11 +222,12 @@ check_ci() {
 #
 #   approval        Codex approved the current head SHA
 #   clean_comment   Codex reported no major issues for the current head SHA
+#   reviewed        Codex reviewed the current head; the thread gate owns adjudication
 #   marker          A manual review marker pins the current head SHA
 #   stale_approval  Codex approved a different SHA — the current head was not reviewed
 #   stale_clean_comment  A clean Codex comment names a different SHA
 #   stale_marker    A manual marker names a different SHA
-#   not_approved    Codex reviewed, but did not approve its most-recent review
+#   not_approved    Codex's most-recent review covers a different SHA and is not an approval
 #   unreviewed      Neither review path has a record
 #
 # Sets globals: RS_STATE RS_HEAD_SHA RS_REVIEW_SHA
@@ -306,6 +309,7 @@ check_unresolved_threads() {
 #
 #   approval        → PASS
 #   clean_comment   → PASS
+#   reviewed        → PASS (the separate thread gate requires every finding adjudicated)
 #   marker          → PASS
 #   stale_approval  → FAIL: Codex approved an earlier commit
 #   not_approved    → FAIL: Codex posted a non-approval review
@@ -321,6 +325,10 @@ check_review_happened() {
       ;;
     clean_comment)
       echo "PASS: reviewed: Codex found no major issues on head SHA ${RS_HEAD_SHA:0:7}"
+      return 0
+      ;;
+    reviewed)
+      echo "PASS: reviewed: Codex reviewed head SHA ${RS_HEAD_SHA:0:7}; thread gate owns findings"
       return 0
       ;;
     marker)
