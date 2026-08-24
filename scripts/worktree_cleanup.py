@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """
-Worktree cleanup — called by .claude/hooks/worktree-remove.sh.
+Worktree cleanup — the single teardown entry point for PinPoint worktrees.
 
-Stops Supabase, removes Docker volumes, deallocates the manifest slot,
-and removes the git worktree. One argument: the worktree path.
+Stops Supabase, removes Docker volumes, removes/prunes the git worktree, then
+deallocates its manifest slot. Call it directly with one worktree path, or use
+`--claude-hook` to read Claude Code's `worktree_path` JSON field from stdin.
 
 The exit code is load-bearing: this script's caller (Claude Code's
 WorktreeRemove hook) has no other way to learn that a worktree leaked. Two
@@ -175,6 +176,32 @@ def registered_worktree_paths() -> set[str] | None:
     }
 
 
+def main_worktree_path(worktree_path: Path) -> Path | None:
+    """Return Git's main worktree, which remains usable after target removal."""
+    try:
+        result = subprocess.run(
+            [
+                "git",
+                "-C",
+                str(worktree_path),
+                "worktree",
+                "list",
+                "--porcelain",
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+    except (OSError, subprocess.CalledProcessError):
+        return None
+
+    prefix = "worktree "
+    for line in result.stdout.splitlines():
+        if line.startswith(prefix):
+            return Path(line[len(prefix) :]).resolve()
+    return None
+
+
 def report_missing_target(worktree_path: Path) -> int:
     """Adjudicate a target path that isn't on disk (PP-omz3).
 
@@ -314,12 +341,8 @@ def list_project_volumes(project_id: str) -> VolumeQuery:
     )
 
 
-def main() -> int:
-    if len(sys.argv) < 2:
-        print("Usage: worktree_cleanup.py <worktree-path>", file=sys.stderr)
-        return EXIT_FAILED
-
-    worktree_path = Path(sys.argv[1]).resolve()
+def cleanup_worktree(worktree_path: Path) -> int:
+    """Perform the complete ordered teardown for one additional worktree."""
 
     if not worktree_path.is_dir():
         return report_missing_target(worktree_path)
@@ -418,13 +441,37 @@ def main() -> int:
     # --force` does NOT bypass these locks. Unlock errors (e.g., "not locked")
     # are harmless and intentionally ignored.
     if git_marker_present:
+        control_worktree = main_worktree_path(worktree_path)
+        if control_worktree is None:
+            print(
+                f"Failed to locate Git's main worktree for {worktree_path} — "
+                "keeping slot manifest entry to avoid a port collision.",
+                file=sys.stderr,
+            )
+            return EXIT_FAILED
+
         subprocess.run(
-            ["git", "worktree", "unlock", str(worktree_path)],
+            [
+                "git",
+                "-C",
+                str(control_worktree),
+                "worktree",
+                "unlock",
+                str(worktree_path),
+            ],
             capture_output=True,
         )
 
         result = subprocess.run(
-            ["git", "worktree", "remove", "--force", str(worktree_path)],
+            [
+                "git",
+                "-C",
+                str(control_worktree),
+                "worktree",
+                "remove",
+                "--force",
+                str(worktree_path),
+            ],
             capture_output=True,
             text=True,
         )
@@ -441,7 +488,10 @@ def main() -> int:
             )
             return EXIT_FAILED
 
-        subprocess.run(["git", "worktree", "prune"], capture_output=True)
+        subprocess.run(
+            ["git", "-C", str(control_worktree), "worktree", "prune"],
+            capture_output=True,
+        )
 
     deallocate_slot(str(worktree_path))
 
@@ -460,6 +510,47 @@ def main() -> int:
 
     print(f"Cleaned up worktree: {worktree_path}", file=sys.stderr)
     return EXIT_OK
+
+
+def target_from_cli() -> Path | None:
+    """Parse the direct or Claude hook interface, reporting usage errors."""
+    args = sys.argv[1:]
+    if args == ["--claude-hook"]:
+        try:
+            payload = json.load(sys.stdin)
+        except (json.JSONDecodeError, OSError) as exc:
+            print(f"Invalid Claude WorktreeRemove payload: {exc}", file=sys.stderr)
+            return None
+        if not isinstance(payload, dict):
+            print(
+                "Invalid Claude WorktreeRemove payload: expected an object.",
+                file=sys.stderr,
+            )
+            return None
+        raw_path = payload.get("worktree_path")
+        if not isinstance(raw_path, str) or not raw_path.strip():
+            print(
+                "Invalid Claude WorktreeRemove payload: missing worktree_path.",
+                file=sys.stderr,
+            )
+            return None
+        return Path(raw_path).resolve()
+
+    if len(args) == 1 and args[0] != "--claude-hook":
+        return Path(args[0]).resolve()
+
+    print(
+        "Usage: worktree_cleanup.py <worktree-path> | --claude-hook",
+        file=sys.stderr,
+    )
+    return None
+
+
+def main() -> int:
+    worktree_path = target_from_cli()
+    if worktree_path is None:
+        return EXIT_FAILED
+    return cleanup_worktree(worktree_path)
 
 
 if __name__ == "__main__":
