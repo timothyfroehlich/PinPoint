@@ -1,6 +1,6 @@
 ---
 name: pinpoint-chores
-description: Runbook for the weekly PinPoint "chores" session — the human-in-the-loop maintenance pass, ten checklist items: the Supabase CLI and pnpm corepack version pins (each with its own cooldown and its own set of sites to update), TS-7 rollout, Dependabot PRs, changelog, Sentry and Supabase advisors, cloud-routine review beads, PinballMap vendored-docs drift, GHA infra-flake triage, prod backup validation (`pnpm run chores:backups`), and the memory-and-context review it hands to `pinpoint-memory-review`. Use when Tim says "let's do chores", when the SessionStart chores-nag fires ("🧹 Weekly chores are N days overdue"), or when you want the chores checklist. After finishing, re-arm the nag with `bd defer`. Session-start project health is `pinpoint-briefing`, not this.
+description: Runbook for the weekly PinPoint "chores" session — the human-in-the-loop maintenance pass, ten checklist items: the Supabase CLI and pnpm version pins (each with its own cooldown and its own set of sites to update), TS-7 rollout, Dependabot PRs, changelog, Sentry and Supabase advisors, cloud-routine review beads, PinballMap vendored-docs drift, GHA infra-flake triage, prod backup validation (`pnpm run chores:backups`), and the memory-and-context review it hands to `pinpoint-memory-review`. Use when Tim says "let's do chores", when the SessionStart chores-nag fires ("🧹 Weekly chores are N days overdue"), or when you want the chores checklist. After finishing, re-arm the nag with `bd defer`. Session-start project health is `pinpoint-briefing`, not this.
 ---
 
 # pinpoint-chores
@@ -38,7 +38,7 @@ Then work the checklist. For each item, note findings as a comment on the bead (
 
 ### Checklist
 
-1. **Stale version-pin checks** (Supabase CLI — PP-nlv6; pnpm corepack pin — PP-w0eq)
+1. **Stale version-pin checks** (Supabase CLI — PP-nlv6; pnpm version pin — PP-w0eq)
    - **Supabase CLI pin.** Compare the pinned Supabase CLI version against the latest release. A version-drift nudge belongs here, not in per-session briefing. If stale, file/refresh a bead to bump it (or bump it if trivial and verified).
      - The pin is **9 sites across 4 files** — `ci.yml` (×6), plus `preview-control.yaml`, `preview-sync.yaml`, `preview-reaper.yaml` (×1 each). A bump is a multi-site edit: change **all nine or none**. A partial bump leaves jobs on mismatched CLI versions, which surfaces as a job-specific CI failure that reads like a flake rather than a bad edit.
      - List every pin, then compare against the newest release:
@@ -49,7 +49,7 @@ Then work the checklist. For each item, note findings as a comment on the bead (
        ```
 
        (`-A6` matters — one call site has an extra `if:` line before `with:`, so a smaller window silently misses it and you'd bump 8 of 9.)
-   - **pnpm corepack pin.** The pnpm binary is pinned in the `packageManager` field of `package.json` (corepack). **Dependabot cannot bump this field** — it's an open, unimplemented feature request ([dependabot-core#4830](https://github.com/dependabot/dependabot-core/issues/4830)); Dependabot's pnpm support only updates deps _inside_ the lockfile, never the corepack pin. So this is the only watcher it has, and it silently rots without it (that's how we ended up 9 months behind on 10.2.0 until npm's audit-endpoint retirement forced the jump — PP-w0eq).
+   - **pnpm version pin.** The pnpm binary is pinned in the `packageManager` field of `package.json` with its SHA-512 integrity hash, and `mise` reads and verifies that declaration directly without Corepack. **Dependabot cannot bump this field** — it's an open, unimplemented feature request ([dependabot-core#4830](https://github.com/dependabot/dependabot-core/issues/4830)); Dependabot's pnpm support only updates deps _inside_ the lockfile, never the `packageManager` pin. So this is the only watcher it has, and it silently rots without it (that's how we ended up 9 months behind on 10.2.0 until npm's audit-endpoint retirement forced the jump — PP-w0eq).
      - **Apply a 30-day cooldown** (supply-chain soak — same rationale as the Dependabot npm cooldown): bump only to the newest stable pnpm ≥30 days old, never the just-released `latest`.
      - Find the newest eligible version:
 
@@ -57,7 +57,7 @@ Then work the checklist. For each item, note findings as a comment on the bead (
        npm view pnpm time --json | python3 -c "import json,sys,datetime as d; t=json.load(sys.stdin); c=d.datetime.now(d.UTC)-d.timedelta(days=30); r=[(v,ts) for v,ts in t.items() if '-' not in v and v.split('.')[0].isdigit()]; r.sort(key=lambda x:list(map(int,x[0].split('.')))); print(next(v for v,ts in reversed(r) if d.datetime.fromisoformat(ts.replace('Z','+00:00'))<=c))"
        ```
 
-     - If it's newer than the current pin (mind major bumps — read the pnpm release notes/migration guide first), bump via `corepack use pnpm@<version>`, then verify no lockfile churn (`pnpm install --frozen-lockfile` → only `package.json` should change), `pnpm audit --audit-level=high` still resolves, and `pnpm run check` is green. PR it through the normal workflow; file a bead if a major bump needs real migration work.
+     - If it's newer than the current pin (mind major bumps — read the pnpm release notes/migration guide first), update `packageManager` in `package.json` with the new version and its sha512 integrity hash (e.g. from `npm view pnpm@<version> dist.integrity` converted to `+sha512.<hex>`), run `mise install` and `mise lock`, then verify no unexpected `pnpm-lock.yaml` churn (`pnpm install --frozen-lockfile`), `pnpm audit --audit-level=high` still resolves, and `pnpm run check` is green. PR it through the normal workflow; file a bead if a major bump needs real migration work.
    - **bd and Dolt compatibility version pins** (from the 2026-08-16 shared-DB schema incident). PinPoint declares exact compatibility versions for `bd` and `dolt` at a **single source**: `scripts/beads-compatibility.json`. The cloud setup script (`scripts/beads-cloud-setup.sh`), runtime guards (`scripts/beads-cloud-init.sh`), and Bazzite services consume or validate this manifest. When Tim's local/Bazzite tools move past the pins, bump **`scripts/beads-compatibility.json`** — cloud routines and services refuse to run until installed binaries match. Exact-pin is deliberate: an accidental _newer_ release migrated the shared DB and locked every client out for two days, so a loud refusal is the safe failure. Compare the pins against installed `bd version` and `dolt version`; bump only once newer versions are tested and running clean locally.
 
 2. **TypeScript compiler maintenance**
