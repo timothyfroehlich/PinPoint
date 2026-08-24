@@ -2,24 +2,15 @@
 """
 worktree_reap.py — remove agent worktrees whose work has already landed.
 
-Nothing else in PinPoint removes a worktree that is still on disk. Three
-mechanisms exist and each covers a different slice; none covers this one:
+Nothing else in PinPoint identifies finished worktrees that are still on disk.
+The cleanup hook only runs when a harness initiates removal, while
+`worktree_orphan_sweep.py` reconciles resources after a directory is gone. A
+background agent that commits, pushes and ends therefore needs this reaper.
 
-- The `WorktreeRemove` hook (`worktree_cleanup.py`) only fires when something
-  *else* initiates removal. A background agent that commits, pushes and ends
-  leaves its directory in place, so nothing ever initiates.
-- `worktree_orphan_sweep.py` reconciles slot entries whose directory is *gone*.
-  A worktree still on disk is "active" by its definition — invisible to the
-  sweep, and its Supabase volumes are deliberately protected there.
-- `scripts/stale-worktrees.sh` is hard-scoped to `../pinpoint-worktrees/*`.
-
-**The predicate matters more than the plumbing.** `stale-worktrees.sh` uses
-"no open PR + clean tree", which is indistinguishable from an agent that is
-working right now and has not opened its PR yet — at the time this script was
-written, zero worktrees had an open PR while at least two agents were live, so
-that rule would have deleted live work. **The absence of a PR is never the
-liveness signal.** This script reaps only on *positive proof that the work is
-already on `main`*:
+**The predicate matters more than the plumbing.** "No open PR + clean tree" is
+indistinguishable from an agent that is working right now and has not opened
+its PR yet. **The absence of a PR is never the liveness signal.** This script
+reaps only on *positive proof that the work is already on `main`*:
 
 - REAP/merged — the branch has a merged PR, the local `HEAD` is *exactly* that
   PR's `headRefOid`, and the tree is clean. SHA equality is load-bearing:

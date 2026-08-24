@@ -38,7 +38,7 @@ Newly unblocked: [blockers resolved — check `bd blocked` for items whose block
 Recently closed: [from `bd list --status=closed --limit 5`]
 
 ## 🌿 Worktree Health
-[From stale-worktrees.sh: any stale/dirty worktrees]
+[From worktree_reap.py: reapable, review, and active worktrees]
 
 ## 🚀 Recommended Next Actions
 1. [Highest impact / most urgent item]
