@@ -92,11 +92,17 @@ const EMAIL_REDACT_PATHS: string[] = Array.from(
  *   frames (every `node_modules` frame in this repo) and version strings like
  *   `runner@4.1.10` (numeric last segment) — so it does not shred the stack
  *   traces it is meant to preserve.
- * - The runs are length-bounded to RFC limits (local ≤64, domain ≤255, TLD
- *   ≤63). Unbounded runs backtrack from every start position on a long
- *   `aaaa…@bbbb…` token that has no TLD, which is quadratic — an 80 KB such
- *   token in a provider response took ~6.6 s and blocked the event loop while
- *   an error was being logged. The bounds cap the retry window to a constant.
+ * - The leading negative lookbehind anchors each match at a token boundary (the
+ *   preceding character is a delimiter, or it is the start of the string). This
+ *   does two jobs at once. It keeps the scan *linear*: after the match at a
+ *   token start fails, every interior character is rejected in O(1) by the
+ *   lookbehind, so a long malformed `aaaa…@bbbb…` token with no TLD cannot drive
+ *   the quadratic per-start re-scan that unbounded runs otherwise cause (an
+ *   80 KB such token in a provider response took ~6.6 s and blocked the event
+ *   loop; anchored, it is under a millisecond). And because the runs stay
+ *   unbounded, an overlong or unusual local part is masked in *full* rather than
+ *   suffix-matched from the middle — a 77-character local part becomes `abc***`,
+ *   not thirteen raw characters plus `abc***`.
  *
  * An apostrophe is a valid unquoted-local-part character (`o'hara@example.com`),
  * so it is *not* a delimiter — excluding it would match only `hara@…` and leave
@@ -110,7 +116,7 @@ const EMAIL_REDACT_PATHS: string[] = Array.from(
  * literal domain (`user@[192.168.1.1]`, bracket-delimited on both sides).
  */
 const EMBEDDED_EMAIL_RE =
-  /[^\s"<>()[\]{},;:@/\\]{1,64}@[^\s"<>()[\]{},;:@/\\]{1,255}\.\p{L}{2,63}/gu;
+  /(?<![^\s"<>()[\]{},;:@/\\])[^\s"<>()[\]{},;:@/\\]+@[^\s"<>()[\]{},;:@/\\]+\.\p{L}{2,63}/gu;
 
 /** Replace every email-like substring of `value` with its {@link maskEmail} form. */
 function maskEmailsInText(value: string): string {

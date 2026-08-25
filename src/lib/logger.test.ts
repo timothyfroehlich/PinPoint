@@ -280,8 +280,9 @@ describe("logger redaction", () => {
 
   it("scans a long malformed email-like token in bounded time", () => {
     // A huge `aaaa…@bbbb…` token with no TLD backtracks quadratically from every
-    // start position with unbounded runs; the RFC length caps keep it linear so
-    // logging malformed provider metadata cannot block the event loop.
+    // start position without a boundary anchor; the lookbehind rejects interior
+    // positions in O(1), keeping the scan linear so logging malformed provider
+    // metadata cannot block the event loop.
     const token = `${"a".repeat(40_000)}@${"b".repeat(40_000)}`;
     const error = new Error(`response: ${token}`);
 
@@ -289,8 +290,23 @@ describe("logger redaction", () => {
     const line = logLine({ err: error });
     const elapsedMs = performance.now() - start;
 
-    // Generous bound: linear scan is ~20ms; the unbounded regex took ~6600ms.
+    // Generous bound: anchored scan is ~1ms; the unanchored regex took ~6600ms.
     expect(elapsedMs).toBeLessThan(1000);
     expect(line).toContain('"msg":"test"');
+  });
+
+  it("masks an overlong local part in full rather than a suffix", () => {
+    // The boundary anchor means matching starts at the token's first character,
+    // so a >64-char local part is masked whole (three-char disclosure) instead
+    // of leaking its leading characters before a suffix match.
+    const localPart = "a".repeat(77);
+    const error = new Error(`bounce for ${localPart}@example.com`);
+
+    const line = logLine({ err: error });
+
+    expect(line).toContain("aaa***");
+    // No run of raw local-part characters survives ahead of the mask.
+    expect(line).not.toContain("aaaa***");
+    expect(line).not.toContain("aaaaaaaaaa"); // 10 raw chars would signal a leak
   });
 });
