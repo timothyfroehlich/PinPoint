@@ -3,7 +3,6 @@ import "server-only";
 import { Resend } from "resend";
 import nodemailer from "nodemailer";
 import type Mail from "nodemailer/lib/mailer";
-import { reportError } from "~/lib/observability/report-error";
 
 export const EMAIL_FROM =
   "PinPoint <notifications@pinpoint.austinpinballcollective.org>";
@@ -64,7 +63,13 @@ export class ResendTransport implements EmailTransport {
       if (inReplyTo) headers["In-Reply-To"] = inReplyTo;
       if (references) headers["References"] = references;
 
-      const data = await this.client.emails.send(
+      // The Resend SDK does NOT throw on API-level send failures (invalid
+      // recipient, unverified/bounced domain, validation errors). It resolves
+      // with `{ data: null, error: {...} }`, so the response must be inspected
+      // — only genuine JS/network faults reach the catch block below. Without
+      // this check a rejected send is reported as success and nothing is
+      // logged: a member email silently never arrives. (PP-okmw)
+      const { data, error } = await this.client.emails.send(
         {
           from: EMAIL_FROM,
           to,
@@ -77,9 +82,24 @@ export class ResendTransport implements EmailTransport {
         idempotencyKey ? { idempotencyKey } : {}
       );
 
+      if (error) {
+        // Wrap the Resend error object in a real Error (with the original as
+        // `cause`) so the single report at the sendEmail boundary gets a
+        // message + stack — the Resend error is a plain object with neither.
+        // Transports never call reportError themselves: sendEmail (client.ts)
+        // is the sole report site, so a failure is captured exactly once.
+        // (PP-okmw, PP-l4fd)
+        return {
+          success: false,
+          error: new Error(`Resend rejected send: ${error.message}`, {
+            cause: error,
+          }),
+        };
+      }
+
       return { success: true, data };
     } catch (error) {
-      reportError(error, { action: "ResendTransport.send" });
+      // Reporting is done once by sendEmail on any !success result. (PP-l4fd)
       return { success: false, error };
     }
   }
@@ -125,7 +145,7 @@ export class SMTPTransport implements EmailTransport {
 
       return { success: true, data: info };
     } catch (error) {
-      reportError(error, { action: "SMTPTransport.send" });
+      // Reporting is done once by sendEmail on any !success result. (PP-l4fd)
       return { success: false, error };
     }
   }
