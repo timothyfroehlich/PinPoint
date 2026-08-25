@@ -50,6 +50,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys
 import threading
@@ -61,6 +62,8 @@ REPO_NAME = "PinPoint"
 READY_LABEL = "ready-for-review"
 CI_GATE_NAME = "CI Gate"
 CODEX_REVIEW_BOT = "chatgpt-codex-connector[bot]"
+CODEX_REVIEW_APP_SLUG = "chatgpt-codex-connector"
+CODEX_CLEAN_REVIEW_PREFIX = "Codex Review: Didn't find any major issues."
 REVIEW_MARKER_PREFIX = "<!-- pinpoint-review:"
 LEGACY_CLAUDE_MARKER_PREFIX = "<!-- pinpoint-claude-review:"
 
@@ -68,7 +71,8 @@ LEGACY_CLAUDE_MARKER_PREFIX = "<!-- pinpoint-claude-review:"
 # Kept deliberately in sync with scripts/workflow/_pr-gates.sh. This watcher only
 # reports the state; merge-pr.sh is the enforcement point.
 REVIEW_HINT = (
-    "comment @codex review on PR #{pr}; the approval must cover the current head"
+    "await automatic Codex review of PR #{pr} at the current head; use @codex review "
+    "only when Tim explicitly requests it"
 )
 
 STARTUP_RETRIES = 6  # attempts to find runs for current SHA
@@ -241,12 +245,35 @@ def _codex_reviews(pr: int) -> list[dict]:
     return sorted(reviews, key=lambda review: review.get("submitted_at") or "")
 
 
-def _manual_markers(pr: int) -> list[tuple[str, str]]:
-    """Return (SHA, timestamp) records from the independent manual path."""
+def _comment_review_records(
+    pr: int,
+) -> tuple[list[tuple[str, str]], list[tuple[str, str]]]:
+    """Return clean automatic comments and independent manual markers."""
     repo = f"repos/{REPO_OWNER}/{REPO_NAME}"
+    clean: list[tuple[str, str]] = []
     markers: list[tuple[str, str]] = []
     for comment in _gh_api_list(f"{repo}/issues/{pr}/comments"):
         body = comment.get("body") or ""
+        app = comment.get("performed_via_github_app") or {}
+        first_line = body.splitlines()[0] if body else ""
+        if (
+            comment.get("user", {}).get("login") == CODEX_REVIEW_BOT
+            and app.get("slug") == CODEX_REVIEW_APP_SLUG
+            and first_line.startswith(CODEX_CLEAN_REVIEW_PREFIX)
+            and (
+                match := re.search(
+                    r"^\*\*Reviewed commit:\*\* `([0-9a-f]{10}|[0-9a-f]{40})`$",
+                    body,
+                    re.MULTILINE,
+                )
+            )
+        ):
+            clean.append(
+                (
+                    match.group(1),
+                    comment.get("updated_at") or comment.get("created_at") or "",
+                )
+            )
         if body.startswith(REVIEW_MARKER_PREFIX):
             markers.append(
                 (
@@ -261,7 +288,7 @@ def _manual_markers(pr: int) -> list[tuple[str, str]]:
                     comment.get("updated_at") or "",
                 )
             )
-    return markers
+    return clean, markers
 
 
 def review_state(pr: int) -> tuple[str, str]:
@@ -271,7 +298,10 @@ def review_state(pr: int) -> tuple[str, str]:
     ]
     reviews = _codex_reviews(pr)
     if reviews:
-        latest = reviews[-1]
+        head_reviews = [
+            review for review in reviews if (review.get("commit_id") or "") == head_sha
+        ]
+        latest = head_reviews[-1] if head_reviews else reviews[-1]
         review_sha = latest.get("commit_id") or ""
         state = (latest.get("state") or "UNKNOWN").upper()
         if state == "APPROVED" and review_sha == head_sha:
@@ -279,18 +309,52 @@ def review_state(pr: int) -> tuple[str, str]:
 
     # A current native approval is sufficient. Defer the paginated comments request
     # unless it is needed to find the independent manual-attestation fallback.
-    markers = _manual_markers(pr)
+    clean_comments, markers = _comment_review_records(pr)
     if any(marker_sha == head_sha for marker_sha, _at in markers):
         return "marker", f"manual review marker pins head {head_sha[:7]}"
+
+    current_clean = max(
+        (record for record in clean_comments if head_sha.startswith(record[0])),
+        key=lambda record: record[1],
+        default=("", ""),
+    )
+    if current_clean[0]:
+        clean_sha, clean_at = current_clean
+        if (
+            not reviews
+            or review_sha != head_sha
+            or clean_at > (latest.get("submitted_at") or "")
+        ):
+            return "clean_comment", f"Codex found no major issues on head {clean_sha}"
+
+    if (
+        reviews
+        and review_sha == head_sha
+        and state in {"COMMENTED", "CHANGES_REQUESTED"}
+    ):
+        return (
+            "reviewed",
+            f"Codex reviewed head {head_sha[:7]} with {state}; thread gate owns findings",
+        )
 
     latest_marker_sha, latest_marker_at = max(
         markers, key=lambda marker: marker[1], default=("", "")
     )
+    latest_clean_sha, latest_clean_at = max(
+        clean_comments, key=lambda record: record[1], default=("", "")
+    )
+    latest_comment_sha, latest_comment_at, latest_comment_state = (
+        (latest_marker_sha, latest_marker_at, "stale_marker")
+        if latest_marker_at > latest_clean_at
+        else (latest_clean_sha, latest_clean_at, "stale_clean_comment")
+    )
     if reviews:
-        if latest_marker_sha and latest_marker_at > (latest.get("submitted_at") or ""):
+        if latest_comment_sha and latest_comment_at > (
+            latest.get("submitted_at") or ""
+        ):
             return (
-                "stale_marker",
-                f"manual review marker pins {latest_marker_sha[:7]} but head is {head_sha[:7]}",
+                latest_comment_state,
+                f"review record pins {latest_comment_sha[:7]} but head is {head_sha[:7]}",
             )
         if state == "APPROVED":
             return (
@@ -307,6 +371,11 @@ def review_state(pr: int) -> tuple[str, str]:
         return (
             "stale_marker",
             f"manual review marker pins {latest_marker_sha[:7]} but head is {head_sha[:7]}",
+        )
+    if latest_clean_sha:
+        return (
+            "stale_clean_comment",
+            f"Codex clean result covers {latest_clean_sha[:7]} but head is {head_sha[:7]}",
         )
     return (
         "unreviewed",
@@ -499,10 +568,9 @@ def run_audit(pr: int) -> bool:
         "applied" if READY_LABEL in labels else "not applied (orchestrator applies)"
     )
 
-    # Reported, but NOT part of the verdict. This mode answers "is this PR worth
-    # Tim's Codex review right now?", and the review is what happens AFTER that
-    # answer is yes — gating on it would make the check circular and permanently
-    # red. merge-pr.sh's `reviewed` gate is the one that refuses to merge an
+    # Reported, but NOT part of the verdict. This mode answers "can this head leave
+    # draft and enter automatic review?"; gating on review here would make the check
+    # circular and permanently red. merge-pr.sh's `reviewed` gate refuses to merge an
     # unreviewed head. A stale Codex approval is worth seeing here anyway: it means the
     # PR looks reviewed and is not.
     try:
