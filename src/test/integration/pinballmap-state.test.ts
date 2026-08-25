@@ -36,7 +36,22 @@ describe("PinballMap shared read path (PGlite)", () => {
     const db = await getTestDb();
     await db
       .insert(pinballmapState)
-      .values({ id: "singleton", locationId: 26454 });
+      .values({ id: "singleton", enabled: true, locationId: 26454 });
+  });
+
+  it("masks a legacy disabled row as unconfigured without erasing its location", async () => {
+    const db = await getTestDb();
+    const { getPinballMapState } = await import("~/lib/pinballmap/state");
+
+    await db.update(pinballmapState).set({ enabled: false });
+
+    expect(await getPinballMapState()).toMatchObject({
+      enabled: false,
+      locationId: null,
+    });
+    expect((await db.select().from(pinballmapState))[0]?.locationId).toBe(
+      26454
+    );
   });
 
   it("syncLocationSnapshot stores the snapshot and marks health ok", async () => {
@@ -139,7 +154,7 @@ describe("manual-refresh token bucket at the seam (PP-hbi0)", () => {
     const db = await getTestDb();
     await db
       .insert(pinballmapState)
-      .values({ id: "singleton", locationId: 26454 });
+      .values({ id: "singleton", enabled: true, locationId: 26454 });
   });
 
   it("returns not_configured before allowance or client work", async () => {
@@ -288,6 +303,7 @@ describe("a failed sync clears nothing (PP-l81u)", () => {
     };
     await db.insert(pinballmapState).values({
       id: "singleton",
+      enabled: true,
       locationId: 26454,
       snapshotJson: staleSnapshot,
       lastSyncStatus: "ok",

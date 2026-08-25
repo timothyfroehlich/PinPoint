@@ -51,7 +51,7 @@ describe("0069 integration configuration-presence expand migration", () => {
     `);
   });
 
-  it("makes a disabled tracked location unconfigured without discarding its snapshot", async () => {
+  it("preserves a disabled tracked location for the previous deployment", async () => {
     const db = await getTestDb();
     await db.insert(pinballmapState).values({
       enabled: false,
@@ -74,7 +74,7 @@ describe("0069 integration configuration-presence expand migration", () => {
     const row = await db.query.pinballmapState.findFirst();
     expect(row).toMatchObject({
       enabled: false,
-      locationId: null,
+      locationId: 777,
       lastSyncStatus: "ok",
     });
     expect(row?.snapshotJson?.name).toBe("Dormant Arcade");

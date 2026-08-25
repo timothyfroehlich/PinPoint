@@ -56,7 +56,7 @@ async function enableIntegration(): Promise<void> {
   const db = await getTestDb();
   await db
     .insert(pinballmapState)
-    .values({ id: "singleton", locationId: 26454 });
+    .values({ id: "singleton", enabled: true, locationId: 26454 });
 }
 
 async function seedUser(

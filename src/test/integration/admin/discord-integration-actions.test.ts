@@ -199,8 +199,12 @@ beforeEach(() => {
   // Default: existing singleton row has a vault id (token-rotation path).
   mockFindFirst.mockResolvedValue({ botTokenVaultId: "existing-vault-id" });
 
-  // Reset execute to return empty array (vault update succeeds silently).
-  mockExecute.mockResolvedValue([]);
+  // Token saves create a replacement secret; cleanup DELETEs return no rows.
+  mockExecute.mockImplementation((query) =>
+    JSON.stringify(query).includes("create_secret")
+      ? Promise.resolve([{ id: "new-vault-id" }])
+      : Promise.resolve([])
+  );
   mockReturning.mockResolvedValue([{ id: "singleton" }]);
 });
 
@@ -363,6 +367,28 @@ describe("saveDiscordConfig", () => {
   });
 
   describe("configured save — probeServerMembership outcomes", () => {
+    it("fails closed when the saved Vault token cannot be loaded", async () => {
+      vi.mocked(getDiscordTokenForAdmin).mockRejectedValue(
+        new Error("Vault unavailable")
+      );
+
+      const result = await saveDiscordConfig(
+        makeFormData({ newToken: "", guildId: "123456789012345678" })
+      );
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.errors).toEqual([
+          expect.objectContaining({
+            field: "newToken",
+            message: expect.stringMatching(/couldn't read/i),
+          }),
+        ]);
+      }
+      expect(globalThis.fetch).not.toHaveBeenCalled();
+      expect(mockTransaction).not.toHaveBeenCalled();
+    });
+
     it("returns guildId field error when bot is not in the server (404)", async () => {
       mockFetch((url) => {
         if (url.includes("/users/@me")) {
@@ -438,7 +464,7 @@ describe("saveDiscordConfig", () => {
       });
     }
 
-    it("update path: rotates the existing secret via db.execute before opening the transaction", async () => {
+    it("rotation creates a replacement before atomically swapping the pointer", async () => {
       mockHappyProbes();
       mockFindFirst.mockResolvedValue({ botTokenVaultId: "existing-vault-id" });
 
@@ -446,7 +472,7 @@ describe("saveDiscordConfig", () => {
       const order: string[] = [];
       mockExecute.mockImplementation(() => {
         order.push("execute");
-        return Promise.resolve([]);
+        return Promise.resolve([{ id: "replacement-vault-id" }]);
       });
       mockTransaction.mockImplementation((callback) => {
         order.push("transaction");
@@ -464,15 +490,15 @@ describe("saveDiscordConfig", () => {
       const result = await saveDiscordConfig(fd);
       expect(result.ok).toBe(true);
 
-      // The vault.update_secret call (db.execute) happened, and it ran
-      // before the transaction opened.
-      expect(mockExecute).toHaveBeenCalledTimes(1);
-      const sqlArg = mockExecute.mock.calls[0]?.[0] as {
-        queryChunks?: unknown;
-      };
-      expect(JSON.stringify(sqlArg)).toContain("update_secret");
-      expect(order[0]).toBe("execute");
-      expect(order).toContain("transaction");
+      // create_secret ran before the pointer-swap transaction. Cleanup of the
+      // replaced secret happens only after the transaction commits.
+      expect(JSON.stringify(mockExecute.mock.calls[0]?.[0])).toContain(
+        "create_secret"
+      );
+      expect(order.slice(0, 2)).toEqual(["execute", "transaction"]);
+      expect(mockUpdateSet).toHaveBeenCalledWith(
+        expect.objectContaining({ botTokenVaultId: "replacement-vault-id" })
+      );
     });
 
     it("create path: creates the secret pre-transaction, then writes botTokenVaultId inside the transaction", async () => {
@@ -501,8 +527,7 @@ describe("saveDiscordConfig", () => {
       ).toBe(true);
     });
 
-    // The two orphan-compensation cases (create path deletes the orphan;
-    // update path deletes nothing) deliberately do NOT live here. They used to,
+    // The orphan-compensation cases deliberately do NOT live here. They used to,
     // asserted as `JSON.stringify(sqlArg).includes("delete_secret")` — a test
     // that inspects the SQL string the action generates without ever running
     // it. That let a compensation calling a function supabase_vault does not
@@ -515,7 +540,7 @@ describe("saveDiscordConfig", () => {
       mockHappyProbes();
       mockFindFirst.mockResolvedValue({ botTokenVaultId: "existing-vault-id" });
 
-      // Vault is down: the pre-transaction vault.update_secret rejects.
+      // Vault is down: the pre-transaction vault.create_secret rejects.
       // This call now lives inside the action's try, so the failure must be
       // caught and surfaced as a structured error — not escape to Next.js's
       // generic server-action error boundary.

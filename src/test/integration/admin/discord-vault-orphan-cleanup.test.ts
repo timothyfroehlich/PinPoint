@@ -1,5 +1,5 @@
 /**
- * Integration tests: saveDiscordConfig's create-path Vault orphan compensation,
+ * Integration tests: saveDiscordConfig's Vault orphan compensation,
  * with the compensation SQL **actually executed** against Postgres (PP-w3d9).
  *
  * Why this file exists separately from discord-integration-actions.test.ts:
@@ -16,9 +16,9 @@
  * The Vault stand-in (CORE-TEST-006): `vault` is a Postgres extension, not a
  * network service, so the boundary we mock is its *public function surface*.
  * supabase_vault 0.3.1 — the version installed both locally and in
- * pinpoint-prod — exposes exactly `vault.create_secret` and
- * `vault.update_secret` over the `vault.secrets` table. The stub below defines
- * those two and the table, and deliberately defines **nothing else**: any call
+ * pinpoint-prod — exposes `vault.create_secret` and `vault.update_secret` over
+ * the `vault.secrets` table. The action rotates with create + atomic pointer
+ * swap, while the stub deliberately defines **no delete helper**: any call
  * to a function the real extension lacks (`vault.delete_secret` among them)
  * fails here exactly as it fails in production. The "harness self-check" test
  * pins that property so the stub can't silently grow teeth-free.
@@ -348,7 +348,7 @@ describe("saveDiscordConfig Vault orphan compensation (real SQL, PGlite)", () =>
     expect((await readSingleton()).botTokenVaultId).toBe(stored[0]?.id);
   });
 
-  it("update path: a rolled-back rotation deletes nothing (there is no orphan to undo)", async () => {
+  it("a rolled-back rotation deletes the replacement and preserves the referenced token", async () => {
     const existingId = await seedVaultSecret("original-token");
     await seedSingleton(existingId);
     testControl.failInsideTransaction = true;
@@ -356,12 +356,12 @@ describe("saveDiscordConfig Vault orphan compensation (real SQL, PGlite)", () =>
     const result = await saveDiscordConfig(makeFormData(ROTATED_TOKEN));
     expect(result.ok).toBe(false);
 
-    // The rotation is non-transactional and intentional: the secret stays,
-    // rotated in place, and the singleton still points at it.
+    // The pointer swap rolled back, so the replacement is an orphan and is
+    // deleted. The original credential remains referenced and unchanged.
     const stored = await readVaultSecrets();
     expect(stored).toHaveLength(1);
     expect(stored[0]?.id).toBe(existingId);
-    expect(stored[0]?.secret).toBe(ROTATED_TOKEN);
+    expect(stored[0]?.secret).toBe("original-token");
     expect((await readSingleton()).botTokenVaultId).toBe(existingId);
   });
 
