@@ -350,12 +350,13 @@ try {
 
   await sql`
     INSERT INTO pinballmap_state
-      (id, location_id, snapshot_json, last_synced_at,
+      (id, enabled, location_id, snapshot_json, last_synced_at,
        last_sync_attempt_at, last_sync_status, last_sync_error)
     VALUES
-      ('singleton', ${snapshot.locationId}, ${JSON.stringify(snapshot)}::text::jsonb, now(),
+      ('singleton', true, ${snapshot.locationId}, ${JSON.stringify(snapshot)}::text::jsonb, now(),
        now(), 'ok', NULL)
     ON CONFLICT (id) DO UPDATE SET
+      enabled = true,
       location_id = excluded.location_id,
       snapshot_json = excluded.snapshot_json,
       last_synced_at = excluded.last_synced_at,
