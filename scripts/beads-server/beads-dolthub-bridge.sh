@@ -34,9 +34,36 @@ DB="${BEADS_DB:-PP}"
 log() { printf '[beads-bridge] %s\n' "$*" >&2; }
 die() { printf '[beads-bridge] ERROR: %s\n' "$*" >&2; exit 1; }
 
+PINPOINT_DIR="${PINPOINT_DIR:-$HOME/Code/PinPoint}"
+COMPAT_FILE="$PINPOINT_DIR/scripts/beads-compatibility.json"
+
 command -v bd >/dev/null 2>&1 || die "bd not found on PATH"
 command -v dolt >/dev/null 2>&1 || die "dolt not found on PATH"
 [[ -n "${BEADS_DOLT_PASSWORD:-}" ]] || die "BEADS_DOLT_PASSWORD not set"
+
+if [[ ! -f "$COMPAT_FILE" ]]; then
+  die "compatibility manifest not found at $COMPAT_FILE"
+fi
+
+BD_PINNED="$(sed -nE 's/^[[:space:]]*"bd"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/p' "$COMPAT_FILE" | head -n1 || true)"
+DOLT_PINNED="$(sed -nE 's/^[[:space:]]*"dolt"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/p' "$COMPAT_FILE" | head -n1 || true)"
+
+[[ -n "$BD_PINNED" ]] || die "could not parse \"bd\" version from $COMPAT_FILE"
+[[ -n "$DOLT_PINNED" ]] || die "could not parse \"dolt\" version from $COMPAT_FILE"
+
+bd_raw="$(bd version 2>&1 || true)"
+bd_ver="$(printf '%s\n' "$bd_raw" | sed -nE 's/^bd version ([0-9]+\.[0-9]+\.[0-9]+).*/\1/p' | head -n1 || true)"
+if [[ "$bd_ver" != "$BD_PINNED" ]]; then
+  die "bd $bd_ver != pinned $BD_PINNED from $COMPAT_FILE — refusing bridge cycle"
+fi
+
+dolt_raw="$(dolt version 2>&1 || true)"
+dolt_ver="$(printf '%s\n' "$dolt_raw" | sed -nE 's/^dolt version ([0-9]+\.[0-9]+\.[0-9]+).*/\1/p' | head -n1 || true)"
+if [[ "$dolt_ver" != "$DOLT_PINNED" ]]; then
+  die "dolt $dolt_ver != pinned $DOLT_PINNED from $COMPAT_FILE — refusing bridge cycle"
+fi
+
+log "bd $bd_ver and dolt $dolt_ver match compatibility contract ($COMPAT_FILE)"
 
 # dolt SQL helper against the live server (used for the abort path). Uses the
 # same env password; --result-format null keeps output quiet.

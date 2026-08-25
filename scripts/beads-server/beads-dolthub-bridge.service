@@ -9,7 +9,11 @@
 #
 # BEADS_DOLT_PASSWORD comes from an environment file readable only by the user
 # (chmod 600). NEVER commit that file; NEVER put the password in this unit.
-# PATH must include /home/linuxbrew/.linuxbrew/bin for brew-installed bd + dolt.
+#
+# Invokes bridge explicitly through user-global `mise` context rather than
+# relying on shell activation or a Linuxbrew PATH.
+# Disables surprise auto-install and fallback (fails closed).
+# %h expands to the user's home directory.
 
 [Unit]
 Description=Beads DoltHub bridge (commit/pull/push cycle)
@@ -21,9 +25,12 @@ Type=oneshot
 # REQUIRED: run from the project so `bd` resolves .beads (the server config).
 # Without this the bridge runs from $HOME and every `bd dolt` call fails.
 WorkingDirectory=%h/Code/PinPoint
-Environment=PATH=/home/linuxbrew/.linuxbrew/bin:/usr/local/bin:/usr/bin:/bin
+Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+Environment=MISE_EXEC_AUTO_INSTALL=false
+Environment=MISE_NOT_FOUND_AUTO_INSTALL=false
+Environment=MISE_NOT_FOUND_SYSTEM_FALLBACK=false
 # Secret lives here, mode 600, outside git. See SETUP.md.
 EnvironmentFile=%h/.beads-server/bridge.env
 # System bash (brew bash is not guaranteed installed); script is invoked via bash
-# so its +x bit is optional.
-ExecStart=/usr/bin/bash %h/.beads-server/beads-dolthub-bridge.sh
+# under mise exec so bd and dolt resolve from global mise context.
+ExecStart=%h/.local/bin/mise exec -- /usr/bin/bash %h/.beads-server/beads-dolthub-bridge.sh

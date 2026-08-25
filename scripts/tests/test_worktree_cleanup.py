@@ -637,6 +637,31 @@ class TestMainTeardown:
         assert exit_code == cleanup.EXIT_OK
         assert "Cleaned up worktree" in capsys.readouterr().err
 
+    def test_missing_supabase_cli_still_reports_success(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        fake_worktree: Path,
+        deallocated: list[str],
+    ) -> None:
+        """When supabase CLI is absent, cleanup tolerates FileNotFoundError and continues."""
+        install(
+            monkeypatch,
+            RunStub(
+                rev_parse=(0, f"{BRANCH}\n", ""),
+                supabase=FileNotFoundError(2, "No such file: supabase"),
+                volume_ls=(0, "", ""),
+            ),
+        )
+
+        exit_code = _run_main(monkeypatch, fake_worktree)
+
+        assert exit_code == cleanup.EXIT_OK
+        err = capsys.readouterr().err
+        assert "failed to invoke `supabase stop`" in err
+        assert "Cleaned up worktree" in err
+        assert deallocated == [str(fake_worktree)]
+
     def test_failed_worktree_removal_keeps_the_slot(
         self,
         monkeypatch: pytest.MonkeyPatch,

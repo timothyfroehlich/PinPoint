@@ -396,16 +396,22 @@ def cleanup_worktree(worktree_path: Path) -> int:
         # a stack that was never started both look like errors but don't block
         # slot deallocation.
         print(f"Stopping Supabase for {branch}...", file=sys.stderr)
-        stop_result = subprocess.run(
-            ["supabase", "stop"],
-            cwd=worktree_path,
-            capture_output=True,
-            text=True,
-        )
-        if stop_result.returncode != 0:
+        try:
+            stop_result = subprocess.run(
+                ["supabase", "stop"],
+                cwd=worktree_path,
+                capture_output=True,
+                text=True,
+            )
+            if stop_result.returncode != 0:
+                print(
+                    f"Warning: `supabase stop` exited {stop_result.returncode}: "
+                    f"{stop_result.stderr.strip() or stop_result.stdout.strip()}",
+                    file=sys.stderr,
+                )
+        except (FileNotFoundError, OSError) as exc:
             print(
-                f"Warning: `supabase stop` exited {stop_result.returncode}: "
-                f"{stop_result.stderr.strip() or stop_result.stdout.strip()}",
+                f"Warning: failed to invoke `supabase stop` ({exc}) — continuing cleanup",
                 file=sys.stderr,
             )
 
@@ -422,19 +428,32 @@ def cleanup_worktree(worktree_path: Path) -> int:
                 file=sys.stderr,
             )
         elif query.volumes:
-            rm_result = subprocess.run(
-                ["docker", "volume", "rm", *query.volumes],
-                capture_output=True,
-                text=True,
-            )
-            if rm_result.returncode != 0:
+            try:
+                rm_result = subprocess.run(
+                    ["docker", "volume", "rm", *query.volumes],
+                    capture_output=True,
+                    text=True,
+                )
+                if rm_result.returncode != 0:
+                    err_msg = (
+                        rm_result.stderr.strip() or f"exit code {rm_result.returncode}"
+                    )
+                    print(
+                        f"Warning: `docker volume rm` exited {rm_result.returncode}: {err_msg}",
+                        file=sys.stderr,
+                    )
+                    volumes_unknown_reason = f"`docker volume rm` failed: {err_msg}"
+                else:
+                    print(
+                        f"Removed {len(query.volumes)} Docker volume(s)",
+                        file=sys.stderr,
+                    )
+            except (FileNotFoundError, OSError) as exc:
                 print(
-                    f"Warning: `docker volume rm` exited {rm_result.returncode}: "
-                    f"{rm_result.stderr.strip()}",
+                    f"Warning: failed to invoke `docker volume rm` ({exc})",
                     file=sys.stderr,
                 )
-            else:
-                print(f"Removed {len(query.volumes)} Docker volume(s)", file=sys.stderr)
+                volumes_unknown_reason = f"failed to invoke `docker volume rm`: {exc}"
 
     # Unlock first. Claude Code agent runtimes lock worktrees while in use,
     # and the lock persists after the agent finishes; `git worktree remove

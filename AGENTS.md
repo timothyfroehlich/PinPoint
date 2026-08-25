@@ -28,7 +28,7 @@
 3. **Don't kill processes you didn't start** — see §4 Process safety.
 4. **Sync with merge, never rebase** — see §5 Branches.
 5. **Root checkout is read-only.** It stays on `main`. All work — including planning docs — happens in a worktree. Dispatch a subagent or switch into an existing worktree. Tool-specific dispatch mechanics live in `CLAUDE.md`. (PP-46z, PP-bg45.)
-6. **Never `--no-verify`**, never wildcard tool permissions — without explicit user approval each time. **The merge decision is Tim's, always.** An agent MAY run the gate-enforced script `bash scripts/workflow/merge-pr.sh <PR> --human`, but the `block-direct-merge.cjs` PreToolUse hook turns that invocation into an **approval prompt** — Tim approves before it runs, so the merge is still his call (PP-wi85, reversed for the script only, per Tim 2026-08-19). The raw merge channels stay **hard-blocked** for agents — never `gh pr merge`, never `gh api PUT .../merge`, never MCP `merge_pull_request` — because they skip the script's gate re-checks (CI green, review pins head, threads resolved, no conflict). An agent's normal terminal state on a PR is still: ready-for-review, CI green, a review covering the head commit (see §5 "Getting a PR reviewed"), threads resolved, screenshots posted if UI-touching, then hand over with `bash scripts/workflow/merge-handoff.sh <PR>` — it prints the state Tim needs plus the merge command. (PP-wi85.)
+6. **Never `--no-verify`**, never wildcard tool permissions — without explicit user approval each time. **The merge decision is Tim's, always.** An agent MAY run the gate-enforced script `bash scripts/workflow/merge-pr.sh <PR> --human`, but the `block-direct-merge.cjs` PreToolUse hook turns that invocation into an **approval prompt** — Tim approves before it runs, so the merge is still his call (PP-wi85, reversed for the script only, per Tim 2026-08-19). The raw merge channels stay **hard-blocked** for agents — never `gh pr merge`, never `gh api PUT .../merge`, never MCP `merge_pull_request` — because they skip the script's gate re-checks (CI green, review pins head, threads resolved, no conflict). An agent's normal terminal state on a PR is: GitHub-ready, CI green, automatic Codex coverage of head, threads resolved, `ready-for-review` applied, and screenshots posted if UI-touching; then hand over with `bash scripts/workflow/merge-handoff.sh <PR>` — it prints the state Tim needs plus the merge command. (PP-wi85.)
 7. **Beads: `team-maintainer` policy** (not the conservative default).
 
 **Codex mutations:** use `bd --actor Codex <command>` so automated writes never fall back to Tim's identity.
@@ -52,6 +52,7 @@ domain language.
 
 One-time install for tools the workflow scripts depend on:
 
+- **mise** — version `2026.8.11` or newer. Manages Node (`24.16.0` pinned in `mise.toml`) and pnpm (`package.json#packageManager` single authority with SHA-512 integrity verification).
 - **GNU parallel** — provides `sem`, which `pnpm run preflight` uses to cap host-wide concurrency at 2. Without it, `preflight` fails with a clear install hint; `pnpm run preflight:unlocked` bypasses the cap.
 - **pytest** — `pnpm run check:python` runs the hook/script tests with it, and dies with a bare `pytest: command not found` if it is absent (no runtime install hint, unlike `sem`). Install it however your host installs Python CLI tools — Homebrew, pipx, distro package.
 
@@ -101,9 +102,9 @@ Only stop services you started in this session, by specific PID or via worktree-
 | `./scripts/workflow/pr-watch.py <PR>`     | Watch CI for a PR (Monitor-compatible). Never hand-roll a polling loop.                                                                                                                                                                                                                                                            |
 | `pnpm run dev:status`                     | Check whether Next.js / Supabase / Postgres are up — one command, worktree-port aware. Use it instead of ad-hoc `curl` health checks against localhost.                                                                                                                                                                            |
 
-### Type-check engine (TS 7 GA dual-install)
+### Type-check engine (TS 7)
 
-TypeScript 7.0 (the Go-native compiler) is GA and installed via Microsoft's recommended dual-install: `@typescript/native` (alias of `typescript@^7`) ships the native `tsc` binary that runs the `typecheck`, `typecheck:tests`, and `typecheck:e2e` gates (~4–6× faster than TS6's `tsc`), while the `typescript` package name is aliased to `@typescript/typescript6` — the TS6 JS compiler API + a `tsc6` binary. `next build` still type-checks on that TS6 API (PP-sc77.5 migrates Next onto TS7 CLI mode). Bin names are unambiguous: `tsc` = native 7, `tsc6` = JS 6. `pnpm run typecheck:tsc6` runs the TS6 engine for A/B comparison. PP-8mv1 moved the test/e2e configs onto native `tsc` (0 divergences vs `tsc6` on `tsconfig.tests.check.json` and `e2e/tsconfig.json`) and retired the `tsc-baseline` gate. History and validation record: `docs/plans/2026-06-27-typescript-7-upgrade-plan.md` (PRs #1586, PP-xu96, PP-8mv1).
+`typescript` is TypeScript 7.0, whose Go-native `tsc` runs the `typecheck`, `typecheck:tests`, and `typecheck:e2e` gates. `next build` uses CLI mode to run the same compiler against `tsconfig.app.json`; Next 16.2.x needs this because its API mode requires a JavaScript compiler API, while 16.3+ defaults to CLI mode. The CLI emits raw `tsc` diagnostics rather than Next code frames. History and validation record: `docs/plans/2026-06-27-typescript-7-upgrade-plan.md` (PRs #1586, PP-xu96, PP-8mv1, PP-sc77.5).
 
 ### Lint engine (Oxlint)
 
@@ -151,11 +152,11 @@ Never resolve `drizzle/meta` conflicts manually — the folder holds binary-like
 
 ### Getting a PR reviewed
 
-**No bot reviews this repo.** Copilot review was retired on 2026-08-02 (PP-4ric) — the free tier was too small to review PinPoint's PRs, so quota outages were the normal state. The merge bar is unchanged: a PR still needs a review covering its **head commit**, with threads resolved.
+**Automatic Codex review is the default.** Open every agent-created PR as a GitHub draft; promote it only after the current-head `CI Gate` succeeds. Before a later upload that changes more than 50 executable-code lines, return the PR to draft **before** pushing, then promote it again after the replacement `CI Gate` succeeds.
 
-**Tim can trigger GitHub-native Codex review.** Finish churn first (CI fixes, merge-from-main), stop iterating, then Tim may comment `@codex review` on the PR. It uses the installed GitHub integration and does not use an OpenAI API key. Once Codex has reviewed, address every finding and have Tim comment `@codex review` again if the branch changed. A Codex GitHub `APPROVED` review of the current head SHA is valid alongside the existing manual attestation workflow.
+The owning agent monitors CI, draft promotion, automatic review, findings, and corrective pushes until Codex has returned a clean result for the exact current head and every review thread is resolved. An exact-head finding-bearing review is also terminal once every thread is explicitly adjudicated and resolved; declining a finding without a push does not require manual re-review. Use `@codex review` only when Tim explicitly asks for a manual trigger; it is not the fallback when automation is slow.
 
-The gate accepts either GitHub's native Codex review record — exact account `chatgpt-codex-connector[bot]`, state `APPROVED`, and `commit_id` equal to the PR head SHA — or the existing SHA-pinned `mark-review.sh` attestation after `/codex:review` or `/code-review`. Full rules: `pinpoint-pr-workflow` skill Phase 3.4.
+The gate accepts Codex's native GitHub approval, its exact-bot/exact-app clean comment pinned to head, an exact-head `COMMENTED`/`CHANGES_REQUESTED` review after every finding thread is adjudicated and resolved, or the existing SHA-pinned manual attestation after Tim runs `/codex:review` or `/code-review`. Exact upload counting, state transitions, and fallback rules: `pinpoint-pr-workflow` skill Phase 3.
 
 ### Handing a PR over to merge
 
@@ -193,7 +194,7 @@ How Tim wants agents to behave. (§1 has the one-line version; this is the detai
 ### Collaboration & decisions
 
 - **Don't make my calls for me.** (a) When you ask me a multi-option question, wait for my answer before acting on one — even in auto/autonomous mode; deciding before I reply makes the question performative and removes my choice. (b) Auto/autonomous mode authorizes _operational_ calls (continuing work, tool choices, cleanup, re-publishing after a restart), **not** taste decisions — layout, color, copy, IA, or scope tradeoffs I surfaced. When I'm the taste-maker, ask (`AskUserQuestion` or a visual playground). While waiting on an answer, only do genuinely non-blocking parallel work.
-- **PRs ready-by-default.** Open PRs as ready-for-review, not draft. CI runs the same on drafts, so draft gates nothing — it just adds a "flip ready" step and signals WIP. Use draft only while still iterating, when you want title/description feedback first, or when you've told me you're pausing mid-task.
+- **PR lifecycle is agent-owned.** Follow §5 "Getting a PR reviewed" through exact-head automatic review and finding adjudication; draft/ready mechanics live in `pinpoint-pr-workflow`.
 - **Link markdown files by absolute path.** When you point me at a markdown file to read or review (a plan, spec, handoff doc, report), always give the full absolute path (e.g. `/Users/froeht/Code/PinPoint/docs/...`), never a relative one. Absolute paths open directly in a cmux pane.
 
 ### Scope and shipping discipline

@@ -18,9 +18,7 @@ PinPoint uses single-context domain documentation. See `docs/agents/domain.md`.
 
 `REVIEW.md` at the repo root is the canonical review rubric. Read it before launching the code-review skill.
 
-**Codex GitHub review is a valid review-gate path.** Tim triggers it by commenting `@codex review` on the PR. A native GitHub `APPROVED` review of the current head passes the gate alongside the existing SHA-pinned manual attestation; no OpenAI API key is involved.
-
-Finish churn first, then have Tim comment `@codex review` or use the existing `/codex:review` / `/code-review` and `mark-review.sh` workflow. Address findings and repeat the chosen review path if the head changes. Full rules: `pinpoint-pr-workflow` Phase 3.4.
+Codex reviews every eligible PR update automatically. Author-side draft/CI/review ownership, the 51-line re-draft threshold, and explicit-request-only manual review paths are canonical in `pinpoint-pr-workflow` Phase 3.
 
 ### Sandbox network isolation
 

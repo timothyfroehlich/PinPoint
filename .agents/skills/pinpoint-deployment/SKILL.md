@@ -129,7 +129,7 @@ Native Supabase auto-branching is **disabled** — no PR gets a preview by defau
   - `/preview extend` — push expiry +48h (no DB work). `/preview stop` — tear down now.
 - **State**: one sticky bot comment per PR (keyed `<!-- pinpoint-preview-status -->`) holds the `Expires:` timestamp — the TTL source of truth.
 - **Reaper**: `Preview Reaper` runs hourly; deletes branches past expiry or on closed/merged PRs, and flips the sticky comment to "expired — comment `/preview` to restart."
-- **Implementation** (workflows, the Vercel git-integration wiring, and required secrets): `.github/workflows/preview-control.yaml`, `preview-reaper.yaml`, `scripts/workflow/preview/*.sh`.
+- **Implementation** (workflows, the Vercel git-integration wiring, and required secrets): `.github/workflows/preview-control.yaml`, `preview-reaper.yaml`, `scripts/workflow/preview/*.sh` (including the pinned Vercel CLI wrapper `scripts/workflow/preview/vercel-cli.sh`, PP-h2ui.7).
 
 Vercel preview migrations: preview deployments skip `migrate:production` (branch DB user lacks `CREATE SCHEMA`). The on-demand `Preview Controller` workflow migrates + seeds the branch DB before building the preview. Production deploys still migrate.
 
