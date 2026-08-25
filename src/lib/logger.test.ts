@@ -152,8 +152,8 @@ describe("logger redaction", () => {
   });
 
   it("preserves a non-plain-object field (Date) rather than blanking it", () => {
-    // In-place masking keeps value identity: a Date serializes to its ISO string
-    // as before, not to `{}` (which a rebuild-from-keys would produce).
+    // A Date serializes through its own `toJSON` to the ISO string, not to `{}`
+    // (which a blind rebuild-from-keys would produce).
     const occurredAt = new Date("2020-01-02T03:04:05.000Z");
     const error = Object.assign(new Error("boom"), { occurredAt });
 
@@ -218,5 +218,51 @@ describe("logger redaction", () => {
 
     expect(line).toContain("@vitest+runner@4.1.10");
     expect(line).not.toContain("***");
+  });
+
+  it("terminates on a branching cycle instead of fanning out exponentially", () => {
+    // A depth cap alone does not bound total work: `n.left = n; n.right = n`
+    // duplicates both paths at every level (~2^depth visits) before the cap is
+    // reached. The visited-set guard short-circuits the repeat immediately, so
+    // this returns rather than hanging the event loop while reporting an error.
+    interface Node {
+      note: string;
+      left?: Node;
+      right?: Node;
+    }
+    const node: Node = { note: "reject victim@example.com" };
+    node.left = node;
+    node.right = node;
+    const error = Object.assign(new Error("cyclic"), { node });
+
+    const line = logLine({ err: error });
+
+    expect(line).not.toContain("victim@example.com");
+    expect(line).toContain("vic***");
+  });
+
+  it("serializes a value through its toJSON rather than exposing backing fields", () => {
+    // An SDK class whose `toJSON` exposes only a redacted summary must not have
+    // its hidden fields flattened into the log by a blind key-walk.
+    const creds = {
+      token: "supersecrettoken",
+      toJSON: () => ({ summary: "credentials (redacted)" }),
+    };
+    const error = Object.assign(new Error("auth failed"), { creds });
+
+    const line = logLine({ err: error });
+
+    expect(line).toContain("credentials (redacted)");
+    expect(line).not.toContain("supersecrettoken");
+  });
+
+  it("renders a slot-backed object (URL) via toJSON, not as {}", () => {
+    const error = Object.assign(new Error("bad endpoint"), {
+      endpoint: new URL("https://api.example.com/v1/x"),
+    });
+
+    const line = logLine({ err: error });
+
+    expect(line).toContain("api.example.com/v1/x");
   });
 });

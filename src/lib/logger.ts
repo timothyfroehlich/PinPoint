@@ -107,10 +107,12 @@ function maskEmailsInText(value: string): string {
   return value.replace(EMBEDDED_EMAIL_RE, (match) => maskEmail(match));
 }
 
-/** Recursion cap for {@link maskEmailsDeep} — a stack-overflow and cycle guard. */
+/** Recursion cap for {@link maskEmailsDeep} — a stack-overflow guard for a deep, non-cyclic chain. */
 const MAX_MASK_DEPTH = 64;
 /** Placeholder for a value that is too deep, or that threw while being read. */
 const UNMASKABLE_PLACEHOLDER = "[unserializable]";
+/** Placeholder for an object already visited on this pass (cycle or shared reference). */
+const CIRCULAR_PLACEHOLDER = "[circular]";
 
 /**
  * Return a copy of an already-serialized error with the email addresses in its
@@ -131,35 +133,58 @@ const UNMASKABLE_PLACEHOLDER = "[unserializable]";
  * turns "an address leaked" into "the log call itself throws", inside the very
  * catch block reporting the original failure. Reading a source value never
  * throws for those shapes; a read that *does* throw (a throwing getter) is
- * caught per-key. Opaque built-ins whose data lives in internal slots — `Date`,
- * `Buffer`/typed arrays, `Map`, `RegExp`, `Set` — are passed through by
- * reference so their serialization is preserved (rebuilding a `Date` from its
- * keys would flatten it to `{}`); an address inside one is left as-is, which is
- * not a realistic shape for a recipient. Recursion is depth-capped so a deeply
- * nested (or self-referential) value cannot overflow the stack; past the cap the
- * subtree is replaced by a placeholder, which fails safe (no raw remainder).
+ * caught per-key.
+ *
+ * Two termination guards, because the depth cap alone is not enough. `seen`
+ * tracks every object visited on the pass and short-circuits a repeat: a
+ * branching self-cycle (`n.a = n; n.b = n`) or a diamond DAG would otherwise
+ * fan out to ~2^depth visits before the cap stopped it, hanging the event loop
+ * while an error is being reported. The depth cap then bounds a deep, non-cyclic
+ * chain that no repeat catches. Both replace the offending subtree with a
+ * placeholder, which fails safe (no raw remainder).
+ *
+ * A value carrying its own `toJSON` (a `Date`, a `URL`, or an SDK class that
+ * exposes only a redacted summary) is serialized *through* it and the result
+ * masked — not flattened field-by-field, which would strip the prototype,
+ * bypass the class's own redaction (potentially logging a token it hides), and
+ * collapse a slot-backed object like `URL` to `{}`. Typed arrays hold bytes,
+ * never a maskable address, and are large, so they pass through untouched.
  */
-function maskEmailsDeep(value: unknown, depth: number): unknown {
+function maskEmailsDeep(
+  value: unknown,
+  depth: number,
+  seen: WeakSet<object>
+): unknown {
   if (typeof value === "string") return maskEmailsInText(value);
   if (value === null || typeof value !== "object") return value;
-  if (
-    value instanceof Date ||
-    value instanceof RegExp ||
-    value instanceof Map ||
-    value instanceof Set ||
-    ArrayBuffer.isView(value)
-  ) {
-    return value;
-  }
+  if (seen.has(value)) return CIRCULAR_PLACEHOLDER;
+  if (ArrayBuffer.isView(value)) return value;
   if (depth >= MAX_MASK_DEPTH) return UNMASKABLE_PLACEHOLDER;
+  seen.add(value);
+
+  let toJSON: (() => unknown) | undefined;
+  try {
+    const candidate = (value as { toJSON?: unknown }).toJSON;
+    if (typeof candidate === "function") toJSON = candidate as () => unknown;
+  } catch {
+    // A throwing `toJSON` accessor — treat the value as having none.
+  }
+  if (toJSON) {
+    try {
+      return maskEmailsDeep(toJSON.call(value), depth + 1, seen);
+    } catch {
+      return UNMASKABLE_PLACEHOLDER;
+    }
+  }
+
   if (Array.isArray(value)) {
-    return value.map((item) => maskEmailsDeep(item, depth + 1));
+    return value.map((item) => maskEmailsDeep(item, depth + 1, seen));
   }
   const source = value as Record<string, unknown>;
   const result: Record<string, unknown> = {};
   for (const key of Object.keys(source)) {
     try {
-      result[key] = maskEmailsDeep(source[key], depth + 1);
+      result[key] = maskEmailsDeep(source[key], depth + 1, seen);
     } catch {
       // A throwing getter (or any read failure) must not crash the log call.
       result[key] = UNMASKABLE_PLACEHOLDER;
@@ -176,7 +201,7 @@ function maskEmailsDeep(value: unknown, depth: number): unknown {
  */
 function maskingErrSerializer(error: Error): unknown {
   try {
-    return maskEmailsDeep(pino.stdSerializers.err(error), 0);
+    return maskEmailsDeep(pino.stdSerializers.err(error), 0, new WeakSet());
   } catch {
     // `stdSerializers.err` reads every own enumerable error property, so a
     // throwing getter on the error can fail here, before maskEmailsDeep runs.
