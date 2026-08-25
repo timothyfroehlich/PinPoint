@@ -265,4 +265,32 @@ describe("logger redaction", () => {
 
     expect(line).toContain("api.example.com/v1/x");
   });
+
+  it("masks the full local part of an address containing an apostrophe", () => {
+    // An apostrophe is valid in an unquoted local part; excluding it would match
+    // only `hara@…` and leave `o'har***` (five of six chars) in the log.
+    const error = new Error(`bounce for ${"o"}'hara@example.com`);
+
+    const line = logLine({ err: error });
+
+    expect(line).not.toContain("o'hara@example.com");
+    expect(line).toContain("o'h***");
+    expect(line).not.toContain("o'har***");
+  });
+
+  it("scans a long malformed email-like token in bounded time", () => {
+    // A huge `aaaa…@bbbb…` token with no TLD backtracks quadratically from every
+    // start position with unbounded runs; the RFC length caps keep it linear so
+    // logging malformed provider metadata cannot block the event loop.
+    const token = `${"a".repeat(40_000)}@${"b".repeat(40_000)}`;
+    const error = new Error(`response: ${token}`);
+
+    const start = performance.now();
+    const line = logLine({ err: error });
+    const elapsedMs = performance.now() - start;
+
+    // Generous bound: linear scan is ~20ms; the unbounded regex took ~6600ms.
+    expect(elapsedMs).toBeLessThan(1000);
+    expect(line).toContain('"msg":"test"');
+  });
 });

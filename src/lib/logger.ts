@@ -80,9 +80,9 @@ const EMAIL_REDACT_PATHS: string[] = Array.from(
  * Matches an email address embedded anywhere in a string.
  *
  * The runs either side of the `@` are "any run of characters that cannot
- * delimit or path-separate an address" — no whitespace, quotes, brackets,
+ * delimit or path-separate an address" — no whitespace, double quote, brackets,
  * braces, slashes, or the punctuation that frames one in error text — and the
- * domain must end in an alphabetic TLD (`\p{L}{2,}`). Two forces shape this:
+ * domain must end in an alphabetic TLD (`\p{L}{2,63}`). Three forces shape this:
  *
  * - The `u` flag plus `\p{L}` match by code point, so an internationalised
  *   domain (`user@exämple.com`, or a `.рф`/`.中国` TLD) is caught; an ASCII-only
@@ -92,6 +92,16 @@ const EMAIL_REDACT_PATHS: string[] = Array.from(
  *   frames (every `node_modules` frame in this repo) and version strings like
  *   `runner@4.1.10` (numeric last segment) — so it does not shred the stack
  *   traces it is meant to preserve.
+ * - The runs are length-bounded to RFC limits (local ≤64, domain ≤255, TLD
+ *   ≤63). Unbounded runs backtrack from every start position on a long
+ *   `aaaa…@bbbb…` token that has no TLD, which is quadratic — an 80 KB such
+ *   token in a provider response took ~6.6 s and blocked the event loop while
+ *   an error was being logged. The bounds cap the retry window to a constant.
+ *
+ * An apostrophe is a valid unquoted-local-part character (`o'hara@example.com`),
+ * so it is *not* a delimiter — excluding it would match only `hara@…` and leave
+ * `o'har***` in the log, five of six local-part characters instead of three. A
+ * double quote still is a delimiter (it frames a quoted local part).
  *
  * Both a bare `a@b.com` and one wrapped in SMTP punctuation (`550 <a@b.com>`)
  * yield exactly the address. Two known, accepted gaps — neither a realistic
@@ -100,7 +110,7 @@ const EMAIL_REDACT_PATHS: string[] = Array.from(
  * literal domain (`user@[192.168.1.1]`, bracket-delimited on both sides).
  */
 const EMBEDDED_EMAIL_RE =
-  /[^\s"'<>()[\]{},;:@/\\]+@[^\s"'<>()[\]{},;:@/\\]+\.\p{L}{2,}/gu;
+  /[^\s"<>()[\]{},;:@/\\]{1,64}@[^\s"<>()[\]{},;:@/\\]{1,255}\.\p{L}{2,63}/gu;
 
 /** Replace every email-like substring of `value` with its {@link maskEmail} form. */
 function maskEmailsInText(value: string): string {
