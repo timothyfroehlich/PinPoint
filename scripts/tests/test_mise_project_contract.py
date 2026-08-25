@@ -357,16 +357,21 @@ def test_python_package_ownership_requirements() -> None:
     )
 
 
-def test_check_pytest_wrapper_contract() -> None:
+def test_check_pytest_wrapper_contract(tmp_path: Path) -> None:
     """Verify scripts/check-pytest.sh exists and outputs install hint on missing pytest."""
     assert CHECK_PYTEST_PATH.is_file(), f"expected {CHECK_PYTEST_PATH} to exist"
     assert os.access(CHECK_PYTEST_PATH, os.X_OK), (
         f"expected {CHECK_PYTEST_PATH} to be executable"
     )
 
-    # Run check-pytest.sh in a restricted environment where pytest is absent from PATH
+    python_stub = tmp_path / "python3"
+    python_stub.write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
+    python_stub.chmod(0o755)
+
+    # Use a controlled Python probe failure so an ambient pytest install cannot
+    # enter the wrapper's success path and recursively launch this test suite.
     restricted_env = {
-        "PATH": "/usr/bin:/bin",  # Standard system paths without pytest
+        "PATH": f"{tmp_path}:/usr/bin:/bin",
     }
     proc = subprocess.run(
         ["bash", str(CHECK_PYTEST_PATH)],
