@@ -532,7 +532,7 @@ jobs:
         uses: supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520  # ratchet:supabase/setup-cli@v3.0.0
         with:
           # Pinned Supabase CLI — bump deliberately (was: latest). PP-d5zn.
-          version: 2.113.0
+          version: 2.115.0
 
       - name: Setup Supabase
         uses: ./.github/actions/setup-supabase
@@ -597,7 +597,7 @@ jobs:
         uses: supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520  # ratchet:supabase/setup-cli@v3.0.0
         with:
           # Pinned Supabase CLI — bump deliberately (was: latest). PP-d5zn.
-          version: 2.113.0
+          version: 2.115.0
 
       - name: Setup Supabase
         uses: ./.github/actions/setup-supabase
@@ -656,7 +656,7 @@ jobs:
         uses: supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520  # ratchet:supabase/setup-cli@v3.0.0
         with:
           # Pinned Supabase CLI — bump deliberately (was: latest). PP-d5zn.
-          version: 2.113.0
+          version: 2.115.0
 
       - name: Cache Playwright browsers
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # ratchet:actions/cache@v6.1.0
@@ -741,7 +741,7 @@ jobs:
         uses: supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520  # ratchet:supabase/setup-cli@v3.0.0
         with:
           # Pinned Supabase CLI — bump deliberately (was: latest). PP-d5zn.
-          version: 2.113.0
+          version: 2.115.0
 
       - name: Cache Playwright browsers
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # ratchet:actions/cache@v6.1.0
@@ -826,7 +826,7 @@ jobs:
         uses: supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520  # ratchet:supabase/setup-cli@v3.0.0
         with:
           # Pinned Supabase CLI — bump deliberately (was: latest). PP-d5zn.
-          version: 2.113.0
+          version: 2.115.0
 
       - name: Cache Playwright browsers
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # ratchet:actions/cache@v6.1.0
@@ -925,7 +925,7 @@ jobs:
         uses: supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520  # ratchet:supabase/setup-cli@v3.0.0
         with:
           # Pinned Supabase CLI — bump deliberately (was: latest). PP-d5zn.
-          version: 2.113.0
+          version: 2.115.0
 
       - name: Cache Playwright browsers
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # ratchet:actions/cache@v6.1.0
