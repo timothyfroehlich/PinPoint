@@ -256,6 +256,25 @@ describe("logger redaction", () => {
     expect(line).not.toContain("supersecrettoken");
   });
 
+  it("invokes toJSON with the property key, as JSON.stringify would", () => {
+    // A toJSON that redacts based on its key argument must take the same branch
+    // it would under real serialization; passing no key could expose a token.
+    const creds = {
+      token: "supersecrettoken",
+      toJSON(key: string) {
+        return key === "creds"
+          ? { summary: "redacted" }
+          : { token: "supersecrettoken" };
+      },
+    };
+    const error = Object.assign(new Error("auth"), { creds });
+
+    const line = logLine({ err: error });
+
+    expect(line).toContain("redacted");
+    expect(line).not.toContain("supersecrettoken");
+  });
+
   it("renders a slot-backed object (URL) via toJSON, not as {}", () => {
     const error = Object.assign(new Error("bad endpoint"), {
       endpoint: new URL("https://api.example.com/v1/x"),

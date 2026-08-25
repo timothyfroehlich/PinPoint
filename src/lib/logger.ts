@@ -163,11 +163,16 @@ const CIRCULAR_PLACEHOLDER = "[circular]";
  * exposes only a redacted summary) is serialized *through* it and the result
  * masked — not flattened field-by-field, which would strip the prototype,
  * bypass the class's own redaction (potentially logging a token it hides), and
- * collapse a slot-backed object like `URL` to `{}`. Typed arrays hold bytes,
- * never a maskable address, and are large, so they pass through untouched.
+ * collapse a slot-backed object like `URL` to `{}`. `toJSON` is invoked with the
+ * property key the value sits under (the array index as a string, `""` at the
+ * root), matching how `JSON.stringify` calls it, so a `toJSON(key)` that varies
+ * its redaction by key takes the same branch it would in the real log. Typed
+ * arrays hold bytes, never a maskable address, and are large, so they pass
+ * through untouched.
  */
 function maskEmailsDeep(
   value: unknown,
+  key: string,
   depth: number,
   seen: WeakSet<object>
 ): unknown {
@@ -178,32 +183,40 @@ function maskEmailsDeep(
   if (depth >= MAX_MASK_DEPTH) return UNMASKABLE_PLACEHOLDER;
   seen.add(value);
 
-  let toJSON: (() => unknown) | undefined;
+  let toJSON: ((key: string) => unknown) | undefined;
   try {
     const candidate = (value as { toJSON?: unknown }).toJSON;
-    if (typeof candidate === "function") toJSON = candidate as () => unknown;
+    if (typeof candidate === "function")
+      toJSON = candidate as (key: string) => unknown;
   } catch {
     // A throwing `toJSON` accessor — treat the value as having none.
   }
   if (toJSON) {
     try {
-      return maskEmailsDeep(toJSON.call(value), depth + 1, seen);
+      return maskEmailsDeep(toJSON.call(value, key), key, depth + 1, seen);
     } catch {
       return UNMASKABLE_PLACEHOLDER;
     }
   }
 
   if (Array.isArray(value)) {
-    return value.map((item) => maskEmailsDeep(item, depth + 1, seen));
+    return value.map((item, index) =>
+      maskEmailsDeep(item, String(index), depth + 1, seen)
+    );
   }
   const source = value as Record<string, unknown>;
   const result: Record<string, unknown> = {};
-  for (const key of Object.keys(source)) {
+  for (const childKey of Object.keys(source)) {
     try {
-      result[key] = maskEmailsDeep(source[key], depth + 1, seen);
+      result[childKey] = maskEmailsDeep(
+        source[childKey],
+        childKey,
+        depth + 1,
+        seen
+      );
     } catch {
       // A throwing getter (or any read failure) must not crash the log call.
-      result[key] = UNMASKABLE_PLACEHOLDER;
+      result[childKey] = UNMASKABLE_PLACEHOLDER;
     }
   }
   return result;
@@ -217,7 +230,7 @@ function maskEmailsDeep(
  */
 function maskingErrSerializer(error: Error): unknown {
   try {
-    return maskEmailsDeep(pino.stdSerializers.err(error), 0, new WeakSet());
+    return maskEmailsDeep(pino.stdSerializers.err(error), "", 0, new WeakSet());
   } catch {
     // `stdSerializers.err` reads every own enumerable error property, so a
     // throwing getter on the error can fail here, before maskEmailsDeep runs.
