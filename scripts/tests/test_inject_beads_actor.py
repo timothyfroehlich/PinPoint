@@ -3,16 +3,24 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 from pathlib import Path
 
 HOOK = Path(__file__).parents[2] / ".claude" / "hooks" / "inject-beads-actor.cjs"
-NODE = subprocess.run(
-    ["mise", "which", "node"],
-    check=True,
-    text=True,
-    capture_output=True,
-).stdout.strip()
+
+
+def find_node() -> str:
+    """Find a real Node binary, skipping mise's HOME-sensitive shim."""
+    for entry in os.environ.get("PATH", "").split(os.pathsep):
+        candidate = Path(entry) / "node"
+        if candidate.is_file() and os.access(candidate, os.X_OK):
+            if candidate.resolve().name != "mise":
+                return str(candidate)
+    raise RuntimeError("Node.js is required to test the hook")
+
+
+NODE = find_node()
 
 
 def install_whoami_stub(home: Path) -> Path:
