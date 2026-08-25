@@ -3,25 +3,33 @@
 #
 # AGENTS.md §4: pytest is required for running hook and script tests under
 # `pnpm run check:python`. If absent, this script exits with code 1 and prints
-# a clear install hint for macOS, Linux, pipx, and pip.
+# a clear install hint for the mise-selected Python runtime.
 
 set -euo pipefail
 
-if ! command -v pytest >/dev/null 2>&1; then
+if ! command -v python3 >/dev/null 2>&1; then
   cat >&2 <<'EOF'
-Error: pytest not found on PATH.
+Error: python3 not found on PATH.
 
-`pnpm run check:python` requires pytest to run hook and script tests.
-Install it using your system package manager or Python toolchain:
+Install the locked PinPoint toolchain first:
 
-  macOS (Homebrew):  brew install pytest
-  Linux (apt):       sudo apt-get install -y python3-pytest
-  Linux (dnf):       sudo dnf install -y python3-pytest
-  pipx:              pipx install "pytest==9.0.3"
-  pip:               pip install -r scripts/requirements.txt
+  mise install --locked
 
 EOF
   exit 1
 fi
 
-exec pytest "$@"
+if ! python3 -c 'import pytest' >/dev/null 2>&1; then
+  cat >&2 <<'EOF'
+Error: pytest is not installed for the selected Python runtime.
+
+`pnpm run check:python` requires pytest to run hook and script tests.
+Install the declared Python dependencies into the mise-selected runtime:
+
+  mise exec -- python3 -m pip install -r scripts/requirements.txt
+
+EOF
+  exit 1
+fi
+
+exec python3 -m pytest "$@"

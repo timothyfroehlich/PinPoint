@@ -54,7 +54,7 @@ One-time install for tools the workflow scripts depend on:
 
 - **mise** — version `2026.8.11` or newer. Manages Node (`24.16.0`), Python (`3.12.9`), Ruff (`0.15.1`), and pnpm (`package.json#packageManager` single authority with SHA-512 integrity verification).
 - **GNU parallel** — provides `sem`, which `pnpm run preflight` uses to cap host-wide concurrency at 2. Without it, `preflight` fails with a clear install hint; `pnpm run preflight:unlocked` bypasses the cap.
-- **pytest** — `pnpm run check:python` runs the hook/script tests with it. If absent, `check:pytest` fails with a clear install hint. Install it however your host installs Python CLI tools — Homebrew, pipx, distro package, or `pip install -r scripts/requirements.txt`.
+- **pytest** — `pnpm run check:python` runs the hook/script tests with it under the mise-selected Python. Install it with `mise exec -- python3 -m pip install -r scripts/requirements.txt`; if absent from that interpreter, `check:pytest` fails with this install hint rather than using a pytest bound to another Python.
 
 ### Worktrees & ports
 

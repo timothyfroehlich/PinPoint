@@ -91,6 +91,7 @@ git clone https://github.com/timothyfroehlich/PinPoint.git
 cd PinPoint
 
 mise install --locked           # installs pinned Node, Python, Ruff, and pnpm via package.json
+mise exec -- python3 -m pip install -r scripts/requirements.txt
 mise exec -- pnpm install       # (or plain `pnpm install` if mise shell hook is active)
 cp .env.example .env.local      # then fill in Supabase + DB vars
 

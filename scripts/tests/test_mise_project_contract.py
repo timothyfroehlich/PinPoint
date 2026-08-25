@@ -28,6 +28,7 @@ PACKAGE_JSON_PATH = REPO_ROOT / "package.json"
 RUFF_TOML_PATH = REPO_ROOT / "ruff.toml"
 REQUIREMENTS_TXT_PATH = REPO_ROOT / "scripts" / "requirements.txt"
 CHECK_PYTEST_PATH = REPO_ROOT / "scripts" / "check-pytest.sh"
+CI_WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "ci.yml"
 
 MINIMUM_MISE_VERSION = (2026, 8, 11)
 
@@ -378,11 +379,29 @@ def test_check_pytest_wrapper_contract() -> None:
     assert proc.returncode != 0, (
         "check-pytest.sh must exit non-zero when pytest is absent"
     )
-    assert "Error: pytest not found" in proc.stderr, (
+    assert "pytest is not installed for the selected Python runtime" in proc.stderr, (
         f"expected install hint in stderr, got:\n{proc.stderr}"
     )
-    assert "brew install pytest" in proc.stderr
-    assert "apt-get install" in proc.stderr
+    assert "mise exec -- python3 -m pip install" in proc.stderr
+
+    wrapper = CHECK_PYTEST_PATH.read_text(encoding="utf-8")
+    assert 'exec python3 -m pytest "$@"' in wrapper, (
+        "check-pytest.sh must bind pytest to the selected python3 interpreter"
+    )
+
+
+def test_ci_installs_pytest_for_mise_python() -> None:
+    """Verify CI binds pytest installation and execution to the pinned Python."""
+    workflow = CI_WORKFLOW_PATH.read_text(encoding="utf-8")
+
+    setup_mise = workflow.index("- name: Setup mise", workflow.index("linters:"))
+    install_pytest = workflow.index(
+        "python3 -m pip install -r scripts/requirements.txt"
+    )
+    run_pytest = workflow.index("python3 -m pytest scripts/tests/")
+
+    assert setup_mise < install_pytest < run_pytest
+    assert 'pipx install "pytest==' not in workflow
 
 
 def test_offline_python_and_ruff_resolution() -> None:
