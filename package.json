@@ -58,7 +58,7 @@
     "audit:role-checks": "bash scripts/audit/no-hardcoded-role-checks.sh",
     "audit:sm-structural": "bash scripts/audit/no-sm-structural-breakpoints.sh",
     "check:behind-main": "bash scripts/check-behind-main.sh",
-    "check:pytest": "pytest scripts/tests/",
+    "check:pytest": "bash scripts/check-pytest.sh scripts/tests/",
     "check:python": "ruff check scripts/ && ruff format --check scripts/ && pnpm run check:pytest",
     "check:rule-ids": "python3 scripts/check_rule_ids.py",
     "check:rule-ids:orphans": "python3 scripts/check_rule_ids.py --orphans",
