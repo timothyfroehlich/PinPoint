@@ -60,7 +60,7 @@ Reviewers read agent skills. Consult the relevant one for the area a PR touches 
 
 **Codex reviews every eligible PR update automatically.** Authors open agent-created PRs as drafts, promote them after current-head CI succeeds, and then stay with the PR through the resulting review/fix cycle. Comment `@codex review` only when Tim explicitly asks for a manual trigger; automation being slow is not a reason to comment.
 
-A PR cannot merge without a review covering its **current head commit**, with every thread resolved. Codex may provide either a native `APPROVED` review or its trusted connector clean comment; both must be from exact account `chatgpt-codex-connector[bot]` and pin the current head, while the comment must also identify the connector app. The existing SHA-pinned manual attestation may cover head after Tim explicitly runs a local review. Any push requires a fresh review. **If you're reviewing, assume the commit you were handed is the one the author intends to be final.** Full author-side rules: `.agents/skills/pinpoint-pr-workflow/SKILL.md` Phase 3.4.
+A PR cannot merge without a review covering its **current head commit**, with every thread resolved. Codex may provide a native `APPROVED` review, its trusted connector clean comment, or a native `COMMENTED`/`CHANGES_REQUESTED` review whose finding threads have all been explicitly adjudicated and resolved. Automatic records must be from exact account `chatgpt-codex-connector[bot]` and pin the current head, while the clean comment must also identify the connector app. The existing SHA-pinned manual attestation may cover head after Tim explicitly runs a local review. Any push requires a fresh review. **If you're reviewing, assume the commit you were handed is the one the author intends to be final.** Full author-side rules: `.agents/skills/pinpoint-pr-workflow/SKILL.md` Phase 3.4.
 
 ## Review mechanics
 
@@ -72,7 +72,7 @@ Reviewers never merge. The merge decision is Tim's, always (PP-wi85) — the raw
 
 This is enforced differently by harness. In **Claude Code**, `block-direct-merge.cjs` is a PreToolUse hook that **hard-blocks** the raw channels and turns any `merge-pr.sh` invocation into an **approval prompt Tim must accept** before it runs (PP-wi85, reversed for the script only, per Tim 2026-08-19). The hook does **not** fire inside Antigravity, Codex, or Gemini — in those harnesses there is no hook backstop and no approval prompt, so **do not run any merge path yourself**; what binds you is this written instruction plus `merge-pr.sh`'s own refusal to execute without a `--human` flag that only Tim should ever pass.
 
-An agent's terminal state on a PR is: GitHub-ready, CI green, a clean automatic review covering the head commit (see "How review runs"), review threads resolved, `ready-for-review` applied, and screenshots posted if UI-touching. Then either hand Tim the command to run himself, `! scripts/workflow/merge-pr.sh <PR> --human`, or (Claude Code only) run it and let him approve the prompt.
+An agent's terminal state on a PR is: GitHub-ready, CI green, exact-head automatic review coverage (see "How review runs"), review threads resolved, `ready-for-review` applied, and screenshots posted if UI-touching. Then either hand Tim the command to run himself, `! scripts/workflow/merge-pr.sh <PR> --human`, or (Claude Code only) run it and let him approve the prompt.
 
 ## Pointers, not copies
 
