@@ -52,7 +52,6 @@ Evidence that these three patterns account for most of the corpus:
 | `pinpoint-typescript/SKILL.md`                       |   334 |         212 (63%) |                3 |
 | `pinpoint-testing/SKILL.md`                          |   420 |         189 (45%) |               14 |
 | `pinpoint-security/SKILL.md`                         |   374 |         154 (41%) |               32 |
-| `pinpoint-orchestrator/SKILL.md`                     |   324 |         109 (34%) |                0 |
 | `pinpoint-ui/references/layout-and-anti-patterns.md` |   188 |         118 (63%) |                7 |
 | `pinpoint-ui/references/form-patterns.md`            |   110 |          86 (78%) |                1 |
 

@@ -236,7 +236,6 @@ The skill points to scripts as the canonical mechanical implementations and to M
 
 **EDIT**:
 
-- `.claude/skills/pinpoint-orchestrator/SKILL.md` — remove stale `.agent/skills/pinpoint-commit/scripts/watch-ci.sh` reference. State the N=1 dispatch rule affirmatively (PR #1353 shipped this; ensure orchestrator doc is current). Remove the historical PR reference ("relaxed from PR 1353").
 - `.claude/skills/pinpoint-dispatch-e2e-teammate/SKILL.md` — update any references to the deleted skills.
 - `AGENTS.md` (root) section 3 skills table — replace 3 entries (pinpoint-commit, pinpoint-ready-to-review, pinpoint-github-monitor) with 1 entry (`pinpoint-pr-workflow` — "Full PR lifecycle: commit, push, CI monitoring, Copilot review (via MCP), readiness labeling, gate-enforced merge.").
 - `scripts/workflow/AGENTS.md` — remove copilot-comments.sh/respond-to-copilot.sh/resolve-copilot-threads.sh/label-ready.sh entries. Add merge-pr.sh and \_pr-gates.sh entries. Add status-token vocabulary section. Add MCP-vs-script decision table. Update "Key Design Decisions" to reflect mechanical-only-output principle.
@@ -289,7 +288,7 @@ Estimated PR size (rough):
 5. Add `.claude/hooks/block-direct-merge.cjs` and wire in settings.json.
 6. Write `.claude/skills/pinpoint-pr-workflow/SKILL.md`.
 7. Delete the three old skill directories.
-8. Update `AGENTS.md` skills table, `scripts/workflow/AGENTS.md`, `.claude/skills/pinpoint-orchestrator/SKILL.md`, `.claude/skills/pinpoint-dispatch-e2e-teammate/SKILL.md`.
+8. Update `AGENTS.md` skills table, `scripts/workflow/AGENTS.md`, and `.claude/skills/pinpoint-dispatch-e2e-teammate/SKILL.md`.
 9. Smoke test all kept scripts with --dry-run.
 10. Push, open PR.
 

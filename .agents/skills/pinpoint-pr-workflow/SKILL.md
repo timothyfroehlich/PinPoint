@@ -364,4 +364,3 @@ Hand off for the next session, and post to the huddle daily bead if other sessio
 
 - Status tokens (`PASS`/`FAIL`/`WAIT`/`WARN`/`BLOCK`) and what to do for each: `scripts/workflow/AGENTS.md`
 - Spec: `docs/superpowers/specs/2026-05-16-pinpoint-pr-workflow-consolidation-design.md`
-- Subagent dispatch rules (dispatch from the main worktree): `pinpoint-orchestrator` skill

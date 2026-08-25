@@ -145,8 +145,7 @@ did, say that instead of proposing it as new work.
 
 ## Relationship to Other Skills
 
-| Skill                   | When to Use                                                           |
-| ----------------------- | --------------------------------------------------------------------- |
-| `pinpoint-briefing`     | Start of session — situational awareness and triage                   |
-| `pinpoint-orchestrator` | After briefing — dispatching parallel subagents for chosen work       |
-| `pinpoint-pr-workflow`  | During & end of work — commit, CI watch, readiness label, gated merge |
+| Skill                  | When to Use                                                           |
+| ---------------------- | --------------------------------------------------------------------- |
+| `pinpoint-briefing`    | Start of session — situational awareness and triage                   |
+| `pinpoint-pr-workflow` | During & end of work — commit, CI watch, readiness label, gated merge |
