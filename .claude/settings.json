@@ -107,15 +107,6 @@
     ],
     "PostToolUse": [
       {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash \"$HOME\"/.agents/huddle/huddle-main-watch.sh",
-            "timeout": 5000
-          }
-        ]
-      },
-      {
         "matcher": "Bash",
         "hooks": [
           {
@@ -132,25 +123,6 @@
             "type": "command",
             "command": "node \"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/ui-screenshot-reminder.cjs",
             "timeout": 5000
-          }
-        ]
-      },
-      {
-        "matcher": "Bash|mcp__github__create_pull_request",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash \"$HOME\"/.agents/huddle/huddle-pr-announce.sh",
-            "timeout": 10000
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "HUDDLE_THROTTLE_SECONDS=180 bash \"$HOME\"/.agents/huddle/huddle-poll.sh",
-            "timeout": 10000
           }
         ]
       }
@@ -182,11 +154,6 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"$HOME\"/.agents/huddle/huddle-poll.sh",
-            "timeout": 10000
-          },
-          {
-            "type": "command",
             "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/scripts/hooks/prototype-mode-poll.sh",
             "timeout": 5000
           }
@@ -197,11 +164,6 @@
       {
         "matcher": "",
         "hooks": [
-          {
-            "type": "command",
-            "command": "bash \"$HOME\"/.agents/huddle/huddle-session-start.sh",
-            "timeout": 5000
-          },
           {
             "type": "command",
             "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/session-start-orphan-sweep.sh",

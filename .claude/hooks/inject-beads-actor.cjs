@@ -12,7 +12,7 @@
  * hook. So every command seen here is agent-initiated and should be attributed
  * to an agent (its huddle identity, e.g. `Claude-DevxReview`) — never to Tim.
  *
- * We resolve the agent's huddle name from the shared session-names.json map
+ * We resolve the agent's huddle name through the global huddle-whoami interface
  * (keyed by session_id) and prepend `export BEADS_ACTOR="<name>";` so the
  * attribution covers compound/piped commands (a bare `BEADS_ACTOR=x bd …`
  * prefix would only apply to the first segment of `bd … && …`).
@@ -26,37 +26,34 @@
  * input.tool_input.command and don't depend on chaining between them.
  */
 
-const fs = require("fs");
 const path = require("path");
+const { execFileSync } = require("child_process");
 
-// Resolve the agent's huddle name from <main-worktree>/.agents/huddle/session-names.json.
-// Mirrors huddle_state_dir() in ~/.agents/huddle/huddle-lib.sh. Fail-open: on ANY
-// error or a missing/invalid name, return the literal "Claude" — never unset,
-// never "Tim Froehlich".
+// Ask the global Huddle interface to resolve its own registry and XDG state.
+// Fail-open: on ANY error or a missing/invalid name, return the literal
+// "Claude" — never unset, never "Tim Froehlich".
 function resolveActor(sessionId, cwd) {
   const fallback = "Claude";
   try {
-    const { execSync } = require("child_process");
-    const commonDir = execSync("git rev-parse --git-common-dir", {
+    if (typeof sessionId !== "string" || !sessionId) {
+      return fallback;
+    }
+    const home = process.env.HOME;
+    if (!home) {
+      return fallback;
+    }
+    const whoami = path.join(
+      home,
+      ".agents",
+      "huddle",
+      "huddle-whoami.sh"
+    );
+    const name = execFileSync("bash", [whoami, "whoami", sessionId], {
       cwd,
       encoding: "utf8",
       stdio: ["pipe", "pipe", "pipe"],
+      timeout: 3000,
     }).trim();
-    if (!commonDir) {
-      return fallback;
-    }
-    const absCommon = path.isAbsolute(commonDir)
-      ? commonDir
-      : path.resolve(cwd, commonDir);
-    const mainRoot = path.dirname(absCommon);
-    const namesFile = path.join(
-      mainRoot,
-      ".agents",
-      "huddle",
-      "session-names.json"
-    );
-    const map = JSON.parse(fs.readFileSync(namesFile, "utf8"));
-    const name = map[sessionId];
     // Huddle names are already constrained to this charset by huddle-whoami.sh;
     // re-validate defensively before injecting into a shell command.
     if (typeof name === "string" && /^[A-Za-z0-9_-]+$/.test(name)) {
