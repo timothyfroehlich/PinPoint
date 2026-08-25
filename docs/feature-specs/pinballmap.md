@@ -261,13 +261,12 @@ intent agrees with the lineup; _out of sync_ means they disagree.
 
 ## Known divergences (code vs spec)
 
-| Spec                            | Code today                                                                                                      | Resolution                                               |
-| :------------------------------ | :-------------------------------------------------------------------------------------------------------------- | :------------------------------------------------------- |
-| §3 configuration-presence model | A required default location and a separate `enabled` flag represent configuration; some readers ignore the flag | PP-o355.51.4 and PP-o355.51.6                            |
-| 7.1 comment fan-out             | No comment import exists                                                                                        | PP-o355.4 (reshape to fan-out); PP-o355.36 depends on it |
-| 4.9 read-only viewer            | No surface reaches it — the only page carrying the control is the Manage tab, which gates on `machines.edit`    | PP-o355.38                                               |
-| 2.4 uncataloged / manual model  | Fields exist; the surface for them is not what it should be                                                     | PP-3bbr                                                  |
-| 7.3 comment marking on removal  | Not implemented                                                                                                 | PP-o355.36                                               |
+| Spec                           | Code today                                                                                                   | Resolution                                               |
+| :----------------------------- | :----------------------------------------------------------------------------------------------------------- | :------------------------------------------------------- |
+| 7.1 comment fan-out            | No comment import exists                                                                                     | PP-o355.4 (reshape to fan-out); PP-o355.36 depends on it |
+| 4.9 read-only viewer           | No surface reaches it — the only page carrying the control is the Manage tab, which gates on `machines.edit` | PP-o355.38                                               |
+| 2.4 uncataloged / manual model | Fields exist; the surface for them is not what it should be                                                  | PP-3bbr                                                  |
+| 7.3 comment marking on removal | Not implemented                                                                                              | PP-o355.36                                               |
 
 ---
 
