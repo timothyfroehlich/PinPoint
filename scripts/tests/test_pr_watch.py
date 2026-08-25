@@ -103,6 +103,24 @@ def manual_marker(sha=HEAD_SHA):
     }
 
 
+def clean_codex_comment(
+    sha=HEAD_SHA[:10],
+    *,
+    login=pr_watch.CODEX_REVIEW_BOT,
+    app=pr_watch.CODEX_REVIEW_APP_SLUG,
+    updated_at="2026-08-22T12:00:00Z",
+):
+    return {
+        "user": {"login": login},
+        "performed_via_github_app": {"slug": app},
+        "body": (
+            "Codex Review: Didn't find any major issues. Keep it up!\n\n"
+            f"**Reviewed commit:** `{sha}`"
+        ),
+        "updated_at": updated_at,
+    }
+
+
 def make_gh(
     *,
     rollup=(),
@@ -808,14 +826,21 @@ def test_codex_login_is_identical_to_the_bash_gate():
     assert match, "CODEX_REVIEW_BOT not found in _pr-gates.sh"
     assert match.group(1) == pr_watch.CODEX_REVIEW_BOT
 
+    app_match = re.search(r'^readonly CODEX_REVIEW_APP_SLUG="(.+)"$', gates, re.M)
+    assert app_match, "CODEX_REVIEW_APP_SLUG not found in _pr-gates.sh"
+    assert app_match.group(1) == pr_watch.CODEX_REVIEW_APP_SLUG
+
 
 @pytest.mark.unit
 @pytest.mark.parametrize(
     "state",
     [
         "approval",
+        "clean_comment",
+        "reviewed",
         "marker",
         "stale_approval",
+        "stale_clean_comment",
         "stale_marker",
         "not_approved",
         "unreviewed",
@@ -841,6 +866,94 @@ def test_review_state_approval_pins_head(monkeypatch):
     state, detail = pr_watch.review_state(PR)
     assert state == "approval"
     assert HEAD_SHA[:7] in detail
+
+
+@pytest.mark.unit
+def test_review_state_clean_comment_pins_head(monkeypatch):
+    monkeypatch.setattr(pr_watch, "gh", make_gh(comments=[clean_codex_comment()]))
+    state, detail = pr_watch.review_state(PR)
+    assert state == "clean_comment"
+    assert HEAD_SHA[:10] in detail
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "comment",
+    [
+        clean_codex_comment(login="other[bot]"),
+        clean_codex_comment(app="other-app"),
+        clean_codex_comment(OLD_SHA[:10]),
+    ],
+)
+def test_review_state_rejects_untrusted_or_stale_clean_comment(monkeypatch, comment):
+    monkeypatch.setattr(pr_watch, "gh", make_gh(comments=[comment]))
+    assert pr_watch.review_state(PR)[0] != "clean_comment"
+
+
+@pytest.mark.unit
+def test_review_state_later_native_finding_overrides_clean_comment(monkeypatch):
+    monkeypatch.setattr(
+        pr_watch,
+        "gh",
+        make_gh(
+            reviews=[
+                codex_review(state="COMMENTED", submitted_at="2026-08-22T12:01:00Z")
+            ],
+            comments=[clean_codex_comment(updated_at="2026-08-22T12:00:00Z")],
+        ),
+    )
+    assert pr_watch.review_state(PR)[0] == "reviewed"
+
+
+@pytest.mark.unit
+def test_review_state_ignores_delayed_native_review_of_old_head(monkeypatch):
+    monkeypatch.setattr(
+        pr_watch,
+        "gh",
+        make_gh(
+            reviews=[
+                codex_review(
+                    OLD_SHA,
+                    state="COMMENTED",
+                    submitted_at="2026-08-22T12:01:00Z",
+                )
+            ],
+            comments=[clean_codex_comment(updated_at="2026-08-22T12:00:00Z")],
+        ),
+    )
+    assert pr_watch.review_state(PR)[0] == "clean_comment"
+
+
+@pytest.mark.unit
+def test_review_state_later_clean_comment_supersedes_native_finding(monkeypatch):
+    monkeypatch.setattr(
+        pr_watch,
+        "gh",
+        make_gh(
+            reviews=[
+                codex_review(state="COMMENTED", submitted_at="2026-08-22T12:00:00Z")
+            ],
+            comments=[clean_codex_comment(updated_at="2026-08-22T12:01:00Z")],
+        ),
+    )
+    assert pr_watch.review_state(PR)[0] == "clean_comment"
+
+
+@pytest.mark.unit
+def test_review_state_current_finding_outranks_delayed_stale_clean_comment(monkeypatch):
+    monkeypatch.setattr(
+        pr_watch,
+        "gh",
+        make_gh(
+            reviews=[
+                codex_review(state="COMMENTED", submitted_at="2026-08-22T12:00:00Z")
+            ],
+            comments=[
+                clean_codex_comment(OLD_SHA[:10], updated_at="2026-08-22T12:01:00Z")
+            ],
+        ),
+    )
+    assert pr_watch.review_state(PR)[0] == "reviewed"
 
 
 @pytest.mark.unit
@@ -896,10 +1009,17 @@ def test_review_state_stale_approval(monkeypatch):
 
 
 @pytest.mark.unit
-def test_review_state_requires_an_approval(monkeypatch):
+def test_review_state_current_head_finding_completes_review_coverage(monkeypatch):
     monkeypatch.setattr(
         pr_watch, "gh", make_gh(reviews=[codex_review(state="COMMENTED")])
     )
+    assert pr_watch.review_state(PR)[0] == "reviewed"
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("state", ["DISMISSED", "PENDING", "UNKNOWN"])
+def test_review_state_unusable_current_head_state_fails_closed(monkeypatch, state):
+    monkeypatch.setattr(pr_watch, "gh", make_gh(reviews=[codex_review(state=state)]))
     assert pr_watch.review_state(PR)[0] == "not_approved"
 
 
@@ -918,7 +1038,26 @@ def test_review_state_uses_the_latest_codex_review(monkeypatch):
             ]
         ),
     )
-    assert pr_watch.review_state(PR)[0] == "not_approved"
+    assert pr_watch.review_state(PR)[0] == "reviewed"
+
+
+@pytest.mark.unit
+def test_review_state_ignores_delayed_old_head_native_review(monkeypatch):
+    monkeypatch.setattr(
+        pr_watch,
+        "gh",
+        make_gh(
+            reviews=[
+                codex_review(submitted_at="2026-08-22T12:00:00Z"),
+                codex_review(
+                    OLD_SHA,
+                    state="COMMENTED",
+                    submitted_at="2026-08-22T12:01:00Z",
+                ),
+            ]
+        ),
+    )
+    assert pr_watch.review_state(PR)[0] == "approval"
 
 
 # ---------------------------------------------------------------------------
@@ -933,6 +1072,7 @@ def test_review_state_uses_the_latest_codex_review(monkeypatch):
         ("unreviewed", (), ()),
         ("stale_approval", (codex_review(OLD_SHA),), ()),
         ("approval", (codex_review(),), ()),
+        ("clean_comment", (), (clean_codex_comment(),)),
         ("marker", (), (manual_marker(),)),
     ],
 )

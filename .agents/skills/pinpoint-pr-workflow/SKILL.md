@@ -106,9 +106,18 @@ Every unresolved thread counts, whoever opened it — the `threads` gate is auth
 ### 3.4 Get the head commit reviewed
 
 **Automatic Codex review is the normal path.** It runs for each update once that head is
-eligible. The gate accepts the result only from exact account
-`chatgpt-codex-connector[bot]`, with state `APPROVED` and `commit_id` equal to the PR's
-current head SHA. An older approval is stale even if it was submitted later.
+eligible. The gate accepts either a native `APPROVED` review whose `commit_id` equals
+the PR head, or the connector's no-major-issues issue comment naming a 10- or
+40-character prefix of that head. Both require exact account
+`chatgpt-codex-connector[bot]`; the comment also requires exact app slug
+`chatgpt-codex-connector` and the known clean-result prefix. An older result is stale.
+Among records for the same head, a later native finding overrides an earlier clean
+comment; no delayed review, clean comment, or manual marker for an older SHA can
+invalidate current-head coverage.
+A native `COMMENTED` or `CHANGES_REQUESTED` review also completes review coverage for
+its exact head once every associated thread has been replied to and resolved. Dismissed,
+pending, or unknown review states fail closed. The adjudicated terminal state needs no
+manual re-review when a finding is explicitly declined without a push.
 
 The owning agent stays assigned through the whole loop: monitor current-head CI and
 review, address or explicitly decline every finding, resolve every thread, push fixes,
@@ -120,20 +129,25 @@ Use the harness's Monitor/wait mechanism rather than a hand-written polling loop
 
 Before pushing an update to an existing PR, compare the remote PR head with the local
 head you are about to upload. Count additions plus deletions in source, tests, scripts,
-SQL/migrations, CSS, and GitHub workflow code. Do not count docs, lockfiles, generated
-snapshots/assets, or binaries:
+SQL/migrations, CSS, and GitHub workflow or composite-action code. Do not count docs,
+lockfiles, generated snapshots/assets, or binaries:
 
 ```bash
 remote_head=$(gh pr view <PR> --json headRefOid --jq .headRefOid)
-upload_code_lines=$(
+if ! upload_code_lines=$(
+  set -o pipefail
   git diff --no-renames --numstat "$remote_head"..HEAD |
     awk -F '\t' '
       ($3 ~ /\.(ts|tsx|js|jsx|mjs|cjs|py|sh|sql|css)$/ ||
-       $3 ~ /^\.github\/workflows\/.*\.ya?ml$/) &&
+       ($3 ~ /^(scripts\/|\.claude\/hooks\/|\.husky\/)/ &&
+        $3 ~ /(^|\/)[^\/.]+$/) ||
+       $3 ~ /^\.github\/(workflows|actions)\/.*\.ya?ml$/) &&
       $1 ~ /^[0-9]+$/ && $2 ~ /^[0-9]+$/ { total += $1 + $2 }
       END { print total + 0 }
     '
-)
+); then
+  upload_code_lines=51
+fi
 ```
 
 - **51 or more lines:** if the PR is ready, run `gh pr ready <PR> --undo` **before**
@@ -158,8 +172,8 @@ gh pr comment <PR> --body '@codex review'
 
 Respect the same eligibility sequence: if the upload crossed the threshold and returned
 the PR to draft, wait for current-head CI and promote it before commenting. Never use the
-manual comment merely because the automatic review has not appeared yet. The native
-approval satisfies the gate directly; do not add a marker for it.
+manual comment merely because the automatic review has not appeared yet. A trusted
+clean automatic result satisfies the gate directly; do not add a marker for it.
 
 #### Local review and manual-attestation route
 
@@ -206,7 +220,7 @@ That posts the sticky SHA-pinned marker `<!-- pinpoint-review: <head_sha> -->` t
 
 #### Pushing after the review
 
-Any push invalidates an approval or marker for the previous SHA. Return to the automatic
+Any push invalidates a clean automatic result or marker for the previous SHA. Return to the automatic
 path for the new head unless Tim explicitly asks for another manual review. Never copy
 or refresh a marker over code that the named local review did not inspect. Historical
 `claude-code:trivial` markers remain readable for old PRs, but agents must not create new
@@ -261,7 +275,7 @@ Requires the local dev server (`pnpm run dev`) and Supabase (`supabase start`) r
 
 ### 3.6 Apply `ready-for-review` label
 
-Once CI green + either a native Codex approval or manual attestation of head (per 3.4) + zero unresolved review threads + no merge conflict + screenshots posted (if UI-touching, per 3.5), apply the label via `mcp__github__issue_write(method: "update", …)` or `gh pr edit <PR> --add-label ready-for-review`.
+Once CI green + either exact-head automatic Codex coverage (including an adjudicated finding-bearing review per 3.4) or manual attestation of head + zero unresolved review threads + no merge conflict + screenshots posted (if UI-touching, per 3.5), apply the label via `mcp__github__issue_write(method: "update", …)` or `gh pr edit <PR> --add-label ready-for-review`.
 
 The label is a hint to Tim that the PR is ready for **him** to merge — it does not authorize an agent to merge. `merge-pr.sh --human` re-checks all gates when Tim runs it.
 
@@ -301,7 +315,7 @@ Never say "ready to push when you are" — you push. Never say a PR is "merged" 
 
 **On any FAIL the script removes the `ready-for-review` label if present** (and likewise on the `--automerge` RED path). The label's contract is "click-merge-without-thinking"; if a gate fails at merge time that contract is broken, so the label goes. Practical consequence: after Tim reports a FAIL, fix the underlying issue, push, and **re-apply the label** (3.6) before re-handing him the `--human` command — don't assume it survived.
 
-**A `reviewed` FAIL is almost never a `--force` case.** `unreviewed` means neither path covers head, `stale_approval` / `stale_marker` mean you pushed past the review record, and `not_approved` means Codex's latest review did not approve — all describe an unfinished PR, not a broken gate. Take either honest path in 3.4 and cover head.
+**A `reviewed` FAIL is almost never a `--force` case.** `unreviewed` means neither path covers head, `stale_approval` / `stale_clean_comment` / `stale_marker` mean you pushed past the review record, and `not_approved` means the latest non-approval review covers another SHA — all describe an unfinished PR, not a broken gate. Take either honest path in 3.4 and cover head.
 
 `--bypass-merge-requirements` is for a required check failing for known-irrelevant reasons (infrastructure flake, unrelated job) where the change has been manually verified safe — log the flake first with `bash scripts/workflow/log-gha-flake.sh <pr> <run-id> <class> "<symptom>"` (see `docs/runbooks/gha-flake-log.md`) — or an emergency hotfix where waiting for CI is not acceptable. Do NOT suggest bypassing when a merge conflict exists, or when the underlying state hasn't been manually verified.
 
