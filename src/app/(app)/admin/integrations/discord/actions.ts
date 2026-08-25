@@ -1,5 +1,6 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
 import { discordIntegrationConfig } from "~/server/db/schema";
@@ -377,8 +378,9 @@ export async function saveDiscordConfig(
 
     if (hasTypedNewToken) {
       const newToken = validated.newToken ?? "";
+      const vaultName = `discord_bot_token_${randomUUID()}`;
       const rows = (await db.execute(
-        sql`SELECT vault.create_secret(${newToken}, 'discord_bot_token', 'Discord bot token (saved via UI)') AS id`
+        sql`SELECT vault.create_secret(${newToken}, ${vaultName}, 'Discord bot token (saved via UI)') AS id`
       )) as { id: string }[];
       const createdId = rows[0]?.id;
       if (!createdId) {

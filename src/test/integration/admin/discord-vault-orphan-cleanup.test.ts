@@ -145,7 +145,7 @@ async function createVaultStub(): Promise<void> {
   await db.execute(sql`
     CREATE TABLE IF NOT EXISTS vault.secrets (
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-      name text,
+      name text UNIQUE,
       description text NOT NULL DEFAULT '',
       secret text NOT NULL,
       created_at timestamptz NOT NULL DEFAULT now(),
@@ -199,10 +199,13 @@ async function readVaultSecrets(): Promise<VaultRow[]> {
   return result.rows;
 }
 
-async function seedVaultSecret(secret: string): Promise<string> {
+async function seedVaultSecret(
+  secret: string,
+  name = `seed-${randomUUID()}`
+): Promise<string> {
   const db = await getTestDb();
   const result = await db.execute<IdRow>(
-    sql`INSERT INTO vault.secrets (secret, name) VALUES (${secret}, ${`seed-${randomUUID()}`}) RETURNING id::text AS id`
+    sql`INSERT INTO vault.secrets (secret, name) VALUES (${secret}, ${name}) RETURNING id::text AS id`
   );
   const id = result.rows[0]?.id;
   if (id === undefined) throw new Error("failed to seed vault secret");
@@ -363,6 +366,23 @@ describe("saveDiscordConfig Vault orphan compensation (real SQL, PGlite)", () =>
     expect(stored[0]?.id).toBe(existingId);
     expect(stored[0]?.secret).toBe("original-token");
     expect((await readSingleton()).botTokenVaultId).toBe(existingId);
+  });
+
+  it("rotates a UI-created token without colliding on the Vault name", async () => {
+    const existingId = await seedVaultSecret(
+      "original-token",
+      "discord_bot_token"
+    );
+    await seedSingleton(existingId);
+
+    const result = await saveDiscordConfig(makeFormData(ROTATED_TOKEN));
+    expect(result.ok).toBe(true);
+
+    const stored = await readVaultSecrets();
+    expect(stored).toHaveLength(1);
+    expect(stored[0]?.id).not.toBe(existingId);
+    expect(stored[0]?.secret).toBe(ROTATED_TOKEN);
+    expect((await readSingleton()).botTokenVaultId).toBe(stored[0]?.id);
   });
 
   it("explicit removal unlinks and deletes only the referenced secret", async () => {
