@@ -11,7 +11,7 @@ vi.mock("~/lib/supabase/admin", () => ({
   createAdminClient: () => ({ rpc: rpcMock }),
 }));
 
-import { getDiscordConfig } from "~/lib/discord/config";
+import { getDiscordBotToken, getDiscordConfig } from "~/lib/discord/config";
 
 describe("getDiscordConfig", () => {
   beforeEach(() => {
@@ -23,11 +23,10 @@ describe("getDiscordConfig", () => {
     await expect(getDiscordConfig()).resolves.toBeNull();
   });
 
-  it("returns null when enabled is false", async () => {
+  it("returns null when the server ID is missing", async () => {
     rpcMock.mockResolvedValueOnce({
       data: [
         {
-          enabled: false,
           guild_id: null,
           invite_link: null,
           bot_token: null,
@@ -41,11 +40,10 @@ describe("getDiscordConfig", () => {
     await expect(getDiscordConfig()).resolves.toBeNull();
   });
 
-  it("returns null when enabled but bot_token is missing", async () => {
+  it("returns null when the bot token is missing", async () => {
     rpcMock.mockResolvedValueOnce({
       data: [
         {
-          enabled: true,
           guild_id: "123",
           invite_link: null,
           bot_token: null,
@@ -59,11 +57,10 @@ describe("getDiscordConfig", () => {
     await expect(getDiscordConfig()).resolves.toBeNull();
   });
 
-  it("returns a typed DiscordConfig when enabled and token set", async () => {
+  it("returns a typed DiscordConfig when server ID and token are set", async () => {
     rpcMock.mockResolvedValueOnce({
       data: [
         {
-          enabled: true,
           guild_id: "123",
           invite_link: "https://discord.gg/abc",
           bot_token: "secret-token",
@@ -76,7 +73,6 @@ describe("getDiscordConfig", () => {
     });
     const config = await getDiscordConfig();
     expect(config).not.toBeNull();
-    expect(config?.enabled).toBe(true);
     expect(config?.guildId).toBe("123");
     expect(config?.botToken).toBe("secret-token");
   });
@@ -87,5 +83,22 @@ describe("getDiscordConfig", () => {
       error: { message: "rpc failed" },
     });
     await expect(getDiscordConfig()).rejects.toThrow(/rpc failed/);
+  });
+
+  it("returns a token for independently configured consumers without a server ID", async () => {
+    rpcMock.mockResolvedValueOnce({
+      data: [
+        {
+          guild_id: null,
+          invite_link: null,
+          bot_token: "region-alert-token",
+          bot_health_status: "unknown",
+          last_bot_check_at: null,
+          updated_at: "2026-04-20T00:00:00Z",
+        },
+      ],
+      error: null,
+    });
+    await expect(getDiscordBotToken()).resolves.toBe("region-alert-token");
   });
 });

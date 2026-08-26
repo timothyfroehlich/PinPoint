@@ -29,7 +29,6 @@ export default async function AdminDiscordIntegrationPage(): Promise<React.JSX.E
       />
 
       <DiscordConfigForm
-        enabled={config?.enabled ?? false}
         guildId={config?.guildId ?? ""}
         inviteLink={config?.inviteLink ?? ""}
         hasToken={!!config?.botTokenVaultId}

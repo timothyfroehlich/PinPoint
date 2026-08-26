@@ -3,11 +3,7 @@ import { eq, sql } from "drizzle-orm";
 import { db } from "~/server/db";
 import { pinballmapState } from "~/server/db/schema";
 import { getPinballMapClient } from "./client";
-import {
-  APC_LOCATION_ID,
-  PBM_REFRESH_BURST,
-  PBM_REFRESH_REFILL_MS,
-} from "./config";
+import { PBM_REFRESH_BURST, PBM_REFRESH_REFILL_MS } from "./config";
 import type { NewPinballmapState, PinballmapState } from "~/lib/types/database";
 
 /**
@@ -33,7 +29,14 @@ export async function getPinballMapState(): Promise<PinballmapState | null> {
     .from(pinballmapState)
     .where(eq(pinballmapState.id, SINGLETON_ID))
     .limit(1);
-  return row ?? null;
+  if (!row) return null;
+
+  // Expand/contract compatibility: migration 0069 must leave a legacy disabled
+  // row's location_id intact while the previous deployment can still serve.
+  // Mask it at the single read seam so the new runtime consistently treats the
+  // row as unconfigured. PP-o355.51.4.1 removes the compatibility column and
+  // this branch after the new deployment is serving everywhere.
+  return row.enabled ? row : { ...row, locationId: null };
 }
 
 /**
@@ -53,6 +56,7 @@ export type SyncTrigger = "manual" | "cron";
 export type SyncResult =
   | { ok: true; machineCount: number; syncedAt: Date }
   | { ok: false; reason: "error"; error: string }
+  | { ok: false; reason: "not_configured" }
   | { ok: false; reason: "throttled"; retryAfterMs: number };
 
 /**
@@ -213,9 +217,9 @@ async function stampSyncAttempt(
  * check, any future caller) inherits one guard. The `cron` trigger spends no
  * token (the sanctioned hourly refresh) but still records its attempt.
  *
- * Does NOT gate on `state.enabled` — this is the pure read-path mechanism and the
- * caller owns the "should we sync at all" decision (the PP-o355.11 cron checks
- * `enabled`/connection before calling; CORE-PBM-001). `lastSyncedAt` means "last
+ * A configured location is required before the throttle claim or client lookup,
+ * so an unconfigured integration spends no allowance and makes no PBM call.
+ * `lastSyncedAt` means "last
  * SUCCESSFUL sync" and is only written on the ok path, so downstream freshness
  * math (`now - lastSyncedAt`, PP-o355.11 status card) isn't fooled by a failed
  * attempt over a stale snapshot — read `lastSyncStatus` for attempt outcome.
@@ -226,7 +230,10 @@ export async function syncLocationSnapshot(opts?: {
 }): Promise<SyncResult> {
   const trigger = opts?.trigger ?? "manual";
   const state = await getPinballMapState();
-  const locationId = state?.locationId ?? APC_LOCATION_ID;
+  const locationId = state?.locationId;
+  if (locationId === null || locationId === undefined) {
+    return { ok: false, reason: "not_configured" };
+  }
   const syncedAt = new Date();
   const actor = opts?.updatedBy ? { updatedBy: opts.updatedBy } : {};
 

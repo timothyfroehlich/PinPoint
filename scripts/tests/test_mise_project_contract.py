@@ -25,6 +25,10 @@ REPO_ROOT = Path(__file__).parent.parent.parent
 MISE_TOML_PATH = REPO_ROOT / "mise.toml"
 MISE_LOCK_PATH = REPO_ROOT / "mise.lock"
 PACKAGE_JSON_PATH = REPO_ROOT / "package.json"
+RUFF_TOML_PATH = REPO_ROOT / "ruff.toml"
+REQUIREMENTS_TXT_PATH = REPO_ROOT / "scripts" / "requirements.txt"
+CHECK_PYTEST_PATH = REPO_ROOT / "scripts" / "check-pytest.sh"
+CI_WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "ci.yml"
 
 MINIMUM_MISE_VERSION = (2026, 8, 11)
 
@@ -55,10 +59,16 @@ def test_mise_toml_exists_and_is_valid() -> None:
         f"mise.toml must enforce min_version = '2026.8.11', got {data.get('min_version')!r}"
     )
 
-    # Node development runtime must be pinned
+    # Node, Python, and Ruff development runtime must be pinned
     tools = data.get("tools", {})
     assert "node" in tools, "mise.toml must specify node in [tools]"
     assert tools["node"] == "24.16.0", f"expected node 24.16.0, got {tools['node']!r}"
+    assert "python" in tools, "mise.toml must specify python in [tools]"
+    assert tools["python"] == "3.12.9", (
+        f"expected python 3.12.9, got {tools['python']!r}"
+    )
+    assert "ruff" in tools, "mise.toml must specify ruff in [tools]"
+    assert tools["ruff"] == "0.15.1", f"expected ruff 0.15.1, got {tools['ruff']!r}"
 
     # pnpm must NOT be duplicated in [tools]
     assert "pnpm" not in tools, (
@@ -104,6 +114,8 @@ def test_mise_lock_exists_and_captures_tools() -> None:
     tools = data.get("tools", {})
     assert "node" in tools, "mise.lock must have node tool locked"
     assert "pnpm" in tools, "mise.lock must have pnpm tool locked"
+    assert "python" in tools, "mise.lock must have python tool locked"
+    assert "ruff" in tools, "mise.lock must have ruff tool locked"
 
 
 def test_mise_cli_version_meets_minimum() -> None:
@@ -139,6 +151,8 @@ def test_mise_ls_resolves_sources_correctly() -> None:
 
     assert "node" in tools_dict, "node not listed by mise ls"
     assert "pnpm" in tools_dict, "pnpm not listed by mise ls"
+    assert "python" in tools_dict, "python not listed by mise ls"
+    assert "ruff" in tools_dict, "ruff not listed by mise ls"
 
     node_info = tools_dict["node"]
     node_source = (
@@ -158,6 +172,26 @@ def test_mise_ls_resolves_sources_correctly() -> None:
     )
     assert str(pnpm_source).endswith("package.json"), (
         f"pnpm source should be package.json, got {pnpm_source}"
+    )
+
+    python_info = tools_dict["python"]
+    python_source = (
+        python_info[0]["source"]["path"]
+        if isinstance(python_info, list)
+        else python_info["source"]["path"]
+    )
+    assert str(python_source).endswith("mise.toml"), (
+        f"python source should be mise.toml, got {python_source}"
+    )
+
+    ruff_info = tools_dict["ruff"]
+    ruff_source = (
+        ruff_info[0]["source"]["path"]
+        if isinstance(ruff_info, list)
+        else ruff_info["source"]["path"]
+    )
+    assert str(ruff_source).endswith("mise.toml"), (
+        f"ruff source should be mise.toml, got {ruff_source}"
     )
 
 
@@ -276,4 +310,138 @@ def test_offline_corepack_free_resolution() -> None:
     )
     assert exec_proc.stdout.strip() == "11.11.0", (
         f"Expected pnpm version 11.11.0, got {exec_proc.stdout.strip()}"
+    )
+
+
+def test_python_and_ruff_version_alignment() -> None:
+    """Verify python version in mise.toml aligns with ruff.toml target-version."""
+    assert MISE_TOML_PATH.is_file(), f"expected {MISE_TOML_PATH} to exist"
+    assert RUFF_TOML_PATH.is_file(), f"expected {RUFF_TOML_PATH} to exist"
+
+    mise_data = tomllib.loads(MISE_TOML_PATH.read_text(encoding="utf-8"))
+    ruff_data = tomllib.loads(RUFF_TOML_PATH.read_text(encoding="utf-8"))
+
+    py_version = mise_data.get("tools", {}).get("python", "")
+    assert py_version == "3.12.9", (
+        f"expected python 3.12.9 in mise.toml, got {py_version!r}"
+    )
+
+    ruff_target = ruff_data.get("target-version", "")
+    assert ruff_target == "py312", (
+        f"expected target-version = 'py312' in ruff.toml, got {ruff_target!r}"
+    )
+
+
+def test_python_shebang_scripts_consistency() -> None:
+    """Verify all executable python scripts in scripts/ use #!/usr/bin/env python3."""
+    scripts_dir = REPO_ROOT / "scripts"
+    py_files = sorted(scripts_dir.rglob("*.py"))
+    assert py_files, "expected python scripts in scripts/"
+
+    for py_file in py_files:
+        # Ignore __init__.py and tests
+        if py_file.name == "__init__.py" or "scripts/tests" in str(py_file):
+            continue
+        first_line = py_file.read_text(encoding="utf-8").splitlines()[0].strip()
+        assert first_line == "#!/usr/bin/env python3", (
+            f"expected #!/usr/bin/env python3 shebang in {py_file}, got {first_line!r}"
+        )
+
+
+def test_python_package_ownership_requirements() -> None:
+    """Verify scripts/requirements.txt exists and explicitly declares workflow dependencies."""
+    assert REQUIREMENTS_TXT_PATH.is_file(), f"expected {REQUIREMENTS_TXT_PATH} to exist"
+    content = REQUIREMENTS_TXT_PATH.read_text(encoding="utf-8")
+    assert "pytest==9.0.3" in content, (
+        "scripts/requirements.txt must explicitly declare pinned pytest version"
+    )
+
+
+def test_check_pytest_wrapper_contract(tmp_path: Path) -> None:
+    """Verify scripts/check-pytest.sh exists and outputs install hint on missing pytest."""
+    assert CHECK_PYTEST_PATH.is_file(), f"expected {CHECK_PYTEST_PATH} to exist"
+    assert os.access(CHECK_PYTEST_PATH, os.X_OK), (
+        f"expected {CHECK_PYTEST_PATH} to be executable"
+    )
+
+    python_stub = tmp_path / "python3"
+    python_stub.write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
+    python_stub.chmod(0o755)
+
+    # Use a controlled Python probe failure so an ambient pytest install cannot
+    # enter the wrapper's success path and recursively launch this test suite.
+    restricted_env = {
+        "PATH": f"{tmp_path}:/usr/bin:/bin",
+    }
+    proc = subprocess.run(
+        ["bash", str(CHECK_PYTEST_PATH)],
+        cwd=REPO_ROOT,
+        env=restricted_env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert proc.returncode != 0, (
+        "check-pytest.sh must exit non-zero when pytest is absent"
+    )
+    assert "pytest is not installed for the selected Python runtime" in proc.stderr, (
+        f"expected install hint in stderr, got:\n{proc.stderr}"
+    )
+    assert "mise exec -- python3 -m pip install" in proc.stderr
+
+    wrapper = CHECK_PYTEST_PATH.read_text(encoding="utf-8")
+    assert 'exec python3 -m pytest "$@"' in wrapper, (
+        "check-pytest.sh must bind pytest to the selected python3 interpreter"
+    )
+
+
+def test_ci_installs_pytest_for_mise_python() -> None:
+    """Verify CI binds pytest installation and execution to the pinned Python."""
+    workflow = CI_WORKFLOW_PATH.read_text(encoding="utf-8")
+
+    setup_mise = workflow.index("- name: Setup mise", workflow.index("linters:"))
+    install_pytest = workflow.index(
+        "python3 -m pip install -r scripts/requirements.txt"
+    )
+    run_pytest = workflow.index("python3 -m pytest scripts/tests/")
+
+    assert setup_mise < install_pytest < run_pytest
+    assert 'pipx install "pytest==' not in workflow
+
+
+def test_offline_python_and_ruff_resolution() -> None:
+    """Verify offline resolution for python3 and ruff via mise exec."""
+    mise_bin = _get_mise_bin()
+
+    env = os.environ.copy()
+    env["MISE_OFFLINE"] = "1"
+
+    py_proc = subprocess.run(
+        [mise_bin, "exec", "--", "python3", "--version"],
+        cwd=REPO_ROOT,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert py_proc.returncode == 0, (
+        f"Expected offline mise exec -- python3 --version to succeed, got:\n{py_proc.stderr}"
+    )
+    assert py_proc.stdout.strip() == "Python 3.12.9", (
+        f"Expected Python 3.12.9, got {py_proc.stdout.strip()}"
+    )
+
+    ruff_proc = subprocess.run(
+        [mise_bin, "exec", "--", "ruff", "--version"],
+        cwd=REPO_ROOT,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert ruff_proc.returncode == 0, (
+        f"Expected offline mise exec -- ruff --version to succeed, got:\n{ruff_proc.stderr}"
+    )
+    assert ruff_proc.stdout.strip() == "ruff 0.15.1", (
+        f"Expected ruff 0.15.1, got {ruff_proc.stdout.strip()}"
     )

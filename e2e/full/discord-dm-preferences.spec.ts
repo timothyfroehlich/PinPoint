@@ -5,8 +5,8 @@ import {
   deleteTestUser,
   setUserDiscordId,
   updateUserRole,
-  disableDiscordIntegration,
-  enableDiscordIntegrationForTest,
+  configureDiscordIntegrationForTest,
+  unconfigureDiscordIntegrationForTest,
 } from "../support/supabase-admin.js";
 
 test.describe("Discord DM preferences", () => {
@@ -24,12 +24,12 @@ test.describe("Discord DM preferences", () => {
   test.afterAll(async () => {
     await deleteTestUser(memberId);
     // Belt-and-suspenders: ensure global state isn't dirty for other suites.
-    await disableDiscordIntegration().catch(() => {
+    await unconfigureDiscordIntegrationForTest().catch(() => {
       // Tolerable if singleton row state already matches.
     });
   });
 
-  test("Discord column is hidden when integration is disabled", async ({
+  test("Discord column is hidden when integration is unconfigured", async ({
     page,
   }, testInfo) => {
     await loginAs(page, testInfo, {
@@ -50,15 +50,15 @@ test.describe("Discord DM preferences", () => {
     await expect(page.getByLabel("Discord Notifications")).not.toBeAttached();
   });
 
-  // "Linked user without integration enabled still sees no Discord column" deleted
-  // (row 24): this block duplicates "Discord column is hidden when integration is
-  // disabled" — both assert `not.toBeAttached()` for the Discord switch when
+  // "Linked user without a configured integration still sees no Discord column"
+  // deleted (row 24): this block duplicates "Discord column is hidden when
+  // integration is unconfigured" — both assert `not.toBeAttached()` when
   // getDiscordConfig() returns null. The integration column visibility is driven
   // entirely by the integration config, not the user's linked state, so the linked
   // variant adds no additional coverage.
 });
 
-test.describe("Discord DM preferences (integration enabled)", () => {
+test.describe("Discord DM preferences (integration configured)", () => {
   let memberEmail: string;
   let memberId: string;
 
@@ -69,14 +69,14 @@ test.describe("Discord DM preferences (integration enabled)", () => {
     memberId = user.id;
     await updateUserRole(memberId, "member");
 
-    // Flip the singleton row to enabled with a fake vault-backed token so
+    // Configure the singleton with a fake vault-backed token and guild ID so
     // getDiscordConfig() returns non-null and the form renders the Discord
     // column.
-    await enableDiscordIntegrationForTest();
+    await configureDiscordIntegrationForTest();
   });
 
   test.afterAll(async () => {
-    await disableDiscordIntegration().catch(() => {
+    await unconfigureDiscordIntegrationForTest().catch(() => {
       // Tolerable if singleton row state already matches.
     });
     await deleteTestUser(memberId);
@@ -86,7 +86,7 @@ test.describe("Discord DM preferences (integration enabled)", () => {
     page,
   }, testInfo) => {
     // discord_user_id stays null for this test — the column should render
-    // (admin enabled the integration) but the main switch is disabled with
+    // (the integration is configured) but the main switch is disabled with
     // a Link CTA pointing at Connected Accounts.
     await loginAs(page, testInfo, {
       email: memberEmail,

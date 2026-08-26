@@ -484,6 +484,13 @@
       "when": 1787052885201,
       "tag": "0068_pinballmap_region_seen_machines",
       "breakpoints": true
+    },
+    {
+      "idx": 69,
+      "version": "7",
+      "when": 1787583620914,
+      "tag": "0069_integration_config_presence_expand",
+      "breakpoints": true
     }
   ]
 }

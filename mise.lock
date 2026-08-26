@@ -39,3 +39,78 @@ url = "https://nodejs.org/dist/v24.16.0/node-v24.16.0-win-x64.zip"
 version = "11.11.0"
 backend = "npm:pnpm"
 specifiers = ["11.11.0"]
+
+[[tools.python]]
+version = "3.12.9"
+backend = "core:python"
+specifiers = ["3.12.9"]
+
+[tools.python."platforms.linux-arm64"]
+checksum = "sha256:0354f70e7d3e2d0c36308edc1815c563d9bae1a3221830f7e222f6bb0a7e1a3a"
+url = "https://github.com/astral-sh/python-build-standalone/releases/download/20250317/cpython-3.12.9+20250317-aarch64-unknown-linux-gnu-install_only_stripped.tar.gz"
+provenance = "github-attestations"
+
+[tools.python."platforms.linux-x64"]
+checksum = "sha256:a36bc60c38fe146e908e2e71fc21266c8558b24a9407226b1d887212839437ef"
+url = "https://github.com/astral-sh/python-build-standalone/releases/download/20250317/cpython-3.12.9+20250317-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz"
+provenance = "github-attestations"
+
+[tools.python."platforms.linux-x64-musl"]
+checksum = "sha256:cb0a1b8e34692b49059ac78c0eda5b5c137262ba5d9b5898dcbeb03c0e6116a3"
+url = "https://github.com/astral-sh/python-build-standalone/releases/download/20250317/cpython-3.12.9+20250317-x86_64-unknown-linux-musl-install_only_stripped.tar.gz"
+provenance = "github-attestations"
+
+[tools.python."platforms.macos-arm64"]
+checksum = "sha256:0a4647b7df3c8eca11071d6cea68a14a4b102bd6fc6afae314e9852510654b7d"
+url = "https://github.com/astral-sh/python-build-standalone/releases/download/20250317/cpython-3.12.9+20250317-aarch64-apple-darwin-install_only_stripped.tar.gz"
+provenance = "github-attestations"
+
+[tools.python."platforms.macos-x64"]
+checksum = "sha256:1a414bf392a7afe08c742502a82edd41893a1144ccbceb184dc5ee6ee9c069c0"
+url = "https://github.com/astral-sh/python-build-standalone/releases/download/20250317/cpython-3.12.9+20250317-x86_64-apple-darwin-install_only_stripped.tar.gz"
+provenance = "github-attestations"
+
+[tools.python."platforms.windows-x64"]
+checksum = "sha256:ee338839315bdd8af5fc935f9595eca20ebebdd250726c5816b2d0cf94d1e661"
+url = "https://github.com/astral-sh/python-build-standalone/releases/download/20250317/cpython-3.12.9+20250317-x86_64-pc-windows-msvc-install_only_stripped.tar.gz"
+provenance = "github-attestations"
+
+[[tools.ruff]]
+version = "0.15.1"
+backend = "aqua:astral-sh/ruff"
+specifiers = ["0.15.1"]
+
+[tools.ruff."platforms.linux-arm64"]
+checksum = "sha256:003848ac89a6d2ca1a2ce4e663daec4f90212fc9fd6f338d7cd692c7c8ae9480"
+url = "https://github.com/astral-sh/ruff/releases/download/0.15.1/ruff-aarch64-unknown-linux-gnu.tar.gz"
+url_api = "https://api.github.com/repos/astral-sh/ruff/releases/assets/355179032"
+
+[tools.ruff."platforms.linux-arm64-musl"]
+checksum = "sha256:05a41b8b7c068633b27e8f9149c70154ac2090e61d48e5ea9983de769593d29c"
+url = "https://github.com/astral-sh/ruff/releases/download/0.15.1/ruff-aarch64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/astral-sh/ruff/releases/assets/355179036"
+
+[tools.ruff."platforms.linux-x64"]
+checksum = "sha256:f63d467b81ef1a7a8552fef001784215bb2fc4d7a7e32216c48aaa3bad066779"
+url = "https://github.com/astral-sh/ruff/releases/download/0.15.1/ruff-x86_64-unknown-linux-gnu.tar.gz"
+url_api = "https://api.github.com/repos/astral-sh/ruff/releases/assets/355179118"
+
+[tools.ruff."platforms.linux-x64-musl"]
+checksum = "sha256:c8d04b4f6ce053809d98d1ef99f897c52e6204708bb157551ede7fbab505fea2"
+url = "https://github.com/astral-sh/ruff/releases/download/0.15.1/ruff-x86_64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/astral-sh/ruff/releases/assets/355179125"
+
+[tools.ruff."platforms.macos-arm64"]
+checksum = "sha256:196f6d4bd380f4a03f9d2d3bcfe17b991145a110f5fc9f5999521cd5e5335e1c"
+url = "https://github.com/astral-sh/ruff/releases/download/0.15.1/ruff-aarch64-apple-darwin.tar.gz"
+url_api = "https://api.github.com/repos/astral-sh/ruff/releases/assets/355179018"
+
+[tools.ruff."platforms.macos-x64"]
+checksum = "sha256:55fd4437b4b6b0c75793525c980bb1d49d9723044edbdd7dcc962cb595d26d51"
+url = "https://github.com/astral-sh/ruff/releases/download/0.15.1/ruff-x86_64-apple-darwin.tar.gz"
+url_api = "https://api.github.com/repos/astral-sh/ruff/releases/assets/355179104"
+
+[tools.ruff."platforms.windows-x64"]
+checksum = "sha256:4bd4d5bb5b3c3fa44a4c3d4748dc03f9fbd53808ff2d3adda75e50b1ec1374e2"
+url = "https://github.com/astral-sh/ruff/releases/download/0.15.1/ruff-x86_64-pc-windows-msvc.zip"
+url_api = "https://api.github.com/repos/astral-sh/ruff/releases/assets/355179106"
