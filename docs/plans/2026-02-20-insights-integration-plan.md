@@ -67,11 +67,14 @@ Expected: All `name:` fields start with `tmf-`.
 
 ### Task 2: Recreate `.claude/skills/` Symlinks
 
-Delete old symlinks and create new ones pointing to renamed directories.
+Delete old symlinks, create new ones pointing to renamed directories. Also rename the
+real `pinpoint-orchestrator` directory.
 
 **Files:**
 
 - Delete + recreate: 8 symlinks in `.claude/skills/`
+- Rename: `.claude/skills/pinpoint-orchestrator` → `.claude/skills/tmf-orchestrator`
+- Modify: `.claude/skills/tmf-orchestrator/SKILL.md` (name field)
 
 **Step 1: Remove old symlinks**
 
@@ -100,7 +103,16 @@ ln -s ../../.agent/skills/tmf-ui .claude/skills/tmf-ui
 ln -s ../../.agent/skills/tmf-github-monitor .claude/skills/tmf-github-monitor
 ```
 
-**Step 3: Verify symlinks resolve**
+**Step 3: Rename orchestrator (real directory)**
+
+```bash
+git mv .claude/skills/pinpoint-orchestrator .claude/skills/tmf-orchestrator
+```
+
+Update `.claude/skills/tmf-orchestrator/SKILL.md` line 2:
+`name: pinpoint-orchestrator` → `name: tmf-orchestrator`
+
+**Step 4: Verify symlinks resolve**
 
 ```bash
 ls -la .claude/skills/tmf-* | head -20

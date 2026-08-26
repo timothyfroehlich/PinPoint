@@ -1329,6 +1329,7 @@ Same as in `scripts/workflow/AGENTS.md` and emitted by `merge-pr.sh`, `pr-watch.
 
 - Spec: `docs/superpowers/specs/2026-05-16-pinpoint-pr-workflow-consolidation-design.md`
 - Workflow scripts reference: `scripts/workflow/AGENTS.md`
+- Subagent dispatch rules (N=1 strict, dispatch from main worktree): see `pinpoint-orchestrator` skill
 
 ````
 
@@ -1404,6 +1405,45 @@ Remove rows for `pinpoint-commit`, `pinpoint-ready-to-review`, `pinpoint-github-
 ```bash
 git add AGENTS.md
 git commit -m "docs(AGENTS): replace 3 deprecated skill entries with pinpoint-pr-workflow (PP-d4bf)"
+```
+
+### Task 8.2: Update `pinpoint-orchestrator/SKILL.md`
+
+**Files:**
+
+- Modify: `.claude/skills/pinpoint-orchestrator/SKILL.md`
+
+- [ ] **Step 1: Remove stale `watch-ci.sh` reference**
+
+```bash
+rg -n 'watch-ci\.sh' .claude/skills/pinpoint-orchestrator/SKILL.md
+```
+
+Replace any reference to `.agent/skills/pinpoint-commit/scripts/watch-ci.sh` with `pr-watch.py` only (it's the canonical CI watcher).
+
+- [ ] **Step 2: State N=1 rule affirmatively**
+
+```bash
+rg -n 'relaxed from PR 1353\|N=1-per-message rule' .claude/skills/pinpoint-orchestrator/SKILL.md
+```
+
+If matches: replace the historical reference with affirmative current-rule language:
+
+> **Dispatch rule: One `Agent(isolation: "worktree")` call per message.** Dispatch, confirm the new `.claude/worktrees/agent-<hex>` directory appeared, then dispatch the next.
+
+- [ ] **Step 3: Update skill references**
+
+```bash
+rg -n 'pinpoint-commit\|pinpoint-ready-to-review\|pinpoint-github-monitor' .claude/skills/pinpoint-orchestrator/SKILL.md
+```
+
+Replace any references with `pinpoint-pr-workflow`.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add .claude/skills/pinpoint-orchestrator/SKILL.md
+git commit -m "docs(orchestrator): update stale watch-ci.sh ref and skill names (PP-d4bf)"
 ```
 
 ### Task 8.3: Update `pinpoint-dispatch-e2e-teammate/SKILL.md`
@@ -1583,7 +1623,7 @@ Architecture: MCP for per-operation reads/writes via skill instructions; scripts
 - **Scripts deleted**: copilot-comments.sh, respond-to-copilot.sh, resolve-copilot-threads.sh, label-ready.sh.
 - **Scripts kept + cleaned**: merge-pr.sh (renamed from claude-merge.sh), _pr-gates.sh (shared helper), pr-watch.py (advisory text stripped, gh run list dedup), pr-dashboard.sh (dynamic slug, source _pr-gates.sh).
 - **New hook**: .claude/hooks/block-direct-merge.cjs blocks gh pr merge and MCP merge_pull_request, routes through merge-pr.sh. Bypass: .claude-merge-bypass sentinel (single-use).
-- **Docs updated**: AGENTS.md skills table, scripts/workflow/AGENTS.md, pinpoint-dispatch-e2e-teammate/SKILL.md.
+- **Docs updated**: AGENTS.md skills table, scripts/workflow/AGENTS.md, pinpoint-orchestrator/SKILL.md, pinpoint-dispatch-e2e-teammate/SKILL.md.
 
 ## Audit findings addressed
 

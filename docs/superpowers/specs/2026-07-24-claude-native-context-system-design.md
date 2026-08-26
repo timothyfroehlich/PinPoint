@@ -97,9 +97,9 @@ Budget: ~125 lines.
 
 | Today                      | Now | Disposition                                                                                                                                                                                                              |
 | -------------------------- | --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Worktree dispatch safety   | 20  | Becomes a **hook** (§6).                                                                                                                                                                                                 |
+| Worktree dispatch safety   | 20  | Becomes a **hook** (§6). One-line pointer remains; the 17-line technical record already lives in `pinpoint-orchestrator` Phase 2, which CLAUDE.md itself says                                                            |
 | Worktrees (Claude Code)    | 8   | Mostly describes what `post-checkout` / `WorktreeRemove` already do automatically — informational, not a rule. Keep only: manual `git worktree remove` / `rm -rf` skips the hook and leaks slot entries + Docker volumes |
-| Parallel Subagent Workflow | 10  | Remove repository-owned harness workflow.                                                                                                                                                                                |
+| Parallel Subagent Workflow | 10  | Procedure → `pinpoint-orchestrator`. Keep one gotcha: hooks don't fire for subagents, so `pnpm run check` is self-enforced via the dispatch prompt                                                                       |
 | Working Style (3 bullets)  | 5   | Not PinPoint-specific — agent-restraint preferences. → `~/.claude/CLAUDE.md`, with the §6 working-style block and the existing multi-agent scale gate                                                                    |
 | Status vocabulary          | 5   | **Keep.** Speech rule, always applies, unenforceable                                                                                                                                                                     |
 | Sandbox & Playwright       | 5   | Mach-port / `excludedCommands` half → `pinpoint-e2e`. `gh` TLS + `dev:status` stay                                                                                                                                       |
@@ -170,7 +170,7 @@ Recoverable from git history if Antigravity is ever revisited.
 
 Also:
 
-- Delete the duplicated "Which Tests to Run" decision tree from `pinpoint-e2e` (it exists verbatim in `pinpoint-testing`).
+- Delete the duplicated "Which Tests to Run" decision tree from `pinpoint-e2e` (it exists verbatim in `pinpoint-testing`) and have the bridge point at `pinpoint-orchestrator` for worktree mechanics instead of restating them.
 - **`pinpoint-pr-workflow` gains Phase 5: post-merge deploy watch** — the one step of AGENTS.md §9 with no coverage anywhere else (§4.1).
 - **`pinpoint-e2e` gains the sandbox/Playwright troubleshooting** moved out of CLAUDE.md (§4.1).
 
@@ -278,15 +278,16 @@ This catches renames, deletions, and orphans — the drift that actually bites �
 
 ## 9. Considered and rejected
 
-| Option                                        | Why not                                                                                                                                   |
-| --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| Delete `AGENTS.md` outright                   | A 3-line stub costs nothing and catches a future tool looking for the standard name                                                       |
-| Generate rule files from the catalog          | Two registers from one source; see §8                                                                                                     |
-| Merge `pinpoint-testing` + `pinpoint-e2e`     | Both actively used (9 and 7); 33k combined is a lot to load for a Playwright-only question. De-duplicate the shared decision tree instead |
-| Merge `pinpoint-briefing` + `pinpoint-chores` | Different cadences, both hook-driven; briefing runs 29× and would drag 10k of chores content along                                        |
-| Merge `design-bible` + `pinpoint-ui`          | Would create a ~100k skill. The opposite is needed — see §10                                                                              |
-| "Caveman" prose compression                   | ~0.2% of a 1M window, and the compressible parts are exactly the rationale that makes rules stick                                         |
-| Codex nested `AGENTS.md`                      | Codex retired                                                                                                                             |
+| Option                                               | Why not                                                                                                                                   |
+| ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| Delete `AGENTS.md` outright                          | A 3-line stub costs nothing and catches a future tool looking for the standard name                                                       |
+| Generate rule files from the catalog                 | Two registers from one source; see §8                                                                                                     |
+| Merge `pinpoint-testing` + `pinpoint-e2e`            | Both actively used (9 and 7); 33k combined is a lot to load for a Playwright-only question. De-duplicate the shared decision tree instead |
+| Merge `pinpoint-orchestrator` + `superpowers-bridge` | Bridge has a much narrower trigger; de-duplicate the worktree overlap instead                                                             |
+| Merge `pinpoint-briefing` + `pinpoint-chores`        | Different cadences, both hook-driven; briefing runs 29× and would drag 10k of chores content along                                        |
+| Merge `design-bible` + `pinpoint-ui`                 | Would create a ~100k skill. The opposite is needed — see §10                                                                              |
+| "Caveman" prose compression                          | ~0.2% of a 1M window, and the compressible parts are exactly the rationale that makes rules stick                                         |
+| Codex nested `AGENTS.md`                             | Codex retired                                                                                                                             |
 
 ## 10. Out of scope — follow-up beads
 

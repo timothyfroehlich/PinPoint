@@ -86,8 +86,8 @@ it cannot verify a human is actually typing the command, and doesn't try to.
 It stops accidental/scripted calls; it is not a security boundary on its own.
 
 All documented invocations were updated to the canonical `<PR> --human` form:
-`AGENTS.md`, `pinpoint-pr-workflow` SKILL.md,
-`pinpoint-superpowers-bridge` SKILL.md, `pinpoint-agy-execute`
+`AGENTS.md`, `pinpoint-pr-workflow` SKILL.md, `pinpoint-orchestrator`
+SKILL.md, `pinpoint-superpowers-bridge` SKILL.md, `pinpoint-agy-execute`
 SKILL.md, `scripts/workflow/AGENTS.md`, and the script's own usage/help text.
 
 ### 3. Commit-time screenshot reminder — `.claude/hooks/ui-screenshot-reminder.cjs`
@@ -194,8 +194,8 @@ this as a hooks/tooling change, not a polished feature):
   what `merge-pr.sh --human` does for reference (§4.2-4.4, reframed as "Tim
   runs this"), and what to do if the script itself is broken (§4.5: flag it,
   don't work around it).
-- `pinpoint-superpowers-bridge` and `pinpoint-agy-execute` SKILL.md files
-  updated to the same human-only
+- `pinpoint-orchestrator`, `pinpoint-superpowers-bridge`, and
+  `pinpoint-agy-execute` SKILL.md files updated to the same human-only
   framing. `pinpoint-agy-execute` additionally corrects a pre-existing
   inaccuracy: Antigravity doesn't have the Claude-Code-specific PreToolUse
   hook, so its actual enforcement there is the explicit "do not merge"

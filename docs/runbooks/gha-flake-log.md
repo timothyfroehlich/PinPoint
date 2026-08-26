@@ -240,8 +240,8 @@ bd show "$root"                                                   # current ledg
   correctly-formatted signed comment on it; `bd comments <week-bead>` shows it.
   Sightings are append-only (no delete), so use an obviously-fake `pr=#9999` for
   tests — triage ignores it and the whole week bead is eventually closed.
-- **Skill wiring:** the orchestrator and pr-workflow skills point at the helper
-  at their log-time decision points; the chores checklist item #8 and the
+- **Skill wiring:** the pr-workflow skill points at the helper at its log-time
+  decision points; the chores checklist item #8 and the
   `weekly-chore` bead body both carry the triage item.
 
 ## Related

@@ -140,6 +140,7 @@ Disjoint from every other task — touches `package.json`, `eslint.config.mjs`, 
 **Files:**
 
 - Modify: `.agents/skills/pinpoint-pr-workflow/SKILL.md` (429)
+- Modify: `.agents/skills/pinpoint-orchestrator/SKILL.md` (324)
 - Modify: `.agents/skills/pinpoint-huddle/SKILL.md` (370)
 - Modify: `.agents/skills/pinpoint-briefing/SKILL.md` (159)
 
