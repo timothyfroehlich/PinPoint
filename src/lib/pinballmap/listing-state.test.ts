@@ -60,6 +60,7 @@ function derive(overrides: {
   presenceStatus?: MachinePresenceStatus;
   pinballmapMachineId?: number | null;
   pinballmapExcluded?: boolean;
+  configured?: boolean;
   snapshot?: LocationSnapshot | null;
   siblings?: PbmSiblingInput[];
 }): ReturnType<typeof derivePbmListingView> {
@@ -73,6 +74,7 @@ function derive(overrides: {
         : TITLE,
     pinballmapExcluded: overrides.pinballmapExcluded ?? false,
     intent: overrides.intent ?? "off",
+    configured: overrides.configured ?? true,
     presenceStatus: overrides.presenceStatus ?? "on_the_floor",
     snapshot:
       overrides.snapshot === undefined ? snapshot([]) : overrides.snapshot,
@@ -87,6 +89,11 @@ interface Case {
 }
 
 const CASES: Case[] = [
+  {
+    name: "not_configured",
+    when: "no tracked location is configured",
+    args: { configured: false },
+  },
   {
     name: "no_model",
     when: "no catalog title and not declared uncataloged",
@@ -174,7 +181,7 @@ const CASES: Case[] = [
   },
 ];
 
-describe("derivePbmListingView — the thirteen states", () => {
+describe("derivePbmListingView — the fourteen states", () => {
   it.each(CASES)("$name when $when", ({ name, args }) => {
     expect(derive(args).name).toBe(name);
   });
@@ -183,7 +190,7 @@ describe("derivePbmListingView — the thirteen states", () => {
     const covered = CASES.map((c) => c.name).sort();
     expect(new Set(covered).size).toBe(CASES.length);
     // Fails loudly when a state is added to the union without a row here.
-    expect(covered).toHaveLength(13);
+    expect(covered).toHaveLength(14);
   });
 });
 

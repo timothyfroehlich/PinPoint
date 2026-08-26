@@ -148,7 +148,8 @@ export default async function MachineEditPage({
     role: u.role,
   }));
 
-  const snapshot = pbmState?.snapshotJson ?? null;
+  const configured = pbmState?.locationId != null;
+  const snapshot = configured ? (pbmState.snapshotJson ?? null) : null;
 
   // The control's whole view is DERIVED here and handed down — nothing in it
   // discovers state by calling Pinball Map (CORE-PBM-001, PP-o355.21).
@@ -158,6 +159,7 @@ export default async function MachineEditPage({
     pinballmapExcluded: machine.pinballmapExcluded,
     intent: machine.pinballmapIntent,
     presenceStatus: machine.presenceStatus,
+    configured,
     snapshot,
     siblings: sameTitle,
   });
@@ -176,7 +178,9 @@ export default async function MachineEditPage({
   // outbound writes cannot run, so Add / Remove are absent rather than present
   // and failing (CORE-ARCH-012).
   const writeEnabled =
-    pbmState?.outboundEmail != null && pbmState.outboundTokenVaultId != null;
+    configured &&
+    pbmState.outboundEmail != null &&
+    pbmState.outboundTokenVaultId != null;
 
   // Entries left on the public lineup by an earlier re-match (PP-l81u).
   //
@@ -194,7 +198,9 @@ export default async function MachineEditPage({
   // The catalog row can disappear while the entry on Pinball Map outlives it,
   // so a null title falls back to naming the entry by id rather than inventing
   // one.
-  const abandonedRows = await listSurfacingAbandonedForMachine(machine.id);
+  const abandonedRows = configured
+    ? await listSurfacingAbandonedForMachine(machine.id)
+    : [];
   const abandoned = await Promise.all(
     abandonedRows.map(async (row) => ({
       lmxId: row.lmxId,
@@ -210,7 +216,10 @@ export default async function MachineEditPage({
   const isOwner =
     user.id === machine.ownerId || user.id === machine.invitedOwnerId;
 
-  const locationUrl = pinballmapLocationUrl();
+  const locationUrl =
+    pbmState?.locationId != null
+      ? pinballmapLocationUrl(pbmState.locationId)
+      : null;
 
   return (
     // Capped at 4xl rather than filling the tab strip's width: these are form
@@ -281,7 +290,7 @@ export default async function MachineEditPage({
             title's ordinary business and shows through those cabinets' own
             states. The Info tab's "Config issue" warning links here, so this is
             where that trail has to end. */}
-        {abandoned.length > 0 ? (
+        {locationUrl !== null && abandoned.length > 0 ? (
           <PinballmapAbandonedEntries
             machineId={machine.id}
             entries={abandoned}

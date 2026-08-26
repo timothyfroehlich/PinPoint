@@ -71,9 +71,8 @@ describe("testDiscordDmAction", () => {
     mockUser("u1");
     findFirst.mockResolvedValue({ id: "u1", discordUserId: "d1" });
     vi.mocked(getDiscordConfig).mockResolvedValue({
-      enabled: true,
       botToken: "t",
-      guildId: null,
+      guildId: "g",
       inviteLink: null,
       botHealthStatus: "healthy",
       lastBotCheckAt: null,
@@ -92,9 +91,8 @@ describe("testDiscordDmAction", () => {
     mockUser("u1");
     findFirst.mockResolvedValue({ id: "u1", discordUserId: "d1" });
     vi.mocked(getDiscordConfig).mockResolvedValue({
-      enabled: true,
       botToken: "t",
-      guildId: null,
+      guildId: "g",
       inviteLink: null,
       botHealthStatus: "healthy",
       lastBotCheckAt: null,
@@ -116,9 +114,8 @@ describe("testDiscordDmAction", () => {
       mockUser("u1");
       findFirst.mockResolvedValue({ id: "u1", discordUserId: "d1" });
       vi.mocked(getDiscordConfig).mockResolvedValue({
-        enabled: true,
         botToken: "t",
-        guildId: null,
+        guildId: "g",
         inviteLink: null,
         botHealthStatus: "healthy",
         lastBotCheckAt: null,

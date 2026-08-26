@@ -25,7 +25,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
  *               Limitation: cannot follow aliased imports or indirect callbacks.
  *  2. Runtime — `assertNotInTransaction()` called at the top of each
  *               side-effecting wrapper (sendEmail, sendDm, uploadToBlob,
- *               deleteFromBlob, getDiscordConfig, isDiscordIntegrationEnabled).
+ *               deleteFromBlob, getDiscordConfig, isDiscordIntegrationConfigured).
  *               Backstops every path the static rule can't see.
  * Keep both layers in sync when adding a new side-effect entry point: add the
  * function name to `SIDE_EFFECT_CALLEES` in the Oxlint rule AND add an

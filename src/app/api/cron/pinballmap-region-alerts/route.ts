@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { assertCronAuthorized } from "~/lib/cron/auth";
 import { log } from "~/lib/logger";
 import { reportError } from "~/lib/observability/report-error";
-import { getPinballMapState } from "~/lib/pinballmap/state";
 import { runRegionNewMachineAlerts } from "~/lib/pinballmap/region-alerts";
 
 /**
@@ -24,11 +23,9 @@ import { runRegionNewMachineAlerts } from "~/lib/pinballmap/region-alerts";
  * so the steady state is a cheap no-op that exists to make the rare real one
  * prompt.
  *
- * Two gates, both cheap and both before any PBM call:
- * - `state.enabled` — the integration-level kill switch, same as the snapshot sync
- *   route. While the integration is off this route makes ZERO PBM calls, so it is
- *   safe to register before rollout (PP-o355.10).
- * - a configured alert channel — enforced inside `runRegionNewMachineAlerts`.
+ * The configured alert channel and shared Discord bot token are checked inside
+ * `runRegionNewMachineAlerts` before any Pinball Map call. Region alerts are
+ * independent from a tracked Pinball Map location.
  */
 
 export const dynamic = "force-dynamic";
@@ -48,12 +45,6 @@ export const maxDuration = 300;
 export async function GET(request: Request): Promise<NextResponse> {
   const denied = assertCronAuthorized(request);
   if (denied) return denied;
-
-  const state = await getPinballMapState();
-  if (!state?.enabled) {
-    // Dormant: the integration isn't enabled yet. Correct no-op, not an error.
-    return NextResponse.json({ ok: true, skipped: "disabled" });
-  }
 
   try {
     const run = await runRegionNewMachineAlerts();

@@ -492,7 +492,8 @@ export async function addMachineToPinballMapAction(
     );
 
   const state = await getPinballMapState();
-  if (!state) return err("SERVER", "Pinball Map isn't configured yet");
+  if (state?.locationId === null || state?.locationId === undefined)
+    return err("SERVER", "Pinball Map isn't configured yet");
 
   // Idempotent: the lineup already carries this title, so there is nothing to
   // add and the entry it already has is the answer. Spending a write call on
@@ -633,7 +634,8 @@ export async function removeMachineFromPinballMapAction(
   const { userId, machine } = authed;
 
   const state = await getPinballMapState();
-  if (!state) return err("SERVER", "Pinball Map isn't configured yet");
+  if (state?.locationId === null || state?.locationId === undefined)
+    return err("SERVER", "Pinball Map isn't configured yet");
 
   // The submitted id is attacker-controlled, and the operator account it would
   // act through can edit the WHOLE location's lineup. Push is `member: "owner"`,
@@ -847,8 +849,8 @@ export type RefreshPinballmapResult = Result<
  * which the header shows as a disabled button with a countdown rather than an
  * error nobody could have avoided.
  *
- * Unlike the hourly cron this does not gate on `state.enabled`: an explicit
- * human refresh owns its own decision. Form-action shaped `(prevState,
+ * `syncLocationSnapshot` itself refuses an unconfigured location before it
+ * spends the shared allowance. Form-action shaped `(prevState,
  * formData)` so a `useActionState` button drops it in directly
  * (CORE-ARCH-005/007).
  */
@@ -879,6 +881,9 @@ export async function refreshPinballmapLineupAction(
       trigger: "manual",
     });
     if (!result.ok) {
+      if (result.reason === "not_configured") {
+        return err("SERVER", "Pinball Map isn't configured yet");
+      }
       if (result.reason === "throttled") {
         const minutes = Math.max(
           1,

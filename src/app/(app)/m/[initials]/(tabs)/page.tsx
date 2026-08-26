@@ -122,7 +122,8 @@ export default async function MachineInfoTab({
   // the old control gave APC's whole fleet (CORE-ARCH-012). It is one
   // location-wide singleton row.
   const pbmState = await getPinballMapState();
-  const snapshot = pbmState?.snapshotJson ?? null;
+  const configured = pbmState?.locationId != null;
+  const snapshot = configured ? (pbmState.snapshotJson ?? null) : null;
 
   // The same-title group is diagnose-only, because coverage feeds nothing but
   // the Config-issue warning. It has to be read for THAT, though: coverage is
@@ -148,11 +149,13 @@ export default async function MachineInfoTab({
     pinballmapExcluded: machine.pinballmapExcluded,
     intent: machine.pinballmapIntent,
     presenceStatus: machine.presenceStatus,
+    configured,
     snapshot,
     siblings: sameTitle,
   });
   const configIssue =
     canDiagnose &&
+    configured &&
     (listingView.outOfSync ||
       // The SAME filter the Manage tab's alert applies (spec 2.5). The chip's
       // only job is to send a reader there, so an unfiltered count here fires
@@ -177,7 +180,10 @@ export default async function MachineInfoTab({
       descriptionSlot={descriptionSlot}
       modelName={modelName}
       pinballmap={{
-        locationUrl: pinballmapLocationUrl(),
+        locationUrl:
+          pbmState?.locationId != null
+            ? pinballmapLocationUrl(pbmState.locationId)
+            : null,
         // `observed` is false both for "the lineup does not carry it" and for
         // "there is no lineup yet", and the rail would render the first as a
         // fact. Waiting reports unknown instead.
