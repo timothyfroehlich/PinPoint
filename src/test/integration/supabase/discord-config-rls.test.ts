@@ -96,16 +96,16 @@ describe("Discord integration config RLS", () => {
   it("member client cannot UPDATE the config", async () => {
     const { error } = await memberAuthedClient
       .from("discord_integration_config")
-      .update({ enabled: true })
+      .update({ guild_id: "123456789012345678" })
       .eq("id", "singleton");
     // RLS returns no error but affects 0 rows; re-read to prove no mutation
     expect(error).toBeNull();
     const { data } = await adminClient
       .from("discord_integration_config")
-      .select("enabled")
+      .select("guild_id")
       .eq("id", "singleton")
       .single();
-    expect(data?.enabled).toBe(false);
+    expect(data?.guild_id).toBeNull();
   });
 
   it("admin client can UPDATE the config", async () => {
@@ -138,5 +138,8 @@ describe("Discord integration config RLS", () => {
     expect(error).toBeNull();
     expect(Array.isArray(data)).toBe(true);
     expect(data?.length).toBe(1);
+    // Expand migration compatibility: the previous serving deployment still
+    // expects this return column until the follow-up contract migration.
+    expect(data?.[0]).toHaveProperty("enabled");
   });
 });

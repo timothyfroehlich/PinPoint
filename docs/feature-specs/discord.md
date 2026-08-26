@@ -90,7 +90,6 @@ records, a separate re-check, and a stored status line. It is not a toggle.
 
 | Spec                            | Code today                                                                                      | Resolution                                                                             |
 | :------------------------------ | :---------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------- |
-| §2.2 no enable flag             | `discord_integration_config.enabled` gates sending (`config.ts` 73, 133)                        | Drop the column; token presence is the gate                                            |
 | §2.3 save validates and records | An enabled save is rejected on a failed probe rather than recording it                          | Always persist; write the outcome to status                                            |
 | §2.4 one Test connection        | Two per-field Validate buttons; results held in client state, lost on reload                    | Collapse to Save-validates + a stored-config Test connection                           |
 | §3 stored status                | `bot_health_status` / `last_bot_check_at` columns exist but are never written                   | Wire the write path; widen the enum (rejected vs unreachable)                          |

@@ -293,17 +293,14 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y yamllint shellcheck
 
-      - name: Install Ruff
-        run: pipx install "ruff==0.15.1"
-
-      - name: Install pytest
-        run: pipx install "pytest==9.0.3"
-
       - name: Setup mise
         uses: jdx/mise-action@3c2e0cf82a5b2e5249f0d3635a4d83d0ae861518  # ratchet:jdx/mise-action@v4.2.5
         with:
           version: "2026.8.11"
-          install: false
+          install_args: "--locked"
+
+      - name: Install Python test dependencies
+        run: python3 -m pip install -r scripts/requirements.txt
 
       - name: YAML lint
         run: yamllint .github/workflows/
@@ -325,7 +322,7 @@ jobs:
         run: ruff format --check scripts/
 
       - name: Pytest (scripts)
-        run: pytest scripts/tests/
+        run: python3 -m pytest scripts/tests/
 
       - name: ShellCheck
         run: find scripts/ .devcontainer/ -name '*.sh' -print0 | xargs -0 shellcheck

@@ -4,13 +4,12 @@ import { z } from "zod";
  * Save the full Discord integration config in one action.
  *
  * `newToken` is optional: empty (or absent) means "no change to saved token";
- * a non-empty value means "rotate to this on save." `guildId` is required
- * because the dispatcher needs it to verify server membership before sending
- * a DM. `inviteLink` is optional and may be empty (we coerce empty to null
- * on write).
+ * a non-empty value means "rotate to this on save." `guildId` may be cleared
+ * to turn off Discord notifications while retaining the shared bot token for
+ * independently configured consumers such as region alerts. `inviteLink` is
+ * optional and may be empty (we coerce empty to null on write).
  */
 export const saveDiscordConfigSchema = z.object({
-  enabled: z.boolean(),
   newToken: z
     .string()
     .trim()
@@ -26,9 +25,8 @@ export const saveDiscordConfigSchema = z.object({
   guildId: z
     .string()
     .trim()
-    .min(1, "Server ID is required")
     .max(64)
-    .regex(/^\d+$/, "Server ID must be numeric"),
+    .regex(/^(?:\d+)?$/, "Server ID must be numeric or empty"),
   inviteLink: z
     .string()
     .trim()

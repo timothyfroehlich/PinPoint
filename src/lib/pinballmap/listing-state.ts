@@ -28,6 +28,8 @@ export type PbmListingIntent = "on" | "off" | "no_sync";
  * test ids all cite, so a state that cannot be named cannot be discussed.
  */
 export type PbmListingStateName =
+  /** No tracked location is configured, so retained state is dormant. */
+  | "not_configured"
   /** No catalog title chosen yet, so there is nothing to put on a lineup. */
   | "no_model"
   /** Declared absent from their catalog — a homebrew, a flipperless game. */
@@ -56,7 +58,8 @@ export type PbmListingStateName =
   | "covered";
 
 /** Why the box is disabled — decides the wording, which differs per reason. */
-export type PbmDisabledReason = "no_model" | "uncataloged" | "waiting";
+export type PbmDisabledReason =
+  "not_configured" | "no_model" | "uncataloged" | "waiting";
 
 /** The push that would make the lineup agree with the intent (4.3). */
 export type PbmPushAction = "add" | "remove";
@@ -133,10 +136,8 @@ const ADVISE_WHEN_ON: readonly MachinePresenceStatus[] = [
  * An empty array is read as "this cabinet is the only one", which is what an
  * unmatched machine's caller should pass.
  *
- * Deliberately NOT gated on `pinballmap_state.enabled`. Spec 3.5 defines Waiting
- * by whether a valid refresh exists, and the flag has no surface that can turn
- * it on (PP-o355.37) — so gating here would render every machine's control inert
- * on a flag nobody can flip.
+ * A non-null location is the configuration gate. Dormant snapshots must never
+ * be rendered as current after configuration is removed.
  */
 export function derivePbmListingView(args: {
   machineId: string;
@@ -144,6 +145,7 @@ export function derivePbmListingView(args: {
   pinballmapExcluded: boolean;
   intent: PbmListingIntent;
   presenceStatus: MachinePresenceStatus;
+  configured: boolean;
   snapshot: LocationSnapshot | null;
   siblings: readonly PbmSiblingInput[];
 }): PbmListingView {
@@ -153,6 +155,7 @@ export function derivePbmListingView(args: {
     pinballmapExcluded,
     intent,
     presenceStatus,
+    configured,
     snapshot,
     siblings,
   } = args;
@@ -180,6 +183,8 @@ export function derivePbmListingView(args: {
     coveredBy: [],
     pushAction: null,
   });
+
+  if (!configured) return inert("not_configured");
 
   // Matched and excluded are mutually exclusive (2.1, DB CHECK), so the excluded
   // branch is only reachable with no title and reading it first is not an

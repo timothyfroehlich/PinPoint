@@ -10,9 +10,8 @@ divergences table. Each requirement is numbered for citation. When code and
 spec disagree, either the code is wrong or this document gets amended — never
 silently neither.
 
-**Related records.** `docs/pbm-listing-redesign-refresher.md`, PP-o355 (epic),
-PP-3bbr (uncataloged games / manual model), PP-o355.36 (timeline comments
-after removal).
+**Related records.** `docs/pbm-listing-redesign-refresher.md`,
+`docs/feature-specs/admin-integrations.md`.
 
 ---
 
@@ -45,7 +44,8 @@ Six independent facts. No one of them ever implies another.
 
 **Sync participation** is the intent tri-state's third position: a machine
 set to Don't sync is exempt from alerts, reconciliation, and comment import — but its observed status stays visible, because
-the location-level refresh keeps recording the lineup regardless.
+the location-level refresh keeps recording the lineup while Pinball Map is
+configured.
 Uncataloged and unmatched machines never participate.
 
 The control's states (§4) are comparisons across these: _in sync_ means
@@ -76,24 +76,29 @@ intent agrees with the lineup; _out of sync_ means they disagree.
 
 ## 3. Reading from Pinball Map
 
-- **3.1** PinPoint reads the location's lineup on a schedule (hourly) and
-  stores what it saw, including each entry's condition comments.
-- **3.2** A person can refresh at any time from the control's header;
-  refreshes draw from a small shared burst allowance (a few back-to-back,
-  then one every few minutes) so the sustained rate stays inside the
-  committed hourly cap. The allowance is global, not per-user. The header
-  always shows when the lineup was last refreshed, and the button disables
-  with a countdown when the allowance is spent.
+- **3.1** While configured, PinPoint reads the location's lineup on a schedule
+  (hourly) and stores what it saw, including each entry's condition comments.
+  While Not configured, PinPoint makes no location-tracking Pinball Map API
+  calls. The separately configured region-alert feature is independent and
+  follows its own spec.
+- **3.2** A person can refresh at any time from the control's header while the
+  integration is configured. Refreshes and location-validation reads draw from
+  one shared burst allowance (a few back-to-back, then one every few minutes)
+  so the sustained rate stays inside the committed hourly cap. The allowance
+  is global, not per-user. The header always shows when the lineup was last
+  refreshed, and the button disables with a countdown when the allowance is
+  spent.
 - **3.3** PinPoint never writes to Pinball Map on its own. Every outbound
   write is an explicit human action.
 - **3.4** The UI renders from stored data. Opening a page never triggers a
   call to Pinball Map, and no control requires a click to discover its own
   state.
-- **3.5** Until a valid refresh exists, the control renders disabled — no
-  interactive element against unknown data. Enabling the integration
-  triggers a refresh as part of enabling, so this state is momentary; the
-  header stays live with an error marker and the Refresh button as the
-  escape hatch.
+- **3.5** While configured but before a valid snapshot exists, the control is
+  in the **Waiting** state and renders disabled — no interactive element acts
+  against unknown data. Successfully setting the location supplies a valid
+  snapshot; otherwise the hourly refresh and the header's manual Refresh are
+  the paths out. Waiting may persist while attempts fail, and the header stays
+  live with an error marker and Refresh as the escape hatch.
 
 ## 4. The listing control
 
@@ -112,6 +117,8 @@ intent agrees with the lineup; _out of sync_ means they disagree.
     title is bare.
 - **4.2** State names (canonical):
   - **No model / Uncataloged** — disabled box, status says why.
+  - **Not configured** — no tracked location; disabled box, no Refresh or
+    location link, and no retained snapshot rendered as current.
   - **Waiting** — no valid refresh yet (3.5); disabled box, header error
     marker.
   - **Sync off** — Don't sync selected; observed status still shown, no
@@ -169,7 +176,8 @@ intent agrees with the lineup; _out of sync_ means they disagree.
   entry is otherwise the same, PinPoint repairs its record silently — this
   touches bookkeeping, never intent.
 - **5.3** Machines set to Don't sync are exempt from repair and imports; the
-  location-level refresh itself always runs.
+  location-level refresh itself always runs while the integration is
+  configured.
 
 ## 6. Availability interplay
 
@@ -256,7 +264,6 @@ intent agrees with the lineup; _out of sync_ means they disagree.
 | Spec                           | Code today                                                                                                   | Resolution                                               |
 | :----------------------------- | :----------------------------------------------------------------------------------------------------------- | :------------------------------------------------------- |
 | 7.1 comment fan-out            | No comment import exists                                                                                     | PP-o355.4 (reshape to fan-out); PP-o355.36 depends on it |
-| 3.5 enable triggers a refresh  | No enable surface exists to trigger from                                                                     | PP-o355.37 (admin enable surface)                        |
 | 4.9 read-only viewer           | No surface reaches it — the only page carrying the control is the Manage tab, which gates on `machines.edit` | PP-o355.38                                               |
 | 2.4 uncataloged / manual model | Fields exist; the surface for them is not what it should be                                                  | PP-3bbr                                                  |
 | 7.3 comment marking on removal | Not implemented                                                                                              | PP-o355.36                                               |
@@ -270,5 +277,6 @@ logged here.
 
 | Date       | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | :--------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-08-23 | Replaced the distinct integration enable flag with configuration presence: a stored location means configured and no location means Not configured. Defined the dormant-state behavior, made all human-triggered lineup reads share the refresh allowance, and rewrote Waiting so it lasts until a valid snapshot arrives. Clarified that this state governs location tracking, not the separately configured region-alert feature.                                                      |
 | 2026-08-16 | Added spec status and this changelog. Removed the `[shipped]`/`[designed]` tags — the divergence table is the only record of what is built, gaining rows for 3.2, 6.5 and 8.3 — and the code-state commentary in Related records. Amended 2.5 (an orphaned entry surfaces on the machine that walked away only when no cabinet still carries the old title), 4.9 (read-only viewers keep the header Refresh) and 8.2 (names the machine-linking capability rather than citing 8.1 bare). |
 | 2026-08-15 | Created, recording the two-line intent/status control: coverage replaces holding/claiming (§1), no automatic intent (5.1), Alert and Flag (4.2, 6.5), vocabulary purge (4.8).                                                                                                                                                                                                                                                                                                            |

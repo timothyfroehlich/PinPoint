@@ -1,5 +1,5 @@
 /**
- * Integration tests: saveDiscordConfig's create-path Vault orphan compensation,
+ * Integration tests: saveDiscordConfig's Vault orphan compensation,
  * with the compensation SQL **actually executed** against Postgres (PP-w3d9).
  *
  * Why this file exists separately from discord-integration-actions.test.ts:
@@ -16,9 +16,9 @@
  * The Vault stand-in (CORE-TEST-006): `vault` is a Postgres extension, not a
  * network service, so the boundary we mock is its *public function surface*.
  * supabase_vault 0.3.1 — the version installed both locally and in
- * pinpoint-prod — exposes exactly `vault.create_secret` and
- * `vault.update_secret` over the `vault.secrets` table. The stub below defines
- * those two and the table, and deliberately defines **nothing else**: any call
+ * pinpoint-prod — exposes `vault.create_secret` and `vault.update_secret` over
+ * the `vault.secrets` table. The action rotates with create + atomic pointer
+ * swap, while the stub deliberately defines **no delete helper**: any call
  * to a function the real extension lacks (`vault.delete_secret` among them)
  * fails here exactly as it fails in production. The "harness self-check" test
  * pins that property so the stub can't silently grow teeth-free.
@@ -72,7 +72,7 @@ vi.mock("~/lib/observability/report-error", () => ({
 vi.mock("~/lib/discord/config", () => ({
   getDiscordTokenForAdmin: vi.fn().mockResolvedValue(null),
   getDiscordConfig: vi.fn(),
-  isDiscordIntegrationEnabled: vi.fn(),
+  isDiscordIntegrationConfigured: vi.fn(),
 }));
 
 const mockGetUser = vi.fn();
@@ -129,7 +129,7 @@ vi.mock("~/server/db", async () => {
 });
 
 // Import the action AFTER the db mock so it binds to PGlite.
-const { saveDiscordConfig } =
+const { clearDiscordBotTokenAction, saveDiscordConfig } =
   await import("~/app/(app)/admin/integrations/discord/actions");
 
 // ── Vault stand-in ───────────────────────────────────────────────────────────
@@ -145,7 +145,7 @@ async function createVaultStub(): Promise<void> {
   await db.execute(sql`
     CREATE TABLE IF NOT EXISTS vault.secrets (
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-      name text,
+      name text UNIQUE,
       description text NOT NULL DEFAULT '',
       secret text NOT NULL,
       created_at timestamptz NOT NULL DEFAULT now(),
@@ -199,10 +199,13 @@ async function readVaultSecrets(): Promise<VaultRow[]> {
   return result.rows;
 }
 
-async function seedVaultSecret(secret: string): Promise<string> {
+async function seedVaultSecret(
+  secret: string,
+  name = `seed-${randomUUID()}`
+): Promise<string> {
   const db = await getTestDb();
   const result = await db.execute<IdRow>(
-    sql`INSERT INTO vault.secrets (secret, name) VALUES (${secret}, ${`seed-${randomUUID()}`}) RETURNING id::text AS id`
+    sql`INSERT INTO vault.secrets (secret, name) VALUES (${secret}, ${name}) RETURNING id::text AS id`
   );
   const id = result.rows[0]?.id;
   if (id === undefined) throw new Error("failed to seed vault secret");
@@ -218,14 +221,11 @@ const ROTATED_TOKEN =
   "Bot.Rotated.12345678901234567890123456789012345678901234567890123456";
 
 /**
- * `enabled: "false"` keeps Discord's REST probes out of the picture entirely
- * (the action only probes when enabling), so these tests exercise nothing but
- * the Vault + row-write path. A non-empty `newToken` still selects the
- * create/rotate branch.
+ * The tests exercise the Vault + row-write path. A non-empty `newToken`
+ * selects the create/rotate branch.
  */
 function makeFormData(newToken: string): FormData {
   const fd = new FormData();
-  fd.set("enabled", "false");
   fd.set("newToken", newToken);
   fd.set("guildId", "123456789012345678");
   fd.set("inviteLink", "");
@@ -236,16 +236,25 @@ async function seedSingleton(botTokenVaultId: string | null): Promise<void> {
   const db = await getTestDb();
   await db.insert(discordIntegrationConfig).values({
     id: "singleton",
-    enabled: false,
     botTokenVaultId,
   });
 }
 
-async function readSingleton(): Promise<{ botTokenVaultId: string | null }> {
+async function readSingleton(): Promise<{
+  botTokenVaultId: string | null;
+  enabled: boolean;
+  botHealthStatus: "unknown" | "healthy" | "degraded";
+  lastBotCheckAt: Date | null;
+}> {
   const db = await getTestDb();
   const row = await db.query.discordIntegrationConfig.findFirst({
     where: eq(discordIntegrationConfig.id, "singleton"),
-    columns: { botTokenVaultId: true },
+    columns: {
+      botTokenVaultId: true,
+      enabled: true,
+      botHealthStatus: true,
+      lastBotCheckAt: true,
+    },
   });
   if (!row) throw new Error("singleton row missing");
   return row;
@@ -269,6 +278,21 @@ describe("saveDiscordConfig Vault orphan compensation (real SQL, PGlite)", () =>
     await db.execute(sql`DELETE FROM vault.secrets`);
 
     mockGetUser.mockResolvedValue({ data: { user: { id: ADMIN_USER_ID } } });
+    globalThis.fetch = vi.fn((input: RequestInfo | URL) => {
+      const url =
+        typeof input === "string"
+          ? input
+          : input instanceof URL
+            ? input.href
+            : input.url;
+      return Promise.resolve(
+        url.endsWith("/users/@me")
+          ? new Response(JSON.stringify({ username: "pinpoint" }), {
+              status: 200,
+            })
+          : new Response(JSON.stringify({ name: "APC" }), { status: 200 })
+      );
+    });
     await db.insert(userProfiles).values(
       createTestUser({
         id: ADMIN_USER_ID,
@@ -327,7 +351,7 @@ describe("saveDiscordConfig Vault orphan compensation (real SQL, PGlite)", () =>
     expect((await readSingleton()).botTokenVaultId).toBe(stored[0]?.id);
   });
 
-  it("update path: a rolled-back rotation deletes nothing (there is no orphan to undo)", async () => {
+  it("a rolled-back rotation deletes the replacement and preserves the referenced token", async () => {
     const existingId = await seedVaultSecret("original-token");
     await seedSingleton(existingId);
     testControl.failInsideTransaction = true;
@@ -335,12 +359,57 @@ describe("saveDiscordConfig Vault orphan compensation (real SQL, PGlite)", () =>
     const result = await saveDiscordConfig(makeFormData(ROTATED_TOKEN));
     expect(result.ok).toBe(false);
 
-    // The rotation is non-transactional and intentional: the secret stays,
-    // rotated in place, and the singleton still points at it.
+    // The pointer swap rolled back, so the replacement is an orphan and is
+    // deleted. The original credential remains referenced and unchanged.
     const stored = await readVaultSecrets();
     expect(stored).toHaveLength(1);
     expect(stored[0]?.id).toBe(existingId);
-    expect(stored[0]?.secret).toBe(ROTATED_TOKEN);
+    expect(stored[0]?.secret).toBe("original-token");
     expect((await readSingleton()).botTokenVaultId).toBe(existingId);
+  });
+
+  it("rotates a UI-created token without colliding on the Vault name", async () => {
+    const existingId = await seedVaultSecret(
+      "original-token",
+      "discord_bot_token"
+    );
+    await seedSingleton(existingId);
+
+    const result = await saveDiscordConfig(makeFormData(ROTATED_TOKEN));
+    expect(result.ok).toBe(true);
+
+    const stored = await readVaultSecrets();
+    expect(stored).toHaveLength(1);
+    expect(stored[0]?.id).not.toBe(existingId);
+    expect(stored[0]?.secret).toBe(ROTATED_TOKEN);
+    expect((await readSingleton()).botTokenVaultId).toBe(stored[0]?.id);
+  });
+
+  it("explicit removal unlinks and deletes only the referenced secret", async () => {
+    const referencedId = await seedVaultSecret("saved-token");
+    const unrelatedId = await seedVaultSecret("unrelated-token");
+    await seedSingleton(referencedId);
+    const db = await getTestDb();
+    await db
+      .update(discordIntegrationConfig)
+      .set({
+        enabled: true,
+        botHealthStatus: "healthy",
+        lastBotCheckAt: new Date(),
+      })
+      .where(eq(discordIntegrationConfig.id, "singleton"));
+
+    const result = await clearDiscordBotTokenAction();
+
+    expect(result).toEqual({ ok: true });
+    const singleton = await readSingleton();
+    expect(singleton).toMatchObject({
+      botTokenVaultId: null,
+      enabled: false,
+      botHealthStatus: "unknown",
+      lastBotCheckAt: null,
+    });
+    const remaining = await readVaultSecrets();
+    expect(remaining.map((row) => row.id)).toEqual([unrelatedId]);
   });
 });

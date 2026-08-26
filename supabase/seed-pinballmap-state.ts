@@ -356,7 +356,7 @@ try {
       ('singleton', true, ${snapshot.locationId}, ${JSON.stringify(snapshot)}::text::jsonb, now(),
        now(), 'ok', NULL)
     ON CONFLICT (id) DO UPDATE SET
-      enabled = excluded.enabled,
+      enabled = true,
       location_id = excluded.location_id,
       snapshot_json = excluded.snapshot_json,
       last_synced_at = excluded.last_synced_at,
