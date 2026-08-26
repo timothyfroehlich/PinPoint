@@ -220,16 +220,18 @@ export async function setUserDiscordId(
 }
 
 /**
- * Disable the Discord integration (clears bot_token_vault_id + sets
- * enabled=false). Useful for after-test cleanup. Does NOT remove the
- * underlying vault secret — that's harmless leftover.
+ * Remove both required Discord notification configuration values. Useful for
+ * after-test cleanup and for tests that need the integration unconfigured.
+ * Does NOT remove the underlying vault secret.
  */
-export async function disableDiscordIntegration(): Promise<void> {
+export async function unconfigureDiscordIntegrationForTest(): Promise<void> {
   const { error } = await supabaseAdmin
     .from("discord_integration_config")
     .update({
-      enabled: false,
       bot_token_vault_id: null,
+      guild_id: null,
+      // Expand/contract compatibility for the previous serving deployment.
+      enabled: false,
       updated_at: new Date().toISOString(),
     })
     .eq("id", "singleton");
@@ -237,19 +239,19 @@ export async function disableDiscordIntegration(): Promise<void> {
 }
 
 /**
- * Enable the Discord integration with a fake bot token for E2E tests.
+ * Configure the Discord integration with a fake bot token for E2E tests.
  *
- * Creates a vault secret, links it via `bot_token_vault_id`, and sets
- * `enabled=true` on the singleton config row. After this, `getDiscordConfig()`
- * returns a non-null config and the Discord column is rendered on the
- * notification preferences page.
+ * Creates a vault secret, links it via `bot_token_vault_id`, and supplies a
+ * test guild ID when one is not already configured. After this,
+ * `getDiscordConfig()` returns a non-null config and the Discord column is
+ * rendered on the notification preferences page.
  *
  * Vault writes go through a direct postgres connection because vault.* lives
  * in a separate schema that the supabase-js REST client can't reach. Pair
- * with `disableDiscordIntegration()` in afterAll so the singleton row is
- * restored for tests that depend on the disabled state.
+ * with `unconfigureDiscordIntegrationForTest()` in afterAll so the singleton
+ * row is restored for tests that depend on the unconfigured state.
  */
-export async function enableDiscordIntegrationForTest(): Promise<void> {
+export async function configureDiscordIntegrationForTest(): Promise<void> {
   const postgresUrl =
     process.env["POSTGRES_URL_NON_POOLING"] ?? process.env["POSTGRES_URL"];
   if (!postgresUrl) {
@@ -274,8 +276,9 @@ export async function enableDiscordIntegrationForTest(): Promise<void> {
 
     await sql`
       UPDATE discord_integration_config
-      SET enabled = true,
-          bot_token_vault_id = ${vaultId}::uuid,
+      SET bot_token_vault_id = ${vaultId}::uuid,
+          guild_id = COALESCE(guild_id, 'e2e-test-guild-id'),
+          enabled = true,
           updated_at = now()
       WHERE id = 'singleton'
     `;

@@ -3,7 +3,7 @@ import { and, asc, count, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "~/server/db";
 import { pinballmapRegionSeenMachines } from "~/server/db/schema";
 import { postChannelMessage } from "~/lib/discord/client";
-import { getDiscordConfig } from "~/lib/discord/config";
+import { getDiscordBotToken } from "~/lib/discord/config";
 import { log } from "~/lib/logger";
 import { reportError } from "~/lib/observability/report-error";
 import {
@@ -462,6 +462,9 @@ export async function runRegionNewMachineAlerts(opts?: {
   const channelId = getRegionAlertChannelId();
   if (channelId === null) return noop(region, "not_configured");
 
+  const botToken = await getDiscordBotToken();
+  if (botToken === null) return noop(region, "not_configured");
+
   const client = await getPinballMapClient();
   const observed = await client.fetchRegionLmxes(region);
   // An empty payload is a bad read (outage, wrong region slug), not "the region
@@ -558,17 +561,6 @@ export async function runRegionNewMachineAlerts(opts?: {
   // would burn those requests on EVERY hourly run, forever, for an install whose
   // Discord integration is off. Same reasoning as the channel-id check above; it
   // is only correct once both gates sit on the same side of the fetch.
-  const config = await getDiscordConfig();
-  if (!config) {
-    // Channel configured but the Discord integration is off or unprovisioned.
-    // The rows stay pending and the next run tries again.
-    log.warn(
-      { region, pending: pending.length, action: "pinballmap.regionAlerts" },
-      "New PinballMap machines pending: Discord integration unavailable"
-    );
-    return { ...base, announced: 0, pending: pending.length };
-  }
-
   const entries = await resolveLabels(region, pending);
   const content = formatRegionAlertMessage({
     entries,
@@ -577,7 +569,7 @@ export async function runRegionNewMachineAlerts(opts?: {
   if (content === null) return { ...base, announced: 0, pending: 0 };
 
   const sent = await postChannelMessage({
-    botToken: config.botToken,
+    botToken,
     channelId,
     content,
   });

@@ -74,7 +74,7 @@ export interface PinballmapListingControlProps {
   /** Location name from Pinball Map's own record; null before a first refresh. */
   locationName: string | null;
   /** The location's page on pinballmap.com — also the 9.1 attribution link. */
-  locationUrl: string;
+  locationUrl: string | null;
   /** When the stored lineup was last read, or null if it never has been. */
   lastRefreshedAt: Date | null;
   /** Refreshes left in the shared burst allowance, and when the next lands. */
@@ -148,7 +148,7 @@ export function PinballmapListingControl({
   }
 
   const game = modelName ?? "this machine";
-  const canWriteOut = canPush && writeEnabled;
+  const canWriteOut = canPush && writeEnabled && locationUrl !== null;
   const disabled = view.disabled !== null;
 
   return (
@@ -288,7 +288,7 @@ function Header({
   onRefresh,
 }: {
   locationName: string | null;
-  locationUrl: string;
+  locationUrl: string | null;
   lastRefreshedAt: Date | null;
   refreshRemaining: number;
   refreshAvailableAt: Date | null;
@@ -304,7 +304,7 @@ function Header({
     <div className="mb-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
       <h3 className="text-base font-semibold">
         Pinball Map
-        {locationName !== null ? (
+        {locationName !== null && locationUrl !== null ? (
           <>
             {" — "}
             <a
@@ -353,7 +353,7 @@ function Header({
           )}
         </span>
 
-        {canRefresh ? (
+        {canRefresh && locationUrl !== null ? (
           <Button
             variant="outline"
             size="sm"
@@ -535,28 +535,33 @@ function StatusIcon({ view }: { view: PbmListingView }): React.JSX.Element {
  */
 function statusSentence(
   view: PbmListingView,
-  locationUrl: string,
+  locationUrl: string | null,
   canWriteOut: boolean
 ): React.ReactNode {
   const sub = (text: string): React.JSX.Element => (
     <span className="text-muted-foreground">{text}</span>
   );
-  const linkOut = (text: string): React.JSX.Element => (
-    <>
-      {" "}
-      <a
-        href={locationUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="text-primary underline underline-offset-2 hover:no-underline"
-      >
-        {text}
-      </a>
-      , then Refresh to update.
-    </>
-  );
+  const linkOut = (text: string): React.JSX.Element =>
+    locationUrl === null ? (
+      <></>
+    ) : (
+      <>
+        {" "}
+        <a
+          href={locationUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-primary underline underline-offset-2 hover:no-underline"
+        >
+          {text}
+        </a>
+        , then Refresh to update.
+      </>
+    );
 
   switch (view.name) {
+    case "not_configured":
+      return sub("Not configured.");
     case "no_model":
       return (
         <>

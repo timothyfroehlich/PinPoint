@@ -53,5 +53,11 @@
     "route": "/m/AFM/settings",
     "authRole": "admin",
     "seedNeeds": "seeded AFM settings sets (supabase/seed-machine-settings.mjs) — 6 sets spanning both owner/community kinds × public/private-draft + the Tournament tag; admin sees all six"
+  },
+  "admin-discord-integration": {
+    "label": "Admin Discord Integration",
+    "route": "/admin/integrations/discord",
+    "authRole": "admin",
+    "seedNeeds": "default seed; the form renders with or without stored Discord configuration"
   }
 }

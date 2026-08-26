@@ -219,7 +219,9 @@ async function resolveAbandonedEntry(
   oldPinballmapMachineId: number
 ): Promise<AbandonedListing | null> {
   const state = await getPinballMapState();
-  const snapshot = state?.snapshotJson ?? null;
+  if (state?.locationId === null || state?.locationId === undefined)
+    return null;
+  const snapshot = state.snapshotJson ?? null;
   if (!snapshot) return null;
   const lmx = findLmxForMachine(snapshot, oldPinballmapMachineId);
   if (!lmx) return null;

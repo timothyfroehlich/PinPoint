@@ -5,13 +5,12 @@ import { assertNotInTransaction } from "~/server/db/transaction-context";
 /**
  * Discord integration configuration, as loaded by `getDiscordConfig()`.
  *
- * Returned only when the integration is enabled AND a bot token is set.
+ * Returned only when the integration has both required configuration values.
  * Otherwise callers receive `null` and should treat the integration as
  * unavailable (skip channel registration, disable admin UI sections, etc.).
  */
 export interface DiscordConfig {
-  enabled: true;
-  guildId: string | null;
+  guildId: string;
   inviteLink: string | null;
   botToken: string;
   botHealthStatus: "unknown" | "healthy" | "degraded";
@@ -25,8 +24,7 @@ export interface DiscordConfig {
  *
  * Returns null when:
  * - No config row exists (shouldn't happen — migration seeds one)
- * - `enabled` is false
- * - Bot token is not yet set
+ * - Bot token or server ID is not yet set
  *
  * SECURITY: This accessor MUST be called only from server code. It uses
  * the service-role Supabase client and exposes secret material. The
@@ -37,7 +35,6 @@ export interface DiscordConfig {
  * and are never read at runtime.
  */
 interface DiscordConfigRow {
-  enabled: boolean;
   guild_id: string | null;
   invite_link: string | null;
   bot_token: string | null;
@@ -70,12 +67,11 @@ async function fetchDiscordConfigRow(): Promise<DiscordConfigRow | null> {
 
 export async function getDiscordConfig(): Promise<DiscordConfig | null> {
   const row = await fetchDiscordConfigRow();
-  if (!row || !row.enabled || !row.bot_token) {
+  if (!row?.bot_token || !row.guild_id) {
     return null;
   }
 
   return {
-    enabled: true,
     guildId: row.guild_id,
     inviteLink: row.invite_link,
     botToken: row.bot_token,
@@ -88,27 +84,26 @@ export async function getDiscordConfig(): Promise<DiscordConfig | null> {
 }
 
 /**
- * Admin-only accessor: returns the saved bot token regardless of the
- * `enabled` flag. Used by the admin Validate buttons so an admin can probe
- * the saved token before flipping the integration on (the chicken-and-egg:
- * env-seeded token + integration starts disabled → admin must validate to
- * enable, but old getDiscordConfig() refused to surface the token until
- * enabled was already true).
+ * Returns the saved bot token without requiring the Discord server ID. This is
+ * for independently configured consumers, such as region alerts, which use a
+ * Discord channel rather than the notification guild.
  *
  * SECURITY: Same as getDiscordConfig — server-only; uses the service-role
  * client to decrypt the Vault secret. Callers must have already checked
  * the admin permission via verifyIntegrationsAdmin().
  */
-export async function getDiscordTokenForAdmin(): Promise<string | null> {
+export async function getDiscordBotToken(): Promise<string | null> {
   const row = await fetchDiscordConfigRow();
   return row?.bot_token ?? null;
 }
 
+/** Admin validation keeps its intent-specific name at the call site. */
+export const getDiscordTokenForAdmin = getDiscordBotToken;
+
 /**
- * Lightweight boolean accessor: is the Discord integration enabled and
- * provisioned (token saved)?
+ * Lightweight boolean accessor: is the Discord integration configured?
  *
- * Reads `enabled` and `bot_token_vault_id` directly from the singleton
+ * Reads `guild_id` and `bot_token_vault_id` directly from the singleton
  * row instead of going through `get_discord_config()` — that RPC always
  * decrypts the Vault secret, which is unnecessary when the caller only
  * needs to decide whether to render Discord-related UI. Use this on hot
@@ -117,20 +112,20 @@ export async function getDiscordTokenForAdmin(): Promise<string | null> {
  * Returns false on any error (missing env vars, transient RPC failure, etc.)
  * so a misconfigured Discord integration can't break unrelated pages.
  */
-export async function isDiscordIntegrationEnabled(): Promise<boolean> {
+export async function isDiscordIntegrationConfigured(): Promise<boolean> {
   // CORE-ARCH-011 tripwire: this function issues a Supabase HTTP round-trip and
   // must not run inside a DB transaction. See getDiscordConfig() above for the
   // same guard applied to the full Vault-decrypt path. (PP-lbqh)
-  assertNotInTransaction("isDiscordIntegrationEnabled");
+  assertNotInTransaction("isDiscordIntegrationConfigured");
   try {
     const supabase = createAdminClient();
     const { data, error } = await supabase
       .from("discord_integration_config")
-      .select("enabled, bot_token_vault_id")
+      .select("guild_id, bot_token_vault_id")
       .eq("id", "singleton")
       .maybeSingle();
     if (error || !data) return false;
-    return Boolean(data.enabled && data.bot_token_vault_id);
+    return Boolean(data.guild_id && data.bot_token_vault_id);
   } catch {
     return false;
   }

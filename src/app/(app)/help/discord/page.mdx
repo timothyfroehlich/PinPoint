@@ -32,15 +32,14 @@ Before the admin form has anything to accept, you need a Discord bot that lives 
 3. **Get the Server (Guild) ID.** In Discord, enable **User Settings → Advanced → Developer Mode**, then right-click your server icon and choose **Copy Server ID**. That value goes in the admin form's **Server ID** field, and validation confirms the bot is a member of it.
 4. **Create a non-expiring invite link (optional).** Right-click a channel or the server → **Invite People → Edit invite link**, set **Expire After** to **Never** and **Max Number of Uses** to **No limit**, then copy it. Paste it into the admin form's **Invite link** field; PinPoint surfaces it to users when a DM fails because they aren't in the server.
 
-## How admins enable it
+## How admins configure it
 
 The admin page is a single form with three fields and inline validation.
 
 1. Go to **Integrations → Discord** (the Integrations link is in the user dropdown, admins only).
 2. Paste the bot token from the Discord developer portal into **Bot token** and click **Validate** next to it. A green check appears when Discord accepts the token.
 3. Enter the **Server ID** for your Discord server and click **Validate** next to it — this confirms the bot is a member of that server. Optionally fill **Invite link**; it's surfaced to users when DMs fail because they aren't in the server.
-4. Flip the **Integration enabled** switch. The switch stays disabled until both the token and server ID validate cleanly.
-5. Click **Save changes**. Tokens are written to Supabase Vault — you'll never see the saved value again, only re-paste a fresh one to rotate.
+4. Click **Save changes**. Tokens are written to Supabase Vault — you'll never see the saved value again, only re-paste a fresh one to rotate.
 
 Without a saved token the "Sign in with Discord" button stays hidden for everyone, and Discord is omitted from each user's notification preferences.
 
@@ -61,7 +60,7 @@ Sign in with Discord (the OAuth login button, separate from the bot) is driven b
 
 ## Troubleshooting
 
-- **"Sign in with Discord" button is missing on the login page.** An admin hasn't enabled the integration yet. Ask an admin to set the bot token and flip the Enabled switch.
+- **"Sign in with Discord" button is missing on the login page.** Discord sign-in uses its own OAuth credentials. Ask an admin to configure those credentials.
 - **DMs aren't arriving.** The bot can only DM users who share a server with it. Make sure you're in the configured Discord server — admins can share the invite link from the Integrations page. If you've blocked DMs from server members in your Discord privacy settings, allow them.
 - **"Send test DM" returns "blocked".** Same root cause as above — usually privacy settings or not sharing a server with the bot.
 - **Bot health shows anything other than "healthy".** Possible values are `unknown`, `healthy`, and `degraded`. Re-check the bot token under Integrations and make sure the bot user hasn't been removed from the server.

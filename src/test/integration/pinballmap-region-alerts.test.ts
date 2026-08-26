@@ -13,7 +13,6 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   pinballmapCatalog,
   pinballmapRegionSeenMachines,
-  pinballmapState,
 } from "~/server/db/schema";
 import { getTestDb, setupTestDb } from "~/test/setup/pglite";
 import type { PbmRegionLmx, PbmRegionLocation } from "~/lib/pinballmap/types";
@@ -85,18 +84,14 @@ vi.mock("~/lib/pinballmap/catalog", async () => {
 });
 
 const discord = {
-  enabled: true,
+  hasToken: true,
   result: { ok: true } as DiscordSendResult,
   posts: [] as { channelId: string; content: string }[],
 };
 
 vi.mock("~/lib/discord/config", () => ({
-  getDiscordConfig: () =>
-    Promise.resolve(
-      discord.enabled
-        ? { enabled: true, botToken: "bot-token", guildId: null }
-        : null
-    ),
+  getDiscordBotToken: () =>
+    Promise.resolve(discord.hasToken ? "bot-token" : null),
 }));
 
 vi.mock("~/lib/discord/client", () => ({
@@ -183,7 +178,7 @@ describe("PinballMap region new-machine alerts (PGlite)", () => {
     catalog.refreshCalls = 0;
     catalog.error = null;
     catalog.seeds = [];
-    discord.enabled = true;
+    discord.hasToken = true;
     discord.result = { ok: true };
     discord.posts = [];
   });
@@ -464,39 +459,23 @@ describe("PinballMap region new-machine alerts (PGlite)", () => {
     expect(settled?.announcedAt).not.toBeNull();
   });
 
-  it("keeps rows pending when the Discord integration is unavailable", async () => {
-    pbm.entries = [lmx({ lmxId: 1 })];
-    await runRegionNewMachineAlerts();
-
-    discord.enabled = false;
-    pbm.entries = [lmx({ lmxId: 1 }), lmx({ lmxId: 2, machineId: 7 })];
+  it("makes no Pinball Map call when the shared bot token is unavailable", async () => {
+    discord.hasToken = false;
     const run = await runRegionNewMachineAlerts();
 
-    expect(run).toMatchObject({ discovered: 1, announced: 0, pending: 1 });
+    expect(run).toMatchObject({ skipped: "not_configured" });
+    expect(pbm.calls).toBe(0);
     expect(discord.posts).toEqual([]);
   });
 
-  it("spends no label lookups when the Discord integration is unavailable", async () => {
-    // The gate order is the point. A pending row never clears without a
-    // successful post, so if the integration check sat AFTER label resolution,
-    // an install with Discord off would spend a region-locations call — and
-    // possibly a full catalog refresh — on every hourly run, forever, and post
-    // nothing. Counting the calls is the only way to catch that; the run's
-    // return value looks identical either way.
-    // Bootstrap first: on a region's very first run everything is born
-    // already-announced, so nothing would be pending and the gate would never be
-    // reached. The counters are captured after it for the same reason.
-    pbm.entries = [lmx({ lmxId: 1 })];
-    await runRegionNewMachineAlerts();
-
-    discord.enabled = false;
-    pbm.entries = [lmx({ lmxId: 1 }), lmx({ lmxId: 2, machineId: 999 })];
+  it("does not resolve labels when the shared bot token is unavailable", async () => {
+    discord.hasToken = false;
     const locationCallsBefore = pbm.locationCalls;
     const refreshCallsBefore = catalog.refreshCalls;
 
     const run = await runRegionNewMachineAlerts();
 
-    expect(run).toMatchObject({ announced: 0, pending: 1 });
+    expect(run).toMatchObject({ skipped: "not_configured" });
     expect(pbm.locationCalls).toBe(locationCallsBefore);
     expect(catalog.refreshCalls).toBe(refreshCallsBefore);
   });
@@ -505,14 +484,13 @@ describe("PinballMap region new-machine alerts (PGlite)", () => {
     // `readPending` caps at PENDING_READ_LIMIT (500), so a long Discord outage
     // can queue more than one run can drain. `pending` is the job's monitoring
     // signal, so it has to be counted, not inferred from "we announced them all".
-    discord.enabled = false;
     pbm.entries = Array.from({ length: 620 }, (_, i) =>
       lmx({ lmxId: i + 1, machineId: 1 })
     );
     await runRegionNewMachineAlerts(); // bootstrap: born announced
     await markAllPending();
 
-    discord.enabled = true;
+    discord.hasToken = true;
     const run = await runRegionNewMachineAlerts();
 
     expect(run.announced).toBe(500);
@@ -627,7 +605,7 @@ describe("GET /api/cron/pinballmap-region-alerts", () => {
     pbm.calls = 0;
     pbm.locationCalls = 0;
     discord.posts = [];
-    discord.enabled = true;
+    discord.hasToken = true;
     discord.result = { ok: true };
   });
 
@@ -640,23 +618,23 @@ describe("GET /api/cron/pinballmap-region-alerts", () => {
     expect(res.status).toBe(401);
   });
 
-  it("is dormant (no PBM call) while the integration is disabled", async () => {
+  it("makes no PBM call without the shared bot token", async () => {
+    discord.hasToken = false;
     const { GET } =
       await import("~/app/api/cron/pinballmap-region-alerts/route");
     const res = await GET(
       new Request(url, { headers: { authorization: `Bearer ${CRON_SECRET}` } })
     );
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ ok: true, skipped: "disabled" });
+    expect(await res.json()).toMatchObject({
+      ok: true,
+      region: "austin",
+      skipped: "not_configured",
+    });
     expect(pbm.calls).toBe(0);
   });
 
-  it("runs the pass when the integration is enabled", async () => {
-    const db = await getTestDb();
-    await db
-      .insert(pinballmapState)
-      .values({ id: "singleton", enabled: true, locationId: 26454 });
-
+  it("runs independently of tracked-location configuration", async () => {
     const { GET } =
       await import("~/app/api/cron/pinballmap-region-alerts/route");
     const res = await GET(
