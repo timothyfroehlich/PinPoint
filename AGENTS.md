@@ -226,7 +226,7 @@ Actionable, "what" and "how" only. Skills carry the deep dives.
 
 **Canonical specs are authoritative** — particularly `pinpoint-design-bible` (§5 page archetypes, §17 modal archetypes). When implementation changes UI behavior covered there, **edit the spec in place**. Don't append divergence notes or "TODO: spec out of date" disclaimers. If you find one, fold it into canonical text and delete it. Dated artifacts in `docs/superpowers/specs/` are records — leave them alone.
 
-**Feature specs stay current as you work** (`docs/feature-specs/`, `spec-driven-development` skill): when a change touches behavior covered by one, the **same PR** updates the spec or adds a divergence-table row — never neither. Spec edits require Tim approving the exact diff first, even when he says "update the spec".
+**Feature specs stay current as you work** (`docs/feature-specs/`, `spec-driven-development` skill): when a change touches behavior covered by one, the **same PR** updates the spec or adds a divergence-table row — never neither. Feature-spec edits require Tim approving the exact diff first, even when he says "update the spec." One exception: an implementation PR may delete any divergence-table rows it fully resolves without separate approval; adding, narrowing, or otherwise changing a row still requires approval.
 
 <!-- BEGIN:nextjs-agent-rules -->
 
