@@ -1,6 +1,7 @@
 // Unit tests for .claude/hooks/block-direct-merge.cjs — the PreToolUse hook that
-// governs agent-initiated PR merges. Two outcomes, by channel (PP-wi85 reversed
-// for the script only, per Tim 2026-08-19):
+// governs agent-initiated PinPoint PR merges. Explicit targets in other
+// repositories follow their own policy. Two outcomes, by channel (PP-wi85
+// reversed for the script only, per Tim 2026-08-19):
 //   - merge-pr.sh (the gate-enforced script) → ASK: exit 0 with a PreToolUse
 //     "ask" decision on stdout, so Tim approves the prompt before it runs.
 //   - gh pr merge / gh api PUT .../merge / MCP merge_pull_request → DENY: exit 2,
@@ -80,10 +81,29 @@ describe("block-direct-merge.cjs — gh merge paths", () => {
 
   it("blocks `gh api PUT .../pulls/N/merge`", () => {
     const { status, stderr } = runHook(
-      bashPayload("gh api -X PUT repos/o/r/pulls/123/merge")
+      bashPayload(
+        "gh api -X PUT repos/timothyfroehlich/PinPoint/pulls/123/merge"
+      )
     );
     expect(status).toBe(2);
     expect(stderr).toContain("gh api PUT .../merge");
+  });
+
+  it.each([
+    "gh pr merge 4 --repo timothyfroehlich/dotfiles --squash",
+    "gh -R timothyfroehlich/dotfiles pr merge 4 --squash",
+    "gh pr merge https://github.com/timothyfroehlich/dotfiles/pull/4 --squash",
+    "gh api -X PUT repos/timothyfroehlich/dotfiles/pulls/4/merge",
+  ])("allows an explicit non-PinPoint target: %s", (command) => {
+    expectAllow(runHook(bashPayload(command)));
+  });
+
+  it.each([
+    'gh pr merge 4 --repo "$TARGET_REPOSITORY" --squash',
+    "gh pr merge https://github.com/timothyfroehlich/PinPoint/pull/123 --repo timothyfroehlich/dotfiles",
+  ])("fails closed on an ambiguous repository target: %s", (command) => {
+    const { status } = runHook(bashPayload(command));
+    expect(status).toBe(2);
   });
 
   it("does not block gh api GET on a pulls/N/merge path (no write method)", () => {
@@ -103,13 +123,38 @@ describe("block-direct-merge.cjs — gh merge paths", () => {
 });
 
 describe("block-direct-merge.cjs — MCP merge", () => {
-  it("blocks mcp__github__merge_pull_request regardless of tool_input", () => {
+  it("blocks mcp__github__merge_pull_request for PinPoint", () => {
     const { status, stderr } = runHook({
       tool_name: "mcp__github__merge_pull_request",
-      tool_input: { owner: "o", repo: "r", pullNumber: 123 },
+      tool_input: {
+        owner: "timothyfroehlich",
+        repo: "PinPoint",
+        pullNumber: 123,
+      },
     });
     expect(status).toBe(2);
     expect(stderr).toContain("MCP merge_pull_request");
+  });
+
+  it("allows mcp__github__merge_pull_request for an explicit other repo", () => {
+    expectAllow(
+      runHook({
+        tool_name: "mcp__github__merge_pull_request",
+        tool_input: {
+          owner: "timothyfroehlich",
+          repo: "dotfiles",
+          pullNumber: 4,
+        },
+      })
+    );
+  });
+
+  it("fails closed when the MCP repository target is missing", () => {
+    const { status } = runHook({
+      tool_name: "mcp__github__merge_pull_request",
+      tool_input: { pullNumber: 123 },
+    });
+    expect(status).toBe(2);
   });
 });
 
@@ -261,18 +306,18 @@ describe("block-direct-merge.cjs — wrapped invocations (PP-6t3c, PP-ar8a)", ()
   });
 
   it.each([
-    'eval "gh api -X PUT repos/o/r/pulls/123/merge"',
-    'sh -c "gh api --method PUT repos/o/r/pulls/123/merge"',
-    "env gh api -X POST repos/o/r/pulls/123/merge",
+    'eval "gh api -X PUT repos/timothyfroehlich/PinPoint/pulls/123/merge"',
+    'sh -c "gh api --method PUT repos/timothyfroehlich/PinPoint/pulls/123/merge"',
+    "env gh api -X POST repos/timothyfroehlich/PinPoint/pulls/123/merge",
   ])("blocks %s", (command) => {
     const { status } = runHook(bashPayload(command));
     expect(status).toBe(2);
   });
 
   it.each([
-    "gh -R owner/repo pr merge 123",
-    "gh pr --repo owner/repo merge 123",
-    "gh --repo=owner/repo pr merge 123",
+    "gh -R timothyfroehlich/PinPoint pr merge 123",
+    "gh pr --repo timothyfroehlich/PinPoint merge 123",
+    "gh --repo=timothyfroehlich/PinPoint pr merge 123",
   ])("blocks %s (repo selector between gh and its subcommand)", (command) => {
     const { status } = runHook(bashPayload(command));
     expect(status).toBe(2);
@@ -287,7 +332,9 @@ describe("block-direct-merge.cjs — wrapped invocations (PP-6t3c, PP-ar8a)", ()
 
   it("blocks `gh api --method=PUT` (attached flag value)", () => {
     const { status } = runHook(
-      bashPayload("gh api --method=PUT repos/o/r/pulls/123/merge")
+      bashPayload(
+        "gh api --method=PUT repos/timothyfroehlich/PinPoint/pulls/123/merge"
+      )
     );
     expect(status).toBe(2);
   });
@@ -340,7 +387,7 @@ describe("block-direct-merge.cjs — env -S split-string", () => {
     "env -S'gh pr merge 123'",
     "env -i -S 'gh pr merge 123'",
     "env -iS 'gh pr merge 123'",
-    "env -S 'gh api -X PUT repos/o/r/pulls/1/merge'",
+    "env -S 'gh api -X PUT repos/timothyfroehlich/PinPoint/pulls/1/merge'",
     "sudo env -S 'gh pr merge 1'",
     "xargs env -S 'gh pr merge 1'",
   ])("blocks %s", (command) => {
