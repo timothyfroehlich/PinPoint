@@ -58,7 +58,7 @@
  *
  * API
  *   resolveCommand(commandString, options?) → {
- *     segments:     Segment[],       // { command, name, args, raw }
+ *     segments:     Segment[],       // { command, name, args, dynamicArgs, raw }
  *     unresolvable: Unresolvable[],  // { reason, text }
  *   }
  *
@@ -66,6 +66,8 @@
  *                    (e.g. "./scripts/workflow/merge-pr.sh")
  *   Segment.name     its basename (e.g. "merge-pr.sh") — what guards match on
  *   Segment.args     the tokens after it, unquoted, in order
+ *   Segment.dynamicArgs whether each argument contains shell expansion or
+ *                       substitution that changed its resolved literal value
  *   Segment.raw      normalized reconstruction (`[command, ...args].join(" ")`),
  *                    for messages only — NOT source-exact
  *
@@ -680,6 +682,7 @@ function pushSegment(out, command, argWords) {
     command,
     name: path.basename(command),
     args,
+    dynamicArgs: argWords.map((w) => w.dynamic),
     raw: [command, ...args].join(" "),
   });
 }
@@ -726,7 +729,7 @@ function resolveInto(command, out, depth, options) {
  *
  * @param {string} command
  * @param {{ splitNewlines?: boolean }} [options]
- * @returns {{ segments: Array<{command: string, name: string, args: string[], raw: string}>,
+ * @returns {{ segments: Array<{command: string, name: string, args: string[], dynamicArgs: boolean[], raw: string}>,
  *             unresolvable: Array<{reason: string, text: string}> }}
  */
 function resolveCommand(command, options = {}) {

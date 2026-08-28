@@ -18,6 +18,7 @@ interface Segment {
   command: string;
   name: string;
   args: string[];
+  dynamicArgs: boolean[];
   raw: string;
 }
 interface Unresolvable {
@@ -75,6 +76,22 @@ describe("plain commands", () => {
   it("returns no segments for an empty or whitespace-only command", () => {
     expect(resolveCommand("").segments).toEqual([]);
     expect(resolveCommand("   ").segments).toEqual([]);
+  });
+
+  it("marks arguments whose literal value was changed by shell expansion", () => {
+    const { segments } = resolveCommand(
+      "gh pr merge 123 --repo timothyfroehlich/Pin$(printf Point)"
+    );
+    const seg = segments.find(({ name }) => name === "gh");
+    if (seg === undefined) throw new Error("expected the outer gh segment");
+    expect(seg.args).toEqual([
+      "pr",
+      "merge",
+      "123",
+      "--repo",
+      "timothyfroehlich/Pin",
+    ]);
+    expect(seg.dynamicArgs).toEqual([false, false, false, false, true]);
   });
 });
 

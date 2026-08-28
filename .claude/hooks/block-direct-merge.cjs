@@ -92,7 +92,7 @@ const GH_VALUE_FLAGS = new Set([
 
 /** gh's positional arguments — flag values removed, so the subcommand chain is
  *  contiguous. Flags with `=` carry their value inline and need no skipping. */
-function ghPositionals(args) {
+function ghPositionalEntries(args, dynamicArgs = []) {
   const positionals = [];
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
@@ -100,9 +100,13 @@ function ghPositionals(args) {
       if (GH_VALUE_FLAGS.has(a)) i++;
       continue;
     }
-    positionals.push(a);
+    positionals.push({ value: a, dynamic: Boolean(dynamicArgs[i]) });
   }
   return positionals;
+}
+
+function ghPositionals(args) {
+  return ghPositionalEntries(args).map(({ value }) => value);
 }
 
 /** Normalize a static [HOST/]OWNER/REPO selector. Dynamic or malformed values
@@ -132,12 +136,16 @@ function normalizeRepository(value) {
 /** Return an explicit repository target when gh received one. `explicit` with
  *  a null repository means the command tried to name a target dynamically or
  *  ambiguously, which remains protected. */
-function ghRepositoryTarget(args) {
+function ghRepositoryTarget(args, dynamicArgs = [], commandKind) {
   let explicit = false;
   let ambiguous = false;
   const repositories = [];
-  const record = (value) => {
+  const record = (value, dynamic = false) => {
     explicit = true;
+    if (dynamic) {
+      ambiguous = true;
+      return;
+    }
     const repository = normalizeRepository(value);
     if (repository === null) ambiguous = true;
     else repositories.push(repository);
@@ -145,35 +153,44 @@ function ghRepositoryTarget(args) {
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
+    if (GH_VALUE_FLAGS.has(arg) && arg !== "-R" && arg !== "--repo") {
+      i++;
+      continue;
+    }
     if (arg === "-R" || arg === "--repo") {
-      record(args[i + 1] || null);
+      record(args[i + 1] || null, Boolean(dynamicArgs[i + 1]));
       i++;
       continue;
     }
     const equals = /^(?:-R|--repo)=(.*)$/.exec(arg);
     if (equals) {
-      record(equals[1]);
+      record(equals[1], Boolean(dynamicArgs[i]));
       continue;
     }
     const attachedShort = /^-R(.+)$/.exec(arg);
     if (attachedShort) {
-      record(attachedShort[1]);
+      record(attachedShort[1], Boolean(dynamicArgs[i]));
     }
   }
 
-  const positionals = ghPositionals(args);
-  const prMerge = positionals.findIndex(
-    (arg, index) => arg === "pr" && positionals[index + 1] === "merge"
-  );
-  const pullRequest = prMerge === -1 ? null : positionals[prMerge + 2];
-  if (pullRequest && PULL_URL.test(pullRequest)) {
-    record(pullRequest);
+  if (commandKind === "pr") {
+    const positionals = ghPositionalEntries(args, dynamicArgs);
+    const prMerge = positionals.findIndex(
+      (arg, index) =>
+        arg.value === "pr" && positionals[index + 1]?.value === "merge"
+    );
+    const pullRequest = prMerge === -1 ? null : positionals[prMerge + 2];
+    if (pullRequest && PULL_URL.test(pullRequest.value)) {
+      record(pullRequest.value, pullRequest.dynamic);
+    }
   }
 
-  for (const arg of args) {
-    const path = API_REPOSITORY_PATH.exec(arg);
-    if (path) {
-      record(`${path[1]}/${path[2]}`);
+  if (commandKind === "api") {
+    for (let i = 0; i < args.length; i++) {
+      const path = API_REPOSITORY_PATH.exec(args[i]);
+      if (path) {
+        record(`${path[1]}/${path[2]}`, Boolean(dynamicArgs[i]));
+      }
     }
   }
 
@@ -274,11 +291,23 @@ function classifyMerge(toolName, toolInput) {
     // `gh pr merge --help` / `gh api --help` document rather than merge.
     if (segment.args.some((a) => HELP_FLAGS.has(a))) continue;
     if (isGhPrMerge(segment.args)) {
-      if (!isProtectedTarget(ghRepositoryTarget(segment.args))) continue;
+      if (
+        !isProtectedTarget(
+          ghRepositoryTarget(segment.args, segment.dynamicArgs, "pr")
+        )
+      ) {
+        continue;
+      }
       return { block: true, kind: "merge", detail: "gh pr merge" };
     }
     if (isGhApiMerge(segment.args)) {
-      if (!isProtectedTarget(ghRepositoryTarget(segment.args))) continue;
+      if (
+        !isProtectedTarget(
+          ghRepositoryTarget(segment.args, segment.dynamicArgs, "api")
+        )
+      ) {
+        continue;
+      }
       return { block: true, kind: "merge", detail: "gh api PUT .../merge" };
     }
   }
