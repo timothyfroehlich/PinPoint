@@ -274,7 +274,7 @@ const BEHAVIOR_PROBES = [
       "gh pr merge 123 --squash",
       "gh pr merge 123 --repo timothyfroehlich/PinPoint --squash",
       'gh pr merge 123 --repo "$TARGET_REPOSITORY" --squash',
-      'GH_REPO="$TARGET_REPOSITORY" gh pr merge 123 --squash',
+      "GH_REPO=timothyfroehlich/dotfiles gh pr merge 123 --squash",
       'eval "gh pr merge 123 --squash"',
       "xargs -I{} gh pr merge {} < prs.txt",
       "env -S 'gh pr merge 123'",
@@ -289,7 +289,6 @@ const BEHAVIOR_PROBES = [
     mustAllow: [
       "gh pr view 123",
       "gh pr merge 4 --repo timothyfroehlich/dotfiles --squash",
-      "GH_REPO=timothyfroehlich/dotfiles gh pr merge 4 --squash",
       "gh api -X PUT repos/timothyfroehlich/dotfiles/pulls/4/merge",
       MERGE_MCP_OTHER_REPOSITORY_PROBE,
       'echo "run merge-pr.sh when ready"',

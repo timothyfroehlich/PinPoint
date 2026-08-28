@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // .claude/hooks/block-direct-merge.cjs
-// PreToolUse hook: governs agent-initiated merges into PinPoint. Explicit
-// targets in other repositories follow that repository's own policy. Two
+// PreToolUse hook: governs agent-initiated merges into PinPoint. Repository
+// targets explicit in command arguments or MCP input follow the target
+// repository's own policy. Environment-only selectors remain fail-closed. Two
 // outcomes, by channel — an ASK prompt for the gate-enforcing script, a hard
 // DENY for the raw merge channels (PP-wi85 reversed for the script only, per
 // Tim 2026-08-19).
@@ -74,7 +75,20 @@ const PINPOINT_REPOSITORY = "timothyfroehlich/pinpoint";
 // gh flags that consume the NEXT token as their value. Skipping their values
 // keeps a repo selector from splitting the subcommand chain: `gh pr --repo o/r
 // merge 1` must read as `pr merge`, not `pr`, `o/r`, `merge`.
-const GH_VALUE_FLAGS = new Set(["-R", "--repo", "--hostname"]);
+const GH_VALUE_FLAGS = new Set([
+  "-A",
+  "--author-email",
+  "-b",
+  "--body",
+  "-F",
+  "--body-file",
+  "--match-head-commit",
+  "-R",
+  "--repo",
+  "-t",
+  "--subject",
+  "--hostname",
+]);
 
 /** gh's positional arguments — flag values removed, so the subcommand chain is
  *  contiguous. Flags with `=` carry their value inline and need no skipping. */
@@ -118,7 +132,7 @@ function normalizeRepository(value) {
 /** Return an explicit repository target when gh received one. `explicit` with
  *  a null repository means the command tried to name a target dynamically or
  *  ambiguously, which remains protected. */
-function ghRepositoryTarget(args, environment = {}) {
+function ghRepositoryTarget(args) {
   let explicit = false;
   let ambiguous = false;
   const repositories = [];
@@ -128,10 +142,6 @@ function ghRepositoryTarget(args, environment = {}) {
     if (repository === null) ambiguous = true;
     else repositories.push(repository);
   };
-
-  if (Object.hasOwn(environment, "GH_REPO")) {
-    record(environment.GH_REPO);
-  }
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -151,10 +161,13 @@ function ghRepositoryTarget(args, environment = {}) {
     }
   }
 
-  for (const arg of args) {
-    if (PULL_URL.test(arg)) {
-      record(arg);
-    }
+  const positionals = ghPositionals(args);
+  const prMerge = positionals.findIndex(
+    (arg, index) => arg === "pr" && positionals[index + 1] === "merge"
+  );
+  const pullRequest = prMerge === -1 ? null : positionals[prMerge + 2];
+  if (pullRequest && PULL_URL.test(pullRequest)) {
+    record(pullRequest);
   }
 
   for (const arg of args) {
@@ -261,23 +274,11 @@ function classifyMerge(toolName, toolInput) {
     // `gh pr merge --help` / `gh api --help` document rather than merge.
     if (segment.args.some((a) => HELP_FLAGS.has(a))) continue;
     if (isGhPrMerge(segment.args)) {
-      if (
-        !isProtectedTarget(
-          ghRepositoryTarget(segment.args, segment.environment)
-        )
-      ) {
-        continue;
-      }
+      if (!isProtectedTarget(ghRepositoryTarget(segment.args))) continue;
       return { block: true, kind: "merge", detail: "gh pr merge" };
     }
     if (isGhApiMerge(segment.args)) {
-      if (
-        !isProtectedTarget(
-          ghRepositoryTarget(segment.args, segment.environment)
-        )
-      ) {
-        continue;
-      }
+      if (!isProtectedTarget(ghRepositoryTarget(segment.args))) continue;
       return { block: true, kind: "merge", detail: "gh api PUT .../merge" };
     }
   }
