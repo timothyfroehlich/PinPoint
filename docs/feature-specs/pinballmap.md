@@ -360,8 +360,9 @@ honest rather than building a workflow around it.
   fires the **stored lmx only** and never re-resolves the machine's title
   against any lineup. An lmx is globally unique on Pinball Map, so the direct
   remove takes down the correct old-location entry; a Pinball Map `not_found` is
-  treated as already-gone and the record is dropped. The handle-repair recovery
-  a same-location removal uses (§5.2) is **suppressed** for these records:
+  treated as already-gone and the record is dropped. The re-mint recovery a
+  same-location removal uses — re-resolving the title against the live lineup
+  when the stored handle looks stale — is **suppressed** for these records:
   pointed at the new location it would find and delete a live entry belonging to
   an unrelated machine there. This is the destructive path §10.12 exists to
   close.
