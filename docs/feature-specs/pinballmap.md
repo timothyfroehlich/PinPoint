@@ -303,8 +303,9 @@ dashboard). The region-alert channel that shares the section is its own feature
 - **10.6** While Not configured, PinPoint makes no location-tracking Pinball Map
   API calls and does not render or reconcile retained observed state as current;
   admin and machine surfaces show Not configured (the machine control's Not
-  configured / Waiting states, §4.2). The separately configured region-alert
-  feature is unaffected and follows its own spec.
+  configured state, §4.2 — distinct from Waiting, which is a configured
+  integration still lacking a valid snapshot, §3.5). The separately configured
+  region-alert feature is unaffected and follows its own spec.
 - **10.7** Clearing the location requires confirmation that automatic and manual
   refreshes will stop. It retains the last snapshot and sync health, every
   machine's catalog match and listing intent, imported comments, and
