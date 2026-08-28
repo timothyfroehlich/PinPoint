@@ -213,7 +213,7 @@ def test_negative_checksum_mismatch_rejected(tmp_path: Path) -> None:
         json.dumps(
             {
                 "name": "checksum-test",
-                "packageManager": f"pnpm@11.11.0+sha512.{bad_hash}",
+                "packageManager": f"pnpm@11.17.0+sha512.{bad_hash}",
             }
         ),
         encoding="utf-8",
@@ -308,8 +308,8 @@ def test_offline_corepack_free_resolution() -> None:
     assert exec_proc.returncode == 0, (
         f"Expected offline mise exec -- pnpm --version to succeed, got:\n{exec_proc.stderr}"
     )
-    assert exec_proc.stdout.strip() == "11.11.0", (
-        f"Expected pnpm version 11.11.0, got {exec_proc.stdout.strip()}"
+    assert exec_proc.stdout.strip() == "11.17.0", (
+        f"Expected pnpm version 11.17.0, got {exec_proc.stdout.strip()}"
     )
 
 
