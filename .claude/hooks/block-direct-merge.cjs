@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 // .claude/hooks/block-direct-merge.cjs
-// PreToolUse hook: governs every agent-initiated PR merge. Two outcomes, by
-// channel — an ASK prompt for the gate-enforcing script, a hard DENY for the
-// raw merge channels (PP-wi85 reversed for the script only, per Tim 2026-08-19).
+// PreToolUse hook: governs agent-initiated merges into PinPoint. Explicit
+// targets in other repositories follow that repository's own policy. Two
+// outcomes, by channel — an ASK prompt for the gate-enforcing script, a hard
+// DENY for the raw merge channels (PP-wi85 reversed for the script only, per
+// Tim 2026-08-19).
 //
 // ASK (prompts Tim; exits 0 with a PreToolUse "ask" decision):
 //   3. `scripts/workflow/merge-pr.sh` — the gate-enforced merge script. An agent
@@ -18,10 +20,11 @@
 //   1. `gh pr merge` (direct CLI merge)
 //   2. `gh api .../pulls/N/merge` with a write method (REST merge)
 //   4. mcp__github__merge_pull_request (MCP merge)
-//   These three stay human-only-via-`!` because they bypass merge-pr.sh's gate
-//   checks entirely — a raw merge runs no CI/review/threads/conflict
-//   re-evaluation, so there is no safe agent path through them. The only way an
-//   agent reaches a merge is the ask-gated script above.
+//   For PinPoint targets, these three stay human-only-via-`!` because they
+//   bypass merge-pr.sh's gate checks entirely — a raw merge runs no
+//   CI/review/threads/conflict re-evaluation, so there is no safe agent path
+//   through them. The only way an agent reaches a PinPoint merge is the
+//   ask-gated script above.
 //
 // HOW IT MATCHES (PP-6t3c, PP-ar8a). This used to regex a quote-stripped copy of
 // the command, which had the boundary wide open: `eval "gh pr merge 123"`,
@@ -63,6 +66,10 @@ const RAW_MERGE_INDICATORS = [
 const HELP_FLAGS = new Set(["--help", "-h"]);
 const WRITE_METHODS = new Set(["PUT", "POST"]);
 const MERGE_API_PATH = /\/pulls\/\d+\/merge\b/;
+const API_REPOSITORY_PATH =
+  /(?:^|\/)repos\/([^/]+)\/([^/]+)\/pulls\/\d+\/merge\b/;
+const PULL_URL = /^https?:\/\/[^/]+\/([^/]+)\/([^/]+)\/pull\/\d+(?:[/?#]|$)/;
+const PINPOINT_REPOSITORY = "timothyfroehlich/pinpoint";
 
 // gh flags that consume the NEXT token as their value. Skipping their values
 // keeps a repo selector from splitting the subcommand chain: `gh pr --repo o/r
@@ -82,6 +89,109 @@ function ghPositionals(args) {
     positionals.push(a);
   }
   return positionals;
+}
+
+/** Normalize a static [HOST/]OWNER/REPO selector. Dynamic or malformed values
+ *  return null so the guard fails closed rather than guessing their target. */
+function normalizeRepository(value) {
+  const raw = String(value || "").trim();
+  if (!raw || /[\s$`{}*?]/.test(raw)) return null;
+
+  const pullUrl = PULL_URL.exec(raw);
+  if (pullUrl) return `${pullUrl[1]}/${pullUrl[2]}`.toLowerCase();
+
+  const parts = raw.replace(/\.git$/, "").split("/");
+  if (parts.length !== 2 && parts.length !== 3) return null;
+  const owner = parts.at(-2);
+  const repository = parts.at(-1);
+  if (
+    !owner ||
+    !repository ||
+    !/^[A-Za-z0-9_.-]+$/.test(owner) ||
+    !/^[A-Za-z0-9_.-]+$/.test(repository)
+  ) {
+    return null;
+  }
+  return `${owner}/${repository}`.toLowerCase();
+}
+
+/** Return an explicit repository target when gh received one. `explicit` with
+ *  a null repository means the command tried to name a target dynamically or
+ *  ambiguously, which remains protected. */
+function ghRepositoryTarget(args) {
+  let explicit = false;
+  let ambiguous = false;
+  const repositories = [];
+  const record = (value) => {
+    explicit = true;
+    const repository = normalizeRepository(value);
+    if (repository === null) ambiguous = true;
+    else repositories.push(repository);
+  };
+
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg === "-R" || arg === "--repo") {
+      record(args[i + 1] || null);
+      i++;
+      continue;
+    }
+    const equals = /^(?:-R|--repo)=(.*)$/.exec(arg);
+    if (equals) {
+      record(equals[1]);
+      continue;
+    }
+    const attachedShort = /^-R(.+)$/.exec(arg);
+    if (attachedShort) {
+      record(attachedShort[1]);
+    }
+  }
+
+  for (const arg of args) {
+    if (PULL_URL.test(arg)) {
+      record(arg);
+    }
+  }
+
+  for (const arg of args) {
+    const path = API_REPOSITORY_PATH.exec(arg);
+    if (path) {
+      record(`${path[1]}/${path[2]}`);
+    }
+  }
+
+  if (!explicit) return { explicit: false, repository: null };
+  const unique = new Set(repositories);
+  return {
+    explicit: true,
+    repository: ambiguous || unique.size !== 1 ? null : repositories[0],
+  };
+}
+
+function mcpRepositoryTarget(toolInput) {
+  if (!toolInput || typeof toolInput !== "object" || Array.isArray(toolInput)) {
+    return { explicit: false, repository: null };
+  }
+  const owner = toolInput.owner;
+  const repository = toolInput.repo;
+  if (owner === undefined && repository === undefined) {
+    return { explicit: false, repository: null };
+  }
+  if (typeof owner !== "string" || typeof repository !== "string") {
+    return { explicit: true, repository: null };
+  }
+  return {
+    explicit: true,
+    repository: normalizeRepository(`${owner}/${repository}`),
+  };
+}
+
+function isProtectedTarget(target) {
+  return (
+    !target.explicit ||
+    target.repository === null ||
+    target.repository === PINPOINT_REPOSITORY
+  );
 }
 
 /** Does `args` invoke `gh api` against a pulls/N/merge path with a write method? */
@@ -120,13 +230,19 @@ function isGhPrMerge(args) {
  * Exported so verify-guard-stack.cjs can probe that this guard still BLOCKS a
  * known-bad command, not merely that it is still registered.
  */
-function classifyMerge(toolName, command) {
+function classifyMerge(toolName, toolInput) {
   if (toolName === "mcp__github__merge_pull_request") {
+    if (!isProtectedTarget(mcpRepositoryTarget(toolInput))) {
+      return { block: false, kind: null, detail: "" };
+    }
     return { block: true, kind: "merge", detail: "MCP merge_pull_request" };
   }
   if (toolName !== "Bash") return { block: false, kind: null, detail: "" };
 
-  const cmd = String(command || "");
+  const cmd =
+    typeof toolInput === "string"
+      ? toolInput
+      : String((toolInput && toolInput.command) || "");
   const { segments, unresolvable } = resolveCommand(cmd);
 
   for (const segment of segments) {
@@ -141,9 +257,11 @@ function classifyMerge(toolName, command) {
     // `gh pr merge --help` / `gh api --help` document rather than merge.
     if (segment.args.some((a) => HELP_FLAGS.has(a))) continue;
     if (isGhPrMerge(segment.args)) {
+      if (!isProtectedTarget(ghRepositoryTarget(segment.args))) continue;
       return { block: true, kind: "merge", detail: "gh pr merge" };
     }
     if (isGhApiMerge(segment.args)) {
+      if (!isProtectedTarget(ghRepositoryTarget(segment.args))) continue;
       return { block: true, kind: "merge", detail: "gh api PUT .../merge" };
     }
   }
@@ -178,7 +296,7 @@ if (require.main === module) {
 
     const { block, kind, detail } = classifyMerge(
       payload.tool_name || "",
-      (payload.tool_input || {}).command
+      payload.tool_input || {}
     );
 
     if (!block) {

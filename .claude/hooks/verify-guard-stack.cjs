@@ -240,6 +240,8 @@ function evaluateGuardStack(settings, options = {}) {
 // mapper feeds it as the TOOL NAME (not a Bash command) so the MCP merge channel
 // is exercised through the same table.
 const MERGE_MCP_PROBE = "mcp__github__merge_pull_request";
+const MERGE_MCP_OTHER_REPOSITORY_PROBE =
+  "mcp__github__merge_pull_request:other-repository";
 
 const BEHAVIOR_PROBES = [
   {
@@ -248,17 +250,34 @@ const BEHAVIOR_PROBES = [
     // classifyMerge(toolName, command) → { block, kind }. Reduce to an outcome:
     // block:false → allow; kind "merge-script" → ask; any other block → deny.
     outcome: (fn, input) => {
-      const { block, kind } =
-        input === MERGE_MCP_PROBE ? fn(input, "") : fn("Bash", input);
+      let result;
+      if (input === MERGE_MCP_PROBE) {
+        result = fn(input, {
+          owner: "timothyfroehlich",
+          repo: "PinPoint",
+          pull_number: 123,
+        });
+      } else if (input === MERGE_MCP_OTHER_REPOSITORY_PROBE) {
+        result = fn(MERGE_MCP_PROBE, {
+          owner: "timothyfroehlich",
+          repo: "dotfiles",
+          pull_number: 4,
+        });
+      } else {
+        result = fn("Bash", input);
+      }
+      const { block, kind } = result;
       if (!block) return "allow";
       return kind === "merge-script" ? "ask" : "deny";
     },
     mustDeny: [
       "gh pr merge 123 --squash",
+      "gh pr merge 123 --repo timothyfroehlich/PinPoint --squash",
+      'gh pr merge 123 --repo "$TARGET_REPOSITORY" --squash',
       'eval "gh pr merge 123 --squash"',
       "xargs -I{} gh pr merge {} < prs.txt",
       "env -S 'gh pr merge 123'",
-      "gh api -X PUT repos/o/r/pulls/123/merge",
+      "gh api -X PUT repos/timothyfroehlich/PinPoint/pulls/123/merge",
       MERGE_MCP_PROBE,
     ],
     mustAsk: [
@@ -268,6 +287,9 @@ const BEHAVIOR_PROBES = [
     ],
     mustAllow: [
       "gh pr view 123",
+      "gh pr merge 4 --repo timothyfroehlich/dotfiles --squash",
+      "gh api -X PUT repos/timothyfroehlich/dotfiles/pulls/4/merge",
+      MERGE_MCP_OTHER_REPOSITORY_PROBE,
       'echo "run merge-pr.sh when ready"',
       "env | rg merge-pr.sh",
     ],

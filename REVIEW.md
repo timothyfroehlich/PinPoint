@@ -66,9 +66,9 @@ A PR cannot merge without a review covering its **current head commit**, with ev
 
 Sign every review comment or reply with your agent name (`—Claude`, `—Gemini`, `—Codex`, `—Antigravity`). If you decline to act on a comment (Tim's or another agent's), don't leave it silent: reply with one sentence explaining why, then resolve the thread. Every comment gets a fix or a reply — never a silent ignore.
 
-## The merge boundary
+## The PinPoint merge boundary
 
-Reviewers never merge. The merge decision is Tim's, always (PP-wi85) — the raw channels are off-limits to agents outright: no `gh pr merge`, no `gh api PUT .../merge`, no MCP `merge_pull_request`. The gate-enforced script `scripts/workflow/merge-pr.sh` is the one exception, and only in Claude Code: an agent MAY run it, but the merge is still Tim's call (see below).
+Reviewers never merge PinPoint PRs. The PinPoint merge decision is Tim's, always (PP-wi85) — the raw channels are off-limits to agents outright: no `gh pr merge`, no `gh api PUT .../merge`, no MCP `merge_pull_request`. The gate-enforced script `scripts/workflow/merge-pr.sh` is the one exception, and only in Claude Code: an agent MAY run it, but the merge is still Tim's call (see below). This boundary applies to implicit current-repository targets and explicit `timothyfroehlich/PinPoint` targets; a statically explicit non-PinPoint target follows that repository's policy and the user's authorization.
 
 This is enforced differently by harness. In **Claude Code**, `block-direct-merge.cjs` is a PreToolUse hook that **hard-blocks** the raw channels and turns any `merge-pr.sh` invocation into an **approval prompt Tim must accept** before it runs (PP-wi85, reversed for the script only, per Tim 2026-08-19). The hook does **not** fire inside Antigravity, Codex, or Gemini — in those harnesses there is no hook backstop and no approval prompt, so **do not run any merge path yourself**; what binds you is this written instruction plus `merge-pr.sh`'s own refusal to execute without a `--human` flag that only Tim should ever pass.
 
