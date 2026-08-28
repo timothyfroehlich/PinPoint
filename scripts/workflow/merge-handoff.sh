@@ -199,6 +199,17 @@ case "$rv_state" in
       since_review_note="unknowable — the reviewed commit is not an ancestor of head"
     fi
     ;;
+  stale_clean_reaction)
+    if git cat-file -e "${rv_sha}^{commit}" 2>/dev/null \
+      && git merge-base --is-ancestor "$rv_sha" "$head_sha" 2>/dev/null; then
+      behind=$(git rev-list --count "${rv_sha}..${head_sha}")
+      review_desc="Codex clean reaction witness · ${rv_at} · STALE: ${behind} commit(s) back, reviewed ${rv_sha:0:7}, head is ${short_head}"
+      since_review_from=$rv_sha
+    else
+      review_desc="Codex clean reaction witness · ${rv_at} · STALE: reviewed ${rv_sha:0:7}, not an ancestor of head (force-push?)"
+      since_review_note="unknowable — the witnessed commit is not an ancestor of head"
+    fi
+    ;;
   not_approved)
     review_desc="Codex GitHub review (${rv_detail}) · ${rv_at} · did not approve ${rv_sha:0:7}"
     ;;
