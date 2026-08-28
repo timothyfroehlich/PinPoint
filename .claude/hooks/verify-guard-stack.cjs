@@ -50,6 +50,7 @@ const EXPECTED_GUARD_HOOKS = [
   "block-direct-merge.cjs",
   "block-main-worktree-branch-switch.cjs",
   "block-worktree-dispatch-from-linked.cjs",
+  "block-gh-pr-checkout.cjs",
 ];
 
 // --- Registered-script extraction --------------------------------------------
@@ -278,6 +279,22 @@ const BEHAVIOR_PROBES = [
     outcome: (fn, command) => (fn(command).block ? "deny" : "allow"),
     mustDeny: ["git checkout feature/x", 'eval "git switch feature/x"'],
     mustAllow: ["git checkout main", "echo git checkout feature/x"],
+  },
+  {
+    hook: "block-gh-pr-checkout.cjs",
+    export: "classifyCommand",
+    outcome: (fn, command) => (fn(command).block ? "deny" : "allow"),
+    mustDeny: [
+      "gh pr checkout 123",
+      "gh pr co 123",
+      'eval "gh pr checkout 123"',
+      "gh --hostname ghe.example.com pr checkout 123",
+    ],
+    mustAllow: [
+      "gh pr diff 123",
+      "gh pr comment 123",
+      "echo gh pr checkout 123",
+    ],
   },
 ];
 

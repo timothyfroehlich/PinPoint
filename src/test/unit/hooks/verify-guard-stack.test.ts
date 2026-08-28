@@ -62,6 +62,7 @@ const ALL_EXPECTED_HOOKS = [
   "block-direct-merge.cjs",
   "block-main-worktree-branch-switch.cjs",
   "block-worktree-dispatch-from-linked.cjs",
+  "block-gh-pr-checkout.cjs",
 ];
 
 /** Build a settings object wiring the given hook basenames under PreToolUse. */
@@ -93,7 +94,7 @@ function settingsWithHooks(
 // Fast path: pure evaluateGuardStack
 // ---------------------------------------------------------------------------
 describe("evaluateGuardStack — healthy", () => {
-  it("reports no problems when all 6 hooks + non-empty permissions present", () => {
+  it("reports no problems when all expected hooks + non-empty permissions present", () => {
     const settings = settingsWithHooks(ALL_EXPECTED_HOOKS);
     expect(evaluateGuardStack(settings)).toEqual([]);
   });
