@@ -84,7 +84,6 @@ const baseProps = {
   canLink: true,
   pinballmapMachineId: 42,
   pinballmapExcluded: false,
-  pinballmapExcludedReason: null,
   pinballmapTitleName: "Godzilla (Premium)",
   modelName: null,
   manufacturer: null,

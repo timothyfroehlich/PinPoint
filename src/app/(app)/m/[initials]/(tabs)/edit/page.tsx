@@ -242,7 +242,6 @@ export default async function MachineEditPage({
           canLink={canSetIntent}
           pinballmapMachineId={machine.pinballmapMachineId}
           pinballmapExcluded={machine.pinballmapExcluded}
-          pinballmapExcludedReason={machine.pinballmapExcludedReason}
           pinballmapTitleName={pinballmapTitleName}
           // Straight off the row. These used to come from a second query,
           // because `getMachineForLayout` nulled `manufacturer` and `year` via
@@ -268,21 +267,40 @@ export default async function MachineEditPage({
           Pinball Map
         </h2>
 
-        <PinballmapListingControl
-          machineId={machine.id}
-          view={listingView}
-          locationName={snapshot?.name ?? null}
-          locationUrl={locationUrl}
-          lastRefreshedAt={pbmState?.lastSyncedAt ?? null}
-          refreshRemaining={allowance.remaining}
-          refreshAvailableAt={allowance.nextRefillAt}
-          canSetIntent={canSetIntent}
-          canPush={canPush}
-          canRefresh={canRefresh}
-          writeEnabled={writeEnabled}
-          modelName={pinballmapTitleName}
-          commentCount={commentCount}
-        />
+        {/* Manual Entry collapses this section to one line (Tim, 2026-08-27).
+            A hand-entered model has no catalog title, so intent has nothing to
+            act on and the refresh has nothing to refresh FOR — and a stale
+            snapshot is harmless here precisely because nothing on the page
+            reads it. The section keeps its position rather than disappearing:
+            the abandoned-entry alert below lives in it, and the machine that
+            just switched away from a catalog title is exactly the one that may
+            have left an entry on the public lineup (PP-3bbr.3). */}
+        {machine.pinballmapExcluded ? (
+          <p
+            className="text-sm text-muted-foreground"
+            data-testid="pbm-listing-collapsed"
+          >
+            <span className="font-semibold text-foreground">Pinball Map</span> —
+            this machine&apos;s model is entered by hand, so there is no catalog
+            title to list.
+          </p>
+        ) : (
+          <PinballmapListingControl
+            machineId={machine.id}
+            view={listingView}
+            locationName={snapshot?.name ?? null}
+            locationUrl={locationUrl}
+            lastRefreshedAt={pbmState?.lastSyncedAt ?? null}
+            refreshRemaining={allowance.remaining}
+            refreshAvailableAt={allowance.nextRefillAt}
+            canSetIntent={canSetIntent}
+            canPush={canPush}
+            canRefresh={canRefresh}
+            writeEnabled={writeEnabled}
+            modelName={pinballmapTitleName}
+            commentCount={commentCount}
+          />
+        )}
 
         {/* Entries this machine walked away from that are still live on the
             public map (PP-l81u). Spec 2.5 routes them here only once NO cabinet

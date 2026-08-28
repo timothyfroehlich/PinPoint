@@ -51,7 +51,6 @@ export interface MachineDetailsFormProps {
   canLink: boolean;
   pinballmapMachineId: number | null;
   pinballmapExcluded: boolean;
-  pinballmapExcludedReason: string | null;
   pinballmapTitleName: string | null;
   /** Hand-entered model identity, present only on an excluded machine (PP-3bbr). */
   modelName: string | null;
@@ -82,7 +81,6 @@ export function MachineDetailsForm({
   canLink,
   pinballmapMachineId,
   pinballmapExcluded,
-  pinballmapExcludedReason,
   pinballmapTitleName,
   modelName,
   manufacturer,
@@ -371,7 +369,6 @@ export function MachineDetailsForm({
             defaultMachineId={pinballmapMachineId}
             defaultName={pinballmapTitleName}
             defaultExcluded={pinballmapExcluded}
-            defaultExcludedReason={pinballmapExcludedReason}
             defaultModelName={modelName}
             defaultManufacturer={manufacturer}
             defaultYear={year}

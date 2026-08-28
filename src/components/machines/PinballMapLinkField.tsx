@@ -5,7 +5,7 @@ import { ChevronsUpDown } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { Label } from "~/components/ui/label";
 import { Input } from "~/components/ui/input";
-import { Switch } from "~/components/ui/switch";
+import { cn } from "~/lib/utils";
 import {
   Command,
   CommandGroup,
@@ -66,11 +66,17 @@ import {
  * - `pinballmapMachineId` — the resolved edition's id, or empty when unlinked.
  *   When the edition step is shown it IS the `<select>` (so `required` is
  *   enforced natively); otherwise it is a hidden input.
- * - `pinballmapExcluded=on` + `pinballmapExcludedReason` — the "not on
- *   PinballMap" flag and its optional reason.
+ * - `pinballmapExcluded=on` — the Manual Entry flag.
  *
  * Link and excluded are mutually exclusive in the UI (selecting one clears the
  * other), mirroring the DB CHECK.
+ *
+ * `pinballmapExcludedReason` is deliberately NOT submitted (PP-3bbr.3). The
+ * field was write-only — nothing in the app ever rendered it back, only the MCP
+ * tools read it — so it was dropped rather than kept as a box nobody sees the
+ * output of. The column stays, `set_machine_pinballmap` still writes it, and
+ * `carryExcludedFields` preserves a stored value across a save from this form
+ * because an absent field arrives as `undefined`. Nothing here can clear one.
  */
 
 interface PinballMapLinkFieldProps {
@@ -78,16 +84,17 @@ interface PinballMapLinkFieldProps {
   /** Display name of the currently-linked title (resolved from the mirror), if any. */
   defaultName?: string | null;
   defaultExcluded?: boolean;
-  defaultExcludedReason?: string | null;
   /** Stored hand-entered model identity, for a machine already marked excluded. */
   defaultModelName?: string | null;
   defaultManufacturer?: string | null;
   defaultYear?: number | null;
   /**
-   * What APC calls this cabinet — used ONCE, to seed the Model name when the
-   * hand-entry panel first opens with nothing in it. A seed, not a mirror: the
-   * two are separate facts and are free to diverge the moment anyone edits
-   * either. Omit it and the panel simply opens empty.
+   * What APC calls this cabinet, shown as the Model name field's PLACEHOLDER
+   * (spec 2.4). Suggested, never pre-filled: a blank model name already means
+   * "same as the cabinet's name" at read time, so leaving it blank keeps
+   * following a later rename, where a pre-filled copy would freeze the name as
+   * it was the day the source was switched. Omit it and the field falls back to
+   * a generic example.
    */
   machineName?: string;
   disabled?: boolean;
@@ -102,6 +109,23 @@ interface PinballMapLinkFieldProps {
   onDirty?: (() => void) | undefined;
 }
 
+/**
+ * The two Source positions (PP-3bbr.3). "Manual Entry" rather than "Uncataloged
+ * game" (Tim, 2026-08-27): it names what the operator does, not what the game
+ * is. The `uncataloged` state name, the `pinballmap_excluded` column and
+ * `PinballmapListingControl`'s own status copy are unchanged — that block
+ * reports why a machine cannot be listed, which is a fact about the catalog,
+ * not about where these three fields came from.
+ */
+const SOURCE_OPTIONS: readonly {
+  manual: boolean;
+  label: string;
+  testId: string;
+}[] = [
+  { manual: false, label: "Pinball Map", testId: "pinballmap-source-catalog" },
+  { manual: true, label: "Manual Entry", testId: "pinballmap-source-manual" },
+];
+
 function formatMeta(manufacturer: string | null, year: number | null): string {
   return [manufacturer, year !== null ? String(year) : null]
     .filter((v): v is string => v !== null && v.length > 0)
@@ -112,7 +136,6 @@ export function PinballMapLinkField({
   defaultMachineId = null,
   defaultName = null,
   defaultExcluded = false,
-  defaultExcludedReason = null,
   defaultModelName = null,
   defaultManufacturer = null,
   defaultYear = null,
@@ -120,13 +143,12 @@ export function PinballMapLinkField({
   disabled = false,
   onDirty,
 }: PinballMapLinkFieldProps): React.JSX.Element {
-  const reasonId = useId();
   const triggerId = useId();
   const editionId = useId();
   const modelNameId = useId();
   const manufacturerId = useId();
   const yearId = useId();
-  const switchId = useId();
+  const sourceLabelId = useId();
 
   const [family, setFamily] = useState<CatalogFamily | null>(null);
   const [editions, setEditions] = useState<CatalogEdition[]>([]);
@@ -136,14 +158,13 @@ export function PinballMapLinkField({
   const [editionsLoading, setEditionsLoading] = useState(false);
 
   const [excluded, setExcluded] = useState(defaultExcluded);
-  const [reason, setReason] = useState(defaultExcludedReason ?? "");
 
   // Hand-entered model identity for a game the catalog can't cover (PP-3bbr).
   // Kept in state rather than left uncontrolled so switching back to a catalog
-  // title can warn about losing them, and so the seed below can write one.
+  // title can warn about losing what was typed.
   const [modelName, setModelName] = useState(defaultModelName ?? "");
   // A linked machine's manufacturer/year came from the catalog, not the user.
-  // Don't load them — toggling to uncataloged must not inherit them (PP-3bbr.2).
+  // Don't load them — switching to Manual Entry must not inherit them (PP-3bbr.2).
   const [manufacturer, setManufacturer] = useState(
     defaultMachineId !== null ? "" : (defaultManufacturer ?? "")
   );
@@ -154,11 +175,13 @@ export function PinballMapLinkField({
         ? String(defaultYear)
         : ""
   );
-  // Whether the model name was auto-seeded and never edited. A seed is not user
-  // work, so it must not count as "entered" for the confirm dialog (PP-3bbr.2).
-  const [modelNameSeeded, setModelNameSeeded] = useState(false);
+  // Nothing is auto-filled, so anything in these three fields is the user's
+  // (spec 2.4). PP-3bbr.2 had to track whether the model name was seeded or
+  // typed, because a seeded value would otherwise have fired the overwrite
+  // confirm over text nobody wrote; dropping the seed drops that distinction
+  // with it (Tim, 2026-08-27).
   const hasHandEntry =
-    (modelName.trim().length > 0 && !modelNameSeeded) ||
+    modelName.trim().length > 0 ||
     manufacturer.trim().length > 0 ||
     year.trim().length > 0;
 
@@ -239,9 +262,16 @@ export function PinballMapLinkField({
   /**
    * Step 1 of a catalog pick: intercept it when there is hand-entered model
    * identity to lose, otherwise apply it straight away.
+   *
+   * Guarded on `hasHandEntry` alone, NOT on `excluded` too. Since PP-3bbr.3 the
+   * picker only exists while Source is Pinball Map, so a guard that also
+   * required `excluded` could never fire — reaching the picker means having
+   * left Manual Entry already. What was typed survives that move in React
+   * state, so the pick is still the step that destroys it, and this is still
+   * where the warning belongs.
    */
   const handlePickFamily = (pick: CatalogFamily): void => {
-    if (excluded && hasHandEntry) {
+    if (hasHandEntry) {
       setPendingFamily(pick);
       setOpen(false);
       return;
@@ -256,7 +286,6 @@ export function PinballMapLinkField({
     // cannot survive the switch — clear it in the UI too rather than leave
     // values on screen that the save is about to drop (CORE-ARCH-012).
     setModelName("");
-    setModelNameSeeded(false);
     setManufacturer("");
     setYear("");
     setOpen(false);
@@ -289,20 +318,27 @@ export function PinballMapLinkField({
     })();
   };
 
-  const handleToggleUncataloged = (checked: boolean): void => {
+  /**
+   * The Source segmented control (PP-3bbr.3). `manual` true is Manual Entry,
+   * false is Pinball Map.
+   *
+   * Switching back to Pinball Map keeps what was typed in React state, so
+   * flipping twice restores it; only saving while on Pinball Map drops it,
+   * which is the source the user chose to save under. Actively picking a
+   * catalog title is the destructive move, and that one is confirmed
+   * ({@link handlePickFamily}).
+   */
+  const handleSetSource = (manual: boolean): void => {
+    if (manual === excluded) return;
     setUserChanged(true);
     onDirty?.();
-    if (checked) {
+    if (manual) {
       setExcluded(true);
       setFamily(null);
       setEditions([]);
       setSelectedEditionId(null);
       setOpen(false);
       setQuery("");
-      if (modelName.length === 0 && machineName.length > 0) {
-        setModelName(machineName);
-        setModelNameSeeded(true);
-      }
     } else {
       setExcluded(false);
     }
@@ -375,140 +411,202 @@ export function PinballMapLinkField({
           otherwise a placeholder reading "Pick a model first". Keeping them on
           one row is what makes that dependency legible. */}
         <div className="space-y-1.5">
-          <div className="flex items-center justify-between">
-            <Label
-              htmlFor={triggerId}
-              className="flex items-baseline gap-2 text-foreground"
+          <Label
+            htmlFor={excluded ? modelNameId : triggerId}
+            className="text-foreground"
+          >
+            Model Details
+          </Label>
+
+          {/* Source gets its own line rather than riding the label row: it
+              governs the whole group, and a control tucked in beside a label
+              reads as subordinate to the thing it decides (Tim, 2026-08-27).
+              The segmented control is the same one the Pinball Map block's
+              Intent row uses below — real buttons in a radiogroup, so keyboard
+              and screen-reader users get both positions (CORE-A11Y-004). */}
+          <div className="flex items-center gap-2.5">
+            <span
+              id={sourceLabelId}
+              className="text-[13px] leading-none text-muted-foreground"
             >
-              Model
-              <span className="text-xs font-normal text-muted-foreground">
-                {excluded ? "Uncataloged game" : "source: Pinball Map"}
-              </span>
-            </Label>
-            <Switch
-              id={switchId}
-              checked={excluded}
-              onCheckedChange={handleToggleUncataloged}
-              disabled={disabled}
-              aria-label="Uncataloged game"
-              data-testid="pinballmap-uncataloged-toggle"
-            />
+              Source:
+            </span>
+            <div
+              role="radiogroup"
+              aria-labelledby={sourceLabelId}
+              className="inline-flex overflow-hidden rounded-lg border border-outline-variant"
+              data-testid="pinballmap-source-toggle"
+            >
+              {SOURCE_OPTIONS.map((option) => {
+                const selected = option.manual === excluded;
+                return (
+                  <button
+                    key={option.testId}
+                    type="button"
+                    role="radio"
+                    aria-checked={selected}
+                    disabled={disabled}
+                    onClick={() => {
+                      handleSetSource(option.manual);
+                    }}
+                    data-testid={option.testId}
+                    className={cn(
+                      "px-3 py-1.5 text-xs whitespace-nowrap transition-colors",
+                      "border-l border-outline-variant first:border-l-0",
+                      selected
+                        ? "bg-primary/15 font-semibold text-primary"
+                        : "text-muted-foreground hover:bg-muted/50",
+                      "disabled:pointer-events-none disabled:opacity-40"
+                    )}
+                  >
+                    {option.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
-          <Popover open={open} onOpenChange={setOpen}>
-            <PopoverTrigger asChild>
-              <Button
-                type="button"
-                id={triggerId}
-                variant="outline"
-                role="combobox"
-                aria-expanded={open}
-                aria-controls={open ? `${triggerId}-listbox` : undefined}
-                disabled={disabled}
-                data-testid="pinballmap-link-select"
-                className="w-full justify-between border-outline bg-surface text-foreground font-normal"
-              >
-                <span
-                  className={
-                    family ? "text-foreground" : "text-muted-foreground"
-                  }
+          {/* One control slot, two sources. Manual Entry REPLACES the catalog
+              picker rather than leaving it live beside fields it can no longer
+              fill — a picker that still searches while the machine is on manual
+              is a control with nothing to do (PP-3bbr.3). */}
+          {excluded ? (
+            <Input
+              id={modelNameId}
+              name="modelName"
+              value={modelName}
+              onChange={(e) => {
+                setModelName(e.target.value);
+                onDirty?.();
+              }}
+              maxLength={200}
+              disabled={disabled}
+              // Suggests the cabinet's name without filling it in — blank
+              // already means "same as the name" (spec 2.4).
+              placeholder={
+                machineName.length > 0 ? machineName : "e.g. Bordertown"
+              }
+              className="border-outline bg-surface text-foreground placeholder:text-muted-foreground"
+            />
+          ) : (
+            <Popover open={open} onOpenChange={setOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  type="button"
+                  id={triggerId}
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={open}
+                  aria-controls={open ? `${triggerId}-listbox` : undefined}
+                  disabled={disabled}
+                  data-testid="pinballmap-link-select"
+                  className="w-full justify-between border-outline bg-surface text-foreground font-normal"
                 >
-                  {family
-                    ? `${family.name}${familyMeta ? ` · ${familyMeta}` : ""}`
-                    : placeholderLabel}
-                </span>
-                <ChevronsUpDown className="ml-2 size-4 shrink-0 opacity-50" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent
-              id={`${triggerId}-listbox`}
-              className="w-(--radix-popover-trigger-width) p-0"
-              align="start"
-            >
-              {/* shouldFilter={false}: results are already filtered server-side. */}
-              <Command shouldFilter={false}>
-                <CommandInput
-                  placeholder="e.g. Medieval Madness"
-                  value={query}
-                  onValueChange={setQuery}
-                />
-                <CommandList>
-                  {loading ? (
-                    <div
-                      role="status"
-                      className="px-3 py-4 text-xs text-muted-foreground"
-                    >
-                      Searching…
-                    </div>
-                  ) : query.trim().length === 0 ? (
-                    <div className="px-3 py-4 text-xs text-muted-foreground">
-                      Type a title to search Pinball Map.
-                    </div>
-                  ) : results.length > 0 ? (
-                    <CommandGroup>
-                      {results.map((r) => {
-                        const meta = formatMeta(r.manufacturer, r.year);
-                        const key =
-                          r.machineGroupId !== null
-                            ? `g${r.machineGroupId}`
-                            : `m${r.pinballmapMachineId}`;
-                        return (
-                          <CommandItem
-                            key={key}
-                            value={key}
-                            onSelect={() => handlePickFamily(r)}
-                          >
-                            <div className="flex flex-col">
-                              <span>
-                                {r.name}
-                                {r.editionCount > 1 && (
-                                  <span className="ml-1.5 text-[10px] text-muted-foreground">
-                                    {r.editionCount} editions
+                  <span
+                    className={
+                      family ? "text-foreground" : "text-muted-foreground"
+                    }
+                  >
+                    {family
+                      ? `${family.name}${familyMeta ? ` · ${familyMeta}` : ""}`
+                      : placeholderLabel}
+                  </span>
+                  <ChevronsUpDown className="ml-2 size-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent
+                id={`${triggerId}-listbox`}
+                className="w-(--radix-popover-trigger-width) p-0"
+                align="start"
+              >
+                {/* shouldFilter={false}: results are already filtered server-side. */}
+                <Command shouldFilter={false}>
+                  <CommandInput
+                    placeholder="e.g. Medieval Madness"
+                    value={query}
+                    onValueChange={setQuery}
+                  />
+                  <CommandList>
+                    {loading ? (
+                      <div
+                        role="status"
+                        className="px-3 py-4 text-xs text-muted-foreground"
+                      >
+                        Searching…
+                      </div>
+                    ) : query.trim().length === 0 ? (
+                      <div className="px-3 py-4 text-xs text-muted-foreground">
+                        Type a title to search Pinball Map.
+                      </div>
+                    ) : results.length > 0 ? (
+                      <CommandGroup>
+                        {results.map((r) => {
+                          const meta = formatMeta(r.manufacturer, r.year);
+                          const key =
+                            r.machineGroupId !== null
+                              ? `g${r.machineGroupId}`
+                              : `m${r.pinballmapMachineId}`;
+                          return (
+                            <CommandItem
+                              key={key}
+                              value={key}
+                              onSelect={() => handlePickFamily(r)}
+                            >
+                              <div className="flex flex-col">
+                                <span>
+                                  {r.name}
+                                  {r.editionCount > 1 && (
+                                    <span className="ml-1.5 text-[10px] text-muted-foreground">
+                                      {r.editionCount} editions
+                                    </span>
+                                  )}
+                                </span>
+                                {meta.length > 0 && (
+                                  <span className="text-[10px] text-muted-foreground">
+                                    {meta}
                                   </span>
                                 )}
-                              </span>
-                              {meta.length > 0 && (
-                                <span className="text-[10px] text-muted-foreground">
-                                  {meta}
-                                </span>
-                              )}
-                            </div>
-                          </CommandItem>
-                        );
-                      })}
-                    </CommandGroup>
-                  ) : (
-                    <p className="px-3 py-4 text-xs text-muted-foreground">
-                      No Pinball Map match for “{query.trim()}”.
-                    </p>
-                  )}
-                </CommandList>
-              </Command>
-            </PopoverContent>
-          </Popover>
-
-          {/* Edition / Reason — one always-present slot so the field never reflows.
-          It's the required edition picker for an ambiguous multi-edition family;
-          when the machine is marked Not on PinballMap it becomes the reason
-          input instead; otherwise it's a disabled slot with contextual text.
-          The select carries pinballmapMachineId natively when shown; otherwise
-          the hidden input above does. */}
+                              </div>
+                            </CommandItem>
+                          );
+                        })}
+                      </CommandGroup>
+                    ) : (
+                      <p className="px-3 py-4 text-xs text-muted-foreground">
+                        No Pinball Map match for “{query.trim()}”.
+                      </p>
+                    )}
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+          )}
         </div>
 
-        <div className="space-y-1.5">
+        {/* The second column follows the source: Edition when the model comes
+          from the catalog (meaningless without one), Manufacturer and Year when
+          it is hand-entered. It is the slot the Reason box used to occupy —
+          removing that write-only field is what freed it, so the three
+          hand-entered fields fit on the Model row instead of needing a panel
+          below it, and both sources render at the same height (PP-3bbr.3).
+
+          `justify-end` because the left column is one row taller (it carries
+          the Source line); without it this column's control floats above its
+          neighbour instead of sitting level with it. */}
+        <div className="flex flex-col justify-end gap-1.5">
           {/* Associate the label only with a control that actually renders: the
-            reason input when excluded, the edition select when one is needed.
-            In the placeholder state neither exists, so the label is a plain
-            caption (no htmlFor pointing at a non-existent id). */}
+            manufacturer input when hand-entered, the edition select when one is
+            needed. In the placeholder state neither exists, so the label is a
+            plain caption (no htmlFor pointing at a non-existent id). */}
           <Label
             {...(excluded
-              ? { htmlFor: reasonId }
+              ? { htmlFor: manufacturerId }
               : needsEdition
                 ? { htmlFor: editionId }
                 : {})}
             className="text-xs text-muted-foreground"
           >
-            {excluded ? "Reason (optional)" : "Edition"}
+            {excluded ? "Manufacturer and year" : "Edition"}
             {needsEdition && !excluded && (
               <span aria-hidden="true" className="text-destructive-text">
                 {" "}
@@ -517,20 +615,53 @@ export function PinballMapLinkField({
             )}
           </Label>
           {excluded ? (
-            <Input
-              id={reasonId}
-              name="pinballmapExcludedReason"
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              placeholder="e.g. novelty game, not real pinball"
-              maxLength={200}
-              disabled={disabled}
-              // Same surface treatment as every other input on this page. Without
-              // it the shared Input base (`bg-input/30 border-input`) renders
-              // dimmer than its neighbours and reads as disabled.
-              className="border-outline bg-surface text-foreground placeholder:text-muted-foreground"
-              aria-label="Reason this machine is not on Pinball Map"
-            />
+            <div className="grid grid-cols-[minmax(0,1fr)_6rem] gap-2">
+              <Input
+                id={manufacturerId}
+                name="manufacturer"
+                value={manufacturer}
+                onChange={(e) => {
+                  setManufacturer(e.target.value);
+                  onDirty?.();
+                }}
+                maxLength={100}
+                disabled={disabled}
+                placeholder="e.g. Williams"
+                // Same surface treatment as every other input on this page.
+                // Without it the shared Input base (`bg-input/30 border-input`)
+                // renders dimmer than its neighbours and reads as disabled.
+                className="border-outline bg-surface text-foreground placeholder:text-muted-foreground"
+              />
+              {/* `inputMode="numeric"` rather than `type="number"`: a spinner is
+                useless for a four-digit year and Safari's stepper eats the
+                field's width. It also brings up the numeric keypad on mobile,
+                which is the real win.
+
+                That choice costs the browser-side range check — `min`/`max` are
+                inert on anything but `type="number"` — so `pattern` gives the
+                browser the one thing it can still enforce (four digits) and the
+                1930..next-year range stays the server's, where it was
+                authoritative anyway.
+
+                The visible label covers both inputs, so this one carries its
+                own accessible name (CORE-A11Y). */}
+              <Input
+                id={yearId}
+                name="year"
+                inputMode="numeric"
+                pattern="\d{4}"
+                maxLength={4}
+                value={year}
+                onChange={(e) => {
+                  setYear(e.target.value);
+                  onDirty?.();
+                }}
+                disabled={disabled}
+                placeholder="1994"
+                aria-label="Year"
+                className="border-outline bg-surface text-foreground placeholder:text-muted-foreground"
+              />
+            </div>
           ) : needsEdition ? (
             <Select
               name="pinballmapMachineId"
@@ -587,97 +718,6 @@ export function PinballMapLinkField({
           )}
         </div>
       </div>
-
-      {/* Hand-entered model identity (PP-3bbr) — a full-width panel BELOW the
-          Model row rather than a third column, because it is three fields and
-          because it belongs to the choice made above it. The Reason input stays
-          exactly where it was, in the Edition slot: it answers "why isn't this
-          on the map", which is about the exclusion, not about the game.
-
-          Only rendered when excluded, so the inputs do not exist to be
-          submitted otherwise — the server drops these fields on every other
-          branch anyway, but not sending them at all is the cheaper truth. */}
-      {excluded && (
-        <div
-          data-testid="pinballmap-manual-model"
-          className="mt-4 space-y-1.5 rounded-md border border-outline bg-surface p-3"
-        >
-          <p className="text-xs text-muted-foreground">
-            Pinball Map has no entry for this game, so its details are ours to
-            keep.
-          </p>
-          <div className="grid gap-3 @xl:grid-cols-[2fr_1.5fr_1fr]">
-            <div className="space-y-1.5">
-              <Label htmlFor={modelNameId} className="text-xs">
-                Model name
-              </Label>
-              <Input
-                id={modelNameId}
-                name="modelName"
-                value={modelName}
-                onChange={(e) => {
-                  setModelName(e.target.value);
-                  setModelNameSeeded(false);
-                  onDirty?.();
-                }}
-                maxLength={200}
-                disabled={disabled}
-                placeholder="e.g. Bordertown"
-                className="border-outline bg-surface text-foreground placeholder:text-muted-foreground"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor={manufacturerId} className="text-xs">
-                Manufacturer
-              </Label>
-              <Input
-                id={manufacturerId}
-                name="manufacturer"
-                value={manufacturer}
-                onChange={(e) => {
-                  setManufacturer(e.target.value);
-                  onDirty?.();
-                }}
-                maxLength={100}
-                disabled={disabled}
-                placeholder="e.g. homebrew"
-                className="border-outline bg-surface text-foreground placeholder:text-muted-foreground"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor={yearId} className="text-xs">
-                Year
-              </Label>
-              {/* `inputMode="numeric"` rather than `type="number"`: a spinner
-                  is useless for a four-digit year and Safari's stepper eats the
-                  field's width. It also brings up the numeric keypad on mobile,
-                  which is the real win.
-
-                  That choice costs the browser-side range check — `min`/`max`
-                  are inert on anything but `type="number"`, so carrying them
-                  here would have been decoration. `pattern` gives the browser
-                  the one thing it can still enforce (four digits), and the
-                  1930..next-year range stays the server's, where it was
-                  authoritative anyway. */}
-              <Input
-                id={yearId}
-                name="year"
-                inputMode="numeric"
-                pattern="\d{4}"
-                maxLength={4}
-                value={year}
-                onChange={(e) => {
-                  setYear(e.target.value);
-                  onDirty?.();
-                }}
-                disabled={disabled}
-                placeholder="1994"
-                className="border-outline bg-surface text-foreground placeholder:text-muted-foreground"
-              />
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Switching to a catalog title drops everything typed above — the DB
           forbids a linked machine carrying a hand-entered model, so this is a

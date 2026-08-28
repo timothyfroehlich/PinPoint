@@ -25,7 +25,8 @@ Six independent facts. No one of them ever implies another.
   homebrew, a flipperless game, or a title too old or obscure for their
   catalog. Declared by a person, mutually exclusive with a match. Carries
   its own hand-entered model identity (§2.4) — the "manual model". Not
-  listable.
+  listable. The machine's Model Details field calls this source **Manual
+  Entry**; "uncataloged" stays the name of the concept and of the state.
 - **Listing intent** — whether this machine should appear on the location's
   public Pinball Map lineup. An operator decision, per machine, owned by
   PinPoint, expressed as a tri-state: **On the lineup / Off the lineup /
@@ -62,8 +63,14 @@ intent agrees with the lineup; _out of sync_ means they disagree.
   intent to Off (a Don't-sync setting is kept), with a confirmation that
   says the old Pinball Map entry itself is not removed.
 - **2.4** An uncataloged machine can carry a hand-entered model identity
-  (title, manufacturer, year) — the manual model. Title defaults to the
-  machine's name.
+  (title, manufacturer, year) — the manual model. All three are optional
+  and all three start blank. A blank title means the machine's own name:
+  the field suggests the current name rather than pre-filling it, so a
+  title left blank keeps following a later rename instead of freezing the
+  name as it was the day the source was switched. A blank manufacturer or
+  year reads as **Unknown** wherever it is shown under its own label. The
+  machine header omits blanks instead, so it never reads "Unknown ·
+  Unknown".
 - **2.5** Cleaning up the old entry after a re-match is deliberately a
   separate action, never a side effect of changing the match. The orphaned
   entry may stay on the lineup as long as the operator wants. While any
@@ -104,6 +111,7 @@ intent agrees with the lineup; _out of sync_ means they disagree.
 
 - **4.1** The control is two rows under one header, and **renders at the
   same fixed height in every state** — states swap content, never geometry.
+  An uncataloged machine has no control at all (§4.2).
   - **Intent row**: the tri-state toggle (On the lineup / Off the lineup /
     Don't sync). Changing it writes only to PinPoint, needs no
     confirmation, and is instantly reversible.
@@ -116,7 +124,12 @@ intent agrees with the lineup; _out of sync_ means they disagree.
     disagree. Before the first refresh the location name is unknown and the
     title is bare.
 - **4.2** State names (canonical):
-  - **No model / Uncataloged** — disabled box, status says why.
+  - **No model** — disabled box, status says why.
+  - **Uncataloged** — no control. The section collapses to one line saying
+    the model is entered by hand and there is no catalog title to list: no
+    intent, no status, no Refresh. It keeps its place on the page, so an
+    abandoned entry (§2.5) still surfaces beneath it. The stored snapshot
+    may go stale here — nothing on the page reads it.
   - **Not configured** — no tracked location; disabled box, no Refresh or
     location link, and no retained snapshot rendered as current.
   - **Waiting** — no valid refresh yet (3.5); disabled box, header error
@@ -265,7 +278,6 @@ intent agrees with the lineup; _out of sync_ means they disagree.
 | :----------------------------- | :----------------------------------------------------------------------------------------------------------- | :------------------------------------------------------- |
 | 7.1 comment fan-out            | No comment import exists                                                                                     | PP-o355.4 (reshape to fan-out); PP-o355.36 depends on it |
 | 4.9 read-only viewer           | No surface reaches it — the only page carrying the control is the Manage tab, which gates on `machines.edit` | PP-o355.38                                               |
-| 2.4 uncataloged / manual model | Fields exist; the surface for them is not what it should be                                                  | PP-3bbr                                                  |
 | 7.3 comment marking on removal | Not implemented                                                                                              | PP-o355.36                                               |
 
 ---
@@ -275,8 +287,9 @@ intent agrees with the lineup; _out of sync_ means they disagree.
 Changes to this document. Divergence-table rows are working state and are not
 logged here.
 
-| Date       | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| :--------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 2026-08-23 | Replaced the distinct integration enable flag with configuration presence: a stored location means configured and no location means Not configured. Defined the dormant-state behavior, made all human-triggered lineup reads share the refresh allowance, and rewrote Waiting so it lasts until a valid snapshot arrives. Clarified that this state governs location tracking, not the separately configured region-alert feature.                                                      |
-| 2026-08-16 | Added spec status and this changelog. Removed the `[shipped]`/`[designed]` tags — the divergence table is the only record of what is built, gaining rows for 3.2, 6.5 and 8.3 — and the code-state commentary in Related records. Amended 2.5 (an orphaned entry surfaces on the machine that walked away only when no cabinet still carries the old title), 4.9 (read-only viewers keep the header Refresh) and 8.2 (names the machine-linking capability rather than citing 8.1 bare). |
-| 2026-08-15 | Created, recording the two-line intent/status control: coverage replaces holding/claiming (§1), no automatic intent (5.1), Alert and Flag (4.2, 6.5), vocabulary purge (4.8).                                                                                                                                                                                                                                                                                                            |
+| Date       | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| :--------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-08-27 | Named the machine edit form's source label for an uncataloged game as **Manual Entry**, keeping "uncataloged" as the concept and state name. Made all three manual-model fields optional and blank by default: the title is suggested rather than pre-filled, so leaving it blank keeps following a later rename, and a blank manufacturer or year reads as Unknown under its own label while the machine header omits blanks. Split the old "No model / Uncataloged" state in two — uncataloged now has no control at all, collapsing the section to one line while keeping its place so an abandoned entry still surfaces. |
+| 2026-08-23 | Replaced the distinct integration enable flag with configuration presence: a stored location means configured and no location means Not configured. Defined the dormant-state behavior, made all human-triggered lineup reads share the refresh allowance, and rewrote Waiting so it lasts until a valid snapshot arrives. Clarified that this state governs location tracking, not the separately configured region-alert feature.                                                                                                                                                                                          |
+| 2026-08-16 | Added spec status and this changelog. Removed the `[shipped]`/`[designed]` tags — the divergence table is the only record of what is built, gaining rows for 3.2, 6.5 and 8.3 — and the code-state commentary in Related records. Amended 2.5 (an orphaned entry surfaces on the machine that walked away only when no cabinet still carries the old title), 4.9 (read-only viewers keep the header Refresh) and 8.2 (names the machine-linking capability rather than citing 8.1 bare).                                                                                                                                     |
+| 2026-08-15 | Created, recording the two-line intent/status control: coverage replaces holding/claiming (§1), no automatic intent (5.1), Alert and Flag (4.2, 6.5), vocabulary purge (4.8).                                                                                                                                                                                                                                                                                                                                                                                                                                                |
