@@ -491,11 +491,12 @@ def _collect_setup_cli_versions(
             match_line: int | None = None
             match_version: str | None = None
             in_with = False
+            with_child_col: int | None = None
             offset = 1
             while idx + offset < len(lines):
                 nxt = lines[idx + offset]
                 stripped = nxt.strip()
-                if stripped:
+                if stripped and not stripped.startswith("#"):
                     indent = len(nxt) - len(nxt.lstrip())
                     if stripped.startswith("- ") or stripped == "-":
                         break  # next step in the sequence
@@ -505,12 +506,16 @@ def _collect_setup_cli_versions(
                         # A step-level key: entering `with:`, or leaving it for a
                         # sibling key (`env:`, `name:`, …).
                         in_with = stripped.startswith("with:")
+                        with_child_col = None
                     elif in_with:
-                        m = version_re.match(nxt)
-                        if m:
-                            match_line = idx + offset + 1
-                            match_version = m.group(1)
-                            break
+                        if with_child_col is None:
+                            with_child_col = indent
+                        if indent == with_child_col:
+                            m = version_re.match(nxt)
+                            if m:
+                                match_line = idx + offset + 1
+                                match_version = m.group(1)
+                                break
                 offset += 1
             if match_version is None or match_line is None:
                 raise AssertionError(
@@ -629,6 +634,28 @@ def test_collect_setup_cli_versions_ignores_non_with_version(tmp_path: Path) -> 
         raised = True
         assert "no `version:`" in str(exc)
     assert raised, "expected a non-with version: to be rejected as unpinned"
+
+
+def test_collect_setup_cli_versions_ignores_block_scalar_version(
+    tmp_path: Path,
+) -> None:
+    """A version-looking line inside a block scalar is not a `with.version`."""
+    wf = tmp_path / "block-scalar-version.yaml"
+    wf.write_text(
+        "jobs:\n  x:\n    steps:\n"
+        "      - uses: supabase/setup-cli@v3\n"
+        "        with:\n"
+        "          config: |\n"
+        "            version: 2.115.0\n",
+        encoding="utf-8",
+    )
+    raised = False
+    try:
+        _collect_setup_cli_versions(workflows_dir=tmp_path)
+    except AssertionError as exc:
+        raised = True
+        assert "no `version:`" in str(exc)
+    assert raised, "expected a block-scalar version: to be rejected as unpinned"
 
 
 def test_collect_setup_cli_versions_handles_name_form_step(tmp_path: Path) -> None:
