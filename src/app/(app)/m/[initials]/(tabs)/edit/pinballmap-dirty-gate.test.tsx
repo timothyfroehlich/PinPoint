@@ -74,10 +74,10 @@ describe("PinballmapDirtyGate", () => {
 
     await user.click(screen.getByRole("button", { name: "Edit something" }));
 
-    // The note explains why everything below it is unavailable, so it has to
+    // The note names why everything below it is unavailable, so it has to
     // survive the same treatment it is describing.
     expect(screen.getByRole("status")).toHaveTextContent(
-      /Save or cancel your Details changes/
+      "Unsaved model selection"
     );
   });
 

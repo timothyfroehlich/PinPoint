@@ -37,8 +37,7 @@ export function PinballmapDirtyGate({
   return (
     <div className="space-y-3" data-testid="pbm-listing-gated">
       <p className="text-xs text-muted-foreground" role="status">
-        Save or cancel your Details changes to use Pinball Map — they decide
-        which model this machine is.
+        Unsaved model selection
       </p>
       <div className="opacity-45" inert>
         {children}
