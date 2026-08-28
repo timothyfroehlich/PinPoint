@@ -64,14 +64,23 @@ configured in the same section).
 ## 5. Pinball Map configuration state
 
 - _Retired 2026-08-27._ The Pinball Map configuration-state requirements moved
-  to `pinballmap.md` §10.5–§10.8 when this spec became a page shell. Section
-  number kept so older citations do not dangle.
+  to `pinballmap.md` §10 when this spec became a page shell. Section and
+  requirement numbers are kept so older citations resolve to their exact
+  successors:
+  - §5.1–§5.3 — already retired 2026-08-23 (the enable/disable flag); no
+    successor.
+  - §5.4 → `pinballmap.md` §10.5 · §5.5 → §10.6 · §5.6 → §10.7 · §5.7 → §10.8.
 
 ## 6. Changing the tracked location
 
 - _Retired 2026-08-27._ The change-the-tracked-location requirements moved to
-  `pinballmap.md` §10.9–§10.15. Section number kept so older citations do not
-  dangle.
+  `pinballmap.md` §10. Requirement numbers are kept so older citations resolve
+  to their exact successors:
+  - §6.1 → `pinballmap.md` §10.5 · §6.2 → §10.9 · §6.3 → §10.10 ·
+    §6.4 → §10.11 · §6.5 → §10.13 · §6.6 → §10.14 · §6.8 → §10.15 ·
+    §6.9 → §10.12.
+  - §6.7 — already retired 2026-08-23 (the disabled re-point path); no
+    successor.
 
 ## 7. Permissions
 
