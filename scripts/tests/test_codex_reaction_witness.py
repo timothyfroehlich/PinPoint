@@ -159,8 +159,8 @@ def test_workflow_uses_trusted_main_and_narrow_permissions() -> None:
     text = WORKFLOW.read_text()
     assert "pull_request_target:" in text
     assert "types: [opened, ready_for_review, synchronize, reopened]" in text
-    assert "issues: write" in text
-    assert "pull-requests: read" in text
+    assert "issues: write" not in text
+    assert "pull-requests: write" in text
     assert "ref: ${{ github.event.repository.default_branch }}" in text
     assert "persist-credentials: false" in text
     assert "github.event.pull_request.head.repo.full_name == github.repository" in text
