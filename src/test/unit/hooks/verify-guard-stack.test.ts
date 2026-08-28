@@ -61,7 +61,6 @@ const ALL_EXPECTED_HOOKS = [
   "inject-beads-actor.cjs",
   "block-direct-merge.cjs",
   "block-main-worktree-branch-switch.cjs",
-  "block-worktree-dispatch-from-linked.cjs",
 ];
 
 /** Build a settings object wiring the given hook basenames under PreToolUse. */
@@ -93,7 +92,7 @@ function settingsWithHooks(
 // Fast path: pure evaluateGuardStack
 // ---------------------------------------------------------------------------
 describe("evaluateGuardStack — healthy", () => {
-  it("reports no problems when all 6 hooks + non-empty permissions present", () => {
+  it("reports no problems when all expected hooks + non-empty permissions present", () => {
     const settings = settingsWithHooks(ALL_EXPECTED_HOOKS);
     expect(evaluateGuardStack(settings)).toEqual([]);
   });
@@ -106,14 +105,14 @@ describe("evaluateGuardStack — healthy", () => {
         PreToolUse: [
           {
             matcher: "Bash",
-            hooks: ALL_EXPECTED_HOOKS.slice(0, 3).map((b) => ({
+            hooks: ALL_EXPECTED_HOOKS.slice(0, -1).map((b) => ({
               type: "command",
               command: `node .claude/hooks/${b}`,
             })),
           },
           {
             matcher: "Bash|mcp__github__merge_pull_request",
-            hooks: ALL_EXPECTED_HOOKS.slice(3).map((b) => ({
+            hooks: ALL_EXPECTED_HOOKS.slice(-1).map((b) => ({
               type: "command",
               command: `node .claude/hooks/${b}`,
             })),

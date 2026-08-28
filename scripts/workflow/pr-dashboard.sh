@@ -105,10 +105,12 @@ for pr in $PRS; do
         case "$RS_STATE" in
             approval)       review_str="reviewed" ;;
             clean_comment)  review_str="reviewed" ;;
+            clean_reaction) review_str="reviewed" ;;
             reviewed)       review_str="reviewed" ;;
             marker)         review_str="reviewed" ;;
             stale_approval) review_str="RE-REVIEW" ;;
             stale_clean_comment) review_str="RE-REVIEW" ;;
+            stale_clean_reaction) review_str="RE-REVIEW" ;;
             stale_marker)   review_str="RE-REVIEW" ;;
             not_approved)   review_str="NOT APPROVED" ;;
             unreviewed)     review_str="NOT REVIEWED" ;;

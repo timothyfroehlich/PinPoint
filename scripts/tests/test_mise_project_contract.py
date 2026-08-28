@@ -1,12 +1,14 @@
-"""Tests for the PinPoint mise project contract (PP-h2ui.4).
+"""Tests for the PinPoint mise project contract (PP-h2ui.4, .5, .6, .8).
 
 Verifies that:
-1. mise.toml defines the exact development Node runtime and settings.
+1. mise.toml defines the exact development Node/Python/Ruff/Supabase-CLI runtimes and settings.
 2. package.json#packageManager remains the single pnpm version and checksum authority.
 3. mise.toml does not duplicate the pnpm version (idiomatic_version_file_enable_tools is used).
 4. mise.lock exists and captures resolved artifacts across platforms.
 5. mise rejects mismatched packageManager checksum suffixes (negative test).
 6. mise meets the minimum version requirement (>= 2026.8.11).
+7. CI's supabase/setup-cli blocks mirror the single mise.toml Supabase CLI pin (PP-h2ui.6).
+8. CI's required mise-only canary validates the locked toolchain and cache identity (PP-h2ui.8).
 """
 
 import json
@@ -59,7 +61,7 @@ def test_mise_toml_exists_and_is_valid() -> None:
         f"mise.toml must enforce min_version = '2026.8.11', got {data.get('min_version')!r}"
     )
 
-    # Node, Python, and Ruff development runtime must be pinned
+    # Node, Python, Ruff, and Supabase CLI development runtime must be pinned
     tools = data.get("tools", {})
     assert "node" in tools, "mise.toml must specify node in [tools]"
     assert tools["node"] == "24.16.0", f"expected node 24.16.0, got {tools['node']!r}"
@@ -69,6 +71,10 @@ def test_mise_toml_exists_and_is_valid() -> None:
     )
     assert "ruff" in tools, "mise.toml must specify ruff in [tools]"
     assert tools["ruff"] == "0.15.1", f"expected ruff 0.15.1, got {tools['ruff']!r}"
+    assert "supabase" in tools, "mise.toml must specify supabase in [tools]"
+    assert re.fullmatch(r"\d+\.\d+\.\d+", str(tools["supabase"])), (
+        f"expected an exact supabase CLI pin (X.Y.Z), got {tools['supabase']!r}"
+    )
 
     # pnpm must NOT be duplicated in [tools]
     assert "pnpm" not in tools, (
@@ -116,6 +122,7 @@ def test_mise_lock_exists_and_captures_tools() -> None:
     assert "pnpm" in tools, "mise.lock must have pnpm tool locked"
     assert "python" in tools, "mise.lock must have python tool locked"
     assert "ruff" in tools, "mise.lock must have ruff tool locked"
+    assert "supabase" in tools, "mise.lock must have supabase tool locked"
 
 
 def test_mise_cli_version_meets_minimum() -> None:
@@ -131,6 +138,21 @@ def test_mise_cli_version_meets_minimum() -> None:
     assert version_tuple >= MINIMUM_MISE_VERSION, (
         f"mise version {proc.stdout.strip()} is older than minimum required {MINIMUM_MISE_VERSION}"
     )
+
+
+def _tool_source_path(info: object) -> str:
+    """Extract the config-file source path for a tool from `mise ls --json`.
+
+    A tool entry is a list of installed versions when more than one is present
+    (e.g. a stale pnpm alongside the pinned one); only the active/requested
+    entry carries a `source`. Selecting index 0 blindly can pick an inactive
+    install that has no `source` key, so scan for the entry that declares one.
+    """
+    candidates = info if isinstance(info, list) else [info]
+    for entry in candidates:
+        if isinstance(entry, dict) and isinstance(entry.get("source"), dict):
+            return str(entry["source"]["path"])
+    raise AssertionError(f"no active entry with a source path in {info!r}")
 
 
 def test_mise_ls_resolves_sources_correctly() -> None:
@@ -153,46 +175,21 @@ def test_mise_ls_resolves_sources_correctly() -> None:
     assert "pnpm" in tools_dict, "pnpm not listed by mise ls"
     assert "python" in tools_dict, "python not listed by mise ls"
     assert "ruff" in tools_dict, "ruff not listed by mise ls"
+    assert "supabase" in tools_dict, "supabase not listed by mise ls"
 
-    node_info = tools_dict["node"]
-    node_source = (
-        node_info[0]["source"]["path"]
-        if isinstance(node_info, list)
-        else node_info["source"]["path"]
-    )
-    assert str(node_source).endswith("mise.toml"), (
-        f"node source should be mise.toml, got {node_source}"
-    )
-
-    pnpm_info = tools_dict["pnpm"]
-    pnpm_source = (
-        pnpm_info[0]["source"]["path"]
-        if isinstance(pnpm_info, list)
-        else pnpm_info["source"]["path"]
-    )
-    assert str(pnpm_source).endswith("package.json"), (
-        f"pnpm source should be package.json, got {pnpm_source}"
-    )
-
-    python_info = tools_dict["python"]
-    python_source = (
-        python_info[0]["source"]["path"]
-        if isinstance(python_info, list)
-        else python_info["source"]["path"]
-    )
-    assert str(python_source).endswith("mise.toml"), (
-        f"python source should be mise.toml, got {python_source}"
-    )
-
-    ruff_info = tools_dict["ruff"]
-    ruff_source = (
-        ruff_info[0]["source"]["path"]
-        if isinstance(ruff_info, list)
-        else ruff_info["source"]["path"]
-    )
-    assert str(ruff_source).endswith("mise.toml"), (
-        f"ruff source should be mise.toml, got {ruff_source}"
-    )
+    # pnpm's version is authored in package.json; the rest are pinned in mise.toml.
+    expected_sources = {
+        "node": "mise.toml",
+        "pnpm": "package.json",
+        "python": "mise.toml",
+        "ruff": "mise.toml",
+        "supabase": "mise.toml",
+    }
+    for tool, expected_file in expected_sources.items():
+        source = _tool_source_path(tools_dict[tool])
+        assert source.endswith(expected_file), (
+            f"{tool} source should be {expected_file}, got {source}"
+        )
 
 
 def test_negative_checksum_mismatch_rejected(tmp_path: Path) -> None:
@@ -409,6 +406,76 @@ def test_ci_installs_pytest_for_mise_python() -> None:
     assert 'pipx install "pytest==' not in workflow
 
 
+def _workflow_job_block(workflow: str, job_name: str) -> str:
+    """Return one top-level workflow job block without adding a YAML dependency."""
+    pattern = re.compile(
+        rf"^  {re.escape(job_name)}:\n.*?(?=^  [a-z0-9-]+:\n|\Z)",
+        re.MULTILINE | re.DOTALL,
+    )
+    match = pattern.search(workflow)
+    assert match is not None, f"expected workflow job {job_name!r}"
+    return match.group(0)
+
+
+def test_ci_mise_canary_contract() -> None:
+    """Verify the required canary uses only mise and collision-safe caches."""
+    workflow = CI_WORKFLOW_PATH.read_text(encoding="utf-8")
+    canary = _workflow_job_block(workflow, "mise-canary")
+
+    checkout = canary.index("uses: actions/checkout@")
+    mise_action = canary.index(
+        "uses: jdx/mise-action@3c2e0cf82a5b2e5249f0d3635a4d83d0ae861518"
+    )
+    assert checkout < mise_action
+    assert 'version: "2026.8.11"' in canary
+    assert 'install_args: "--locked"' in canary
+    assert "cache: true" in canary
+
+    assert "actions/setup-node" not in canary
+    assert "pnpm/action-setup" not in canary
+    assert "supabase/setup-cli" not in canary
+
+    for version_command in (
+        "node --version",
+        "pnpm --version",
+        "platform.python_version()",
+        "supabase --version",
+    ):
+        assert version_command in canary
+
+    assert "pnpm store path --silent" in canary
+    assert "Cache pnpm store" in canary
+    assert "Cache node_modules" in canary
+    assert "runner.os" in canary
+    assert "runner.arch" in canary
+    assert "steps.toolchain.outputs.node" in canary
+    assert "steps.toolchain.outputs.pnpm" in canary
+    assert "hashFiles('package.json')" in canary
+    assert "hashFiles('pnpm-lock.yaml')" in canary
+    assert "pnpm-store-${RUNNER_OS}-${RUNNER_ARCH}" in canary
+    assert "node-modules-${RUNNER_OS}-${RUNNER_ARCH}" in canary
+    assert "-node-${NODE_VERSION}-pnpm-${PNPM_VERSION}" in canary
+    assert "-${PACKAGE_HASH}-${LOCK_HASH}" in canary
+
+    for command in (
+        "pnpm install --frozen-lockfile",
+        "pnpm run typecheck",
+        "pnpm run typecheck:tests",
+        "pnpm run lint",
+        "pnpm run format",
+        "ruff check scripts/",
+        "ruff format --check scripts/",
+        "pnpm run test",
+        "pnpm run build",
+    ):
+        assert command in canary
+
+    ci_gate = _workflow_job_block(workflow, "ci-gate")
+    assert "- mise-canary" in ci_gate
+    assert "MISE_CANARY_RESULT: ${{ needs.mise-canary.result }}" in ci_gate
+    assert 'required=("$MISE_CANARY_RESULT"' in ci_gate
+
+
 def test_offline_python_and_ruff_resolution() -> None:
     """Verify offline resolution for python3 and ruff via mise exec."""
     mise_bin = _get_mise_bin()
@@ -445,3 +512,237 @@ def test_offline_python_and_ruff_resolution() -> None:
     assert ruff_proc.stdout.strip() == "ruff 0.15.1", (
         f"Expected ruff 0.15.1, got {ruff_proc.stdout.strip()}"
     )
+
+
+def _read_mise_supabase_pin() -> str:
+    """Return the exact Supabase CLI version pinned in mise.toml [tools]."""
+    data = tomllib.loads(MISE_TOML_PATH.read_text(encoding="utf-8"))
+    pin = data.get("tools", {}).get("supabase")
+    assert isinstance(pin, str) and re.fullmatch(r"\d+\.\d+\.\d+", pin), (
+        f"mise.toml must pin an exact supabase CLI version (X.Y.Z), got {pin!r}"
+    )
+    return pin
+
+
+def _collect_setup_cli_versions(
+    workflows_dir: Path | None = None,
+) -> list[tuple[Path, int, str]]:
+    """Find every `version:` bound to a `supabase/setup-cli` step across workflows.
+
+    Returns (path, line_number, version) tuples. Auto-discovers all workflow
+    files so a new job that adds a setup-cli block is covered without editing
+    this test.
+
+    The scan is bounded to the setup-cli step's own `with:` mapping: starting
+    after the `uses: supabase/setup-cli` line it reads until the next step
+    (`- ` list item) or a dedent out of the step's key level, and accepts only a
+    `version:` nested inside that step's `with:` — so neither a *later* step's
+    `version:` nor a `version:` under some other key (e.g. `env:`) of this step
+    can be misattributed to an unpinned setup-cli. YAML is parsed by hand
+    (indentation + step markers) rather than with a library because the
+    script/test suite is deliberately stdlib-only.
+
+    `workflows_dir` defaults to the repo's `.github/workflows`; the parameter
+    exists so the regression tests can point it at a fixture.
+    """
+    if workflows_dir is None:
+        workflows_dir = REPO_ROOT / ".github" / "workflows"
+    version_re = re.compile(r"^\s*version:\s*['\"]?(\d+\.\d+\.\d+)['\"]?\s*$")
+    found: list[tuple[Path, int, str]] = []
+    for wf in sorted(workflows_dir.glob("*.y*ml")):
+        lines = wf.read_text(encoding="utf-8").splitlines()
+        for idx, line in enumerate(lines):
+            if "uses: supabase/setup-cli" not in line:
+                continue
+            # Column of the `uses:` keyword; the step's sibling keys (`with:`,
+            # `env:`, `name:`) sit at this column, their children deeper. Only a
+            # `version:` nested inside this step's own `with:` mapping configures
+            # the action — a `version:` under `env:` (or any other key) does not.
+            uses_col = line.index("uses:")
+            match_line: int | None = None
+            match_version: str | None = None
+            in_with = False
+            with_child_col: int | None = None
+            offset = 1
+            while idx + offset < len(lines):
+                nxt = lines[idx + offset]
+                stripped = nxt.strip()
+                if stripped and not stripped.startswith("#"):
+                    indent = len(nxt) - len(nxt.lstrip())
+                    if stripped.startswith("- ") or stripped == "-":
+                        break  # next step in the sequence
+                    if indent < uses_col:
+                        break  # dedented out of this step's mapping
+                    if indent == uses_col:
+                        # A step-level key: entering `with:`, or leaving it for a
+                        # sibling key (`env:`, `name:`, …).
+                        in_with = stripped.startswith("with:")
+                        with_child_col = None
+                    elif in_with:
+                        if with_child_col is None:
+                            with_child_col = indent
+                        if indent == with_child_col:
+                            m = version_re.match(nxt)
+                            if m:
+                                match_line = idx + offset + 1
+                                match_version = m.group(1)
+                                break
+                offset += 1
+            if match_version is None or match_line is None:
+                raise AssertionError(
+                    f"{wf.name}:{idx + 1} uses supabase/setup-cli but the step "
+                    "declares no `version:` of its own"
+                )
+            found.append((wf, match_line, match_version))
+    return found
+
+
+def test_ci_setup_cli_pins_match_mise() -> None:
+    """CI's supabase/setup-cli blocks must mirror the single mise.toml pin.
+
+    mise.toml is the source of truth for the approved Supabase CLI version
+    (Mac, Bazzite, agent bootstrap). Until the mise-only CI lane (PP-h2ui.8)
+    consumes it directly, the workflow setup-cli blocks carry a literal mirror
+    of the same version; this test fails loudly on any drift so a partial bump
+    (the classic "8 of 9 sites" mistake) cannot merge.
+    """
+    mise_pin = _read_mise_supabase_pin()
+    pins = _collect_setup_cli_versions()
+    assert pins, (
+        "expected at least one supabase/setup-cli block in .github/workflows/; "
+        "found none — did the CLI setup move without updating this contract?"
+    )
+    mismatched = [
+        (str(p.relative_to(REPO_ROOT)), ln, v) for p, ln, v in pins if v != mise_pin
+    ]
+    assert not mismatched, (
+        f"supabase/setup-cli version(s) must match the mise.toml pin {mise_pin!r}; "
+        f"drifted sites: {mismatched}"
+    )
+
+
+def test_collect_setup_cli_versions_raises_on_versionless_block(tmp_path: Path) -> None:
+    """A setup-cli block with no version (incl. at EOF) must raise, not be skipped.
+
+    Regression guard for the drift check: an unpinned/default-CLI block cannot
+    be allowed to slip through just because it sits near the end of a file.
+    """
+    wf = tmp_path / "unpinned.yaml"
+    # `setup-cli` on the final line — the scan window immediately hits EOF.
+    wf.write_text(
+        "jobs:\n  x:\n    steps:\n      - uses: supabase/setup-cli\n",
+        encoding="utf-8",
+    )
+    raised = False
+    try:
+        _collect_setup_cli_versions(workflows_dir=tmp_path)
+    except AssertionError as exc:
+        raised = True
+        assert "no `version:`" in str(exc)
+    assert raised, "expected a versionless setup-cli block to raise, but it was skipped"
+
+
+def test_collect_setup_cli_versions_reads_versioned_fixture(tmp_path: Path) -> None:
+    """A well-formed setup-cli block resolves to its pinned version."""
+    wf = tmp_path / "pinned.yaml"
+    wf.write_text(
+        "jobs:\n  x:\n    steps:\n"
+        "      - uses: supabase/setup-cli@v3\n"
+        "        with:\n"
+        "          version: 9.9.9\n",
+        encoding="utf-8",
+    )
+    pins = _collect_setup_cli_versions(workflows_dir=tmp_path)
+    assert [v for _, _, v in pins] == ["9.9.9"]
+
+
+def test_collect_setup_cli_versions_ignores_later_steps_version(tmp_path: Path) -> None:
+    """A later step's `version:` must not be attributed to an unpinned setup-cli.
+
+    Regression guard: an unpinned `supabase/setup-cli` immediately followed by
+    another action carrying `version: 2.115.0` must still raise — the scan is
+    bounded to setup-cli's own step, so the neighbor's value can't stand in.
+    """
+    wf = tmp_path / "misattribution.yaml"
+    wf.write_text(
+        "jobs:\n  x:\n    steps:\n"
+        "      - uses: supabase/setup-cli@v3\n"
+        "      - uses: some/other-action@v1\n"
+        "        with:\n"
+        "          version: 2.115.0\n",
+        encoding="utf-8",
+    )
+    raised = False
+    try:
+        _collect_setup_cli_versions(workflows_dir=tmp_path)
+    except AssertionError as exc:
+        raised = True
+        assert "no `version:`" in str(exc)
+    assert raised, (
+        "expected an unpinned setup-cli to raise despite a neighbor's version:"
+    )
+
+
+def test_collect_setup_cli_versions_ignores_non_with_version(tmp_path: Path) -> None:
+    """A `version:` outside the step's `with:` (e.g. under `env:`) must not count.
+
+    Regression guard: only `with.version` configures setup-cli, so a step that
+    carries a `version:` under another key but no `with.version` is unpinned and
+    must raise.
+    """
+    wf = tmp_path / "env-version.yaml"
+    wf.write_text(
+        "jobs:\n  x:\n    steps:\n"
+        "      - uses: supabase/setup-cli@v3\n"
+        "        env:\n"
+        "          version: 2.115.0\n",
+        encoding="utf-8",
+    )
+    raised = False
+    try:
+        _collect_setup_cli_versions(workflows_dir=tmp_path)
+    except AssertionError as exc:
+        raised = True
+        assert "no `version:`" in str(exc)
+    assert raised, "expected a non-with version: to be rejected as unpinned"
+
+
+def test_collect_setup_cli_versions_ignores_block_scalar_version(
+    tmp_path: Path,
+) -> None:
+    """A version-looking line inside a block scalar is not a `with.version`."""
+    wf = tmp_path / "block-scalar-version.yaml"
+    wf.write_text(
+        "jobs:\n  x:\n    steps:\n"
+        "      - uses: supabase/setup-cli@v3\n"
+        "        with:\n"
+        "          config: |\n"
+        "            version: 2.115.0\n",
+        encoding="utf-8",
+    )
+    raised = False
+    try:
+        _collect_setup_cli_versions(workflows_dir=tmp_path)
+    except AssertionError as exc:
+        raised = True
+        assert "no `version:`" in str(exc)
+    assert raised, "expected a block-scalar version: to be rejected as unpinned"
+
+
+def test_collect_setup_cli_versions_handles_name_form_step(tmp_path: Path) -> None:
+    """The `- name:` step form (uses under the marker) resolves its own version."""
+    wf = tmp_path / "name-form.yaml"
+    wf.write_text(
+        "jobs:\n  x:\n    steps:\n"
+        "      - name: Setup Supabase CLI\n"
+        "        uses: supabase/setup-cli@v3  # ratchet:...\n"
+        "        with:\n"
+        "          version: 1.2.3\n"
+        "      - name: Next\n"
+        "        uses: some/other@v1\n"
+        "        with:\n"
+        "          version: 9.9.9\n",
+        encoding="utf-8",
+    )
+    pins = _collect_setup_cli_versions(workflows_dir=tmp_path)
+    assert [v for _, _, v in pins] == ["1.2.3"]

@@ -52,7 +52,16 @@ test.describe("Profile edit", () => {
     await page.getByRole("button", { name: /^Save$/i }).click();
     await expect(page).toHaveURL(new RegExp(`${profileHref}$`));
 
-    await expect(page.getByText(pronouns, { exact: true })).toBeVisible();
+    // Scope the pronouns read-back to the profile hero. Pronouns also render
+    // in PersonHoverCard (fed by /api/users/[id]/card), so a page-wide
+    // getByText can resolve to two nodes once a hover card mounts — the
+    // strict-mode violation behind this spec's per-run flake (PP-sto3). The
+    // hero is the region the edit actually updates; asserting inside it is
+    // both correct and immune to the hover card. Bio renders only in the
+    // profile body (not the hover card), so it needs no scoping.
+    await expect(
+      page.getByTestId("profile-hero").getByText(pronouns, { exact: true })
+    ).toBeVisible();
     await expect(page.getByText("Loves drop targets")).toBeVisible();
   });
 });

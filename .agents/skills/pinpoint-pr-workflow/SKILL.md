@@ -1,6 +1,6 @@
 ---
 name: pinpoint-pr-workflow
-description: The PR-lifecycle decisions the scripts and gates do not state — draft-first creation, the 51-line re-draft threshold for later uploads, automatic Codex review of every head, explicit-request-only manual review triggers, and why every push needs a fresh review. Also covers the merge handoff, screenshot gotchas, Dependabot lockfile trap, merge escape hatches, broken merge scripts, and GitHub MCP gotchas. Use when committing, opening or updating a PR, monitoring CI or review, addressing review comments, posting screenshots, handing a PR over to merge, landing the plane after Tim merges, or when a GitHub MCP call does something unexpected.
+description: The PR-lifecycle decisions the scripts and gates do not state — draft-first creation, automatic Codex review on every push, exact-head review evidence, explicit-request-only manual review triggers, and why every push needs a fresh review. Also covers the merge handoff, screenshot gotchas, Dependabot lockfile trap, merge escape hatches, broken merge scripts, and GitHub MCP gotchas. Use when committing, opening or updating a PR, monitoring CI or review, addressing review comments, posting screenshots, handing a PR over to merge, landing the plane after Tim merges, or when a GitHub MCP call does something unexpected.
 ---
 
 # PinPoint PR Workflow
@@ -105,12 +105,17 @@ Every unresolved thread counts, whoever opened it — the `threads` gate is auth
 
 ### 3.4 Get the head commit reviewed
 
-**Automatic Codex review is the normal path.** It runs for each update once that head is
-eligible. The gate accepts either a native `APPROVED` review whose `commit_id` equals
-the PR head, or the connector's no-major-issues issue comment naming a 10- or
-40-character prefix of that head. Both require exact account
-`chatgpt-codex-connector[bot]`; the comment also requires exact app slug
-`chatgpt-codex-connector` and the known clean-result prefix. An older result is stale.
+**Automatic Codex review is the normal path.** Tim's personal review trigger is set to
+**On every push**: it runs when a PR is opened for review and again when commits are
+pushed to an already-ready PR. The gate accepts a native `APPROVED` review whose
+`commit_id` equals the PR head, the connector's no-major-issues issue comment naming a
+10- or 40-character prefix of that head, or a trusted GitHub Actions comment witnessing
+a fresh connector-bot `eyes`→`+1` transition while that exact SHA remained head. Direct
+reactions are never merge evidence because GitHub reactions carry no commit SHA. Codex
+reviews and clean comments require exact account `chatgpt-codex-connector[bot]`; clean
+comments also require exact app slug `chatgpt-codex-connector` and the known clean-result
+prefix. A reaction witness requires exact account `github-actions[bot]`, exact app slug
+`github-actions`, and the SHA-pinned witness marker. An older result is stale.
 Among records for the same head, a later native finding overrides an earlier clean
 comment; no delayed review, clean comment, or manual marker for an older SHA can
 invalidate current-head coverage.
@@ -125,41 +130,18 @@ and wait for the replacement automatic review. Automation being slow is a wait s
 not permission to comment `@codex review`, self-attest, or hand off an unreviewed PR.
 Use the harness's Monitor/wait mechanism rather than a hand-written polling loop.
 
-#### Later uploads: decide whether to return to draft
+#### Later uploads: keep the PR eligible
 
-Before pushing an update to an existing PR, compare the remote PR head with the local
-head you are about to upload. Count additions plus deletions in source, tests, scripts,
-SQL/migrations, CSS, and GitHub workflow or composite-action code. Do not count docs,
-lockfiles, generated snapshots/assets, or binaries:
+Leave an existing ready PR ready when pushing later commits. The **On every push**
+personal trigger starts a replacement review automatically; monitor both current-head CI
+and that review. If the PR is already draft, leave it draft through the push, wait for
+the replacement current-head `CI Gate` to succeed, then run `gh pr ready <PR>` to make
+the head review-eligible.
 
-```bash
-remote_head=$(gh pr view <PR> --json headRefOid --jq .headRefOid)
-if ! upload_code_lines=$(
-  set -o pipefail
-  git diff --no-renames --numstat "$remote_head"..HEAD |
-    awk -F '\t' '
-      ($3 ~ /\.(ts|tsx|js|jsx|mjs|cjs|py|sh|sql|css)$/ ||
-       ($3 ~ /^(scripts\/|\.claude\/hooks\/|\.husky\/)/ &&
-        $3 ~ /(^|\/)[^\/.]+$/) ||
-       $3 ~ /^\.github\/(workflows|actions)\/.*\.ya?ml$/) &&
-      $1 ~ /^[0-9]+$/ && $2 ~ /^[0-9]+$/ { total += $1 + $2 }
-      END { print total + 0 }
-    '
-); then
-  upload_code_lines=51
-fi
-```
-
-- **51 or more lines:** if the PR is ready, run `gh pr ready <PR> --undo` **before**
-  `git push`. After the push, keep it draft until the replacement current-head `CI Gate`
-  succeeds, then run `gh pr ready <PR>` and monitor the automatic review.
-- **50 or fewer lines:** leave a ready PR ready, push, and monitor current-head CI plus
-  the automatic review of the update.
-- If the comparison is missing or untrustworthy, take the conservative path and return
-  the PR to draft before pushing.
-
-This is a per-upload delta, not the PR's cumulative size and not commit count. Initial
-PRs are always drafts regardless of their line count.
+The upload's size does not change this sequence. Every push invalidates the previous
+head's coverage, even if Smart detect or another personal trigger would choose not to
+run a replacement review. PinPoint relies on **On every push** for deterministic
+exact-head coverage.
 
 #### Manual GitHub trigger — only on Tim's explicit request
 
@@ -170,8 +152,8 @@ comment once for the current head:
 gh pr comment <PR> --body '@codex review'
 ```
 
-Respect the same eligibility sequence: if the upload crossed the threshold and returned
-the PR to draft, wait for current-head CI and promote it before commenting. Never use the
+Respect the same eligibility sequence: wait for current-head CI and promote the PR
+before commenting. Never use the
 manual comment merely because the automatic review has not appeared yet. A trusted
 clean automatic result satisfies the gate directly; do not add a marker for it.
 

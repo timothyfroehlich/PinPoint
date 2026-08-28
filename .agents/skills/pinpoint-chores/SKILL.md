@@ -39,16 +39,19 @@ Then work the checklist. For each item, note findings as a comment on the bead (
 ### Checklist
 
 1. **Stale version-pin checks** (Supabase CLI — PP-nlv6; pnpm version pin — PP-w0eq)
-   - **Supabase CLI pin.** Compare the pinned Supabase CLI version against the latest release. A version-drift nudge belongs here, not in per-session briefing. If stale, file/refresh a bead to bump it (or bump it if trivial and verified).
-     - The pin is **9 sites across 4 files** — `ci.yml` (×6), plus `preview-control.yaml`, `preview-sync.yaml`, `preview-reaper.yaml` (×1 each). A bump is a multi-site edit: change **all nine or none**. A partial bump leaves jobs on mismatched CLI versions, which surfaces as a job-specific CI failure that reads like a flake rather than a bad edit.
-     - List every pin, then compare against the newest release:
+   - **Supabase CLI pin.** The source of truth is now **`mise.toml`** (`[tools].supabase`, PP-h2ui.6) — Mac, Bazzite, and agent bootstrap resolve the CLI from there via `mise install --locked`. The CI `supabase/setup-cli` blocks carry a literal mirror of the same version until the mise-only CI lane (PP-h2ui.8) consumes it directly; `scripts/tests/test_mise_project_contract.py::test_ci_setup_cli_pins_match_mise` **fails the build on any drift**, so a partial bump (the classic "8 of 9 sites") can no longer merge — but the test enforces equality, it does not auto-edit, so a bump is still a multi-site edit you make by hand.
+     - Compare the pin against the newest release; apply a **cooldown** (soak the release, don't take `latest` the day it ships) and validate **Bazzite rootless-podman / SELinux compatibility** before bumping — the CLI version is what triggered the PP-9mg0 local-stack breakage, so a bump is a functional change, not a number swap (see `pinpoint-deployment`).
 
        ```bash
+       # authoritative pin + its CI mirrors:
+       rg -n 'supabase' mise.toml
        rg -n -A6 'uses: supabase/setup-cli' .github/workflows/*.y*ml | rg 'version:'
        gh api /repos/supabase/cli/releases/latest --jq .tag_name
        ```
 
-       (`-A6` matters — one call site has an extra `if:` line before `with:`, so a smaller window silently misses it and you'd bump 8 of 9.)
+       (`-A6` matters — one call site has an extra `if:` line before `with:`, so a smaller window silently misses it.)
+
+     - To bump: update `mise.toml`, run `mise lock` (refreshes `mise.lock` across platforms), update **all** CI `setup-cli` `version:` sites to match, then confirm `pnpm run check:python` is green (the contract test verifies mise ↔ CI agreement) and the local stack starts (`supabase start`) on an SELinux host if one is available.
    - **pnpm version pin.** The pnpm binary is pinned in the `packageManager` field of `package.json` with its SHA-512 integrity hash, and `mise` reads and verifies that declaration directly without Corepack. **Dependabot cannot bump this field** — it's an open, unimplemented feature request ([dependabot-core#4830](https://github.com/dependabot/dependabot-core/issues/4830)); Dependabot's pnpm support only updates deps _inside_ the lockfile, never the `packageManager` pin. So this is the only watcher it has, and it silently rots without it (that's how we ended up 9 months behind on 10.2.0 until npm's audit-endpoint retirement forced the jump — PP-w0eq).
      - **Apply a 30-day cooldown** (supply-chain soak — same rationale as the Dependabot npm cooldown): bump only to the newest stable pnpm ≥30 days old, never the just-released `latest`.
      - Find the newest eligible version:

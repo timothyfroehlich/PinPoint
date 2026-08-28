@@ -1,7 +1,7 @@
 """Regression tests for the merge gate's automatic and manual review records.
 
-A native approval or trusted clean connector comment from the official Codex GitHub
-App, or the existing SHA-pinned manual attestation, may cover the current head.
+A native approval, trusted clean connector comment or reaction-witness comment, or the
+existing SHA-pinned manual attestation, may cover the current head.
 """
 
 import json
@@ -18,6 +18,8 @@ import pytest
 GATES_PATH = Path(__file__).parent.parent / "workflow" / "_pr-gates.sh"
 CODEX_BOT = "chatgpt-codex-connector[bot]"
 CODEX_APP = "chatgpt-codex-connector"
+GITHUB_ACTIONS_BOT = "github-actions[bot]"
+GITHUB_ACTIONS_APP = "github-actions"
 HEAD_SHA = "d084c14a43af3ac021f0838f5c7bf4b77f72fb62"
 OTHER_SHA = "0000000000000000000000000000000000000000"
 
@@ -67,6 +69,22 @@ def clean_codex_comment(
         "user": {"login": login},
         "performed_via_github_app": {"slug": app},
         "body": f"{prefix}\n\n**Reviewed commit:** `{sha}`",
+        "created_at": updated_at,
+        "updated_at": updated_at,
+    }
+
+
+def clean_codex_reaction_witness(
+    sha: str = HEAD_SHA,
+    *,
+    login: str = GITHUB_ACTIONS_BOT,
+    app: str = GITHUB_ACTIONS_APP,
+    updated_at: str = "2026-08-22T12:02:00Z",
+) -> dict:
+    return {
+        "user": {"login": login},
+        "performed_via_github_app": {"slug": app},
+        "body": f"<!-- pinpoint-codex-reaction-witness: {sha} -->\nwitnessed",
         "created_at": updated_at,
         "updated_at": updated_at,
     }
@@ -208,6 +226,42 @@ def test_clean_codex_comment_accepts_full_head_sha() -> None:
     )
 
 
+def test_clean_codex_reaction_witness_pins_current_head() -> None:
+    with gate_env(comment_pages=[[clean_codex_reaction_witness()]]) as env:
+        state, sha, reviewer, detail, *_rest = review_record(env)
+    assert (state, sha, reviewer, detail) == (
+        "clean_reaction",
+        HEAD_SHA,
+        GITHUB_ACTIONS_BOT,
+        "REACTION_WITNESS",
+    )
+
+
+@pytest.mark.parametrize(
+    "witness",
+    [
+        pytest.param(
+            clean_codex_reaction_witness(login="other[bot]"),
+            id="wrong-bot",
+        ),
+        pytest.param(
+            clean_codex_reaction_witness(app="other-app"),
+            id="wrong-app",
+        ),
+        pytest.param(
+            clean_codex_reaction_witness(OTHER_SHA),
+            id="stale-head",
+        ),
+    ],
+)
+def test_untrusted_or_stale_reaction_witnesses_do_not_cover_head(
+    witness: dict,
+) -> None:
+    with gate_env(comment_pages=[[witness]]) as env:
+        result = run_gate("check_review_happened", env)
+    assert result.returncode == 1, result.stdout
+
+
 @pytest.mark.parametrize(
     "comment",
     [
@@ -344,6 +398,12 @@ def test_manual_markers_are_read_across_all_pages() -> None:
 
 def test_clean_codex_comments_are_read_across_all_pages() -> None:
     with gate_env(comment_pages=[[], [clean_codex_comment()]]) as env:
+        result = run_gate("check_review_happened", env)
+    assert result.returncode == 0, result.stdout
+
+
+def test_clean_codex_reaction_witnesses_are_read_across_all_pages() -> None:
+    with gate_env(comment_pages=[[], [clean_codex_reaction_witness()]]) as env:
         result = run_gate("check_review_happened", env)
     assert result.returncode == 0, result.stdout
 

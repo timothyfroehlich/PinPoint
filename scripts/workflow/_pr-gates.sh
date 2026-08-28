@@ -20,6 +20,9 @@ set -euo pipefail
 readonly CODEX_REVIEW_BOT="chatgpt-codex-connector[bot]"
 readonly CODEX_REVIEW_APP_SLUG="chatgpt-codex-connector"
 readonly CODEX_CLEAN_REVIEW_PREFIX="Codex Review: Didn't find any major issues."
+readonly GITHUB_ACTIONS_BOT="github-actions[bot]"
+readonly GITHUB_ACTIONS_APP_SLUG="github-actions"
+readonly CODEX_REACTION_WITNESS_PREFIX="<!-- pinpoint-codex-reaction-witness:"
 readonly REVIEW_MARKER_PREFIX="<!-- pinpoint-review:"
 readonly LEGACY_CLAUDE_MARKER_PREFIX="<!-- pinpoint-claude-review:"
 
@@ -73,14 +76,15 @@ _codex_review_record() {
          | [ .state, .sha, .reviewer, .detail, .at, .summary ] | @tsv'
 }
 
-# Issue comments carry two distinct review records: the connector's clean automatic
-# result and the independent manual attestation. The clean result is trusted only when
-# the exact bot posted it through the exact GitHub App, used the known no-findings
-# prefix, and named a 10- or 40-character prefix of the current head SHA.
+# Issue comments carry three review records: the connector's clean automatic result,
+# the trusted workflow's SHA-pinned witness of a fresh eyes-to-+1 transition, and the
+# independent manual attestation.
 _comment_review_record() {
   local pr=$1 owner_repo=$2 head=$3
   gh api --paginate "repos/${owner_repo}/issues/${pr}/comments" \
     | jq -rs --arg bot "$CODEX_REVIEW_BOT" --arg app "$CODEX_REVIEW_APP_SLUG" \
+        --arg actions_bot "$GITHUB_ACTIONS_BOT" --arg actions_app "$GITHUB_ACTIONS_APP_SLUG" \
+        --arg witness_prefix "$CODEX_REACTION_WITNESS_PREFIX" \
         --arg clean_prefix "$CODEX_CLEAN_REVIEW_PREFIX" --arg prefix "$REVIEW_MARKER_PREFIX" \
         --arg legacy "$LEGACY_CLAUDE_MARKER_PREFIX" --arg head "$head" \
         '[ .[] | flatten | .[] ] as $comments
@@ -91,10 +95,24 @@ _comment_review_record() {
                reviewer: (.user.login // ""),
                detail: "NO_FINDINGS",
                at: (.updated_at // .created_at // ""),
-               summary: (($body | split("\n")[0]) // "") }
+               summary: (($body | split("\n")[0]) // ""),
+               state: "clean_comment" }
            | select(.summary | startswith($clean_prefix))
            | select((.sha | length) == 10 or (.sha | length) == 40)
          ] | sort_by(.at)) as $clean
+         | ([ $comments[]
+           | (.body // "") as $body
+           | select(.user.login? == $actions_bot
+                    and .performed_via_github_app.slug? == $actions_app
+                    and ($body | startswith($witness_prefix)))
+           | { sha: ($body | [scan("^<!-- pinpoint-codex-reaction-witness: ([0-9a-f]{40}) -->")] | flatten | (.[0] // "")),
+               reviewer: (.user.login // ""),
+               detail: "REACTION_WITNESS",
+               at: (.updated_at // .created_at // ""),
+               summary: "Codex clean reaction witnessed by GitHub Actions",
+               state: "clean_reaction" }
+           | select((.sha | length) == 40)
+         ] | sort_by(.at)) as $witness
          | ([ $comments[]
            | (.body // "") as $body
            | select($body | startswith($prefix) or startswith($legacy))
@@ -109,26 +127,33 @@ _comment_review_record() {
                summary: (($body | split("\n") | last) // "") }
          ] | sort_by(.at)) as $markers
          | [ $markers[] | select(.sha == $head) ] as $pinned
-         | [ $clean[] | .sha as $sha | select($head | startswith($sha)) ] as $clean_pinned
+         | (($clean + $witness) | sort_by(.at)) as $automatic
+         | [ $automatic[]
+             | select(if .state == "clean_comment"
+                      then (.sha as $sha | $head | startswith($sha))
+                      else .sha == $head
+                      end)
+           ] as $automatic_pinned
          | if ($pinned | length) > 0 then ($pinned | last) + { state: "marker" }
-           elif ($clean_pinned | length) > 0 then ($clean_pinned | last) + { state: "clean_comment" }
-           elif ($markers | length) > 0 and ($clean | length) > 0 then
-             if $markers[-1].at > $clean[-1].at
+           elif ($automatic_pinned | length) > 0 then ($automatic_pinned | last)
+           elif ($markers | length) > 0 and ($automatic | length) > 0 then
+             if $markers[-1].at > $automatic[-1].at
              then $markers[-1] + { state: "stale_marker" }
-             else $clean[-1] + { state: "stale_clean_comment" }
+             else $automatic[-1] + { state: (if $automatic[-1].state == "clean_reaction" then "stale_clean_reaction" else "stale_clean_comment" end) }
              end
            elif ($markers | length) > 0 then $markers[-1] + { state: "stale_marker" }
-           elif ($clean | length) > 0 then $clean[-1] + { state: "stale_clean_comment" }
+           elif ($automatic | length) > 0 then $automatic[-1] + { state: (if $automatic[-1].state == "clean_reaction" then "stale_clean_reaction" else "stale_clean_comment" end) }
            else { state: "unreviewed", sha: "", reviewer: "", detail: "", at: "", summary: "" }
            end
          | [ .state, .sha, .reviewer, .detail, .at, .summary ] | @tsv'
 }
 
-# A manual marker is an independent valid record. Native reviews and clean connector
-# comments are two representations of the automatic Codex path; when they disagree,
-# the newer automatic record wins so a later finding cannot inherit an earlier clean.
+# A manual marker is an independent valid record. Native reviews, clean connector
+# comments, and SHA-pinned reaction witnesses are representations of the automatic
+# Codex path. A later current-head finding cannot inherit an earlier clean result.
 _review_record() {
-  local head=$3 codex comment codex_state comment_state codex_sha codex_at comment_at
+  local head=$3 codex comment codex_state comment_state
+  local codex_sha codex_at comment_at
   codex=$(_codex_review_record "$@")
   codex_state=$(cut -f1 <<< "$codex")
   # A current native approval already passes the gate. Do not spend a second
@@ -142,7 +167,7 @@ _review_record() {
   comment_state=$(cut -f1 <<< "$comment")
   if [[ "$comment_state" == "marker" ]]; then
     printf '%s\n' "$comment"
-  elif [[ "$comment_state" == "clean_comment" ]]; then
+  elif [[ "$comment_state" == "clean_comment" || "$comment_state" == "clean_reaction" ]]; then
     codex_sha=$(cut -f2 <<< "$codex")
     codex_at=$(cut -f5 <<< "$codex")
     comment_at=$(cut -f5 <<< "$comment")
@@ -151,18 +176,19 @@ _review_record() {
     else
       printf '%s\n' "$codex"
     fi
-  elif [[ "$codex_state" == "unreviewed" ]]; then
-    printf '%s\n' "$comment"
   elif [[ "$codex_state" == "reviewed" ]]; then
     # A current-head native finding review is coverage. A delayed comment for an
     # older SHA cannot invalidate it; current clean comments were handled above.
     printf '%s\n' "$codex"
-  elif [[ "$comment_state" == "unreviewed" ]]; then
-    printf '%s\n' "$codex"
   else
+    codex_at=$(cut -f5 <<< "$codex")
+    if [[ "$comment_state" == "unreviewed" ]]; then
+      printf '%s\n' "$codex"
+      return
+    fi
+
     # Neither path covers head. Report the newest record so merge-handoff can
     # show the real diff since review instead of an older, unrelated failure.
-    codex_at=$(cut -f5 <<< "$codex")
     comment_at=$(cut -f5 <<< "$comment")
     if [[ "$comment_at" > "$codex_at" ]]; then
       printf '%s\n' "$comment"
@@ -226,10 +252,12 @@ check_ci() {
 #
 #   approval        Codex approved the current head SHA
 #   clean_comment   Codex reported no major issues for the current head SHA
+#   clean_reaction  Trusted workflow witnessed Codex eyes-to-+1 on the current head
 #   reviewed        Codex reviewed the current head; the thread gate owns adjudication
 #   marker          A manual review marker pins the current head SHA
 #   stale_approval  Codex approved a different SHA — the current head was not reviewed
 #   stale_clean_comment  A clean Codex comment names a different SHA
+#   stale_clean_reaction  A reaction witness names a different SHA
 #   stale_marker    A manual marker names a different SHA
 #   not_approved    Codex's most-recent review covers a different SHA and is not an approval
 #   unreviewed      Neither review path has a record
@@ -313,6 +341,7 @@ check_unresolved_threads() {
 #
 #   approval        → PASS
 #   clean_comment   → PASS
+#   clean_reaction  → PASS
 #   reviewed        → PASS (the separate thread gate requires every finding adjudicated)
 #   marker          → PASS
 #   stale_approval  → FAIL: Codex approved an earlier commit
@@ -331,6 +360,10 @@ check_review_happened() {
       echo "PASS: reviewed: Codex found no major issues on head SHA ${RS_HEAD_SHA:0:7}"
       return 0
       ;;
+    clean_reaction)
+      echo "PASS: reviewed: trusted workflow witnessed Codex clean reaction on head SHA ${RS_HEAD_SHA:0:7}"
+      return 0
+      ;;
     reviewed)
       echo "PASS: reviewed: Codex reviewed head SHA ${RS_HEAD_SHA:0:7}; thread gate owns findings"
       return 0
@@ -347,6 +380,11 @@ check_review_happened() {
       ;;
     stale_clean_comment)
       echo "FAIL: reviewed: Codex clean result covers ${RS_REVIEW_SHA:0:7}, but head is ${RS_HEAD_SHA:0:7}"
+      _review_remedy "$pr"
+      return 1
+      ;;
+    stale_clean_reaction)
+      echo "FAIL: reviewed: Codex clean-reaction witness covers ${RS_REVIEW_SHA:0:7}, but head is ${RS_HEAD_SHA:0:7}"
       _review_remedy "$pr"
       return 1
       ;;
