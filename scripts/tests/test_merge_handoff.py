@@ -327,6 +327,7 @@ def test_a_clean_codex_reaction_gets_the_merge_command() -> None:
     ) as (_head, run):
         assert run.returncode == 0, run.stderr
         assert "Codex clean reaction witness" in run.stdout
+        assert "since review  none — the review covers head" in run.stdout
         assert MERGE_CMD in run.stdout, run.stdout
 
 

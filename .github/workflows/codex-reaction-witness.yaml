@@ -11,7 +11,7 @@ on:
   # Required so the workflow and helper come from trusted main. The job rejects forks,
   # checks out only the default branch, and never evaluates or executes PR-controlled data.
   pull_request_target:  # zizmor: ignore[dangerous-triggers]
-    types: [ready_for_review, synchronize, reopened]
+    types: [opened, ready_for_review, synchronize, reopened]
 
 permissions:
   contents: read

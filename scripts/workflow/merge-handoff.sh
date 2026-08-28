@@ -282,7 +282,7 @@ elif [[ -n "$since_review_note" ]]; then
   # compare against" here would contradict the review line two rows above, which names
   # the reviewed SHA.
   diff_since_review=$since_review_note
-elif [[ "$rv_state" == "approval" || "$rv_state" == "clean_comment" || "$rv_state" == "reviewed" || "$rv_state" == "marker" ]]; then
+elif [[ "$rv_state" == "approval" || "$rv_state" == "clean_comment" || "$rv_state" == "clean_reaction" || "$rv_state" == "reviewed" || "$rv_state" == "marker" ]]; then
   diff_since_review="none — the review covers head"
 else
   diff_since_review="n/a — nothing reviewed to compare against"

@@ -158,6 +158,7 @@ def test_sha_pinned_native_review_needs_no_witness(tmp_path: Path) -> None:
 def test_workflow_uses_trusted_main_and_narrow_permissions() -> None:
     text = WORKFLOW.read_text()
     assert "pull_request_target:" in text
+    assert "types: [opened, ready_for_review, synchronize, reopened]" in text
     assert "issues: write" in text
     assert "pull-requests: read" in text
     assert "ref: ${{ github.event.repository.default_branch }}" in text
