@@ -94,13 +94,18 @@ describe("block-direct-merge.cjs — gh merge paths", () => {
     "gh -R timothyfroehlich/dotfiles pr merge 4 --squash",
     "gh pr merge https://github.com/timothyfroehlich/dotfiles/pull/4 --squash",
     "gh api -X PUT repos/timothyfroehlich/dotfiles/pulls/4/merge",
+    "GH_REPO=timothyfroehlich/dotfiles gh pr merge 4 --squash",
+    "env GH_REPO=timothyfroehlich/dotfiles gh pr merge 4 --squash",
+    'env GH_REPO=timothyfroehlich/dotfiles sh -c "gh pr merge 4 --squash"',
   ])("allows an explicit non-PinPoint target: %s", (command) => {
     expectAllow(runHook(bashPayload(command)));
   });
 
   it.each([
     'gh pr merge 4 --repo "$TARGET_REPOSITORY" --squash',
+    'GH_REPO="$TARGET_REPOSITORY" gh pr merge 4 --squash',
     "gh pr merge https://github.com/timothyfroehlich/PinPoint/pull/123 --repo timothyfroehlich/dotfiles",
+    "GH_REPO=timothyfroehlich/dotfiles gh pr merge 123 --repo timothyfroehlich/PinPoint",
   ])("fails closed on an ambiguous repository target: %s", (command) => {
     const { status } = runHook(bashPayload(command));
     expect(status).toBe(2);

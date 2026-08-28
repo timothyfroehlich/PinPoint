@@ -18,6 +18,7 @@ interface Segment {
   command: string;
   name: string;
   args: string[];
+  environment: Record<string, string | null>;
   raw: string;
 }
 interface Unresolvable {
@@ -75,6 +76,23 @@ describe("plain commands", () => {
   it("returns no segments for an empty or whitespace-only command", () => {
     expect(resolveCommand("").segments).toEqual([]);
     expect(resolveCommand("   ").segments).toEqual([]);
+  });
+
+  it.each([
+    "GH_REPO=timothyfroehlich/dotfiles gh pr merge 4",
+    "env GH_REPO=timothyfroehlich/dotfiles gh pr merge 4",
+    'env GH_REPO=timothyfroehlich/dotfiles sh -c "gh pr merge 4"',
+  ])("carries static environment assignments onto %s", (command) => {
+    expect(firstSegment(command).environment.GH_REPO).toBe(
+      "timothyfroehlich/dotfiles"
+    );
+  });
+
+  it("marks a dynamic environment assignment as unknown", () => {
+    expect(
+      firstSegment('GH_REPO="$TARGET_REPOSITORY" gh pr merge 4').environment
+        .GH_REPO
+    ).toBeNull();
   });
 });
 

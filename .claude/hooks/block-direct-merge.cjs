@@ -118,7 +118,7 @@ function normalizeRepository(value) {
 /** Return an explicit repository target when gh received one. `explicit` with
  *  a null repository means the command tried to name a target dynamically or
  *  ambiguously, which remains protected. */
-function ghRepositoryTarget(args) {
+function ghRepositoryTarget(args, environment = {}) {
   let explicit = false;
   let ambiguous = false;
   const repositories = [];
@@ -128,6 +128,10 @@ function ghRepositoryTarget(args) {
     if (repository === null) ambiguous = true;
     else repositories.push(repository);
   };
+
+  if (Object.hasOwn(environment, "GH_REPO")) {
+    record(environment.GH_REPO);
+  }
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -257,11 +261,23 @@ function classifyMerge(toolName, toolInput) {
     // `gh pr merge --help` / `gh api --help` document rather than merge.
     if (segment.args.some((a) => HELP_FLAGS.has(a))) continue;
     if (isGhPrMerge(segment.args)) {
-      if (!isProtectedTarget(ghRepositoryTarget(segment.args))) continue;
+      if (
+        !isProtectedTarget(
+          ghRepositoryTarget(segment.args, segment.environment)
+        )
+      ) {
+        continue;
+      }
       return { block: true, kind: "merge", detail: "gh pr merge" };
     }
     if (isGhApiMerge(segment.args)) {
-      if (!isProtectedTarget(ghRepositoryTarget(segment.args))) continue;
+      if (
+        !isProtectedTarget(
+          ghRepositoryTarget(segment.args, segment.environment)
+        )
+      ) {
+        continue;
+      }
       return { block: true, kind: "merge", detail: "gh api PUT .../merge" };
     }
   }

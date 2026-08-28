@@ -66,6 +66,8 @@
  *                    (e.g. "./scripts/workflow/merge-pr.sh")
  *   Segment.name     its basename (e.g. "merge-pr.sh") — what guards match on
  *   Segment.args     the tokens after it, unquoted, in order
+ *   Segment.environment static leading environment assignments; dynamic
+ *                       values are null so callers can fail closed
  *   Segment.raw      normalized reconstruction (`[command, ...args].join(" ")`),
  *                    for messages only — NOT source-exact
  *
@@ -479,7 +481,7 @@ function readPayloadFlag(wrapper, words, i) {
       const next = words[i + 1];
       // `env -S` with nothing after it runs nothing — fall through to the
       // ordinary flag walk rather than inventing an empty payload.
-      return next ? { kind: "payload", word: next } : null;
+      return next ? { kind: "payload", word: next, index: i } : null;
     }
     const attached = pf.startsWith("--")
       ? flag.startsWith(`${pf}=`) && flag.slice(pf.length + 1)
@@ -488,6 +490,7 @@ function readPayloadFlag(wrapper, words, i) {
       return {
         kind: "payload",
         word: { value: attached, dynamic: word.dynamic, subs: [] },
+        index: i,
       };
     }
   }
@@ -565,15 +568,27 @@ function describeWords(words) {
  * Resolve one segment into zero or more Segments, following literal shell
  * payloads. Pushes into `out.segments` / `out.unresolvable`.
  */
-function resolveSegment(words, out, depth, options) {
+function resolveSegment(words, out, depth, options, inheritedEnvironment) {
   // Any substitution anywhere in the segment is itself a command to resolve.
   for (const w of words) {
     for (const body of w.subs) {
-      resolveInto(body, out, depth + 1, options);
+      resolveInto(body, out, depth + 1, options, inheritedEnvironment);
     }
   }
 
   const slot = resolveCommandSlot(words);
+  const environment = { ...inheritedEnvironment };
+  const assignmentLimit = slot.kind === "none" ? words.length : slot.index;
+  for (const word of words.slice(0, assignmentLimit)) {
+    if (!ENV_ASSIGN.test(word.value)) continue;
+    const equals = word.value.indexOf("=");
+    const name = word.value.slice(0, equals).replace(/[+:]$/, "");
+    const isPlainAssignment = word.value[equals - 1] !== "+";
+    environment[name] =
+      word.dynamic || !isPlainAssignment
+        ? null
+        : word.value.slice(equals + 1);
+  }
 
   // `env -S '<program>'` — GNU env splits the string and runs it.
   if (slot.kind === "payload") {
@@ -584,7 +599,7 @@ function resolveSegment(words, out, depth, options) {
       });
       return;
     }
-    resolveInto(slot.word.value, out, depth + 1, options);
+    resolveInto(slot.word.value, out, depth + 1, options, environment);
     return;
   }
 
@@ -619,7 +634,8 @@ function resolveSegment(words, out, depth, options) {
       [cmdWord.value, ...argWords.map((w) => w.value)].join(" "),
       out,
       depth + 1,
-      options
+      options,
+      environment
     );
     return;
   }
@@ -635,7 +651,13 @@ function resolveSegment(words, out, depth, options) {
       });
       return;
     }
-    resolveInto(argWords.map((w) => w.value).join(" "), out, depth + 1, options);
+    resolveInto(
+      argWords.map((w) => w.value).join(" "),
+      out,
+      depth + 1,
+      options,
+      environment
+    );
     return;
   }
 
@@ -652,7 +674,7 @@ function resolveSegment(words, out, depth, options) {
         });
         return;
       }
-      resolveInto(payload.value, out, depth + 1, options);
+      resolveInto(payload.value, out, depth + 1, options, environment);
       return;
     }
     // `bash script.sh args…` — the script is the effective command.
@@ -666,25 +688,26 @@ function resolveSegment(words, out, depth, options) {
         });
         return;
       }
-      pushSegment(out, script.value, argWords.slice(scriptIdx + 1));
+      pushSegment(out, script.value, argWords.slice(scriptIdx + 1), environment);
       return;
     }
   }
 
-  pushSegment(out, cmdWord.value, argWords);
+  pushSegment(out, cmdWord.value, argWords, environment);
 }
 
-function pushSegment(out, command, argWords) {
+function pushSegment(out, command, argWords, environment) {
   const args = argWords.map((w) => w.value);
   out.segments.push({
     command,
     name: path.basename(command),
     args,
+    environment,
     raw: [command, ...args].join(" "),
   });
 }
 
-function resolveInto(command, out, depth, options) {
+function resolveInto(command, out, depth, options, inheritedEnvironment) {
   if (depth > MAX_DEPTH) {
     out.unresolvable.push({ reason: "depth-limit", text: String(command) });
     return;
@@ -699,7 +722,7 @@ function resolveInto(command, out, depth, options) {
   for (const words of splitSegments(tokens, options.splitNewlines)) {
     const segmentsBefore = out.segments.length;
     const unresolvableBefore = out.unresolvable.length;
-    resolveSegment(words, out, depth, options);
+    resolveSegment(words, out, depth, options, inheritedEnvironment);
 
     // BACKSTOP — the invariant this module owes its callers: a segment that
     // contains a real (non-assignment) word must produce EITHER a segment or an
@@ -726,14 +749,14 @@ function resolveInto(command, out, depth, options) {
  *
  * @param {string} command
  * @param {{ splitNewlines?: boolean }} [options]
- * @returns {{ segments: Array<{command: string, name: string, args: string[], raw: string}>,
+ * @returns {{ segments: Array<{command: string, name: string, args: string[], environment: Record<string, string | null>, raw: string}>,
  *             unresolvable: Array<{reason: string, text: string}> }}
  */
 function resolveCommand(command, options = {}) {
   const out = { segments: [], unresolvable: [] };
   resolveInto(command, out, 0, {
     splitNewlines: options.splitNewlines !== false,
-  });
+  }, {});
   return out;
 }
 
