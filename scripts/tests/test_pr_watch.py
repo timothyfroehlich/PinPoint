@@ -121,16 +121,19 @@ def clean_codex_comment(
     }
 
 
-def clean_codex_reaction(
+def clean_codex_reaction_witness(
+    sha=HEAD_SHA,
     *,
-    login=pr_watch.CODEX_REVIEW_BOT,
-    content="+1",
-    created_at="2026-08-22T12:02:00Z",
+    login=pr_watch.GITHUB_ACTIONS_BOT,
+    app=pr_watch.GITHUB_ACTIONS_APP_SLUG,
+    updated_at="2026-08-22T12:02:00Z",
 ):
     return {
         "user": {"login": login},
-        "content": content,
-        "created_at": created_at,
+        "performed_via_github_app": {"slug": app},
+        "body": f"<!-- pinpoint-codex-reaction-witness: {sha} -->\nwitnessed",
+        "created_at": updated_at,
+        "updated_at": updated_at,
     }
 
 
@@ -143,7 +146,6 @@ def make_gh(
     labels=(),
     reviews=(),
     comments=(),
-    reactions=(),
 ):
     """Build a fake `gh` that answers every call pr-watch makes.
 
@@ -177,8 +179,6 @@ def make_gh(
                 return json.dumps(list(reviews))
             if "/comments" in path:
                 return json.dumps(list(comments))
-            if "/reactions" in path:
-                return json.dumps(list(reactions))
         if args[:2] == ("api", "graphql"):
             return json.dumps(
                 {
@@ -858,6 +858,7 @@ def test_codex_login_is_identical_to_the_bash_gate():
         "marker",
         "stale_approval",
         "stale_clean_comment",
+        "stale_clean_reaction",
         "stale_marker",
         "not_approved",
         "unreviewed",
@@ -894,13 +895,12 @@ def test_review_state_clean_comment_pins_head(monkeypatch):
 
 
 @pytest.mark.unit
-def test_review_state_clean_reaction_after_current_head_ci_pins_head(monkeypatch):
+def test_review_state_clean_reaction_witness_pins_head(monkeypatch):
     monkeypatch.setattr(
         pr_watch,
         "gh",
         make_gh(
-            rollup=[_gate("SUCCESS", completed_at="2026-08-22T12:01:00Z")],
-            reactions=[clean_codex_reaction()],
+            comments=[clean_codex_reaction_witness()],
         ),
     )
     state, detail = pr_watch.review_state(PR)
@@ -910,20 +910,19 @@ def test_review_state_clean_reaction_after_current_head_ci_pins_head(monkeypatch
 
 @pytest.mark.unit
 @pytest.mark.parametrize(
-    "reaction",
+    "witness",
     [
-        clean_codex_reaction(login="other[bot]"),
-        clean_codex_reaction(content="eyes"),
-        clean_codex_reaction(created_at="2026-08-22T12:00:00Z"),
+        clean_codex_reaction_witness(login="other[bot]"),
+        clean_codex_reaction_witness(app="other-app"),
+        clean_codex_reaction_witness(OLD_SHA),
     ],
 )
-def test_review_state_rejects_untrusted_or_pre_head_reaction(monkeypatch, reaction):
+def test_review_state_rejects_untrusted_or_stale_reaction_witness(monkeypatch, witness):
     monkeypatch.setattr(
         pr_watch,
         "gh",
         make_gh(
-            rollup=[_gate("SUCCESS", completed_at="2026-08-22T12:01:00Z")],
-            reactions=[reaction],
+            comments=[witness],
         ),
     )
     assert pr_watch.review_state(PR)[0] != "clean_reaction"

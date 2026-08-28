@@ -169,7 +169,7 @@ case "$rv_state" in
     review_desc="Codex clean review comment · ${rv_at} · covers head ${short_head}"
     ;;
   clean_reaction)
-    review_desc="Codex clean +1 reaction · ${rv_at} · covers head ${short_head}"
+    review_desc="Codex clean reaction witness · ${rv_at} · covers head ${short_head}"
     ;;
   reviewed)
     review_desc="Codex GitHub review (${rv_detail}) · ${rv_at} · covers head ${short_head}; threads adjudicated separately"

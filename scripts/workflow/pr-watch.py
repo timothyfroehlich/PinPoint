@@ -64,6 +64,9 @@ CI_GATE_NAME = "CI Gate"
 CODEX_REVIEW_BOT = "chatgpt-codex-connector[bot]"
 CODEX_REVIEW_APP_SLUG = "chatgpt-codex-connector"
 CODEX_CLEAN_REVIEW_PREFIX = "Codex Review: Didn't find any major issues."
+GITHUB_ACTIONS_BOT = "github-actions[bot]"
+GITHUB_ACTIONS_APP_SLUG = "github-actions"
+CODEX_REACTION_WITNESS_PREFIX = "<!-- pinpoint-codex-reaction-witness:"
 REVIEW_MARKER_PREFIX = "<!-- pinpoint-review:"
 LEGACY_CLAUDE_MARKER_PREFIX = "<!-- pinpoint-claude-review:"
 
@@ -247,10 +250,10 @@ def _codex_reviews(pr: int) -> list[dict]:
 
 def _comment_review_records(
     pr: int,
-) -> tuple[list[tuple[str, str]], list[tuple[str, str]]]:
-    """Return clean automatic comments and independent manual markers."""
+) -> tuple[list[tuple[str, str, str]], list[tuple[str, str]]]:
+    """Return SHA-pinned automatic comments and independent manual markers."""
     repo = f"repos/{REPO_OWNER}/{REPO_NAME}"
-    clean: list[tuple[str, str]] = []
+    automatic: list[tuple[str, str, str]] = []
     markers: list[tuple[str, str]] = []
     for comment in _gh_api_list(f"{repo}/issues/{pr}/comments"):
         body = comment.get("body") or ""
@@ -268,8 +271,27 @@ def _comment_review_records(
                 )
             )
         ):
-            clean.append(
+            automatic.append(
                 (
+                    "clean_comment",
+                    match.group(1),
+                    comment.get("updated_at") or comment.get("created_at") or "",
+                )
+            )
+        if (
+            comment.get("user", {}).get("login") == GITHUB_ACTIONS_BOT
+            and app.get("slug") == GITHUB_ACTIONS_APP_SLUG
+            and body.startswith(CODEX_REACTION_WITNESS_PREFIX)
+            and (
+                match := re.match(
+                    r"^<!-- pinpoint-codex-reaction-witness: ([0-9a-f]{40}) -->",
+                    body,
+                )
+            )
+        ):
+            automatic.append(
+                (
+                    "clean_reaction",
                     match.group(1),
                     comment.get("updated_at") or comment.get("created_at") or "",
                 )
@@ -288,26 +310,7 @@ def _comment_review_records(
                     comment.get("updated_at") or "",
                 )
             )
-    return clean, markers
-
-
-def _clean_codex_reaction_at(pr: int) -> str:
-    """Return a trusted clean reaction time anchored to the current-head CI Gate."""
-    ci_completed_at = _ci_gate_completed_at(pr)
-    if not ci_completed_at:
-        return ""
-
-    repo = f"repos/{REPO_OWNER}/{REPO_NAME}"
-    return max(
-        (
-            reaction.get("created_at") or ""
-            for reaction in _gh_api_list(f"{repo}/issues/{pr}/reactions")
-            if reaction.get("user", {}).get("login") == CODEX_REVIEW_BOT
-            and reaction.get("content") == "+1"
-            and (reaction.get("created_at") or "") >= ci_completed_at
-        ),
-        default="",
-    )
+    return automatic, markers
 
 
 def review_state(pr: int) -> tuple[str, str]:
@@ -328,23 +331,33 @@ def review_state(pr: int) -> tuple[str, str]:
 
     # A current native approval is sufficient. Defer the paginated comments request
     # unless it is needed to find the independent manual-attestation fallback.
-    clean_comments, markers = _comment_review_records(pr)
+    automatic_comments, markers = _comment_review_records(pr)
     if any(marker_sha == head_sha for marker_sha, _at in markers):
         return "marker", f"manual review marker pins head {head_sha[:7]}"
 
     current_clean = max(
-        (record for record in clean_comments if head_sha.startswith(record[0])),
-        key=lambda record: record[1],
-        default=("", ""),
+        (
+            record
+            for record in automatic_comments
+            if (record[0] == "clean_comment" and head_sha.startswith(record[1]))
+            or (record[0] == "clean_reaction" and record[1] == head_sha)
+        ),
+        key=lambda record: record[2],
+        default=("", "", ""),
     )
-    if current_clean[0]:
-        clean_sha, clean_at = current_clean
+    if current_clean[1]:
+        clean_state, clean_sha, clean_at = current_clean
         if (
             not reviews
             or review_sha != head_sha
             or clean_at > (latest.get("submitted_at") or "")
         ):
-            return "clean_comment", f"Codex found no major issues on head {clean_sha}"
+            if clean_state == "clean_reaction":
+                return (
+                    clean_state,
+                    f"Codex clean reaction witnessed on head {head_sha[:7]}",
+                )
+            return clean_state, f"Codex found no major issues on head {clean_sha}"
 
     if (
         reviews
@@ -356,24 +369,22 @@ def review_state(pr: int) -> tuple[str, str]:
             f"Codex reviewed head {head_sha[:7]} with {state}; thread gate owns findings",
         )
 
-    reaction_at = _clean_codex_reaction_at(pr)
-    if reaction_at and (
-        not reviews
-        or review_sha != head_sha
-        or reaction_at > (latest.get("submitted_at") or "")
-    ):
-        return "clean_reaction", f"Codex reacted +1 on head {head_sha[:7]}"
-
     latest_marker_sha, latest_marker_at = max(
         markers, key=lambda marker: marker[1], default=("", "")
     )
-    latest_clean_sha, latest_clean_at = max(
-        clean_comments, key=lambda record: record[1], default=("", "")
+    latest_clean_state, latest_clean_sha, latest_clean_at = max(
+        automatic_comments, key=lambda record: record[2], default=("", "", "")
     )
     latest_comment_sha, latest_comment_at, latest_comment_state = (
         (latest_marker_sha, latest_marker_at, "stale_marker")
         if latest_marker_at > latest_clean_at
-        else (latest_clean_sha, latest_clean_at, "stale_clean_comment")
+        else (
+            latest_clean_sha,
+            latest_clean_at,
+            "stale_clean_reaction"
+            if latest_clean_state == "clean_reaction"
+            else "stale_clean_comment",
+        )
     )
     if reviews:
         if latest_comment_sha and latest_comment_at > (

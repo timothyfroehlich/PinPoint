@@ -110,6 +110,7 @@ for pr in $PRS; do
             marker)         review_str="reviewed" ;;
             stale_approval) review_str="RE-REVIEW" ;;
             stale_clean_comment) review_str="RE-REVIEW" ;;
+            stale_clean_reaction) review_str="RE-REVIEW" ;;
             stale_marker)   review_str="RE-REVIEW" ;;
             not_approved)   review_str="NOT APPROVED" ;;
             unreviewed)     review_str="NOT REVIEWED" ;;

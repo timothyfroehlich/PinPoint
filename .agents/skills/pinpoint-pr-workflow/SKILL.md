@@ -109,11 +109,13 @@ Every unresolved thread counts, whoever opened it — the `threads` gate is auth
 **On every push**: it runs when a PR is opened for review and again when commits are
 pushed to an already-ready PR. The gate accepts a native `APPROVED` review whose
 `commit_id` equals the PR head, the connector's no-major-issues issue comment naming a
-10- or 40-character prefix of that head, or the connector bot's `+1` reaction created
-after the successful current-head `CI Gate`. The reaction needs the CI timestamp anchor
-because GitHub reactions carry no commit SHA. All automatic evidence requires exact
-account `chatgpt-codex-connector[bot]`; the comment also requires exact app slug
-`chatgpt-codex-connector` and the known clean-result prefix. An older result is stale.
+10- or 40-character prefix of that head, or a trusted GitHub Actions comment witnessing
+a fresh connector-bot `eyes`→`+1` transition while that exact SHA remained head. Direct
+reactions are never merge evidence because GitHub reactions carry no commit SHA. Codex
+reviews and clean comments require exact account `chatgpt-codex-connector[bot]`; clean
+comments also require exact app slug `chatgpt-codex-connector` and the known clean-result
+prefix. A reaction witness requires exact account `github-actions[bot]`, exact app slug
+`github-actions`, and the SHA-pinned witness marker. An older result is stale.
 Among records for the same head, a later native finding overrides an earlier clean
 comment; no delayed review, clean comment, or manual marker for an older SHA can
 invalidate current-head coverage.
