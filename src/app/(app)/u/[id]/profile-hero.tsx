@@ -23,7 +23,10 @@ export function ProfileHero({
   editHref,
 }: ProfileHeroProps): React.JSX.Element {
   return (
-    <header className="profile-hero-surface relative overflow-hidden rounded-2xl border border-outline-variant bg-card p-6">
+    <header
+      data-testid="profile-hero"
+      className="profile-hero-surface relative overflow-hidden rounded-2xl border border-outline-variant bg-card p-6"
+    >
       <div className="flex flex-col gap-4 @lg:flex-row @lg:items-center">
         <Avatar className="size-20 ring-2 ring-primary/25">
           {avatarUrl ? <AvatarImage src={avatarUrl} alt="" /> : null}

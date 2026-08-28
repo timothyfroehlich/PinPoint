@@ -238,10 +238,13 @@ The bridge is deliberately **loud**, unlike the fail-open huddle hooks:
 
 - Any step failing → `beads-dolthub-bridge.sh` exits nonzero → the oneshot unit is
   marked `failed`. Inspect `journalctl --user -u beads-dolthub-bridge`.
-- On a **pull conflict** the script runs `CALL DOLT_MERGE('--abort')` against the
-  live server FIRST — so neither machine is left reading/writing a conflicted
-  working set — then exits nonzero and stops. A human resolves the DoltHub
-  divergence, then `systemctl --user restart beads-dolthub-bridge.timer`.
+- On a **pull conflict** the script checks `dolt_merge_status` on the live server.
+  `bd dolt pull` normally restores the pre-pull working set itself; when it does,
+  the bridge records that verification and stops. If conflicts remain, the
+  bridge runs `CALL DOLT_MERGE('--abort')` and verifies no merge remains active
+  before stopping. This covers both row and schema conflicts. A human resolves
+  the DoltHub divergence, then runs
+  `systemctl --user restart beads-dolthub-bridge.timer`.
 - There is intentionally **no `|| true`** anywhere in the bridge (contrast PP-0b7p):
   silent bridge failure would let DoltHub and the live server drift apart unnoticed.
 

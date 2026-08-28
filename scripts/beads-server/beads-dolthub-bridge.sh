@@ -12,8 +12,9 @@
 # PP-0b7p). Any step failing exits non-zero so systemd marks the unit `failed`
 # and it stays failed until a human restarts it. On a pull CONFLICT we do NOT
 # leave the live server sitting in a conflicted working set that both machines
-# read/write: we immediately roll the merge back via DOLT_MERGE('--abort'),
-# alert, and stop (nonzero). A human resolves before re-enabling the timer.
+# read/write: we verify whether unresolved conflicts remain, abort an active
+# merge when needed, verify again, alert, and stop (nonzero). A human resolves
+# the remote divergence before re-enabling the timer.
 #
 # Required env:
 #   BEADS_DOLT_PASSWORD  — password for the `beads` SQL user (env only, never
@@ -65,33 +66,65 @@ fi
 
 log "bd $bd_ver and dolt $dolt_ver match compatibility contract ($COMPAT_FILE)"
 
-# dolt SQL helper against the live server (used for the abort path). Uses the
-# same env password; --result-format null keeps output quiet.
+# Dolt connection options are global flags and must precede the `sql`
+# subcommand. The server is tailnet-local and does not serve TLS.
 dolt_sql() {
-  dolt sql \
+  dolt \
     --host "$HOST" --port "$PORT" \
     --user "$USER" --password "$BEADS_DOLT_PASSWORD" \
-    --use-db "$DB" \
+    --no-tls --use-db "$DB" \
+    sql --result-format csv \
     --query "$1"
+}
+
+merge_in_progress() {
+  local output is_merging
+  if ! output="$(dolt_sql "SELECT is_merging FROM dolt_merge_status;")"; then
+    log "failed to inspect dolt_merge_status on the live server"
+    return 1
+  fi
+
+  is_merging="$(printf '%s\n' "$output" | tail -n1 | tr -d '\r')"
+  if [[ ! "$is_merging" =~ ^[01]$ ]]; then
+    log "unexpected merge-status response from the live server: $output"
+    return 1
+  fi
+  printf '%s\n' "$is_merging"
 }
 
 # 1. Commit any uncommitted working-set drift so pull has a clean base.
 log "commit (flush working set)"
 bd dolt commit >&2 || die "bd dolt commit failed"
 
-# 2. Pull DoltHub. A conflict is the dangerous case — abort it on the server so
-#    neither machine reads/writes a conflicted working set, then stop loudly.
+# 2. Pull DoltHub. bd normally restores the pre-pull working set after a
+#    conflict. Verify that claim against the server's merge status; abort only
+#    if a merge actually remains active, then verify once more before stopping
+#    loudly. `dolt_merge_status` covers row and schema conflicts.
 log "pull DoltHub"
 pull_rc=0
 pull_out=$(bd dolt pull 2>&1) || pull_rc=$?
 printf '%s\n' "$pull_out" >&2
 if [[ "$pull_rc" -ne 0 ]]; then
   if printf '%s' "$pull_out" | grep -qiE 'conflict|operator resolution'; then
-    log "PULL CONFLICT — aborting the merge on the live server (DOLT_MERGE --abort)"
-    if dolt_sql "CALL DOLT_MERGE('--abort');" >&2; then
-      log "merge aborted; working set restored to pre-pull HEAD"
+    log "PULL CONFLICT — checking whether a merge remains active on the live server"
+    if ! is_merging="$(merge_in_progress)"; then
+      die "could not verify live-server merge state; manual intervention required"
+    fi
+
+    if [[ "$is_merging" -eq 0 ]]; then
+      log "pull restored the pre-merge working set; no merge remains active"
     else
-      log "DOLT_MERGE('--abort') FAILED — server may be in a conflicted state; manual intervention required"
+      log "a merge remains active — aborting it"
+      if ! dolt_sql "CALL DOLT_MERGE('--abort');" >&2; then
+        die "DOLT_MERGE('--abort') failed; manual intervention required"
+      fi
+      if ! is_merging="$(merge_in_progress)"; then
+        die "merge abort returned but merge state could not be verified"
+      fi
+      if [[ "$is_merging" -ne 0 ]]; then
+        die "merge abort returned but a merge remains active"
+      fi
+      log "merge aborted; no merge remains active"
     fi
     die "DoltHub pull hit a merge conflict — bridge stopped. Resolve manually, then: systemctl --user restart beads-dolthub-bridge.timer"
   fi

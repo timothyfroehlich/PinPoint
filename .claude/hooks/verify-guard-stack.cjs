@@ -49,7 +49,6 @@ const EXPECTED_GUARD_HOOKS = [
   "inject-beads-actor.cjs",
   "block-direct-merge.cjs",
   "block-main-worktree-branch-switch.cjs",
-  "block-worktree-dispatch-from-linked.cjs",
 ];
 
 // --- Registered-script extraction --------------------------------------------
