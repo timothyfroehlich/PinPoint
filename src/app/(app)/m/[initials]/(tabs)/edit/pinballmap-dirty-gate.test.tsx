@@ -4,6 +4,7 @@
  * mid-edit sets state for a model the pending save is about to replace.
  */
 
+import { useState } from "react";
 import type React from "react";
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
@@ -24,6 +25,21 @@ function DirtyTrigger(): React.JSX.Element {
       }}
     >
       Edit something
+    </button>
+  );
+}
+
+function StatefulControl(): React.JSX.Element {
+  const [attempts, setAttempts] = useState(0);
+
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        setAttempts((current) => current + 1);
+      }}
+    >
+      Attempts: {attempts}
     </button>
   );
 }
@@ -66,6 +82,25 @@ describe("PinballmapDirtyGate", () => {
         .querySelector("[inert]")
         ?.contains(screen.getByRole("button", { name: "On the lineup" }))
     ).toBe(true);
+  });
+
+  it("keeps mounted control state when Details becomes dirty", async () => {
+    const user = userEvent.setup();
+    render(
+      <DetailsDirtyProvider>
+        <DirtyTrigger />
+        <PinballmapDirtyGate>
+          <StatefulControl />
+        </PinballmapDirtyGate>
+      </DetailsDirtyProvider>
+    );
+
+    await user.click(screen.getByRole("button", { name: "Attempts: 0" }));
+    await user.click(screen.getByRole("button", { name: "Edit something" }));
+
+    expect(
+      screen.getByRole("button", { name: "Attempts: 1" })
+    ).toBeInTheDocument();
   });
 
   it("keeps the explanation readable outside the inert subtree", async () => {

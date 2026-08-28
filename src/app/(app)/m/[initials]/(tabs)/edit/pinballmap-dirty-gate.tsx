@@ -20,6 +20,9 @@ import { useDetailsDirty } from "./details-dirty";
  *
  * The note is a sibling and stays outside the inert subtree, so the explanation
  * remains readable and announced while everything it explains is not.
+ * The wrapper and control subtree stay mounted across both states so an
+ * in-flight listing action keeps its pending and error state if Details becomes
+ * dirty before the request settles.
  *
  * Wraps the CONTROL only, never the abandoned-entry alert: that entry is an
  * old title this machine no longer carries, so no pending Details save can
@@ -32,14 +35,25 @@ export function PinballmapDirtyGate({
 }): React.JSX.Element {
   const { dirty } = useDetailsDirty();
 
-  if (!dirty) return <>{children}</>;
-
   return (
-    <div className="space-y-3" data-testid="pbm-listing-gated">
-      <p className="text-xs text-muted-foreground" role="status">
-        Unsaved model selection
-      </p>
-      <div className="opacity-45" inert>
+    <div
+      className="space-y-3"
+      data-testid={dirty ? "pbm-listing-gated" : undefined}
+    >
+      {dirty ? (
+        <p
+          key="dirty-note"
+          className="text-xs text-muted-foreground"
+          role="status"
+        >
+          Unsaved model selection
+        </p>
+      ) : null}
+      <div
+        key="listing-control"
+        className={dirty ? "opacity-45" : undefined}
+        {...(dirty ? { inert: true } : {})}
+      >
         {children}
       </div>
     </div>
