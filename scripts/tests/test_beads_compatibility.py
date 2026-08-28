@@ -179,6 +179,76 @@ DOLT_LAUNCHER = REPO_ROOT / "scripts" / "beads-server" / "dolt-sql-server.sh"
 BRIDGE_SCRIPT = REPO_ROOT / "scripts" / "beads-server" / "beads-dolthub-bridge.sh"
 
 
+def run_bridge_pull_conflict(
+    tmp_path: Path, *, conflict_state: str
+) -> tuple[subprocess.CompletedProcess[str], list[str]]:
+    """Run one bridge conflict cycle against deterministic bd/dolt stubs."""
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    calls_file = tmp_path / "dolt-calls"
+    state_file = tmp_path / "dolt-state"
+
+    data = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
+    bd_bin = bin_dir / "bd"
+    bd_bin.write_text(
+        f"""#!/bin/sh
+case "$*" in
+  version) echo 'bd version {data["bd"]} (test)' ;;
+  'dolt commit') exit 0 ;;
+  'dolt pull') echo 'merge conflicts in issues require operator resolution' >&2; exit 1 ;;
+  *) echo "unexpected bd call: $*" >&2; exit 88 ;;
+esac
+""",
+        encoding="utf-8",
+    )
+    bd_bin.chmod(0o755)
+
+    dolt_bin = bin_dir / "dolt"
+    dolt_bin.write_text(
+        f"""#!/bin/sh
+if [ "$1" = version ]; then
+  echo 'dolt version {data["dolt"]}'
+  exit 0
+fi
+printf '%s\\n' "$*" >> "$DOLT_CALLS_FILE"
+if printf '%s' "$*" | grep -q 'conflict_count'; then
+  printf 'conflict_count\\n'
+  if [ "$DOLT_TEST_CONFLICT_STATE" = clean ] || [ -f "$DOLT_STATE_FILE" ]; then
+    printf '0\\n'
+  else
+    printf '1\\n'
+  fi
+elif printf '%s' "$*" | grep -q 'DOLT_MERGE'; then
+  touch "$DOLT_STATE_FILE"
+else
+  echo "unexpected dolt call: $*" >&2
+  exit 89
+fi
+""",
+        encoding="utf-8",
+    )
+    dolt_bin.chmod(0o755)
+
+    env = {
+        "PATH": f"{bin_dir}:/usr/bin:/bin",
+        "HOME": str(tmp_path),
+        "PINPOINT_DIR": str(REPO_ROOT),
+        "BEADS_DOLT_PASSWORD": "dummy",
+        "BEADS_SERVER_HOST": "test-host",
+        "BEADS_SERVER_PORT": "13306",
+        "BEADS_SERVER_USER": "test-user",
+        "BEADS_DB": "PP",
+        "DOLT_CALLS_FILE": str(calls_file),
+        "DOLT_STATE_FILE": str(state_file),
+        "DOLT_TEST_CONFLICT_STATE": conflict_state,
+    }
+    proc = subprocess.run(
+        ["bash", str(BRIDGE_SCRIPT)], env=env, capture_output=True, text=True
+    )
+    calls = calls_file.read_text(encoding="utf-8").splitlines()
+    return proc, calls
+
+
 class TestBazziteServiceTemplates:
     def test_dolt_service_uses_mise_exec_and_launcher(self):
         content = DOLT_SERVICE.read_text(encoding="utf-8")
@@ -294,6 +364,40 @@ class TestBazziteServiceGuards:
         )
         assert proc.returncode != 0
         assert "refusing bridge cycle" in proc.stderr
+
+    def test_bridge_conflict_recovery_uses_remote_dolt_connection_flags(
+        self, tmp_path: Path
+    ):
+        """Connection flags belong to the root `dolt` command, before `sql`."""
+        proc, calls = run_bridge_pull_conflict(tmp_path, conflict_state="clean")
+
+        assert proc.returncode != 0
+        assert calls
+        assert all(
+            call.startswith(
+                "--host test-host --port 13306 --user test-user "
+                "--password dummy --no-tls --use-db PP sql "
+            )
+            for call in calls
+        )
+
+    def test_bridge_skips_abort_when_pull_already_restored_conflicts(
+        self, tmp_path: Path
+    ):
+        proc, calls = run_bridge_pull_conflict(tmp_path, conflict_state="clean")
+
+        assert proc.returncode != 0
+        assert any("conflict_count" in call for call in calls)
+        assert all("DOLT_MERGE" not in call for call in calls)
+        assert "no unresolved conflicts remain" in proc.stderr
+
+    def test_bridge_aborts_and_verifies_a_persisting_conflict(self, tmp_path: Path):
+        proc, calls = run_bridge_pull_conflict(tmp_path, conflict_state="active")
+
+        assert proc.returncode != 0
+        assert sum("conflict_count" in call for call in calls) == 2
+        assert sum("DOLT_MERGE" in call for call in calls) == 1
+        assert "merge aborted; no unresolved conflicts remain" in proc.stderr
 
 
 class TestDocumentationReferences:
