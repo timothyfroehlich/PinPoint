@@ -124,11 +124,51 @@ _comment_review_record() {
          | [ .state, .sha, .reviewer, .detail, .at, .summary ] | @tsv'
 }
 
-# A manual marker is an independent valid record. Native reviews and clean connector
-# comments are two representations of the automatic Codex path; when they disagree,
-# the newer automatic record wins so a later finding cannot inherit an earlier clean.
+# A clean Codex review may be represented only by a +1 reaction on the PR. Reactions
+# do not name a commit, so they are eligible only when they were created after the
+# successful CI Gate for GitHub's current head. statusCheckRollup is scoped to that
+# head, making its completion timestamp a push-safe lower bound even when the commit's
+# authored/committed timestamp predates its upload.
+_clean_reaction_record() {
+  local pr=$1 owner_repo=$2 head=$3 ci_completed_at
+  ci_completed_at=$(gh pr view "$pr" --json statusCheckRollup --jq '
+    [ .statusCheckRollup[]
+      | select(.name == "CI Gate"
+               and .status == "COMPLETED"
+               and (.conclusion == "SUCCESS" or .conclusion == "NEUTRAL" or .conclusion == "SKIPPED"))
+      | (.completedAt // .startedAt // "")
+      | select(length > 0)
+    ] | sort | last // empty')
+
+  if [[ -z "$ci_completed_at" ]]; then
+    printf 'unreviewed\t\t\t\t\t\n'
+    return
+  fi
+
+  gh api --paginate -H "Accept: application/vnd.github+json" \
+    "repos/${owner_repo}/issues/${pr}/reactions" \
+    | jq -rs --arg bot "$CODEX_REVIEW_BOT" --arg head "$head" \
+        --arg ci_completed_at "$ci_completed_at" '
+        [ .[] | flatten | .[]
+          | select(.user.login? == $bot and .content == "+1")
+          | select((.created_at // "") >= $ci_completed_at)
+          | { state: "clean_reaction",
+              sha: $head,
+              reviewer: (.user.login // ""),
+              detail: "NO_FINDINGS",
+              at: (.created_at // ""),
+              summary: "Codex reacted +1 after current-head CI" }
+        ] | sort_by(.at)
+        | (last // { state: "unreviewed", sha: "", reviewer: "", detail: "", at: "", summary: "" })
+        | [ .state, .sha, .reviewer, .detail, .at, .summary ] | @tsv'
+}
+
+# A manual marker is an independent valid record. Native reviews, clean connector
+# comments, and clean reactions are representations of the automatic Codex path. A
+# later current-head finding cannot inherit an earlier clean result.
 _review_record() {
-  local head=$3 codex comment codex_state comment_state codex_sha codex_at comment_at
+  local head=$3 codex comment reaction codex_state comment_state reaction_state
+  local codex_sha codex_at comment_at reaction_at
   codex=$(_codex_review_record "$@")
   codex_state=$(cut -f1 <<< "$codex")
   # A current native approval already passes the gate. Do not spend a second
@@ -151,18 +191,29 @@ _review_record() {
     else
       printf '%s\n' "$codex"
     fi
-  elif [[ "$codex_state" == "unreviewed" ]]; then
-    printf '%s\n' "$comment"
   elif [[ "$codex_state" == "reviewed" ]]; then
     # A current-head native finding review is coverage. A delayed comment for an
     # older SHA cannot invalidate it; current clean comments were handled above.
     printf '%s\n' "$codex"
-  elif [[ "$comment_state" == "unreviewed" ]]; then
-    printf '%s\n' "$codex"
   else
+    reaction=$(_clean_reaction_record "$@")
+    reaction_state=$(cut -f1 <<< "$reaction")
+    reaction_at=$(cut -f5 <<< "$reaction")
+    codex_sha=$(cut -f2 <<< "$codex")
+    codex_at=$(cut -f5 <<< "$codex")
+    if [[ "$reaction_state" == "clean_reaction" \
+          && ( "$codex_state" == "unreviewed" || "$codex_sha" != "$head" || "$reaction_at" > "$codex_at" ) ]]; then
+      printf '%s\n' "$reaction"
+      return
+    fi
+
+    if [[ "$comment_state" == "unreviewed" ]]; then
+      printf '%s\n' "$codex"
+      return
+    fi
+
     # Neither path covers head. Report the newest record so merge-handoff can
     # show the real diff since review instead of an older, unrelated failure.
-    codex_at=$(cut -f5 <<< "$codex")
     comment_at=$(cut -f5 <<< "$comment")
     if [[ "$comment_at" > "$codex_at" ]]; then
       printf '%s\n' "$comment"
@@ -226,6 +277,7 @@ check_ci() {
 #
 #   approval        Codex approved the current head SHA
 #   clean_comment   Codex reported no major issues for the current head SHA
+#   clean_reaction  Codex reacted +1 after the current head's successful CI Gate
 #   reviewed        Codex reviewed the current head; the thread gate owns adjudication
 #   marker          A manual review marker pins the current head SHA
 #   stale_approval  Codex approved a different SHA — the current head was not reviewed
@@ -313,6 +365,7 @@ check_unresolved_threads() {
 #
 #   approval        → PASS
 #   clean_comment   → PASS
+#   clean_reaction  → PASS
 #   reviewed        → PASS (the separate thread gate requires every finding adjudicated)
 #   marker          → PASS
 #   stale_approval  → FAIL: Codex approved an earlier commit
@@ -329,6 +382,10 @@ check_review_happened() {
       ;;
     clean_comment)
       echo "PASS: reviewed: Codex found no major issues on head SHA ${RS_HEAD_SHA:0:7}"
+      return 0
+      ;;
+    clean_reaction)
+      echo "PASS: reviewed: Codex reacted +1 on head SHA ${RS_HEAD_SHA:0:7}"
       return 0
       ;;
     reviewed)

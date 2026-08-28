@@ -36,23 +36,24 @@ Scripts are designed for the **PinPoint orchestrator workflow** where multiple s
 
 ### Gates (evaluated by `merge-pr.sh`, defined in `_pr-gates.sh`)
 
-| Gate          | Passes when                                                                                                                                              | Bypass kind |
-| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
-| `ci`          | `CI Gate` check is SUCCESS/NEUTRAL/SKIPPED                                                                                                               | `admin`     |
-| `threads`     | Zero unresolved review threads, from any author                                                                                                          | `force`     |
-| `reviewed`    | Hard backstop — an automatic Codex review or manual marker must cover head. PASS on `approval` / `clean_comment` / `reviewed` / `marker`; FAIL otherwise | `force`     |
-| `no_conflict` | PR is MERGEABLE (never bypassable — GitHub rejects conflicting merges)                                                                                   | `none`      |
+| Gate          | Passes when                                                                                                                                                                 | Bypass kind |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
+| `ci`          | `CI Gate` check is SUCCESS/NEUTRAL/SKIPPED                                                                                                                                  | `admin`     |
+| `threads`     | Zero unresolved review threads, from any author                                                                                                                             | `force`     |
+| `reviewed`    | Hard backstop — an automatic Codex review or manual marker must cover head. PASS on `approval` / `clean_comment` / `clean_reaction` / `reviewed` / `marker`; FAIL otherwise | `force`     |
+| `no_conflict` | PR is MERGEABLE (never bypassable — GitHub rejects conflicting merges)                                                                                                      | `none`      |
 
 ### Review state (`reviewed`)
 
-**Automatic Codex GitHub review is the default path.** The gate accepts a native review pinned to the exact head, or the connector's no-major-issues issue comment pinned to a 10- or 40-character prefix of that head. A finding-bearing native review relies on the separate thread gate: every finding must be fixed or explicitly declined, replied to, and resolved. Both automatic records must come from exact account `chatgpt-codex-connector[bot]`; the comment must also carry exact app slug `chatgpt-codex-connector` and the known clean-result prefix. The existing SHA-pinned `mark-review.sh` route remains valid after Tim explicitly runs a local review. Every push needs a fresh review; comment `@codex review` only when Tim explicitly asks for a manual trigger.
+**Automatic Codex GitHub review is the default path.** The gate accepts a native review pinned to the exact head, the connector's no-major-issues issue comment pinned to a 10- or 40-character prefix of that head, or the connector bot's `+1` reaction created after the successful current-head `CI Gate`. A finding-bearing native review relies on the separate thread gate: every finding must be fixed or explicitly declined, replied to, and resolved. All automatic records must come from exact account `chatgpt-codex-connector[bot]`; the comment must also carry exact app slug `chatgpt-codex-connector` and the known clean-result prefix. The existing SHA-pinned `mark-review.sh` route remains valid after Tim explicitly runs a local review. Every push needs a fresh review; comment `@codex review` only when Tim explicitly asks for a manual trigger.
 
-`_compute_review_state` in `_pr-gates.sh` reports nine states:
+`_compute_review_state` in `_pr-gates.sh` reports ten states:
 
 | State                 | Meaning                                                                    | `reviewed` |
 | --------------------- | -------------------------------------------------------------------------- | ---------- |
 | `approval`            | Latest Codex review approved the current head SHA                          | PASS       |
 | `clean_comment`       | Trusted Codex clean comment pins the current head                          | PASS       |
+| `clean_reaction`      | Trusted Codex `+1` follows the successful current-head CI Gate             | PASS       |
 | `reviewed`            | `COMMENTED`/`CHANGES_REQUESTED` review pins head; threads own adjudication | PASS       |
 | `marker`              | Manual review marker pins the current head SHA                             | PASS       |
 | `stale_approval`      | Latest Codex approval names a different SHA                                | FAIL       |
@@ -61,11 +62,11 @@ Scripts are designed for the **PinPoint orchestrator workflow** where multiple s
 | `not_approved`        | Non-approval review is stale or unusable (`DISMISSED`/`PENDING`/unknown)   | FAIL       |
 | `unreviewed`          | Neither review path covers this PR                                         | FAIL       |
 
-Within the automatic Codex path, compare precedence only among records for the same head. A later `CHANGES_REQUESTED` or `COMMENTED` review of that head overrides an earlier clean comment; no delayed review, clean comment, or manual marker for an older SHA can invalidate current-head coverage. A current manual marker remains independently valid.
+Within the automatic Codex path, compare precedence only among records for the same head. A later `CHANGES_REQUESTED` or `COMMENTED` review of that head overrides an earlier clean result; no delayed review, clean comment, or manual marker for an older SHA can invalidate current-head coverage. A current manual marker remains independently valid.
 
 Nothing here WAITs. The gate reports the current snapshot and fails on an unreviewed or stale head; the owning agent waits for automatic review outside the merge script. `merge-pr.sh --automerge` must stop rather than hide that unfinished state.
 
-**Coverage is judged by SHA equality, not timestamps.** GitHub's `commit_id` identifies the commit Codex reviewed. Comparing submission time instead could accept a review of an earlier tree submitted after a later push.
+**Native reviews and clean comments use SHA equality.** GitHub reactions carry no commit SHA, so the `clean_reaction` path is the narrow exception: the exact bot's `+1` must post after the successful `CI Gate` associated with GitHub's current PR head. The current-head check completion is a push-safe lower bound; commit authored/committed timestamps are not.
 
 ## Status Token Vocabulary
 

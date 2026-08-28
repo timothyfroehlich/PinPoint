@@ -152,11 +152,11 @@ Never resolve `drizzle/meta` conflicts manually — the folder holds binary-like
 
 ### Getting a PR reviewed
 
-**Automatic Codex review is the default.** Open every agent-created PR as a GitHub draft; promote it only after the current-head `CI Gate` succeeds. Before a later upload that changes more than 50 executable-code lines, return the PR to draft **before** pushing, then promote it again after the replacement `CI Gate` succeeds.
+**Automatic Codex review is the default.** Open every agent-created PR as a GitHub draft; promote it only after the current-head `CI Gate` succeeds. Tim's personal review trigger is set to **On every push**, so leave a ready PR ready for later uploads and monitor the replacement current-head CI and automatic review. If a PR is already draft, keep it draft through the push and promote it only after replacement CI succeeds.
 
 The owning agent monitors CI, draft promotion, automatic review, findings, and corrective pushes until Codex has returned a clean result for the exact current head and every review thread is resolved. An exact-head finding-bearing review is also terminal once every thread is explicitly adjudicated and resolved; declining a finding without a push does not require manual re-review. Use `@codex review` only when Tim explicitly asks for a manual trigger; it is not the fallback when automation is slow.
 
-The gate accepts Codex's native GitHub approval, its exact-bot/exact-app clean comment pinned to head, an exact-head `COMMENTED`/`CHANGES_REQUESTED` review after every finding thread is adjudicated and resolved, or the existing SHA-pinned manual attestation after Tim runs `/codex:review` or `/code-review`. Exact upload counting, state transitions, and fallback rules: `pinpoint-pr-workflow` skill Phase 3.
+The gate accepts Codex's native GitHub approval, its exact-bot/exact-app clean comment pinned to head, its exact-bot `+1` reaction created after the successful current-head `CI Gate`, an exact-head `COMMENTED`/`CHANGES_REQUESTED` review after every finding thread is adjudicated and resolved, or the existing SHA-pinned manual attestation after Tim runs `/codex:review` or `/code-review`. State transitions and fallback rules: `pinpoint-pr-workflow` skill Phase 3.
 
 ### Handing a PR over to merge
 

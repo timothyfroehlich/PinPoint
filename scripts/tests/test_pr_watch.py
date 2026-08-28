@@ -121,6 +121,19 @@ def clean_codex_comment(
     }
 
 
+def clean_codex_reaction(
+    *,
+    login=pr_watch.CODEX_REVIEW_BOT,
+    content="+1",
+    created_at="2026-08-22T12:02:00Z",
+):
+    return {
+        "user": {"login": login},
+        "content": content,
+        "created_at": created_at,
+    }
+
+
 def make_gh(
     *,
     rollup=(),
@@ -130,6 +143,7 @@ def make_gh(
     labels=(),
     reviews=(),
     comments=(),
+    reactions=(),
 ):
     """Build a fake `gh` that answers every call pr-watch makes.
 
@@ -163,6 +177,8 @@ def make_gh(
                 return json.dumps(list(reviews))
             if "/comments" in path:
                 return json.dumps(list(comments))
+            if "/reactions" in path:
+                return json.dumps(list(reactions))
         if args[:2] == ("api", "graphql"):
             return json.dumps(
                 {
@@ -837,6 +853,7 @@ def test_codex_login_is_identical_to_the_bash_gate():
     [
         "approval",
         "clean_comment",
+        "clean_reaction",
         "reviewed",
         "marker",
         "stale_approval",
@@ -874,6 +891,42 @@ def test_review_state_clean_comment_pins_head(monkeypatch):
     state, detail = pr_watch.review_state(PR)
     assert state == "clean_comment"
     assert HEAD_SHA[:10] in detail
+
+
+@pytest.mark.unit
+def test_review_state_clean_reaction_after_current_head_ci_pins_head(monkeypatch):
+    monkeypatch.setattr(
+        pr_watch,
+        "gh",
+        make_gh(
+            rollup=[_gate("SUCCESS", completed_at="2026-08-22T12:01:00Z")],
+            reactions=[clean_codex_reaction()],
+        ),
+    )
+    state, detail = pr_watch.review_state(PR)
+    assert state == "clean_reaction"
+    assert HEAD_SHA[:7] in detail
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "reaction",
+    [
+        clean_codex_reaction(login="other[bot]"),
+        clean_codex_reaction(content="eyes"),
+        clean_codex_reaction(created_at="2026-08-22T12:00:00Z"),
+    ],
+)
+def test_review_state_rejects_untrusted_or_pre_head_reaction(monkeypatch, reaction):
+    monkeypatch.setattr(
+        pr_watch,
+        "gh",
+        make_gh(
+            rollup=[_gate("SUCCESS", completed_at="2026-08-22T12:01:00Z")],
+            reactions=[reaction],
+        ),
+    )
+    assert pr_watch.review_state(PR)[0] != "clean_reaction"
 
 
 @pytest.mark.unit

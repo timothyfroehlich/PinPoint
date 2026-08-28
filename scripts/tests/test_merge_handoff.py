@@ -82,6 +82,7 @@ class Scenario:
     review: str | None = None
     review_state: str = "APPROVED"
     clean_comment: bool = False
+    clean_reaction: bool = False
     manual_review: bool = False
     gh_head: str = "head"
     threads: list[dict] = field(default_factory=list)
@@ -244,6 +245,19 @@ def repo_with_pr(
         (tmp_path / "threads.json").write_text(json.dumps(threads_payload))
         (tmp_path / "comments.json").write_text(json.dumps(comments))
         (tmp_path / "reviews.json").write_text(json.dumps(reviews))
+        (tmp_path / "reactions.json").write_text(
+            json.dumps(
+                [
+                    {
+                        "user": {"login": "chatgpt-codex-connector[bot]"},
+                        "content": "+1",
+                        "created_at": "2026-08-02T20:43:19Z",
+                    }
+                ]
+                if scenario.clean_reaction
+                else []
+            )
+        )
 
         # Dispatches on the joined argument string, most specific first: `gh pr view`
         # carries a different --json set per caller and they must not collide.
@@ -253,6 +267,7 @@ def repo_with_pr(
             'args="$*"\n'
             'case "$args" in\n'
             '  *"nameWithOwner"*) printf "acme/widget\\n" ;;\n'
+            '  *"last // empty"*) printf "%s\\n" "$STUB_CI_COMPLETED_AT" ;;\n'
             '  *"statusCheckRollup"*) cat "$STUB_ROLLUP" ;;\n'
             '  *"--json mergeable"*) printf "%s\\n" "$STUB_MERGEABLE" ;;\n'
             '  *"--jq .headRefOid"*) jq -r .headRefOid "$STUB_META" ;;\n'
@@ -260,6 +275,7 @@ def repo_with_pr(
             '  *"api graphql"*) cat "$STUB_THREADS" ;;\n'
             '  *"/reviews"*) cat "$STUB_REVIEWS" ;;\n'
             '  *"/comments"*) cat "$STUB_COMMENTS" ;;\n'
+            '  *"/reactions"*) cat "$STUB_REACTIONS" ;;\n'
             '  *) printf "UNEXPECTED gh call: %s\\n" "$args" >&2; exit 1 ;;\n'
             "esac\n"
         )
@@ -276,6 +292,13 @@ def repo_with_pr(
             "STUB_THREADS": str(tmp_path / "threads.json"),
             "STUB_COMMENTS": str(tmp_path / "comments.json"),
             "STUB_REVIEWS": str(tmp_path / "reviews.json"),
+            "STUB_REACTIONS": str(tmp_path / "reactions.json"),
+            "STUB_CI_COMPLETED_AT": (
+                "2026-08-02T20:42:00Z"
+                if scenario.ci_status == "COMPLETED"
+                and scenario.ci_conclusion in {"SUCCESS", "NEUTRAL", "SKIPPED"}
+                else ""
+            ),
             "STUB_MERGEABLE": scenario.mergeable,
         }
         run = subprocess.run(
@@ -304,6 +327,16 @@ def test_a_ready_pr_gets_the_merge_command() -> None:
         assert run.returncode == 0, run.stderr
         assert MERGE_CMD in run.stdout, run.stdout
         assert "NOT MERGEABLE YET" not in run.stdout
+
+
+def test_a_clean_codex_reaction_gets_the_merge_command() -> None:
+    with repo_with_pr(
+        branch_changes={"src/lib/thing.ts": "export const x = 1;\n"},
+        scenario=Scenario(clean_reaction=True),
+    ) as (_head, run):
+        assert run.returncode == 0, run.stderr
+        assert "Codex clean +1 reaction" in run.stdout
+        assert MERGE_CMD in run.stdout, run.stdout
 
 
 @pytest.mark.parametrize(

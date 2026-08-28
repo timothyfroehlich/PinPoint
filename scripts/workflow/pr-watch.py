@@ -291,6 +291,25 @@ def _comment_review_records(
     return clean, markers
 
 
+def _clean_codex_reaction_at(pr: int) -> str:
+    """Return a trusted clean reaction time anchored to the current-head CI Gate."""
+    ci_completed_at = _ci_gate_completed_at(pr)
+    if not ci_completed_at:
+        return ""
+
+    repo = f"repos/{REPO_OWNER}/{REPO_NAME}"
+    return max(
+        (
+            reaction.get("created_at") or ""
+            for reaction in _gh_api_list(f"{repo}/issues/{pr}/reactions")
+            if reaction.get("user", {}).get("login") == CODEX_REVIEW_BOT
+            and reaction.get("content") == "+1"
+            and (reaction.get("created_at") or "") >= ci_completed_at
+        ),
+        default="",
+    )
+
+
 def review_state(pr: int) -> tuple[str, str]:
     """Return the current-head state across both valid review paths."""
     head_sha = json.loads(gh("pr", "view", str(pr), "--json", "headRefOid"))[
@@ -336,6 +355,14 @@ def review_state(pr: int) -> tuple[str, str]:
             "reviewed",
             f"Codex reviewed head {head_sha[:7]} with {state}; thread gate owns findings",
         )
+
+    reaction_at = _clean_codex_reaction_at(pr)
+    if reaction_at and (
+        not reviews
+        or review_sha != head_sha
+        or reaction_at > (latest.get("submitted_at") or "")
+    ):
+        return "clean_reaction", f"Codex reacted +1 on head {head_sha[:7]}"
 
     latest_marker_sha, latest_marker_at = max(
         markers, key=lambda marker: marker[1], default=("", "")
@@ -395,8 +422,8 @@ def _unresolved_threads(threads: list[dict]) -> int:
     return sum(1 for t in threads if not t["isResolved"])
 
 
-def _ci_gate_state(pr: int) -> tuple[str, str]:
-    """Return (status, conclusion) for the CI Gate check, or ("", "") if absent.
+def _current_ci_gate(pr: int) -> dict | None:
+    """Return the authoritative CI Gate check for GitHub's current PR head.
 
     GitHub scopes statusCheckRollup to the PR's current head commit, but that
     commit can still carry MORE THAN ONE `CI Gate` entry — a re-run, or a run
@@ -409,15 +436,34 @@ def _ci_gate_state(pr: int) -> tuple[str, str]:
     rollup = json.loads(raw).get("statusCheckRollup", [])
     gates = [c for c in rollup if c.get("name") == CI_GATE_NAME]
     if not gates:
-        return "", ""
+        return None
 
     def rank(check: dict) -> tuple[int, str]:
         not_superseded = 0 if _is_superseded(check.get("conclusion")) else 1
         when = check.get("completedAt") or check.get("startedAt") or ""
         return not_superseded, when
 
-    newest = max(gates, key=rank)
-    return newest.get("status", ""), newest.get("conclusion", "")
+    return max(gates, key=rank)
+
+
+def _ci_gate_completed_at(pr: int) -> str:
+    """Return the passing current-head CI Gate completion time, if available."""
+    gate = _current_ci_gate(pr)
+    if (
+        gate is None
+        or (gate.get("status") or "").upper() != "COMPLETED"
+        or not _is_passing(gate.get("conclusion"))
+    ):
+        return ""
+    return gate.get("completedAt") or gate.get("startedAt") or ""
+
+
+def _ci_gate_state(pr: int) -> tuple[str, str]:
+    """Return (status, conclusion) for the CI Gate check, or ("", "") if absent."""
+    gate = _current_ci_gate(pr)
+    if gate is None:
+        return "", ""
+    return gate.get("status", ""), gate.get("conclusion", "")
 
 
 def _finalize_via_ci_gate(pr: int, timeout_sec: int = 1200, poll_sec: int = 10) -> int:

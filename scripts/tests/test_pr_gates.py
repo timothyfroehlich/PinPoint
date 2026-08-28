@@ -1,7 +1,7 @@
 """Regression tests for the merge gate's automatic and manual review records.
 
-A native approval or trusted clean connector comment from the official Codex GitHub
-App, or the existing SHA-pinned manual attestation, may cover the current head.
+A native approval, trusted clean connector comment or reaction from the official Codex
+GitHub App, or the existing SHA-pinned manual attestation, may cover the current head.
 """
 
 import json
@@ -72,6 +72,19 @@ def clean_codex_comment(
     }
 
 
+def clean_codex_reaction(
+    *,
+    login: str = CODEX_BOT,
+    content: str = "+1",
+    created_at: str = "2026-08-22T12:02:00Z",
+) -> dict:
+    return {
+        "user": {"login": login},
+        "content": content,
+        "created_at": created_at,
+    }
+
+
 def legacy_claude_marker(sha: str = HEAD_SHA, detail: str = "high") -> dict:
     return {
         "body": (
@@ -95,8 +108,10 @@ def gate_env(
     *,
     review_pages: list[list[dict]] | None = None,
     comment_pages: list[list[dict]] | None = None,
+    reaction_pages: list[list[dict]] | None = None,
     threads: list[dict] | None = None,
     head_sha: str = HEAD_SHA,
+    ci_completed_at: str = "2026-08-22T12:01:00Z",
 ) -> Iterator[dict]:
     """Yield an environment whose gh executable serves paginated review records."""
     with tempfile.TemporaryDirectory() as tmp:
@@ -106,6 +121,9 @@ def gate_env(
         )
         (tmp_path / "comments.json").write_text(
             "\n".join(json.dumps(page) for page in (comment_pages or [[]]))
+        )
+        (tmp_path / "reactions.json").write_text(
+            "\n".join(json.dumps(page) for page in (reaction_pages or [[]]))
         )
         (tmp_path / "threads.json").write_text(
             json.dumps(
@@ -136,10 +154,12 @@ def gate_env(
             'printf "%s\\n" "$args" >> "$STUB_CALLS"\n'
             'case "$args" in\n'
             '  *"--jq .headRefOid"*) printf "%s\\n" "$STUB_HEAD_SHA" ;;\n'
+            '  *"statusCheckRollup"*) printf "%s\\n" "$STUB_CI_COMPLETED_AT" ;;\n'
             '  *"nameWithOwner"*) printf "acme/widget\\n" ;;\n'
             '  *"api graphql"*) cat "$STUB_THREADS" ;;\n'
             '  *"/pulls/"*"/reviews"*) cat "$STUB_REVIEWS" ;;\n'
             '  *"/issues/"*"/comments"*) cat "$STUB_COMMENTS" ;;\n'
+            '  *"/issues/"*"/reactions"*) cat "$STUB_REACTIONS" ;;\n'
             '  *) printf "UNEXPECTED gh call: %s\\n" "$args" >&2; exit 1 ;;\n'
             "esac\n"
         )
@@ -152,8 +172,10 @@ def gate_env(
         env["STUB_HEAD_SHA"] = head_sha
         env["STUB_REVIEWS"] = str(tmp_path / "reviews.json")
         env["STUB_COMMENTS"] = str(tmp_path / "comments.json")
+        env["STUB_REACTIONS"] = str(tmp_path / "reactions.json")
         env["STUB_THREADS"] = str(tmp_path / "threads.json")
         env["STUB_CALLS"] = str(calls_path)
+        env["STUB_CI_COMPLETED_AT"] = ci_completed_at
         yield env
 
 
@@ -206,6 +228,45 @@ def test_clean_codex_comment_accepts_full_head_sha() -> None:
         CODEX_BOT,
         "NO_FINDINGS",
     )
+
+
+def test_clean_codex_reaction_after_current_head_ci_passes() -> None:
+    with gate_env(reaction_pages=[[clean_codex_reaction()]]) as env:
+        state, sha, reviewer, detail, *_rest = review_record(env)
+    assert (state, sha, reviewer, detail) == (
+        "clean_reaction",
+        HEAD_SHA,
+        CODEX_BOT,
+        "NO_FINDINGS",
+    )
+
+
+@pytest.mark.parametrize(
+    "reaction,ci_completed_at",
+    [
+        pytest.param(
+            clean_codex_reaction(login="other[bot]"),
+            "2026-08-22T12:01:00Z",
+            id="wrong-bot",
+        ),
+        pytest.param(
+            clean_codex_reaction(content="eyes"),
+            "2026-08-22T12:01:00Z",
+            id="wrong-content",
+        ),
+        pytest.param(
+            clean_codex_reaction(created_at="2026-08-22T12:00:00Z"),
+            "2026-08-22T12:01:00Z",
+            id="before-current-ci",
+        ),
+    ],
+)
+def test_untrusted_or_pre_head_reactions_do_not_cover_head(
+    reaction: dict, ci_completed_at: str
+) -> None:
+    with gate_env(reaction_pages=[[reaction]], ci_completed_at=ci_completed_at) as env:
+        result = run_gate("check_review_happened", env)
+    assert result.returncode == 1, result.stdout
 
 
 @pytest.mark.parametrize(
@@ -344,6 +405,12 @@ def test_manual_markers_are_read_across_all_pages() -> None:
 
 def test_clean_codex_comments_are_read_across_all_pages() -> None:
     with gate_env(comment_pages=[[], [clean_codex_comment()]]) as env:
+        result = run_gate("check_review_happened", env)
+    assert result.returncode == 0, result.stdout
+
+
+def test_clean_codex_reactions_are_read_across_all_pages() -> None:
+    with gate_env(reaction_pages=[[], [clean_codex_reaction()]]) as env:
         result = run_gate("check_review_happened", env)
     assert result.returncode == 0, result.stdout
 
