@@ -460,12 +460,17 @@ def _collect_setup_cli_versions(
 
     Returns (path, line_number, version) tuples. Auto-discovers all workflow
     files so a new job that adds a setup-cli block is covered without editing
-    this test. The scan window after each `uses: supabase/setup-cli` line is
-    generous (matches the chores runbook's `rg -A6`) because one call site has
-    an extra `if:` line before `with:`.
+    this test.
+
+    The scan is bounded to the setup-cli step's own mapping: starting after the
+    `uses: supabase/setup-cli` line it reads until the next step (`- ` list
+    item) or a dedent out of the step's key level, so a `version:` belonging to
+    a *later* step can never be misattributed to an unpinned setup-cli. YAML is
+    parsed by hand (indentation + step markers) rather than with a library
+    because the script/test suite is deliberately stdlib-only.
 
     `workflows_dir` defaults to the repo's `.github/workflows`; the parameter
-    exists so the EOF-guard regression test can point it at a fixture.
+    exists so the regression tests can point it at a fixture.
     """
     if workflows_dir is None:
         workflows_dir = REPO_ROOT / ".github" / "workflows"
@@ -476,24 +481,32 @@ def _collect_setup_cli_versions(
         for idx, line in enumerate(lines):
             if "uses: supabase/setup-cli" not in line:
                 continue
-            # Track the hit explicitly instead of relying on for/else: an EOF
-            # break within the scan window would otherwise also suppress the
-            # else clause, silently skipping a version-less block near EOF and
-            # defeating the drift guard.
+            # Column of the `uses:` keyword; the step's sibling keys (`with:`)
+            # sit at this column and `version:` deeper. Anything shallower, or a
+            # new `- ` list item, begins a different step — stop there.
+            uses_col = line.index("uses:")
             match_line: int | None = None
             match_version: str | None = None
-            for offset in range(1, 8):
-                if idx + offset >= len(lines):
-                    break
-                m = version_re.match(lines[idx + offset])
-                if m:
-                    match_line = idx + offset + 1
-                    match_version = m.group(1)
-                    break
+            offset = 1
+            while idx + offset < len(lines):
+                nxt = lines[idx + offset]
+                stripped = nxt.strip()
+                if stripped:
+                    indent = len(nxt) - len(nxt.lstrip())
+                    if stripped.startswith("- ") or stripped == "-":
+                        break  # next step in the sequence
+                    if indent < uses_col:
+                        break  # dedented out of this step's mapping
+                    m = version_re.match(nxt)
+                    if m:
+                        match_line = idx + offset + 1
+                        match_version = m.group(1)
+                        break
+                offset += 1
             if match_version is None or match_line is None:
                 raise AssertionError(
-                    f"{wf.name}:{idx + 1} uses supabase/setup-cli but no `version:` "
-                    "was found within the next 7 lines"
+                    f"{wf.name}:{idx + 1} uses supabase/setup-cli but the step "
+                    "declares no `version:` of its own"
                 )
             found.append((wf, match_line, match_version))
     return found
@@ -556,3 +569,49 @@ def test_collect_setup_cli_versions_reads_versioned_fixture(tmp_path: Path) -> N
     )
     pins = _collect_setup_cli_versions(workflows_dir=tmp_path)
     assert [v for _, _, v in pins] == ["9.9.9"]
+
+
+def test_collect_setup_cli_versions_ignores_later_steps_version(tmp_path: Path) -> None:
+    """A later step's `version:` must not be attributed to an unpinned setup-cli.
+
+    Regression guard: an unpinned `supabase/setup-cli` immediately followed by
+    another action carrying `version: 2.115.0` must still raise — the scan is
+    bounded to setup-cli's own step, so the neighbor's value can't stand in.
+    """
+    wf = tmp_path / "misattribution.yaml"
+    wf.write_text(
+        "jobs:\n  x:\n    steps:\n"
+        "      - uses: supabase/setup-cli@v3\n"
+        "      - uses: some/other-action@v1\n"
+        "        with:\n"
+        "          version: 2.115.0\n",
+        encoding="utf-8",
+    )
+    raised = False
+    try:
+        _collect_setup_cli_versions(workflows_dir=tmp_path)
+    except AssertionError as exc:
+        raised = True
+        assert "no `version:`" in str(exc)
+    assert raised, (
+        "expected an unpinned setup-cli to raise despite a neighbor's version:"
+    )
+
+
+def test_collect_setup_cli_versions_handles_name_form_step(tmp_path: Path) -> None:
+    """The `- name:` step form (uses under the marker) resolves its own version."""
+    wf = tmp_path / "name-form.yaml"
+    wf.write_text(
+        "jobs:\n  x:\n    steps:\n"
+        "      - name: Setup Supabase CLI\n"
+        "        uses: supabase/setup-cli@v3  # ratchet:...\n"
+        "        with:\n"
+        "          version: 1.2.3\n"
+        "      - name: Next\n"
+        "        uses: some/other@v1\n"
+        "        with:\n"
+        "          version: 9.9.9\n",
+        encoding="utf-8",
+    )
+    pins = _collect_setup_cli_versions(workflows_dir=tmp_path)
+    assert [v for _, _, v in pins] == ["1.2.3"]
