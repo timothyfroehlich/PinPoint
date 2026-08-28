@@ -25,6 +25,7 @@ import pytest
 
 REPO_ROOT = Path(__file__).parent.parent.parent
 SETTINGS_PATH = REPO_ROOT / ".claude" / "settings.json"
+CODEX_HOOKS_PATH = REPO_ROOT / ".codex" / "hooks.json"
 
 # Matches `node "${CLAUDE_PROJECT_DIR:-.}"/.claude/hooks/<name>.cjs` -- the
 # same anchoring form the bash hooks in this file already use.
@@ -89,6 +90,20 @@ EXPECTED_NODE_HOOK_BASENAMES = [
 
 def test_settings_json_exists() -> None:
     assert SETTINGS_PATH.is_file(), f"expected {SETTINGS_PATH} to exist"
+
+
+def test_project_hooks_do_not_register_global_huddle_runtime() -> None:
+    """Huddle injection and Git maintenance are owned entirely by dotfiles."""
+    claude_commands = _all_hook_commands()
+    codex_hooks = json.loads(CODEX_HOOKS_PATH.read_text(encoding="utf-8"))
+    codex_commands: list[str] = []
+    for event_entries in codex_hooks.get("hooks", {}).values():
+        codex_commands.extend(_collect_commands(event_entries))
+
+    registered = "\n".join([*claude_commands, *codex_commands])
+    assert ".agents/huddle/" not in registered
+    assert "huddle-main-watch" not in registered
+    assert "huddle-service" not in registered
 
 
 def test_all_expected_node_hooks_are_wired() -> None:

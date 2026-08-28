@@ -34,16 +34,6 @@
           }
         ],
         "matcher": "startup|resume|clear"
-      },
-      {
-        "hooks": [
-          {
-            "command": "node \"$HOME\"/.agents/huddle/huddle-codex-adapter.cjs start",
-            "statusMessage": "Syncing huddle and main",
-            "type": "command"
-          }
-        ],
-        "matcher": "startup|resume|clear"
       }
     ],
     "UserPromptSubmit": [
@@ -52,26 +42,6 @@
           {
             "command": "bd codex-hook UserPromptSubmit",
             "statusMessage": "Refreshing Beads context",
-            "type": "command"
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "command": "node \"$HOME\"/.agents/huddle/huddle-codex-adapter.cjs prompt",
-            "statusMessage": "Checking huddle and main",
-            "type": "command"
-          }
-        ]
-      }
-    ],
-    "PostToolUse": [
-      {
-        "hooks": [
-          {
-            "command": "node \"$HOME\"/.agents/huddle/huddle-codex-adapter.cjs post-tool",
-            "statusMessage": "Checking main",
             "type": "command"
           }
         ]
