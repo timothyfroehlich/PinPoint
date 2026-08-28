@@ -82,6 +82,8 @@ class Scenario:
     review: str | None = None
     review_state: str = "APPROVED"
     clean_comment: bool = False
+    clean_reaction: bool = False
+    clean_reaction_sha: str = "head"
     manual_review: bool = False
     gh_head: str = "head"
     threads: list[dict] = field(default_factory=list)
@@ -179,6 +181,23 @@ def repo_with_pr(
                         "Codex Review: Didn't find any major issues. Hooray!\n\n"
                         f"**Reviewed commit:** `{head_sha[:10]}`"
                     ),
+                    "updated_at": "2026-08-02T20:43:19Z",
+                }
+            )
+        if scenario.clean_reaction:
+            witnessed_sha = {
+                "head": head_sha,
+                "previous": git("rev-parse", "HEAD~1", cwd=work),
+            }[scenario.clean_reaction_sha]
+            comments.append(
+                {
+                    "user": {"login": "github-actions[bot]"},
+                    "performed_via_github_app": {"slug": "github-actions"},
+                    "body": (
+                        f"<!-- pinpoint-codex-reaction-witness: {witnessed_sha} -->\n"
+                        "Trusted workflow witnessed Codex eyes-to-+1 on this head."
+                    ),
+                    "created_at": "2026-08-02T20:43:19Z",
                     "updated_at": "2026-08-02T20:43:19Z",
                 }
             )
@@ -304,6 +323,17 @@ def test_a_ready_pr_gets_the_merge_command() -> None:
         assert run.returncode == 0, run.stderr
         assert MERGE_CMD in run.stdout, run.stdout
         assert "NOT MERGEABLE YET" not in run.stdout
+
+
+def test_a_clean_codex_reaction_gets_the_merge_command() -> None:
+    with repo_with_pr(
+        branch_changes={"src/lib/thing.ts": "export const x = 1;\n"},
+        scenario=Scenario(clean_reaction=True),
+    ) as (_head, run):
+        assert run.returncode == 0, run.stderr
+        assert "Codex clean reaction witness" in run.stdout
+        assert "since review  none — the review covers head" in run.stdout
+        assert MERGE_CMD in run.stdout, run.stdout
 
 
 @pytest.mark.parametrize(
@@ -526,6 +556,17 @@ def test_commits_pushed_after_the_review_are_counted_and_diffed() -> None:
     ) as (_head, run):
         assert "STALE: 1 commit(s) back" in run.stdout, run.stdout
         assert "since review  +2 -0" in run.stdout
+
+
+def test_commits_pushed_after_a_reaction_witness_are_counted_and_diffed() -> None:
+    with repo_with_pr(
+        branch_changes={"src/lib/thing.ts": "x\n"},
+        extra_branch_commit={"src/lib/other.ts": "a\nb\n"},
+        scenario=Scenario(clean_reaction=True, clean_reaction_sha="previous"),
+    ) as (_head, run):
+        assert "Codex clean reaction witness" in run.stdout, run.stdout
+        assert "STALE: 1 commit(s) back" in run.stdout, run.stdout
+        assert "since review  +2 -0" in run.stdout, run.stdout
 
 
 def test_a_review_of_an_unrelated_commit_reports_the_distance_as_unknowable() -> None:

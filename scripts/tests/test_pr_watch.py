@@ -121,6 +121,22 @@ def clean_codex_comment(
     }
 
 
+def clean_codex_reaction_witness(
+    sha=HEAD_SHA,
+    *,
+    login=pr_watch.GITHUB_ACTIONS_BOT,
+    app=pr_watch.GITHUB_ACTIONS_APP_SLUG,
+    updated_at="2026-08-22T12:02:00Z",
+):
+    return {
+        "user": {"login": login},
+        "performed_via_github_app": {"slug": app},
+        "body": f"<!-- pinpoint-codex-reaction-witness: {sha} -->\nwitnessed",
+        "created_at": updated_at,
+        "updated_at": updated_at,
+    }
+
+
 def make_gh(
     *,
     rollup=(),
@@ -837,10 +853,12 @@ def test_codex_login_is_identical_to_the_bash_gate():
     [
         "approval",
         "clean_comment",
+        "clean_reaction",
         "reviewed",
         "marker",
         "stale_approval",
         "stale_clean_comment",
+        "stale_clean_reaction",
         "stale_marker",
         "not_approved",
         "unreviewed",
@@ -874,6 +892,40 @@ def test_review_state_clean_comment_pins_head(monkeypatch):
     state, detail = pr_watch.review_state(PR)
     assert state == "clean_comment"
     assert HEAD_SHA[:10] in detail
+
+
+@pytest.mark.unit
+def test_review_state_clean_reaction_witness_pins_head(monkeypatch):
+    monkeypatch.setattr(
+        pr_watch,
+        "gh",
+        make_gh(
+            comments=[clean_codex_reaction_witness()],
+        ),
+    )
+    state, detail = pr_watch.review_state(PR)
+    assert state == "clean_reaction"
+    assert HEAD_SHA[:7] in detail
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "witness",
+    [
+        clean_codex_reaction_witness(login="other[bot]"),
+        clean_codex_reaction_witness(app="other-app"),
+        clean_codex_reaction_witness(OLD_SHA),
+    ],
+)
+def test_review_state_rejects_untrusted_or_stale_reaction_witness(monkeypatch, witness):
+    monkeypatch.setattr(
+        pr_watch,
+        "gh",
+        make_gh(
+            comments=[witness],
+        ),
+    )
+    assert pr_watch.review_state(PR)[0] != "clean_reaction"
 
 
 @pytest.mark.unit
