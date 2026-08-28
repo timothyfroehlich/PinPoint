@@ -397,4 +397,65 @@ describe("PinballMapLinkField — Source control (PP-3bbr.2 / .3)", () => {
       screen.getByRole("radiogroup", { name: "Source:" })
     ).toBeInTheDocument();
   });
+
+  it("stops naming the stored title once the selection has been cleared", async () => {
+    // Codex review, PR #1925. Manual Entry and back leaves nothing picked, so
+    // the trigger must not keep advertising the title the save is dropping.
+    const user = userEvent.setup();
+    render(<PinballMapLinkField {...STORED} />);
+    await waitFor(() => {
+      expect(resolvePinballMapLinkAction).toHaveBeenCalled();
+    });
+    expect(screen.getByText("Godzilla (Premium)")).toBeInTheDocument();
+
+    await user.click(screen.getByTestId("pinballmap-source-manual"));
+    await user.click(screen.getByTestId("pinballmap-source-catalog"));
+
+    expect(screen.queryByText("Godzilla (Premium)")).not.toBeInTheDocument();
+    expect(screen.getByText("Search for a model…")).toBeInTheDocument();
+    expect(submittedLinkId()).toBe("");
+  });
+
+  it("drops a preselect that lands after the user has switched source", async () => {
+    // Codex review, PR #1925. The late resolve used to restore the catalog id
+    // without clearing `excluded`, submitting both — which the DB CHECK
+    // `machines_pinballmap_excluded_xor_link` forbids.
+    const user = userEvent.setup();
+    let land: (() => void) | undefined;
+    vi.mocked(resolvePinballMapLinkAction).mockReturnValue(
+      new Promise((resolve) => {
+        land = () => {
+          resolve({
+            family: {
+              machineGroupId: null,
+              pinballmapMachineId: 42,
+              name: "Godzilla (Premium)",
+              manufacturer: "Stern",
+              year: 2021,
+              editionCount: 1,
+            },
+            editions: [],
+            pinballmapMachineId: 42,
+          });
+        };
+      })
+    );
+
+    render(<PinballMapLinkField {...STORED} />);
+    await user.click(screen.getByTestId("pinballmap-source-manual"));
+
+    land?.();
+    await waitFor(() => {
+      expect(field("modelName")).not.toBeNull();
+    });
+
+    expect(submittedLinkId()).toBe("");
+    expect(
+      document.querySelector('input[name="pinballmapExcluded"]')
+    ).not.toBeNull();
+    expect(screen.getByTestId("pinballmap-source-manual")).toHaveAttribute(
+      "aria-checked",
+      "true"
+    );
+  });
 });

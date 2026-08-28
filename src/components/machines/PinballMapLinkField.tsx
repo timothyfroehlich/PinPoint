@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useId, useState } from "react";
+import React, { useEffect, useId, useRef, useState } from "react";
 import { ChevronsUpDown } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { Label } from "~/components/ui/label";
@@ -199,7 +199,16 @@ export function PinballMapLinkField({
 
   // Whether the USER has changed the selection. Until they do, the form submits
   // the machine's STORED link — see `submittedId`.
+  //
+  // Mirrored into a ref because the preselect effect below closes over its
+  // first render's value and would therefore always read `false`. Set both
+  // through {@link markUserChanged} so they cannot drift.
   const [userChanged, setUserChanged] = useState(false);
+  const userChangedRef = useRef(false);
+  const markUserChanged = (): void => {
+    userChangedRef.current = true;
+    setUserChanged(true);
+  };
 
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -212,12 +221,19 @@ export function PinballMapLinkField({
   // A rejection here must not be swallowed: `family` would stay null forever
   // while the trigger kept showing the stored title, and what the form submits
   // is decided by `userChanged` below rather than by whether this resolved.
+  //
+  // It also has to lose a race it can win: a user who picks Manual Entry before
+  // this lands would otherwise have `family` and the resolved edition id put
+  // back underneath them, with `excluded` still on — a form submitting both a
+  // catalog id and the Manual Entry flag, which the DB CHECK forbids outright
+  // (Codex review, PR #1925). Once the user has touched the field the stored
+  // link is no longer what the control is about, so a late resolve is dropped.
   useEffect(() => {
     if (defaultMachineId === null) return;
     let active = true;
     void resolvePinballMapLinkAction(defaultMachineId)
       .then((resolved) => {
-        if (active && resolved) {
+        if (active && !userChangedRef.current && resolved) {
           setFamily(resolved.family);
           setEditions(resolved.editions);
           setSelectedEditionId(resolved.pinballmapMachineId);
@@ -290,7 +306,7 @@ export function PinballMapLinkField({
     setYear("");
     setOpen(false);
     setQuery("");
-    setUserChanged(true);
+    markUserChanged();
     onDirty?.();
 
     if (pick.pinballmapMachineId !== null) {
@@ -330,7 +346,7 @@ export function PinballMapLinkField({
    */
   const handleSetSource = (manual: boolean): void => {
     if (manual === excluded) return;
-    setUserChanged(true);
+    markUserChanged();
     onDirty?.();
     if (manual) {
       setExcluded(true);
@@ -372,9 +388,17 @@ export function PinballMapLinkField({
   const submittedId = userChanged ? resolvedId : defaultMachineId;
 
   const familyMeta = family ? formatMeta(family.manufacturer, family.year) : "";
-  // While an existing link resolves on edit, show its known name; otherwise prompt.
+  // While an existing link resolves on edit, show its known name; otherwise
+  // prompt.
+  //
+  // Gated on `userChanged` for the same reason `submittedId` is, and it has to
+  // be the same gate: once the user has changed the field, the trigger showing
+  // the stored title while the hidden input carries an empty id is the picker
+  // claiming a link the save is about to drop (Codex review, PR #1925). The
+  // clearest case is switching to Manual Entry and back — `family` is null and
+  // nothing has been picked, so there is nothing to name.
   const placeholderLabel =
-    defaultMachineId !== null && defaultName
+    !userChanged && defaultMachineId !== null && defaultName
       ? defaultName
       : "Search for a model…";
 
@@ -678,7 +702,7 @@ export function PinballMapLinkField({
                 : {})}
               onValueChange={(v) => {
                 setSelectedEditionId(Number(v));
-                setUserChanged(true);
+                markUserChanged();
                 onDirty?.();
               }}
             >
