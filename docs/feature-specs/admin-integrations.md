@@ -73,8 +73,11 @@ configured in the same section).
   to `pinballmap.md` §10 when this spec became a page shell. Section and
   requirement numbers are kept so older citations resolve to their exact
   successors:
-  - §5.1–§5.3 — already retired 2026-08-23 (the enable/disable flag); no
-    successor.
+  - §5.1–§5.3 — retired 2026-08-23 when the enable flag was removed; their
+    replacement behavior now lives in §10: §5.1 (enable toggle → configuration
+    presence) → `pinballmap.md` §10.5 · §5.2 (enabling → setting a location
+    supplies the first snapshot) → §10.9 · §5.3 (disabling → clearing the
+    location) → §10.7.
   - §5.4 → `pinballmap.md` §10.5 · §5.5 → §10.6 · §5.6 → §10.7 · §5.7 → §10.8.
 
 ## 6. Changing the tracked location
@@ -85,8 +88,9 @@ configured in the same section).
   - §6.1 → `pinballmap.md` §10.5 · §6.2 → §10.9 · §6.3 → §10.10 ·
     §6.4 → §10.11 · §6.5 → §10.13 · §6.6 → §10.14 · §6.8 → §10.15 ·
     §6.9 → §10.12.
-  - §6.7 — already retired 2026-08-23 (the disabled re-point path); no
-    successor.
+  - §6.7 — retired 2026-08-23 (the disabled re-point path removed); its
+    replacement behavior — clearing follows the configuration-state rules,
+    setting validates through the commit sequence — now lives at §10.7 / §10.9.
 
 ## 7. Permissions
 
