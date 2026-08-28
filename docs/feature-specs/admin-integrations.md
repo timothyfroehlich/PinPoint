@@ -33,37 +33,52 @@ configured in the same section).
 - **2.1** A single admin page lists every integration as a section, one section
   per integration, on one route. There is no per-integration page.
 - **2.2** The page is admin-only: it requires the manage-integrations capability
-  (§4), an admin-tier grant. A member, technician, or guest never reaches it.
+  (§7), an admin-tier grant. A member, technician, or guest never reaches it.
 - **2.3** Each section saves and resets on its own. Editing and saving one
   section never touches another's fields, dirty state, or stored settings. A
   section with unsaved edits warns before the page is abandoned.
 - **2.4** Sections render in a fixed order with the same visual frame, so a new
   integration is added as another section without restructuring the page.
 
-## 3. The sections
+## 3. The Discord section
 
-- **3.1** The **Discord** section implements the credential-entry card defined
-  by the Discord spec (`docs/feature-specs/discord.md` §2–§3): fields,
-  validation, connection status, and sending. It has no enable toggle — the
-  required configuration's presence and validation determine its state — and it
-  links to the Discord help page.
-- **3.2** The **Pinball Map** section configures the Pinball Map integration:
-  the tracked location, its sync health, and an on-demand refresh
-  (`docs/feature-specs/pinballmap.md` §10), and the region-alert channel
-  (`docs/feature-specs/pinballmap-region-alerts.md`). Its behavior — the
-  configuration-presence state model, validate-then-commit location changes, and
-  the location-change safety rules — lives in those specs, not here.
-- **3.3** Per-user credentials are not configured here: per-operator Pinball Map
-  write credentials belong to a person's own settings (PP-o355.5 / PP-o355.6),
-  and Discord login is a separate system from Discord notifications
-  (`discord.md`).
+- **3.1** The Discord section implements the credential-entry card defined by
+  the Discord spec (`docs/feature-specs/discord.md` §2–§3): fields, validation,
+  and connection status. It has no enable toggle — the required configuration's
+  presence and validation determine its state.
+- **3.2** The section links to the Discord help page. Discord login is a
+  separate system from these notifications (`discord.md`) and is not configured
+  here.
 
-## 4. Permissions
+## 4. The Pinball Map section
 
-- **4.1** Configuring any integration on this page requires the
+- **4.1** The Pinball Map section configures the tracked location, its sync
+  health, and an on-demand refresh (`docs/feature-specs/pinballmap.md` §10), and
+  the region-alert channel (`docs/feature-specs/pinballmap-region-alerts.md`).
+  Its detailed requirements — the section behavior, the configuration-presence
+  state model, validate-then-commit location changes, and the location-change
+  safety rules — live in `pinballmap.md` §10, not here. Per-operator outbound
+  write credentials are per-user and belong to a person's own settings
+  (PP-o355.5 / PP-o355.6), not this admin surface.
+
+## 5. Pinball Map configuration state
+
+- _Retired 2026-08-27._ The Pinball Map configuration-state requirements moved
+  to `pinballmap.md` §10.5–§10.8 when this spec became a page shell. Section
+  number kept so older citations do not dangle.
+
+## 6. Changing the tracked location
+
+- _Retired 2026-08-27._ The change-the-tracked-location requirements moved to
+  `pinballmap.md` §10.9–§10.15. Section number kept so older citations do not
+  dangle.
+
+## 7. Permissions
+
+- **7.1** Configuring any integration on this page requires the
   manage-integrations capability — an admin-tier grant. The same capability
   gates the whole page (§2.2) and every section's save.
-- **4.2** This is deliberately a single admin capability, not a per-integration
+- **7.2** This is deliberately a single admin capability, not a per-integration
   one: the page is admin-only, and Pinball Map's finer-grained per-machine
   grants (linking, pushing, refreshing — pinballmap spec §8) gate the machine
   surfaces, not this configuration surface.
@@ -77,7 +92,7 @@ configured in the same section).
 | §2 one combined page               | One Discord-only page at `/admin/integrations/discord`; no combined page | PP-o355.51.5 and PP-o355.51.6 |
 | §2.3 per-section save              | Only the Discord form exists, with its own save                          | PP-o355.51.5 and PP-o355.51.6 |
 | §3.1 Discord credential-entry card | The standalone card has per-field validation                             | PP-o355.51.5                  |
-| §3.2 Pinball Map section           | No Pinball Map section anywhere in admin                                 | PP-o355.51.6                  |
+| §4 Pinball Map section             | No Pinball Map section anywhere in admin                                 | PP-o355.51.6                  |
 
 ---
 
@@ -88,6 +103,6 @@ logged here.
 
 | Date       | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | :--------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 2026-08-27 | Slimmed to a page-level spec. The Pinball Map section's behavior — the sync-health readout and Sync now (was §4), the configuration-presence state model (was §5), and the location-change rules (was §6) — moved to `pinballmap.md` §10. The page spec now states only the page structure (§2), the sections and where each one's behavior lives (§3), and the shared admin capability (§4). No behavior changed; this is a relocation (PP-o355.51.3).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| 2026-08-27 | Slimmed to a page-level spec. The Pinball Map section's detailed behavior — the sync-health readout and Sync now (§4), the configuration-presence state model (§5), and the location-change rules (§6) — moved to `pinballmap.md` §10; §5 and §6 are kept as retired-number tombstones so older citations still resolve, and §7 Permissions is unchanged. The page spec now states only the page structure (§2), the sections and where each one's behavior lives (§3–§4), and the shared admin capability (§7). No behavior changed; this is a relocation (PP-o355.51.8).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | 2026-08-23 | Replaced the distinct Pinball Map enable flag with configuration presence: a stored location means configured and clearing it means Not configured. Defined reversible dormant-state retention, shared throttling for location validation, and validate-then-commit behavior for initial configuration, resumption, and location replacement. Clarified that this state governs location tracking, not the separately configured region-alert feature. Updated the Discord section to follow its approved credential-entry spec.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | 2026-08-17 | Created. Combined Admin Integrations page (§2), Discord section preserved (§3), Pinball Map section with enable toggle / editable location / sync health / sync now / link-out (§4–§5), location-change behavior keeping matches and intents (§6), single admin capability (§7). Then, after a §6 review: §2.2 stated admin-only explicitly; §5.1 clarified seeds still set the initial enabled value; §6 rewritten to validate-before-wipe, forbid wrapping the fetch in a transaction (CORE-ARCH-011), keep the abandoned-listing rows (6.4), leave the refresh allowance untouched (6.5), guard against a concurrent sync (6.6), defer the refresh when disabled (6.7), and name both Missing and Lingering in the confirmation (6.8). Then closed a destructive bug the review surfaced: keeping the old rows exposed the entry-removal re-mint recovery, which re-resolves a title against the _current_ lineup and would delete a live entry at the new location — so abandoned records are now location-stamped, reconciled only same-location (6.4), and removed by stored lmx with re-mint recovery suppressed cross-location (6.9). |

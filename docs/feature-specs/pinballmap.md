@@ -269,9 +269,10 @@ intent agrees with the lineup; _out of sync_ means they disagree.
 The Pinball Map section of the Admin Integrations page
 (`docs/feature-specs/admin-integrations.md`) configures the integration's
 PinPoint-wide state: the tracked location (§1), its sync health, and an
-on-demand refresh. It is a configuration surface only — per-machine listing
-state and the listing control live on the machine surfaces (§4), and the
-region-alert channel that shares the section is its own feature
+on-demand refresh. It is a configuration surface only — it does not show
+per-machine listing state or the listing control (those live on the machine
+surfaces, §4), or fleet-wide Pinball Map views (those live on the admin fleet
+dashboard). The region-alert channel that shares the section is its own feature
 (`docs/feature-specs/pinballmap-region-alerts.md`).
 
 ### The section
@@ -385,7 +386,7 @@ honest rather than building a workflow around it.
 
 - **10.16** Configuring the Pinball Map integration — the location and every
   action in this section — requires the manage-integrations capability
-  (admin-integrations spec §4), the admin-tier grant that gates the page,
+  (admin-integrations spec §7), the admin-tier grant that gates the page,
   distinct from the per-machine machine-linking capability (§8) that gates the
   machine surfaces.
 

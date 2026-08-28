@@ -94,7 +94,7 @@ Related: `docs/feature-specs/pinballmap.md` (the location-sync integration),
 ## 5. Permissions
 
 - **5.1** Configuring region alerts requires the manage-integrations capability
-  (admin-integrations spec §4).
+  (admin-integrations spec §7).
 - **5.2** The region seen-set is server-only state, not readable by clients.
 
 ---

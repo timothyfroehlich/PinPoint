@@ -82,7 +82,7 @@ records, a separate re-check, and a stored status line. It is not a toggle.
 ## 5. Permissions
 
 - **5.1** Configuring Discord requires the manage-integrations capability
-  (admin-integrations spec §4).
+  (admin-integrations spec §7).
 
 ---
 
