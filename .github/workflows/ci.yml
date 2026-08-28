@@ -209,7 +209,13 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Run representative static checks
-        run: pnpm run check
+        run: |
+          pnpm run typecheck
+          pnpm run typecheck:tests
+          pnpm run lint
+          pnpm run format
+          ruff check scripts/
+          ruff format --check scripts/
 
       - name: Run representative unit tests
         run: |

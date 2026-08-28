@@ -459,7 +459,12 @@ def test_ci_mise_canary_contract() -> None:
 
     for command in (
         "pnpm install --frozen-lockfile",
-        "pnpm run check",
+        "pnpm run typecheck",
+        "pnpm run typecheck:tests",
+        "pnpm run lint",
+        "pnpm run format",
+        "ruff check scripts/",
+        "ruff format --check scripts/",
         "pnpm run test",
         "pnpm run build",
     ):
