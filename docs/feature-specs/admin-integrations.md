@@ -60,6 +60,12 @@ configured in the same section).
   safety rules — live in `pinballmap.md` §10, not here. Per-operator outbound
   write credentials are per-user and belong to a person's own settings
   (PP-o355.5 / PP-o355.6), not this admin surface.
+- _Retired 2026-08-27._ The section's detailed sub-requirements moved to
+  `pinballmap.md` §10; their identifiers are kept so older citations resolve to
+  their exact successors: §4.2 → `pinballmap.md` §10.2 · §4.3 → §10.3 ·
+  §4.4 → §10.4 · §4.5 → `pinballmap.md` §10 (introduction). The former §4.6
+  (per-operator write credentials are not configured here) is retained inline in
+  §4.1 above.
 
 ## 5. Pinball Map configuration state
 
