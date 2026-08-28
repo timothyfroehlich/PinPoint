@@ -45,7 +45,7 @@
 #
 # no_conflict gate is NEVER bypassable — GitHub rejects conflicting merges regardless of --admin.
 # Authorship gate has no bypass; this script operates only on PRs you authored OR PRs authored
-# by trusted Dependabot bot identities (app/dependabot, dependabot[bot], dependabot).
+# by trusted dependency-bot identities (Dependabot or the hosted Renovate App).
 # Both --force and --bypass-merge-requirements require manual permission approval
 # (settings.json permissions.ask).
 #
@@ -127,13 +127,13 @@ is_trusted_author() {
   local author="$1"
   [ "$author" = "$CURRENT_USER" ] && return 0
   case "$author" in
-    "app/dependabot"|"dependabot[bot]"|"dependabot") return 0 ;;
+    "app/dependabot"|"dependabot[bot]"|"dependabot"|"app/renovate"|"renovate[bot]") return 0 ;;
   esac
   return 1
 }
 
 if ! is_trusted_author "$PR_AUTHOR"; then
-  echo "REFUSE: merge-pr.sh only operates on your own PRs or Dependabot PRs (PR author: $PR_AUTHOR, you: $CURRENT_USER)" >&2
+  echo "REFUSE: merge-pr.sh only operates on your own PRs or trusted dependency-bot PRs (PR author: $PR_AUTHOR, you: $CURRENT_USER)" >&2
   exit 1
 fi
 

@@ -51,6 +51,7 @@ EMPTY_THREADS = json.dumps(
 def stub_repo(
     *,
     ci_rollup: str,
+    author: str = "tim",
     labels: list[str] | None = None,
     live_labels: list[str] | None = None,
     reap_exit: int = 0,
@@ -75,7 +76,7 @@ def stub_repo(
 
         pr_info = json.dumps(
             {
-                "author": {"login": "tim"},
+                "author": {"login": author},
                 "title": "test PR (PP-test)",
                 "url": "https://example.invalid/pr/123",
                 "labels": [{"name": n} for n in (labels or [])],
@@ -401,6 +402,29 @@ def test_automerge_requires_human() -> None:
     assert out.returncode == 1
     assert "REFUSE: merges are human-authorized only" in out.stderr
     assert not out.merged
+
+
+def test_trusted_dependency_bots_pass_the_authorship_gate() -> None:
+    for author in (
+        "app/dependabot",
+        "dependabot[bot]",
+        "dependabot",
+        "app/renovate",
+        "renovate[bot]",
+    ):
+        with stub_repo(ci_rollup=CI_PASS, author=author) as ctx:
+            out = run_and_snapshot(ctx, "--dry-run")
+
+        assert out.returncode == 0, f"{author}: {out.stdout}{out.stderr}"
+        assert "DRY RUN:" in out.stdout
+
+
+def test_untrusted_bot_fails_the_authorship_gate() -> None:
+    with stub_repo(ci_rollup=CI_PASS, author="dependency-helper[bot]") as ctx:
+        out = run_and_snapshot(ctx, "--dry-run")
+
+    assert out.returncode == 1
+    assert "trusted dependency-bot PRs" in out.stderr
 
 
 def test_automerge_and_dry_run_are_mutually_exclusive() -> None:

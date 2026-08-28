@@ -139,6 +139,11 @@ For the command reference and the rules behind it, see `AGENTS.md` §5; for whic
 tests to write where, the `pinpoint-testing` skill at
 `.agents/skills/pinpoint-testing/SKILL.md`.
 
+Dependency updates are intentionally split: Dependabot owns npm and GitHub Actions,
+while hosted Renovate may propose mise tool updates only. See
+`docs/runbooks/renovate-mise.md` for cooldowns, compatibility checks, hosted-app
+permissions, installation, and rollback.
+
 ---
 
 ## Deployment
