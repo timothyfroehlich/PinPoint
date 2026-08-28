@@ -1503,8 +1503,8 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
       const db = await getTestDb();
       await db.insert(pinballmapState).values({
         id: "singleton",
-        locationId: 26454,
         enabled: true,
+        locationId: 26454,
         lastSyncStatus: "ok",
         snapshotJson: {
           locationId: 26454,

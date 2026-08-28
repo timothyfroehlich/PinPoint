@@ -400,7 +400,7 @@ function TimelineItem({
                     )}
                     {canDelete && (
                       <DropdownMenuItem
-                        className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+                        className="text-destructive-text focus:bg-destructive/10 focus:text-destructive-text"
                         onSelect={() => setIsDeleteDialogOpen(true)}
                       >
                         <Trash2 className="mr-2 size-4" />

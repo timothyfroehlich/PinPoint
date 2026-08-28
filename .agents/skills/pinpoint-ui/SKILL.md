@@ -1,6 +1,6 @@
 ---
 name: pinpoint-ui
-description: shadcn/ui patterns, Server Action forms, Server Components, Client Components, form handling, Tailwind CSS v4, accessibility. The color system is here: semantic tokens only, never a raw palette class or hex, and the app is dark-only so `dark:` variants are wrong. Also the Radix Select form-reset footgun (useActionState dispatch, PP-0fvr/PP-1ajq), CREATE form reset (return-redirect + dual-pass reset), the native `<select>` stale-option-ID silent fallback (PP-lql), authoring config-driven enums with rich metadata (labels/icons/styles), discriminated-union component props, Server Action conventions (`Action` suffix, `checkPermission`, `Result`, `serverActionError`), colocated data access with React `cache()` and `revalidatePath`, derived machine status, and why `console.*` is correct inside client components. Use when building UI, forms, components, badges, server actions, or data fetching, or when user mentions UI/styling/components/forms/enums/dropdowns/logging. Design-system depth — page archetypes, spacing rhythm, severity vocabulary, the form-correctness conventions themselves, and whether a web platform feature clears the Baseline floor — is owned by `pinpoint-design-bible`; this skill states the rules and how to build against them.
+description: shadcn/ui patterns, Server Action forms, Server Components, Client Components, form handling, Tailwind CSS v4, accessibility. The color system is here: semantic tokens only, never a raw palette class or hex, and the app is dark-only so `dark:` variants are wrong. Also the Radix Select form-reset footgun (useActionState dispatch, PP-0fvr/PP-1ajq), CREATE form reset (return-redirect + dual-pass reset), the native `<select>` stale-option-ID silent fallback (PP-lql), authoring config-driven enums with rich metadata (labels/icons/styles), discriminated-union component props, Server Action conventions (`Action` suffix, `checkPermission`, `Result`, `serverActionError`), colocated data access with React `cache()` and `revalidatePath`, the transactional-service pattern (plan-in-transaction / dispatch-after-commit, CORE-ARCH-011, the Doodle Bug), derived machine status, and why `console.*` is correct inside client components. Use when building UI, forms, components, badges, server actions, or data fetching, or when user mentions UI/styling/components/forms/enums/dropdowns/logging. Design-system depth — page archetypes, spacing rhythm, severity vocabulary, the form-correctness conventions themselves, and whether a web platform feature clears the Baseline floor — is owned by `pinpoint-design-bible`; this skill states the rules and how to build against them.
 ---
 
 # PinPoint UI Guide
@@ -18,7 +18,8 @@ Use this skill when:
 - Deciding between Server and Client Components
 - Authoring a new config-driven domain enum, or a badge component that renders several enum types
 - Writing a Server Action or a colocated data-access module
-- User mentions: "UI", "component", "form", "styling", "Tailwind", "shadcn", "button", "input", "select", "dropdown", "badge", "enum", "server action", "form reset"
+- Writing a transactional service function that also notifies — the plan-in-transaction / dispatch-after-commit pattern (CORE-ARCH-011), or when you hit `SideEffectInTransactionError`
+- User mentions: "UI", "component", "form", "styling", "Tailwind", "shadcn", "button", "input", "select", "dropdown", "badge", "enum", "server action", "form reset", "db.transaction", "planNotification", "dispatchNotification", "SideEffectInTransactionError", "side effect in transaction"
 
 ## Quick Reference
 
@@ -29,7 +30,7 @@ Use this skill when:
 3. **shadcn/ui only**: No MUI components
 4. **Direct Server Action references** (CORE-ARCH-005): No inline wrappers in forms
 5. **Dropdown Server Actions** (CORE-ARCH-006): Use `onSelect`, not forms
-6. **Tailwind CSS v4 + semantic tokens**: Use `bg-primary`, `text-destructive-text`, etc. — no raw palette classes (`bg-cyan-500`, `text-red-500`) and no hardcoded hex (enforced via ESLint `better-tailwindcss/no-restricted-classes`)
+6. **Tailwind CSS v4 + semantic tokens**: Use `bg-primary`, `text-destructive-text`, etc. — no raw palette classes (`bg-cyan-500`, `text-red-500`) and no hardcoded hex (enforced via Oxlint `better-tailwindcss/no-restricted-classes`)
 7. **TooltipProvider is hoisted**: `<TooltipProvider>` is mounted once in `ClientProviders` — don't add nested providers. See `pinpoint-design-bible` §12.
 8. **Baseline Widely available is the floor** (CORE-UI-005): use `<dialog>`, container queries, `:has()`, `:user-invalid`, `inert`, `aspect-ratio`, native form validation directly — no polyfills. Newly-available features (Popover API, View Transitions, anchor positioning) require a per-feature opt-in in `pinpoint-design-bible` §19; `fetchpriority` and `text-wrap: balance` are the two that have one. Never trust a cached Baseline date — look it up live (`references/browser-support.md`).
 9. **Form correctness** (CORE-FORM-001..006): right `type`, correct `autocomplete` token, `:user-invalid` styling, `aria-invalid` blur sync, visible required-field indicator, `enterkeyhint` on sequential mobile fields. Conventions are owned by `pinpoint-design-bible` §20; the code is in `references/form-correctness.md`.
@@ -50,7 +51,7 @@ Everything below lives one hop away in `references/`. Load the file you need.
 
 ## Color System
 
-- **Use semantic tokens** (`bg-primary`, `text-destructive-text`, `text-muted-foreground`, `border-success/40`). Raw Tailwind palette classes and hardcoded hex are **forbidden in component code**, enforced by ESLint (`better-tailwindcss/no-restricted-classes`). The token values live in the Tailwind v4 `@theme` block in `src/app/globals.css`; the rule and its two design-layer exceptions are `pinpoint-design-bible` §1.
+- **Use semantic tokens** (`bg-primary`, `text-destructive-text`, `text-muted-foreground`, `border-success/40`). Raw Tailwind palette classes and hardcoded hex are **forbidden in component code**, enforced by Oxlint (`better-tailwindcss/no-restricted-classes`). The token values live in the Tailwind v4 `@theme` block in `src/app/globals.css`; the rule and its two design-layer exceptions are `pinpoint-design-bible` §1.
 - Status / severity / priority / frequency colors come from the configs in `src/lib/issues/status.ts` — never freestyle a status color at a call site.
 - **PinPoint is dark-only.** `dark:` utility classes are dead code; remove them when you touch a file that still has them.
 - **The secondary is teal, and purple is not in the palette** — a purple/fuchsia secondary was removed deliberately (PR #1204) so primary and secondary read as one green-family pairing rather than two competing brands. Do not reintroduce it.
@@ -159,6 +160,23 @@ Native reset clears the form's DOM state; explicit `setState` clears React's vie
 - Actions return `Result<T, C>` from `~/lib/result.ts` (`ok(...)` / `err(...)`), not thrown exceptions, so `useActionState` can render the failure.
 - Report failures through `serverActionError()` from `~/lib/observability/report-error` rather than a bare `console.error` — that's what routes the error to Sentry with action context.
 - Zod schemas live in a separate `schemas.ts` next to the action (a Next.js requirement — `"use server"` files may only export async functions).
+
+### Transactional service functions (side effects after commit — CORE-ARCH-011)
+
+External side effects — email, Discord, blob storage, the Discord-config Vault RPC, notification _dispatch_, raw HTTP — must never run inside a `db.transaction(...)` callback. A send that "succeeds" just before a rolled-back transaction ships an effect for data that was never persisted. That is not theoretical: in the Doodle Bug (PP-2053) a member reported an issue and got a confirmation email with a working link, but the issue was never persisted and no alert fired — the Resend call ran inside the issue-creation transaction, the request was killed mid-flight, and the rollback took the row while the email had already gone out. A transaction can roll back at any point, so anything irreversible done before COMMIT can outlive a write that never lands. Fetch any inputs the effect needs _before_ the transaction opens, and deliver the effect _after_ it commits.
+
+The worked shape lives in `createIssue` (`src/services/issues.ts`) and repeats across `updateIssueStatus`, `addIssueComment`, `assignIssue`, and `machines.ts` — read one rather than a prose copy:
+
+- **Inside** `db.transaction(async (tx) => …)`: do the DB writes, then call `planNotification` with the transaction and the notification channels **resolved up front** — pass `tx` so the in-app rows and watcher backfill are written through it, and pass the channels rather than letting `planNotification` resolve them itself, which would reach the Vault (the one way planning does external I/O). Planning is otherwise transactional and does no I/O. It returns a `DeliveryPlan`; gather its `deliveries` and hand the plan back from the service (`return { …, deliveryPlan }`). Wrap the planning in `try/catch` with `reportError(err, { …, bestEffort: true })` so a planning hiccup cannot roll back the row the transaction just committed.
+- **After** commit: the calling Server Action runs `after(() => dispatchNotification(deliveryPlan))` (`after` from `next/server`). `dispatchNotification` is the only half that talks to email/Discord, and running it in `after()` keeps a slow or failed external send off the request path, where it can neither roll back nor delay the write.
+
+Do **not** pass `tx` to a notification-_creating_ call. The retired anti-pattern was `createNotification({…}, tx)` inside the transaction's `try` — the Doodle Bug verbatim; that `tx` parameter no longer exists. Plan in, dispatch out.
+
+Three guardrails enforce this, so a violation fails loudly instead of silently shipping:
+
+- **Runtime tripwire** — `src/server/db/transaction-context.ts` runs every `db.transaction` callback inside an `AsyncLocalStorage` flag; side-effect client wrappers call `assertNotInTransaction(name)` and throw `SideEffectInTransactionError` when reached mid-transaction. Hitting that error means you called an external client (`sendEmail`, the Discord-config Vault RPC, …) inside a transaction — hoist the call out and dispatch after commit.
+- **Static rule** — `pinpoint/no-side-effects-in-transaction` (`eslint-rules/no-side-effects-in-transaction.mjs`), `"error"` on every `*.ts(x)`, anchored on the `db.transaction(...)` callback argument.
+- **Tests** — `src/test/integration/transaction-tripwire.test.ts` (the runtime tripwire) and `src/test/lint/oxlint-fixtures.test.ts` (the static rule fixture tests).
 
 ### Data access
 

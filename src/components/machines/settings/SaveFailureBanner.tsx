@@ -32,7 +32,7 @@ export function SaveFailureBanner({
       role="alert"
       className="fixed inset-x-0 top-14 z-30 border-b border-destructive/50 bg-card px-4 py-2 shadow-lg"
     >
-      <div className="mx-auto flex max-w-6xl items-center gap-2 text-sm text-destructive">
+      <div className="mx-auto flex max-w-6xl items-center gap-2 text-sm text-destructive-text">
         <AlertTriangle className="size-4 shrink-0" aria-hidden="true" />
         <span className="min-w-0 flex-1">
           Some changes couldn&apos;t be saved. Your edits are still here — retry

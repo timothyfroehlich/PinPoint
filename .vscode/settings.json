@@ -1,8 +1,7 @@
 {
   // TypeScript Configuration - Optimized for @tsconfig/strictest
-  // No "typescript.tsdk": the workspace `typescript` package is the
-  // @typescript/typescript6 API wrapper (no tsserver.js), so VS Code uses its
-  // bundled tsserver for editor features. CLI gates run TS7 native / tsc6.
+  // No "typescript.tsdk": TypeScript 7 provides the native `tsc` CLI but no
+  // tsserver.js, so VS Code uses its bundled tsserver for editor features.
   "typescript.preferences.includePackageJsonAutoImports": "on",
   "typescript.preferences.strictMode": true,
   "typescript.suggest.autoImports": true,
@@ -13,47 +12,24 @@
   "typescript.suggest.includeCompletionsWithSnippetText": true,
   "typescript.suggest.strictMode": true,
 
-  // ESLint Flat Config Integration (Required for ESLint v9 + Security Plugins)
-  "eslint.experimental.useFlatConfig": true,
-  "eslint.validate": [
-    "javascript",
-    "typescript",
-    "javascriptreact",
-    "typescriptreact"
-  ],
-  "eslint.format.enable": true,
-  "eslint.run": "onType",
-  "eslint.packageManager": "npm",
-  "eslint.problems.shortenToSingleLine": true,
-
   // Language-Specific Auto-Fix Settings
   "[typescript]": {
     "editor.formatOnSave": true,
     "editor.formatOnPaste": true,
     "editor.codeActionsOnSave": {
-      "source.fixAll.eslint": "explicit",
       "source.addMissingImports": "explicit"
     },
     "editor.maxTokenizationLineLength": 2500
   },
   "[typescriptreact]": {
     "editor.formatOnSave": true,
-    "editor.formatOnPaste": true,
-    "editor.codeActionsOnSave": {
-      "source.fixAll.eslint": "explicit"
-    }
+    "editor.formatOnPaste": true
   },
   "[javascript]": {
-    "editor.formatOnSave": true,
-    "editor.codeActionsOnSave": {
-      "source.fixAll.eslint": "explicit"
-    }
+    "editor.formatOnSave": true
   },
   "[javascriptreact]": {
-    "editor.formatOnSave": true,
-    "editor.codeActionsOnSave": {
-      "source.fixAll.eslint": "explicit"
-    }
+    "editor.formatOnSave": true
   },
 
   // Next.js and React Development

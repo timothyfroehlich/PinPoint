@@ -1,6 +1,9 @@
 {
   "permissions": {
-    "allow": ["Bash(bash scripts/workflow/mark-claude-review.sh *)"],
+    "allow": [
+      "Bash(bash scripts/workflow/mark-review.sh *)",
+      "Bash(bash scripts/workflow/review-preflight.sh *)"
+    ],
     "deny": [
       "Bash(supabase db push:*)",
       "Bash(supabase projects delete:*)",
@@ -104,6 +107,15 @@
     ],
     "PostToolUse": [
       {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$HOME\"/.agents/huddle/huddle-main-watch.sh",
+            "timeout": 5000
+          }
+        ]
+      },
+      {
         "matcher": "Bash",
         "hooks": [
           {
@@ -128,7 +140,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"$HOME\"/.claude/hooks/huddle/huddle-pr-announce.sh",
+            "command": "bash \"$HOME\"/.agents/huddle/huddle-pr-announce.sh",
             "timeout": 10000
           }
         ]
@@ -137,7 +149,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "HUDDLE_THROTTLE_SECONDS=180 bash \"$HOME\"/.claude/hooks/huddle/huddle-poll.sh",
+            "command": "HUDDLE_THROTTLE_SECONDS=180 bash \"$HOME\"/.agents/huddle/huddle-poll.sh",
             "timeout": 10000
           }
         ]
@@ -149,7 +161,7 @@
           {
             "type": "command",
             "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/worktree-create.sh",
-            "timeout": 60000
+            "timeout": 240000
           }
         ]
       }
@@ -159,7 +171,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/worktree-remove.sh",
+            "command": "python3 \"${CLAUDE_PROJECT_DIR:-.}/scripts/worktree_cleanup.py\" --claude-hook",
             "timeout": 60000
           }
         ]
@@ -170,7 +182,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"$HOME\"/.claude/hooks/huddle/huddle-poll.sh",
+            "command": "bash \"$HOME\"/.agents/huddle/huddle-poll.sh",
             "timeout": 10000
           },
           {
@@ -187,7 +199,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"$HOME\"/.claude/hooks/huddle/huddle-session-start.sh",
+            "command": "bash \"$HOME\"/.agents/huddle/huddle-session-start.sh",
             "timeout": 5000
           },
           {

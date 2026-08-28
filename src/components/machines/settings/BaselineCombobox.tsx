@@ -92,6 +92,7 @@ export function BaselineCombobox({
           size="sm"
           role="combobox"
           aria-expanded={open}
+          aria-controls={open ? "baseline-listbox" : undefined}
           className="h-8 w-64 justify-between text-sm font-normal"
         >
           {value || (
@@ -100,7 +101,7 @@ export function BaselineCombobox({
           <ChevronsUpDown className="size-3.5 opacity-50" aria-hidden="true" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-72 p-0" align="start">
+      <PopoverContent id="baseline-listbox" className="w-72 p-0" align="start">
         <Command>
           <CommandInput
             placeholder="Pick a preset, or type your own…"

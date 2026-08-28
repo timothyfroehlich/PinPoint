@@ -3,7 +3,7 @@
 **Last Updated**: 2026-07-27
 **Version**: 2.5 (progressive-enhancement non-negotiable retired; CORE-ARCH-012 honest-failure added — PP-nw80)
 
-> **Sync contract**: the rule files in `.claude/rules/` are one-line summaries of these rules, grouped by the paths they apply to. Every summary cites the canonical `CORE-*` ID(s) here. When a rule changes, update both — `.claude/rules/README.md` says which file a rule belongs in. (`AGENTS.md` used to carry that index as one numbered list; PP-22e4.4 moved it.)
+> **Canonical catalog**: this document defines the canonical `CORE-*` rules for PinPoint. Portable skills (`.agents/skills/`) and agent context (`AGENTS.md`) cite rules by ID and provide domain/task-specific procedures.
 
 ## Overview
 
@@ -91,7 +91,7 @@
 - **Why:** `any`, non-null `!`, and unsafe `as` defeat ts-strictest and hide real bugs
 - **Do:** Use proper type guards, narrowing, and Zod-validated shapes. Reach for `unknown` + a guard instead of `any`.
 - **Don't:** Use `any`, non-null assertions (`x!`), or unsafe casts (`as Foo`) to silence the type checker
-- **Enforced by:** ESLint — `@typescript-eslint/no-explicit-any` and `no-non-null-assertion`, both "error". Test and e2e blocks turn each off: a wrong assertion there fails the test loudly instead of 500ing a page. `tsc` cannot help with either — both are valid TypeScript at every strictness setting. The **unsafe `as`** third has no gate and is review-enforced; `no-unsafe-*` targets untyped values, not casts between known types. (PP-8k07.)
+- **Enforced by:** Oxlint — `typescript/no-explicit-any` and `typescript/no-non-null-assertion`, both "error". Test and e2e blocks turn each off: a wrong assertion there fails the test loudly instead of 500ing a page. `tsc` cannot help with either — both are valid TypeScript at every strictness setting. Directive governance (`pinpoint/no-restricted-disable-directives` and `pinpoint/require-directive-description`) is the sole disable gate, ensuring safety rules cannot be bypassed by an unreviewed comment. The **unsafe `as`** third has no gate and is review-enforced; `no-unsafe-*` targets untyped values, not casts between known types. (PP-8k07, PP-sc77.)
 
 **CORE-TS-008:** Always use `~/` path aliases
 
@@ -378,7 +378,7 @@
 
 - **Severity:** Critical
 - **Why:** The "Doodle Bug" (PP-2053). A user reported an issue, got a confirmation email with a working link, but the issue was never persisted and no alert fired. Root cause: the confirmation email was sent from a Resend HTTP call executed _inside_ the issue-creation transaction, before COMMIT. When the request was killed mid-flight the transaction rolled back, but the email had already gone out — a silent write-loss. A transaction can roll back at any point; anything irreversible done before COMMIT can outlive a write that never lands.
-- **Do:** Keep transaction callbacks to transactional DB work only. Fetch external inputs (e.g. the Discord Vault token via `getDiscordConfig()`) _before_ opening the transaction. Deliver external effects _after_ commit — use `after()` in a Server Action plus the two-phase `planNotification` (in-transaction writes) / `dispatchNotification` (post-commit fan-out) split. A runtime tripwire enforces this: `db.transaction` sets an in-transaction `AsyncLocalStorage` flag (`~/server/db/transaction-context`), and the email / Discord / blob / Vault-RPC client wrappers throw `SideEffectInTransactionError` if invoked while it is set — failing loudly in dev, test, and CI. A static ESLint backstop (`no-restricted-syntax`, options in `eslint-rules/no-side-effects-in-transaction.mjs`) catches the same violation at lint/CI time, before runtime: it flags calls to `sendEmail` / `sendDm` / `dispatchNotification` / `uploadToBlob` / `deleteFromBlob` / `getDiscordConfig` / `fetch` / `*.emails.send` inside a `db.transaction(...)` callback.
+- **Do:** Keep transaction callbacks to transactional DB work only. Fetch external inputs (e.g. the Discord Vault token via `getDiscordConfig()`) _before_ opening the transaction. Deliver external effects _after_ commit — use `after()` in a Server Action plus the two-phase `planNotification` (in-transaction writes) / `dispatchNotification` (post-commit fan-out) split. A runtime tripwire enforces this: `db.transaction` sets an in-transaction `AsyncLocalStorage` flag (`~/server/db/transaction-context`), and the email / Discord / blob / Vault-RPC client wrappers throw `SideEffectInTransactionError` if invoked while it is set — failing loudly in dev, test, and CI. A static Oxlint backstop (the custom rule `pinpoint/no-side-effects-in-transaction`, registered in `.oxlintrc.json` and implemented in `eslint-rules/no-side-effects-in-transaction.mjs`) catches the same violation at lint/CI time, before runtime: it flags calls to `sendEmail` / `sendDm` / `dispatchNotification` / `uploadToBlob` / `deleteFromBlob` / `getDiscordConfig` / `fetch` / `*.emails.send` inside a `db.transaction(...)` callback.
 - **Don't:** Call `sendEmail`, `sendDm`, `uploadToBlob`/`deleteFromBlob`, `getDiscordConfig`, `fetch`, or any other HTTP/IO from inside a `db.transaction(...)` callback. Don't "optimize" by moving a pre-fetch into the transaction. Don't catch and swallow `SideEffectInTransactionError` — fix the call site to run post-commit.
 
 **CORE-ARCH-012:** A control that cannot act must not report that it did
@@ -449,6 +449,7 @@
 - **Why:** JS viewport checks create hydration mismatches, add resize listeners, and duplicate CSS's job
 - **Do:** Use Tailwind breakpoint classes or container queries
 - **Don't:** `window.innerWidth`, `window.matchMedia`, `useMediaQuery` hooks
+- **Boundary:** Component-local geometry observation with `ResizeObserver` is allowed when JavaScript must derive behavior or semantic DOM state that CSS cannot expose (for example, which links belong in an overflow menu). It must not be used to restyle a component based on viewport-like breakpoints; CSS still owns presentation.
 - **Sanctioned exceptions** (behavior swaps CSS can't express, not styling): `use-table-responsive-columns` (PP-rs9); `use-is-mobile` (PP-43q3) — two consumers: it swaps inline cell editing for a bottom-sheet editor, and swaps the arm/confirm-tap delete affordance for a modal confirm in `ConfirmingDeleteButton`
 
 **CORE-RESP-003:** sm: is padding only
@@ -663,6 +664,6 @@ If all Yes → ship it. Perfect is the enemy of done.
 **Cross-References:**
 
 - Testing patterns: `pinpoint-testing` skill (`.agents/skills/pinpoint-testing/SKILL.md`)
-- Product features: `docs/PRODUCT_SPEC.md`
-- Technical architecture: `docs/TECH_SPEC.md`
+- Product requirements: approved documents in `docs/feature-specs/`
+- Technical architecture: the relevant `.agents/skills/` guidance and source code
 - Discipline guidelines: `docs/DISCIPLINE.md`

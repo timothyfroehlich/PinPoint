@@ -51,7 +51,7 @@ Launch these six groups simultaneously:
 ./scripts/workflow/orchestration-status.sh
 ```
 
-Covers: open PRs (CI + merge), worktree health, beads ready/in-progress, Dependabot alerts. It wraps `pr-dashboard.sh`, `stale-worktrees.sh` and `bd ready -n 50`, so the output template's "Open PRs" and "Worktree Health" sections are filled from this one call — don't re-run those scripts separately.
+Covers: open PRs (CI + merge), the location-agnostic `worktree_reap.py` dry-run, beads ready/in-progress, and Dependabot alerts. The output template's "Open PRs" and "Worktree Health" sections are filled from this one call — don't re-run those reports separately.
 
 ### Group B: Security Audit
 
@@ -145,8 +145,7 @@ did, say that instead of proposing it as new work.
 
 ## Relationship to Other Skills
 
-| Skill                   | When to Use                                                           |
-| ----------------------- | --------------------------------------------------------------------- |
-| `pinpoint-briefing`     | Start of session — situational awareness and triage                   |
-| `pinpoint-orchestrator` | After briefing — dispatching parallel subagents for chosen work       |
-| `pinpoint-pr-workflow`  | During & end of work — commit, CI watch, readiness label, gated merge |
+| Skill                  | When to Use                                                           |
+| ---------------------- | --------------------------------------------------------------------- |
+| `pinpoint-briefing`    | Start of session — situational awareness and triage                   |
+| `pinpoint-pr-workflow` | During & end of work — commit, CI watch, readiness label, gated merge |

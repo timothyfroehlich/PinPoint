@@ -538,7 +538,7 @@ function QuickRow({
         </div>
       )}
       {ui.error ? (
-        <p className="mt-2 text-xs text-destructive">{ui.error}</p>
+        <p className="mt-2 text-xs text-destructive-text">{ui.error}</p>
       ) : null}
     </div>
   );
@@ -655,7 +655,7 @@ function Field({
       >
         {label}
         {required ? (
-          <span aria-hidden="true" className="text-destructive">
+          <span aria-hidden="true" className="text-destructive-text">
             {" "}
             *
           </span>

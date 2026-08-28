@@ -20,6 +20,22 @@ interface LoginOptions {
 }
 
 /**
+ * Opens a machine's Manage route through whichever tab control fits. At
+ * narrow widths the shared tab strip puts Manage in its explicit overflow
+ * menu rather than leaving an off-screen scroll target.
+ */
+export async function openMachineManageTab(page: Page): Promise<void> {
+  const directTab = page.getByTestId("machine-tab-edit");
+  if ((await directTab.count()) > 0) {
+    await directTab.click();
+    return;
+  }
+
+  await page.getByTestId("machine-tab-more").click();
+  await page.getByTestId("machine-tab-overflow-edit").click();
+}
+
+/**
  * Shared E2E action to perform a UI login.
  *
  * @param page Playwright page object
@@ -274,6 +290,52 @@ export async function openSidebarIfMobile(
   // No-op — mobile navigation is handled by the bottom tab bar
 }
 
+interface RetryNavClickOptions {
+  /** Outer `toPass` timeout. Default 15 000 ms. */
+  timeout?: number;
+  /** Inner assertion timeout (URL match or visibility). Default 5 000 ms. */
+  innerTimeout?: number;
+}
+
+/**
+ * Retry a client-side navigation click until the expected outcome holds.
+ *
+ * Under `next dev`, Fast Refresh rebuilds can remount the React tree
+ * mid-navigation. The soft navigation is discarded and the click is lost —
+ * only re-issuing it recovers (PP-2b3r). This helper wraps the click in an
+ * `expect().toPass()` retry loop with two safeguards:
+ *
+ * 1. Each attempt presses Escape first to dismiss any Radix dropdown or modal
+ *    that a prior failed attempt may have left open. Without this, retrying a
+ *    dropdown-menu sequence toggles the menu shut instead of re-opening it.
+ * 2. The outer timeout defaults to 15 s so that three sequential calls fit
+ *    comfortably inside the 120 s CI per-test budget.
+ *
+ * @param page     Playwright page
+ * @param click    Callback that performs the click(s)
+ * @param expected RegExp → asserts page URL; Locator → asserts visibility
+ */
+export async function retryNavClick(
+  page: Page,
+  click: () => Promise<void>,
+  expected: RegExp | Locator,
+  options?: RetryNavClickOptions
+): Promise<void> {
+  const timeout = options?.timeout ?? 15_000;
+  const innerTimeout = options?.innerTimeout ?? 5_000;
+  await expect(async () => {
+    // Dismiss any popup/dropdown left open by a previous attempt so the next
+    // click lands on the right target, not a toggle-closed menu (PP-2b3r).
+    await page.keyboard.press("Escape");
+    await click();
+    if (expected instanceof RegExp) {
+      await expect(page).toHaveURL(expected, { timeout: innerTimeout });
+    } else {
+      await expect(expected).toBeVisible({ timeout: innerTimeout });
+    }
+  }).toPass({ timeout });
+}
+
 /**
  * Selects an option from a shadcn/ui Select component.
  * Clicks the trigger, waits for the dropdown, then clicks the option.
@@ -433,10 +495,30 @@ export async function updateIssueField(
  * than the viewport, the assertion fails with a diagnostic message showing
  * the overflow amount and viewport width.
  */
-export async function assertNoHorizontalOverflow(page: Page): Promise<void> {
-  const result = await page.evaluate(() => {
+interface HorizontalOverflowOptions {
+  /** Limit clipped-element detection to a component while retaining the page-width check. */
+  scopeTestIds?: readonly string[];
+}
+
+export async function assertNoHorizontalOverflow(
+  page: Page,
+  { scopeTestIds }: HorizontalOverflowOptions = {}
+): Promise<void> {
+  const result = await page.evaluate((scopeTestIds) => {
     const doc = document.documentElement;
     const viewportWidth = doc.clientWidth;
+    const scopes = scopeTestIds
+      ? scopeTestIds.map((testId) => {
+          const scope = document.querySelector(`[data-testid="${testId}"]`);
+          if (!scope) {
+            throw new Error(`Overflow assertion scope not found: ${testId}`);
+          }
+          return scope;
+        })
+      : [document.body];
+    if (scopes.length === 0) {
+      throw new Error("Overflow assertion requires at least one scope");
+    }
 
     // How far past a viewport edge an element must extend before we treat it as
     // a layout break rather than acceptable graceful clipping. Components that
@@ -497,7 +579,10 @@ export async function assertNoHorizontalOverflow(page: Page): Promise<void> {
     };
 
     const offenders: string[] = [];
-    for (const el of Array.from(document.body.querySelectorAll("*"))) {
+    for (const el of scopes.flatMap((scope) => [
+      scope,
+      ...Array.from(scope.querySelectorAll("*")),
+    ])) {
       if (
         typeof el.checkVisibility === "function" &&
         !el.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true })
@@ -526,7 +611,7 @@ export async function assertNoHorizontalOverflow(page: Page): Promise<void> {
       clientWidth: viewportWidth,
       offenders,
     };
-  });
+  }, scopeTestIds);
 
   // Kept as a cheap belt-and-suspenders for any surface rendered outside the
   // overflow-hidden app shell. Note: under the shell this can never fail (the

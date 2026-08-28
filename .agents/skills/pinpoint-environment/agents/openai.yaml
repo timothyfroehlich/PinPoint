@@ -1,0 +1,4 @@
+interface:
+  display_name: "PinPoint Environment"
+  short_description: "Env-var and local URL policy"
+  default_prompt: "Use $pinpoint-environment to add or update a PinPoint environment variable."

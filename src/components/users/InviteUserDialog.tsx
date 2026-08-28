@@ -112,7 +112,7 @@ function InviteUserForm({
         <div className="space-y-2">
           <Label htmlFor="invite-firstName">
             First Name{" "}
-            <span aria-hidden="true" className="text-destructive">
+            <span aria-hidden="true" className="text-destructive-text">
               *
             </span>
           </Label>
@@ -143,7 +143,7 @@ function InviteUserForm({
       <div className="space-y-2">
         <Label htmlFor="invite-email">
           Email{" "}
-          <span aria-hidden="true" className="text-destructive">
+          <span aria-hidden="true" className="text-destructive-text">
             *
           </span>
         </Label>

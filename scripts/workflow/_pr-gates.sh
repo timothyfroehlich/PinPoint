@@ -13,17 +13,15 @@
 
 set -euo pipefail
 
-# SHA-pinned review marker, posted by mark-claude-review.sh. Since PP-4ric this is the
-# ONLY thing that satisfies the `reviewed` gate — Copilot review was retired on
-# 2026-08-02 (its free tier was too small to review PinPoint's PRs), and no bot reviews
-# this repo now. The marker attests that Tim ran `/code-review` over the diff, which an
-# agent cannot do for itself: `/code-review` is a harness built-in only he can trigger.
-#
-# What follows this prefix, up to the `-->`, is compared to the head SHA by STRING
-# EQUALITY. Nothing else may go inside this comment — the review depth mark-claude-review.sh
-# records lives in its own `<!-- pinpoint-review-depth: … -->` comment for exactly that
-# reason, since adding it here would fail every `reviewed` gate on every PR. (PP-9onv.)
-readonly CLAUDE_MARKER_PREFIX="<!-- pinpoint-claude-review:"
+# The GitHub App identity Codex uses for native pull-request reviews. The account is
+# deliberately exact: accepting an arbitrary bot (or a human who happens to include
+# "codex" in a login) would let a review be forged. A qualifying approval must also name
+# the PR's exact current head SHA.
+readonly CODEX_REVIEW_BOT="chatgpt-codex-connector[bot]"
+readonly CODEX_REVIEW_APP_SLUG="chatgpt-codex-connector"
+readonly CODEX_CLEAN_REVIEW_PREFIX="Codex Review: Didn't find any major issues."
+readonly REVIEW_MARKER_PREFIX="<!-- pinpoint-review:"
+readonly LEGACY_CLAUDE_MARKER_PREFIX="<!-- pinpoint-claude-review:"
 
 # Parse owner/repo dynamically — avoid hardcoded slug. Memoized: several gates ask for
 # it and pr-dashboard.sh runs them once per open PR, so an unmemoized call was one
@@ -36,61 +34,149 @@ _repo_slug() {
   printf '%s\n' "$_REPO_SLUG_CACHE"
 }
 
-# The full record of the review marker that decides a head's state, as one TSV line:
+# The full record of the Codex GitHub review that decides a head's state, as one TSV
+# line: <state> <sha> <reviewer> <detail> <submitted_at> <summary line>.
 #
-#   <state>\t<sha>\t<depth>\t<updated_at>\t<summary line>
+# The latest review from the trusted Codex App is authoritative. An approval for an
+# older commit cannot cover a later push, and a later change-request review cannot
+# inherit an earlier approval. GitHub's commit_id is compared directly to the head SHA;
+# timestamps are only ordering metadata.
 #
-# `_marker_verdict` (the gate's question) is the first two fields; merge-handoff.sh
-# reports the rest, so this is the single place the pinning semantics live. Keeping one
-# implementation is deliberate: a second lookup that answered "which marker counts?"
-# even slightly differently would let the gate and the handoff report disagree about
-# whether head was reviewed, which is the one thing neither may be wrong about.
-#
-# `depth` is the `/code-review` level recorded by mark-claude-review.sh in a second
-# HTML comment. Markers posted before PP-9onv have no such comment and read as
-# `unrecorded` — absence of the field, not a claim that no review ran.
-#
-# Asked as "does ANY marker pin this head?", deliberately — not "does the newest one?".
-# mark-claude-review.sh keeps ONE sticky comment and rewrites it in place, so a PR
-# normally carries a single marker, but nothing enforces that: a second session, or a
-# hand-posted comment, can leave two. If the reader picks one comment and the writer
-# picks a different one, re-attesting rewrites a marker the gate never reads, and a
-# genuinely reviewed head reports stale_marker forever with `--force` as the only exit.
-# Membership has no such failure mode: a marker pinning head means someone attested
-# head, whatever order the comments landed in.
-#
-# When nothing pins head, the newest marker is the one reported — it is the most recent
-# review the PR actually got, and naming its SHA is what lets the gate say "you pushed
-# past the review" instead of "nobody reviewed this".
-#
-# `jq -rs` (slurp) rather than gh's `--jq`, which runs per-page under --paginate and so
-# misses a marker sitting on page 2+ of a busy PR.
-_marker_record() {
+# The slurp is required because gh emits one JSON array per page under --paginate.
+_codex_review_record() {
   local pr=$1 owner_repo=$2 head=$3
-  gh api --paginate "repos/${owner_repo}/issues/${pr}/comments" \
-    | jq -rs --arg prefix "$CLAUDE_MARKER_PREFIX" --arg head "$head" \
+  gh api --paginate "repos/${owner_repo}/pulls/${pr}/reviews" \
+    | jq -rs --arg bot "$CODEX_REVIEW_BOT" --arg head "$head" \
         '[ .[] | flatten | .[]
-           | (.body // "") as $b
-           | select($b | startswith($prefix))
-           | { sha: ($b | ltrimstr($prefix) | split("-->")[0] | gsub("^\\s+|\\s+$"; "")),
-               depth: ($b | [scan("<!-- pinpoint-review-depth:\\s*([a-z]+)\\s*-->")]
-                          | flatten | (.[0] // "unrecorded")),
-               at: (.updated_at // ""),
-               summary: ($b | split("\n") | last | gsub("^\\s+|\\s+$"; "")) }
-         ] as $markers
-         | [ $markers[] | select(.sha == $head) ] as $pinned
-         | if ($pinned | length) > 0 then ($pinned | last) + { state: "marker" }
-           elif ($markers | length) > 0 then ($markers | last) + { state: "stale_marker" }
-           else { state: "unreviewed", sha: "", depth: "", at: "", summary: "" }
+           | select(.user.login? == $bot)
+           | { sha: (.commit_id // ""),
+               reviewer: (.user.login // ""),
+               detail: (.state // "UNKNOWN"),
+               at: (.submitted_at // ""),
+               summary: (((.body? // "") | tostring | split("\n")[0] // "") | gsub("^\\s+|\\s+$"; "")) }
+         ] | sort_by(.at) as $reviews
+         | [ $reviews[] | select(.sha == $head) ] as $head_reviews
+         | if ($reviews | length) == 0 then
+             { state: "unreviewed", sha: "", reviewer: "", detail: "", at: "", summary: "" }
+           else
+             (if ($head_reviews | length) > 0 then $head_reviews[-1] else $reviews[-1] end) as $latest
+             | if $latest.detail == "APPROVED" and $latest.sha == $head then
+                 $latest + { state: "approval" }
+               elif $latest.detail == "APPROVED" then
+                 $latest + { state: "stale_approval" }
+               elif $latest.sha == $head and ($latest.detail == "COMMENTED" or $latest.detail == "CHANGES_REQUESTED") then
+                 $latest + { state: "reviewed" }
+               else
+                 $latest + { state: "not_approved" }
+               end
            end
-         | [ .state, .sha, .depth, .at, .summary ] | @tsv'
+         | [ .state, .sha, .reviewer, .detail, .at, .summary ] | @tsv'
 }
 
-# The review markers' verdict on a given head, printed as "<state> <sha>" — the two
-# fields of `_marker_record` the merge gate acts on.
-_marker_verdict() {
+# Issue comments carry two distinct review records: the connector's clean automatic
+# result and the independent manual attestation. The clean result is trusted only when
+# the exact bot posted it through the exact GitHub App, used the known no-findings
+# prefix, and named a 10- or 40-character prefix of the current head SHA.
+_comment_review_record() {
+  local pr=$1 owner_repo=$2 head=$3
+  gh api --paginate "repos/${owner_repo}/issues/${pr}/comments" \
+    | jq -rs --arg bot "$CODEX_REVIEW_BOT" --arg app "$CODEX_REVIEW_APP_SLUG" \
+        --arg clean_prefix "$CODEX_CLEAN_REVIEW_PREFIX" --arg prefix "$REVIEW_MARKER_PREFIX" \
+        --arg legacy "$LEGACY_CLAUDE_MARKER_PREFIX" --arg head "$head" \
+        '[ .[] | flatten | .[] ] as $comments
+         | ([ $comments[]
+           | (.body // "") as $body
+           | select(.user.login? == $bot and .performed_via_github_app.slug? == $app)
+           | { sha: ($body | [scan("\\*\\*Reviewed commit:\\*\\* `([0-9a-f]{10}|[0-9a-f]{40})`")] | flatten | (.[0] // "")),
+               reviewer: (.user.login // ""),
+               detail: "NO_FINDINGS",
+               at: (.updated_at // .created_at // ""),
+               summary: (($body | split("\n")[0]) // "") }
+           | select(.summary | startswith($clean_prefix))
+           | select((.sha | length) == 10 or (.sha | length) == 40)
+         ] | sort_by(.at)) as $clean
+         | ([ $comments[]
+           | (.body // "") as $body
+           | select($body | startswith($prefix) or startswith($legacy))
+           | { sha: (if $body | startswith($prefix) then ($body | ltrimstr($prefix)) else ($body | ltrimstr($legacy)) end | split("-->")[0] | gsub("^\\s+|\\s+$"; "")),
+               reviewer: (if $body | startswith($prefix)
+                          then ($body | [scan("<!-- pinpoint-reviewer:\\s*([a-z0-9-]+)\\s*-->")] | flatten | (.[0] // "unrecorded"))
+                          else "claude-code" end),
+               detail: (if $body | startswith($prefix)
+                        then ($body | [scan("<!-- pinpoint-review-detail:\\s*([a-z0-9-]+)\\s*-->")] | flatten | (.[0] // "unrecorded"))
+                        else ($body | [scan("<!-- pinpoint-review-depth:\\s*([a-z]+)\\s*-->")] | flatten | (.[0] // "unrecorded")) end),
+               at: (.updated_at // ""),
+               summary: (($body | split("\n") | last) // "") }
+         ] | sort_by(.at)) as $markers
+         | [ $markers[] | select(.sha == $head) ] as $pinned
+         | [ $clean[] | .sha as $sha | select($head | startswith($sha)) ] as $clean_pinned
+         | if ($pinned | length) > 0 then ($pinned | last) + { state: "marker" }
+           elif ($clean_pinned | length) > 0 then ($clean_pinned | last) + { state: "clean_comment" }
+           elif ($markers | length) > 0 and ($clean | length) > 0 then
+             if $markers[-1].at > $clean[-1].at
+             then $markers[-1] + { state: "stale_marker" }
+             else $clean[-1] + { state: "stale_clean_comment" }
+             end
+           elif ($markers | length) > 0 then $markers[-1] + { state: "stale_marker" }
+           elif ($clean | length) > 0 then $clean[-1] + { state: "stale_clean_comment" }
+           else { state: "unreviewed", sha: "", reviewer: "", detail: "", at: "", summary: "" }
+           end
+         | [ .state, .sha, .reviewer, .detail, .at, .summary ] | @tsv'
+}
+
+# A manual marker is an independent valid record. Native reviews and clean connector
+# comments are two representations of the automatic Codex path; when they disagree,
+# the newer automatic record wins so a later finding cannot inherit an earlier clean.
+_review_record() {
+  local head=$3 codex comment codex_state comment_state codex_sha codex_at comment_at
+  codex=$(_codex_review_record "$@")
+  codex_state=$(cut -f1 <<< "$codex")
+  # A current native approval already passes the gate. Do not spend a second
+  # paginated GitHub request looking up a marker that cannot change that result.
+  if [[ "$codex_state" == "approval" ]]; then
+    printf '%s\n' "$codex"
+    return
+  fi
+
+  comment=$(_comment_review_record "$@")
+  comment_state=$(cut -f1 <<< "$comment")
+  if [[ "$comment_state" == "marker" ]]; then
+    printf '%s\n' "$comment"
+  elif [[ "$comment_state" == "clean_comment" ]]; then
+    codex_sha=$(cut -f2 <<< "$codex")
+    codex_at=$(cut -f5 <<< "$codex")
+    comment_at=$(cut -f5 <<< "$comment")
+    if [[ "$codex_state" == "unreviewed" || "$codex_sha" != "$head" || "$comment_at" > "$codex_at" ]]; then
+      printf '%s\n' "$comment"
+    else
+      printf '%s\n' "$codex"
+    fi
+  elif [[ "$codex_state" == "unreviewed" ]]; then
+    printf '%s\n' "$comment"
+  elif [[ "$codex_state" == "reviewed" ]]; then
+    # A current-head native finding review is coverage. A delayed comment for an
+    # older SHA cannot invalidate it; current clean comments were handled above.
+    printf '%s\n' "$codex"
+  elif [[ "$comment_state" == "unreviewed" ]]; then
+    printf '%s\n' "$codex"
+  else
+    # Neither path covers head. Report the newest record so merge-handoff can
+    # show the real diff since review instead of an older, unrelated failure.
+    codex_at=$(cut -f5 <<< "$codex")
+    comment_at=$(cut -f5 <<< "$comment")
+    if [[ "$comment_at" > "$codex_at" ]]; then
+      printf '%s\n' "$comment"
+    else
+      printf '%s\n' "$codex"
+    fi
+  fi
+}
+
+# The review verdict on a given head, printed as "<state> <sha>" — the two
+# fields of _review_record the merge gate acts on.
+_review_verdict() {
   local record
-  record=$(_marker_record "$1" "$2" "$3")
+  record=$(_review_record "$1" "$2" "$3")
   printf '%s %s\n' "$(cut -f1 <<< "$record")" "$(cut -f2 <<< "$record")"
 }
 
@@ -134,39 +220,24 @@ check_ci() {
 }
 
 # ---------------------------------------------------------------------------------
-# Shared review state (PP-lzaw, rewritten for marker-only review in PP-4ric)
+# Shared review state — a trusted automatic Codex result or manual attestation pinned
+# to the PR head.
 # ---------------------------------------------------------------------------------
 #
-# Three states. With the bot reviewer retired there is nobody to poll, no request to
-# wait on, and no timer to run out — Tim's `/code-review` runs on his machine and
-# leaves no GitHub trace. The only observable fact is the marker, so the question
-# collapses to "does an attestation pin THIS head?":
+#   approval        Codex approved the current head SHA
+#   clean_comment   Codex reported no major issues for the current head SHA
+#   reviewed        Codex reviewed the current head; the thread gate owns adjudication
+#   marker          A manual review marker pins the current head SHA
+#   stale_approval  Codex approved a different SHA — the current head was not reviewed
+#   stale_clean_comment  A clean Codex comment names a different SHA
+#   stale_marker    A manual marker names a different SHA
+#   not_approved    Codex's most-recent review covers a different SHA and is not an approval
+#   unreviewed      Neither review path has a record
 #
-#   marker        a review marker pins head's SHA — head has been reviewed
-#   stale_marker  a marker exists but pins a DIFFERENT SHA — head was never reviewed
-#   unreviewed    no marker on this PR at all — nobody has reviewed it
-#
-# "Different", not "older": the usual cause is a push on top of the reviewed commit, but
-# a force-push leaves a marker pinning a commit that is not an ancestor of head at all,
-# and there the distance between them is not merely large — it is undefined.
-# merge-handoff.sh reports that case as unknowable rather than counting commits from an
-# unrelated tree, and this gate does not care which it is: neither is a reviewed head.
-#
-# `stale_marker` is the state worth keeping distinct. It is the successor to the old
-# `pushed_after`, and the same trap: the PR visibly HAS a review, so the reflex is to
-# read the gate as flaky rather than as "the thing you pushed was never looked at".
-# Nothing re-attests automatically, and that is deliberate — a 3-commit fixup should
-# not silently inherit the review of the commit before it.
-#
-# All six of the old states existed to separate "asked and waiting" from "nobody
-# asked", which only meant something while a bot answered requests on its own clock.
-# The wait threshold, the request timeline, and the quota-limited non-review body
-# matching went with them (PP-lzaw, PP-jw0s — resolved by deletion, not by regression).
-#
-# Sets globals: RS_STATE RS_HEAD_SHA RS_MARKER_SHA
+# Sets globals: RS_STATE RS_HEAD_SHA RS_REVIEW_SHA
 RS_STATE=""
 RS_HEAD_SHA=""
-RS_MARKER_SHA=""
+RS_REVIEW_SHA=""
 
 _compute_review_state() {
   local pr=$1
@@ -174,23 +245,18 @@ _compute_review_state() {
   owner_repo=$(_repo_slug)
 
   head_sha=$(gh pr view "$pr" --json headRefOid --jq .headRefOid)
-  verdict=$(_marker_verdict "$pr" "$owner_repo" "$head_sha")
+  verdict=$(_review_verdict "$pr" "$owner_repo" "$head_sha")
 
   RS_HEAD_SHA=$head_sha
   RS_STATE=${verdict%% *}
-  RS_MARKER_SHA=${verdict#* }
+  RS_REVIEW_SHA=${verdict#* }
 }
 
-# The remedy every un-reviewed state prints. Two steps, in order, because the agent
-# cannot do the first one: `/code-review` is a Claude Code harness built-in that only
-# Tim can trigger, so the review is a handoff and the marker is what the agent posts
-# once he has run it and the findings are addressed.
 _review_remedy() {
   local pr=$1
-  echo "  remedy: ask Tim to run /code-review on this branch, address the findings,"
-  echo "          then attest the head he reviewed:"
-  echo "    bash scripts/workflow/mark-claude-review.sh $pr <depth> \"<one-line findings>\""
-  echo "          (<depth> is the /code-review level he ran: low|medium|high|xhigh|max|ultra)"
+  echo "  remedy: await a clean automatic Codex result on this head of PR #${pr}. Use @codex"
+  echo "          review only when Tim explicitly requests it; use review-preflight +"
+  echo "          mark-review only after Tim explicitly runs a local review."
 }
 
 # Gate 2: Zero unresolved review threads. Uses GraphQL with cursor pagination.
@@ -243,36 +309,59 @@ check_unresolved_threads() {
   return 1
 }
 
-# Gate 3: head commit has been reviewed. The hard backstop — a head nobody reviewed
-# cannot merge, and nothing here WAITs, because with no bot in the loop there is never
-# an answer already on its way. The marker is
-# `<!-- pinpoint-claude-review: <head_sha> -->` in a PR conversation comment (posted by
-# mark-claude-review.sh, alongside a `<!-- pinpoint-review-depth: … -->` comment this
-# gate ignores); the SHA pin makes it self-expiring, so a later fix changes the head SHA
-# and re-arms the gate.
+# Gate 3: a trusted clean Codex result or manual review marker must cover the exact head.
 #
-#   marker        → PASS
-#   stale_marker  → FAIL   remedy: re-review the new head, re-attest
-#   unreviewed    → FAIL   remedy: Tim runs /code-review, then attest
+#   approval        → PASS
+#   clean_comment   → PASS
+#   reviewed        → PASS (the separate thread gate requires every finding adjudicated)
+#   marker          → PASS
+#   stale_approval  → FAIL: Codex approved an earlier commit
+#   not_approved    → FAIL: Codex posted a non-approval review
+#   unreviewed      → FAIL: Codex has not reviewed the PR
 check_review_happened() {
   local pr=$1
   _compute_review_state "$pr"
 
   case "$RS_STATE" in
+    approval)
+      echo "PASS: reviewed: Codex approved head SHA ${RS_HEAD_SHA:0:7}"
+      return 0
+      ;;
+    clean_comment)
+      echo "PASS: reviewed: Codex found no major issues on head SHA ${RS_HEAD_SHA:0:7}"
+      return 0
+      ;;
+    reviewed)
+      echo "PASS: reviewed: Codex reviewed head SHA ${RS_HEAD_SHA:0:7}; thread gate owns findings"
+      return 0
+      ;;
     marker)
       echo "PASS: reviewed: review marker pins head SHA ${RS_HEAD_SHA:0:7}"
       return 0
       ;;
+    stale_approval)
+      echo "FAIL: reviewed: Codex approved ${RS_REVIEW_SHA:0:7}, but head is ${RS_HEAD_SHA:0:7}"
+      echo "  You pushed after that approval, so what is about to merge was never read."
+      _review_remedy "$pr"
+      return 1
+      ;;
+    stale_clean_comment)
+      echo "FAIL: reviewed: Codex clean result covers ${RS_REVIEW_SHA:0:7}, but head is ${RS_HEAD_SHA:0:7}"
+      _review_remedy "$pr"
+      return 1
+      ;;
+    not_approved)
+      echo "FAIL: reviewed: Codex last reviewed ${RS_REVIEW_SHA:0:7} without approval"
+      _review_remedy "$pr"
+      return 1
+      ;;
     stale_marker)
-      echo "FAIL: reviewed: the review marker pins ${RS_MARKER_SHA:0:7}, but head is ${RS_HEAD_SHA:0:7}"
-      echo "  You pushed AFTER the review, so what is about to merge was never read."
-      echo "  Nothing re-attests automatically — that is deliberate, so a 3-commit"
-      echo "  fixup cannot inherit the review of the commit before it."
+      echo "FAIL: reviewed: the review marker pins ${RS_REVIEW_SHA:0:7}, but head is ${RS_HEAD_SHA:0:7}"
       _review_remedy "$pr"
       return 1
       ;;
     unreviewed)
-      echo "FAIL: reviewed: no review marker on this PR — head ${RS_HEAD_SHA:0:7} is unreviewed"
+      echo "FAIL: reviewed: no clean Codex result on PR #${pr} — head ${RS_HEAD_SHA:0:7} is unreviewed"
       _review_remedy "$pr"
       return 1
       ;;

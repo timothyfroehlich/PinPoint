@@ -20,8 +20,8 @@
 // legitimate `getTestEmail("…@test.com")` calls. A distinct custom rule has its
 // own severity slot, so it applies at "error" to every `**/*.ts(x)` file —
 // including `e2e/**` — and coexists with the e2e `no-restricted-syntax` warn.
-// It is wired in `eslint.config.mjs` and exercised by
-// `src/test/eslint/no-side-effects-in-transaction.test.ts`.
+// It is registered in `.oxlintrc.json` (via `pinpoint-plugin.mjs`) and
+// exercised by `src/test/lint/oxlint-fixtures.test.ts`.
 //
 // ── Selector strategy (zero-false-positive priority) ─────────────────────────
 //   1. Anchor on the function argument of a `db.transaction(...)` /

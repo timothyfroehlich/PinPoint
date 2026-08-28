@@ -2,6 +2,8 @@ import pino from "pino";
 import { mkdirSync } from "fs";
 import { join } from "path";
 
+import { maskEmail } from "~/lib/logging/mask";
+
 const LOG_LEVEL = process.env["LOG_LEVEL"] ?? "info";
 const DEFAULT_LOG_ROOT = join(process.cwd(), "logs");
 
@@ -29,8 +31,9 @@ const DEFAULT_LOG_ROOT = join(process.cwd(), "logs");
  *
  * **What a key list cannot catch**: an address embedded in a *value*. A mail
  * provider send failure carries the recipient in its `message`, `stack`,
- * `rejected` and `envelope.to`, and reaches the log raw through `reportError`'s
- * `err` serializer. That needs a serializer, not more key names — PP-45qx.
+ * `rejected`, `envelope.to` and `response`, none under an email-named key. Those are masked
+ * by the `err` serializer below ({@link maskingErrSerializer}) — a serializer,
+ * not more key names, because the address is a value (PP-45qx).
  */
 const EMAIL_LOG_KEYS = [
   "email",
@@ -74,6 +77,176 @@ const EMAIL_REDACT_PATHS: string[] = Array.from(
 ).flatMap((prefix) => EMAIL_LOG_KEYS.map((key) => `${prefix}${key}`));
 
 /**
+ * Matches an email address embedded anywhere in a string.
+ *
+ * The runs either side of the `@` are "any run of characters that cannot
+ * delimit or path-separate an address" — no whitespace, double quote, brackets,
+ * braces, slashes, or the punctuation that frames one in error text — and the
+ * domain must end in an alphabetic TLD (`\p{L}{2,63}`). Three forces shape this:
+ *
+ * - The `u` flag plus `\p{L}` match by code point, so an internationalised
+ *   domain (`user@exämple.com`, or a `.рф`/`.中国` TLD) is caught; an ASCII-only
+ *   class stops at the first non-ASCII byte and would leak the whole address.
+ * - Excluding `/` `\` and requiring a *letter* TLD keeps the pattern off things
+ *   that merely contain an `@` — pnpm's `.pnpm/@scope+pkg@1.2.3/…` stack-trace
+ *   frames (every `node_modules` frame in this repo) and version strings like
+ *   `runner@4.1.10` (numeric last segment) — so it does not shred the stack
+ *   traces it is meant to preserve.
+ * - The leading negative lookbehind anchors each match at a token boundary (the
+ *   preceding character is a delimiter, or it is the start of the string). This
+ *   does two jobs at once. It keeps the scan *linear*: after the match at a
+ *   token start fails, every interior character is rejected in O(1) by the
+ *   lookbehind, so a long malformed `aaaa…@bbbb…` token with no TLD cannot drive
+ *   the quadratic per-start re-scan that unbounded runs otherwise cause (an
+ *   80 KB such token in a provider response took ~6.6 s and blocked the event
+ *   loop; anchored, it is under a millisecond). And because the runs stay
+ *   unbounded, an overlong or unusual local part is masked in *full* rather than
+ *   suffix-matched from the middle — a 77-character local part becomes `abc***`,
+ *   not thirteen raw characters plus `abc***`.
+ *
+ * An apostrophe is a valid unquoted-local-part character (`o'hara@example.com`),
+ * so it is *not* a delimiter — excluding it would match only `hara@…` and leave
+ * `o'har***` in the log, five of six local-part characters instead of three. A
+ * double quote still is a delimiter (it frames a quoted local part).
+ *
+ * Both a bare `a@b.com` and one wrapped in SMTP punctuation (`550 <a@b.com>`)
+ * yield exactly the address. Two known, accepted gaps — neither a realistic
+ * recipient address, and closing either would over-mask ordinary log text:
+ * a quoted local part with whitespace (`"john doe"@x.com`), and an address
+ * literal domain (`user@[192.168.1.1]`, bracket-delimited on both sides).
+ */
+const EMBEDDED_EMAIL_RE =
+  /(?<![^\s"<>()[\]{},;:@/\\])[^\s"<>()[\]{},;:@/\\]+@[^\s"<>()[\]{},;:@/\\]+\.\p{L}{2,63}/gu;
+
+/** Replace every email-like substring of `value` with its {@link maskEmail} form. */
+function maskEmailsInText(value: string): string {
+  return value.replace(EMBEDDED_EMAIL_RE, (match) => maskEmail(match));
+}
+
+/** Recursion cap for {@link maskEmailsDeep} — a stack-overflow guard for a deep, non-cyclic chain. */
+const MAX_MASK_DEPTH = 64;
+/** Placeholder for a value that is too deep, or that threw while being read. */
+const UNMASKABLE_PLACEHOLDER = "[unserializable]";
+/** Placeholder for an object already visited on this pass (cycle or shared reference). */
+const CIRCULAR_PLACEHOLDER = "[circular]";
+
+/**
+ * Return a copy of an already-serialized error with the email addresses in its
+ * string values masked.
+ *
+ * The key-based {@link EMAIL_REDACT_PATHS} redaction cannot reach an address
+ * that lives in a *value* rather than under an email-named key. A mail-provider
+ * send failure carries the recipient exactly there — in `message`, `stack`,
+ * `rejected`, `envelope.to` and `response` — so without this the raw address
+ * reaches the log through `reportError`'s `err` serializer (PP-45qx). Masking
+ * the substrings keeps the diagnostic (`550 <vic***> unknown`) while dropping
+ * the address; it does not blank the error.
+ *
+ * Rebuilds rather than mutating in place, and this matters for safety: a
+ * provider error can carry a frozen or getter-only nested value (an idiomatic
+ * `Object.freeze`d context, a class instance from an SDK), and assigning into
+ * one throws — pino does not catch serializer errors, so an in-place approach
+ * turns "an address leaked" into "the log call itself throws", inside the very
+ * catch block reporting the original failure. Reading a source value never
+ * throws for those shapes; a read that *does* throw (a throwing getter) is
+ * caught per-key.
+ *
+ * Two termination guards, because the depth cap alone is not enough. `seen`
+ * tracks every object visited on the pass and short-circuits a repeat: a
+ * branching self-cycle (`n.a = n; n.b = n`) or a diamond DAG would otherwise
+ * fan out to ~2^depth visits before the cap stopped it, hanging the event loop
+ * while an error is being reported. The depth cap then bounds a deep, non-cyclic
+ * chain that no repeat catches. Both replace the offending subtree with a
+ * placeholder, which fails safe (no raw remainder).
+ *
+ * A value carrying its own `toJSON` (a `Date`, a `URL`, or an SDK class that
+ * exposes only a redacted summary) is serialized *through* it and the result
+ * masked — not flattened field-by-field, which would strip the prototype,
+ * bypass the class's own redaction (potentially logging a token it hides), and
+ * collapse a slot-backed object like `URL` to `{}`. `toJSON` is invoked with the
+ * property key the value sits under (the array index as a string, `""` at the
+ * root), matching how `JSON.stringify` calls it, so a `toJSON(key)` that varies
+ * its redaction by key takes the same branch it would in the real log. Typed
+ * arrays hold bytes, never a maskable address, and are large, so they pass
+ * through untouched.
+ */
+function maskEmailsDeep(
+  value: unknown,
+  key: string,
+  depth: number,
+  seen: WeakSet<object>
+): unknown {
+  if (typeof value === "string") return maskEmailsInText(value);
+  if (value === null || typeof value !== "object") return value;
+  if (seen.has(value)) return CIRCULAR_PLACEHOLDER;
+  if (ArrayBuffer.isView(value)) return value;
+  if (depth >= MAX_MASK_DEPTH) return UNMASKABLE_PLACEHOLDER;
+  seen.add(value);
+
+  let toJSON: ((key: string) => unknown) | undefined;
+  try {
+    const candidate = (value as { toJSON?: unknown }).toJSON;
+    if (typeof candidate === "function")
+      toJSON = candidate as (key: string) => unknown;
+  } catch {
+    // A throwing `toJSON` accessor — treat the value as having none.
+  }
+  if (toJSON) {
+    try {
+      return maskEmailsDeep(toJSON.call(value, key), key, depth + 1, seen);
+    } catch {
+      return UNMASKABLE_PLACEHOLDER;
+    }
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item, index) =>
+      maskEmailsDeep(item, String(index), depth + 1, seen)
+    );
+  }
+  const source = value as Record<string, unknown>;
+  const result: Record<string, unknown> = {};
+  for (const childKey of Object.keys(source)) {
+    try {
+      result[childKey] = maskEmailsDeep(
+        source[childKey],
+        childKey,
+        depth + 1,
+        seen
+      );
+    } catch {
+      // A throwing getter (or any read failure) must not crash the log call.
+      result[childKey] = UNMASKABLE_PLACEHOLDER;
+    }
+  }
+  return result;
+}
+
+/**
+ * Pino's `err` serializer, wrapped to also mask email addresses embedded in the
+ * serialized error's string values (see {@link maskEmailsDeep}). `stdSerializers.err`
+ * copies every own enumerable error property, so a provider send failure would
+ * otherwise carry the raw recipient into the log.
+ */
+function maskingErrSerializer(error: Error): unknown {
+  try {
+    return maskEmailsDeep(pino.stdSerializers.err(error), "", 0, new WeakSet());
+  } catch {
+    // `stdSerializers.err` reads every own enumerable error property, so a
+    // throwing getter on the error can fail here, before maskEmailsDeep runs.
+    // pino does not catch serializer errors, so fall back to a minimal masked
+    // shape rather than throwing out of the log call.
+    let message = UNMASKABLE_PLACEHOLDER;
+    try {
+      message = maskEmailsInText(String(error.message));
+    } catch {
+      // Keep the placeholder if even the message cannot be read.
+    }
+    return { type: "Error", message };
+  }
+}
+
+/**
  * Options shared by every logger instance. Exported so tests can exercise the
  * real redaction config against an in-memory stream rather than a copy of it.
  */
@@ -87,10 +260,12 @@ export const baseLoggerOptions: pino.LoggerOptions = {
       return { level: label };
     },
   },
-  // Pino's stdSerializers.err only fires for the `err` key. All call sites
-  // have been standardised to use `err` so this single mapping is sufficient.
+  // Pino's stdSerializers.err only fires for the `err` key. All call sites have
+  // been standardised to use `err`, so wrapping it here also catches addresses
+  // embedded in error values (message/stack/rejected/envelope.to/response) that
+  // the key-based redact list cannot reach (PP-45qx).
   serializers: {
-    err: pino.stdSerializers.err,
+    err: maskingErrSerializer,
   },
   timestamp: pino.stdTimeFunctions.isoTime,
 };

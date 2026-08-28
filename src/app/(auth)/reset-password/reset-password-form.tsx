@@ -37,7 +37,7 @@ export function ResetPasswordForm(): React.JSX.Element {
       <div className="space-y-2">
         <Label htmlFor="password">
           New Password{" "}
-          <span aria-hidden="true" className="text-destructive">
+          <span aria-hidden="true" className="text-destructive-text">
             *
           </span>
         </Label>
@@ -63,7 +63,7 @@ export function ResetPasswordForm(): React.JSX.Element {
       <div className="space-y-2">
         <Label htmlFor="confirmPassword">
           Confirm Password{" "}
-          <span aria-hidden="true" className="text-destructive">
+          <span aria-hidden="true" className="text-destructive-text">
             *
           </span>
         </Label>

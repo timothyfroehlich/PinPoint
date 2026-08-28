@@ -25,6 +25,7 @@ Everything is mocked at the subprocess boundary: these tests never touch the
 real Docker daemon, Supabase, git worktrees, or the slot manifest.
 """
 
+import io
 import json
 import subprocess
 import sys
@@ -94,7 +95,12 @@ class RunStub:
         self, args: list[str], **kwargs: object
     ) -> subprocess.CompletedProcess[str]:
         self.calls.append(list(args))
-        response = self.responses.get(_kind(args), (0, "", ""))
+        default = (
+            (0, "worktree /repo\n", "")
+            if _kind(args) == "worktree_list"
+            else (0, "", "")
+        )
+        response = self.responses.get(_kind(args), default)
         if isinstance(response, BaseException):
             raise response
         returncode, stdout, stderr = response  # type: ignore[misc]
@@ -284,6 +290,83 @@ def _run_main(monkeypatch: pytest.MonkeyPatch, target: Path | str) -> int:
     return cleanup.main()
 
 
+class TestInterfaces:
+    def test_direct_absolute_path_uses_the_shared_teardown(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        target = (tmp_path / "absolute-worktree").resolve()
+        called: list[Path] = []
+        monkeypatch.setattr(
+            cleanup,
+            "cleanup_worktree",
+            lambda path: called.append(path) or cleanup.EXIT_OK,
+        )
+
+        assert _run_main(monkeypatch, target) == cleanup.EXIT_OK
+        assert called == [target]
+
+    def test_direct_relative_path_is_resolved_before_teardown(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        called: list[Path] = []
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setattr(
+            cleanup,
+            "cleanup_worktree",
+            lambda path: called.append(path) or cleanup.EXIT_OK,
+        )
+
+        assert _run_main(monkeypatch, "relative-worktree") == cleanup.EXIT_OK
+        assert called == [(tmp_path / "relative-worktree").resolve()]
+
+    def test_claude_payload_uses_the_shared_teardown(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        target = (tmp_path / ".claude" / "worktrees" / "agent-123").resolve()
+        called: list[Path] = []
+        monkeypatch.setattr(sys, "argv", ["worktree_cleanup.py", "--claude-hook"])
+        monkeypatch.setattr(
+            sys, "stdin", io.StringIO(json.dumps({"worktree_path": str(target)}))
+        )
+        monkeypatch.setattr(
+            cleanup,
+            "cleanup_worktree",
+            lambda path: called.append(path) or cleanup.EXIT_OK,
+        )
+
+        assert cleanup.main() == cleanup.EXIT_OK
+        assert called == [target]
+
+    @pytest.mark.parametrize(
+        "payload",
+        [
+            "",
+            "{not json",
+            "null",
+            "[]",
+            "{}",
+            '{"worktree_path": null}',
+            '{"worktree_path": ""}',
+        ],
+    )
+    def test_malformed_or_missing_claude_payload_is_a_usage_error(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        payload: str,
+    ) -> None:
+        monkeypatch.setattr(sys, "argv", ["worktree_cleanup.py", "--claude-hook"])
+        monkeypatch.setattr(sys, "stdin", io.StringIO(payload))
+        monkeypatch.setattr(
+            cleanup,
+            "cleanup_worktree",
+            lambda _path: pytest.fail("invalid payload must not start teardown"),
+        )
+
+        assert cleanup.main() == cleanup.EXIT_FAILED
+        assert "Invalid Claude WorktreeRemove payload" in capsys.readouterr().err
+
+
 class TestMissingTarget:
     def test_absent_from_both_sources_is_an_idempotent_success(
         self,
@@ -429,6 +512,10 @@ class TestMainTeardown:
         assert "Removed 1 Docker volume(s)" in err
         assert f"Cleaned up worktree: {fake_worktree}" in err
         assert deallocated == [str(fake_worktree)]
+        # Codex invokes cleanup from the target as `.`. Git removal and prune
+        # must therefore run from the main worktree, which survives deletion.
+        assert stub.calls_of("worktree_remove")[0][:3] == ["git", "-C", "/repo"]
+        assert stub.calls_of("worktree_prune")[0][:3] == ["git", "-C", "/repo"]
 
     def test_renamed_branch_still_tears_down_the_pinned_project(
         self,
@@ -498,7 +585,7 @@ class TestMainTeardown:
         assert "UNKNOWN" not in err
         assert deallocated == [str(fake_worktree)]
 
-    def test_failed_volume_ls_does_not_report_success(
+    def test_incomplete_docker_cleanup_does_not_report_success(
         self,
         monkeypatch: pytest.MonkeyPatch,
         capsys: pytest.CaptureFixture[str],
@@ -549,6 +636,31 @@ class TestMainTeardown:
 
         assert exit_code == cleanup.EXIT_OK
         assert "Cleaned up worktree" in capsys.readouterr().err
+
+    def test_missing_supabase_cli_still_reports_success(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        fake_worktree: Path,
+        deallocated: list[str],
+    ) -> None:
+        """When supabase CLI is absent, cleanup tolerates FileNotFoundError and continues."""
+        install(
+            monkeypatch,
+            RunStub(
+                rev_parse=(0, f"{BRANCH}\n", ""),
+                supabase=FileNotFoundError(2, "No such file: supabase"),
+                volume_ls=(0, "", ""),
+            ),
+        )
+
+        exit_code = _run_main(monkeypatch, fake_worktree)
+
+        assert exit_code == cleanup.EXIT_OK
+        err = capsys.readouterr().err
+        assert "failed to invoke `supabase stop`" in err
+        assert "Cleaned up worktree" in err
+        assert deallocated == [str(fake_worktree)]
 
     def test_failed_worktree_removal_keeps_the_slot(
         self,

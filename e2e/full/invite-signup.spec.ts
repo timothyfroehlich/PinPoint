@@ -10,7 +10,11 @@
  */
 
 import { test, expect } from "../support/fixtures.js";
-import { ensureLoggedIn, logout } from "../support/actions.js";
+import {
+  ensureLoggedIn,
+  logout,
+  openMachineManageTab,
+} from "../support/actions.js";
 import { cleanupTestEntities } from "../support/cleanup.js";
 import { seededMachines, TEST_USERS } from "../support/constants.js";
 import { getSignupLink } from "../support/mailpit.js";
@@ -157,7 +161,7 @@ test.describe("User Invitation & Signup Flow", () => {
     ).toBeVisible();
 
     // Open the machine edit page (admin has edit permission)
-    await page.getByTestId("machine-tab-edit").click();
+    await openMachineManageTab(page);
     await expect(page).toHaveURL(/\/edit$/);
 
     // Ownership lives in the Danger zone behind a disclosure (PP-o355.19).

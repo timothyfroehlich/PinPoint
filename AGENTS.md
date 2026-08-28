@@ -12,9 +12,14 @@
 
 **`docs/NON_NEGOTIABLES.md` is the catalog** — every implementation rule, with its canonical `CORE-*` ID, severity, rationale, and do/don't. Read it before writing code in an area you have not touched before, and cite rules by ID.
 
-This section used to restate all 20 rules as one-line summaries, loaded on every session regardless of what the session was doing. They now live in `.claude/rules/`, grouped by where they apply: files with a `paths:` glob list load when a matching file is opened, and `always.md` — the six rules no glob would narrow honestly — loads at launch. `.claude/rules/README.md` explains the split and how to add a rule.
+`AGENTS.md` is the portable, always-on project policy. Skills hold task-specific procedure; the catalog remains authoritative for complete rule statements.
 
-That tier is Claude Code-specific. In any other tool, read the catalog directly.
+#### Universal implementation policy
+
+- **Type safety (CORE-TS-007):** never use `any`, non-null `!`, or unsafe `as`; model or narrow the value instead. See `pinpoint-typescript` for PinPoint's database-typing guidance.
+- **Path aliases (CORE-TS-008):** import project code with `~/`, never deep relative paths.
+- **Rule of Three (CORE-ARCH-010):** do not abstract before the third real duplication.
+- **Email privacy (CORE-SEC-007):** user emails only in admin views and the user's own settings page; everywhere else use names, "Anonymous", or roles.
 
 ### 2.2 Process rules
 
@@ -22,17 +27,24 @@ That tier is Claude Code-specific. In any other tool, read the catalog directly.
 2. **Run `pnpm run check` before committing** (~9s — the default floor). It is a **static** gate: types, lint, format, and the shell/YAML/Python linters. **It does not run unit tests, and does not run pytest** (PP-4zcj) — unit tests are a required CI job (`test-unit`), part of `preflight`, and available via `pnpm run test`; the Python hook/script tests are a required CI job (`linters`) and available via `pnpm run check:python`. Reserve `pnpm run preflight` (the slower check + build + unit + integration) for **non-trivial changes**: migrations, security/auth, server actions, middleware, DB schema. Preflight is the exception, not the per-commit rule.
 3. **Don't kill processes you didn't start** — see §4 Process safety.
 4. **Sync with merge, never rebase** — see §5 Branches.
-5. **Root checkout is read-only.** It stays on `main`. All work — including planning docs — happens in a worktree. Dispatch a subagent or switch into an existing worktree. Tool-specific dispatch mechanics live in `CLAUDE.md`. (PP-46z, PP-bg45.)
-6. **Never `--no-verify`**, never wildcard tool permissions — without explicit user approval each time. **The merge decision is Tim's, always.** An agent MAY run the gate-enforced script `bash scripts/workflow/merge-pr.sh <PR> --human`, but the `block-direct-merge.cjs` PreToolUse hook turns that invocation into an **approval prompt** — Tim approves before it runs, so the merge is still his call (PP-wi85, reversed for the script only, per Tim 2026-08-19). The raw merge channels stay **hard-blocked** for agents — never `gh pr merge`, never `gh api PUT .../merge`, never MCP `merge_pull_request` — because they skip the script's gate re-checks (CI green, review pins head, threads resolved, no conflict). An agent's normal terminal state on a PR is still: ready-for-review, CI green, a review covering the head commit (see §5 "Getting a PR reviewed"), threads resolved, screenshots posted if UI-touching, then hand over with `bash scripts/workflow/merge-handoff.sh <PR>` — it prints the state Tim needs plus the merge command. (PP-wi85.)
+5. **Root checkout is read-only.** It stays on `main`. All work — including planning docs — happens in a worktree. Dispatch a subagent or switch into an existing worktree. (PP-46z, PP-bg45.)
+6. **Never `--no-verify`**, never wildcard tool permissions — without explicit user approval each time. **The merge decision is Tim's, always.** An agent MAY run the gate-enforced script `bash scripts/workflow/merge-pr.sh <PR> --human`, but the `block-direct-merge.cjs` PreToolUse hook turns that invocation into an **approval prompt** — Tim approves before it runs, so the merge is still his call (PP-wi85, reversed for the script only, per Tim 2026-08-19). The raw merge channels stay **hard-blocked** for agents — never `gh pr merge`, never `gh api PUT .../merge`, never MCP `merge_pull_request` — because they skip the script's gate re-checks (CI green, review pins head, threads resolved, no conflict). An agent's normal terminal state on a PR is: GitHub-ready, CI green, automatic Codex coverage of head, threads resolved, `ready-for-review` applied, and screenshots posted if UI-touching; then hand over with `bash scripts/workflow/merge-handoff.sh <PR>` — it prints the state Tim needs plus the merge command. (PP-wi85.)
 7. **Beads: `team-maintainer` policy** (not the conservative default).
+
+**Codex mutations:** use `bd --actor Codex <command>` so automated writes never fall back to Tim's identity.
 
 **Beads in a cloud/ephemeral checkout:** if `.beads/` is absent (fresh cloud sandbox), run `bash scripts/beads-cloud-init.sh && cd ~/beads` before any `bd` write — the binaries are already installed by the environment setup script; this materializes the DoltHub credential and clones the shared DB. A discovery net; scheduled routines still carry the same line as a prompt preamble. Full setup: `docs/runbooks/cloud-routines-beads-access.md`.
 
 ## 3. Agent Skills
 
-Load relevant skills for every task. If your tool doesn't support skills, read the file directly. All skills live at `.agents/skills/<name>/SKILL.md`.
+Before working in an area covered by a skill, read that skill. If your tool doesn't support skills, read its `SKILL.md` directly. All project skills live at `.agents/skills/<name>/SKILL.md`; they own task-specific procedure while this file stays agent-neutral.
 
-**The huddle is the exception, and it is not in this repo.** Inter-session coordination — the SessionStart identity notice, the poll, the daily bead — moved to Tim's dotfiles on 2026-08-12: scripts at `~/.claude/hooks/huddle/`, skill at `~/.claude/skills/huddle/`, tests alongside the scripts. Nothing about it was PinPoint-specific, and living outside the repo means editing it costs no PR. What stays here is the four hook registrations in `.claude/settings.json` and the channel itself — the huddle resolves `.agents/huddle/` and its beads from the cwd's repo, so the conversation is still per-project.
+Before exploring or changing non-mechanical product behavior, read
+`docs/agents/domain.md`; it routes the relevant glossary, feature spec, and
+ADRs. Skip it for mechanical changes that do not affect product behavior or
+domain language.
+
+**The huddle is the exception, and it is not in this repo.** Inter-session coordination — the SessionStart identity notice, the poll, the daily bead, and the main watcher — moved to Tim's dotfiles on 2026-08-12: scripts at `~/.agents/huddle/`, skill at `~/.claude/skills/huddle/`, tests alongside the scripts. Nothing about it was PinPoint-specific, and living outside the repo means editing it costs no PR. What stays here is the harness hook registrations in `.claude/settings.json` and `.codex/hooks.json` and the channel itself — the huddle resolves `.agents/huddle/` and its beads from the cwd's repo, so the conversation is still per-project.
 
 ## 4. Environment
 
@@ -40,16 +52,17 @@ Load relevant skills for every task. If your tool doesn't support skills, read t
 
 One-time install for tools the workflow scripts depend on:
 
+- **mise** — version `2026.8.11` or newer. Manages Node (`24.16.0`), Python (`3.12.9`), Ruff (`0.15.1`), and pnpm (`package.json#packageManager` single authority with SHA-512 integrity verification).
 - **GNU parallel** — provides `sem`, which `pnpm run preflight` uses to cap host-wide concurrency at 2. Without it, `preflight` fails with a clear install hint; `pnpm run preflight:unlocked` bypasses the cap.
-- **pytest** — `pnpm run check:python` runs the hook/script tests with it, and dies with a bare `pytest: command not found` if it is absent (no runtime install hint, unlike `sem`). Install it however your host installs Python CLI tools — Homebrew, pipx, distro package.
+- **pytest** — `pnpm run check:python` runs the hook/script tests with it under the mise-selected Python. Install it with `mise exec -- python3 -m pip install -r scripts/requirements.txt`; if absent from that interpreter, `check:pytest` fails with this install hint rather than using a pytest bound to another Python.
 
 ### Worktrees & ports
 
 Each git worktree gets isolated Supabase ports automatically. The Husky `post-checkout` hook runs `scripts/worktree_setup.py`, which allocates a slot from `~/.config/pinpoint/worktree-slots.json` and generates read-only `supabase/config.toml`, `.env.local`, `.claude/launch.json`.
 
 - **Create**: `git worktree add /path -b branch origin/main` — the hook handles the rest.
-- **Cleanup**: `scripts/worktree_cleanup.py` (stops Supabase, removes volumes, deallocates slot) is what runs _when a worktree is removed_ — it never initiates removal itself. Plain `git worktree remove` or `rm -rf` bypasses it and leaks slot entries and Docker volumes; `scripts/worktree_orphan_sweep.py` reconciles those, `--apply` to reclaim.
-- **Reaping finished worktrees**: `scripts/worktree_reap.py` is what _removes_ worktrees whose work already landed, delegating the teardown to `worktree_cleanup.py`. Nothing else does — an agent that commits, pushes and ends leaves its directory on disk forever, and the sweep can't see it (a worktree still on disk is "active" to the sweep). It reaps only on positive proof: a merged PR whose `headRefOid` **is** the local `HEAD` with a clean tree, or zero commits ahead of `origin/main` with no PR. Dirty tree, post-merge commits, an open PR or an unreachable `gh` all mean "leave it alone". Dry-run by default; `--apply` to reclaim. `merge-pr.sh` reaps the merged branch's worktree automatically. (PP-49x5.)
+- **Cleanup**: `python3 scripts/worktree_cleanup.py <worktree-path>` is the complete teardown command: it stops the pinned Supabase project, removes its volumes, unlocks/removes/prunes the Git worktree, then releases its slot. Claude's `WorktreeRemove` hook calls the same module via `--claude-hook`; configure Codex cleanup as `python3 scripts/worktree_cleanup.py .`. Plain `git worktree remove` or `rm -rf` bypasses it and leaks resources; `scripts/worktree_orphan_sweep.py --apply` reconciles those.
+- **Reaping finished worktrees**: `scripts/worktree_reap.py` identifies worktrees whose work already landed and delegates teardown to `worktree_cleanup.py`. It consumes Git's complete worktree inventory, regardless of whether Claude, Codex, Antigravity, or a human chose the path. The sweep can't reap an existing worktree because it is still "active". Reap requires positive proof: a merged PR whose `headRefOid` **is** local `HEAD` with a clean tree, or zero commits ahead of `origin/main` with no PR. Dirty tree, post-merge commits, an open PR, or unreachable `gh` means "leave it alone". Dry-run by default; `--apply` to reclaim. `merge-pr.sh` reaps the merged branch's worktree automatically. (PP-49x5.)
 - **SessionStart audit**: one hook runs both the sweep and the reap in dry-run mode every 6h and prints a one-line nudge when either finds something to reclaim.
 - **Ports**: main worktree uses defaults (3000 / 54321 / 54322). Slot N: `3000+N*10`, `54321+N*100`, `54322+N*100`.
 - **Supabase `project_id`**: derived from the branch name the **first** time a worktree is set up, then **pinned** — later checkouts reuse the id already in `supabase/config.toml`. It names the Docker containers and labels the volumes, so letting it follow a `git checkout -b` would rename the stack out from under itself (`supabase stop` matches nothing, the old containers keep the ports bound, cleanup misses them). `config.toml` is the authoritative record of the running stack's id. (PP-4936.)
@@ -74,7 +87,7 @@ Only stop services you started in this session, by specific PID or via worktree-
 
 | Command                                   | What                                                                                                                                                                                                                                                                                                                               |
 | :---------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pnpm run check`                          | Fast **static** gate: types, lint (via the `lint:local` oxlint mirror), format, yamllint, actionlint, ruff, shellcheck (~9s; `format:fix` is the long pole). **No unit tests** (see `pnpm run test`), **no pytest** (see `check:python`).                                                                                          |
+| `pnpm run check`                          | Fast **static** gate: types, lint (oxlint), format, yamllint, actionlint, ruff, shellcheck (~9s; `format:fix` is the long pole). **No unit tests** (see `pnpm run test`), **no pytest** (see `check:python`).                                                                                                                      |
 | `pnpm run check:python`                   | ruff + `pytest scripts/tests/` (~14s). Split out of `check` because Python changes are rare; CI's required `Fast Linters` job runs it on every push regardless. Run after touching `scripts/` or `.claude/hooks/`.                                                                                                                 |
 | `pnpm run preflight`                      | Full: check + build + integration. **For non-trivial changes** (migrations, auth, server actions, middleware, DB schema) — not every commit. Host-wide cap of 2 concurrent runs (via `sem`); use `preflight:unlocked` to bypass.                                                                                                   |
 | `pnpm run smoke`                          | Smoke E2E (~60s)                                                                                                                                                                                                                                                                                                                   |
@@ -89,32 +102,18 @@ Only stop services you started in this session, by specific PID or via worktree-
 | `./scripts/workflow/pr-watch.py <PR>`     | Watch CI for a PR (Monitor-compatible). Never hand-roll a polling loop.                                                                                                                                                                                                                                                            |
 | `pnpm run dev:status`                     | Check whether Next.js / Supabase / Postgres are up — one command, worktree-port aware. Use it instead of ad-hoc `curl` health checks against localhost.                                                                                                                                                                            |
 
-### Type-check engine (TS 7 GA dual-install)
+### Type-check engine (TS 7)
 
-TypeScript 7.0 (the Go-native compiler) is GA and installed via Microsoft's recommended dual-install: `@typescript/native` (alias of `typescript@^7`) ships the native `tsc` binary that runs the `typecheck`, `typecheck:tests`, and `typecheck:e2e` gates (~4–6× faster than TS6's `tsc`), while the `typescript` package name is aliased to `@typescript/typescript6` — the TS6 JS compiler API + a `tsc6` binary. **ESLint type-aware linting and `next build` still type-check on that TS6 API** — TS7 doesn't ship a stable JS API until 7.1, so do not remove the `typescript` alias. Bin names are unambiguous: `tsc` = native 7, `tsc6` = JS 6. `pnpm run typecheck:tsc6` runs the TS6 engine for A/B comparison. PP-8mv1 moved the test/e2e configs onto native `tsc` (0 divergences vs `tsc6` on `tsconfig.tests.check.json` and `e2e/tsconfig.json`) and retired the `tsc-baseline` gate. History and validation record: `docs/plans/2026-06-27-typescript-7-upgrade-plan.md` (PRs #1586, PP-xu96, PP-8mv1).
+`typescript` is TypeScript 7.0, whose Go-native `tsc` runs the `typecheck`, `typecheck:tests`, and `typecheck:e2e` gates. `next build` uses CLI mode to run the same compiler against `tsconfig.app.json`; Next 16.2.x needs this because its API mode requires a JavaScript compiler API, while 16.3+ defaults to CLI mode. The CLI emits raw `tsc` diagnostics rather than Next code frames. History and validation record: `docs/plans/2026-06-27-typescript-7-upgrade-plan.md` (PRs #1586, PP-xu96, PP-8mv1, PP-sc77.5).
 
-### Lint engines (authoritative ESLint + local oxlint mirror)
+### Lint engine (Oxlint)
 
-`pnpm run lint` (full ESLint, type-aware via the TS6 JS API) is **authoritative** and is what CI runs — unchanged. `pnpm run check` runs `lint:local` instead: a faster **mirror** of the same rules, split in two because no single engine covers them all.
+`oxlint` is the sole, authoritative lint engine (PP-sc77). It runs type-aware via `oxlint-tsgolint`, alongside native plugins (`typescript`, `unicorn`, `react`, `jsx-a11y`, `promise`) and JS plugins (`pinpoint`, `eslint-plugin-better-tailwindcss`).
 
-- `lint:_oxlint` — `oxlint` with `options.typeAware`, backed by the Go-native tsgolint engine. Owns the type-checked bulk plus the syntactic TypeScript rules. ~0.9s / ~930 MB.
-- `lint:_slim` — `PINPOINT_LINT_SLIM=1 eslint src/ e2e/ scripts/`. The same `eslint.config.mjs`, with typescript-eslint's `disable-type-checked` spread in and the project service off, so it costs nothing to build a Program. Owns the plugins oxlint can't run: the local `pinpoint` custom rule, `better-tailwindcss`, `eslint-comments`, `unused-imports`, `react-hooks`, `promise`, `jsx-a11y`. ~3.5s / ~1.2 GB.
-
-Together ~3.8s vs full ESLint's ~14.9s, and peak RSS ~1.2 GB vs ~3.2 GB. The memory drop is the point, not the wall-clock.
-
-**The mirror is a speed optimization, never a coverage bet.** Drift fails safe: whatever it misses, CI's full ESLint still catches, so the worst case is a CI-only failure, never silent loss. Two maintenance rules follow:
-
-1. Add a type-aware rule to `eslint.config.mjs` → add it to `.oxlintrc.json` too, **including any per-override `"off"`**. Rules oxlint still classifies as nursery (e.g. `no-unnecessary-condition`) are skipped by `@oxlint/migrate` and must be listed by hand.
-2. A lint failure that reproduces only in CI means the mirror drifted. Fix the mirror; don't treat it as flake.
-
-**`typescript/prefer-optional-chain` is stricter in oxlint than in typescript-eslint.** It is enabled in both, but oxlint fires on two shapes ESLint stays silent on, and they needed opposite treatment:
+**`typescript/prefer-optional-chain` is stricter in oxlint than in typescript-eslint.** It is enabled, but oxlint fires on two shapes typescript-eslint stayed silent on, and they needed opposite treatment:
 
 - `src/lib/cookies/client.ts` — `typeof window !== "undefined" && window.location…`. **oxlint is wrong here**: `?.` guards a nullish _value_, not an undeclared _binding_, so `window?.location` still throws `ReferenceError` under SSR (verified: `undeclared?.foo` throws). Silenced with a scoped `/* oxlint-disable */` … `/* oxlint-enable */` pair — block form, because the expression wraps and `-next-line` would miss it. The suppression is narrow: a violation elsewhere in that file is still caught.
-- `src/components/machines/PinballMapLinkField.tsx` — a `family !== null && family.x === null && family.y > 1` chain. **oxlint was right and typescript-eslint merely conservative**: the rewrite is semantically equivalent and type-checks clean, because TS narrows `family` to non-null once `family?.x === null` holds. Rewritten.
-
-The general rule this illustrates: when the mirror is stricter than authoritative ESLint, fix or suppress the specific site — don't drop the rule, which would silently widen the coverage gap. (PP-4zcj.)
-
-(PP-4zcj.)
+- `src/components/machines/PinballMapLinkField.tsx` — a `family !== null && family.x === null && family.y > 1` chain. **oxlint was right and typescript-eslint merely conservative**: the rewrite is semantically equivalent and type-checks clean, because TS narrows `family` to non-null once `family?.x === null` holds. Rewritten. (PP-4zcj.)
 
 ### Prototype mode (rapid iteration)
 
@@ -153,15 +152,11 @@ Never resolve `drizzle/meta` conflicts manually — the folder holds binary-like
 
 ### Getting a PR reviewed
 
-**No bot reviews this repo.** Copilot review was retired on 2026-08-02 (PP-4ric) — the free tier was too small to review PinPoint's PRs, so quota outages were the normal state. The merge bar is unchanged: a PR still needs a review covering its **head commit**, with threads resolved.
+**Automatic Codex review is the default.** Open every agent-created PR as a GitHub draft; promote it only after the current-head `CI Gate` succeeds. Before a later upload that changes more than 50 executable-code lines, return the PR to draft **before** pushing, then promote it again after the replacement `CI Gate` succeeds.
 
-The reviewer is **Tim, running `/code-review` on the branch** — a Claude Code harness built-in an agent cannot launch. So getting reviewed is a handoff: **finish your churn first** (CI fixes, merge-from-main), stop iterating, then tell Tim the branch is ready for review. Once he has, address the findings and attest the head he read:
+The owning agent monitors CI, draft promotion, automatic review, findings, and corrective pushes until Codex has returned a clean result for the exact current head and every review thread is resolved. An exact-head finding-bearing review is also terminal once every thread is explicitly adjudicated and resolved; declining a finding without a push does not require manual re-review. Use `@codex review` only when Tim explicitly asks for a manual trigger; it is not the fallback when automation is slow.
 
-```bash
-bash scripts/workflow/mark-claude-review.sh <PR> <depth> "<one-line findings>"
-```
-
-`<depth>` is the level he ran — `low | medium | high | xhigh | max | ultra`, or `trivial` for the carve-out below — and is required: "reviewed" and "reviewed at `low`" are different facts, and the handoff report states which. The marker pins a SHA, so any push invalidates it — re-attest if what you pushed was the review's own findings; get a fresh review if it was anything else. A genuinely trivial change (typo, comment, one-line mechanical fix) can be attested without interrupting him, saying why it was trivial. The marker attests a review happened; posting it otherwise is a false attestation. Full rules: `pinpoint-pr-workflow` skill Phase 3.4.
+The gate accepts Codex's native GitHub approval, its exact-bot/exact-app clean comment pinned to head, an exact-head `COMMENTED`/`CHANGES_REQUESTED` review after every finding thread is adjudicated and resolved, or the existing SHA-pinned manual attestation after Tim runs `/codex:review` or `/code-review`. Exact upload counting, state transitions, and fallback rules: `pinpoint-pr-workflow` skill Phase 3.
 
 ### Handing a PR over to merge
 
@@ -171,15 +166,11 @@ Don't write the handoff summary — **run it and paste it**:
 bash scripts/workflow/merge-handoff.sh <PR>
 ```
 
-It computes what Tim needs in order to merge without re-deriving anything: which `/code-review` covered head and how many commits back it was, CI, threads, mergeable + distance behind main, when main was last merged in, the diff split src / tests / docs / other, migrations, newly-registered env vars, UI + screenshots — then two `!`-prefixed commands, one to re-run the report (it is a snapshot) and one to merge. The merge command is printed **only** when all four gates pass; otherwise the block names what is blocking, so an un-ready PR cannot be handed over as ready. Every field is a claim an agent would otherwise be making from memory. (PP-9onv.)
+It computes what Tim needs in order to merge without re-deriving anything: which review covered head and how many commits back it was, CI, threads, mergeable + distance behind main, when main was last merged in, the diff split src / tests / docs / other, migrations, newly-registered env vars, UI + screenshots — then two `!`-prefixed commands, one to re-run the report (it is a snapshot) and one to merge. The merge command is printed **only** when all four gates pass; otherwise the block names what is blocking, so an un-ready PR cannot be handed over as ready. Every field is a claim an agent would otherwise be making from memory. (PP-9onv.)
 
 ### Review comments
 
 The canonical review rubric is `REVIEW.md` at the repo root. If a PR accumulates review comments (from Tim or another agent): fix the code, OR decline with a one-sentence reply (`add_reply_to_pull_request_comment`) and resolve the thread (`pull_request_review_write(method: "resolve_thread")`). Sign replies with your agent name (`—Claude`, `—Gemini`, `—Codex`, `—Antigravity`). Declined comments must get a reply — no silent ignores.
-
-### Parallel subagent work
-
-Use worktree-isolated subagents for independent tasks. Tool-specific dispatch, hooks, and known bugs live in your tool's instructions file. Full multi-tool workflow: `pinpoint-orchestrator` skill.
 
 ### Superpowers lifecycle → beads
 
@@ -192,10 +183,6 @@ When you run the superpowers plugin lifecycle (`brainstorming → writing-plans 
 
 Plan-file checkboxes are within-PR execution state, **not** durable task tracking — the bead is the cross-session source of truth. Single-PR work gets one bead (no per-task sliver-beads); only multi-PR epics decompose into children.
 
-### Surfacing visual or ambiguous decisions (playgrounds)
-
-When a decision is **visual or hard to convey in prose** — color/contrast, spacing, layout, component variants, or a tradeoff with several plausible answers — build a small interactive playground for the user instead of describing options in text or guessing on their behalf. A playground is a single self-contained HTML file with live controls, a real rendered preview, and a copy-out decision; the user adjusts it, sees the actual result, and hands the choice back. (Claude Code provides this via a `playground` plugin skill — it is **not** a checked-in `.agents/skills/` skill, so in any tool you can simply write the single-file HTML directly.) Prefer this over a wall of bullet-pointed options whenever the user would benefit from _seeing_ the thing — e.g. a contrast change is far easier to judge as rendered swatches with live WCAG ratios than as numbers. Keep using `AskUserQuestion`-style prompts for non-visual forks; reach for a playground when sight is the deciding factor.
-
 ## 6. Working style
 
 How Tim wants agents to behave. (§1 has the one-line version; this is the detail.)
@@ -203,7 +190,7 @@ How Tim wants agents to behave. (§1 has the one-line version; this is the detai
 ### Collaboration & decisions
 
 - **Don't make my calls for me.** (a) When you ask me a multi-option question, wait for my answer before acting on one — even in auto/autonomous mode; deciding before I reply makes the question performative and removes my choice. (b) Auto/autonomous mode authorizes _operational_ calls (continuing work, tool choices, cleanup, re-publishing after a restart), **not** taste decisions — layout, color, copy, IA, or scope tradeoffs I surfaced. When I'm the taste-maker, ask (`AskUserQuestion` or a visual playground). While waiting on an answer, only do genuinely non-blocking parallel work.
-- **PRs ready-by-default.** Open PRs as ready-for-review, not draft. CI runs the same on drafts, so draft gates nothing — it just adds a "flip ready" step and signals WIP. Use draft only while still iterating, when you want title/description feedback first, or when you've told me you're pausing mid-task.
+- **PR lifecycle is agent-owned.** Follow §5 "Getting a PR reviewed" through exact-head automatic review and finding adjudication; draft/ready mechanics live in `pinpoint-pr-workflow`.
 - **Link markdown files by absolute path.** When you point me at a markdown file to read or review (a plan, spec, handoff doc, report), always give the full absolute path (e.g. `/Users/froeht/Code/PinPoint/docs/...`), never a relative one. Absolute paths open directly in a cmux pane.
 
 ### Scope and shipping discipline
@@ -239,4 +226,14 @@ Actionable, "what" and "how" only. Skills carry the deep dives.
 
 **Canonical specs are authoritative** — particularly `pinpoint-design-bible` (§5 page archetypes, §17 modal archetypes). When implementation changes UI behavior covered there, **edit the spec in place**. Don't append divergence notes or "TODO: spec out of date" disclaimers. If you find one, fold it into canonical text and delete it. Dated artifacts in `docs/superpowers/specs/` are records — leave them alone.
 
-**Feature specs stay current as you work** (`docs/feature-specs/`, `spec-driven-development` skill): when a change touches behavior covered by one, the **same PR** updates the spec or adds a divergence-table row — never neither. Spec edits require Tim approving the exact diff first, even when he says "update the spec".
+**Feature specs stay current as you work** (`docs/feature-specs/`, `spec-driven-development` skill): when a change touches behavior covered by one, the **same PR** updates the spec or adds a divergence-table row — never neither. Feature-spec edits require Tim approving the exact diff first, even when he says "update the spec." One exception: an implementation PR may delete any divergence-table rows it fully resolves without separate approval; adding, narrowing, or otherwise changing a row still requires approval.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

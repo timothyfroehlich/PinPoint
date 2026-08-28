@@ -14,22 +14,22 @@ files do not: `tsconfig.tests.json` extends only `tsconfig.base.json` with
 `strict: true`, so both flags are off across everything it owns —
 `src/**/*.test.ts(x)`, `src/**/*.spec.ts(x)`, `src/test/**`, and `vitest.config.ts`.
 
-The `CORE-TS-*` rules the compiler cannot express are carried by ESLint, and only
+The `CORE-TS-*` rules the compiler cannot express are carried by Oxlint, and only
 in app code. `no-explicit-any` (CORE-TS-007) and `explicit-function-return-type`
 (CORE-TS-006) are both switched **off** for `e2e/**`, for test files, and for
 `*.config.*` / `scripts/**`. Writing `const page: any` in an e2e spec passes
 every gate.
 
 CORE-TS-007's ban on `!` **is** linted, as of PP-8k07:
-`@typescript-eslint/no-non-null-assertion` is "error", and
-`eslint-comments/no-restricted-disable` names it, so you cannot disable-comment
+`typescript/no-non-null-assertion` is "error", and
+`pinpoint/no-restricted-disable-directives` names it, so you cannot disable-comment
 past it in `src/`. It is off in the test and e2e blocks — a wrong assertion
 there fails the test loudly instead of 500ing a page — and that test exemption
 is meant to go away (PP-9q5k), so don't read it as blessed. Note the scope
 differs from the paragraph above: `scripts/**` and `*.config.*` keep
 `no-non-null-assertion` at "error", but they switch
-`eslint-comments/no-restricted-disable` off, so a `// eslint-disable-next-line`
-does work there.
+`pinpoint/no-restricted-disable-directives` off, so a `// oxlint-disable-next-line`
+(or `// eslint-disable-next-line`) does work there.
 
 The third of CORE-TS-007 that no tool checks is **unsafe `as`**. The
 `no-unsafe-*` rules target untyped values, not casts between two known types,

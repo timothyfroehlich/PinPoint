@@ -578,7 +578,7 @@ export function SettingsSetCard({
                     Duplicate
                   </DropdownMenuItem>
                   <DropdownMenuItem
-                    className="text-destructive focus:text-destructive"
+                    className="text-destructive-text focus:text-destructive-text"
                     onSelect={() => {
                       setDeleteDialogOpen(true);
                     }}

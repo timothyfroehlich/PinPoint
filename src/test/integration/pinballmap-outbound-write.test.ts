@@ -141,8 +141,8 @@ async function seedState(
   const db = await getTestDb();
   await db.insert(pinballmapState).values({
     id: "singleton",
-    locationId: 26454,
     enabled: true,
+    locationId: 26454,
     snapshotJson: snapshotOf(rows),
     lastSyncStatus: "ok",
   });
@@ -535,7 +535,6 @@ describe("PinballMap outbound writes (PGlite)", () => {
     const db = await getTestDb();
     const { removeMachineFromPinballMapAction } =
       await import("~/app/(app)/m/pinballmap-actions");
-    const { reconcileAfterSync } = await import("~/lib/pinballmap/sync");
     const admin = await createUser("admin");
     await mockAuthAs(admin.id);
     pbm.lineup = [{ id: 777, machineId: TITLE_ID }];
@@ -577,7 +576,6 @@ describe("PinballMap outbound writes (PGlite)", () => {
     const db = await getTestDb();
     const { removeMachineFromPinballMapAction } =
       await import("~/app/(app)/m/pinballmap-actions");
-    const { reconcileAfterSync } = await import("~/lib/pinballmap/sync");
     const admin = await createUser("admin");
     await mockAuthAs(admin.id);
     pbm.lineup = [{ id: 888, machineId: TITLE_ID }];

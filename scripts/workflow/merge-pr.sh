@@ -21,8 +21,8 @@
 #                                 an unreviewed head: `reviewed` never WAITs, because no
 #                                 bot reviews this repo and so no answer is ever already
 #                                 on its way. An unattested head hard-fails on the FIRST
-#                                 poll and the run ends. So run /code-review and let the
-#                                 agent attest head with mark-claude-review.sh BEFORE
+#                                 poll and the run ends. So get Tim's review and
+#                                 get a fresh Codex GitHub approval BEFORE
 #                                 firing this. Terminates on exactly three outcomes, each
 #                                 reported on exit:
 #                                   MERGED      — gates went green, PR squash-merged
@@ -332,41 +332,8 @@ fi
 gh pr merge "$PR" "${MERGE_ARGS[@]}"
 echo "MERGED: PR #$PR"
 
-# --- Post huddle coordination notice (fail-open) ---
-# The merge is already done — a huddle failure must NEVER propagate an error.
-#
-# The huddle lives in dotfiles (~/.claude/hooks/huddle/), not this repo, so the
-# absent-file guard below is now a real path: a machine without the dotfiles
-# stowed skips the notice instead of failing the merge.
-# shellcheck disable=SC1090,SC1091
-(
-  set +e
-  set +u
-  set +o pipefail
-  _HUDDLE_LIB="$HOME/.claude/hooks/huddle/huddle-lib.sh"
-  if [[ ! -f "$_HUDDLE_LIB" ]]; then
-    exit 0
-  fi
-  source "$_HUDDLE_LIB"
-  _TODAY=$(huddle_today_bead_id 2>/dev/null) || exit 0
-  [[ -n "$_TODAY" ]] || exit 0
-  # Parse PinPoint bead ID from PR title (convention: trailing "(PP-xxx)").
-  # Bead IDs may include dots (e.g. PP-yxw.9), so allow [a-z0-9.] in the capture.
-  _BEAD_ID=$(printf '%s' "$PR_TITLE" | grep -oE '\(PP-[a-z0-9.]+\)' | tail -1 | tr -d '()' || echo "")
-  # Compact changed-files hint for collision awareness (top-level dirs, first 5)
-  _FILES=$(gh pr view "$PR" --json files --jq '[.files[].path | split("/")[0]] | unique | .[:5] | join(", ")' 2>/dev/null || echo "")
-  _BEAD_PART=""
-  [[ -n "$_BEAD_ID" ]] && _BEAD_PART=" ($_BEAD_ID)"
-  _FILES_PART=""
-  [[ -n "$_FILES" ]] && _FILES_PART=" [touched: $_FILES]"
-  _SIGN="${HUDDLE_NAME:-huddle-auto}"
-  _MSG="Merged PR #$PR$_BEAD_PART: $PR_TITLE$_FILES_PART. Sync main if you have active branches. —$_SIGN"
-  bd comments add "$_TODAY" "$_MSG" >/dev/null 2>&1 || true
-) || true
-
 # --- Reap the merged PR's worktree (fail-open) ---
-# Same contract as the huddle notice above: the merge already happened, so no
-# post-step may propagate an error.
+# The merge is already done, so this post-step must never propagate an error.
 #
 # worktree_reap.py re-derives the verdict itself rather than trusting "this PR
 # just merged" — it reaps only when the worktree's HEAD *is* the merged SHA and

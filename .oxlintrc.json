@@ -1,11 +1,24 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["typescript"],
+  "plugins": ["typescript", "unicorn", "react", "jsx-a11y", "promise"],
+  "jsPlugins": [
+    "./eslint-rules/pinpoint-plugin.mjs",
+    "eslint-plugin-better-tailwindcss"
+  ],
+  "settings": {
+    "better-tailwindcss": {
+      "entryPoint": "src/app/globals.css"
+    }
+  },
   "categories": {
     "correctness": "off"
   },
   "options": {
-    "typeAware": true
+    "typeAware": true,
+    // "error": react-hooks and jsx-a11y rules run in oxlint as of PP-sc77.3,
+    // so all valid disable directives in src/ are recognized and any dead /
+    // stale disable comments trigger a build error.
+    "reportUnusedDisableDirectives": "error"
   },
   "env": {
     "builtin": true
@@ -21,9 +34,13 @@
     "*.config.ts",
     "*.config.cjs",
     "src/app/(app)/mockup/**",
-    "src/components/mockups/**"
+    "src/components/mockups/**",
+    "eslint-rules/__fixtures__/**"
   ],
   "rules": {
+    "pinpoint/no-restricted-disable-directives": "error",
+    "pinpoint/require-directive-description": "error",
+    "unicorn/no-abusive-eslint-disable": "error",
     "constructor-super": "error",
     "for-direction": "error",
     "getter-return": "error",
@@ -97,9 +114,21 @@
           }
         ],
         "no-array-constructor": "error",
+        "pinpoint/no-side-effects-in-transaction": "error",
+        "pinpoint/server-action-file-naming": "error",
         "no-implied-eval": "off",
         "no-unused-expressions": "error",
-        "no-unused-vars": "off",
+        "no-unused-vars": [
+          "error",
+          {
+            "args": "after-used",
+            "argsIgnorePattern": "^_",
+            "vars": "all",
+            "varsIgnorePattern": "^_",
+            "caughtErrors": "none",
+            "ignoreRestSiblings": true
+          }
+        ],
         "no-throw-literal": "off",
         "prefer-promise-reject-errors": "off",
         "require-await": "off",
@@ -126,6 +155,17 @@
             "minimumDescriptionLength": 10
           }
         ],
+        "typescript/no-non-null-assertion": "error",
+        "promise/catch-or-return": [
+          "error",
+          {
+            "allowFinally": true
+          }
+        ],
+        "promise/no-nesting": "warn",
+        "promise/no-promise-in-callback": "warn",
+        "promise/no-callback-in-promise": "warn",
+        "promise/no-return-wrap": "error",
         "typescript/no-array-delete": "error",
         "typescript/no-base-to-string": "error",
         "typescript/no-duplicate-enum-values": "error",
@@ -208,8 +248,7 @@
           }
         ],
         "typescript/no-unnecessary-condition": "error"
-      },
-      "plugins": ["typescript"]
+      }
     },
     {
       "files": [
@@ -231,9 +270,10 @@
         "typescript/no-unsafe-return": "off",
         "typescript/no-unsafe-argument": "off",
         "typescript/unbound-method": "off",
-        "typescript/no-unnecessary-condition": "off"
-      },
-      "plugins": ["typescript"]
+        "typescript/no-non-null-assertion": "off",
+        "typescript/no-unnecessary-condition": "off",
+        "pinpoint/no-restricted-disable-directives": "off"
+      }
     },
     {
       "files": ["e2e/**/*"],
@@ -249,6 +289,7 @@
         "typescript/no-unsafe-return": "off",
         "typescript/no-unsafe-argument": "off",
         "typescript/unbound-method": "off",
+        "typescript/no-non-null-assertion": "off",
         "no-restricted-properties": [
           "warn",
           {
@@ -257,9 +298,10 @@
             "message": "Use Playwright assertions (auto-wait) instead of waitForTimeout"
           }
         ],
-        "typescript/no-unnecessary-condition": "off"
-      },
-      "plugins": ["typescript"]
+        "pinpoint/no-test-com-literals": "warn",
+        "typescript/no-unnecessary-condition": "off",
+        "pinpoint/no-restricted-disable-directives": "off"
+      }
     },
     {
       "files": [
@@ -272,9 +314,196 @@
       "rules": {
         "no-restricted-imports": "off",
         "typescript/no-explicit-any": "off",
-        "typescript/explicit-function-return-type": "off"
-      },
-      "plugins": ["typescript"]
+        "typescript/explicit-function-return-type": "off",
+        "pinpoint/no-restricted-disable-directives": "off"
+      }
+    },
+    {
+      "files": ["supabase/**/*.mjs"],
+      "env": {
+        "node": true
+      }
+    },
+    {
+      "files": ["scripts/**/*.{mjs,cjs,js,jsx,ts,tsx}"],
+      "env": {
+        "node": true
+      }
+    },
+    {
+      "files": ["src/**/*.ts", "src/**/*.tsx"],
+      "excludeFiles": [
+        "**/*.test.ts",
+        "**/*.test.tsx",
+        "**/*.spec.ts",
+        "**/*.spec.tsx",
+        "src/test/**"
+      ],
+      "rules": {
+        "react/rules-of-hooks": "error",
+        "react/exhaustive-deps": "error"
+      }
+    },
+    {
+      "files": ["src/**/*.tsx"],
+      "excludeFiles": ["**/*.test.tsx", "**/*.spec.tsx", "src/test/**"],
+      "rules": {
+        "jsx-a11y/alt-text": "error",
+        "jsx-a11y/anchor-ambiguous-text": "off",
+        "jsx-a11y/anchor-has-content": "error",
+        "jsx-a11y/anchor-is-valid": "error",
+        "jsx-a11y/aria-activedescendant-has-tabindex": "error",
+        "jsx-a11y/aria-props": "error",
+        "jsx-a11y/aria-proptypes": "error",
+        "jsx-a11y/aria-role": "error",
+        "jsx-a11y/aria-unsupported-elements": "error",
+        "jsx-a11y/autocomplete-valid": "error",
+        "jsx-a11y/click-events-have-key-events": "error",
+        "jsx-a11y/control-has-associated-label": "off",
+        "jsx-a11y/heading-has-content": "error",
+        "jsx-a11y/html-has-lang": "error",
+        "jsx-a11y/iframe-has-title": "error",
+        "jsx-a11y/img-redundant-alt": "error",
+        "jsx-a11y/interactive-supports-focus": [
+          "error",
+          {
+            "tabbable": [
+              "button",
+              "checkbox",
+              "link",
+              "searchbox",
+              "spinbutton",
+              "switch",
+              "textbox"
+            ]
+          }
+        ],
+        "jsx-a11y/label-has-associated-control": "error",
+        "jsx-a11y/media-has-caption": "error",
+        "jsx-a11y/mouse-events-have-key-events": "error",
+        "jsx-a11y/no-access-key": "error",
+        "jsx-a11y/no-autofocus": "error",
+        "jsx-a11y/no-distracting-elements": "error",
+        "jsx-a11y/no-interactive-element-to-noninteractive-role": [
+          "error",
+          {
+            "tr": ["none", "presentation"],
+            "canvas": ["img"]
+          }
+        ],
+        "jsx-a11y/no-noninteractive-element-interactions": [
+          "error",
+          {
+            "handlers": [
+              "onClick",
+              "onError",
+              "onLoad",
+              "onMouseDown",
+              "onMouseUp",
+              "onKeyPress",
+              "onKeyDown",
+              "onKeyUp"
+            ],
+            "alert": ["onKeyUp", "onKeyDown", "onKeyPress"],
+            "body": ["onError", "onLoad"],
+            "dialog": ["onKeyUp", "onKeyDown", "onKeyPress"],
+            "iframe": ["onError", "onLoad"],
+            "img": ["onError", "onLoad"]
+          }
+        ],
+        "jsx-a11y/no-noninteractive-element-to-interactive-role": [
+          "error",
+          {
+            "ul": [
+              "listbox",
+              "menu",
+              "menubar",
+              "radiogroup",
+              "tablist",
+              "tree",
+              "treegrid"
+            ],
+            "ol": [
+              "listbox",
+              "menu",
+              "menubar",
+              "radiogroup",
+              "tablist",
+              "tree",
+              "treegrid"
+            ],
+            "li": [
+              "menuitem",
+              "menuitemradio",
+              "menuitemcheckbox",
+              "option",
+              "row",
+              "tab",
+              "treeitem"
+            ],
+            "table": ["grid"],
+            "td": ["gridcell"],
+            "fieldset": ["radiogroup", "presentation"]
+          }
+        ],
+        "jsx-a11y/no-noninteractive-tabindex": [
+          "error",
+          {
+            "tags": [],
+            "roles": ["tabpanel"],
+            "allowExpressionValues": true
+          }
+        ],
+        "jsx-a11y/no-redundant-roles": "error",
+        "jsx-a11y/no-static-element-interactions": [
+          "error",
+          {
+            "allowExpressionValues": true,
+            "handlers": [
+              "onClick",
+              "onMouseDown",
+              "onMouseUp",
+              "onKeyPress",
+              "onKeyDown",
+              "onKeyUp"
+            ]
+          }
+        ],
+        "jsx-a11y/role-has-required-aria-props": "error",
+        "jsx-a11y/role-supports-aria-props": "error",
+        "jsx-a11y/scope": "error",
+        "jsx-a11y/tabindex-no-positive": "error"
+      }
+    },
+    {
+      "files": ["**/*.ts", "**/*.tsx"],
+      "excludeFiles": [
+        "src/lib/issues/status.ts",
+        "src/lib/machines/status.ts",
+        "**/*.test.ts",
+        "**/*.test.tsx",
+        "**/*.spec.ts",
+        "**/*.spec.tsx",
+        "e2e/**",
+        "src/test/fixtures/**"
+      ],
+      "rules": {
+        "better-tailwindcss/no-restricted-classes": [
+          "error",
+          {
+            "restrict": [
+              {
+                "pattern": "^(?:[^:]+:)*(?:bg|text|border|ring|fill|stroke|outline|divide|placeholder|caret|accent|decoration|shadow|from|via|to)-(?:red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|slate|gray|zinc|neutral|stone)-[0-9]+(?:\\/[0-9]{1,3})?$",
+                "message": "Raw Tailwind palette classes are forbidden. Please use semantic tokens instead (e.g. bg-primary, text-destructive). See pinpoint-ui §Color System and pinpoint-design-bible §1."
+              },
+              {
+                "pattern": "^(?:[^:]+:)*[a-z0-9-]+-\\[(?:[^\\]]*?)#[0-9a-fA-F]{3,8}(?:[^\\]]*?)\\](?:\\/.*)?$",
+                "message": "Hardcoded arbitrary hex values are forbidden. Please use semantic tokens instead (e.g. text-muted-foreground, bg-primary). See pinpoint-ui §Color System and pinpoint-design-bible §1."
+              }
+            ]
+          }
+        ]
+      }
     }
   ]
 }

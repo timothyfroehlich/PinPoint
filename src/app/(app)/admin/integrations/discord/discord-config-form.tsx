@@ -5,13 +5,31 @@ import { useActionState, useTransition } from "react";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
-import { Switch } from "~/components/ui/switch";
 import { Separator } from "~/components/ui/separator";
 import { Badge } from "~/components/ui/badge";
-import { CheckCircle2, AlertCircle, Loader2, Check } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "~/components/ui/alert-dialog";
+import {
+  CheckCircle2,
+  AlertCircle,
+  Loader2,
+  Check,
+  Trash2,
+} from "lucide-react";
+import { useRouter } from "next/navigation";
 import { cn } from "~/lib/utils";
 import {
   saveDiscordConfigAction,
+  clearDiscordBotTokenAction,
   validateBotToken,
   validateServerId,
   type SaveDiscordConfigResult,
@@ -26,25 +44,23 @@ type ValidationState =
   | { kind: "invalid"; message: string };
 
 interface DiscordConfigFormProps {
-  enabled: boolean;
   guildId: string;
   inviteLink: string;
   hasToken: boolean;
 }
 
 export function DiscordConfigForm({
-  enabled,
   guildId,
   inviteLink,
   hasToken,
 }: DiscordConfigFormProps): React.JSX.Element {
+  const router = useRouter();
   // Local form state — controlled inputs so we can drive the inline Validate
   // buttons off the *unsaved* values (e.g. validate a freshly-pasted token
   // before it hits Vault).
   const [tokenInput, setTokenInput] = React.useState("");
   const [guildIdInput, setGuildIdInput] = React.useState(guildId);
   const [inviteLinkInput, setInviteLinkInput] = React.useState(inviteLink);
-  const [enabledInput, setEnabledInput] = React.useState(enabled);
 
   // Per-field validation status — transient, cleared on input change ("Stale"
   // state per the design spec D8).
@@ -56,6 +72,10 @@ export function DiscordConfigForm({
   });
   const [validatingToken, startTokenTransition] = useTransition();
   const [validatingServer, startServerTransition] = useTransition();
+  const [clearingToken, startClearTokenTransition] = useTransition();
+  const [clearTokenError, setClearTokenError] = React.useState<string | null>(
+    null
+  );
 
   // Save action — useActionState wraps the server action so we get pending
   // state and the structured result back. Form-level submission goes through
@@ -77,11 +97,10 @@ export function DiscordConfigForm({
       setTokenInput("");
       setGuildIdInput(guildId);
       setInviteLinkInput(inviteLink);
-      setEnabledInput(enabled);
       setTokenStatus({ kind: "idle" });
       setServerStatus({ kind: "idle" });
     }
-  }, [saveState, guildId, inviteLink, enabled]);
+  }, [saveState, guildId, inviteLink]);
 
   // Activation rule: switch is interactive iff a token exists somewhere —
   // either committed in DB or freshly typed (Save will commit them together).
@@ -92,25 +111,6 @@ export function DiscordConfigForm({
   const canValidateToken = tokenAvailable;
   const canValidateServer = tokenAvailable && guildIdInput.trim().length > 0;
 
-  // Switch gating: turning the integration ON requires fresh validation,
-  // OR the saved state was already enabled (so the admin can flip back to
-  // a known-good state without re-running probes). Note this is a UI gate
-  // only — the server action re-runs `probeServerMembership` on every
-  // enabled save and rejects bad config regardless of what the client
-  // permitted, so an admin who flips OFF, edits a field to something
-  // invalid, and flips back ON will be rejected on submit.
-  //
-  // Turning OFF is always allowed.
-  const validationsPassed =
-    tokenStatus.kind === "valid" && serverStatus.kind === "valid";
-  const canTurnOn = validationsPassed || enabled;
-  const switchDisabled = !tokenAvailable || (!enabledInput && !canTurnOn);
-  const switchTitle = !tokenAvailable
-    ? "Set a bot token first."
-    : !enabledInput && !canTurnOn
-      ? "Validate the bot token and Server ID before enabling."
-      : undefined;
-
   // Unsaved-changes guard. Browser-level beforeunload fires on tab close,
   // refresh, and external navigation. (App Router does not expose router
   // events, so internal client-side nav via <Link> will not trigger this —
@@ -119,7 +119,7 @@ export function DiscordConfigForm({
     tokenInput.length > 0 ||
     guildIdInput !== guildId ||
     inviteLinkInput !== inviteLink ||
-    enabledInput !== enabled;
+    false;
 
   React.useEffect(() => {
     if (!isDirty) return;
@@ -167,30 +167,38 @@ export function DiscordConfigForm({
     setTokenInput("");
     setGuildIdInput(guildId);
     setInviteLinkInput(inviteLink);
-    setEnabledInput(enabled);
     setTokenStatus({ kind: "idle" });
     setServerStatus({ kind: "idle" });
   }
 
+  function handleClearToken(): void {
+    setClearTokenError(null);
+    startClearTokenTransition(async () => {
+      try {
+        const result = await clearDiscordBotTokenAction();
+        if (!result.ok) {
+          setClearTokenError(result.message);
+          return;
+        }
+        setTokenInput("");
+        setTokenStatus({ kind: "idle" });
+        setServerStatus({ kind: "idle" });
+        router.refresh();
+      } catch {
+        setClearTokenError("Failed to remove the token. Try again.");
+      }
+    });
+  }
+
   return (
     <form action={saveFormAction} className="space-y-6">
-      <input
-        type="hidden"
-        name="enabled"
-        value={enabledInput ? "true" : "false"}
-      />
-
       {/* Bot token */}
       <section className="space-y-2">
         <FieldLabel
           htmlFor="newToken"
           label="Bot token"
-          // Server schema treats newToken as optional ("" = no change when a
-          // token is already saved). Only flag the input as required when
-          // there's no saved token to fall back on, otherwise screen-reader
-          // required-field cues misrepresent the actual validation rule.
-          required={!hasToken}
-          hint="From Discord Developer Portal → your app → Bot → Reset Token."
+          optional
+          hint="Required for Discord notifications and region alerts. Get it from Discord Developer Portal → your app → Bot → Reset Token."
           savedBadge={hasToken && tokenInput === ""}
         />
         <div className="flex items-center gap-2 flex-wrap">
@@ -234,6 +242,51 @@ export function DiscordConfigForm({
         {fieldErrors["newToken"] && (
           <FieldError message={fieldErrors["newToken"]} />
         )}
+        {hasToken && (
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={isPending || clearingToken}
+              >
+                {clearingToken ? (
+                  <Loader2 className="mr-1.5 size-3 animate-spin motion-reduce:animate-none" />
+                ) : (
+                  <Trash2 className="mr-1.5 size-3" aria-hidden />
+                )}
+                Remove saved token
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>
+                  Remove the Discord bot token?
+                </AlertDialogTitle>
+                <AlertDialogDescription>
+                  This turns off Discord notifications and Pinball Map region
+                  alerts. You will need to save and validate a token again to
+                  restore either feature.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={isPending || clearingToken}>
+                  Cancel
+                </AlertDialogCancel>
+                <AlertDialogAction
+                  type="button"
+                  variant="destructive"
+                  disabled={isPending || clearingToken}
+                  onClick={handleClearToken}
+                >
+                  Remove token
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        )}
+        {clearTokenError && <FieldError message={clearTokenError} />}
       </section>
 
       <Separator />
@@ -244,8 +297,8 @@ export function DiscordConfigForm({
           <FieldLabel
             htmlFor="guildId"
             label="Server ID"
-            required
-            hint="Right-click the server in Discord → Copy Server ID. Enable Developer Mode in Settings → Advanced if hidden."
+            optional
+            hint="Right-click the server in Discord → Copy Server ID. Clear it to turn notifications off while retaining the shared bot token."
           />
           <div className="flex items-center gap-2 flex-wrap">
             <Input
@@ -253,7 +306,7 @@ export function DiscordConfigForm({
               name="guildId"
               type="text"
               inputMode="numeric"
-              pattern="[0-9]+"
+              pattern="[0-9]*"
               placeholder="123456789012345678"
               maxLength={64}
               value={guildIdInput}
@@ -261,8 +314,6 @@ export function DiscordConfigForm({
                 setGuildIdInput(e.target.value);
                 setServerStatus({ kind: "idle" });
               }}
-              required
-              aria-required="true"
               className="flex-1 max-w-[360px]"
             />
             <Button
@@ -314,27 +365,8 @@ export function DiscordConfigForm({
         </div>
       </section>
 
-      <Separator />
-
-      {/* Activation */}
-      <section className="flex items-center gap-3">
-        <Switch
-          id="enabled"
-          checked={enabledInput}
-          onCheckedChange={setEnabledInput}
-          disabled={switchDisabled}
-        />
-        <Label
-          htmlFor="enabled"
-          className="text-sm font-medium"
-          title={switchTitle}
-        >
-          {enabledInput ? "Enabled" : "Disabled"}
-        </Label>
-      </section>
-
       <SaveResetFooter
-        isPending={isPending}
+        isPending={isPending || clearingToken}
         isSuccess={!!saveState?.ok}
         onReset={handleReset}
       />
@@ -401,7 +433,7 @@ function FieldLabel({
       <Label htmlFor={htmlFor} className="text-sm font-medium">
         {label}
         {required && (
-          <span className="ml-1 text-destructive" aria-hidden>
+          <span className="ml-1 text-destructive-text" aria-hidden>
             *
           </span>
         )}
@@ -448,7 +480,7 @@ function ValidationStatus({
     );
   }
   return (
-    <p className="text-xs text-destructive flex items-center gap-1">
+    <p className="text-xs text-destructive-text flex items-center gap-1">
       <AlertCircle className="size-3" aria-hidden /> {status.message}
     </p>
   );
@@ -456,7 +488,7 @@ function ValidationStatus({
 
 function FieldError({ message }: { message: string }): React.JSX.Element {
   return (
-    <p className="text-xs text-destructive flex items-center gap-1">
+    <p className="text-xs text-destructive-text flex items-center gap-1">
       <AlertCircle className="size-3" aria-hidden /> {message}
     </p>
   );

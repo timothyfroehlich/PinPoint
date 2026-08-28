@@ -8,6 +8,7 @@
  */
 
 import { test, expect } from "../support/fixtures.js";
+import { openMachineManageTab } from "../support/actions.js";
 import { STORAGE_STATE } from "../support/auth-state.js";
 import { seededMachines } from "../support/constants.js";
 
@@ -35,9 +36,7 @@ test.describe("Technician Role Permissions", () => {
       return;
     }
     // Name was changed — restore it
-    const editTab = page.getByTestId("machine-tab-edit");
-    await expect(editTab).toBeVisible();
-    await editTab.click();
+    await openMachineManageTab(page);
     await expect(page).toHaveURL(/\/edit$/);
     const nameInput = page.getByLabel("Machine Name");
     await nameInput.fill(seededMachines.addamsFamily.name);
@@ -101,10 +100,7 @@ test.describe("Technician Role Permissions", () => {
     await page.goto("/m/TAF");
 
     // The Manage tab only renders for viewers holding `machines.edit`
-    const editTab = page.getByTestId("machine-tab-edit");
-    await expect(editTab).toBeVisible();
-
-    await editTab.click();
+    await openMachineManageTab(page);
     await expect(page).toHaveURL(/\/edit$/);
 
     // Should be able to change the name

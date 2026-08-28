@@ -160,7 +160,9 @@ export function MachineTimelineComposer({
           </Button>
         </div>
       </div>
-      {error ? <p className="mt-2 text-sm text-destructive">{error}</p> : null}
+      {error ? (
+        <p className="mt-2 text-sm text-destructive-text">{error}</p>
+      ) : null}
     </div>
   );
 }

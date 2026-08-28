@@ -1,6 +1,6 @@
 ---
 name: pinpoint-pr-workflow
-description: The PR-lifecycle decisions the scripts and gates do not state — why getting reviewed is a handoff (Tim runs `/code-review`; an agent cannot) and why the SHA-pinned marker you post is the only thing that satisfies the `reviewed` gate, which pushes let you re-attest versus needing a fresh review, the narrow trivial-change exception, why the merge handoff is a script you run rather than a summary you write, the `--pages` screenshot gotchas, and the Dependabot back-to-back lockfile trap. Also the merge escape hatches (`--force`, `--bypass-merge-requirements`) and when each is and is not appropriate, what to do when `merge-pr.sh` itself is broken, and the GitHub MCP gotchas that silently do the wrong thing — snake_case field names, the pagination cap, label writes replacing the whole set rather than adding to it, `resolve_thread` ignoring owner/repo, and the thread-ID format. Use when committing, opening a PR, handing a branch to Tim for review, attesting a reviewed head, addressing review comments, posting screenshots, handing a PR over to merge, landing the plane after Tim merges, or when a GitHub MCP call does something you did not expect.
+description: The PR-lifecycle decisions the scripts and gates do not state — draft-first creation, the 51-line re-draft threshold for later uploads, automatic Codex review of every head, explicit-request-only manual review triggers, and why every push needs a fresh review. Also covers the merge handoff, screenshot gotchas, Dependabot lockfile trap, merge escape hatches, broken merge scripts, and GitHub MCP gotchas. Use when committing, opening or updating a PR, monitoring CI or review, addressing review comments, posting screenshots, handing a PR over to merge, landing the plane after Tim merges, or when a GitHub MCP call does something unexpected.
 ---
 
 # PinPoint PR Workflow
@@ -38,7 +38,27 @@ PinPoint scopes: `issues`, `machines`, `auth`, `ui`, `db`, `e2e`, `agents`, `wor
 ## Phase 2: PR
 
 Prefer MCP `create_pull_request` for typed argument handling, or `gh pr create` if you're
-already in a shell. Open **ready-for-review, not draft** (AGENTS.md §6).
+already in a shell. Open every agent-created PR as a **GitHub draft**, regardless of
+size (`gh pr create --draft ...`). GitHub draft/ready state controls when automatic
+Codex review begins; it is separate from the PinPoint `ready-for-review` label applied
+only at the end of Phase 3.
+
+### Agent origin
+
+Every PR opened by an agent carries exactly one origin label and a visible signature in
+its description. This is a lightweight way to find the implementing session; it is not
+a review, readiness, CI, or merge signal.
+
+1. Use the full registered huddle name as the final line of the PR description:
+   `—<huddle-name>`.
+2. Add one label for the implementing harness:
+   - `Claude-*` → `Claude`
+   - `Codex-*` → `Codex`
+   - `Antigravity-*` or `AGY-*` → `Agy`
+
+Preserve the PR's other labels and description content. Do not replace the origin label
+or signature on a PR another agent opened; its attribution remains with the original
+implementer.
 
 ### PR description template
 
@@ -54,6 +74,8 @@ already in a shell. Open **ready-for-review, not draft** (AGENTS.md §6).
 ## Related Issues
 
 Closes #N (if applicable)
+
+—<YourFullRegisteredHuddleName>
 ```
 
 ---
@@ -64,6 +86,10 @@ Closes #N (if applicable)
 
 `./scripts/workflow/pr-watch.py <PR>`, via the Monitor tool. Exit 0 = all passed. Exit 1 =
 failure — read `tmp/gh-monitor/failure-<RUN_ID>.md`.
+
+For a new draft PR, keep it draft until `CI Gate` succeeds for the current head, then
+run `gh pr ready <PR>`. Promotion starts the automatic Codex review. A green run for an
+older SHA does not qualify.
 
 If you judge the failure to be a GitHub Actions **infra** flake (network timeout, runner loss, download 5xx, Supabase container-start) rather than a real code/test failure, log it before rerunning: `bash scripts/workflow/log-gha-flake.sh <pr> <run-id> <class> "<symptom>"` (see `docs/runbooks/gha-flake-log.md`).
 
@@ -77,81 +103,161 @@ Fixing, declining with a one-sentence signed reply, and resolving the thread is 
 
 Every unresolved thread counts, whoever opened it — the `threads` gate is author-agnostic. Resolve or decline each one before moving on.
 
-### 3.4 Get the head commit reviewed — Tim runs `/code-review`, you attest
+### 3.4 Get the head commit reviewed
 
-**The merge bar has not moved: a PR cannot merge without a review covering the HEAD commit,** with all its threads resolved. Review is mandatory, not on-demand, not discretionary.
+**Automatic Codex review is the normal path.** It runs for each update once that head is
+eligible. The gate accepts either a native `APPROVED` review whose `commit_id` equals
+the PR head, or the connector's no-major-issues issue comment naming a 10- or
+40-character prefix of that head. Both require exact account
+`chatgpt-codex-connector[bot]`; the comment also requires exact app slug
+`chatgpt-codex-connector` and the known clean-result prefix. An older result is stale.
+Among records for the same head, a later native finding overrides an earlier clean
+comment; no delayed review, clean comment, or manual marker for an older SHA can
+invalidate current-head coverage.
+A native `COMMENTED` or `CHANGES_REQUESTED` review also completes review coverage for
+its exact head once every associated thread has been replied to and resolved. Dismissed,
+pending, or unknown review states fail closed. The adjudicated terminal state needs no
+manual re-review when a finding is explicitly declined without a push.
 
-**What changed on 2026-08-02 (PP-4ric) is who does it.** The bot reviewer this repo used was retired — its free tier was too small to review PinPoint's PRs, so quota outages were the normal state rather than the exception. No bot reviews this repo now, and there is nothing to request: a PR carries no pending reviewer, and any doc or habit that has you adding one is stale.
+The owning agent stays assigned through the whole loop: monitor current-head CI and
+review, address or explicitly decline every finding, resolve every thread, push fixes,
+and wait for the replacement automatic review. Automation being slow is a wait state,
+not permission to comment `@codex review`, self-attest, or hand off an unreviewed PR.
+Use the harness's Monitor/wait mechanism rather than a hand-written polling loop.
 
-The reviewer is **Tim, running `/code-review` on the branch**. You cannot do this for him — `/code-review` is a Claude Code harness built-in only he can trigger (`ultra` likewise, and billed). So the review is a **handoff**, and your job is to make the handoff at the right moment and record the result.
+#### Later uploads: decide whether to return to draft
 
-#### Sequencing
+Before pushing an update to an existing PR, compare the remote PR head with the local
+head you are about to upload. Count additions plus deletions in source, tests, scripts,
+SQL/migrations, CSS, and GitHub workflow or composite-action code. Do not count docs,
+lockfiles, generated snapshots/assets, or binaries:
 
-1. Open the PR whenever you like and watch CI. Nothing is reviewing yet, so an early PR costs nothing.
-2. Finish **all** the work: the implementation, the CI fixes, the merge-from-main. Stop iterating.
-3. Ask Tim for the review, naming the branch, and wait. This is a real stop — don't fill the time with more commits, because every push invalidates the review he is about to give you.
-4. Address the findings: fix → push → and note that head has moved (see below). Consciously decline the rest, with a reason. **A review that found nothing worth fixing skips straight to step 5** — there is no push, so head is already the SHA he read.
-5. Attest the head he reviewed — **this step is yours, always, and it is the only thing that satisfies the gate.** A clean review with an unposted marker reads to `merge-pr.sh` as `unreviewed`, so the review Tim ran buys nothing until you post it:
+```bash
+remote_head=$(gh pr view <PR> --json headRefOid --jq .headRefOid)
+if ! upload_code_lines=$(
+  set -o pipefail
+  git diff --no-renames --numstat "$remote_head"..HEAD |
+    awk -F '\t' '
+      ($3 ~ /\.(ts|tsx|js|jsx|mjs|cjs|py|sh|sql|css)$/ ||
+       ($3 ~ /^(scripts\/|\.claude\/hooks\/|\.husky\/)/ &&
+        $3 ~ /(^|\/)[^\/.]+$/) ||
+       $3 ~ /^\.github\/(workflows|actions)\/.*\.ya?ml$/) &&
+      $1 ~ /^[0-9]+$/ && $2 ~ /^[0-9]+$/ { total += $1 + $2 }
+      END { print total + 0 }
+    '
+); then
+  upload_code_lines=51
+fi
+```
 
-   ```bash
-   bash scripts/workflow/mark-claude-review.sh <PR> <depth> "<one-line findings summary>"
-   ```
+- **51 or more lines:** if the PR is ready, run `gh pr ready <PR> --undo` **before**
+  `git push`. After the push, keep it draft until the replacement current-head `CI Gate`
+  succeeds, then run `gh pr ready <PR>` and monitor the automatic review.
+- **50 or fewer lines:** leave a ready PR ready, push, and monitor current-head CI plus
+  the automatic review of the update.
+- If the comparison is missing or untrustworthy, take the conservative path and return
+  the PR to draft before pushing.
 
-   That posts the sticky SHA-pinned marker `<!-- pinpoint-claude-review: <head_sha> -->` that the `reviewed` gate detects.
+This is a per-upload delta, not the PR's cumulative size and not commit count. Initial
+PRs are always drafts regardless of their line count.
 
-   `<depth>` is the level Tim actually ran — `low | medium | high | xhigh | max | ultra` (or `trivial`, below). It is required and has no default: "a review happened" and "a `/code-review low` happened" are different facts, and the merge handoff report states which one. If you don't know which he ran, ask — guessing here writes a false claim into the record that reads exactly like a true one.
+#### Manual GitHub trigger — only on Tim's explicit request
 
-6. Then 3.5 / 3.6.
+If Tim explicitly asks to "trigger a review" (including "upload and trigger a review"),
+comment once for the current head:
 
-**Finish your churn before you ask.** This mattered under the bot reviewer because a review cost quota; it matters more now because it costs Tim's attention. Asking for a review of a tree you're about to change wastes the more expensive resource.
+```bash
+gh pr comment <PR> --body '@codex review'
+```
+
+Respect the same eligibility sequence: if the upload crossed the threshold and returned
+the PR to draft, wait for current-head CI and promote it before commenting. Never use the
+manual comment merely because the automatic review has not appeared yet. A trusted
+clean automatic result satisfies the gate directly; do not add a marker for it.
+
+#### Local review and manual-attestation route
+
+This older route remains valid when Tim explicitly chooses `/codex:review` or
+`/code-review`. Agents cannot launch either local command. Finish the work, then check
+that the review will see the intended diff:
+
+```bash
+bash scripts/workflow/review-preflight.sh <PR>
+```
+
+Both reviewers read **local git state in the session's working directory**. Neither reads the PR, neither knows its head SHA, and neither objects to being pointed somewhere else — so a review run from the wrong directory finds nothing and reports nothing, which is indistinguishable from a clean review. That is the one failure mode here that produces a false attestation nobody notices making.
+
+The preflight checks what has to hold — you're on the PR's branch, local HEAD is the SHA that's actually pushed, the tree is clean, `main...HEAD` is non-empty, local `main` matches `origin/main`, and the PR is based on `main` — and prints both commands for Tim only when all of it passes. When something doesn't, it names it and prints no command; hand over the reasons, not a command you know is aimed at nothing.
+
+The `main` == `origin/main` check is the least obvious and the easiest to dismiss. It is on the LOCAL branch deliberately: the Codex plugin's `detectDefaultBranch` reads `refs/remotes/origin/HEAD`, strips the `refs/remotes/origin/` prefix and returns the bare name, so git resolves the local branch. Meanwhile §5 says sync with `git fetch origin && git merge origin/main`, which advances your branch and never the `main` it merged from — so local `main` is stale as a matter of routine and the review quietly covers other people's already-merged work. On PR #1931 that was 34 files instead of the PR's 22. The remedy names the worktree holding `main`, because a branch checked out elsewhere cannot be fast-forwarded from here.
+
+Then wait. This is a real stop — don't fill the time with more commits, because every push invalidates the review he is about to give you.
+
+**When Tim types `/codex:review`, pick foreground vs background yourself — don't ask.** The plugin's command file instructs you to settle it with `AskUserQuestion`. Tim's global `CLAUDE.md` forbids that tool outright: interrupting the picker to type something returns a _fabricated_ answer, reporting whichever option was labelled "(Recommended)" as his choice. So use the plugin's own heuristic instead — foreground only when the diff is roughly 1–2 files with no sign of a directory-sized change, background in every other case including unclear size — and say in one line which you picked and why. This is an operational call, not one of the taste decisions §6 reserves for him (Tim, 2026-08-20).
+
+**The Bash call behind it is subject to the same intermittent classifier block as
+`mark-review.sh`.** `/codex:review` expands into an instruction for you to run
+`node …/codex-companion.mjs review`, so the review does execute through your Bash tool
+— the `disable-model-invocation` flag only stops you invoking the _slash command_. On
+2026-08-21 that node call was refused with `Blocked by classifier` after succeeding
+twice earlier in the same session. There is no allow rule for it, because the path
+lives outside the repo in the plugin cache and would have to go in Tim's global
+settings. If it is denied, say so and ask him to type the command again; do not
+hand-roll the node invocation to get around it.
+
+Address the findings. If the reviewed head remains current, attest it — **this step is
+yours on the local route.** A clean local review with no marker still reads as
+`unreviewed`:
+
+```bash
+bash scripts/workflow/mark-review.sh <PR> codex-plugin-cc base-main "<one-line findings summary>"   # /codex:review
+bash scripts/workflow/mark-review.sh <PR> claude-code <depth> "<one-line findings summary>"         # /code-review <depth>
+```
+
+That posts the sticky SHA-pinned marker `<!-- pinpoint-review: <head_sha> -->` that the `reviewed` gate detects.
+
+**The pair has to match what Tim actually ran.** `codex-plugin-cc base-main` is the exact attestation for `/codex:review`; `claude-code <depth>` is the one for the built-in `/code-review`, where `<depth>` is the level he chose (`low`, `medium`, `high`, `xhigh`, `max`, `ultra`). Do not substitute a custom focus, a different base, a depth he didn't run, or a result from before the final push. The marker records the review method as well as the SHA, so the merge handoff can state what actually ran.
 
 #### Pushing after the review
 
-**The marker pins a SHA, so any push invalidates it** — the gate flips to `stale_marker` and says so. That's deliberate: a 3-commit fixup must not inherit the review of the commit before it.
+Any push invalidates a clean automatic result or marker for the previous SHA. Return to the automatic
+path for the new head unless Tim explicitly asks for another manual review. Never copy
+or refresh a marker over code that the named local review did not inspect. Historical
+`claude-code:trivial` markers remain readable for old PRs, but agents must not create new
+self-attestations: automatic Codex review now covers every update.
 
-Which of two things you do next depends on what you pushed:
+#### Why the review-handoff commands carry permission allow rules
 
-- **The fixes he asked for.** Re-attest at the new head and say so in the summary — `"applied review findings from <old_sha>"`. A reviewer's own requested changes are within what they reviewed; this is the same round-trip any human review has.
-- **Anything else** — new work, a refactor you thought of, a scope addition. That needs a fresh `/code-review`. Re-attesting over it is a false attestation.
-
-If you're unsure which bucket you're in, ask. The cost of asking is one message; the cost of guessing wrong is merging something nobody read.
-
-#### The trivial-change exception
-
-A genuinely trivial change — a typo, a comment, a one-line mechanical fix — doesn't need to interrupt Tim. Attest it yourself and **say why it was trivial** in the marker summary, so the judgement is on the record and reviewable:
-
-```bash
-bash scripts/workflow/mark-claude-review.sh <PR> trivial "typo in a comment; no behavior change"
-```
-
-`trivial` is the depth for this case, and it is the only one that does not name a `/code-review` level — the report then says "attested trivial (no /code-review run)" rather than implying a review happened.
-
-This is a narrow exception and it is self-policing. "It's only a small change" is not the test — the test is whether there is any way for it to be wrong. If you're reaching for a justification, it isn't trivial.
-
-**The marker attests that a review actually happened.** Posting it otherwise is a false attestation, not a shortcut — the same honesty model as `merge-pr.sh --force`.
-
-#### Why the marker command carries a permission allow rule
-
-`.claude/settings.json` has one `permissions.allow` entry, and it is this script:
+`.claude/settings.json` has two `permissions.allow` entries, and they are the two
+scripts in this phase:
 
 ```json
-"allow": ["Bash(bash scripts/workflow/mark-claude-review.sh *)"]
+"allow": [
+  "Bash(bash scripts/workflow/mark-review.sh *)",
+  "Bash(bash scripts/workflow/review-preflight.sh *)"
+]
 ```
 
-It is there because the command was intermittently denied. On 2026-08-03 an auto-mode session was refused with `Blocked by classifier` on PR #1815, while the same command succeeded four times across 2026-08-09/10 (PRs #1832, #1828, #1829, #1848). The block was contextual, not a standing rule — which is the worst shape for a required step, because it fails only sometimes and leaves the PR sitting at `unreviewed` with no path forward. A background subagent has no human to hand the command to at all. Rules are evaluated deny → ask → allow, and an explicit allow resolves the call before the classifier is consulted, so the entry makes the step deterministic. (PP-yx97. A new tool permission needs Tim's explicit approval each time; he gave it on 2026-08-11. This is not a CORE-SEC-010 surface — that rule governs prod-mutating Supabase tools, and its ban on `allow` applies to those.)
+`review-preflight.sh` is read-only and is required before the explicit local-review
+route — so without the rule, that handoff raises a prompt for a script that only reads. (Tim
+approved it on 2026-08-21, from the `/code-review medium` finding on #1931.)
+
+The `mark-review.sh` entry is there for a sharper reason: the command was intermittently
+denied. On 2026-08-03 an auto-mode session was refused with `Blocked by classifier` on PR #1815, while the same command succeeded four times across 2026-08-09/10 (PRs #1832, #1828, #1829, #1848). The block was contextual, not a standing rule — which is the worst shape for a required step, because it fails only sometimes and leaves the PR sitting at `unreviewed` with no path forward. A background subagent has no human to hand the command to at all. Rules are evaluated deny → ask → allow, and an explicit allow resolves the call before the classifier is consulted, so the entry makes the step deterministic. (PP-yx97. A new tool permission needs Tim's explicit approval each time; he gave it on 2026-08-11. This is not a CORE-SEC-010 surface — that rule governs prod-mutating Supabase tools, and its ban on `allow` applies to those.)
 
 **What the rule does not do is make the attestation true.** It removes the harness's opinion about whether you earned the marker, which means your own judgement is now the only thing standing between a false attestation and the merge gate. The honesty model above is not softened by the allow rule; it is the entire remaining check. The merge decision stays Tim's regardless (PP-wi85) — even when an agent runs `merge-pr.sh`, the hook prompts him to approve — so a marker you should not have posted misleads Tim into approving rather than merging anything by itself. That is a smaller failure, not a harmless one: his approval at the prompt is the last backstop, and a false marker is exactly what erodes it.
 
 Two limits worth knowing:
 
-- The rule matches the documented invocation, `bash scripts/workflow/mark-claude-review.sh …`, and only that shape. **Use the relative path** — an absolute one does not match and falls through to the classifier. Don't count on `normalize-workspace-paths.cjs` to rescue it: its rewrite regex is hardcoded to `/home/froeht/Code/…`, so it never fires on this Mac (`/Users/froeht/Code/PinPoint`), and its `pinpoint-worktrees/` alternative predates the current `.claude/worktrees/<branch>/` layout. Chaining (`… && something-else`) does not inherit the allow either — each subcommand is matched on its own.
+- Each rule matches the documented invocation — `bash scripts/workflow/<script> …` — and only that shape. **Use the relative path** — an absolute one does not match and falls through to the classifier. Don't count on `normalize-workspace-paths.cjs` to rescue it: its rewrite regex is hardcoded to `/home/froeht/Code/…`, so it never fires on this Mac (`/Users/froeht/Code/PinPoint`), and its `pinpoint-worktrees/` alternative predates the current `.claude/worktrees/<branch>/` layout. Chaining (`… && something-else`) does not inherit the allow either — each subcommand is matched on its own.
 - A summary string containing an unbalanced quote makes the whole command unresolvable to `block-direct-merge.cjs`, which then scans the raw text and blocks on `merge-pr.sh` or `pr merge`. Rare, and it fails closed. Fix the quoting rather than working around it.
 
 #### Readiness is not review
 
-`pr-watch.py --check-ready` reports review state but does **not** gate on it. That check answers "is this PR worth Tim's `/code-review` right now?", and the review is what happens after that answer is yes — gating on it would be circular. Check-ready green means "hand it to Tim", not "will merge".
-
-Don't tell Tim a PR is "ready" or "done" while head is unreviewed — say it's ready for his `/code-review`, which is a different claim.
+`pr-watch.py --check-ready` reports review state but does **not** gate on it. It answers
+whether the current head may leave draft and enter automatic review; gating on review
+there would be circular. A PR may be GitHub-ready while still lacking the final PinPoint
+`ready-for-review` label. Do not call it merge-ready until 3.6 is satisfied.
 
 ### 3.5 Post UI screenshots (UI-touching PRs only)
 
@@ -169,7 +275,7 @@ Requires the local dev server (`pnpm run dev`) and Supabase (`supabase start`) r
 
 ### 3.6 Apply `ready-for-review` label
 
-Once CI green + a review marker pinning head (per 3.4) + zero unresolved review threads + no merge conflict + screenshots posted (if UI-touching, per 3.5), apply the label via `mcp__github__issue_write(method: "update", …)` or `gh pr edit <PR> --add-label ready-for-review`.
+Once CI green + either exact-head automatic Codex coverage (including an adjudicated finding-bearing review per 3.4) or manual attestation of head + zero unresolved review threads + no merge conflict + screenshots posted (if UI-touching, per 3.5), apply the label via `mcp__github__issue_write(method: "update", …)` or `gh pr edit <PR> --add-label ready-for-review`.
 
 The label is a hint to Tim that the PR is ready for **him** to merge — it does not authorize an agent to merge. `merge-pr.sh --human` re-checks all gates when Tim runs it.
 
@@ -189,13 +295,13 @@ Once 3.1–3.6 are satisfied (CI green, a review whose `commit_id` matches head 
 bash scripts/workflow/merge-handoff.sh <PR>
 ```
 
-It prints what Tim needs to decide whether to merge — which `/code-review` ran and whether it covers head, how many commits landed since, CI, threads, mergeable + how far behind main, when main was last merged in, the diff split into src / tests / docs / other, migrations, newly-registered env vars, UI + screenshots — and ends with two `!`-prefixed commands: one to re-run the report, one to merge.
+It prints what Tim needs to decide whether to merge — which review ran and whether it covers head, how many commits landed since, CI, threads, mergeable + how far behind main, when main was last merged in, the diff split into src / tests / docs / other, migrations, newly-registered env vars, UI + screenshots — and ends with two `!`-prefixed commands: one to re-run the report, one to merge.
 
 **Why a script and not a format you fill in.** Every line of it is a fact you would otherwise be recalling: how many commits back the review was, what the line counts are, whether main has been merged in. Those are exactly the claims that drift, and Tim acts on them. `git` and `gh` already know all of it. Paste the block; add prose only for what the block cannot know (why a finding was declined, what to watch on deploy).
 
 **The re-run line is part of the report, not decoration.** The block is a snapshot and is stale as soon as CI re-runs or anyone pushes. Tim re-runs it himself rather than asking you to re-check.
 
-**The merge command only appears when all four gates actually pass.** An un-ready PR gets the blocking reasons instead — so don't hand over a merge command the report didn't print. If CI is still running, the report says so; hand him the automerge form, which waits rather than making him come back. Get the head reviewed first (Phase 3.4); automerge waits out CI, not an unreviewed head — and a review you never requested never arrives, so it would just burn the timeout:
+**The merge command only appears when all four gates actually pass.** An un-ready PR gets the blocking reasons instead — so don't hand over a merge command the report didn't print. If CI is still running, the report says so; hand him the automerge form, which waits rather than making him come back. Get the head reviewed first (Phase 3.4); automerge waits out CI, not an unreviewed head. The owning agent monitors automatic review outside this script:
 
 ```
 ! scripts/workflow/merge-pr.sh <PR> --human --automerge
@@ -209,7 +315,7 @@ Never say "ready to push when you are" — you push. Never say a PR is "merged" 
 
 **On any FAIL the script removes the `ready-for-review` label if present** (and likewise on the `--automerge` RED path). The label's contract is "click-merge-without-thinking"; if a gate fails at merge time that contract is broken, so the label goes. Practical consequence: after Tim reports a FAIL, fix the underlying issue, push, and **re-apply the label** (3.6) before re-handing him the `--human` command — don't assume it survived.
 
-**A `reviewed` FAIL is almost never a `--force` case.** `unreviewed` means nobody has reviewed it and `stale_marker` means you pushed past the review that happened — both describe an unfinished PR, not a broken gate. Take the honest path in 3.4 and hand off a PR whose marker pins head.
+**A `reviewed` FAIL is almost never a `--force` case.** `unreviewed` means neither path covers head, `stale_approval` / `stale_clean_comment` / `stale_marker` mean you pushed past the review record, and `not_approved` means the latest non-approval review covers another SHA — all describe an unfinished PR, not a broken gate. Take either honest path in 3.4 and cover head.
 
 `--bypass-merge-requirements` is for a required check failing for known-irrelevant reasons (infrastructure flake, unrelated job) where the change has been manually verified safe — log the flake first with `bash scripts/workflow/log-gha-flake.sh <pr> <run-id> <class> "<symptom>"` (see `docs/runbooks/gha-flake-log.md`) — or an emergency hotfix where waiting for CI is not acceptable. Do NOT suggest bypassing when a merge conflict exists, or when the underlying state hasn't been manually verified.
 
@@ -272,4 +378,3 @@ Hand off for the next session, and post to the huddle daily bead if other sessio
 
 - Status tokens (`PASS`/`FAIL`/`WAIT`/`WARN`/`BLOCK`) and what to do for each: `scripts/workflow/AGENTS.md`
 - Spec: `docs/superpowers/specs/2026-05-16-pinpoint-pr-workflow-consolidation-design.md`
-- Subagent dispatch rules (dispatch from the main worktree): `pinpoint-orchestrator` skill

@@ -1,6 +1,6 @@
 # PinPoint — Code Review Brief
 
-This is the canonical review rubric for PinPoint. It is harness-neutral: Claude Code reads it via a pointer in `CLAUDE.md` (and via the `/code-review` skill), and the Antigravity adapter (`.agents/rules/antigravity.md`) pulls it in via `@REVIEW.md`. Any reviewer added later reads the same brief — edit only here.
+This is the canonical review rubric for PinPoint. It is harness-neutral: Claude Code reads it via a pointer in `CLAUDE.md` (and via the `/code-review` skill), and `AGENTS.md` points reviewers here. Any reviewer reads the same brief — edit only here.
 
 PinPoint is a **single-tenant** pinball issue tracker (Austin Pinball Collective), in live production with real user data. Stack: Next.js App Router (React Server Components by default), Drizzle ORM on Supabase Postgres, Supabase SSR auth, shadcn/ui + Tailwind CSS v4, TypeScript `ts-strictest`. There is no multi-tenancy, no RLS, and no tRPC — by design.
 
@@ -43,7 +43,7 @@ If a PR changes roles, statuses, permissions, or user-facing terminology, check 
 
 ## Scope of the review
 
-A default `/code-review` or Antigravity pass is aimed at smaller changes — Tim triggers deeper reviews (`/code-review ultra`) manually on bigger ones. In practice: prioritise the highest-priority rule violations above and genuine correctness defects. Don't editorialise about style a formatter or linter already owns (Prettier, ESLint, oxlint). A clean review — no comments — is a valid outcome; don't manufacture nits to justify the pass.
+A default `/code-review` pass is aimed at smaller changes — Tim triggers deeper reviews (`/code-review ultra`) manually on bigger ones. In practice: prioritise the highest-priority rule violations above and genuine correctness defects. Don't editorialise about style a formatter or linter already owns (Prettier, oxlint). A clean review — no comments — is a valid outcome; don't manufacture nits to justify the pass.
 
 ## Reviewer-relevant skill pointers
 
@@ -56,17 +56,11 @@ Reviewers read agent skills. Consult the relevant one for the area a PR touches 
 - `pinpoint-ui` and `pinpoint-design-bible` — UI, component, and responsive-design changes. `pinpoint-ui` also owns Server Actions, data fetching, and the form conventions (Radix Select form-reset carve-out, CREATE form reset).
 - `pinpoint-deployment` — Drizzle migrations, DB connection/pooler config, preview deployments.
 
-## How a review gets triggered
+## How review runs
 
-**Every review on this repo is asked for. No bot reviews it, and nothing fires a review automatically.** GitHub Copilot code review was retired on 2026-08-02 (PP-4ric) — its free tier was too small to review PinPoint's PRs, so quota outages were the normal state. The reviewer is now Tim, running `/code-review` on a branch; Antigravity likewise reviews when he asks.
+**Codex reviews every eligible PR update automatically.** Authors open agent-created PRs as drafts, promote them after current-head CI succeeds, and then stay with the PR through the resulting review/fix cycle. Comment `@codex review` only when Tim explicitly asks for a manual trigger; automation being slow is not a reason to comment.
 
-That did **not** loosen the merge bar. A PR still cannot merge without a review covering its **head commit**, recorded as the author's SHA-pinned marker (`<!-- pinpoint-claude-review: <head_sha> -->`), with every thread resolved. An agent cannot launch `/code-review`, so the author's job is to finish the work, hand the branch over, address the findings, and attest the head that was read:
-
-```bash
-bash scripts/workflow/mark-claude-review.sh <PR> <depth> "<one-line findings>"
-```
-
-The marker pins a SHA, so a later push invalidates it — deliberately, so a 3-commit fixup can't inherit the review of the commit before it. **If you're reviewing, assume the commit you were handed is the one the author intends to be final.** Full author-side rules: `.agents/skills/pinpoint-pr-workflow/SKILL.md` Phase 3.4.
+A PR cannot merge without a review covering its **current head commit**, with every thread resolved. Codex may provide a native `APPROVED` review, its trusted connector clean comment, or a native `COMMENTED`/`CHANGES_REQUESTED` review whose finding threads have all been explicitly adjudicated and resolved. Automatic records must be from exact account `chatgpt-codex-connector[bot]` and pin the current head, while the clean comment must also identify the connector app. The existing SHA-pinned manual attestation may cover head after Tim explicitly runs a local review. Any push requires a fresh review. **If you're reviewing, assume the commit you were handed is the one the author intends to be final.** Full author-side rules: `.agents/skills/pinpoint-pr-workflow/SKILL.md` Phase 3.4.
 
 ## Review mechanics
 
@@ -78,7 +72,7 @@ Reviewers never merge. The merge decision is Tim's, always (PP-wi85) — the raw
 
 This is enforced differently by harness. In **Claude Code**, `block-direct-merge.cjs` is a PreToolUse hook that **hard-blocks** the raw channels and turns any `merge-pr.sh` invocation into an **approval prompt Tim must accept** before it runs (PP-wi85, reversed for the script only, per Tim 2026-08-19). The hook does **not** fire inside Antigravity, Codex, or Gemini — in those harnesses there is no hook backstop and no approval prompt, so **do not run any merge path yourself**; what binds you is this written instruction plus `merge-pr.sh`'s own refusal to execute without a `--human` flag that only Tim should ever pass.
 
-An agent's terminal state on a PR is: ready-for-review, CI green, a review covering the head commit (see "How a review gets triggered"), review threads resolved, screenshots posted if UI-touching. Then either hand Tim the command to run himself, `! scripts/workflow/merge-pr.sh <PR> --human`, or (Claude Code only) run it and let him approve the prompt.
+An agent's terminal state on a PR is: GitHub-ready, CI green, exact-head automatic review coverage (see "How review runs"), review threads resolved, `ready-for-review` applied, and screenshots posted if UI-touching. Then either hand Tim the command to run himself, `! scripts/workflow/merge-pr.sh <PR> --human`, or (Claude Code only) run it and let him approve the prompt.
 
 ## Pointers, not copies
 

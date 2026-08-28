@@ -1,7 +1,7 @@
 {
   "recommendations": [
     // Core Development - Essential
-    "ms-vscode.vscode-eslint",
+    "oxc.oxc-vscode",
     "esbenp.prettier-vscode",
     "usernamehw.errorlens",
 

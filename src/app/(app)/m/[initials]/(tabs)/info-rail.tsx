@@ -41,7 +41,7 @@ interface InfoRailProps {
    */
   pinballmap: {
     /** `pinballmapLocationUrl()` — the by_location_id form, never hand-written. */
-    locationUrl: string;
+    locationUrl: string | null;
     /**
      * Whether the location's lineup currently carries this machine's title —
      * or `null` when PinPoint has never fetched a lineup and so cannot say.
@@ -151,22 +151,31 @@ export function InfoRail({
           </p>
 
           <p className="mt-1 flex items-baseline gap-2 text-sm">
-            <a
-              href={pinballmap.locationUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-primary hover:underline"
-              data-testid="machine-pinballmap-line"
-            >
-              {/* Three readings, not two. With no lineup fetched yet the link
+            {pinballmap.locationUrl === null ? (
+              <span
+                className="text-muted-foreground"
+                data-testid="machine-pinballmap-line"
+              >
+                Not configured
+              </span>
+            ) : (
+              <a
+                href={pinballmap.locationUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary hover:underline"
+                data-testid="machine-pinballmap-line"
+              >
+                {/* Three readings, not two. With no lineup fetched yet the link
                   still goes somewhere useful — the location's page — so it
                   names the destination and claims nothing about this machine. */}
-              {pinballmap.onLineup === null
-                ? "Pinball Map"
-                : pinballmap.onLineup
-                  ? "View on Pinball Map"
-                  : "Not on Pinball Map"}
-            </a>
+                {pinballmap.onLineup === null
+                  ? "Pinball Map"
+                  : pinballmap.onLineup
+                    ? "View on Pinball Map"
+                    : "Not on Pinball Map"}
+              </a>
+            )}
 
             {/* One line or nothing. Below the container width where this fits,
                 it is hidden outright rather than allowed to wrap (Tim,

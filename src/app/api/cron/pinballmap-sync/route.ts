@@ -15,13 +15,8 @@ import { log } from "~/lib/logger";
  * machine lmx drift (`reconcileAfterSync`). CRON_SECRET-gated like the other
  * cron routes.
  *
- * Enabled gate: the route is the caller that owns "should we sync at all"
- * (CORE-PBM-001) — the foundation's `syncLocationSnapshot` deliberately does
- * NOT gate on `state.enabled`. While the integration is disabled (the default)
- * this route makes ZERO PBM calls, so it is safe to register hourly before the
- * integration is turned on. Turning it on + wiring the Vercel Cron schedule is
- * the rollout bead (PP-o355.10); intended cadence is hourly (`0 * * * *`), one
- * location call per hour per PBM conduct.
+ * A non-null configured location is required. While it is absent this route
+ * makes zero PBM calls, so it is safe to register hourly before configuration.
  */
 
 export const dynamic = "force-dynamic";
@@ -33,9 +28,8 @@ export async function GET(request: Request): Promise<NextResponse> {
   if (denied) return denied;
 
   const state = await getPinballMapState();
-  if (!state?.enabled) {
-    // Dormant: the integration isn't enabled yet. Correct no-op, not an error.
-    return NextResponse.json({ ok: true, skipped: "disabled" });
+  if (state?.locationId === null || state?.locationId === undefined) {
+    return NextResponse.json({ ok: true, skipped: "not_configured" });
   }
 
   // Automated hourly refresh — the sanctioned one-call/hour path, exempt from
@@ -43,7 +37,12 @@ export async function GET(request: Request): Promise<NextResponse> {
   const result = await syncLocationSnapshot({ trigger: "cron" });
   if (!result.ok) {
     // The cron path is never throttled, but narrow defensively for type safety.
-    const error = result.reason === "throttled" ? "throttled" : result.error;
+    const error =
+      result.reason === "throttled"
+        ? "throttled"
+        : result.reason === "not_configured"
+          ? "not_configured"
+          : result.error;
     log.error(
       { err: error, action: "pinballmap.syncLocationSnapshot" },
       "PinballMap snapshot sync failed"

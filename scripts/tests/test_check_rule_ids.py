@@ -1,11 +1,10 @@
 """Tests for scripts/check_rule_ids.py — the CORE-* citation gate.
 
 The gate exists because PinPoint states its rules in several hand-written
-places (catalog, CLAUDE.md, AGENTS.md, REVIEW.md, .claude/rules/) that are
+places (catalog, CLAUDE.md, AGENTS.md, REVIEW.md, skills) that are
 deliberately NOT generated from one source. It catches the drift that bites:
-a rule renamed or deleted while citations linger, and (PP-22e4) a fragile
-"rule N" / "AGENTS.md §2.1" citation that a future restructuring of AGENTS.md
-would turn into a pointer to nothing.
+a rule renamed or deleted while citations linger, and fragile rule-number
+or section citations that break under refactoring.
 """
 
 import sys
@@ -151,8 +150,8 @@ class TestFindLegacyCitations:
     def test_ignores_heading_ending_in_rule_above_an_ordered_list(self):
         # A citation lives on one line. Matching across a newline would make
         # every markdown heading that ends in "rule" followed by an ordered
-        # list -- .claude/rules/README.md's "Adding or changing a rule" -- read
-        # as a citation of "rule 1".
+        # list -- e.g. "## Adding or changing a rule" -- read as a citation of
+        # "rule 1".
         assert (
             find_legacy_citations("## Adding or changing a rule\n\n1. State it") == []
         )
@@ -169,7 +168,7 @@ class TestFindLegacyCitations:
     def test_wrapped_form_ignores_heading_above_an_ordered_list(self):
         # Same shape as the wrapped citation except for the blank line, which
         # is exactly what separates a markdown heading + list from a sentence
-        # that wrapped. This is .claude/rules/README.md's own text.
+        # that wrapped.
         assert (
             find_legacy_citations("## Adding or changing a rule\n\n1. State it") == []
         )
@@ -251,24 +250,22 @@ class TestCatalogAndCitations:
         (repo / "CLAUDE.md").write_text("Follow CORE-ARCH-009.", encoding="utf-8")
         assert collect_citations(repo) == {"CLAUDE.md": {"CORE-ARCH-009"}}
 
-    def test_collects_from_globbed_rule_files(self, repo: Path):
-        rules = repo / ".claude" / "rules"
-        rules.mkdir(parents=True)
-        (rules / "database.md").write_text("CORE-ARCH-009", encoding="utf-8")
+    def test_collects_from_globbed_skill_files(self, repo: Path):
+        skills = repo / ".agents" / "skills" / "sample"
+        skills.mkdir(parents=True)
+        (skills / "SKILL.md").write_text("CORE-ARCH-009", encoding="utf-8")
         assert collect_citations(repo) == {
-            ".claude/rules/database.md": {"CORE-ARCH-009"}
+            ".agents/skills/sample/SKILL.md": {"CORE-ARCH-009"}
         }
 
     def test_overlapping_globs_do_not_double_count(self, repo: Path):
-        # rules/*.md and rules/**/*.md both match a top-level rule file.
-        rules = repo / ".claude" / "rules"
-        rules.mkdir(parents=True)
-        (rules / "a.md").write_text("CORE-SEC-008", encoding="utf-8")
+        skills = repo / ".agents" / "skills" / "sample"
+        skills.mkdir(parents=True)
+        (skills / "SKILL.md").write_text("CORE-SEC-008", encoding="utf-8")
         citations = collect_citations(repo)
-        assert list(citations) == [".claude/rules/a.md"]
+        assert list(citations) == [".agents/skills/sample/SKILL.md"]
 
     def test_missing_optional_sources_are_fine(self, repo: Path):
-        # CODE_REVIEW.md and .claude/rules/ do not exist until PP-22e4 lands.
         assert collect_citations(repo) == {}
 
     def test_files_without_ids_are_omitted(self, repo: Path):
@@ -419,13 +416,13 @@ class TestMain:
 
     def test_fails_on_unknown_id_in_agents_rules(self, repo: Path, capsys):
         (repo / ".agents" / "rules").mkdir(parents=True)
-        (repo / ".agents" / "rules" / "antigravity.md").write_text(
+        (repo / ".agents" / "rules" / "sample_rule.md").write_text(
             "CORE-ARCH-999 is fake", encoding="utf-8"
         )
         assert main(["--root", str(repo)]) == 1
         err = capsys.readouterr().err
         assert "CORE-ARCH-999" in err
-        assert ".agents/rules/antigravity.md" in err
+        assert ".agents/rules/sample_rule.md" in err
 
 
 class TestFindRepoRoot:
@@ -477,13 +474,11 @@ class TestRealRepo:
     def test_citing_sources_literals_exist_on_disk(self):
         """Every non-glob CITING_SOURCES entry must resolve to a real file.
 
-        Glob entries (e.g. `.claude/rules/*.md`) are exempt on purpose --
-        several of them are declared ahead of the file existing (PP-22e4
-        lands `.claude/rules/` in a later PR), and "missing paths are fine"
-        for those. A literal filename has no such excuse: if it's wrong, the
-        gate silently checks nothing for that file, which is exactly the bug
-        this module's REVIEW.md regression test above catches for one
-        specific case. This test would have caught it directly.
+        Glob entries (e.g. `.agents/skills/**/*.md`) are exempt on purpose --
+        and "missing paths are fine" for those. A literal filename has no such
+        excuse: if it's wrong, the gate silently checks nothing for that file,
+        which is exactly the bug this module's REVIEW.md regression test above
+        catches for one specific case. This test would have caught it directly.
         """
         root = find_repo_root(Path(__file__).resolve().parent)
         for pattern in CITING_SOURCES:

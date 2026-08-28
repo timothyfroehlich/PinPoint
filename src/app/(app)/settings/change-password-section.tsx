@@ -45,7 +45,7 @@ export function ChangePasswordSection(): React.JSX.Element {
       {state && !state.ok && showFeedback && (
         <div
           className={cn(
-            "rounded-md border p-4 border-destructive/20 bg-destructive/10 text-destructive"
+            "rounded-md border p-4 border-destructive/20 bg-destructive/10 text-destructive-text"
           )}
         >
           <p className="text-sm font-medium">{state.message}</p>
@@ -56,7 +56,7 @@ export function ChangePasswordSection(): React.JSX.Element {
         <div className="space-y-2">
           <Label htmlFor="currentPassword">
             Current Password{" "}
-            <span aria-hidden="true" className="text-destructive">
+            <span aria-hidden="true" className="text-destructive-text">
               *
             </span>
           </Label>
@@ -72,7 +72,7 @@ export function ChangePasswordSection(): React.JSX.Element {
         <div className="space-y-2">
           <Label htmlFor="newPassword">
             New Password{" "}
-            <span aria-hidden="true" className="text-destructive">
+            <span aria-hidden="true" className="text-destructive-text">
               *
             </span>
           </Label>
@@ -90,7 +90,7 @@ export function ChangePasswordSection(): React.JSX.Element {
         <div className="space-y-2">
           <Label htmlFor="confirmNewPassword">
             Confirm New Password{" "}
-            <span aria-hidden="true" className="text-destructive">
+            <span aria-hidden="true" className="text-destructive-text">
               *
             </span>
           </Label>

@@ -14,7 +14,6 @@ import type { NotificationPreferencesRow, ChannelContext } from "./types";
 import { sendDm } from "~/lib/discord/client";
 
 const MOCK_CONFIG: DiscordConfig = {
-  enabled: true,
   botToken: "tok",
   guildId: "g",
   inviteLink: null,

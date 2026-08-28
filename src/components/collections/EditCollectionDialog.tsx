@@ -127,7 +127,7 @@ export function EditCollectionDialog({
         />
 
         {error && (
-          <p className="mt-4 text-sm text-destructive" role="alert">
+          <p className="mt-4 text-sm text-destructive-text" role="alert">
             {error}
           </p>
         )}

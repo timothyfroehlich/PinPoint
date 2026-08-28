@@ -196,6 +196,7 @@ export function OwnerSelect({
             variant="outline"
             role="combobox"
             aria-expanded={open}
+            aria-controls={open ? "owner-listbox" : undefined}
             {...(showHelpText ? { "aria-describedby": "owner-help" } : {})}
             disabled={!!disabled}
             data-testid="owner-select"
@@ -236,6 +237,7 @@ export function OwnerSelect({
           </Button>
         </PopoverTrigger>
         <PopoverContent
+          id="owner-listbox"
           className="w-(--radix-popover-trigger-width) p-0"
           align="start"
         >

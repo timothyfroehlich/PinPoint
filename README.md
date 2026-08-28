@@ -73,12 +73,15 @@ If you’re changing code, **start here**:
 - `AGENTS.md` – project rules, constraints, and expectations
 - `docs/NON_NEGOTIABLES.md` – things you must not break
 - `.agents/skills/` – how we structure code (and why); `pinpoint-ui`, `pinpoint-typescript`, `pinpoint-security`, `pinpoint-testing` are the ones you'll reach for most
-- `docs/PRODUCT_SPEC.md` and `docs/TECH_SPEC.md` – what the product should do, and how it is built
+- `docs/feature-specs/` – approved requirements for individual features
 
 ### Prerequisites
 
-- Node.js **24** (pinned in `.nvmrc`; `22.22+` or `26+` also satisfy `engines`)
-- pnpm (see `packageManager` in `package.json`)
+- [mise](https://mise.jdx.dev/) **2026.8.11+** (manages development Node, Python, Ruff, and pnpm)
+- Node.js **24** (pinned in `mise.toml`; `22.22+` or `26+` also satisfy `engines`)
+- Python **3.12.9** (pinned in `mise.toml`; target `py312` in `ruff.toml`)
+- Ruff **0.15.1** (pinned in `mise.toml`)
+- pnpm (exact version and sha512 integrity pinned in `packageManager` in `package.json`)
 - Supabase account (for local dev / preview / prod)
 
 ### Local Setup (Short Version)
@@ -87,10 +90,12 @@ If you’re changing code, **start here**:
 git clone https://github.com/timothyfroehlich/PinPoint.git
 cd PinPoint
 
-pnpm install
-cp .env.example .env.local   # then fill in Supabase + DB vars
+mise install --locked           # installs pinned Node, Python, Ruff, and pnpm via package.json
+mise exec -- python3 -m pip install -r scripts/requirements.txt
+mise exec -- pnpm install       # (or plain `pnpm install` if mise shell hook is active)
+cp .env.example .env.local      # then fill in Supabase + DB vars
 
-pnpm run dev                  # automatically ensures Supabase is running
+mise exec -- pnpm run dev       # automatically ensures Supabase is running
 ```
 
 Open `http://localhost:<PORT>` (see `.env.local`) to use the app.
@@ -162,4 +167,4 @@ Future ideas:
 - Parts and inventory tracking
 - Additional locations and multi‑venue support
 
-See `docs/PRODUCT_SPEC.md` and `docs/V2_ROADMAP.md` for a more detailed roadmap.
+Individual feature requirements live in `docs/feature-specs/`.

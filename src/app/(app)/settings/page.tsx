@@ -11,7 +11,7 @@ import {
 } from "~/server/db/schema";
 import { eq, and, ne, count } from "drizzle-orm";
 import { isInternalAccount } from "~/lib/auth/internal-accounts";
-import { isDiscordIntegrationEnabled } from "~/lib/discord/config";
+import { isDiscordIntegrationConfigured } from "~/lib/discord/config";
 import Link from "next/link";
 import { ConnectedAccountsSection } from "./connected-accounts/connected-accounts-section";
 import { NotificationPreferencesForm } from "./notifications/notification-preferences-form";
@@ -83,7 +83,7 @@ export default async function SettingsPage(): Promise<React.JSX.Element> {
 
   // Discord integration state for the preferences form (PP-2n5). Only need
   // the boolean here — skip the Vault decrypt that getDiscordConfig() does.
-  const discordIntegrationEnabled = await isDiscordIntegrationEnabled();
+  const discordIntegrationEnabled = await isDiscordIntegrationConfigured();
   const userHasDiscord = profile.discordUserId !== null;
 
   // Check if user is the sole admin
@@ -179,7 +179,7 @@ export default async function SettingsPage(): Promise<React.JSX.Element> {
         <Separator />
 
         <div>
-          <h2 className="text-balance text-xl font-semibold mb-2 text-destructive">
+          <h2 className="text-balance text-xl font-semibold mb-2 text-destructive-text">
             Danger Zone
           </h2>
           <p className="text-pretty text-sm text-muted-foreground mb-4">

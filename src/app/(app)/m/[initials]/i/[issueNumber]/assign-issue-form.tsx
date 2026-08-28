@@ -99,7 +99,7 @@ export function AssignIssueForm({
         </Tooltip>
       )}
       {state && !state.ok && (
-        <p className="text-sm text-destructive">{state.message}</p>
+        <p className="text-sm text-destructive-text">{state.message}</p>
       )}
     </div>
   );

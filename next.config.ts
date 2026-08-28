@@ -87,6 +87,12 @@ const nextConfig: NextConfig = {
       // to account for multipart FormData overhead (~20% buffer) and avoid 413s at 1MB default.
       bodySizeLimit: "12mb",
     },
+    // TypeScript 7 is the real `typescript` package, so CLI mode runs its
+    // native `tsc` for the build type check. Next 16.2.x needs CLI mode because
+    // API mode requires a JavaScript compiler API; 16.3+ uses this by default.
+    // It checks `typescript.tsconfigPath` (tsconfig.app.json) and reports raw
+    // tsc diagnostics rather than Next code frames.
+    useTypeScriptCli: true,
   },
   typescript: {
     // App-source project. The root tsconfig.json is references-only after the

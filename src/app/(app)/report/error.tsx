@@ -54,7 +54,7 @@ export default function ReportErrorPage({
       <div className="text-center">
         <div className="mb-4 inline-flex size-16 items-center justify-center rounded-full bg-destructive/10">
           <AlertTriangle
-            className="size-8 text-destructive"
+            className="size-8 text-destructive-text"
             aria-hidden="true"
           />
         </div>

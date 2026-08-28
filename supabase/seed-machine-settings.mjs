@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* eslint-disable no-undef */
 /**
  * Machine Settings Sets Demo Seed (PP-43q3, PP-tn6t) — LOCAL ONLY
  *
