@@ -1,4 +1,4 @@
-"""Tests for the PinPoint mise project contract (PP-h2ui.4, .5, .6).
+"""Tests for the PinPoint mise project contract (PP-h2ui.4, .5, .6, .8).
 
 Verifies that:
 1. mise.toml defines the exact development Node/Python/Ruff/Supabase-CLI runtimes and settings.
@@ -8,6 +8,7 @@ Verifies that:
 5. mise rejects mismatched packageManager checksum suffixes (negative test).
 6. mise meets the minimum version requirement (>= 2026.8.11).
 7. CI's supabase/setup-cli blocks mirror the single mise.toml Supabase CLI pin (PP-h2ui.6).
+8. CI's required mise-only canary validates the locked toolchain and cache identity (PP-h2ui.8).
 """
 
 import json
@@ -403,6 +404,71 @@ def test_ci_installs_pytest_for_mise_python() -> None:
 
     assert setup_mise < install_pytest < run_pytest
     assert 'pipx install "pytest==' not in workflow
+
+
+def _workflow_job_block(workflow: str, job_name: str) -> str:
+    """Return one top-level workflow job block without adding a YAML dependency."""
+    pattern = re.compile(
+        rf"^  {re.escape(job_name)}:\n.*?(?=^  [a-z0-9-]+:\n|\Z)",
+        re.MULTILINE | re.DOTALL,
+    )
+    match = pattern.search(workflow)
+    assert match is not None, f"expected workflow job {job_name!r}"
+    return match.group(0)
+
+
+def test_ci_mise_canary_contract() -> None:
+    """Verify the required canary uses only mise and collision-safe caches."""
+    workflow = CI_WORKFLOW_PATH.read_text(encoding="utf-8")
+    canary = _workflow_job_block(workflow, "mise-canary")
+
+    checkout = canary.index("uses: actions/checkout@")
+    mise_action = canary.index(
+        "uses: jdx/mise-action@3c2e0cf82a5b2e5249f0d3635a4d83d0ae861518"
+    )
+    assert checkout < mise_action
+    assert 'version: "2026.8.11"' in canary
+    assert 'install_args: "--locked"' in canary
+    assert "cache: true" in canary
+
+    assert "actions/setup-node" not in canary
+    assert "pnpm/action-setup" not in canary
+    assert "supabase/setup-cli" not in canary
+
+    for version_command in (
+        "node --version",
+        "pnpm --version",
+        "platform.python_version()",
+        "supabase --version",
+    ):
+        assert version_command in canary
+
+    assert "pnpm store path --silent" in canary
+    assert "Cache pnpm store" in canary
+    assert "Cache node_modules" in canary
+    assert "runner.os" in canary
+    assert "runner.arch" in canary
+    assert "steps.toolchain.outputs.node" in canary
+    assert "steps.toolchain.outputs.pnpm" in canary
+    assert "hashFiles('package.json')" in canary
+    assert "hashFiles('pnpm-lock.yaml')" in canary
+    assert "pnpm-store-${RUNNER_OS}-${RUNNER_ARCH}" in canary
+    assert "node-modules-${RUNNER_OS}-${RUNNER_ARCH}" in canary
+    assert "-node-${NODE_VERSION}-pnpm-${PNPM_VERSION}" in canary
+    assert "-${PACKAGE_HASH}-${LOCK_HASH}" in canary
+
+    for command in (
+        "pnpm install --frozen-lockfile",
+        "pnpm run check",
+        "pnpm run test",
+        "pnpm run build",
+    ):
+        assert command in canary
+
+    ci_gate = _workflow_job_block(workflow, "ci-gate")
+    assert "- mise-canary" in ci_gate
+    assert "MISE_CANARY_RESULT: ${{ needs.mise-canary.result }}" in ci_gate
+    assert 'required=("$MISE_CANARY_RESULT"' in ci_gate
 
 
 def test_offline_python_and_ruff_resolution() -> None:
