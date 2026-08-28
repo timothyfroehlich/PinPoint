@@ -53,7 +53,7 @@ jobs:
       - uses: supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520  # ratchet:supabase/setup-cli@v3.0.0
         with:
           # Pinned Supabase CLI — bump deliberately (was: latest). PP-d5zn.
-          version: 2.113.0
+          version: 2.115.0
 
       - name: Reap preview branches
         run: bash scripts/workflow/preview/preview-reap.sh
