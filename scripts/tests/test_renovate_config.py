@@ -38,7 +38,9 @@ def test_renovate_cooldowns_fail_closed() -> None:
     )
 
     supabase_rule = next(
-        rule for rule in package_rules if rule.get("matchPackageNames") == ["supabase"]
+        rule
+        for rule in package_rules
+        if rule.get("matchPackageNames") == ["supabase/cli"]
     )
     assert supabase_rule["minimumReleaseAge"] == "7 days"
 

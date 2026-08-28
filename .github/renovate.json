@@ -23,7 +23,7 @@
     {
       "description": "Keep the weekly Supabase CLI compatibility cadence",
       "matchManagers": ["mise"],
-      "matchPackageNames": ["supabase"],
+      "matchPackageNames": ["supabase/cli"],
       "minimumReleaseAge": "7 days"
     },
     {
