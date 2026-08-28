@@ -271,14 +271,14 @@ The Pinball Map section of the Admin Integrations page
 PinPoint-wide state: the tracked location (§1), its sync health, and an
 on-demand refresh. It is a configuration surface only — it does not show
 per-machine listing state or the listing control (those live on the machine
-surfaces, §4), or fleet-wide Pinball Map views (those live on the admin fleet
+edit page, §4), or fleet-wide Pinball Map views (those live on the admin fleet
 dashboard). The region-alert channel that shares the section is its own feature
 (`docs/feature-specs/pinballmap-region-alerts.md`).
 
 ### The section
 
 - **10.1** The section shows, and lets an admin edit, the integration's
-  PinPoint-wide settings: the location id (§10.5–§10.8) and — read-only — the
+  PinPoint-wide settings: the location id (§10.5–§10.15) and — read-only — the
   sync health (§10.2). It has no enable toggle.
 - **10.2** Sync health shows the last successful sync time, the last sync
   _attempt_ time, the last outcome (ok / error) with the error text on failure,
@@ -286,8 +286,8 @@ dashboard). The region-alert channel that shares the section is its own feature
   editable field. With no configured location it shows **Not configured**;
   retained health is not presented as current.
 - **10.3** A **Sync now** action refreshes the stored snapshot on demand while
-  configured. It draws from the same global allowance as the machine control's
-  Refresh and location validation (§3.2) — all three share one budget — and
+  configured. It draws from the same global allowance as the machine listing
+  control's Refresh and location validation (§3.2) — all three share one budget — and
   disables with a countdown when the allowance is spent. While Not configured it
   is unavailable and the section states a location must be saved first.
 - **10.4** While configured, the section links to the location's Pinball Map
@@ -302,7 +302,7 @@ dashboard). The region-alert channel that shares the section is its own feature
   makes it Not configured (§10.7).
 - **10.6** While Not configured, PinPoint makes no location-tracking Pinball Map
   API calls and does not render or reconcile retained observed state as current;
-  admin and machine surfaces show Not configured (the machine control's Not
+  admin and machine surfaces show Not configured (the listing control's Not
   configured state, §4.2 — distinct from Waiting, which is a configured
   integration still lacking a valid snapshot, §3.5). The separately configured
   region-alert feature is unaffected and follows its own spec.
@@ -372,7 +372,7 @@ honest rather than building a workflow around it.
   allowance; when none is available, the save leaves the previous configuration
   unchanged and shows the retry countdown.
 - **10.14** The switch is atomic with respect to any in-flight sync. A
-  concurrent hourly cron or Sync now — which reads the location id, fetches,
+  concurrent hourly cron or manual Sync now — which reads the location id, fetches,
   then writes the snapshot back under the id it read — must not overwrite the new
   id or store an old-location snapshot under it. A configuration save is the
   authoritative writer for the duration of the change.
