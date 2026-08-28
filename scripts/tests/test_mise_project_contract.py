@@ -1,12 +1,13 @@
-"""Tests for the PinPoint mise project contract (PP-h2ui.4).
+"""Tests for the PinPoint mise project contract (PP-h2ui.4, .5, .6).
 
 Verifies that:
-1. mise.toml defines the exact development Node runtime and settings.
+1. mise.toml defines the exact development Node/Python/Ruff/Supabase-CLI runtimes and settings.
 2. package.json#packageManager remains the single pnpm version and checksum authority.
 3. mise.toml does not duplicate the pnpm version (idiomatic_version_file_enable_tools is used).
 4. mise.lock exists and captures resolved artifacts across platforms.
 5. mise rejects mismatched packageManager checksum suffixes (negative test).
 6. mise meets the minimum version requirement (>= 2026.8.11).
+7. CI's supabase/setup-cli blocks mirror the single mise.toml Supabase CLI pin (PP-h2ui.6).
 """
 
 import json
@@ -59,7 +60,7 @@ def test_mise_toml_exists_and_is_valid() -> None:
         f"mise.toml must enforce min_version = '2026.8.11', got {data.get('min_version')!r}"
     )
 
-    # Node, Python, and Ruff development runtime must be pinned
+    # Node, Python, Ruff, and Supabase CLI development runtime must be pinned
     tools = data.get("tools", {})
     assert "node" in tools, "mise.toml must specify node in [tools]"
     assert tools["node"] == "24.16.0", f"expected node 24.16.0, got {tools['node']!r}"
@@ -69,6 +70,10 @@ def test_mise_toml_exists_and_is_valid() -> None:
     )
     assert "ruff" in tools, "mise.toml must specify ruff in [tools]"
     assert tools["ruff"] == "0.15.1", f"expected ruff 0.15.1, got {tools['ruff']!r}"
+    assert "supabase" in tools, "mise.toml must specify supabase in [tools]"
+    assert re.fullmatch(r"\d+\.\d+\.\d+", str(tools["supabase"])), (
+        f"expected an exact supabase CLI pin (X.Y.Z), got {tools['supabase']!r}"
+    )
 
     # pnpm must NOT be duplicated in [tools]
     assert "pnpm" not in tools, (
@@ -116,6 +121,7 @@ def test_mise_lock_exists_and_captures_tools() -> None:
     assert "pnpm" in tools, "mise.lock must have pnpm tool locked"
     assert "python" in tools, "mise.lock must have python tool locked"
     assert "ruff" in tools, "mise.lock must have ruff tool locked"
+    assert "supabase" in tools, "mise.lock must have supabase tool locked"
 
 
 def test_mise_cli_version_meets_minimum() -> None:
@@ -131,6 +137,21 @@ def test_mise_cli_version_meets_minimum() -> None:
     assert version_tuple >= MINIMUM_MISE_VERSION, (
         f"mise version {proc.stdout.strip()} is older than minimum required {MINIMUM_MISE_VERSION}"
     )
+
+
+def _tool_source_path(info: object) -> str:
+    """Extract the config-file source path for a tool from `mise ls --json`.
+
+    A tool entry is a list of installed versions when more than one is present
+    (e.g. a stale pnpm alongside the pinned one); only the active/requested
+    entry carries a `source`. Selecting index 0 blindly can pick an inactive
+    install that has no `source` key, so scan for the entry that declares one.
+    """
+    candidates = info if isinstance(info, list) else [info]
+    for entry in candidates:
+        if isinstance(entry, dict) and isinstance(entry.get("source"), dict):
+            return str(entry["source"]["path"])
+    raise AssertionError(f"no active entry with a source path in {info!r}")
 
 
 def test_mise_ls_resolves_sources_correctly() -> None:
@@ -153,46 +174,21 @@ def test_mise_ls_resolves_sources_correctly() -> None:
     assert "pnpm" in tools_dict, "pnpm not listed by mise ls"
     assert "python" in tools_dict, "python not listed by mise ls"
     assert "ruff" in tools_dict, "ruff not listed by mise ls"
+    assert "supabase" in tools_dict, "supabase not listed by mise ls"
 
-    node_info = tools_dict["node"]
-    node_source = (
-        node_info[0]["source"]["path"]
-        if isinstance(node_info, list)
-        else node_info["source"]["path"]
-    )
-    assert str(node_source).endswith("mise.toml"), (
-        f"node source should be mise.toml, got {node_source}"
-    )
-
-    pnpm_info = tools_dict["pnpm"]
-    pnpm_source = (
-        pnpm_info[0]["source"]["path"]
-        if isinstance(pnpm_info, list)
-        else pnpm_info["source"]["path"]
-    )
-    assert str(pnpm_source).endswith("package.json"), (
-        f"pnpm source should be package.json, got {pnpm_source}"
-    )
-
-    python_info = tools_dict["python"]
-    python_source = (
-        python_info[0]["source"]["path"]
-        if isinstance(python_info, list)
-        else python_info["source"]["path"]
-    )
-    assert str(python_source).endswith("mise.toml"), (
-        f"python source should be mise.toml, got {python_source}"
-    )
-
-    ruff_info = tools_dict["ruff"]
-    ruff_source = (
-        ruff_info[0]["source"]["path"]
-        if isinstance(ruff_info, list)
-        else ruff_info["source"]["path"]
-    )
-    assert str(ruff_source).endswith("mise.toml"), (
-        f"ruff source should be mise.toml, got {ruff_source}"
-    )
+    # pnpm's version is authored in package.json; the rest are pinned in mise.toml.
+    expected_sources = {
+        "node": "mise.toml",
+        "pnpm": "package.json",
+        "python": "mise.toml",
+        "ruff": "mise.toml",
+        "supabase": "mise.toml",
+    }
+    for tool, expected_file in expected_sources.items():
+        source = _tool_source_path(tools_dict[tool])
+        assert source.endswith(expected_file), (
+            f"{tool} source should be {expected_file}, got {source}"
+        )
 
 
 def test_negative_checksum_mismatch_rejected(tmp_path: Path) -> None:
@@ -444,4 +440,70 @@ def test_offline_python_and_ruff_resolution() -> None:
     )
     assert ruff_proc.stdout.strip() == "ruff 0.15.1", (
         f"Expected ruff 0.15.1, got {ruff_proc.stdout.strip()}"
+    )
+
+
+def _read_mise_supabase_pin() -> str:
+    """Return the exact Supabase CLI version pinned in mise.toml [tools]."""
+    data = tomllib.loads(MISE_TOML_PATH.read_text(encoding="utf-8"))
+    pin = data.get("tools", {}).get("supabase")
+    assert isinstance(pin, str) and re.fullmatch(r"\d+\.\d+\.\d+", pin), (
+        f"mise.toml must pin an exact supabase CLI version (X.Y.Z), got {pin!r}"
+    )
+    return pin
+
+
+def _collect_setup_cli_versions() -> list[tuple[Path, int, str]]:
+    """Find every `version:` bound to a `supabase/setup-cli` step across workflows.
+
+    Returns (path, line_number, version) tuples. Auto-discovers all workflow
+    files so a new job that adds a setup-cli block is covered without editing
+    this test. The scan window after each `uses: supabase/setup-cli` line is
+    generous (matches the chores runbook's `rg -A6`) because one call site has
+    an extra `if:` line before `with:`.
+    """
+    workflows_dir = REPO_ROOT / ".github" / "workflows"
+    version_re = re.compile(r"^\s*version:\s*['\"]?(\d+\.\d+\.\d+)['\"]?\s*$")
+    found: list[tuple[Path, int, str]] = []
+    for wf in sorted(workflows_dir.glob("*.y*ml")):
+        lines = wf.read_text(encoding="utf-8").splitlines()
+        for idx, line in enumerate(lines):
+            if "uses: supabase/setup-cli" not in line:
+                continue
+            for offset in range(1, 8):
+                if idx + offset >= len(lines):
+                    break
+                m = version_re.match(lines[idx + offset])
+                if m:
+                    found.append((wf, idx + offset + 1, m.group(1)))
+                    break
+            else:
+                raise AssertionError(
+                    f"{wf.name}:{idx + 1} uses supabase/setup-cli but no `version:` "
+                    "was found within the next 7 lines"
+                )
+    return found
+
+
+def test_ci_setup_cli_pins_match_mise() -> None:
+    """CI's supabase/setup-cli blocks must mirror the single mise.toml pin.
+
+    mise.toml is the source of truth for the approved Supabase CLI version
+    (Mac, Bazzite, agent bootstrap). Until the mise-only CI lane (PP-h2ui.8)
+    consumes it directly, the workflow setup-cli blocks carry a literal mirror
+    of the same version; this test fails loudly on any drift so a partial bump
+    (the classic "8 of 9 sites" mistake) cannot merge.
+    """
+    mise_pin = _read_mise_supabase_pin()
+    pins = _collect_setup_cli_versions()
+    assert pins, (
+        "expected at least one supabase/setup-cli block in .github/workflows/; "
+        "found none — did the CLI setup move without updating this contract?"
+    )
+    mismatched = [
+        (str(p.relative_to(REPO_ROOT)), ln, v) for p, ln, v in pins if v != mise_pin
+    ]
+    assert not mismatched, (
+        f"supabase/setup-cli version(s) must match the mise.toml pin {mise_pin!r}; "
+        f"drifted sites: {mismatched}"
     )

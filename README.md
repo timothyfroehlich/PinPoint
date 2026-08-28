@@ -77,10 +77,11 @@ If you’re changing code, **start here**:
 
 ### Prerequisites
 
-- [mise](https://mise.jdx.dev/) **2026.8.11+** (manages development Node, Python, Ruff, and pnpm)
+- [mise](https://mise.jdx.dev/) **2026.8.11+** (manages development Node, Python, Ruff, the Supabase CLI, and pnpm)
 - Node.js **24** (pinned in `mise.toml`; `22.22+` or `26+` also satisfy `engines`)
 - Python **3.12.9** (pinned in `mise.toml`; target `py312` in `ruff.toml`)
 - Ruff **0.15.1** (pinned in `mise.toml`)
+- Supabase CLI (pinned in `mise.toml`; installed by `mise install --locked` — no separate host install needed)
 - pnpm (exact version and sha512 integrity pinned in `packageManager` in `package.json`)
 - Supabase account (for local dev / preview / prod)
 
@@ -90,7 +91,7 @@ If you’re changing code, **start here**:
 git clone https://github.com/timothyfroehlich/PinPoint.git
 cd PinPoint
 
-mise install --locked           # installs pinned Node, Python, Ruff, and pnpm via package.json
+mise install --locked           # installs pinned Node, Python, Ruff, Supabase CLI, and pnpm
 mise exec -- python3 -m pip install -r scripts/requirements.txt
 mise exec -- pnpm install       # (or plain `pnpm install` if mise shell hook is active)
 cp .env.example .env.local      # then fill in Supabase + DB vars
