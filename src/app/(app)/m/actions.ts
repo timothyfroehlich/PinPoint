@@ -13,6 +13,7 @@ import { db } from "~/server/db";
 import {
   applyMachinePbmLink,
   createMachine,
+  carryExcludedReason,
   planMachinePbmLink,
   updateMachinePresence,
   type MachinePbmLinkPlan,
@@ -663,6 +664,10 @@ export async function updateMachineAction(
         // intent carry-over at the `resolvePbmLinkColumnsForUpdate` call.
         pinballmapMachineId: true,
         pinballmapIntent: true,
+        // Needed for the reason carry-over below — this form posts no control
+        // for the reason, so it must not be inferred from its silence.
+        pinballmapExcluded: true,
+        pinballmapExcludedReason: true,
       },
     });
 
@@ -713,7 +718,15 @@ export async function updateMachineAction(
       // (PP-l81u).
       const planned = await planMachinePbmLink({
         machineId: id,
-        selection: validation.data,
+        // The form posts every excluded column it owns, so a blank one is a
+        // human clearing the box — except the reason, which has no control
+        // here at all (PP-3bbr.3). Its absence is absence, so it carries;
+        // otherwise saving an unrelated detail would null a reason
+        // `set_machine_pinballmap` wrote (CORE-ARCH-012).
+        selection: carryExcludedReason(validation.data, {
+          pinballmapExcluded: currentMachine.pinballmapExcluded,
+          pinballmapExcludedReason: currentMachine.pinballmapExcludedReason,
+        }),
         stored: {
           pinballmapMachineId: currentMachine.pinballmapMachineId,
           pinballmapIntent: currentMachine.pinballmapIntent,

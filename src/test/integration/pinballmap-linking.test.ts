@@ -472,4 +472,95 @@ describe("updateMachineAction — PinballMap link (PGlite)", () => {
     expect(updated?.pinballmapMachineId).toBe(55);
     expect(updated?.manufacturer).toBe("Williams");
   });
+
+  it("keeps a stored exclusion reason across a save from the edit form", async () => {
+    // The form owns every other excluded column and posts them on every save,
+    // so a blank one is a human clearing the box. It owns no control for the
+    // reason — the box was write-only and was removed in PP-3bbr.3 — so its
+    // silence there is absence, not intent. Without the carry-over, saving an
+    // unrelated detail would null a reason `set_machine_pinballmap` wrote
+    // (CORE-ARCH-012).
+    const db = await getTestDb();
+    const { updateMachineAction } = await import("~/app/(app)/m/actions");
+    const admin = await createUser("admin");
+    await mockAuthAs(admin.id);
+    const [machine] = await db
+      .insert(machines)
+      .values({
+        name: "Unicorn Magic",
+        initials: "UNM",
+        pinballmapExcluded: true,
+        pinballmapExcludedReason: "homebrew — one-off cabinet",
+        modelName: "Unicorn Magic",
+        manufacturer: "APC",
+        year: 2024,
+      })
+      .returning();
+
+    const fd = new FormData();
+    fd.append("id", machine.id);
+    fd.append("name", "Unicorn Magic");
+    fd.append("pbmLinkPresent", "1");
+    fd.append("pinballmapExcluded", "on");
+    // Exactly what the field posts: the model identity, and no reason.
+    fd.append("modelName", "Unicorn Magic");
+    fd.append("manufacturer", "APC");
+    fd.append("year", "2024");
+
+    const result = await updateMachineAction(undefined, fd);
+    expect(result.ok).toBe(true);
+
+    const updated = await db.query.machines.findFirst({
+      where: eq(machines.id, machine.id),
+    });
+    expect(updated?.pinballmapExcludedReason).toBe(
+      "homebrew — one-off cabinet"
+    );
+  });
+
+  it("still clears a hand-entered model field the form posts blank", async () => {
+    // The other half of the rule: the three model fields DO have controls, so
+    // an empty one is a deliberate clear and must not be carried back. Spec 2.4
+    // makes all three optional, and a blank title falls back to the machine's
+    // name at read time.
+    const db = await getTestDb();
+    const { updateMachineAction } = await import("~/app/(app)/m/actions");
+    const admin = await createUser("admin");
+    await mockAuthAs(admin.id);
+    const [machine] = await db
+      .insert(machines)
+      .values({
+        name: "Unicorn Magic",
+        initials: "UNM",
+        pinballmapExcluded: true,
+        pinballmapExcludedReason: "homebrew — one-off cabinet",
+        modelName: "Unicorn Magic",
+        manufacturer: "APC",
+        year: 2024,
+      })
+      .returning();
+
+    const fd = new FormData();
+    fd.append("id", machine.id);
+    fd.append("name", "Unicorn Magic");
+    fd.append("pbmLinkPresent", "1");
+    fd.append("pinballmapExcluded", "on");
+    fd.append("modelName", "");
+    fd.append("manufacturer", "");
+    fd.append("year", "");
+
+    const result = await updateMachineAction(undefined, fd);
+    expect(result.ok).toBe(true);
+
+    const updated = await db.query.machines.findFirst({
+      where: eq(machines.id, machine.id),
+    });
+    expect(updated?.modelName).toBeNull();
+    expect(updated?.manufacturer).toBeNull();
+    expect(updated?.year).toBeNull();
+    // The reason still carries — it has no control to have been cleared from.
+    expect(updated?.pinballmapExcludedReason).toBe(
+      "homebrew — one-off cabinet"
+    );
+  });
 });
