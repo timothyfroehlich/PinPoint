@@ -462,12 +462,14 @@ def _collect_setup_cli_versions(
     files so a new job that adds a setup-cli block is covered without editing
     this test.
 
-    The scan is bounded to the setup-cli step's own mapping: starting after the
-    `uses: supabase/setup-cli` line it reads until the next step (`- ` list
-    item) or a dedent out of the step's key level, so a `version:` belonging to
-    a *later* step can never be misattributed to an unpinned setup-cli. YAML is
-    parsed by hand (indentation + step markers) rather than with a library
-    because the script/test suite is deliberately stdlib-only.
+    The scan is bounded to the setup-cli step's own `with:` mapping: starting
+    after the `uses: supabase/setup-cli` line it reads until the next step
+    (`- ` list item) or a dedent out of the step's key level, and accepts only a
+    `version:` nested inside that step's `with:` — so neither a *later* step's
+    `version:` nor a `version:` under some other key (e.g. `env:`) of this step
+    can be misattributed to an unpinned setup-cli. YAML is parsed by hand
+    (indentation + step markers) rather than with a library because the
+    script/test suite is deliberately stdlib-only.
 
     `workflows_dir` defaults to the repo's `.github/workflows`; the parameter
     exists so the regression tests can point it at a fixture.
@@ -481,12 +483,14 @@ def _collect_setup_cli_versions(
         for idx, line in enumerate(lines):
             if "uses: supabase/setup-cli" not in line:
                 continue
-            # Column of the `uses:` keyword; the step's sibling keys (`with:`)
-            # sit at this column and `version:` deeper. Anything shallower, or a
-            # new `- ` list item, begins a different step — stop there.
+            # Column of the `uses:` keyword; the step's sibling keys (`with:`,
+            # `env:`, `name:`) sit at this column, their children deeper. Only a
+            # `version:` nested inside this step's own `with:` mapping configures
+            # the action — a `version:` under `env:` (or any other key) does not.
             uses_col = line.index("uses:")
             match_line: int | None = None
             match_version: str | None = None
+            in_with = False
             offset = 1
             while idx + offset < len(lines):
                 nxt = lines[idx + offset]
@@ -497,11 +501,16 @@ def _collect_setup_cli_versions(
                         break  # next step in the sequence
                     if indent < uses_col:
                         break  # dedented out of this step's mapping
-                    m = version_re.match(nxt)
-                    if m:
-                        match_line = idx + offset + 1
-                        match_version = m.group(1)
-                        break
+                    if indent == uses_col:
+                        # A step-level key: entering `with:`, or leaving it for a
+                        # sibling key (`env:`, `name:`, …).
+                        in_with = stripped.startswith("with:")
+                    elif in_with:
+                        m = version_re.match(nxt)
+                        if m:
+                            match_line = idx + offset + 1
+                            match_version = m.group(1)
+                            break
                 offset += 1
             if match_version is None or match_line is None:
                 raise AssertionError(
@@ -596,6 +605,30 @@ def test_collect_setup_cli_versions_ignores_later_steps_version(tmp_path: Path) 
     assert raised, (
         "expected an unpinned setup-cli to raise despite a neighbor's version:"
     )
+
+
+def test_collect_setup_cli_versions_ignores_non_with_version(tmp_path: Path) -> None:
+    """A `version:` outside the step's `with:` (e.g. under `env:`) must not count.
+
+    Regression guard: only `with.version` configures setup-cli, so a step that
+    carries a `version:` under another key but no `with.version` is unpinned and
+    must raise.
+    """
+    wf = tmp_path / "env-version.yaml"
+    wf.write_text(
+        "jobs:\n  x:\n    steps:\n"
+        "      - uses: supabase/setup-cli@v3\n"
+        "        env:\n"
+        "          version: 2.115.0\n",
+        encoding="utf-8",
+    )
+    raised = False
+    try:
+        _collect_setup_cli_versions(workflows_dir=tmp_path)
+    except AssertionError as exc:
+        raised = True
+        assert "no `version:`" in str(exc)
+    assert raised, "expected a non-with version: to be rejected as unpinned"
 
 
 def test_collect_setup_cli_versions_handles_name_form_step(tmp_path: Path) -> None:
