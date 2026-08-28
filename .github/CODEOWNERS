@@ -4,6 +4,7 @@
 # CI pipeline and workflow configuration
 .github/workflows/ @timothyfroehlich
 .github/dependabot.yml @timothyfroehlich
+.github/renovate.json @timothyfroehlich
 .github/CODEOWNERS @timothyfroehlich
 
 # Database schema and migrations
