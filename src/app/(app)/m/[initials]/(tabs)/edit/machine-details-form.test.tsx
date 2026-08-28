@@ -9,6 +9,7 @@ import {
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MachineDetailsForm } from "./machine-details-form";
+import { DetailsDirtyProvider } from "./details-dirty";
 import { updateMachineAction } from "~/app/(app)/m/actions";
 import { err, ok } from "~/lib/result";
 import type { UpdateMachineResult } from "~/app/(app)/m/actions";
@@ -90,6 +91,19 @@ const baseProps = {
   year: null,
 };
 
+/**
+ * The form's dirty state lives in `DetailsDirtyProvider` so the Pinball Map
+ * section can see it (PP-3bbr.3), and the hook throws outside the provider
+ * rather than defaulting to clean — so every case renders inside one.
+ */
+function renderForm(overrides: Partial<typeof baseProps> = {}): void {
+  render(
+    <DetailsDirtyProvider>
+      <MachineDetailsForm {...baseProps} {...overrides} />
+    </DetailsDirtyProvider>
+  );
+}
+
 function hiddenDescription(): HTMLInputElement {
   const field = document.querySelector<HTMLInputElement>(
     'input[name="description"]'
@@ -116,13 +130,13 @@ describe("MachineDetailsForm", () => {
   }
 
   it("does not block unload when the form is untouched", () => {
-    render(<MachineDetailsForm {...baseProps} />);
+    renderForm();
     expect(beforeUnloadWasBlocked()).toBe(false);
   });
 
   it("blocks unload once the form is dirty", async () => {
     const user = userEvent.setup();
-    render(<MachineDetailsForm {...baseProps} />);
+    renderForm();
 
     await user.type(screen.getByLabelText(/Machine Name/), "!");
 
@@ -131,7 +145,7 @@ describe("MachineDetailsForm", () => {
 
   it("stops blocking unload after Cancel reverts the edits", async () => {
     const user = userEvent.setup();
-    render(<MachineDetailsForm {...baseProps} />);
+    renderForm();
 
     await user.type(screen.getByLabelText(/Machine Name/), "!");
     await user.click(screen.getByRole("button", { name: "Cancel" }));
@@ -141,7 +155,7 @@ describe("MachineDetailsForm", () => {
 
   it("serializes the editor's doc into the hidden description input", async () => {
     const user = userEvent.setup();
-    render(<MachineDetailsForm {...baseProps} />);
+    renderForm();
 
     await user.type(screen.getByLabelText("Machine description"), "Hi");
 
@@ -151,13 +165,13 @@ describe("MachineDetailsForm", () => {
   });
 
   it("serializes a null description to an empty string", () => {
-    render(<MachineDetailsForm {...baseProps} />);
+    renderForm();
     expect(hiddenDescription().value).toBe("");
   });
 
   it("shows an unsaved-changes note once a field is edited", async () => {
     const user = userEvent.setup();
-    render(<MachineDetailsForm {...baseProps} />);
+    renderForm();
 
     expect(screen.getByTestId("details-dirty-note")).toHaveTextContent(
       "No unsaved changes"
@@ -172,7 +186,7 @@ describe("MachineDetailsForm", () => {
 
   it("restores the original name, availability, and description on Cancel", async () => {
     const user = userEvent.setup();
-    render(<MachineDetailsForm {...baseProps} />);
+    renderForm();
 
     const nameInput = screen.getByLabelText(/Machine Name/);
     await user.type(nameInput, "!");
@@ -202,7 +216,7 @@ describe("MachineDetailsForm", () => {
       err("SERVER", "Something went wrong saving these details.")
     );
     const user = userEvent.setup();
-    render(<MachineDetailsForm {...baseProps} />);
+    renderForm();
 
     await user.click(screen.getByRole("button", { name: "Save details" }));
 
@@ -217,7 +231,7 @@ describe("MachineDetailsForm", () => {
       ok({ machineId: baseProps.machineId })
     );
     const user = userEvent.setup();
-    render(<MachineDetailsForm {...baseProps} />);
+    renderForm();
 
     await user.type(screen.getByLabelText(/Machine Name/), "!");
     await user.click(screen.getByRole("combobox"));
@@ -249,7 +263,7 @@ describe("MachineDetailsForm", () => {
       err("SERVER", "Something went wrong saving these details.")
     );
     const user = userEvent.setup();
-    render(<MachineDetailsForm {...baseProps} />);
+    renderForm();
 
     await user.type(screen.getByLabelText(/Machine Name/), "!");
     await user.click(screen.getByRole("combobox"));
@@ -288,7 +302,7 @@ describe("MachineDetailsForm", () => {
     // real pending edit, so Cancel discarded it with no signal
     // (PP-o355.19 review).
     const user = userEvent.setup();
-    render(<MachineDetailsForm {...baseProps} />);
+    renderForm();
 
     expect(screen.getByTestId("details-dirty-note")).toHaveTextContent(
       "No unsaved changes"
@@ -308,7 +322,7 @@ describe("MachineDetailsForm", () => {
       err("SERVER", "Something went wrong saving these details.")
     );
     const user = userEvent.setup();
-    render(<MachineDetailsForm {...baseProps} />);
+    renderForm();
 
     await user.type(screen.getByLabelText(/Machine Name/), "!");
     await user.click(screen.getByRole("button", { name: "Save details" }));
@@ -323,7 +337,7 @@ describe("MachineDetailsForm", () => {
   });
 
   it("keeps keyboard order Name → Availability → PinballMap fields", () => {
-    render(<MachineDetailsForm {...baseProps} />);
+    renderForm();
 
     const name = screen.getByLabelText(/Machine Name/);
     const availability = screen.getByRole("combobox");
@@ -345,7 +359,7 @@ describe("MachineDetailsForm", () => {
       })
     );
     const user = userEvent.setup();
-    render(<MachineDetailsForm {...baseProps} />);
+    renderForm();
 
     await user.type(screen.getByLabelText(/Machine Name/), "!");
     await user.click(screen.getByRole("button", { name: "Save details" }));
@@ -370,10 +384,10 @@ describe("MachineDetailsForm", () => {
     /** A tab-strip-style link rendered as a sibling, like RouteTabStrip's. */
     function renderWithTabLink(): void {
       render(
-        <>
+        <DetailsDirtyProvider>
           <a href="/m/TAF/settings">Settings</a>
           <MachineDetailsForm {...baseProps} />
-        </>
+        </DetailsDirtyProvider>
       );
     }
 
@@ -408,7 +422,7 @@ describe("MachineDetailsForm", () => {
       mockOverflowingTabStrip();
       const user = userEvent.setup();
       render(
-        <>
+        <DetailsDirtyProvider>
           <RouteTabStrip
             basePath="/m/TAF"
             ariaLabel="Machine sections"
@@ -420,7 +434,7 @@ describe("MachineDetailsForm", () => {
             ]}
           />
           <MachineDetailsForm {...baseProps} />
-        </>
+        </DetailsDirtyProvider>
       );
 
       await user.click(
@@ -481,10 +495,10 @@ describe("MachineDetailsForm", () => {
     it("lets a link to the current page through", async () => {
       const user = userEvent.setup();
       render(
-        <>
+        <DetailsDirtyProvider>
           <a href="/">Here</a>
           <MachineDetailsForm {...baseProps} />
-        </>
+        </DetailsDirtyProvider>
       );
 
       await user.type(screen.getByLabelText(/Machine Name/), "!");

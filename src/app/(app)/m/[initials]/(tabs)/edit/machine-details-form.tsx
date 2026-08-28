@@ -9,6 +9,7 @@ import {
   useState,
 } from "react";
 import { useRouter } from "next/navigation";
+import { useDetailsDirty } from "./details-dirty";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -91,7 +92,11 @@ export function MachineDetailsForm({
     FormData
   >(updateMachineAction, undefined);
 
-  const [isDirty, setIsDirty] = useState(false);
+  // Dirtiness lives in a context rather than local state because the Pinball
+  // Map section below reads it too — this form owns the PBM link, so its
+  // pending save can move the ground under those controls (PP-3bbr.3). Still
+  // written from here only; nothing else sets it.
+  const { dirty: isDirty, setDirty: setIsDirty } = useDetailsDirty();
   // `useActionState` exposes no reset, so Cancel dismisses the last result
   // instead. Cleared on every submit so a fresh outcome always shows.
   const [resultDismissed, setResultDismissed] = useState(false);
@@ -122,11 +127,17 @@ export function MachineDetailsForm({
   // anything typed after the snapshot was taken is still unsaved. Clearing
   // dirtiness for it would both mislabel the note "Saved" and disarm the
   // navigation guard protecting it (PP-o355.19 review).
+  //
+  // `setIsDirty` is in the deps because it now comes off a context value whose
+  // identity changes with `dirty`, so the effect re-runs on every flip. That is
+  // safe rather than merely tolerated: `markDirty` bumps `submitSeqRef` on every
+  // edit, so the moment anything is dirty the two sequence numbers differ and
+  // the body is a no-op. Only the save that matches its own snapshot clears.
   useEffect(() => {
     if (state?.ok && submitSeqRef.current === inFlightSeqRef.current) {
       setIsDirty(false);
     }
-  }, [state]);
+  }, [state, setIsDirty]);
 
   /**
    * Unsaved-changes guard, part 1 of 2: exits that unload the document —
