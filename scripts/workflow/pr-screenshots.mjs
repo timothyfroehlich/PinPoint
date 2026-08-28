@@ -322,6 +322,11 @@ function ghText(args) {
  * it never touches the working tree and never trips the repo's Husky
  * post-checkout hook (which would otherwise allocate a worktree port slot
  * for a directory that only exists to hold PNGs for a few seconds).
+ *
+ * Returns `{ remotePaths, pushed }`: the branch-relative paths for the captured
+ * images (present on the branch either way), and whether this run committed and
+ * pushed. `pushed` is false on a no-op re-shoot (byte-identical images already
+ * on the branch), which is a clean success, not a failure.
  */
 function publishScreenshots(pr, shortSha, captured) {
   const remoteUrl = git(["remote", "get-url", "origin"], { cwd: REPO_ROOT });
@@ -358,14 +363,34 @@ function publishScreenshots(pr, shortSha, captured) {
     }
 
     git(["add", "-A"], { cwd: tmpDir });
-    git(["commit", "-q", "-m", `screenshots: PR #${pr} @ ${shortSha}`], {
-      cwd: tmpDir,
-    });
-    git(["push", "-q", "origin", `HEAD:${SCREENSHOTS_BRANCH}`], {
-      cwd: tmpDir,
-    });
 
-    return remotePaths;
+    // A re-shoot whose PNGs are byte-identical to what's already on the branch
+    // (same PR + SHA, unchanged pages) stages nothing. `git commit` would then
+    // abort with "nothing to commit" and crash the whole script with a raw
+    // "Command failed: git commit" — which reads as a git/tooling failure and,
+    // worse, masks the real cause of the identical images (e.g. expired auth).
+    // A no-op re-shoot is a clean success: skip the commit+push and still return
+    // the remote paths so the sticky comment is refreshed. `git diff --cached
+    // --quiet` exits 0 when the index is clean, non-zero when it has changes;
+    // run it through spawnSync so a clean index is a status check, not a throw.
+    const hasStagedChanges =
+      spawnSync("git", ["diff", "--cached", "--quiet"], { cwd: tmpDir })
+        .status !== 0;
+
+    if (hasStagedChanges) {
+      git(["commit", "-q", "-m", `screenshots: PR #${pr} @ ${shortSha}`], {
+        cwd: tmpDir,
+      });
+      git(["push", "-q", "origin", `HEAD:${SCREENSHOTS_BRANCH}`], {
+        cwd: tmpDir,
+      });
+    } else {
+      console.log(
+        "ℹ️  No image changes since the last shoot — skipping commit/push."
+      );
+    }
+
+    return { remotePaths, pushed: hasStagedChanges };
   } finally {
     rmSync(tmpDir, { recursive: true, force: true });
   }
@@ -501,9 +526,11 @@ async function main() {
       );
     }
 
-    const remotePaths = publishScreenshots(pr, shortSha, captured);
+    const { remotePaths, pushed } = publishScreenshots(pr, shortSha, captured);
     console.log(
-      `✅ Pushed ${remotePaths.length} screenshot(s) to ${SCREENSHOTS_BRANCH}`
+      pushed
+        ? `✅ Pushed ${remotePaths.length} screenshot(s) to ${SCREENSHOTS_BRANCH}`
+        : `✅ ${remotePaths.length} screenshot(s) already up to date on ${SCREENSHOTS_BRANCH}`
     );
 
     const repoSlug = execFileSync(
