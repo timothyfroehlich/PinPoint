@@ -52,10 +52,22 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           persist-credentials: false
 
+      # A synchronize event can target a PR whose head predates setup-mise.
+      # Load workflow infrastructure from the trusted default branch while the
+      # PR checkout remains the source of migrations and seed data.
+      - name: Checkout trusted workflow action
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # ratchet:actions/checkout@v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          path: .pinpoint-workflow
+          sparse-checkout: .github/actions/setup-mise
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+
       # Preserve the preview orchestration compatibility lane while provisioning
       # Node, pnpm, and the Supabase CLI through the same mise authority as CI.
       - name: Setup locked preview toolchain (Node 22 compatibility)
-        uses: ./.github/actions/setup-mise
+        uses: ./.pinpoint-workflow/.github/actions/setup-mise
         with:
           install-args: "--locked node pnpm supabase"
           node-version: "22"

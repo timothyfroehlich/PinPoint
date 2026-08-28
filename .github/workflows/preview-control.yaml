@@ -111,18 +111,32 @@ jobs:
           ref: ${{ steps.pr.outputs.head_sha }}
           persist-credentials: false
 
+      # The issue_comment workflow comes from the default branch, but the
+      # checkout above replaces the workspace with the PR head. Keep workflow
+      # infrastructure on the trusted default branch so /preview also works for
+      # PRs opened before setup-mise existed.
+      - name: Checkout trusted workflow action
+        if: steps.parse.outputs.action != 'noop'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # ratchet:actions/checkout@v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          path: .pinpoint-workflow
+          sparse-checkout: .github/actions/setup-mise
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+
       # Keep the existing Node 22 compatibility lane explicit for preview
       # orchestration. Vercel still owns its independent preview build runtime.
       - name: Setup locked preview toolchain (Node 22 compatibility)
         if: steps.parse.outputs.action == 'start'
-        uses: ./.github/actions/setup-mise
+        uses: ./.pinpoint-workflow/.github/actions/setup-mise
         with:
           install-args: "--locked node pnpm supabase"
           node-version: "22"
 
       - name: Setup locked Supabase CLI for stop
         if: steps.parse.outputs.action == 'stop'
-        uses: ./.github/actions/setup-mise
+        uses: ./.pinpoint-workflow/.github/actions/setup-mise
         with:
           install-args: "--locked supabase"
           cache-pnpm: "false"

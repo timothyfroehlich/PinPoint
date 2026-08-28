@@ -511,15 +511,18 @@ def test_workflows_use_mise_without_legacy_setup_actions() -> None:
                 offenders.append(f"{path.name}: {action}")
     assert not offenders, f"legacy setup actions remain: {offenders}"
 
-    for path in (
-        CI_WORKFLOW_PATH,
-        PREVIEW_CONTROL_PATH,
-        PREVIEW_REAPER_PATH,
-        PREVIEW_SYNC_PATH,
-    ):
+    expected_action_refs = {
+        CI_WORKFLOW_PATH: "uses: ./.github/actions/setup-mise",
+        PREVIEW_REAPER_PATH: "uses: ./.github/actions/setup-mise",
+        PREVIEW_CONTROL_PATH: (
+            "uses: ./.pinpoint-workflow/.github/actions/setup-mise"
+        ),
+        PREVIEW_SYNC_PATH: "uses: ./.pinpoint-workflow/.github/actions/setup-mise",
+    }
+    for path, action_ref in expected_action_refs.items():
         content = path.read_text(encoding="utf-8")
-        assert "uses: ./.github/actions/setup-mise" in content, (
-            f"{path.name} must provision executable tools through setup-mise"
+        assert action_ref in content, (
+            f"{path.name} must provision executable tools through {action_ref}"
         )
 
 
@@ -574,9 +577,15 @@ def test_preview_mise_compatibility_and_ordering() -> None:
     for workflow in (control, sync):
         assert 'node-version: "22"' in workflow
         assert 'install-args: "--locked node pnpm supabase"' in workflow
+        assert "name: Checkout trusted workflow action" in workflow
+        assert "ref: ${{ github.event.repository.default_branch }}" in workflow
+        assert "path: .pinpoint-workflow" in workflow
+        assert "sparse-checkout: .github/actions/setup-mise" in workflow
+        assert "uses: ./.pinpoint-workflow/.github/actions/setup-mise" in workflow
 
     assert (
-        control.index("Setup locked preview toolchain")
+        control.index("name: Checkout trusted workflow action")
+        < control.index("Setup locked preview toolchain")
         < control.index("name: Install dependencies")
         < control.index("name: Create preview")
     )
@@ -584,7 +593,8 @@ def test_preview_mise_compatibility_and_ordering() -> None:
         "name: Destroy preview"
     )
     assert (
-        sync.index("Setup locked preview toolchain")
+        sync.index("name: Checkout trusted workflow action")
+        < sync.index("Setup locked preview toolchain")
         < sync.index("name: Install dependencies")
         < sync.index("name: Re-sync preview branch")
     )
