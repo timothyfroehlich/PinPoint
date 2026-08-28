@@ -83,7 +83,7 @@ Superpowers presents a 4-option menu led by "1. Merge back to `<base>` locally".
 | :----------------------- | :------------------------------------------------------------------------------------------------ |
 | Spec written             | don't commit it; create bead with `--acceptance` (+ `--spec-id` if a feature spec exists) (§2)    |
 | Plan written             | don't commit it; paste full plan text into `--design` (§1)                                        |
-| Worktree create          | `EnterWorktree` / `Agent(isolation:"worktree")`, from main worktree                               |
+| Worktree create          | `EnterWorktree` / `Agent(isolation:"worktree")`                                                   |
 | SDD dispatch             | clear the scale gate (count + cost, Tim's yes) first                                              |
 | Code review              | CI Gate + `pinpoint-pr-workflow` head-commit review; replies via MCP, signed with your agent name |
 | Finish: "merge locally"  | ❌ prohibited → PR + `merge-pr.sh --human` (Tim approves the hook prompt) + landing-the-plane     |
