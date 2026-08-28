@@ -211,8 +211,8 @@ if [ "$1" = version ]; then
   exit 0
 fi
 printf '%s\\n' "$*" >> "$DOLT_CALLS_FILE"
-if printf '%s' "$*" | grep -q 'conflict_count'; then
-  printf 'conflict_count\\n'
+if printf '%s' "$*" | grep -q 'is_merging'; then
+  printf 'is_merging\\n'
   if [ "$DOLT_TEST_CONFLICT_STATE" = clean ] || [ -f "$DOLT_STATE_FILE" ]; then
     printf '0\\n'
   else
@@ -387,17 +387,17 @@ class TestBazziteServiceGuards:
         proc, calls = run_bridge_pull_conflict(tmp_path, conflict_state="clean")
 
         assert proc.returncode != 0
-        assert any("conflict_count" in call for call in calls)
+        assert any("is_merging" in call for call in calls)
         assert all("DOLT_MERGE" not in call for call in calls)
-        assert "no unresolved conflicts remain" in proc.stderr
+        assert "no merge remains active" in proc.stderr
 
-    def test_bridge_aborts_and_verifies_a_persisting_conflict(self, tmp_path: Path):
+    def test_bridge_aborts_and_verifies_a_schema_only_conflict(self, tmp_path: Path):
         proc, calls = run_bridge_pull_conflict(tmp_path, conflict_state="active")
 
         assert proc.returncode != 0
-        assert sum("conflict_count" in call for call in calls) == 2
+        assert sum("is_merging" in call for call in calls) == 2
         assert sum("DOLT_MERGE" in call for call in calls) == 1
-        assert "merge aborted; no unresolved conflicts remain" in proc.stderr
+        assert "merge aborted; no merge remains active" in proc.stderr
 
 
 class TestDocumentationReferences:

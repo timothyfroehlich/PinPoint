@@ -77,19 +77,19 @@ dolt_sql() {
     --query "$1"
 }
 
-unresolved_conflict_count() {
-  local output count
-  if ! output="$(dolt_sql "SELECT COALESCE(SUM(num_conflicts), 0) AS conflict_count FROM dolt_conflicts;")"; then
-    log "failed to inspect dolt_conflicts on the live server"
+merge_in_progress() {
+  local output is_merging
+  if ! output="$(dolt_sql "SELECT is_merging FROM dolt_merge_status;")"; then
+    log "failed to inspect dolt_merge_status on the live server"
     return 1
   fi
 
-  count="$(printf '%s\n' "$output" | tail -n1 | tr -d '\r')"
-  if [[ ! "$count" =~ ^[0-9]+$ ]]; then
-    log "unexpected conflict-count response from the live server: $output"
+  is_merging="$(printf '%s\n' "$output" | tail -n1 | tr -d '\r')"
+  if [[ ! "$is_merging" =~ ^[01]$ ]]; then
+    log "unexpected merge-status response from the live server: $output"
     return 1
   fi
-  printf '%s\n' "$count"
+  printf '%s\n' "$is_merging"
 }
 
 # 1. Commit any uncommitted working-set drift so pull has a clean base.
@@ -97,33 +97,34 @@ log "commit (flush working set)"
 bd dolt commit >&2 || die "bd dolt commit failed"
 
 # 2. Pull DoltHub. bd normally restores the pre-pull working set after a
-#    conflict. Verify that claim against the server; abort only if unresolved
-#    conflicts actually remain, then verify once more before stopping loudly.
+#    conflict. Verify that claim against the server's merge status; abort only
+#    if a merge actually remains active, then verify once more before stopping
+#    loudly. `dolt_merge_status` covers row and schema conflicts.
 log "pull DoltHub"
 pull_rc=0
 pull_out=$(bd dolt pull 2>&1) || pull_rc=$?
 printf '%s\n' "$pull_out" >&2
 if [[ "$pull_rc" -ne 0 ]]; then
   if printf '%s' "$pull_out" | grep -qiE 'conflict|operator resolution'; then
-    log "PULL CONFLICT — checking the live server for unresolved conflicts"
-    if ! conflict_count="$(unresolved_conflict_count)"; then
-      die "could not verify live-server conflict state; manual intervention required"
+    log "PULL CONFLICT — checking whether a merge remains active on the live server"
+    if ! is_merging="$(merge_in_progress)"; then
+      die "could not verify live-server merge state; manual intervention required"
     fi
 
-    if [[ "$conflict_count" -eq 0 ]]; then
-      log "pull restored the pre-merge working set; no unresolved conflicts remain"
+    if [[ "$is_merging" -eq 0 ]]; then
+      log "pull restored the pre-merge working set; no merge remains active"
     else
-      log "$conflict_count unresolved conflict row(s) remain — aborting the merge"
+      log "a merge remains active — aborting it"
       if ! dolt_sql "CALL DOLT_MERGE('--abort');" >&2; then
         die "DOLT_MERGE('--abort') failed; manual intervention required"
       fi
-      if ! conflict_count="$(unresolved_conflict_count)"; then
-        die "merge abort returned but conflict state could not be verified"
+      if ! is_merging="$(merge_in_progress)"; then
+        die "merge abort returned but merge state could not be verified"
       fi
-      if [[ "$conflict_count" -ne 0 ]]; then
-        die "merge abort returned but $conflict_count unresolved conflict row(s) remain"
+      if [[ "$is_merging" -ne 0 ]]; then
+        die "merge abort returned but a merge remains active"
       fi
-      log "merge aborted; no unresolved conflicts remain"
+      log "merge aborted; no merge remains active"
     fi
     die "DoltHub pull hit a merge conflict — bridge stopped. Resolve manually, then: systemctl --user restart beads-dolthub-bridge.timer"
   fi
