@@ -453,7 +453,9 @@ def _read_mise_supabase_pin() -> str:
     return pin
 
 
-def _collect_setup_cli_versions() -> list[tuple[Path, int, str]]:
+def _collect_setup_cli_versions(
+    workflows_dir: Path | None = None,
+) -> list[tuple[Path, int, str]]:
     """Find every `version:` bound to a `supabase/setup-cli` step across workflows.
 
     Returns (path, line_number, version) tuples. Auto-discovers all workflow
@@ -461,8 +463,12 @@ def _collect_setup_cli_versions() -> list[tuple[Path, int, str]]:
     this test. The scan window after each `uses: supabase/setup-cli` line is
     generous (matches the chores runbook's `rg -A6`) because one call site has
     an extra `if:` line before `with:`.
+
+    `workflows_dir` defaults to the repo's `.github/workflows`; the parameter
+    exists so the EOF-guard regression test can point it at a fixture.
     """
-    workflows_dir = REPO_ROOT / ".github" / "workflows"
+    if workflows_dir is None:
+        workflows_dir = REPO_ROOT / ".github" / "workflows"
     version_re = re.compile(r"^\s*version:\s*['\"]?(\d+\.\d+\.\d+)['\"]?\s*$")
     found: list[tuple[Path, int, str]] = []
     for wf in sorted(workflows_dir.glob("*.y*ml")):
@@ -470,18 +476,26 @@ def _collect_setup_cli_versions() -> list[tuple[Path, int, str]]:
         for idx, line in enumerate(lines):
             if "uses: supabase/setup-cli" not in line:
                 continue
+            # Track the hit explicitly instead of relying on for/else: an EOF
+            # break within the scan window would otherwise also suppress the
+            # else clause, silently skipping a version-less block near EOF and
+            # defeating the drift guard.
+            match_line: int | None = None
+            match_version: str | None = None
             for offset in range(1, 8):
                 if idx + offset >= len(lines):
                     break
                 m = version_re.match(lines[idx + offset])
                 if m:
-                    found.append((wf, idx + offset + 1, m.group(1)))
+                    match_line = idx + offset + 1
+                    match_version = m.group(1)
                     break
-            else:
+            if match_version is None or match_line is None:
                 raise AssertionError(
                     f"{wf.name}:{idx + 1} uses supabase/setup-cli but no `version:` "
                     "was found within the next 7 lines"
                 )
+            found.append((wf, match_line, match_version))
     return found
 
 
@@ -507,3 +521,38 @@ def test_ci_setup_cli_pins_match_mise() -> None:
         f"supabase/setup-cli version(s) must match the mise.toml pin {mise_pin!r}; "
         f"drifted sites: {mismatched}"
     )
+
+
+def test_collect_setup_cli_versions_raises_on_versionless_block(tmp_path: Path) -> None:
+    """A setup-cli block with no version (incl. at EOF) must raise, not be skipped.
+
+    Regression guard for the drift check: an unpinned/default-CLI block cannot
+    be allowed to slip through just because it sits near the end of a file.
+    """
+    wf = tmp_path / "unpinned.yaml"
+    # `setup-cli` on the final line — the scan window immediately hits EOF.
+    wf.write_text(
+        "jobs:\n  x:\n    steps:\n      - uses: supabase/setup-cli\n",
+        encoding="utf-8",
+    )
+    raised = False
+    try:
+        _collect_setup_cli_versions(workflows_dir=tmp_path)
+    except AssertionError as exc:
+        raised = True
+        assert "no `version:`" in str(exc)
+    assert raised, "expected a versionless setup-cli block to raise, but it was skipped"
+
+
+def test_collect_setup_cli_versions_reads_versioned_fixture(tmp_path: Path) -> None:
+    """A well-formed setup-cli block resolves to its pinned version."""
+    wf = tmp_path / "pinned.yaml"
+    wf.write_text(
+        "jobs:\n  x:\n    steps:\n"
+        "      - uses: supabase/setup-cli@v3\n"
+        "        with:\n"
+        "          version: 9.9.9\n",
+        encoding="utf-8",
+    )
+    pins = _collect_setup_cli_versions(workflows_dir=tmp_path)
+    assert [v for _, _, v in pins] == ["9.9.9"]
