@@ -8,9 +8,10 @@ hard-fails, and give up without touching the PR when the budget runs out. A WAIT
 The whole script runs against a stubbed `gh`, including the real `_pr-gates.sh` it
 sources, so the gate wiring is exercised end to end. `gh pr merge` and `gh pr edit`
 write to marker files instead of acting, which is how "did not merge" is asserted.
-`bd` and `python3` are shadowed for the same reason: the two post-merge steps reach
-outward at real shared state — the live huddle bead, and this machine's real
-worktrees via `worktree_reap.py --apply`.
+`bd` and `python3` are shadowed as tripwires around shared state. Merge
+announcements belong to the global Huddle leader service, while the remaining
+post-merge cleanup reaches this machine's real worktrees via
+`worktree_reap.py --apply`.
 """
 
 import json
@@ -129,7 +130,8 @@ def stub_repo(
         )
 
         # Keep `bd` shadowed as a regression tripwire: merge-pr.sh must not post
-        # huddle notices itself. The neutral main watcher owns that side effect.
+        # Huddle notices itself. The global Bazzite leader service owns that
+        # side effect.
         bd_stub = tmp_path / "bd"
         bd_stub.write_text(
             '#!/usr/bin/env bash\nprintf "%s\\n" "$*" >> "$STUB_BD_CALLS"\nexit 0\n'
@@ -237,7 +239,7 @@ def test_automerge_merges_once_gates_are_green() -> None:
 
 
 def test_merge_does_not_post_directly_to_huddle() -> None:
-    """The watcher, not the merge command, owns merge announcements."""
+    """The global leader service, not the merge command, owns announcements."""
     with stub_repo(ci_rollup=CI_PASS) as ctx:
         resolved = subprocess.run(
             ["bash", "-c", "command -v bd"],
