@@ -111,6 +111,13 @@ export function MachineDetailsForm({
   const [descriptionDoc, setDescriptionDoc] = useState<ProseMirrorDoc | null>(
     description
   );
+  // Machine Name stays uncontrolled, but its live value is mirrored because the
+  // Model Details field below shows it as the placeholder — and that
+  // placeholder is a promise: a blank model name resolves to the machine's name
+  // at read time (spec 2.4). Reading the stored prop instead would preview the
+  // OLD name after a rename in the same unsaved edit, then save something else
+  // (PR #1925 review).
+  const [liveName, setLiveName] = useState(name);
   // Cancel remounts the subtree by changing the key — a native form reset
   // cannot restore a contenteditable widget.
   const [resetKey, setResetKey] = useState(0);
@@ -290,6 +297,9 @@ export function MachineDetailsForm({
 
   const handleCancel = (): void => {
     setDescriptionDoc(description);
+    // The remount restores the input's defaultValue without firing `change`,
+    // so the mirror has to be put back by hand.
+    setLiveName(name);
     setResetKey((k) => k + 1);
     setIsDirty(false);
     // Cancel discards the edits, so any banner or "Saved" note describing them
@@ -344,6 +354,9 @@ export function MachineDetailsForm({
               type="text"
               required
               defaultValue={name}
+              onChange={(event) => {
+                setLiveName(event.target.value);
+              }}
               placeholder="e.g., Medieval Madness"
               enterKeyHint="next"
               className="border-outline bg-surface text-foreground placeholder:text-muted-foreground"
@@ -383,11 +396,10 @@ export function MachineDetailsForm({
             defaultModelName={modelName}
             defaultManufacturer={manufacturer}
             defaultYear={year}
-            // Seeds the Model name when the hand-entry panel opens empty. The
-            // stored name, not the live input: renaming a cabinet and marking
-            // it off-catalog in the same edit is rare enough that reading the
-            // uncontrolled input's DOM value would cost more than it buys.
-            machineName={name}
+            // The Model name's placeholder — the live input, not the stored
+            // prop, so a rename in the same unsaved edit previews the name a
+            // blank model will actually resolve to.
+            machineName={liveName}
             // The picker's controls are cmdk items and a Radix Select, so none of
             // them bubble `input` — without this the section would still claim
             // "No unsaved changes" after a model change, and Cancel would discard

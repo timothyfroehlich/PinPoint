@@ -68,11 +68,20 @@ vi.mock("~/components/editor/RichTextEditorDynamic", () => ({
 // picker's controls (cmdk items, a Radix Select) never bubble `input`, so the
 // callback is the ONLY way the form learns a PBM change happened.
 vi.mock("~/components/machines/PinballMapLinkField", () => ({
-  PinballMapLinkField: ({ onDirty }: { onDirty?: () => void }) => (
+  PinballMapLinkField: ({
+    onDirty,
+    machineName,
+  }: {
+    onDirty?: () => void;
+    machineName?: string;
+  }) => (
     <div data-testid="pbm-link-field">
       <button type="button" onClick={() => onDirty?.()}>
         stub-pbm-change
       </button>
+      {/* Echoed so the live-name wiring is assertable — the real field uses it
+          as the Model name placeholder. */}
+      <span data-testid="pbm-machine-name">{machineName}</span>
     </div>
   ),
 }));
@@ -208,6 +217,32 @@ describe("MachineDetailsForm", () => {
     expect(hiddenDescription().value).toBe("");
     expect(screen.getByTestId("details-dirty-note")).toHaveTextContent(
       "No unsaved changes"
+    );
+  });
+
+  it("hands the Model field the live machine name, not the stored one", async () => {
+    // The Model name placeholder is a promise: leaving it blank makes the read
+    // path fall back to the machine's name (spec 2.4). Sourcing it from the
+    // stored prop would preview the pre-rename name and then save a different
+    // one (PR #1925 review).
+    const user = userEvent.setup();
+    renderForm();
+
+    expect(screen.getByTestId("pbm-machine-name")).toHaveTextContent(
+      "Godzilla (Premium)"
+    );
+
+    await user.clear(screen.getByLabelText(/Machine Name/));
+    await user.type(screen.getByLabelText(/Machine Name/), "Bordertown");
+    expect(screen.getByTestId("pbm-machine-name")).toHaveTextContent(
+      "Bordertown"
+    );
+
+    // Cancel remounts the input to its defaultValue without firing `change`,
+    // so the mirror has to be restored explicitly or it keeps the stale name.
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.getByTestId("pbm-machine-name")).toHaveTextContent(
+      "Godzilla (Premium)"
     );
   });
 
