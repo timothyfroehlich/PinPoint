@@ -16,6 +16,10 @@ inputs:
     description: Optional Node compatibility major to activate after the locked install.
     required: false
     default: ""
+  working-directory:
+    description: Directory containing the trusted mise configuration used for installation.
+    required: false
+    default: "."
 
 outputs:
   node:
@@ -36,12 +40,14 @@ runs:
       with:
         version: "2026.8.11"
         install_args: ${{ inputs.install-args }}
+        working_directory: ${{ inputs.working-directory }}
         cache: true
         cache_key: "{{default}}-compat-node-${{ inputs.node-version }}"
 
     - name: Activate Node compatibility runtime
       if: inputs.node-version != ''
       shell: bash
+      working-directory: ${{ inputs.working-directory }}
       env:
         NODE_VERSION: ${{ inputs.node-version }}
       run: | # zizmor: ignore[github-env] path comes from mise's installed tool directory

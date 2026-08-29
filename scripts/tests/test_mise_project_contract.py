@@ -451,6 +451,9 @@ def test_ci_mise_canary_contract() -> None:
     )
     assert "Verify Node compatibility runtime" in setup_action
     assert "Node compatibility mismatch" in setup_action
+    assert 'default: "."' in setup_action
+    assert "working_directory: ${{ inputs.working-directory }}" in setup_action
+    assert "working-directory: ${{ inputs.working-directory }}" in setup_action
 
     for version_command in (
         "node --version",
@@ -578,8 +581,15 @@ def test_preview_mise_compatibility_and_ordering() -> None:
         assert "name: Checkout trusted workflow action" in workflow
         assert "ref: ${{ github.event.repository.default_branch }}" in workflow
         assert "path: .pinpoint-workflow" in workflow
-        assert "sparse-checkout: .github/actions/setup-mise" in workflow
+        for trusted_file in (
+            ".github/actions/setup-mise",
+            "mise.toml",
+            "mise.lock",
+            "package.json",
+        ):
+            assert trusted_file in workflow
         assert "uses: ./.pinpoint-workflow/.github/actions/setup-mise" in workflow
+        assert "working-directory: .pinpoint-workflow" in workflow
 
     assert (
         control.index("name: Checkout trusted workflow action")

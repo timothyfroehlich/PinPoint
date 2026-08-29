@@ -60,7 +60,11 @@ jobs:
         with:
           ref: ${{ github.event.repository.default_branch }}
           path: .pinpoint-workflow
-          sparse-checkout: .github/actions/setup-mise
+          sparse-checkout: |
+            .github/actions/setup-mise
+            mise.toml
+            mise.lock
+            package.json
           sparse-checkout-cone-mode: false
           persist-credentials: false
 
@@ -71,6 +75,7 @@ jobs:
         with:
           install-args: "--locked node pnpm supabase"
           node-version: "22"
+          working-directory: .pinpoint-workflow
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
