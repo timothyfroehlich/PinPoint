@@ -514,9 +514,7 @@ def test_workflows_use_mise_without_legacy_setup_actions() -> None:
     expected_action_refs = {
         CI_WORKFLOW_PATH: "uses: ./.github/actions/setup-mise",
         PREVIEW_REAPER_PATH: "uses: ./.github/actions/setup-mise",
-        PREVIEW_CONTROL_PATH: (
-            "uses: ./.pinpoint-workflow/.github/actions/setup-mise"
-        ),
+        PREVIEW_CONTROL_PATH: ("uses: ./.pinpoint-workflow/.github/actions/setup-mise"),
         PREVIEW_SYNC_PATH: "uses: ./.pinpoint-workflow/.github/actions/setup-mise",
     }
     for path, action_ref in expected_action_refs.items():
