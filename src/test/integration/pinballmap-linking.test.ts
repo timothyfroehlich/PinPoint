@@ -20,10 +20,28 @@ import {
   authUsers,
   pinballmapCatalog,
 } from "~/server/db/schema";
+import type * as MachineServices from "~/services/machines";
 
 vi.mock("~/server/db", async () => {
   const { getTestDb } = await import("~/test/setup/pglite");
   return { db: await getTestDb() };
+});
+
+type AfterPlanHook = () => Promise<void>;
+const planHook = vi.hoisted((): { afterPlan?: AfterPlanHook } => ({}));
+
+vi.mock("~/services/machines", async (importOriginal) => {
+  const actual = await importOriginal<typeof MachineServices>();
+  return {
+    ...actual,
+    planMachinePbmLink: async (
+      params: Parameters<typeof actual.planMachinePbmLink>[0]
+    ): ReturnType<typeof actual.planMachinePbmLink> => {
+      const result = await actual.planMachinePbmLink(params);
+      await planHook.afterPlan?.();
+      return result;
+    },
+  };
 });
 
 vi.mock("~/lib/supabase/server", () => ({
@@ -516,6 +534,46 @@ describe("updateMachineAction — PinballMap link (PGlite)", () => {
     expect(updated?.pinballmapExcludedReason).toBe(
       "homebrew — one-off cabinet"
     );
+  });
+
+  it("carries an exclusion reason updated after planning under the write lock", async () => {
+    const db = await getTestDb();
+    const { updateMachineAction } = await import("~/app/(app)/m/actions");
+    const admin = await createUser("admin");
+    await mockAuthAs(admin.id);
+    const [machine] = await db
+      .insert(machines)
+      .values({
+        name: "Unicorn Magic",
+        initials: "UNM",
+        pinballmapExcluded: true,
+        pinballmapExcludedReason: "original reason",
+        modelName: "Unicorn Magic",
+      })
+      .returning();
+
+    const fd = new FormData();
+    fd.append("id", machine.id);
+    fd.append("name", "Unicorn Magic");
+    fd.append("pbmLinkPresent", "1");
+    fd.append("pinballmapExcluded", "on");
+    fd.append("modelName", "Unicorn Magic");
+
+    planHook.afterPlan = async () => {
+      planHook.afterPlan = undefined;
+      await db
+        .update(machines)
+        .set({ pinballmapExcludedReason: "newer MCP reason" })
+        .where(eq(machines.id, machine.id));
+    };
+
+    const result = await updateMachineAction(undefined, fd);
+    expect(result.ok).toBe(true);
+
+    const updated = await db.query.machines.findFirst({
+      where: eq(machines.id, machine.id),
+    });
+    expect(updated?.pinballmapExcludedReason).toBe("newer MCP reason");
   });
 
   it("still clears a hand-entered model field the form posts blank", async () => {
