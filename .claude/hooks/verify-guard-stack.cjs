@@ -64,9 +64,9 @@ const EXPECTED_GUARD_HOOKS = [
 // flagged. A missed exotic registration is far cheaper than a canary that
 // cries wolf every session.
 //
-// The huddle registrations target `$HOME/.agents/huddle/`, outside the project
-// set by design: the huddle lives in dotfiles, not this repo, so there is no
-// repo-relative path to verify and its absence is not a repo defect.
+// Global Huddle registrations live in machine/user settings and dotfiles, not
+// this project settings file. This project canary intentionally verifies only
+// the project-owned guard stack below.
 
 const SCRIPT_EXTENSIONS = new Set([".cjs", ".mjs", ".js", ".sh", ".py", ".ts"]);
 // Any of these in a token means shell machinery we won't try to interpret.
