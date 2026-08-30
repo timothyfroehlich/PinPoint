@@ -38,20 +38,19 @@ Then work the checklist. For each item, note findings as a comment on the bead (
 
 ### Checklist
 
-1. **Stale version-pin checks** (Supabase CLI — PP-nlv6; pnpm version pin — PP-w0eq)
-   - **Supabase CLI pin.** The source of truth is now **`mise.toml`** (`[tools].supabase`, PP-h2ui.6) — Mac, Bazzite, and agent bootstrap resolve the CLI from there via `mise install --locked`. The CI `supabase/setup-cli` blocks carry a literal mirror of the same version until the mise-only CI lane (PP-h2ui.8) consumes it directly; `scripts/tests/test_mise_project_contract.py::test_ci_setup_cli_pins_match_mise` **fails the build on any drift**, so a partial bump (the classic "8 of 9 sites") can no longer merge — but the test enforces equality, it does not auto-edit, so a bump is still a multi-site edit you make by hand.
-     - Compare the pin against the newest release; apply a **cooldown** (soak the release, don't take `latest` the day it ships) and validate **Bazzite rootless-podman / SELinux compatibility** before bumping — the CLI version is what triggered the PP-9mg0 local-stack breakage, so a bump is a functional change, not a number swap (see `pinpoint-deployment`).
+1. **Stale version-pin checks** (mise tools, pnpm, Vercel CLI, bd/Dolt)
+   - **Ownership first.** Hosted Renovate may propose updates only for exact tool pins in root `mise.toml`, with the matching `mise.lock` changes and no automerge. Dependabot remains the sole owner of npm dependencies and GitHub Actions. The pnpm `packageManager` checksum, the Vercel wrapper, and the bd/Dolt compatibility manifest remain manual chores surfaces. Review open bot proposals before doing a duplicate manual bump.
+   - **Supabase CLI pin.** `mise.toml` (`[tools].supabase`, PP-h2ui.6) is the single executable-version authority for local development, Bazzite, CI, and preview orchestration. GitHub workflows consume it through the shared mise action; there are no workflow-local version mirrors to edit. The pin does not own Supabase service images, generated worktree configuration, container lifecycle, or production migration behavior.
+     - Renovate applies a 7-day release cooldown. Before accepting a proposal, validate **Bazzite rootless-Podman / SELinux compatibility** and a local stack start — the CLI version triggered the PP-9mg0 breakage, so a bump is a functional change, not a number swap (see `pinpoint-deployment`).
 
        ```bash
-       # authoritative pin + its CI mirrors:
+       # authoritative pin, resolved lock entries, and latest upstream release:
        rg -n 'supabase' mise.toml
-       rg -n -A6 'uses: supabase/setup-cli' .github/workflows/*.y*ml | rg 'version:'
+       rg -n 'supabase' mise.lock
        gh api /repos/supabase/cli/releases/latest --jq .tag_name
        ```
 
-       (`-A6` matters — one call site has an extra `if:` line before `with:`, so a smaller window silently misses it.)
-
-     - To bump: update `mise.toml`, run `mise lock` (refreshes `mise.lock` across platforms), update **all** CI `setup-cli` `version:` sites to match, then confirm `pnpm run check:python` is green (the contract test verifies mise ↔ CI agreement) and the local stack starts (`supabase start`) on an SELinux host if one is available.
+     - For a manual bump, update `mise.toml`, run `mise lock`, then confirm `pnpm run check:python` is green and the local stack starts on an SELinux host. Do not add a host installer or workflow-local version mirror.
    - **pnpm version pin.** The pnpm binary is pinned in the `packageManager` field of `package.json` with its SHA-512 integrity hash, and `mise` reads and verifies that declaration directly without Corepack. **Dependabot cannot bump this field** — it's an open, unimplemented feature request ([dependabot-core#4830](https://github.com/dependabot/dependabot-core/issues/4830)); Dependabot's pnpm support only updates deps _inside_ the lockfile, never the `packageManager` pin. So this is the only watcher it has, and it silently rots without it (that's how we ended up 9 months behind on 10.2.0 until npm's audit-endpoint retirement forced the jump — PP-w0eq).
      - **Apply a 30-day cooldown** (supply-chain soak — same rationale as the Dependabot npm cooldown): bump only to the newest stable pnpm ≥30 days old, never the just-released `latest`.
      - Find the newest eligible version:
@@ -60,7 +59,7 @@ Then work the checklist. For each item, note findings as a comment on the bead (
        npm view pnpm time --json | python3 -c "import json,sys,datetime as d; t=json.load(sys.stdin); c=d.datetime.now(d.UTC)-d.timedelta(days=30); r=[(v,ts) for v,ts in t.items() if '-' not in v and v.split('.')[0].isdigit()]; r.sort(key=lambda x:list(map(int,x[0].split('.')))); print(next(v for v,ts in reversed(r) if d.datetime.fromisoformat(ts.replace('Z','+00:00'))<=c))"
        ```
 
-     - If it's newer than the current pin (mind major bumps — read the pnpm release notes/migration guide first), update `packageManager` in `package.json` with the new version and its sha512 integrity hash (e.g. from `npm view pnpm@<version> dist.integrity` converted to `+sha512.<hex>`), run `mise install` and `mise lock`, then verify no unexpected `pnpm-lock.yaml` churn (`pnpm install --frozen-lockfile`), `pnpm audit --audit-level=high` still resolves, and `pnpm run check` is green. PR it through the normal workflow; file a bead if a major bump needs real migration work.
+     - If it's newer than the current pin (mind major bumps — read the pnpm release notes/migration guide first), update `packageManager` in `package.json` with the new version and its sha512 integrity hash (e.g. from `npm view pnpm@<version> dist.integrity` converted to `+sha512.<hex>`), run `mise lock` and then `mise install --locked`, then verify no unexpected `pnpm-lock.yaml` churn (`pnpm install --frozen-lockfile`), `pnpm audit --audit-level=high` still resolves, and `pnpm run check` is green. PR it through the normal workflow; file a bead if a major bump needs real migration work.
    - **Vercel CLI pin** (PP-h2ui.7). Privileged Vercel CLI invocations use one repository-owned wrapper: `scripts/workflow/preview/vercel-cli.sh`. Compare the pinned `VERCEL_CLI_VERSION` against the latest release on npm (applying a 14/30-day cooldown). Bumping is a single-site edit in `scripts/workflow/preview/vercel-cli.sh`.
    - **bd and Dolt compatibility version pins** (from the 2026-08-16 shared-DB schema incident). PinPoint declares exact compatibility versions for `bd` and `dolt` at a **single source**: `scripts/beads-compatibility.json`. The cloud setup script (`scripts/beads-cloud-setup.sh`), runtime guards (`scripts/beads-cloud-init.sh`), and Bazzite services consume or validate this manifest. When Tim's local/Bazzite tools move past the pins, bump **`scripts/beads-compatibility.json`** — cloud routines and services refuse to run until installed binaries match. Exact-pin is deliberate: an accidental _newer_ release migrated the shared DB and locked every client out for two days, so a loud refusal is the safe failure. Compare the pins against installed `bd version` and `dolt version`; bump only once newer versions are tested and running clean locally.
 

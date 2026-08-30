@@ -4,8 +4,8 @@
     {
       "label": "TypeScript: Check",
       "type": "shell",
-      "command": "npm",
-      "args": ["run", "typecheck"],
+      "command": "mise",
+      "args": ["exec", "--", "pnpm", "run", "typecheck"],
       "group": {
         "kind": "build",
         "isDefault": false
@@ -24,8 +24,8 @@
     {
       "label": "Build Project",
       "type": "shell",
-      "command": "npm",
-      "args": ["run", "build"],
+      "command": "mise",
+      "args": ["exec", "--", "pnpm", "run", "build"],
       "group": {
         "kind": "build",
         "isDefault": true
@@ -44,8 +44,8 @@
     {
       "label": "Lint Code",
       "type": "shell",
-      "command": "npm",
-      "args": ["run", "lint"],
+      "command": "mise",
+      "args": ["exec", "--", "pnpm", "run", "lint"],
       "group": "build",
       "presentation": {
         "echo": true,
@@ -59,10 +59,10 @@
       "detail": "Run Oxlint to check code quality"
     },
     {
-      "label": "Database: Push Schema",
+      "label": "Database: Apply Migrations",
       "type": "shell",
-      "command": "npm",
-      "args": ["run", "db:push"],
+      "command": "mise",
+      "args": ["exec", "--", "pnpm", "run", "db:migrate"],
       "group": "build",
       "presentation": {
         "echo": true,
@@ -72,13 +72,13 @@
         "showReuseMessage": true,
         "clear": false
       },
-      "detail": "Push Drizzle schema changes to database"
+      "detail": "Apply pending Drizzle migrations to the local database"
     },
     {
       "label": "Database: Reset & Seed",
       "type": "shell",
-      "command": "npm",
-      "args": ["run", "db:reset"],
+      "command": "mise",
+      "args": ["exec", "--", "pnpm", "run", "db:reset"],
       "group": "build",
       "presentation": {
         "echo": true,
@@ -93,8 +93,8 @@
     {
       "label": "Database: Studio",
       "type": "shell",
-      "command": "npm",
-      "args": ["run", "db:studio"],
+      "command": "mise",
+      "args": ["exec", "--", "pnpm", "run", "db:studio"],
       "group": "build",
       "isBackground": true,
       "presentation": {
@@ -108,10 +108,10 @@
       "detail": "Open Drizzle Studio in browser"
     },
     {
-      "label": "Format Code",
+      "label": "Check Formatting",
       "type": "shell",
-      "command": "npm",
-      "args": ["run", "format:write"],
+      "command": "mise",
+      "args": ["exec", "--", "pnpm", "run", "format"],
       "group": "build",
       "presentation": {
         "echo": true,
@@ -121,14 +121,14 @@
         "showReuseMessage": true,
         "clear": false
       },
-      "detail": "Format code with Prettier"
+      "detail": "Check Prettier formatting"
     },
 
     {
       "label": "Run Tests",
       "type": "shell",
-      "command": "npm",
-      "args": ["run", "test"],
+      "command": "mise",
+      "args": ["exec", "--", "pnpm", "run", "test"],
       "group": "test",
       "presentation": {
         "echo": true,
@@ -138,14 +138,14 @@
         "showReuseMessage": true,
         "clear": false
       },
-      "detail": "Run Jest tests",
+      "detail": "Run Vitest unit tests",
       "problemMatcher": []
     },
     {
       "label": "Run Tests with Coverage",
       "type": "shell",
-      "command": "npm",
-      "args": ["run", "test:coverage"],
+      "command": "mise",
+      "args": ["exec", "--", "pnpm", "run", "test:coverage"],
       "group": "test",
       "presentation": {
         "echo": true,
@@ -155,13 +155,13 @@
         "showReuseMessage": true,
         "clear": false
       },
-      "detail": "Run Jest tests with coverage reporting"
+      "detail": "Run Vitest unit tests with coverage reporting"
     },
     {
       "label": "Development Server",
       "type": "shell",
-      "command": "npm",
-      "args": ["run", "dev"],
+      "command": "mise",
+      "args": ["exec", "--", "pnpm", "run", "dev"],
       "group": "build",
       "isBackground": true,
       "presentation": {
