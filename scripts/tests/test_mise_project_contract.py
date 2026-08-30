@@ -99,11 +99,63 @@ def _pnpm_pin(data: dict[str, object]) -> str:
     return match.group(1)
 
 
+def _parse_exact_version(raw: str, *, source: str) -> tuple[int, int, int]:
+    """Parse the exact X.Y.Z versions used by this contract."""
+    assert EXACT_VERSION_RE.fullmatch(raw), (
+        f"{source} must use an exact X.Y.Z version, got {raw!r}"
+    )
+    major, minor, patch = raw.split(".")
+    return int(major), int(minor), int(patch)
+
+
+def _node_pin_satisfies_engine(pin: str, engine_range: str) -> bool:
+    """Evaluate the deliberately small engines.node grammar used by PinPoint."""
+    version = _parse_exact_version(pin, source="mise.toml node pin")
+    clauses = [clause.strip() for clause in engine_range.split("||")]
+    assert clauses and all(clauses), (
+        f"package.json#engines.node has an invalid range: {engine_range!r}"
+    )
+
+    for clause in clauses:
+        match = re.fullmatch(r"(\^|>=)?(\d+\.\d+\.\d+)", clause)
+        assert match is not None, (
+            "package.json#engines.node must use exact, caret, or >= X.Y.Z clauses "
+            f"joined by ||, got {engine_range!r}"
+        )
+        operator, floor_raw = match.groups()
+        floor = _parse_exact_version(
+            floor_raw, source="package.json#engines.node clause"
+        )
+        if operator is None and version == floor:
+            return True
+        if operator == ">=" and version >= floor:
+            return True
+        if operator == "^":
+            if floor[0] > 0:
+                ceiling = (floor[0] + 1, 0, 0)
+            elif floor[1] > 0:
+                ceiling = (0, floor[1] + 1, 0)
+            else:
+                ceiling = (0, 0, floor[2] + 1)
+            if floor <= version < ceiling:
+                return True
+    return False
+
+
 def _expected_tool_pins(
     mise_data: dict[str, object], package_data: dict[str, object]
 ) -> dict[str, str]:
     """Combine the two project authorities into the expected lock contents."""
-    return {**_mise_managed_pins(mise_data), "pnpm": _pnpm_pin(package_data)}
+    pins = _mise_managed_pins(mise_data)
+    engines = package_data.get("engines")
+    assert isinstance(engines, dict), "package.json must define an engines table"
+    node_engine = engines.get("node")
+    assert isinstance(node_engine, str), "package.json must declare engines.node"
+    assert _node_pin_satisfies_engine(pins["node"], node_engine), (
+        f"mise.toml node pin {pins['node']} must satisfy "
+        f"package.json#engines.node {node_engine!r}"
+    )
+    return {**pins, "pnpm": _pnpm_pin(package_data)}
 
 
 def _assert_mise_lock_coherent(
@@ -250,6 +302,16 @@ def test_mise_managed_pins_reject_malformed_or_floating_versions(
 
     with pytest.raises(AssertionError, match="node as an exact X.Y.Z pin"):
         _mise_managed_pins(invalid_mise)
+
+
+def test_mise_managed_pins_reject_node_outside_engine_range() -> None:
+    mise_data = tomllib.loads(MISE_TOML_PATH.read_text(encoding="utf-8"))
+    package_data = json.loads(PACKAGE_JSON_PATH.read_text(encoding="utf-8"))
+    invalid_mise = deepcopy(mise_data)
+    invalid_mise["tools"]["node"] = "25.0.0"
+
+    with pytest.raises(AssertionError, match="must satisfy package.json#engines.node"):
+        _expected_tool_pins(invalid_mise, package_data)
 
 
 def test_mise_lock_rejects_missing_managed_tool() -> None:
