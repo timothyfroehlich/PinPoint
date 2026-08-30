@@ -13,6 +13,7 @@ import { db } from "~/server/db";
 import {
   applyMachinePbmLink,
   createMachine,
+  carryExcludedReason,
   planMachinePbmLink,
   updateMachinePresence,
   type MachinePbmLinkPlan,
@@ -713,6 +714,10 @@ export async function updateMachineAction(
       // (PP-l81u).
       const planned = await planMachinePbmLink({
         machineId: id,
+        // The form posts every excluded column it owns, so a blank one is a
+        // human clearing the box. The reason has no control here at all
+        // (PP-3bbr.3), so it is carried from the transaction-locked row below;
+        // doing that from this preflight read would race an MCP reason update.
         selection: validation.data,
         stored: {
           pinballmapMachineId: currentMachine.pinballmapMachineId,
@@ -798,7 +803,26 @@ export async function updateMachineAction(
         }
 
         if (pbmPlan) {
-          await applyMachinePbmLink(tx, id, pbmPlan, user.id);
+          const selectionWithFreshReason = carryExcludedReason(
+            validation.data,
+            {
+              pinballmapExcluded: updatedMachine.pinballmapExcluded,
+              pinballmapExcludedReason: updatedMachine.pinballmapExcludedReason,
+            }
+          );
+          await applyMachinePbmLink(
+            tx,
+            id,
+            {
+              ...pbmPlan,
+              columns: {
+                ...pbmPlan.columns,
+                pinballmapExcludedReason:
+                  selectionWithFreshReason.pinballmapExcludedReason ?? null,
+              },
+            },
+            user.id
+          );
         }
 
         // Add new owner as watcher if active user
@@ -1001,6 +1025,7 @@ export async function updateMachineAction(
               .select()
               .from(machines)
               .where(eq(machines.id, id))
+              .for("update")
               .limit(1);
 
       if (!updatedMachine) {
@@ -1008,7 +1033,23 @@ export async function updateMachineAction(
       }
 
       if (pbmPlan) {
-        await applyMachinePbmLink(tx, id, pbmPlan, user.id);
+        const selectionWithFreshReason = carryExcludedReason(validation.data, {
+          pinballmapExcluded: updatedMachine.pinballmapExcluded,
+          pinballmapExcludedReason: updatedMachine.pinballmapExcludedReason,
+        });
+        await applyMachinePbmLink(
+          tx,
+          id,
+          {
+            ...pbmPlan,
+            columns: {
+              ...pbmPlan.columns,
+              pinballmapExcludedReason:
+                selectionWithFreshReason.pinballmapExcludedReason ?? null,
+            },
+          },
+          user.id
+        );
       }
 
       // Handle owner changes in machine_watchers (inside tx so they roll back

@@ -179,6 +179,8 @@ export default async function MachineInfoTab({
       addedAt={machine.createdAt}
       descriptionSlot={descriptionSlot}
       modelName={modelName}
+      manufacturer={machine.manufacturer}
+      year={machine.year}
       pinballmap={{
         locationUrl:
           pbmState?.locationId != null

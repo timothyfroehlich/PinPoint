@@ -85,8 +85,7 @@ describe("PinballMapLinkField — what it submits", () => {
     consoleError.mockRestore();
   });
 
-  it("submits an empty id once the user marks the machine not-on-PinballMap", async () => {
-    // The one case where clearing the stored link IS the user's intent.
+  it("submits an empty id once the user toggles uncataloged", async () => {
     vi.mocked(resolvePinballMapLinkAction).mockResolvedValue(null);
     const user = userEvent.setup();
 
@@ -95,21 +94,7 @@ describe("PinballMapLinkField — what it submits", () => {
       expect(resolvePinballMapLinkAction).toHaveBeenCalled();
     });
 
-    // The "Not on Pinball Map" choice only surfaces once a search has actually
-    // come up empty, so drive it through that path rather than reaching for it.
-    await user.click(screen.getByRole("combobox"));
-    await user.type(
-      screen.getByPlaceholderText(/medieval madness/i),
-      "nothing matches"
-    );
-    const notOnMap = await screen.findByTestId(
-      "pinballmap-not-on-map",
-      {},
-      {
-        timeout: 3000,
-      }
-    );
-    await user.click(notOnMap);
+    await user.click(screen.getByTestId("pinballmap-source-manual"));
 
     expect(submittedLinkId()).toBe("");
     expect(
@@ -125,8 +110,8 @@ describe("PinballMapLinkField — what it submits", () => {
 });
 
 /**
- * Hand-entered model identity (PP-3bbr, folded into PP-o355.21) — the panel for
- * games PinballMap's catalog cannot cover.
+ * Hand-entered model identity (PP-3bbr) — the fields for games PinballMap's
+ * catalog cannot cover, reached through the Source control (PP-3bbr.3).
  */
 describe("PinballMapLinkField — manual model entry", () => {
   beforeEach(() => {
@@ -135,46 +120,38 @@ describe("PinballMapLinkField — manual model entry", () => {
     vi.mocked(resolvePinballMapLinkAction).mockResolvedValue(null);
   });
 
-  /** Drive the "Not on Pinball Map" choice through the empty-search path. */
-  async function pickNotOnMap(
+  async function pickManualEntry(
     user: ReturnType<typeof userEvent.setup>
   ): Promise<void> {
-    await user.click(screen.getByRole("combobox"));
-    await user.type(
-      screen.getByPlaceholderText(/medieval madness/i),
-      "nothing matches"
-    );
-    await user.click(
-      await screen.findByTestId("pinballmap-not-on-map", {}, { timeout: 3000 })
-    );
+    await user.click(screen.getByTestId("pinballmap-source-manual"));
   }
 
   function field(name: string): HTMLInputElement | null {
     return document.querySelector<HTMLInputElement>(`input[name="${name}"]`);
   }
 
-  it("is absent until the machine is marked not-on-Pinball-Map", () => {
+  it("is absent while the source is Pinball Map", () => {
     render(<PinballMapLinkField machineName="Bordertown" />);
-    expect(
-      screen.queryByTestId("pinballmap-manual-model")
-    ).not.toBeInTheDocument();
     // The fields must not merely be hidden — a linked machine's save has no
     // business carrying them at all.
     expect(field("modelName")).toBeNull();
+    expect(field("manufacturer")).toBeNull();
+    expect(field("year")).toBeNull();
   });
 
-  it("opens seeded from the machine's name", async () => {
+  it("opens blank, suggesting the machine's name rather than filling it in", async () => {
     const user = userEvent.setup();
     render(<PinballMapLinkField machineName="Bordertown" />);
 
-    await pickNotOnMap(user);
+    await pickManualEntry(user);
 
-    expect(screen.getByTestId("pinballmap-manual-model")).toBeInTheDocument();
-    expect(field("modelName")?.value).toBe("Bordertown");
+    // Spec 2.4: blank already means "same as the cabinet's name", so
+    // pre-filling would only freeze the name as it is today.
+    expect(field("modelName")?.value).toBe("");
+    expect(field("modelName")?.placeholder).toBe("Bordertown");
   });
 
-  it("leaves a stored model name alone rather than re-seeding it", async () => {
-    // The seed is a starting point, not a mirror of the machine's name.
+  it("shows a stored model name and keeps it across a source round-trip", async () => {
     const user = userEvent.setup();
     render(
       <PinballMapLinkField
@@ -185,8 +162,20 @@ describe("PinballMapLinkField — manual model entry", () => {
     );
     expect(field("modelName")?.value).toBe("Bordertown");
 
-    await pickNotOnMap(user);
+    await user.click(screen.getByTestId("pinballmap-source-catalog"));
+    expect(field("modelName")).toBeNull();
+
+    await user.click(screen.getByTestId("pinballmap-source-manual"));
     expect(field("modelName")?.value).toBe("Bordertown");
+  });
+
+  it("replaces the catalog picker rather than leaving it live", async () => {
+    const user = userEvent.setup();
+    render(<PinballMapLinkField machineName="Bordertown" />);
+
+    expect(screen.getByRole("combobox")).toBeInTheDocument();
+    await pickManualEntry(user);
+    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
   });
 
   it("warns before a catalog title overwrites what was typed", async () => {
@@ -209,15 +198,21 @@ describe("PinballMapLinkField — manual model entry", () => {
       />
     );
 
+    // The picker only exists under the Pinball Map source now, so reaching
+    // it means leaving Manual Entry first. What was typed survives that
+    // move in state, which is why the pick is still the destructive step.
+    await user.click(screen.getByTestId("pinballmap-source-catalog"));
     await user.click(screen.getByRole("combobox"));
     await user.type(screen.getByPlaceholderText(/medieval madness/i), "med");
     await user.click(await screen.findByText("Medieval Madness"));
 
     // Not applied yet: the DB forbids a linked machine carrying a hand-entered
-    // model, so the pick genuinely destroys what is on screen.
+    // model, so the pick genuinely destroys what was typed. The inputs are
+    // already unmounted at this point — leaving Manual Entry took them off
+    // screen — so the pending pick is checked on the submitted id instead.
     const confirm = await screen.findByTestId("pinballmap-overwrite-confirm");
     expect(confirm).toHaveTextContent("Medieval Madness");
-    expect(field("modelName")?.value).toBe("Bordertown");
+    expect(submittedLinkId()).toBe("");
 
     await user.click(
       screen.getByRole("button", { name: /use pinball map's details/i })
@@ -242,6 +237,10 @@ describe("PinballMapLinkField — manual model entry", () => {
       <PinballMapLinkField defaultExcluded defaultModelName="Bordertown" />
     );
 
+    // The picker only exists under the Pinball Map source now, so reaching
+    // it means leaving Manual Entry first. What was typed survives that
+    // move in state, which is why the pick is still the destructive step.
+    await user.click(screen.getByTestId("pinballmap-source-catalog"));
     await user.click(screen.getByRole("combobox"));
     await user.type(screen.getByPlaceholderText(/medieval madness/i), "med");
     await user.click(await screen.findByText("Medieval Madness"));
@@ -249,12 +248,14 @@ describe("PinballMapLinkField — manual model entry", () => {
       await screen.findByRole("button", { name: /keep what i entered/i })
     );
 
-    expect(field("modelName")?.value).toBe("Bordertown");
     expect(submittedLinkId()).toBe("");
+    // Declining leaves the source where the user put it, so the value is proved
+    // by going back to Manual Entry and finding it intact.
+    await user.click(screen.getByTestId("pinballmap-source-manual"));
+    expect(field("modelName")?.value).toBe("Bordertown");
   });
 
   it("picks a catalog title with no warning when nothing was entered", async () => {
-    // The warning is about losing work; with nothing typed there is none.
     const user = userEvent.setup();
     vi.mocked(searchPinballMapFamiliesAction).mockResolvedValue([
       {
@@ -268,6 +269,10 @@ describe("PinballMapLinkField — manual model entry", () => {
     ]);
     render(<PinballMapLinkField defaultExcluded />);
 
+    // The picker only exists under the Pinball Map source now, so reaching
+    // it means leaving Manual Entry first. What was typed survives that
+    // move in state, which is why the pick is still the destructive step.
+    await user.click(screen.getByTestId("pinballmap-source-catalog"));
     await user.click(screen.getByRole("combobox"));
     await user.type(screen.getByPlaceholderText(/medieval madness/i), "med");
     await user.click(await screen.findByText("Medieval Madness"));
@@ -276,5 +281,181 @@ describe("PinballMapLinkField — manual model entry", () => {
       screen.queryByTestId("pinballmap-overwrite-confirm")
     ).not.toBeInTheDocument();
     expect(submittedLinkId()).toBe("77");
+  });
+});
+
+describe("PinballMapLinkField — Source control (PP-3bbr.2 / .3)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(searchPinballMapFamiliesAction).mockResolvedValue([]);
+    vi.mocked(resolvePinballMapLinkAction).mockResolvedValue(null);
+  });
+
+  function field(name: string): HTMLInputElement | null {
+    return document.querySelector<HTMLInputElement>(`input[name="${name}"]`);
+  }
+
+  it("does not inherit catalog manufacturer/year when switching from a linked machine", async () => {
+    const user = userEvent.setup();
+    render(
+      <PinballMapLinkField
+        defaultMachineId={42}
+        defaultName="Godzilla (Premium)"
+        defaultManufacturer="Stern"
+        defaultYear={2021}
+      />
+    );
+    await waitFor(() => {
+      expect(resolvePinballMapLinkAction).toHaveBeenCalled();
+    });
+
+    await user.click(screen.getByTestId("pinballmap-source-manual"));
+
+    // Those two came out of the catalog for the title this machine WAS.
+    // Carrying them over would silently relabel Stern's data as the user's.
+    expect(field("manufacturer")?.value).toBe("");
+    expect(field("year")?.value).toBe("");
+  });
+
+  it("fires the confirm once a model name is typed", async () => {
+    const user = userEvent.setup();
+    vi.mocked(searchPinballMapFamiliesAction).mockResolvedValue([
+      {
+        machineGroupId: null,
+        pinballmapMachineId: 77,
+        name: "Medieval Madness",
+        manufacturer: "Williams",
+        year: 1997,
+        editionCount: 1,
+      },
+    ]);
+    render(<PinballMapLinkField machineName="Bordertown" />);
+
+    await user.click(screen.getByTestId("pinballmap-source-manual"));
+    const modelInput = field("modelName");
+    // Narrowed by a throw rather than `!` or a cast (CORE-TS-007); a missing
+    // input here means the source switch did not render, which is the failure.
+    if (modelInput === null) throw new Error("model name input did not render");
+    await user.type(modelInput, "Custom Game");
+
+    await user.click(screen.getByTestId("pinballmap-source-catalog"));
+    await user.click(screen.getByRole("combobox"));
+    await user.type(screen.getByPlaceholderText(/medieval madness/i), "med");
+    await user.click(await screen.findByText("Medieval Madness"));
+
+    expect(
+      screen.getByTestId("pinballmap-overwrite-confirm")
+    ).toBeInTheDocument();
+  });
+
+  it("picks a catalog title with no confirm when the fields were left blank", async () => {
+    const user = userEvent.setup();
+    vi.mocked(searchPinballMapFamiliesAction).mockResolvedValue([
+      {
+        machineGroupId: null,
+        pinballmapMachineId: 77,
+        name: "Medieval Madness",
+        manufacturer: "Williams",
+        year: 1997,
+        editionCount: 1,
+      },
+    ]);
+    // Blank is a valid Manual Entry save (spec 2.4) — and with nothing typed
+    // there is nothing for the confirm to warn about.
+    render(<PinballMapLinkField machineName="Bordertown" />);
+
+    await user.click(screen.getByTestId("pinballmap-source-manual"));
+    await user.click(screen.getByTestId("pinballmap-source-catalog"));
+    await user.click(screen.getByRole("combobox"));
+    await user.type(screen.getByPlaceholderText(/medieval madness/i), "med");
+    await user.click(await screen.findByText("Medieval Madness"));
+
+    expect(
+      screen.queryByTestId("pinballmap-overwrite-confirm")
+    ).not.toBeInTheDocument();
+    expect(submittedLinkId()).toBe("77");
+  });
+
+  it("marks exactly one Source position as chosen, and swaps on click", async () => {
+    const user = userEvent.setup();
+    render(<PinballMapLinkField />);
+
+    const catalog = screen.getByTestId("pinballmap-source-catalog");
+    const manual = screen.getByTestId("pinballmap-source-manual");
+    expect(catalog).toHaveAttribute("aria-checked", "true");
+    expect(manual).toHaveAttribute("aria-checked", "false");
+
+    await user.click(manual);
+
+    expect(catalog).toHaveAttribute("aria-checked", "false");
+    expect(manual).toHaveAttribute("aria-checked", "true");
+  });
+
+  it("names the group so both positions read as one choice", () => {
+    render(<PinballMapLinkField />);
+    expect(
+      screen.getByRole("radiogroup", { name: "Source:" })
+    ).toBeInTheDocument();
+  });
+
+  it("stops naming the stored title once the selection has been cleared", async () => {
+    // Codex review, PR #1925. Manual Entry and back leaves nothing picked, so
+    // the trigger must not keep advertising the title the save is dropping.
+    const user = userEvent.setup();
+    render(<PinballMapLinkField {...STORED} />);
+    await waitFor(() => {
+      expect(resolvePinballMapLinkAction).toHaveBeenCalled();
+    });
+    expect(screen.getByText("Godzilla (Premium)")).toBeInTheDocument();
+
+    await user.click(screen.getByTestId("pinballmap-source-manual"));
+    await user.click(screen.getByTestId("pinballmap-source-catalog"));
+
+    expect(screen.queryByText("Godzilla (Premium)")).not.toBeInTheDocument();
+    expect(screen.getByText("Search for a model…")).toBeInTheDocument();
+    expect(submittedLinkId()).toBe("");
+  });
+
+  it("drops a preselect that lands after the user has switched source", async () => {
+    // Codex review, PR #1925. The late resolve used to restore the catalog id
+    // without clearing `excluded`, submitting both — which the DB CHECK
+    // `machines_pinballmap_excluded_xor_link` forbids.
+    const user = userEvent.setup();
+    let land: (() => void) | undefined;
+    vi.mocked(resolvePinballMapLinkAction).mockReturnValue(
+      new Promise((resolve) => {
+        land = () => {
+          resolve({
+            family: {
+              machineGroupId: null,
+              pinballmapMachineId: 42,
+              name: "Godzilla (Premium)",
+              manufacturer: "Stern",
+              year: 2021,
+              editionCount: 1,
+            },
+            editions: [],
+            pinballmapMachineId: 42,
+          });
+        };
+      })
+    );
+
+    render(<PinballMapLinkField {...STORED} />);
+    await user.click(screen.getByTestId("pinballmap-source-manual"));
+
+    land?.();
+    await waitFor(() => {
+      expect(field("modelName")).not.toBeNull();
+    });
+
+    expect(submittedLinkId()).toBe("");
+    expect(
+      document.querySelector('input[name="pinballmapExcluded"]')
+    ).not.toBeNull();
+    expect(screen.getByTestId("pinballmap-source-manual")).toHaveAttribute(
+      "aria-checked",
+      "true"
+    );
   });
 });

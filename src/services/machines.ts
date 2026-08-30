@@ -747,6 +747,12 @@ function pbmLinkBasisUnchanged(a: PbmLinkBasis, b: PbmLinkBasis): boolean {
  * `MachinePbmColumns`) rather than getting their own helper, because they are
  * one decision: what an omitted field means depends on the caller, not on which
  * column it is.
+ *
+ * The reason splits back out into {@link carryExcludedReason} for the ONE
+ * caller whose answer differs per column: the edit form posts the three model
+ * fields (so a blank one is a human clearing the box, spec 2.4) but has no
+ * control for the reason at all (PP-3bbr.3), so its silence there is absence,
+ * not intent.
  */
 function carryExcludedFields(
   selection: PbmLinkSelection,
@@ -768,18 +774,44 @@ function carryExcludedFields(
     return selection;
   }
 
-  const carried: PbmLinkSelection = { ...selection };
-  if (
-    selection.pinballmapExcludedReason === undefined &&
-    stored.pinballmapExcludedReason !== null
-  )
-    carried.pinballmapExcludedReason = stored.pinballmapExcludedReason;
+  const carried: PbmLinkSelection = carryExcludedReason(selection, stored);
   if (selection.modelName === undefined && stored.modelName !== null)
     carried.modelName = stored.modelName;
   if (selection.manufacturer === undefined && stored.manufacturer !== null)
     carried.manufacturer = stored.manufacturer;
   if (selection.year === undefined && stored.year !== null)
     carried.year = stored.year;
+  return carried;
+}
+
+/**
+ * Keep the stored exclusion reason when the caller re-states an exclusion
+ * without supplying one — the reason-only half of {@link carryExcludedFields},
+ * split out for the machine edit form.
+ *
+ * That form owns every other excluded column and posts them on every save, so
+ * `value ?? null` is the right rule for those. It owns no control for the
+ * reason: the box was write-only (nothing in the app rendered it back, only the
+ * MCP tools read it) and was removed in PP-3bbr.3. Without this, saving an
+ * unrelated detail on a machine `set_machine_pinballmap` had excluded would
+ * silently null "homebrew — one-off cabinet" — a forgotten argument destroying
+ * stored state, which is the thing CORE-ARCH-012 forbids.
+ *
+ * Returns a copy; never mutates `selection`.
+ */
+export function carryExcludedReason(
+  selection: PbmLinkSelection,
+  stored: Pick<PbmLinkBasis, "pinballmapExcluded" | "pinballmapExcludedReason">
+): PbmLinkSelection {
+  const carried: PbmLinkSelection = { ...selection };
+  if (selection.pinballmapExcluded !== true || !stored.pinballmapExcluded) {
+    return carried;
+  }
+  if (
+    selection.pinballmapExcludedReason === undefined &&
+    stored.pinballmapExcludedReason !== null
+  )
+    carried.pinballmapExcludedReason = stored.pinballmapExcludedReason;
   return carried;
 }
 

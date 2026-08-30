@@ -30,6 +30,19 @@ interface InfoRailProps {
    */
   modelName: string | null;
   /**
+   * Who built the game and when — catalog-derived for a matched machine,
+   * hand-entered under Manual Entry (spec 2.4).
+   *
+   * Rendered only for a machine that has a model at all, and `null` reads as
+   * **Unknown** rather than being dropped. This is the labelled surface that
+   * rule exists for: the machine header composes the same two values into a
+   * bare "Name · Maker · Year" line and omits blanks there, because "Hyperball
+   * · Unknown · Unknown" would be the loudest text on the page (Tim,
+   * 2026-08-27).
+   */
+  manufacturer: string | null;
+  year: number | null;
+  /**
    * The machine's standing on Pinball Map, rendered as one unlabelled line
    * under Model.
    *
@@ -108,6 +121,8 @@ export function InfoRail({
   descriptionSlot,
   editSlot,
   modelName,
+  manufacturer,
+  year,
   pinballmap,
 }: InfoRailProps): React.JSX.Element {
   return (
@@ -149,6 +164,34 @@ export function InfoRail({
               <span className="text-foreground">{modelName}</span>
             )}
           </p>
+
+          {/* Only alongside a model — on a machine nobody has said anything
+              about, two rows of "Unknown" would be noise under a "Not
+              specified" (spec 2.4). */}
+          {modelName !== null && (
+            <>
+              <p className="mt-1 text-sm">
+                <span className="font-semibold text-muted-foreground">
+                  Manufacturer
+                </span>{" "}
+                {manufacturer === null || manufacturer === "" ? (
+                  <span className="text-muted-foreground">Unknown</span>
+                ) : (
+                  <span className="text-foreground">{manufacturer}</span>
+                )}
+              </p>
+              <p className="mt-1 text-sm">
+                <span className="font-semibold text-muted-foreground">
+                  Year
+                </span>{" "}
+                {year === null ? (
+                  <span className="text-muted-foreground">Unknown</span>
+                ) : (
+                  <span className="text-foreground">{year}</span>
+                )}
+              </p>
+            </>
+          )}
 
           <p className="mt-1 flex items-baseline gap-2 text-sm">
             {pinballmap.locationUrl === null ? (
