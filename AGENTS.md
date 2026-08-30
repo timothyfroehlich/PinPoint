@@ -59,7 +59,7 @@ announcements. PinPoint keeps only its Beads actor hook, which asks the global
 
 One-time install for tools the workflow scripts depend on:
 
-- **mise** — version `2026.8.11` or newer. Manages Node (`24.16.0`), Python (`3.12.9`), Ruff (`0.15.1`), the Supabase CLI (pinned in `mise.toml`; the approved local-stack/migration-tooling binary — not the prod migration path), and pnpm (`package.json#packageManager` single authority with SHA-512 integrity verification). `mise install --locked` supplies the Supabase CLI, so a separate host install (Homebrew tap, npm) is no longer required.
+- **mise** — version `2026.8.11` or newer. `mise.toml` is the exact authority for project Node, Python, Ruff, and the Supabase CLI; `package.json#packageManager` is the single pnpm version and SHA-512 authority; `mise.lock` records resolved artifacts. Run `mise install --locked` rather than installing competing project copies. Keep project commands in `package.json#scripts`, not duplicated as mise tasks. The Supabase declaration owns only the CLI executable — not production migration behavior, service images, containers, or generated worktree state.
 - **GNU parallel** — provides `sem`, which `pnpm run preflight` uses to cap host-wide concurrency at 2. Without it, `preflight` fails with a clear install hint; `pnpm run preflight:unlocked` bypasses the cap.
 - **pytest** — `pnpm run check:python` runs the hook/script tests with it under the mise-selected Python. Install it with `mise exec -- python3 -m pip install -r scripts/requirements.txt`; if absent from that interpreter, `check:pytest` fails with this install hint rather than using a pytest bound to another Python.
 
