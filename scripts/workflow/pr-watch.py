@@ -31,15 +31,17 @@ here: pushing a second commit cancels the in-flight run via concurrency groups,
 and the Preview Auto-Resync workflow cancels itself the same way. (PP-r63o)
 
 A gh API error (rate-limit 403, network drop, auth failure) is likewise not a
-failure — it means we could not find out. It exits as undetermined with the
-real cause and makes no speculative follow-up calls. (PP-qkl8)
+failure — it means we could not find out. The same is true when the bounded
+watch expires without a terminal CI Gate. Both exit as undetermined with the
+real cause and make no speculative follow-up calls. (PP-qkl8)
 
 Exit 0: all checks passed, or (with --check-ready) the PR is ready for
         human review.
 Exit 1: one or more checks failed, no matching runs found,
         or (with --check-ready) the PR is not ready.
-Exit 2: the outcome could not be determined — the GitHub API was unreachable.
-        Nothing was observed, so this is neither a pass nor a failure.
+Exit 2: the outcome could not be determined — the GitHub API was unreachable
+        or the bounded watch expired without a terminal verdict. This is
+        neither a pass nor a failure.
 """
 
 from __future__ import annotations
@@ -75,7 +77,9 @@ REVIEW_HINT = (
 
 LOG_DIR = "tmp/gh-monitor"
 WATCH_POLL_SECONDS = 30
-WATCH_TIMEOUT_SECONDS = 1200
+# PR CI currently has a 30-minute job backstop. Leave another 30 minutes for
+# runner queueing while still bounding unattended harness waits.
+WATCH_TIMEOUT_SECONDS = 3600
 
 # How long to keep polling for a replacement CI Gate after the current one came
 # back cancelled. A cancel almost always means a newer run is already queued;
@@ -756,8 +760,11 @@ def _watch_ci_gate(
 
         time.sleep(poll_sec)
 
-    emit(f"CI Gate did not report within {timeout_sec}s — treat as failure")
-    return 1
+    emit(
+        f"⚠  Could not determine CI Gate state — no terminal verdict "
+        f"within {timeout_sec}s."
+    )
+    return EXIT_UNDETERMINED
 
 
 # ---------------------------------------------------------------------------

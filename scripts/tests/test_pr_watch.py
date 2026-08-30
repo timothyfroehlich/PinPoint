@@ -433,6 +433,26 @@ def test_watch_reports_api_outage_as_undetermined_without_retry(monkeypatch, cap
 
 
 @pytest.mark.unit
+def test_watch_timeout_is_undetermined_not_failure(monkeypatch, capsys):
+    calls = []
+
+    def unexpected_gh(*args):
+        calls.append(args)
+        pytest.fail("an already-expired bounded watch must not query GitHub")
+
+    monkeypatch.setattr(pr_watch, "gh", unexpected_gh)
+
+    assert (
+        pr_watch._watch_ci_gate(PR, HEAD_SHA, timeout_sec=0, poll_sec=0)
+        == pr_watch.EXIT_UNDETERMINED
+    )
+    assert calls == []
+    out = capsys.readouterr().out
+    assert "no terminal verdict" in out
+    assert "failed" not in out.lower()
+
+
+@pytest.mark.unit
 def test_watch_emits_unchanged_pending_state_only_once(monkeypatch, capsys):
     fake = snapshot_gh(
         [
