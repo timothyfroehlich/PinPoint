@@ -29,14 +29,7 @@ export async function getPinballMapState(): Promise<PinballmapState | null> {
     .from(pinballmapState)
     .where(eq(pinballmapState.id, SINGLETON_ID))
     .limit(1);
-  if (!row) return null;
-
-  // Expand/contract compatibility: migration 0069 must leave a legacy disabled
-  // row's location_id intact while the previous deployment can still serve.
-  // Mask it at the single read seam so the new runtime consistently treats the
-  // row as unconfigured. PP-o355.51.4.1 removes the compatibility column and
-  // this branch after the new deployment is serving everywhere.
-  return row.enabled ? row : { ...row, locationId: null };
+  return row ?? null;
 }
 
 /**
