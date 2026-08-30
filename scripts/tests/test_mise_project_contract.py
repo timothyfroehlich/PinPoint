@@ -1,4 +1,4 @@
-"""Tests for the PinPoint mise project contract (PP-h2ui.4, .5, .6, .8).
+"""Tests for the PinPoint mise project contract (PP-h2ui.4, .5, .6, .8, .9).
 
 Verifies that:
 1. mise.toml defines the exact development Node/Python/Ruff/Supabase-CLI runtimes and settings.
@@ -7,8 +7,8 @@ Verifies that:
 4. mise.lock exists and captures resolved artifacts across platforms.
 5. mise rejects mismatched packageManager checksum suffixes (negative test).
 6. mise meets the minimum version requirement (>= 2026.8.11).
-7. CI's supabase/setup-cli blocks mirror the single mise.toml Supabase CLI pin (PP-h2ui.6).
-8. CI's required mise-only canary validates the locked toolchain and cache identity (PP-h2ui.8).
+7. CI's required mise-only canary validates the locked toolchain and cache identity (PP-h2ui.8).
+8. CI and preview workflows use the shared mise setup without legacy setup actions (PP-h2ui.9).
 """
 
 import json
@@ -31,6 +31,10 @@ RUFF_TOML_PATH = REPO_ROOT / "ruff.toml"
 REQUIREMENTS_TXT_PATH = REPO_ROOT / "scripts" / "requirements.txt"
 CHECK_PYTEST_PATH = REPO_ROOT / "scripts" / "check-pytest.sh"
 CI_WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "ci.yml"
+MISE_ACTION_PATH = REPO_ROOT / ".github" / "actions" / "setup-mise" / "action.yml"
+PREVIEW_CONTROL_PATH = REPO_ROOT / ".github" / "workflows" / "preview-control.yaml"
+PREVIEW_REAPER_PATH = REPO_ROOT / ".github" / "workflows" / "preview-reaper.yaml"
+PREVIEW_SYNC_PATH = REPO_ROOT / ".github" / "workflows" / "preview-sync.yaml"
 
 MINIMUM_MISE_VERSION = (2026, 8, 11)
 
@@ -396,7 +400,9 @@ def test_ci_installs_pytest_for_mise_python() -> None:
     """Verify CI binds pytest installation and execution to the pinned Python."""
     workflow = CI_WORKFLOW_PATH.read_text(encoding="utf-8")
 
-    setup_mise = workflow.index("- name: Setup mise", workflow.index("linters:"))
+    setup_mise = workflow.index(
+        "- name: Setup locked Python toolchain", workflow.index("linters:")
+    )
     install_pytest = workflow.index(
         "python3 -m pip install -r scripts/requirements.txt"
     )
@@ -418,22 +424,36 @@ def _workflow_job_block(workflow: str, job_name: str) -> str:
 
 
 def test_ci_mise_canary_contract() -> None:
-    """Verify the required canary uses only mise and collision-safe caches."""
+    """Verify the required canary exercises the shared mise setup and caches."""
     workflow = CI_WORKFLOW_PATH.read_text(encoding="utf-8")
+    setup_action = MISE_ACTION_PATH.read_text(encoding="utf-8")
     canary = _workflow_job_block(workflow, "mise-canary")
 
     checkout = canary.index("uses: actions/checkout@")
-    mise_action = canary.index(
-        "uses: jdx/mise-action@3c2e0cf82a5b2e5249f0d3635a4d83d0ae861518"
-    )
+    mise_action = canary.index("uses: ./.github/actions/setup-mise")
     assert checkout < mise_action
-    assert 'version: "2026.8.11"' in canary
-    assert 'install_args: "--locked"' in canary
-    assert "cache: true" in canary
+    assert "id: toolchain" in canary
+    assert 'install-args: "--locked"' in canary
 
     assert "actions/setup-node" not in canary
     assert "pnpm/action-setup" not in canary
     assert "supabase/setup-cli" not in canary
+
+    assert (
+        "uses: jdx/mise-action@3c2e0cf82a5b2e5249f0d3635a4d83d0ae861518" in setup_action
+    )
+    assert 'version: "2026.8.11"' in setup_action
+    assert 'default: "--locked node pnpm"' in setup_action
+    assert "cache: true" in setup_action
+    assert (
+        'cache_key: "{{default}}-compat-node-${{ inputs.node-version }}"'
+        in setup_action
+    )
+    assert "Verify Node compatibility runtime" in setup_action
+    assert "Node compatibility mismatch" in setup_action
+    assert 'default: "."' in setup_action
+    assert "working_directory: ${{ inputs.working-directory }}" in setup_action
+    assert "working-directory: ${{ inputs.working-directory }}" in setup_action
 
     for version_command in (
         "node --version",
@@ -443,19 +463,18 @@ def test_ci_mise_canary_contract() -> None:
     ):
         assert version_command in canary
 
-    assert "pnpm store path --silent" in canary
-    assert "Cache pnpm store" in canary
+    assert "pnpm store path --silent" in setup_action
+    assert "Cache pnpm store" in setup_action
     assert "Cache node_modules" in canary
-    assert "runner.os" in canary
-    assert "runner.arch" in canary
-    assert "steps.toolchain.outputs.node" in canary
-    assert "steps.toolchain.outputs.pnpm" in canary
-    assert "hashFiles('package.json')" in canary
-    assert "hashFiles('pnpm-lock.yaml')" in canary
-    assert "pnpm-store-${RUNNER_OS}-${RUNNER_ARCH}" in canary
-    assert "node-modules-${RUNNER_OS}-${RUNNER_ARCH}" in canary
-    assert "-node-${NODE_VERSION}-pnpm-${PNPM_VERSION}" in canary
-    assert "-${PACKAGE_HASH}-${LOCK_HASH}" in canary
+    assert "steps.toolchain.outputs.node-modules-key" in canary
+    assert "runner.os" in setup_action
+    assert "runner.arch" in setup_action
+    assert "hashFiles('package.json')" in setup_action
+    assert "hashFiles('pnpm-lock.yaml')" in setup_action
+    assert "pnpm-store-${RUNNER_OS}-${RUNNER_ARCH}" in setup_action
+    assert "node-modules-${RUNNER_OS}-${RUNNER_ARCH}" in setup_action
+    assert "-node-${node_version}-pnpm-${pnpm_version}" in setup_action
+    assert "-${PACKAGE_HASH}-${LOCK_HASH}" in setup_action
 
     for command in (
         "pnpm install --frozen-lockfile",
@@ -474,6 +493,123 @@ def test_ci_mise_canary_contract() -> None:
     assert "- mise-canary" in ci_gate
     assert "MISE_CANARY_RESULT: ${{ needs.mise-canary.result }}" in ci_gate
     assert 'required=("$MISE_CANARY_RESULT"' in ci_gate
+
+
+def test_workflows_use_mise_without_legacy_setup_actions() -> None:
+    """Normal CI and preview jobs must not reinstall competing tool authorities."""
+    workflows_dir = REPO_ROOT / ".github" / "workflows"
+    workflow_paths = sorted(workflows_dir.glob("*.y*ml"))
+    assert workflow_paths, "expected GitHub workflows to exist"
+
+    legacy_actions = (
+        "actions/setup-node",
+        "pnpm/action-setup",
+        "supabase/setup-cli",
+    )
+    offenders: list[str] = []
+    for path in workflow_paths:
+        content = path.read_text(encoding="utf-8")
+        for action in legacy_actions:
+            if action in content:
+                offenders.append(f"{path.name}: {action}")
+    assert not offenders, f"legacy setup actions remain: {offenders}"
+
+    expected_action_refs = {
+        CI_WORKFLOW_PATH: "uses: ./.github/actions/setup-mise",
+        PREVIEW_REAPER_PATH: "uses: ./.github/actions/setup-mise",
+        PREVIEW_CONTROL_PATH: ("uses: ./.pinpoint-workflow/.github/actions/setup-mise"),
+        PREVIEW_SYNC_PATH: "uses: ./.pinpoint-workflow/.github/actions/setup-mise",
+    }
+    for path, action_ref in expected_action_refs.items():
+        content = path.read_text(encoding="utf-8")
+        assert action_ref in content, (
+            f"{path.name} must provision executable tools through {action_ref}"
+        )
+
+
+def test_ci_jobs_share_runtime_aware_dependency_cache() -> None:
+    """Producer and consumers must agree on the composite action's cache key."""
+    workflow = CI_WORKFLOW_PATH.read_text(encoding="utf-8")
+    dependency_jobs = (
+        "setup",
+        "typecheck",
+        "lint",
+        "format",
+        "build",
+        "test-unit",
+        "test-integration",
+        "test-migrations",
+        "test-integration-supabase",
+        "test-e2e-smoke",
+        "test-e2e-smoke-mobile-chrome",
+        "test-e2e-full-chromium",
+        "test-e2e-comprehensive",
+        "pnpm-audit",
+    )
+    supabase_jobs = {
+        "test-migrations",
+        "test-integration-supabase",
+        "test-e2e-smoke",
+        "test-e2e-smoke-mobile-chrome",
+        "test-e2e-full-chromium",
+        "test-e2e-comprehensive",
+    }
+    for job_name in dependency_jobs:
+        job = _workflow_job_block(workflow, job_name)
+        assert "id: toolchain" in job, f"{job_name} must expose toolchain outputs"
+        assert "uses: ./.github/actions/setup-mise" in job, (
+            f"{job_name} must use the shared mise setup"
+        )
+        assert "key: ${{ steps.toolchain.outputs.node-modules-key }}" in job, (
+            f"{job_name} must use the runtime-aware node_modules cache key"
+        )
+        if job_name in supabase_jobs:
+            assert 'install-args: "--locked node pnpm supabase"' in job
+        else:
+            assert "supabase" not in job
+
+
+def test_preview_mise_compatibility_and_ordering() -> None:
+    """Preview orchestration keeps Node 22 explicit without moving deploy ownership."""
+    control = PREVIEW_CONTROL_PATH.read_text(encoding="utf-8")
+    sync = PREVIEW_SYNC_PATH.read_text(encoding="utf-8")
+    reaper = PREVIEW_REAPER_PATH.read_text(encoding="utf-8")
+
+    for workflow in (control, sync):
+        assert 'node-version: "22"' in workflow
+        assert 'install-args: "--locked node pnpm supabase"' in workflow
+        assert "name: Checkout trusted workflow action" in workflow
+        assert "ref: ${{ github.event.repository.default_branch }}" in workflow
+        assert "path: .pinpoint-workflow" in workflow
+        for trusted_file in (
+            ".github/actions/setup-mise",
+            "mise.toml",
+            "mise.lock",
+            "package.json",
+        ):
+            assert trusted_file in workflow
+        assert "uses: ./.pinpoint-workflow/.github/actions/setup-mise" in workflow
+        assert "working-directory: .pinpoint-workflow" in workflow
+
+    assert (
+        control.index("name: Checkout trusted workflow action")
+        < control.index("Setup locked preview toolchain")
+        < control.index("name: Install dependencies")
+        < control.index("name: Create preview")
+    )
+    assert control.index("Setup locked Supabase CLI for stop") < control.index(
+        "name: Destroy preview"
+    )
+    assert (
+        sync.index("name: Checkout trusted workflow action")
+        < sync.index("Setup locked preview toolchain")
+        < sync.index("name: Install dependencies")
+        < sync.index("name: Re-sync preview branch")
+    )
+
+    for workflow in (control, reaper):
+        assert 'install-args: "--locked supabase"' in workflow
+        assert 'cache-pnpm: "false"' in workflow
 
 
 def test_offline_python_and_ruff_resolution() -> None:
@@ -514,20 +650,10 @@ def test_offline_python_and_ruff_resolution() -> None:
     )
 
 
-def _read_mise_supabase_pin() -> str:
-    """Return the exact Supabase CLI version pinned in mise.toml [tools]."""
-    data = tomllib.loads(MISE_TOML_PATH.read_text(encoding="utf-8"))
-    pin = data.get("tools", {}).get("supabase")
-    assert isinstance(pin, str) and re.fullmatch(r"\d+\.\d+\.\d+", pin), (
-        f"mise.toml must pin an exact supabase CLI version (X.Y.Z), got {pin!r}"
-    )
-    return pin
-
-
 def _collect_setup_cli_versions(
     workflows_dir: Path | None = None,
 ) -> list[tuple[Path, int, str]]:
-    """Find every `version:` bound to a `supabase/setup-cli` step across workflows.
+    """Find every legacy `supabase/setup-cli` step across workflows.
 
     Returns (path, line_number, version) tuples. Auto-discovers all workflow
     files so a new job that adds a setup-cli block is covered without editing
@@ -597,28 +723,10 @@ def _collect_setup_cli_versions(
     return found
 
 
-def test_ci_setup_cli_pins_match_mise() -> None:
-    """CI's supabase/setup-cli blocks must mirror the single mise.toml pin.
-
-    mise.toml is the source of truth for the approved Supabase CLI version
-    (Mac, Bazzite, agent bootstrap). Until the mise-only CI lane (PP-h2ui.8)
-    consumes it directly, the workflow setup-cli blocks carry a literal mirror
-    of the same version; this test fails loudly on any drift so a partial bump
-    (the classic "8 of 9 sites" mistake) cannot merge.
-    """
-    mise_pin = _read_mise_supabase_pin()
+def test_ci_has_no_legacy_supabase_setup_actions() -> None:
+    """The PP-h2ui.9 cutover leaves mise as the sole Supabase CLI authority."""
     pins = _collect_setup_cli_versions()
-    assert pins, (
-        "expected at least one supabase/setup-cli block in .github/workflows/; "
-        "found none — did the CLI setup move without updating this contract?"
-    )
-    mismatched = [
-        (str(p.relative_to(REPO_ROOT)), ln, v) for p, ln, v in pins if v != mise_pin
-    ]
-    assert not mismatched, (
-        f"supabase/setup-cli version(s) must match the mise.toml pin {mise_pin!r}; "
-        f"drifted sites: {mismatched}"
-    )
+    assert not pins, f"legacy supabase/setup-cli action(s) remain: {pins}"
 
 
 def test_collect_setup_cli_versions_raises_on_versionless_block(tmp_path: Path) -> None:

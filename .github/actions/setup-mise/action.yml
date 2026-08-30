@@ -1,0 +1,100 @@
+name: Setup locked mise toolchain
+description: >-
+  Install PinPoint's mise-managed tools, cache the pnpm store when requested,
+  and expose the runtime-aware node_modules cache key shared by CI jobs.
+
+inputs:
+  install-args:
+    description: Arguments passed to mise install; defaults to the locked JavaScript toolchain.
+    required: false
+    default: "--locked node pnpm"
+  cache-pnpm:
+    description: Cache the pnpm store and calculate the node_modules cache key.
+    required: false
+    default: "true"
+  node-version:
+    description: Optional Node compatibility major to activate after the locked install.
+    required: false
+    default: ""
+  working-directory:
+    description: Directory containing the trusted mise configuration used for installation.
+    required: false
+    default: "."
+
+outputs:
+  node:
+    description: Active Node version, without the leading v.
+    value: ${{ steps.cache-identity.outputs.node }}
+  pnpm:
+    description: Active pnpm version.
+    value: ${{ steps.cache-identity.outputs.pnpm }}
+  node-modules-key:
+    description: Runtime-aware cache key for producer-built node_modules.
+    value: ${{ steps.cache-identity.outputs.node-modules-key }}
+
+runs:
+  using: composite
+  steps:
+    - name: Install mise-managed tools
+      uses: jdx/mise-action@3c2e0cf82a5b2e5249f0d3635a4d83d0ae861518  # ratchet:jdx/mise-action@v4.2.5
+      with:
+        version: "2026.8.11"
+        install_args: ${{ inputs.install-args }}
+        working_directory: ${{ inputs.working-directory }}
+        cache: true
+        cache_key: "{{default}}-compat-node-${{ inputs.node-version }}"
+
+    - name: Activate Node compatibility runtime
+      if: inputs.node-version != ''
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        NODE_VERSION: ${{ inputs.node-version }}
+      run: | # zizmor: ignore[github-env] path comes from mise's installed tool directory
+        set -euo pipefail
+        mise install "node@${NODE_VERSION}"
+        echo "$(mise where "node@${NODE_VERSION}")/bin" >> "$GITHUB_PATH"
+
+    - name: Verify Node compatibility runtime
+      if: inputs.node-version != ''
+      shell: bash
+      env:
+        EXPECTED_NODE_VERSION: ${{ inputs.node-version }}
+      run: |
+        set -euo pipefail
+        actual="$(node --version)"
+        actual="${actual#v}"
+        if [[ "$actual" != "${EXPECTED_NODE_VERSION}."* ]]; then
+          echo "::error::Node compatibility mismatch: expected ${EXPECTED_NODE_VERSION}.x, got ${actual}"
+          exit 1
+        fi
+        echo "Node compatibility runtime ${actual}"
+
+    - name: Resolve package-manager cache identity
+      id: cache-identity
+      if: inputs.cache-pnpm == 'true'
+      shell: bash
+      env:
+        RUNNER_OS: ${{ runner.os }}
+        RUNNER_ARCH: ${{ runner.arch }}
+        PACKAGE_HASH: ${{ hashFiles('package.json') }}
+        LOCK_HASH: ${{ hashFiles('pnpm-lock.yaml') }}
+      run: |
+        set -euo pipefail
+        node_version="$(node --version)"
+        node_version="${node_version#v}"
+        pnpm_version="$(pnpm --version)"
+        {
+          echo "node=${node_version}"
+          echo "pnpm=${pnpm_version}"
+          echo "pnpm-store-path=$(pnpm store path --silent)"
+          echo "pnpm-store-key=pnpm-store-${RUNNER_OS}-${RUNNER_ARCH}-node-${node_version}-pnpm-${pnpm_version}-${LOCK_HASH}"
+          echo "node-modules-key=node-modules-${RUNNER_OS}-${RUNNER_ARCH}-node-${node_version}-pnpm-${pnpm_version}-${PACKAGE_HASH}-${LOCK_HASH}"
+        } >> "$GITHUB_OUTPUT"
+
+    - name: Cache pnpm store
+      if: inputs.cache-pnpm == 'true'
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # ratchet:actions/cache@v6.1.0
+      with:
+        path: ${{ steps.cache-identity.outputs.pnpm-store-path }}
+        key: ${{ steps.cache-identity.outputs.pnpm-store-key }}
