@@ -278,28 +278,40 @@ def test_mise_cli_version_meets_minimum() -> None:
     )
 
 
-def _active_tool_entry(info: object) -> dict[str, object]:
-    """Select the sole active entry for a tool from `mise ls --json`."""
+def _selected_tool_entry(info: object) -> dict[str, object]:
+    """Select the active entry, or the sole requested entry if uninstalled."""
     candidates = info if isinstance(info, list) else [info]
     active = [
         entry
         for entry in candidates
         if isinstance(entry, dict) and entry.get("active") is True
     ]
-    assert len(active) == 1, (
-        f"expected exactly one active mise entry, got {len(active)} in {info!r}"
+    assert len(active) <= 1, (
+        f"expected at most one active mise entry, got {len(active)} in {info!r}"
     )
-    return active[0]
+    if active:
+        return active[0]
+
+    requested = [
+        entry
+        for entry in candidates
+        if isinstance(entry, dict) and isinstance(entry.get("requested_version"), str)
+    ]
+    assert len(requested) == 1, (
+        "expected exactly one project-requested mise entry when none is active, "
+        f"got {len(requested)} in {info!r}"
+    )
+    return requested[0]
 
 
 def _tool_source_path(info: object) -> str:
-    """Extract the config-file source path from the active mise entry."""
-    entry = _active_tool_entry(info)
+    """Extract the config-file source path from the selected mise entry."""
+    entry = _selected_tool_entry(info)
     source = entry.get("source")
-    assert isinstance(source, dict), f"active mise entry has no source in {info!r}"
+    assert isinstance(source, dict), f"selected mise entry has no source in {info!r}"
     path = source.get("path")
     assert isinstance(path, str) and path, (
-        f"active mise entry has no source path in {info!r}"
+        f"selected mise entry has no source path in {info!r}"
     )
     return path
 
@@ -330,8 +342,23 @@ def test_tool_source_path_rejects_unsourced_active_entry() -> None:
         {"version": "2.0.0", "active": True},
     ]
 
-    with pytest.raises(AssertionError, match="active mise entry has no source"):
+    with pytest.raises(AssertionError, match="selected mise entry has no source"):
         _tool_source_path(info)
+
+
+def test_tool_source_path_accepts_requested_uninstalled_entry() -> None:
+    """CI jobs may request a project tool without installing it in that job."""
+    info = [
+        {
+            "version": "2.0.0",
+            "requested_version": "2.0.0",
+            "active": False,
+            "installed": False,
+            "source": {"path": "/project/mise.toml"},
+        }
+    ]
+
+    assert _tool_source_path(info) == "/project/mise.toml"
 
 
 def test_mise_ls_resolves_sources_correctly() -> None:
@@ -369,16 +396,16 @@ def test_mise_ls_resolves_sources_correctly() -> None:
         "supabase": "mise.toml",
     }
     for tool, expected_file in expected_sources.items():
-        active_entry = _active_tool_entry(tools_dict[tool])
-        assert active_entry.get("version") == expected_versions[tool], (
-            f"active {tool} version should be {expected_versions[tool]}, "
-            f"got {active_entry.get('version')!r}"
+        selected_entry = _selected_tool_entry(tools_dict[tool])
+        assert selected_entry.get("version") == expected_versions[tool], (
+            f"selected {tool} version should be {expected_versions[tool]}, "
+            f"got {selected_entry.get('version')!r}"
         )
-        assert active_entry.get("requested_version") == expected_versions[tool], (
-            f"active {tool} requested_version should be {expected_versions[tool]}, "
-            f"got {active_entry.get('requested_version')!r}"
+        assert selected_entry.get("requested_version") == expected_versions[tool], (
+            f"selected {tool} requested_version should be {expected_versions[tool]}, "
+            f"got {selected_entry.get('requested_version')!r}"
         )
-        source = _tool_source_path(active_entry)
+        source = _tool_source_path(selected_entry)
         assert source.endswith(expected_file), (
             f"{tool} source should be {expected_file}, got {source}"
         )
