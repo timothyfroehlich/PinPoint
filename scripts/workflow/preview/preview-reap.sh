@@ -97,10 +97,10 @@ ALL_BRANCHES_JSON="$(supabase branches list \
 # them visible without allowing them to corrupt the machine-readable payload.
 cat "$BRANCH_LIST_STDERR" >&2
 
-if ! BRANCH_COUNT="$(jq -er \
-  'if type == "array" then length else error("expected a JSON array") end' \
+if ! BRANCH_COUNT="$(jq -ers \
+  'if (length == 1 and (.[0] | type == "array")) then (.[0] | length) else error("expected exactly one JSON array") end' \
   <<<"$ALL_BRANCHES_JSON")"; then
-  echo "ERROR: Supabase branch listing was not a valid JSON array." >&2
+  echo "ERROR: Supabase branch listing was not exactly one valid JSON array." >&2
   exit 1
 fi
 

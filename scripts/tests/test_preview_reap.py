@@ -68,7 +68,23 @@ def test_malformed_branch_list_fails_before_evaluation(tmp_path: Path) -> None:
     result = _run_reaper(tmp_path, stdout="not-json\n")
 
     assert result.returncode != 0
-    assert "Supabase branch listing was not a valid JSON array" in result.stderr
+    assert (
+        "Supabase branch listing was not exactly one valid JSON array" in result.stderr
+    )
+    assert "Total preview branches:" not in result.stdout
+    assert "DESTROY" not in result.stdout
+
+
+def test_multiple_top_level_arrays_fail_before_evaluation(tmp_path: Path) -> None:
+    result = _run_reaper(
+        tmp_path,
+        stdout='[{"name":"pr-1"}]\n[{"name":"pr-2"}]\n',
+    )
+
+    assert result.returncode != 0
+    assert (
+        "Supabase branch listing was not exactly one valid JSON array" in result.stderr
+    )
     assert "Total preview branches:" not in result.stdout
     assert "DESTROY" not in result.stdout
 
