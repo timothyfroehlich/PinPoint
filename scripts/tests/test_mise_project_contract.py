@@ -11,6 +11,7 @@ Verifies that:
 8. CI and preview workflows use the shared mise setup without legacy setup actions (PP-h2ui.9).
 """
 
+import hashlib
 import json
 import os
 import re
@@ -48,7 +49,45 @@ EXPECTED_TOOL_BACKENDS = {
     "ruff": "aqua:astral-sh/ruff",
     "supabase": "aqua:supabase/cli",
 }
+EXPECTED_LOCK_PLATFORMS = {
+    "node": {
+        "linux-arm64",
+        "linux-arm64-musl",
+        "linux-x64",
+        "linux-x64-musl",
+        "macos-arm64",
+        "macos-x64",
+        "windows-x64",
+    },
+    "python": {
+        "linux-arm64",
+        "linux-x64",
+        "linux-x64-musl",
+        "macos-arm64",
+        "macos-x64",
+        "windows-x64",
+    },
+    "ruff": {
+        "linux-arm64",
+        "linux-arm64-musl",
+        "linux-x64",
+        "linux-x64-musl",
+        "macos-arm64",
+        "macos-x64",
+        "windows-x64",
+    },
+    "supabase": {
+        "linux-arm64",
+        "linux-arm64-musl",
+        "linux-x64",
+        "linux-x64-musl",
+        "macos-arm64",
+        "macos-x64",
+        "windows-x64",
+    },
+}
 EXACT_VERSION_RE = re.compile(r"^\d+\.\d+\.\d+$")
+SHA256_CHECKSUM_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 
 
 def _parse_mise_version(raw: str) -> tuple[int, ...]:
@@ -158,6 +197,44 @@ def _expected_tool_pins(
     return {**pins, "pnpm": _pnpm_pin(package_data)}
 
 
+def _assert_platform_locks_coherent(
+    tool: str, expected_version: str, entry: dict[str, object]
+) -> None:
+    """Require every supported platform to carry version-bound artifact data."""
+    expected_platforms = EXPECTED_LOCK_PLATFORMS.get(tool)
+    if expected_platforms is None:
+        return
+
+    platform_prefix = "platforms."
+    actual_platforms = {
+        key.removeprefix(platform_prefix)
+        for key in entry
+        if key.startswith(platform_prefix)
+    }
+    assert actual_platforms == expected_platforms, (
+        f"mise.lock {tool} platforms must exactly match the supported set; "
+        f"expected {sorted(expected_platforms)}, got {sorted(actual_platforms)}"
+    )
+    for platform in sorted(expected_platforms):
+        artifact = entry.get(f"{platform_prefix}{platform}")
+        assert isinstance(artifact, dict), (
+            f"mise.lock {tool} {platform} platform entry must be a table"
+        )
+        url = artifact.get("url")
+        assert isinstance(url, str) and url.startswith("https://"), (
+            f"mise.lock {tool} {platform} platform URL must be HTTPS, got {url!r}"
+        )
+        assert expected_version in url, (
+            f"mise.lock {tool} {platform} platform URL must reference "
+            f"{expected_version}, got {url!r}"
+        )
+        checksum = artifact.get("checksum")
+        assert isinstance(checksum, str) and SHA256_CHECKSUM_RE.fullmatch(checksum), (
+            f"mise.lock {tool} {platform} checksum must be sha256:<64 lowercase hex>, "
+            f"got {checksum!r}"
+        )
+
+
 def _assert_mise_lock_coherent(
     mise_data: dict[str, object],
     lock_data: dict[str, object],
@@ -197,6 +274,7 @@ def _assert_mise_lock_coherent(
             f"mise.lock {tool} backend must be {EXPECTED_TOOL_BACKENDS[tool]!r}, "
             f"got {entry.get('backend')!r}"
         )
+        _assert_platform_locks_coherent(tool, expected_version, entry)
 
 
 def test_mise_toml_exists_and_is_valid() -> None:
@@ -274,9 +352,16 @@ def test_mise_lock_accepts_coherent_managed_tool_bump(
     bumped_mise = deepcopy(mise_data)
     bumped_lock = deepcopy(lock_data)
 
+    old_version = bumped_lock["tools"][tool][0]["version"]
     bumped_mise["tools"][tool] = new_version
     bumped_lock["tools"][tool][0]["version"] = new_version
     bumped_lock["tools"][tool][0]["specifiers"] = [new_version]
+    for key, artifact in bumped_lock["tools"][tool][0].items():
+        if not key.startswith("platforms."):
+            continue
+        artifact["url"] = artifact["url"].replace(old_version, new_version)
+        digest_input = f"{tool}:{new_version}:{key}".encode()
+        artifact["checksum"] = f"sha256:{hashlib.sha256(digest_input).hexdigest()}"
 
     _assert_mise_lock_coherent(bumped_mise, bumped_lock, package_data)
 
@@ -290,6 +375,20 @@ def test_mise_lock_rejects_version_mismatch() -> None:
 
     with pytest.raises(AssertionError, match="node version must match"):
         _assert_mise_lock_coherent(mise_data, mismatched_lock, package_data)
+
+
+def test_mise_lock_rejects_stale_platform_artifacts() -> None:
+    mise_data = tomllib.loads(MISE_TOML_PATH.read_text(encoding="utf-8"))
+    lock_data = tomllib.loads(MISE_LOCK_PATH.read_text(encoding="utf-8"))
+    package_data = json.loads(PACKAGE_JSON_PATH.read_text(encoding="utf-8"))
+    bumped_mise = deepcopy(mise_data)
+    stale_lock = deepcopy(lock_data)
+    bumped_mise["tools"]["node"] = "24.19.0"
+    stale_lock["tools"]["node"][0]["version"] = "24.19.0"
+    stale_lock["tools"]["node"][0]["specifiers"] = ["24.19.0"]
+
+    with pytest.raises(AssertionError, match="platform URL must reference 24.19.0"):
+        _assert_mise_lock_coherent(bumped_mise, stale_lock, package_data)
 
 
 @pytest.mark.parametrize("invalid_pin", ("latest", "24.19", "^24.19.0"))
