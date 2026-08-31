@@ -21,6 +21,7 @@ CODEX_REACTION_WITNESS_PREFIX = "<!-- pinpoint-codex-reaction-witness:"
 REVIEW_MARKER_PREFIX = "<!-- pinpoint-review:"
 LEGACY_REVIEW_MARKER_PREFIX = "<!-- pinpoint-claude-review:"
 CONNECTION_PAGE_SIZE = 100
+CI_GATE_NAME = "CI Gate"
 
 
 @dataclass(frozen=True)
@@ -75,7 +76,7 @@ PR_FIELDS = f"""
             pageInfo {{ hasNextPage endCursor }}
             nodes {{
               __typename
-              ... on CheckRun {{ name status conclusion }}
+              ... on CheckRun {{ name status conclusion startedAt completedAt }}
               ... on StatusContext {{ context state }}
             }}
           }}
@@ -170,7 +171,7 @@ def _nested_query(owner: str, repo: str, pr: int, kind: str, cursor: str) -> str
             pageInfo {{ hasNextPage endCursor }}
             nodes {{
               __typename
-              ... on CheckRun {{ name status conclusion }}
+              ... on CheckRun {{ name status conclusion startedAt completedAt }}
               ... on StatusContext {{ context state }}
             }}
           }}
@@ -411,22 +412,39 @@ def _review_label(state: str) -> str:
 
 
 def _ci_label(checks: list[dict[str, Any]]) -> str:
-    replacement_names = {
-        check.get("name")
+    gates = [
+        check
         for check in checks
-        if check.get("__typename") == "CheckRun"
-        and check.get("name") == "CI Gate"
-        and (check.get("conclusion") or check.get("status")) != "CANCELLED"
-    }
+        if check.get("__typename") == "CheckRun" and check.get("name") == CI_GATE_NAME
+    ]
+    if len(gates) > 1:
+        for gate in gates:
+            completed_at = gate.get("completedAt")
+            started_at = gate.get("startedAt")
+            if (
+                completed_at is not None
+                and not isinstance(completed_at, str)
+                or started_at is not None
+                and not isinstance(started_at, str)
+                or not (completed_at or started_at)
+            ):
+                return "?"
+
+    def gate_rank(check: dict[str, Any]) -> tuple[int, str]:
+        not_superseded = 0 if check.get("conclusion") == "CANCELLED" else 1
+        when = check.get("completedAt") or check.get("startedAt") or ""
+        return not_superseded, str(when)
+
+    authoritative_gate = max(gates, key=gate_rank) if gates else None
     effective_checks = [
         check
         for check in checks
         if not (
-            check.get("__typename") == "CheckRun"
-            and check.get("conclusion") == "CANCELLED"
-            and check.get("name") in replacement_names
+            check.get("__typename") == "CheckRun" and check.get("name") == CI_GATE_NAME
         )
     ]
+    if authoritative_gate is not None:
+        effective_checks.append(authoritative_gate)
     total = len(effective_checks)
     passed = 0
     failed = 0

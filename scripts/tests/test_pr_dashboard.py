@@ -19,12 +19,20 @@ def connection(nodes=(), *, has_next=False, cursor=None):
     }
 
 
-def check(name="CI Gate", status="COMPLETED", conclusion="SUCCESS"):
+def check(
+    name="CI Gate",
+    status="COMPLETED",
+    conclusion="SUCCESS",
+    completed_at="2026-08-30T12:00:00Z",
+    started_at="2026-08-30T11:59:00Z",
+):
     return {
         "__typename": "CheckRun",
         "name": name,
         "status": status,
         "conclusion": conclusion,
+        "completedAt": completed_at,
+        "startedAt": started_at,
     }
 
 
@@ -352,8 +360,14 @@ def test_superseded_cancelled_check_does_not_override_replacement(run_dashboard)
             pr_node(
                 10,
                 checks=[
-                    check(conclusion="CANCELLED"),
-                    check(conclusion="SUCCESS"),
+                    check(
+                        conclusion="CANCELLED",
+                        completed_at="2026-08-30T12:00:00Z",
+                    ),
+                    check(
+                        conclusion="SUCCESS",
+                        completed_at="2026-08-30T12:01:00Z",
+                    ),
                 ],
             )
         ]
@@ -366,6 +380,71 @@ def test_superseded_cancelled_check_does_not_override_replacement(run_dashboard)
     row = result.stdout.splitlines()[2]
     assert "All passed" in row
     assert "FAILED" not in row
+    assert len(calls) == 1
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    ("older_conclusion", "newer_conclusion", "expected"),
+    [
+        ("FAILURE", "SUCCESS", "All passed"),
+        ("SUCCESS", "FAILURE", "1 FAILED"),
+    ],
+)
+def test_latest_authoritative_ci_gate_rerun_wins(
+    run_dashboard,
+    older_conclusion,
+    newer_conclusion,
+    expected,
+):
+    initial = open_pr_response(
+        [
+            pr_node(
+                13,
+                checks=[
+                    check(
+                        conclusion=older_conclusion,
+                        completed_at="2026-08-30T12:00:00Z",
+                    ),
+                    check(
+                        conclusion=newer_conclusion,
+                        completed_at="2026-08-30T12:01:00Z",
+                    ),
+                ],
+            )
+        ]
+    )
+    result, calls = run_dashboard(
+        [{"contains": ["pullRequests(first: 100"], "stdout": json.dumps(initial)}]
+    )
+
+    assert result.returncode == 0
+    row = result.stdout.splitlines()[2]
+    assert expected in row
+    assert len(calls) == 1
+
+
+@pytest.mark.unit
+def test_multiple_ci_gates_without_timestamps_fail_closed(run_dashboard):
+    initial = open_pr_response(
+        [
+            pr_node(
+                14,
+                checks=[
+                    check(conclusion="FAILURE", completed_at="", started_at=""),
+                    check(conclusion="SUCCESS", completed_at="", started_at=""),
+                ],
+            )
+        ]
+    )
+    result, calls = run_dashboard(
+        [{"contains": ["pullRequests(first: 100"], "stdout": json.dumps(initial)}]
+    )
+
+    assert result.returncode == 0
+    row = result.stdout.splitlines()[2]
+    assert "?" in row
+    assert "All passed" not in row
     assert len(calls) == 1
 
 
