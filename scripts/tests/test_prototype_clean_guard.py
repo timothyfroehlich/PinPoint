@@ -1,9 +1,11 @@
 """Regression tests for the prototype-mode cleanup guard."""
 
+import json
 import subprocess
 from pathlib import Path
 
 GUARD_PATH = Path(__file__).parent.parent / "hooks/prototype-clean-guard.sh"
+REPO_ROOT = Path(__file__).parents[2]
 
 
 def _run_guard(repo_root: Path) -> subprocess.CompletedProcess[str]:
@@ -67,3 +69,13 @@ def test_disposable_file_next_to_layout_fails(tmp_path: Path) -> None:
 
     assert result.returncode == 1
     assert "fixture.ts" in result.stderr
+
+
+def test_both_preflight_paths_run_the_cleanup_guard() -> None:
+    package = json.loads((REPO_ROOT / "package.json").read_text())
+    locked_script = (REPO_ROOT / "scripts/workflow/preflight-locked.sh").read_text()
+
+    assert "bash scripts/hooks/prototype-clean-guard.sh" in locked_script
+    assert package["scripts"]["preflight:unlocked"].startswith(
+        "pnpm run check:prototype-clean && "
+    )
