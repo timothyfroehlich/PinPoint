@@ -18,6 +18,11 @@ set -euo pipefail
 # "codex" in a login) would let a review be forged. A qualifying approval must also name
 # the PR's exact current head SHA.
 readonly CODEX_REVIEW_BOT="chatgpt-codex-connector[bot]"
+readonly CODEX_REVIEW_APP_SLUG="chatgpt-codex-connector"
+readonly CODEX_CLEAN_REVIEW_PREFIX="Codex Review: Didn't find any major issues."
+readonly GITHUB_ACTIONS_BOT="github-actions[bot]"
+readonly GITHUB_ACTIONS_APP_SLUG="github-actions"
+readonly CODEX_REACTION_WITNESS_PREFIX="<!-- pinpoint-codex-reaction-witness:"
 readonly REVIEW_MARKER_PREFIX="<!-- pinpoint-review:"
 readonly LEGACY_CLAUDE_MARKER_PREFIX="<!-- pinpoint-claude-review:"
 
@@ -53,14 +58,17 @@ _codex_review_record() {
                at: (.submitted_at // ""),
                summary: (((.body? // "") | tostring | split("\n")[0] // "") | gsub("^\\s+|\\s+$"; "")) }
          ] | sort_by(.at) as $reviews
+         | [ $reviews[] | select(.sha == $head) ] as $head_reviews
          | if ($reviews | length) == 0 then
              { state: "unreviewed", sha: "", reviewer: "", detail: "", at: "", summary: "" }
            else
-             $reviews[-1] as $latest
+             (if ($head_reviews | length) > 0 then $head_reviews[-1] else $reviews[-1] end) as $latest
              | if $latest.detail == "APPROVED" and $latest.sha == $head then
                  $latest + { state: "approval" }
                elif $latest.detail == "APPROVED" then
                  $latest + { state: "stale_approval" }
+               elif $latest.sha == $head and ($latest.detail == "COMMENTED" or $latest.detail == "CHANGES_REQUESTED") then
+                 $latest + { state: "reviewed" }
                else
                  $latest + { state: "not_approved" }
                end
@@ -68,13 +76,44 @@ _codex_review_record() {
          | [ .state, .sha, .reviewer, .detail, .at, .summary ] | @tsv'
 }
 
-# The manual attestation remains a valid, independent review path. A matching marker
-# covers head even when Codex has not reviewed the PR (or left a non-approval review).
-_marker_record() {
+# Issue comments carry three review records: the connector's clean automatic result,
+# the trusted workflow's SHA-pinned witness of a fresh eyes-to-+1 transition, and the
+# independent manual attestation.
+_comment_review_record() {
   local pr=$1 owner_repo=$2 head=$3
   gh api --paginate "repos/${owner_repo}/issues/${pr}/comments" \
-    | jq -rs --arg prefix "$REVIEW_MARKER_PREFIX" --arg legacy "$LEGACY_CLAUDE_MARKER_PREFIX" --arg head "$head" \
-        '[ .[] | flatten | .[]
+    | jq -rs --arg bot "$CODEX_REVIEW_BOT" --arg app "$CODEX_REVIEW_APP_SLUG" \
+        --arg actions_bot "$GITHUB_ACTIONS_BOT" --arg actions_app "$GITHUB_ACTIONS_APP_SLUG" \
+        --arg witness_prefix "$CODEX_REACTION_WITNESS_PREFIX" \
+        --arg clean_prefix "$CODEX_CLEAN_REVIEW_PREFIX" --arg prefix "$REVIEW_MARKER_PREFIX" \
+        --arg legacy "$LEGACY_CLAUDE_MARKER_PREFIX" --arg head "$head" \
+        '[ .[] | flatten | .[] ] as $comments
+         | ([ $comments[]
+           | (.body // "") as $body
+           | select(.user.login? == $bot and .performed_via_github_app.slug? == $app)
+           | { sha: ($body | [scan("\\*\\*Reviewed commit:\\*\\* `([0-9a-f]{10}|[0-9a-f]{40})`")] | flatten | (.[0] // "")),
+               reviewer: (.user.login // ""),
+               detail: "NO_FINDINGS",
+               at: (.updated_at // .created_at // ""),
+               summary: (($body | split("\n")[0]) // ""),
+               state: "clean_comment" }
+           | select(.summary | startswith($clean_prefix))
+           | select((.sha | length) == 10 or (.sha | length) == 40)
+         ] | sort_by(.at)) as $clean
+         | ([ $comments[]
+           | (.body // "") as $body
+           | select(.user.login? == $actions_bot
+                    and .performed_via_github_app.slug? == $actions_app
+                    and ($body | startswith($witness_prefix)))
+           | { sha: ($body | [scan("^<!-- pinpoint-codex-reaction-witness: ([0-9a-f]{40}) -->")] | flatten | (.[0] // "")),
+               reviewer: (.user.login // ""),
+               detail: "REACTION_WITNESS",
+               at: (.updated_at // .created_at // ""),
+               summary: "Codex clean reaction witnessed by GitHub Actions",
+               state: "clean_reaction" }
+           | select((.sha | length) == 40)
+         ] | sort_by(.at)) as $witness
+         | ([ $comments[]
            | (.body // "") as $body
            | select($body | startswith($prefix) or startswith($legacy))
            | { sha: (if $body | startswith($prefix) then ($body | ltrimstr($prefix)) else ($body | ltrimstr($legacy)) end | split("-->")[0] | gsub("^\\s+|\\s+$"; "")),
@@ -86,20 +125,35 @@ _marker_record() {
                         else ($body | [scan("<!-- pinpoint-review-depth:\\s*([a-z]+)\\s*-->")] | flatten | (.[0] // "unrecorded")) end),
                at: (.updated_at // ""),
                summary: (($body | split("\n") | last) // "") }
-         ] as $markers
+         ] | sort_by(.at)) as $markers
          | [ $markers[] | select(.sha == $head) ] as $pinned
+         | (($clean + $witness) | sort_by(.at)) as $automatic
+         | [ $automatic[]
+             | select(if .state == "clean_comment"
+                      then (.sha as $sha | $head | startswith($sha))
+                      else .sha == $head
+                      end)
+           ] as $automatic_pinned
          | if ($pinned | length) > 0 then ($pinned | last) + { state: "marker" }
-           elif ($markers | length) > 0 then ($markers | last) + { state: "stale_marker" }
+           elif ($automatic_pinned | length) > 0 then ($automatic_pinned | last)
+           elif ($markers | length) > 0 and ($automatic | length) > 0 then
+             if $markers[-1].at > $automatic[-1].at
+             then $markers[-1] + { state: "stale_marker" }
+             else $automatic[-1] + { state: (if $automatic[-1].state == "clean_reaction" then "stale_clean_reaction" else "stale_clean_comment" end) }
+             end
+           elif ($markers | length) > 0 then $markers[-1] + { state: "stale_marker" }
+           elif ($automatic | length) > 0 then $automatic[-1] + { state: (if $automatic[-1].state == "clean_reaction" then "stale_clean_reaction" else "stale_clean_comment" end) }
            else { state: "unreviewed", sha: "", reviewer: "", detail: "", at: "", summary: "" }
            end
          | [ .state, .sha, .reviewer, .detail, .at, .summary ] | @tsv'
 }
 
-# A Codex approval and a manual marker are independent valid records. Prefer the native
-# approval for reporting, but never let a later Codex non-approval invalidate a current
-# human-attested marker.
+# A manual marker is an independent valid record. Native reviews, clean connector
+# comments, and SHA-pinned reaction witnesses are representations of the automatic
+# Codex path. A later current-head finding cannot inherit an earlier clean result.
 _review_record() {
-  local codex marker codex_state marker_state codex_at marker_at
+  local head=$3 codex comment codex_state comment_state
+  local codex_sha codex_at comment_at
   codex=$(_codex_review_record "$@")
   codex_state=$(cut -f1 <<< "$codex")
   # A current native approval already passes the gate. Do not spend a second
@@ -109,21 +163,35 @@ _review_record() {
     return
   fi
 
-  marker=$(_marker_record "$@")
-  marker_state=$(cut -f1 <<< "$marker")
-  if [[ "$marker_state" == "marker" ]]; then
-    printf '%s\n' "$marker"
-  elif [[ "$codex_state" == "unreviewed" ]]; then
-    printf '%s\n' "$marker"
-  elif [[ "$marker_state" == "unreviewed" ]]; then
+  comment=$(_comment_review_record "$@")
+  comment_state=$(cut -f1 <<< "$comment")
+  if [[ "$comment_state" == "marker" ]]; then
+    printf '%s\n' "$comment"
+  elif [[ "$comment_state" == "clean_comment" || "$comment_state" == "clean_reaction" ]]; then
+    codex_sha=$(cut -f2 <<< "$codex")
+    codex_at=$(cut -f5 <<< "$codex")
+    comment_at=$(cut -f5 <<< "$comment")
+    if [[ "$codex_state" == "unreviewed" || "$codex_sha" != "$head" || "$comment_at" > "$codex_at" ]]; then
+      printf '%s\n' "$comment"
+    else
+      printf '%s\n' "$codex"
+    fi
+  elif [[ "$codex_state" == "reviewed" ]]; then
+    # A current-head native finding review is coverage. A delayed comment for an
+    # older SHA cannot invalidate it; current clean comments were handled above.
     printf '%s\n' "$codex"
   else
+    codex_at=$(cut -f5 <<< "$codex")
+    if [[ "$comment_state" == "unreviewed" ]]; then
+      printf '%s\n' "$codex"
+      return
+    fi
+
     # Neither path covers head. Report the newest record so merge-handoff can
     # show the real diff since review instead of an older, unrelated failure.
-    codex_at=$(cut -f5 <<< "$codex")
-    marker_at=$(cut -f5 <<< "$marker")
-    if [[ "$marker_at" > "$codex_at" ]]; then
-      printf '%s\n' "$marker"
+    comment_at=$(cut -f5 <<< "$comment")
+    if [[ "$comment_at" > "$codex_at" ]]; then
+      printf '%s\n' "$comment"
     else
       printf '%s\n' "$codex"
     fi
@@ -178,15 +246,20 @@ check_ci() {
 }
 
 # ---------------------------------------------------------------------------------
-# Shared review state — either a native Codex approval or a manual attestation pinned
+# Shared review state — a trusted automatic Codex result or manual attestation pinned
 # to the PR head.
 # ---------------------------------------------------------------------------------
 #
 #   approval        Codex approved the current head SHA
+#   clean_comment   Codex reported no major issues for the current head SHA
+#   clean_reaction  Trusted workflow witnessed Codex eyes-to-+1 on the current head
+#   reviewed        Codex reviewed the current head; the thread gate owns adjudication
 #   marker          A manual review marker pins the current head SHA
 #   stale_approval  Codex approved a different SHA — the current head was not reviewed
+#   stale_clean_comment  A clean Codex comment names a different SHA
+#   stale_clean_reaction  A reaction witness names a different SHA
 #   stale_marker    A manual marker names a different SHA
-#   not_approved    Codex reviewed, but did not approve its most-recent review
+#   not_approved    Codex's most-recent review covers a different SHA and is not an approval
 #   unreviewed      Neither review path has a record
 #
 # Sets globals: RS_STATE RS_HEAD_SHA RS_REVIEW_SHA
@@ -209,8 +282,9 @@ _compute_review_state() {
 
 _review_remedy() {
   local pr=$1
-  echo "  remedy: either comment @codex review on PR #${pr} and obtain an approval of this"
-  echo "          head, or run the existing review-preflight + mark-review attestation path."
+  echo "  remedy: await a clean automatic Codex result on this head of PR #${pr}. Use @codex"
+  echo "          review only when Tim explicitly requests it; use review-preflight +"
+  echo "          mark-review only after Tim explicitly runs a local review."
 }
 
 # Gate 2: Zero unresolved review threads. Uses GraphQL with cursor pagination.
@@ -263,9 +337,12 @@ check_unresolved_threads() {
   return 1
 }
 
-# Gate 3: a trusted Codex approval or manual review marker must cover the exact head.
+# Gate 3: a trusted clean Codex result or manual review marker must cover the exact head.
 #
 #   approval        → PASS
+#   clean_comment   → PASS
+#   clean_reaction  → PASS
+#   reviewed        → PASS (the separate thread gate requires every finding adjudicated)
 #   marker          → PASS
 #   stale_approval  → FAIL: Codex approved an earlier commit
 #   not_approved    → FAIL: Codex posted a non-approval review
@@ -279,6 +356,18 @@ check_review_happened() {
       echo "PASS: reviewed: Codex approved head SHA ${RS_HEAD_SHA:0:7}"
       return 0
       ;;
+    clean_comment)
+      echo "PASS: reviewed: Codex found no major issues on head SHA ${RS_HEAD_SHA:0:7}"
+      return 0
+      ;;
+    clean_reaction)
+      echo "PASS: reviewed: trusted workflow witnessed Codex clean reaction on head SHA ${RS_HEAD_SHA:0:7}"
+      return 0
+      ;;
+    reviewed)
+      echo "PASS: reviewed: Codex reviewed head SHA ${RS_HEAD_SHA:0:7}; thread gate owns findings"
+      return 0
+      ;;
     marker)
       echo "PASS: reviewed: review marker pins head SHA ${RS_HEAD_SHA:0:7}"
       return 0
@@ -286,6 +375,16 @@ check_review_happened() {
     stale_approval)
       echo "FAIL: reviewed: Codex approved ${RS_REVIEW_SHA:0:7}, but head is ${RS_HEAD_SHA:0:7}"
       echo "  You pushed after that approval, so what is about to merge was never read."
+      _review_remedy "$pr"
+      return 1
+      ;;
+    stale_clean_comment)
+      echo "FAIL: reviewed: Codex clean result covers ${RS_REVIEW_SHA:0:7}, but head is ${RS_HEAD_SHA:0:7}"
+      _review_remedy "$pr"
+      return 1
+      ;;
+    stale_clean_reaction)
+      echo "FAIL: reviewed: Codex clean-reaction witness covers ${RS_REVIEW_SHA:0:7}, but head is ${RS_HEAD_SHA:0:7}"
       _review_remedy "$pr"
       return 1
       ;;
@@ -300,7 +399,7 @@ check_review_happened() {
       return 1
       ;;
     unreviewed)
-      echo "FAIL: reviewed: no Codex approval on PR #${pr} — head ${RS_HEAD_SHA:0:7} is unreviewed"
+      echo "FAIL: reviewed: no clean Codex result on PR #${pr} — head ${RS_HEAD_SHA:0:7} is unreviewed"
       _review_remedy "$pr"
       return 1
       ;;

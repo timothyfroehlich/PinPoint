@@ -3,12 +3,8 @@ import { eq, sql } from "drizzle-orm";
 import { db } from "~/server/db";
 import { pinballmapState } from "~/server/db/schema";
 import { getPinballMapClient } from "./client";
-import {
-  APC_LOCATION_ID,
-  PBM_REFRESH_BURST,
-  PBM_REFRESH_REFILL_MS,
-} from "./config";
-import type { NewPinballmapState, PinballmapState } from "~/lib/types/database";
+import { PBM_REFRESH_BURST, PBM_REFRESH_REFILL_MS } from "./config";
+import type { PinballmapRuntimeState } from "~/lib/types";
 
 /**
  * PinballMap location-snapshot read path (foundation — PP-o355.16).
@@ -27,9 +23,23 @@ import type { NewPinballmapState, PinballmapState } from "~/lib/types/database";
 const SINGLETON_ID = "singleton";
 
 /** Read the integration-state singleton (null when never initialized). */
-export async function getPinballMapState(): Promise<PinballmapState | null> {
+export async function getPinballMapState(): Promise<PinballmapRuntimeState | null> {
   const [row] = await db
-    .select()
+    .select({
+      id: pinballmapState.id,
+      locationId: pinballmapState.locationId,
+      snapshotJson: pinballmapState.snapshotJson,
+      lastSyncedAt: pinballmapState.lastSyncedAt,
+      lastSyncAttemptAt: pinballmapState.lastSyncAttemptAt,
+      lastSyncStatus: pinballmapState.lastSyncStatus,
+      lastSyncError: pinballmapState.lastSyncError,
+      refreshTokens: pinballmapState.refreshTokens,
+      refreshTokensAt: pinballmapState.refreshTokensAt,
+      outboundEmail: pinballmapState.outboundEmail,
+      outboundTokenVaultId: pinballmapState.outboundTokenVaultId,
+      updatedAt: pinballmapState.updatedAt,
+      updatedBy: pinballmapState.updatedBy,
+    })
     .from(pinballmapState)
     .where(eq(pinballmapState.id, SINGLETON_ID))
     .limit(1);
@@ -53,6 +63,7 @@ export type SyncTrigger = "manual" | "cron";
 export type SyncResult =
   | { ok: true; machineCount: number; syncedAt: Date }
   | { ok: false; reason: "error"; error: string }
+  | { ok: false; reason: "not_configured" }
   | { ok: false; reason: "throttled"; retryAfterMs: number };
 
 /**
@@ -101,19 +112,87 @@ export async function getRefreshAllowance(
 }
 
 /**
- * Upsert the singleton, writing the given health fields. `id` is fixed and the
- * differing fields (snapshot, health, actor) are passed by the caller, so the ok
- * and error paths can't drift. The `set` reuses the same fields, so a key omitted
- * by the caller (e.g. `snapshotJson`/`lastSyncedAt` on the error path) is left
- * untouched on an existing row rather than clobbered.
+ * These raw upserts intentionally name only the post-contract columns. Drizzle
+ * inserts every schema-declared column (using DEFAULT for omitted values), which
+ * would still mention `enabled` after the follow-up migration drops it while
+ * this deployment is serving. The error path omits the last good snapshot and
+ * timestamp so an unsuccessful fetch cannot clobber them. The serialized JSON
+ * is cast through text before jsonb so postgres-js cannot double-encode it.
  */
-async function upsertState(
-  fields: Omit<NewPinballmapState, "id"> & { locationId: number }
+async function recordSyncSuccess(
+  locationId: number,
+  snapshot: NonNullable<PinballmapRuntimeState["snapshotJson"]>,
+  syncedAt: Date,
+  updatedBy: string | undefined
 ): Promise<void> {
-  await db
-    .insert(pinballmapState)
-    .values({ id: SINGLETON_ID, ...fields })
-    .onConflictDoUpdate({ target: pinballmapState.id, set: fields });
+  await db.execute(sql`
+    INSERT INTO "pinballmap_state" (
+      "id",
+      "location_id",
+      "snapshot_json",
+      "last_synced_at",
+      "last_sync_status",
+      "last_sync_error",
+      "updated_at",
+      "updated_by"
+    )
+    VALUES (
+      ${SINGLETON_ID},
+      ${locationId},
+      ${JSON.stringify(snapshot)}::text::jsonb,
+      ${syncedAt.toISOString()}::timestamptz,
+      'ok',
+      NULL,
+      ${syncedAt.toISOString()}::timestamptz,
+      ${updatedBy ?? null}::uuid
+    )
+    ON CONFLICT ("id") DO UPDATE SET
+      "location_id" = EXCLUDED."location_id",
+      "snapshot_json" = EXCLUDED."snapshot_json",
+      "last_synced_at" = EXCLUDED."last_synced_at",
+      "last_sync_status" = EXCLUDED."last_sync_status",
+      "last_sync_error" = EXCLUDED."last_sync_error",
+      "updated_at" = EXCLUDED."updated_at",
+      "updated_by" = COALESCE(
+        EXCLUDED."updated_by",
+        "pinballmap_state"."updated_by"
+      )
+  `);
+}
+
+async function recordSyncFailure(
+  locationId: number,
+  message: string,
+  attemptedAt: Date,
+  updatedBy: string | undefined
+): Promise<void> {
+  await db.execute(sql`
+    INSERT INTO "pinballmap_state" (
+      "id",
+      "location_id",
+      "last_sync_status",
+      "last_sync_error",
+      "updated_at",
+      "updated_by"
+    )
+    VALUES (
+      ${SINGLETON_ID},
+      ${locationId},
+      'error',
+      ${message},
+      ${attemptedAt.toISOString()}::timestamptz,
+      ${updatedBy ?? null}::uuid
+    )
+    ON CONFLICT ("id") DO UPDATE SET
+      "location_id" = EXCLUDED."location_id",
+      "last_sync_status" = EXCLUDED."last_sync_status",
+      "last_sync_error" = EXCLUDED."last_sync_error",
+      "updated_at" = EXCLUDED."updated_at",
+      "updated_by" = COALESCE(
+        EXCLUDED."updated_by",
+        "pinballmap_state"."updated_by"
+      )
+  `);
 }
 
 /**
@@ -133,6 +212,15 @@ const ELAPSED_PERIODS = sql`floor(extract(epoch from (now() - ${pinballmapState.
 
 /** Tokens available right now: what is banked, plus what time has refilled. */
 const AVAILABLE_TOKENS = sql`least(${PBM_REFRESH_BURST}, ${pinballmapState.refreshTokens} + ${ELAPSED_PERIODS})`;
+
+/** Raw RETURNING differs between postgres-js (array) and PGlite ({ rows }). */
+function hasReturnedRow(result: unknown): boolean {
+  if (Array.isArray(result)) return result.length > 0;
+  if (typeof result !== "object" || result === null || !("rows" in result)) {
+    return false;
+  }
+  return Array.isArray(result.rows) && result.rows.length > 0;
+}
 
 /**
  * Stamp the attempt and claim a refresh token, atomically.
@@ -168,36 +256,54 @@ async function stampSyncAttempt(
   };
 
   if (!guarded) {
-    await db
-      .insert(pinballmapState)
-      .values(values)
-      .onConflictDoUpdate({
-        target: pinballmapState.id,
-        set: { lastSyncAttemptAt: attemptAt, updatedAt: attemptAt },
-      });
+    await db.execute(sql`
+      INSERT INTO "pinballmap_state" (
+        "id",
+        "location_id",
+        "last_sync_attempt_at",
+        "updated_at"
+      )
+      VALUES (
+        ${values.id},
+        ${values.locationId},
+        ${attemptAt.toISOString()}::timestamptz,
+        ${attemptAt.toISOString()}::timestamptz
+      )
+      ON CONFLICT ("id") DO UPDATE SET
+        "last_sync_attempt_at" = EXCLUDED."last_sync_attempt_at",
+        "updated_at" = EXCLUDED."updated_at"
+    `);
     return true;
   }
 
-  const claimed = await db
-    .insert(pinballmapState)
-    // A first-ever manual refresh creates the row with one token already spent.
-    .values({
-      ...values,
-      refreshTokens: PBM_REFRESH_BURST - 1,
-      refreshTokensAt: attemptAt,
-    })
-    .onConflictDoUpdate({
-      target: pinballmapState.id,
-      set: {
-        lastSyncAttemptAt: attemptAt,
-        updatedAt: attemptAt,
-        refreshTokens: sql`${AVAILABLE_TOKENS} - 1`,
-        refreshTokensAt: sql`${pinballmapState.refreshTokensAt} + (interval '1 millisecond' * ${PBM_REFRESH_REFILL_MS} * ${ELAPSED_PERIODS})`,
-      },
-      setWhere: sql`${AVAILABLE_TOKENS} >= 1`,
-    })
-    .returning({ id: pinballmapState.id });
-  return claimed.length > 0;
+  // A first-ever manual refresh creates the row with one token already spent.
+  const claimed = await db.execute(sql`
+    INSERT INTO "pinballmap_state" (
+      "id",
+      "location_id",
+      "last_sync_attempt_at",
+      "updated_at",
+      "refresh_tokens",
+      "refresh_tokens_at"
+    )
+    VALUES (
+      ${values.id},
+      ${values.locationId},
+      ${attemptAt.toISOString()}::timestamptz,
+      ${attemptAt.toISOString()}::timestamptz,
+      ${PBM_REFRESH_BURST - 1},
+      ${attemptAt.toISOString()}::timestamptz
+    )
+    ON CONFLICT ("id") DO UPDATE SET
+      "last_sync_attempt_at" = EXCLUDED."last_sync_attempt_at",
+      "updated_at" = EXCLUDED."updated_at",
+      "refresh_tokens" = ${AVAILABLE_TOKENS} - 1,
+      "refresh_tokens_at" = ${pinballmapState.refreshTokensAt}
+        + (interval '1 millisecond' * ${PBM_REFRESH_REFILL_MS} * ${ELAPSED_PERIODS})
+    WHERE ${AVAILABLE_TOKENS} >= 1
+    RETURNING "id"
+  `);
+  return hasReturnedRow(claimed);
 }
 
 /**
@@ -213,9 +319,9 @@ async function stampSyncAttempt(
  * check, any future caller) inherits one guard. The `cron` trigger spends no
  * token (the sanctioned hourly refresh) but still records its attempt.
  *
- * Does NOT gate on `state.enabled` — this is the pure read-path mechanism and the
- * caller owns the "should we sync at all" decision (the PP-o355.11 cron checks
- * `enabled`/connection before calling; CORE-PBM-001). `lastSyncedAt` means "last
+ * A configured location is required before the throttle claim or client lookup,
+ * so an unconfigured integration spends no allowance and makes no PBM call.
+ * `lastSyncedAt` means "last
  * SUCCESSFUL sync" and is only written on the ok path, so downstream freshness
  * math (`now - lastSyncedAt`, PP-o355.11 status card) isn't fooled by a failed
  * attempt over a stale snapshot — read `lastSyncStatus` for attempt outcome.
@@ -226,9 +332,11 @@ export async function syncLocationSnapshot(opts?: {
 }): Promise<SyncResult> {
   const trigger = opts?.trigger ?? "manual";
   const state = await getPinballMapState();
-  const locationId = state?.locationId ?? APC_LOCATION_ID;
+  const locationId = state?.locationId;
+  if (locationId === null || locationId === undefined) {
+    return { ok: false, reason: "not_configured" };
+  }
   const syncedAt = new Date();
-  const actor = opts?.updatedBy ? { updatedBy: opts.updatedBy } : {};
 
   // Chokepoint: stamp the attempt before the fetch. Manual spends a token
   // (TOCTOU-safe); cron records unconditionally.
@@ -257,27 +365,13 @@ export async function syncLocationSnapshot(opts?: {
     const snapshot = await (
       await getPinballMapClient()
     ).fetchLocation(locationId);
-    await upsertState({
-      locationId,
-      snapshotJson: snapshot,
-      lastSyncedAt: syncedAt,
-      lastSyncStatus: "ok",
-      lastSyncError: null,
-      updatedAt: syncedAt,
-      ...actor,
-    });
+    await recordSyncSuccess(locationId, snapshot, syncedAt, opts?.updatedBy);
     return { ok: true, machineCount: snapshot.machineCount, syncedAt };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown sync error";
     // Note: no `lastSyncedAt` here — a failed attempt must not advance the
     // last-successful-sync clock. `updatedAt` still records that we wrote.
-    await upsertState({
-      locationId,
-      lastSyncStatus: "error",
-      lastSyncError: message,
-      updatedAt: syncedAt,
-      ...actor,
-    });
+    await recordSyncFailure(locationId, message, syncedAt, opts?.updatedBy);
     return { ok: false, reason: "error", error: message };
   }
 }

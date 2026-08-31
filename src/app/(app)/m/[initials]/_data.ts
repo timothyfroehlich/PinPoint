@@ -125,10 +125,21 @@ export const getMachineForLayout = cache(async (initials: string) => {
  */
 function resolveModelTitle(machine: {
   pinballmapMachineId: number | null;
+  pinballmapExcluded: boolean;
+  name: string;
   modelName: string | null;
   pinballmapTitle: { name: string } | null;
 }): string | null {
-  if (machine.pinballmapMachineId === null) return machine.modelName;
+  if (machine.pinballmapMachineId === null) {
+    // Model name is optional under Manual Entry (Tim, 2026-08-27): leaving it
+    // blank means "same as what we call the cabinet", so it FOLLOWS a later
+    // rename instead of freezing the name as it was the day the source was
+    // switched. Only the declared case falls back — a machine that is neither
+    // matched nor hand-entered has genuinely had nothing said about it, and
+    // "Not specified" is the honest answer there (PP-3bbr.3).
+    if (machine.pinballmapExcluded) return machine.modelName ?? machine.name;
+    return machine.modelName;
+  }
   return (
     machine.pinballmapTitle?.name ??
     `Pinball Map title #${String(machine.pinballmapMachineId)}`

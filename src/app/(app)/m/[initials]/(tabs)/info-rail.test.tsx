@@ -27,6 +27,8 @@ function renderRail(overrides: Partial<RailProps> = {}): void {
       invitedOwner={null}
       addedAt={addedAt}
       modelName="Medieval Madness"
+      manufacturer="Williams"
+      year={1997}
       pinballmap={{
         locationUrl: LOCATION_URL,
         onLineup: true,
@@ -99,6 +101,30 @@ describe("InfoRail", () => {
           "Not specified"
         )
       ).toBeInTheDocument();
+    });
+
+    it("names the maker and the year", () => {
+      renderRail({ manufacturer: "Bally", year: 1995 });
+      const block = screen.getByTestId("machine-model-block");
+      expect(within(block).getByText("Bally")).toBeInTheDocument();
+      expect(within(block).getByText("1995")).toBeInTheDocument();
+    });
+
+    it("reads 'Unknown' for a blank maker or year rather than dropping the row", () => {
+      // Spec 2.4: these are optional under Manual Entry, and a labelled row is
+      // the surface that rule exists for — the machine header omits blanks.
+      renderRail({ manufacturer: null, year: null });
+      const block = screen.getByTestId("machine-model-block");
+      expect(within(block).getAllByText("Unknown")).toHaveLength(2);
+    });
+
+    it("omits both rows when there is no model at all", () => {
+      // Two "Unknown"s under a "Not specified" would be noise about a machine
+      // nobody has said anything about.
+      renderRail({ modelName: null, manufacturer: null, year: null });
+      const block = screen.getByTestId("machine-model-block");
+      expect(within(block).queryByText("Manufacturer")).not.toBeInTheDocument();
+      expect(within(block).queryByText("Year")).not.toBeInTheDocument();
     });
   });
 

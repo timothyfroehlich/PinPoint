@@ -60,7 +60,7 @@ vi.mock("~/server/db", async () => {
 // UI components — not exercised in the missing-profile path (notFound throws
 // before rendering), but must be resolvable at import time.
 vi.mock("~/lib/discord/config", () => ({
-  isDiscordIntegrationEnabled: vi.fn().mockResolvedValue(false),
+  isDiscordIntegrationConfigured: vi.fn().mockResolvedValue(false),
 }));
 vi.mock("~/lib/auth/internal-accounts", () => ({
   isInternalAccount: vi.fn().mockReturnValue(false),

@@ -26,6 +26,8 @@ import { PinballmapAbandonedEntries } from "~/components/machines/PinballmapAban
 import { getUnifiedUsers } from "~/lib/users/queries";
 import { getMachineForLayout } from "~/app/(app)/m/[initials]/_data";
 import { MachineDetailsForm } from "./machine-details-form";
+import { DetailsDirtyProvider } from "./details-dirty";
+import { PinballmapDirtyGate } from "./pinballmap-dirty-gate";
 import { MachineOwnerTransfer } from "./machine-owner-transfer";
 
 /**
@@ -148,7 +150,8 @@ export default async function MachineEditPage({
     role: u.role,
   }));
 
-  const snapshot = pbmState?.snapshotJson ?? null;
+  const configured = pbmState?.locationId != null;
+  const snapshot = configured ? (pbmState.snapshotJson ?? null) : null;
 
   // The control's whole view is DERIVED here and handed down — nothing in it
   // discovers state by calling Pinball Map (CORE-PBM-001, PP-o355.21).
@@ -158,6 +161,7 @@ export default async function MachineEditPage({
     pinballmapExcluded: machine.pinballmapExcluded,
     intent: machine.pinballmapIntent,
     presenceStatus: machine.presenceStatus,
+    configured,
     snapshot,
     siblings: sameTitle,
   });
@@ -176,7 +180,9 @@ export default async function MachineEditPage({
   // outbound writes cannot run, so Add / Remove are absent rather than present
   // and failing (CORE-ARCH-012).
   const writeEnabled =
-    pbmState?.outboundEmail != null && pbmState.outboundTokenVaultId != null;
+    configured &&
+    pbmState.outboundEmail != null &&
+    pbmState.outboundTokenVaultId != null;
 
   // Entries left on the public lineup by an earlier re-match (PP-l81u).
   //
@@ -194,7 +200,9 @@ export default async function MachineEditPage({
   // The catalog row can disappear while the entry on Pinball Map outlives it,
   // so a null title falls back to naming the entry by id rather than inventing
   // one.
-  const abandonedRows = await listSurfacingAbandonedForMachine(machine.id);
+  const abandonedRows = configured
+    ? await listSurfacingAbandonedForMachine(machine.id)
+    : [];
   const abandoned = await Promise.all(
     abandonedRows.map(async (row) => ({
       lmxId: row.lmxId,
@@ -210,7 +218,10 @@ export default async function MachineEditPage({
   const isOwner =
     user.id === machine.ownerId || user.id === machine.invitedOwnerId;
 
-  const locationUrl = pinballmapLocationUrl();
+  const locationUrl =
+    pbmState?.locationId != null
+      ? pinballmapLocationUrl(pbmState.locationId)
+      : null;
 
   return (
     // Capped at 4xl rather than filling the tab strip's width: these are form
@@ -220,76 +231,105 @@ export default async function MachineEditPage({
     // viewport's (CORE-RESP-001..004), so the pairing behaves the same whether
     // or not a future layout puts something beside it.
     <div className="@container max-w-4xl space-y-5">
-      {/* Details — these fields save together. */}
-      <section className="space-y-4" aria-labelledby="section-details">
-        <h2 id="section-details" className="text-base font-semibold">
-          Details
-        </h2>
-        <MachineDetailsForm
-          machineId={machine.id}
-          name={machine.name}
-          presenceStatus={machine.presenceStatus}
-          description={machine.description}
-          canLink={canSetIntent}
-          pinballmapMachineId={machine.pinballmapMachineId}
-          pinballmapExcluded={machine.pinballmapExcluded}
-          pinballmapExcludedReason={machine.pinballmapExcludedReason}
-          pinballmapTitleName={pinballmapTitleName}
-          // Straight off the row. These used to come from a second query,
-          // because `getMachineForLayout` nulled `manufacturer` and `year` via
-          // `PBM_METADATA_PLACEHOLDER` and the hand-entry panel would have
-          // opened blank on a machine that had them — then written the nulls
-          // back on save. PP-3bbr.1 took those two fields out of the
-          // placeholder, so the loader carries the real values and the extra
-          // round-trip was pure cost.
-          modelName={machine.modelName}
-          manufacturer={machine.manufacturer}
-          year={machine.year}
-        />
-      </section>
+      {/* Details and Pinball Map share one dirty flag. They are separate saves,
+          but not separate subjects: the Details form owns the Pinball Map link,
+          so while it has unsaved edits the controls below are acting on a link
+          that is about to move (PP-3bbr.3). Danger zone stays outside — nothing
+          in it depends on the model.
 
-      {/* Pinball Map — no save bar: every control here acts on its own, and
+          PP-53ns removes the save bar entirely, at which point there is no
+          unsaved state and this provider goes with it. */}
+      <DetailsDirtyProvider>
+        {/* Details — these fields save together. */}
+        <section className="space-y-4" aria-labelledby="section-details">
+          <h2 id="section-details" className="text-base font-semibold">
+            Details
+          </h2>
+          <MachineDetailsForm
+            machineId={machine.id}
+            name={machine.name}
+            presenceStatus={machine.presenceStatus}
+            description={machine.description}
+            canLink={canSetIntent}
+            pinballmapMachineId={machine.pinballmapMachineId}
+            pinballmapExcluded={machine.pinballmapExcluded}
+            pinballmapTitleName={pinballmapTitleName}
+            // Straight off the row. These used to come from a second query,
+            // because `getMachineForLayout` nulled `manufacturer` and `year` via
+            // `PBM_METADATA_PLACEHOLDER` and the hand-entry panel would have
+            // opened blank on a machine that had them — then written the nulls
+            // back on save. PP-3bbr.1 took those two fields out of the
+            // placeholder, so the loader carries the real values and the extra
+            // round-trip was pure cost.
+            modelName={machine.modelName}
+            manufacturer={machine.manufacturer}
+            year={machine.year}
+          />
+        </section>
+
+        {/* Pinball Map — no save bar: every control here acts on its own, and
           the section heading lives inside the control (its header carries the
           location name, the refresh state and the out-of-sync alert). */}
-      <section
-        className="space-y-4 border-t border-outline-variant pt-6"
-        aria-labelledby="section-pinballmap"
-      >
-        <h2 id="section-pinballmap" className="sr-only">
-          Pinball Map
-        </h2>
+        <section
+          className="space-y-4 border-t border-outline-variant pt-6"
+          aria-labelledby="section-pinballmap"
+        >
+          <h2 id="section-pinballmap" className="sr-only">
+            Pinball Map
+          </h2>
 
-        <PinballmapListingControl
-          machineId={machine.id}
-          view={listingView}
-          locationName={snapshot?.name ?? null}
-          locationUrl={locationUrl}
-          lastRefreshedAt={pbmState?.lastSyncedAt ?? null}
-          refreshRemaining={allowance.remaining}
-          refreshAvailableAt={allowance.nextRefillAt}
-          canSetIntent={canSetIntent}
-          canPush={canPush}
-          canRefresh={canRefresh}
-          writeEnabled={writeEnabled}
-          modelName={pinballmapTitleName}
-          commentCount={commentCount}
-        />
+          {/* Manual Entry collapses this section to one line (Tim, 2026-08-27).
+            A hand-entered model has no catalog title, so intent has nothing to
+            act on and the refresh has nothing to refresh FOR — and a stale
+            snapshot is harmless here precisely because nothing on the page
+            reads it. The section keeps its position rather than disappearing:
+            the abandoned-entry alert below lives in it, and the machine that
+            just switched away from a catalog title is exactly the one that may
+            have left an entry on the public lineup (PP-3bbr.3). */}
+          {machine.pinballmapExcluded ? (
+            <p
+              className="text-sm text-muted-foreground"
+              data-testid="pbm-listing-collapsed"
+            >
+              <span className="font-semibold text-foreground">Pinball Map</span>{" "}
+              — integration disabled. Requires a model listed in their catalog.
+            </p>
+          ) : (
+            <PinballmapDirtyGate>
+              <PinballmapListingControl
+                machineId={machine.id}
+                view={listingView}
+                locationName={snapshot?.name ?? null}
+                locationUrl={locationUrl}
+                lastRefreshedAt={pbmState?.lastSyncedAt ?? null}
+                refreshRemaining={allowance.remaining}
+                refreshAvailableAt={allowance.nextRefillAt}
+                canSetIntent={canSetIntent}
+                canPush={canPush}
+                canRefresh={canRefresh}
+                writeEnabled={writeEnabled}
+                modelName={pinballmapTitleName}
+                commentCount={commentCount}
+              />
+            </PinballmapDirtyGate>
+          )}
 
-        {/* Entries this machine walked away from that are still live on the
+          {/* Entries this machine walked away from that are still live on the
             public map (PP-l81u). Spec 2.5 routes them here only once NO cabinet
             carries the old title any more — while one does, the entry is that
             title's ordinary business and shows through those cabinets' own
             states. The Info tab's "Config issue" warning links here, so this is
             where that trail has to end. */}
-        {abandoned.length > 0 ? (
-          <PinballmapAbandonedEntries
-            machineId={machine.id}
-            entries={abandoned}
-            locationUrl={locationUrl}
-            canPush={canPush && writeEnabled}
-          />
-        ) : null}
-      </section>
+          {locationUrl !== null && abandoned.length > 0 ? (
+            <PinballmapAbandonedEntries
+              machineId={machine.id}
+              entries={abandoned}
+              locationUrl={locationUrl}
+              canPush={canPush && writeEnabled}
+            />
+          ) : null}
+        </section>
+      </DetailsDirtyProvider>
 
       {/* Danger zone — applies immediately. Machine deletion joins this
           section in PP-o355.25. */}

@@ -77,9 +77,31 @@ If you’re changing code, **start here**:
 
 ### Prerequisites
 
-- Node.js **24** (pinned in `.nvmrc`; `22.22+` or `26+` also satisfy `engines`)
-- pnpm (see `packageManager` in `package.json`)
-- Supabase account (for local dev / preview / prod)
+- [mise](https://mise.jdx.dev/) **2026.8.11+**
+- A Docker-compatible container runtime for the local Supabase stack
+- GNU parallel for the host-wide `pnpm run preflight` concurrency cap
+- A Supabase account only for preview or production administration
+
+`mise install --locked` supplies the project Node, Python, Ruff, Supabase CLI,
+and pnpm executables. Do not install separate project copies with Corepack, npm,
+Homebrew, or another version manager.
+
+### Tool Ownership
+
+| Surface                                      | Authority                                                                                                                                     |
+| :------------------------------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------- |
+| Project Node, Python, Ruff, and Supabase CLI | Exact pins in `mise.toml`; resolved artifacts in `mise.lock`                                                                                  |
+| pnpm executable                              | Exact version and sha512 integrity in `package.json#packageManager`, installed by mise                                                        |
+| Project commands                             | `package.json#scripts`; mise resolves tools but does not duplicate the task namespace                                                         |
+| Local/Bazzite `bd` and Dolt                  | User-global mise declarations checked against `scripts/beads-compatibility.json`                                                              |
+| Cloud-routine `bd` and Dolt                  | `scripts/beads-cloud-setup.sh` plus `scripts/beads-cloud-init.sh`; this path remains separate because cloud routines cannot reach the tailnet |
+
+Vercel does not install or invoke mise. `package.json#engines` is its Node
+compatibility contract, `vercel-build` retains the production migration/build
+ordering, and the preview Vercel CLI remains pinned behind the repository-owned
+wrapper. The Supabase pin in `mise.toml` owns only the CLI executable: container
+images, generated worktree configuration, database lifecycle, and deployment
+migrations remain with their existing owners.
 
 ### Local Setup (Short Version)
 
@@ -87,10 +109,12 @@ If you’re changing code, **start here**:
 git clone https://github.com/timothyfroehlich/PinPoint.git
 cd PinPoint
 
-pnpm install
-cp .env.example .env.local   # then fill in Supabase + DB vars
+mise install --locked           # installs pinned Node, Python, Ruff, Supabase CLI, and pnpm
+mise exec -- python3 -m pip install -r scripts/requirements.txt
+mise exec -- pnpm install       # plain `pnpm` also works after mise shell activation
+cp .env.example .env.local      # then fill in Supabase + DB vars
 
-pnpm run dev                  # automatically ensures Supabase is running
+mise exec -- pnpm run dev       # automatically ensures Supabase is running
 ```
 
 Open `http://localhost:<PORT>` (see `.env.local`) to use the app.
@@ -133,6 +157,11 @@ For the command reference and the rules behind it, see `AGENTS.md` §5; for whic
 tests to write where, the `pinpoint-testing` skill at
 `.agents/skills/pinpoint-testing/SKILL.md`.
 
+Dependency updates are intentionally split: Dependabot owns npm and GitHub Actions,
+while hosted Renovate may propose mise tool updates only. See
+`docs/runbooks/renovate-mise.md` for cooldowns, compatibility checks, hosted-app
+permissions, installation, and rollback.
+
 ---
 
 ## Deployment
@@ -142,9 +171,12 @@ PinPoint is designed to run on **Vercel + Supabase**:
 1. Push your code to GitHub.
 2. Import the repo into Vercel.
 3. Configure environment variables in Vercel to match your `.env.local`.
-4. Point the app at your Supabase project (preview and production projects recommended).
+4. Point the app at the production Supabase project. Preview database branches are
+   created only on demand through the `/preview` PR command.
 
 CI is configured via `.github/workflows/ci.yml` and mirrors the `pnpm run preflight` pipeline.
+Production remains `pnpm run migrate:production` followed by `next build`; a
+failed build can therefore follow a successful production migration.
 
 ---
 

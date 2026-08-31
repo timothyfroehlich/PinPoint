@@ -1,0 +1,51 @@
+# Convert Codex's commit-less clean-review reaction into exact-head evidence.
+#
+# Security boundary: pull_request_target loads this workflow and its checked-out helper
+# from trusted main, never from the PR branch. The helper witnesses a fresh eyes -> +1
+# transition after this event while continuously verifying that the PR head is unchanged.
+# It then posts a github-actions comment pinned to that SHA for the reviewed gate.
+
+name: Codex Reaction Witness
+
+on:
+  # Required so the workflow and helper come from trusted main. The job rejects forks,
+  # checks out only the default branch, and never evaluates or executes PR-controlled data.
+  pull_request_target:  # zizmor: ignore[dangerous-triggers]
+    types: [opened, ready_for_review, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: codex-reaction-witness-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  witness:
+    name: Witness clean Codex review
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GITHUB_REPOSITORY: ${{ github.repository }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+      TRIGGERED_AT: ${{ github.event.pull_request.updated_at }}
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@b09bb98e06d4d774595224525879c09bc6e98c40  # ratchet:step-security/harden-runner@v2.20.1
+        with:
+          egress-policy: audit
+
+      - name: Check out trusted default branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # ratchet:actions/checkout@v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+
+      - name: Witness reaction transition
+        run: bash scripts/workflow/codex-reaction-witness.sh "$PR_NUMBER" "$EXPECTED_HEAD" "$TRIGGERED_AT"

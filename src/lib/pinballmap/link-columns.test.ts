@@ -61,6 +61,7 @@ const snapshot = {
 beforeEach(() => {
   vi.mocked(getCatalogEntry).mockResolvedValue(entry);
   vi.mocked(getPinballMapState).mockResolvedValue({
+    locationId: 26454,
     snapshotJson: snapshot,
   } as unknown as Awaited<ReturnType<typeof getPinballMapState>>);
 });

@@ -112,7 +112,6 @@ async function seedLineup(): Promise<void> {
   await db.insert(pinballmapState).values({
     id: "singleton",
     locationId: 26454,
-    enabled: true,
     snapshotJson: {
       locationId: 26454,
       name: "Austin Pinball Collective",

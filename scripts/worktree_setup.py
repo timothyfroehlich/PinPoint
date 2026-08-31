@@ -11,8 +11,10 @@ import fcntl
 import hashlib
 import json
 import os
+import platform
 import re
 import shlex
+import shutil
 import stat
 import subprocess
 import sys
@@ -22,6 +24,18 @@ from pathlib import Path
 # =============================================================================
 # Constants
 # =============================================================================
+
+DEFAULT_INSTALL_TIMEOUT = 120  # seconds
+
+# Failure classes for dependency setup
+FAILURE_CLASS_MISSING_TOOL = "missing-tool"
+FAILURE_CLASS_TIMEOUT = "timeout"
+FAILURE_CLASS_NETWORK = "network"
+FAILURE_CLASS_INSTALL = "install"
+
+# Exit codes for worktree_setup.py
+EXIT_READY = 0
+EXIT_INCOMPLETE = 1
 
 BASE_PORT_NEXTJS = 3000
 BASE_PORT_API = 54321
@@ -593,8 +607,8 @@ def generate_launch_json(worktree_path: Path, port_config: PortConfig) -> None:
     configurations: list[dict[str, object]] = [
         {
             "name": "next-dev",
-            "runtimeExecutable": "pnpm",
-            "runtimeArgs": ["run", "dev"],
+            "runtimeExecutable": "mise",
+            "runtimeArgs": ["exec", "--", "pnpm", "run", "dev"],
             "port": port_config.nextjs_port,
         }
     ]
@@ -634,6 +648,180 @@ def generate_launch_json(worktree_path: Path, port_config: PortConfig) -> None:
         indent=2,
     )
     launch_path.write_text(content + "\n")
+
+
+# =============================================================================
+# Diagnostics and Dependencies
+# =============================================================================
+
+
+@dataclass
+class RuntimeInfo:
+    """Executable path and version diagnostic for one runtime."""
+
+    path: str | None
+    version: str | None
+
+
+@dataclass
+class RuntimeDiagnostics:
+    """Runtime diagnostics for critical development toolchains."""
+
+    python: RuntimeInfo
+    node: RuntimeInfo
+    pnpm: RuntimeInfo
+    git: RuntimeInfo
+
+    def format_summary(self) -> str:
+        parts: list[str] = []
+        for name, info in [
+            ("python", self.python),
+            ("node", self.node),
+            ("pnpm", self.pnpm),
+            ("git", self.git),
+        ]:
+            if info.path:
+                v_str = f" ({info.version})" if info.version else ""
+                parts.append(f"{name}={info.path}{v_str}")
+            else:
+                parts.append(f"{name}=<not found>")
+        return " ".join(parts)
+
+
+def _probe_version(executable_path: str, args: list[str]) -> str | None:
+    try:
+        res = subprocess.run(
+            [executable_path, *args],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if res.returncode == 0:
+            return res.stdout.strip()
+    except Exception:
+        pass
+    return None
+
+
+def collect_runtime_diagnostics() -> RuntimeDiagnostics:
+    """Collect paths and versions for python, node, pnpm, and git."""
+    py_info = RuntimeInfo(path=sys.executable, version=platform.python_version())
+
+    node_path = shutil.which("node")
+    node_ver = _probe_version(node_path, ["--version"]) if node_path else None
+    node_info = RuntimeInfo(path=node_path, version=node_ver)
+
+    pnpm_path = shutil.which("pnpm")
+    pnpm_ver = _probe_version(pnpm_path, ["--version"]) if pnpm_path else None
+    pnpm_info = RuntimeInfo(path=pnpm_path, version=pnpm_ver)
+
+    git_path = shutil.which("git")
+    git_raw = _probe_version(git_path, ["--version"]) if git_path else None
+    git_ver = git_raw.removeprefix("git version ") if git_raw else None
+    git_info = RuntimeInfo(path=git_path, version=git_ver)
+
+    return RuntimeDiagnostics(
+        python=py_info, node=node_info, pnpm=pnpm_info, git=git_info
+    )
+
+
+NETWORK_ERROR_PATTERNS = [
+    re.compile(r"\bENOTFOUND\b", re.IGNORECASE),
+    re.compile(r"\bETIMEDOUT\b", re.IGNORECASE),
+    re.compile(r"\bECONNREFUSED\b", re.IGNORECASE),
+    re.compile(r"\bECONNRESET\b", re.IGNORECASE),
+    re.compile(r"\bEAI_AGAIN\b", re.IGNORECASE),
+    re.compile(r"\bgetaddrinfo\b", re.IGNORECASE),
+    re.compile(r"fetch failed", re.IGNORECASE),
+    re.compile(r"ERR_PNPM_FETCH_", re.IGNORECASE),
+    re.compile(r"network error", re.IGNORECASE),
+    re.compile(r"request to .* failed", re.IGNORECASE),
+    re.compile(r"CERT_HAS_EXPIRED", re.IGNORECASE),
+]
+
+
+def classify_install_failure(returncode: int, stdout: str, stderr: str) -> str:
+    """Classify the failure reason of a dependency install invocation."""
+    combined = f"{stdout}\n{stderr}"
+    for pat in NETWORK_ERROR_PATTERNS:
+        if pat.search(combined):
+            return FAILURE_CLASS_NETWORK
+    return FAILURE_CLASS_INSTALL
+
+
+DEFAULT_INSTALL_TIMEOUT: int = 120
+MAX_INSTALL_TIMEOUT: int = 150
+
+
+def resolve_install_timeout() -> int:
+    """Determine the install timeout budget in seconds (capped at MAX_INSTALL_TIMEOUT)."""
+    env_val = os.environ.get("PINPOINT_WORKTREE_INSTALL_TIMEOUT") or os.environ.get(
+        "WORKTREE_INSTALL_TIMEOUT"
+    )
+    if env_val:
+        try:
+            val = int(env_val)
+            if val > 0:
+                return min(val, MAX_INSTALL_TIMEOUT)
+        except ValueError:
+            pass
+    return DEFAULT_INSTALL_TIMEOUT
+
+
+def are_dependencies_ready(worktree_path: Path) -> bool:
+    """Verify that dependencies are fully installed and linked.
+
+    Checks for node_modules/.modules.yaml (pnpm's completion marker written
+    only when linking finishes) rather than node_modules directory existence alone,
+    preventing partial installs from falsely reporting ready.
+    """
+    modules_yaml = worktree_path / "node_modules" / ".modules.yaml"
+    return modules_yaml.is_file()
+
+
+def install_dependencies(
+    worktree_path: Path, timeout: int | None = None
+) -> tuple[bool, str | None, str | None]:
+    """Ensure node_modules exists and is completely installed.
+
+    Returns (is_ready, failure_class, detail).
+    If node_modules is already present and complete, returns (True, None, None).
+    """
+    if are_dependencies_ready(worktree_path):
+        return True, None, None
+
+    pnpm_path = shutil.which("pnpm")
+    if not pnpm_path:
+        return False, FAILURE_CLASS_MISSING_TOOL, "pnpm executable not found in PATH"
+
+    if timeout is None:
+        timeout = resolve_install_timeout()
+
+    try:
+        res = subprocess.run(
+            [pnpm_path, "install", "--frozen-lockfile"],
+            cwd=worktree_path,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+        if res.returncode == 0:
+            return True, None, None
+
+        failure_class = classify_install_failure(res.returncode, res.stdout, res.stderr)
+        lines = (res.stderr or res.stdout).strip().splitlines()
+        last_line = lines[-1] if lines else f"exit code {res.returncode}"
+        return (
+            False,
+            failure_class,
+            f"pnpm install failed (exit {res.returncode}): {last_line}",
+        )
+    except subprocess.TimeoutExpired:
+        return False, FAILURE_CLASS_TIMEOUT, f"pnpm install timed out after {timeout}s"
+    except FileNotFoundError:
+        return False, FAILURE_CLASS_MISSING_TOOL, "pnpm executable not found"
+    except OSError as exc:
+        return False, FAILURE_CLASS_INSTALL, f"failed to execute pnpm: {exc}"
 
 
 # =============================================================================
@@ -755,16 +943,19 @@ def configure_branch_tracking(branch: str, worktree_path: Path) -> None:
         )
 
 
-def main() -> None:
+def main() -> int:
     worktree_path = Path.cwd().resolve()
 
     # Skip if this is the main worktree (uses default ports)
     try:
         main_wt = get_main_worktree()
         if worktree_path == main_wt.resolve():
-            return
+            return EXIT_READY
     except (subprocess.CalledProcessError, RuntimeError):
-        return
+        return EXIT_READY
+
+    diagnostics = collect_runtime_diagnostics()
+    print(f"worktree_setup: runtimes: {diagnostics.format_summary()}", file=sys.stderr)
 
     branch = get_branch()
     configure_branch_tracking(branch, worktree_path)
@@ -794,19 +985,6 @@ def main() -> None:
 
     generate_launch_json(worktree_path, port_config)
 
-    # Install dependencies if this is a fresh worktree
-    if not (worktree_path / "node_modules").exists():
-        result = subprocess.run(
-            ["pnpm", "install", "--frozen-lockfile"],
-            cwd=worktree_path,
-        )
-        if result.returncode != 0:
-            print(
-                f"worktree_setup: warning: pnpm install failed "
-                f"(exit {result.returncode}) in {worktree_path}",
-                file=sys.stderr,
-            )
-
     # Set up beads redirect
     main_beads = main_wt / ".beads"
     wt_beads = worktree_path / ".beads"
@@ -817,16 +995,31 @@ def main() -> None:
             rel_path = os.path.relpath(main_beads, worktree_path)
             redirect_file.write_text(rel_path + "\n")
 
-    # Print summary to stderr (post-checkout output goes to terminal)
+    # Verify / install dependencies
+    is_ready, failure_class, detail = install_dependencies(worktree_path)
+
+    if is_ready:
+        print(
+            f"worktree_setup: status=ready "
+            f"slot={slot} "
+            f"project_id={port_config.project_id} "
+            f"nextjs={port_config.nextjs_port} "
+            f"api={port_config.api_port} "
+            f"db={port_config.db_port}",
+            file=sys.stderr,
+        )
+        return EXIT_READY
+
     print(
-        f"worktree_setup: slot={slot} "
-        f"project_id={port_config.project_id} "
-        f"nextjs={port_config.nextjs_port} "
-        f"api={port_config.api_port} "
-        f"db={port_config.db_port}",
+        f"worktree_setup: status=incomplete "
+        f"failure_class={failure_class} "
+        f"detail={detail} "
+        f"slot={slot} "
+        f"project_id={port_config.project_id}",
         file=sys.stderr,
     )
+    return EXIT_INCOMPLETE
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

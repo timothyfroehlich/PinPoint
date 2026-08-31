@@ -8,9 +8,10 @@ hard-fails, and give up without touching the PR when the budget runs out. A WAIT
 The whole script runs against a stubbed `gh`, including the real `_pr-gates.sh` it
 sources, so the gate wiring is exercised end to end. `gh pr merge` and `gh pr edit`
 write to marker files instead of acting, which is how "did not merge" is asserted.
-`bd` and `python3` are shadowed for the same reason: the two post-merge steps reach
-outward at real shared state — the live huddle bead, and this machine's real
-worktrees via `worktree_reap.py --apply`.
+`bd` and `python3` are shadowed as tripwires around shared state. Merge
+announcements belong to the global Huddle leader service, while the remaining
+post-merge cleanup reaches this machine's real worktrees via
+`worktree_reap.py --apply`.
 """
 
 import json
@@ -51,9 +52,11 @@ EMPTY_THREADS = json.dumps(
 def stub_repo(
     *,
     ci_rollup: str,
+    author: str = "tim",
     labels: list[str] | None = None,
     live_labels: list[str] | None = None,
     reap_exit: int = 0,
+    compact_head_sha: str = HEAD_SHA,
 ) -> Iterator[dict]:
     """Yield paths + env for a run against a fully stubbed `gh`.
 
@@ -75,7 +78,7 @@ def stub_repo(
 
         pr_info = json.dumps(
             {
-                "author": {"login": "tim"},
+                "author": {"login": author},
                 "title": "test PR (PP-test)",
                 "url": "https://example.invalid/pr/123",
                 "labels": [{"name": n} for n in (labels or [])],
@@ -109,6 +112,9 @@ def stub_repo(
             '  "pr merge"*) printf "%s\\n" "$args" > "$STUB_MERGED"; printf "merged\\n" ;;\n'
             '  "pr edit"*) printf "%s\\n" "$args" > "$STUB_LABEL_REMOVED" ;;\n'
             '  *"--json author"*) cat "$STUB_PR_INFO" ;;\n'
+            '  *"--json headRefOid,statusCheckRollup,mergeable"*) '
+            'printf \'{"headRefOid":"%s","statusCheckRollup":[\' "$STUB_COMPACT_HEAD_SHA"; '
+            'cat "$STUB_ROLLUP"; printf \'],"mergeable":"MERGEABLE"}\\n\' ;;\n'
             '  *"--json statusCheckRollup"*) cat "$STUB_ROLLUP" ;;\n'
             '  *"--json labels"*) printf "%s\\n" "$STUB_LIVE_LABELS" ;;\n'
             '  *"--json mergeable"*) printf "MERGEABLE\\n" ;;\n'
@@ -128,7 +134,8 @@ def stub_repo(
         )
 
         # Keep `bd` shadowed as a regression tripwire: merge-pr.sh must not post
-        # huddle notices itself. The neutral main watcher owns that side effect.
+        # Huddle notices itself. The global Bazzite leader service owns that
+        # side effect.
         bd_stub = tmp_path / "bd"
         bd_stub.write_text(
             '#!/usr/bin/env bash\nprintf "%s\\n" "$*" >> "$STUB_BD_CALLS"\nexit 0\n'
@@ -156,6 +163,7 @@ def stub_repo(
         env = dict(os.environ)
         env["PATH"] = f"{tmp}{os.pathsep}{env.get('PATH', '')}"
         env["STUB_HEAD_SHA"] = HEAD_SHA
+        env["STUB_COMPACT_HEAD_SHA"] = compact_head_sha
         env["STUB_HEAD_DATE"] = head_date
         env["STUB_PR_INFO"] = str(tmp_path / "pr_info.json")
         env["STUB_REVIEWS"] = str(tmp_path / "reviews.json")
@@ -233,10 +241,17 @@ def test_automerge_merges_once_gates_are_green() -> None:
     assert "MERGED: PR #123" in out.stdout
     assert out.merged, "gh pr merge should have been invoked"
     assert f"--match-head-commit={HEAD_SHA}" in out.merge_args
+    full_ci_reads = [
+        call
+        for call in out.gh_calls
+        if "--json statusCheckRollup" in call
+        and "headRefOid,statusCheckRollup,mergeable" not in call
+    ]
+    assert len(full_ci_reads) == 2, "initial green still requires a final full audit"
 
 
 def test_merge_does_not_post_directly_to_huddle() -> None:
-    """The watcher, not the merge command, owns merge announcements."""
+    """The global leader service, not the merge command, owns announcements."""
     with stub_repo(ci_rollup=CI_PASS) as ctx:
         resolved = subprocess.run(
             ["bash", "-c", "command -v bd"],
@@ -392,6 +407,38 @@ def test_automerge_times_out_without_touching_the_pr() -> None:
     assert "still waiting on: ci" in out.stdout
     assert not out.merged, "must not merge on timeout"
     assert not out.label_removed, "timeout is not a failure — keep the label"
+    compact_polls = [
+        call
+        for call in out.gh_calls
+        if "--json headRefOid,statusCheckRollup,mergeable" in call
+    ]
+    full_ci_reads = [
+        call
+        for call in out.gh_calls
+        if "--json statusCheckRollup" in call
+        and "headRefOid,statusCheckRollup,mergeable" not in call
+    ]
+    assert compact_polls, out.gh_calls
+    assert len(full_ci_reads) == 1, (
+        "stable review/thread/conflict gates must not be re-read while CI waits",
+        out.gh_calls,
+    )
+
+
+def test_head_movement_restarts_the_full_gate_audit() -> None:
+    with stub_repo(ci_rollup=CI_RUNNING, compact_head_sha="e" * 40) as ctx:
+        out = run_and_snapshot(ctx, "--human", "--automerge")
+
+    assert out.returncode == 2, out.stdout + out.stderr
+    assert "head moved" in out.stdout
+    assert not out.merged
+    full_ci_reads = [
+        call
+        for call in out.gh_calls
+        if "--json statusCheckRollup" in call
+        and "headRefOid,statusCheckRollup,mergeable" not in call
+    ]
+    assert len(full_ci_reads) > 1, "a changed head must invalidate the full snapshot"
 
 
 def test_automerge_requires_human() -> None:
@@ -401,6 +448,29 @@ def test_automerge_requires_human() -> None:
     assert out.returncode == 1
     assert "REFUSE: merges are human-authorized only" in out.stderr
     assert not out.merged
+
+
+def test_trusted_dependency_bots_pass_the_authorship_gate() -> None:
+    for author in (
+        "app/dependabot",
+        "dependabot[bot]",
+        "dependabot",
+        "app/renovate",
+        "renovate[bot]",
+    ):
+        with stub_repo(ci_rollup=CI_PASS, author=author) as ctx:
+            out = run_and_snapshot(ctx, "--dry-run")
+
+        assert out.returncode == 0, f"{author}: {out.stdout}{out.stderr}"
+        assert "DRY RUN:" in out.stdout
+
+
+def test_untrusted_bot_fails_the_authorship_gate() -> None:
+    with stub_repo(ci_rollup=CI_PASS, author="dependency-helper[bot]") as ctx:
+        out = run_and_snapshot(ctx, "--dry-run")
+
+    assert out.returncode == 1
+    assert "trusted dependency-bot PRs" in out.stderr
 
 
 def test_automerge_and_dry_run_are_mutually_exclusive() -> None:

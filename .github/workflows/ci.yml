@@ -113,6 +113,94 @@ jobs:
           else
             echo "code=false" >> "$GITHUB_OUTPUT"
           fi
+
+  # Required parallel canary for the locked mise toolchain. Keep the existing
+  # job graph intact until the later cutover so it remains the rollback path.
+  mise-canary:
+    name: mise Toolchain Canary
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@b09bb98e06d4d774595224525879c09bc6e98c40  # ratchet:step-security/harden-runner@v2.20.1
+        with:
+          egress-policy: audit
+
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # ratchet:actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup locked mise toolchain
+        id: toolchain
+        uses: ./.github/actions/setup-mise
+        with:
+          install-args: "--locked"
+
+      - name: Verify locked toolchain versions
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          assert_version() {
+            local tool="$1"
+            local expected="$2"
+            local actual="$3"
+            if [[ "$actual" != "$expected" ]]; then
+              echo "::error::${tool} version mismatch: expected ${expected}, got ${actual}"
+              exit 1
+            fi
+            echo "${tool} ${actual}"
+          }
+
+          node_version="$(node --version)"
+          node_version="${node_version#v}"
+          pnpm_version="$(pnpm --version)"
+          python_version="$(python3 -c 'import platform; print(platform.python_version())')"
+          supabase_version="$(supabase --version)"
+
+          expected_node="$(python3 -c 'import tomllib; print(tomllib.load(open("mise.toml", "rb"))["tools"]["node"])')"
+          expected_pnpm="$(python3 -c 'import json; value=json.load(open("package.json"))["packageManager"]; print(value.split("@", 1)[1].split("+", 1)[0])')"
+          expected_python="$(python3 -c 'import tomllib; print(tomllib.load(open("mise.toml", "rb"))["tools"]["python"])')"
+          expected_supabase="$(python3 -c 'import tomllib; print(tomllib.load(open("mise.toml", "rb"))["tools"]["supabase"])')"
+
+          assert_version node "$expected_node" "$node_version"
+          assert_version pnpm "$expected_pnpm" "$pnpm_version"
+          assert_version python "$expected_python" "$python_version"
+          assert_version supabase "$expected_supabase" "$supabase_version"
+
+      - name: Cache node_modules
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # ratchet:actions/cache@v6.1.0
+        with:
+          path: node_modules
+          key: ${{ steps.toolchain.outputs.node-modules-key }}
+
+      - name: Install dependencies from lockfile
+        run: pnpm install --frozen-lockfile
+
+      - name: Run representative static checks
+        run: |
+          pnpm run typecheck
+          pnpm run typecheck:tests
+          pnpm run lint
+          pnpm run format
+          ruff check scripts/
+          ruff format --check scripts/
+
+      - name: Run representative unit tests
+        run: |
+          set -a
+          source .env.ci
+          set +a
+          pnpm run test
+
+      - name: Build application
+        run: |
+          set -a
+          source .env.ci
+          set +a
+          pnpm run build
+
   # Setup job caches dependencies for reuse by other jobs
   setup:
     name: Setup Dependencies
@@ -130,16 +218,9 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@c5ba7f7862a0f64c1b1a05fbac13e0b8e86ba08c  # ratchet:pnpm/action-setup@v4
-        with:
-          run_install: false
-
-      - name: Setup Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # ratchet:actions/setup-node@v7.0.0
-        with:
-          node-version: "24"
-          cache: "pnpm"
+      - name: Setup locked mise toolchain
+        id: toolchain
+        uses: ./.github/actions/setup-mise
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -148,7 +229,7 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # ratchet:actions/cache@v6.1.0
         with:
           path: node_modules
-          key: node-modules-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          key: ${{ steps.toolchain.outputs.node-modules-key }}
 
   typecheck:
     name: TypeScript Type Check
@@ -165,23 +246,16 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@c5ba7f7862a0f64c1b1a05fbac13e0b8e86ba08c  # ratchet:pnpm/action-setup@v4
-        with:
-          run_install: false
-
-      - name: Setup Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # ratchet:actions/setup-node@v7.0.0
-        with:
-          node-version: "24"
-          cache: "pnpm"
+      - name: Setup locked mise toolchain
+        id: toolchain
+        uses: ./.github/actions/setup-mise
 
       - name: Restore node_modules
         id: cache-restore
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # ratchet:actions/cache/restore@v6.1.0
         with:
           path: node_modules
-          key: node-modules-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          key: ${{ steps.toolchain.outputs.node-modules-key }}
 
       - name: Install dependencies (if cache miss)
         if: steps.cache-restore.outputs.cache-hit != 'true'
@@ -208,23 +282,16 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@c5ba7f7862a0f64c1b1a05fbac13e0b8e86ba08c  # ratchet:pnpm/action-setup@v4
-        with:
-          run_install: false
-
-      - name: Setup Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # ratchet:actions/setup-node@v7.0.0
-        with:
-          node-version: "24"
-          cache: "pnpm"
+      - name: Setup locked mise toolchain
+        id: toolchain
+        uses: ./.github/actions/setup-mise
 
       - name: Restore node_modules
         id: cache-restore
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # ratchet:actions/cache/restore@v6.1.0
         with:
           path: node_modules
-          key: node-modules-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          key: ${{ steps.toolchain.outputs.node-modules-key }}
 
       - name: Install dependencies (if cache miss)
         if: steps.cache-restore.outputs.cache-hit != 'true'
@@ -248,23 +315,16 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@c5ba7f7862a0f64c1b1a05fbac13e0b8e86ba08c  # ratchet:pnpm/action-setup@v4
-        with:
-          run_install: false
-
-      - name: Setup Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # ratchet:actions/setup-node@v7.0.0
-        with:
-          node-version: "24"
-          cache: "pnpm"
+      - name: Setup locked mise toolchain
+        id: toolchain
+        uses: ./.github/actions/setup-mise
 
       - name: Restore node_modules
         id: cache-restore
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # ratchet:actions/cache/restore@v6.1.0
         with:
           path: node_modules
-          key: node-modules-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          key: ${{ steps.toolchain.outputs.node-modules-key }}
 
       - name: Install dependencies (if cache miss)
         if: steps.cache-restore.outputs.cache-hit != 'true'
@@ -293,14 +353,17 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y yamllint shellcheck
 
-      - name: Install Ruff
-        run: pipx install "ruff==0.15.1"
+      - name: Setup locked Python toolchain
+        uses: ./.github/actions/setup-mise
+        with:
+          install-args: "--locked python ruff"
+          cache-pnpm: "false"
 
-      - name: Install pytest
-        run: pipx install "pytest==9.0.3"
+      - name: Install Python test dependencies
+        run: python3 -m pip install -r scripts/requirements.txt
 
       - name: YAML lint
-        run: yamllint .github/workflows/
+        run: yamllint .github/workflows/ .github/actions/setup-mise/action.yml
 
       - name: Action lint
         env:
@@ -319,7 +382,7 @@ jobs:
         run: ruff format --check scripts/
 
       - name: Pytest (scripts)
-        run: pytest scripts/tests/
+        run: python3 -m pytest scripts/tests/
 
       - name: ShellCheck
         run: find scripts/ .devcontainer/ -name '*.sh' -print0 | xargs -0 shellcheck
@@ -331,15 +394,19 @@ jobs:
       - name: Zizmor (GitHub Actions security)
         run: |
           find .github/workflows \( -name '*.yml' -o -name '*.yaml' \) \
-            ! -name '*.lock.yml' -print0 | xargs -0 zizmor --min-severity low --format plain
+            ! -name '*.lock.yml' -print0 \
+            | xargs -0 zizmor --min-severity low --format plain \
+                .github/actions/setup-mise/action.yml
 
       - name: Ratchet Check (pinned actions)
         uses: sethvargo/ratchet@a7ead07a89972fef4316ad196af18f87ac77bb97  # ratchet:sethvargo/ratchet@main
         with:
           files: |
+            .github/actions/setup-mise/action.yml
             .github/workflows/ci.yml
             .github/workflows/preview-control.yaml
             .github/workflows/preview-reaper.yaml
+            .github/workflows/preview-sync.yaml
 
   build:
     name: Build
@@ -356,23 +423,16 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@c5ba7f7862a0f64c1b1a05fbac13e0b8e86ba08c  # ratchet:pnpm/action-setup@v4
-        with:
-          run_install: false
-
-      - name: Setup Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # ratchet:actions/setup-node@v7.0.0
-        with:
-          node-version: "24"
-          cache: "pnpm"
+      - name: Setup locked mise toolchain
+        id: toolchain
+        uses: ./.github/actions/setup-mise
 
       - name: Restore node_modules
         id: cache-restore
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # ratchet:actions/cache/restore@v6.1.0
         with:
           path: node_modules
-          key: node-modules-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          key: ${{ steps.toolchain.outputs.node-modules-key }}
 
       - name: Install dependencies (if cache miss)
         if: steps.cache-restore.outputs.cache-hit != 'true'
@@ -401,23 +461,16 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@c5ba7f7862a0f64c1b1a05fbac13e0b8e86ba08c  # ratchet:pnpm/action-setup@v4
-        with:
-          run_install: false
-
-      - name: Setup Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # ratchet:actions/setup-node@v7.0.0
-        with:
-          node-version: "24"
-          cache: "pnpm"
+      - name: Setup locked mise toolchain
+        id: toolchain
+        uses: ./.github/actions/setup-mise
 
       - name: Restore node_modules
         id: cache-restore
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # ratchet:actions/cache/restore@v6.1.0
         with:
           path: node_modules
-          key: node-modules-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          key: ${{ steps.toolchain.outputs.node-modules-key }}
 
       - name: Install dependencies (if cache miss)
         if: steps.cache-restore.outputs.cache-hit != 'true'
@@ -446,23 +499,16 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@c5ba7f7862a0f64c1b1a05fbac13e0b8e86ba08c  # ratchet:pnpm/action-setup@v4
-        with:
-          run_install: false
-
-      - name: Setup Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # ratchet:actions/setup-node@v7.0.0
-        with:
-          node-version: "24"
-          cache: "pnpm"
+      - name: Setup locked mise toolchain
+        id: toolchain
+        uses: ./.github/actions/setup-mise
 
       - name: Restore node_modules
         id: cache-restore
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # ratchet:actions/cache/restore@v6.1.0
         with:
           path: node_modules
-          key: node-modules-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          key: ${{ steps.toolchain.outputs.node-modules-key }}
 
       - name: Install dependencies (if cache miss)
         if: steps.cache-restore.outputs.cache-hit != 'true'
@@ -500,33 +546,22 @@ jobs:
       - name: Reserve Supabase ports
         uses: ./.github/actions/reserve-supabase-ports
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@c5ba7f7862a0f64c1b1a05fbac13e0b8e86ba08c  # ratchet:pnpm/action-setup@v4
+      - name: Setup locked mise toolchain
+        id: toolchain
+        uses: ./.github/actions/setup-mise
         with:
-          run_install: false
-
-      - name: Setup Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # ratchet:actions/setup-node@v7.0.0
-        with:
-          node-version: "24"
-          cache: "pnpm"
+          install-args: "--locked node pnpm supabase"
 
       - name: Restore node_modules
         id: cache-restore
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # ratchet:actions/cache/restore@v6.1.0
         with:
           path: node_modules
-          key: node-modules-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          key: ${{ steps.toolchain.outputs.node-modules-key }}
 
       - name: Install dependencies (if cache miss)
         if: steps.cache-restore.outputs.cache-hit != 'true'
         run: pnpm install --frozen-lockfile
-
-      - name: Setup Supabase CLI
-        uses: supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520  # ratchet:supabase/setup-cli@v3.0.0
-        with:
-          # Pinned Supabase CLI — bump deliberately (was: latest). PP-d5zn.
-          version: 2.113.0
 
       - name: Setup Supabase
         uses: ./.github/actions/setup-supabase
@@ -565,33 +600,22 @@ jobs:
       - name: Reserve Supabase ports
         uses: ./.github/actions/reserve-supabase-ports
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@c5ba7f7862a0f64c1b1a05fbac13e0b8e86ba08c  # ratchet:pnpm/action-setup@v4
+      - name: Setup locked mise toolchain
+        id: toolchain
+        uses: ./.github/actions/setup-mise
         with:
-          run_install: false
-
-      - name: Setup Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # ratchet:actions/setup-node@v7.0.0
-        with:
-          node-version: "24"
-          cache: "pnpm"
+          install-args: "--locked node pnpm supabase"
 
       - name: Restore node_modules
         id: cache-restore
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # ratchet:actions/cache/restore@v6.1.0
         with:
           path: node_modules
-          key: node-modules-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          key: ${{ steps.toolchain.outputs.node-modules-key }}
 
       - name: Install dependencies (if cache miss)
         if: steps.cache-restore.outputs.cache-hit != 'true'
         run: pnpm install --frozen-lockfile
-
-      - name: Setup Supabase CLI
-        uses: supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520  # ratchet:supabase/setup-cli@v3.0.0
-        with:
-          # Pinned Supabase CLI — bump deliberately (was: latest). PP-d5zn.
-          version: 2.113.0
 
       - name: Setup Supabase
         uses: ./.github/actions/setup-supabase
@@ -624,33 +648,22 @@ jobs:
       - name: Reserve Supabase ports
         uses: ./.github/actions/reserve-supabase-ports
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@c5ba7f7862a0f64c1b1a05fbac13e0b8e86ba08c  # ratchet:pnpm/action-setup@v4
+      - name: Setup locked mise toolchain
+        id: toolchain
+        uses: ./.github/actions/setup-mise
         with:
-          run_install: false
-
-      - name: Setup Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # ratchet:actions/setup-node@v7.0.0
-        with:
-          node-version: "24"
-          cache: "pnpm"
+          install-args: "--locked node pnpm supabase"
 
       - name: Restore node_modules
         id: cache-restore
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # ratchet:actions/cache/restore@v6.1.0
         with:
           path: node_modules
-          key: node-modules-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          key: ${{ steps.toolchain.outputs.node-modules-key }}
 
       - name: Install dependencies (if cache miss)
         if: steps.cache-restore.outputs.cache-hit != 'true'
         run: pnpm install --frozen-lockfile
-
-      - name: Setup Supabase CLI
-        uses: supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520  # ratchet:supabase/setup-cli@v3.0.0
-        with:
-          # Pinned Supabase CLI — bump deliberately (was: latest). PP-d5zn.
-          version: 2.113.0
 
       - name: Cache Playwright browsers
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # ratchet:actions/cache@v6.1.0
@@ -709,33 +722,22 @@ jobs:
       - name: Reserve Supabase ports
         uses: ./.github/actions/reserve-supabase-ports
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@c5ba7f7862a0f64c1b1a05fbac13e0b8e86ba08c  # ratchet:pnpm/action-setup@v4
+      - name: Setup locked mise toolchain
+        id: toolchain
+        uses: ./.github/actions/setup-mise
         with:
-          run_install: false
-
-      - name: Setup Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # ratchet:actions/setup-node@v7.0.0
-        with:
-          node-version: "24"
-          cache: "pnpm"
+          install-args: "--locked node pnpm supabase"
 
       - name: Restore node_modules
         id: cache-restore
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # ratchet:actions/cache/restore@v6.1.0
         with:
           path: node_modules
-          key: node-modules-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          key: ${{ steps.toolchain.outputs.node-modules-key }}
 
       - name: Install dependencies (if cache miss)
         if: steps.cache-restore.outputs.cache-hit != 'true'
         run: pnpm install --frozen-lockfile
-
-      - name: Setup Supabase CLI
-        uses: supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520  # ratchet:supabase/setup-cli@v3.0.0
-        with:
-          # Pinned Supabase CLI — bump deliberately (was: latest). PP-d5zn.
-          version: 2.113.0
 
       - name: Cache Playwright browsers
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # ratchet:actions/cache@v6.1.0
@@ -794,33 +796,22 @@ jobs:
       - name: Reserve Supabase ports
         uses: ./.github/actions/reserve-supabase-ports
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@c5ba7f7862a0f64c1b1a05fbac13e0b8e86ba08c  # ratchet:pnpm/action-setup@v4
+      - name: Setup locked mise toolchain
+        id: toolchain
+        uses: ./.github/actions/setup-mise
         with:
-          run_install: false
-
-      - name: Setup Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # ratchet:actions/setup-node@v7.0.0
-        with:
-          node-version: "24"
-          cache: "pnpm"
+          install-args: "--locked node pnpm supabase"
 
       - name: Restore node_modules
         id: cache-restore
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # ratchet:actions/cache/restore@v6.1.0
         with:
           path: node_modules
-          key: node-modules-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          key: ${{ steps.toolchain.outputs.node-modules-key }}
 
       - name: Install dependencies (if cache miss)
         if: steps.cache-restore.outputs.cache-hit != 'true'
         run: pnpm install --frozen-lockfile
-
-      - name: Setup Supabase CLI
-        uses: supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520  # ratchet:supabase/setup-cli@v3.0.0
-        with:
-          # Pinned Supabase CLI — bump deliberately (was: latest). PP-d5zn.
-          version: 2.113.0
 
       - name: Cache Playwright browsers
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # ratchet:actions/cache@v6.1.0
@@ -893,33 +884,22 @@ jobs:
       - name: Reserve Supabase ports
         uses: ./.github/actions/reserve-supabase-ports
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@c5ba7f7862a0f64c1b1a05fbac13e0b8e86ba08c  # ratchet:pnpm/action-setup@v4
+      - name: Setup locked mise toolchain
+        id: toolchain
+        uses: ./.github/actions/setup-mise
         with:
-          run_install: false
-
-      - name: Setup Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # ratchet:actions/setup-node@v7.0.0
-        with:
-          node-version: "24"
-          cache: "pnpm"
+          install-args: "--locked node pnpm supabase"
 
       - name: Restore node_modules
         id: cache-restore
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # ratchet:actions/cache/restore@v6.1.0
         with:
           path: node_modules
-          key: node-modules-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          key: ${{ steps.toolchain.outputs.node-modules-key }}
 
       - name: Install dependencies (if cache miss)
         if: steps.cache-restore.outputs.cache-hit != 'true'
         run: pnpm install --frozen-lockfile
-
-      - name: Setup Supabase CLI
-        uses: supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520  # ratchet:supabase/setup-cli@v3.0.0
-        with:
-          # Pinned Supabase CLI — bump deliberately (was: latest). PP-d5zn.
-          version: 2.113.0
 
       - name: Cache Playwright browsers
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # ratchet:actions/cache@v6.1.0
@@ -1069,23 +1049,16 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@c5ba7f7862a0f64c1b1a05fbac13e0b8e86ba08c  # ratchet:pnpm/action-setup@v4
-        with:
-          run_install: false
-
-      - name: Setup Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # ratchet:actions/setup-node@v7.0.0
-        with:
-          node-version: "24"
-          cache: "pnpm"
+      - name: Setup locked mise toolchain
+        id: toolchain
+        uses: ./.github/actions/setup-mise
 
       - name: Restore node_modules
         id: cache-restore
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # ratchet:actions/cache/restore@v6.1.0
         with:
           path: node_modules
-          key: node-modules-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          key: ${{ steps.toolchain.outputs.node-modules-key }}
 
       - name: Install dependencies (if cache miss)
         if: steps.cache-restore.outputs.cache-hit != 'true'
@@ -1128,7 +1101,7 @@ jobs:
   #
   # Two tiers of required jobs:
   #
-  #   1. ALWAYS-RUNS (must succeed): linters, gitleaks
+  #   1. ALWAYS-RUNS (must succeed): mise-canary, linters, gitleaks
   #      These run on every PR including docs-only changes. Their `success` is
   #      strictly required - failure or cancellation fails the gate.
   #
@@ -1166,6 +1139,7 @@ jobs:
     name: CI Gate
     if: always()
     needs:
+      - mise-canary
       - linters
       - gitleaks
       - build
@@ -1191,6 +1165,7 @@ jobs:
       - name: Check required job results
         env:
           # Tier 1: always-runs jobs - must be `success`.
+          MISE_CANARY_RESULT: ${{ needs.mise-canary.result }}
           LINTERS_RESULT: ${{ needs.linters.result }}
           GITLEAKS_RESULT: ${{ needs.gitleaks.result }}
           # Tier 2: path-filtered jobs - `failure` fails the gate;
@@ -1212,7 +1187,7 @@ jobs:
           PNPM_AUDIT_RESULT: ${{ needs.pnpm-audit.result }}
         run: |
           # Tier 1: always-runs jobs - must be `success`.
-          required=("$LINTERS_RESULT" "$GITLEAKS_RESULT")
+          required=("$MISE_CANARY_RESULT" "$LINTERS_RESULT" "$GITLEAKS_RESULT")
           for r in "${required[@]}"; do
             if [[ "$r" != "success" ]]; then
               echo "::error::Always-runs job did not succeed (result=$r)"

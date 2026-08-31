@@ -142,7 +142,6 @@ async function seedState(
   await db.insert(pinballmapState).values({
     id: "singleton",
     locationId: 26454,
-    enabled: true,
     snapshotJson: snapshotOf(rows),
     lastSyncStatus: "ok",
   });

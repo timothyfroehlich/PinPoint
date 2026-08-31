@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // .claude/hooks/block-gh-pr-checkout.cjs
-// PreToolUse hook: hard-blocks `gh pr checkout` in EVERY worktree.
+// PreToolUse hook: hard-blocks `gh pr checkout` and its aliases in EVERY worktree.
 //
 // `gh pr checkout <n>` creates a local branch (typically `prNNNN`) and switches
 // the current checkout onto it. Run inside a session's worktree it silently
@@ -22,7 +22,7 @@
 // / `gh pr view`), so it is blocked everywhere unconditionally.
 //
 // Fails OPEN in every ambiguous case: non-Bash tools, malformed payloads, and
-// anything the shared resolver cannot statically prove is a `gh pr checkout`.
+// anything the shared resolver cannot statically prove invokes PR checkout.
 
 const { resolveCommand } = require("./lib/resolve-command.cjs");
 
@@ -33,10 +33,11 @@ const { resolveCommand } = require("./lib/resolve-command.cjs");
 // Returns { block: boolean, detail: string }.
 //
 // A command BLOCKS if ANY of its resolved segments is a `gh` invocation whose
-// first two positional (non-flag) arguments are `pr` then `checkout` — OR its
-// built-in shorthand `co` (gh ships `co` as an ALIAS for `checkout`, so
-// `gh pr co 1` performs the identical branch creation + switch). Everything
-// else — `gh pr diff`, `gh pr view`, `gh pr list`, `gh pr comment`, `gh issue …`,
+// first two positional (non-flag) arguments are `pr` then `checkout` or `co`,
+// OR whose first positional is the top-level `co` alias. GitHub CLI ships both
+// aliases for `pr checkout`, so all three forms perform the identical branch
+// creation + switch. Everything else — `gh pr diff`, `gh pr view`, `gh pr list`,
+// `gh pr comment`, `gh issue …`,
 // a bare `gh`, a non-gh command, or `echo gh pr checkout 1` (resolves to
 // `echo`) — ALLOWS.
 //
@@ -75,11 +76,15 @@ function classifyCommand(command) {
       positionals.push(t);
     }
 
-    if (
+    const isPrCheckout =
       positionals[0] === "pr" &&
-      (positionals[1] === "checkout" || positionals[1] === "co")
-    ) {
-      return { block: true, detail: `gh pr ${positionals[1]}` };
+      (positionals[1] === "checkout" || positionals[1] === "co");
+    const isTopLevelCheckoutAlias = positionals[0] === "co";
+    if (isPrCheckout || isTopLevelCheckoutAlias) {
+      return {
+        block: true,
+        detail: isTopLevelCheckoutAlias ? "gh co" : `gh pr ${positionals[1]}`,
+      };
     }
   }
 
@@ -108,11 +113,10 @@ if (require.main === module) {
 
     const cmd = String((payload.tool_input || {}).command || "");
 
-    // Cheap pre-filter: no `gh … pr … checkout|co` anywhere → allow without
-    // parsing. Must include the `co` alias, or `gh pr co` would exit here before
-    // the classifier ever runs. Over-matching is harmless — the prefilter only
-    // gates whether the classifier runs, and the classifier makes the real call.
-    if (!/\bgh\b[\s\S]*\bpr\b[\s\S]*\b(?:checkout|co)\b/.test(cmd)) {
+    // Cheap pre-filter: no checkout command/alias anywhere after `gh` → allow
+    // without parsing. It must admit both `gh pr co` and the top-level `gh co`
+    // alias so the classifier gets the final say. Over-matching is harmless.
+    if (!/\bgh\b[\s\S]*\b(?:checkout|co)\b/.test(cmd)) {
       process.exit(0);
     }
 

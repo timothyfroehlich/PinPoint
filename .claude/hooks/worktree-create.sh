@@ -149,6 +149,15 @@ do_worktree_add() {
   local delay_ms=200
   local attempt
   local last_stderr=""
+  local branch_existed_before=0
+  local worktree_registered_before=0
+
+  if git -C "$BASE_PATH" rev-parse --verify --quiet "refs/heads/$BRANCH" >/dev/null 2>&1; then
+    branch_existed_before=1
+  fi
+  if git -C "$BASE_PATH" worktree list --porcelain 2>/dev/null | grep -Fx "worktree $WORKTREE_PATH" >/dev/null 2>&1; then
+    worktree_registered_before=1
+  fi
 
   for attempt in $(seq 1 "$max_retries"); do
     last_stderr=$(git -C "$BASE_PATH" worktree add "$WORKTREE_PATH" -b "$BRANCH" "$BASE_REF" 2>&1) && {
@@ -160,6 +169,16 @@ do_worktree_add() {
     if ! is_lock_contention "$last_stderr"; then
       echo "worktree-create.sh: permanent error (not retrying):" >&2
       echo "$last_stderr" >&2
+      case "$last_stderr" in
+        *post-checkout*|*"hook failed"*)
+          if [ "$worktree_registered_before" -eq 0 ] && [ -f "$BASE_PATH/scripts/worktree_cleanup.py" ]; then
+            python3 "$BASE_PATH/scripts/worktree_cleanup.py" "$WORKTREE_PATH" >&2 || true
+          fi
+          if [ "$branch_existed_before" -eq 0 ] && git -C "$BASE_PATH" rev-parse --verify --quiet "refs/heads/$BRANCH" >/dev/null 2>&1; then
+            git -C "$BASE_PATH" branch -D "$BRANCH" >&2 2>/dev/null || true
+          fi
+          ;;
+      esac
       return 1
     fi
 
@@ -175,6 +194,16 @@ do_worktree_add() {
   echo "worktree-create.sh: FAILED to create worktree after $max_retries attempts" >&2
   echo "  cwd=$BASE_PATH  branch=$BRANCH  target=$WORKTREE_PATH" >&2
   echo "  Last error: $last_stderr" >&2
+  case "$last_stderr" in
+    *post-checkout*|*"hook failed"*)
+      if [ "$worktree_registered_before" -eq 0 ] && [ -f "$BASE_PATH/scripts/worktree_cleanup.py" ]; then
+        python3 "$BASE_PATH/scripts/worktree_cleanup.py" "$WORKTREE_PATH" >&2 || true
+      fi
+      if [ "$branch_existed_before" -eq 0 ] && git -C "$BASE_PATH" rev-parse --verify --quiet "refs/heads/$BRANCH" >/dev/null 2>&1; then
+        git -C "$BASE_PATH" branch -D "$BRANCH" >&2 2>/dev/null || true
+      fi
+      ;;
+  esac
   return 1
 }
 

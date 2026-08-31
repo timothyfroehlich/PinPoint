@@ -3,7 +3,7 @@
  *
  * Covers the two ways a snapshot sync is kicked off:
  *  - the CRON_SECRET-gated GET /api/cron/pinballmap-sync route (auth + the
- *    `enabled` dormancy gate)
+ *    configured-location dormancy gate)
  *  - the member+ `refreshPinballmapLineupAction` server action (permission gate)
  *
  * Real PGlite + real permission matrix + real sync/reconcile; the PBM client is
@@ -56,7 +56,7 @@ async function enableIntegration(): Promise<void> {
   const db = await getTestDb();
   await db
     .insert(pinballmapState)
-    .values({ id: "singleton", enabled: true, locationId: 26454 });
+    .values({ id: "singleton", locationId: 26454 });
 }
 
 async function seedUser(
@@ -82,7 +82,7 @@ describe("GET /api/cron/pinballmap-sync", () => {
     expect(res.status).toBe(401);
   });
 
-  it("with the right bearer + enabled, syncs and reconciles", async () => {
+  it("with the right bearer + a configured location, syncs and reconciles", async () => {
     await enableIntegration();
     const res = await GET(cronRequest(`Bearer ${CRON_SECRET}`));
     expect(res.status).toBe(200);
@@ -102,11 +102,11 @@ describe("GET /api/cron/pinballmap-sync", () => {
     expect(state?.lastSyncStatus).toBe("ok");
   });
 
-  it("is dormant (no PBM call) while the integration is disabled", async () => {
+  it("is dormant (no PBM call) while no location is configured", async () => {
     const res = await GET(cronRequest(`Bearer ${CRON_SECRET}`));
     expect(res.status).toBe(200);
     const body = (await res.json()) as { ok: boolean; skipped?: string };
-    expect(body).toEqual({ ok: true, skipped: "disabled" });
+    expect(body).toEqual({ ok: true, skipped: "not_configured" });
 
     // No snapshot was fetched or stored.
     const { getPinballMapState } = await import("~/lib/pinballmap/state");
@@ -143,6 +143,7 @@ describe("refreshPinballmapLineupAction", () => {
     // limit is global rather than per-caller (spec 3.2), so a wider audience
     // does not widen anyone's allowance.
     const id = await seedUser("member");
+    await enableIntegration();
     mockGetUser.mockResolvedValueOnce({ data: { user: { id } } });
     const result = await refreshPinballmapLineupAction(
       undefined,

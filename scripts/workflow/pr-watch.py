@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
-"""PR CI watcher for the Claude Code Monitor tool.
+"""Compact PR CI watcher for agent harnesses.
 
-Streams timestamped events to stdout as GitHub Actions runs complete.
+Polls the authoritative current-head ``CI Gate`` once per interval. Harnesses
+wait on this one quiet process instead of starting one ``gh run watch`` process
+per active workflow.
 
 Usage: ./scripts/workflow/pr-watch.py [--check-ready | --force] [--verbose] <PR_NUMBER>
   (no flag)      Run blocking pre-checks (mergeable, no failed CI Gate, no
@@ -19,48 +21,53 @@ Usage: ./scripts/workflow/pr-watch.py [--check-ready | --force] [--verbose] <PR_
                  `reviewed` gate is what refuses to merge an unreviewed
                  head.
   --force        Skip the pre-check entirely and watch unconditionally.
-  --verbose      Emit per-job progressive updates ("X passed", "CI Gate
-                 in_progress — continuing to wait", "Watching PR #N — N
-                 run(s)", per-run icon listing, startup retries). Default
-                 behavior is quiet — only terminal verdicts (CI Gate
-                 decided, check PASS/FAIL) and action items (failure
-                 details) are emitted, so that running under Claude
-                 Code's Monitor doesn't wake the agent on every job
-                 transition.
+  --verbose      Emit CI Gate state changes. Default behavior is quiet — only
+                 terminal verdicts and action items are emitted, so harnesses
+                 are not woken by unchanged polls.
 
 Cancelled runs are neither a pass nor a failure — they are reported as
 "superseded" (⊘) and never produce a failure artifact. Cancellation is routine
 here: pushing a second commit cancels the in-flight run via concurrency groups,
 and the Preview Auto-Resync workflow cancels itself the same way. (PP-r63o)
 
-A gh API error while probing a run (rate-limit 403, network drop, auth failure)
-is likewise not a failure — it means we could not find out. Those probes are
-retried with bounded backoff and, if the API stays unreachable, reported as
-"could not determine" (⚠) with the real cause, never as "✗ failed". (PP-qkl8)
+A gh API error (rate-limit 403, network drop, auth failure) is likewise not a
+failure — it means we could not find out. The same is true when the bounded
+watch expires without a terminal CI Gate. Both exit as undetermined with the
+real cause and make no speculative follow-up calls. (PP-qkl8)
 
 Exit 0: all checks passed, or (with --check-ready) the PR is ready for
         human review.
 Exit 1: one or more checks failed, no matching runs found,
         or (with --check-ready) the PR is not ready.
-Exit 2: the outcome could not be determined — the GitHub API was unreachable.
-        Nothing was observed, so this is neither a pass nor a failure.
+Exit 2: the outcome could not be determined — the GitHub API was unreachable
+        or the bounded watch expired without a terminal verdict. This is
+        neither a pass nor a failure.
 """
 
 from __future__ import annotations
 
+import fcntl
 import json
 import os
+import re
 import subprocess
 import sys
-import threading
+import tempfile
 import time
 from datetime import datetime, timezone
+from pathlib import Path
+from typing import Callable
 
 REPO_OWNER = "timothyfroehlich"
 REPO_NAME = "PinPoint"
 READY_LABEL = "ready-for-review"
 CI_GATE_NAME = "CI Gate"
 CODEX_REVIEW_BOT = "chatgpt-codex-connector[bot]"
+CODEX_REVIEW_APP_SLUG = "chatgpt-codex-connector"
+CODEX_CLEAN_REVIEW_PREFIX = "Codex Review: Didn't find any major issues."
+GITHUB_ACTIONS_BOT = "github-actions[bot]"
+GITHUB_ACTIONS_APP_SLUG = "github-actions"
+CODEX_REACTION_WITNESS_PREFIX = "<!-- pinpoint-codex-reaction-witness:"
 REVIEW_MARKER_PREFIX = "<!-- pinpoint-review:"
 LEGACY_CLAUDE_MARKER_PREFIX = "<!-- pinpoint-claude-review:"
 
@@ -68,27 +75,30 @@ LEGACY_CLAUDE_MARKER_PREFIX = "<!-- pinpoint-claude-review:"
 # Kept deliberately in sync with scripts/workflow/_pr-gates.sh. This watcher only
 # reports the state; merge-pr.sh is the enforcement point.
 REVIEW_HINT = (
-    "comment @codex review on PR #{pr}; the approval must cover the current head"
+    "await automatic Codex review of PR #{pr} at the current head; use @codex review "
+    "only when Tim explicitly requests it"
 )
 
-STARTUP_RETRIES = 6  # attempts to find runs for current SHA
-STARTUP_WAIT = 10  # seconds between startup retries
 LOG_DIR = "tmp/gh-monitor"
+WATCH_POLL_SECONDS = 30
+# PR CI currently has a 30-minute job backstop. Leave another 30 minutes for
+# runner queueing while still bounding unattended harness waits.
+WATCH_TIMEOUT_SECONDS = 3600
 
 # How long to keep polling for a replacement CI Gate after the current one came
 # back cancelled. A cancel almost always means a newer run is already queued;
 # this bounds the wait so a genuinely abandoned run still terminates.
 SUPERSEDED_GATE_GRACE = 180  # seconds
 
-# How many times to re-probe a run's state when the gh call itself fails, and
-# the first backoff (doubling each attempt: 5s, 10s, 20s → ~35s total). The
-# retry is there to ride out a blip; a user-level rate limit resets on the hour,
-# so retrying past this is pointless — better to stop and say why. (PP-qkl8)
-RUN_STATE_ATTEMPTS = 4
-RUN_STATE_BACKOFF = 5  # seconds
 EXIT_UNDETERMINED = 2
 
-_lock = threading.Lock()
+MONITOR_SCHEMA_VERSION = 1
+MONITOR_REPOSITORY = f"{REPO_OWNER}/{REPO_NAME}"
+MONITOR_TERMINAL_STATUSES = {"passed", "failed", "superseded", "undetermined"}
+MONITOR_STATUSES = MONITOR_TERMINAL_STATUSES | {"starting", "pending"}
+FOLLOWER_POLL_SECONDS = 0.25
+MonitorStateSink = Callable[[str, str, str, str | None], None]
+MonitorActionSink = Callable[[str | None], None]
 
 # Set by main() from --verbose flag. When False (the default), emit_event() is
 # a no-op so the script only emits terminal verdicts and action items. This
@@ -104,8 +114,7 @@ def ts() -> str:
 
 
 def emit(msg: str) -> None:
-    with _lock:
-        print(f"[{ts()}] {msg}", flush=True)
+    print(f"[{ts()}] {msg}", flush=True)
 
 
 def emit_event(msg: str) -> None:
@@ -127,6 +136,261 @@ def gh(*args: str) -> str:
     if result.returncode != 0:
         raise RuntimeError(result.stderr.strip() or f"gh {args[0]} failed")
     return result.stdout.strip()
+
+
+# ---------------------------------------------------------------------------
+# Host-local monitor ownership
+# ---------------------------------------------------------------------------
+
+
+def _monitor_dir() -> Path:
+    """Return the host-local state directory without consulting GitHub."""
+    state_home = os.environ.get("XDG_STATE_HOME")
+    root = Path(state_home) if state_home else Path.home() / ".local" / "state"
+    return root / "pinpoint" / "pr-watch"
+
+
+def _monitor_paths(pr: int, *, force: bool = False) -> tuple[Path, Path]:
+    mode_suffix = "-force" if force else ""
+    stem = f"{REPO_OWNER}-{REPO_NAME}-{pr}{mode_suffix}"
+    root = _monitor_dir()
+    return root / f"{stem}.lock", root / f"{stem}.json"
+
+
+def _utc_now() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _write_monitor_state(
+    path: Path,
+    *,
+    pr: int,
+    head_sha: str,
+    leader_pid: int,
+    status: str,
+    detail: str,
+    failure_artifact: str | None = None,
+    action_item: str | None = None,
+) -> None:
+    """Atomically publish one versioned monitor snapshot."""
+    if status not in MONITOR_STATUSES:
+        raise ValueError(f"unknown monitor status: {status}")
+    path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    state: dict[str, object] = {
+        "schema_version": MONITOR_SCHEMA_VERSION,
+        "repository": MONITOR_REPOSITORY,
+        "pr": pr,
+        "head_sha": head_sha,
+        "leader_pid": leader_pid,
+        "status": status,
+        "timestamp": _utc_now(),
+        "detail": detail[:240],
+    }
+    if failure_artifact is not None:
+        state["failure_artifact"] = str(Path(failure_artifact).resolve())
+    if action_item is not None:
+        state["action_item"] = action_item[:240]
+
+    temp_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=path.parent,
+            prefix=f".{path.name}.",
+            delete=False,
+        ) as handle:
+            temp_path = Path(handle.name)
+            json.dump(state, handle, separators=(",", ":"), sort_keys=True)
+            handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temp_path, path)
+    finally:
+        if temp_path is not None and temp_path.exists():
+            temp_path.unlink()
+
+
+def _read_monitor_state(path: Path, pr: int) -> dict[str, object] | None:
+    """Read one valid state snapshot; malformed or foreign data is unknown."""
+    try:
+        state = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(state, dict):
+        return None
+    required_types = {
+        "schema_version": int,
+        "repository": str,
+        "pr": int,
+        "head_sha": str,
+        "leader_pid": int,
+        "status": str,
+        "timestamp": str,
+        "detail": str,
+    }
+    if any(
+        not isinstance(state.get(key), kind) for key, kind in required_types.items()
+    ):
+        return None
+    if (
+        state["schema_version"] != MONITOR_SCHEMA_VERSION
+        or state["repository"] != MONITOR_REPOSITORY
+        or state["pr"] != pr
+        or state["leader_pid"] <= 0
+        or state["status"] not in MONITOR_STATUSES
+    ):
+        return None
+    artifact = state.get("failure_artifact")
+    if artifact is not None and not isinstance(artifact, str):
+        return None
+    action_item = state.get("action_item")
+    if action_item is not None and not isinstance(action_item, str):
+        return None
+    return state
+
+
+def _write_lock_owner(lock_handle, leader_pid: int) -> None:
+    """Identify the process holding the advisory lock for follower validation."""
+    lock_handle.seek(0)
+    lock_handle.truncate()
+    lock_handle.write(f"{leader_pid}\n")
+    lock_handle.flush()
+    os.fsync(lock_handle.fileno())
+
+
+def _read_lock_owner(lock_handle) -> int | None:
+    try:
+        lock_handle.seek(0)
+        value = lock_handle.read().strip()
+        return int(value) if value.isdigit() and int(value) > 0 else None
+    except OSError:
+        return None
+
+
+def _monitor_exit_code(status: str) -> int:
+    if status == "passed":
+        return 0
+    if status in {"failed", "superseded"}:
+        return 1
+    return EXIT_UNDETERMINED
+
+
+def _run_coordinated_watch(
+    pr: int,
+    owned_watch: Callable[[MonitorStateSink, MonitorActionSink], int],
+    *,
+    force: bool = False,
+    follower_poll_sec: float = FOLLOWER_POLL_SECONDS,
+) -> int:
+    """Own the remote watch or follow a live owner's local atomic state.
+
+    The lock, rather than the JSON file, proves liveness. A terminal file with
+    no held lock is never trusted: the new invocation becomes leader and
+    remotely revalidates it. The PID written into the locked file must match the
+    state record before a follower accepts that state, closing the stale-file
+    race between consecutive owners.
+    """
+    lock_path, state_path = _monitor_paths(pr, force=force)
+    lock_path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    with lock_path.open("a+", encoding="utf-8") as lock_handle:
+        attached_pid: int | None = None
+        last_signature: tuple[str, str, str] | None = None
+        last_action_item: str | None = None
+
+        def surface_action_item(state: dict[str, object]) -> None:
+            nonlocal last_action_item
+            action_item = state.get("action_item")
+            if isinstance(action_item, str) and action_item != last_action_item:
+                emit(action_item)
+                last_action_item = action_item
+
+        while True:
+            # An attached follower may observe the owner's atomic terminal
+            # write just after the owner releases its lock. Trust that exact
+            # PID's terminal record before contesting the now-free lock; the
+            # follower already proved this owner was live. A pending record is
+            # never trusted after unlock, so a dead leader still revalidates.
+            if attached_pid is not None:
+                attached_state = _read_monitor_state(state_path, pr)
+                if (
+                    attached_state is not None
+                    and attached_state["leader_pid"] == attached_pid
+                    and attached_state["status"] in MONITOR_TERMINAL_STATUSES
+                ):
+                    surface_action_item(attached_state)
+                    detail = str(attached_state["detail"])
+                    emit(detail)
+                    artifact = attached_state.get("failure_artifact")
+                    if artifact:
+                        emit(f"Failure details: {artifact}")
+                    return _monitor_exit_code(str(attached_state["status"]))
+            try:
+                fcntl.flock(lock_handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                lock_owner = _read_lock_owner(lock_handle)
+                state = _read_monitor_state(state_path, pr)
+                if (
+                    state is not None
+                    and lock_owner is not None
+                    and state["leader_pid"] == lock_owner
+                ):
+                    if attached_pid != lock_owner:
+                        attached_pid = lock_owner
+                        last_signature = None
+                        last_action_item = None
+                        emit_event(
+                            f"Following host-local PR #{pr} monitor pid={lock_owner}"
+                        )
+                    surface_action_item(state)
+                    signature = (
+                        str(state["head_sha"]),
+                        str(state["status"]),
+                        str(state["detail"]),
+                    )
+                    if signature != last_signature:
+                        emit_event(str(state["detail"]))
+                        last_signature = signature
+                    if state["status"] in MONITOR_TERMINAL_STATUSES:
+                        detail = str(state["detail"])
+                        emit(detail)
+                        artifact = state.get("failure_artifact")
+                        if artifact:
+                            emit(f"Failure details: {artifact}")
+                        return _monitor_exit_code(str(state["status"]))
+                time.sleep(follower_poll_sec)
+                continue
+
+            leader_pid = os.getpid()
+            _write_lock_owner(lock_handle, leader_pid)
+            action_item: str | None = None
+
+            def set_action_item(value: str | None) -> None:
+                nonlocal action_item
+                action_item = value
+
+            def publish(
+                head_sha: str,
+                status: str,
+                detail: str,
+                failure_artifact: str | None = None,
+            ) -> None:
+                _write_monitor_state(
+                    state_path,
+                    pr=pr,
+                    head_sha=head_sha,
+                    leader_pid=leader_pid,
+                    status=status,
+                    detail=detail,
+                    failure_artifact=failure_artifact,
+                    action_item=action_item,
+                )
+
+            publish("", "starting", f"PR #{pr} monitor is starting")
+            try:
+                return owned_watch(publish, set_action_item)
+            finally:
+                fcntl.flock(lock_handle.fileno(), fcntl.LOCK_UN)
 
 
 # ---------------------------------------------------------------------------
@@ -241,12 +505,54 @@ def _codex_reviews(pr: int) -> list[dict]:
     return sorted(reviews, key=lambda review: review.get("submitted_at") or "")
 
 
-def _manual_markers(pr: int) -> list[tuple[str, str]]:
-    """Return (SHA, timestamp) records from the independent manual path."""
+def _comment_review_records(
+    pr: int,
+) -> tuple[list[tuple[str, str, str]], list[tuple[str, str]]]:
+    """Return SHA-pinned automatic comments and independent manual markers."""
     repo = f"repos/{REPO_OWNER}/{REPO_NAME}"
+    automatic: list[tuple[str, str, str]] = []
     markers: list[tuple[str, str]] = []
     for comment in _gh_api_list(f"{repo}/issues/{pr}/comments"):
         body = comment.get("body") or ""
+        app = comment.get("performed_via_github_app") or {}
+        first_line = body.splitlines()[0] if body else ""
+        if (
+            comment.get("user", {}).get("login") == CODEX_REVIEW_BOT
+            and app.get("slug") == CODEX_REVIEW_APP_SLUG
+            and first_line.startswith(CODEX_CLEAN_REVIEW_PREFIX)
+            and (
+                match := re.search(
+                    r"^\*\*Reviewed commit:\*\* `([0-9a-f]{10}|[0-9a-f]{40})`$",
+                    body,
+                    re.MULTILINE,
+                )
+            )
+        ):
+            automatic.append(
+                (
+                    "clean_comment",
+                    match.group(1),
+                    comment.get("updated_at") or comment.get("created_at") or "",
+                )
+            )
+        if (
+            comment.get("user", {}).get("login") == GITHUB_ACTIONS_BOT
+            and app.get("slug") == GITHUB_ACTIONS_APP_SLUG
+            and body.startswith(CODEX_REACTION_WITNESS_PREFIX)
+            and (
+                match := re.match(
+                    r"^<!-- pinpoint-codex-reaction-witness: ([0-9a-f]{40}) -->",
+                    body,
+                )
+            )
+        ):
+            automatic.append(
+                (
+                    "clean_reaction",
+                    match.group(1),
+                    comment.get("updated_at") or comment.get("created_at") or "",
+                )
+            )
         if body.startswith(REVIEW_MARKER_PREFIX):
             markers.append(
                 (
@@ -261,7 +567,7 @@ def _manual_markers(pr: int) -> list[tuple[str, str]]:
                     comment.get("updated_at") or "",
                 )
             )
-    return markers
+    return automatic, markers
 
 
 def review_state(pr: int) -> tuple[str, str]:
@@ -271,7 +577,10 @@ def review_state(pr: int) -> tuple[str, str]:
     ]
     reviews = _codex_reviews(pr)
     if reviews:
-        latest = reviews[-1]
+        head_reviews = [
+            review for review in reviews if (review.get("commit_id") or "") == head_sha
+        ]
+        latest = head_reviews[-1] if head_reviews else reviews[-1]
         review_sha = latest.get("commit_id") or ""
         state = (latest.get("state") or "UNKNOWN").upper()
         if state == "APPROVED" and review_sha == head_sha:
@@ -279,18 +588,68 @@ def review_state(pr: int) -> tuple[str, str]:
 
     # A current native approval is sufficient. Defer the paginated comments request
     # unless it is needed to find the independent manual-attestation fallback.
-    markers = _manual_markers(pr)
+    automatic_comments, markers = _comment_review_records(pr)
     if any(marker_sha == head_sha for marker_sha, _at in markers):
         return "marker", f"manual review marker pins head {head_sha[:7]}"
+
+    current_clean = max(
+        (
+            record
+            for record in automatic_comments
+            if (record[0] == "clean_comment" and head_sha.startswith(record[1]))
+            or (record[0] == "clean_reaction" and record[1] == head_sha)
+        ),
+        key=lambda record: record[2],
+        default=("", "", ""),
+    )
+    if current_clean[1]:
+        clean_state, clean_sha, clean_at = current_clean
+        if (
+            not reviews
+            or review_sha != head_sha
+            or clean_at > (latest.get("submitted_at") or "")
+        ):
+            if clean_state == "clean_reaction":
+                return (
+                    clean_state,
+                    f"Codex clean reaction witnessed on head {head_sha[:7]}",
+                )
+            return clean_state, f"Codex found no major issues on head {clean_sha}"
+
+    if (
+        reviews
+        and review_sha == head_sha
+        and state in {"COMMENTED", "CHANGES_REQUESTED"}
+    ):
+        return (
+            "reviewed",
+            f"Codex reviewed head {head_sha[:7]} with {state}; thread gate owns findings",
+        )
 
     latest_marker_sha, latest_marker_at = max(
         markers, key=lambda marker: marker[1], default=("", "")
     )
+    latest_clean_state, latest_clean_sha, latest_clean_at = max(
+        automatic_comments, key=lambda record: record[2], default=("", "", "")
+    )
+    latest_comment_sha, latest_comment_at, latest_comment_state = (
+        (latest_marker_sha, latest_marker_at, "stale_marker")
+        if latest_marker_at > latest_clean_at
+        else (
+            latest_clean_sha,
+            latest_clean_at,
+            "stale_clean_reaction"
+            if latest_clean_state == "clean_reaction"
+            else "stale_clean_comment",
+        )
+    )
     if reviews:
-        if latest_marker_sha and latest_marker_at > (latest.get("submitted_at") or ""):
+        if latest_comment_sha and latest_comment_at > (
+            latest.get("submitted_at") or ""
+        ):
             return (
-                "stale_marker",
-                f"manual review marker pins {latest_marker_sha[:7]} but head is {head_sha[:7]}",
+                latest_comment_state,
+                f"review record pins {latest_comment_sha[:7]} but head is {head_sha[:7]}",
             )
         if state == "APPROVED":
             return (
@@ -307,6 +666,11 @@ def review_state(pr: int) -> tuple[str, str]:
         return (
             "stale_marker",
             f"manual review marker pins {latest_marker_sha[:7]} but head is {head_sha[:7]}",
+        )
+    if latest_clean_sha:
+        return (
+            "stale_clean_comment",
+            f"Codex clean result covers {latest_clean_sha[:7]} but head is {head_sha[:7]}",
         )
     return (
         "unreviewed",
@@ -326,78 +690,65 @@ def _unresolved_threads(threads: list[dict]) -> int:
     return sum(1 for t in threads if not t["isResolved"])
 
 
-def _ci_gate_state(pr: int) -> tuple[str, str]:
-    """Return (status, conclusion) for the CI Gate check, or ("", "") if absent.
+def _select_ci_gate(rollup: list[dict]) -> dict | None:
+    """Select the authoritative CI Gate from one current-head rollup."""
+    gates = [c for c in rollup if c.get("name") == CI_GATE_NAME]
+    if not gates:
+        return None
+
+    def rank(check: dict) -> str:
+        when = check.get("startedAt") or check.get("completedAt") or ""
+        return when
+
+    return max(gates, key=rank)
+
+
+def _current_ci_snapshot(pr: int) -> tuple[str, dict | None]:
+    """Fetch the current head and authoritative CI Gate in one API query.
+
+    Keeping both values in one response is the exact-head boundary: a push
+    cannot interleave between separate head and check reads.
+    """
+    raw = gh("pr", "view", str(pr), "--json", "headRefOid,statusCheckRollup")
+    data = json.loads(raw)
+    return data.get("headRefOid") or "", _select_ci_gate(
+        data.get("statusCheckRollup") or []
+    )
+
+
+def _current_ci_gate(pr: int) -> dict | None:
+    """Return the authoritative CI Gate check for GitHub's current PR head.
 
     GitHub scopes statusCheckRollup to the PR's current head commit, but that
     commit can still carry MORE THAN ONE `CI Gate` entry — a re-run, or a run
     cancelled by a concurrency group, leaves its superseded check behind next to
-    the live one. Returning the first match let a cancelled leftover shadow the
-    run we actually care about, so prefer a non-superseded entry and, among
-    equals, the most recent one. (PP-r63o)
+    the live one. Returning the first match let an older entry shadow the run we
+    actually care about, so select the entry with the most recent start time.
+    Completion is only a fallback because an older run can finish cancelling
+    after its replacement has already completed. (PP-r63o)
     """
-    raw = gh("pr", "view", str(pr), "--json", "statusCheckRollup")
-    rollup = json.loads(raw).get("statusCheckRollup", [])
-    gates = [c for c in rollup if c.get("name") == CI_GATE_NAME]
-    if not gates:
+    _head, gate = _current_ci_snapshot(pr)
+    return gate
+
+
+def _ci_gate_completed_at(pr: int) -> str:
+    """Return the passing current-head CI Gate completion time, if available."""
+    gate = _current_ci_gate(pr)
+    if (
+        gate is None
+        or (gate.get("status") or "").upper() != "COMPLETED"
+        or not _is_passing(gate.get("conclusion"))
+    ):
+        return ""
+    return gate.get("completedAt") or gate.get("startedAt") or ""
+
+
+def _ci_gate_state(pr: int) -> tuple[str, str]:
+    """Return (status, conclusion) for the CI Gate check, or ("", "") if absent."""
+    gate = _current_ci_gate(pr)
+    if gate is None:
         return "", ""
-
-    def rank(check: dict) -> tuple[int, str]:
-        not_superseded = 0 if _is_superseded(check.get("conclusion")) else 1
-        when = check.get("completedAt") or check.get("startedAt") or ""
-        return not_superseded, when
-
-    newest = max(gates, key=rank)
-    return newest.get("status", ""), newest.get("conclusion", "")
-
-
-def _finalize_via_ci_gate(pr: int, timeout_sec: int = 1200, poll_sec: int = 10) -> int:
-    """Anchor exit status on the CI Gate aggregate check, not the visible workflow runs.
-
-    The "any completed run with no failures" heuristic produces false greens when
-    side workflows (e.g. the on-demand Preview Controller) finish before the main
-    CI workflow has been queued. Wait for CI Gate to actually report a conclusion;
-    only then return 0 (success/neutral) or 1 (anything else, or timeout).
-    """
-    deadline = time.monotonic() + timeout_sec
-    last_status = ""
-    superseded_deadline: float | None = None
-    while time.monotonic() < deadline:
-        status, conclusion = _ci_gate_state(pr)
-        if status == "COMPLETED":
-            # Match run_audit's pass criteria (SUCCESS / NEUTRAL / SKIPPED) so
-            # the watcher and the audit can't disagree on the same CI Gate state.
-            if _is_passing(conclusion):
-                emit(f"CI Gate passed (conclusion={conclusion}) ✓")
-                return 0
-            if _is_superseded(conclusion):
-                # Cancelled is neither pass nor fail. A replacement run is
-                # normally already queued, so give it a bounded grace period to
-                # post a fresh CI Gate rather than declaring failure. (PP-r63o)
-                if superseded_deadline is None:
-                    superseded_deadline = time.monotonic() + SUPERSEDED_GATE_GRACE
-                    emit_event(
-                        "CI Gate cancelled (superseded) — waiting for a replacement run"
-                    )
-                elif time.monotonic() >= superseded_deadline:
-                    emit(
-                        "⊘  CI Gate cancelled (superseded) — no replacement run appeared"
-                    )
-                    return 1
-                time.sleep(poll_sec)
-                continue
-            emit(f"CI Gate failed (conclusion={conclusion or 'unknown'})")
-            return 1
-        # A fresh run posted a new gate — restart the supersession grace clock.
-        superseded_deadline = None
-        if status != last_status:
-            emit_event(
-                f"CI Gate {status.lower() or 'not yet posted'} — continuing to wait"
-            )
-            last_status = status
-        time.sleep(poll_sec)
-    emit(f"CI Gate did not report within {timeout_sec}s — treat as failure")
-    return 1
+    return gate.get("status", ""), gate.get("conclusion", "")
 
 
 def _fetch_merge_state(pr: int) -> tuple[str, set[str]]:
@@ -418,15 +769,15 @@ def _fetch_merge_state(pr: int) -> tuple[str, set[str]]:
     return "UNKNOWN", set()
 
 
-def _pre_check_blocking(pr: int) -> tuple[bool, str]:
-    """Return (True, "") if no blocking conditions are present, else (False, reason).
+def _pre_check_blocking(pr: int) -> tuple[bool, str, str]:
+    """Return ``(allowed, reason, action_item)`` for the default watch precheck.
 
     Used by the default watch mode as a fail-fast pre-check BEFORE entering the
     watch loop. Distinguishes conditions that won't resolve by waiting (bad merge
     state, already-failed CI Gate) from conditions that the watch loop is
     designed to wait through (CI Gate not yet posted, CI Gate in progress). The
     latter MUST pass this pre-check so the watch loop can fire and
-    `_finalize_via_ci_gate` can poll for completion.
+    the aggregate watcher can poll for completion.
 
     Unresolved review threads are reported but do NOT block — watching CI is a
     step *inside* the address-the-findings loop, not after it.
@@ -436,7 +787,7 @@ def _pre_check_blocking(pr: int) -> tuple[bool, str]:
     """
     merge_state, _labels = _fetch_merge_state(pr)
     if merge_state in ("DIRTY", "CONFLICTING", "BEHIND"):
-        return False, f"merge state {merge_state} — resolve before watching"
+        return False, f"merge state {merge_state} — resolve before watching", ""
 
     ci_status, ci_conclusion = _ci_gate_state(pr)
     if ci_status == "COMPLETED":
@@ -450,9 +801,11 @@ def _pre_check_blocking(pr: int) -> tuple[bool, str]:
             return (
                 False,
                 f"CI Gate already failed (conclusion={ci_conclusion or 'unknown'})",
+                "",
             )
 
     unresolved = _unresolved_threads(get_review_threads(pr))
+    action_item = ""
     if unresolved > 0:
         # A notice, not a block. Threads are author-agnostic since PP-4ric, so
         # these are Tim's /code-review findings, and the documented loop is
@@ -464,9 +817,10 @@ def _pre_check_blocking(pr: int) -> tuple[bool, str]:
         # and --check-ready still reports one as not-ready.
         # emit(), not emit_event(): this is an action item the agent still owes,
         # not per-job progress noise, so it must survive non-verbose runs.
-        emit(f"{unresolved} unresolved review thread(s) — resolve before merge")
+        action_item = f"{unresolved} unresolved review thread(s) — resolve before merge"
+        emit(action_item)
 
-    return True, ""
+    return True, "", action_item
 
 
 def run_audit(pr: int) -> bool:
@@ -499,10 +853,9 @@ def run_audit(pr: int) -> bool:
         "applied" if READY_LABEL in labels else "not applied (orchestrator applies)"
     )
 
-    # Reported, but NOT part of the verdict. This mode answers "is this PR worth
-    # Tim's Codex review right now?", and the review is what happens AFTER that
-    # answer is yes — gating on it would make the check circular and permanently
-    # red. merge-pr.sh's `reviewed` gate is the one that refuses to merge an
+    # Reported, but NOT part of the verdict. This mode answers "can this head leave
+    # draft and enter automatic review?"; gating on review here would make the check
+    # circular and permanently red. merge-pr.sh's `reviewed` gate refuses to merge an
     # unreviewed head. A stale Codex approval is worth seeing here anyway: it means the
     # PR looks reviewed and is not.
     try:
@@ -531,149 +884,6 @@ def run_audit(pr: int) -> bool:
     return all_ok
 
 
-# ---------------------------------------------------------------------------
-# CI run watcher
-# ---------------------------------------------------------------------------
-
-
-class RunStateUnavailable(RuntimeError):
-    """The GitHub API could not be reached to determine a run's state.
-
-    Distinct from "the run reported a bad conclusion". Before PP-qkl8 the two
-    were collapsed: a failed `gh run view` returned ("", ""), which fell through
-    to the fail-safe branch and emitted "✗ — failed" plus a failure artifact for
-    a run that was, in the observed case, perfectly healthy and still pending.
-    """
-
-
-def _run_conclusion(run_id: int) -> tuple[str, str]:
-    """Return (status, conclusion) for a run.
-
-    Raises RunStateUnavailable if the gh call itself failed — a rate-limit 403,
-    a network drop, an expired token. That is "we could not find out", which is
-    not a verdict about the run and must never be reported as one.
-
-    The two failure modes are decoded separately so the reason carried up is
-    actionable: a bare "Expecting value: line 1 column 1" tells the reader
-    nothing, so unparseable output is quoted back with the raw prefix.
-    """
-    try:
-        raw = gh("run", "view", str(run_id), "--json", "status,conclusion")
-    except RuntimeError as exc:
-        raise RunStateUnavailable(str(exc) or "gh run view failed") from exc
-    try:
-        data = json.loads(raw)
-    except json.JSONDecodeError as exc:
-        raise RunStateUnavailable(
-            f"gh run view returned unparseable output ({exc}): {raw[:120]!r}"
-        ) from exc
-    return data.get("status") or "", data.get("conclusion") or ""
-
-
-def _run_conclusion_retrying(
-    run_id: int, name: str, stop: threading.Event
-) -> tuple[str, str]:
-    """_run_conclusion with bounded exponential backoff on API errors.
-
-    Re-raises RunStateUnavailable once the attempts are exhausted, so the caller
-    still has to decide what an undeterminable run means — it just gets to make
-    that decision after the API has had a fair chance to come back.
-    """
-    delay = RUN_STATE_BACKOFF
-    for attempt in range(RUN_STATE_ATTEMPTS):
-        try:
-            return _run_conclusion(run_id)
-        except RunStateUnavailable as exc:
-            if attempt == RUN_STATE_ATTEMPTS - 1 or stop.is_set():
-                raise
-            emit_event(f"↻  {name} — gh API error ({exc}); retrying in {delay}s")
-            if stop.wait(delay):
-                raise
-            delay *= 2
-    raise AssertionError("unreachable")  # pragma: no cover — loop always exits
-
-
-def watch_run(
-    run_id: int,
-    name: str,
-    stop: threading.Event,
-    failures: list[int],
-    undetermined: list[tuple[str, str]],
-) -> None:
-    """Watch one CI run via gh run watch. Retries if watcher exits prematurely.
-
-    Appends to `failures` only for an observed bad conclusion. When the run's
-    state could not be read at all, appends (name, reason) to `undetermined`
-    instead — the caller reports that as an inability to determine, not as a
-    failure, and writes no failure artifact. (PP-qkl8)
-    """
-    while not stop.is_set():
-        with subprocess.Popen(
-            ["gh", "run", "watch", str(run_id), "--exit-status"],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        ) as proc:
-            while proc.poll() is None:
-                if stop.is_set():
-                    proc.terminate()
-                    try:
-                        proc.wait(timeout=2)
-                    except subprocess.TimeoutExpired:
-                        proc.kill()
-                        proc.wait()
-                    return
-                time.sleep(0.5)
-
-        if stop.is_set():
-            return
-
-        # Verify via API regardless of exit code — gh run watch can exit 0
-        # prematurely if jobs haven't been assigned yet when the watcher starts.
-        try:
-            status, conclusion = _run_conclusion_retrying(run_id, name, stop)
-        except RunStateUnavailable as exc:
-            if stop.is_set():
-                return
-            emit_event(
-                f"⚠  {name} — could not determine run state after "
-                f"{RUN_STATE_ATTEMPTS} attempts: {exc}"
-            )
-            with _lock:
-                undetermined.append((name, str(exc)))
-            return
-
-        if proc.returncode == 0 and status not in ("queued", "in_progress"):
-            if _is_passing(conclusion):
-                emit_event(f"✓  {name} — passed")
-                return
-            # Exited 0 but API says non-passing — fall through to failure handling.
-
-        # gh run watch exited non-zero — verify via API before declaring failure.
-        # It can crash or disconnect while the run is still in progress.
-
-        if status in ("queued", "in_progress"):
-            # Watcher crashed prematurely — restart it.
-            emit_event(f"↻  {name} — watcher restarted (run still in progress)")
-            continue
-
-        if _is_passing(conclusion):
-            emit_event(f"✓  {name} — passed")
-            return
-
-        if _is_superseded(conclusion):
-            # Neither pass nor fail — a newer commit, or a self-cancelling side
-            # workflow, superseded this run. There is no failed step to log, so
-            # record no failure and write no artifact. (PP-r63o)
-            emit_event(f"⊘  {name} — superseded (cancelled)")
-            return
-
-        # Confirmed failure (or unrecognised conclusion — fail safe).
-        emit(f"✗  {name} — failed")
-        with _lock:
-            failures.append(run_id)
-        return
-
-
 def write_failure_artifact(run_id: int) -> str:
     """Fetch failure logs and write a markdown report. Returns the file path."""
     os.makedirs(LOG_DIR, exist_ok=True)
@@ -700,6 +910,188 @@ def write_failure_artifact(run_id: int) -> str:
         f.write(f"## Run Summary\n\n```text\n{summary_text}\n```\n")
 
     return path
+
+
+def _failed_ci_run_id(head_sha: str, details_url: str = "") -> int | None:
+    """Return the newest confirmed-failing CI workflow run for ``head_sha``.
+
+    This lookup happens only after the aggregate CI Gate is red. The ordinary
+    watch path never enumerates workflow runs. Prefer the run ID already
+    embedded in the selected gate's URL; the fallback filters a commit-scoped
+    list after retrieval so duplicate workflow names cannot make `gh` abort.
+    """
+    match = re.search(r"/actions/runs/(\d+)(?:/|$)", details_url)
+    if match is not None:
+        return int(match.group(1))
+
+    raw = gh(
+        "run",
+        "list",
+        "--commit",
+        head_sha,
+        "--limit",
+        "10",
+        "--json",
+        "databaseId,status,conclusion,headSha,workflowName",
+    )
+    runs = json.loads(raw)
+    failed = [
+        run
+        for run in runs
+        if run.get("headSha") == head_sha
+        and run.get("workflowName") == "CI"
+        and run.get("status") == "completed"
+        and _is_failing(run.get("conclusion"))
+    ]
+    if not failed:
+        return None
+    return int(
+        max(failed, key=lambda run: int(run.get("databaseId") or 0))["databaseId"]
+    )
+
+
+def _watch_ci_gate(
+    pr: int,
+    expected_head: str,
+    *,
+    timeout_sec: int = WATCH_TIMEOUT_SECONDS,
+    poll_sec: int = WATCH_POLL_SECONDS,
+    state_sink: MonitorStateSink | None = None,
+) -> int:
+    """Watch one exact-head CI Gate snapshot per interval.
+
+    A push moves ``expected_head`` forward and resets the observed state. A
+    terminal verdict is therefore always paired with the head returned in the
+    same GitHub response. Unchanged polls are silent.
+    """
+    deadline = time.monotonic() + timeout_sec
+    superseded_deadline: float | None = None
+    last_signature: tuple[str, str, str] | None = None
+
+    while time.monotonic() < deadline:
+        try:
+            head_sha, gate = _current_ci_snapshot(pr)
+        except (RuntimeError, json.JSONDecodeError) as exc:
+            detail = (
+                "⚠  Could not determine CI Gate state — "
+                f"the GitHub API was unreachable ({exc})."
+            )
+            emit(detail)
+            if state_sink is not None:
+                state_sink(expected_head, "undetermined", detail, None)
+            return EXIT_UNDETERMINED
+
+        if not head_sha:
+            detail = "⚠  Could not determine CI Gate state — PR head SHA was empty."
+            emit(detail)
+            if state_sink is not None:
+                state_sink("", "undetermined", detail, None)
+            return EXIT_UNDETERMINED
+
+        if expected_head and head_sha != expected_head:
+            emit_event(
+                f"PR head moved {expected_head[:7]} → {head_sha[:7]}; "
+                "following the replacement CI Gate"
+            )
+        if head_sha != expected_head:
+            expected_head = head_sha
+            superseded_deadline = None
+            last_signature = None
+
+        status = (gate or {}).get("status") or ""
+        conclusion = (gate or {}).get("conclusion") or ""
+        signature = (head_sha, status, conclusion)
+        if signature != last_signature:
+            detail = (
+                f"CI Gate {status.lower() or 'not yet posted'} on {head_sha[:7]}"
+                + (f" ({conclusion})" if conclusion else "")
+            )
+            emit_event(detail)
+            if state_sink is not None:
+                state_sink(head_sha, "pending", detail, None)
+            last_signature = signature
+
+        if status == "COMPLETED":
+            if _is_passing(conclusion):
+                detail = f"CI Gate passed on {head_sha[:7]} (conclusion={conclusion}) ✓"
+                emit(detail)
+                if state_sink is not None:
+                    state_sink(head_sha, "passed", detail, None)
+                return 0
+            if _is_superseded(conclusion):
+                if superseded_deadline is None:
+                    superseded_deadline = time.monotonic() + SUPERSEDED_GATE_GRACE
+                    emit_event(
+                        "CI Gate cancelled (superseded) — waiting for a replacement run"
+                    )
+                elif time.monotonic() >= superseded_deadline:
+                    detail = (
+                        "⊘  CI Gate cancelled (superseded) — "
+                        "no replacement run appeared"
+                    )
+                    emit(detail)
+                    if state_sink is not None:
+                        state_sink(head_sha, "superseded", detail, None)
+                    return 1
+            else:
+                detail = (
+                    f"CI Gate failed on {head_sha[:7]} "
+                    f"(conclusion={conclusion or 'unknown'})"
+                )
+                emit(detail)
+                artifact: str | None = None
+                try:
+                    run_id = _failed_ci_run_id(
+                        head_sha, str((gate or {}).get("detailsUrl") or "")
+                    )
+                    if run_id is not None:
+                        artifact = write_failure_artifact(run_id)
+                        emit(f"Failure details: {artifact}")
+                except (RuntimeError, json.JSONDecodeError, OSError, ValueError) as exc:
+                    emit(f"Failure logs unavailable: {exc}")
+                if state_sink is not None:
+                    state_sink(head_sha, "failed", detail, artifact)
+                return 1
+        else:
+            superseded_deadline = None
+
+        time.sleep(poll_sec)
+
+    detail = (
+        f"⚠  Could not determine CI Gate state — no terminal verdict "
+        f"within {timeout_sec}s."
+    )
+    emit(detail)
+    if state_sink is not None:
+        state_sink(expected_head, "undetermined", detail, None)
+    return EXIT_UNDETERMINED
+
+
+def _run_owned_watch(
+    pr: int,
+    force: bool,
+    state_sink: MonitorStateSink,
+    action_item_sink: MonitorActionSink,
+) -> int:
+    """Run pre-checks and remote polling for the process holding the lock."""
+    if not force:
+        try:
+            blocking_ok, reason, action_item = _pre_check_blocking(pr)
+        except (RuntimeError, json.JSONDecodeError, KeyError, ValueError) as exc:
+            detail = f"⚠  Could not complete pre-check — {exc}"
+            emit(detail)
+            state_sink("", "undetermined", detail, None)
+            return EXIT_UNDETERMINED
+        if not blocking_ok:
+            detail = f"Pre-check failed: {reason}"
+            emit(detail)
+            state_sink("", "failed", detail, None)
+            return 1
+        action_item_sink(action_item or None)
+
+    emit_event(f"Watching PR #{pr} — aggregate CI Gate")
+    state_sink("", "pending", f"Watching PR #{pr} — aggregate CI Gate", None)
+    return _watch_ci_gate(pr, "", state_sink=state_sink)
 
 
 # ---------------------------------------------------------------------------
@@ -739,147 +1131,13 @@ def main() -> int:
     if check_ready:
         return 0 if run_audit(pr) else 1
 
-    if not force:
-        blocking_ok, reason = _pre_check_blocking(pr)
-        if not blocking_ok:
-            emit(f"Pre-check failed: {reason}")
-            return 1
-
-    try:
-        pr_data = json.loads(
-            gh("pr", "view", str(pr), "--json", "headRefName,headRefOid")
-        )
-    except (RuntimeError, json.JSONDecodeError) as exc:
-        print(f"Error: {exc}", file=sys.stderr)
-        return 1
-
-    branch = pr_data["headRefName"]
-    head_sha = pr_data["headRefOid"]
-
-    active: list[dict] = []
-    runs: list[dict] = []
-    announced_superseded: set[int] = set()
-    for attempt in range(STARTUP_RETRIES):
-        runs = json.loads(
-            gh(
-                "run",
-                "list",
-                "--limit",
-                "50",
-                "--branch",
-                branch,
-                "--json",
-                "databaseId,status,conclusion,name,headSha",
-            )
-        )
-        # Every scan below is scoped to the CURRENT head SHA. `gh run list`
-        # returns the branch's whole recent history, so an older commit's run —
-        # in particular one cancelled when this commit superseded it — must
-        # never influence the verdict for the commit we're watching. (PP-r63o)
-        sha_runs = [r for r in runs if r["headSha"] == head_sha]
-        active = [r for r in sha_runs if r["status"] in ("queued", "in_progress")]
-
-        # Fail fast if any run for this SHA already completed with a real
-        # failure (e.g., a fast lint job failed before we started watching).
-        # Cancelled runs are excluded — they're superseded, not failed.
-        completed = [r for r in sha_runs if r["status"] == "completed"]
-        for r in completed:
-            if _is_superseded(r.get("conclusion")) and r["databaseId"] not in (
-                announced_superseded
-            ):
-                announced_superseded.add(r["databaseId"])
-                emit_event(f"⊘  {r['name']} — superseded (cancelled)")
-        early_failures = [r for r in completed if _is_failing(r.get("conclusion"))]
-        if early_failures:
-            for r in early_failures:
-                path = write_failure_artifact(r["databaseId"])
-                emit(f"Failure details: {path}")
-            emit(f"{len(early_failures)} failure(s) detected before watching started")
-            return 1
-
-        if active:
-            break
-        if attempt < STARTUP_RETRIES - 1:
-            emit_event(f"Waiting for CI to start... ({attempt + 1}/{STARTUP_RETRIES})")
-            time.sleep(STARTUP_WAIT)
-
-    if not active:
-        # Fall back to recently completed runs for the same SHA — they may have
-        # finished before we started watching (e.g., fast lint jobs).
-        # Reuse the last fetched runs list; no second gh run list call needed.
-        completed = [
-            r for r in runs if r["headSha"] == head_sha and r["status"] == "completed"
-        ]
-        if completed:
-            failures = [
-                r["databaseId"] for r in completed if _is_failing(r.get("conclusion"))
-            ]
-            if failures:
-                for run_id in failures:
-                    path = write_failure_artifact(run_id)
-                    emit(f"Failure details: {path}")
-                emit(f"{len(failures)} failure(s) detected — check artifact for logs")
-                return 1
-            # No active runs and no failures among completed runs — but those
-            # completed runs may just be side workflows (e.g. the Preview
-            # Controller) that finished before the main CI was queued. Anchor on
-            # CI Gate before exiting.
-            return _finalize_via_ci_gate(pr)
-        emit(f"No runs found for current commit on PR #{pr}.")
-        return 1
-
-    emit_event(f"Watching PR #{pr} — branch: {branch} — {len(active)} run(s)")
-    for run in active:
-        icon = "▶ " if run["status"] == "in_progress" else "⏳"
-        emit_event(f"{icon} {run['name']}")
-
-    stop = threading.Event()
-    failures: list[int] = []
-    undetermined: list[tuple[str, str]] = []
-
-    ci_threads = [
-        threading.Thread(
-            target=watch_run,
-            args=(run["databaseId"], run["name"], stop, failures, undetermined),
-            daemon=True,
-        )
-        for run in active
-    ]
-
-    for t in ci_threads:
-        t.start()
-
-    for t in ci_threads:
-        t.join()
-
-    stop.set()
-
-    if failures:
-        for run_id in failures:
-            path = write_failure_artifact(run_id)
-            emit(f"Failure details: {path}")
-        emit(f"{len(failures)} failure(s) detected — check artifact for logs")
-        return 1
-
-    if undetermined:
-        # No observed failure, but at least one run's outcome was never read.
-        # Say so and stop: claiming green here would be a guess, and claiming
-        # red would be the false alarm this exists to prevent. Skipping the CI
-        # Gate poll is deliberate — the same API is down, and under a rate-limit
-        # 403 every extra call digs the shared quota deeper. (PP-qkl8)
-        names = ", ".join(name for name, _ in undetermined)
-        emit(
-            f"⚠  Could not determine the outcome of {names} — "
-            f"the GitHub API was unreachable ({undetermined[0][1]}). "
-            "Nothing was observed, so this is neither a pass nor a failure."
-        )
-        return EXIT_UNDETERMINED
-
-    # The watched workflow runs all finished without failures. CI Gate is the
-    # aggregate that branch protection actually requires; verify it before
-    # claiming success (it may still be pending if it's posted by a separate
-    # workflow than the ones we watched).
-    return _finalize_via_ci_gate(pr)
+    return _run_coordinated_watch(
+        pr,
+        lambda state_sink, action_item_sink: _run_owned_watch(
+            pr, force, state_sink, action_item_sink
+        ),
+        force=force,
+    )
 
 
 if __name__ == "__main__":

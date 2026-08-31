@@ -1493,9 +1493,8 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
   describe("set_machine_pinballmap (PP-u4ab.12)", () => {
     /**
      * A lineup the local snapshot already holds. Auto-link reads this table and
-     * never pinballmap.com (CORE-PBM-001, CORE-TEST-006); `enabled` is
-     * load-bearing, since save-time auto-link stands down while the integration
-     * is off.
+     * never pinballmap.com (CORE-PBM-001, CORE-TEST-006). A stored location is
+     * the sole integration-configuration signal.
      */
     async function seedLineup(
       rows: { id: number; machineId: number }[]
@@ -1504,7 +1503,6 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
       await db.insert(pinballmapState).values({
         id: "singleton",
         locationId: 26454,
-        enabled: true,
         lastSyncStatus: "ok",
         snapshotJson: {
           locationId: 26454,

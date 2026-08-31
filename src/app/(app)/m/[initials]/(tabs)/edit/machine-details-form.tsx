@@ -9,6 +9,7 @@ import {
   useState,
 } from "react";
 import { useRouter } from "next/navigation";
+import { useDetailsDirty } from "./details-dirty";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -51,7 +52,6 @@ export interface MachineDetailsFormProps {
   canLink: boolean;
   pinballmapMachineId: number | null;
   pinballmapExcluded: boolean;
-  pinballmapExcludedReason: string | null;
   pinballmapTitleName: string | null;
   /** Hand-entered model identity, present only on an excluded machine (PP-3bbr). */
   modelName: string | null;
@@ -82,7 +82,6 @@ export function MachineDetailsForm({
   canLink,
   pinballmapMachineId,
   pinballmapExcluded,
-  pinballmapExcludedReason,
   pinballmapTitleName,
   modelName,
   manufacturer,
@@ -93,7 +92,11 @@ export function MachineDetailsForm({
     FormData
   >(updateMachineAction, undefined);
 
-  const [isDirty, setIsDirty] = useState(false);
+  // Dirtiness lives in a context rather than local state because the Pinball
+  // Map section below reads it too — this form owns the PBM link, so its
+  // pending save can move the ground under those controls (PP-3bbr.3). Still
+  // written from here only; nothing else sets it.
+  const { dirty: isDirty, setDirty: setIsDirty } = useDetailsDirty();
   // `useActionState` exposes no reset, so Cancel dismisses the last result
   // instead. Cleared on every submit so a fresh outcome always shows.
   const [resultDismissed, setResultDismissed] = useState(false);
@@ -108,6 +111,13 @@ export function MachineDetailsForm({
   const [descriptionDoc, setDescriptionDoc] = useState<ProseMirrorDoc | null>(
     description
   );
+  // Machine Name stays uncontrolled, but its live value is mirrored because the
+  // Model Details field below shows it as the placeholder — and that
+  // placeholder is a promise: a blank model name resolves to the machine's name
+  // at read time (spec 2.4). Reading the stored prop instead would preview the
+  // OLD name after a rename in the same unsaved edit, then save something else
+  // (PR #1925 review).
+  const [liveName, setLiveName] = useState(name);
   // Cancel remounts the subtree by changing the key — a native form reset
   // cannot restore a contenteditable widget.
   const [resetKey, setResetKey] = useState(0);
@@ -124,11 +134,17 @@ export function MachineDetailsForm({
   // anything typed after the snapshot was taken is still unsaved. Clearing
   // dirtiness for it would both mislabel the note "Saved" and disarm the
   // navigation guard protecting it (PP-o355.19 review).
+  //
+  // `setIsDirty` is in the deps because it now comes off a context value whose
+  // identity changes with `dirty`, so the effect re-runs on every flip. That is
+  // safe rather than merely tolerated: `markDirty` bumps `submitSeqRef` on every
+  // edit, so the moment anything is dirty the two sequence numbers differ and
+  // the body is a no-op. Only the save that matches its own snapshot clears.
   useEffect(() => {
     if (state?.ok && submitSeqRef.current === inFlightSeqRef.current) {
       setIsDirty(false);
     }
-  }, [state]);
+  }, [state, setIsDirty]);
 
   /**
    * Unsaved-changes guard, part 1 of 2: exits that unload the document —
@@ -281,6 +297,9 @@ export function MachineDetailsForm({
 
   const handleCancel = (): void => {
     setDescriptionDoc(description);
+    // The remount restores the input's defaultValue without firing `change`,
+    // so the mirror has to be put back by hand.
+    setLiveName(name);
     setResetKey((k) => k + 1);
     setIsDirty(false);
     // Cancel discards the edits, so any banner or "Saved" note describing them
@@ -335,6 +354,9 @@ export function MachineDetailsForm({
               type="text"
               required
               defaultValue={name}
+              onChange={(event) => {
+                setLiveName(event.target.value);
+              }}
               placeholder="e.g., Medieval Madness"
               enterKeyHint="next"
               className="border-outline bg-surface text-foreground placeholder:text-muted-foreground"
@@ -371,15 +393,13 @@ export function MachineDetailsForm({
             defaultMachineId={pinballmapMachineId}
             defaultName={pinballmapTitleName}
             defaultExcluded={pinballmapExcluded}
-            defaultExcludedReason={pinballmapExcludedReason}
             defaultModelName={modelName}
             defaultManufacturer={manufacturer}
             defaultYear={year}
-            // Seeds the Model name when the hand-entry panel opens empty. The
-            // stored name, not the live input: renaming a cabinet and marking
-            // it off-catalog in the same edit is rare enough that reading the
-            // uncontrolled input's DOM value would cost more than it buys.
-            machineName={name}
+            // The Model name's placeholder — the live input, not the stored
+            // prop, so a rename in the same unsaved edit previews the name a
+            // blank model will actually resolve to.
+            machineName={liveName}
             // The picker's controls are cmdk items and a Radix Select, so none of
             // them bubble `input` — without this the section would still claim
             // "No unsaved changes" after a model change, and Cancel would discard

@@ -56,11 +56,11 @@ Reviewers read agent skills. Consult the relevant one for the area a PR touches 
 - `pinpoint-ui` and `pinpoint-design-bible` — UI, component, and responsive-design changes. `pinpoint-ui` also owns Server Actions, data fetching, and the form conventions (Radix Select form-reset carve-out, CREATE form reset).
 - `pinpoint-deployment` — Drizzle migrations, DB connection/pooler config, preview deployments.
 
-## How a review gets triggered
+## How review runs
 
-**Every review on this repo is asked for.** Tim triggers Codex by commenting `@codex review` on the pull request. The GitHub integration uses the connected ChatGPT plan; no OpenAI API key is involved.
+**Codex reviews every eligible PR update automatically.** Tim's personal trigger is set to **On every push**. Authors open agent-created PRs as drafts, promote them after current-head CI succeeds, and leave ready PRs ready for later pushes so Codex starts the replacement review. Comment `@codex review` only when Tim explicitly asks for a manual trigger; automation being slow is not a reason to comment.
 
-That did **not** loosen the merge bar. A PR cannot merge without a review covering its **current head commit**, with every thread resolved. Either Codex's native GitHub review may be `APPROVED` by exact account `chatgpt-codex-connector[bot]` with a matching `commit_id`, or the existing SHA-pinned manual attestation may cover head. Any push requires a fresh review by the chosen path. **If you're reviewing, assume the commit you were handed is the one the author intends to be final.** Full author-side rules: `.agents/skills/pinpoint-pr-workflow/SKILL.md` Phase 3.4.
+A PR cannot merge without a review covering its **current head commit**, with every thread resolved. Codex may provide a native `APPROVED` review, its trusted connector clean comment, a trusted GitHub Actions witness that pins a fresh Codex `eyes`→`+1` transition to head, or a native `COMMENTED`/`CHANGES_REQUESTED` review whose finding threads have all been explicitly adjudicated and resolved. Direct reactions are never merge evidence because GitHub does not attach a commit SHA to them. Automatic Codex records must be from exact account `chatgpt-codex-connector[bot]`; clean connector comments must also identify the connector app, while reaction witnesses must be from exact account `github-actions[bot]` and app `github-actions`. The existing SHA-pinned manual attestation may cover head after Tim explicitly runs a local review. Any push requires a fresh review. **If you're reviewing, assume the commit you were handed is the one the author intends to be final.** Full author-side rules: `.agents/skills/pinpoint-pr-workflow/SKILL.md` Phase 3.4.
 
 ## Review mechanics
 
@@ -72,7 +72,7 @@ Reviewers never merge. The merge decision is Tim's, always (PP-wi85) — the raw
 
 This is enforced differently by harness. In **Claude Code**, `block-direct-merge.cjs` is a PreToolUse hook that **hard-blocks** the raw channels and turns any `merge-pr.sh` invocation into an **approval prompt Tim must accept** before it runs (PP-wi85, reversed for the script only, per Tim 2026-08-19). The hook does **not** fire inside Antigravity, Codex, or Gemini — in those harnesses there is no hook backstop and no approval prompt, so **do not run any merge path yourself**; what binds you is this written instruction plus `merge-pr.sh`'s own refusal to execute without a `--human` flag that only Tim should ever pass.
 
-An agent's terminal state on a PR is: ready-for-review, CI green, a review covering the head commit (see "How a review gets triggered"), review threads resolved, screenshots posted if UI-touching. Then either hand Tim the command to run himself, `! scripts/workflow/merge-pr.sh <PR> --human`, or (Claude Code only) run it and let him approve the prompt.
+An agent's terminal state on a PR is: GitHub-ready, CI green, exact-head automatic review coverage (see "How review runs"), review threads resolved, `ready-for-review` applied, and screenshots posted if UI-touching. Then either hand Tim the command to run himself, `! scripts/workflow/merge-pr.sh <PR> --human`, or (Claude Code only) run it and let him approve the prompt.
 
 ## Pointers, not copies
 

@@ -1,0 +1,26 @@
+# PinPoint project toolchain contract.
+#
+# package.json#packageManager remains the single authority for the exact pnpm
+# version and its integrity hash. Mise 2026.8.11+ reads that declaration directly
+# via idiomatic_version_file_enable_tools without duplicating the pnpm version here.
+#
+# Minimum mise version: 2026.8.11 (verifies packageManager sha512 checksums).
+min_version = "2026.8.11"
+
+[tools]
+node = "24.16.0"
+python = "3.12.9"
+ruff = "0.15.1"
+# Supabase CLI executable only — the approved local-stack / migration-tooling
+# version, sourced here for Mac, Bazzite, CI, and preview
+# orchestration. This pins the CLI binary ONLY: Supabase
+# service images, Postgres major, container lifecycle, generated config.toml,
+# and production migration ownership are all deliberately out of mise's scope.
+# Bump under the weekly Supabase cooldown + Bazzite rootless-podman/SELinux
+# compatibility check (see pinpoint-chores; PP-9mg0).
+supabase = "2.115.0"
+
+[settings]
+idiomatic_version_file_enable_tools = ["pnpm"]
+not_found_auto_install = false
+not_found_system_fallback = false

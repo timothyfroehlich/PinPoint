@@ -40,13 +40,13 @@ failure modes that defeat a naive attempt:
 The Custom base policy is minimal (anthropic.com + package registries + RFC1918
 only). Add:
 
-| Host                                   | Why                                                        |
-| -------------------------------------- | ---------------------------------------------------------- |
-| `github.com`                           | resolve latest release tag + download `bd`/`dolt` binaries |
-| `release-assets.githubusercontent.com` | GitHub release-asset CDN (the binary blobs)                |
-| `doltremoteapi.dolthub.com`            | DoltHub API — credential auth, signed-URL issuance         |
-| `*.cloudfront.net`                     | DoltHub **clone/read** — CDN blob fetch                    |
-| `*.s3.amazonaws.com`                   | DoltHub **push/write** — S3 blob upload                    |
+| Host                                   | Why                                                  |
+| -------------------------------------- | ---------------------------------------------------- |
+| `github.com`                           | download the exact pinned `bd`/`dolt` release assets |
+| `release-assets.githubusercontent.com` | GitHub release-asset CDN (the binary blobs)          |
+| `doltremoteapi.dolthub.com`            | DoltHub API — credential auth, signed-URL issuance   |
+| `*.cloudfront.net`                     | DoltHub **clone/read** — CDN blob fetch              |
+| `*.s3.amazonaws.com`                   | DoltHub **push/write** — S3 blob upload              |
 
 If a push 403s, DoltHub may be using region-scoped upload hosts — widen to
 `*.s3.<region>.amazonaws.com` (confirm the exact host from the proxy status log,

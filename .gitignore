@@ -111,8 +111,9 @@ supabase/config.toml
 .archived_v1/**/*.tsbuildinfo
 
 
-# Git worktrees and Claude Code worktree management
+# Git worktrees and agent worktree management
 .claude/worktrees/
+.codex-worktrees/
 worktrees/
 
 # Build/lint/test output files

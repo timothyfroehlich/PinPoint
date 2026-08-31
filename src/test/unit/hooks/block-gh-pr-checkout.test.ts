@@ -76,6 +76,14 @@ describe("direct gh pr checkout → BLOCK", () => {
     expectBlock("gh pr co 1727");
   });
 
+  it("blocks the top-level `co` alias (gh co)", () => {
+    expectBlock("gh co 1727");
+  });
+
+  it("blocks the top-level `co` alias behind an -R flag", () => {
+    expectBlock("gh -R timothyfroehlich/PinPoint co 1727");
+  });
+
   it("blocks the `co` alias behind an -R flag", () => {
     expectBlock("gh -R timothyfroehlich/PinPoint pr co 1727");
   });
@@ -198,6 +206,10 @@ describe("stdin entrypoint → exit code", () => {
 
   it("exits 2 for the `co` alias", () => {
     expect(runHook(bashPayload("gh pr co 1727")).status).toBe(2);
+  });
+
+  it("exits 2 for the top-level `co` alias", () => {
+    expect(runHook(bashPayload("gh co 1727")).status).toBe(2);
   });
 
   it("exits 2 for the --hostname bypass shape", () => {

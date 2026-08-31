@@ -27,8 +27,8 @@
 2. **Run `pnpm run check` before committing** (~9s — the default floor). It is a **static** gate: types, lint, format, and the shell/YAML/Python linters. **It does not run unit tests, and does not run pytest** (PP-4zcj) — unit tests are a required CI job (`test-unit`), part of `preflight`, and available via `pnpm run test`; the Python hook/script tests are a required CI job (`linters`) and available via `pnpm run check:python`. Reserve `pnpm run preflight` (the slower check + build + unit + integration) for **non-trivial changes**: migrations, security/auth, server actions, middleware, DB schema. Preflight is the exception, not the per-commit rule.
 3. **Don't kill processes you didn't start** — see §4 Process safety.
 4. **Sync with merge, never rebase** — see §5 Branches.
-5. **Root checkout is read-only.** It stays on `main`. All work — including planning docs — happens in a worktree. Dispatch a subagent or switch into an existing worktree. Tool-specific dispatch mechanics live in `CLAUDE.md`. (PP-46z, PP-bg45.)
-6. **Never `--no-verify`**, never wildcard tool permissions — without explicit user approval each time. **The merge decision is Tim's, always.** An agent MAY run the gate-enforced script `bash scripts/workflow/merge-pr.sh <PR> --human`, but the `block-direct-merge.cjs` PreToolUse hook turns that invocation into an **approval prompt** — Tim approves before it runs, so the merge is still his call (PP-wi85, reversed for the script only, per Tim 2026-08-19). The raw merge channels stay **hard-blocked** for agents — never `gh pr merge`, never `gh api PUT .../merge`, never MCP `merge_pull_request` — because they skip the script's gate re-checks (CI green, review pins head, threads resolved, no conflict). An agent's normal terminal state on a PR is still: ready-for-review, CI green, a review covering the head commit (see §5 "Getting a PR reviewed"), threads resolved, screenshots posted if UI-touching, then hand over with `bash scripts/workflow/merge-handoff.sh <PR>` — it prints the state Tim needs plus the merge command. (PP-wi85.)
+5. **Root checkout is read-only.** It stays on `main`. All work — including planning docs — happens in a worktree. Dispatch a subagent or switch into an existing worktree. (PP-46z, PP-bg45.)
+6. **Never `--no-verify`**, never wildcard tool permissions — without explicit user approval each time. **The merge decision is Tim's, always.** An agent MAY run the gate-enforced script `bash scripts/workflow/merge-pr.sh <PR> --human`, but the `block-direct-merge.cjs` PreToolUse hook turns that invocation into an **approval prompt** — Tim approves before it runs, so the merge is still his call (PP-wi85, reversed for the script only, per Tim 2026-08-19). The raw merge channels stay **hard-blocked** for agents — never `gh pr merge`, never `gh api PUT .../merge`, never MCP `merge_pull_request` — because they skip the script's gate re-checks (CI green, review pins head, threads resolved, no conflict). An agent's normal terminal state on a PR is: GitHub-ready, CI green, automatic Codex coverage of head, threads resolved, `ready-for-review` applied, and screenshots posted if UI-touching; then hand over with `bash scripts/workflow/merge-handoff.sh <PR>` — it prints the state Tim needs plus the merge command. (PP-wi85.)
 7. **Beads: `team-maintainer` policy** (not the conservative default).
 
 **Codex mutations:** use `bd --actor Codex <command>` so automated writes never fall back to Tim's identity.
@@ -44,7 +44,14 @@ Before exploring or changing non-mechanical product behavior, read
 ADRs. Skip it for mechanical changes that do not affect product behavior or
 domain language.
 
-**The huddle is the exception, and it is not in this repo.** Inter-session coordination — the SessionStart identity notice, the poll, the daily bead, and the main watcher — moved to Tim's dotfiles on 2026-08-12: scripts at `~/.agents/huddle/`, skill at `~/.claude/skills/huddle/`, tests alongside the scripts. Nothing about it was PinPoint-specific, and living outside the repo means editing it costs no PR. What stays here is the harness hook registrations in `.claude/settings.json` and `.codex/hooks.json` and the channel itself — the huddle resolves `.agents/huddle/` and its beads from the cwd's repo, so the conversation is still per-project.
+**The huddle is global, not a PinPoint subsystem.** Its implementation, trusted
+repository registry, harness registrations, tests, and user services live in
+Tim's dotfiles. Shared scripts are at `~/.agents/huddle/`; agent-writable state
+lives under `$XDG_STATE_HOME/agents-huddle/agent/`. Global hooks silently
+self-disable outside registered repositories. The Mac updater and Bazzite
+leader service own fetch/fast-forward work; Bazzite alone posts merge
+announcements. PinPoint keeps only its Beads actor hook, which asks the global
+`huddle-whoami.sh` interface for the registered identity.
 
 ## 4. Environment
 
@@ -52,8 +59,9 @@ domain language.
 
 One-time install for tools the workflow scripts depend on:
 
+- **mise** — version `2026.8.11` or newer. `mise.toml` is the exact authority for project Node, Python, Ruff, and the Supabase CLI; `package.json#packageManager` is the single pnpm version and SHA-512 authority; `mise.lock` records resolved artifacts. Run `mise install --locked` rather than installing competing project copies. Keep project commands in `package.json#scripts`, not duplicated as mise tasks. The Supabase declaration owns only the CLI executable — not production migration behavior, service images, containers, or generated worktree state.
 - **GNU parallel** — provides `sem`, which `pnpm run preflight` uses to cap host-wide concurrency at 2. Without it, `preflight` fails with a clear install hint; `pnpm run preflight:unlocked` bypasses the cap.
-- **pytest** — `pnpm run check:python` runs the hook/script tests with it, and dies with a bare `pytest: command not found` if it is absent (no runtime install hint, unlike `sem`). Install it however your host installs Python CLI tools — Homebrew, pipx, distro package.
+- **pytest** — `pnpm run check:python` runs the hook/script tests with it under the mise-selected Python. Install it with `mise exec -- python3 -m pip install -r scripts/requirements.txt`; if absent from that interpreter, `check:pytest` fails with this install hint rather than using a pytest bound to another Python.
 
 ### Worktrees & ports
 
@@ -151,11 +159,11 @@ Never resolve `drizzle/meta` conflicts manually — the folder holds binary-like
 
 ### Getting a PR reviewed
 
-**No bot reviews this repo.** Copilot review was retired on 2026-08-02 (PP-4ric) — the free tier was too small to review PinPoint's PRs, so quota outages were the normal state. The merge bar is unchanged: a PR still needs a review covering its **head commit**, with threads resolved.
+**Automatic Codex review is the default.** Open every agent-created PR as a GitHub draft; promote it only after the current-head `CI Gate` succeeds. Tim's personal review trigger is set to **On every push**, so leave a ready PR ready for later uploads and monitor the replacement current-head CI and automatic review. If a PR is already draft, keep it draft through the push and promote it only after replacement CI succeeds.
 
-**Tim can trigger GitHub-native Codex review.** Finish churn first (CI fixes, merge-from-main), stop iterating, then Tim may comment `@codex review` on the PR. It uses the installed GitHub integration and does not use an OpenAI API key. Once Codex has reviewed, address every finding and have Tim comment `@codex review` again if the branch changed. A Codex GitHub `APPROVED` review of the current head SHA is valid alongside the existing manual attestation workflow.
+The owning agent monitors CI, draft promotion, automatic review, findings, and corrective pushes until Codex has returned a clean result for the exact current head and every review thread is resolved. An exact-head finding-bearing review is also terminal once every thread is explicitly adjudicated and resolved; declining a finding without a push does not require manual re-review. Use `@codex review` only when Tim explicitly asks for a manual trigger; it is not the fallback when automation is slow.
 
-The gate accepts either GitHub's native Codex review record — exact account `chatgpt-codex-connector[bot]`, state `APPROVED`, and `commit_id` equal to the PR head SHA — or the existing SHA-pinned `mark-review.sh` attestation after `/codex:review` or `/code-review`. Full rules: `pinpoint-pr-workflow` skill Phase 3.4.
+The gate accepts Codex's native GitHub approval, its exact-bot/exact-app clean comment pinned to head, a trusted GitHub Actions witness that pins a fresh Codex `eyes`→`+1` transition to head, an exact-head `COMMENTED`/`CHANGES_REQUESTED` review after every finding thread is adjudicated and resolved, or the existing SHA-pinned manual attestation after Tim runs `/codex:review` or `/code-review`. State transitions and fallback rules: `pinpoint-pr-workflow` skill Phase 3.
 
 ### Handing a PR over to merge
 
@@ -170,10 +178,6 @@ It computes what Tim needs in order to merge without re-deriving anything: which
 ### Review comments
 
 The canonical review rubric is `REVIEW.md` at the repo root. If a PR accumulates review comments (from Tim or another agent): fix the code, OR decline with a one-sentence reply (`add_reply_to_pull_request_comment`) and resolve the thread (`pull_request_review_write(method: "resolve_thread")`). Sign replies with your agent name (`—Claude`, `—Gemini`, `—Codex`, `—Antigravity`). Declined comments must get a reply — no silent ignores.
-
-### Parallel subagent work
-
-Use worktree-isolated subagents for independent tasks. Tool-specific dispatch, hooks, and known bugs live in your tool's instructions file. Full multi-tool workflow: `pinpoint-orchestrator` skill.
 
 ### Superpowers lifecycle → beads
 
@@ -193,7 +197,7 @@ How Tim wants agents to behave. (§1 has the one-line version; this is the detai
 ### Collaboration & decisions
 
 - **Don't make my calls for me.** (a) When you ask me a multi-option question, wait for my answer before acting on one — even in auto/autonomous mode; deciding before I reply makes the question performative and removes my choice. (b) Auto/autonomous mode authorizes _operational_ calls (continuing work, tool choices, cleanup, re-publishing after a restart), **not** taste decisions — layout, color, copy, IA, or scope tradeoffs I surfaced. When I'm the taste-maker, ask (`AskUserQuestion` or a visual playground). While waiting on an answer, only do genuinely non-blocking parallel work.
-- **PRs ready-by-default.** Open PRs as ready-for-review, not draft. CI runs the same on drafts, so draft gates nothing — it just adds a "flip ready" step and signals WIP. Use draft only while still iterating, when you want title/description feedback first, or when you've told me you're pausing mid-task.
+- **PR lifecycle is agent-owned.** Follow §5 "Getting a PR reviewed" through exact-head automatic review and finding adjudication; draft/ready mechanics live in `pinpoint-pr-workflow`.
 - **Link markdown files by absolute path.** When you point me at a markdown file to read or review (a plan, spec, handoff doc, report), always give the full absolute path (e.g. `/Users/froeht/Code/PinPoint/docs/...`), never a relative one. Absolute paths open directly in a cmux pane.
 
 ### Scope and shipping discipline
@@ -229,7 +233,7 @@ Actionable, "what" and "how" only. Skills carry the deep dives.
 
 **Canonical specs are authoritative** — particularly `pinpoint-design-bible` (§5 page archetypes, §17 modal archetypes). When implementation changes UI behavior covered there, **edit the spec in place**. Don't append divergence notes or "TODO: spec out of date" disclaimers. If you find one, fold it into canonical text and delete it. Dated artifacts in `docs/superpowers/specs/` are records — leave them alone.
 
-**Feature specs stay current as you work** (`docs/feature-specs/`, `spec-driven-development` skill): when a change touches behavior covered by one, the **same PR** updates the spec or adds a divergence-table row — never neither. Spec edits require Tim approving the exact diff first, even when he says "update the spec".
+**Feature specs stay current as you work** (`docs/feature-specs/`, `spec-driven-development` skill): when a change touches behavior covered by one, the **same PR** updates the spec or adds a divergence-table row — never neither. Feature-spec edits require Tim approving the exact diff first, even when he says "update the spec." One exception: an implementation PR may delete any divergence-table rows it fully resolves without separate approval; adding, narrowing, or otherwise changing a row still requires approval.
 
 <!-- BEGIN:nextjs-agent-rules -->
 
