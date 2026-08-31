@@ -18,6 +18,7 @@ reach GitHub (CORE-TEST-006).
 import importlib.util
 import json
 import re
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -360,6 +361,60 @@ def ci_snapshot(head=HEAD_SHA, gate=None):
     }
 
 
+def spawn_live_monitor(lock_path: Path, state_path: Path, ready_path: Path):
+    """Hold the real process lock while publishing a terminal local snapshot."""
+    code = r"""
+import fcntl
+import json
+import os
+import sys
+import time
+from pathlib import Path
+
+lock_path, state_path, ready_path, repository, pr, head = sys.argv[1:]
+with open(lock_path, "a+", encoding="utf-8") as lock_handle:
+    fcntl.flock(lock_handle.fileno(), fcntl.LOCK_EX)
+    lock_handle.seek(0)
+    lock_handle.truncate()
+    lock_handle.write(f"{os.getpid()}\n")
+    lock_handle.flush()
+    os.fsync(lock_handle.fileno())
+    state = {
+        "schema_version": 1,
+        "repository": repository,
+        "pr": int(pr),
+        "head_sha": head,
+        "leader_pid": os.getpid(),
+        "status": "pending",
+        "timestamp": "2026-08-30T12:00:00Z",
+        "detail": f"CI Gate in_progress on {head[:7]}",
+    }
+    def publish():
+        temp = state_path + ".tmp"
+        Path(temp).write_text(json.dumps(state), encoding="utf-8")
+        os.replace(temp, state_path)
+    publish()
+    Path(ready_path).touch()
+    time.sleep(0.1)
+    state["status"] = "passed"
+    state["detail"] = f"CI Gate passed on {head[:7]} (conclusion=SUCCESS) ✓"
+    publish()
+"""
+    return subprocess.Popen(
+        [
+            sys.executable,
+            "-c",
+            code,
+            str(lock_path),
+            str(state_path),
+            str(ready_path),
+            pr_watch.MONITOR_REPOSITORY,
+            str(PR),
+            HEAD_SHA,
+        ]
+    )
+
+
 @pytest.mark.unit
 def test_watch_polls_one_aggregate_snapshot_per_interval(monkeypatch):
     fake = snapshot_gh(
@@ -377,6 +432,129 @@ def test_watch_polls_one_aggregate_snapshot_per_interval(monkeypatch):
 
 
 @pytest.mark.unit
+def test_live_follower_makes_zero_github_requests(monkeypatch, tmp_path, capsys):
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path))
+    lock_path, state_path = pr_watch._monitor_paths(PR)
+    lock_path.parent.mkdir(parents=True)
+    ready_path = tmp_path / "leader-ready"
+    process = spawn_live_monitor(lock_path, state_path, ready_path)
+    try:
+        deadline = time.monotonic() + 2
+        while not ready_path.exists() and time.monotonic() < deadline:
+            time.sleep(0.01)
+        assert ready_path.exists()
+        gh_calls = []
+
+        def forbidden_gh(*args):
+            gh_calls.append(args)
+            pytest.fail("a follower must not call GitHub")
+
+        monkeypatch.setattr(pr_watch, "gh", forbidden_gh)
+        assert (
+            pr_watch._run_coordinated_watch(
+                PR,
+                lambda _sink: pytest.fail("follower must not become leader"),
+                follower_poll_sec=0.25,
+            )
+            == 0
+        )
+        assert gh_calls == []
+        assert "CI Gate passed" in capsys.readouterr().out
+    finally:
+        process.terminate()
+        process.wait(timeout=2)
+
+
+@pytest.mark.unit
+def test_terminal_cache_without_live_lock_is_remotely_revalidated(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path))
+    lock_path, state_path = pr_watch._monitor_paths(PR)
+    lock_path.parent.mkdir(parents=True)
+    lock_path.write_text("999999\n", encoding="utf-8")
+    pr_watch._write_monitor_state(
+        state_path,
+        pr=PR,
+        head_sha=OLD_SHA,
+        leader_pid=999999,
+        status="passed",
+        detail="stale green",
+    )
+    fake = snapshot_gh([ci_snapshot(gate=_gate("SUCCESS"))])
+    monkeypatch.setattr(pr_watch, "gh", fake)
+
+    assert (
+        pr_watch._run_coordinated_watch(
+            PR,
+            lambda sink: pr_watch._watch_ci_gate(
+                PR, "", timeout_sec=60, poll_sec=0, state_sink=sink
+            ),
+            follower_poll_sec=0,
+        )
+        == 0
+    )
+    assert len(fake.calls) == 1
+    state = pr_watch._read_monitor_state(state_path, PR)
+    assert state is not None
+    assert state["head_sha"] == HEAD_SHA
+    assert state["leader_pid"] == pr_watch.os.getpid()
+
+
+@pytest.mark.unit
+def test_monitor_state_rejects_malformed_and_foreign_snapshots(monkeypatch, tmp_path):
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path))
+    _lock_path, state_path = pr_watch._monitor_paths(PR)
+    state_path.parent.mkdir(parents=True)
+    state_path.write_text("{", encoding="utf-8")
+    assert pr_watch._read_monitor_state(state_path, PR) is None
+
+    pr_watch._write_monitor_state(
+        state_path,
+        pr=PR,
+        head_sha=HEAD_SHA,
+        leader_pid=123,
+        status="pending",
+        detail="waiting",
+    )
+    state = json.loads(state_path.read_text(encoding="utf-8"))
+    state["repository"] = "someone/else"
+    state_path.write_text(json.dumps(state), encoding="utf-8")
+    assert pr_watch._read_monitor_state(state_path, PR) is None
+
+
+@pytest.mark.unit
+def test_monitor_state_schema_includes_failure_artifact(monkeypatch, tmp_path):
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path))
+    _lock_path, state_path = pr_watch._monitor_paths(PR)
+    pr_watch._write_monitor_state(
+        state_path,
+        pr=PR,
+        head_sha=HEAD_SHA,
+        leader_pid=321,
+        status="failed",
+        detail="CI Gate failed",
+        failure_artifact="tmp/gh-monitor/failure-42.md",
+    )
+
+    state = pr_watch._read_monitor_state(state_path, PR)
+    assert state is not None
+    expected_artifact = str(Path("tmp/gh-monitor/failure-42.md").resolve())
+    assert state == {
+        "schema_version": 1,
+        "repository": "timothyfroehlich/PinPoint",
+        "pr": PR,
+        "head_sha": HEAD_SHA,
+        "leader_pid": 321,
+        "status": "failed",
+        "timestamp": state["timestamp"],
+        "detail": "CI Gate failed",
+        "failure_artifact": expected_artifact,
+    }
+    assert re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", state["timestamp"])
+
+
+@pytest.mark.unit
 def test_watch_follows_head_movement_before_reporting_green(monkeypatch, capsys):
     fake = snapshot_gh(
         [
@@ -387,11 +565,42 @@ def test_watch_follows_head_movement_before_reporting_green(monkeypatch, capsys)
     monkeypatch.setattr(pr_watch, "gh", fake)
     monkeypatch.setattr(pr_watch.time, "sleep", lambda _seconds: None)
     monkeypatch.setattr(pr_watch, "VERBOSE_MODE", True)
+    states = []
 
-    assert pr_watch._watch_ci_gate(PR, HEAD_SHA, timeout_sec=60, poll_sec=0) == 0
+    assert (
+        pr_watch._watch_ci_gate(
+            PR,
+            HEAD_SHA,
+            timeout_sec=60,
+            poll_sec=0,
+            state_sink=lambda *state: states.append(state),
+        )
+        == 0
+    )
     out = capsys.readouterr().out
     assert f"{HEAD_SHA[:7]} → {OLD_SHA[:7]}" in out
     assert f"passed on {OLD_SHA[:7]}" in out
+    assert states[-1][:2] == (OLD_SHA, "passed")
+
+
+@pytest.mark.unit
+def test_malformed_snapshot_is_published_as_undetermined(monkeypatch, capsys):
+    monkeypatch.setattr(pr_watch, "gh", lambda *_args: "{")
+    states = []
+
+    assert (
+        pr_watch._watch_ci_gate(
+            PR,
+            HEAD_SHA,
+            timeout_sec=60,
+            poll_sec=0,
+            state_sink=lambda *state: states.append(state),
+        )
+        == pr_watch.EXIT_UNDETERMINED
+    )
+    assert states[-1][1] == "undetermined"
+    assert "unreachable" in states[-1][2]
+    assert "failed" not in capsys.readouterr().out.lower()
 
 
 @pytest.mark.unit
