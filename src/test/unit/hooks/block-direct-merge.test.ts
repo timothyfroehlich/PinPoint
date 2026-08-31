@@ -329,6 +329,9 @@ describe("block-direct-merge.cjs — shell control words (PP-c8xa)", () => {
     "! gh pr merge 123",
     "{ gh pr merge 123; }",
     "while gh pr merge 123; do echo blocked; done",
+    "function guarded { gh pr merge 123; }; guarded",
+    "coproc gh pr merge 123",
+    "coproc guarded { gh pr merge 123; }",
   ])("blocks %s", (command) => {
     const { status } = runHook(bashPayload(command));
     expect(status).toBe(2);

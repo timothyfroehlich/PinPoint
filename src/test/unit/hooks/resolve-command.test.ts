@@ -113,12 +113,15 @@ describe("shell control words expose the governed command (PP-c8xa)", () => {
     ["while gh pr merge 1; do echo blocked; done", ["gh", "echo"]],
     ["until gh pr merge 1; do echo blocked; done", ["gh", "echo"]],
     ["if ! env gh pr merge 1; then :; fi", ["gh", ":"]],
+    ["function guarded { gh pr merge 1; }; guarded", ["gh", "guarded"]],
+    ["coproc gh pr merge 1", ["gh"]],
+    ["coproc guarded { gh pr merge 1; }", ["gh"]],
   ])("resolves %s", (cmd, expected) => {
     expect(names(cmd)).toEqual(expected);
   });
 
   it("keeps control words in ordinary argument positions", () => {
-    expect(names("echo if gh pr merge 1")).toEqual(["echo"]);
+    expect(names("echo if function coproc gh pr merge 1")).toEqual(["echo"]);
   });
 
   it("does not treat a quoted control word as shell syntax", () => {

@@ -28,9 +28,9 @@
  *     applies to the `<<TAG` operator itself) and never parsed as commands.
  *   - Redirections and their targets are dropped, not mistaken for arguments.
  *   - Segments are split on real shell separators: && || ; | & newline ( ).
- *   - Leading shell control words are removed from each segment: `if`, `!`,
- *     brace groups, and loop/list continuations cannot occupy the command slot
- *     and hide the command they govern.
+ *   - Leading shell control words are removed from each segment: conditionals,
+ *     negation, brace groups, loops, function bodies, and coprocesses cannot
+ *     occupy the command slot and hide the command they govern.
  *   - Per segment, the EFFECTIVE command is resolved by skipping leading
  *     `VAR=value` assignments and wrappers that do not consume the command slot
  *     (`sudo`, `env`, `command`, `time`, `nice`, `xargs`, `timeout`, ...),
@@ -44,8 +44,8 @@
  *     `unresolvable` instead of being silently dropped.
  *
  * WHAT IT IS NOT: a shell. It does not expand variables, evaluate globs, or
- * execute control flow or understand `for`/`case`/functions. The threat model
- * is a well-meaning agent
+ * execute control flow or fully parse `for`/`case` grammar. The threat model is
+ * a well-meaning agent
  * that wraps a command (accidentally or to "work around" a guard), not an
  * attacker with unbounded shell tricks. Guards on a hard boundary should still
  * treat `unresolvable` as suspicious rather than assuming it is safe.
@@ -148,6 +148,8 @@ const SHELL_CONTROL_WORDS = new Set([
   "!",
   "{",
   "}",
+  "function",
+  "coproc",
 ]);
 
 // How deep to follow eval / sh -c / $() nesting before giving up. Two levels is
@@ -602,12 +604,37 @@ function describeWords(words) {
 /** Remove leading shell syntax so the governed command owns the command slot. */
 function stripLeadingShellControlWords(words) {
   let i = 0;
-  while (
-    i < words.length &&
-    !words[i].quoted &&
-    !words[i].escaped &&
-    SHELL_CONTROL_WORDS.has(words[i].value)
-  ) {
+  while (i < words.length) {
+    const word = words[i];
+    if (
+      word.quoted ||
+      word.escaped ||
+      !SHELL_CONTROL_WORDS.has(word.value)
+    ) {
+      break;
+    }
+
+    if (word.value === "function" || word.value === "coproc") {
+      const braceIdx = words.findIndex(
+        (candidate, index) =>
+          index > i &&
+          !candidate.quoted &&
+          !candidate.escaped &&
+          candidate.value === "{"
+      );
+      if (braceIdx !== -1) {
+        i = braceIdx + 1;
+        continue;
+      }
+
+      // `coproc command ...` runs the following simple command directly.
+      // A function definition without a same-segment brace has its compound
+      // body in a later tokenizer segment (`function f () { ... }`), so keep
+      // the header's existing ordinary classification and let that segment
+      // expose the body.
+      if (word.value === "function") break;
+    }
+
     i++;
   }
   return words.slice(i);
