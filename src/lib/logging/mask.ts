@@ -44,9 +44,33 @@ export function maskEmail(email: string): string {
 const EMBEDDED_EMAIL_RE =
   /(?<![^\s"<>()[\]{},;:@/\\])[^\s"<>()[\]{},;:@/\\]+@[^\s"<>()[\]{},;:@/\\]+\.\p{L}{2,63}/gu;
 
+/**
+ * Candidate token containing an encoded `@` (`%40`, case-insensitive).
+ * Decoding and the stricter raw-address matcher below decide whether the token
+ * is actually an email; malformed or non-email percent encoding is preserved.
+ */
+const EMBEDDED_ENCODED_EMAIL_CANDIDATE_RE =
+  /(?<![^\s"<>()[\]{},;:=?&#/\\])[^\s"<>()[\]{},;:=?&#/\\]*%40[^\s"<>()[\]{},;:=?&#/\\]*/giu;
+
 /** Replace every email-like substring of `value` with its {@link maskEmail} form. */
 export function maskEmailsInText(value: string): string {
-  return value.replace(EMBEDDED_EMAIL_RE, (match) => maskEmail(match));
+  const rawMasked = value.replace(EMBEDDED_EMAIL_RE, (match) =>
+    maskEmail(match)
+  );
+
+  return rawMasked.replace(EMBEDDED_ENCODED_EMAIL_CANDIDATE_RE, (match) => {
+    let decoded: string;
+    try {
+      decoded = decodeURIComponent(match);
+    } catch {
+      return match;
+    }
+
+    const masked = decoded.replace(EMBEDDED_EMAIL_RE, (email) =>
+      maskEmail(email)
+    );
+    return masked === decoded ? match : masked;
+  });
 }
 
 /** Stack-overflow guard for a deep, non-cyclic value. */
