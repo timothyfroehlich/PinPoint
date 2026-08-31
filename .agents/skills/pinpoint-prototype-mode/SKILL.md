@@ -88,18 +88,27 @@ Data mode: <seed record | existing local fixture | existing read-only loader | t
 
 ## Ground the visual target first
 
-Use Product Design for visual grounding and QA, while PinPoint remains the
-runtime:
+Use Product Design for visual grounding and QA when the active agent environment
+provides it, while PinPoint remains the runtime. Product Design is a preferred
+capability, not a portability requirement; preserve the same evidence and
+selection discipline with the environment's available equivalents when it is
+not installed:
 
 - For an existing screen, capture its relevant state with the browser-control
   capability available in the active agent environment at desktop and
   `390×844` **before changing it**. Record both captures.
 - For a live URL, use `product-design:url-to-code`'s source-capture and visual
-  comparison discipline only. Do not initialize its standalone app, copy an
-  asset tree, or pursue exhaustive clone fidelity unless Tim separately asks.
-- For a new screen with no visual target, load `product-design:index`, route to
-  ideation, generate **exactly three** visual options, and wait for Tim to pick
-  one before coding.
+  comparison discipline when that skill is available. Otherwise capture the
+  source with the supported browser capability and compare it against the
+  in-app prototype at matching state and viewport. Do not initialize a
+  standalone app, copy an asset tree, or pursue exhaustive clone fidelity
+  unless Tim separately asks.
+- For a new screen with no visual target, load `product-design:index` and route
+  to ideation when available. Otherwise use the environment's available visual
+  design or image-ideation capability. Generate **exactly three** visual options
+  and wait for Tim to pick one before coding. If the environment cannot produce
+  and show visual options, stop and ask Tim for a visual target; do not invent
+  and implement one from prose alone.
 - In Codex Desktop, use the in-app browser. In another agent environment, use
   that environment's supported interactive browser capability. If more than one
   browser is available, keep using the one Tim already chose or ask him to
