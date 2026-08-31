@@ -1,6 +1,15 @@
 ---
 name: spec-driven-development
-description: How PinPoint feature specs work — the living, requirements-only documents in docs/feature-specs/ that are the intended truth for a feature, kept in sync with code through an explicit divergence table. Carries the format (a draft/approved status line, numbered citable requirements, a Concepts section, retired-number tombstones, a changelog of amendments), the rule that a spec states the intended final state and never what the code does or used to do — build state lives only in the divergence table, which is why there are no shipped/designed tags — the lifecycle rules (the spec changes alongside any design decision; code-vs-spec disagreement always resolves by amending one, never silently neither), and the hard editing rule — a feature spec is NEVER edited without Tim approving the exact diff first, even when he says "update the spec", with one carve-out: an implementation PR may strike every divergence row it fully resolves, while adding or changing a row always goes to Tim. Use when designing or changing a feature that has a spec, when starting substantial new feature design (offer to create one), when a review or bead needs to cite a requirement, when deciding whether something belongs in a spec versus a design record or the design bible, or when Tim says "spec", "feature spec", or "spec-driven".
+description: >-
+  Define and maintain PinPoint's living feature specs in docs/feature-specs/.
+  Use when designing or changing a feature that has a spec, starting substantial
+  new feature design, creating a feature spec, reviewing spec conformance,
+  citing requirements, deciding whether behavior belongs in a feature spec
+  versus a design record or the design bible, or when Tim says "spec", "feature
+  spec", or "spec-driven". Includes the approval boundary: an implementation PR
+  may delete divergence rows its changes fully resolve without separate
+  approval; every other feature-spec edit requires Tim's approval of the exact
+  diff.
 ---
 
 # Spec-Driven Development
@@ -29,9 +38,14 @@ The exemplar is [docs/feature-specs/pinballmap.md](../../../docs/feature-specs/p
 written during the PP-o355.21 redesign (2026-08-15/16). Read it before
 writing a new spec.
 
-## The hard rule: no unapproved edits
+## Approval boundary
 
-**Never edit a feature spec without Tim approving the exact diff first —
+**An implementation PR may delete any divergence rows its changes fully
+resolve without separate approval.** This narrow exception applies only to
+deleting fully resolved rows; the implementation in the same PR is the
+evidence for deletion.
+
+**Every other feature-spec edit requires Tim to approve the exact diff first —
 even when he says "update the spec."** Propose the change as a literal
 before/after diff in chat, wait for approval, then write. Tim's words
 (2026-08-16): "this is a document that I need to know the contents of at all
@@ -41,14 +55,13 @@ This is the one place the usual proactive-edit posture inverts. Mockups,
 beads, and scratch documents you edit freely; the spec is Tim's document
 that you maintain.
 
-### The one carve-out: striking rows the implementation resolved
+### Resolved divergence rows
 
-**An implementation PR may delete any divergence rows its changes fully
-resolve without asking.** The table is ephemeral status rather than part of
-the document's meaning (Tim, 2026-08-17), the code in the same PR is the
-evidence, and git history has the row if anyone needs it back. Do it in the PR
-that does the work, not later — a row describing shipped behaviour is the same
-lie as a missing row describing unshipped behaviour.
+The table is ephemeral status rather than part of the document's meaning (Tim,
+2026-08-17), and git history retains deleted rows. When an implementation PR
+uses the exception, remove the resolved rows in that PR rather than a later
+cleanup — a row describing shipped behaviour is the same lie as a missing row
+describing unshipped behaviour.
 
 Everything else about the table still goes through the hard rule, and one case
 matters more than the rest:
