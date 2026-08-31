@@ -56,6 +56,7 @@ def _gate(
     status: str = "COMPLETED",
     completed_at: str = "",
     started_at: str | None = None,
+    details_url: str = "",
 ) -> dict:
     return {
         "name": pr_watch.CI_GATE_NAME,
@@ -63,15 +64,23 @@ def _gate(
         "conclusion": conclusion,
         "completedAt": completed_at,
         "startedAt": completed_at if started_at is None else started_at,
+        "detailsUrl": details_url,
     }
 
 
-def _run(run_id: int, status: str, conclusion: str, sha=HEAD_SHA) -> dict:
+def _run(
+    run_id: int,
+    status: str,
+    conclusion: str,
+    sha=HEAD_SHA,
+    workflow_name="CI",
+) -> dict:
     return {
         "databaseId": run_id,
         "status": status,
         "conclusion": conclusion,
         "headSha": sha,
+        "workflowName": workflow_name,
     }
 
 
@@ -679,9 +688,17 @@ def test_malformed_snapshot_is_published_as_undetermined(monkeypatch, capsys):
 
 @pytest.mark.unit
 def test_watch_fetches_failure_artifact_only_after_red(monkeypatch, capsys):
-    fake = snapshot_gh([ci_snapshot(gate=_gate("FAILURE"))])
+    fake = snapshot_gh(
+        [
+            ci_snapshot(
+                gate=_gate(
+                    "FAILURE",
+                    details_url="https://github.com/o/r/actions/runs/555/job/999",
+                )
+            )
+        ]
+    )
     monkeypatch.setattr(pr_watch, "gh", fake)
-    monkeypatch.setattr(pr_watch, "_failed_ci_run_id", lambda _head: 555)
     monkeypatch.setattr(
         pr_watch,
         "write_failure_artifact",
@@ -781,6 +798,7 @@ def test_failure_run_lookup_is_terminal_only_and_head_scoped(monkeypatch):
                 _run(41, "completed", "failure", sha=OLD_SHA),
                 _run(42, "completed", "cancelled"),
                 _run(43, "completed", "failure"),
+                _run(44, "completed", "failure", workflow_name="Legacy CI"),
             ]
         )
 
@@ -789,6 +807,7 @@ def test_failure_run_lookup_is_terminal_only_and_head_scoped(monkeypatch):
     assert pr_watch._failed_ci_run_id(HEAD_SHA) == 43
     assert len(calls) == 1
     assert calls[0][:2] == ("run", "list")
+    assert "--workflow" not in calls[0]
 
 
 # ---------------------------------------------------------------------------

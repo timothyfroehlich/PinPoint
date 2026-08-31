@@ -912,29 +912,34 @@ def write_failure_artifact(run_id: int) -> str:
     return path
 
 
-def _failed_ci_run_id(head_sha: str) -> int | None:
+def _failed_ci_run_id(head_sha: str, details_url: str = "") -> int | None:
     """Return the newest confirmed-failing CI workflow run for ``head_sha``.
 
     This lookup happens only after the aggregate CI Gate is red. The ordinary
-    watch path never enumerates workflow runs.
+    watch path never enumerates workflow runs. Prefer the run ID already
+    embedded in the selected gate's URL; the fallback filters a commit-scoped
+    list after retrieval so duplicate workflow names cannot make `gh` abort.
     """
+    match = re.search(r"/actions/runs/(\d+)(?:/|$)", details_url)
+    if match is not None:
+        return int(match.group(1))
+
     raw = gh(
         "run",
         "list",
         "--commit",
         head_sha,
-        "--workflow",
-        "CI",
         "--limit",
         "10",
         "--json",
-        "databaseId,status,conclusion,headSha",
+        "databaseId,status,conclusion,headSha,workflowName",
     )
     runs = json.loads(raw)
     failed = [
         run
         for run in runs
         if run.get("headSha") == head_sha
+        and run.get("workflowName") == "CI"
         and run.get("status") == "completed"
         and _is_failing(run.get("conclusion"))
     ]
@@ -1036,7 +1041,9 @@ def _watch_ci_gate(
                 emit(detail)
                 artifact: str | None = None
                 try:
-                    run_id = _failed_ci_run_id(head_sha)
+                    run_id = _failed_ci_run_id(
+                        head_sha, str((gate or {}).get("detailsUrl") or "")
+                    )
                     if run_id is not None:
                         artifact = write_failure_artifact(run_id)
                         emit(f"Failure details: {artifact}")
