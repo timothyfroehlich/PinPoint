@@ -29,9 +29,14 @@ The exemplar is [docs/feature-specs/pinballmap.md](../../../docs/feature-specs/p
 written during the PP-o355.21 redesign (2026-08-15/16). Read it before
 writing a new spec.
 
-## The hard rule: no unapproved edits
+## Approval boundary
 
-**Never edit a feature spec without Tim approving the exact diff first —
+**Delete every divergence row an implementation PR fully resolves in that same
+PR, without asking Tim.** Resolved-row deletion is implementation bookkeeping,
+not a spec amendment or an approval gate. Do it before review and handoff so the
+table remains an accurate conformance work queue.
+
+**Every other feature-spec edit requires Tim to approve the exact diff first —
 even when he says "update the spec."** Propose the change as a literal
 before/after diff in chat, wait for approval, then write. Tim's words
 (2026-08-16): "this is a document that I need to know the contents of at all
@@ -41,17 +46,14 @@ This is the one place the usual proactive-edit posture inverts. Mockups,
 beads, and scratch documents you edit freely; the spec is Tim's document
 that you maintain.
 
-### The one carve-out: striking rows the implementation resolved
+### Divergence-table boundary
 
-**An implementation PR may delete any divergence rows its changes fully
-resolve without asking.** The table is ephemeral status rather than part of
-the document's meaning (Tim, 2026-08-17), the code in the same PR is the
-evidence, and git history has the row if anyone needs it back. Do it in the PR
-that does the work, not later — a row describing shipped behaviour is the same
-lie as a missing row describing unshipped behaviour.
+The table is ephemeral status rather than part of the document's meaning (Tim,
+2026-08-17), the implementation in the same PR is the evidence for deletion,
+and git history retains the old row. A row describing shipped behavior is the
+same lie as a missing row describing unshipped behavior.
 
-Everything else about the table still goes through the hard rule, and one case
-matters more than the rest:
+Everything except fully resolved-row deletion goes through the approval rule:
 
 - **A NEW divergence always goes to Tim**, as a row you propose rather than a
   row you add. Most of all when your own change caused it: "I built this and it
