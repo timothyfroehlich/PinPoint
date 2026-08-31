@@ -1,5 +1,5 @@
 import "server-only";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { db } from "~/server/db";
 import { pinballmapState } from "~/server/db/schema";
 import { getPinballMapClient } from "./client";
@@ -60,11 +60,36 @@ export async function getPinballMapState(): Promise<PinballmapRuntimeState | nul
 export type SyncTrigger = "manual" | "cron";
 
 /** Outcome of a sync attempt. */
-export type SyncResult =
-  | { ok: true; machineCount: number; syncedAt: Date }
+type SyncFailure =
   | { ok: false; reason: "error"; error: string }
   | { ok: false; reason: "not_configured" }
+  | { ok: false; reason: "superseded" }
   | { ok: false; reason: "throttled"; retryAfterMs: number };
+
+export type SyncResult =
+  { ok: true; machineCount: number; syncedAt: Date } | SyncFailure;
+
+export type ValidationSyncResult =
+  | {
+      ok: true;
+      machineCount: number;
+      syncedAt: Date;
+      snapshot: NonNullable<PinballmapRuntimeState["snapshotJson"]>;
+    }
+  | SyncFailure;
+
+interface SyncOptions {
+  updatedBy?: string;
+  trigger?: SyncTrigger;
+}
+
+interface ValidationSyncOptions {
+  updatedBy?: string;
+  validation: {
+    locationId: number;
+    expectedLocationId: number | null;
+  };
+}
 
 /**
  * What is left of the shared refresh allowance (spec 3.2), so the header's
@@ -124,8 +149,8 @@ async function recordSyncSuccess(
   snapshot: NonNullable<PinballmapRuntimeState["snapshotJson"]>,
   syncedAt: Date,
   updatedBy: string | undefined
-): Promise<void> {
-  await db.execute(sql`
+): Promise<boolean> {
+  const written = await db.execute(sql`
     INSERT INTO "pinballmap_state" (
       "id",
       "location_id",
@@ -157,7 +182,10 @@ async function recordSyncSuccess(
         EXCLUDED."updated_by",
         "pinballmap_state"."updated_by"
       )
+    WHERE "pinballmap_state"."location_id" = ${locationId}
+    RETURNING "id"
   `);
+  return hasReturnedRow(written);
 }
 
 async function recordSyncFailure(
@@ -165,8 +193,8 @@ async function recordSyncFailure(
   message: string,
   attemptedAt: Date,
   updatedBy: string | undefined
-): Promise<void> {
-  await db.execute(sql`
+): Promise<boolean> {
+  const written = await db.execute(sql`
     INSERT INTO "pinballmap_state" (
       "id",
       "location_id",
@@ -192,7 +220,10 @@ async function recordSyncFailure(
         EXCLUDED."updated_by",
         "pinballmap_state"."updated_by"
       )
+    WHERE "pinballmap_state"."location_id" = ${locationId}
+    RETURNING "id"
   `);
+  return hasReturnedRow(written);
 }
 
 /**
@@ -244,19 +275,23 @@ function hasReturnedRow(result: unknown): boolean {
  * otherwise a steady clicker could hold the bucket empty indefinitely.
  */
 async function stampSyncAttempt(
-  locationId: number,
+  expectedLocationId: number | null,
   attemptAt: Date,
   guarded: boolean
 ): Promise<boolean> {
+  const locationGuard =
+    expectedLocationId === null
+      ? isNull(pinballmapState.locationId)
+      : eq(pinballmapState.locationId, expectedLocationId);
   const values = {
     id: SINGLETON_ID,
-    locationId,
+    locationId: expectedLocationId,
     lastSyncAttemptAt: attemptAt,
     updatedAt: attemptAt,
   };
 
   if (!guarded) {
-    await db.execute(sql`
+    const stamped = await db.execute(sql`
       INSERT INTO "pinballmap_state" (
         "id",
         "location_id",
@@ -272,8 +307,10 @@ async function stampSyncAttempt(
       ON CONFLICT ("id") DO UPDATE SET
         "last_sync_attempt_at" = EXCLUDED."last_sync_attempt_at",
         "updated_at" = EXCLUDED."updated_at"
+      WHERE ${locationGuard}
+      RETURNING "id"
     `);
-    return true;
+    return hasReturnedRow(stamped);
   }
 
   // A first-ever manual refresh creates the row with one token already spent.
@@ -301,6 +338,7 @@ async function stampSyncAttempt(
       "refresh_tokens_at" = ${pinballmapState.refreshTokensAt}
         + (interval '1 millisecond' * ${PBM_REFRESH_REFILL_MS} * ${ELAPSED_PERIODS})
     WHERE ${AVAILABLE_TOKENS} >= 1
+      AND ${locationGuard}
     RETURNING "id"
   `);
   return hasReturnedRow(claimed);
@@ -326,14 +364,29 @@ async function stampSyncAttempt(
  * math (`now - lastSyncedAt`, PP-o355.11 status card) isn't fooled by a failed
  * attempt over a stale snapshot — read `lastSyncStatus` for attempt outcome.
  */
-export async function syncLocationSnapshot(opts?: {
-  updatedBy?: string;
-  trigger?: SyncTrigger;
-}): Promise<SyncResult> {
-  const trigger = opts?.trigger ?? "manual";
+export async function syncLocationSnapshot(
+  opts: ValidationSyncOptions
+): Promise<ValidationSyncResult>;
+export async function syncLocationSnapshot(
+  opts?: SyncOptions
+): Promise<SyncResult>;
+export async function syncLocationSnapshot(
+  opts?: SyncOptions | ValidationSyncOptions
+): Promise<SyncResult | ValidationSyncResult> {
+  const validation = opts && "validation" in opts ? opts.validation : null;
+  const trigger =
+    validation === null && opts && !("validation" in opts)
+      ? (opts.trigger ?? "manual")
+      : "manual";
   const state = await getPinballMapState();
-  const locationId = state?.locationId;
-  if (locationId === null || locationId === undefined) {
+  const trackedLocationId = state?.locationId ?? null;
+  const expectedLocationId =
+    validation?.expectedLocationId ?? trackedLocationId;
+  const locationId = validation?.locationId ?? trackedLocationId;
+  if (trackedLocationId !== expectedLocationId) {
+    return { ok: false, reason: "superseded" };
+  }
+  if (locationId === null) {
     return { ok: false, reason: "not_configured" };
   }
   const syncedAt = new Date();
@@ -341,11 +394,15 @@ export async function syncLocationSnapshot(opts?: {
   // Chokepoint: stamp the attempt before the fetch. Manual spends a token
   // (TOCTOU-safe); cron records unconditionally.
   const claimed = await stampSyncAttempt(
-    locationId,
+    expectedLocationId,
     syncedAt,
     trigger === "manual"
   );
   if (!claimed) {
+    const current = await getPinballMapState();
+    if ((current?.locationId ?? null) !== expectedLocationId) {
+      return { ok: false, reason: "superseded" };
+    }
     // Re-read rather than reuse the row loaded above: the claim we just lost
     // was won by somebody, so the bucket moved and the pre-claim copy would
     // report a refill time that has already passed.
@@ -365,13 +422,118 @@ export async function syncLocationSnapshot(opts?: {
     const snapshot = await (
       await getPinballMapClient()
     ).fetchLocation(locationId);
-    await recordSyncSuccess(locationId, snapshot, syncedAt, opts?.updatedBy);
+    if (validation !== null) {
+      return {
+        ok: true,
+        machineCount: snapshot.machineCount,
+        syncedAt,
+        snapshot,
+      };
+    }
+    const stored = await recordSyncSuccess(
+      locationId,
+      snapshot,
+      syncedAt,
+      opts?.updatedBy
+    );
+    if (!stored) return { ok: false, reason: "superseded" };
     return { ok: true, machineCount: snapshot.machineCount, syncedAt };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown sync error";
+    if (validation !== null) {
+      return { ok: false, reason: "error", error: message };
+    }
     // Note: no `lastSyncedAt` here — a failed attempt must not advance the
     // last-successful-sync clock. `updatedAt` still records that we wrote.
-    await recordSyncFailure(locationId, message, syncedAt, opts?.updatedBy);
+    const stored = await recordSyncFailure(
+      locationId,
+      message,
+      syncedAt,
+      opts?.updatedBy
+    );
+    if (!stored) return { ok: false, reason: "superseded" };
     return { ok: false, reason: "error", error: message };
   }
+}
+
+export type SetTrackedLocationResult =
+  | { ok: true }
+  | { ok: false; reason: "concurrent_change" }
+  | { ok: false; reason: "error"; error: string }
+  | { ok: false; reason: "throttled"; retryAfterMs: number };
+
+/**
+ * Validate and atomically store the tracked Pinball Map location (spec 10.7–10.14).
+ *
+ * A non-empty save validates through `syncLocationSnapshot` before opening the
+ * transaction, so the external read obeys CORE-ARCH-011 and spends from the
+ * shared manual-refresh allowance. The transaction then replaces the location,
+ * snapshot, and health together. Clearing writes only the nullable location;
+ * the retained snapshot, health, links, intent, comments, and abandonments stay
+ * dormant and reversible.
+ */
+export async function setTrackedLocation(
+  locationId: number | null,
+  updatedBy?: string
+): Promise<SetTrackedLocationResult> {
+  const state = await getPinballMapState();
+  const previousLocationId = state?.locationId ?? null;
+  const previousLocationGuard =
+    previousLocationId === null
+      ? isNull(pinballmapState.locationId)
+      : eq(pinballmapState.locationId, previousLocationId);
+  const actor = updatedBy === undefined ? {} : { updatedBy };
+
+  if (locationId === null) {
+    if (!state) return { ok: true };
+    const cleared = await db.transaction(async (tx) =>
+      tx
+        .update(pinballmapState)
+        .set({ locationId: null, updatedAt: new Date(), ...actor })
+        .where(and(eq(pinballmapState.id, SINGLETON_ID), previousLocationGuard))
+        .returning({ id: pinballmapState.id })
+    );
+    return cleared.length > 0
+      ? { ok: true }
+      : { ok: false, reason: "concurrent_change" };
+  }
+
+  const validated = await syncLocationSnapshot({
+    validation: { locationId, expectedLocationId: previousLocationId },
+    ...(updatedBy === undefined ? {} : { updatedBy }),
+  });
+  if (!validated.ok) {
+    if (validated.reason === "throttled") return validated;
+    if (validated.reason === "superseded") {
+      return { ok: false, reason: "concurrent_change" };
+    }
+    return {
+      ok: false,
+      reason: "error",
+      error:
+        validated.reason === "error"
+          ? validated.error
+          : "Pinball Map is not configured.",
+    };
+  }
+
+  const committed = await db.transaction(async (tx) =>
+    tx
+      .update(pinballmapState)
+      .set({
+        locationId,
+        snapshotJson: validated.snapshot,
+        lastSyncedAt: validated.syncedAt,
+        lastSyncAttemptAt: validated.syncedAt,
+        lastSyncStatus: "ok",
+        lastSyncError: null,
+        updatedAt: validated.syncedAt,
+        ...actor,
+      })
+      .where(and(eq(pinballmapState.id, SINGLETON_ID), previousLocationGuard))
+      .returning({ id: pinballmapState.id })
+  );
+  return committed.length > 0
+    ? { ok: true }
+    : { ok: false, reason: "concurrent_change" };
 }

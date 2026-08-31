@@ -340,6 +340,11 @@ export const pinballmapAbandonedListings = pgTable(
     lmxId: integer("lmx_id").notNull(),
     // The catalog title the entry was listed under, so the UI can name it.
     pinballmapMachineId: integer("pinballmap_machine_id").notNull(),
+    // The location whose stored snapshot supplied this lmx. Abandonments remain
+    // actionable across a tracked-location change, and only records for the
+    // currently synced location may be reconciled against that lineup
+    // (pinballmap spec 10.11–10.12).
+    locationId: integer("location_id").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

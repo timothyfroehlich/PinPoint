@@ -253,6 +253,7 @@ describe("PinballMap outbound writes (PGlite)", () => {
       machineId: abandoner.id,
       lmxId: 777,
       pinballmapMachineId: TITLE_ID,
+      locationId: 26454,
     });
 
     const [claimer] = await db
@@ -724,6 +725,7 @@ describe("PinballMap outbound writes (PGlite)", () => {
       machineId: machine.id,
       lmxId: 500,
       pinballmapMachineId: 8080,
+      locationId: 26454,
     });
 
     const result = await removeMachineFromPinballMapAction(
@@ -809,6 +811,7 @@ describe("PinballMap outbound writes (PGlite)", () => {
       machineId: machine.id,
       lmxId: 321,
       pinballmapMachineId: 8080,
+      locationId: 26454,
     });
 
     const result = await removeMachineFromPinballMapAction(
@@ -862,6 +865,7 @@ describe("PinballMap outbound writes (PGlite)", () => {
       machineId: machine.id,
       lmxId: 111,
       pinballmapMachineId: 8080,
+      locationId: 26454,
     });
 
     const result = await removeMachineFromPinballMapAction(
@@ -912,5 +916,42 @@ describe("PinballMap outbound writes (PGlite)", () => {
     // offered), and writing it here would make the push and the toggle two
     // ways to do one thing (spec 4.1).
     expect(row?.pinballmapIntent).toBe("on");
+  });
+
+  it("does not re-mint a cross-location orphan into the current lineup", async () => {
+    const db = await getTestDb();
+    const { removeMachineFromPinballMapAction } =
+      await import("~/app/(app)/m/pinballmap-actions");
+    const admin = await createUser("admin");
+    await mockAuthAs(admin.id);
+
+    // The currently tracked venue has an unrelated live entry under the same
+    // title as an old venue's abandoned entry.
+    pbm.lineup = [{ id: 500, machineId: 8080 }];
+    await seedState([{ id: 500, machineId: 8080 }]);
+    const [machine] = await db
+      .insert(machines)
+      .values({ name: "Old-location orphan", initials: "OLO" })
+      .returning();
+    if (!machine) throw new Error("failed to seed machine");
+    await db.insert(pinballmapAbandonedListings).values({
+      machineId: machine.id,
+      lmxId: 4040,
+      pinballmapMachineId: 8080,
+      locationId: 99999,
+    });
+
+    const result = await removeMachineFromPinballMapAction(
+      undefined,
+      formWithLmx(machine.id, 4040)
+    );
+
+    expect(result.ok).toBe(true);
+    // The stored old-location handle was already gone. Re-resolving title 8080
+    // against the current lineup would have deleted this unrelated lmx.
+    expect(pbm.lineup).toEqual([{ id: 500, machineId: 8080 }]);
+    const state = await db.query.pinballmapState.findFirst();
+    expect(state?.snapshotJson?.lmxes.map((lmx) => lmx.id)).toEqual([500]);
+    expect(await db.select().from(pinballmapAbandonedListings)).toHaveLength(0);
   });
 });

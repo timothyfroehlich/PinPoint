@@ -634,8 +634,6 @@ export async function removeMachineFromPinballMapAction(
   const { userId, machine } = authed;
 
   const state = await getPinballMapState();
-  if (state?.locationId === null || state?.locationId === undefined)
-    return err("SERVER", "Pinball Map isn't configured yet");
 
   // The submitted id is attacker-controlled, and the operator account it would
   // act through can edit the WHOLE location's lineup. Push is `member: "owner"`,
@@ -654,26 +652,39 @@ export async function removeMachineFromPinballMapAction(
   // sibling is actively covering — and `withLmxRemoved` would strip that title
   // from the stored lineup too. Authorizing exactly what the UI offers keeps
   // the two from drifting apart in the direction that matters.
-  const abandonedTitleId =
+  const abandonedRecord =
     explicitLmxId === null
       ? null
-      : ((await listSurfacingAbandonedForMachine(machine.id)).find(
-          (a) => a.lmxId === explicitLmxId
-        )?.pinballmapMachineId ?? null);
+      : ((
+          await listSurfacingAbandonedForMachine(
+            machine.id,
+            state?.locationId ?? null
+          )
+        ).find((record) => record.lmxId === explicitLmxId) ?? null);
 
-  if (explicitLmxId !== null && abandonedTitleId === null)
+  if (explicitLmxId !== null && abandonedRecord === null)
     return err(
       "NOT_FOUND",
       "That entry is not one this machine left behind, so it is not this machine's to remove."
     );
 
+  if (
+    explicitLmxId === null &&
+    (state?.locationId === null || state?.locationId === undefined)
+  )
+    return err("SERVER", "Pinball Map isn't configured yet");
+
   // Which title this removal is ABOUT: the abandoned entry's own, when we are
   // acting on one, and otherwise the cabinet's current title.
-  const titleId = abandonedTitleId ?? machine.pinballmapMachineId;
+  const titleId =
+    abandonedRecord?.pinballmapMachineId ?? machine.pinballmapMachineId;
+  const isCrossLocation =
+    abandonedRecord !== null &&
+    abandonedRecord.locationId !== (state?.locationId ?? null);
 
   const liveLmxId =
     explicitLmxId ??
-    (machine.pinballmapMachineId !== null && state.snapshotJson
+    (machine.pinballmapMachineId !== null && state?.snapshotJson
       ? (findLmxForMachine(state.snapshotJson, machine.pinballmapMachineId)
           ?.id ?? null)
       : null);
@@ -711,7 +722,16 @@ export async function removeMachineFromPinballMapAction(
   // title is still listed under a re-minted id. `classifyRemoveNotFound` asks
   // the live lineup which one it is; taking the already-gone reading on faith
   // is what silently un-does a human unlist (PP-rnup).
-  if (!written.ok) {
+  if (!written.ok && isCrossLocation) {
+    log.info(
+      {
+        lmxId: deletedLmxId,
+        machineId: machine.id,
+        action: "pinballmap.removeMachine",
+      },
+      "PinballMap returned not_found for a cross-location abandoned entry — treating it as already gone"
+    );
+  } else if (!written.ok) {
     const verdict = await classifyRemoveNotFound({
       attemptedLmxId: deletedLmxId,
       // The abandoned entry's title, not the cabinet's current one. Passing the
@@ -719,7 +739,7 @@ export async function removeMachineFromPinballMapAction(
       // about an entry under a different title — and a `retry` verdict would
       // then delete the cabinet's own live entry from the public lineup.
       pinballmapMachineId: titleId,
-      snapshotSyncedAt: state.lastSyncedAt,
+      snapshotSyncedAt: state?.lastSyncedAt ?? null,
       userId,
     });
 
@@ -781,13 +801,14 @@ export async function removeMachineFromPinballMapAction(
   // the toggle two ways to do one thing, which is the conflation the two-line
   // control exists to undo (spec 4.1).
   await db.transaction(async (tx) => {
-    await editStoredSnapshot(tx, (snapshot) =>
-      // Same reason as above: `withLmxRemoved` drops rows matching EITHER the
-      // id or the title, so the cabinet's current title would take its own live
-      // row out of the stored lineup and leave every same-title cabinet reading
-      // Missing until the next cron.
-      withLmxRemoved(snapshot, deletedLmxId, titleId)
-    );
+    if (!isCrossLocation)
+      await editStoredSnapshot(tx, (snapshot) =>
+        // Same reason as above: `withLmxRemoved` drops rows matching EITHER the
+        // id or the title, so the cabinet's current title would take its own live
+        // row out of the stored lineup and leave every same-title cabinet reading
+        // Missing until the next cron.
+        withLmxRemoved(snapshot, deletedLmxId, titleId)
+      );
 
     // The abandoned-entry alert reads the RECORD, not the snapshot, so editing
     // the snapshot alone leaves the alert standing after a removal that
@@ -897,6 +918,13 @@ export async function refreshPinballmapLineupAction(
         return err(
           "THROTTLED",
           `Pinball Map was refreshed recently. Try again in about ${String(minutes)} minute${minutes === 1 ? "" : "s"}.`
+        );
+      }
+      if (result.reason === "superseded") {
+        revalidatePath("/m", "layout");
+        return err(
+          "SERVER",
+          "The tracked Pinball Map location changed while this refresh was running. Reload the page and try again."
         );
       }
       return err("SERVER", result.error);
