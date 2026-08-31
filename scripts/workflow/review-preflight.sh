@@ -173,7 +173,7 @@ elif [[ "$(git rev-parse "$base")" != "$(git rev-parse "origin/${base}")" ]]; th
   # the bare name — so git resolves it as the local branch. Whatever this script measures
   # has to be the ref the reviewer will actually use.
   #
-  # And local `main` goes stale as a matter of routine: AGENTS.md §5 says sync with
+  # And local `main` goes stale as a matter of routine: AGENTS.md "Branches" says sync with
   # `git fetch origin && git merge origin/main`, which advances the feature branch and
   # never the local `main` it merged from. Staleness only ever ENLARGES the diff, so
   # check 4 below stays safe — but the review then covers other people's already-merged

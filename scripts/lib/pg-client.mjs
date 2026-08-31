@@ -7,7 +7,7 @@ import postgres from "postgres";
  * (`…pooler.supabase.com:6543`). We deliberately do NOT fall back to
  * POSTGRES_URL_NON_POOLING: in prod/preview that resolves to an IPv6-only host
  * unreachable from CI/preview/Vercel runners (the cause of ENETUNREACH seed
- * failures). See AGENTS.md §7 (Deployment).
+ * failures). See AGENTS.md "Supabase".
  *
  * @returns {string}
  */
@@ -28,7 +28,7 @@ export function resolveScriptDatabaseUrl() {
  * statement caching. Pass `options` to extend (e.g. `{ max: 1 }` for DDL).
  * `prepare: false` is applied last so callers cannot accidentally re-enable
  * prepared statements (which would reintroduce the transaction-pooler hazard).
- * See AGENTS.md §7 (Deployment).
+ * See AGENTS.md "Supabase".
  *
  * @param {string} [databaseUrl]
  * @param {Record<string, unknown>} [options]

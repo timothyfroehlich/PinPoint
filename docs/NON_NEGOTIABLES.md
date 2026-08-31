@@ -363,7 +363,7 @@
 
 - **Severity:** Critical
 - **Why:** Production has real user data. `push` bypasses migration history, can drop columns silently, and corrupts the schema's relationship to `drizzle/meta` snapshots. Supabase migrations are disabled (`db.migrations.enabled = false`) — Drizzle is the single source of truth.
-- **Do:** Use `pnpm run db:generate` to author migrations, then `pnpm run db:migrate` to apply. Treat `drizzle/meta` snapshots as authoritative; never edit them by hand (see also `AGENTS.md` §5 Migration conflicts).
+- **Do:** Use `pnpm run db:generate` to author migrations, then `pnpm run db:migrate` to apply. Treat `drizzle/meta` snapshots as authoritative; never edit them by hand (see also `AGENTS.md` "Migration conflicts").
 - **Don't:** Run `drizzle-kit push` against any database (local, preview, prod). Don't use Supabase CLI migrations. Don't hand-edit `drizzle/meta/*.json`.
 - **Enforced by:** `drizzle.config.ts` calls `assertNotDrizzlePush()` (`scripts/lib/drizzle-push-guard.ts`) before any credential is resolved, so drizzle-kit refuses `push` no matter how it was invoked. `package.json`'s `db:_push` tripwire is a second, independent line of defense.
 

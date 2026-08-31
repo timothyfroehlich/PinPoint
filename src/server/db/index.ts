@@ -28,7 +28,7 @@ const globalForDb = globalThis as unknown as {
 // whole write transactions resolved as committed yet never persisted (PP-d8l8,
 // incident 2026-06-18). This is the canonical Drizzle + postgres-js + Supabase
 // serverless setting; scripts/lib/pg-client.mjs sets it for the same reason.
-// See AGENTS.md §7 (canonical endpoint table).
+// See AGENTS.md "Supabase" (canonical endpoint table).
 const conn = globalForDb.conn ?? postgres(databaseUrl, { prepare: false });
 if (process.env.NODE_ENV !== "production") globalForDb.conn = conn;
 

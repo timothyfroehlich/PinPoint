@@ -41,7 +41,7 @@ if (!databaseUrl) {
 
 // `prepare: false` for the same reason as the sibling credential test: the
 // fallback is the Supavisor transaction pooler on `:6543`, which has no
-// prepared statements (AGENTS.md §7, PP-d8l8).
+// prepared statements (AGENTS.md "Supabase", PP-d8l8).
 const client = postgres(databaseUrl, { prepare: false });
 const db = drizzle(client, { schema: { pinballmapState } });
 

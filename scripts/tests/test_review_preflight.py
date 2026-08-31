@@ -297,7 +297,7 @@ def test_the_printed_attestation_is_a_pair_mark_review_accepts() -> None:
 WRAPPER = "mark-claude-review"
 
 # Live instruction surfaces only. `docs/superpowers/**` and `docs/plans/**` are dated
-# records of what was true when they were written (AGENTS.md §8) and keep their
+# records of what was true when they were written (AGENTS.md "Documentation") and keep their
 # references; a repo-wide grep would need an exclusion list that ages badly.
 INSTRUCTION_FILES = [
     ".claude/settings.json",

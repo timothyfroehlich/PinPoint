@@ -25,8 +25,8 @@
 
 1. **Escape parentheses in paths**: `src/app/\(app\)/page.tsx`.
 2. **Run `pnpm run check` before committing** (~9s — the default floor). It is a **static** gate: types, lint, format, and the shell/YAML/Python linters. **It does not run unit tests, and does not run pytest** (PP-4zcj) — unit tests are a required CI job (`test-unit`), part of `preflight`, and available via `pnpm run test`; the Python hook/script tests are a required CI job (`linters`) and available via `pnpm run check:python`. Reserve `pnpm run preflight` (the slower check + build + unit + integration) for **non-trivial changes**: migrations, security/auth, server actions, middleware, DB schema. Preflight is the exception, not the per-commit rule.
-3. **Don't kill processes you didn't start** — see §4 Process safety.
-4. **Sync with merge, never rebase** — see §5 Branches.
+3. **Don't kill processes you didn't start** — see "Process safety".
+4. **Sync with merge, never rebase** — see "Branches".
 5. **Root checkout is read-only.** It stays on `main`. All work — including planning docs — happens in a worktree. Dispatch a subagent or switch into an existing worktree. (PP-46z, PP-bg45.)
 6. **Never `--no-verify`**, never wildcard tool permissions — without explicit user approval each time. **The merge decision is Tim's, always.** An agent MAY run the gate-enforced script `bash scripts/workflow/merge-pr.sh <PR> --human`, but the `block-direct-merge.cjs` PreToolUse hook turns that invocation into an **approval prompt** — Tim approves before it runs, so the merge is still his call (PP-wi85, reversed for the script only, per Tim 2026-08-19). The raw merge channels stay **hard-blocked** for agents — never `gh pr merge`, never `gh api PUT .../merge`, never MCP `merge_pull_request` — because they skip the script's gate re-checks (CI green, review pins head, threads resolved, no conflict). An agent's normal terminal state on a PR is: GitHub-ready, CI green, automatic Codex coverage of head, threads resolved, `ready-for-review` applied, and screenshots posted if UI-touching; then hand over with `bash scripts/workflow/merge-handoff.sh <PR>` — it prints the state Tim needs plus the merge command. (PP-wi85.)
 7. **Beads: `team-maintainer` policy** (not the conservative default).
@@ -124,7 +124,7 @@ Only stop services you started in this session, by specific PID or via worktree-
 
 ### Prototype mode (rapid iteration)
 
-When the user explicitly asks for "prototype mode" / "rapid iteration" / "just explore" **for UI/UX work**, load the `pinpoint-prototype-mode` skill and enter it. It's scoped to **presentation only** — layout, components, styling, page structure, interaction/flow — and explicitly **not** for backend/internal work (data layer, server-action logic, auth, permissions, migrations), which keep full rigor; stub data rather than building it. Within that scope it relaxes the §2 rigor (skip preflight/tests before showing work, defer lint/type fixes, defer coverage and DRY) while logging every skipped item to a `.prototype-mode` debt ledger. It changes **agent behavior only** — pre-commit and `preflight` hooks still run on any real commit, which is fine because prototype work stays local and uncommitted. Never self-elect into it; full rigor is the default. A `UserPromptSubmit`/`SessionStart` hook reminds the agent while the marker exists, so the mode survives compaction. Exit on "exit prototype mode" / "make this real" — then repay the ledger.
+When the user explicitly asks for "prototype mode" / "rapid iteration" / "just explore" **for UI/UX work**, load the `pinpoint-prototype-mode` skill and enter it. It's scoped to **presentation only** — layout, components, styling, page structure, interaction/flow — and explicitly **not** for backend/internal work (data layer, server-action logic, auth, permissions, migrations), which keep full rigor; stub data rather than building it. Within that scope it relaxes the "Critical Non-Negotiables" rigor (skip preflight/tests before showing work, defer lint/type fixes, defer coverage and DRY) while logging every skipped item to a `.prototype-mode` debt ledger. It changes **agent behavior only** — pre-commit and `preflight` hooks still run on any real commit, which is fine because prototype work stays local and uncommitted. Never self-elect into it; full rigor is the default. A `UserPromptSubmit`/`SessionStart` hook reminds the agent while the marker exists, so the mode survives compaction. Exit on "exit prototype mode" / "make this real" — then repay the ledger.
 
 ### Which tests to run
 
@@ -151,7 +151,7 @@ Always try local first — seconds vs minutes, full devtools. If a single-test r
 
 - **Check for conflicts first**: `gh pr view <PR> --json mergeable,mergeStateStatus`. `DIRTY`/`CONFLICTING` means GitHub silently skips workflow runs until you resolve. `pnpm run check` includes a `check:behind-main` warning.
 - **Required check**: only `CI Gate` (ruleset `6326455`). Vercel is not required. `BLOCKED` while E2E is still running is normal.
-- **Vercel preview migrations**: preview deployments skip `migrate:production` (branch DB user lacks `CREATE SCHEMA`). The on-demand `Preview Controller` workflow migrates + seeds the branch DB before building the preview (see §7 "Preview deployments"). Production deploys still migrate.
+- **Vercel preview migrations**: preview deployments skip `migrate:production` (branch DB user lacks `CREATE SCHEMA`). The on-demand `Preview Controller` workflow migrates + seeds the branch DB before building the preview (see "Preview deployments"). Production deploys still migrate.
 
 ### Migration conflicts
 
@@ -181,7 +181,7 @@ The canonical review rubric is `REVIEW.md` at the repo root. If a PR accumulates
 
 ### Superpowers lifecycle → beads
 
-When you run the superpowers plugin lifecycle (`brainstorming → writing-plans → subagent-driven-development → finishing-a-development-branch`), load `pinpoint-superpowers-bridge` — several superpowers steps conflict with PinPoint rules (local merge, raw `git worktree remove`, generic test commands, uncapped subagent dispatch, the plugin's own review-reply flow) and the skill spells out the overrides. Superpowers specs and plans are **working documents, not repo artifacts** (decision 2026-08-16): draft them outside the repo tree (the session scratchpad), store the content in the bead. Files under `docs/superpowers/` committed before the decision stay as records (§8); no new files go there. Durable requirements belong in `docs/feature-specs/` (§8), not in superpowers docs. Bead fields:
+When you run the superpowers plugin lifecycle (`brainstorming → writing-plans → subagent-driven-development → finishing-a-development-branch`), load `pinpoint-superpowers-bridge` — several superpowers steps conflict with PinPoint rules (local merge, raw `git worktree remove`, generic test commands, uncapped subagent dispatch, the plugin's own review-reply flow) and the skill spells out the overrides. Superpowers specs and plans are **working documents, not repo artifacts** (decision 2026-08-16): draft them outside the repo tree (the session scratchpad), store the content in the bead. Files under `docs/superpowers/` committed before the decision stay as records ("Documentation"); no new files go there. Durable requirements belong in `docs/feature-specs/` ("Documentation"), not in superpowers docs. Bead fields:
 
 - `--spec-id` = the feature spec path (`docs/feature-specs/<feature>.md`), when the work has one
 - `--design` = the **full plan text**, stored when the plan is written and refreshed when it materially changes
@@ -192,12 +192,12 @@ Plan-file checkboxes are within-PR execution state, **not** durable task trackin
 
 ## 6. Working style
 
-How Tim wants agents to behave. (§1 has the one-line version; this is the detail.)
+How Tim wants agents to behave. ("User & Mission" has the one-line version; this is the detail.)
 
 ### Collaboration & decisions
 
 - **Don't make my calls for me.** (a) When you ask me a multi-option question, wait for my answer before acting on one — even in auto/autonomous mode; deciding before I reply makes the question performative and removes my choice. (b) Auto/autonomous mode authorizes _operational_ calls (continuing work, tool choices, cleanup, re-publishing after a restart), **not** taste decisions — layout, color, copy, IA, or scope tradeoffs I surfaced. When I'm the taste-maker, ask (`AskUserQuestion` or a visual playground). While waiting on an answer, only do genuinely non-blocking parallel work.
-- **PR lifecycle is agent-owned.** Follow §5 "Getting a PR reviewed" through exact-head automatic review and finding adjudication; draft/ready mechanics live in `pinpoint-pr-workflow`.
+- **PR lifecycle is agent-owned.** Follow "Getting a PR reviewed" through exact-head automatic review and finding adjudication; draft/ready mechanics live in `pinpoint-pr-workflow`.
 - **Link markdown files by absolute path.** When you point me at a markdown file to read or review (a plan, spec, handoff doc, report), always give the full absolute path (e.g. `/Users/froeht/Code/PinPoint/docs/...`), never a relative one. Absolute paths open directly in a cmux pane.
 
 ### Scope and shipping discipline
@@ -230,6 +230,8 @@ When `pnpm audit --audit-level=high` goes RED on a freshly-published advisory **
 ## 8. Documentation
 
 Actionable, "what" and "how" only. Skills carry the deep dives.
+
+**Cite a section of this file by its heading title, never its number** — `AGENTS.md "Which tests to run"`, not `AGENTS.md §<number>`. Section numbers shift whenever this file gains or loses a section and nothing tells the citation, so a stale number points confidently at the wrong content; PP-z9m1 found three sites citing a "§2.2.5" that was never a section at all. A title is checkable, and `scripts/check_rule_ids.py` checks it: it fails the build on any surviving `§<number>` / `section <number>` form, and on any cited title that resolves to no heading here. Cite the most specific heading that covers the claim (`"Supabase"`, not `"Deployment"`), and cite `CORE-*` IDs from `docs/NON_NEGOTIABLES.md` for rules rather than either. Dated records under `docs/superpowers/` and `docs/plans/` are out of scope — they are historical, not live citations.
 
 **Canonical specs are authoritative** — particularly `pinpoint-design-bible` (§5 page archetypes, §17 modal archetypes). When implementation changes UI behavior covered there, **edit the spec in place**. Don't append divergence notes or "TODO: spec out of date" disclaimers. If you find one, fold it into canonical text and delete it. Dated artifacts in `docs/superpowers/specs/` are records — leave them alone.
 

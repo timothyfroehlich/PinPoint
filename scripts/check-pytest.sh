@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # check-pytest.sh — Run pytest over scripts/tests/ with missing-tool install hint.
 #
-# AGENTS.md §4: pytest is required for running hook and script tests under
+# AGENTS.md "Host prerequisites": pytest is required for running hook and script tests under
 # `pnpm run check:python`. If absent, this script exits with code 1 and prints
 # a clear install hint for the mise-selected Python runtime.
 

@@ -14,16 +14,22 @@ text, so they are hand-written. This gate catches the drift that actually bites
 -- a rule renamed or deleted in the catalog while citations linger, and catalog
 rules that no mechanism references at all -- without pretending to diff prose.
 
-Three checks:
+Four checks:
 
   ERROR  A cited CORE-* ID that does not exist in the catalog. Always a bug:
          either a typo or a rule that was renamed/removed without updating its
          citations. This is the check that runs in `pnpm run check`.
-  ERROR  A fragile "rule N" / "commandment N" / "AGENTS.md §2.1" citation.
-         Rules must be cited by their canonical CORE-* ID. Citing by rule
-         number or section reference is not machine-checkable against the
-         catalog, so the gate bans the pattern outright and requires the
-         CORE-* ID instead.
+  ERROR  A fragile "rule N" / "commandment N" / "AGENTS.md §N" citation.
+         Rules must be cited by their canonical CORE-* ID; sections must be
+         cited by their heading title. Citing by rule number is not
+         machine-checkable against the catalog, and a section number resolves
+         to whatever now sits at that position -- which is how a citation goes
+         wrong without going missing -- so the gate bans both number forms and
+         requires the CORE-* ID or the heading title instead.
+  ERROR  An AGENTS.md "Title" citation matching no heading. This is what makes
+         the previous check an improvement rather than a swap: a title, unlike
+         a number, can be resolved, so a renamed heading fails the build
+         instead of silently pointing somewhere else.
   AUDIT  (--orphans) A catalog rule cited nowhere. Opt-in, never fails the
          build: 17 of 67 catalog rules are "orphans" by this definition as of
          2026-08-07, because the catalog is deliberately broader than the set
@@ -32,7 +38,8 @@ Three checks:
          coverage audit you run deliberately, not a default warning.
 
 Exit codes: 0 clean, 1 unknown IDs found, 2 catalog missing, 3 descending
-range cited, 4 fragile rule-number/§2.1 citation found.
+range cited, 4 fragile rule-number/section-number citation found, 5 heading
+title cited that resolves to no AGENTS.md heading.
 """
 
 from __future__ import annotations
@@ -89,9 +96,47 @@ WRAPPED_RULE_CITATION = re.compile(
 )
 WRAPPED_CITATION_NUMBER = re.compile(r"^[ \t]*#?\d+\b")
 
-# "AGENTS.md §2.1" citation ban. Rules must be cited by CORE-* ID, not section
-# references. Tolerates the same optional backtick as NUMBERED_RULE_CITATION.
-SECTION_21_CITATION = re.compile(r"AGENTS\.md`?[ \t]*§[ \t]*2\.1\b")
+# Any "AGENTS.md §N" section citation. This started as §2.1 alone -- that
+# section stopped listing the rules in PP-22e4.4, so citing it sent the reader
+# somewhere the rule is not -- but the whole numbering is the same hazard, just
+# slower: section numbers shift whenever AGENTS.md gains or loses a section, and
+# nothing tells the citation. PP-z9m1 found ~40 such citations across 28 files,
+# three of them pointing at "§2.2.5", which is not a section at all (it is item
+# 5 of a numbered list under §2.2) and never was.
+#
+# The durable form is the heading title: `AGENTS.md "Which tests to run"`.
+# Titles are edited far less often than numbers are renumbered, a stale one is
+# greppable, and -- unlike a number -- it can be resolved against the real
+# headings, which is what find_unresolved_section_titles() below does.
+#
+# Tolerates the same optional backtick as NUMBERED_RULE_CITATION, and matches
+# the spelled-out "section N" as well as "§N": PP-z9m1's first sweep converted
+# every § form and left `AGENTS.md section 3` sitting in a comment, because the
+# gate only knew one spelling of the thing it was banning.
+SECTION_CITATION = re.compile(
+    r"AGENTS\.md`?[ \t]*(?:§[ \t]*|[Ss]ection[ \t]+)\d(?:\.?\d)*"
+)
+
+# The hard-wrapped section citation, for the same reason WRAPPED_RULE_CITATION
+# exists: "AGENTS.md\n# §8" in a comment block wrapped at ~78 columns. The
+# continuation line may open with comment punctuation (`#`, ` * `, `//`) before
+# the §, so the leading run of non-word characters is tolerated. No heading
+# exception is needed here -- unlike "rule", a line ending in "AGENTS.md" is
+# never a heading followed by an ordered list.
+WRAPPED_SECTION_CITATION = re.compile(r"\bAGENTS\.md`?[ \t]*$")
+WRAPPED_SECTION_NUMBER = re.compile(r"^\W{0,4}(?:§[ \t]*|[Ss]ection[ \t]+)\d")
+
+# A heading-title citation: AGENTS.md "Which tests to run" (optionally with the
+# filename code-fenced). Unlike a number, this one is checkable -- see
+# find_unresolved_section_titles().
+SECTION_TITLE_CITATION = re.compile(r"AGENTS\.md`?[ \t]+\"([^\"\n]{2,80})\"")
+
+# An AGENTS.md ATX heading. The leading "N. " on a top-level heading is part of
+# the numbering, not the title, so it is stripped before matching: a citation
+# says "Deployment", never "7. Deployment".
+AGENTS_HEADING = re.compile(
+    r"^#{2,6}[ \t]+(?:\d+(?:\.\d+)*\.?[ \t]+)?(.+?)[ \t]*$", re.MULTILINE
+)
 
 CATALOG = "docs/NON_NEGOTIABLES.md"
 
@@ -100,9 +145,9 @@ CATALOG = "docs/NON_NEGOTIABLES.md"
 # before it exists and can outlive one that is retired.
 #
 # .agents/skills/ is here because it is a first-class citation surface, not a
-# doc archive: AGENTS.md section 3 instructs every agent to load the relevant
-# skill for every task, so a skill citing a retired ID misinstructs agents at
-# least as loudly as AGENTS.md would. PP-nw80 found exactly that -- the
+# doc archive: AGENTS.md "Agent Skills" instructs every agent to load the
+# relevant skill for every task, so a skill citing a retired ID misinstructs
+# agents at least as loudly as AGENTS.md would. PP-nw80 found exactly that -- the
 # progressive-enhancement rule survived in pinpoint-design-bible after being
 # deleted from the catalog, with `pnpm run check` green, because this list
 # stopped at .agents/rules/. Note that a bare `rg CORE-ARCH-002 .` will not
@@ -118,7 +163,8 @@ CITING_SOURCES: tuple[str, ...] = (
     ".claude/hooks/*.cjs",
 )
 
-# Files and globs scanned for fragile rule-number/§2.1 citations (PP-22e4).
+# Files and globs scanned for fragile rule-number/section-number citations
+# (PP-22e4, PP-z9m1), and for heading titles that must resolve (PP-z9m1).
 # Deliberately an explicit allowlist, like CITING_SOURCES above, rather than
 # "every tracked file": several docs subtrees run their own independent
 # "Rule N" numbering with nothing to do with AGENTS.md (e.g.
@@ -129,18 +175,21 @@ CITING_SOURCES: tuple[str, ...] = (
 # citation targets (docs/NON_NEGOTIABLES.md, docs/ENV_VARS.md). Dated-record
 # trees (docs/superpowers/, docs/plans/, the dated docs/testing/*-audit-*.md
 # files) are excluded on purpose -- they are historical records, not live
-# citations, per AGENTS.md §8. Add a path here only when a real citation
-# turns up in it.
+# citations, per AGENTS.md "Documentation". Add a path here only when a real
+# citation turns up in it.
 LEGACY_CITATION_SOURCES: tuple[str, ...] = (
     "AGENTS.md",
     "CLAUDE.md",
+    "README.md",
     "docs/NON_NEGOTIABLES.md",
     "docs/ENV_VARS.md",
+    ".agents/rules/*.md",
     "src/**/*.ts",
     "src/**/*.tsx",
     "scripts/**/*.mjs",
     "scripts/**/*.ts",
     "scripts/**/*.py",
+    "scripts/**/*.sh",
     "e2e/**/*.ts",
     "supabase/**/*.mjs",
     ".agents/skills/**/*.md",
@@ -245,23 +294,27 @@ def collect_descending_ranges(root: Path) -> dict[str, list[str]]:
 
 
 def find_legacy_citations(text: str) -> list[tuple[int, str]]:
-    """Return every fragile rule-number/§2.1 citation in text as (line, text).
+    """Return every fragile rule-number/section-number citation as (line, text).
 
     1-indexed line numbers, so a failure message can point straight at the
     offending line instead of just the file.
     """
     hits: list[tuple[int, str]] = []
-    for regex in (NUMBERED_RULE_CITATION, SECTION_21_CITATION):
+    for regex in (NUMBERED_RULE_CITATION, SECTION_CITATION):
         for match in regex.finditer(text):
             line_no = text.count("\n", 0, match.start()) + 1
             hits.append((line_no, match.group(0)))
 
     lines = text.splitlines()
     for index, line in enumerate(lines[:-1]):
-        if line.lstrip().startswith("#"):
-            continue  # A heading, not a wrapped sentence.
-        match = WRAPPED_RULE_CITATION.search(line)
-        if match and WRAPPED_CITATION_NUMBER.match(lines[index + 1]):
+        if not line.lstrip().startswith("#"):  # A heading is not a wrapped sentence.
+            match = WRAPPED_RULE_CITATION.search(line)
+            if match and WRAPPED_CITATION_NUMBER.match(lines[index + 1]):
+                wrapped = f"{match.group(0)} {lines[index + 1].strip()}"
+                hits.append((index + 1, wrapped))
+
+        match = WRAPPED_SECTION_CITATION.search(line)
+        if match and WRAPPED_SECTION_NUMBER.match(lines[index + 1]):
             wrapped = f"{match.group(0)} {lines[index + 1].strip()}"
             hits.append((index + 1, wrapped))
 
@@ -269,9 +322,65 @@ def find_legacy_citations(text: str) -> list[tuple[int, str]]:
     return hits
 
 
+def collect_section_titles(root: Path) -> set[str]:
+    """Every ATX heading title in AGENTS.md, minus any "N. " numeric prefix."""
+    text = (root / "AGENTS.md").read_text(encoding="utf-8")
+    return {match.group(1) for match in AGENTS_HEADING.finditer(text)}
+
+
+def find_unresolved_section_titles(
+    text: str, titles: set[str]
+) -> list[tuple[int, str]]:
+    """Return every AGENTS.md "Title" citation that matches no real heading.
+
+    A cited title resolves if it equals a heading or is a prefix of one. The
+    prefix rule exists for headings that carry a parenthetical gloss --
+    `### Lint engine (Oxlint)` is cited as "Lint engine", and requiring the
+    gloss verbatim would make every citation churn whenever the gloss is
+    reworded. A prefix still pins the part of the heading that identifies it.
+    """
+    hits: list[tuple[int, str]] = []
+    for match in SECTION_TITLE_CITATION.finditer(text):
+        cited = match.group(1)
+        if any(title == cited or title.startswith(cited) for title in titles):
+            continue
+        line_no = text.count("\n", 0, match.start()) + 1
+        hits.append((line_no, cited))
+    return hits
+
+
+def collect_unresolved_section_titles(
+    root: Path,
+) -> dict[str, list[tuple[int, str]]]:
+    """Map relative file path -> [(line, cited title), ...] for titles that
+    resolve to no AGENTS.md heading.
+
+    The counterpart to the ban on section numbers: replacing "§7" with
+    "Deployment" is only an improvement if something notices when the heading
+    is renamed. Scoped to the same allowlist as the ban itself.
+    """
+    if not (root / "AGENTS.md").is_file():
+        return {}
+    titles = collect_section_titles(root)
+    found: dict[str, list[tuple[int, str]]] = {}
+    for pattern in LEGACY_CITATION_SOURCES:
+        for path in _glob_paths(root, pattern):
+            if not path.is_file():
+                continue
+            rel = path.relative_to(root).as_posix()
+            if rel in found or rel in LEGACY_CITATION_SELF_EXCLUDE:
+                continue  # Overlapping globs, or this module's own docstrings.
+            hits = find_unresolved_section_titles(
+                path.read_text(encoding="utf-8"), titles
+            )
+            if hits:
+                found[rel] = hits
+    return found
+
+
 def collect_legacy_citations(root: Path) -> dict[str, list[tuple[int, str]]]:
     """Map relative file path -> [(line, matched text), ...] for fragile
-    rule-number/§2.1 citations.
+    rule-number/section-number citations.
 
     Scoped to LEGACY_CITATION_SOURCES -- see the comment there for why this is
     an explicit allowlist rather than a scan of every tracked file.
@@ -328,24 +437,55 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 3
 
-    # ERROR: a fragile "rule N" / "commandment N" / "AGENTS.md §2.1" citation.
-    # Rules must be cited by CORE-* ID from the catalog; number or section
-    # citations are not machine-checkable: ban the pattern outright.
+    # ERROR: a fragile "rule N" / "commandment N" / "AGENTS.md §N" citation
+    # (PP-22e4, PP-z9m1). Rule numbers stopped resolving when PP-22e4.4 moved
+    # the rules to .claude/rules/; section numbers shift silently whenever
+    # AGENTS.md gains or loses a section. Neither is machine-checkable against
+    # a catalog the way a CORE-* ID is: ban the pattern outright.
     legacy = collect_legacy_citations(root)
     if legacy:
         print(
-            "check:rule-ids: fragile AGENTS.md rule-number/§2.1 citation(s) found\n",
+            "check:rule-ids: fragile AGENTS.md rule-number/section-number "
+            "citation(s) found\n",
             file=sys.stderr,
         )
         for rel in sorted(legacy):
             for line_no, matched_text in legacy[rel]:
                 print(f"  {rel}:{line_no}: {matched_text!r}", file=sys.stderr)
         print(
-            f"\nRules must be cited by CORE-* ID from {CATALOG}. Fragile "
-            'rule-number or "§2.1" citations are banned.',
+            "\nNeither form resolves on its own. A rule number points at "
+            "nothing since PP-22e4.4 moved the rules to .claude/rules/ -- "
+            f"cite the CORE-* ID instead, from {CATALOG}, which is the only "
+            "catalog there is. A section number goes stale the next time "
+            "AGENTS.md is restructured, and nothing tells the citation -- "
+            'cite the heading title instead: AGENTS.md "Which tests to run".',
             file=sys.stderr,
         )
         return 4
+
+    # ERROR: a heading-title citation that resolves to no AGENTS.md heading.
+    # Banning section numbers only helps if the replacement is checkable, and
+    # this is the check: a renamed or deleted heading fails here instead of
+    # quietly sending readers nowhere, which is exactly the failure mode the
+    # numbers had.
+    unresolved = collect_unresolved_section_titles(root)
+    if unresolved:
+        print(
+            "check:rule-ids: AGENTS.md heading-title citation(s) that resolve "
+            "to no heading\n",
+            file=sys.stderr,
+        )
+        for rel in sorted(unresolved):
+            for line_no, title in unresolved[rel]:
+                print(f"  {rel}:{line_no}: {title!r}", file=sys.stderr)
+        print(
+            "\nEither the heading was renamed (update the citations) or the "
+            "citation was always wrong. A cited title must equal an AGENTS.md "
+            "heading or be a prefix of one -- the prefix rule is what lets "
+            '"Lint engine" cite a heading that carries a parenthetical gloss.',
+            file=sys.stderr,
+        )
+        return 5
 
     catalog_ids = collect_catalog_ids(root)
     citations = collect_citations(root)

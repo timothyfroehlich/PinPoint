@@ -135,7 +135,7 @@ pnpm run smoke        # Playwright smoke E2E tests
 pnpm run preflight    # full local CI gate before pushing
 ```
 
-For the command reference and the rules behind it, see `AGENTS.md` §5; for which
+For the command reference and the rules behind it, see `AGENTS.md` "Key commands"; for which
 tests to write where, the `pinpoint-testing` skill at
 `.agents/skills/pinpoint-testing/SKILL.md`.
 

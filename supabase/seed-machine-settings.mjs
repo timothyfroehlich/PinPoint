@@ -53,7 +53,7 @@ import { assertLocalDatabase } from "../scripts/assert-local-db.mjs";
 
 // Use the pooled POSTGRES_URL (port :6543, IPv4) like seed-users.mjs — NOT
 // POSTGRES_URL_NON_POOLING (:5432), which resolves to IPv6 and is unreachable
-// from CI / the preview pipeline runners (AGENTS.md §7). The preview "Seed
+// from CI / the preview pipeline runners (AGENTS.md "Supabase"). The preview "Seed
 // machine settings demo" step crashed with ENETUNREACH against the :5432 host
 // before this was switched.
 const databaseUrl = process.env.POSTGRES_URL;

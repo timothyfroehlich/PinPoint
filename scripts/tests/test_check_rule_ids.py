@@ -20,10 +20,13 @@ from check_rule_ids import (  # noqa: E402
     collect_citations,
     collect_descending_ranges,
     collect_legacy_citations,
+    collect_section_titles,
+    collect_unresolved_section_titles,
     extract_ids,
     find_descending_ranges,
     find_legacy_citations,
     find_repo_root,
+    find_unresolved_section_titles,
     main,
 )
 
@@ -131,6 +134,35 @@ class TestFindLegacyCitations:
         assert find_legacy_citations('AGENTS.md §2.1 "Progressive Enhancement"') == [
             (1, "AGENTS.md §2.1")
         ]
+
+    def test_finds_any_top_level_section_citation(self):
+        # PP-z9m1 widened this from §2.1 alone to every section number: the
+        # numbering shifts whenever AGENTS.md gains or loses a section and
+        # nothing tells the citation.
+        assert find_legacy_citations("See AGENTS.md §7 for the pooler table") == [
+            (1, "AGENTS.md §7")
+        ]
+
+    def test_finds_multi_level_section_citation(self):
+        # "§2.2.5" is not a section at all -- it is item 5 of a numbered list
+        # under §2.2. Three sites cited it before PP-z9m1, so the pattern has
+        # to reach arbitrary depth rather than stopping at N.N.
+        assert find_legacy_citations("root checkout (AGENTS.md §2.2.5)") == [
+            (1, "AGENTS.md §2.2.5")
+        ]
+
+    def test_ignores_bare_section_mark_without_agents_md(self):
+        # docs/pbm-listing-redesign-refresher.md numbers its OWN sections and
+        # refers to them as "§7"/"§11", and AGENTS.md cites pinpoint-design-bible
+        # as "(§5 page archetypes)". Those are not AGENTS.md citations and must
+        # not trip the gate.
+        assert (
+            find_legacy_citations("amended 2026-07-25 (§7). Build state is §11.") == []
+        )
+
+    def test_accepts_the_durable_heading_title_form(self):
+        # The replacement form this gate is steering people toward.
+        assert find_legacy_citations('per AGENTS.md "Which tests to run"') == []
 
     def test_tolerates_backtick_between_filename_and_keyword(self):
         # `AGENTS.md` §2.1 -- code-fenced filename immediately followed by
@@ -435,6 +467,99 @@ class TestFindRepoRoot:
         assert find_repo_root(tmp_path) == tmp_path
 
 
+class TestSectionTitleResolution:
+    """Banning section numbers is only an improvement if the replacement
+    resolves. These cover the check that makes that true."""
+
+    TITLES = {"Deployment", "Which tests to run", "Lint engine (Oxlint)"}
+
+    def test_exact_title_resolves(self):
+        assert (
+            find_unresolved_section_titles('see AGENTS.md "Deployment"', self.TITLES)
+            == []
+        )
+
+    def test_backticked_filename_resolves(self):
+        text = 'see `AGENTS.md` "Which tests to run" first'
+        assert find_unresolved_section_titles(text, self.TITLES) == []
+
+    def test_prefix_of_a_glossed_heading_resolves(self):
+        # `### Lint engine (Oxlint)` is cited as "Lint engine" -- requiring the
+        # gloss verbatim would churn every citation when the gloss is reworded.
+        text = 'per AGENTS.md "Lint engine"'
+        assert find_unresolved_section_titles(text, self.TITLES) == []
+
+    def test_renamed_heading_is_reported(self):
+        text = 'per AGENTS.md "Deployments"\n'
+        assert find_unresolved_section_titles(text, self.TITLES) == [(1, "Deployments")]
+
+    def test_reports_the_line_number(self):
+        text = 'intro\n\nsee AGENTS.md "Nowhere"\n'
+        assert find_unresolved_section_titles(text, self.TITLES) == [(3, "Nowhere")]
+
+    def test_adjacent_string_literal_is_not_a_citation(self):
+        # `(root / "AGENTS.md").write_text("x")` -- the quote after the
+        # filename closes the literal; it does not open a cited title.
+        text = '(root / "AGENTS.md").write_text("x")'
+        assert find_unresolved_section_titles(text, self.TITLES) == []
+
+    def test_collect_section_titles_strips_numeric_prefixes(self, repo: Path):
+        (repo / "AGENTS.md").write_text(
+            "# Top\n\n## 7. Deployment\n\n### 2.2 Process rules\n\n### Branches\n",
+            encoding="utf-8",
+        )
+        assert collect_section_titles(repo) == {
+            "Deployment",
+            "Process rules",
+            "Branches",
+        }
+
+    def test_main_fails_on_unresolvable_title(self, repo: Path, capsys):
+        (repo / "AGENTS.md").write_text("# A\n\n## 7. Deployment\n", encoding="utf-8")
+        (repo / "CLAUDE.md").write_text(
+            'never db:reset (AGENTS.md "Deployments")\n', encoding="utf-8"
+        )
+        assert main(["--root", str(repo)]) == 5
+        assert "Deployments" in capsys.readouterr().err
+
+    def test_main_passes_when_the_title_resolves(self, repo: Path):
+        (repo / "AGENTS.md").write_text("# A\n\n## 7. Deployment\n", encoding="utf-8")
+        (repo / "CLAUDE.md").write_text(
+            'never db:reset (AGENTS.md "Deployment")\n', encoding="utf-8"
+        )
+        assert main(["--root", str(repo)]) == 0
+
+    def test_missing_agents_md_is_not_a_failure(self, repo: Path):
+        (repo / "CLAUDE.md").write_text('AGENTS.md "Anything"\n', encoding="utf-8")
+        assert collect_unresolved_section_titles(repo) == {}
+
+
+class TestWordAndWrappedSectionForms:
+    """The spellings PP-z9m1's first sweep left behind."""
+
+    def test_finds_the_spelled_out_section_form(self):
+        assert find_legacy_citations("per AGENTS.md section 3") == [
+            (1, "AGENTS.md section 3")
+        ]
+
+    def test_finds_capitalised_section_form(self):
+        assert find_legacy_citations("AGENTS.md Section 5 covers it") == [
+            (1, "AGENTS.md Section 5")
+        ]
+
+    def test_finds_a_hard_wrapped_section_citation(self):
+        # A comment block wrapped at ~78 columns, continuation line opening
+        # with the comment marker.
+        text = "# citations, per AGENTS.md\n# §8. Add a path here only when\n"
+        assert find_legacy_citations(text) == [
+            (1, "AGENTS.md # §8. Add a path here only when")
+        ]
+
+    def test_bare_filename_at_end_of_line_is_not_a_citation(self):
+        text = "the durable target is AGENTS.md\nand nothing else.\n"
+        assert find_legacy_citations(text) == []
+
+
 class TestRealRepo:
     """The gate must be green against the actual repository.
 
@@ -466,8 +591,17 @@ class TestRealRepo:
         assert collect_descending_ranges(root) == {}
 
         # PP-22e4 converted every legacy rule-number/§2.1 citation in scope
-        # to a CORE-* ID; none should have crept back in.
+        # to a CORE-* ID, and PP-z9m1 widened the ban to every section number
+        # and converted those to heading titles; none should have crept back in.
         assert collect_legacy_citations(root) == {}
+
+        # PP-z9m1: every section-number citation is now a heading title.
+        # Non-triviality: the conversion left many real title citations, so an
+        # empty result would mean the title regex stopped matching rather than
+        # that every title resolves. AGENTS.md itself parses 20+ headings.
+        titles = collect_section_titles(root)
+        assert len(titles) > 20
+        assert collect_unresolved_section_titles(root) == {}
 
         assert main(["--root", str(root)]) == 0
 

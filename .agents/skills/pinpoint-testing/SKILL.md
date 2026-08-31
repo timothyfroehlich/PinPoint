@@ -1,6 +1,6 @@
 ---
 name: pinpoint-testing
-description: Which layer catches which class of bug, and where the coverage for each class already lives — the bug-class table AGENTS.md routes to, the canonical file per class so new tests extend rather than duplicate, and the "Test What We Own" boundary with its casework. Also the one mocking pattern worth knowing — forwarding `~/server/db` to the worker-scoped PGlite instance rather than handing a test canned rows. Use when deciding what layer a new test belongs at, before creating a new test file, when reaching for a mock of the database or an ORM, when tempted to synthesize a third party's internal state in a test, or when reviewing whether a PR picked the right layer. Playwright technique lives in `pinpoint-e2e`; the rules themselves are `CORE-TEST-*` in `docs/NON_NEGOTIABLES.md`; which commands to run is AGENTS.md §5.
+description: Which layer catches which class of bug, and where the coverage for each class already lives — the bug-class table AGENTS.md routes to, the canonical file per class so new tests extend rather than duplicate, and the "Test What We Own" boundary with its casework. Also the one mocking pattern worth knowing — forwarding `~/server/db` to the worker-scoped PGlite instance rather than handing a test canned rows. Use when deciding what layer a new test belongs at, before creating a new test file, when reaching for a mock of the database or an ORM, when tempted to synthesize a third party's internal state in a test, or when reviewing whether a PR picked the right layer. Playwright technique lives in `pinpoint-e2e`; the rules themselves are `CORE-TEST-*` in `docs/NON_NEGOTIABLES.md`; which commands to run is AGENTS.md "Which tests to run".
 ---
 
 # PinPoint Testing
@@ -103,6 +103,6 @@ The house pattern instead forwards the `db` singleton to worker-scoped PGlite, s
 
 - `pinpoint-e2e` — Playwright technique, selector strategy, worker isolation, environment defaults.
 - [src/test/README.md](../../../src/test/README.md) — the mechanics: `setupTestDb()` / `getTestDb()` call contract, factories, and which command runs which project.
-- AGENTS.md §5 "Which tests to run" — the decision tree and the commands.
+- AGENTS.md "Which tests to run" — the decision tree and the commands.
 - [NON_NEGOTIABLES.md](../../../docs/NON_NEGOTIABLES.md#testing) — the `CORE-TEST-*` rules themselves.
 - [e2e-audit-2026-05.md](../../../docs/testing/e2e-audit-2026-05.md) — per-spec verdicts and the bug-class framework's history.

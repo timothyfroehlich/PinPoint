@@ -41,7 +41,7 @@ const anonClient = createClient(supabaseUrl, supabaseAnonKey);
 //
 // `prepare: false` because `databaseUrl` falls back to `POSTGRES_URL`, which in
 // any pooled environment is the Supavisor transaction pooler on `:6543` — no
-// prepared statements there (AGENTS.md §7, PP-d8l8). Without it a pooled run
+// prepared statements there (AGENTS.md "Supabase", PP-d8l8). Without it a pooled run
 // fails on the GRANT rather than on an assertion, which reads as a broken guard
 // test instead of a misconfigured connection.
 const sql = postgres(databaseUrl, { prepare: false });

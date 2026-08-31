@@ -9,7 +9,7 @@ Merged reference covering PinPoint's deployment-adjacent operational surfaces: D
 
 ## DB Connections
 
-Full pooler/endpoint reference for PinPoint's Supabase Postgres setup. The one-line operational rules live in `AGENTS.md` §7 Supabase — this skill is the deep reference behind them.
+Full pooler/endpoint reference for PinPoint's Supabase Postgres setup. The one-line operational rules live in `AGENTS.md` "Supabase" — this skill is the deep reference behind them.
 
 ### Connection string format
 
@@ -63,7 +63,7 @@ PinPoint uses **Drizzle ORM** for schema definition and migrations, plus a **sep
 - **Migrations only, never `drizzle-kit push`** (CORE-ARCH-009). Generate and apply; the Supabase migration config is deliberately disabled.
 - **Descriptive names** — `add-notifications-table`, not `changes2`.
 - **Commit everything together**: `schema.ts`, the new `drizzle/` files (`.sql` **and** `_snapshot.json`), and the updated `src/test/setup/schema.sql`.
-- **Production and preview are `db:migrate` only.** Never `db:reset`, never `drizzle-kit push` against them. (AGENTS.md §7.)
+- **Production and preview are `db:migrate` only.** Never `db:reset`, never `drizzle-kit push` against them. (AGENTS.md "Supabase".)
 
 ## Local stack won't start on an SELinux host (resolved, PP-9mg0)
 

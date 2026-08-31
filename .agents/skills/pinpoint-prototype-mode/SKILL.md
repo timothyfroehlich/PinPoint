@@ -34,7 +34,7 @@ than quietly relaxing rigor on logic that matters.
 Enter **only** when the user explicitly asks: "prototype mode", "rapid
 iteration", "let's just explore", "vibe on this UI", "don't worry about tests
 for now", or similar — and the work is **UI/UX**. **Never self-elect into this
-mode.** Full rigor (AGENTS.md §2) is always the default.
+mode.** Full rigor (AGENTS.md "Critical Non-Negotiables") is always the default.
 
 ## Entering the mode
 
@@ -95,7 +95,7 @@ land it", or starts asking for tests/PR/commit.
    green, DRY cleanup.
 2. Delete the marker file.
 3. Announce: "✅ Exited prototype mode. Repaying debt:" followed by the
-   checklist. Then resume full AGENTS.md §2 rigor.
+   checklist. Then resume full AGENTS.md "Critical Non-Negotiables" rigor.
 
 Do not silently drop the ledger. If the user wants to abandon the prototype
 entirely, confirm before deleting the marker without repaying.
