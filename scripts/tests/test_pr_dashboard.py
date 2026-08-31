@@ -389,6 +389,7 @@ def test_superseded_cancelled_check_does_not_override_replacement(run_dashboard)
     [
         ("FAILURE", "SUCCESS", "All passed"),
         ("SUCCESS", "FAILURE", "1 FAILED"),
+        ("SUCCESS", "CANCELLED", "1 FAILED"),
     ],
 )
 def test_latest_authoritative_ci_gate_rerun_wins(

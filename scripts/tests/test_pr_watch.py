@@ -257,19 +257,24 @@ def test_ci_gate_state_prefers_live_gate_over_cancelled_leftover(monkeypatch):
 
 
 @pytest.mark.unit
-def test_ci_gate_state_prefers_older_failure_over_newer_cancellation(monkeypatch):
-    """Supersession must never mask a real verdict, even a newer cancellation.
-
-    Pins the FIRST key of the ranking (non-superseded wins) independently of
-    the second (recency): here the cancelled entry is the more recent one, so
-    a naive "newest wins" would hide the failure.
-    """
+def test_ci_gate_state_reports_newer_cancellation_over_older_failure(monkeypatch):
+    """The latest rerun is authoritative even when both outcomes are non-green."""
     rollup = [
         _gate("FAILURE", completed_at="2026-07-24T20:00:00Z"),
         _gate("CANCELLED", completed_at="2026-07-24T23:26:45Z"),
     ]
     monkeypatch.setattr(pr_watch, "gh", make_gh(rollup=rollup))
-    assert pr_watch._ci_gate_state(PR) == ("COMPLETED", "FAILURE")
+    assert pr_watch._ci_gate_state(PR) == ("COMPLETED", "CANCELLED")
+
+
+@pytest.mark.unit
+def test_ci_gate_state_does_not_expose_older_green_after_cancellation(monkeypatch):
+    rollup = [
+        _gate("SUCCESS", completed_at="2026-07-24T20:00:00Z"),
+        _gate("CANCELLED", completed_at="2026-07-24T23:26:45Z"),
+    ]
+    monkeypatch.setattr(pr_watch, "gh", make_gh(rollup=rollup))
+    assert pr_watch._ci_gate_state(PR) == ("COMPLETED", "CANCELLED")
 
 
 @pytest.mark.unit

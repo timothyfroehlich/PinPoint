@@ -696,10 +696,9 @@ def _select_ci_gate(rollup: list[dict]) -> dict | None:
     if not gates:
         return None
 
-    def rank(check: dict) -> tuple[int, str]:
-        not_superseded = 0 if _is_superseded(check.get("conclusion")) else 1
+    def rank(check: dict) -> str:
         when = check.get("completedAt") or check.get("startedAt") or ""
-        return not_superseded, when
+        return when
 
     return max(gates, key=rank)
 
@@ -723,9 +722,9 @@ def _current_ci_gate(pr: int) -> dict | None:
     GitHub scopes statusCheckRollup to the PR's current head commit, but that
     commit can still carry MORE THAN ONE `CI Gate` entry — a re-run, or a run
     cancelled by a concurrency group, leaves its superseded check behind next to
-    the live one. Returning the first match let a cancelled leftover shadow the
-    run we actually care about, so prefer a non-superseded entry and, among
-    equals, the most recent one. (PP-r63o)
+    the live one. Returning the first match let an older entry shadow the run we
+    actually care about, so select the most recent entry. A latest cancellation
+    remains superseded rather than exposing an older green verdict. (PP-r63o)
     """
     _head, gate = _current_ci_snapshot(pr)
     return gate

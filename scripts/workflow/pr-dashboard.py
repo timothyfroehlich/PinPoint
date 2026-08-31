@@ -430,10 +430,9 @@ def _ci_label(checks: list[dict[str, Any]]) -> str:
             ):
                 return "?"
 
-    def gate_rank(check: dict[str, Any]) -> tuple[int, str]:
-        not_superseded = 0 if check.get("conclusion") == "CANCELLED" else 1
+    def gate_rank(check: dict[str, Any]) -> str:
         when = check.get("completedAt") or check.get("startedAt") or ""
-        return not_superseded, str(when)
+        return str(when)
 
     authoritative_gate = max(gates, key=gate_rank) if gates else None
     effective_checks = [
