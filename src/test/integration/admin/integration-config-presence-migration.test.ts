@@ -22,7 +22,11 @@ const contractMigrationSql = readFileSync(
 const contractColumnStatements = contractMigrationSql
   .split("--> statement-breakpoint")
   .map((statement) => statement.trim())
-  .filter((statement) => statement.startsWith("ALTER TABLE"));
+  .filter(
+    (statement) =>
+      statement.includes('UPDATE "pinballmap_state"') ||
+      statement.startsWith("ALTER TABLE")
+  );
 
 async function applyExpandMigration(): Promise<void> {
   const db = await getTestDb();
@@ -216,6 +220,35 @@ describe("integration configuration-presence migrations", () => {
       guildId: "guild-26454",
       botHealthStatus: "healthy",
     });
+  });
+
+  it("keeps disabled Pinball Map history dormant after contract", async () => {
+    const db = await getTestDb();
+    await db.insert(pinballmapState).values({
+      locationId: 777,
+      snapshotJson: {
+        locationId: 777,
+        name: "Dormant Arcade",
+        dateLastUpdated: "2026-08-23",
+        lastUpdatedByUsername: "operator",
+        machineCount: 0,
+        lmxes: [],
+        fetchedAtIso: "2026-08-23T12:00:00.000Z",
+        raw: { retained: true },
+      },
+      lastSyncStatus: "ok",
+    });
+    await db.execute(sql`UPDATE pinballmap_state SET enabled = false`);
+
+    await applyExpandMigration();
+    await applyContractColumns();
+
+    const row = await db.query.pinballmapState.findFirst();
+    expect(row).toMatchObject({
+      locationId: null,
+      lastSyncStatus: "ok",
+    });
+    expect(row?.snapshotJson?.name).toBe("Dormant Arcade");
   });
 
   it("contracts the Discord RPC return shape without weakening its gate", () => {

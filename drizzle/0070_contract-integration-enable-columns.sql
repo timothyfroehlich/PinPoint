@@ -8,6 +8,15 @@
 -- intermediate schema.
 DROP FUNCTION public.get_discord_config();--> statement-breakpoint
 
+-- Migration 0069 retained a disabled location_id so the previous deployment
+-- could keep serving its legacy enabled=false state. The current runtime uses
+-- location_id presence as the activation signal, so clear only those dormant
+-- locations before removing the compatibility marker. Retain the snapshot and
+-- sync-health fields for diagnostics.
+UPDATE "pinballmap_state"
+SET "location_id" = NULL
+WHERE "enabled" = false;--> statement-breakpoint
+
 ALTER TABLE "discord_integration_config" DROP COLUMN "enabled";--> statement-breakpoint
 ALTER TABLE "pinballmap_state" DROP COLUMN "enabled";--> statement-breakpoint
 
