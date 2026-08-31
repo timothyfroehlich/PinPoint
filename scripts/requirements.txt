@@ -1,5 +1,5 @@
 # PinPoint Python workflow dependencies for scripts/tests.
-# Python runtime: 3.12.9 (pinned in mise.toml, target py312 in ruff.toml).
+# Python runtime: exact pin in mise.toml, target py312 in ruff.toml.
 # All workflow and hook scripts rely strictly on the Python standard library.
 # pytest is the test runner dependency for scripts/tests/.
 pytest==9.0.3
