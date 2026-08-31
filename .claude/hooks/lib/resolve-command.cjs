@@ -29,8 +29,9 @@
  *   - Redirections and their targets are dropped, not mistaken for arguments.
  *   - Segments are split on real shell separators: && || ; | & newline ( ).
  *   - Leading shell control words are removed from each segment: conditionals,
- *     negation, brace groups, loops, function bodies, and coprocesses cannot
- *     occupy the command slot and hide the command they govern.
+ *     negation, brace groups, loops, function bodies, coprocesses, and timed
+ *     compound commands cannot occupy the command slot and hide the command
+ *     they govern.
  *   - Per segment, the EFFECTIVE command is resolved by skipping leading
  *     `VAR=value` assignments and wrappers that do not consume the command slot
  *     (`sudo`, `env`, `command`, `time`, `nice`, `xargs`, `timeout`, ...),
@@ -641,6 +642,55 @@ function stripLeadingShellControlWords(words) {
 }
 
 /**
+ * Bash's bare, unquoted `time` is reserved syntax and can prefix a compound
+ * command (`time if ...`, `time { ...; }`). Consume that one syntax prefix so
+ * the newly-exposed control word can be normalized too. Do not do this after
+ * ordinary wrappers: `env time if ...` and `/usr/bin/time if ...` attempt to
+ * execute a command named `if`, rather than asking Bash to parse a conditional.
+ */
+function stripLeadingShellTimePrefix(words) {
+  let i = 0;
+  while (i < words.length && ENV_ASSIGN.test(words[i].value)) i++;
+
+  const word = words[i];
+  if (!word || word.quoted || word.escaped || word.value !== "time") {
+    return words;
+  }
+
+  const wrapper = WRAPPERS.get("time");
+  i++;
+  while (i < words.length && words[i].value.startsWith("-")) {
+    const flag = words[i].value;
+    if (flag === "--") {
+      i++;
+      break;
+    }
+
+    const hasEquals = flag.includes("=");
+    const bare = hasEquals ? flag.slice(0, flag.indexOf("=")) : flag;
+    const attachedShortValue =
+      !hasEquals && !bare.startsWith("--") && flag.length > 2;
+    i++;
+    if (!hasEquals && !attachedShortValue && wrapper.valueFlags.has(bare)) i++;
+  }
+
+  // A prefix without a following pipeline is still the effective command for
+  // classification/backstop purposes; do not turn it into structural silence.
+  return i < words.length ? words.slice(i) : words;
+}
+
+/** Normalize leading shell syntax until no timed compound prefix remains. */
+function normalizeLeadingShellSyntax(words) {
+  let effectiveWords = stripLeadingShellControlWords(words);
+  while (effectiveWords.length > 0) {
+    const afterTime = stripLeadingShellTimePrefix(effectiveWords);
+    if (afterTime === effectiveWords) break;
+    effectiveWords = stripLeadingShellControlWords(afterTime);
+  }
+  return effectiveWords;
+}
+
+/**
  * Resolve one segment into zero or more Segments, following literal shell
  * payloads. Pushes into `out.segments` / `out.unresolvable`.
  */
@@ -652,7 +702,7 @@ function resolveSegment(words, out, depth, options) {
     }
   }
 
-  const effectiveWords = stripLeadingShellControlWords(words);
+  const effectiveWords = normalizeLeadingShellSyntax(words);
 
   // A segment made only of reserved words (`then`, `fi`, `done`, `}`) is shell
   // structure, not a command and not an ambiguity.
