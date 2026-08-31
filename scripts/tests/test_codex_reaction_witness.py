@@ -74,6 +74,7 @@ def run_witness(
         {
             "PATH": f"{tmp_path}{os.pathsep}{env['PATH']}",
             "GITHUB_REPOSITORY": "acme/widget",
+            "CODEX_WITNESS_INITIAL_DELAY_SECONDS": "0",
             "CODEX_WITNESS_MAX_ATTEMPTS": "3",
             "CODEX_WITNESS_POLL_SECONDS": "0",
             "STUB_HEADS": str(heads_path),
@@ -164,3 +165,12 @@ def test_workflow_uses_trusted_main_and_narrow_permissions() -> None:
     assert "ref: ${{ github.event.repository.default_branch }}" in text
     assert "persist-credentials: false" in text
     assert "github.event.pull_request.head.repo.full_name == github.repository" in text
+
+
+def test_default_budget_has_a_quiet_window_and_at_most_108_loop_reads() -> None:
+    text = SCRIPT.read_text()
+    assert "CODEX_WITNESS_INITIAL_DELAY_SECONDS:-120" in text
+    assert "CODEX_WITNESS_MAX_ATTEMPTS:-36" in text
+    assert "CODEX_WITNESS_POLL_SECONDS:-30" in text
+    # Each attempt reads head + reviews + one reaction endpoint until eyes appears.
+    assert 36 * 3 == 108

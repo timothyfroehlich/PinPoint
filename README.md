@@ -77,13 +77,31 @@ If you’re changing code, **start here**:
 
 ### Prerequisites
 
-- [mise](https://mise.jdx.dev/) **2026.8.11+** (manages development Node, Python, Ruff, the Supabase CLI, and pnpm)
-- Node.js (exact version pinned in `mise.toml`; must satisfy `package.json#engines.node`)
-- Python (exact version pinned in `mise.toml`; target `py312` in `ruff.toml`)
-- Ruff (exact version pinned in `mise.toml`)
-- Supabase CLI (pinned in `mise.toml`; installed by `mise install --locked` — no separate host install needed)
-- pnpm (exact version and sha512 integrity pinned in `packageManager` in `package.json`)
-- Supabase account (for local dev / preview / prod)
+- [mise](https://mise.jdx.dev/) **2026.8.11+**
+- A Docker-compatible container runtime for the local Supabase stack
+- GNU parallel for the host-wide `pnpm run preflight` concurrency cap
+- A Supabase account only for preview or production administration
+
+`mise install --locked` supplies the project Node, Python, Ruff, Supabase CLI,
+and pnpm executables. Do not install separate project copies with Corepack, npm,
+Homebrew, or another version manager.
+
+### Tool Ownership
+
+| Surface                                      | Authority                                                                                                                                     |
+| :------------------------------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------- |
+| Project Node, Python, Ruff, and Supabase CLI | Exact pins in `mise.toml`; resolved artifacts in `mise.lock`                                                                                  |
+| pnpm executable                              | Exact version and sha512 integrity in `package.json#packageManager`, installed by mise                                                        |
+| Project commands                             | `package.json#scripts`; mise resolves tools but does not duplicate the task namespace                                                         |
+| Local/Bazzite `bd` and Dolt                  | User-global mise declarations checked against `scripts/beads-compatibility.json`                                                              |
+| Cloud-routine `bd` and Dolt                  | `scripts/beads-cloud-setup.sh` plus `scripts/beads-cloud-init.sh`; this path remains separate because cloud routines cannot reach the tailnet |
+
+Vercel does not install or invoke mise. `package.json#engines` is its Node
+compatibility contract, `vercel-build` retains the production migration/build
+ordering, and the preview Vercel CLI remains pinned behind the repository-owned
+wrapper. The Supabase pin in `mise.toml` owns only the CLI executable: container
+images, generated worktree configuration, database lifecycle, and deployment
+migrations remain with their existing owners.
 
 ### Local Setup (Short Version)
 
@@ -93,7 +111,7 @@ cd PinPoint
 
 mise install --locked           # installs pinned Node, Python, Ruff, Supabase CLI, and pnpm
 mise exec -- python3 -m pip install -r scripts/requirements.txt
-mise exec -- pnpm install       # (or plain `pnpm install` if mise shell hook is active)
+mise exec -- pnpm install       # plain `pnpm` also works after mise shell activation
 cp .env.example .env.local      # then fill in Supabase + DB vars
 
 mise exec -- pnpm run dev       # automatically ensures Supabase is running
@@ -153,9 +171,12 @@ PinPoint is designed to run on **Vercel + Supabase**:
 1. Push your code to GitHub.
 2. Import the repo into Vercel.
 3. Configure environment variables in Vercel to match your `.env.local`.
-4. Point the app at your Supabase project (preview and production projects recommended).
+4. Point the app at the production Supabase project. Preview database branches are
+   created only on demand through the `/preview` PR command.
 
 CI is configured via `.github/workflows/ci.yml` and mirrors the `pnpm run preflight` pipeline.
+Production remains `pnpm run migrate:production` followed by `next build`; a
+failed build can therefore follow a successful production migration.
 
 ---
 
