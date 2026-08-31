@@ -411,11 +411,27 @@ def _review_label(state: str) -> str:
 
 
 def _ci_label(checks: list[dict[str, Any]]) -> str:
-    total = len(checks)
+    replacement_names = {
+        check.get("name")
+        for check in checks
+        if check.get("__typename") == "CheckRun"
+        and check.get("name") == "CI Gate"
+        and (check.get("conclusion") or check.get("status")) != "CANCELLED"
+    }
+    effective_checks = [
+        check
+        for check in checks
+        if not (
+            check.get("__typename") == "CheckRun"
+            and check.get("conclusion") == "CANCELLED"
+            and check.get("name") in replacement_names
+        )
+    ]
+    total = len(effective_checks)
     passed = 0
     failed = 0
     pending = 0
-    for check in checks:
+    for check in effective_checks:
         name = check.get("name") or check.get("context") or ""
         typename = check.get("__typename")
         if typename == "StatusContext":
@@ -480,6 +496,7 @@ def _merge_label(state: Any) -> str:
         if state
         in {
             "CONFLICTING",
+            "DIRTY",
             "CLEAN",
             "BLOCKED",
             "UNSTABLE",

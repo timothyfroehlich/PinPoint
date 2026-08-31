@@ -45,6 +45,7 @@ def pr_node(
     review_cursor=None,
     threads=(),
     checks=None,
+    merge_state="CLEAN",
 ):
     if reviews is None:
         reviews = [review()]
@@ -57,7 +58,7 @@ def pr_node(
         "headRefOid": HEAD,
         "isDraft": False,
         "mergeable": "MERGEABLE",
-        "mergeStateStatus": "CLEAN",
+        "mergeStateStatus": merge_state,
         "commits": {
             "nodes": [
                 {"commit": {"statusCheckRollup": {"contexts": connection(checks)}}}
@@ -341,6 +342,66 @@ def test_malformed_check_context_is_unknown_while_review_remains_usable(
     assert "?" in row
     assert "reviewed" in row
     assert "All passed" not in row
+    assert len(calls) == 1
+
+
+@pytest.mark.unit
+def test_superseded_cancelled_check_does_not_override_replacement(run_dashboard):
+    initial = open_pr_response(
+        [
+            pr_node(
+                10,
+                checks=[
+                    check(conclusion="CANCELLED"),
+                    check(conclusion="SUCCESS"),
+                ],
+            )
+        ]
+    )
+    result, calls = run_dashboard(
+        [{"contains": ["pullRequests(first: 100"], "stdout": json.dumps(initial)}]
+    )
+
+    assert result.returncode == 0
+    row = result.stdout.splitlines()[2]
+    assert "All passed" in row
+    assert "FAILED" not in row
+    assert len(calls) == 1
+
+
+@pytest.mark.unit
+def test_non_authoritative_cancelled_check_still_fails_closed(run_dashboard):
+    initial = open_pr_response(
+        [
+            pr_node(
+                12,
+                checks=[
+                    check(name="Lint", conclusion="CANCELLED"),
+                    check(name="Lint", conclusion="SUCCESS"),
+                ],
+            )
+        ]
+    )
+    result, calls = run_dashboard(
+        [{"contains": ["pullRequests(first: 100"], "stdout": json.dumps(initial)}]
+    )
+
+    assert result.returncode == 0
+    row = result.stdout.splitlines()[2]
+    assert "1 FAILED" in row
+    assert len(calls) == 1
+
+
+@pytest.mark.unit
+def test_dirty_merge_state_remains_visible(run_dashboard):
+    initial = open_pr_response([pr_node(11, merge_state="DIRTY")])
+    result, calls = run_dashboard(
+        [{"contains": ["pullRequests(first: 100"], "stdout": json.dumps(initial)}]
+    )
+
+    assert result.returncode == 0
+    row = result.stdout.splitlines()[2]
+    assert "DIRTY" in row
     assert len(calls) == 1
 
 
