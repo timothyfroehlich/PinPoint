@@ -115,6 +115,26 @@ describe("DateRangePicker", () => {
     );
   });
 
+  it("completes an end-only range from the desktop calendar", () => {
+    const onChange = vi.fn();
+    render(
+      <DateRangePicker
+        label="Created"
+        to={localDate(2026, 4, 15)}
+        onChange={onChange}
+        data-testid="created-range"
+      />
+    );
+
+    fireEvent.click(screen.getByTestId("created-range-trigger"));
+    fireEvent.click(screen.getByRole("button", { name: /April 10th, 2026/i }));
+
+    expect(onChange).toHaveBeenLastCalledWith({
+      from: localDate(2026, 4, 10),
+      to: localDate(2026, 4, 15),
+    });
+  });
+
   it("clears the whole range from the mobile action", () => {
     const onChange = vi.fn();
     render(

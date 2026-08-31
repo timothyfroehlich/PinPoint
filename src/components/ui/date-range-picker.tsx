@@ -97,6 +97,12 @@ export function DateRangePicker({
   };
 
   const hasDate = Boolean(date?.from ?? date?.to);
+  const calendarSelection: DateRange | undefined = date?.from
+    ? date
+    : date?.to
+      ? { from: date.to }
+      : undefined;
+  const calendarDefaultMonth = date?.from ?? date?.to;
   const desktopSummary = date?.from
     ? date.to
       ? `${format(date.from, "LLL dd, y")} - ${format(date.to, "LLL dd, y")}`
@@ -190,8 +196,10 @@ export function DateRangePicker({
               // eslint-disable-next-line jsx-a11y/no-autofocus -- deliberate focus-on-open in popover, PP-u4cp
               autoFocus
               mode="range"
-              {...(date?.from ? { defaultMonth: date.from } : {})}
-              selected={date}
+              {...(calendarDefaultMonth
+                ? { defaultMonth: calendarDefaultMonth }
+                : {})}
+              selected={calendarSelection}
               onSelect={updateRange}
               numberOfMonths={2}
             />
