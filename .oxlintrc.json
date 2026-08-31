@@ -333,6 +333,7 @@
         "src/app/(dev)/prototype/**/*.ts",
         "src/app/(dev)/prototype/**/*.tsx"
       ],
+      "excludeFiles": ["src/app/(dev)/prototype/layout.tsx"],
       "rules": {
         "no-unused-vars": "off",
         "typescript/explicit-function-return-type": "off",
