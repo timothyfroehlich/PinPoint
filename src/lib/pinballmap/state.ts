@@ -116,7 +116,8 @@ export async function getRefreshAllowance(
  * inserts every schema-declared column (using DEFAULT for omitted values), which
  * would still mention `enabled` after the follow-up migration drops it while
  * this deployment is serving. The error path omits the last good snapshot and
- * timestamp so an unsuccessful fetch cannot clobber them.
+ * timestamp so an unsuccessful fetch cannot clobber them. The serialized JSON
+ * is cast through text before jsonb so postgres-js cannot double-encode it.
  */
 async function recordSyncSuccess(
   locationId: number,
@@ -138,7 +139,7 @@ async function recordSyncSuccess(
     VALUES (
       ${SINGLETON_ID},
       ${locationId},
-      ${JSON.stringify(snapshot)}::jsonb,
+      ${JSON.stringify(snapshot)}::text::jsonb,
       ${syncedAt.toISOString()}::timestamptz,
       'ok',
       NULL,
