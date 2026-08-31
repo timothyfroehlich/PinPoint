@@ -323,6 +323,35 @@ describe("block-direct-merge.cjs — wrapped invocations (PP-6t3c, PP-ar8a)", ()
   });
 });
 
+describe("block-direct-merge.cjs — shell control words (PP-c8xa)", () => {
+  it.each([
+    "if gh pr merge 123; then echo blocked; fi",
+    "! gh pr merge 123",
+    "{ gh pr merge 123; }",
+    "while gh pr merge 123; do echo blocked; done",
+    "function guarded { gh pr merge 123; }; guarded",
+    "coproc gh pr merge 123",
+    "coproc guarded { gh pr merge 123; }",
+    "time if gh pr merge 123; then echo blocked; fi",
+    "time { gh pr merge 123; }",
+    "time function guarded { gh pr merge 123; }; guarded",
+    "time coproc gh pr merge 123",
+    "time coproc guarded { gh pr merge 123; }",
+    "coproc guarded if gh pr merge 123; then :; fi",
+    "coproc guarded while gh pr merge 123; do :; done",
+    "coproc guarded until gh pr merge 123; do :; done",
+    "time coproc guarded if gh pr merge 123; then :; fi",
+    "coproc gh -R { pr merge 123",
+    "function guarded if gh pr merge 123; then :; fi; guarded",
+    "function guarded while gh pr merge 123; do :; done; guarded",
+    "function guarded until gh pr merge 123; do :; done; guarded",
+    "time function guarded if gh pr merge 123; then :; fi; guarded",
+  ])("blocks %s", (command) => {
+    const { status } = runHook(bashPayload(command));
+    expect(status).toBe(2);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // `env -S` (GNU split-string) — found by review on this PR, same bug class.
 //
