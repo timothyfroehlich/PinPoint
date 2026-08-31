@@ -33,8 +33,6 @@
     "*.config.mjs",
     "*.config.ts",
     "*.config.cjs",
-    "src/app/(app)/mockup/**",
-    "src/components/mockups/**",
     "eslint-rules/__fixtures__/**"
   ],
   "rules": {
@@ -328,6 +326,21 @@
       "files": ["scripts/**/*.{mjs,cjs,js,jsx,ts,tsx}"],
       "env": {
         "node": true
+      }
+    },
+    {
+      "files": [
+        "src/app/(dev)/prototype/**/*.ts",
+        "src/app/(dev)/prototype/**/*.tsx"
+      ],
+      "rules": {
+        "no-unused-vars": "off",
+        "typescript/explicit-function-return-type": "off",
+        "typescript/consistent-type-imports": "off",
+        "typescript/no-unnecessary-condition": "off",
+        "promise/no-nesting": "off",
+        "promise/no-promise-in-callback": "off",
+        "promise/no-callback-in-promise": "off"
       }
     },
     {

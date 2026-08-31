@@ -6,6 +6,10 @@
 .prototype-mode
 .claude/scheduled_tasks.lock
 
+# Prototype mode: keep the production-safe layout, ignore disposable routes.
+/src/app/(dev)/prototype/**
+!/src/app/(dev)/prototype/layout.tsx
+
 # Huddle coordination state (runtime, machine-local)
 .agents/huddle/
 .agents/.huddle-last-poll
