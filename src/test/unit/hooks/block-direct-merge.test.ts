@@ -117,6 +117,8 @@ describe("block-direct-merge.cjs — gh merge paths", () => {
     "gh api -X PUT repos/timothyfroehlich/dotfiles/pulls/4/merge --input repos/timothyfroehlich/PinPoint/pulls/123/merge",
     "GH_REPO=timothyfroehlich/PinPoint gh pr merge 4 --repo timothyfroehlich/dotfiles",
     'gh pr merge 4 --repo timothyfroehlich/dotfiles --body "$(printf note)"',
+    'gh pr merge 4 --body "$BODY" --repo timothyfroehlich/dotfiles',
+    'gh api --input "$FILE" -X PUT repos/timothyfroehlich/dotfiles/pulls/4/merge',
   ])("allows an explicit non-PinPoint target: %s", (command) => {
     expectAllow(runHook(bashPayload(command)));
   });
@@ -131,6 +133,8 @@ describe("block-direct-merge.cjs — gh merge paths", () => {
     "gh pr merge 123 --body repos/timothyfroehlich/dotfiles/pulls/4/merge",
     "gh pr merge 123 --repo timothyfroehlich/Pin$(printf Point)",
     "gh pr merge 123 --body --repo=timothyfroehlich/dotfiles",
+    "FLAG=--body; gh pr merge 123 $FLAG --repo=timothyfroehlich/dotfiles",
+    "gh api $FLAG -X PUT repos/timothyfroehlich/dotfiles/pulls/4/merge",
   ])("fails closed on an ambiguous repository target: %s", (command) => {
     const { status } = runHook(bashPayload(command));
     expect(status).toBe(2);

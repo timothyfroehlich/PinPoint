@@ -146,6 +146,20 @@ function ghPositionals(args) {
   return ghPositionalEntries(args).map(({ value }) => value);
 }
 
+/** A dynamic token in option-parsing position can expand to a value-taking
+ *  flag and consume a later apparent repository selector. Dynamic values of a
+ *  known literal flag are safe because that flag already fixes their role. */
+function hasDynamicOptionBefore(args, dynamicArgs, endIndex, valueFlags) {
+  for (let i = 0; i < endIndex; i++) {
+    if (valueFlags.has(args[i])) {
+      i++;
+      continue;
+    }
+    if (dynamicArgs[i]) return true;
+  }
+  return false;
+}
+
 function hasAttachedShortValue(arg) {
   return [...API_ATTACHED_SHORT_VALUE_FLAGS].some(
     (flag) => arg.startsWith(flag) && arg.length > flag.length
@@ -160,6 +174,7 @@ function ghApiEndpointEntry(args, dynamicArgs = []) {
   );
   if (!api) return null;
 
+  let ambiguousParsing = false;
   for (let i = api.index + 1; i < args.length; i++) {
     const arg = args[i];
     if (API_VALUE_FLAGS.has(arg)) {
@@ -169,7 +184,19 @@ function ghApiEndpointEntry(args, dynamicArgs = []) {
     if (arg.startsWith("--") && arg.includes("=")) continue;
     if (hasAttachedShortValue(arg)) continue;
     if (arg.startsWith("-")) continue;
-    return { value: arg, dynamic: Boolean(dynamicArgs[i]) };
+    if (dynamicArgs[i]) {
+      // Expansion can disappear or become a flag, so a later positional may
+      // be the endpoint. Preserve a dynamic merge-shaped endpoint itself.
+      if (MERGE_API_PATH.test(arg)) return { value: arg, dynamic: true };
+      ambiguousParsing = true;
+      continue;
+    }
+    return {
+      value: arg,
+      dynamic:
+        ambiguousParsing ||
+        hasDynamicOptionBefore(args, dynamicArgs, i, API_VALUE_FLAGS),
+    };
   }
   return null;
 }
@@ -270,18 +297,30 @@ function ghRepositoryTarget(args, dynamicArgs = [], commandKind) {
         continue;
       }
       if (arg === "-R" || arg === "--repo") {
-        record(args[i + 1] || null, Boolean(dynamicArgs[i + 1]));
+        record(
+          args[i + 1] || null,
+          Boolean(dynamicArgs[i + 1]) ||
+            hasDynamicOptionBefore(args, dynamicArgs, i, GH_VALUE_FLAGS)
+        );
         i++;
         continue;
       }
       const equals = /^(?:-R|--repo)=(.*)$/.exec(arg);
       if (equals) {
-        record(equals[1], Boolean(dynamicArgs[i]));
+        record(
+          equals[1],
+          Boolean(dynamicArgs[i]) ||
+            hasDynamicOptionBefore(args, dynamicArgs, i, GH_VALUE_FLAGS)
+        );
         continue;
       }
       const attachedShort = /^-R(.+)$/.exec(arg);
       if (attachedShort) {
-        record(attachedShort[1], Boolean(dynamicArgs[i]));
+        record(
+          attachedShort[1],
+          Boolean(dynamicArgs[i]) ||
+            hasDynamicOptionBefore(args, dynamicArgs, i, GH_VALUE_FLAGS)
+        );
       }
     }
   }
@@ -294,7 +333,16 @@ function ghRepositoryTarget(args, dynamicArgs = [], commandKind) {
     );
     const pullRequest = prMerge === -1 ? null : positionals[prMerge + 2];
     if (pullRequest && PULL_URL.test(pullRequest.value)) {
-      record(pullRequest.value, pullRequest.dynamic);
+      record(
+        pullRequest.value,
+        pullRequest.dynamic ||
+          hasDynamicOptionBefore(
+            args,
+            dynamicArgs,
+            pullRequest.index,
+            GH_VALUE_FLAGS
+          )
+      );
     }
   }
 
