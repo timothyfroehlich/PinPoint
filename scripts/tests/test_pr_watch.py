@@ -296,14 +296,14 @@ def test_ci_gate_state_absent(monkeypatch):
 @pytest.mark.unit
 def test_pre_check_does_not_block_on_cancelled_ci_gate(monkeypatch):
     monkeypatch.setattr(pr_watch, "gh", make_gh(rollup=[_gate("CANCELLED")]))
-    ok, reason = pr_watch._pre_check_blocking(PR)
+    ok, reason, _action_item = pr_watch._pre_check_blocking(PR)
     assert ok, reason
 
 
 @pytest.mark.unit
 def test_pre_check_still_blocks_on_failed_ci_gate(monkeypatch):
     monkeypatch.setattr(pr_watch, "gh", make_gh(rollup=[_gate("FAILURE")]))
-    ok, reason = pr_watch._pre_check_blocking(PR)
+    ok, reason, _action_item = pr_watch._pre_check_blocking(PR)
     assert not ok
     assert "CI Gate already failed" in reason
 
@@ -311,7 +311,7 @@ def test_pre_check_still_blocks_on_failed_ci_gate(monkeypatch):
 @pytest.mark.unit
 def test_pre_check_passes_on_green_ci_gate(monkeypatch):
     monkeypatch.setattr(pr_watch, "gh", make_gh(rollup=[_gate("SUCCESS")]))
-    assert pr_watch._pre_check_blocking(PR) == (True, "")
+    assert pr_watch._pre_check_blocking(PR) == (True, "", "")
 
 
 @pytest.mark.unit
@@ -329,8 +329,9 @@ def test_pre_check_reports_unresolved_threads_without_blocking(monkeypatch, caps
         "gh",
         make_gh(rollup=[_gate("SUCCESS")], threads=[{"isResolved": False}]),
     )
-    ok, reason = pr_watch._pre_check_blocking(PR)
+    ok, reason, action_item = pr_watch._pre_check_blocking(PR)
     assert (ok, reason) == (True, "")
+    assert action_item == "1 unresolved review thread(s) — resolve before merge"
     assert "1 unresolved review thread(s)" in capsys.readouterr().out
 
 
@@ -388,6 +389,7 @@ with open(lock_path, "a+", encoding="utf-8") as lock_handle:
         "status": "pending",
         "timestamp": "2026-08-30T12:00:00Z",
         "detail": f"CI Gate in_progress on {head[:7]}",
+        "action_item": "1 unresolved review thread(s) — resolve before merge",
     }
     def publish():
         temp = state_path + ".tmp"
@@ -453,13 +455,53 @@ def test_live_follower_makes_zero_github_requests(monkeypatch, tmp_path, capsys)
         assert (
             pr_watch._run_coordinated_watch(
                 PR,
-                lambda _sink: pytest.fail("follower must not become leader"),
+                lambda _sink, _action: pytest.fail("follower must not become leader"),
                 follower_poll_sec=0.25,
             )
             == 0
         )
         assert gh_calls == []
-        assert "CI Gate passed" in capsys.readouterr().out
+        output = capsys.readouterr().out
+        assert "CI Gate passed" in output
+        assert "1 unresolved review thread(s)" in output
+    finally:
+        process.terminate()
+        process.wait(timeout=2)
+
+
+@pytest.mark.unit
+def test_force_and_prechecked_watches_use_separate_owners(monkeypatch, tmp_path):
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path))
+    normal_paths = pr_watch._monitor_paths(PR)
+    force_paths = pr_watch._monitor_paths(PR, force=True)
+    assert normal_paths != force_paths
+
+    force_lock_path, force_state_path = force_paths
+    force_lock_path.parent.mkdir(parents=True)
+    ready_path = tmp_path / "force-leader-ready"
+    process = spawn_live_monitor(force_lock_path, force_state_path, ready_path)
+    try:
+        deadline = time.monotonic() + 2
+        while not ready_path.exists() and time.monotonic() < deadline:
+            time.sleep(0.01)
+        assert ready_path.exists()
+        owned_calls = []
+
+        def normal_owner(state_sink, _action_item_sink):
+            owned_calls.append(True)
+            state_sink(HEAD_SHA, "passed", "normal prechecked owner passed", None)
+            return 0
+
+        assert (
+            pr_watch._run_coordinated_watch(
+                PR,
+                normal_owner,
+                force=False,
+                follower_poll_sec=0,
+            )
+            == 0
+        )
+        assert owned_calls == [True]
     finally:
         process.terminate()
         process.wait(timeout=2)
@@ -487,7 +529,7 @@ def test_terminal_cache_without_live_lock_is_remotely_revalidated(
     assert (
         pr_watch._run_coordinated_watch(
             PR,
-            lambda sink: pr_watch._watch_ci_gate(
+            lambda sink, _action: pr_watch._watch_ci_gate(
                 PR, "", timeout_sec=60, poll_sec=0, state_sink=sink
             ),
             follower_poll_sec=0,
@@ -535,6 +577,7 @@ def test_monitor_state_schema_includes_failure_artifact(monkeypatch, tmp_path):
         status="failed",
         detail="CI Gate failed",
         failure_artifact="tmp/gh-monitor/failure-42.md",
+        action_item="1 unresolved review thread(s) — resolve before merge",
     )
 
     state = pr_watch._read_monitor_state(state_path, PR)
@@ -550,6 +593,7 @@ def test_monitor_state_schema_includes_failure_artifact(monkeypatch, tmp_path):
         "timestamp": state["timestamp"],
         "detail": "CI Gate failed",
         "failure_artifact": expected_artifact,
+        "action_item": "1 unresolved review thread(s) — resolve before merge",
     }
     assert re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", state["timestamp"])
 

@@ -98,6 +98,7 @@ MONITOR_TERMINAL_STATUSES = {"passed", "failed", "superseded", "undetermined"}
 MONITOR_STATUSES = MONITOR_TERMINAL_STATUSES | {"starting", "pending"}
 FOLLOWER_POLL_SECONDS = 0.25
 MonitorStateSink = Callable[[str, str, str, str | None], None]
+MonitorActionSink = Callable[[str | None], None]
 
 # Set by main() from --verbose flag. When False (the default), emit_event() is
 # a no-op so the script only emits terminal verdicts and action items. This
@@ -149,8 +150,9 @@ def _monitor_dir() -> Path:
     return root / "pinpoint" / "pr-watch"
 
 
-def _monitor_paths(pr: int) -> tuple[Path, Path]:
-    stem = f"{REPO_OWNER}-{REPO_NAME}-{pr}"
+def _monitor_paths(pr: int, *, force: bool = False) -> tuple[Path, Path]:
+    mode_suffix = "-force" if force else ""
+    stem = f"{REPO_OWNER}-{REPO_NAME}-{pr}{mode_suffix}"
     root = _monitor_dir()
     return root / f"{stem}.lock", root / f"{stem}.json"
 
@@ -168,6 +170,7 @@ def _write_monitor_state(
     status: str,
     detail: str,
     failure_artifact: str | None = None,
+    action_item: str | None = None,
 ) -> None:
     """Atomically publish one versioned monitor snapshot."""
     if status not in MONITOR_STATUSES:
@@ -185,6 +188,8 @@ def _write_monitor_state(
     }
     if failure_artifact is not None:
         state["failure_artifact"] = str(Path(failure_artifact).resolve())
+    if action_item is not None:
+        state["action_item"] = action_item[:240]
 
     temp_path: Path | None = None
     try:
@@ -239,6 +244,9 @@ def _read_monitor_state(path: Path, pr: int) -> dict[str, object] | None:
     artifact = state.get("failure_artifact")
     if artifact is not None and not isinstance(artifact, str):
         return None
+    action_item = state.get("action_item")
+    if action_item is not None and not isinstance(action_item, str):
+        return None
     return state
 
 
@@ -270,8 +278,9 @@ def _monitor_exit_code(status: str) -> int:
 
 def _run_coordinated_watch(
     pr: int,
-    owned_watch: Callable[[MonitorStateSink], int],
+    owned_watch: Callable[[MonitorStateSink, MonitorActionSink], int],
     *,
+    force: bool = False,
     follower_poll_sec: float = FOLLOWER_POLL_SECONDS,
 ) -> int:
     """Own the remote watch or follow a live owner's local atomic state.
@@ -282,11 +291,20 @@ def _run_coordinated_watch(
     state record before a follower accepts that state, closing the stale-file
     race between consecutive owners.
     """
-    lock_path, state_path = _monitor_paths(pr)
+    lock_path, state_path = _monitor_paths(pr, force=force)
     lock_path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     with lock_path.open("a+", encoding="utf-8") as lock_handle:
         attached_pid: int | None = None
         last_signature: tuple[str, str, str] | None = None
+        last_action_item: str | None = None
+
+        def surface_action_item(state: dict[str, object]) -> None:
+            nonlocal last_action_item
+            action_item = state.get("action_item")
+            if isinstance(action_item, str) and action_item != last_action_item:
+                emit(action_item)
+                last_action_item = action_item
+
         while True:
             # An attached follower may observe the owner's atomic terminal
             # write just after the owner releases its lock. Trust that exact
@@ -300,6 +318,7 @@ def _run_coordinated_watch(
                     and attached_state["leader_pid"] == attached_pid
                     and attached_state["status"] in MONITOR_TERMINAL_STATUSES
                 ):
+                    surface_action_item(attached_state)
                     detail = str(attached_state["detail"])
                     emit(detail)
                     artifact = attached_state.get("failure_artifact")
@@ -319,9 +338,11 @@ def _run_coordinated_watch(
                     if attached_pid != lock_owner:
                         attached_pid = lock_owner
                         last_signature = None
+                        last_action_item = None
                         emit_event(
                             f"Following host-local PR #{pr} monitor pid={lock_owner}"
                         )
+                    surface_action_item(state)
                     signature = (
                         str(state["head_sha"]),
                         str(state["status"]),
@@ -342,6 +363,11 @@ def _run_coordinated_watch(
 
             leader_pid = os.getpid()
             _write_lock_owner(lock_handle, leader_pid)
+            action_item: str | None = None
+
+            def set_action_item(value: str | None) -> None:
+                nonlocal action_item
+                action_item = value
 
             def publish(
                 head_sha: str,
@@ -357,11 +383,12 @@ def _run_coordinated_watch(
                     status=status,
                     detail=detail,
                     failure_artifact=failure_artifact,
+                    action_item=action_item,
                 )
 
             publish("", "starting", f"PR #{pr} monitor is starting")
             try:
-                return owned_watch(publish)
+                return owned_watch(publish, set_action_item)
             finally:
                 fcntl.flock(lock_handle.fileno(), fcntl.LOCK_UN)
 
@@ -742,8 +769,8 @@ def _fetch_merge_state(pr: int) -> tuple[str, set[str]]:
     return "UNKNOWN", set()
 
 
-def _pre_check_blocking(pr: int) -> tuple[bool, str]:
-    """Return (True, "") if no blocking conditions are present, else (False, reason).
+def _pre_check_blocking(pr: int) -> tuple[bool, str, str]:
+    """Return ``(allowed, reason, action_item)`` for the default watch precheck.
 
     Used by the default watch mode as a fail-fast pre-check BEFORE entering the
     watch loop. Distinguishes conditions that won't resolve by waiting (bad merge
@@ -760,7 +787,7 @@ def _pre_check_blocking(pr: int) -> tuple[bool, str]:
     """
     merge_state, _labels = _fetch_merge_state(pr)
     if merge_state in ("DIRTY", "CONFLICTING", "BEHIND"):
-        return False, f"merge state {merge_state} — resolve before watching"
+        return False, f"merge state {merge_state} — resolve before watching", ""
 
     ci_status, ci_conclusion = _ci_gate_state(pr)
     if ci_status == "COMPLETED":
@@ -774,9 +801,11 @@ def _pre_check_blocking(pr: int) -> tuple[bool, str]:
             return (
                 False,
                 f"CI Gate already failed (conclusion={ci_conclusion or 'unknown'})",
+                "",
             )
 
     unresolved = _unresolved_threads(get_review_threads(pr))
+    action_item = ""
     if unresolved > 0:
         # A notice, not a block. Threads are author-agnostic since PP-4ric, so
         # these are Tim's /code-review findings, and the documented loop is
@@ -788,9 +817,10 @@ def _pre_check_blocking(pr: int) -> tuple[bool, str]:
         # and --check-ready still reports one as not-ready.
         # emit(), not emit_event(): this is an action item the agent still owes,
         # not per-job progress noise, so it must survive non-verbose runs.
-        emit(f"{unresolved} unresolved review thread(s) — resolve before merge")
+        action_item = f"{unresolved} unresolved review thread(s) — resolve before merge"
+        emit(action_item)
 
-    return True, ""
+    return True, "", action_item
 
 
 def run_audit(pr: int) -> bool:
@@ -1030,11 +1060,16 @@ def _watch_ci_gate(
     return EXIT_UNDETERMINED
 
 
-def _run_owned_watch(pr: int, force: bool, state_sink: MonitorStateSink) -> int:
+def _run_owned_watch(
+    pr: int,
+    force: bool,
+    state_sink: MonitorStateSink,
+    action_item_sink: MonitorActionSink,
+) -> int:
     """Run pre-checks and remote polling for the process holding the lock."""
     if not force:
         try:
-            blocking_ok, reason = _pre_check_blocking(pr)
+            blocking_ok, reason, action_item = _pre_check_blocking(pr)
         except (RuntimeError, json.JSONDecodeError, KeyError, ValueError) as exc:
             detail = f"⚠  Could not complete pre-check — {exc}"
             emit(detail)
@@ -1045,6 +1080,7 @@ def _run_owned_watch(pr: int, force: bool, state_sink: MonitorStateSink) -> int:
             emit(detail)
             state_sink("", "failed", detail, None)
             return 1
+        action_item_sink(action_item or None)
 
     emit_event(f"Watching PR #{pr} — aggregate CI Gate")
     state_sink("", "pending", f"Watching PR #{pr} — aggregate CI Gate", None)
@@ -1089,7 +1125,11 @@ def main() -> int:
         return 0 if run_audit(pr) else 1
 
     return _run_coordinated_watch(
-        pr, lambda state_sink: _run_owned_watch(pr, force, state_sink)
+        pr,
+        lambda state_sink, action_item_sink: _run_owned_watch(
+            pr, force, state_sink, action_item_sink
+        ),
+        force=force,
     )
 
 
