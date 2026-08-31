@@ -115,6 +115,17 @@ describe("wrapped/quoted git invocations → BLOCK (PP-6t3c)", () => {
   });
 });
 
+describe("shell-control-prefixed checkout invocations → BLOCK (PP-c8xa)", () => {
+  it.each([
+    "if git checkout feature/x; then echo blocked; fi",
+    "! git checkout feature/x",
+    "{ git checkout feature/x; }",
+    "while git checkout feature/x; do echo blocked; done",
+  ])("blocks %s", (cmd) => {
+    expectBlock(cmd);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // git-as-argument (false-positive fix) — must ALLOW
 // ---------------------------------------------------------------------------

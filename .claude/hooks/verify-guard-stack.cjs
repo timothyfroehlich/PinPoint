@@ -255,6 +255,10 @@ const BEHAVIOR_PROBES = [
     mustDeny: [
       "gh pr merge 123 --squash",
       'eval "gh pr merge 123 --squash"',
+      "if gh pr merge 123; then echo blocked; fi",
+      "! gh pr merge 123",
+      "{ gh pr merge 123; }",
+      "while gh pr merge 123; do echo blocked; done",
       "xargs -I{} gh pr merge {} < prs.txt",
       "env -S 'gh pr merge 123'",
       "gh api -X PUT repos/o/r/pulls/123/merge",
@@ -275,7 +279,14 @@ const BEHAVIOR_PROBES = [
     hook: "block-main-worktree-branch-switch.cjs",
     export: "classifyCommand",
     outcome: (fn, command) => (fn(command).block ? "deny" : "allow"),
-    mustDeny: ["git checkout feature/x", 'eval "git switch feature/x"'],
+    mustDeny: [
+      "git checkout feature/x",
+      'eval "git switch feature/x"',
+      "if git checkout feature/x; then echo blocked; fi",
+      "! git checkout feature/x",
+      "{ git checkout feature/x; }",
+      "while git checkout feature/x; do echo blocked; done",
+    ],
     mustAllow: ["git checkout main", "echo git checkout feature/x"],
   },
 ];

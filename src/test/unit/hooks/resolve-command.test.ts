@@ -103,6 +103,44 @@ describe("shell separators", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Shell control words — syntax must not occupy the effective command slot
+// ---------------------------------------------------------------------------
+describe("shell control words expose the governed command (PP-c8xa)", () => {
+  it.each([
+    ["if gh pr merge 1; then echo blocked; fi", ["gh", "echo"]],
+    ["! gh pr merge 1", ["gh"]],
+    ["{ gh pr merge 1; }", ["gh"]],
+    ["while gh pr merge 1; do echo blocked; done", ["gh", "echo"]],
+    ["until gh pr merge 1; do echo blocked; done", ["gh", "echo"]],
+    ["if ! env gh pr merge 1; then :; fi", ["gh", ":"]],
+  ])("resolves %s", (cmd, expected) => {
+    expect(names(cmd)).toEqual(expected);
+  });
+
+  it("keeps control words in ordinary argument positions", () => {
+    expect(names("echo if gh pr merge 1")).toEqual(["echo"]);
+  });
+
+  it("does not treat a quoted control word as shell syntax", () => {
+    expect(names("'if' gh pr merge 1")).toEqual(["if"]);
+  });
+
+  it("does not treat an escaped control word as shell syntax", () => {
+    expect(names("\\if gh pr merge 1")).toEqual(["if"]);
+  });
+
+  it("reports a dynamic governed command as unresolvable", () => {
+    const { segments, unresolvable } = resolveCommand(
+      'if "$COMMAND"; then echo blocked; fi'
+    );
+    expect(segments.map((segment) => segment.name)).toEqual(["echo"]);
+    expect(unresolvable.map((entry) => entry.reason)).toContain(
+      "substituted-command"
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Wrappers — the class that folded the guards
 // ---------------------------------------------------------------------------
 describe("wrappers resolve through to the real command", () => {
