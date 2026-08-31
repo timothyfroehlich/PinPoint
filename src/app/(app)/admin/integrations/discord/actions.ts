@@ -402,11 +402,6 @@ export async function saveDiscordConfig(
           ...(newVaultId !== null && { botTokenVaultId: newVaultId }),
           guildId: hasGuildId ? validated.guildId : null,
           inviteLink: validated.inviteLink === "" ? null : validated.inviteLink,
-          // Expand/contract compatibility only. The current runtime uses
-          // configuration presence; the previous deployment still reads this
-          // column until the contract migration lands.
-          enabled:
-            Boolean(existing?.botTokenVaultId ?? newVaultId) && hasGuildId,
           ...(!hasGuildId && {
             botHealthStatus: "unknown" as const,
             lastBotCheckAt: null,
@@ -567,7 +562,6 @@ export async function clearDiscordBotTokenAction(): Promise<ClearDiscordBotToken
     await db
       .update(discordIntegrationConfig)
       .set({
-        enabled: false,
         botHealthStatus: "unknown",
         lastBotCheckAt: null,
         updatedAt: new Date(),
@@ -583,7 +577,6 @@ export async function clearDiscordBotTokenAction(): Promise<ClearDiscordBotToken
       .update(discordIntegrationConfig)
       .set({
         botTokenVaultId: null,
-        enabled: false,
         botHealthStatus: "unknown",
         lastBotCheckAt: null,
         updatedAt: new Date(),
