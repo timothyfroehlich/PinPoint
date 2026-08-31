@@ -103,7 +103,7 @@ test.describe("Issue List Features - Extended", () => {
 
   test("should filter by Created and Modified date ranges", async ({
     page,
-  }) => {
+  }, testInfo) => {
     // 1. Setup
     // All seeded issues are created "NOW()" so they are today.
     await page.goto("/issues");
@@ -111,28 +111,66 @@ test.describe("Issue List Features - Extended", () => {
     // 2. Expand "More Filters" to see date pickers
     await page.getByRole("button", { name: "More Filters" }).click();
 
-    // Verify date pickers are now visible
-    // Expand filters if hidden (desktop usually shows them)
-    // The previous implementation added two distinct pickers
-
-    // Verify date pickers are now visible
+    // Both date-range instances share the same responsive component contract.
     await expect(page.getByTestId("filter-created")).toBeVisible();
     await expect(page.getByTestId("filter-modified")).toBeVisible();
 
-    // Verify clicking opens the calendar popover
-    await page.getByTestId("filter-created").click();
-    await expect(
-      page.getByRole("dialog").or(page.locator('[role="dialog"]')).first()
-    ).toBeVisible();
+    const isMobile = testInfo.project.name.includes("Mobile");
+    if (isMobile) {
+      const createdFrom = page.getByTestId("filter-created-from");
+      const createdTo = page.getByTestId("filter-created-to");
+      const modifiedFrom = page.getByTestId("filter-modified-from");
+      const modifiedTo = page.getByTestId("filter-modified-to");
 
-    // Close with Escape
+      await expect(createdFrom).toBeVisible();
+      await expect(createdTo).toBeVisible();
+      await expect(modifiedFrom).toBeVisible();
+      await expect(modifiedTo).toBeVisible();
+
+      await createdFrom.fill("2026-08-10");
+      await createdTo.fill("2026-08-20");
+      await expect
+        .poll(() => {
+          const params = new URL(page.url()).searchParams;
+          return [params.get("created_from"), params.get("created_to")];
+        })
+        .toEqual([
+          expect.stringContaining("2026-08-10"),
+          expect.stringContaining("2026-08-20"),
+        ]);
+
+      // Keep the newly edited endpoint and clear the conflicting opposite one.
+      await createdFrom.fill("2026-08-25");
+      await expect(createdTo).toHaveValue("");
+      await expect
+        .poll(() => {
+          const params = new URL(page.url()).searchParams;
+          return [params.get("created_from"), params.get("created_to")];
+        })
+        .toEqual([expect.stringContaining("2026-08-25"), null]);
+
+      await modifiedFrom.fill("2026-08-01");
+      await modifiedTo.fill("2026-08-31");
+      await expect
+        .poll(() => {
+          const params = new URL(page.url()).searchParams;
+          return [params.get("updated_from"), params.get("updated_to")];
+        })
+        .toEqual([
+          expect.stringContaining("2026-08-01"),
+          expect.stringContaining("2026-08-31"),
+        ]);
+      return;
+    }
+
+    await expect(page.getByTestId("filter-created-from")).toBeHidden();
+    await page.getByTestId("filter-created-trigger").click();
+    await expect(page.getByRole("dialog")).toBeVisible();
     await page.keyboard.press("Escape");
 
-    // Verify the "Modified Range" picker also works
-    await page.getByTestId("filter-modified").click();
-    await expect(
-      page.getByRole("dialog").or(page.locator('[role="dialog"]')).first()
-    ).toBeVisible();
+    await expect(page.getByTestId("filter-modified-from")).toBeHidden();
+    await page.getByTestId("filter-modified-trigger").click();
+    await expect(page.getByRole("dialog")).toBeVisible();
     await page.keyboard.press("Escape");
   });
 
