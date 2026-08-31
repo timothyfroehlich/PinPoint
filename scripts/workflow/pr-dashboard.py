@@ -497,6 +497,8 @@ def _merge_label(state: Any) -> str:
         in {
             "CONFLICTING",
             "DIRTY",
+            "DRAFT",
+            "HAS_HOOKS",
             "CLEAN",
             "BLOCKED",
             "UNSTABLE",

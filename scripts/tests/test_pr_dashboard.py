@@ -393,15 +393,16 @@ def test_non_authoritative_cancelled_check_still_fails_closed(run_dashboard):
 
 
 @pytest.mark.unit
-def test_dirty_merge_state_remains_visible(run_dashboard):
-    initial = open_pr_response([pr_node(11, merge_state="DIRTY")])
+@pytest.mark.parametrize("merge_state", ["DIRTY", "DRAFT", "HAS_HOOKS"])
+def test_valid_merge_states_remain_visible(run_dashboard, merge_state):
+    initial = open_pr_response([pr_node(11, merge_state=merge_state)])
     result, calls = run_dashboard(
         [{"contains": ["pullRequests(first: 100"], "stdout": json.dumps(initial)}]
     )
 
     assert result.returncode == 0
     row = result.stdout.splitlines()[2]
-    assert "DIRTY" in row
+    assert merge_state in row
     assert len(calls) == 1
 
 
