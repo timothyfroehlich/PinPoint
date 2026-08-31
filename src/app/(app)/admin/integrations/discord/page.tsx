@@ -11,6 +11,11 @@ import { DiscordConfigForm } from "./discord-config-form";
 export default async function AdminDiscordIntegrationPage(): Promise<React.JSX.Element> {
   const config = await db.query.discordIntegrationConfig.findFirst({
     where: eq(discordIntegrationConfig.id, "singleton"),
+    columns: {
+      guildId: true,
+      inviteLink: true,
+      botTokenVaultId: true,
+    },
   });
 
   return (

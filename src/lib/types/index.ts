@@ -14,6 +14,7 @@ export type {
   IssueSeverity,
   IssuePriority,
   IssueFrequency,
+  PinballmapRuntimeState,
 } from "./database";
 
 export {

@@ -230,8 +230,6 @@ export async function unconfigureDiscordIntegrationForTest(): Promise<void> {
     .update({
       bot_token_vault_id: null,
       guild_id: null,
-      // Expand/contract compatibility for the previous serving deployment.
-      enabled: false,
       updated_at: new Date().toISOString(),
     })
     .eq("id", "singleton");
@@ -278,7 +276,6 @@ export async function configureDiscordIntegrationForTest(): Promise<void> {
       UPDATE discord_integration_config
       SET bot_token_vault_id = ${vaultId}::uuid,
           guild_id = COALESCE(guild_id, 'e2e-test-guild-id'),
-          enabled = true,
           updated_at = now()
       WHERE id = 'singleton'
     `;
