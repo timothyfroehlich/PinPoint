@@ -61,6 +61,7 @@ const ALL_EXPECTED_HOOKS = [
   "inject-beads-actor.cjs",
   "block-direct-merge.cjs",
   "block-main-worktree-branch-switch.cjs",
+  "block-gh-pr-checkout.cjs",
 ];
 
 /** Build a settings object wiring the given hook basenames under PreToolUse. */
