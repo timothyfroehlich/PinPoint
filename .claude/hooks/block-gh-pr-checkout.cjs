@@ -113,13 +113,6 @@ if (require.main === module) {
 
     const cmd = String((payload.tool_input || {}).command || "");
 
-    // Cheap pre-filter: no checkout command/alias anywhere after `gh` → allow
-    // without parsing. It must admit both `gh pr co` and the top-level `gh co`
-    // alias so the classifier gets the final say. Over-matching is harmless.
-    if (!/\bgh\b[\s\S]*\b(?:checkout|co)\b/.test(cmd)) {
-      process.exit(0);
-    }
-
     const { block, detail } = classifyCommand(cmd);
     if (!block) {
       process.exit(0);

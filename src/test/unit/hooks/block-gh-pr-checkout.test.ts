@@ -71,8 +71,7 @@ describe("direct gh pr checkout → BLOCK", () => {
 
   it("blocks the built-in `co` alias (gh pr co)", () => {
     // `co` is shipped as an ALIAS for `checkout`, so `gh pr co 1` does the
-    // identical branch-create-and-switch — the classifier and the entrypoint
-    // prefilter must both recognize it (PP-p53z Codex review).
+    // identical branch-create-and-switch (PP-p53z Codex review).
     expectBlock("gh pr co 1727");
   });
 
@@ -132,6 +131,13 @@ describe("wrapped / quoted gh pr checkout → BLOCK", () => {
   it("blocks a gh pr checkout in a later segment of a chain", () => {
     expectBlock("git fetch origin && gh pr checkout 1727");
   });
+
+  it.each(["g'h' pr checkout 1727", "g\\h pr checkout 1727"])(
+    "blocks a shell-concatenated gh token: %s",
+    (command) => {
+      expectBlock(command);
+    }
+  );
 });
 
 describe("shell-control-prefixed gh pr checkout → BLOCK (PP-c8xa)", () => {
@@ -229,6 +235,13 @@ describe("stdin entrypoint → exit code", () => {
     );
     expect(status).toBe(2);
   });
+
+  it.each(["g'h' pr checkout 1727", "g\\h pr checkout 1727"])(
+    "exits 2 for a shell-concatenated gh token: %s",
+    (command) => {
+      expect(runHook(bashPayload(command)).status).toBe(2);
+    }
+  );
 
   it("exits 0 for a read-only gh pr diff", () => {
     expect(runHook(bashPayload("gh pr diff 1727")).status).toBe(0);
