@@ -18,6 +18,7 @@ reach GitHub (CORE-TEST-006).
 import importlib.util
 import json
 import re
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -50,22 +51,36 @@ PR = 1734
 RATE_LIMIT_403 = "HTTP 403: API rate limit exceeded for user ID"
 
 
-def _gate(conclusion: str, status: str = "COMPLETED", completed_at: str = "") -> dict:
+def _gate(
+    conclusion: str,
+    status: str = "COMPLETED",
+    completed_at: str = "",
+    started_at: str | None = None,
+    details_url: str = "",
+) -> dict:
     return {
         "name": pr_watch.CI_GATE_NAME,
         "status": status,
         "conclusion": conclusion,
         "completedAt": completed_at,
-        "startedAt": completed_at,
+        "startedAt": completed_at if started_at is None else started_at,
+        "detailsUrl": details_url,
     }
 
 
-def _run(run_id: int, status: str, conclusion: str, sha=HEAD_SHA) -> dict:
+def _run(
+    run_id: int,
+    status: str,
+    conclusion: str,
+    sha=HEAD_SHA,
+    workflow_name="CI",
+) -> dict:
     return {
         "databaseId": run_id,
         "status": status,
         "conclusion": conclusion,
         "headSha": sha,
+        "workflowName": workflow_name,
     }
 
 
@@ -256,19 +271,44 @@ def test_ci_gate_state_prefers_live_gate_over_cancelled_leftover(monkeypatch):
 
 
 @pytest.mark.unit
-def test_ci_gate_state_prefers_older_failure_over_newer_cancellation(monkeypatch):
-    """Supersession must never mask a real verdict, even a newer cancellation.
+def test_ci_gate_state_prefers_replacement_that_started_after_late_cancellation(
+    monkeypatch,
+):
+    rollup = [
+        _gate(
+            "CANCELLED",
+            completed_at="2026-07-24T23:35:00Z",
+            started_at="2026-07-24T23:25:00Z",
+        ),
+        _gate(
+            "SUCCESS",
+            completed_at="2026-07-24T23:34:00Z",
+            started_at="2026-07-24T23:30:00Z",
+        ),
+    ]
+    monkeypatch.setattr(pr_watch, "gh", make_gh(rollup=rollup))
+    assert pr_watch._ci_gate_state(PR) == ("COMPLETED", "SUCCESS")
 
-    Pins the FIRST key of the ranking (non-superseded wins) independently of
-    the second (recency): here the cancelled entry is the more recent one, so
-    a naive "newest wins" would hide the failure.
-    """
+
+@pytest.mark.unit
+def test_ci_gate_state_reports_newer_cancellation_over_older_failure(monkeypatch):
+    """The latest rerun is authoritative even when both outcomes are non-green."""
     rollup = [
         _gate("FAILURE", completed_at="2026-07-24T20:00:00Z"),
         _gate("CANCELLED", completed_at="2026-07-24T23:26:45Z"),
     ]
     monkeypatch.setattr(pr_watch, "gh", make_gh(rollup=rollup))
-    assert pr_watch._ci_gate_state(PR) == ("COMPLETED", "FAILURE")
+    assert pr_watch._ci_gate_state(PR) == ("COMPLETED", "CANCELLED")
+
+
+@pytest.mark.unit
+def test_ci_gate_state_does_not_expose_older_green_after_cancellation(monkeypatch):
+    rollup = [
+        _gate("SUCCESS", completed_at="2026-07-24T20:00:00Z"),
+        _gate("CANCELLED", completed_at="2026-07-24T23:26:45Z"),
+    ]
+    monkeypatch.setattr(pr_watch, "gh", make_gh(rollup=rollup))
+    assert pr_watch._ci_gate_state(PR) == ("COMPLETED", "CANCELLED")
 
 
 @pytest.mark.unit
@@ -295,14 +335,14 @@ def test_ci_gate_state_absent(monkeypatch):
 @pytest.mark.unit
 def test_pre_check_does_not_block_on_cancelled_ci_gate(monkeypatch):
     monkeypatch.setattr(pr_watch, "gh", make_gh(rollup=[_gate("CANCELLED")]))
-    ok, reason = pr_watch._pre_check_blocking(PR)
+    ok, reason, _action_item = pr_watch._pre_check_blocking(PR)
     assert ok, reason
 
 
 @pytest.mark.unit
 def test_pre_check_still_blocks_on_failed_ci_gate(monkeypatch):
     monkeypatch.setattr(pr_watch, "gh", make_gh(rollup=[_gate("FAILURE")]))
-    ok, reason = pr_watch._pre_check_blocking(PR)
+    ok, reason, _action_item = pr_watch._pre_check_blocking(PR)
     assert not ok
     assert "CI Gate already failed" in reason
 
@@ -310,7 +350,7 @@ def test_pre_check_still_blocks_on_failed_ci_gate(monkeypatch):
 @pytest.mark.unit
 def test_pre_check_passes_on_green_ci_gate(monkeypatch):
     monkeypatch.setattr(pr_watch, "gh", make_gh(rollup=[_gate("SUCCESS")]))
-    assert pr_watch._pre_check_blocking(PR) == (True, "")
+    assert pr_watch._pre_check_blocking(PR) == (True, "", "")
 
 
 @pytest.mark.unit
@@ -328,8 +368,9 @@ def test_pre_check_reports_unresolved_threads_without_blocking(monkeypatch, caps
         "gh",
         make_gh(rollup=[_gate("SUCCESS")], threads=[{"isResolved": False}]),
     )
-    ok, reason = pr_watch._pre_check_blocking(PR)
+    ok, reason, action_item = pr_watch._pre_check_blocking(PR)
     assert (ok, reason) == (True, "")
+    assert action_item == "1 unresolved review thread(s) — resolve before merge"
     assert "1 unresolved review thread(s)" in capsys.readouterr().out
 
 
@@ -360,6 +401,61 @@ def ci_snapshot(head=HEAD_SHA, gate=None):
     }
 
 
+def spawn_live_monitor(lock_path: Path, state_path: Path, ready_path: Path):
+    """Hold the real process lock while publishing a terminal local snapshot."""
+    code = r"""
+import fcntl
+import json
+import os
+import sys
+import time
+from pathlib import Path
+
+lock_path, state_path, ready_path, repository, pr, head = sys.argv[1:]
+with open(lock_path, "a+", encoding="utf-8") as lock_handle:
+    fcntl.flock(lock_handle.fileno(), fcntl.LOCK_EX)
+    lock_handle.seek(0)
+    lock_handle.truncate()
+    lock_handle.write(f"{os.getpid()}\n")
+    lock_handle.flush()
+    os.fsync(lock_handle.fileno())
+    state = {
+        "schema_version": 1,
+        "repository": repository,
+        "pr": int(pr),
+        "head_sha": head,
+        "leader_pid": os.getpid(),
+        "status": "pending",
+        "timestamp": "2026-08-30T12:00:00Z",
+        "detail": f"CI Gate in_progress on {head[:7]}",
+        "action_item": "1 unresolved review thread(s) — resolve before merge",
+    }
+    def publish():
+        temp = state_path + ".tmp"
+        Path(temp).write_text(json.dumps(state), encoding="utf-8")
+        os.replace(temp, state_path)
+    publish()
+    Path(ready_path).touch()
+    time.sleep(0.1)
+    state["status"] = "passed"
+    state["detail"] = f"CI Gate passed on {head[:7]} (conclusion=SUCCESS) ✓"
+    publish()
+"""
+    return subprocess.Popen(
+        [
+            sys.executable,
+            "-c",
+            code,
+            str(lock_path),
+            str(state_path),
+            str(ready_path),
+            pr_watch.MONITOR_REPOSITORY,
+            str(PR),
+            HEAD_SHA,
+        ]
+    )
+
+
 @pytest.mark.unit
 def test_watch_polls_one_aggregate_snapshot_per_interval(monkeypatch):
     fake = snapshot_gh(
@@ -377,6 +473,171 @@ def test_watch_polls_one_aggregate_snapshot_per_interval(monkeypatch):
 
 
 @pytest.mark.unit
+def test_live_follower_makes_zero_github_requests(monkeypatch, tmp_path, capsys):
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path))
+    lock_path, state_path = pr_watch._monitor_paths(PR)
+    lock_path.parent.mkdir(parents=True)
+    ready_path = tmp_path / "leader-ready"
+    process = spawn_live_monitor(lock_path, state_path, ready_path)
+    try:
+        deadline = time.monotonic() + 2
+        while not ready_path.exists() and time.monotonic() < deadline:
+            time.sleep(0.01)
+        assert ready_path.exists()
+        gh_calls = []
+
+        def forbidden_gh(*args):
+            gh_calls.append(args)
+            pytest.fail("a follower must not call GitHub")
+
+        monkeypatch.setattr(pr_watch, "gh", forbidden_gh)
+        assert (
+            pr_watch._run_coordinated_watch(
+                PR,
+                lambda _sink, _action: pytest.fail("follower must not become leader"),
+                follower_poll_sec=0.25,
+            )
+            == 0
+        )
+        assert gh_calls == []
+        output = capsys.readouterr().out
+        assert "CI Gate passed" in output
+        assert "1 unresolved review thread(s)" in output
+    finally:
+        process.terminate()
+        process.wait(timeout=2)
+
+
+@pytest.mark.unit
+def test_force_and_prechecked_watches_use_separate_owners(monkeypatch, tmp_path):
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path))
+    normal_paths = pr_watch._monitor_paths(PR)
+    force_paths = pr_watch._monitor_paths(PR, force=True)
+    assert normal_paths != force_paths
+
+    force_lock_path, force_state_path = force_paths
+    force_lock_path.parent.mkdir(parents=True)
+    ready_path = tmp_path / "force-leader-ready"
+    process = spawn_live_monitor(force_lock_path, force_state_path, ready_path)
+    try:
+        deadline = time.monotonic() + 2
+        while not ready_path.exists() and time.monotonic() < deadline:
+            time.sleep(0.01)
+        assert ready_path.exists()
+        owned_calls = []
+
+        def normal_owner(state_sink, _action_item_sink):
+            owned_calls.append(True)
+            state_sink(HEAD_SHA, "passed", "normal prechecked owner passed", None)
+            return 0
+
+        assert (
+            pr_watch._run_coordinated_watch(
+                PR,
+                normal_owner,
+                force=False,
+                follower_poll_sec=0,
+            )
+            == 0
+        )
+        assert owned_calls == [True]
+    finally:
+        process.terminate()
+        process.wait(timeout=2)
+
+
+@pytest.mark.unit
+def test_terminal_cache_without_live_lock_is_remotely_revalidated(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path))
+    lock_path, state_path = pr_watch._monitor_paths(PR)
+    lock_path.parent.mkdir(parents=True)
+    lock_path.write_text("999999\n", encoding="utf-8")
+    pr_watch._write_monitor_state(
+        state_path,
+        pr=PR,
+        head_sha=OLD_SHA,
+        leader_pid=999999,
+        status="passed",
+        detail="stale green",
+    )
+    fake = snapshot_gh([ci_snapshot(gate=_gate("SUCCESS"))])
+    monkeypatch.setattr(pr_watch, "gh", fake)
+
+    assert (
+        pr_watch._run_coordinated_watch(
+            PR,
+            lambda sink, _action: pr_watch._watch_ci_gate(
+                PR, "", timeout_sec=60, poll_sec=0, state_sink=sink
+            ),
+            follower_poll_sec=0,
+        )
+        == 0
+    )
+    assert len(fake.calls) == 1
+    state = pr_watch._read_monitor_state(state_path, PR)
+    assert state is not None
+    assert state["head_sha"] == HEAD_SHA
+    assert state["leader_pid"] == pr_watch.os.getpid()
+
+
+@pytest.mark.unit
+def test_monitor_state_rejects_malformed_and_foreign_snapshots(monkeypatch, tmp_path):
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path))
+    _lock_path, state_path = pr_watch._monitor_paths(PR)
+    state_path.parent.mkdir(parents=True)
+    state_path.write_text("{", encoding="utf-8")
+    assert pr_watch._read_monitor_state(state_path, PR) is None
+
+    pr_watch._write_monitor_state(
+        state_path,
+        pr=PR,
+        head_sha=HEAD_SHA,
+        leader_pid=123,
+        status="pending",
+        detail="waiting",
+    )
+    state = json.loads(state_path.read_text(encoding="utf-8"))
+    state["repository"] = "someone/else"
+    state_path.write_text(json.dumps(state), encoding="utf-8")
+    assert pr_watch._read_monitor_state(state_path, PR) is None
+
+
+@pytest.mark.unit
+def test_monitor_state_schema_includes_failure_artifact(monkeypatch, tmp_path):
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path))
+    _lock_path, state_path = pr_watch._monitor_paths(PR)
+    pr_watch._write_monitor_state(
+        state_path,
+        pr=PR,
+        head_sha=HEAD_SHA,
+        leader_pid=321,
+        status="failed",
+        detail="CI Gate failed",
+        failure_artifact="tmp/gh-monitor/failure-42.md",
+        action_item="1 unresolved review thread(s) — resolve before merge",
+    )
+
+    state = pr_watch._read_monitor_state(state_path, PR)
+    assert state is not None
+    expected_artifact = str(Path("tmp/gh-monitor/failure-42.md").resolve())
+    assert state == {
+        "schema_version": 1,
+        "repository": "timothyfroehlich/PinPoint",
+        "pr": PR,
+        "head_sha": HEAD_SHA,
+        "leader_pid": 321,
+        "status": "failed",
+        "timestamp": state["timestamp"],
+        "detail": "CI Gate failed",
+        "failure_artifact": expected_artifact,
+        "action_item": "1 unresolved review thread(s) — resolve before merge",
+    }
+    assert re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", state["timestamp"])
+
+
+@pytest.mark.unit
 def test_watch_follows_head_movement_before_reporting_green(monkeypatch, capsys):
     fake = snapshot_gh(
         [
@@ -387,18 +648,57 @@ def test_watch_follows_head_movement_before_reporting_green(monkeypatch, capsys)
     monkeypatch.setattr(pr_watch, "gh", fake)
     monkeypatch.setattr(pr_watch.time, "sleep", lambda _seconds: None)
     monkeypatch.setattr(pr_watch, "VERBOSE_MODE", True)
+    states = []
 
-    assert pr_watch._watch_ci_gate(PR, HEAD_SHA, timeout_sec=60, poll_sec=0) == 0
+    assert (
+        pr_watch._watch_ci_gate(
+            PR,
+            HEAD_SHA,
+            timeout_sec=60,
+            poll_sec=0,
+            state_sink=lambda *state: states.append(state),
+        )
+        == 0
+    )
     out = capsys.readouterr().out
     assert f"{HEAD_SHA[:7]} → {OLD_SHA[:7]}" in out
     assert f"passed on {OLD_SHA[:7]}" in out
+    assert states[-1][:2] == (OLD_SHA, "passed")
+
+
+@pytest.mark.unit
+def test_malformed_snapshot_is_published_as_undetermined(monkeypatch, capsys):
+    monkeypatch.setattr(pr_watch, "gh", lambda *_args: "{")
+    states = []
+
+    assert (
+        pr_watch._watch_ci_gate(
+            PR,
+            HEAD_SHA,
+            timeout_sec=60,
+            poll_sec=0,
+            state_sink=lambda *state: states.append(state),
+        )
+        == pr_watch.EXIT_UNDETERMINED
+    )
+    assert states[-1][1] == "undetermined"
+    assert "unreachable" in states[-1][2]
+    assert "failed" not in capsys.readouterr().out.lower()
 
 
 @pytest.mark.unit
 def test_watch_fetches_failure_artifact_only_after_red(monkeypatch, capsys):
-    fake = snapshot_gh([ci_snapshot(gate=_gate("FAILURE"))])
+    fake = snapshot_gh(
+        [
+            ci_snapshot(
+                gate=_gate(
+                    "FAILURE",
+                    details_url="https://github.com/o/r/actions/runs/555/job/999",
+                )
+            )
+        ]
+    )
     monkeypatch.setattr(pr_watch, "gh", fake)
-    monkeypatch.setattr(pr_watch, "_failed_ci_run_id", lambda _head: 555)
     monkeypatch.setattr(
         pr_watch,
         "write_failure_artifact",
@@ -498,6 +798,7 @@ def test_failure_run_lookup_is_terminal_only_and_head_scoped(monkeypatch):
                 _run(41, "completed", "failure", sha=OLD_SHA),
                 _run(42, "completed", "cancelled"),
                 _run(43, "completed", "failure"),
+                _run(44, "completed", "failure", workflow_name="Legacy CI"),
             ]
         )
 
@@ -506,6 +807,7 @@ def test_failure_run_lookup_is_terminal_only_and_head_scoped(monkeypatch):
     assert pr_watch._failed_ci_run_id(HEAD_SHA) == 43
     assert len(calls) == 1
     assert calls[0][:2] == ("run", "list")
+    assert "--workflow" not in calls[0]
 
 
 # ---------------------------------------------------------------------------
