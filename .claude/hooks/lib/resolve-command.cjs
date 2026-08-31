@@ -153,6 +153,14 @@ const SHELL_CONTROL_WORDS = new Set([
   "coproc",
 ]);
 
+// In Bash's named coprocess form, these compound commands can execute a
+// command list in the condition position before the tokenizer reaches a
+// separator. Other compound forms (`for`, `case`, grouped commands) expose
+// their executable bodies in later segments, so they do not need name-skipping
+// to keep a governed command visible.
+const NAMED_COPROC_CONDITION_OPENERS = new Set(["if", "while", "until"]);
+const SHELL_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
 // How deep to follow eval / sh -c / $() nesting before giving up. Two levels is
 // already exotic; the cap only bounds pathological input.
 const MAX_DEPTH = 5;
@@ -626,6 +634,28 @@ function stripLeadingShellControlWords(words) {
       if (braceIdx !== -1) {
         i = braceIdx + 1;
         continue;
+      }
+
+      if (word.value === "coproc") {
+        const possibleName = words[i + 1];
+        const possibleOpener = words[i + 2];
+        if (
+          possibleName &&
+          !possibleName.quoted &&
+          !possibleName.escaped &&
+          !possibleName.dynamic &&
+          SHELL_IDENTIFIER.test(possibleName.value) &&
+          possibleOpener &&
+          !possibleOpener.quoted &&
+          !possibleOpener.escaped &&
+          NAMED_COPROC_CONDITION_OPENERS.has(possibleOpener.value)
+        ) {
+          // `coproc NAME if|while|until ...`: NAME labels the coprocess; the
+          // following compound opener is still syntax and must be stripped on
+          // the next loop iteration.
+          i += 2;
+          continue;
+        }
       }
 
       // `coproc command ...` runs the following simple command directly.

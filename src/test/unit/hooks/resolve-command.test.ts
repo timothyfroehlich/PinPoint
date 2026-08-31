@@ -122,6 +122,10 @@ describe("shell control words expose the governed command (PP-c8xa)", () => {
     ["time coproc gh pr merge 1", ["gh"]],
     ["time coproc guarded { gh pr merge 1; }", ["gh"]],
     ["time -p if ! env gh pr merge 1; then :; fi", ["gh", ":"]],
+    ["coproc guarded if gh pr merge 1; then :; fi", ["gh", ":"]],
+    ["coproc guarded while gh pr merge 1; do :; done", ["gh", ":"]],
+    ["coproc guarded until gh pr merge 1; do :; done", ["gh", ":"]],
+    ["time coproc guarded if gh pr merge 1; then :; fi", ["gh", ":"]],
   ])("resolves %s", (cmd, expected) => {
     expect(names(cmd)).toEqual(expected);
   });
@@ -141,6 +145,10 @@ describe("shell control words expose the governed command (PP-c8xa)", () => {
   it("does not treat control words after an external time command as shell syntax", () => {
     expect(names("/usr/bin/time if gh pr merge 1")).toEqual(["if"]);
     expect(names("env time if gh pr merge 1")).toEqual(["if"]);
+  });
+
+  it("keeps a simple coprocess operand in the command slot", () => {
+    expect(names("coproc guarded gh pr merge 1")).toEqual(["guarded"]);
   });
 
   it("reports a dynamic governed command as unresolvable", () => {
