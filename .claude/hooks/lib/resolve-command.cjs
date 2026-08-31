@@ -624,13 +624,28 @@ function stripLeadingShellControlWords(words) {
     }
 
     if (word.value === "function" || word.value === "coproc") {
-      const braceIdx = words.findIndex(
-        (candidate, index) =>
-          index > i &&
-          !candidate.quoted &&
-          !candidate.escaped &&
-          candidate.value === "{"
-      );
+      const first = words[i + 1];
+      const second = words[i + 2];
+      const firstIsBrace =
+        first && !first.quoted && !first.escaped && first.value === "{";
+      const secondIsBrace =
+        second && !second.quoted && !second.escaped && second.value === "{";
+      const validCoprocName =
+        first &&
+        !first.quoted &&
+        !first.escaped &&
+        !first.dynamic &&
+        SHELL_IDENTIFIER.test(first.value);
+      const braceIdx =
+        word.value === "function"
+          ? secondIsBrace
+            ? i + 2
+            : -1
+          : firstIsBrace
+            ? i + 1
+            : validCoprocName && secondIsBrace
+              ? i + 2
+              : -1;
       if (braceIdx !== -1) {
         i = braceIdx + 1;
         continue;

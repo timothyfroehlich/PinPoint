@@ -115,6 +115,7 @@ describe("shell control words expose the governed command (PP-c8xa)", () => {
     ["if ! env gh pr merge 1; then :; fi", ["gh", ":"]],
     ["function guarded { gh pr merge 1; }; guarded", ["gh", "guarded"]],
     ["coproc gh pr merge 1", ["gh"]],
+    ["coproc { gh pr merge 1; }", ["gh"]],
     ["coproc guarded { gh pr merge 1; }", ["gh"]],
     ["time if gh pr merge 1; then echo blocked; fi", ["gh", "echo"]],
     ["time { gh pr merge 1; }", ["gh"]],
@@ -149,6 +150,13 @@ describe("shell control words expose the governed command (PP-c8xa)", () => {
 
   it("keeps a simple coprocess operand in the command slot", () => {
     expect(names("coproc guarded gh pr merge 1")).toEqual(["guarded"]);
+    expect(names("coproc git -C { checkout feature/x")).toEqual(["git"]);
+    expect(firstSegment("coproc git -C { checkout feature/x").args).toEqual([
+      "-C",
+      "{",
+      "checkout",
+      "feature/x",
+    ]);
   });
 
   it("reports a dynamic governed command as unresolvable", () => {
