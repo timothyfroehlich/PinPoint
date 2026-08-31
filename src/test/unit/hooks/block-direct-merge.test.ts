@@ -90,10 +90,31 @@ describe("block-direct-merge.cjs — gh merge paths", () => {
   });
 
   it.each([
+    "gh api -XPUT repos/timothyfroehlich/PinPoint/pulls/123/merge",
+    'gh api -X "$METHOD" repos/timothyfroehlich/PinPoint/pulls/123/merge',
+    'gh api --method="$METHOD" repos/timothyfroehlich/PinPoint/pulls/123/merge',
+    "gh api -X$METHOD repos/timothyfroehlich/PinPoint/pulls/123/merge",
+  ])("blocks an attached or dynamic REST method selector: %s", (command) => {
+    expect(runHook(bashPayload(command)).status).toBe(2);
+  });
+
+  it("fails closed on a dynamic REST endpoint despite a dotfiles-shaped input filename", () => {
+    const { status } = runHook(
+      bashPayload(
+        'gh api -X PUT "repos/$TARGET/pulls/123/merge" --input repos/timothyfroehlich/dotfiles/pulls/4/merge'
+      )
+    );
+    expect(status).toBe(2);
+  });
+
+  it.each([
     "gh pr merge 4 --repo timothyfroehlich/dotfiles --squash",
     "gh -R timothyfroehlich/dotfiles pr merge 4 --squash",
     "gh pr merge https://github.com/timothyfroehlich/dotfiles/pull/4 --squash",
     "gh api -X PUT repos/timothyfroehlich/dotfiles/pulls/4/merge",
+    "gh api -XPUT repos/timothyfroehlich/dotfiles/pulls/4/merge",
+    'gh api -X "$METHOD" repos/timothyfroehlich/dotfiles/pulls/4/merge',
+    "gh api -X PUT repos/timothyfroehlich/dotfiles/pulls/4/merge --input repos/timothyfroehlich/PinPoint/pulls/123/merge",
     "GH_REPO=timothyfroehlich/PinPoint gh pr merge 4 --repo timothyfroehlich/dotfiles",
     'gh pr merge 4 --repo timothyfroehlich/dotfiles --body "$(printf note)"',
   ])("allows an explicit non-PinPoint target: %s", (command) => {

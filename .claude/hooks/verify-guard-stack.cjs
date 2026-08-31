@@ -289,6 +289,7 @@ const BEHAVIOR_PROBES = [
       "xargs -I{} gh pr merge {} < prs.txt",
       "env -S 'gh pr merge 123'",
       "gh api -X PUT repos/timothyfroehlich/PinPoint/pulls/123/merge",
+      "gh api -XPUT repos/timothyfroehlich/PinPoint/pulls/123/merge",
       MERGE_MCP_PROBE,
     ],
     mustAsk: [

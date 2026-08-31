@@ -90,6 +90,39 @@ const GH_VALUE_FLAGS = new Set([
   "--hostname",
 ]);
 
+// `gh api` flags that consume the NEXT token. The endpoint is the first
+// remaining positional after the `api` subcommand; option values such as an
+// `--input` filename are not endpoints and must never supply a repository
+// exemption (PP-d7me).
+const API_VALUE_FLAGS = new Set([
+  "--cache",
+  "-F",
+  "--field",
+  "-H",
+  "--header",
+  "--hostname",
+  "--input",
+  "-q",
+  "--jq",
+  "-X",
+  "--method",
+  "-p",
+  "--preview",
+  "-f",
+  "--raw-field",
+  "-t",
+  "--template",
+]);
+const API_ATTACHED_SHORT_VALUE_FLAGS = new Set([
+  "-F",
+  "-H",
+  "-q",
+  "-X",
+  "-p",
+  "-f",
+  "-t",
+]);
+
 /** gh's positional arguments — flag values removed, so the subcommand chain is
  *  contiguous. Flags with `=` carry their value inline and need no skipping. */
 function ghPositionalEntries(args, dynamicArgs = []) {
@@ -100,13 +133,91 @@ function ghPositionalEntries(args, dynamicArgs = []) {
       if (GH_VALUE_FLAGS.has(a)) i++;
       continue;
     }
-    positionals.push({ value: a, dynamic: Boolean(dynamicArgs[i]) });
+    positionals.push({
+      value: a,
+      dynamic: Boolean(dynamicArgs[i]),
+      index: i,
+    });
   }
   return positionals;
 }
 
 function ghPositionals(args) {
   return ghPositionalEntries(args).map(({ value }) => value);
+}
+
+function hasAttachedShortValue(arg) {
+  return [...API_ATTACHED_SHORT_VALUE_FLAGS].some(
+    (flag) => arg.startsWith(flag) && arg.length > flag.length
+  );
+}
+
+/** The one endpoint argument `gh api` will request. Values consumed by API
+ *  flags are skipped even when they resemble REST merge paths. */
+function ghApiEndpointEntry(args, dynamicArgs = []) {
+  const api = ghPositionalEntries(args, dynamicArgs).find(
+    ({ value }) => value === "api"
+  );
+  if (!api) return null;
+
+  for (let i = api.index + 1; i < args.length; i++) {
+    const arg = args[i];
+    if (API_VALUE_FLAGS.has(arg)) {
+      i++;
+      continue;
+    }
+    if (arg.startsWith("--") && arg.includes("=")) continue;
+    if (hasAttachedShortValue(arg)) continue;
+    if (arg.startsWith("-")) continue;
+    return { value: arg, dynamic: Boolean(dynamicArgs[i]) };
+  }
+  return null;
+}
+
+/** Resolve an explicit `gh api` method. A dynamic, missing, or conflicting
+ *  selector is ambiguous and therefore treated as potentially write-capable. */
+function ghApiMethodTarget(args, dynamicArgs = []) {
+  const api = ghPositionalEntries(args, dynamicArgs).find(
+    ({ value }) => value === "api"
+  );
+  if (!api) return { ambiguous: false, method: null };
+
+  let ambiguous = false;
+  const methods = [];
+  const record = (value, dynamic = false) => {
+    if (dynamic || !value) {
+      ambiguous = true;
+      return;
+    }
+    methods.push(String(value).replace(/^=/, "").toUpperCase());
+  };
+
+  for (let i = api.index + 1; i < args.length; i++) {
+    const arg = args[i];
+    if (arg === "-X" || arg === "--method") {
+      record(args[i + 1] || null, Boolean(dynamicArgs[i + 1]));
+      i++;
+      continue;
+    }
+    const equals = /^(?:-X|--method)=(.*)$/.exec(arg);
+    if (equals) {
+      record(equals[1], Boolean(dynamicArgs[i]));
+      continue;
+    }
+    const attachedShort = /^-X(.+)$/.exec(arg);
+    if (attachedShort) {
+      record(attachedShort[1], Boolean(dynamicArgs[i]));
+    }
+  }
+
+  if (methods.length === 0) {
+    return { ambiguous, method: ambiguous ? null : "GET" };
+  }
+  const unique = new Set(methods);
+  return {
+    ambiguous: ambiguous || unique.size !== 1,
+    method: ambiguous || unique.size !== 1 ? null : methods[0],
+  };
 }
 
 /** Normalize a static [HOST/]OWNER/REPO selector. Dynamic or malformed values
@@ -151,25 +262,27 @@ function ghRepositoryTarget(args, dynamicArgs = [], commandKind) {
     else repositories.push(repository);
   };
 
-  for (let i = 0; i < args.length; i++) {
-    const arg = args[i];
-    if (GH_VALUE_FLAGS.has(arg) && arg !== "-R" && arg !== "--repo") {
-      i++;
-      continue;
-    }
-    if (arg === "-R" || arg === "--repo") {
-      record(args[i + 1] || null, Boolean(dynamicArgs[i + 1]));
-      i++;
-      continue;
-    }
-    const equals = /^(?:-R|--repo)=(.*)$/.exec(arg);
-    if (equals) {
-      record(equals[1], Boolean(dynamicArgs[i]));
-      continue;
-    }
-    const attachedShort = /^-R(.+)$/.exec(arg);
-    if (attachedShort) {
-      record(attachedShort[1], Boolean(dynamicArgs[i]));
+  if (commandKind !== "api") {
+    for (let i = 0; i < args.length; i++) {
+      const arg = args[i];
+      if (GH_VALUE_FLAGS.has(arg) && arg !== "-R" && arg !== "--repo") {
+        i++;
+        continue;
+      }
+      if (arg === "-R" || arg === "--repo") {
+        record(args[i + 1] || null, Boolean(dynamicArgs[i + 1]));
+        i++;
+        continue;
+      }
+      const equals = /^(?:-R|--repo)=(.*)$/.exec(arg);
+      if (equals) {
+        record(equals[1], Boolean(dynamicArgs[i]));
+        continue;
+      }
+      const attachedShort = /^-R(.+)$/.exec(arg);
+      if (attachedShort) {
+        record(attachedShort[1], Boolean(dynamicArgs[i]));
+      }
     }
   }
 
@@ -186,11 +299,12 @@ function ghRepositoryTarget(args, dynamicArgs = [], commandKind) {
   }
 
   if (commandKind === "api") {
-    for (let i = 0; i < args.length; i++) {
-      const path = API_REPOSITORY_PATH.exec(args[i]);
-      if (path) {
-        record(`${path[1]}/${path[2]}`, Boolean(dynamicArgs[i]));
-      }
+    const endpoint = ghApiEndpointEntry(args, dynamicArgs);
+    if (endpoint?.dynamic) {
+      record(endpoint.value, true);
+    } else if (endpoint) {
+      const path = API_REPOSITORY_PATH.exec(endpoint.value);
+      if (path) record(`${path[1]}/${path[2]}`);
     }
   }
 
@@ -228,24 +342,13 @@ function isProtectedTarget(target) {
   );
 }
 
-/** Does `args` invoke `gh api` against a pulls/N/merge path with a write method? */
-function isGhApiMerge(args) {
-  if (!args.some((a) => MERGE_API_PATH.test(a))) return false;
-  let hasWriteMethod = false;
-  for (let i = 0; i < args.length; i++) {
-    const a = args[i];
-    if (a === "-X" || a === "--method") {
-      if (WRITE_METHODS.has(String(args[i + 1] || "").toUpperCase())) {
-        hasWriteMethod = true;
-      }
-      continue;
-    }
-    const eq = /^(?:-X|--method)=(.+)$/.exec(a);
-    if (eq && WRITE_METHODS.has(eq[1].toUpperCase())) hasWriteMethod = true;
-  }
-  if (!hasWriteMethod) return false;
-  // `api` must be gh's subcommand, not a value of some flag.
-  return ghPositionals(args).includes("api");
+/** Does `args` invoke `gh api` against its actual pulls/N/merge endpoint with
+ *  a write-capable (or dynamic/ambiguous) method selector? */
+function isGhApiMerge(args, dynamicArgs = []) {
+  const endpoint = ghApiEndpointEntry(args, dynamicArgs);
+  if (!endpoint || !MERGE_API_PATH.test(endpoint.value)) return false;
+  const method = ghApiMethodTarget(args, dynamicArgs);
+  return method.ambiguous || WRITE_METHODS.has(method.method);
 }
 
 /** Does `args` invoke `gh pr merge`? Adjacency in the positional chain, so
@@ -300,7 +403,7 @@ function classifyMerge(toolName, toolInput) {
       }
       return { block: true, kind: "merge", detail: "gh pr merge" };
     }
-    if (isGhApiMerge(segment.args)) {
+    if (isGhApiMerge(segment.args, segment.dynamicArgs)) {
       if (
         !isProtectedTarget(
           ghRepositoryTarget(segment.args, segment.dynamicArgs, "api")
