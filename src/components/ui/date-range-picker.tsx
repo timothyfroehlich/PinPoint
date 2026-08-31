@@ -101,7 +101,9 @@ export function DateRangePicker({
     ? date.to
       ? `${format(date.from, "LLL dd, y")} - ${format(date.to, "LLL dd, y")}`
       : format(date.from, "LLL dd, y")
-    : label;
+    : date?.to
+      ? `To ${format(date.to, "LLL dd, y")}`
+      : label;
 
   return (
     <div data-testid={testId} className={cn("grid gap-2", className)}>

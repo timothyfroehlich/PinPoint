@@ -110,6 +110,9 @@ describe("DateRangePicker", () => {
       to: localDate(2026, 1, 31),
     });
     expect(screen.getByTestId("created-range-to")).toHaveValue("2026-01-31");
+    expect(screen.getByTestId("created-range-trigger")).toHaveAccessibleName(
+      "Created date range: To Jan 31, 2026"
+    );
   });
 
   it("clears the whole range from the mobile action", () => {
