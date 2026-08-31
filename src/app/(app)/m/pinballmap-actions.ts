@@ -330,30 +330,40 @@ type NotFoundVerdict =
   | { kind: "gone" }
   /** Still listed under a different id — delete that one instead. */
   | { kind: "retry"; lmxId: number }
+  /** The lineup changed underneath this recovery; never resolve in the new one. */
+  | { kind: "location_changed" }
   /** No trustworthy evidence either way — do not claim an unlist happened. */
   | { kind: "refuse"; message: string };
 
 async function classifyRemoveNotFound(args: {
   attemptedLmxId: number;
   pinballmapMachineId: number | null;
-  snapshotSyncedAt: Date | null;
+  expectedLocationId: number;
   userId: string;
 }): Promise<NotFoundVerdict> {
-  const { attemptedLmxId, pinballmapMachineId, snapshotSyncedAt, userId } =
+  const { attemptedLmxId, pinballmapMachineId, expectedLocationId, userId } =
     args;
 
   const isFresh = (syncedAt: Date | null): boolean =>
     syncedAt !== null &&
     Date.now() - syncedAt.getTime() < PBM_REFRESH_REFILL_MS;
 
-  if (!isFresh(snapshotSyncedAt)) {
+  let refreshed = await getPinballMapState();
+  if ((refreshed?.locationId ?? null) !== expectedLocationId) {
+    return { kind: "location_changed" };
+  }
+
+  if (!isFresh(refreshed?.lastSyncedAt ?? null)) {
     // Outcome is deliberately ignored: `throttled` means a concurrent refresh
     // just landed and `error` means PBM is unreachable, and the freshness check
     // below answers both correctly without re-deriving them here.
     await syncLocationSnapshot({ updatedBy: userId, trigger: "manual" });
+    refreshed = await getPinballMapState();
   }
 
-  const refreshed = await getPinballMapState();
+  if ((refreshed?.locationId ?? null) !== expectedLocationId) {
+    return { kind: "location_changed" };
+  }
   if (!isFresh(refreshed?.lastSyncedAt ?? null)) {
     return {
       kind: "refuse",
@@ -413,14 +423,18 @@ function pbmWriteFailureMessage(failure: PbmWriteFailure): string {
  */
 async function editStoredSnapshot(
   tx: Tx,
+  expectedLocationId: number,
   edit: (snapshot: LocationSnapshot) => LocationSnapshot
 ): Promise<void> {
   const [row] = await tx
-    .select({ snapshotJson: pinballmapState.snapshotJson })
+    .select({
+      locationId: pinballmapState.locationId,
+      snapshotJson: pinballmapState.snapshotJson,
+    })
     .from(pinballmapState)
     .where(eq(pinballmapState.id, "singleton"))
     .for("update");
-  if (!row?.snapshotJson) return;
+  if (row?.locationId !== expectedLocationId || !row.snapshotJson) return;
   await tx
     .update(pinballmapState)
     .set({ snapshotJson: edit(row.snapshotJson), updatedAt: new Date() })
@@ -494,6 +508,7 @@ export async function addMachineToPinballMapAction(
   const state = await getPinballMapState();
   if (state?.locationId === null || state?.locationId === undefined)
     return err("SERVER", "Pinball Map isn't configured yet");
+  const locationId = state.locationId;
 
   // Idempotent: the lineup already carries this title, so there is nothing to
   // add and the entry it already has is the answer. Spending a write call on
@@ -526,7 +541,7 @@ export async function addMachineToPinballMapAction(
   const client = await getPinballMapClient();
   const written = await client.addMachine({
     credentials,
-    locationId: state.locationId,
+    locationId,
     machineId: titleId,
   });
   if (!written.ok) {
@@ -546,7 +561,7 @@ export async function addMachineToPinballMapAction(
     // The stored lineup is what every control renders from, so it has to carry
     // the entry we just created — otherwise the page repaints as still Missing
     // and offers Add again, for up to an hour (CORE-ARCH-012).
-    await editStoredSnapshot(tx, (snapshot) =>
+    await editStoredSnapshot(tx, locationId, (snapshot) =>
       withLmxAdded(snapshot, lmxId, titleId)
     );
     await createMachineTimelineEvent(
@@ -678,6 +693,10 @@ export async function removeMachineFromPinballMapAction(
   // acting on one, and otherwise the cabinet's current title.
   const titleId =
     abandonedRecord?.pinballmapMachineId ?? machine.pinballmapMachineId;
+  const removalLocationId =
+    abandonedRecord?.locationId ?? state?.locationId ?? null;
+  if (removalLocationId === null)
+    return err("SERVER", "Pinball Map isn't configured yet");
   const isCrossLocation =
     abandonedRecord !== null &&
     abandonedRecord.locationId !== (state?.locationId ?? null);
@@ -739,11 +758,29 @@ export async function removeMachineFromPinballMapAction(
       // about an entry under a different title — and a `retry` verdict would
       // then delete the cabinet's own live entry from the public lineup.
       pinballmapMachineId: titleId,
-      snapshotSyncedAt: state?.lastSyncedAt ?? null,
+      expectedLocationId: removalLocationId,
       userId,
     });
 
-    if (verdict.kind === "refuse") {
+    if (verdict.kind === "location_changed") {
+      if (abandonedRecord === null) {
+        return err(
+          "SERVER",
+          "The tracked Pinball Map location changed while this removal was running. Reload the page and try again."
+        );
+      }
+      // Once the tracked location differs, spec 10.12 makes this the same as
+      // every other cross-location 404: never re-resolve its title in the new
+      // lineup, and retire the old record as already gone.
+      log.info(
+        {
+          lmxId: deletedLmxId,
+          machineId: machine.id,
+          action: "pinballmap.removeMachine",
+        },
+        "Tracked Pinball Map location changed during orphan recovery — suppressing title re-resolution"
+      );
+    } else if (verdict.kind === "refuse") {
       log.warn(
         {
           lmxId: deletedLmxId,
@@ -753,9 +790,7 @@ export async function removeMachineFromPinballMapAction(
         "PinballMap returned not_found and the live lineup could not confirm removal — refusing to clear"
       );
       return err("PBM_REJECTED", verdict.message);
-    }
-
-    if (verdict.kind === "retry") {
+    } else if (verdict.kind === "retry") {
       log.info(
         {
           staleLmxId: deletedLmxId,
@@ -801,14 +836,13 @@ export async function removeMachineFromPinballMapAction(
   // the toggle two ways to do one thing, which is the conflation the two-line
   // control exists to undo (spec 4.1).
   await db.transaction(async (tx) => {
-    if (!isCrossLocation)
-      await editStoredSnapshot(tx, (snapshot) =>
-        // Same reason as above: `withLmxRemoved` drops rows matching EITHER the
-        // id or the title, so the cabinet's current title would take its own live
-        // row out of the stored lineup and leave every same-title cabinet reading
-        // Missing until the next cron.
-        withLmxRemoved(snapshot, deletedLmxId, titleId)
-      );
+    await editStoredSnapshot(tx, removalLocationId, (snapshot) =>
+      // Same reason as above: `withLmxRemoved` drops rows matching EITHER the
+      // id or the title, so the cabinet's current title would take its own live
+      // row out of the stored lineup and leave every same-title cabinet reading
+      // Missing until the next cron.
+      withLmxRemoved(snapshot, deletedLmxId, titleId)
+    );
 
     // The abandoned-entry alert reads the RECORD, not the snapshot, so editing
     // the snapshot alone leaves the alert standing after a removal that

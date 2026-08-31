@@ -16,7 +16,7 @@ const migrationStatements = readFileSync(
 describe("0071 abandoned-listing location backfill", () => {
   setupTestDb();
 
-  it("backfills existing rows from the tracked location before enforcing NOT NULL", async () => {
+  it("backfills existing rows and keeps the previous writer compatible", async () => {
     const db = await getTestDb();
     const [machine] = await db
       .insert(machines)
@@ -52,6 +52,24 @@ describe("0071 abandoned-listing location backfill", () => {
     `);
     expect(backfilled.rows).toEqual([{ location_id: 77777 }]);
 
+    // The previous production runtime remains live while Vercel runs this
+    // migration and still omits location_id from this insert. The temporary
+    // APC default keeps that writer compatible until the contract migration
+    // removes it after this runtime is serving.
+    await db.execute(sql`
+      INSERT INTO pinballmap_abandoned_listings (
+        machine_id,
+        lmx_id,
+        pinballmap_machine_id
+      ) VALUES (${machine.id}, 4472, 6221)
+    `);
+    const previousWriterRow = await db.execute(sql`
+      SELECT location_id
+      FROM pinballmap_abandoned_listings
+      WHERE lmx_id = 4472
+    `);
+    expect(previousWriterRow.rows).toEqual([{ location_id: 26454 }]);
+
     await expect(
       db.execute(sql`
         INSERT INTO pinballmap_abandoned_listings (
@@ -59,7 +77,7 @@ describe("0071 abandoned-listing location backfill", () => {
           lmx_id,
           pinballmap_machine_id,
           location_id
-        ) VALUES (${machine.id}, 4472, 6221, NULL)
+        ) VALUES (${machine.id}, 4473, 6221, NULL)
       `)
     ).rejects.toThrow();
   });

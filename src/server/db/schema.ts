@@ -344,7 +344,10 @@ export const pinballmapAbandonedListings = pgTable(
     // actionable across a tracked-location change, and only records for the
     // currently synced location may be reconciled against that lineup
     // (pinballmap spec 10.11–10.12).
-    locationId: integer("location_id").notNull(),
+    // Expand-deploy compatibility: the previous runtime omits this column when
+    // it records an abandonment. Keep the APC default until the contract
+    // migration after this writer is serving, then drop only the default.
+    locationId: integer("location_id").notNull().default(26454),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
