@@ -21,6 +21,7 @@ describe("PrototypeLayout", () => {
 
   it("renders disposable prototype content outside production", () => {
     vi.stubEnv("VERCEL_ENV", "development");
+    vi.stubEnv("NODE_ENV", "test");
 
     render(PrototypeLayout({ children: <p>prototype</p> }));
 
@@ -28,8 +29,19 @@ describe("PrototypeLayout", () => {
     expect(notFoundMock).not.toHaveBeenCalled();
   });
 
-  it("returns not found in production", () => {
+  it("returns not found in Vercel production", () => {
     vi.stubEnv("VERCEL_ENV", "production");
+    vi.stubEnv("NODE_ENV", "development");
+
+    expect(() => PrototypeLayout({ children: "prototype" })).toThrow(
+      "NEXT_NOT_FOUND"
+    );
+    expect(notFoundMock).toHaveBeenCalledOnce();
+  });
+
+  it("returns not found in a non-Vercel production server", () => {
+    vi.stubEnv("VERCEL_ENV", "development");
+    vi.stubEnv("NODE_ENV", "production");
 
     expect(() => PrototypeLayout({ children: "prototype" })).toThrow(
       "NEXT_NOT_FOUND"

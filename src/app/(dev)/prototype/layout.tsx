@@ -14,7 +14,10 @@ export default function PrototypeLayout({
 }: {
   children: React.ReactNode;
 }): React.JSX.Element {
-  if (process.env["VERCEL_ENV"] === "production") {
+  if (
+    process.env["VERCEL_ENV"] === "production" ||
+    process.env.NODE_ENV === "production"
+  ) {
     notFound();
   }
 
