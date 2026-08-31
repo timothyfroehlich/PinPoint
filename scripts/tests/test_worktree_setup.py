@@ -429,6 +429,17 @@ class TestGenerateLaunchJson:
         names = [c["name"] for c in configs]
         assert names == ["next-dev", "brainstorm", "scotty"]
 
+        next_dev = next(c for c in configs if c["name"] == "next-dev")
+        assert next_dev["runtimeExecutable"] == "mise"
+        assert next_dev["runtimeArgs"] == [
+            "exec",
+            "--",
+            "pnpm",
+            "run",
+            "dev",
+        ]
+        assert next_dev["port"] == port_config.nextjs_port
+
         # Attach-only and on a fixed port: the beads viewer is one host-global
         # server every worktree points at, so it is deliberately not slotted.
         scotty = next(c for c in configs if c["name"] == "scotty")

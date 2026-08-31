@@ -6,7 +6,7 @@
  * This ensures password hashes are compatible with signInWithPassword()
  * and maintains proper foreign key relationships.
  *
- * Usage: npm run db:seed-users
+ * Usage: pnpm run db:_seed-users
  *
  * Password for all test users: "TestPassword123"
  * DO NOT use these in production!

@@ -27,10 +27,18 @@ readonly TRIGGERED_AT=$3
 [[ "$EXPECTED_HEAD" =~ ^[0-9a-f]{40}$ ]] || usage
 [[ "$TRIGGERED_AT" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$ ]] || usage
 
-readonly MAX_ATTEMPTS=${CODEX_WITNESS_MAX_ATTEMPTS:-120}
-readonly POLL_SECONDS=${CODEX_WITNESS_POLL_SECONDS:-10}
+readonly INITIAL_DELAY_SECONDS=${CODEX_WITNESS_INITIAL_DELAY_SECONDS:-120}
+readonly MAX_ATTEMPTS=${CODEX_WITNESS_MAX_ATTEMPTS:-36}
+readonly POLL_SECONDS=${CODEX_WITNESS_POLL_SECONDS:-30}
+[[ "$INITIAL_DELAY_SECONDS" =~ ^[0-9]+$ ]] || usage
 [[ "$MAX_ATTEMPTS" =~ ^[1-9][0-9]*$ ]] || usage
 [[ "$POLL_SECONDS" =~ ^[0-9]+$ ]] || usage
+
+# Native SHA-pinned reviews usually arrive early. Spend that ordinary quiet
+# window without touching the repository's 1,000-request/hour Actions token.
+if ((INITIAL_DELAY_SECONDS > 0)); then
+  sleep "$INITIAL_DELAY_SECONDS"
+fi
 
 OWNER_REPO=${GITHUB_REPOSITORY:-}
 if [[ -z "$OWNER_REPO" ]]; then

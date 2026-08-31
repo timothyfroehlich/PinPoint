@@ -103,6 +103,22 @@ export type NewPinballmapCatalogEntry = InferInsertModel<
 // PinballMap integration state singleton (PP-o355.16)
 export type PinballmapState = InferSelectModel<typeof pinballmapState>;
 export type NewPinballmapState = InferInsertModel<typeof pinballmapState>;
+export type PinballmapRuntimeState = Pick<
+  PinballmapState,
+  | "id"
+  | "locationId"
+  | "snapshotJson"
+  | "lastSyncedAt"
+  | "lastSyncAttemptAt"
+  | "lastSyncStatus"
+  | "lastSyncError"
+  | "refreshTokens"
+  | "refreshTokensAt"
+  | "outboundEmail"
+  | "outboundTokenVaultId"
+  | "updatedAt"
+  | "updatedBy"
+>;
 
 // Region-wide seen-machine memory behind the new-machine alert (PP-o355.18)
 export type PinballmapRegionSeenMachine = InferSelectModel<
