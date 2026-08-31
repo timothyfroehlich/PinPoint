@@ -1,10 +1,10 @@
 # Cross-Cutting UI States & Feedback (§13–§14)
 
-Empty / loading / error state patterns, and where user-action feedback belongs.
+Empty / loading / error / throttled state patterns, and where user-action feedback belongs.
 
 ## 13. Cross-Cutting UI States
 
-Every page will eventually need one of these three states: empty, loading, error. Each has a canonical pattern. Reach for the pattern first; don't invent a variant.
+Every page will eventually need one of these three states: empty, loading, error. Each has a canonical pattern. Reach for the pattern first; don't invent a variant. Throttled is a fourth, narrower one — it applies only to controls that spend from a rate-limit budget.
 
 ### Empty State
 
@@ -69,6 +69,20 @@ Three tiers based on scope. Pick the narrowest one that fits.
 - **Form-level errors should be announced at the top of the form**, not buried near the submit button. Screen reader users need the error to appear above the inputs.
 - **Provide a recovery path.** "Try again" button, a link to contact support, or instructions on what to fix.
 - **Don't use toast for form-level errors.** Toasts dismiss themselves and are easy to miss. Use them only for transient async events.
+
+### Throttled State
+
+A rate-limit budget is bookkeeping, not information. A control that spends from one looks and behaves like any other control until the budget runs out; only then does the throttle appear, as a single line beside the control saying when the action comes back. Settled by Tim, 2026-08-31, during the PP-o355.51.6.2 Pinball Map config-card design review.
+
+**Rules:**
+
+- **Never display remaining allowance while the bucket still has room.** "3 refreshes left" is a number nobody can act on, and putting it on screen invites people to ration a resource they should be free to ignore.
+- **Surface the throttle exactly once — at the moment it blocks the action.** The control disables, and a line beside it names the wait: "Refreshes again in 2:14".
+- **Anti-enumeration limits are the exception, and they stay silent.** A budget whose job is to stop probing rather than to pace a person must never reveal that it fired — the wait message is itself the signal being withheld. `forgotPasswordAction` in `src/app/(auth)/actions.ts` enforces its email-keyed limit and returns the same success either way, deliberately. Everything here governs budgets the person spending them is meant to see.
+- **The wait message is rendered text, never a `title` tooltip.** A tooltip needs a hover, and throttled controls get used on touch, where a disabled control would then explain itself to nobody. `title` is announced inconsistently by screen readers besides, so it can never be the only explanation a control offers.
+- **Amber, not red — waiting is not an error.** A spent budget is a warning state, so it takes the warning treatment rather than the destructive one the Error State section calls for. Write the message in the §25 telegraphic register.
+- **Every path that spends from a shared budget shows the wait in its own error slot.** One path's throttle is never surfaced on another path's control.
+- **Reading the remaining count to decide whether a control is disabled is the one sanctioned use of it.** It computes state; it does not get rendered.
 
 ## 14. Feedback Decision Tree
 
