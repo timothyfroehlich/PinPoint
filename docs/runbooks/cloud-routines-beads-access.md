@@ -13,8 +13,13 @@ This runbook documents the cloud **environment** configuration that grants a
 routine full read + write to that DB. Proven end-to-end on 2026-07-11 (PP-3x7s).
 
 **Model:** hybrid — routines run unattended and may write beads; a local
-"chores" session reviews and acts on them. Concurrent writers are acceptable:
-Dolt is merge-native, and the beads remote-migrate gate is the backstop.
+"chores" session reviews and acts on them. Dolt merges independent rows and
+tables, but it does not semantically merge two edits to the same issue row.
+Concurrent cloud and live-server updates to one issue can therefore stop the
+bridge with a conflict even when both edits are legitimate. The bridge fails
+closed so an operator can preserve the intended fields from both sides; never
+resolve these conflicts with a blanket newest-row, `--ours`, or `--theirs`
+policy. The beads remote-migrate gate remains the schema-version backstop.
 
 ## The three things that make it work
 

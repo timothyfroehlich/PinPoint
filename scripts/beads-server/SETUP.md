@@ -236,8 +236,11 @@ mv .beads/embeddeddolt .beads/embeddeddolt.pre-server
 
 The bridge is deliberately **loud**, unlike the fail-open huddle hooks:
 
-- Any step failing → `beads-dolthub-bridge.sh` exits nonzero → the oneshot unit is
-  marked `failed`. Inspect `journalctl --user -u beads-dolthub-bridge`.
+- Any step failing → `beads-dolthub-bridge.sh` exits nonzero → that oneshot
+  invocation is marked `failed`. The timer remains active and retries on its
+  normal cadence; repeated failures do not mean the primary Dolt server is
+  unhealthy. Inspect `journalctl --user -u beads-dolthub-bridge` and reconcile
+  the divergence rather than repeatedly restarting the service.
 - On a **pull conflict** the script checks `dolt_merge_status` on the live server.
   `bd dolt pull` normally restores the pre-pull working set itself; when it does,
   the bridge records that verification and stops. If conflicts remain, the
@@ -245,6 +248,12 @@ The bridge is deliberately **loud**, unlike the fail-open huddle hooks:
   before stopping. This covers both row and schema conflicts. A human resolves
   the DoltHub divergence, then runs
   `systemctl --user restart beads-dolthub-bridge.timer`.
+- Dolt can merge independent rows, but concurrent edits to the same `issues`
+  row require semantic reconciliation. Preserve legitimate fields from both
+  sides; do not apply a blanket newest-row, `--ours`, or `--theirs` policy.
+  Lifecycle changes are not monotonic — a later `open` row may be stale after a
+  legitimate close, while another later `open` row may represent an intentional
+  reopen.
 - There is intentionally **no `|| true`** anywhere in the bridge (contrast PP-0b7p):
   silent bridge failure would let DoltHub and the live server drift apart unnoticed.
 
