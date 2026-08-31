@@ -51,13 +51,18 @@ PR = 1734
 RATE_LIMIT_403 = "HTTP 403: API rate limit exceeded for user ID"
 
 
-def _gate(conclusion: str, status: str = "COMPLETED", completed_at: str = "") -> dict:
+def _gate(
+    conclusion: str,
+    status: str = "COMPLETED",
+    completed_at: str = "",
+    started_at: str | None = None,
+) -> dict:
     return {
         "name": pr_watch.CI_GATE_NAME,
         "status": status,
         "conclusion": conclusion,
         "completedAt": completed_at,
-        "startedAt": completed_at,
+        "startedAt": completed_at if started_at is None else started_at,
     }
 
 
@@ -254,6 +259,26 @@ def test_ci_gate_state_prefers_live_gate_over_cancelled_leftover(monkeypatch):
     ]
     monkeypatch.setattr(pr_watch, "gh", make_gh(rollup=rollup))
     assert pr_watch._ci_gate_state(PR) == ("IN_PROGRESS", "")
+
+
+@pytest.mark.unit
+def test_ci_gate_state_prefers_replacement_that_started_after_late_cancellation(
+    monkeypatch,
+):
+    rollup = [
+        _gate(
+            "CANCELLED",
+            completed_at="2026-07-24T23:35:00Z",
+            started_at="2026-07-24T23:25:00Z",
+        ),
+        _gate(
+            "SUCCESS",
+            completed_at="2026-07-24T23:34:00Z",
+            started_at="2026-07-24T23:30:00Z",
+        ),
+    ]
+    monkeypatch.setattr(pr_watch, "gh", make_gh(rollup=rollup))
+    assert pr_watch._ci_gate_state(PR) == ("COMPLETED", "SUCCESS")
 
 
 @pytest.mark.unit

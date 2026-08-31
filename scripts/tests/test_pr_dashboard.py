@@ -362,11 +362,13 @@ def test_superseded_cancelled_check_does_not_override_replacement(run_dashboard)
                 checks=[
                     check(
                         conclusion="CANCELLED",
-                        completed_at="2026-08-30T12:00:00Z",
+                        completed_at="2026-08-30T12:05:00Z",
+                        started_at="2026-08-30T11:58:00Z",
                     ),
                     check(
                         conclusion="SUCCESS",
                         completed_at="2026-08-30T12:01:00Z",
+                        started_at="2026-08-30T11:59:00Z",
                     ),
                 ],
             )
@@ -406,10 +408,12 @@ def test_latest_authoritative_ci_gate_rerun_wins(
                     check(
                         conclusion=older_conclusion,
                         completed_at="2026-08-30T12:00:00Z",
+                        started_at="2026-08-30T11:58:00Z",
                     ),
                     check(
                         conclusion=newer_conclusion,
                         completed_at="2026-08-30T12:01:00Z",
+                        started_at="2026-08-30T11:59:00Z",
                     ),
                 ],
             )

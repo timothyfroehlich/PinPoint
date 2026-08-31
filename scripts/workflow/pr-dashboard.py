@@ -431,7 +431,7 @@ def _ci_label(checks: list[dict[str, Any]]) -> str:
                 return "?"
 
     def gate_rank(check: dict[str, Any]) -> str:
-        when = check.get("completedAt") or check.get("startedAt") or ""
+        when = check.get("startedAt") or check.get("completedAt") or ""
         return str(when)
 
     authoritative_gate = max(gates, key=gate_rank) if gates else None

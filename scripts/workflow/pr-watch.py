@@ -697,7 +697,7 @@ def _select_ci_gate(rollup: list[dict]) -> dict | None:
         return None
 
     def rank(check: dict) -> str:
-        when = check.get("completedAt") or check.get("startedAt") or ""
+        when = check.get("startedAt") or check.get("completedAt") or ""
         return when
 
     return max(gates, key=rank)
@@ -723,8 +723,9 @@ def _current_ci_gate(pr: int) -> dict | None:
     commit can still carry MORE THAN ONE `CI Gate` entry — a re-run, or a run
     cancelled by a concurrency group, leaves its superseded check behind next to
     the live one. Returning the first match let an older entry shadow the run we
-    actually care about, so select the most recent entry. A latest cancellation
-    remains superseded rather than exposing an older green verdict. (PP-r63o)
+    actually care about, so select the entry with the most recent start time.
+    Completion is only a fallback because an older run can finish cancelling
+    after its replacement has already completed. (PP-r63o)
     """
     _head, gate = _current_ci_snapshot(pr)
     return gate
