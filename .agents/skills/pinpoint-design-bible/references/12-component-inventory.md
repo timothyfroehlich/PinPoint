@@ -27,6 +27,21 @@ Two conventions that come with the picker pattern:
 - **Export the filterable list separately from the popover wrapper.** Contexts that already own their own chrome (a dialog, a sheet) should render the list without a redundant nested popover. `MachineCombobox` splits exactly this way.
 - **Support native form submission** via an optional hidden input, so a picker can sit in a Server Action form without a bespoke bridge.
 
+### Date ranges: native mobile, custom desktop
+
+Every product date range uses the shared `DateRangePicker`. Below `md`, it
+renders two visible, labelled native `input[type="date"]` fields so the browser
+supplies the familiar platform picker. At `md` and above, it renders the Radix
+Popover with the two-month `Calendar`. The shared component owns both trees and
+switches them with CSS; call sites supply only the label, value, and change
+handler.
+
+Treat the native values as local calendar dates. Format and parse
+`YYYY-MM-DD` without passing the date-only string to the `Date` constructor,
+which interprets that shape as UTC and can shift the displayed day. New date
+range surfaces extend this component rather than wiring `Calendar` or native
+date fields independently.
+
 ### Other standing rules
 
 - **`Sheet` and `Drawer` are different components.** `sheet.tsx` is Radix Dialog; `drawer.tsx` wraps vaul (swipe-to-close, momentum) and is what the mobile "More" menu uses. Pick deliberately.
