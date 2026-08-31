@@ -491,13 +491,6 @@
       "when": 1787583620914,
       "tag": "0069_integration_config_presence_expand",
       "breakpoints": true
-    },
-    {
-      "idx": 70,
-      "version": "7",
-      "when": 1788129160033,
-      "tag": "0070_contract-integration-enable-columns",
-      "breakpoints": true
     }
   ]
 }
