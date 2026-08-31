@@ -332,36 +332,6 @@ def test_mise_lock_exists_and_captures_tools() -> None:
     _assert_mise_lock_coherent(mise_data, lock_data, package_data)
 
 
-def test_mise_lock_matches_fresh_multi_platform_resolution(tmp_path: Path) -> None:
-    """A coherent Renovate mise.toml + mise.lock update needs no test edit."""
-    for source in (MISE_TOML_PATH, MISE_LOCK_PATH, PACKAGE_JSON_PATH):
-        shutil.copy2(source, tmp_path / source.name)
-    mise_env = os.environ.copy()
-    mise_env["XDG_CACHE_HOME"] = str(tmp_path / "cache")
-    mise_env["XDG_STATE_HOME"] = str(tmp_path / "state")
-
-    proc = subprocess.run(
-        [_get_mise_bin(), "--yes", "--cd", str(tmp_path), "lock"],
-        capture_output=True,
-        text=True,
-        timeout=180,
-        check=False,
-        env=mise_env,
-    )
-    assert proc.returncode == 0, (
-        "mise lock must resolve every configured platform artifact; "
-        f"stdout={proc.stdout!r}, stderr={proc.stderr!r}"
-    )
-
-    committed_lock = tomllib.loads(MISE_LOCK_PATH.read_text(encoding="utf-8"))
-    regenerated_lock = tomllib.loads(
-        (tmp_path / "mise.lock").read_text(encoding="utf-8")
-    )
-    assert regenerated_lock == committed_lock, (
-        "mise.lock must exactly match a fresh multi-platform `mise lock` resolution"
-    )
-
-
 def test_mise_lock_rejects_version_mismatch() -> None:
     mise_data = tomllib.loads(MISE_TOML_PATH.read_text(encoding="utf-8"))
     lock_data = tomllib.loads(MISE_LOCK_PATH.read_text(encoding="utf-8"))

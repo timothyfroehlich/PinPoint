@@ -78,9 +78,9 @@ If you’re changing code, **start here**:
 ### Prerequisites
 
 - [mise](https://mise.jdx.dev/) **2026.8.11+** (manages development Node, Python, Ruff, the Supabase CLI, and pnpm)
-- Node.js **24** (pinned in `mise.toml`; `22.22+` or `26+` also satisfy `engines`)
-- Python **3.12.9** (pinned in `mise.toml`; target `py312` in `ruff.toml`)
-- Ruff **0.15.1** (pinned in `mise.toml`)
+- Node.js (exact version pinned in `mise.toml`; must satisfy `package.json#engines.node`)
+- Python (exact version pinned in `mise.toml`; target `py312` in `ruff.toml`)
+- Ruff (exact version pinned in `mise.toml`)
 - Supabase CLI (pinned in `mise.toml`; installed by `mise install --locked` — no separate host install needed)
 - pnpm (exact version and sha512 integrity pinned in `packageManager` in `package.json`)
 - Supabase account (for local dev / preview / prod)
