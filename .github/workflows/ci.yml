@@ -356,7 +356,7 @@ jobs:
       - name: Setup locked Python toolchain
         uses: ./.github/actions/setup-mise
         with:
-          install-args: "--locked python ruff"
+          install-args: "--locked python ruff zizmor"
           cache-pnpm: "false"
 
       - name: Install Python test dependencies
@@ -386,10 +386,6 @@ jobs:
 
       - name: ShellCheck
         run: find scripts/ .devcontainer/ -name '*.sh' -print0 | xargs -0 shellcheck
-
-      - name: Install zizmor
-        run: |
-          pipx install "zizmor==1.23.1"
 
       - name: Zizmor (GitHub Actions security)
         run: |
