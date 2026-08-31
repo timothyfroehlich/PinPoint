@@ -127,6 +127,11 @@ describe("shell control words expose the governed command (PP-c8xa)", () => {
     ["coproc guarded while gh pr merge 1; do :; done", ["gh", ":"]],
     ["coproc guarded until gh pr merge 1; do :; done", ["gh", ":"]],
     ["time coproc guarded if gh pr merge 1; then :; fi", ["gh", ":"]],
+    ["function guarded if gh pr merge 1; then :; fi", ["gh", ":"]],
+    ["function guarded while gh pr merge 1; do :; done", ["gh", ":"]],
+    ["function guarded until gh pr merge 1; do :; done", ["gh", ":"]],
+    ["time function guarded if gh pr merge 1; then :; fi", ["gh", ":"]],
+    ["function guarded-name if gh pr merge 1; then :; fi", ["gh", ":"]],
   ])("resolves %s", (cmd, expected) => {
     expect(names(cmd)).toEqual(expected);
   });
@@ -157,6 +162,10 @@ describe("shell control words expose the governed command (PP-c8xa)", () => {
       "checkout",
       "feature/x",
     ]);
+  });
+
+  it("keeps a non-compound function header in its ordinary command slot", () => {
+    expect(names("function guarded gh pr merge 1")).toEqual(["function"]);
   });
 
   it("reports a dynamic governed command as unresolvable", () => {

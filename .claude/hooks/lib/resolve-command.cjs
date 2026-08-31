@@ -158,7 +158,7 @@ const SHELL_CONTROL_WORDS = new Set([
 // separator. Other compound forms (`for`, `case`, grouped commands) expose
 // their executable bodies in later segments, so they do not need name-skipping
 // to keep a governed command visible.
-const NAMED_COPROC_CONDITION_OPENERS = new Set(["if", "while", "until"]);
+const NAMED_COMPOUND_CONDITION_OPENERS = new Set(["if", "while", "until"]);
 const SHELL_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 // How deep to follow eval / sh -c / $() nesting before giving up. Two levels is
@@ -651,26 +651,29 @@ function stripLeadingShellControlWords(words) {
         continue;
       }
 
-      if (word.value === "coproc") {
-        const possibleName = words[i + 1];
-        const possibleOpener = words[i + 2];
-        if (
-          possibleName &&
-          !possibleName.quoted &&
-          !possibleName.escaped &&
-          !possibleName.dynamic &&
-          SHELL_IDENTIFIER.test(possibleName.value) &&
-          possibleOpener &&
-          !possibleOpener.quoted &&
-          !possibleOpener.escaped &&
-          NAMED_COPROC_CONDITION_OPENERS.has(possibleOpener.value)
-        ) {
-          // `coproc NAME if|while|until ...`: NAME labels the coprocess; the
-          // following compound opener is still syntax and must be stripped on
-          // the next loop iteration.
-          i += 2;
-          continue;
-        }
+      const possibleName = words[i + 1];
+      const possibleOpener = words[i + 2];
+      const literalName =
+        possibleName &&
+        !possibleName.quoted &&
+        !possibleName.escaped &&
+        !possibleName.dynamic;
+      const validNamedOwner =
+        word.value === "function"
+          ? literalName
+          : literalName && SHELL_IDENTIFIER.test(possibleName.value);
+      if (
+        validNamedOwner &&
+        possibleOpener &&
+        !possibleOpener.quoted &&
+        !possibleOpener.escaped &&
+        NAMED_COMPOUND_CONDITION_OPENERS.has(possibleOpener.value)
+      ) {
+        // `function|coproc NAME if|while|until ...`: NAME labels the compound
+        // owner; the following opener is still syntax and must be stripped on
+        // the next loop iteration.
+        i += 2;
+        continue;
       }
 
       // `coproc command ...` runs the following simple command directly.

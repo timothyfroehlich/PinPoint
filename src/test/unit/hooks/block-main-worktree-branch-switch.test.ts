@@ -134,6 +134,10 @@ describe("shell-control-prefixed checkout invocations → BLOCK (PP-c8xa)", () =
     "coproc guarded until git checkout feature/x; do :; done",
     "time coproc guarded if git checkout feature/x; then :; fi",
     "coproc git -C { checkout feature/x",
+    "function guarded if git checkout feature/x; then :; fi; guarded",
+    "function guarded while git checkout feature/x; do :; done; guarded",
+    "function guarded until git checkout feature/x; do :; done; guarded",
+    "time function guarded if git checkout feature/x; then :; fi; guarded",
   ])("blocks %s", (cmd) => {
     expectBlock(cmd);
   });
