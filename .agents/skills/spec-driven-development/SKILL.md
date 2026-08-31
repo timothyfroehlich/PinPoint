@@ -2,13 +2,14 @@
 name: spec-driven-development
 description: >-
   Define and maintain PinPoint's living feature specs in docs/feature-specs/.
-  Use when designing or changing a specified feature, creating a feature spec,
-  reviewing spec conformance, citing requirements, deciding whether behavior
-  belongs in a feature spec versus a design record or the design bible, or when
-  Tim says "spec", "feature spec", or "spec-driven". Includes the approval
-  boundary: an implementation PR may delete divergence rows its changes fully
-  resolve without separate approval; every other feature-spec edit requires
-  Tim's approval of the exact diff.
+  Use when designing or changing a feature that has a spec, starting substantial
+  new feature design, creating a feature spec, reviewing spec conformance,
+  citing requirements, deciding whether behavior belongs in a feature spec
+  versus a design record or the design bible, or when Tim says "spec", "feature
+  spec", or "spec-driven". Includes the approval boundary: an implementation PR
+  may delete divergence rows its changes fully resolve without separate
+  approval; every other feature-spec edit requires Tim's approval of the exact
+  diff.
 ---
 
 # Spec-Driven Development
