@@ -1,7 +1,7 @@
 """Tests for the PinPoint mise project contract (PP-h2ui.4, .5, .6, .8, .9).
 
 Verifies that:
-1. mise.toml defines the exact development Node/Python/Ruff/Supabase-CLI runtimes and settings.
+1. mise.toml defines the exact development Node/Python/Ruff/Supabase-CLI/zizmor tools and settings.
 2. package.json#packageManager remains the single pnpm version and checksum authority.
 3. mise.toml does not duplicate the pnpm version (idiomatic_version_file_enable_tools is used).
 4. mise.lock exists and captures resolved artifacts across platforms.
@@ -40,13 +40,14 @@ PREVIEW_REAPER_PATH = REPO_ROOT / ".github" / "workflows" / "preview-reaper.yaml
 PREVIEW_SYNC_PATH = REPO_ROOT / ".github" / "workflows" / "preview-sync.yaml"
 
 MINIMUM_MISE_VERSION = (2026, 8, 11)
-MISE_MANAGED_TOOLS = ("node", "python", "ruff", "supabase")
+MISE_MANAGED_TOOLS = ("node", "python", "ruff", "supabase", "zizmor")
 EXPECTED_TOOL_BACKENDS = {
     "node": "core:node",
     "pnpm": "npm:pnpm",
     "python": "core:python",
     "ruff": "aqua:astral-sh/ruff",
     "supabase": "aqua:supabase/cli",
+    "zizmor": "aqua:zizmorcore/zizmor",
 }
 EXPECTED_LOCK_PLATFORMS = {
     "node": {
@@ -84,6 +85,19 @@ EXPECTED_LOCK_PLATFORMS = {
         "macos-x64",
         "windows-x64",
     },
+    "zizmor": {
+        "linux-arm64",
+        "linux-arm64-musl",
+        "linux-x64",
+        "linux-x64-musl",
+        "macos-arm64",
+        "macos-x64",
+        "windows-x64",
+    },
+}
+EXPECTED_LOCK_PROVENANCE = {
+    "python": "github-attestations",
+    "zizmor": "github-attestations",
 }
 EXACT_VERSION_RE = re.compile(r"^\d+\.\d+\.\d+$")
 SHA256_CHECKSUM_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
@@ -219,6 +233,18 @@ def _assert_platform_locks_coherent(
         assert isinstance(artifact, dict), (
             f"mise.lock {tool} {platform} platform entry must be a table"
         )
+        expected_provenance = EXPECTED_LOCK_PROVENANCE.get(tool)
+        if set(artifact) == {"provenance"}:
+            assert artifact == {"provenance": expected_provenance}, (
+                f"mise.lock {tool} {platform} must remain an explicit "
+                f"unavailable-platform marker, got {artifact!r}"
+            )
+            continue
+        if expected_provenance is not None:
+            assert artifact.get("provenance") == expected_provenance, (
+                f"mise.lock {tool} {platform} provenance must be "
+                f"{expected_provenance!r}, got {artifact.get('provenance')!r}"
+            )
         url = artifact.get("url")
         assert isinstance(url, str) and url.startswith("https://"), (
             f"mise.lock {tool} {platform} platform URL must be HTTPS, got {url!r}"
@@ -356,7 +382,9 @@ def test_mise_lock_accepts_structurally_coherent_managed_tool_bump(
     lock_entry["specifiers"] = [bumped_version]
     for platform in EXPECTED_LOCK_PLATFORMS[tool]:
         artifact = lock_entry[f"platforms.{platform}"]
-        artifact["url"] = artifact["url"].replace(current_version, bumped_version)
+        url = artifact.get("url")
+        if isinstance(url, str):
+            artifact["url"] = url.replace(current_version, bumped_version)
 
     _assert_mise_lock_coherent(bumped_mise, bumped_lock, package_data)
 
@@ -577,6 +605,7 @@ def test_mise_ls_resolves_sources_correctly() -> None:
     assert "python" in tools_dict, "python not listed by mise ls"
     assert "ruff" in tools_dict, "ruff not listed by mise ls"
     assert "supabase" in tools_dict, "supabase not listed by mise ls"
+    assert "zizmor" in tools_dict, "zizmor not listed by mise ls"
 
     # pnpm's version is authored in package.json; the rest are pinned in mise.toml.
     expected_sources = {
@@ -585,6 +614,7 @@ def test_mise_ls_resolves_sources_correctly() -> None:
         "python": MISE_TOML_PATH,
         "ruff": MISE_TOML_PATH,
         "supabase": MISE_TOML_PATH,
+        "zizmor": MISE_TOML_PATH,
     }
     for tool, expected_path in expected_sources.items():
         selected_entry = _selected_tool_entry(tools_dict[tool])
@@ -811,6 +841,15 @@ def test_ci_installs_pytest_for_mise_python() -> None:
 
     assert setup_mise < install_pytest < run_pytest
     assert 'pipx install "pytest==' not in workflow
+
+
+def test_ci_installs_zizmor_from_locked_mise_toolchain() -> None:
+    """Verify local and CI zizmor use the same mise-authored exact pin."""
+    workflow = CI_WORKFLOW_PATH.read_text(encoding="utf-8")
+    linters = _workflow_job_block(workflow, "linters")
+
+    assert 'install-args: "--locked python ruff zizmor"' in linters
+    assert "pipx install" not in linters
 
 
 def _workflow_job_block(workflow: str, job_name: str) -> str:
