@@ -332,6 +332,37 @@ def test_mise_lock_exists_and_captures_tools() -> None:
     _assert_mise_lock_coherent(mise_data, lock_data, package_data)
 
 
+@pytest.mark.parametrize(
+    ("tool", "bumped_version"),
+    (
+        ("node", "24.19.0"),
+        ("python", "3.12.10"),
+        ("ruff", "0.15.2"),
+        ("supabase", "2.116.0"),
+    ),
+)
+def test_mise_lock_accepts_coherent_managed_tool_bump(
+    tool: str, bumped_version: str
+) -> None:
+    """A two-file Renovate bump passes when config and lock metadata agree."""
+    mise_data = tomllib.loads(MISE_TOML_PATH.read_text(encoding="utf-8"))
+    lock_data = tomllib.loads(MISE_LOCK_PATH.read_text(encoding="utf-8"))
+    package_data = json.loads(PACKAGE_JSON_PATH.read_text(encoding="utf-8"))
+    bumped_mise = deepcopy(mise_data)
+    bumped_lock = deepcopy(lock_data)
+    current_version = bumped_mise["tools"][tool]
+    bumped_mise["tools"][tool] = bumped_version
+
+    lock_entry = bumped_lock["tools"][tool][0]
+    lock_entry["version"] = bumped_version
+    lock_entry["specifiers"] = [bumped_version]
+    for platform in EXPECTED_LOCK_PLATFORMS[tool]:
+        artifact = lock_entry[f"platforms.{platform}"]
+        artifact["url"] = artifact["url"].replace(current_version, bumped_version)
+
+    _assert_mise_lock_coherent(bumped_mise, bumped_lock, package_data)
+
+
 def test_mise_lock_rejects_version_mismatch() -> None:
     mise_data = tomllib.loads(MISE_TOML_PATH.read_text(encoding="utf-8"))
     lock_data = tomllib.loads(MISE_LOCK_PATH.read_text(encoding="utf-8"))
@@ -443,6 +474,16 @@ def _tool_source_path(info: object) -> str:
     return path
 
 
+def _assert_tool_source_path(info: object, expected_path: Path) -> None:
+    """Require the selected entry to originate from this project's authority."""
+    actual_path = Path(_tool_source_path(info)).resolve()
+    normalized_expected_path = expected_path.resolve()
+    assert actual_path == normalized_expected_path, (
+        f"selected mise source must resolve to {normalized_expected_path}, "
+        f"got {actual_path}"
+    )
+
+
 def test_tool_source_path_selects_active_entry() -> None:
     info = [
         {
@@ -488,6 +529,21 @@ def test_tool_source_path_accepts_requested_uninstalled_entry() -> None:
     assert _tool_source_path(info) == "/project/mise.toml"
 
 
+def test_tool_source_path_rejects_matching_basename_from_other_project(
+    tmp_path: Path,
+) -> None:
+    expected_path = tmp_path / "project" / "mise.toml"
+    wrong_path = tmp_path / "other-project" / "mise.toml"
+    info = {
+        "version": "2.0.0",
+        "active": True,
+        "source": {"path": str(wrong_path)},
+    }
+
+    with pytest.raises(AssertionError, match="selected mise source must resolve to"):
+        _assert_tool_source_path(info, expected_path)
+
+
 def test_mise_ls_resolves_sources_correctly() -> None:
     mise_bin = _get_mise_bin()
 
@@ -516,13 +572,13 @@ def test_mise_ls_resolves_sources_correctly() -> None:
 
     # pnpm's version is authored in package.json; the rest are pinned in mise.toml.
     expected_sources = {
-        "node": "mise.toml",
-        "pnpm": "package.json",
-        "python": "mise.toml",
-        "ruff": "mise.toml",
-        "supabase": "mise.toml",
+        "node": MISE_TOML_PATH,
+        "pnpm": PACKAGE_JSON_PATH,
+        "python": MISE_TOML_PATH,
+        "ruff": MISE_TOML_PATH,
+        "supabase": MISE_TOML_PATH,
     }
-    for tool, expected_file in expected_sources.items():
+    for tool, expected_path in expected_sources.items():
         selected_entry = _selected_tool_entry(tools_dict[tool])
         assert selected_entry.get("version") == expected_versions[tool], (
             f"selected {tool} version should be {expected_versions[tool]}, "
@@ -532,10 +588,7 @@ def test_mise_ls_resolves_sources_correctly() -> None:
             f"selected {tool} requested_version should be {expected_versions[tool]}, "
             f"got {selected_entry.get('requested_version')!r}"
         )
-        source = _tool_source_path(selected_entry)
-        assert source.endswith(expected_file), (
-            f"{tool} source should be {expected_file}, got {source}"
-        )
+        _assert_tool_source_path(selected_entry, expected_path)
 
 
 def test_negative_checksum_mismatch_rejected(tmp_path: Path) -> None:
