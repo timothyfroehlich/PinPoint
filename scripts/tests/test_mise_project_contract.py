@@ -11,7 +11,6 @@ Verifies that:
 8. CI and preview workflows use the shared mise setup without legacy setup actions (PP-h2ui.9).
 """
 
-import hashlib
 import json
 import os
 import re
@@ -333,37 +332,34 @@ def test_mise_lock_exists_and_captures_tools() -> None:
     _assert_mise_lock_coherent(mise_data, lock_data, package_data)
 
 
-@pytest.mark.parametrize(
-    ("tool", "new_version"),
-    (
-        ("node", "24.19.0"),
-        ("python", "3.12.10"),
-        ("ruff", "0.15.2"),
-        ("supabase", "2.116.0"),
-    ),
-)
-def test_mise_lock_accepts_coherent_managed_tool_bump(
-    tool: str, new_version: str
-) -> None:
-    """A Renovate-style mise.toml + mise.lock update needs no test edit."""
-    mise_data = tomllib.loads(MISE_TOML_PATH.read_text(encoding="utf-8"))
-    lock_data = tomllib.loads(MISE_LOCK_PATH.read_text(encoding="utf-8"))
-    package_data = json.loads(PACKAGE_JSON_PATH.read_text(encoding="utf-8"))
-    bumped_mise = deepcopy(mise_data)
-    bumped_lock = deepcopy(lock_data)
+def test_mise_lock_matches_fresh_multi_platform_resolution(tmp_path: Path) -> None:
+    """A coherent Renovate mise.toml + mise.lock update needs no test edit."""
+    for source in (MISE_TOML_PATH, MISE_LOCK_PATH, PACKAGE_JSON_PATH):
+        shutil.copy2(source, tmp_path / source.name)
+    mise_env = os.environ.copy()
+    mise_env["XDG_CACHE_HOME"] = str(tmp_path / "cache")
+    mise_env["XDG_STATE_HOME"] = str(tmp_path / "state")
 
-    old_version = bumped_lock["tools"][tool][0]["version"]
-    bumped_mise["tools"][tool] = new_version
-    bumped_lock["tools"][tool][0]["version"] = new_version
-    bumped_lock["tools"][tool][0]["specifiers"] = [new_version]
-    for key, artifact in bumped_lock["tools"][tool][0].items():
-        if not key.startswith("platforms."):
-            continue
-        artifact["url"] = artifact["url"].replace(old_version, new_version)
-        digest_input = f"{tool}:{new_version}:{key}".encode()
-        artifact["checksum"] = f"sha256:{hashlib.sha256(digest_input).hexdigest()}"
+    proc = subprocess.run(
+        [_get_mise_bin(), "--yes", "--cd", str(tmp_path), "lock"],
+        capture_output=True,
+        text=True,
+        timeout=180,
+        check=False,
+        env=mise_env,
+    )
+    assert proc.returncode == 0, (
+        "mise lock must resolve every configured platform artifact; "
+        f"stdout={proc.stdout!r}, stderr={proc.stderr!r}"
+    )
 
-    _assert_mise_lock_coherent(bumped_mise, bumped_lock, package_data)
+    committed_lock = tomllib.loads(MISE_LOCK_PATH.read_text(encoding="utf-8"))
+    regenerated_lock = tomllib.loads(
+        (tmp_path / "mise.lock").read_text(encoding="utf-8")
+    )
+    assert regenerated_lock == committed_lock, (
+        "mise.lock must exactly match a fresh multi-platform `mise lock` resolution"
+    )
 
 
 def test_mise_lock_rejects_version_mismatch() -> None:
