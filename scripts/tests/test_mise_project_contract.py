@@ -376,13 +376,23 @@ def test_mise_lock_rejects_stale_platform_artifacts() -> None:
     mise_data = tomllib.loads(MISE_TOML_PATH.read_text(encoding="utf-8"))
     lock_data = tomllib.loads(MISE_LOCK_PATH.read_text(encoding="utf-8"))
     package_data = json.loads(PACKAGE_JSON_PATH.read_text(encoding="utf-8"))
+    current_version = _mise_managed_pins(mise_data)["node"]
+    major, minor, patch = _parse_exact_version(
+        current_version, source="mise.toml node pin"
+    )
+    bumped_version = f"{major}.{minor}.{patch + 1}"
+    assert bumped_version != current_version
+
     bumped_mise = deepcopy(mise_data)
     stale_lock = deepcopy(lock_data)
-    bumped_mise["tools"]["node"] = "24.19.0"
-    stale_lock["tools"]["node"][0]["version"] = "24.19.0"
-    stale_lock["tools"]["node"][0]["specifiers"] = ["24.19.0"]
+    bumped_mise["tools"]["node"] = bumped_version
+    stale_lock["tools"]["node"][0]["version"] = bumped_version
+    stale_lock["tools"]["node"][0]["specifiers"] = [bumped_version]
 
-    with pytest.raises(AssertionError, match="platform URL must reference 24.19.0"):
+    with pytest.raises(
+        AssertionError,
+        match=rf"platform URL must reference {re.escape(bumped_version)}",
+    ):
         _assert_mise_lock_coherent(bumped_mise, stale_lock, package_data)
 
 
