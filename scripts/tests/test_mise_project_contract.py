@@ -332,25 +332,23 @@ def test_mise_lock_exists_and_captures_tools() -> None:
     _assert_mise_lock_coherent(mise_data, lock_data, package_data)
 
 
-@pytest.mark.parametrize(
-    ("tool", "bumped_version"),
-    (
-        ("node", "24.19.0"),
-        ("python", "3.12.10"),
-        ("ruff", "0.15.2"),
-        ("supabase", "2.116.0"),
-    ),
-)
-def test_mise_lock_accepts_coherent_managed_tool_bump(
-    tool: str, bumped_version: str
+@pytest.mark.parametrize("tool", MISE_MANAGED_TOOLS)
+def test_mise_lock_accepts_structurally_coherent_managed_tool_bump(
+    tool: str,
 ) -> None:
-    """A two-file Renovate bump passes when config and lock metadata agree."""
+    """A synthetic two-file bump passes structural config/lock validation."""
     mise_data = tomllib.loads(MISE_TOML_PATH.read_text(encoding="utf-8"))
     lock_data = tomllib.loads(MISE_LOCK_PATH.read_text(encoding="utf-8"))
     package_data = json.loads(PACKAGE_JSON_PATH.read_text(encoding="utf-8"))
+    current_version = _mise_managed_pins(mise_data)[tool]
+    major, minor, patch = _parse_exact_version(
+        current_version, source=f"mise.toml {tool} pin"
+    )
+    bumped_version = f"{major}.{minor}.{patch + 1}"
+    assert bumped_version != current_version
+
     bumped_mise = deepcopy(mise_data)
     bumped_lock = deepcopy(lock_data)
-    current_version = bumped_mise["tools"][tool]
     bumped_mise["tools"][tool] = bumped_version
 
     lock_entry = bumped_lock["tools"][tool][0]
