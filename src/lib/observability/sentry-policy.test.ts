@@ -64,7 +64,7 @@ describe("sentryBeforeSend", () => {
         ],
       },
       request: {
-        url: "https://pinpoint.example/signup?email=victim%40example.com#form",
+        url: "https://pinpoint.example/signup?email=victim@example.com#form",
       },
       contexts: {
         mail: {
@@ -213,6 +213,11 @@ describe("sentryBeforeSendSpan", () => {
         recipient: "victim@example.com",
         "http.url":
           "https://pinpoint.example/signup?email=victim%40example.com#form",
+        "http.query": "?token=secret",
+        "http.fragment": "form",
+        "url.query": "?token=secret",
+        "url.fragment": "form",
+        query_string: "token=secret",
       },
       description: "invite victim%40example.com",
       span_id: "1234567890abcdef",
@@ -220,13 +225,13 @@ describe("sentryBeforeSendSpan", () => {
       trace_id: "1234567890abcdef1234567890abcdef",
     };
 
-    expect(sentryBeforeSendSpan(span)).toMatchObject({
-      data: {
-        recipient: "vic***",
-        "http.url": "https://pinpoint.example/signup",
-      },
-      description: "invite vic***",
+    const result = sentryBeforeSendSpan(span);
+
+    expect(result.data).toEqual({
+      recipient: "vic***",
+      "http.url": "https://pinpoint.example/signup",
     });
+    expect(result.description).toBe("invite vic***");
   });
 
   it("returns a minimal safe span with original trace correlation when a sensitive field is unwritable", () => {
@@ -243,6 +248,28 @@ describe("sentryBeforeSendSpan", () => {
       span_id: "1234567890abcdef",
       start_timestamp: 1,
       trace_id: "1234567890abcdef1234567890abcdef",
+    });
+  });
+
+  it("returns a contract-valid safe span when trace correlation cannot be read", () => {
+    const span: SentrySpan = {
+      data: { recipient: "victim@example.com" },
+      span_id: "1234567890abcdef",
+      start_timestamp: 1,
+      trace_id: "1234567890abcdef1234567890abcdef",
+    };
+    Object.defineProperty(span, "span_id", {
+      enumerable: true,
+      get() {
+        throw new Error("opaque span");
+      },
+    });
+
+    expect(sentryBeforeSendSpan(span)).toEqual({
+      data: {},
+      span_id: "0000000000000001",
+      start_timestamp: 0,
+      trace_id: "00000000000000000000000000000001",
     });
   });
 });
@@ -266,6 +293,22 @@ describe("sentryBeforeSendLog", () => {
         request: { url: "/signup" },
       },
     });
+  });
+
+  it("drops logs whose attributes can serialize hidden email data", () => {
+    class ContactAttribute {
+      toJSON(): string {
+        return "victim@example.com";
+      }
+    }
+
+    const log: Log = {
+      level: "error",
+      message: "Invite failed",
+      attributes: { contact: new ContactAttribute() },
+    };
+
+    expect(sentryBeforeSendLog(log)).toBeNull();
   });
 });
 
@@ -291,5 +334,22 @@ describe("sentryBeforeSendMetric", () => {
         requestUrl: "https://pinpoint.example/signup",
       },
     });
+  });
+
+  it("drops metrics whose attributes can serialize hidden email data", () => {
+    class ContactAttribute {
+      toJSON(): string {
+        return "victim@example.com";
+      }
+    }
+
+    const metric: Metric = {
+      name: "invite.failed",
+      type: "counter",
+      value: 1,
+      attributes: { contact: new ContactAttribute() },
+    };
+
+    expect(sentryBeforeSendMetric(metric)).toBeNull();
   });
 });

@@ -13,6 +13,24 @@ type SentrySpan = Parameters<
 type SentryTransaction = Parameters<
   NonNullable<SentryInitOptions["beforeSendTransaction"]>
 >[0];
+type SpanCorrelation = Pick<
+  SentrySpan,
+  "span_id" | "start_timestamp" | "trace_id"
+>;
+
+const FALLBACK_SPAN_CORRELATION = {
+  span_id: "0000000000000001",
+  start_timestamp: 0,
+  trace_id: "00000000000000000000000000000001",
+} satisfies SpanCorrelation;
+
+const CAPTURED_URL_DETAIL_KEYS = new Set([
+  "http.fragment",
+  "http.query",
+  "query_string",
+  "url.fragment",
+  "url.query",
+]);
 
 /** Strict, explicit collection contract shared by browser, server, and edge. */
 export const SENTRY_DATA_COLLECTION = {
@@ -61,7 +79,16 @@ function stripCapturedUrlDetails(value: string, key: string): string {
 }
 
 function sanitizeSentryString(value: string, key: string): string {
-  return stripCapturedUrlDetails(maskEmailsInText(value), key);
+  return maskEmailsInText(stripCapturedUrlDetails(value, key));
+}
+
+function deleteOwnProperty(value: object, key: string): boolean {
+  try {
+    if (!Reflect.deleteProperty(value, key)) return false;
+    return !Object.hasOwn(value, key);
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -76,10 +103,27 @@ function sanitizeStructuredData(
   depth: number,
   seen: WeakSet<object>
 ): boolean {
-  if (value === null || typeof value !== "object") return true;
+  if (value === null) return true;
+  if (typeof value === "function") {
+    try {
+      return !Reflect.has(value, "toJSON");
+    } catch {
+      return false;
+    }
+  }
+  if (typeof value !== "object") return true;
   if (depth >= MAX_SANITIZE_DEPTH) return false;
   if (seen.has(value)) return true;
   seen.add(value);
+
+  // JSON.stringify invokes inherited as well as own toJSON methods after this
+  // hook runs. Without replacing the object, no in-place walk can guarantee
+  // that later serialization will not reveal data hidden behind that method.
+  try {
+    if (Reflect.has(value, "toJSON")) return false;
+  } catch {
+    return false;
+  }
 
   let keys: string[];
   try {
@@ -89,6 +133,11 @@ function sanitizeStructuredData(
   }
 
   for (const key of keys) {
+    if (CAPTURED_URL_DETAIL_KEYS.has(key.toLowerCase())) {
+      if (!deleteOwnProperty(value, key)) return false;
+      continue;
+    }
+
     let child: unknown;
     try {
       child = Reflect.get(value, key);
@@ -126,7 +175,7 @@ function sanitizeStructuredData(
       ) {
         return false;
       }
-      if (!Reflect.deleteProperty(value, key)) return false;
+      if (!deleteOwnProperty(value, key)) return false;
     } catch {
       return false;
     }
@@ -165,14 +214,45 @@ export function sentryBeforeBreadcrumb(
   return sanitizeChannelPayload(breadcrumb) ? breadcrumb : null;
 }
 
-export function sentryBeforeSendSpan(span: SentrySpan): SentrySpan {
-  if (sanitizeChannelPayload(span)) return span;
+function readSpanCorrelation(span: SentrySpan): SpanCorrelation | null {
+  let spanId: unknown;
+  let startTimestamp: unknown;
+  let traceId: unknown;
+  try {
+    spanId = Reflect.get(span, "span_id");
+    startTimestamp = Reflect.get(span, "start_timestamp");
+    traceId = Reflect.get(span, "trace_id");
+  } catch {
+    return null;
+  }
+
+  if (
+    typeof spanId !== "string" ||
+    !/^(?!0{16}$)[\da-f]{16}$/iu.test(spanId) ||
+    typeof startTimestamp !== "number" ||
+    !Number.isFinite(startTimestamp) ||
+    typeof traceId !== "string" ||
+    !/^(?!0{32}$)[\da-f]{32}$/iu.test(traceId)
+  ) {
+    return null;
+  }
+
   return {
-    data: {},
-    span_id: span.span_id,
-    start_timestamp: span.start_timestamp,
-    trace_id: span.trace_id,
+    span_id: spanId,
+    start_timestamp: startTimestamp,
+    trace_id: traceId,
   };
+}
+
+function minimalSafeSpan(correlation: SpanCorrelation): SentrySpan {
+  return { data: {}, ...correlation };
+}
+
+export function sentryBeforeSendSpan(span: SentrySpan): SentrySpan {
+  const correlation = readSpanCorrelation(span);
+  if (!correlation) return minimalSafeSpan(FALLBACK_SPAN_CORRELATION);
+  if (sanitizeChannelPayload(span)) return span;
+  return minimalSafeSpan(correlation);
 }
 
 export function sentryBeforeSendTransaction(
