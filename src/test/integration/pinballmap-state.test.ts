@@ -39,6 +39,18 @@ describe("PinballMap shared read path (PGlite)", () => {
       .values({ id: "singleton", locationId: 26454 });
   });
 
+  it("uses location presence even while the compatibility flag remains", async () => {
+    const db = await getTestDb();
+    const { getPinballMapState } = await import("~/lib/pinballmap/state");
+
+    await db.update(pinballmapState).set({ enabled: false });
+
+    expect(await getPinballMapState()).toMatchObject({
+      enabled: false,
+      locationId: 26454,
+    });
+  });
+
   it("syncLocationSnapshot stores the snapshot and marks health ok", async () => {
     const { syncLocationSnapshot, getPinballMapState } =
       await import("~/lib/pinballmap/state");
