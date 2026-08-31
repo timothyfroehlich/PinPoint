@@ -90,6 +90,7 @@ class Scenario:
     comments: list[dict] = field(default_factory=list)
     title: str = "feat(thing): do the thing (PP-abcd)"
     branch: str = BRANCH
+    body: str = ""
 
 
 def codex_review(sha: str, state: str = "APPROVED") -> dict:
@@ -233,6 +234,7 @@ def repo_with_pr(
             "baseRefName": "main",
             "isDraft": scenario.draft,
             "state": scenario.state,
+            "body": scenario.body,
         }
         rollup = (
             ""
@@ -466,7 +468,70 @@ def test_ui_changes_without_screenshots_say_so() -> None:
     with repo_with_pr(
         branch_changes={"src/components/Thing.tsx": "export const T = () => null;\n"}
     ) as (_head, run):
-        assert "yes · NO screenshots posted" in run.stdout, run.stdout
+        assert "UI file(s) changed · NO screenshots posted" in run.stdout, run.stdout
+
+
+def test_the_ui_line_claims_only_the_path_fact_not_a_visual_change() -> None:
+    """`ui yes` over-claimed — the heuristic keys on paths, so it says "a file changed".
+
+    A component edit trips the UI globs whether or not anything renders differently, so
+    the line names the fact the heuristic actually has (a UI FILE changed), never that
+    the UI changed (PP-lhjg).
+    """
+    with repo_with_pr(
+        branch_changes={"src/components/Thing.tsx": "export const T = () => null;\n"}
+    ) as (_head, run):
+        assert "UI file(s) changed" in run.stdout, run.stdout
+        # The bare over-claiming value must be gone (anchored on the value, not the
+        # label gutter, so a future re-alignment of the report does not break this).
+        assert "yes · NO screenshots posted" not in run.stdout, run.stdout
+
+
+def test_no_ui_file_change_reads_as_no_ui_files() -> None:
+    """A PR with no UI-glob file names that fact plainly, rather than the bare `no`
+    that used to pair with the `ui` label and read as "the UI did not change"."""
+    with repo_with_pr(branch_changes={"src/lib/thing.ts": "x\n"}) as (_head, run):
+        assert "no UI files changed" in run.stdout, run.stdout
+
+
+def test_a_no_visual_change_marker_clears_the_screenshot_nudge() -> None:
+    """A UI FILE changed but nothing renders differently (a refactor, a non-null-! removal).
+
+    Two identical screenshots would satisfy the old nudge without conveying anything, so
+    the PR records the claim in its body with a marker instead, and the report drops the
+    "NO screenshots posted" nudge in favor of stating the recorded claim (PP-lhjg).
+    """
+    with repo_with_pr(
+        branch_changes={"src/components/Thing.tsx": "export const T = () => null;\n"},
+        scenario=Scenario(
+            body="Refactor, no rendered change.\n\n<!-- no-visual-change -->\n"
+        ),
+    ) as (_head, run):
+        assert "UI file(s) changed · marked no-visual-change" in run.stdout, run.stdout
+        assert "NO screenshots posted" not in run.stdout, run.stdout
+
+
+def test_the_marker_does_not_suppress_a_genuine_missing_screenshot_nudge() -> None:
+    """The opt-out is a body marker, not any mention of the words — no marker, no clearing."""
+    with repo_with_pr(
+        branch_changes={"src/components/Thing.tsx": "export const T = () => null;\n"},
+        scenario=Scenario(body="This PR changes the button color.\n"),
+    ) as (_head, run):
+        assert "UI file(s) changed · NO screenshots posted" in run.stdout, run.stdout
+
+
+def test_posted_screenshots_win_over_the_marker() -> None:
+    """Real screenshots are reported even if the body also carries the opt-out marker —
+    the marker only clears the *absence* nudge, it never hides posted evidence."""
+    with repo_with_pr(
+        branch_changes={"src/components/Thing.tsx": "export const T = () => null;\n"},
+        scenario=Scenario(
+            comments=[screenshot_comment()],
+            body="<!-- no-visual-change -->\n",
+        ),
+    ) as (_head, run):
+        assert f"screenshots posted {SHOTS_AFTER_COMMITS}" in run.stdout, run.stdout
+        assert "marked no-visual-change" not in run.stdout, run.stdout
 
 
 def test_posted_screenshots_are_reported_with_their_timestamp() -> None:
