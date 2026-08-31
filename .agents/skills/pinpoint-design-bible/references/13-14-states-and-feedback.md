@@ -80,7 +80,7 @@ A rate-limit budget is bookkeeping, not information. A control that spends from 
 - **Surface the throttle exactly once — at the moment it blocks the action.** The control disables, and a line beside it names the wait: "Refreshes again in 2:14".
 - **Anti-enumeration limits are the exception, and they stay silent.** A budget whose job is to stop probing rather than to pace a person must never reveal that it fired — the wait message is itself the signal being withheld. `forgotPasswordAction` in `src/app/(auth)/actions.ts` enforces its email-keyed limit and returns the same success either way, deliberately. Everything here governs budgets the person spending them is meant to see.
 - **The wait message is rendered text, never a `title` tooltip.** A tooltip needs a hover, and throttled controls get used on touch, where a disabled control would then explain itself to nobody. `title` is announced inconsistently by screen readers besides, so it can never be the only explanation a control offers.
-- **Amber, not red — waiting is not an error.** Red stays reserved for destructive actions (§18's two-reds rule). Write the message in the §25 telegraphic register.
+- **Amber, not red — waiting is not an error.** A spent budget is a warning state, so it takes the warning treatment rather than the destructive one the Error State section calls for. Write the message in the §25 telegraphic register.
 - **Every path that spends from a shared budget shows the wait in its own error slot.** One path's throttle is never surfaced on another path's control.
 - **Reading the remaining count to decide whether a control is disabled is the one sanctioned use of it.** It computes state; it does not get rendered.
 
