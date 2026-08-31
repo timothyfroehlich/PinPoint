@@ -46,13 +46,17 @@ Exit 2: the outcome could not be determined — the GitHub API was unreachable
 
 from __future__ import annotations
 
+import fcntl
 import json
 import os
 import re
 import subprocess
 import sys
+import tempfile
 import time
 from datetime import datetime, timezone
+from pathlib import Path
+from typing import Callable
 
 REPO_OWNER = "timothyfroehlich"
 REPO_NAME = "PinPoint"
@@ -87,6 +91,14 @@ WATCH_TIMEOUT_SECONDS = 3600
 SUPERSEDED_GATE_GRACE = 180  # seconds
 
 EXIT_UNDETERMINED = 2
+
+MONITOR_SCHEMA_VERSION = 1
+MONITOR_REPOSITORY = f"{REPO_OWNER}/{REPO_NAME}"
+MONITOR_TERMINAL_STATUSES = {"passed", "failed", "superseded", "undetermined"}
+MONITOR_STATUSES = MONITOR_TERMINAL_STATUSES | {"starting", "pending"}
+FOLLOWER_POLL_SECONDS = 0.25
+MonitorStateSink = Callable[[str, str, str, str | None], None]
+MonitorActionSink = Callable[[str | None], None]
 
 # Set by main() from --verbose flag. When False (the default), emit_event() is
 # a no-op so the script only emits terminal verdicts and action items. This
@@ -124,6 +136,261 @@ def gh(*args: str) -> str:
     if result.returncode != 0:
         raise RuntimeError(result.stderr.strip() or f"gh {args[0]} failed")
     return result.stdout.strip()
+
+
+# ---------------------------------------------------------------------------
+# Host-local monitor ownership
+# ---------------------------------------------------------------------------
+
+
+def _monitor_dir() -> Path:
+    """Return the host-local state directory without consulting GitHub."""
+    state_home = os.environ.get("XDG_STATE_HOME")
+    root = Path(state_home) if state_home else Path.home() / ".local" / "state"
+    return root / "pinpoint" / "pr-watch"
+
+
+def _monitor_paths(pr: int, *, force: bool = False) -> tuple[Path, Path]:
+    mode_suffix = "-force" if force else ""
+    stem = f"{REPO_OWNER}-{REPO_NAME}-{pr}{mode_suffix}"
+    root = _monitor_dir()
+    return root / f"{stem}.lock", root / f"{stem}.json"
+
+
+def _utc_now() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _write_monitor_state(
+    path: Path,
+    *,
+    pr: int,
+    head_sha: str,
+    leader_pid: int,
+    status: str,
+    detail: str,
+    failure_artifact: str | None = None,
+    action_item: str | None = None,
+) -> None:
+    """Atomically publish one versioned monitor snapshot."""
+    if status not in MONITOR_STATUSES:
+        raise ValueError(f"unknown monitor status: {status}")
+    path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    state: dict[str, object] = {
+        "schema_version": MONITOR_SCHEMA_VERSION,
+        "repository": MONITOR_REPOSITORY,
+        "pr": pr,
+        "head_sha": head_sha,
+        "leader_pid": leader_pid,
+        "status": status,
+        "timestamp": _utc_now(),
+        "detail": detail[:240],
+    }
+    if failure_artifact is not None:
+        state["failure_artifact"] = str(Path(failure_artifact).resolve())
+    if action_item is not None:
+        state["action_item"] = action_item[:240]
+
+    temp_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=path.parent,
+            prefix=f".{path.name}.",
+            delete=False,
+        ) as handle:
+            temp_path = Path(handle.name)
+            json.dump(state, handle, separators=(",", ":"), sort_keys=True)
+            handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temp_path, path)
+    finally:
+        if temp_path is not None and temp_path.exists():
+            temp_path.unlink()
+
+
+def _read_monitor_state(path: Path, pr: int) -> dict[str, object] | None:
+    """Read one valid state snapshot; malformed or foreign data is unknown."""
+    try:
+        state = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(state, dict):
+        return None
+    required_types = {
+        "schema_version": int,
+        "repository": str,
+        "pr": int,
+        "head_sha": str,
+        "leader_pid": int,
+        "status": str,
+        "timestamp": str,
+        "detail": str,
+    }
+    if any(
+        not isinstance(state.get(key), kind) for key, kind in required_types.items()
+    ):
+        return None
+    if (
+        state["schema_version"] != MONITOR_SCHEMA_VERSION
+        or state["repository"] != MONITOR_REPOSITORY
+        or state["pr"] != pr
+        or state["leader_pid"] <= 0
+        or state["status"] not in MONITOR_STATUSES
+    ):
+        return None
+    artifact = state.get("failure_artifact")
+    if artifact is not None and not isinstance(artifact, str):
+        return None
+    action_item = state.get("action_item")
+    if action_item is not None and not isinstance(action_item, str):
+        return None
+    return state
+
+
+def _write_lock_owner(lock_handle, leader_pid: int) -> None:
+    """Identify the process holding the advisory lock for follower validation."""
+    lock_handle.seek(0)
+    lock_handle.truncate()
+    lock_handle.write(f"{leader_pid}\n")
+    lock_handle.flush()
+    os.fsync(lock_handle.fileno())
+
+
+def _read_lock_owner(lock_handle) -> int | None:
+    try:
+        lock_handle.seek(0)
+        value = lock_handle.read().strip()
+        return int(value) if value.isdigit() and int(value) > 0 else None
+    except OSError:
+        return None
+
+
+def _monitor_exit_code(status: str) -> int:
+    if status == "passed":
+        return 0
+    if status in {"failed", "superseded"}:
+        return 1
+    return EXIT_UNDETERMINED
+
+
+def _run_coordinated_watch(
+    pr: int,
+    owned_watch: Callable[[MonitorStateSink, MonitorActionSink], int],
+    *,
+    force: bool = False,
+    follower_poll_sec: float = FOLLOWER_POLL_SECONDS,
+) -> int:
+    """Own the remote watch or follow a live owner's local atomic state.
+
+    The lock, rather than the JSON file, proves liveness. A terminal file with
+    no held lock is never trusted: the new invocation becomes leader and
+    remotely revalidates it. The PID written into the locked file must match the
+    state record before a follower accepts that state, closing the stale-file
+    race between consecutive owners.
+    """
+    lock_path, state_path = _monitor_paths(pr, force=force)
+    lock_path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    with lock_path.open("a+", encoding="utf-8") as lock_handle:
+        attached_pid: int | None = None
+        last_signature: tuple[str, str, str] | None = None
+        last_action_item: str | None = None
+
+        def surface_action_item(state: dict[str, object]) -> None:
+            nonlocal last_action_item
+            action_item = state.get("action_item")
+            if isinstance(action_item, str) and action_item != last_action_item:
+                emit(action_item)
+                last_action_item = action_item
+
+        while True:
+            # An attached follower may observe the owner's atomic terminal
+            # write just after the owner releases its lock. Trust that exact
+            # PID's terminal record before contesting the now-free lock; the
+            # follower already proved this owner was live. A pending record is
+            # never trusted after unlock, so a dead leader still revalidates.
+            if attached_pid is not None:
+                attached_state = _read_monitor_state(state_path, pr)
+                if (
+                    attached_state is not None
+                    and attached_state["leader_pid"] == attached_pid
+                    and attached_state["status"] in MONITOR_TERMINAL_STATUSES
+                ):
+                    surface_action_item(attached_state)
+                    detail = str(attached_state["detail"])
+                    emit(detail)
+                    artifact = attached_state.get("failure_artifact")
+                    if artifact:
+                        emit(f"Failure details: {artifact}")
+                    return _monitor_exit_code(str(attached_state["status"]))
+            try:
+                fcntl.flock(lock_handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                lock_owner = _read_lock_owner(lock_handle)
+                state = _read_monitor_state(state_path, pr)
+                if (
+                    state is not None
+                    and lock_owner is not None
+                    and state["leader_pid"] == lock_owner
+                ):
+                    if attached_pid != lock_owner:
+                        attached_pid = lock_owner
+                        last_signature = None
+                        last_action_item = None
+                        emit_event(
+                            f"Following host-local PR #{pr} monitor pid={lock_owner}"
+                        )
+                    surface_action_item(state)
+                    signature = (
+                        str(state["head_sha"]),
+                        str(state["status"]),
+                        str(state["detail"]),
+                    )
+                    if signature != last_signature:
+                        emit_event(str(state["detail"]))
+                        last_signature = signature
+                    if state["status"] in MONITOR_TERMINAL_STATUSES:
+                        detail = str(state["detail"])
+                        emit(detail)
+                        artifact = state.get("failure_artifact")
+                        if artifact:
+                            emit(f"Failure details: {artifact}")
+                        return _monitor_exit_code(str(state["status"]))
+                time.sleep(follower_poll_sec)
+                continue
+
+            leader_pid = os.getpid()
+            _write_lock_owner(lock_handle, leader_pid)
+            action_item: str | None = None
+
+            def set_action_item(value: str | None) -> None:
+                nonlocal action_item
+                action_item = value
+
+            def publish(
+                head_sha: str,
+                status: str,
+                detail: str,
+                failure_artifact: str | None = None,
+            ) -> None:
+                _write_monitor_state(
+                    state_path,
+                    pr=pr,
+                    head_sha=head_sha,
+                    leader_pid=leader_pid,
+                    status=status,
+                    detail=detail,
+                    failure_artifact=failure_artifact,
+                    action_item=action_item,
+                )
+
+            publish("", "starting", f"PR #{pr} monitor is starting")
+            try:
+                return owned_watch(publish, set_action_item)
+            finally:
+                fcntl.flock(lock_handle.fileno(), fcntl.LOCK_UN)
 
 
 # ---------------------------------------------------------------------------
@@ -429,10 +696,9 @@ def _select_ci_gate(rollup: list[dict]) -> dict | None:
     if not gates:
         return None
 
-    def rank(check: dict) -> tuple[int, str]:
-        not_superseded = 0 if _is_superseded(check.get("conclusion")) else 1
-        when = check.get("completedAt") or check.get("startedAt") or ""
-        return not_superseded, when
+    def rank(check: dict) -> str:
+        when = check.get("startedAt") or check.get("completedAt") or ""
+        return when
 
     return max(gates, key=rank)
 
@@ -456,9 +722,10 @@ def _current_ci_gate(pr: int) -> dict | None:
     GitHub scopes statusCheckRollup to the PR's current head commit, but that
     commit can still carry MORE THAN ONE `CI Gate` entry — a re-run, or a run
     cancelled by a concurrency group, leaves its superseded check behind next to
-    the live one. Returning the first match let a cancelled leftover shadow the
-    run we actually care about, so prefer a non-superseded entry and, among
-    equals, the most recent one. (PP-r63o)
+    the live one. Returning the first match let an older entry shadow the run we
+    actually care about, so select the entry with the most recent start time.
+    Completion is only a fallback because an older run can finish cancelling
+    after its replacement has already completed. (PP-r63o)
     """
     _head, gate = _current_ci_snapshot(pr)
     return gate
@@ -502,8 +769,8 @@ def _fetch_merge_state(pr: int) -> tuple[str, set[str]]:
     return "UNKNOWN", set()
 
 
-def _pre_check_blocking(pr: int) -> tuple[bool, str]:
-    """Return (True, "") if no blocking conditions are present, else (False, reason).
+def _pre_check_blocking(pr: int) -> tuple[bool, str, str]:
+    """Return ``(allowed, reason, action_item)`` for the default watch precheck.
 
     Used by the default watch mode as a fail-fast pre-check BEFORE entering the
     watch loop. Distinguishes conditions that won't resolve by waiting (bad merge
@@ -520,7 +787,7 @@ def _pre_check_blocking(pr: int) -> tuple[bool, str]:
     """
     merge_state, _labels = _fetch_merge_state(pr)
     if merge_state in ("DIRTY", "CONFLICTING", "BEHIND"):
-        return False, f"merge state {merge_state} — resolve before watching"
+        return False, f"merge state {merge_state} — resolve before watching", ""
 
     ci_status, ci_conclusion = _ci_gate_state(pr)
     if ci_status == "COMPLETED":
@@ -534,9 +801,11 @@ def _pre_check_blocking(pr: int) -> tuple[bool, str]:
             return (
                 False,
                 f"CI Gate already failed (conclusion={ci_conclusion or 'unknown'})",
+                "",
             )
 
     unresolved = _unresolved_threads(get_review_threads(pr))
+    action_item = ""
     if unresolved > 0:
         # A notice, not a block. Threads are author-agnostic since PP-4ric, so
         # these are Tim's /code-review findings, and the documented loop is
@@ -548,9 +817,10 @@ def _pre_check_blocking(pr: int) -> tuple[bool, str]:
         # and --check-ready still reports one as not-ready.
         # emit(), not emit_event(): this is an action item the agent still owes,
         # not per-job progress noise, so it must survive non-verbose runs.
-        emit(f"{unresolved} unresolved review thread(s) — resolve before merge")
+        action_item = f"{unresolved} unresolved review thread(s) — resolve before merge"
+        emit(action_item)
 
-    return True, ""
+    return True, "", action_item
 
 
 def run_audit(pr: int) -> bool:
@@ -642,29 +912,34 @@ def write_failure_artifact(run_id: int) -> str:
     return path
 
 
-def _failed_ci_run_id(head_sha: str) -> int | None:
+def _failed_ci_run_id(head_sha: str, details_url: str = "") -> int | None:
     """Return the newest confirmed-failing CI workflow run for ``head_sha``.
 
     This lookup happens only after the aggregate CI Gate is red. The ordinary
-    watch path never enumerates workflow runs.
+    watch path never enumerates workflow runs. Prefer the run ID already
+    embedded in the selected gate's URL; the fallback filters a commit-scoped
+    list after retrieval so duplicate workflow names cannot make `gh` abort.
     """
+    match = re.search(r"/actions/runs/(\d+)(?:/|$)", details_url)
+    if match is not None:
+        return int(match.group(1))
+
     raw = gh(
         "run",
         "list",
         "--commit",
         head_sha,
-        "--workflow",
-        "CI",
         "--limit",
         "10",
         "--json",
-        "databaseId,status,conclusion,headSha",
+        "databaseId,status,conclusion,headSha,workflowName",
     )
     runs = json.loads(raw)
     failed = [
         run
         for run in runs
         if run.get("headSha") == head_sha
+        and run.get("workflowName") == "CI"
         and run.get("status") == "completed"
         and _is_failing(run.get("conclusion"))
     ]
@@ -681,6 +956,7 @@ def _watch_ci_gate(
     *,
     timeout_sec: int = WATCH_TIMEOUT_SECONDS,
     poll_sec: int = WATCH_POLL_SECONDS,
+    state_sink: MonitorStateSink | None = None,
 ) -> int:
     """Watch one exact-head CI Gate snapshot per interval.
 
@@ -696,14 +972,20 @@ def _watch_ci_gate(
         try:
             head_sha, gate = _current_ci_snapshot(pr)
         except (RuntimeError, json.JSONDecodeError) as exc:
-            emit(
+            detail = (
                 "⚠  Could not determine CI Gate state — "
                 f"the GitHub API was unreachable ({exc})."
             )
+            emit(detail)
+            if state_sink is not None:
+                state_sink(expected_head, "undetermined", detail, None)
             return EXIT_UNDETERMINED
 
         if not head_sha:
-            emit("⚠  Could not determine CI Gate state — PR head SHA was empty.")
+            detail = "⚠  Could not determine CI Gate state — PR head SHA was empty."
+            emit(detail)
+            if state_sink is not None:
+                state_sink("", "undetermined", detail, None)
             return EXIT_UNDETERMINED
 
         if expected_head and head_sha != expected_head:
@@ -720,15 +1002,21 @@ def _watch_ci_gate(
         conclusion = (gate or {}).get("conclusion") or ""
         signature = (head_sha, status, conclusion)
         if signature != last_signature:
-            emit_event(
+            detail = (
                 f"CI Gate {status.lower() or 'not yet posted'} on {head_sha[:7]}"
                 + (f" ({conclusion})" if conclusion else "")
             )
+            emit_event(detail)
+            if state_sink is not None:
+                state_sink(head_sha, "pending", detail, None)
             last_signature = signature
 
         if status == "COMPLETED":
             if _is_passing(conclusion):
-                emit(f"CI Gate passed on {head_sha[:7]} (conclusion={conclusion}) ✓")
+                detail = f"CI Gate passed on {head_sha[:7]} (conclusion={conclusion}) ✓"
+                emit(detail)
+                if state_sink is not None:
+                    state_sink(head_sha, "passed", detail, None)
                 return 0
             if _is_superseded(conclusion):
                 if superseded_deadline is None:
@@ -737,34 +1025,73 @@ def _watch_ci_gate(
                         "CI Gate cancelled (superseded) — waiting for a replacement run"
                     )
                 elif time.monotonic() >= superseded_deadline:
-                    emit(
+                    detail = (
                         "⊘  CI Gate cancelled (superseded) — "
                         "no replacement run appeared"
                     )
+                    emit(detail)
+                    if state_sink is not None:
+                        state_sink(head_sha, "superseded", detail, None)
                     return 1
             else:
-                emit(
+                detail = (
                     f"CI Gate failed on {head_sha[:7]} "
                     f"(conclusion={conclusion or 'unknown'})"
                 )
+                emit(detail)
+                artifact: str | None = None
                 try:
-                    run_id = _failed_ci_run_id(head_sha)
+                    run_id = _failed_ci_run_id(
+                        head_sha, str((gate or {}).get("detailsUrl") or "")
+                    )
                     if run_id is not None:
-                        path = write_failure_artifact(run_id)
-                        emit(f"Failure details: {path}")
+                        artifact = write_failure_artifact(run_id)
+                        emit(f"Failure details: {artifact}")
                 except (RuntimeError, json.JSONDecodeError, OSError, ValueError) as exc:
                     emit(f"Failure logs unavailable: {exc}")
+                if state_sink is not None:
+                    state_sink(head_sha, "failed", detail, artifact)
                 return 1
         else:
             superseded_deadline = None
 
         time.sleep(poll_sec)
 
-    emit(
+    detail = (
         f"⚠  Could not determine CI Gate state — no terminal verdict "
         f"within {timeout_sec}s."
     )
+    emit(detail)
+    if state_sink is not None:
+        state_sink(expected_head, "undetermined", detail, None)
     return EXIT_UNDETERMINED
+
+
+def _run_owned_watch(
+    pr: int,
+    force: bool,
+    state_sink: MonitorStateSink,
+    action_item_sink: MonitorActionSink,
+) -> int:
+    """Run pre-checks and remote polling for the process holding the lock."""
+    if not force:
+        try:
+            blocking_ok, reason, action_item = _pre_check_blocking(pr)
+        except (RuntimeError, json.JSONDecodeError, KeyError, ValueError) as exc:
+            detail = f"⚠  Could not complete pre-check — {exc}"
+            emit(detail)
+            state_sink("", "undetermined", detail, None)
+            return EXIT_UNDETERMINED
+        if not blocking_ok:
+            detail = f"Pre-check failed: {reason}"
+            emit(detail)
+            state_sink("", "failed", detail, None)
+            return 1
+        action_item_sink(action_item or None)
+
+    emit_event(f"Watching PR #{pr} — aggregate CI Gate")
+    state_sink("", "pending", f"Watching PR #{pr} — aggregate CI Gate", None)
+    return _watch_ci_gate(pr, "", state_sink=state_sink)
 
 
 # ---------------------------------------------------------------------------
@@ -804,14 +1131,13 @@ def main() -> int:
     if check_ready:
         return 0 if run_audit(pr) else 1
 
-    if not force:
-        blocking_ok, reason = _pre_check_blocking(pr)
-        if not blocking_ok:
-            emit(f"Pre-check failed: {reason}")
-            return 1
-
-    emit_event(f"Watching PR #{pr} — aggregate CI Gate")
-    return _watch_ci_gate(pr, "")
+    return _run_coordinated_watch(
+        pr,
+        lambda state_sink, action_item_sink: _run_owned_watch(
+            pr, force, state_sink, action_item_sink
+        ),
+        force=force,
+    )
 
 
 if __name__ == "__main__":
