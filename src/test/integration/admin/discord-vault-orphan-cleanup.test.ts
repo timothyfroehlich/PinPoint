@@ -242,7 +242,6 @@ async function seedSingleton(botTokenVaultId: string | null): Promise<void> {
 
 async function readSingleton(): Promise<{
   botTokenVaultId: string | null;
-  enabled: boolean;
   botHealthStatus: "unknown" | "healthy" | "degraded";
   lastBotCheckAt: Date | null;
 }> {
@@ -251,7 +250,6 @@ async function readSingleton(): Promise<{
     where: eq(discordIntegrationConfig.id, "singleton"),
     columns: {
       botTokenVaultId: true,
-      enabled: true,
       botHealthStatus: true,
       lastBotCheckAt: true,
     },
@@ -393,7 +391,6 @@ describe("saveDiscordConfig Vault orphan compensation (real SQL, PGlite)", () =>
     await db
       .update(discordIntegrationConfig)
       .set({
-        enabled: true,
         botHealthStatus: "healthy",
         lastBotCheckAt: new Date(),
       })
@@ -405,7 +402,6 @@ describe("saveDiscordConfig Vault orphan compensation (real SQL, PGlite)", () =>
     const singleton = await readSingleton();
     expect(singleton).toMatchObject({
       botTokenVaultId: null,
-      enabled: false,
       botHealthStatus: "unknown",
       lastBotCheckAt: null,
     });

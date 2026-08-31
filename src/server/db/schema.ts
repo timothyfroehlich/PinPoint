@@ -1300,9 +1300,9 @@ export const discordIntegrationConfig = pgTable(
   "discord_integration_config",
   {
     id: text("id").primaryKey().default("singleton"),
-    // Expand/contract compatibility only: the current runtime ignores this
-    // column, but the previous deployment still reads it while the expand
-    // migration is applied. Drop it in the follow-up contract migration.
+    // Deploy-order compatibility only: the current runtime no longer reads or
+    // writes this column. Keep it until the follow-up contract migration lands
+    // after this runtime is serving everywhere.
     enabled: boolean("enabled").notNull().default(false),
     guildId: text("guild_id"),
     inviteLink: text("invite_link"),
@@ -1357,9 +1357,9 @@ export const pinballmapState = pgTable(
   "pinballmap_state",
   {
     id: text("id").primaryKey().default("singleton"),
-    // Expand/contract compatibility only: nullable locationId is authoritative
-    // for the current runtime. The previous deployment still reads enabled
-    // while the expand migration is applied.
+    // Deploy-order compatibility only: locationId is authoritative for the
+    // current runtime. Keep this column until the follow-up contract migration
+    // lands after this runtime is serving everywhere.
     enabled: boolean("enabled").notNull().default(false),
     // A configured location is the integration's sole activation signal.
     // Null retains the dormant state without permitting any Pinball Map calls.
