@@ -134,6 +134,17 @@ describe("wrapped / quoted gh pr checkout → BLOCK", () => {
   });
 });
 
+describe("shell-control-prefixed gh pr checkout → BLOCK (PP-c8xa)", () => {
+  it.each([
+    "if gh pr checkout 1727; then echo blocked; fi",
+    "! gh pr checkout 1727",
+    "{ gh pr checkout 1727; }",
+    "while gh pr checkout 1727; do echo blocked; done",
+  ])("blocks %s", (command) => {
+    expectBlock(command);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Read-only PR inspection and unrelated gh usage — must ALLOW
 // ---------------------------------------------------------------------------

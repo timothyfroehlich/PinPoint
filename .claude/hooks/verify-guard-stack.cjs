@@ -311,6 +311,7 @@ const BEHAVIOR_PROBES = [
       "gh pr co 123",
       "gh co 123",
       'eval "gh pr checkout 123"',
+      "if gh pr checkout 123; then echo blocked; fi",
       "gh --hostname ghe.example.com pr checkout 123",
     ],
     mustAllow: [
