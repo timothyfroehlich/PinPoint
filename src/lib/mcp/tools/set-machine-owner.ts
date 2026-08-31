@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "@modelcontextprotocol/server";
 import { after } from "next/server";
 import { z } from "zod";
 
@@ -98,7 +98,7 @@ export function registerSetMachineOwner(server: McpServer): void {
       title: "Set machine owner",
       description:
         "Set or clear a machine's owner. Identify the machine by initials or UUID; give the owner as a member's full name or UUID, or omit to clear ownership. Guests must be promoted to member first.",
-      inputSchema: setOwnerSchema.shape,
+      inputSchema: setOwnerSchema,
     },
     (args, extra) =>
       runTool("set_machine_owner", extra, (ctx) =>
