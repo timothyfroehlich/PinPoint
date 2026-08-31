@@ -91,16 +91,20 @@ Data mode: <seed record | existing local fixture | existing read-only loader | t
 Use Product Design for visual grounding and QA, while PinPoint remains the
 runtime:
 
-- For an existing screen, capture its relevant state in the in-app browser at
-  desktop and `390×844` **before changing it**. Record both captures.
+- For an existing screen, capture its relevant state with the browser-control
+  capability available in the active agent environment at desktop and
+  `390×844` **before changing it**. Record both captures.
 - For a live URL, use `product-design:url-to-code`'s source-capture and visual
   comparison discipline only. Do not initialize its standalone app, copy an
   asset tree, or pursue exhaustive clone fidelity unless Tim separately asks.
 - For a new screen with no visual target, load `product-design:index`, route to
   ideation, generate **exactly three** visual options, and wait for Tim to pick
   one before coding.
-- Work in the in-app browser in Codex Desktop. Do not substitute another browser
-  without Tim choosing it.
+- In Codex Desktop, use the in-app browser. In another agent environment, use
+  that environment's supported interactive browser capability. If more than one
+  browser is available, keep using the one Tim already chose or ask him to
+  choose. Do not fall back to the Playwright CLI or another browser behind his
+  back; if the environment has no browser-control capability, stop and ask.
 - `/dev/preview` fixes the mobile width at 390px, not its height. Use a direct
   browser viewport for the exact `390×844` capture and record whether preview
   chrome is visible or hidden.
