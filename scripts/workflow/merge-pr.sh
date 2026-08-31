@@ -45,7 +45,7 @@
 #
 # no_conflict gate is NEVER bypassable — GitHub rejects conflicting merges regardless of --admin.
 # Authorship gate has no bypass; this script operates only on PRs you authored OR PRs authored
-# by trusted Dependabot bot identities (app/dependabot, dependabot[bot], dependabot).
+# by trusted dependency-bot identities (Dependabot or the hosted Renovate App).
 # Both --force and --bypass-merge-requirements require manual permission approval
 # (settings.json permissions.ask).
 #
@@ -127,13 +127,13 @@ is_trusted_author() {
   local author="$1"
   [ "$author" = "$CURRENT_USER" ] && return 0
   case "$author" in
-    "app/dependabot"|"dependabot[bot]"|"dependabot") return 0 ;;
+    "app/dependabot"|"dependabot[bot]"|"dependabot"|"app/renovate"|"renovate[bot]") return 0 ;;
   esac
   return 1
 }
 
 if ! is_trusted_author "$PR_AUTHOR"; then
-  echo "REFUSE: merge-pr.sh only operates on your own PRs or Dependabot PRs (PR author: $PR_AUTHOR, you: $CURRENT_USER)" >&2
+  echo "REFUSE: merge-pr.sh only operates on your own PRs or trusted dependency-bot PRs (PR author: $PR_AUTHOR, you: $CURRENT_USER)" >&2
   exit 1
 fi
 
@@ -219,6 +219,81 @@ run_all_gates() {
   run_gate no_conflict check_no_merge_conflict   none
 }
 
+# Poll only the transient gates from the last full evaluation. Head, CI Gate,
+# and mergeability come from ONE response so the steady-state automerge wait
+# costs one GitHub query per interval. Any terminal transition or head movement
+# returns control to run_all_gates for a complete exact-head audit.
+poll_waiting_gates() {
+  local expected_head=$1 data current_head gate_name
+  if ! data=$(gh pr view "$PR" --json headRefOid,statusCheckRollup,mergeable); then
+    GATE_REPORT="FAIL: polling: could not read compact PR status snapshot"$'\n'
+    GATE_FAILURES=("polling")
+    GATE_WAITS=()
+    return 1
+  fi
+
+  if ! current_head=$(jq -r '.headRefOid // empty' <<< "$data"); then
+    GATE_REPORT="FAIL: polling: compact PR status was not valid JSON"$'\n'
+    GATE_FAILURES=("polling")
+    GATE_WAITS=()
+    return 1
+  fi
+  if [ -z "$current_head" ]; then
+    GATE_REPORT="FAIL: polling: compact PR status omitted headRefOid"$'\n'
+    GATE_FAILURES=("polling")
+    GATE_WAITS=()
+    return 1
+  fi
+  if [ "$current_head" != "$expected_head" ]; then
+    echo "AUTOMERGE: head moved ${expected_head:0:7} → ${current_head:0:7}; restarting full gate audit"
+    return 3
+  fi
+
+  for gate_name in "${GATE_WAITS[@]}"; do
+    case "$gate_name" in
+      ci)
+        # Prefer a live/non-cancelled gate over a superseded leftover, then the
+        # newest timestamp. This matches pr-watch.py's authoritative selection.
+        local ci_state
+        if ! ci_state=$(jq -r '
+          [.statusCheckRollup[]? | select(.name == "CI Gate")]
+          | sort_by(
+              (if ((.conclusion // "") | ascii_upcase) == "CANCELLED" then 0 else 1 end),
+              (.completedAt // .startedAt // "")
+            )
+          | last
+          | if . == null then "WAIT"
+            elif .status != "COMPLETED" then "WAIT"
+            else "TERMINAL"
+            end' <<< "$data"); then
+          GATE_REPORT="FAIL: polling: compact CI Gate state was malformed"$'\n'
+          GATE_FAILURES=("polling")
+          GATE_WAITS=()
+          return 1
+        fi
+        [ "$ci_state" = "WAIT" ] && return 2
+        ;;
+      no_conflict)
+        local compact_mergeable
+        if ! compact_mergeable=$(jq -r '.mergeable // "UNKNOWN"' <<< "$data"); then
+          GATE_REPORT="FAIL: polling: compact mergeability state was malformed"$'\n'
+          GATE_FAILURES=("polling")
+          GATE_WAITS=()
+          return 1
+        fi
+        [ "$compact_mergeable" = "UNKNOWN" ] && return 2
+        ;;
+      *)
+        GATE_REPORT="FAIL: polling: unsupported transient gate '$gate_name'"$'\n'
+        GATE_FAILURES=("polling")
+        GATE_WAITS=()
+        return 1
+        ;;
+    esac
+  done
+  return 0
+}
+
 drop_ready_label() {
   # Re-read rather than trusting the startup snapshot: --automerge can run for an
   # hour, and the label is often added by an agent minutes after Tim fires the
@@ -248,12 +323,16 @@ if [ "$AUTOMERGE" = "true" ]; then
   automerge_deadline=$((automerge_started + AUTOMERGE_TIMEOUT))
   poll=0
   last_signature="__unset__"
+  final_audit_fresh=false
 
   echo "AUTOMERGE: polling every ${AUTOMERGE_POLL_INTERVAL}s, giving up after ${AUTOMERGE_TIMEOUT}s"
 
+  # Full initial snapshot. The wait loop below does not re-read stable review
+  # evidence, threads, or conflict state until a transient gate terminates.
+  run_all_gates
+
   while true; do
     poll=$((poll + 1))
-    run_all_gates
 
     # Print the gate block on the first poll and whenever the picture changes. A
     # 40-minute CI wait would otherwise scroll the same five lines 80 times.
@@ -271,6 +350,17 @@ if [ "$AUTOMERGE" = "true" ]; then
     fi
 
     if [ ${#GATE_WAITS[@]} -eq 0 ]; then
+      # The first green snapshot is not enough: run every gate once more
+      # immediately before merge so changes made during the wait cannot inherit
+      # stale review/thread/conflict evidence.
+      if [ "$final_audit_fresh" != "true" ]; then
+        run_all_gates
+        final_audit_fresh=true
+        if [ ${#GATE_FAILURES[@]} -gt 0 ] || [ ${#GATE_WAITS[@]} -gt 0 ]; then
+          last_signature="__force_final_report__"
+          continue
+        fi
+      fi
       echo "RESULT: all gates passed"
       echo "AUTOMERGE: green after ${poll} poll(s), $(( $(date -u +%s) - automerge_started ))s — merging."
       break
@@ -285,6 +375,23 @@ if [ "$AUTOMERGE" = "true" ]; then
       exit 2
     fi
     sleep "$AUTOMERGE_POLL_INTERVAL"
+
+    poll_rc=0
+    poll_waiting_gates "$POLL_HEAD_SHA" || poll_rc=$?
+    case "$poll_rc" in
+      0|3)
+        # A pending gate terminated, or the head moved. Re-evaluate every gate
+        # and pin the next waiting phase to that complete snapshot.
+        run_all_gates
+        final_audit_fresh=true
+        ;;
+      2)
+        # Still waiting. No stable gate reads this interval.
+        ;;
+      *)
+        # poll_waiting_gates populated a fail-closed synthetic failure.
+        ;;
+    esac
   done
 
   # Merge the head the FINAL poll evaluated, not whatever is current now. Re-reading

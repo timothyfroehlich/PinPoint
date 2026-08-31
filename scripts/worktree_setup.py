@@ -607,8 +607,8 @@ def generate_launch_json(worktree_path: Path, port_config: PortConfig) -> None:
     configurations: list[dict[str, object]] = [
         {
             "name": "next-dev",
-            "runtimeExecutable": "pnpm",
-            "runtimeArgs": ["run", "dev"],
+            "runtimeExecutable": "mise",
+            "runtimeArgs": ["exec", "--", "pnpm", "run", "dev"],
             "port": port_config.nextjs_port,
         }
     ]

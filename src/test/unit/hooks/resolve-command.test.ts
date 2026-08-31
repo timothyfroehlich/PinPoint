@@ -120,6 +120,83 @@ describe("shell separators", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Shell control words — syntax must not occupy the effective command slot
+// ---------------------------------------------------------------------------
+describe("shell control words expose the governed command (PP-c8xa)", () => {
+  it.each([
+    ["if gh pr merge 1; then echo blocked; fi", ["gh", "echo"]],
+    ["! gh pr merge 1", ["gh"]],
+    ["{ gh pr merge 1; }", ["gh"]],
+    ["while gh pr merge 1; do echo blocked; done", ["gh", "echo"]],
+    ["until gh pr merge 1; do echo blocked; done", ["gh", "echo"]],
+    ["if ! env gh pr merge 1; then :; fi", ["gh", ":"]],
+    ["function guarded { gh pr merge 1; }; guarded", ["gh", "guarded"]],
+    ["coproc gh pr merge 1", ["gh"]],
+    ["coproc { gh pr merge 1; }", ["gh"]],
+    ["coproc guarded { gh pr merge 1; }", ["gh"]],
+    ["time if gh pr merge 1; then echo blocked; fi", ["gh", "echo"]],
+    ["time { gh pr merge 1; }", ["gh"]],
+    ["time function guarded { gh pr merge 1; }; guarded", ["gh", "guarded"]],
+    ["time coproc gh pr merge 1", ["gh"]],
+    ["time coproc guarded { gh pr merge 1; }", ["gh"]],
+    ["time -p if ! env gh pr merge 1; then :; fi", ["gh", ":"]],
+    ["coproc guarded if gh pr merge 1; then :; fi", ["gh", ":"]],
+    ["coproc guarded while gh pr merge 1; do :; done", ["gh", ":"]],
+    ["coproc guarded until gh pr merge 1; do :; done", ["gh", ":"]],
+    ["time coproc guarded if gh pr merge 1; then :; fi", ["gh", ":"]],
+    ["function guarded if gh pr merge 1; then :; fi", ["gh", ":"]],
+    ["function guarded while gh pr merge 1; do :; done", ["gh", ":"]],
+    ["function guarded until gh pr merge 1; do :; done", ["gh", ":"]],
+    ["time function guarded if gh pr merge 1; then :; fi", ["gh", ":"]],
+    ["function guarded-name if gh pr merge 1; then :; fi", ["gh", ":"]],
+  ])("resolves %s", (cmd, expected) => {
+    expect(names(cmd)).toEqual(expected);
+  });
+
+  it("keeps control words in ordinary argument positions", () => {
+    expect(names("echo if function coproc gh pr merge 1")).toEqual(["echo"]);
+  });
+
+  it("does not treat a quoted control word as shell syntax", () => {
+    expect(names("'if' gh pr merge 1")).toEqual(["if"]);
+  });
+
+  it("does not treat an escaped control word as shell syntax", () => {
+    expect(names("\\if gh pr merge 1")).toEqual(["if"]);
+  });
+
+  it("does not treat control words after an external time command as shell syntax", () => {
+    expect(names("/usr/bin/time if gh pr merge 1")).toEqual(["if"]);
+    expect(names("env time if gh pr merge 1")).toEqual(["if"]);
+  });
+
+  it("keeps a simple coprocess operand in the command slot", () => {
+    expect(names("coproc guarded gh pr merge 1")).toEqual(["guarded"]);
+    expect(names("coproc git -C { checkout feature/x")).toEqual(["git"]);
+    expect(firstSegment("coproc git -C { checkout feature/x").args).toEqual([
+      "-C",
+      "{",
+      "checkout",
+      "feature/x",
+    ]);
+  });
+
+  it("keeps a non-compound function header in its ordinary command slot", () => {
+    expect(names("function guarded gh pr merge 1")).toEqual(["function"]);
+  });
+
+  it("reports a dynamic governed command as unresolvable", () => {
+    const { segments, unresolvable } = resolveCommand(
+      'if "$COMMAND"; then echo blocked; fi'
+    );
+    expect(segments.map((segment) => segment.name)).toEqual(["echo"]);
+    expect(unresolvable.map((entry) => entry.reason)).toContain(
+      "substituted-command"
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Wrappers — the class that folded the guards
 // ---------------------------------------------------------------------------
 describe("wrappers resolve through to the real command", () => {

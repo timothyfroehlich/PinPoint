@@ -79,15 +79,31 @@ parse_expiry_epoch() {
 }
 
 echo "Listing Supabase preview branches..."
+BRANCH_LIST_STDERR="$(mktemp)"
+trap 'rm -f "$BRANCH_LIST_STDERR"' EXIT
+
 ALL_BRANCHES_JSON="$(supabase branches list \
   --project-ref "$SUPABASE_PROJECT_ID" \
-  --output json 2>&1)" || {
+  --output json 2>"$BRANCH_LIST_STDERR")" || {
   echo "ERROR: failed to list Supabase branches:" >&2
-  echo "$ALL_BRANCHES_JSON" >&2
+  if [[ -n "$ALL_BRANCHES_JSON" ]]; then
+    printf '%s\n' "$ALL_BRANCHES_JSON" >&2
+  fi
+  cat "$BRANCH_LIST_STDERR" >&2
   exit 1
 }
 
-BRANCH_COUNT="$(echo "$ALL_BRANCHES_JSON" | jq 'length')"
+# Supabase CLI diagnostics (including its update notice) belong on stderr. Keep
+# them visible without allowing them to corrupt the machine-readable payload.
+cat "$BRANCH_LIST_STDERR" >&2
+
+if ! BRANCH_COUNT="$(jq -ers \
+  'if (length == 1 and (.[0] | type == "array")) then (.[0] | length) else error("expected exactly one JSON array") end' \
+  <<<"$ALL_BRANCHES_JSON")"; then
+  echo "ERROR: Supabase branch listing was not exactly one valid JSON array." >&2
+  exit 1
+fi
+
 echo "Total preview branches: ${BRANCH_COUNT}"
 
 if [[ "$BRANCH_COUNT" -eq 0 ]]; then

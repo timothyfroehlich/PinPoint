@@ -111,22 +111,41 @@ jobs:
           ref: ${{ steps.pr.outputs.head_sha }}
           persist-credentials: false
 
-      - uses: supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520  # ratchet:supabase/setup-cli@v3.0.0
-        if: steps.parse.outputs.action == 'start' || steps.parse.outputs.action == 'stop'
+      # The issue_comment workflow comes from the default branch, but the
+      # checkout above replaces the workspace with the PR head. Keep workflow
+      # infrastructure on the trusted default branch so /preview also works for
+      # PRs opened before setup-mise existed.
+      - name: Checkout trusted workflow action
+        if: steps.parse.outputs.action != 'noop'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # ratchet:actions/checkout@v7.0.1
         with:
-          # Pinned Supabase CLI — bump deliberately (was: latest). PP-d5zn.
-          version: 2.115.0
+          ref: ${{ github.event.repository.default_branch }}
+          path: .pinpoint-workflow
+          sparse-checkout: |
+            .github/actions/setup-mise
+            mise.toml
+            mise.lock
+            package.json
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
 
-      - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061  # ratchet:pnpm/action-setup@v4.2.0
+      # Keep the existing Node 22 compatibility lane explicit for preview
+      # orchestration. Vercel still owns its independent preview build runtime.
+      - name: Setup locked preview toolchain (Node 22 compatibility)
         if: steps.parse.outputs.action == 'start'
+        uses: ./.pinpoint-workflow/.github/actions/setup-mise
         with:
-          run_install: false
+          install-args: "--locked node pnpm supabase"
+          node-version: "22"
+          working-directory: .pinpoint-workflow
 
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # ratchet:actions/setup-node@v7.0.0
-        if: steps.parse.outputs.action == 'start'
+      - name: Setup locked Supabase CLI for stop
+        if: steps.parse.outputs.action == 'stop'
+        uses: ./.pinpoint-workflow/.github/actions/setup-mise
         with:
-          node-version: '22'
-          cache: pnpm
+          install-args: "--locked supabase"
+          cache-pnpm: "false"
+          working-directory: .pinpoint-workflow
 
       - name: Install dependencies
         if: steps.parse.outputs.action == 'start'

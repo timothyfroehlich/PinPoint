@@ -26,7 +26,7 @@ If `pnpm run test:ensure-schema` fails or tests still complain about `schema.sql
   The export step uses `drizzle-kit`. If you see `drizzle-kit: command not found` (or a similar error), ensure dev dependencies are installed:
 
   ```bash
-  pnpm install
+  mise exec -- pnpm install
   ```
 
   Then try again:

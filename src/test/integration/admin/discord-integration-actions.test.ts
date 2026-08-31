@@ -39,7 +39,6 @@ const {
   const mockUpdateSet = vi.fn(
     (_payload: {
       botTokenVaultId?: string | null;
-      enabled?: boolean;
       guildId?: string | null;
       botHealthStatus?: string;
       lastBotCheckAt?: Date | null;
@@ -249,7 +248,6 @@ describe("saveDiscordConfig", () => {
       expect(mockUpdateSet).toHaveBeenCalledWith(
         expect.objectContaining({
           guildId: null,
-          enabled: false,
           botHealthStatus: "unknown",
           lastBotCheckAt: null,
         })
@@ -312,7 +310,7 @@ describe("saveDiscordConfig", () => {
         expect(result.botUsername).toBe("TestBot");
       }
       expect(mockUpdateSet).toHaveBeenCalledWith(
-        expect.objectContaining({ enabled: true })
+        expect.objectContaining({ guildId: "123456789012345678" })
       );
 
       // Assert that fetch was called as expected (method + auth header)
@@ -443,7 +441,7 @@ describe("saveDiscordConfig", () => {
       const result = await saveDiscordConfig(fd);
       expect(result.ok).toBe(true);
       expect(mockUpdateSet).toHaveBeenCalledWith(
-        expect.objectContaining({ enabled: false })
+        expect.objectContaining({ guildId: "123456789012345678" })
       );
     });
   });
@@ -596,7 +594,6 @@ describe("clearDiscordBotTokenAction", () => {
     expect(mockUpdateSet).toHaveBeenCalledWith(
       expect.objectContaining({
         botTokenVaultId: null,
-        enabled: false,
         botHealthStatus: "unknown",
         lastBotCheckAt: null,
       })
@@ -642,7 +639,10 @@ describe("clearDiscordBotTokenAction", () => {
 
     expect(result).toEqual({ ok: true });
     expect(mockUpdateSet).toHaveBeenCalledWith(
-      expect.objectContaining({ enabled: false })
+      expect.objectContaining({
+        botHealthStatus: "unknown",
+        lastBotCheckAt: null,
+      })
     );
     expect(mockExecute).not.toHaveBeenCalled();
   });

@@ -258,9 +258,13 @@ suspect.
 
 ## Cloud re-bootstrap caveat
 
-`scripts/agent-bootstrap.sh` is intentionally untouched: cloud Claude sessions can't
-reach the tailnet, so they stay embedded + raw `dolt fetch/reset` against DoltHub
-(the bridge-maintained remote). See `docs/runbooks/cloud-routines-beads-access.md`.
+Cloud Claude sessions cannot reach the tailnet, so their Beads path stays separate
+from the local/Bazzite mise-managed server path. The environment setup invokes
+`scripts/beads-cloud-setup.sh` to install the exact `bd` and Dolt versions from
+`scripts/beads-compatibility.json`; the agent then runs
+`scripts/beads-cloud-init.sh` to materialize credentials and clone the
+bridge-maintained DoltHub remote. See
+`docs/runbooks/cloud-routines-beads-access.md`.
 **Sharp edge:** `dolt reset --hard` during a cloud re-bootstrap discards any
 unpushed cloud writes — always let the bridge (or a manual `bd dolt push`) land
 cloud work before re-bootstrapping a cloud clone.
