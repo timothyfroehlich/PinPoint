@@ -251,6 +251,13 @@ describe("wrappers resolve through to the real command", () => {
     expect(segment.dynamicArgs).toEqual([false, false, false, false, true]);
   });
 
+  it("does not apply xargs replacement provenance to the command token", () => {
+    const segment = firstSegment("xargs -I git git checkout feature/x");
+    expect(segment.name).toBe("git");
+    expect(segment.args).toEqual(["checkout", "feature/x"]);
+    expect(segment.dynamicArgs).toEqual([false, false]);
+  });
+
   it.each(["-i", "--replace"])(
     "does not consume the command after bare xargs %s",
     (flag) => {

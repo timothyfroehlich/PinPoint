@@ -858,7 +858,9 @@ function resolveSegment(words, out, depth, options) {
   // parse failure — nothing to report.
   if (slot.kind === "none") return;
 
-  const cmdWord = withReplacementProvenance(effectiveWords[slot.index], slot);
+  // xargs replacement applies only to INITIAL-ARGS, never COMMAND itself.
+  // Keeping the command static lets every guard still classify it correctly.
+  const cmdWord = effectiveWords[slot.index];
   const argWords = effectiveWords
     .slice(slot.index + 1)
     .map((word) => withReplacementProvenance(word, slot));
