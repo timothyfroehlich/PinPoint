@@ -489,11 +489,15 @@ describe("tracked-location changes", () => {
     const { getPinballMapState, setTrackedLocation } =
       await import("~/lib/pinballmap/state");
     const original = snapshotAt(26454, "APC", [{ id: 1, machineId: 100 }]);
+    const previousAttempt = new Date("2026-08-30T12:00:00.000Z");
+    const previousUpdated = new Date("2026-08-30T12:01:00.000Z");
     await db.insert(pinballmapState).values({
       id: "singleton",
       locationId: 26454,
       snapshotJson: original,
+      lastSyncAttemptAt: previousAttempt,
       lastSyncStatus: "ok",
+      updatedAt: previousUpdated,
     });
     const fetchSpy = vi
       .spyOn(getMockClient(), "fetchLocation")
@@ -508,6 +512,8 @@ describe("tracked-location changes", () => {
     expect(state?.locationId).toBe(26454);
     expect(state?.snapshotJson).toEqual(original);
     expect(state?.lastSyncStatus).toBe("ok");
+    expect(state?.lastSyncAttemptAt?.getTime()).toBe(previousAttempt.getTime());
+    expect(state?.updatedAt.getTime()).toBe(previousUpdated.getTime());
     fetchSpy.mockRestore();
   });
 
@@ -651,6 +657,32 @@ describe("tracked-location concurrency guards", () => {
     expect(state?.locationId).toBe(26454);
     expect(state?.configurationGeneration).toBe(1);
     expect(state?.snapshotJson).toEqual(freshlyValidated);
+    fetchSpy.mockRestore();
+  });
+
+  it("does not start another sync during configuration validation", async () => {
+    const db = await getTestDb();
+    const { getMockClient } = await import("~/lib/pinballmap/client-mock");
+    const { setTrackedLocation, syncLocationSnapshot } =
+      await import("~/lib/pinballmap/state");
+    await db.insert(pinballmapState).values({
+      id: "singleton",
+      locationId: 26454,
+      snapshotJson: snapshotAt(26454, "Original APC"),
+      lastSyncStatus: "ok",
+    });
+
+    let concurrentSync: unknown;
+    const fetchSpy = vi
+      .spyOn(getMockClient(), "fetchLocation")
+      .mockImplementationOnce(async () => {
+        concurrentSync = await syncLocationSnapshot({ trigger: "cron" });
+        return snapshotAt(26454, "Validated APC");
+      });
+
+    await expect(setTrackedLocation(26454)).resolves.toEqual({ ok: true });
+    expect(concurrentSync).toEqual({ ok: false, reason: "busy" });
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
     fetchSpy.mockRestore();
   });
 

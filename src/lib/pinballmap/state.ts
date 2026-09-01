@@ -37,6 +37,8 @@ export async function getPinballMapState(): Promise<PinballmapRuntimeState | nul
       id: pinballmapState.id,
       locationId: pinballmapState.locationId,
       configurationGeneration: pinballmapState.configurationGeneration,
+      mutationLeaseId: pinballmapState.mutationLeaseId,
+      mutationLeaseExpiresAt: pinballmapState.mutationLeaseExpiresAt,
       snapshotJson: pinballmapState.snapshotJson,
       lastSyncedAt: pinballmapState.lastSyncedAt,
       lastSyncAttemptAt: pinballmapState.lastSyncAttemptAt,
@@ -171,6 +173,7 @@ export type SyncTrigger = "manual" | "cron";
 /** Outcome of a sync attempt. */
 type SyncFailure =
   | { ok: false; reason: "error"; error: string }
+  | { ok: false; reason: "busy" }
   | { ok: false; reason: "not_configured" }
   | { ok: false; reason: "superseded" }
   | { ok: false; reason: "throttled"; retryAfterMs: number };
@@ -190,6 +193,7 @@ export type ValidationSyncResult =
 interface SyncOptions {
   updatedBy?: string;
   trigger?: SyncTrigger;
+  mutationLeaseId?: string;
 }
 
 interface ValidationSyncOptions {
@@ -197,6 +201,7 @@ interface ValidationSyncOptions {
   validation: {
     locationId: number;
     expectedLocationId: number | null;
+    mutationLeaseId: string;
   };
 }
 
@@ -391,12 +396,18 @@ async function stampSyncAttempt(
   expectedLocationId: number | null,
   expectedGeneration: number,
   attemptAt: Date,
-  guarded: boolean
+  guarded: boolean,
+  recordHealth: boolean,
+  expectedLeaseId: string | undefined
 ): Promise<boolean> {
   const locationGuard =
     expectedLocationId === null
       ? isNull(pinballmapState.locationId)
       : eq(pinballmapState.locationId, expectedLocationId);
+  const leaseGuard =
+    expectedLeaseId === undefined
+      ? availableMutationLease(attemptAt)
+      : eq(pinballmapState.mutationLeaseId, expectedLeaseId);
   const values = {
     id: SINGLETON_ID,
     locationId: expectedLocationId,
@@ -423,9 +434,40 @@ async function stampSyncAttempt(
         "updated_at" = EXCLUDED."updated_at"
       WHERE ${locationGuard}
         AND "pinballmap_state"."configuration_generation" = ${expectedGeneration}
+        AND ${leaseGuard}
       RETURNING "id"
     `);
     return hasReturnedRow(stamped);
+  }
+
+  if (!recordHealth) {
+    // Candidate validation spends the shared traffic allowance but is not an
+    // attempt to refresh the CURRENT location. Leave its health untouched; the
+    // successful configuration commit writes coherent health for the candidate.
+    const claimed = await db.execute(sql`
+      INSERT INTO "pinballmap_state" (
+        "id",
+        "location_id",
+        "refresh_tokens",
+        "refresh_tokens_at"
+      )
+      VALUES (
+        ${values.id},
+        ${values.locationId},
+        ${PBM_REFRESH_BURST - 1},
+        ${attemptAt.toISOString()}::timestamptz
+      )
+      ON CONFLICT ("id") DO UPDATE SET
+        "refresh_tokens" = ${AVAILABLE_TOKENS} - 1,
+        "refresh_tokens_at" = ${pinballmapState.refreshTokensAt}
+          + (interval '1 millisecond' * ${PBM_REFRESH_REFILL_MS} * ${ELAPSED_PERIODS})
+      WHERE ${AVAILABLE_TOKENS} >= 1
+        AND ${locationGuard}
+        AND "pinballmap_state"."configuration_generation" = ${expectedGeneration}
+        AND ${leaseGuard}
+      RETURNING "id"
+    `);
+    return hasReturnedRow(claimed);
   }
 
   // A first-ever manual refresh creates the row with one token already spent.
@@ -455,6 +497,7 @@ async function stampSyncAttempt(
     WHERE ${AVAILABLE_TOKENS} >= 1
       AND ${locationGuard}
       AND "pinballmap_state"."configuration_generation" = ${expectedGeneration}
+      AND ${leaseGuard}
     RETURNING "id"
   `);
   return hasReturnedRow(claimed);
@@ -494,6 +537,11 @@ export async function syncLocationSnapshot(
     validation === null && opts && !("validation" in opts)
       ? (opts.trigger ?? "manual")
       : "manual";
+  const mutationLeaseId =
+    validation?.mutationLeaseId ??
+    (validation === null && opts && !("validation" in opts)
+      ? opts.mutationLeaseId
+      : undefined);
   const state = await getPinballMapState();
   const trackedLocationId = state?.locationId ?? null;
   const configurationGeneration = state?.configurationGeneration ?? 0;
@@ -514,7 +562,9 @@ export async function syncLocationSnapshot(
     expectedLocationId,
     configurationGeneration,
     syncedAt,
-    trigger === "manual"
+    trigger === "manual",
+    validation === null,
+    mutationLeaseId
   );
   if (!claimed) {
     const current = await getPinballMapState();
@@ -523,6 +573,21 @@ export async function syncLocationSnapshot(
       (current?.configurationGeneration ?? 0) !== configurationGeneration
     ) {
       return { ok: false, reason: "superseded" };
+    }
+    if (
+      mutationLeaseId !== undefined &&
+      current?.mutationLeaseId !== mutationLeaseId
+    ) {
+      return { ok: false, reason: "superseded" };
+    }
+    if (
+      mutationLeaseId === undefined &&
+      current?.mutationLeaseId !== null &&
+      current?.mutationLeaseId !== undefined &&
+      current.mutationLeaseExpiresAt !== null &&
+      current.mutationLeaseExpiresAt.getTime() > syncedAt.getTime()
+    ) {
+      return { ok: false, reason: "busy" };
     }
     // Re-read rather than reuse the row loaded above: the claim we just lost
     // was won by somebody, so the bucket moved and the pre-claim copy would
@@ -648,12 +713,19 @@ export async function setTrackedLocation(
     }
 
     const validated = await syncLocationSnapshot({
-      validation: { locationId, expectedLocationId: previousLocationId },
+      validation: {
+        locationId,
+        expectedLocationId: previousLocationId,
+        mutationLeaseId: lease.id,
+      },
       ...(updatedBy === undefined ? {} : { updatedBy }),
     });
     if (!validated.ok) {
       if (validated.reason === "throttled") return validated;
       if (validated.reason === "superseded") {
+        return { ok: false, reason: "concurrent_change" };
+      }
+      if (validated.reason === "busy") {
         return { ok: false, reason: "concurrent_change" };
       }
       return {

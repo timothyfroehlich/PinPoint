@@ -343,10 +343,16 @@ async function classifyRemoveNotFound(args: {
   attemptedLmxId: number;
   pinballmapMachineId: number | null;
   expectedLocationId: number;
+  mutationLeaseId: string;
   userId: string;
 }): Promise<NotFoundVerdict> {
-  const { attemptedLmxId, pinballmapMachineId, expectedLocationId, userId } =
-    args;
+  const {
+    attemptedLmxId,
+    pinballmapMachineId,
+    expectedLocationId,
+    mutationLeaseId,
+    userId,
+  } = args;
 
   const isFresh = (syncedAt: Date | null): boolean =>
     syncedAt !== null &&
@@ -361,7 +367,11 @@ async function classifyRemoveNotFound(args: {
     // Outcome is deliberately ignored: `throttled` means a concurrent refresh
     // just landed and `error` means PBM is unreachable, and the freshness check
     // below answers both correctly without re-deriving them here.
-    await syncLocationSnapshot({ updatedBy: userId, trigger: "manual" });
+    await syncLocationSnapshot({
+      updatedBy: userId,
+      trigger: "manual",
+      mutationLeaseId,
+    });
     refreshed = await getPinballMapState();
   }
 
@@ -867,6 +877,7 @@ export async function removeMachineFromPinballMapAction(
         // then delete the cabinet's own live entry from the public lineup.
         pinballmapMachineId: titleId,
         expectedLocationId: removalLocationId,
+        mutationLeaseId: lease.id,
         userId,
       });
 
@@ -1078,6 +1089,12 @@ export async function refreshPinballmapLineupAction(
         return err(
           "SERVER",
           "The tracked Pinball Map location changed while this refresh was running. Reload the page and try again."
+        );
+      }
+      if (result.reason === "busy") {
+        return err(
+          "SERVER",
+          "A Pinball Map change is already running. Reload the page and try again."
         );
       }
       return err("SERVER", result.error);

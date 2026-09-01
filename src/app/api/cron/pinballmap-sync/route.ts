@@ -43,6 +43,13 @@ export async function GET(request: Request): Promise<NextResponse> {
       );
       return NextResponse.json({ ok: true, skipped: "superseded" });
     }
+    if (result.reason === "busy") {
+      log.info(
+        { action: "pinballmap.syncLocationSnapshot" },
+        "PinballMap snapshot sync deferred while a configuration-sensitive mutation is running"
+      );
+      return NextResponse.json({ ok: true, skipped: "busy" });
+    }
     // The cron path is never throttled, but narrow defensively for type safety.
     const error =
       result.reason === "throttled"
