@@ -26,7 +26,7 @@ const MUTATION_LEASE_MS = 10 * 60 * 1000;
 
 export interface PinballMapMutationLease {
   id: string;
-  locationId: number;
+  trackedLocationId: number | null;
   configurationGeneration: number;
 }
 
@@ -80,11 +80,15 @@ function availableMutationLease(now: Date): ReturnType<typeof or> {
  * configuration forever.
  */
 export async function claimPinballMapMutationLease(
-  locationId: number,
+  trackedLocationId: number | null,
   configurationGeneration: number
 ): Promise<PinballMapMutationLease | null> {
   const now = new Date();
   const id = randomUUID();
+  const locationGuard =
+    trackedLocationId === null
+      ? isNull(pinballmapState.locationId)
+      : eq(pinballmapState.locationId, trackedLocationId);
   const [claimed] = await db
     .update(pinballmapState)
     .set({
@@ -94,13 +98,13 @@ export async function claimPinballMapMutationLease(
     .where(
       and(
         eq(pinballmapState.id, SINGLETON_ID),
-        eq(pinballmapState.locationId, locationId),
+        locationGuard,
         eq(pinballmapState.configurationGeneration, configurationGeneration),
         availableMutationLease(now)
       )
     )
     .returning({ id: pinballmapState.id });
-  return claimed ? { id, locationId, configurationGeneration } : null;
+  return claimed ? { id, trackedLocationId, configurationGeneration } : null;
 }
 
 export async function releasePinballMapMutationLease(

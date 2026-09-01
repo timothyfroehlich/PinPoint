@@ -1041,11 +1041,63 @@ describe("PinballMap outbound writes (PGlite)", () => {
       formWithLmx(machine.id, 4040)
     );
 
-    expect(result.ok).toBe(true);
+    expect(result.ok).toBe(false);
     expect(pbm.lineup).toEqual([{ id: 500, machineId: 8080 }]);
     const state = await db.query.pinballmapState.findFirst();
     expect(state?.locationId).toBe(99999);
     expect(state?.snapshotJson?.lmxes.map((lmx) => lmx.id)).toEqual([500]);
+    expect(await db.select().from(pinballmapAbandonedListings)).toHaveLength(1);
+  });
+
+  it("keeps a switch from changing orphan scope during a removal", async () => {
+    const db = await getTestDb();
+    const { removeMachineFromPinballMapAction } =
+      await import("~/app/(app)/m/pinballmap-actions");
+    const { getPinballMapState, setTrackedLocation } =
+      await import("~/lib/pinballmap/state");
+    const admin = await createUser("admin");
+    await mockAuthAs(admin.id);
+
+    pbm.lineup = [{ id: 4040, machineId: 8080 }];
+    await seedState([{ id: 500, machineId: 9000 }]);
+    await db
+      .update(pinballmapState)
+      .set({
+        locationId: 99999,
+        snapshotJson: {
+          ...snapshotOf([{ id: 500, machineId: 9000 }]),
+          locationId: 99999,
+        },
+      })
+      .where(eq(pinballmapState.id, "singleton"));
+    const [machine] = await db
+      .insert(machines)
+      .values({ name: "Switch-protected orphan", initials: "SPO" })
+      .returning();
+    if (!machine) throw new Error("failed to seed machine");
+    await db.insert(pinballmapAbandonedListings).values({
+      machineId: machine.id,
+      lmxId: 4040,
+      pinballmapMachineId: 8080,
+      locationId: 26454,
+    });
+
+    let switchResult: unknown;
+    pbm.beforeRemove = async () => {
+      pbm.beforeRemove = null;
+      switchResult = await setTrackedLocation(26454, admin.id);
+    };
+
+    await expect(
+      removeMachineFromPinballMapAction(
+        undefined,
+        formWithLmx(machine.id, 4040)
+      )
+    ).resolves.toMatchObject({ ok: true });
+
+    expect(switchResult).toEqual({ ok: false, reason: "concurrent_change" });
+    expect(pbm.lineup).toEqual([]);
+    expect((await getPinballMapState())?.locationId).toBe(99999);
     expect(await db.select().from(pinballmapAbandonedListings)).toHaveLength(0);
   });
 
@@ -1090,11 +1142,11 @@ describe("PinballMap outbound writes (PGlite)", () => {
       formWithLmx(machine.id, 4040)
     );
 
-    expect(result.ok).toBe(true);
+    expect(result.ok).toBe(false);
     expect(pbm.lineup).toEqual([{ id: 500, machineId: 8080 }]);
     const state = await db.query.pinballmapState.findFirst();
     expect(state?.locationId).toBe(99999);
     expect(state?.snapshotJson?.lmxes.map((lmx) => lmx.id)).toEqual([500]);
-    expect(await db.select().from(pinballmapAbandonedListings)).toHaveLength(0);
+    expect(await db.select().from(pinballmapAbandonedListings)).toHaveLength(1);
   });
 });

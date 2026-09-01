@@ -459,7 +459,8 @@ async function mutationLeaseOwnsLocation(
     .where(eq(pinballmapState.id, "singleton"))
     .for("update");
   return (
-    row?.locationId === lease.locationId &&
+    row !== undefined &&
+    row.locationId === lease.trackedLocationId &&
     row.configurationGeneration === lease.configurationGeneration &&
     row.mutationLeaseId === lease.id
   );
@@ -742,242 +743,267 @@ export async function removeMachineFromPinballMapAction(
   const { userId, machine } = authed;
 
   const state = await getPinballMapState();
-
-  // The submitted id is attacker-controlled, and the operator account it would
-  // act through can edit the WHOLE location's lineup. Push is `member: "owner"`,
-  // so without this an owner of any one cabinet could post any lmx on the
-  // lineup and delete a game they have nothing to do with. The abandonment
-  // records are the allowlist: an entry is this machine's business only if this
-  // machine is the one that walked away from it.
-  //
-  // The record also carries the title the entry was listed under, which is the
-  // context the rest of this action needs — `machine.pinballmapMachineId` is
-  // the cabinet's CURRENT title and naming the wrong one here reaches the wrong
-  // entry twice over (see the two uses below).
-  // The SURFACING list, not every record: an abandoned entry whose title some
-  // cabinet still carries is that cabinet's business (spec 2.5) and is not
-  // offered here, so accepting it from a stale page would remove an entry a
-  // sibling is actively covering — and `withLmxRemoved` would strip that title
-  // from the stored lineup too. Authorizing exactly what the UI offers keeps
-  // the two from drifting apart in the direction that matters.
-  const abandonedRecord =
-    explicitLmxId === null
-      ? null
-      : ((
-          await listSurfacingAbandonedForMachine(
-            machine.id,
-            state?.locationId ?? null
-          )
-        ).find((record) => record.lmxId === explicitLmxId) ?? null);
-
-  if (explicitLmxId !== null && abandonedRecord === null)
-    return err(
-      "NOT_FOUND",
-      "That entry is not one this machine left behind, so it is not this machine's to remove."
-    );
-
   if (
     explicitLmxId === null &&
     (state?.locationId === null || state?.locationId === undefined)
   )
     return err("SERVER", "Pinball Map isn't configured yet");
 
-  // Which title this removal is ABOUT: the abandoned entry's own, when we are
-  // acting on one, and otherwise the cabinet's current title.
-  const titleId =
-    abandonedRecord?.pinballmapMachineId ?? machine.pinballmapMachineId;
-  const removalLocationId =
-    abandonedRecord?.locationId ?? state?.locationId ?? null;
-  if (removalLocationId === null)
-    return err("SERVER", "Pinball Map isn't configured yet");
-  const isCrossLocation =
-    abandonedRecord !== null &&
-    abandonedRecord.locationId !== (state?.locationId ?? null);
-
-  const liveLmxId =
-    explicitLmxId ??
-    (machine.pinballmapMachineId !== null && state?.snapshotJson
-      ? (findLmxForMachine(state.snapshotJson, machine.pinballmapMachineId)
-          ?.id ?? null)
-      : null);
-
-  if (liveLmxId === null)
+  // The scope check and PBM delete are one configuration-sensitive operation.
+  // Claim before evaluating the orphan predicate so a switch cannot turn an
+  // old-location orphan into current-location sibling business halfway through
+  // the removal (spec 2.5, 10.9, 10.12).
+  const lease = await claimPinballMapMutationLease(
+    state?.locationId ?? null,
+    state?.configurationGeneration ?? 0
+  );
+  if (!lease)
     return err(
-      "VALIDATION",
-      "That entry is not on the location's lineup, so there is nothing to remove."
+      "SERVER",
+      "The tracked Pinball Map location is being changed. Reload the page and try again."
     );
 
-  // --- non-transactional effects, both BEFORE the transaction ---
-  const credentials = await getPinballMapWriteCredentials();
-  if (!credentials)
-    return err(
-      "NOT_PROVISIONED",
-      "No Pinball Map operator account is set up yet, so PinPoint can't write to Pinball Map."
-    );
+  try {
+    // The submitted id is attacker-controlled, and the operator account it would
+    // act through can edit the WHOLE location's lineup. Push is `member: "owner"`,
+    // so without this an owner of any one cabinet could post any lmx on the
+    // lineup and delete a game they have nothing to do with. The abandonment
+    // records are the allowlist: an entry is this machine's business only if this
+    // machine is the one that walked away from it.
+    //
+    // The record also carries the title the entry was listed under, which is the
+    // context the rest of this action needs — `machine.pinballmapMachineId` is
+    // the cabinet's CURRENT title and naming the wrong one here reaches the wrong
+    // entry twice over (see the two uses below).
+    // The SURFACING list, not every record: an abandoned entry whose title some
+    // cabinet still carries is that cabinet's business (spec 2.5) and is not
+    // offered here, so accepting it from a stale page would remove an entry a
+    // sibling is actively covering — and `withLmxRemoved` would strip that title
+    // from the stored lineup too. Authorizing exactly what the UI offers keeps
+    // the two from drifting apart in the direction that matters.
+    const abandonedRecord =
+      explicitLmxId === null
+        ? null
+        : ((
+            await listSurfacingAbandonedForMachine(
+              machine.id,
+              state?.locationId ?? null
+            )
+          ).find((record) => record.lmxId === explicitLmxId) ?? null);
 
-  const client = await getPinballMapClient();
-  let deletedLmxId = liveLmxId;
-  let written = await client.removeMachine({
-    credentials,
-    lmxId: deletedLmxId,
-  });
+    if (explicitLmxId !== null && abandonedRecord === null)
+      return err(
+        "NOT_FOUND",
+        "That entry is not one this machine left behind, so it is not this machine's to remove."
+      );
 
-  if (!written.ok && written.reason !== "not_found") {
-    log.error(
-      { reason: written.reason, action: "pinballmap.removeMachine" },
-      "PinballMap remove rejected"
-    );
-    return err("PBM_REJECTED", pbmWriteFailureMessage(written));
-  }
+    // Which title this removal is ABOUT: the abandoned entry's own, when we are
+    // acting on one, and otherwise the cabinet's current title.
+    const titleId =
+      abandonedRecord?.pinballmapMachineId ?? machine.pinballmapMachineId;
+    const removalLocationId =
+      abandonedRecord?.locationId ?? state?.locationId ?? null;
+    if (removalLocationId === null)
+      return err("SERVER", "Pinball Map isn't configured yet");
+    const isCrossLocation =
+      abandonedRecord !== null &&
+      abandonedRecord.locationId !== (state?.locationId ?? null);
 
-  // `not_found` is ambiguous — already gone, or our handle was stale and the
-  // title is still listed under a re-minted id. `classifyRemoveNotFound` asks
-  // the live lineup which one it is; taking the already-gone reading on faith
-  // is what silently un-does a human unlist (PP-rnup).
-  if (!written.ok && isCrossLocation) {
-    log.info(
-      {
-        lmxId: deletedLmxId,
-        machineId: machine.id,
-        action: "pinballmap.removeMachine",
-      },
-      "PinballMap returned not_found for a cross-location abandoned entry — treating it as already gone"
-    );
-  } else if (!written.ok) {
-    const verdict = await classifyRemoveNotFound({
-      attemptedLmxId: deletedLmxId,
-      // The abandoned entry's title, not the cabinet's current one. Passing the
-      // current title here would ask "has THIS machine's title been re-minted?"
-      // about an entry under a different title — and a `retry` verdict would
-      // then delete the cabinet's own live entry from the public lineup.
-      pinballmapMachineId: titleId,
-      expectedLocationId: removalLocationId,
-      userId,
+    const liveLmxId =
+      explicitLmxId ??
+      (machine.pinballmapMachineId !== null && state?.snapshotJson
+        ? (findLmxForMachine(state.snapshotJson, machine.pinballmapMachineId)
+            ?.id ?? null)
+        : null);
+
+    if (liveLmxId === null)
+      return err(
+        "VALIDATION",
+        "That entry is not on the location's lineup, so there is nothing to remove."
+      );
+
+    // --- non-transactional effects, both BEFORE the transaction ---
+    const credentials = await getPinballMapWriteCredentials();
+    if (!credentials)
+      return err(
+        "NOT_PROVISIONED",
+        "No Pinball Map operator account is set up yet, so PinPoint can't write to Pinball Map."
+      );
+
+    const client = await getPinballMapClient();
+    let deletedLmxId = liveLmxId;
+    let written = await client.removeMachine({
+      credentials,
+      lmxId: deletedLmxId,
     });
 
-    if (verdict.kind === "location_changed") {
-      if (abandonedRecord === null) {
-        return err(
-          "SERVER",
-          "The tracked Pinball Map location changed while this removal was running. Reload the page and try again."
-        );
-      }
-      // Once the tracked location differs, spec 10.12 makes this the same as
-      // every other cross-location 404: never re-resolve its title in the new
-      // lineup, and retire the old record as already gone.
-      log.info(
-        {
-          lmxId: deletedLmxId,
-          machineId: machine.id,
-          action: "pinballmap.removeMachine",
-        },
-        "Tracked Pinball Map location changed during orphan recovery — suppressing title re-resolution"
+    if (!written.ok && written.reason !== "not_found") {
+      log.error(
+        { reason: written.reason, action: "pinballmap.removeMachine" },
+        "PinballMap remove rejected"
       );
-    } else if (verdict.kind === "refuse") {
-      log.warn(
-        {
-          lmxId: deletedLmxId,
-          machineId: machine.id,
-          action: "pinballmap.removeMachine",
-        },
-        "PinballMap returned not_found and the live lineup could not confirm removal — refusing to clear"
-      );
-      return err("PBM_REJECTED", verdict.message);
-    } else if (verdict.kind === "retry") {
-      log.info(
-        {
-          staleLmxId: deletedLmxId,
-          lmxId: verdict.lmxId,
-          machineId: machine.id,
-          action: "pinballmap.removeMachine",
-        },
-        "PinballMap re-minted this title's lmx — retrying the removal on the live id"
-      );
-      deletedLmxId = verdict.lmxId;
-      written = await client.removeMachine({
-        credentials,
-        lmxId: deletedLmxId,
-      });
-      if (!written.ok) {
-        log.error(
-          { reason: written.reason, action: "pinballmap.removeMachine" },
-          "PinballMap remove rejected on the re-resolved lmx"
-        );
-        return err("PBM_REJECTED", pbmWriteFailureMessage(written));
-      }
-    } else {
-      // Confirmed absent from a lineup we just re-fetched. Finish the job
-      // rather than refuse: the desired end state — the entry off the lineup —
-      // is already reached, and refusing would strand the reader, since every
-      // retry hits the same 404. Not honesty-washing (CORE-ARCH-012): we now
-      // have positive evidence of the state we are about to report, we just
-      // did not have to do the deleting.
-      log.info(
-        {
-          lmxId: deletedLmxId,
-          machineId: machine.id,
-          action: "pinballmap.removeMachine",
-        },
-        "PinballMap lmx confirmed absent from the live lineup — dropping it from the stored lineup"
-      );
+      return err("PBM_REJECTED", pbmWriteFailureMessage(written));
     }
-  }
-  // --- transaction: local state only ---
 
-  // Intent is deliberately untouched. Removing is how the operator's existing
-  // Off decision gets carried out; writing intent here would make the push and
-  // the toggle two ways to do one thing, which is the conflation the two-line
-  // control exists to undo (spec 4.1).
-  await db.transaction(async (tx) => {
-    await editStoredSnapshot(tx, removalLocationId, (snapshot) =>
-      // Same reason as above: `withLmxRemoved` drops rows matching EITHER the
-      // id or the title, so the cabinet's current title would take its own live
-      // row out of the stored lineup and leave every same-title cabinet reading
-      // Missing until the next cron.
-      withLmxRemoved(snapshot, deletedLmxId, titleId)
-    );
-
-    // The abandoned-entry alert reads the RECORD, not the snapshot, so editing
-    // the snapshot alone leaves the alert standing after a removal that
-    // succeeded — press Remove, watch the page repaint with the same "Still on
-    // the location's lineup" card, press it again and 404 through the whole
-    // `classifyRemoveNotFound` refresh. That is the failure this action's
-    // docblock says the snapshot edit exists to prevent, on the other surface.
-    // `clearResolvedAbandonments` would get there eventually; eventually is an
-    // hour (CORE-ARCH-012).
-    //
-    // Both ids, because they can differ: the record holds the id we validated,
-    // while `deletedLmxId` is what PBM actually accepted after a re-mint. A
-    // delete by lmx that matches nothing is a no-op, so the Lingering path
-    // (no record, no explicit id) costs one statement and stays correct.
-    if (explicitLmxId !== null)
-      await retireAbandonmentForLmx(tx, explicitLmxId);
-    if (deletedLmxId !== explicitLmxId)
-      await retireAbandonmentForLmx(tx, deletedLmxId);
-    await createMachineTimelineEvent(
-      machine.id,
-      {
-        sourceType: "lifecycle",
-        tag: "lifecycle",
-        // The lmx we actually deleted, which differs from the one we resolved
-        // when PBM had re-minted the row. Recording the stale handle would make
-        // the timeline disagree with what Pinball Map saw.
-        eventData: {
-          kind: "pinballmap_listing",
-          action: "unlisted",
+    // `not_found` is ambiguous — already gone, or our handle was stale and the
+    // title is still listed under a re-minted id. `classifyRemoveNotFound` asks
+    // the live lineup which one it is; taking the already-gone reading on faith
+    // is what silently un-does a human unlist (PP-rnup).
+    if (!written.ok && isCrossLocation) {
+      log.info(
+        {
           lmxId: deletedLmxId,
+          machineId: machine.id,
+          action: "pinballmap.removeMachine",
         },
-        actorId: userId,
-      },
-      tx
-    );
-  });
+        "PinballMap returned not_found for a cross-location abandoned entry — treating it as already gone"
+      );
+    } else if (!written.ok) {
+      const verdict = await classifyRemoveNotFound({
+        attemptedLmxId: deletedLmxId,
+        // The abandoned entry's title, not the cabinet's current one. Passing the
+        // current title here would ask "has THIS machine's title been re-minted?"
+        // about an entry under a different title — and a `retry` verdict would
+        // then delete the cabinet's own live entry from the public lineup.
+        pinballmapMachineId: titleId,
+        expectedLocationId: removalLocationId,
+        userId,
+      });
 
-  revalidatePath(`/m/${machine.initials}`);
-  // See the add action: the shared lineup changed, so sibling cabinets read
-  // differently now.
-  revalidatePath("/m", "layout");
-  return ok({});
+      if (verdict.kind === "location_changed") {
+        if (abandonedRecord === null) {
+          return err(
+            "SERVER",
+            "The tracked Pinball Map location changed while this removal was running. Reload the page and try again."
+          );
+        }
+        // Once the tracked location differs, spec 10.12 makes this the same as
+        // every other cross-location 404: never re-resolve its title in the new
+        // lineup, and retire the old record as already gone.
+        log.info(
+          {
+            lmxId: deletedLmxId,
+            machineId: machine.id,
+            action: "pinballmap.removeMachine",
+          },
+          "Tracked Pinball Map location changed during orphan recovery — suppressing title re-resolution"
+        );
+      } else if (verdict.kind === "refuse") {
+        log.warn(
+          {
+            lmxId: deletedLmxId,
+            machineId: machine.id,
+            action: "pinballmap.removeMachine",
+          },
+          "PinballMap returned not_found and the live lineup could not confirm removal — refusing to clear"
+        );
+        return err("PBM_REJECTED", verdict.message);
+      } else if (verdict.kind === "retry") {
+        log.info(
+          {
+            staleLmxId: deletedLmxId,
+            lmxId: verdict.lmxId,
+            machineId: machine.id,
+            action: "pinballmap.removeMachine",
+          },
+          "PinballMap re-minted this title's lmx — retrying the removal on the live id"
+        );
+        deletedLmxId = verdict.lmxId;
+        written = await client.removeMachine({
+          credentials,
+          lmxId: deletedLmxId,
+        });
+        if (!written.ok) {
+          log.error(
+            { reason: written.reason, action: "pinballmap.removeMachine" },
+            "PinballMap remove rejected on the re-resolved lmx"
+          );
+          return err("PBM_REJECTED", pbmWriteFailureMessage(written));
+        }
+      } else {
+        // Confirmed absent from a lineup we just re-fetched. Finish the job
+        // rather than refuse: the desired end state — the entry off the lineup —
+        // is already reached, and refusing would strand the reader, since every
+        // retry hits the same 404. Not honesty-washing (CORE-ARCH-012): we now
+        // have positive evidence of the state we are about to report, we just
+        // did not have to do the deleting.
+        log.info(
+          {
+            lmxId: deletedLmxId,
+            machineId: machine.id,
+            action: "pinballmap.removeMachine",
+          },
+          "PinballMap lmx confirmed absent from the live lineup — dropping it from the stored lineup"
+        );
+      }
+    }
+    // --- transaction: local state only ---
+
+    // Intent is deliberately untouched. Removing is how the operator's existing
+    // Off decision gets carried out; writing intent here would make the push and
+    // the toggle two ways to do one thing, which is the conflation the two-line
+    // control exists to undo (spec 4.1).
+    const committed = await db.transaction(async (tx) => {
+      if (!(await mutationLeaseOwnsLocation(tx, lease))) return false;
+      await editStoredSnapshot(tx, removalLocationId, (snapshot) =>
+        // Same reason as above: `withLmxRemoved` drops rows matching EITHER the
+        // id or the title, so the cabinet's current title would take its own live
+        // row out of the stored lineup and leave every same-title cabinet reading
+        // Missing until the next cron.
+        withLmxRemoved(snapshot, deletedLmxId, titleId)
+      );
+
+      // The abandoned-entry alert reads the RECORD, not the snapshot, so editing
+      // the snapshot alone leaves the alert standing after a removal that
+      // succeeded — press Remove, watch the page repaint with the same "Still on
+      // the location's lineup" card, press it again and 404 through the whole
+      // `classifyRemoveNotFound` refresh. That is the failure this action's
+      // docblock says the snapshot edit exists to prevent, on the other surface.
+      // `clearResolvedAbandonments` would get there eventually; eventually is an
+      // hour (CORE-ARCH-012).
+      //
+      // Both ids, because they can differ: the record holds the id we validated,
+      // while `deletedLmxId` is what PBM actually accepted after a re-mint. A
+      // delete by lmx that matches nothing is a no-op, so the Lingering path
+      // (no record, no explicit id) costs one statement and stays correct.
+      if (explicitLmxId !== null)
+        await retireAbandonmentForLmx(tx, explicitLmxId);
+      if (deletedLmxId !== explicitLmxId)
+        await retireAbandonmentForLmx(tx, deletedLmxId);
+      await createMachineTimelineEvent(
+        machine.id,
+        {
+          sourceType: "lifecycle",
+          tag: "lifecycle",
+          // The lmx we actually deleted, which differs from the one we resolved
+          // when PBM had re-minted the row. Recording the stale handle would make
+          // the timeline disagree with what Pinball Map saw.
+          eventData: {
+            kind: "pinballmap_listing",
+            action: "unlisted",
+            lmxId: deletedLmxId,
+          },
+          actorId: userId,
+        },
+        tx
+      );
+      return true;
+    });
+
+    if (!committed)
+      return err(
+        "SERVER",
+        "The tracked Pinball Map location changed while this removal was running. Reload the page to verify the lineup before trying again."
+      );
+
+    revalidatePath(`/m/${machine.initials}`);
+    // See the add action: the shared lineup changed, so sibling cabinets read
+    // differently now.
+    revalidatePath("/m", "layout");
+    return ok({});
+  } finally {
+    await releasePinballMapMutationLease(lease.id);
+  }
 }
 
 export type RefreshPinballmapResult = Result<
