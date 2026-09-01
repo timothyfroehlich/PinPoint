@@ -151,6 +151,7 @@ function ghPositionals(args) {
  *  known literal flag are safe because that flag already fixes their role. */
 function hasDynamicOptionBefore(args, dynamicArgs, endIndex, valueFlags) {
   for (let i = 0; i < endIndex; i++) {
+    if (args[i] === "--") break;
     if (valueFlags.has(args[i])) {
       i++;
       continue;
@@ -274,18 +275,24 @@ function normalizeRepository(value) {
 /** Return an explicit repository target when gh received one. `explicit` with
  *  a null repository means the command tried to name a target dynamically or
  *  ambiguously, which remains protected. */
-function ghRepositoryTarget(args, dynamicArgs = [], commandKind) {
+function ghRepositoryTarget(
+  args,
+  dynamicArgs = [],
+  commandKind,
+  appendsDynamicArgs = false
+) {
   let explicit = false;
   let ambiguous = false;
   const repositories = [];
   const dynamicPrOptionParsing =
     commandKind === "pr" &&
-    hasDynamicOptionBefore(
-      args,
-      dynamicArgs,
-      args.length,
-      GH_VALUE_FLAGS
-    );
+    (appendsDynamicArgs ||
+      hasDynamicOptionBefore(
+        args,
+        dynamicArgs,
+        args.length,
+        GH_VALUE_FLAGS
+      ));
   const record = (value, dynamic = false) => {
     explicit = true;
     if (dynamic) {
@@ -300,6 +307,7 @@ function ghRepositoryTarget(args, dynamicArgs = [], commandKind) {
   if (commandKind !== "api") {
     for (let i = 0; i < args.length; i++) {
       const arg = args[i];
+      if (arg === "--") break;
       if (GH_VALUE_FLAGS.has(arg) && arg !== "-R" && arg !== "--repo") {
         i++;
         continue;
@@ -443,7 +451,12 @@ function classifyMerge(toolName, toolInput) {
     if (isGhPrMerge(segment.args)) {
       if (
         !isProtectedTarget(
-          ghRepositoryTarget(segment.args, segment.dynamicArgs, "pr")
+          ghRepositoryTarget(
+            segment.args,
+            segment.dynamicArgs,
+            "pr",
+            segment.appendsDynamicArgs
+          )
         )
       ) {
         continue;
@@ -453,7 +466,12 @@ function classifyMerge(toolName, toolInput) {
     if (isGhApiMerge(segment.args, segment.dynamicArgs)) {
       if (
         !isProtectedTarget(
-          ghRepositoryTarget(segment.args, segment.dynamicArgs, "api")
+          ghRepositoryTarget(
+            segment.args,
+            segment.dynamicArgs,
+            "api",
+            segment.appendsDynamicArgs
+          )
         )
       ) {
         continue;

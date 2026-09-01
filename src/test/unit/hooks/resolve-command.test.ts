@@ -19,6 +19,7 @@ interface Segment {
   name: string;
   args: string[];
   dynamicArgs: boolean[];
+  appendsDynamicArgs: boolean;
   raw: string;
 }
 interface Unresolvable {
@@ -259,6 +260,13 @@ describe("wrappers resolve through to the real command", () => {
       expect(segment.dynamicArgs).toEqual([false, false, true]);
     }
   );
+
+  it("marks arguments appended by plain xargs as dynamic", () => {
+    const segment = firstSegment(
+      "xargs gh pr merge 4 --repo timothyfroehlich/dotfiles"
+    );
+    expect(segment.appendsDynamicArgs).toBe(true);
+  });
 });
 
 // ---------------------------------------------------------------------------

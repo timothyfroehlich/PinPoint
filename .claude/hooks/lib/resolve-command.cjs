@@ -74,6 +74,8 @@
  *   Segment.dynamicArgs whether each argument contains shell expansion,
  *                       substitution, or wrapper replacement that can change
  *                       its resolved literal value
+ *   Segment.appendsDynamicArgs whether a wrapper can append unknown arguments
+ *                              after the statically resolved argument list
  *   Segment.raw      normalized reconstruction (`[command, ...args].join(" ")`),
  *                    for messages only — NOT source-exact
  *
@@ -104,6 +106,7 @@ const makeWrapper = (valueFlags, options = {}) => ({
   payloadFlags: options.payloadFlags ?? [],
   replacementFlags: options.replacementFlags ?? [],
   optionalReplacementFlags: new Set(options.optionalReplacementFlags ?? []),
+  appendsInputArgs: options.appendsInputArgs ?? false,
   positionals: options.positionals ?? 0,
 });
 
@@ -124,7 +127,7 @@ const WRAPPERS = new Map([
   // `xargs [flags] CMD ARGS…` — CMD really does run, with extra args appended
   // from stdin. Treating xargs as a wrapper is what closes
   // `xargs -I{} gh pr merge {} < prs.txt`.
-  ["xargs", makeWrapper(["-I", "-n", "-P", "-d", "-E", "-L", "-s", "-a", "--max-args", "--max-procs", "--delimiter", "--eof", "--max-lines", "--max-chars", "--arg-file"], { replacementFlags: ["-I", "-i", "--replace"], optionalReplacementFlags: ["-i", "--replace"] })],
+  ["xargs", makeWrapper(["-I", "-n", "-P", "-d", "-E", "-L", "-s", "-a", "--max-args", "--max-procs", "--delimiter", "--eof", "--max-lines", "--max-chars", "--arg-file"], { replacementFlags: ["-I", "-i", "--replace"], optionalReplacementFlags: ["-i", "--replace"], appendsInputArgs: true })],
 ]);
 
 // Shells: `sh -c "<program>"` re-parses its argument, and `sh <file>` makes the
@@ -596,6 +599,7 @@ function resolveCommandSlot(words) {
   let i = 0;
   const replacements = [];
   let replacementUnknown = false;
+  let appendsDynamicArgs = false;
   while (i < words.length) {
     const w = words[i];
     if (ENV_ASSIGN.test(w.value)) {
@@ -609,10 +613,12 @@ function resolveCommandSlot(words) {
         index: i,
         replacements,
         replacementUnknown,
+        appendsDynamicArgs,
       };
     }
 
     const wrapperIdx = i;
+    let replacesInputArgs = false;
     i++;
     // Skip the wrapper's own flags (and the values they consume).
     while (i < words.length && words[i].value.startsWith("-")) {
@@ -622,9 +628,17 @@ function resolveCommandSlot(words) {
         break;
       }
       const payload = readPayloadFlag(wrapper, words, i);
-      if (payload) return { ...payload, replacements, replacementUnknown };
+      if (payload) {
+        return {
+          ...payload,
+          replacements,
+          replacementUnknown,
+          appendsDynamicArgs,
+        };
+      }
       const replacement = readReplacementFlag(wrapper, words, i);
       if (replacement) {
+        replacesInputArgs = true;
         if (replacement.dynamic) replacementUnknown = true;
         else replacements.push(replacement.value);
       }
@@ -638,6 +652,9 @@ function resolveCommandSlot(words) {
       i++;
       if (!hasEquals && !attachedShortValue && wrapper.valueFlags.has(bare)) i++;
     }
+    if (wrapper.appendsInputArgs && !replacesInputArgs) {
+      appendsDynamicArgs = true;
+    }
     // Skip the wrapper's own positional arguments (`timeout 30 cmd`).
     for (let p = 0; p < wrapper.positionals && i < words.length; p++) i++;
 
@@ -648,6 +665,7 @@ function resolveCommandSlot(words) {
         index: wrapperIdx,
         replacements: [],
         replacementUnknown: false,
+        appendsDynamicArgs: false,
       };
     }
   }
@@ -921,16 +939,17 @@ function resolveSegment(words, out, depth, options) {
     }
   }
 
-  pushSegment(out, cmdWord.value, argWords);
+  pushSegment(out, cmdWord.value, argWords, slot.appendsDynamicArgs);
 }
 
-function pushSegment(out, command, argWords) {
+function pushSegment(out, command, argWords, appendsDynamicArgs = false) {
   const args = argWords.map((w) => w.value);
   out.segments.push({
     command,
     name: path.basename(command),
     args,
     dynamicArgs: argWords.map((w) => w.dynamic),
+    appendsDynamicArgs,
     raw: [command, ...args].join(" "),
   });
 }
