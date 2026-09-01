@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 
 import { checkPermission } from "~/lib/permissions/helpers";
@@ -84,7 +84,7 @@ export function registerSetMachineName(server: McpServer): void {
       title: "Rename a machine",
       description:
         "Change a machine's display name. Identify the machine by initials or UUID. Initials cannot be changed by this tool. No-op if the name already matches.",
-      inputSchema: setNameSchema.shape,
+      inputSchema: setNameSchema,
     },
     (args, extra) =>
       runTool("set_machine_name", extra, (ctx) => runSetMachineName(args, ctx))

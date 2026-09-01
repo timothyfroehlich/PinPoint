@@ -1,7 +1,7 @@
 import { createMcpHandler, withMcpAuth } from "mcp-handler";
 
 import { logMcpToolCall } from "~/lib/mcp/audit";
-import { MCP_BASE_PATH } from "~/lib/mcp/config";
+import { MCP_ENDPOINT_PATH } from "~/lib/mcp/config";
 import { registerPinpointTools } from "~/lib/mcp/tools";
 import { requireMcpAuthContext, verifyToken } from "~/lib/mcp/verify-token";
 
@@ -30,8 +30,8 @@ const handler = createMcpHandler(
         description:
           "Return the PinPoint identity and access level resolved from the bearer token. Use this to confirm the connection is authenticated and authorized.",
       },
-      (extra) => {
-        const auth = requireMcpAuthContext(extra.authInfo);
+      (ctx) => {
+        const auth = requireMcpAuthContext(ctx.http?.authInfo);
         logMcpToolCall({
           tool: "whoami",
           userId: auth.userId,
@@ -54,8 +54,7 @@ const handler = createMcpHandler(
 
     registerPinpointTools(server);
   },
-  { serverInfo: { name: "pinpoint", version: "1.0.0" } },
-  { basePath: MCP_BASE_PATH, disableSse: true }
+  { serverInfo: { name: "pinpoint", version: "1.0.0" } }
 );
 
 // Static-bearer auth (PP-u4ab.7). `withMcpAuth` does the useful part — pull the
@@ -71,4 +70,16 @@ const handler = createMcpHandler(
 // discovery chain.
 const authHandler = withMcpAuth(handler, verifyToken, { required: true });
 
-export { authHandler as GET, authHandler as POST };
+/**
+ * Keep the v1 transport boundary explicit. mcp-handler 2.x serves every
+ * request handed to it, so routing only through Next's static segment is the
+ * primary boundary and this pathname check is the fail-closed backstop.
+ */
+export async function handleMcpRequest(request: Request): Promise<Response> {
+  if (new URL(request.url).pathname !== MCP_ENDPOINT_PATH) {
+    return new Response("Not found", { status: 404 });
+  }
+  return authHandler(request);
+}
+
+export { handleMcpRequest as GET, handleMcpRequest as POST };
