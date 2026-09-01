@@ -93,6 +93,16 @@
             "timeout": 5000
           }
         ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/block-gh-pr-checkout.cjs",
+            "timeout": 5000
+          }
+        ]
       }
     ],
     "PostToolUse": [

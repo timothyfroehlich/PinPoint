@@ -629,7 +629,7 @@ export function IssueFilters({
             <DateRangePicker
               from={filters.createdFrom}
               to={filters.createdTo}
-              placeholder="Created"
+              label="Created"
               data-testid="filter-created"
               onChange={(range) => {
                 pushFilters({
@@ -642,7 +642,7 @@ export function IssueFilters({
             <DateRangePicker
               from={filters.updatedFrom}
               to={filters.updatedTo}
-              placeholder="Modified"
+              label="Modified"
               data-testid="filter-modified"
               onChange={(range) => {
                 pushFilters({

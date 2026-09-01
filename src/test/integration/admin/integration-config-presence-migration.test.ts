@@ -10,7 +10,15 @@ const migrationSql = readFileSync(
   resolve("drizzle/0069_integration_config_presence_expand.sql"),
   "utf8"
 );
+const contractPreparationSql = readFileSync(
+  resolve("drizzle/0070_normalize-disabled-pinballmap-location.sql"),
+  "utf8"
+);
 const migrationStatements = migrationSql
+  .split("--> statement-breakpoint")
+  .map((statement) => statement.trim())
+  .filter((statement) => statement.length > 0);
+const contractPreparationStatements = contractPreparationSql
   .split("--> statement-breakpoint")
   .map((statement) => statement.trim())
   .filter((statement) => statement.length > 0);
@@ -18,6 +26,13 @@ const migrationStatements = migrationSql
 async function applyExpandMigration(): Promise<void> {
   const db = await getTestDb();
   for (const statement of migrationStatements) {
+    await db.execute(sql.raw(statement));
+  }
+}
+
+async function applyContractPreparationMigration(): Promise<void> {
+  const db = await getTestDb();
+  for (const statement of contractPreparationStatements) {
     await db.execute(sql.raw(statement));
   }
 }
@@ -80,6 +95,36 @@ describe("0069 integration configuration-presence expand migration", () => {
     expect(row?.snapshotJson?.name).toBe("Dormant Arcade");
   });
 
+  it("normalizes a disabled location before the runtime stops reading enabled", async () => {
+    const db = await getTestDb();
+    await db.insert(pinballmapState).values({
+      enabled: false,
+      locationId: 777,
+      snapshotJson: {
+        locationId: 777,
+        name: "Dormant Arcade",
+        dateLastUpdated: "2026-08-23",
+        lastUpdatedByUsername: "operator",
+        machineCount: 0,
+        lmxes: [],
+        fetchedAtIso: "2026-08-23T12:00:00.000Z",
+        raw: { retained: true },
+      },
+      lastSyncStatus: "ok",
+    });
+
+    await applyExpandMigration();
+    await applyContractPreparationMigration();
+
+    const row = await db.query.pinballmapState.findFirst();
+    expect(row).toMatchObject({
+      enabled: false,
+      locationId: null,
+      lastSyncStatus: "ok",
+    });
+    expect(row?.snapshotJson?.name).toBe("Dormant Arcade");
+  });
+
   it("preserves enabled Pinball Map and Discord configuration", async () => {
     const db = await getTestDb();
     const tokenId = randomUUID();
@@ -98,6 +143,7 @@ describe("0069 integration configuration-presence expand migration", () => {
     });
 
     await applyExpandMigration();
+    await applyContractPreparationMigration();
 
     expect(await db.query.pinballmapState.findFirst()).toMatchObject({
       enabled: true,

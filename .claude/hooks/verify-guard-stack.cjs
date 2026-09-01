@@ -49,6 +49,7 @@ const EXPECTED_GUARD_HOOKS = [
   "inject-beads-actor.cjs",
   "block-direct-merge.cjs",
   "block-main-worktree-branch-switch.cjs",
+  "block-gh-pr-checkout.cjs",
 ];
 
 // --- Registered-script extraction --------------------------------------------
@@ -255,6 +256,16 @@ const BEHAVIOR_PROBES = [
     mustDeny: [
       "gh pr merge 123 --squash",
       'eval "gh pr merge 123 --squash"',
+      "if gh pr merge 123; then echo blocked; fi",
+      "! gh pr merge 123",
+      "{ gh pr merge 123; }",
+      "while gh pr merge 123; do echo blocked; done",
+      "function guarded { gh pr merge 123; }; guarded",
+      "coproc gh pr merge 123",
+      "time if gh pr merge 123; then echo blocked; fi",
+      "coproc guarded if gh pr merge 123; then :; fi",
+      "coproc gh -R { pr merge 123",
+      "function guarded if gh pr merge 123; then :; fi; guarded",
       "xargs -I{} gh pr merge {} < prs.txt",
       "env -S 'gh pr merge 123'",
       "gh api -X PUT repos/o/r/pulls/123/merge",
@@ -275,8 +286,39 @@ const BEHAVIOR_PROBES = [
     hook: "block-main-worktree-branch-switch.cjs",
     export: "classifyCommand",
     outcome: (fn, command) => (fn(command).block ? "deny" : "allow"),
-    mustDeny: ["git checkout feature/x", 'eval "git switch feature/x"'],
+    mustDeny: [
+      "git checkout feature/x",
+      'eval "git switch feature/x"',
+      "if git checkout feature/x; then echo blocked; fi",
+      "! git checkout feature/x",
+      "{ git checkout feature/x; }",
+      "while git checkout feature/x; do echo blocked; done",
+      "function guarded { git checkout feature/x; }; guarded",
+      "coproc git checkout feature/x",
+      "time if git checkout feature/x; then echo blocked; fi",
+      "coproc guarded if git checkout feature/x; then :; fi",
+      "coproc git -C { checkout feature/x",
+      "function guarded if git checkout feature/x; then :; fi; guarded",
+    ],
     mustAllow: ["git checkout main", "echo git checkout feature/x"],
+  },
+  {
+    hook: "block-gh-pr-checkout.cjs",
+    export: "classifyCommand",
+    outcome: (fn, command) => (fn(command).block ? "deny" : "allow"),
+    mustDeny: [
+      "gh pr checkout 123",
+      "gh pr co 123",
+      "gh co 123",
+      'eval "gh pr checkout 123"',
+      "if gh pr checkout 123; then echo blocked; fi",
+      "gh --hostname ghe.example.com pr checkout 123",
+    ],
+    mustAllow: [
+      "gh pr diff 123",
+      "gh pr comment 123",
+      "echo gh pr checkout 123",
+    ],
   },
 ];
 

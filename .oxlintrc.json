@@ -28,13 +28,10 @@
     "node_modules/**",
     "out/**",
     "dist/**",
-    ".archived_v1/**",
     "*.config.js",
     "*.config.mjs",
     "*.config.ts",
     "*.config.cjs",
-    "src/app/(app)/mockup/**",
-    "src/components/mockups/**",
     "eslint-rules/__fixtures__/**"
   ],
   "rules": {

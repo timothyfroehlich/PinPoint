@@ -28,6 +28,10 @@
  *     applies to the `<<TAG` operator itself) and never parsed as commands.
  *   - Redirections and their targets are dropped, not mistaken for arguments.
  *   - Segments are split on real shell separators: && || ; | & newline ( ).
+ *   - Leading shell control words are removed from each segment: conditionals,
+ *     negation, brace groups, loops, function bodies, coprocesses, and timed
+ *     compound commands cannot occupy the command slot and hide the command
+ *     they govern.
  *   - Per segment, the EFFECTIVE command is resolved by skipping leading
  *     `VAR=value` assignments and wrappers that do not consume the command slot
  *     (`sudo`, `env`, `command`, `time`, `nice`, `xargs`, `timeout`, ...),
@@ -41,7 +45,8 @@
  *     `unresolvable` instead of being silently dropped.
  *
  * WHAT IT IS NOT: a shell. It does not expand variables, evaluate globs, or
- * understand `for`/`if`/functions. The threat model is a well-meaning agent
+ * execute control flow or fully parse `for`/`case` grammar. The threat model is
+ * a well-meaning agent
  * that wraps a command (accidentally or to "work around" a guard), not an
  * attacker with unbounded shell tricks. Guards on a hard boundary should still
  * treat `unresolvable` as suspicious rather than assuming it is safe.
@@ -123,6 +128,39 @@ const SHELLS = new Set(["sh", "bash", "zsh", "dash", "ksh", "ash"]);
 
 const ENV_ASSIGN = /^[A-Za-z_][A-Za-z0-9_]*[+:]?=/;
 
+// Shell reserved words that may lead a command inside one of the tokenizer's
+// separator-delimited segments. They are syntax, not the effective command:
+// `if gh pr merge 1; then ...; fi` must expose `gh`, not `if`.
+//
+// Only UNQUOTED leading words are stripped. Quoting disables reserved-word
+// recognition in the shell too, so `"if" gh ...` remains an attempted command
+// named `if`. Terminators are included so their structural-only segments do not
+// trip the no-silent-drop invariant below.
+const SHELL_CONTROL_WORDS = new Set([
+  "if",
+  "then",
+  "elif",
+  "else",
+  "fi",
+  "while",
+  "until",
+  "do",
+  "done",
+  "!",
+  "{",
+  "}",
+  "function",
+  "coproc",
+]);
+
+// In Bash's named coprocess form, these compound commands can execute a
+// command list in the condition position before the tokenizer reaches a
+// separator. Other compound forms (`for`, `case`, grouped commands) expose
+// their executable bodies in later segments, so they do not need name-skipping
+// to keep a governed command visible.
+const NAMED_COMPOUND_CONDITION_OPENERS = new Set(["if", "while", "until"]);
+const SHELL_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
 // How deep to follow eval / sh -c / $() nesting before giving up. Two levels is
 // already exotic; the cap only bounds pathological input.
 const MAX_DEPTH = 5;
@@ -195,9 +233,10 @@ function readBacktickSpan(src, openIdx) {
  * Tokenize a command string into words and separator operators.
  *
  * Returns { tokens, unbalanced } where each token is either
- *   { type: "word", value, quoted, dynamic, subs }
+ *   { type: "word", value, quoted, escaped, dynamic, subs }
  *     value   – unquoted text
  *     quoted  – any part of it came from inside quotes
+ *     escaped – any part of it was escaped outside quotes
  *     dynamic – contains a variable/substitution, so its literal text is
  *               not the whole story
  *     subs    – bodies of `$( )` / backtick substitutions found inside it
@@ -212,7 +251,15 @@ function tokenize(src) {
   const pendingHeredocs = [];
 
   const ensure = () => {
-    if (!cur) cur = { value: "", quoted: false, dynamic: false, subs: [] };
+    if (!cur) {
+      cur = {
+        value: "",
+        quoted: false,
+        escaped: false,
+        dynamic: false,
+        subs: [],
+      };
+    }
     return cur;
   };
   const flush = () => {
@@ -281,7 +328,9 @@ function tokenize(src) {
         i += 2; // line continuation
         continue;
       }
-      ensure().value += src[i + 1] ?? "";
+      const t = ensure();
+      t.escaped = true;
+      t.value += src[i + 1] ?? "";
       i += 2;
       continue;
     }
@@ -561,6 +610,134 @@ function describeWords(words) {
     .trim();
 }
 
+/** Remove leading shell syntax so the governed command owns the command slot. */
+function stripLeadingShellControlWords(words) {
+  let i = 0;
+  while (i < words.length) {
+    const word = words[i];
+    if (
+      word.quoted ||
+      word.escaped ||
+      !SHELL_CONTROL_WORDS.has(word.value)
+    ) {
+      break;
+    }
+
+    if (word.value === "function" || word.value === "coproc") {
+      const first = words[i + 1];
+      const second = words[i + 2];
+      const firstIsBrace =
+        first && !first.quoted && !first.escaped && first.value === "{";
+      const secondIsBrace =
+        second && !second.quoted && !second.escaped && second.value === "{";
+      const validCoprocName =
+        first &&
+        !first.quoted &&
+        !first.escaped &&
+        !first.dynamic &&
+        SHELL_IDENTIFIER.test(first.value);
+      const braceIdx =
+        word.value === "function"
+          ? secondIsBrace
+            ? i + 2
+            : -1
+          : firstIsBrace
+            ? i + 1
+            : validCoprocName && secondIsBrace
+              ? i + 2
+              : -1;
+      if (braceIdx !== -1) {
+        i = braceIdx + 1;
+        continue;
+      }
+
+      const possibleName = words[i + 1];
+      const possibleOpener = words[i + 2];
+      const literalName =
+        possibleName &&
+        !possibleName.quoted &&
+        !possibleName.escaped &&
+        !possibleName.dynamic;
+      const validNamedOwner =
+        word.value === "function"
+          ? literalName
+          : literalName && SHELL_IDENTIFIER.test(possibleName.value);
+      if (
+        validNamedOwner &&
+        possibleOpener &&
+        !possibleOpener.quoted &&
+        !possibleOpener.escaped &&
+        NAMED_COMPOUND_CONDITION_OPENERS.has(possibleOpener.value)
+      ) {
+        // `function|coproc NAME if|while|until ...`: NAME labels the compound
+        // owner; the following opener is still syntax and must be stripped on
+        // the next loop iteration.
+        i += 2;
+        continue;
+      }
+
+      // `coproc command ...` runs the following simple command directly.
+      // A function definition without a same-segment brace has its compound
+      // body in a later tokenizer segment (`function f () { ... }`), so keep
+      // the header's existing ordinary classification and let that segment
+      // expose the body.
+      if (word.value === "function") break;
+    }
+
+    i++;
+  }
+  return words.slice(i);
+}
+
+/**
+ * Bash's bare, unquoted `time` is reserved syntax and can prefix a compound
+ * command (`time if ...`, `time { ...; }`). Consume that one syntax prefix so
+ * the newly-exposed control word can be normalized too. Do not do this after
+ * ordinary wrappers: `env time if ...` and `/usr/bin/time if ...` attempt to
+ * execute a command named `if`, rather than asking Bash to parse a conditional.
+ */
+function stripLeadingShellTimePrefix(words) {
+  let i = 0;
+  while (i < words.length && ENV_ASSIGN.test(words[i].value)) i++;
+
+  const word = words[i];
+  if (!word || word.quoted || word.escaped || word.value !== "time") {
+    return words;
+  }
+
+  const wrapper = WRAPPERS.get("time");
+  i++;
+  while (i < words.length && words[i].value.startsWith("-")) {
+    const flag = words[i].value;
+    if (flag === "--") {
+      i++;
+      break;
+    }
+
+    const hasEquals = flag.includes("=");
+    const bare = hasEquals ? flag.slice(0, flag.indexOf("=")) : flag;
+    const attachedShortValue =
+      !hasEquals && !bare.startsWith("--") && flag.length > 2;
+    i++;
+    if (!hasEquals && !attachedShortValue && wrapper.valueFlags.has(bare)) i++;
+  }
+
+  // A prefix without a following pipeline is still the effective command for
+  // classification/backstop purposes; do not turn it into structural silence.
+  return i < words.length ? words.slice(i) : words;
+}
+
+/** Normalize leading shell syntax until no timed compound prefix remains. */
+function normalizeLeadingShellSyntax(words) {
+  let effectiveWords = stripLeadingShellControlWords(words);
+  while (effectiveWords.length > 0) {
+    const afterTime = stripLeadingShellTimePrefix(effectiveWords);
+    if (afterTime === effectiveWords) break;
+    effectiveWords = stripLeadingShellControlWords(afterTime);
+  }
+  return effectiveWords;
+}
+
 /**
  * Resolve one segment into zero or more Segments, following literal shell
  * payloads. Pushes into `out.segments` / `out.unresolvable`.
@@ -573,14 +750,20 @@ function resolveSegment(words, out, depth, options) {
     }
   }
 
-  const slot = resolveCommandSlot(words);
+  const effectiveWords = normalizeLeadingShellSyntax(words);
+
+  // A segment made only of reserved words (`then`, `fi`, `done`, `}`) is shell
+  // structure, not a command and not an ambiguity.
+  if (effectiveWords.length === 0) return;
+
+  const slot = resolveCommandSlot(effectiveWords);
 
   // `env -S '<program>'` — GNU env splits the string and runs it.
   if (slot.kind === "payload") {
     if (slot.word.dynamic) {
       out.unresolvable.push({
         reason: "split-string-dynamic",
-        text: describeWords(words),
+        text: describeWords(effectiveWords),
       });
       return;
     }
@@ -592,15 +775,15 @@ function resolveSegment(words, out, depth, options) {
   // parse failure — nothing to report.
   if (slot.kind === "none") return;
 
-  const cmdWord = words[slot.index];
-  const argWords = words.slice(slot.index + 1);
+  const cmdWord = effectiveWords[slot.index];
+  const argWords = effectiveWords.slice(slot.index + 1);
 
   // The command slot itself is a substitution/variable → we cannot know what
   // runs. `$(pick-tool) pr merge 1`, `$CMD --squash`.
   if (cmdWord.dynamic) {
     out.unresolvable.push({
       reason: "substituted-command",
-      text: describeWords(words),
+      text: describeWords(effectiveWords),
     });
     return;
   }
@@ -613,7 +796,7 @@ function resolveSegment(words, out, depth, options) {
   if (/\s/.test(cmdWord.value)) {
     out.unresolvable.push({
       reason: "split-string-command",
-      text: describeWords(words),
+      text: describeWords(effectiveWords),
     });
     resolveInto(
       [cmdWord.value, ...argWords.map((w) => w.value)].join(" "),
@@ -711,7 +894,11 @@ function resolveInto(command, out, depth, options) {
     if (
       out.segments.length === segmentsBefore &&
       out.unresolvable.length === unresolvableBefore &&
-      words.some((w) => !ENV_ASSIGN.test(w.value))
+      words.some(
+        (w) =>
+          !ENV_ASSIGN.test(w.value) &&
+          (w.quoted || !SHELL_CONTROL_WORDS.has(w.value))
+      )
     ) {
       out.unresolvable.push({
         reason: "no-effective-command",
