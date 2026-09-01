@@ -873,7 +873,11 @@ def test_review_state_unreviewed(monkeypatch):
     state, detail = pr_watch.review_state(PR)
     assert state == "unreviewed"
     assert "automatic Codex review" in detail
-    assert "only when Tim explicitly requests it" in detail
+    assert "bounded witness conclusively ends" in detail
+    assert "post one @codex review" in detail
+    assert "never repeat it" in detail
+    assert "slow or running attempt is not eligible" in detail
+    assert "new head restarts automatic-first" in detail
 
 
 @pytest.mark.unit

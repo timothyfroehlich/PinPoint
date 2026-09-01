@@ -379,10 +379,14 @@ def test_an_unready_pr_gets_the_reason_instead_of_the_merge_command(
 
 
 def test_an_unreviewed_head_is_named_as_the_blocker() -> None:
-    """The one gate an agent cannot clear on its own — so it must be legible."""
+    """An unreviewed head names the bounded, single-fallback route."""
     with repo_with_pr(branch_changes={"src/lib/thing.ts": "x\n"}) as (_head, run):
         assert MERGE_CMD not in run.stdout, run.stdout
         assert "reviewed: unreviewed" in run.stdout
+        assert "after a conclusive bounded miss" in run.stdout
+        assert "post one @codex review" in run.stdout
+        assert "do not repeat it" in run.stdout
+        assert "restart automatic-first on a new head" in run.stdout
 
 
 def test_the_report_always_offers_to_re_run_itself() -> None:

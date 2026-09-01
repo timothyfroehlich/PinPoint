@@ -474,7 +474,11 @@ def test_stale_approval_reports_both_commits_and_the_automatic_review_remedy() -
     assert OTHER_SHA[:7] in result.stdout
     assert HEAD_SHA[:7] in result.stdout
     assert "await a clean automatic Codex result" in result.stdout
-    assert "only when Tim explicitly requests it" in result.stdout
+    assert "bounded witness conclusively ends" in result.stdout
+    assert "post one\n          @codex review" in result.stdout
+    assert "never repeat it" in result.stdout
+    assert "slow or running\n          attempt is not eligible" in result.stdout
+    assert "new head restarts automatic-first" in result.stdout
 
 
 def test_review_gate_never_waits() -> None:

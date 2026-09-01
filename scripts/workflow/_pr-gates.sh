@@ -282,9 +282,11 @@ _compute_review_state() {
 
 _review_remedy() {
   local pr=$1
-  echo "  remedy: await a clean automatic Codex result on this head of PR #${pr}. Use @codex"
-  echo "          review only when Tim explicitly requests it; use review-preflight +"
-  echo "          mark-review only after Tim explicitly runs a local review."
+  echo "  remedy: await a clean automatic Codex result on this head of PR #${pr}. If its"
+  echo "          bounded witness conclusively ends without exact-head evidence, post one"
+  echo "          @codex review for this unchanged head; never repeat it. A slow or running"
+  echo "          attempt is not eligible, and a new head restarts automatic-first. Use"
+  echo "          review-preflight + mark-review only after Tim runs a local review."
 }
 
 # Gate 2: Zero unresolved review threads. Uses GraphQL with cursor pagination.

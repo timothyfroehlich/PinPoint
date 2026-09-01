@@ -75,8 +75,10 @@ LEGACY_CLAUDE_MARKER_PREFIX = "<!-- pinpoint-claude-review:"
 # Kept deliberately in sync with scripts/workflow/_pr-gates.sh. This watcher only
 # reports the state; merge-pr.sh is the enforcement point.
 REVIEW_HINT = (
-    "await automatic Codex review of PR #{pr} at the current head; use @codex review "
-    "only when Tim explicitly requests it"
+    "await automatic Codex review of PR #{pr} at the current head; if its bounded "
+    "witness conclusively ends without exact-head evidence, post one @codex review "
+    "for this unchanged head and never repeat it; a slow or running attempt is not "
+    "eligible, and a new head restarts automatic-first"
 )
 
 LOG_DIR = "tmp/gh-monitor"

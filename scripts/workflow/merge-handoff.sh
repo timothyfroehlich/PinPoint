@@ -438,7 +438,7 @@ add_block() { blocking+=("$1"); }
 if [[ "$(gate_token "$ci_out")" != "PASS" ]]; then add_block "ci: $(gate_state "$ci_out")"; fi
 if [[ "$(gate_token "$threads_out")" != "PASS" ]]; then add_block "threads: $(gate_state "$threads_out")"; fi
 if [[ "$(gate_token "$conflict_out")" != "PASS" ]]; then add_block "no_conflict: $(gate_state "$conflict_out")"; fi
-if [[ "$rv_state" != "approval" && "$rv_state" != "clean_comment" && "$rv_state" != "clean_reaction" && "$rv_state" != "reviewed" && "$rv_state" != "marker" ]]; then add_block "reviewed: ${rv_state} — await a clean automatic Codex result on the current head; use a manual trigger only when Tim explicitly requests it"; fi
+if [[ "$rv_state" != "approval" && "$rv_state" != "clean_comment" && "$rv_state" != "clean_reaction" && "$rv_state" != "reviewed" && "$rv_state" != "marker" ]]; then add_block "reviewed: ${rv_state} — await a clean automatic Codex result on the current head; after a conclusive bounded miss, post one @codex review for this unchanged head; do not repeat it, and restart automatic-first on a new head"; fi
 if [[ "$is_draft" == "true" ]]; then add_block "draft: wait for current-head CI Gate success, then mark the PR ready"; fi
 if [[ "$pr_state" != "OPEN" ]]; then add_block "state: PR is ${pr_state}, not open"; fi
 # The gate answers came from `gh` at one SHA and the diff from git at another, so no

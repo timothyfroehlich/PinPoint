@@ -1,6 +1,6 @@
 ---
 name: pinpoint-pr-workflow
-description: The PR-lifecycle decisions the scripts and gates do not state — draft-first creation, automatic Codex review on every push, exact-head review evidence, explicit-request-only manual review triggers, and why every push needs a fresh review. Also covers the merge handoff, screenshot gotchas, Dependabot lockfile trap, merge escape hatches, broken merge scripts, and GitHub MCP gotchas. Use when committing, opening or updating a PR, monitoring CI or review, addressing review comments, posting screenshots, handing a PR over to merge, landing the plane after Tim merges, or when a GitHub MCP call does something unexpected.
+description: The PR-lifecycle decisions the scripts and gates do not state — draft-first creation, automatic Codex review on every push, exact-head review evidence, the single manual fallback after a conclusive automatic miss, and why every push needs a fresh review. Also covers the merge handoff, screenshot gotchas, Dependabot lockfile trap, merge escape hatches, broken merge scripts, and GitHub MCP gotchas. Use when committing, opening or updating a PR, monitoring CI or review, addressing review comments, posting screenshots, handing a PR over to merge, landing the plane after Tim merges, or when a GitHub MCP call does something unexpected.
 ---
 
 # PinPoint PR Workflow
@@ -126,9 +126,10 @@ manual re-review when a finding is explicitly declined without a push.
 
 The owning agent stays assigned through the whole loop: monitor current-head CI and
 review, address or explicitly decline every finding, resolve every thread, push fixes,
-and wait for the replacement automatic review. Automation being slow is a wait state,
-not permission to comment `@codex review`, self-attest, or hand off an unreviewed PR.
-Use the harness's Monitor/wait mechanism rather than a hand-written polling loop.
+and wait for the replacement automatic review. A slow or still-running automatic
+attempt is a wait state, not permission to comment `@codex review`, self-attest, or
+hand off an unreviewed PR. Use the harness's Monitor/wait mechanism rather than a
+hand-written polling loop.
 
 #### Later uploads: keep the PR eligible
 
@@ -143,19 +144,22 @@ head's coverage, even if Smart detect or another personal trigger would choose n
 run a replacement review. PinPoint relies on **On every push** for deterministic
 exact-head coverage.
 
-#### Manual GitHub trigger — only on Tim's explicit request
+#### Manual GitHub fallback — once after a conclusive automatic miss
 
-If Tim explicitly asks to "trigger a review" (including "upload and trigger a review"),
-comment once for the current head:
+Automatic review is first for every head. If its bounded witness conclusively finishes
+without exact-head evidence — for example, it reports that no commit-safe Codex
+reaction transition was observed — comment exactly once for that unchanged head:
 
 ```bash
 gh pr comment <PR> --body '@codex review'
 ```
 
 Respect the same eligibility sequence: wait for current-head CI and promote the PR
-before commenting. Never use the
-manual comment merely because the automatic review has not appeared yet. A trusted
-clean automatic result satisfies the gate directly; do not add a marker for it.
+before commenting. A slow or still-running automatic attempt is not a conclusive miss.
+Never repeat the comment for the same head. A trusted clean automatic result satisfies
+the gate directly, so do not add a trigger or marker for it. Every new head resets this
+state and returns to automatic-first; only that head's own conclusive miss permits its
+single fallback.
 
 #### Local review and manual-attestation route
 
@@ -202,9 +206,10 @@ That posts the sticky SHA-pinned marker `<!-- pinpoint-review: <head_sha> -->` t
 
 #### Pushing after the review
 
-Any push invalidates a clean automatic result or marker for the previous SHA. Return to the automatic
-path for the new head unless Tim explicitly asks for another manual review. Never copy
-or refresh a marker over code that the named local review did not inspect. Historical
+Any push invalidates a clean automatic result or marker for the previous SHA. Return to
+the automatic path for the new head; a manual trigger for an older head neither carries
+over nor permits one for the new head. Never copy or refresh a marker over code that the
+named local review did not inspect. Historical
 `claude-code:trivial` markers remain readable for old PRs, but agents must not create new
 self-attestations: automatic Codex review now covers every update.
 
