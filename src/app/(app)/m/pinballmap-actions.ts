@@ -753,10 +753,7 @@ export async function removeMachineFromPinballMapAction(
   const { userId, machine } = authed;
 
   const state = await getPinballMapState();
-  if (
-    explicitLmxId === null &&
-    (state?.locationId === null || state?.locationId === undefined)
-  )
+  if (state?.locationId === null || state?.locationId === undefined)
     return err("SERVER", "Pinball Map isn't configured yet");
 
   // The scope check and PBM delete are one configuration-sensitive operation.
@@ -764,8 +761,8 @@ export async function removeMachineFromPinballMapAction(
   // old-location orphan into current-location sibling business halfway through
   // the removal (spec 2.5, 10.9, 10.12).
   const lease = await claimPinballMapMutationLease(
-    state?.locationId ?? null,
-    state?.configurationGeneration ?? 0
+    state.locationId,
+    state.configurationGeneration
   );
   if (!lease)
     return err(
@@ -795,10 +792,7 @@ export async function removeMachineFromPinballMapAction(
       explicitLmxId === null
         ? null
         : ((
-            await listSurfacingAbandonedForMachine(
-              machine.id,
-              state?.locationId ?? null
-            )
+            await listSurfacingAbandonedForMachine(machine.id, state.locationId)
           ).find((record) => record.lmxId === explicitLmxId) ?? null);
 
     if (explicitLmxId !== null && abandonedRecord === null)
@@ -811,17 +805,14 @@ export async function removeMachineFromPinballMapAction(
     // acting on one, and otherwise the cabinet's current title.
     const titleId =
       abandonedRecord?.pinballmapMachineId ?? machine.pinballmapMachineId;
-    const removalLocationId =
-      abandonedRecord?.locationId ?? state?.locationId ?? null;
-    if (removalLocationId === null)
-      return err("SERVER", "Pinball Map isn't configured yet");
+    const removalLocationId = abandonedRecord?.locationId ?? state.locationId;
     const isCrossLocation =
       abandonedRecord !== null &&
-      abandonedRecord.locationId !== (state?.locationId ?? null);
+      abandonedRecord.locationId !== state.locationId;
 
     const liveLmxId =
       explicitLmxId ??
-      (machine.pinballmapMachineId !== null && state?.snapshotJson
+      (machine.pinballmapMachineId !== null && state.snapshotJson
         ? (findLmxForMachine(state.snapshotJson, machine.pinballmapMachineId)
             ?.id ?? null)
         : null);

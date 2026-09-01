@@ -872,6 +872,41 @@ describe("PinballMap outbound writes (PGlite)", () => {
     expect(records).toHaveLength(0);
   });
 
+  it("does not remove an abandoned entry while the integration is not configured", async () => {
+    const db = await getTestDb();
+    const { removeMachineFromPinballMapAction } =
+      await import("~/app/(app)/m/pinballmap-actions");
+    const admin = await createUser("admin");
+    await mockAuthAs(admin.id);
+
+    pbm.lineup = [{ id: 321, machineId: 8080 }];
+    await seedState([{ id: 321, machineId: 8080 }]);
+    await db
+      .update(pinballmapState)
+      .set({ locationId: null })
+      .where(eq(pinballmapState.id, "singleton"));
+    const [machine] = await db
+      .insert(machines)
+      .values({ name: "Dormant orphan", initials: "DOR" })
+      .returning();
+    if (!machine) throw new Error("failed to seed machine");
+    await db.insert(pinballmapAbandonedListings).values({
+      machineId: machine.id,
+      lmxId: 321,
+      pinballmapMachineId: 8080,
+      locationId: 26454,
+    });
+
+    const result = await removeMachineFromPinballMapAction(
+      undefined,
+      formWithLmx(machine.id, 321)
+    );
+
+    expect(result).toMatchObject({ ok: false, code: "SERVER" });
+    expect(pbm.lineup).toEqual([{ id: 321, machineId: 8080 }]);
+    expect(await db.select().from(pinballmapAbandonedListings)).toHaveLength(1);
+  });
+
   it("leaves the cabinet's own live entry alone when removing an abandoned one", async () => {
     // `withLmxRemoved` drops rows matching EITHER the id or the title, so
     // passing the cabinet's current title while deleting an entry under its OLD
