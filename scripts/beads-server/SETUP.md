@@ -238,16 +238,19 @@ The bridge is deliberately **loud**, unlike the fail-open huddle hooks:
 
 - Any step failing → `beads-dolthub-bridge.sh` exits nonzero → that oneshot
   invocation is marked `failed`. The timer remains active and retries on its
-  normal cadence; repeated failures do not mean the primary Dolt server is
-  unhealthy. Inspect `journalctl --user -u beads-dolthub-bridge` and reconcile
-  the divergence rather than repeatedly restarting the service.
+  normal cadence. Inspect `journalctl --user -u beads-dolthub-bridge` first and
+  troubleshoot the recorded failing step. A failure before or after the pull
+  conflict path can indicate a live-server, credential, compatibility, or
+  DoltHub problem; check the primary server separately with `bd doctor --server`.
 - On a **pull conflict** the script checks `dolt_merge_status` on the live server.
   `bd dolt pull` normally restores the pre-pull working set itself; when it does,
   the bridge records that verification and stops. If conflicts remain, the
   bridge runs `CALL DOLT_MERGE('--abort')` and verifies no merge remains active
-  before stopping. This covers both row and schema conflicts. A human resolves
-  the DoltHub divergence, then runs
-  `systemctl --user restart beads-dolthub-bridge.timer`.
+  before stopping. This covers both row and schema conflicts. Repeated confirmed
+  pull-conflict retries do not by themselves mean the primary server is
+  unhealthy. A human resolves the DoltHub divergence, then either waits for the
+  next timer invocation or runs
+  `systemctl --user start beads-dolthub-bridge.service` to verify immediately.
 - Dolt can merge independent rows, but concurrent edits to the same `issues`
   row require semantic reconciliation. Preserve legitimate fields from both
   sides; do not apply a blanket newest-row, `--ours`, or `--theirs` policy.
