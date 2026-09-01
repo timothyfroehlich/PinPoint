@@ -235,6 +235,20 @@ describe("wrappers resolve through to the real command", () => {
       "{}",
     ]);
   });
+
+  it("marks xargs replacement targets as dynamic", () => {
+    const segment = firstSegment(
+      "xargs -I dotfiles gh pr merge 1 --repo timothyfroehlich/dotfiles"
+    );
+    expect(segment.args).toEqual([
+      "pr",
+      "merge",
+      "1",
+      "--repo",
+      "timothyfroehlich/dotfiles",
+    ]);
+    expect(segment.dynamicArgs).toEqual([false, false, false, false, true]);
+  });
 });
 
 // ---------------------------------------------------------------------------

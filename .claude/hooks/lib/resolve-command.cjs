@@ -71,8 +71,9 @@
  *                    (e.g. "./scripts/workflow/merge-pr.sh")
  *   Segment.name     its basename (e.g. "merge-pr.sh") — what guards match on
  *   Segment.args     the tokens after it, unquoted, in order
- *   Segment.dynamicArgs whether each argument contains shell expansion or
- *                       substitution that changed its resolved literal value
+ *   Segment.dynamicArgs whether each argument contains shell expansion,
+ *                       substitution, or wrapper replacement that can change
+ *                       its resolved literal value
  *   Segment.raw      normalized reconstruction (`[command, ...args].join(" ")`),
  *                    for messages only — NOT source-exact
  *
@@ -101,6 +102,7 @@ const path = require("node:path");
 const makeWrapper = (valueFlags, options = {}) => ({
   valueFlags: new Set(valueFlags),
   payloadFlags: options.payloadFlags ?? [],
+  replacementFlags: options.replacementFlags ?? [],
   positionals: options.positionals ?? 0,
 });
 
@@ -121,7 +123,7 @@ const WRAPPERS = new Map([
   // `xargs [flags] CMD ARGS…` — CMD really does run, with extra args appended
   // from stdin. Treating xargs as a wrapper is what closes
   // `xargs -I{} gh pr merge {} < prs.txt`.
-  ["xargs", makeWrapper(["-I", "-i", "-n", "-P", "-d", "-E", "-L", "-s", "-a", "--replace", "--max-args", "--max-procs", "--delimiter", "--eof", "--max-lines", "--max-chars", "--arg-file"])],
+  ["xargs", makeWrapper(["-I", "-i", "-n", "-P", "-d", "-E", "-L", "-s", "-a", "--replace", "--max-args", "--max-procs", "--delimiter", "--eof", "--max-lines", "--max-chars", "--arg-file"], { replacementFlags: ["-I", "--replace"] })],
 ]);
 
 // Shells: `sh -c "<program>"` re-parses its argument, and `sh <file>` makes the
@@ -545,6 +547,31 @@ function readPayloadFlag(wrapper, words, i) {
   return null;
 }
 
+/** Return the literal replacement marker configured by a wrapper flag. GNU
+ *  xargs replaces every occurrence of this marker in the command arguments,
+ *  so affected words are dynamic even when their shell spelling is literal. */
+function readReplacementFlag(wrapper, words, i) {
+  const word = words[i];
+  const flag = word.value;
+  for (const replacementFlag of wrapper.replacementFlags) {
+    if (flag === replacementFlag) {
+      const next = words[i + 1];
+      if (!next) return null;
+      return { value: next.value, dynamic: next.dynamic || !next.value };
+    }
+    const attached = replacementFlag.startsWith("--")
+      ? flag.startsWith(`${replacementFlag}=`) &&
+        flag.slice(replacementFlag.length + 1)
+      : flag.length > replacementFlag.length &&
+        flag.startsWith(replacementFlag) &&
+        flag.slice(replacementFlag.length);
+    if (attached) {
+      return { value: attached, dynamic: word.dynamic };
+    }
+  }
+  return null;
+}
+
 /**
  * Resolve a segment's command slot past leading `VAR=value` assignments and
  * wrappers. Returns one of:
@@ -563,6 +590,8 @@ function readPayloadFlag(wrapper, words, i) {
  */
 function resolveCommandSlot(words) {
   let i = 0;
+  const replacements = [];
+  let replacementUnknown = false;
   while (i < words.length) {
     const w = words[i];
     if (ENV_ASSIGN.test(w.value)) {
@@ -570,7 +599,14 @@ function resolveCommandSlot(words) {
       continue;
     }
     const wrapper = WRAPPERS.get(path.basename(w.value));
-    if (!wrapper) return { kind: "command", index: i };
+    if (!wrapper) {
+      return {
+        kind: "command",
+        index: i,
+        replacements,
+        replacementUnknown,
+      };
+    }
 
     const wrapperIdx = i;
     i++;
@@ -582,7 +618,12 @@ function resolveCommandSlot(words) {
         break;
       }
       const payload = readPayloadFlag(wrapper, words, i);
-      if (payload) return payload;
+      if (payload) return { ...payload, replacements, replacementUnknown };
+      const replacement = readReplacementFlag(wrapper, words, i);
+      if (replacement) {
+        if (replacement.dynamic) replacementUnknown = true;
+        else replacements.push(replacement.value);
+      }
 
       // The value may already be attached — `--max-args=3`, `-I{}`, `-n1`.
       // Only a bare flag consumes the following token.
@@ -597,9 +638,26 @@ function resolveCommandSlot(words) {
     for (let p = 0; p < wrapper.positionals && i < words.length; p++) i++;
 
     // Nothing left after the wrapper — the wrapper IS the command.
-    if (i >= words.length) return { kind: "command", index: wrapperIdx };
+    if (i >= words.length) {
+      return {
+        kind: "command",
+        index: wrapperIdx,
+        replacements: [],
+        replacementUnknown: false,
+      };
+    }
   }
   return { kind: "none" };
+}
+
+function withReplacementProvenance(word, slot) {
+  const replaced = slot.replacements.some((marker) =>
+    word.value.includes(marker)
+  );
+  return {
+    ...word,
+    dynamic: word.dynamic || slot.replacementUnknown || replaced,
+  };
 }
 
 /** Best-effort human-readable text for an unresolvable report. A word that is
@@ -762,14 +820,15 @@ function resolveSegment(words, out, depth, options) {
 
   // `env -S '<program>'` — GNU env splits the string and runs it.
   if (slot.kind === "payload") {
-    if (slot.word.dynamic) {
+    const payloadWord = withReplacementProvenance(slot.word, slot);
+    if (payloadWord.dynamic) {
       out.unresolvable.push({
         reason: "split-string-dynamic",
         text: describeWords(effectiveWords),
       });
       return;
     }
-    resolveInto(slot.word.value, out, depth + 1, options);
+    resolveInto(payloadWord.value, out, depth + 1, options);
     return;
   }
 
@@ -777,8 +836,10 @@ function resolveSegment(words, out, depth, options) {
   // parse failure — nothing to report.
   if (slot.kind === "none") return;
 
-  const cmdWord = effectiveWords[slot.index];
-  const argWords = effectiveWords.slice(slot.index + 1);
+  const cmdWord = withReplacementProvenance(effectiveWords[slot.index], slot);
+  const argWords = effectiveWords
+    .slice(slot.index + 1)
+    .map((word) => withReplacementProvenance(word, slot));
 
   // The command slot itself is a substitution/variable → we cannot know what
   // runs. `$(pick-tool) pr merge 1`, `$CMD --squash`.
