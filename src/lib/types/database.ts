@@ -107,6 +107,7 @@ export type PinballmapRuntimeState = Pick<
   PinballmapState,
   | "id"
   | "locationId"
+  | "configurationGeneration"
   | "snapshotJson"
   | "lastSyncedAt"
   | "lastSyncAttemptAt"

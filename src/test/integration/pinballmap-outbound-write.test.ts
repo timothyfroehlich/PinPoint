@@ -48,6 +48,7 @@ const pbm = vi.hoisted(() => ({
   nextLmxId: 500,
   addResult: null as PbmWriteFailure | null,
   removeResult: null as PbmWriteFailure | null,
+  beforeAdd: null as null | ((machineId: number) => Promise<void>),
   beforeRemove: null as null | ((lmxId: number) => Promise<void>),
   /** Set to make a live re-fetch fail, as an unreachable PBM would. */
   fetchError: null as string | null,
@@ -84,7 +85,8 @@ vi.mock("~/lib/pinballmap/client", () => ({
         if (pbm.fetchError) return Promise.reject(new Error(pbm.fetchError));
         return Promise.resolve(snapshotOf(pbm.lineup));
       },
-      addMachine: ({ machineId }: { machineId: number }) => {
+      addMachine: async ({ machineId }: { machineId: number }) => {
+        await pbm.beforeAdd?.(machineId);
         if (pbm.addResult) return Promise.resolve(pbm.addResult);
         const existing = pbm.lineup.find((l) => l.machineId === machineId);
         if (existing) return Promise.resolve({ ok: true, lmxId: existing.id });
@@ -170,6 +172,7 @@ describe("PinballMap outbound writes (PGlite)", () => {
     pbm.nextLmxId = 500;
     pbm.addResult = null;
     pbm.removeResult = null;
+    pbm.beforeAdd = null;
     pbm.beforeRemove = null;
     pbm.fetchError = null;
     const { getPinballMapWriteCredentials } =
@@ -229,6 +232,43 @@ describe("PinballMap outbound writes (PGlite)", () => {
       lmxId: 500,
     });
     expect(events[0]?.authorId).toBe(admin.id);
+  });
+
+  it("keeps a location switch from overtaking an in-flight addition", async () => {
+    const db = await getTestDb();
+    const { addMachineToPinballMapAction } =
+      await import("~/app/(app)/m/pinballmap-actions");
+    const { getPinballMapState, setTrackedLocation } =
+      await import("~/lib/pinballmap/state");
+    const admin = await createUser("admin");
+    await mockAuthAs(admin.id);
+    await seedState([]);
+    const [machine] = await db
+      .insert(machines)
+      .values({
+        name: "Lease-race game",
+        initials: "LRG",
+        pinballmapMachineId: TITLE_ID,
+        pinballmapIntent: "on",
+      })
+      .returning();
+    if (!machine) throw new Error("failed to seed machine");
+
+    let switchResult: unknown;
+    pbm.beforeAdd = async () => {
+      pbm.beforeAdd = null;
+      switchResult = await setTrackedLocation(99999, admin.id);
+    };
+
+    await expect(
+      addMachineToPinballMapAction(undefined, form(machine.id))
+    ).resolves.toMatchObject({ ok: true });
+
+    expect(switchResult).toEqual({ ok: false, reason: "concurrent_change" });
+    expect(pbm.lineup).toEqual([{ id: 500, machineId: TITLE_ID }]);
+    const state = await getPinballMapState();
+    expect(state?.locationId).toBe(26454);
+    expect(state?.snapshotJson?.lmxes.map((lmx) => lmx.id)).toEqual([500]);
   });
 
   it("retires an abandonment record when the add reclaims its lmx", async () => {

@@ -1,5 +1,5 @@
 {
-  "id": "75ae50f1-7165-4d0b-8f77-c726592c6175",
+  "id": "21e9fff2-48cd-4f57-8abe-50cffbfbf05c",
   "prevId": "fb3cd430-be8e-4036-a2b3-30c6e909c1f9",
   "version": "7",
   "dialect": "postgresql",
@@ -2272,6 +2272,25 @@
           "primaryKey": false,
           "notNull": false
         },
+        "configuration_generation": {
+          "name": "configuration_generation",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "mutation_lease_id": {
+          "name": "mutation_lease_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "mutation_lease_expires_at": {
+          "name": "mutation_lease_expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
         "snapshot_json": {
           "name": "snapshot_json",
           "type": "jsonb",
@@ -2356,6 +2375,10 @@
         "pinballmap_state_sync_status_check": {
           "name": "pinballmap_state_sync_status_check",
           "value": "last_sync_status IN ('unknown', 'ok', 'error')"
+        },
+        "pinballmap_state_mutation_lease_pair_check": {
+          "name": "pinballmap_state_mutation_lease_pair_check",
+          "value": "(mutation_lease_id IS NULL) = (mutation_lease_expires_at IS NULL)"
         }
       },
       "isRLSEnabled": true

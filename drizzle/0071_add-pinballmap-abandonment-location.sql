@@ -12,3 +12,8 @@ SET "location_id" = COALESCE(
   (SELECT "location_id" FROM "pinballmap_state" WHERE "id" = 'singleton'),
   "location_id"
 );
+--> statement-breakpoint
+ALTER TABLE "pinballmap_state" ADD COLUMN "configuration_generation" integer DEFAULT 0 NOT NULL;--> statement-breakpoint
+ALTER TABLE "pinballmap_state" ADD COLUMN "mutation_lease_id" uuid;--> statement-breakpoint
+ALTER TABLE "pinballmap_state" ADD COLUMN "mutation_lease_expires_at" timestamp with time zone;--> statement-breakpoint
+ALTER TABLE "pinballmap_state" ADD CONSTRAINT "pinballmap_state_mutation_lease_pair_check" CHECK ((mutation_lease_id IS NULL) = (mutation_lease_expires_at IS NULL));

@@ -34,6 +34,13 @@ describe("0071 abandoned-listing location backfill", () => {
       ALTER TABLE pinballmap_abandoned_listings DROP COLUMN location_id
     `);
     await db.execute(sql`
+      ALTER TABLE pinballmap_state
+        DROP CONSTRAINT pinballmap_state_mutation_lease_pair_check,
+        DROP COLUMN configuration_generation,
+        DROP COLUMN mutation_lease_id,
+        DROP COLUMN mutation_lease_expires_at
+    `);
+    await db.execute(sql`
       INSERT INTO pinballmap_abandoned_listings (
         machine_id,
         lmx_id,

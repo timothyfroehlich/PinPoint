@@ -621,6 +621,39 @@ describe("tracked-location concurrency guards", () => {
     fetchSpy.mockRestore();
   });
 
+  it("drops an older sync after a same-location configuration save", async () => {
+    const db = await getTestDb();
+    const { getMockClient } = await import("~/lib/pinballmap/client-mock");
+    const { getPinballMapState, setTrackedLocation, syncLocationSnapshot } =
+      await import("~/lib/pinballmap/state");
+    await db.insert(pinballmapState).values({
+      id: "singleton",
+      locationId: 26454,
+      snapshotJson: snapshotAt(26454, "Original APC"),
+      lastSyncStatus: "ok",
+    });
+    const freshlyValidated = snapshotAt(26454, "Authoritative APC", [
+      { id: 3, machineId: 300 },
+    ]);
+    const fetchSpy = vi
+      .spyOn(getMockClient(), "fetchLocation")
+      .mockImplementationOnce(async () => {
+        await expect(setTrackedLocation(26454)).resolves.toEqual({ ok: true });
+        return snapshotAt(26454, "Stale APC", [{ id: 2, machineId: 200 }]);
+      })
+      .mockResolvedValueOnce(freshlyValidated);
+
+    await expect(syncLocationSnapshot({ trigger: "cron" })).resolves.toEqual({
+      ok: false,
+      reason: "superseded",
+    });
+    const state = await getPinballMapState();
+    expect(state?.locationId).toBe(26454);
+    expect(state?.configurationGeneration).toBe(1);
+    expect(state?.snapshotJson).toEqual(freshlyValidated);
+    fetchSpy.mockRestore();
+  });
+
   it("does not overwrite a concurrent configuration save", async () => {
     const db = await getTestDb();
     const { getMockClient } = await import("~/lib/pinballmap/client-mock");

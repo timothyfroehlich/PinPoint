@@ -20,6 +20,7 @@ import { machines, userProfiles, pinballmapState } from "~/server/db/schema";
 import { reconcileAfterSync } from "~/lib/pinballmap/sync";
 import {
   listSurfacingAbandonedForMachine,
+  recordAbandonedListing,
   retireAbandonmentForLmx,
 } from "~/lib/pinballmap/abandoned-listings";
 import { getPinballMapWriteCredentials } from "~/lib/pinballmap/credentials";
@@ -35,8 +36,11 @@ import {
   type CatalogFamily,
 } from "~/lib/pinballmap/catalog";
 import {
+  claimPinballMapMutationLease,
   getPinballMapState,
+  releasePinballMapMutationLease,
   syncLocationSnapshot,
+  type PinballMapMutationLease,
 } from "~/lib/pinballmap/state";
 import { PBM_REFRESH_REFILL_MS } from "~/lib/pinballmap/config";
 import {
@@ -441,6 +445,45 @@ async function editStoredSnapshot(
     .where(eq(pinballmapState.id, "singleton"));
 }
 
+async function mutationLeaseOwnsLocation(
+  tx: Tx,
+  lease: PinballMapMutationLease
+): Promise<boolean> {
+  const [row] = await tx
+    .select({
+      locationId: pinballmapState.locationId,
+      configurationGeneration: pinballmapState.configurationGeneration,
+      mutationLeaseId: pinballmapState.mutationLeaseId,
+    })
+    .from(pinballmapState)
+    .where(eq(pinballmapState.id, "singleton"))
+    .for("update");
+  return (
+    row?.locationId === lease.locationId &&
+    row.configurationGeneration === lease.configurationGeneration &&
+    row.mutationLeaseId === lease.id
+  );
+}
+
+async function locationGenerationIsCurrent(
+  tx: Tx,
+  locationId: number,
+  configurationGeneration: number
+): Promise<boolean> {
+  const [row] = await tx
+    .select({
+      locationId: pinballmapState.locationId,
+      configurationGeneration: pinballmapState.configurationGeneration,
+    })
+    .from(pinballmapState)
+    .where(eq(pinballmapState.id, "singleton"))
+    .for("update");
+  return (
+    row?.locationId === locationId &&
+    row.configurationGeneration === configurationGeneration
+  );
+}
+
 export type ListPinballmapResult = Result<
   { lmxId: number },
   | "VALIDATION"
@@ -509,6 +552,7 @@ export async function addMachineToPinballMapAction(
   if (state?.locationId === null || state?.locationId === undefined)
     return err("SERVER", "Pinball Map isn't configured yet");
   const locationId = state.locationId;
+  const configurationGeneration = state.configurationGeneration;
 
   // Idempotent: the lineup already carries this title, so there is nothing to
   // add and the entry it already has is the answer. Spending a write call on
@@ -523,9 +567,24 @@ export async function addMachineToPinballMapAction(
     ? findLmxForMachine(state.snapshotJson, titleId)
     : null;
   if (existing) {
-    await db.transaction(async (tx) => {
+    const committed = await db.transaction(async (tx) => {
+      if (
+        !(await locationGenerationIsCurrent(
+          tx,
+          locationId,
+          configurationGeneration
+        ))
+      ) {
+        return false;
+      }
       await retireAbandonmentForLmx(tx, existing.id);
+      return true;
     });
+    if (!committed)
+      return err(
+        "SERVER",
+        "The tracked Pinball Map location changed while this addition was running. Reload the page and try again."
+      );
     revalidatePath(`/m/${machine.initials}`);
     return ok({ lmxId: existing.id });
   }
@@ -538,49 +597,83 @@ export async function addMachineToPinballMapAction(
       "No Pinball Map operator account is set up yet, so PinPoint can't write to Pinball Map."
     );
 
-  const client = await getPinballMapClient();
-  const written = await client.addMachine({
-    credentials,
+  const lease = await claimPinballMapMutationLease(
     locationId,
-    machineId: titleId,
-  });
-  if (!written.ok) {
-    log.error(
-      { reason: written.reason, action: "pinballmap.addMachine" },
-      "PinballMap add rejected"
+    configurationGeneration
+  );
+  if (!lease)
+    return err(
+      "SERVER",
+      "The tracked Pinball Map location is being changed. Reload the page and try again."
     );
-    return err("PBM_REJECTED", pbmWriteFailureMessage(written));
+
+  try {
+    const client = await getPinballMapClient();
+    const written = await client.addMachine({
+      credentials,
+      locationId,
+      machineId: titleId,
+    });
+    if (!written.ok) {
+      log.error(
+        { reason: written.reason, action: "pinballmap.addMachine" },
+        "PinballMap add rejected"
+      );
+      return err("PBM_REJECTED", pbmWriteFailureMessage(written));
+    }
+    const lmxId = written.lmxId;
+    // --- transaction: local state only ---
+
+    const committed = await db.transaction(async (tx) => {
+      if (!(await mutationLeaseOwnsLocation(tx, lease))) return false;
+      // PBM returns the EXISTING lmx when the entry is already on the lineup, so
+      // an add can reclaim one a machine walked away from.
+      await retireAbandonmentForLmx(tx, lmxId);
+      // The stored lineup is what every control renders from, so it has to carry
+      // the entry we just created — otherwise the page repaints as still Missing
+      // and offers Add again, for up to an hour (CORE-ARCH-012).
+      await editStoredSnapshot(tx, locationId, (snapshot) =>
+        withLmxAdded(snapshot, lmxId, titleId)
+      );
+      await createMachineTimelineEvent(
+        machine.id,
+        {
+          sourceType: "lifecycle",
+          tag: "lifecycle",
+          eventData: { kind: "pinballmap_listing", action: "listed", lmxId },
+          actorId: userId,
+        },
+        tx
+      );
+      return true;
+    });
+
+    if (!committed) {
+      // The only normal way to lose the lease is an invocation outliving its
+      // recovery window. Do not report a listing we could not attach locally;
+      // retain its exact old-location handle as an actionable cleanup record.
+      await db.transaction(async (tx) => {
+        await recordAbandonedListing(
+          tx,
+          machine.id,
+          { lmxId, pinballmapMachineId: titleId, locationId },
+          userId
+        );
+      });
+      return err(
+        "SERVER",
+        "The tracked Pinball Map location changed while this addition was running. The old-location entry was saved for cleanup; reload the page."
+      );
+    }
+
+    revalidatePath(`/m/${machine.initials}`);
+    // The stored lineup changed, and every same-title cabinet's state derives
+    // from it — a sibling reads differently now.
+    revalidatePath("/m", "layout");
+    return ok({ lmxId });
+  } finally {
+    await releasePinballMapMutationLease(lease.id);
   }
-  const lmxId = written.lmxId;
-  // --- transaction: local state only ---
-
-  await db.transaction(async (tx) => {
-    // PBM returns the EXISTING lmx when the entry is already on the lineup, so
-    // an add can reclaim one a machine walked away from.
-    await retireAbandonmentForLmx(tx, lmxId);
-    // The stored lineup is what every control renders from, so it has to carry
-    // the entry we just created — otherwise the page repaints as still Missing
-    // and offers Add again, for up to an hour (CORE-ARCH-012).
-    await editStoredSnapshot(tx, locationId, (snapshot) =>
-      withLmxAdded(snapshot, lmxId, titleId)
-    );
-    await createMachineTimelineEvent(
-      machine.id,
-      {
-        sourceType: "lifecycle",
-        tag: "lifecycle",
-        eventData: { kind: "pinballmap_listing", action: "listed", lmxId },
-        actorId: userId,
-      },
-      tx
-    );
-  });
-
-  revalidatePath(`/m/${machine.initials}`);
-  // The stored lineup changed, and every same-title cabinet's state derives
-  // from it — a sibling reads differently now.
-  revalidatePath("/m", "layout");
-  return ok({ lmxId });
 }
 
 export type UnlistPinballmapResult = Result<

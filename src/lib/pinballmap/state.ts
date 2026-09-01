@@ -1,5 +1,6 @@
 import "server-only";
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { randomUUID } from "node:crypto";
+import { and, eq, isNull, lt, or, sql } from "drizzle-orm";
 import { db } from "~/server/db";
 import { pinballmapState } from "~/server/db/schema";
 import { getPinballMapClient } from "./client";
@@ -21,6 +22,13 @@ import type { PinballmapRuntimeState } from "~/lib/types";
  */
 
 const SINGLETON_ID = "singleton";
+const MUTATION_LEASE_MS = 10 * 60 * 1000;
+
+export interface PinballMapMutationLease {
+  id: string;
+  locationId: number;
+  configurationGeneration: number;
+}
 
 /** Read the integration-state singleton (null when never initialized). */
 export async function getPinballMapState(): Promise<PinballmapRuntimeState | null> {
@@ -28,6 +36,7 @@ export async function getPinballMapState(): Promise<PinballmapRuntimeState | nul
     .select({
       id: pinballmapState.id,
       locationId: pinballmapState.locationId,
+      configurationGeneration: pinballmapState.configurationGeneration,
       snapshotJson: pinballmapState.snapshotJson,
       lastSyncedAt: pinballmapState.lastSyncedAt,
       lastSyncAttemptAt: pinballmapState.lastSyncAttemptAt,
@@ -44,6 +53,102 @@ export async function getPinballMapState(): Promise<PinballmapRuntimeState | nul
     .where(eq(pinballmapState.id, SINGLETON_ID))
     .limit(1);
   return row ?? null;
+}
+
+/** Materialize the singleton without naming deploy-order compatibility columns. */
+async function ensureStateRow(): Promise<void> {
+  await db.execute(sql`
+    INSERT INTO "pinballmap_state" ("id")
+    VALUES (${SINGLETON_ID})
+    ON CONFLICT ("id") DO NOTHING
+  `);
+}
+
+function availableMutationLease(now: Date): ReturnType<typeof or> {
+  return or(
+    isNull(pinballmapState.mutationLeaseId),
+    lt(pinballmapState.mutationLeaseExpiresAt, now)
+  );
+}
+
+/**
+ * Reserve the configured location for one outbound addition.
+ *
+ * A configuration save claims the same singleton lease before its validating
+ * fetch, so exactly one of the save and add can own the location. The lease is
+ * deliberately time-bounded: a killed server action cannot strand integration
+ * configuration forever.
+ */
+export async function claimPinballMapMutationLease(
+  locationId: number,
+  configurationGeneration: number
+): Promise<PinballMapMutationLease | null> {
+  const now = new Date();
+  const id = randomUUID();
+  const [claimed] = await db
+    .update(pinballmapState)
+    .set({
+      mutationLeaseId: id,
+      mutationLeaseExpiresAt: new Date(now.getTime() + MUTATION_LEASE_MS),
+    })
+    .where(
+      and(
+        eq(pinballmapState.id, SINGLETON_ID),
+        eq(pinballmapState.locationId, locationId),
+        eq(pinballmapState.configurationGeneration, configurationGeneration),
+        availableMutationLease(now)
+      )
+    )
+    .returning({ id: pinballmapState.id });
+  return claimed ? { id, locationId, configurationGeneration } : null;
+}
+
+export async function releasePinballMapMutationLease(
+  leaseId: string
+): Promise<void> {
+  await db
+    .update(pinballmapState)
+    .set({ mutationLeaseId: null, mutationLeaseExpiresAt: null })
+    .where(
+      and(
+        eq(pinballmapState.id, SINGLETON_ID),
+        eq(pinballmapState.mutationLeaseId, leaseId)
+      )
+    );
+}
+
+async function claimConfigurationLease(
+  expectedLocationId: number | null,
+  expectedGeneration: number
+): Promise<{ id: string; configurationGeneration: number } | null> {
+  await ensureStateRow();
+  const now = new Date();
+  const id = randomUUID();
+  const locationGuard =
+    expectedLocationId === null
+      ? isNull(pinballmapState.locationId)
+      : eq(pinballmapState.locationId, expectedLocationId);
+  const [claimed] = await db
+    .update(pinballmapState)
+    .set({
+      configurationGeneration: sql`${pinballmapState.configurationGeneration} + 1`,
+      mutationLeaseId: id,
+      mutationLeaseExpiresAt: new Date(now.getTime() + MUTATION_LEASE_MS),
+    })
+    .where(
+      and(
+        eq(pinballmapState.id, SINGLETON_ID),
+        locationGuard,
+        eq(pinballmapState.configurationGeneration, expectedGeneration),
+        availableMutationLease(now)
+      )
+    )
+    .returning({
+      configurationGeneration: pinballmapState.configurationGeneration,
+    });
+  return claimed
+    ? { id, configurationGeneration: claimed.configurationGeneration }
+    : null;
 }
 
 /**
@@ -146,6 +251,7 @@ export async function getRefreshAllowance(
  */
 async function recordSyncSuccess(
   locationId: number,
+  configurationGeneration: number,
   snapshot: NonNullable<PinballmapRuntimeState["snapshotJson"]>,
   syncedAt: Date,
   updatedBy: string | undefined
@@ -183,6 +289,7 @@ async function recordSyncSuccess(
         "pinballmap_state"."updated_by"
       )
     WHERE "pinballmap_state"."location_id" = ${locationId}
+      AND "pinballmap_state"."configuration_generation" = ${configurationGeneration}
     RETURNING "id"
   `);
   return hasReturnedRow(written);
@@ -190,6 +297,7 @@ async function recordSyncSuccess(
 
 async function recordSyncFailure(
   locationId: number,
+  configurationGeneration: number,
   message: string,
   attemptedAt: Date,
   updatedBy: string | undefined
@@ -221,6 +329,7 @@ async function recordSyncFailure(
         "pinballmap_state"."updated_by"
       )
     WHERE "pinballmap_state"."location_id" = ${locationId}
+      AND "pinballmap_state"."configuration_generation" = ${configurationGeneration}
     RETURNING "id"
   `);
   return hasReturnedRow(written);
@@ -276,6 +385,7 @@ function hasReturnedRow(result: unknown): boolean {
  */
 async function stampSyncAttempt(
   expectedLocationId: number | null,
+  expectedGeneration: number,
   attemptAt: Date,
   guarded: boolean
 ): Promise<boolean> {
@@ -308,6 +418,7 @@ async function stampSyncAttempt(
         "last_sync_attempt_at" = EXCLUDED."last_sync_attempt_at",
         "updated_at" = EXCLUDED."updated_at"
       WHERE ${locationGuard}
+        AND "pinballmap_state"."configuration_generation" = ${expectedGeneration}
       RETURNING "id"
     `);
     return hasReturnedRow(stamped);
@@ -339,6 +450,7 @@ async function stampSyncAttempt(
         + (interval '1 millisecond' * ${PBM_REFRESH_REFILL_MS} * ${ELAPSED_PERIODS})
     WHERE ${AVAILABLE_TOKENS} >= 1
       AND ${locationGuard}
+      AND "pinballmap_state"."configuration_generation" = ${expectedGeneration}
     RETURNING "id"
   `);
   return hasReturnedRow(claimed);
@@ -380,6 +492,7 @@ export async function syncLocationSnapshot(
       : "manual";
   const state = await getPinballMapState();
   const trackedLocationId = state?.locationId ?? null;
+  const configurationGeneration = state?.configurationGeneration ?? 0;
   const expectedLocationId =
     validation?.expectedLocationId ?? trackedLocationId;
   const locationId = validation?.locationId ?? trackedLocationId;
@@ -395,12 +508,16 @@ export async function syncLocationSnapshot(
   // (TOCTOU-safe); cron records unconditionally.
   const claimed = await stampSyncAttempt(
     expectedLocationId,
+    configurationGeneration,
     syncedAt,
     trigger === "manual"
   );
   if (!claimed) {
     const current = await getPinballMapState();
-    if ((current?.locationId ?? null) !== expectedLocationId) {
+    if (
+      (current?.locationId ?? null) !== expectedLocationId ||
+      (current?.configurationGeneration ?? 0) !== configurationGeneration
+    ) {
       return { ok: false, reason: "superseded" };
     }
     // Re-read rather than reuse the row loaded above: the claim we just lost
@@ -432,6 +549,7 @@ export async function syncLocationSnapshot(
     }
     const stored = await recordSyncSuccess(
       locationId,
+      configurationGeneration,
       snapshot,
       syncedAt,
       opts?.updatedBy
@@ -447,6 +565,7 @@ export async function syncLocationSnapshot(
     // last-successful-sync clock. `updatedAt` still records that we wrote.
     const stored = await recordSyncFailure(
       locationId,
+      configurationGeneration,
       message,
       syncedAt,
       opts?.updatedBy
@@ -478,47 +597,72 @@ export async function setTrackedLocation(
 ): Promise<SetTrackedLocationResult> {
   const state = await getPinballMapState();
   const previousLocationId = state?.locationId ?? null;
+  const previousGeneration = state?.configurationGeneration ?? 0;
   const previousLocationGuard =
     previousLocationId === null
       ? isNull(pinballmapState.locationId)
       : eq(pinballmapState.locationId, previousLocationId);
   const actor = updatedBy === undefined ? {} : { updatedBy };
 
-  if (locationId === null) {
-    if (!state) return { ok: true };
-    const cleared = await db.transaction(async (tx) =>
-      tx
+  if (locationId === null && !state) return { ok: true };
+
+  // Claim before validation so an Add cannot begin halfway through a switch,
+  // and advance the generation immediately so every older sync is superseded
+  // even for A -> B -> A or a same-location re-save (spec 10.9, 10.14).
+  const lease = await claimConfigurationLease(
+    previousLocationId,
+    previousGeneration
+  );
+  if (!lease) return { ok: false, reason: "concurrent_change" };
+
+  try {
+    if (locationId === null) {
+      const cleared = await db
         .update(pinballmapState)
-        .set({ locationId: null, updatedAt: new Date(), ...actor })
-        .where(and(eq(pinballmapState.id, SINGLETON_ID), previousLocationGuard))
-        .returning({ id: pinballmapState.id })
-    );
-    return cleared.length > 0
-      ? { ok: true }
-      : { ok: false, reason: "concurrent_change" };
-  }
-
-  const validated = await syncLocationSnapshot({
-    validation: { locationId, expectedLocationId: previousLocationId },
-    ...(updatedBy === undefined ? {} : { updatedBy }),
-  });
-  if (!validated.ok) {
-    if (validated.reason === "throttled") return validated;
-    if (validated.reason === "superseded") {
-      return { ok: false, reason: "concurrent_change" };
+        .set({
+          locationId: null,
+          mutationLeaseId: null,
+          mutationLeaseExpiresAt: null,
+          updatedAt: new Date(),
+          ...actor,
+        })
+        .where(
+          and(
+            eq(pinballmapState.id, SINGLETON_ID),
+            previousLocationGuard,
+            eq(pinballmapState.mutationLeaseId, lease.id),
+            eq(
+              pinballmapState.configurationGeneration,
+              lease.configurationGeneration
+            )
+          )
+        )
+        .returning({ id: pinballmapState.id });
+      return cleared.length > 0
+        ? { ok: true }
+        : { ok: false, reason: "concurrent_change" };
     }
-    return {
-      ok: false,
-      reason: "error",
-      error:
-        validated.reason === "error"
-          ? validated.error
-          : "Pinball Map is not configured.",
-    };
-  }
 
-  const committed = await db.transaction(async (tx) =>
-    tx
+    const validated = await syncLocationSnapshot({
+      validation: { locationId, expectedLocationId: previousLocationId },
+      ...(updatedBy === undefined ? {} : { updatedBy }),
+    });
+    if (!validated.ok) {
+      if (validated.reason === "throttled") return validated;
+      if (validated.reason === "superseded") {
+        return { ok: false, reason: "concurrent_change" };
+      }
+      return {
+        ok: false,
+        reason: "error",
+        error:
+          validated.reason === "error"
+            ? validated.error
+            : "Pinball Map is not configured.",
+      };
+    }
+
+    const committed = await db
       .update(pinballmapState)
       .set({
         locationId,
@@ -527,13 +671,27 @@ export async function setTrackedLocation(
         lastSyncAttemptAt: validated.syncedAt,
         lastSyncStatus: "ok",
         lastSyncError: null,
+        mutationLeaseId: null,
+        mutationLeaseExpiresAt: null,
         updatedAt: validated.syncedAt,
         ...actor,
       })
-      .where(and(eq(pinballmapState.id, SINGLETON_ID), previousLocationGuard))
-      .returning({ id: pinballmapState.id })
-  );
-  return committed.length > 0
-    ? { ok: true }
-    : { ok: false, reason: "concurrent_change" };
+      .where(
+        and(
+          eq(pinballmapState.id, SINGLETON_ID),
+          previousLocationGuard,
+          eq(pinballmapState.mutationLeaseId, lease.id),
+          eq(
+            pinballmapState.configurationGeneration,
+            lease.configurationGeneration
+          )
+        )
+      )
+      .returning({ id: pinballmapState.id });
+    return committed.length > 0
+      ? { ok: true }
+      : { ok: false, reason: "concurrent_change" };
+  } finally {
+    await releasePinballMapMutationLease(lease.id);
+  }
 }
