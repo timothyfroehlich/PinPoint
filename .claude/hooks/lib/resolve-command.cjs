@@ -103,6 +103,7 @@ const makeWrapper = (valueFlags, options = {}) => ({
   valueFlags: new Set(valueFlags),
   payloadFlags: options.payloadFlags ?? [],
   replacementFlags: options.replacementFlags ?? [],
+  optionalReplacementFlags: new Set(options.optionalReplacementFlags ?? []),
   positionals: options.positionals ?? 0,
 });
 
@@ -123,7 +124,7 @@ const WRAPPERS = new Map([
   // `xargs [flags] CMD ARGS…` — CMD really does run, with extra args appended
   // from stdin. Treating xargs as a wrapper is what closes
   // `xargs -I{} gh pr merge {} < prs.txt`.
-  ["xargs", makeWrapper(["-I", "-i", "-n", "-P", "-d", "-E", "-L", "-s", "-a", "--replace", "--max-args", "--max-procs", "--delimiter", "--eof", "--max-lines", "--max-chars", "--arg-file"], { replacementFlags: ["-I", "--replace"] })],
+  ["xargs", makeWrapper(["-I", "-n", "-P", "-d", "-E", "-L", "-s", "-a", "--max-args", "--max-procs", "--delimiter", "--eof", "--max-lines", "--max-chars", "--arg-file"], { replacementFlags: ["-I", "-i", "--replace"], optionalReplacementFlags: ["-i", "--replace"] })],
 ]);
 
 // Shells: `sh -c "<program>"` re-parses its argument, and `sh <file>` makes the
@@ -555,6 +556,9 @@ function readReplacementFlag(wrapper, words, i) {
   const flag = word.value;
   for (const replacementFlag of wrapper.replacementFlags) {
     if (flag === replacementFlag) {
+      if (wrapper.optionalReplacementFlags.has(replacementFlag)) {
+        return { value: "{}", dynamic: false };
+      }
       const next = words[i + 1];
       if (!next) return null;
       return { value: next.value, dynamic: next.dynamic || !next.value };

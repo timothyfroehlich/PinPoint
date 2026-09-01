@@ -249,6 +249,16 @@ describe("wrappers resolve through to the real command", () => {
     ]);
     expect(segment.dynamicArgs).toEqual([false, false, false, false, true]);
   });
+
+  it.each(["-i", "--replace"])(
+    "does not consume the command after bare xargs %s",
+    (flag) => {
+      const segment = firstSegment(`xargs ${flag} gh pr merge {}`);
+      expect(segment.name).toBe("gh");
+      expect(segment.args).toEqual(["pr", "merge", "{}"]);
+      expect(segment.dynamicArgs).toEqual([false, false, true]);
+    }
+  );
 });
 
 // ---------------------------------------------------------------------------

@@ -137,6 +137,7 @@ describe("block-direct-merge.cjs — gh merge paths", () => {
     "ARGS='--repo timothyfroehlich/PinPoint'; gh pr merge 4 --repo timothyfroehlich/dotfiles $ARGS",
     "gh api $FLAG -X PUT repos/timothyfroehlich/dotfiles/pulls/4/merge",
     "printf 'PinPoint\\n' | xargs -I dotfiles gh pr merge 1 --repo timothyfroehlich/dotfiles",
+    "printf '123\\n' | xargs --replace gh pr merge {}",
   ])("fails closed on an ambiguous repository target: %s", (command) => {
     const { status } = runHook(bashPayload(command));
     expect(status).toBe(2);
