@@ -134,6 +134,7 @@ describe("block-direct-merge.cjs — gh merge paths", () => {
     "gh pr merge 123 --repo timothyfroehlich/Pin$(printf Point)",
     "gh pr merge 123 --body --repo=timothyfroehlich/dotfiles",
     "FLAG=--body; gh pr merge 123 $FLAG --repo=timothyfroehlich/dotfiles",
+    "ARGS='--repo timothyfroehlich/PinPoint'; gh pr merge 4 --repo timothyfroehlich/dotfiles $ARGS",
     "gh api $FLAG -X PUT repos/timothyfroehlich/dotfiles/pulls/4/merge",
     "printf 'PinPoint\\n' | xargs -I dotfiles gh pr merge 1 --repo timothyfroehlich/dotfiles",
   ])("fails closed on an ambiguous repository target: %s", (command) => {

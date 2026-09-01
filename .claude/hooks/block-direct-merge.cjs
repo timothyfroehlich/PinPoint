@@ -278,6 +278,14 @@ function ghRepositoryTarget(args, dynamicArgs = [], commandKind) {
   let explicit = false;
   let ambiguous = false;
   const repositories = [];
+  const dynamicPrOptionParsing =
+    commandKind === "pr" &&
+    hasDynamicOptionBefore(
+      args,
+      dynamicArgs,
+      args.length,
+      GH_VALUE_FLAGS
+    );
   const record = (value, dynamic = false) => {
     explicit = true;
     if (dynamic) {
@@ -299,8 +307,7 @@ function ghRepositoryTarget(args, dynamicArgs = [], commandKind) {
       if (arg === "-R" || arg === "--repo") {
         record(
           args[i + 1] || null,
-          Boolean(dynamicArgs[i + 1]) ||
-            hasDynamicOptionBefore(args, dynamicArgs, i, GH_VALUE_FLAGS)
+          Boolean(dynamicArgs[i + 1]) || dynamicPrOptionParsing
         );
         i++;
         continue;
@@ -309,8 +316,7 @@ function ghRepositoryTarget(args, dynamicArgs = [], commandKind) {
       if (equals) {
         record(
           equals[1],
-          Boolean(dynamicArgs[i]) ||
-            hasDynamicOptionBefore(args, dynamicArgs, i, GH_VALUE_FLAGS)
+          Boolean(dynamicArgs[i]) || dynamicPrOptionParsing
         );
         continue;
       }
@@ -318,8 +324,7 @@ function ghRepositoryTarget(args, dynamicArgs = [], commandKind) {
       if (attachedShort) {
         record(
           attachedShort[1],
-          Boolean(dynamicArgs[i]) ||
-            hasDynamicOptionBefore(args, dynamicArgs, i, GH_VALUE_FLAGS)
+          Boolean(dynamicArgs[i]) || dynamicPrOptionParsing
         );
       }
     }
@@ -335,13 +340,7 @@ function ghRepositoryTarget(args, dynamicArgs = [], commandKind) {
     if (pullRequest && PULL_URL.test(pullRequest.value)) {
       record(
         pullRequest.value,
-        pullRequest.dynamic ||
-          hasDynamicOptionBefore(
-            args,
-            dynamicArgs,
-            pullRequest.index,
-            GH_VALUE_FLAGS
-          )
+        pullRequest.dynamic || dynamicPrOptionParsing
       );
     }
   }
