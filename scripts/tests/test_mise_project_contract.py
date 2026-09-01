@@ -49,7 +49,7 @@ EXPECTED_TOOL_BACKENDS = {
     "supabase": "aqua:supabase/cli",
     "zizmor": "aqua:zizmorcore/zizmor",
 }
-EXPECTED_LOCK_PLATFORMS = {
+REQUIRED_LOCK_PLATFORMS = {
     "node": {
         "linux-arm64",
         "linux-arm64-musl",
@@ -213,9 +213,9 @@ def _expected_tool_pins(
 def _assert_platform_locks_coherent(
     tool: str, expected_version: str, entry: dict[str, object]
 ) -> None:
-    """Require every supported platform to carry version-bound artifact data."""
-    expected_platforms = EXPECTED_LOCK_PLATFORMS.get(tool)
-    if expected_platforms is None:
+    """Require baseline platforms and validate every locked platform artifact."""
+    required_platforms = REQUIRED_LOCK_PLATFORMS.get(tool)
+    if required_platforms is None:
         return
 
     platform_prefix = "platforms."
@@ -224,11 +224,12 @@ def _assert_platform_locks_coherent(
         for key in entry
         if key.startswith(platform_prefix)
     }
-    assert actual_platforms == expected_platforms, (
-        f"mise.lock {tool} platforms must exactly match the supported set; "
-        f"expected {sorted(expected_platforms)}, got {sorted(actual_platforms)}"
+    missing_platforms = required_platforms - actual_platforms
+    assert not missing_platforms, (
+        f"mise.lock {tool} platforms must include the required baseline; "
+        f"missing {sorted(missing_platforms)}, got {sorted(actual_platforms)}"
     )
-    for platform in sorted(expected_platforms):
+    for platform in sorted(actual_platforms):
         artifact = entry.get(f"{platform_prefix}{platform}")
         assert isinstance(artifact, dict), (
             f"mise.lock {tool} {platform} platform entry must be a table"
@@ -380,13 +381,45 @@ def test_mise_lock_accepts_structurally_coherent_managed_tool_bump(
     lock_entry = bumped_lock["tools"][tool][0]
     lock_entry["version"] = bumped_version
     lock_entry["specifiers"] = [bumped_version]
-    for platform in EXPECTED_LOCK_PLATFORMS[tool]:
-        artifact = lock_entry[f"platforms.{platform}"]
+    for key, artifact in lock_entry.items():
+        if not key.startswith("platforms."):
+            continue
+        assert isinstance(artifact, dict)
         url = artifact.get("url")
         if isinstance(url, str):
             artifact["url"] = url.replace(current_version, bumped_version)
 
     _assert_mise_lock_coherent(bumped_mise, bumped_lock, package_data)
+
+
+def test_mise_lock_validates_additional_platform_artifact() -> None:
+    """A generated platform addition passes only while version-coherent."""
+    mise_data = tomllib.loads(MISE_TOML_PATH.read_text(encoding="utf-8"))
+    lock_data = tomllib.loads(MISE_LOCK_PATH.read_text(encoding="utf-8"))
+    package_data = json.loads(PACKAGE_JSON_PATH.read_text(encoding="utf-8"))
+    current_version = _mise_managed_pins(mise_data)["python"]
+    expanded_lock = deepcopy(lock_data)
+    python_entry = expanded_lock["tools"]["python"][0]
+    platform_key = "platforms.linux-arm64-musl"
+    python_entry[platform_key] = {
+        "checksum": f"sha256:{'0' * 64}",
+        "url": (
+            "https://github.com/astral-sh/python-build-standalone/releases/"
+            f"download/test/cpython-{current_version}-arm64-musl.tar.gz"
+        ),
+        "provenance": "github-attestations",
+    }
+
+    _assert_mise_lock_coherent(mise_data, expanded_lock, package_data)
+
+    python_entry[platform_key]["url"] = python_entry[platform_key]["url"].replace(
+        current_version, "0.0.0"
+    )
+    with pytest.raises(
+        AssertionError,
+        match="linux-arm64-musl platform URL must reference",
+    ):
+        _assert_mise_lock_coherent(mise_data, expanded_lock, package_data)
 
 
 def test_mise_lock_rejects_version_mismatch() -> None:
