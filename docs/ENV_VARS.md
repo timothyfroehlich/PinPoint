@@ -223,6 +223,12 @@ lifecycle, deploys) — never read by the app:
 `GITHUB_TOKEN`, `SUPABASE_ACCESS_TOKEN`, `SUPABASE_PROJECT_ID`, `VERCEL_TOKEN`,
 `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`.
 
+### 4.6 Retired variables (must be absent)
+
+| Var                                                       | Sens.   | Scope  | Former owner module          | Note                                                                                          |
+| --------------------------------------------------------- | ------- | ------ | ---------------------------- | --------------------------------------------------------------------------------------------- |
+| `NEXT_PUBLIC_TURNSTILE_SITE_KEY` / `TURNSTILE_SECRET_KEY` | 🟢 / 🔴 | Vercel | `src/lib/security/turnstile` | 🚫 must be absent. CAPTCHA removed. Delete from Vercel settings so dead keys are not shipped. |
+
 ## 5. Alias pairs (same value, two accepted names)
 
 These are **dual _names_ for one value** (Supabase docs vs Vercel integration

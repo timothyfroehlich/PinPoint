@@ -22,6 +22,10 @@ The `'strict-dynamic'` directive allows scripts loaded by nonce'd scripts to exe
 
 **Trade-off**: Slightly relaxes CSP but required for modern JavaScript frameworks. The initial script must still have a valid nonce.
 
+## Supabase Captcha Invariant
+
+**Supabase project-level captcha protection must remain disabled** for the project. Because PinPoint does not send captcha tokens with authentication or report requests, enabling captcha at the Supabase project level will cause auth requests to fail with `captcha_failed`.
+
 ## Threat Model
 
 ### Not Protected Against
