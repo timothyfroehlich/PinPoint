@@ -161,13 +161,10 @@ export async function loginAction(
         );
 
         const mapped = getUserMessageForAuthError(error);
-        if (mapped) {
-          const loginCodes = new Set<string>(["RATE_LIMIT"]);
-          if (loginCodes.has(mapped.code)) {
-            return err(mapped.code as "RATE_LIMIT", mapped.message, {
-              submittedEmail,
-            });
-          }
+        if (mapped?.code === "RATE_LIMIT") {
+          return err("RATE_LIMIT", mapped.message, {
+            submittedEmail,
+          });
         }
 
         if (isAuthRetryableFetchError(error)) {

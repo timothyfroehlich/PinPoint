@@ -89,6 +89,12 @@ export function getUserMessageForAuthError(
         code: "SERVER",
         message: "Account registration is currently unavailable.",
       };
+    case "captcha_failed":
+      return {
+        code: "SERVER",
+        message:
+          "Authentication failed due to unexpected CAPTCHA requirement. Please contact an administrator.",
+      };
     default:
       return undefined;
   }

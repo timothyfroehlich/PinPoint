@@ -59,6 +59,16 @@ describe("getUserMessageForAuthError", () => {
     expect(result?.code).toBe("RATE_LIMIT");
   });
 
+  it("returns actionable SERVER message for captcha_failed", () => {
+    const error = new AuthApiError("captcha failed", 400, "captcha_failed");
+    const result = getUserMessageForAuthError(error);
+    expect(result).toEqual({
+      code: "SERVER",
+      message:
+        "Authentication failed due to unexpected CAPTCHA requirement. Please contact an administrator.",
+    });
+  });
+
   it("returns email confirmation message for email_not_confirmed", () => {
     const error = new AuthApiError("not confirmed", 403, "email_not_confirmed");
     const result = getUserMessageForAuthError(error);
