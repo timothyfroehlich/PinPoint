@@ -217,18 +217,6 @@ class TestMergeEnvLocal:
         assert "INBUCKET_SMTP_PORT=58325" in result
         assert "MAILPIT_SMTP_PORT=58325" in result
 
-    def test_turnstile_keys_are_absent(
-        self, tmp_path: Path, port_config: PortConfig
-    ) -> None:
-        result = merge_env_local(tmp_path, port_config)
-
-        # Turnstile keys must not appear at all — not even commented out.
-        # The application already handles unset keys gracefully:
-        # - Client (TurnstileWidget): if (!siteKey) return null
-        # - Server (turnstile.ts): if (!secretKey && !production) return true
-        assert "NEXT_PUBLIC_TURNSTILE_SITE_KEY" not in result
-        assert "TURNSTILE_SECRET_KEY" not in result
-
 
 class TestManagedKeys:
     """Test the managed key set."""

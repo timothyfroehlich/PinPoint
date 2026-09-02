@@ -55,11 +55,6 @@ export function getUserMessageForAuthError(
         code: "EMAIL_TAKEN",
         message: "This email is already registered.",
       };
-    case "captcha_failed":
-      return {
-        code: "CAPTCHA",
-        message: "Verification failed. Please refresh the page and try again.",
-      };
     case "over_request_rate_limit":
       return {
         code: "RATE_LIMIT",
@@ -97,18 +92,6 @@ export function getUserMessageForAuthError(
     default:
       return undefined;
   }
-}
-
-/**
- * Extracts the Turnstile token from FormData, returning undefined when
- * missing, empty, or not a string (e.g., File).
- */
-export function extractCaptchaToken(formData: FormData): string | undefined {
-  const entry = formData.get("captchaToken");
-  if (typeof entry === "string" && entry.length > 0) {
-    return entry;
-  }
-  return undefined;
 }
 
 /**

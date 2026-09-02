@@ -14,15 +14,10 @@
  *     They stay in the unit file as unit tests.
  *   - "returns err when db.query throws" is a forced-error path — can't
  *     reproduce with a real DB. Stays in unit.
- *   - All input-validation (Zod) blocks stay in unit.
- *   - All submitPublicIssueAction blocks stay in unit (turnstile is an
- *     external boundary, correctly mocked there).
- *
  * External boundaries kept mocked:
  *   - next/navigation, next/cache, next/headers
  *   - ~/lib/supabase/server
  *   - ~/lib/rate-limit
- *   - ~/lib/security/turnstile
  *   - ~/lib/logger
  *   - ~/lib/observability/report-error
  *   - ~/lib/blob/client, ~/lib/blob/config
@@ -77,10 +72,6 @@ vi.mock("~/lib/rate-limit", () => ({
   checkPublicIssueLimit: vi.fn().mockResolvedValue({ success: true, reset: 0 }),
   formatResetTime: vi.fn().mockReturnValue("0s"),
   getClientIp: vi.fn().mockResolvedValue("127.0.0.1"),
-}));
-
-vi.mock("~/lib/security/turnstile", () => ({
-  verifyTurnstileToken: vi.fn().mockResolvedValue(true),
 }));
 
 vi.mock("~/lib/blob/config", () => ({

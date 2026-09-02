@@ -123,12 +123,6 @@ export function PrivacyContent(): React.JSX.Element {
             visited page. These cookies expire after one year.
           </li>
           <li>
-            <strong className="text-foreground">Security cookies</strong> —
-            Cloudflare Turnstile sets cookies to verify you are a real person
-            when submitting forms (e.g., reporting issues, logging in). These
-            are essential for spam prevention.
-          </li>
-          <li>
             <strong className="text-foreground">Cookie consent</strong> — A
             cookie that records whether you have acknowledged this notice.
             Expires after one year.
@@ -206,11 +200,6 @@ export function PrivacyContent(): React.JSX.Element {
           <li>
             <strong className="text-foreground">Resend (Email Delivery)</strong>{" "}
             — Delivers notification emails on our behalf.
-          </li>
-          <li>
-            <strong className="text-foreground">Cloudflare (Security)</strong> —
-            Provides CAPTCHA challenges (Turnstile) to protect forms from
-            automated abuse.
           </li>
         </ul>
       </section>
