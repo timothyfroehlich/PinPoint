@@ -195,8 +195,5 @@
     "*.{json,css,md}": [
       "prettier --write"
     ]
-  },
-  "overrides": {
-    "fast-uri": "^3.1.7"
   }
 }
