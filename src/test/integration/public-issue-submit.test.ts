@@ -11,7 +11,6 @@
  * is the ground truth for each assertion.
  *
  * External boundaries kept mocked:
- *   - ~/lib/security/turnstile  (no Cloudflare round-trip)
  *   - ~/lib/rate-limit          (no Redis)
  *   - ~/lib/supabase/server     (auth.getUser — identity only)
  *   - next/headers, next/navigation, next/cache
@@ -63,10 +62,6 @@ vi.mock("~/lib/logger", () => ({
     error: vi.fn(),
     debug: vi.fn(),
   },
-}));
-
-vi.mock("~/lib/security/turnstile", () => ({
-  verifyTurnstileToken: vi.fn().mockResolvedValue(true),
 }));
 
 vi.mock("~/lib/rate-limit", () => ({

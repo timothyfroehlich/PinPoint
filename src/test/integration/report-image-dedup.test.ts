@@ -60,10 +60,6 @@ vi.mock("~/lib/logger", () => ({
   },
 }));
 
-vi.mock("~/lib/security/turnstile", () => ({
-  verifyTurnstileToken: vi.fn().mockResolvedValue(true),
-}));
-
 vi.mock("~/lib/rate-limit", () => ({
   checkAuthenticatedIssueLimit: vi
     .fn()

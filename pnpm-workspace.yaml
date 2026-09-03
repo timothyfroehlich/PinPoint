@@ -14,6 +14,9 @@ allowBuilds:
   esbuild: false
   sharp: false
 
+minimumReleaseAgeExclude:
+  - fast-uri@3.1.7
+
 overrides:
   esbuild: '>=0.28.1'
   minimatch: '>=10.2.3'
@@ -31,9 +34,8 @@ overrides:
   vite: '>=8.0.16'
   undici: '^7.29.0'
   js-yaml: '>=5.2.2'
-  fast-uri: '>=3.1.5 <4'
+  fast-uri: '>=3.1.7 <4'
   sharp: '>=0.35.0'
   '@hono/node-server': '>=2.0.5'
   hono: '>=4.12.34 <5'
   ip-address: '>=10.3.1 <11'
-

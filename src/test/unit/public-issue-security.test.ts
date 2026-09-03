@@ -27,11 +27,6 @@ vi.mock("~/lib/logger", () => ({
   },
 }));
 
-// Mock Turnstile CAPTCHA — always pass so tests exercise the logic beyond CAPTCHA
-vi.mock("~/lib/security/turnstile", () => ({
-  verifyTurnstileToken: vi.fn().mockResolvedValue(true),
-}));
-
 // Mock rate limiting
 vi.mock("~/lib/rate-limit", () => ({
   checkAuthenticatedIssueLimit: vi
