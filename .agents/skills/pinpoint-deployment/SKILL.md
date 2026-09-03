@@ -143,3 +143,14 @@ When `pnpm audit --audit-level=high` goes RED on a freshly-published advisory **
 - **Commit-bound, not PR-bound**: the override is a commit status on the head SHA. **Pushing a new commit drops it** — the gate re-fires and the override must be re-issued, so a newly-introduced real vulnerability is never silently masked. It only bypasses the audit gate; any other failing check stays red.
 - **Scope**: single PR only; never changes repo-wide audit policy or any other PR. No secrets required (default `GITHUB_TOKEN`).
 - **Implementation**: `.github/workflows/audit-override.yaml`, `scripts/workflow/audit-override/*.sh`; the consuming check is the `Run pnpm audit` step in `ci.yml` (`gate.sh check`).
+
+### Resolving advisories via overrides
+
+When fixing a transitive vulnerability via an override rather than bypassing:
+
+1. **Edit `pnpm-workspace.yaml`**: Add or bump the constraint under `overrides:` (e.g. `fast-uri: '>=3.1.7 <4'`). **Never add overrides to `package.json`** — in pnpm 11, package settings and overrides live in `pnpm-workspace.yaml`.
+2. **Regenerate lockfile**: Run `pnpm install` so `pnpm-lock.yaml` resolves the patched package.
+3. **Verify**:
+   - Run `pnpm why <pkg>` to confirm all dependency paths resolve to the patched version.
+   - Run `pnpm audit` to verify the advisory is cleared.
+   - Run `pnpm run check` to verify lockfile integrity and static checks.
