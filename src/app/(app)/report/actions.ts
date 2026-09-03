@@ -13,6 +13,7 @@ import {
   serverActionError,
 } from "~/lib/observability/report-error";
 import {
+  checkAuthenticatedIssueLimit,
   checkPublicIssueLimit,
   formatResetTime,
   getClientIp,
@@ -89,33 +90,51 @@ export async function submitPublicIssueAction(
     redirect("/report/success");
   }
 
-  // 2. Check Rate Limit
-  const ip = await getClientIp();
-  const { success, reset } = await checkPublicIssueLimit(ip);
-
-  if (!success) {
-    const resetTime = formatResetTime(reset);
-    return {
-      error: `Too many submissions. Please try again in ${resetTime}.`,
-    };
-  }
-
-  // 3. Resolve current user (used to skip CAPTCHA for authenticated reporters
-  // and reused later for permission resolution).
+  // 2. Resolve current user (used to partition rate limits, skip CAPTCHA for
+  // authenticated reporters, and reused later for permission resolution).
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
+  // 3. Check Rate Limit
+  // Authenticated sessions use a per-user bucket (20 per 15m) so members sharing
+  // a venue Wi-Fi/NAT (e.g. APC) don't exhaust each other's limit.
+  // Anonymous reports use the existing per-IP bucket (5 per 15m).
+  // Note: Quick-report grid intentionally bypasses IP limiting entirely via requireQuickReporter().
+  let ip: string | null = null;
+  if (user) {
+    const { success, reset } = await checkAuthenticatedIssueLimit(user.id);
+    if (!success) {
+      const resetTime = formatResetTime(reset);
+      return {
+        error: `Too many submissions. Please try again in ${resetTime}.`,
+      };
+    }
+  } else {
+    ip = await getClientIp();
+    const { success, reset } = await checkPublicIssueLimit(ip);
+    if (!success) {
+      const resetTime = formatResetTime(reset);
+      return {
+        error: `Too many submissions. Please try again in ${resetTime}.`,
+      };
+    }
+  }
+
   // 4. Verify Turnstile CAPTCHA — only required for anonymous reporters.
   // Logged-in users skip the Cloudflare round trip entirely.
   if (!user) {
+    const clientIp = ip ?? (await getClientIp());
     const captchaToken = extractCaptchaToken(formData);
-    const captchaValid = await verifyTurnstileToken(captchaToken ?? "", ip);
+    const captchaValid = await verifyTurnstileToken(
+      captchaToken ?? "",
+      clientIp
+    );
 
     if (!captchaValid) {
       log.warn(
-        { action: "publicIssueReport", ip },
+        { action: "publicIssueReport", ip: clientIp },
         "Turnstile CAPTCHA verification failed"
       );
       return {

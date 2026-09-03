@@ -48,6 +48,7 @@ vi.mock("~/services/issues", () => ({
   createIssue: vi.fn(),
 }));
 vi.mock("~/lib/rate-limit", () => ({
+  checkAuthenticatedIssueLimit: vi.fn(),
   checkPublicIssueLimit: vi.fn(),
   formatResetTime: vi.fn(),
   getClientIp: vi.fn(),
@@ -66,6 +67,7 @@ import { getRecentIssuesAction, submitPublicIssueAction } from "./actions";
 import { db } from "~/server/db";
 import { verifyTurnstileToken } from "~/lib/security/turnstile";
 import {
+  checkAuthenticatedIssueLimit,
   checkPublicIssueLimit,
   formatResetTime,
   getClientIp,
@@ -243,6 +245,10 @@ describe("submitPublicIssueAction — CAPTCHA branching", () => {
       success: true,
       reset: 0,
     } as any);
+    vi.mocked(checkAuthenticatedIssueLimit).mockResolvedValue({
+      success: true,
+      reset: 0,
+    } as any);
     vi.mocked(formatResetTime).mockReturnValue("0s");
   });
 
@@ -312,5 +318,91 @@ describe("submitPublicIssueAction — CAPTCHA branching", () => {
       "valid-cf-token",
       "127.0.0.1"
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// submitPublicIssueAction — Rate limiting branching
+// ---------------------------------------------------------------------------
+describe("submitPublicIssueAction — Rate limiting branching", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(getClientIp).mockResolvedValue("192.168.1.50");
+    vi.mocked(checkPublicIssueLimit).mockResolvedValue({
+      success: true,
+      reset: 0,
+    } as any);
+    vi.mocked(checkAuthenticatedIssueLimit).mockResolvedValue({
+      success: true,
+      reset: 0,
+    } as any);
+    vi.mocked(formatResetTime).mockReturnValue("5 minutes");
+  });
+
+  it("uses checkAuthenticatedIssueLimit (keyed by user.id) and skips IP check when user is logged in", async () => {
+    vi.mocked(createClient).mockResolvedValue({
+      auth: {
+        getUser: vi
+          .fn()
+          .mockResolvedValue({ data: { user: { id: "tech-user-456" } } }),
+      },
+    } as any);
+
+    await submitPublicIssueAction({}, new FormData());
+
+    expect(checkAuthenticatedIssueLimit).toHaveBeenCalledWith("tech-user-456");
+    expect(checkPublicIssueLimit).not.toHaveBeenCalled();
+  });
+
+  it("uses checkPublicIssueLimit (keyed by IP) when user is anonymous", async () => {
+    vi.mocked(createClient).mockResolvedValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({ data: { user: null } }),
+      },
+    } as any);
+    vi.mocked(verifyTurnstileToken).mockResolvedValue(true);
+
+    await submitPublicIssueAction({}, new FormData());
+
+    expect(checkPublicIssueLimit).toHaveBeenCalledWith("192.168.1.50");
+    expect(checkAuthenticatedIssueLimit).not.toHaveBeenCalled();
+  });
+
+  it("returns rate limit error when authenticated limit is exceeded", async () => {
+    vi.mocked(createClient).mockResolvedValue({
+      auth: {
+        getUser: vi
+          .fn()
+          .mockResolvedValue({ data: { user: { id: "tech-user-456" } } }),
+      },
+    } as any);
+    vi.mocked(checkAuthenticatedIssueLimit).mockResolvedValue({
+      success: false,
+      reset: 123456789,
+    } as any);
+
+    const result = await submitPublicIssueAction({}, new FormData());
+
+    expect(result).toEqual({
+      error: "Too many submissions. Please try again in 5 minutes.",
+    });
+  });
+
+  it("returns rate limit error when anonymous limit is exceeded", async () => {
+    vi.mocked(createClient).mockResolvedValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({ data: { user: null } }),
+      },
+    } as any);
+    vi.mocked(checkPublicIssueLimit).mockResolvedValue({
+      success: false,
+      reset: 123456789,
+    } as any);
+
+    const result = await submitPublicIssueAction({}, new FormData());
+
+    expect(result).toEqual({
+      error: "Too many submissions. Please try again in 5 minutes.",
+    });
   });
 });
