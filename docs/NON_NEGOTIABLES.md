@@ -158,12 +158,12 @@
 
 ## Security
 
-**CORE-SEC-001:** Protect APIs and Server Actions
+**CORE-SEC-001:** Protect APIs, Server Actions, and Server Components
 
 - **Severity:** Critical
 - **Why:** Prevent unauthorized access
-- **Do:** Verify authentication in Server Actions and Route Handlers
-- **Don't:** Skip auth checks in protected routes
+- **Do:** Verify authentication in protected Server Actions, Route Handlers, and Server Components / page loaders
+- **Don't:** Skip auth checks in protected routes or restricted server-rendered loaders
 
 **CORE-SEC-002:** Validate all inputs
 

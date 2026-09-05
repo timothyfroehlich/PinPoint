@@ -48,9 +48,11 @@ The `permissions-audit-allow` annotation contract is **enforced**, not documenta
 The line the audit cannot draw for you: a role comparison that **gates a request
 or enforces authorization** is forbidden outright and must go through
 `checkPermission()` / `getPermissionState()`. Comparisons that merely _shape_
-behaviour are allowed with an annotation — SQL/query row filtering (an `isAdmin`
-flag driving a `where` clause), UI display flags and badges, business-logic
-preconditions.
+behaviour are allowed with an annotation — non-protective UI display hints,
+badges, or domain invariants that do not govern access to protected data or
+capabilities. If a query row filter controls access to protected data or search
+scopes (such as matching reporter or user emails), that decision is an
+authorization capability and belongs under `checkPermission()`.
 
 **`getRawPermissionValue` is introspection-only.** It returns the raw matrix
 entry — `boolean | "own" | "owner" | "own_or_owner"` — so every conditional
@@ -79,7 +81,7 @@ Authorization in PinPoint is partitioned between two complementary layers:
 
 - The role capability dimension (e.g., admin override or technician access) must be declared in `matrix.ts` and evaluated via `checkPermission()`, ensuring capabilities reflect on `/help/permissions` (CORE-ARCH-008).
 - Entity-specific checks handle ownership and identity comparisons (`viewer.userId === ownerId`, collaborator status) directly.
-- Hardcoded role comparisons must never be used as authorization gates—even inside resource-level predicate files. Any role comparison that merely shapes non-gating behavior (e.g., driving SQL row filters or domain invariants) must be explicit and tagged with `// permissions-audit-allow: <reason>`.
+- Hardcoded role comparisons must never be used as authorization gates—even inside resource-level predicate files. Any role comparison that merely shapes presentation or domain invariants without controlling access to protected data or capabilities must be explicit and tagged with `// permissions-audit-allow: <reason>`.
 
 ## OAuth providers
 
