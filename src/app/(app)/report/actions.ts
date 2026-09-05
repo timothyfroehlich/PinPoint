@@ -18,8 +18,6 @@ import {
   getClientIp,
 } from "~/lib/rate-limit";
 import { parsePublicIssueForm } from "./validation";
-import { verifyTurnstileToken } from "~/lib/security/turnstile";
-import { extractCaptchaToken } from "~/lib/auth/errors";
 import { BLOB_CONFIG } from "~/lib/blob/config";
 import { db } from "~/server/db";
 import {
@@ -100,29 +98,11 @@ export async function submitPublicIssueAction(
     };
   }
 
-  // 3. Resolve current user (used to skip CAPTCHA for authenticated reporters
-  // and reused later for permission resolution).
+  // 3. Resolve current user (reused later for permission resolution).
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-
-  // 4. Verify Turnstile CAPTCHA — only required for anonymous reporters.
-  // Logged-in users skip the Cloudflare round trip entirely.
-  if (!user) {
-    const captchaToken = extractCaptchaToken(formData);
-    const captchaValid = await verifyTurnstileToken(captchaToken ?? "", ip);
-
-    if (!captchaValid) {
-      log.warn(
-        { action: "publicIssueReport", ip },
-        "Turnstile CAPTCHA verification failed"
-      );
-      return {
-        error: "CAPTCHA verification failed. Please try again.",
-      };
-    }
-  }
 
   const parsedValue = parsePublicIssueForm(formData);
   if (!parsedValue.success) {

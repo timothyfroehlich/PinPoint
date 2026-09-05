@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "@modelcontextprotocol/server";
 
 import { registerAddIssueComment } from "./add-issue-comment";
 import { registerAddMachine } from "./add-machine";

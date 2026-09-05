@@ -31,10 +31,8 @@ import { userProfiles } from "~/server/db/schema";
 import { eq } from "drizzle-orm";
 import {
   authErrorLogContext,
-  extractCaptchaToken,
   getUserMessageForAuthError,
 } from "~/lib/auth/errors";
-import { verifyTurnstileFailOpen } from "~/lib/security/turnstile";
 
 /**
  * Result Types
@@ -42,7 +40,7 @@ import { verifyTurnstileFailOpen } from "~/lib/security/turnstile";
 
 export type LoginResult = Result<
   { userId: string },
-  "VALIDATION" | "AUTH" | "CAPTCHA" | "SERVER" | "RATE_LIMIT",
+  "VALIDATION" | "AUTH" | "SERVER" | "RATE_LIMIT",
   { submittedEmail: string }
 >;
 
@@ -51,7 +49,6 @@ export type SignupResult = Result<
   | "VALIDATION"
   | "EMAIL_TAKEN"
   | "WEAK_PASSWORD"
-  | "CAPTCHA"
   | "SERVER"
   | "CONFIRMATION_REQUIRED"
   | "RATE_LIMIT"
@@ -59,14 +56,11 @@ export type SignupResult = Result<
 
 export type LogoutResult = Result<void, "SERVER">;
 
-export type ForgotPasswordResult = Result<
-  void,
-  "VALIDATION" | "CAPTCHA" | "SERVER"
->;
+export type ForgotPasswordResult = Result<void, "VALIDATION" | "SERVER">;
 
 export type ResetPasswordResult = Result<
   void,
-  "VALIDATION" | "WEAK_PASSWORD" | "SAME_PASSWORD" | "CAPTCHA" | "SERVER"
+  "VALIDATION" | "WEAK_PASSWORD" | "SAME_PASSWORD" | "SERVER"
 >;
 
 /**
@@ -146,16 +140,6 @@ export async function loginAction(
       );
     }
 
-    // Verify Turnstile CAPTCHA ourselves (fail-open) rather than delegating to
-    // Supabase's built-in captcha protection. See verifyTurnstileFailOpen for
-    // the intentional availability > strict-captcha tradeoff (PP-20yy).
-    // NOTE: Supabase project-level captcha protection MUST stay disabled for
-    // this path — with it enabled, Supabase would reject the tokenless
-    // submissions this fail-open gate is designed to let through, and it would
-    // also double-spend the single-use token we consume here.
-    const captchaToken = extractCaptchaToken(formData);
-    await verifyTurnstileFailOpen(captchaToken ?? "", ip, "login");
-
     const supabase = await createClient();
 
     // Sign in with Supabase Auth
@@ -177,15 +161,10 @@ export async function loginAction(
         );
 
         const mapped = getUserMessageForAuthError(error);
-        if (mapped) {
-          const loginCodes = new Set<string>(["CAPTCHA", "RATE_LIMIT"]);
-          if (loginCodes.has(mapped.code)) {
-            return err(
-              mapped.code as "CAPTCHA" | "RATE_LIMIT",
-              mapped.message,
-              { submittedEmail }
-            );
-          }
+        if (mapped?.code === "RATE_LIMIT") {
+          return err("RATE_LIMIT", mapped.message, {
+            submittedEmail,
+          });
         }
 
         if (isAuthRetryableFetchError(error)) {
@@ -304,13 +283,6 @@ export async function signupAction(
       );
     }
 
-    // Fail-open Turnstile verification (PP-20yy). We own verification rather
-    // than delegating to Supabase's built-in captcha protection — see the login
-    // action and verifyTurnstileFailOpen for the tradeoff and the Supabase
-    // config requirement.
-    const captchaToken = extractCaptchaToken(formData);
-    await verifyTurnstileFailOpen(captchaToken ?? "", ip, "signup");
-
     const supabase = await createClient();
 
     // Create user with Supabase Auth
@@ -336,7 +308,6 @@ export async function signupAction(
         const signupCodes = new Set<string>([
           "WEAK_PASSWORD",
           "EMAIL_TAKEN",
-          "CAPTCHA",
           "RATE_LIMIT",
           "SERVER",
           "VALIDATION",
@@ -346,7 +317,6 @@ export async function signupAction(
             mapped.code as
               | "WEAK_PASSWORD"
               | "EMAIL_TAKEN"
-              | "CAPTCHA"
               | "RATE_LIMIT"
               | "SERVER"
               | "VALIDATION",
@@ -528,18 +498,6 @@ export async function forgotPasswordAction(
       return ok(undefined);
     }
 
-    // Fail-open Turnstile verification (PP-20yy). We own verification rather
-    // than delegating to Supabase's built-in captcha protection — see the login
-    // action and verifyTurnstileFailOpen for the tradeoff and the Supabase
-    // config requirement. (No client IP here: this flow is keyed on email, and
-    // `remoteip` is only an optional additive check for Cloudflare.)
-    const captchaToken = extractCaptchaToken(formData);
-    await verifyTurnstileFailOpen(
-      captchaToken ?? "",
-      undefined,
-      "forgot-password"
-    );
-
     const supabase = await createClient();
 
     const siteUrl = requireSiteUrl("forgot-password");
@@ -557,13 +515,6 @@ export async function forgotPasswordAction(
         authErrorLogContext(error, "forgot-password"),
         "Password reset email failed"
       );
-
-      if (error.code === "captcha_failed") {
-        const mapped = getUserMessageForAuthError(error);
-        if (mapped) {
-          return err("CAPTCHA", mapped.message);
-        }
-      }
 
       return ok(undefined);
     }
@@ -615,17 +566,6 @@ export async function resetPasswordAction(
   const { password } = parsed.data;
 
   try {
-    // Fail-open Turnstile verification (PP-20yy). Supabase's auth.updateUser()
-    // has no captchaToken option, so this action always verified the token
-    // itself. It now fails open (never blocks) rather than returning a CAPTCHA
-    // error — see verifyTurnstileFailOpen for the availability tradeoff.
-    const captchaToken = extractCaptchaToken(formData);
-    await verifyTurnstileFailOpen(
-      captchaToken ?? "",
-      await getClientIp(),
-      "reset-password"
-    );
-
     const supabase = await createClient();
 
     // Verify user is authenticated (should be authenticated via reset link)

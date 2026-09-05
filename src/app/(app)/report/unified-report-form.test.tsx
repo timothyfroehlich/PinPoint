@@ -71,10 +71,6 @@ vi.mock("~/components/images/ImageGallery", () => ({
   ),
 }));
 
-vi.mock("~/components/security/TurnstileWidget", () => ({
-  TurnstileWidget: () => <div data-testid="turnstile" />,
-}));
-
 vi.mock("~/components/issues/RecentIssuesPanelClient", () => ({
   RecentIssuesPanelClient: () => <div data-testid="recent-issues" />,
 }));

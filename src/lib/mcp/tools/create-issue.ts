@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "@modelcontextprotocol/server";
 import { after } from "next/server";
 import { z } from "zod";
 
@@ -148,7 +148,7 @@ export function registerCreateIssue(server: McpServer): void {
       title: "Create issue",
       description:
         "File an issue against a machine (identified by initials or UUID). Requires a title; optional plain-text description, severity (cosmetic/minor/major/unplayable), priority (low/medium/high), and frequency (intermittent/frequent/constant). Attributed to the authenticated admin. Retrying an identical call shortly after one usually resolves to the issue already filed instead of a duplicate — check 'created' in the response: false means nothing new was written and 'number' refers to the pre-existing issue, so report it as already filed rather than as a new one.",
-      inputSchema: createIssueSchema.shape,
+      inputSchema: createIssueSchema,
     },
     (args, extra) =>
       runTool("create_issue", extra, (ctx) => runCreateIssue(args, ctx))

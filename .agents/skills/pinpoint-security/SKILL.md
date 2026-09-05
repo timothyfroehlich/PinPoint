@@ -31,9 +31,9 @@ in JS rather than querying the table.
 
 The root `middleware.ts` sets the Content-Security-Policy. Things to know before modifying it:
 
-- **`script-src` posture**: production is nonce-only — `'self' 'nonce-<uuid>' 'strict-dynamic'`, no host allowlist. Preview adds `https://vercel.live` and `https://challenges.cloudflare.com` for the Vercel toolbar and Turnstile widget. Never add `'unsafe-inline'` or `'unsafe-eval'`.
+- **`script-src` posture**: production is nonce-only — `'self' 'nonce-<uuid>' 'strict-dynamic'`, no host allowlist. Preview adds `https://vercel.live` for the Vercel toolbar. Never add `'unsafe-inline'` or `'unsafe-eval'`.
 - **Per-request nonce**: `middleware.ts` calls `crypto.randomUUID()` and sets the nonce on `Content-Security-Policy` (`'nonce-<uuid>'`) plus an `x-nonce` response header. The `x-nonce` header is set for any inline-script use case; there is no consumer in `src/` today, so if you add an inline `<script>` you must read `x-nonce` yourself and set the `nonce` attribute.
-- **Already allowlisted**: `challenges.cloudflare.com` (Turnstile CAPTCHA) — in `connect-src` and `frame-src` in both branches, and additionally in `script-src` only on preview. Supabase URL + WS URL in `connect-src`. Note `connect-src` allows both `localhost:*` and `127.0.0.1:*` in **both** branches (production included), so don't describe that as dev-only.
+- **Already allowlisted**: Supabase URL + WS URL in `connect-src`. Note `connect-src` allows both `localhost:*` and `127.0.0.1:*` in **both** branches (production included), so don't describe that as dev-only.
 - **Adding a new external host**: add to the appropriate directive in the production branch first, mirror to the preview branch only if needed. Default to deny.
 
 Why `'strict-dynamic'` is there, and the gaps the header set does not cover, are
