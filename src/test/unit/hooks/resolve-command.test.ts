@@ -301,14 +301,19 @@ describe("wrappers resolve through to the real command", () => {
     }
   );
 
-  it.each(["-n1", "-n 1", "--max-args=1", "--max-args 1"])(
-    "keeps xargs replacement mode for a later %s exception",
-    (mode) => {
-      const segment = firstSegment(`xargs -I{} ${mode} gh pr merge {}`);
-      expect(segment.appendsDynamicArgs).toBe(false);
-      expect(segment.dynamicArgs).toEqual([false, false, true]);
-    }
-  );
+  it.each([
+    "-n1",
+    "-n 1",
+    "-n01",
+    "-n+1",
+    "--max-args=1",
+    "--max-args 1",
+    "--max-args=01",
+  ])("keeps xargs replacement mode for a later %s exception", (mode) => {
+    const segment = firstSegment(`xargs -I{} ${mode} gh pr merge {}`);
+    expect(segment.appendsDynamicArgs).toBe(false);
+    expect(segment.dynamicArgs).toEqual([false, false, true]);
+  });
 
   it("propagates xargs-appended arguments through an env split payload", () => {
     const segment = firstSegment(
@@ -316,6 +321,16 @@ describe("wrappers resolve through to the real command", () => {
     );
     expect(segment.name).toBe("gh");
     expect(segment.appendsDynamicArgs).toBe(true);
+  });
+
+  it("fails closed on env split-string escapes with non-shell semantics", () => {
+    const { segments, unresolvable } = resolveCommand(
+      "env -S 'gh pr merge 4 note\\_--repo\\_timothyfroehlich/PinPoint'"
+    );
+    expect(segments).toEqual([]);
+    expect(unresolvable.map((entry) => entry.reason)).toContain(
+      "split-string-escape"
+    );
   });
 });
 

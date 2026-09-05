@@ -121,6 +121,7 @@ describe("block-direct-merge.cjs — gh merge paths", () => {
     'gh pr merge 4 --body "$BODY" --repo timothyfroehlich/dotfiles',
     'gh api --input "$FILE" -X PUT repos/timothyfroehlich/dotfiles/pulls/4/merge',
     "xargs -I{} -n1 gh pr merge 4 --repo timothyfroehlich/dotfiles --body {}",
+    "xargs -I{} -n01 gh pr merge 4 --repo timothyfroehlich/dotfiles --body {}",
   ])("allows an explicit non-PinPoint target: %s", (command) => {
     expectAllow(runHook(bashPayload(command)));
   });
@@ -149,6 +150,7 @@ describe("block-direct-merge.cjs — gh merge paths", () => {
     "printf '%s\\n' '--repo timothyfroehlich/PinPoint' | xargs -I{} -l gh pr merge 4 --repo timothyfroehlich/dotfiles",
     "printf '%s\\n' '--repo timothyfroehlich/PinPoint' | xargs -I{} -l2 gh pr merge 4 --repo timothyfroehlich/dotfiles",
     "printf '%s\\n' '--repo timothyfroehlich/PinPoint' | xargs env -S 'gh pr merge 4 --repo timothyfroehlich/dotfiles'",
+    "env -S 'gh pr merge 4 --repo timothyfroehlich/dotfiles note\\_--repo\\_timothyfroehlich/PinPoint'",
     "printf 'PinPoint\\n' | xargs -I dotfiles gh pr merge 1 --repo timothyfroehlich/dotfiles",
     "printf '123\\n' | xargs --replace gh pr merge {}",
     "printf '%s\\n' '--repo timothyfroehlich/PinPoint' | xargs gh pr merge 4 --repo timothyfroehlich/dotfiles",

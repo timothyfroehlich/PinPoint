@@ -672,8 +672,12 @@ function resolveCommandSlot(words) {
       } else if (flag.startsWith("--max-args=")) {
         maxArgsValue = flag.slice("--max-args=".length);
       }
+      const maxArgsCount =
+        maxArgsValue !== null && /^\+?\d+$/.test(maxArgsValue)
+          ? Number.parseInt(maxArgsValue, 10)
+          : null;
       const keepsReplacementMode =
-        replacesInputArgs && isMaxArgsMode && maxArgsValue === "1";
+        replacesInputArgs && isMaxArgsMode && maxArgsCount === 1;
       const selectsBatchMode =
         (isMaxArgsMode && !keepsReplacementMode) ||
         flag === "-L" ||
@@ -902,6 +906,16 @@ function resolveSegment(words, out, depth, options) {
     if (payloadWord.dynamic) {
       out.unresolvable.push({
         reason: "split-string-dynamic",
+        text: describeWords(effectiveWords),
+      });
+      return;
+    }
+    if (payloadWord.value.includes("\\")) {
+      // env -S has its own escape grammar (`\_` can create an argv boundary,
+      // `\c` can truncate the payload). Re-parsing such a string as shell text
+      // would be unsound, so expose ambiguity instead of trusting its target.
+      out.unresolvable.push({
+        reason: "split-string-escape",
         text: describeWords(effectiveWords),
       });
       return;
