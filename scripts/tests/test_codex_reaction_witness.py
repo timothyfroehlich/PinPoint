@@ -193,6 +193,10 @@ def test_workflow_uses_trusted_main_and_narrow_permissions() -> None:
     assert "types: [opened, ready_for_review, synchronize, reopened]" in text
     assert "issue_comment:" in text
     assert "types: [created]" in text
+    assert (
+        "github.event.pull_request.number || format('{0}-comment-{1}', "
+        "github.event.issue.number, github.event.comment.id)" in text
+    )
     assert "issues: write" not in text
     assert "pull-requests: write" in text
     assert "ref: ${{ github.event.repository.default_branch }}" in text

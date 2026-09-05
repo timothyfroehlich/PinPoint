@@ -23,7 +23,10 @@ permissions:
   pull-requests: write
 
 concurrency:
-  group: codex-reaction-witness-${{ github.event.pull_request.number || github.event.issue.number }}
+  # An unrelated issue comment still creates a skipped run, and concurrency is
+  # evaluated before the job-level filter. Give every comment its own group so such a
+  # run cannot cancel the PR's automatic witness or its one manual fallback witness.
+  group: codex-reaction-witness-${{ github.event.pull_request.number || format('{0}-comment-{1}', github.event.issue.number, github.event.comment.id) }}
   cancel-in-progress: true
 
 jobs:
