@@ -145,6 +145,8 @@ describe("block-direct-merge.cjs — gh merge paths", () => {
     "printf 'gh\\n' | xargs -I tool env tool pr merge 123",
     "printf '%s\\n' '--repo timothyfroehlich/PinPoint' | xargs -I{} -n2 gh pr merge 4 --repo timothyfroehlich/dotfiles",
     "printf '%s\\n' '--repo timothyfroehlich/PinPoint' | xargs -I{} -L2 gh pr merge 4 --repo timothyfroehlich/dotfiles",
+    "printf '%s\\n' '--repo timothyfroehlich/PinPoint' | xargs -I{} -l gh pr merge 4 --repo timothyfroehlich/dotfiles",
+    "printf '%s\\n' '--repo timothyfroehlich/PinPoint' | xargs -I{} -l2 gh pr merge 4 --repo timothyfroehlich/dotfiles",
     "printf 'PinPoint\\n' | xargs -I dotfiles gh pr merge 1 --repo timothyfroehlich/dotfiles",
     "printf '123\\n' | xargs --replace gh pr merge {}",
     "printf '%s\\n' '--repo timothyfroehlich/PinPoint' | xargs gh pr merge 4 --repo timothyfroehlich/dotfiles",

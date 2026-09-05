@@ -663,6 +663,8 @@ function resolveCommandSlot(words) {
         flag.startsWith("-n") ||
         flag === "-L" ||
         flag.startsWith("-L") ||
+        flag === "-l" ||
+        flag.startsWith("-l") ||
         flag === "--max-args" ||
         flag.startsWith("--max-args=") ||
         flag === "--max-lines" ||

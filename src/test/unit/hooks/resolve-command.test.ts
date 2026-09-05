@@ -293,7 +293,7 @@ describe("wrappers resolve through to the real command", () => {
     expect(segment.appendsDynamicArgs).toBe(true);
   });
 
-  it.each(["-n2", "-L2", "--max-args=2", "--max-lines=2"])(
+  it.each(["-n2", "-L2", "-l", "-l2", "--max-args=2", "--max-lines=2"])(
     "honors a later xargs %s mode over replacement mode",
     (mode) => {
       const segment = firstSegment(`xargs -I{} ${mode} gh pr merge 4`);
