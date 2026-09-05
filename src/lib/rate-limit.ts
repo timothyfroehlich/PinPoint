@@ -19,6 +19,7 @@
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
 import { headers } from "next/headers";
+import { createHash } from "node:crypto";
 import { log } from "~/lib/logger";
 import { maskEmail } from "~/lib/logging/mask";
 import { BLOB_CONFIG } from "~/lib/blob/config";
@@ -368,6 +369,14 @@ export async function checkPublicIssueLimit(
 }
 
 /**
+ * Hashes a user ID to a pseudonymous string so raw user identifiers
+ * are never stored in external rate-limit caches (CORE-SEC-007).
+ */
+function hashUserId(userId: string): string {
+  return createHash("sha256").update(userId, "utf8").digest("hex");
+}
+
+/**
  * Check authenticated issue rate limit (user-based)
  *
  * @param userId - User ID (UUID)
@@ -391,8 +400,10 @@ export async function checkAuthenticatedIssueLimit(
     return { success: true, limit: 0, remaining: 0, reset: 0 };
   }
 
+  const userKey = hashUserId(userId);
+
   try {
-    const result = await authenticatedIssueLimiter.limit(userId);
+    const result = await authenticatedIssueLimiter.limit(userKey);
     return {
       success: result.success,
       limit: result.limit,
@@ -401,7 +412,10 @@ export async function checkAuthenticatedIssueLimit(
     };
   } catch (error) {
     log.error(
-      { err: error instanceof Error ? error.message : "Unknown", userId },
+      {
+        err: error instanceof Error ? error.message : "Unknown",
+        userKeyPrefix: userKey.slice(0, 8),
+      },
       "Authenticated issue rate limit check failed"
     );
     if (isProductionEnv()) {

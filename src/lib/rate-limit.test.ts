@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { createHash } from "node:crypto";
 
 // Mock logger
 vi.mock("~/lib/logger", () => ({
@@ -132,8 +133,11 @@ describe("rate-limit module — environment isolation & limiter behavior", () =>
         })
       );
 
-      // Verify the limit call is keyed directly to the userId
-      expect(mockLimit).toHaveBeenCalledWith("user-tech-789");
+      // Verify the limit call is keyed to the sha256 hash of the userId (CORE-SEC-007)
+      const expectedKey = createHash("sha256")
+        .update("user-tech-789", "utf8")
+        .digest("hex");
+      expect(mockLimit).toHaveBeenCalledWith(expectedKey);
       expect(result).toEqual({
         success: true,
         limit: 20,
