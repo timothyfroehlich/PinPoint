@@ -90,6 +90,19 @@ def clean_codex_reaction_witness(
     }
 
 
+def manual_review_request(
+    sha: str = HEAD_SHA,
+    *,
+    login: str = "acme",
+    created_at: str = "2026-08-22T12:03:00Z",
+) -> dict:
+    return {
+        "user": {"login": login},
+        "body": f"@codex review\n<!-- pinpoint-codex-review-head: {sha} -->",
+        "created_at": created_at,
+    }
+
+
 def legacy_claude_marker(sha: str = HEAD_SHA, detail: str = "high") -> dict:
     return {
         "body": (
@@ -479,6 +492,32 @@ def test_stale_approval_reports_both_commits_and_the_automatic_review_remedy() -
     assert "never repeat it" in result.stdout
     assert "slow or running\n          attempt is not eligible" in result.stdout
     assert "new head restarts automatic-first" in result.stdout
+
+
+def test_current_head_fallback_request_is_exhausted_not_recommended_again() -> None:
+    with gate_env(comment_pages=[[manual_review_request()]]) as env:
+        result = run_gate("check_review_happened", env)
+    assert result.returncode == 1, result.stdout
+    assert "fallback already used" in result.stdout
+    assert "Do not post another" in result.stdout
+    assert "post one\n          @codex review" not in result.stdout
+
+
+@pytest.mark.parametrize(
+    "fallback_comment",
+    [
+        manual_review_request(OTHER_SHA),
+        manual_review_request(login="someone-else"),
+    ],
+)
+def test_old_or_untrusted_fallback_request_does_not_exhaust_current_head(
+    fallback_comment: dict,
+) -> None:
+    with gate_env(comment_pages=[[fallback_comment]]) as env:
+        result = run_gate("check_review_happened", env)
+    assert result.returncode == 1, result.stdout
+    assert "fallback already used" not in result.stdout
+    assert "post one\n          @codex review" in result.stdout
 
 
 def test_review_gate_never_waits() -> None:

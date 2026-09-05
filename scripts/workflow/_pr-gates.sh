@@ -76,9 +76,9 @@ _codex_review_record() {
          | [ .state, .sha, .reviewer, .detail, .at, .summary ] | @tsv'
 }
 
-# Issue comments carry three review records: the connector's clean automatic result,
-# the trusted workflow's SHA-pinned witness of a fresh eyes-to-+1 transition, and the
-# independent manual attestation.
+# Issue comments carry four review records: the connector's clean automatic result,
+# the trusted workflow's SHA-pinned witness of a fresh eyes-to-+1 transition, the
+# SHA-bound manual fallback request, and the independent manual attestation.
 _comment_review_record() {
   local pr=$1 owner_repo=$2 head=$3
   gh api --paginate "repos/${owner_repo}/issues/${pr}/comments" \
@@ -87,6 +87,7 @@ _comment_review_record() {
         --arg witness_prefix "$CODEX_REACTION_WITNESS_PREFIX" \
         --arg clean_prefix "$CODEX_CLEAN_REVIEW_PREFIX" --arg prefix "$REVIEW_MARKER_PREFIX" \
         --arg legacy "$LEGACY_CLAUDE_MARKER_PREFIX" --arg head "$head" \
+        --arg owner "${owner_repo%%/*}" \
         '[ .[] | flatten | .[] ] as $comments
          | ([ $comments[]
            | (.body // "") as $body
@@ -115,6 +116,17 @@ _comment_review_record() {
          ] | sort_by(.at)) as $witness
          | ([ $comments[]
            | (.body // "") as $body
+           | select(.user.login? == $owner)
+           | { sha: ($body | [scan("^@codex review\\n<!-- pinpoint-codex-review-head: ([0-9a-f]{40}) -->$")] | flatten | (.[0] // "")),
+               reviewer: (.user.login // ""),
+               detail: "MANUAL_FALLBACK_EXHAUSTED",
+               at: (.created_at // ""),
+               summary: "Manual Codex fallback already requested",
+               state: "fallback_exhausted" }
+           | select((.sha | length) == 40)
+         ] | sort_by(.at)) as $fallback_requests
+         | ([ $comments[]
+           | (.body // "") as $body
            | select($body | startswith($prefix) or startswith($legacy))
            | { sha: (if $body | startswith($prefix) then ($body | ltrimstr($prefix)) else ($body | ltrimstr($legacy)) end | split("-->")[0] | gsub("^\\s+|\\s+$"; "")),
                reviewer: (if $body | startswith($prefix)
@@ -133,9 +145,11 @@ _comment_review_record() {
                       then (.sha as $sha | $head | startswith($sha))
                       else .sha == $head
                       end)
-           ] as $automatic_pinned
+         ] as $automatic_pinned
+         | [ $fallback_requests[] | select(.sha == $head) ] as $fallback_used
          | if ($pinned | length) > 0 then ($pinned | last) + { state: "marker" }
            elif ($automatic_pinned | length) > 0 then ($automatic_pinned | last)
+           elif ($fallback_used | length) > 0 then ($fallback_used | last)
            elif ($markers | length) > 0 and ($automatic | length) > 0 then
              if $markers[-1].at > $automatic[-1].at
              then $markers[-1] + { state: "stale_marker" }
@@ -180,6 +194,11 @@ _review_record() {
     # A current-head native finding review is coverage. A delayed comment for an
     # older SHA cannot invalidate it; current clean comments were handled above.
     printf '%s\n' "$codex"
+  elif [[ "$comment_state" == "fallback_exhausted" ]]; then
+    # A request pinned to the current head is durable workflow state, not review
+    # evidence. Report it regardless of older stale review records so no caller
+    # recommends spending the same head's one fallback twice.
+    printf '%s\n' "$comment"
   else
     codex_at=$(cut -f5 <<< "$codex")
     if [[ "$comment_state" == "unreviewed" ]]; then
@@ -260,6 +279,7 @@ check_ci() {
 #   stale_clean_reaction  A reaction witness names a different SHA
 #   stale_marker    A manual marker names a different SHA
 #   not_approved    Codex's most-recent review covers a different SHA and is not an approval
+#   fallback_exhausted  The one manual fallback was already requested for this head
 #   unreviewed      Neither review path has a record
 #
 # Sets globals: RS_STATE RS_HEAD_SHA RS_REVIEW_SHA
@@ -287,6 +307,14 @@ _review_remedy() {
   echo "          @codex review for this unchanged head; never repeat it. A slow or running"
   echo "          attempt is not eligible, and a new head restarts automatic-first. Use"
   echo "          review-preflight + mark-review only after Tim runs a local review."
+}
+
+_review_exhausted_remedy() {
+  local pr=$1
+  echo "  remedy: the one manual @codex review fallback for this head of PR #${pr} was"
+  echo "          already used. Do not post another. Wait for exact-head evidence, or use"
+  echo "          review-preflight + mark-review only after Tim runs a local review. A new"
+  echo "          head restarts automatic-first."
 }
 
 # Gate 2: Zero unresolved review threads. Uses GraphQL with cursor pagination.
@@ -348,6 +376,7 @@ check_unresolved_threads() {
 #   marker          → PASS
 #   stale_approval  → FAIL: Codex approved an earlier commit
 #   not_approved    → FAIL: Codex posted a non-approval review
+#   fallback_exhausted → FAIL: the one manual fallback was already used for this head
 #   unreviewed      → FAIL: Codex has not reviewed the PR
 check_review_happened() {
   local pr=$1
@@ -398,6 +427,11 @@ check_review_happened() {
     stale_marker)
       echo "FAIL: reviewed: the review marker pins ${RS_REVIEW_SHA:0:7}, but head is ${RS_HEAD_SHA:0:7}"
       _review_remedy "$pr"
+      return 1
+      ;;
+    fallback_exhausted)
+      echo "FAIL: reviewed: manual Codex fallback already used for head ${RS_HEAD_SHA:0:7}"
+      _review_exhausted_remedy "$pr"
       return 1
       ;;
     unreviewed)

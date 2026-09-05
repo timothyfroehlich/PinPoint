@@ -138,6 +138,14 @@ def clean_codex_reaction_witness(
     }
 
 
+def manual_review_request(sha=HEAD_SHA, login=pr_watch.REPO_OWNER):
+    return {
+        "user": {"login": login},
+        "body": f"@codex review\n<!-- pinpoint-codex-review-head: {sha} -->",
+        "created_at": "2026-08-22T12:03:00Z",
+    }
+
+
 def make_gh(
     *,
     rollup=(),
@@ -859,6 +867,7 @@ def test_codex_login_is_identical_to_the_bash_gate():
         "stale_clean_reaction",
         "stale_marker",
         "not_approved",
+        "fallback_exhausted",
         "unreviewed",
     ],
 )
@@ -878,6 +887,29 @@ def test_review_state_unreviewed(monkeypatch):
     assert "never repeat it" in detail
     assert "slow or running attempt is not eligible" in detail
     assert "new head restarts automatic-first" in detail
+
+
+@pytest.mark.unit
+def test_review_state_reports_current_head_fallback_as_exhausted(monkeypatch):
+    monkeypatch.setattr(pr_watch, "gh", make_gh(comments=[manual_review_request()]))
+    state, detail = pr_watch.review_state(PR)
+    assert state == "fallback_exhausted"
+    assert "already used" in detail
+    assert "do not post another" in detail
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "fallback_comment",
+    [manual_review_request(OLD_SHA), manual_review_request(login="someone-else")],
+)
+def test_review_state_does_not_exhaust_for_old_or_untrusted_request(
+    monkeypatch, fallback_comment
+):
+    monkeypatch.setattr(pr_watch, "gh", make_gh(comments=[fallback_comment]))
+    state, detail = pr_watch.review_state(PR)
+    assert state == "unreviewed"
+    assert "post one @codex review" in detail
 
 
 @pytest.mark.unit

@@ -68,6 +68,9 @@ CODEX_CLEAN_REVIEW_PREFIX = "Codex Review: Didn't find any major issues."
 GITHUB_ACTIONS_BOT = "github-actions[bot]"
 GITHUB_ACTIONS_APP_SLUG = "github-actions"
 CODEX_REACTION_WITNESS_PREFIX = "<!-- pinpoint-codex-reaction-witness:"
+CODEX_REVIEW_REQUEST_RE = re.compile(
+    r"^@codex review\n<!-- pinpoint-codex-review-head: ([0-9a-f]{40}) -->$"
+)
 REVIEW_MARKER_PREFIX = "<!-- pinpoint-review:"
 LEGACY_CLAUDE_MARKER_PREFIX = "<!-- pinpoint-claude-review:"
 
@@ -79,6 +82,11 @@ REVIEW_HINT = (
     "witness conclusively ends without exact-head evidence, post one @codex review "
     "for this unchanged head and never repeat it; a slow or running attempt is not "
     "eligible, and a new head restarts automatic-first"
+)
+FALLBACK_EXHAUSTED_HINT = (
+    "the one manual @codex review fallback for this head was already used; do not "
+    "post another; wait for exact-head evidence, or use review-preflight + mark-review "
+    "only after Tim runs a local review; a new head restarts automatic-first"
 )
 
 LOG_DIR = "tmp/gh-monitor"
@@ -509,10 +517,11 @@ def _codex_reviews(pr: int) -> list[dict]:
 
 def _comment_review_records(
     pr: int,
-) -> tuple[list[tuple[str, str, str]], list[tuple[str, str]]]:
-    """Return SHA-pinned automatic comments and independent manual markers."""
+) -> tuple[list[tuple[str, str, str]], list[tuple[str, str]], list[tuple[str, str]]]:
+    """Return automatic evidence, fallback requests, and manual markers."""
     repo = f"repos/{REPO_OWNER}/{REPO_NAME}"
     automatic: list[tuple[str, str, str]] = []
+    fallback_requests: list[tuple[str, str]] = []
     markers: list[tuple[str, str]] = []
     for comment in _gh_api_list(f"{repo}/issues/{pr}/comments"):
         body = comment.get("body") or ""
@@ -537,6 +546,10 @@ def _comment_review_records(
                     comment.get("updated_at") or comment.get("created_at") or "",
                 )
             )
+        if comment.get("user", {}).get("login") == REPO_OWNER and (
+            match := CODEX_REVIEW_REQUEST_RE.fullmatch(body)
+        ):
+            fallback_requests.append((match.group(1), comment.get("created_at") or ""))
         if (
             comment.get("user", {}).get("login") == GITHUB_ACTIONS_BOT
             and app.get("slug") == GITHUB_ACTIONS_APP_SLUG
@@ -569,7 +582,7 @@ def _comment_review_records(
                     comment.get("updated_at") or "",
                 )
             )
-    return automatic, markers
+    return automatic, fallback_requests, markers
 
 
 def review_state(pr: int) -> tuple[str, str]:
@@ -590,7 +603,7 @@ def review_state(pr: int) -> tuple[str, str]:
 
     # A current native approval is sufficient. Defer the paginated comments request
     # unless it is needed to find the independent manual-attestation fallback.
-    automatic_comments, markers = _comment_review_records(pr)
+    automatic_comments, fallback_requests, markers = _comment_review_records(pr)
     if any(marker_sha == head_sha for marker_sha, _at in markers):
         return "marker", f"manual review marker pins head {head_sha[:7]}"
 
@@ -627,6 +640,9 @@ def review_state(pr: int) -> tuple[str, str]:
             "reviewed",
             f"Codex reviewed head {head_sha[:7]} with {state}; thread gate owns findings",
         )
+
+    if any(request_sha == head_sha for request_sha, _at in fallback_requests):
+        return "fallback_exhausted", FALLBACK_EXHAUSTED_HINT
 
     latest_marker_sha, latest_marker_at = max(
         markers, key=lambda marker: marker[1], default=("", "")

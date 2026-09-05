@@ -184,6 +184,9 @@ case "$rv_state" in
   marker)
     review_desc="$(review_phrase "$rv_reviewer" "$rv_detail") · ${rv_at} · covers head ${short_head}"
     ;;
+  fallback_exhausted)
+    review_desc="NONE — manual Codex fallback already used for head ${short_head}; no exact-head evidence arrived"
+    ;;
   stale_approval)
     if git cat-file -e "${rv_sha}^{commit}" 2>/dev/null \
       && git merge-base --is-ancestor "$rv_sha" "$head_sha" 2>/dev/null; then
@@ -458,7 +461,11 @@ add_block() { blocking+=("$1"); }
 if [[ "$(gate_token "$ci_out")" != "PASS" ]]; then add_block "ci: $(gate_state "$ci_out")"; fi
 if [[ "$(gate_token "$threads_out")" != "PASS" ]]; then add_block "threads: $(gate_state "$threads_out")"; fi
 if [[ "$(gate_token "$conflict_out")" != "PASS" ]]; then add_block "no_conflict: $(gate_state "$conflict_out")"; fi
-if [[ "$rv_state" != "approval" && "$rv_state" != "clean_comment" && "$rv_state" != "clean_reaction" && "$rv_state" != "reviewed" && "$rv_state" != "marker" ]]; then add_block "reviewed: ${rv_state} — await a clean automatic Codex result on the current head; after a conclusive bounded miss, post one @codex review for this unchanged head; do not repeat it, and restart automatic-first on a new head"; fi
+if [[ "$rv_state" == "fallback_exhausted" ]]; then
+  add_block "reviewed: fallback_exhausted — the one manual @codex review fallback for this head was already used; do not post another; wait for exact-head evidence or use Tim's local-review route"
+elif [[ "$rv_state" != "approval" && "$rv_state" != "clean_comment" && "$rv_state" != "clean_reaction" && "$rv_state" != "reviewed" && "$rv_state" != "marker" ]]; then
+  add_block "reviewed: ${rv_state} — await a clean automatic Codex result on the current head; after a conclusive bounded miss, post one @codex review for this unchanged head; do not repeat it, and restart automatic-first on a new head"
+fi
 if [[ "$is_draft" == "true" ]]; then add_block "draft: wait for current-head CI Gate success, then mark the PR ready"; fi
 if [[ "$pr_state" != "OPEN" ]]; then add_block "state: PR is ${pr_state}, not open"; fi
 # The gate answers came from `gh` at one SHA and the diff from git at another, so no

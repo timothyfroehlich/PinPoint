@@ -230,6 +230,28 @@ def test_comments_are_fetched_only_for_missing_native_evidence_and_verify_app(
 
 
 @pytest.mark.unit
+def test_current_head_manual_fallback_is_visible_as_used(run_dashboard):
+    response = open_pr_response([pr_node(4, reviews=[])])
+    comments = [
+        {
+            "user": {"login": "timothyfroehlich"},
+            "body": f"@codex review\n<!-- pinpoint-codex-review-head: {HEAD} -->",
+            "created_at": "2026-08-30T12:01:00Z",
+        }
+    ]
+    result, calls = run_dashboard(
+        [
+            {"contains": ["pullRequests(first: 100"], "stdout": json.dumps(response)},
+            {"contains": ["issues/4/comments"], "stdout": json.dumps(comments)},
+        ]
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "FALLBACK USED" in result.stdout.splitlines()[2]
+    assert len(calls) == 2
+
+
+@pytest.mark.unit
 def test_comment_rate_limit_renders_review_unknown(run_dashboard):
     response = open_pr_response([pr_node(9, reviews=[])])
     result, calls = run_dashboard(
