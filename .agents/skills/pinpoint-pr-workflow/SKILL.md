@@ -167,6 +167,9 @@ reaction transition was observed — comment exactly once for that unchanged hea
 gh pr comment <PR> --body '@codex review'
 ```
 
+That exact repository-owner comment starts a new trusted-main reaction witness, so a
+reaction-only clean result can still become SHA-pinned evidence for the unchanged head.
+
 Respect the same eligibility sequence: wait for current-head CI and promote the PR
 before commenting. A slow or still-running automatic attempt is not a conclusive miss.
 Never repeat the comment for the same head. A trusted clean automatic result satisfies

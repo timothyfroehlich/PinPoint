@@ -1,9 +1,10 @@
 # Convert Codex's commit-less clean-review reaction into exact-head evidence.
 #
-# Security boundary: pull_request_target loads this workflow and its checked-out helper
-# from trusted main, never from the PR branch. The helper witnesses a fresh eyes -> +1
-# transition after this event while continuously verifying that the PR head is unchanged.
-# It then posts a github-actions comment pinned to that SHA for the reviewed gate.
+# Security boundary: both events load this workflow and its checked-out helper from
+# trusted main, never from the PR branch. Manual fallback comments are accepted only
+# from the repository owner and must exactly match the documented command. The helper
+# witnesses a fresh eyes -> +1 transition while continuously verifying that the PR head
+# is unchanged, then posts a github-actions comment pinned to that SHA.
 
 name: Codex Reaction Witness
 
@@ -12,29 +13,39 @@ on:
   # checks out only the default branch, and never evaluates or executes PR-controlled data.
   pull_request_target:  # zizmor: ignore[dangerous-triggers]
     types: [opened, ready_for_review, synchronize, reopened]
+  # A manual fallback happens only after the automatic witness has exited. Starting a
+  # new trusted-main run here lets a reaction-only fallback produce SHA-pinned evidence.
+  issue_comment:
+    types: [created]
 
 permissions:
   contents: read
   pull-requests: write
 
 concurrency:
-  group: codex-reaction-witness-${{ github.event.pull_request.number }}
+  group: codex-reaction-witness-${{ github.event.pull_request.number || github.event.issue.number }}
   cancel-in-progress: true
 
 jobs:
   witness:
     name: Witness clean Codex review
     if: >-
-      github.event.pull_request.head.repo.full_name == github.repository &&
-      github.event.pull_request.draft == false
+      (github.event_name == 'pull_request_target' &&
+       github.event.pull_request.head.repo.full_name == github.repository &&
+       github.event.pull_request.draft == false) ||
+      (github.event_name == 'issue_comment' &&
+       github.event.issue.pull_request &&
+       github.event.comment.user.login == github.repository_owner &&
+       github.event.comment.body == '@codex review')
     runs-on: ubuntu-latest
     timeout-minutes: 25
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       GITHUB_REPOSITORY: ${{ github.repository }}
-      PR_NUMBER: ${{ github.event.pull_request.number }}
+      EVENT_NAME: ${{ github.event_name }}
+      PR_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
       EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
-      TRIGGERED_AT: ${{ github.event.pull_request.updated_at }}
+      TRIGGERED_AT: ${{ github.event.pull_request.updated_at || github.event.comment.created_at }}
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@b09bb98e06d4d774595224525879c09bc6e98c40  # ratchet:step-security/harden-runner@v2.20.1
@@ -48,4 +59,17 @@ jobs:
           persist-credentials: false
 
       - name: Witness reaction transition
-        run: bash scripts/workflow/codex-reaction-witness.sh "$PR_NUMBER" "$EXPECTED_HEAD" "$TRIGGERED_AT"
+        run: |
+          expected_head="$EXPECTED_HEAD"
+          if [[ "$EVENT_NAME" == "issue_comment" ]]; then
+            pr_json=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}")
+            if ! jq -e --arg repo "$GITHUB_REPOSITORY" \
+              '.head.repo.full_name == $repo and .draft == false' \
+              <<< "$pr_json" >/dev/null; then
+              echo "Manual witness requires a ready pull request from this repository."
+              exit 0
+            fi
+            expected_head=$(jq -r '.head.sha' <<< "$pr_json")
+          fi
+          bash scripts/workflow/codex-reaction-witness.sh \
+            "$PR_NUMBER" "$expected_head" "$TRIGGERED_AT"

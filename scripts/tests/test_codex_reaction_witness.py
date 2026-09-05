@@ -160,11 +160,22 @@ def test_workflow_uses_trusted_main_and_narrow_permissions() -> None:
     text = WORKFLOW.read_text()
     assert "pull_request_target:" in text
     assert "types: [opened, ready_for_review, synchronize, reopened]" in text
+    assert "issue_comment:" in text
+    assert "types: [created]" in text
     assert "issues: write" not in text
     assert "pull-requests: write" in text
     assert "ref: ${{ github.event.repository.default_branch }}" in text
     assert "persist-credentials: false" in text
     assert "github.event.pull_request.head.repo.full_name == github.repository" in text
+    assert "github.event.issue.pull_request" in text
+    assert "github.event.comment.user.login == github.repository_owner" in text
+    assert "github.event.comment.body == '@codex review'" in text
+    assert "github.event.comment.created_at" in text
+    assert "EVENT_NAME: ${{ github.event_name }}" in text
+    assert 'if [[ "$EVENT_NAME" == "issue_comment" ]]' in text
+    assert 'gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}"' in text
+    assert ".head.repo.full_name == $repo and .draft == false" in text
+    assert "GITHUB_ENV" not in text
 
 
 def test_default_budget_has_a_quiet_window_and_at_most_108_loop_reads() -> None:
