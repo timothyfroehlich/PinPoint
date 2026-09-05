@@ -18,6 +18,8 @@
 
 set -euo pipefail
 
+bash scripts/hooks/prototype-clean-guard.sh
+
 if ! command -v sem >/dev/null 2>&1 \
    || ! sem --version 2>/dev/null | grep -q '^GNU parallel'; then
   # moreutils also ships a `sem` binary that doesn't speak --jobs/--id/--fg,
