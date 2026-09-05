@@ -60,6 +60,19 @@ Preserve the PR's other labels and description content. Do not replace the origi
 or signature on a PR another agent opened; its attribution remains with the original
 implementer.
 
+### `ownerless`: the unowned-PR queue
+
+`ownerless` is the companion signal to the origin label. Origin says who opened the PR;
+`ownerless` says nobody is driving it. It is applied only by unattended bots — scheduled
+Claude cloud routines (in their own prompts), Dependabot and Renovate (from
+`.github/dependabot.yml` and `.github/renovate.json`) — which open a PR and then stop, so
+no session is watching CI, adjudicating review threads, or taking it to merge-ready.
+
+`gh pr list --label ownerless` is therefore the queue of open work with no owner. When you
+adopt one, you take on the full Phase 3 obligation for it, so remove the label in the same
+step (`gh pr edit <PR> --remove-label ownerless`) — an adopted PR is no longer unowned.
+Never apply `ownerless` to a PR you opened yourself; you own that one by definition.
+
 ### PR description template
 
 ```

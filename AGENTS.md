@@ -165,6 +165,12 @@ The owning agent monitors CI, draft promotion, automatic review, findings, and c
 
 The gate accepts Codex's native GitHub approval, its exact-bot/exact-app clean comment pinned to head, a trusted GitHub Actions witness that pins a fresh Codex `eyes`→`+1` transition to head, an exact-head `COMMENTED`/`CHANGES_REQUESTED` review after every finding thread is adjudicated and resolved, or the existing SHA-pinned manual attestation after Tim runs `/codex:review` or `/code-review`. State transitions and fallback rules: `pinpoint-pr-workflow` skill Phase 3.
 
+### The `ownerless` label
+
+PinPoint's one use of GitHub labels for agent coordination. Anything opened by an **unattended** bot — a scheduled Claude cloud routine, Dependabot, Renovate — carries `ownerless` on its issue or PR, because no session is driving its lifecycle: nobody is watching CI, adjudicating review threads, or taking it to merge-ready. Dependabot and Renovate apply it from `.github/dependabot.yml` and `.github/renovate.json`; a routine applies it itself (`gh pr create --label ownerless`, `gh issue create --label ownerless`).
+
+It is the queue an orchestrator works from — `gh pr list --label ownerless` and `gh issue list --label ownerless` are the open work nobody owns. A session that **adopts** one takes over that lifecycle per "Getting a PR reviewed" and removes the label (`gh pr edit <n> --remove-label ownerless`). An interactive session **never** adds it to its own work: a PR you opened is a PR you own.
+
 ### Handing a PR over to merge
 
 Don't write the handoff summary — **run it and paste it**:
