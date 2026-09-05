@@ -31,8 +31,11 @@ The `'strict-dynamic'` directive allows scripts loaded by nonce'd scripts to exe
 PinPoint is a single-tenant application with no multi-tenancy and no database-level Row Level Security (RLS) enforcement on application queries:
 
 - **Drizzle connects via `POSTGRES_URL` with `BYPASSRLS`**: The Drizzle database user has `BYPASSRLS`. Database RLS policies are not evaluated for application queries, and the database does not filter rows based on session context.
-- **Server Actions and MCP tools form the sole authorization perimeter**: Server Actions (`"use server"`) and MCP tools are public HTTP/RPC endpoints callable by any client that can reach the application.
-- **Server-side authorization is the authoritative line of defense**: Authorization via `checkPermission()` against `src/lib/permissions/matrix.ts` (or domain-specific permission predicates under `src/lib/permissions/`) in Server Actions and tools is the sole barrier preventing unauthorized data mutations and access.
+- **Application endpoints form the sole authorization perimeter**: Because the database does not enforce row security, all public entry points—Server Actions (`"use server"`), Route Handlers (`src/app/api/**`), and MCP endpoints—must authorize every request at the application layer before touching data.
+- **Layered endpoint authorization**:
+  - **Server Actions**: Must verify user session (`getUser()`) and enforce server-side authorization via `checkPermission()` against `src/lib/permissions/matrix.ts` (or domain-specific predicates under `src/lib/permissions/`) before reading restricted data or mutating state.
+  - **Route Handlers**: Enforce route-specific authorization guards appropriate to the surface, such as HMAC token verification (`/api/unsubscribe`), CRON secret headers via `assertCronAuthorized()` (`/api/cron/*`), or webhook signature checks.
+  - **MCP Tools**: Protected by a layered gate—HTTP-level admin bearer token authentication (`withMcpAuth` in `src/app/api/mcp/mcp/route.ts`) before dispatch, followed by per-tool permission and ownership checks.
 - **Client and UI checks are UX affordances only**: Client-side checks (`canEdit`, `getPermissionDeniedReason`, `getPermissionState`) exist only to drive UI state (e.g., disabling buttons or rendering explanatory messages). They are never security boundaries.
 
 ## Threat Model
