@@ -42,6 +42,11 @@ Six independent facts. No one of them ever implies another.
   2026-08-15.)_
 - **Availability** — where the machine physically is (on the floor, on loan,
   removed, …). Never drives listing intent or the lineup automatically.
+- **Edition near-miss** — a candidate match relationship where a local machine
+  and a Pinball Map lineup entry share a title family (`machineGroupId`), but
+  differ in edition (e.g., Pro on Pinball Map vs. Premium in PinPoint). It will
+  not auto-link automatically and surfaces as a candidate match for operator
+  confirmation rather than an unrelated missing machine.
 
 **Sync participation** is the intent tri-state's third position: a machine
 set to Don't sync is exempt from alerts, reconciliation, and comment import — but its observed status stays visible, because
@@ -87,6 +92,9 @@ intent agrees with the lineup; _out of sync_ means they disagree.
   the entry on that machine's page, with the same removal action and
   matching copy. Listing the machine under its new title is likewise the
   standard flow — two actions, taken independently.
+- **2.6** An edition near-miss (§1) is flagged as a candidate match for operator
+  confirmation in fleet audit surfaces. Resolving an edition near-miss by selecting
+  or changing a match follows standard match reset and entry rules (§2.3, §2.5).
 
 ## 3. Reading from Pinball Map
 
@@ -428,6 +436,7 @@ logged here.
 
 | Date       | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | :--------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-09-05 | Defined the Edition Near-Miss concept (§1) and catalog matching rule (§2.6) for machines sharing a title family (`machineGroupId`) with differing editions.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | 2026-08-27 | Named the machine edit form's source label for an uncataloged game as **Manual Entry**, keeping "uncataloged" as the concept and state name. Made all three manual-model fields optional and blank by default: the title is suggested rather than pre-filled, so leaving it blank keeps following a later rename, and a blank manufacturer or year reads as Unknown under its own label while the machine header omits blanks. Split the old "No model / Uncataloged" state in two — uncataloged now has no control at all, collapsing the section to one line while keeping its place so an abandoned entry still surfaces. Stated that line as a requirement — it names the section and why it is unavailable — rather than prescribing its wording. |
 | 2026-08-27 | Added §10 (admin configuration): the Pinball Map section's behavior moved here from the Admin Integrations spec when that spec was slimmed to a page shell (PP-o355.51.8) — the section and its sync-health readout / Sync now (was admin §4), the configuration-presence state model (was admin §5), and the location-change safety rules (was admin §6). Added the tracked-location concept (§1). No behavior changed; this is a relocation, and the on/off model is unchanged (configuration presence, not an enable flag).                                                                                                                                                                                                                         |
 | 2026-08-23 | Replaced the distinct integration enable flag with configuration presence: a stored location means configured and no location means Not configured. Defined the dormant-state behavior, made all human-triggered lineup reads share the refresh allowance, and rewrote Waiting so it lasts until a valid snapshot arrives. Clarified that this state governs location tracking, not the separately configured region-alert feature.                                                                                                                                                                                                                                                                                                                    |
