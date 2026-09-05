@@ -48,6 +48,8 @@ const pbm = vi.hoisted(() => ({
   nextLmxId: 500,
   addResult: null as PbmWriteFailure | null,
   removeResult: null as PbmWriteFailure | null,
+  beforeAdd: null as null | ((machineId: number) => Promise<void>),
+  beforeRemove: null as null | ((lmxId: number) => Promise<void>),
   /** Set to make a live re-fetch fail, as an unreachable PBM would. */
   fetchError: null as string | null,
 }));
@@ -83,7 +85,8 @@ vi.mock("~/lib/pinballmap/client", () => ({
         if (pbm.fetchError) return Promise.reject(new Error(pbm.fetchError));
         return Promise.resolve(snapshotOf(pbm.lineup));
       },
-      addMachine: ({ machineId }: { machineId: number }) => {
+      addMachine: async ({ machineId }: { machineId: number }) => {
+        await pbm.beforeAdd?.(machineId);
         if (pbm.addResult) return Promise.resolve(pbm.addResult);
         const existing = pbm.lineup.find((l) => l.machineId === machineId);
         if (existing) return Promise.resolve({ ok: true, lmxId: existing.id });
@@ -92,7 +95,8 @@ vi.mock("~/lib/pinballmap/client", () => ({
         pbm.lineup.push({ id, machineId });
         return Promise.resolve({ ok: true, lmxId: id });
       },
-      removeMachine: ({ lmxId }: { lmxId: number }) => {
+      removeMachine: async ({ lmxId }: { lmxId: number }) => {
+        await pbm.beforeRemove?.(lmxId);
         if (pbm.removeResult) return Promise.resolve(pbm.removeResult);
         const idx = pbm.lineup.findIndex((l) => l.id === lmxId);
         if (idx === -1) {
@@ -168,6 +172,8 @@ describe("PinballMap outbound writes (PGlite)", () => {
     pbm.nextLmxId = 500;
     pbm.addResult = null;
     pbm.removeResult = null;
+    pbm.beforeAdd = null;
+    pbm.beforeRemove = null;
     pbm.fetchError = null;
     const { getPinballMapWriteCredentials } =
       await import("~/lib/pinballmap/credentials");
@@ -228,6 +234,43 @@ describe("PinballMap outbound writes (PGlite)", () => {
     expect(events[0]?.authorId).toBe(admin.id);
   });
 
+  it("keeps a location switch from overtaking an in-flight addition", async () => {
+    const db = await getTestDb();
+    const { addMachineToPinballMapAction } =
+      await import("~/app/(app)/m/pinballmap-actions");
+    const { getPinballMapState, setTrackedLocation } =
+      await import("~/lib/pinballmap/state");
+    const admin = await createUser("admin");
+    await mockAuthAs(admin.id);
+    await seedState([]);
+    const [machine] = await db
+      .insert(machines)
+      .values({
+        name: "Lease-race game",
+        initials: "LRG",
+        pinballmapMachineId: TITLE_ID,
+        pinballmapIntent: "on",
+      })
+      .returning();
+    if (!machine) throw new Error("failed to seed machine");
+
+    let switchResult: unknown;
+    pbm.beforeAdd = async () => {
+      pbm.beforeAdd = null;
+      switchResult = await setTrackedLocation(99999, admin.id);
+    };
+
+    await expect(
+      addMachineToPinballMapAction(undefined, form(machine.id))
+    ).resolves.toMatchObject({ ok: true });
+
+    expect(switchResult).toEqual({ ok: false, reason: "concurrent_change" });
+    expect(pbm.lineup).toEqual([{ id: 500, machineId: TITLE_ID }]);
+    const state = await getPinballMapState();
+    expect(state?.locationId).toBe(26454);
+    expect(state?.snapshotJson?.lmxes.map((lmx) => lmx.id)).toEqual([500]);
+  });
+
   it("retires an abandonment record when the add reclaims its lmx", async () => {
     // PinballMap hands back the EXISTING lmx when the entry is already on the
     // lineup, so listing can reclaim exactly the entry some machine walked away
@@ -253,6 +296,7 @@ describe("PinballMap outbound writes (PGlite)", () => {
       machineId: abandoner.id,
       lmxId: 777,
       pinballmapMachineId: TITLE_ID,
+      locationId: 26454,
     });
 
     const [claimer] = await db
@@ -724,6 +768,7 @@ describe("PinballMap outbound writes (PGlite)", () => {
       machineId: machine.id,
       lmxId: 500,
       pinballmapMachineId: 8080,
+      locationId: 26454,
     });
 
     const result = await removeMachineFromPinballMapAction(
@@ -809,6 +854,7 @@ describe("PinballMap outbound writes (PGlite)", () => {
       machineId: machine.id,
       lmxId: 321,
       pinballmapMachineId: 8080,
+      locationId: 26454,
     });
 
     const result = await removeMachineFromPinballMapAction(
@@ -824,6 +870,41 @@ describe("PinballMap outbound writes (PGlite)", () => {
     // removal that worked, and pressing Remove again 404s (CORE-ARCH-012).
     const records = await db.select().from(pinballmapAbandonedListings);
     expect(records).toHaveLength(0);
+  });
+
+  it("does not remove an abandoned entry while the integration is not configured", async () => {
+    const db = await getTestDb();
+    const { removeMachineFromPinballMapAction } =
+      await import("~/app/(app)/m/pinballmap-actions");
+    const admin = await createUser("admin");
+    await mockAuthAs(admin.id);
+
+    pbm.lineup = [{ id: 321, machineId: 8080 }];
+    await seedState([{ id: 321, machineId: 8080 }]);
+    await db
+      .update(pinballmapState)
+      .set({ locationId: null })
+      .where(eq(pinballmapState.id, "singleton"));
+    const [machine] = await db
+      .insert(machines)
+      .values({ name: "Dormant orphan", initials: "DOR" })
+      .returning();
+    if (!machine) throw new Error("failed to seed machine");
+    await db.insert(pinballmapAbandonedListings).values({
+      machineId: machine.id,
+      lmxId: 321,
+      pinballmapMachineId: 8080,
+      locationId: 26454,
+    });
+
+    const result = await removeMachineFromPinballMapAction(
+      undefined,
+      formWithLmx(machine.id, 321)
+    );
+
+    expect(result).toMatchObject({ ok: false, code: "SERVER" });
+    expect(pbm.lineup).toEqual([{ id: 321, machineId: 8080 }]);
+    expect(await db.select().from(pinballmapAbandonedListings)).toHaveLength(1);
   });
 
   it("leaves the cabinet's own live entry alone when removing an abandoned one", async () => {
@@ -862,6 +943,7 @@ describe("PinballMap outbound writes (PGlite)", () => {
       machineId: machine.id,
       lmxId: 111,
       pinballmapMachineId: 8080,
+      locationId: 26454,
     });
 
     const result = await removeMachineFromPinballMapAction(
@@ -912,5 +994,194 @@ describe("PinballMap outbound writes (PGlite)", () => {
     // offered), and writing it here would make the push and the toggle two
     // ways to do one thing (spec 4.1).
     expect(row?.pinballmapIntent).toBe("on");
+  });
+
+  it("does not re-mint a cross-location orphan into the current lineup", async () => {
+    const db = await getTestDb();
+    const { removeMachineFromPinballMapAction } =
+      await import("~/app/(app)/m/pinballmap-actions");
+    const admin = await createUser("admin");
+    await mockAuthAs(admin.id);
+
+    // The currently tracked venue has an unrelated live entry under the same
+    // title as an old venue's abandoned entry.
+    pbm.lineup = [{ id: 500, machineId: 8080 }];
+    await seedState([{ id: 500, machineId: 8080 }]);
+    const [machine] = await db
+      .insert(machines)
+      .values({ name: "Old-location orphan", initials: "OLO" })
+      .returning();
+    if (!machine) throw new Error("failed to seed machine");
+    await db.insert(pinballmapAbandonedListings).values({
+      machineId: machine.id,
+      lmxId: 4040,
+      pinballmapMachineId: 8080,
+      locationId: 99999,
+    });
+
+    const result = await removeMachineFromPinballMapAction(
+      undefined,
+      formWithLmx(machine.id, 4040)
+    );
+
+    expect(result.ok).toBe(true);
+    // The stored old-location handle was already gone. Re-resolving title 8080
+    // against the current lineup would have deleted this unrelated lmx.
+    expect(pbm.lineup).toEqual([{ id: 500, machineId: 8080 }]);
+    const state = await db.query.pinballmapState.findFirst();
+    expect(state?.snapshotJson?.lmxes.map((lmx) => lmx.id)).toEqual([500]);
+    expect(await db.select().from(pinballmapAbandonedListings)).toHaveLength(0);
+  });
+
+  it("does not edit the new location snapshot when location changes during a successful orphan removal", async () => {
+    const db = await getTestDb();
+    const { removeMachineFromPinballMapAction } =
+      await import("~/app/(app)/m/pinballmap-actions");
+    const admin = await createUser("admin");
+    await mockAuthAs(admin.id);
+
+    pbm.lineup = [
+      { id: 4040, machineId: 8080 },
+      { id: 500, machineId: 8080 },
+    ];
+    await seedState([{ id: 4040, machineId: 8080 }]);
+    const [machine] = await db
+      .insert(machines)
+      .values({ name: "Switching-location orphan", initials: "SLO" })
+      .returning();
+    if (!machine) throw new Error("failed to seed machine");
+    await db.insert(pinballmapAbandonedListings).values({
+      machineId: machine.id,
+      lmxId: 4040,
+      pinballmapMachineId: 8080,
+      locationId: 26454,
+    });
+
+    pbm.beforeRemove = async () => {
+      pbm.beforeRemove = null;
+      await db
+        .update(pinballmapState)
+        .set({
+          locationId: 99999,
+          snapshotJson: {
+            ...snapshotOf([{ id: 500, machineId: 8080 }]),
+            locationId: 99999,
+          },
+        })
+        .where(eq(pinballmapState.id, "singleton"));
+    };
+
+    const result = await removeMachineFromPinballMapAction(
+      undefined,
+      formWithLmx(machine.id, 4040)
+    );
+
+    expect(result.ok).toBe(false);
+    expect(pbm.lineup).toEqual([{ id: 500, machineId: 8080 }]);
+    const state = await db.query.pinballmapState.findFirst();
+    expect(state?.locationId).toBe(99999);
+    expect(state?.snapshotJson?.lmxes.map((lmx) => lmx.id)).toEqual([500]);
+    expect(await db.select().from(pinballmapAbandonedListings)).toHaveLength(1);
+  });
+
+  it("keeps a switch from changing orphan scope during a removal", async () => {
+    const db = await getTestDb();
+    const { removeMachineFromPinballMapAction } =
+      await import("~/app/(app)/m/pinballmap-actions");
+    const { getPinballMapState, setTrackedLocation } =
+      await import("~/lib/pinballmap/state");
+    const admin = await createUser("admin");
+    await mockAuthAs(admin.id);
+
+    pbm.lineup = [{ id: 4040, machineId: 8080 }];
+    await seedState([{ id: 500, machineId: 9000 }]);
+    await db
+      .update(pinballmapState)
+      .set({
+        locationId: 99999,
+        snapshotJson: {
+          ...snapshotOf([{ id: 500, machineId: 9000 }]),
+          locationId: 99999,
+        },
+      })
+      .where(eq(pinballmapState.id, "singleton"));
+    const [machine] = await db
+      .insert(machines)
+      .values({ name: "Switch-protected orphan", initials: "SPO" })
+      .returning();
+    if (!machine) throw new Error("failed to seed machine");
+    await db.insert(pinballmapAbandonedListings).values({
+      machineId: machine.id,
+      lmxId: 4040,
+      pinballmapMachineId: 8080,
+      locationId: 26454,
+    });
+
+    let switchResult: unknown;
+    pbm.beforeRemove = async () => {
+      pbm.beforeRemove = null;
+      switchResult = await setTrackedLocation(26454, admin.id);
+    };
+
+    await expect(
+      removeMachineFromPinballMapAction(
+        undefined,
+        formWithLmx(machine.id, 4040)
+      )
+    ).resolves.toMatchObject({ ok: true });
+
+    expect(switchResult).toEqual({ ok: false, reason: "concurrent_change" });
+    expect(pbm.lineup).toEqual([]);
+    expect((await getPinballMapState())?.locationId).toBe(99999);
+    expect(await db.select().from(pinballmapAbandonedListings)).toHaveLength(0);
+  });
+
+  it("does not re-resolve an orphan against a location selected during its remove call", async () => {
+    const db = await getTestDb();
+    const { removeMachineFromPinballMapAction } =
+      await import("~/app/(app)/m/pinballmap-actions");
+    const admin = await createUser("admin");
+    await mockAuthAs(admin.id);
+
+    pbm.lineup = [{ id: 500, machineId: 8080 }];
+    await seedState([{ id: 4040, machineId: 8080 }]);
+    const [machine] = await db
+      .insert(machines)
+      .values({ name: "Racing-location orphan", initials: "RLO" })
+      .returning();
+    if (!machine) throw new Error("failed to seed machine");
+    await db.insert(pinballmapAbandonedListings).values({
+      machineId: machine.id,
+      lmxId: 4040,
+      pinballmapMachineId: 8080,
+      locationId: 26454,
+    });
+
+    pbm.beforeRemove = async () => {
+      pbm.beforeRemove = null;
+      await db
+        .update(pinballmapState)
+        .set({
+          locationId: 99999,
+          snapshotJson: {
+            ...snapshotOf([{ id: 500, machineId: 8080 }]),
+            locationId: 99999,
+          },
+          lastSyncedAt: new Date(),
+        })
+        .where(eq(pinballmapState.id, "singleton"));
+    };
+
+    const result = await removeMachineFromPinballMapAction(
+      undefined,
+      formWithLmx(machine.id, 4040)
+    );
+
+    expect(result.ok).toBe(false);
+    expect(pbm.lineup).toEqual([{ id: 500, machineId: 8080 }]);
+    const state = await db.query.pinballmapState.findFirst();
+    expect(state?.locationId).toBe(99999);
+    expect(state?.snapshotJson?.lmxes.map((lmx) => lmx.id)).toEqual([500]);
+    expect(await db.select().from(pinballmapAbandonedListings)).toHaveLength(1);
   });
 });

@@ -8,7 +8,8 @@
  * - Login: 10 attempts per IP per 15 min, 5 attempts per email per 15 min
  * - Signup: 3 signups per IP per hour
  * - Forgot Password: 3 requests per email per hour
- * - Public Issue: 5 submissions per IP per 15 min
+ * - Public Issue (anonymous): 5 submissions per IP per 15 min
+ * - Authenticated Issue: 20 submissions per user per 15 min
  *
  * @see https://github.com/timothyfroehlich/PinPoint/issues/536
  * @see https://github.com/timothyfroehlich/PinPoint/issues/537
@@ -18,6 +19,7 @@
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
 import { headers } from "next/headers";
+import { createHash } from "node:crypto";
 import { log } from "~/lib/logger";
 import { maskEmail } from "~/lib/logging/mask";
 import { BLOB_CONFIG } from "~/lib/blob/config";
@@ -187,6 +189,22 @@ function createPublicIssueLimiter(): Ratelimit | null {
 }
 
 /**
+ * Authenticated Issue rate limiter
+ * - User-based: 20 submissions per 15 minutes (sliding window)
+ */
+function createAuthenticatedIssueLimiter(): Ratelimit | null {
+  const redis = getRedis();
+  if (!redis) return null;
+
+  return new Ratelimit({
+    redis,
+    limiter: Ratelimit.slidingWindow(20, "15 m"),
+    prefix: "ratelimit:report:user",
+    analytics: true,
+  });
+}
+
+/**
  * Image Upload rate limiter
  * - IP-based: 10 uploads per hour (sliding window)
  */
@@ -203,24 +221,25 @@ function createImageUploadLimiter(): Ratelimit | null {
 }
 
 /**
- * Whether a limit bucket is keyed by client IP or by account email.
+ * Whether a limit bucket is keyed by client IP, account email, or user ID.
  * IP-keyed checks apply the "unknown IP" handling; email-keyed checks
- * normalize the key to lowercase and mask it in logs.
+ * normalize the key to lowercase and mask it in logs; user-keyed checks
+ * hash the user ID before it leaves the application.
  */
-type RateLimitKeyType = "ip" | "email";
+type RateLimitKeyType = "ip" | "email" | "user";
 
 /**
  * Build a rate-limit checker for one limiter bucket.
  *
- * The six auth/report limiters differ only in three ways: the Ratelimit
+ * The seven auth/report limiters differ only in three ways: the Ratelimit
  * configuration (owned by the passed `createLimiter`), whether the key is an
- * IP or an account email (`keyType`), and the log label. Everything else —
+ * IP, account email, or user ID (`keyType`), and the log label. Everything else —
  * lazy limiter initialization, the Redis-unconfigured fallback, and the
  * fail-closed-in-production / fail-open-in-development semantics — is shared.
  *
  * @param createLimiter - Factory for this bucket's limiter (returns null when Redis is unconfigured)
  * @param options.label - Human-readable label used in the failure log message
- * @param options.keyType - Whether the key is a client IP or an account email
+ * @param options.keyType - Whether the key is a client IP, account email, or user ID
  * @returns An async checker `(key) => Promise<RateLimitResult>`
  */
 function makeLimitChecker(
@@ -267,11 +286,15 @@ function makeLimitChecker(
       return failOpenResult();
     }
 
+    const normalizedKey =
+      keyType === "email"
+        ? limitKey.toLowerCase()
+        : keyType === "user"
+          ? hashUserId(limitKey)
+          : limitKey;
+
     try {
-      // Normalize email keys to lowercase for consistent rate limiting.
-      const result = await limiter.limit(
-        keyType === "email" ? limitKey.toLowerCase() : limitKey
-      );
+      const result = await limiter.limit(normalizedKey);
       return {
         success: result.success,
         limit: result.limit,
@@ -283,7 +306,9 @@ function makeLimitChecker(
       log.error(
         keyType === "email"
           ? { err, email: maskEmail(limitKey) }
-          : { err, ip: limitKey },
+          : keyType === "user"
+            ? { err, userKeyPrefix: normalizedKey.slice(0, 8) }
+            : { err, ip: limitKey },
         `${label} rate limit check failed`
       );
       if (isProductionEnv()) {
@@ -348,6 +373,25 @@ export const checkPublicIssueLimit = makeLimitChecker(
     label: "Public issue",
     keyType: "ip",
   }
+);
+
+/**
+ * Hashes a user ID to a pseudonymous string so raw user identifiers
+ * are never stored in external rate-limit caches (CORE-SEC-007).
+ */
+function hashUserId(userId: string): string {
+  return createHash("sha256").update(userId, "utf8").digest("hex");
+}
+
+/**
+ * Check authenticated issue rate limit (user-based)
+ *
+ * @param userId - User ID (UUID)
+ * @returns Rate limit result, or success if Redis not configured
+ */
+export const checkAuthenticatedIssueLimit = makeLimitChecker(
+  createAuthenticatedIssueLimiter,
+  { label: "Authenticated issue", keyType: "user" }
 );
 
 /**
