@@ -200,6 +200,28 @@ unlike the setup script in the claude.ai UI.
   `curl "$HTTPS_PROXY/__agentproxy/status"` — it logs `connect_rejected` with the
   blocked host, distinguishing a policy denial from a DoltHub-side auth error.
 
+## Routine inventory (trigger IDs)
+
+`RemoteTrigger {action: "list"}` returns only the 20 most recent triggers and
+**ignores the pagination cursor** — `cursor` is wired for `list_runs` and
+`get_run_log` only, so `list` cannot page past the first 20. One-shot
+`created_kind: "reminder"` triggers (a session telling itself to re-check a PR)
+accumulate fast and bury the real routines, which is why the IDs are written
+down here. Recovering one otherwise means opening `claude.ai/code/routines` in a
+logged-in browser and clicking each row, since the ID appears only in the
+address bar, never in the list DOM.
+
+| Routine                           | Trigger ID                      | Cron            | Opens                              |
+| --------------------------------- | ------------------------------- | --------------- | ---------------------------------- |
+| Nightly Bead Session              | `trig_011UapxF7gznEG6nuXDpxctf` | `30 7 * * *`    | a PR per worked bead               |
+| Biweekly Spec Conformance Audit   | `trig_01YHuiRgrSEe8krSgmjnZNrZ` | `0 10 1,15 * *` | beads only, never a PR             |
+| Weekly Review Agent               | `trig_01Dp3rMq8LevE4P9gQ1mFSj4` | `0 10 * * 6`    | the changelog PR, plus beads       |
+| Flaky test tracker (**disabled**) | `trig_015aQdBtdaWhpSJRPcBPRMyC` | `0 9 * * 6`     | superseded by Weekly Review Part C |
+
+Every routine that opens a GitHub PR or issue labels it `ownerless` at creation
+— see AGENTS.md §5 "The `ownerless` label". The Spec Conformance Audit is
+exempt because it opens neither.
+
 ## Related
 
 - **PP-3x7s** — the enabler this runbook documents.
