@@ -1,6 +1,6 @@
 ---
 name: pinpoint-security
-description: The security choices PinPoint made that its own code does not state — which modules may touch `@supabase/ssr` directly, the CSP authoring posture and what is already allowlisted, what counts as a non-gating role comparison under the `permissions-audit-allow` contract, why a `SECURITY DEFINER` RPC returning a secret needs an in-body `auth.role()` check rather than `REVOKE`/`GRANT` alone (and which migrations to copy), the multi-provider OAuth registry and unlink guard, the shared `sanitize-html` allowlist, and the `~/lib/url` seam (`getSiteUrl` / `requireSiteUrl` / `resolveRequestUrl` / `isInternalUrl` / `getSafeRedirect`) that makes hand-rolled `process.env` URL building a bug. Use when creating a Supabase server client, writing a Server Action's auth check, a Postgres function that reads Vault, a redirect, an absolute URL in an email or webhook, a CSP change, an OAuth flow, a sanitizer, or a permission gate. The enforced rules themselves are `CORE-SEC-*` / `CORE-SSR-*` in `docs/NON_NEGOTIABLES.md`; recorded threat-model decisions are in `docs/SECURITY.md`.
+description: The security choices PinPoint made that its own code does not state — which modules may touch `@supabase/ssr` directly, the CSP authoring posture and what is already allowlisted, matrix permissions vs resource-level predicates (`collections.ts`, `settings.ts`) under `src/lib/permissions/`, what counts as a non-gating role comparison under the `permissions-audit-allow` contract, why a `SECURITY DEFINER` RPC returning a secret needs an in-body `auth.role()` check rather than `REVOKE`/`GRANT` alone (and which migrations to copy), the multi-provider OAuth registry and unlink guard, the shared `sanitize-html` allowlist, and the `~/lib/url` seam (`getSiteUrl` / `requireSiteUrl` / `resolveRequestUrl` / `isInternalUrl` / `getSafeRedirect`) that makes hand-rolled `process.env` URL building a bug. Use when creating a Supabase server client, writing a Server Action's auth check, a Postgres function that reads Vault, a redirect, an absolute URL in an email or webhook, a CSP change, an OAuth flow, a sanitizer, or a permission gate. The enforced rules themselves are `CORE-SEC-*` / `CORE-SSR-*` in `docs/NON_NEGOTIABLES.md`; recorded threat-model decisions are in `docs/SECURITY.md`.
 ---
 
 # PinPoint Security
@@ -65,6 +65,17 @@ directly: derive the `AccessLevel` and `OwnershipContext` server-side, pass them
 down as props, then call `getPermissionState` / `getPermissionDeniedReason` in
 the component. Deriving server-side also keeps the client payload minimal
 (CORE-SEC-006).
+
+### Matrix-level permissions vs. resource-level permission predicates
+
+Authorization in PinPoint is partitioned between two complementary layers:
+
+- **Matrix-level permissions (`matrix.ts` / `helpers.ts`)**: Model role-based capabilities across the application (e.g. `issues.create`, `machines.edit`, `collections.view.private`). These are evaluated via `checkPermission(permission, accessLevel, context)` and back the auto-generated documentation at `/help/permissions`.
+- **Resource-level permission predicates (`collections.ts`, upcoming `settings.ts`)**: Evaluate domain authorization rules that depend on multi-dimensional entity state, record-specific identity, or ownership (e.g. `canViewCollection`, `canEditCollection`, `canManageCollection`, `canViewSet`, `canEditSet`). The matrix has no visibility into per-entity context (such as whether a viewer is the record's creator, an assigned editor collaborator, or the owner of a machine associated with a settings set).
+
+**All permission helpers must live in `src/lib/permissions/` (CORE-ARCH-008).** Standalone permission predicates must never live scattered across feature domains (e.g., `src/lib/machines/settings-permissions.ts` being relocated to `src/lib/permissions/settings.ts` per PP-leli.5). Centralizing them in `src/lib/permissions/` ensures all authorization logic is discoverable in one place, cleanly separated from UI and data layers, and subject to audit scrutiny.
+
+**Role comparisons within resource-level helpers must be explicit and annotated.** As noted above, the CI role-check audit exempts only `matrix.ts` and `helpers.ts`. Resource-level predicate modules under `src/lib/permissions/` are fully audited. Where a resource predicate needs to evaluate a role comparison to handle multi-dimensional entity ownership (for example, an admin override alongside an owner check, or role-differentiated access for unowned entities), the check must be explicit and tagged with `// permissions-audit-allow: <reason>` documenting the ownership or fallback invariant. Whenever feasible, delegate the pure role dimension to `checkPermission()` and reserve explicit comparisons for the entity-ownership dimensions.
 
 ## OAuth providers
 

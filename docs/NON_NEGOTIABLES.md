@@ -162,7 +162,7 @@
 
 - **Severity:** Critical
 - **Why:** Prevent unauthorized access
-- **Do:** Verify authentication in Server Actions and tRPC procedures
+- **Do:** Verify authentication in Server Actions
 - **Don't:** Skip auth checks in protected routes
 
 **CORE-SEC-002:** Validate all inputs

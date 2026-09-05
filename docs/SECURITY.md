@@ -26,6 +26,15 @@ The `'strict-dynamic'` directive allows scripts loaded by nonce'd scripts to exe
 
 **Supabase project-level captcha protection must remain disabled** for the project. Because PinPoint does not send captcha tokens with authentication or report requests, enabling captcha at the Supabase project level will cause auth requests to fail with `captcha_failed`.
 
+## Database Authorization & RPC Perimeter
+
+PinPoint is a single-tenant application with no multi-tenancy and no database-level Row Level Security (RLS) enforcement on application queries:
+
+- **Drizzle connects via `POSTGRES_URL` with `BYPASSRLS`**: The Drizzle database user has `BYPASSRLS`. Database RLS policies are not evaluated for application queries, and the database does not filter rows based on session context.
+- **Server Actions and MCP tools form the sole authorization perimeter**: Server Actions (`"use server"`) and MCP tools are public HTTP/RPC endpoints callable by any client that can reach the application.
+- **Server-side authorization is the authoritative line of defense**: Authorization via `checkPermission()` against `src/lib/permissions/matrix.ts` (or domain-specific permission predicates under `src/lib/permissions/`) in Server Actions and tools is the sole barrier preventing unauthorized data mutations and access.
+- **Client and UI checks are UX affordances only**: Client-side checks (`canEdit`, `getPermissionDeniedReason`, `getPermissionState`) exist only to drive UI state (e.g., disabling buttons or rendering explanatory messages). They are never security boundaries.
+
 ## Threat Model
 
 ### Not Protected Against
