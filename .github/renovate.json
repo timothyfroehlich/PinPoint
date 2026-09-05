@@ -9,6 +9,7 @@
     "enabled": false
   },
   "dependencyDashboard": true,
+  "dependencyDashboardLabels": ["dependencies", "ownerless"],
   "labels": ["dependencies", "ownerless"],
   "semanticCommits": "enabled",
   "semanticCommitType": "chore",
