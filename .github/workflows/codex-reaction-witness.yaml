@@ -2,9 +2,9 @@
 #
 # Security boundary: both events load this workflow and its checked-out helper from
 # trusted main, never from the PR branch. Manual fallback comments are accepted only
-# from the repository owner and must exactly match the documented command. The helper
-# witnesses a fresh eyes -> +1 transition while continuously verifying that the PR head
-# is unchanged, then posts a github-actions comment pinned to that SHA.
+# from the repository owner and must carry the documented SHA marker. The helper
+# witnesses a fresh eyes -> +1 transition while continuously verifying that the marked
+# PR head is unchanged, then posts a github-actions comment pinned to that SHA.
 
 name: Codex Reaction Witness
 
@@ -36,7 +36,7 @@ jobs:
       (github.event_name == 'issue_comment' &&
        github.event.issue.pull_request &&
        github.event.comment.user.login == github.repository_owner &&
-       github.event.comment.body == '@codex review')
+       startsWith(github.event.comment.body, '@codex review'))
     runs-on: ubuntu-latest
     timeout-minutes: 25
     env:
@@ -62,14 +62,21 @@ jobs:
         run: |
           expected_head="$EXPECTED_HEAD"
           if [[ "$EVENT_NAME" == "issue_comment" ]]; then
-            pr_json=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}")
-            if ! jq -e --arg repo "$GITHUB_REPOSITORY" \
-              '.head.repo.full_name == $repo and .draft == false' \
-              <<< "$pr_json" >/dev/null; then
-              echo "Manual witness requires a ready pull request from this repository."
+            if ! expected_head=$(jq -er '
+              .comment.body
+              | capture("^@codex review\\n<!-- pinpoint-codex-review-head: (?<head>[0-9a-f]{40}) -->$")
+              | .head
+            ' "$GITHUB_EVENT_PATH"); then
+              echo "Manual witness requires the exact SHA-bound review command."
               exit 0
             fi
-            expected_head=$(jq -r '.head.sha' <<< "$pr_json")
+            pr_json=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}")
+            if ! jq -e --arg repo "$GITHUB_REPOSITORY" --arg head "$expected_head" \
+              '.head.repo.full_name == $repo and .draft == false and .head.sha == $head' \
+              <<< "$pr_json" >/dev/null; then
+              echo "Manual witness requires the marked SHA to remain head on a ready pull request from this repository."
+              exit 0
+            fi
           fi
           bash scripts/workflow/codex-reaction-witness.sh \
             "$PR_NUMBER" "$expected_head" "$TRIGGERED_AT"

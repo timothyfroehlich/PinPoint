@@ -161,14 +161,19 @@ exact-head coverage.
 
 Automatic review is first for every head. If its bounded witness conclusively finishes
 without exact-head evidence — for example, it reports that no commit-safe Codex
-reaction transition was observed — comment exactly once for that unchanged head:
+reaction transition was observed — comment exactly once for that unchanged head. Bind
+the comment to the head you inspected so a concurrent push makes the witness fail closed:
 
 ```bash
-gh pr comment <PR> --body '@codex review'
+head=$(gh pr view <PR> --json headRefOid --jq .headRefOid)
+body=$(printf '@codex review\n<!-- pinpoint-codex-review-head: %s -->' "$head")
+gh pr comment <PR> --body "$body"
 ```
 
-That exact repository-owner comment starts a new trusted-main reaction witness, so a
-reaction-only clean result can still become SHA-pinned evidence for the unchanged head.
+The visible first line is Codex's documented review trigger; the hidden marker binds the
+trusted-main reaction witness to that SHA. The witness rejects the request if another
+commit becomes head before it starts, and its helper keeps checking the head throughout
+the reaction transition.
 
 Respect the same eligibility sequence: wait for current-head CI and promote the PR
 before commenting. A slow or still-running automatic attempt is not a conclusive miss.

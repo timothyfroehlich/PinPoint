@@ -169,12 +169,17 @@ def test_workflow_uses_trusted_main_and_narrow_permissions() -> None:
     assert "github.event.pull_request.head.repo.full_name == github.repository" in text
     assert "github.event.issue.pull_request" in text
     assert "github.event.comment.user.login == github.repository_owner" in text
-    assert "github.event.comment.body == '@codex review'" in text
+    assert "startsWith(github.event.comment.body, '@codex review')" in text
     assert "github.event.comment.created_at" in text
     assert "EVENT_NAME: ${{ github.event_name }}" in text
     assert 'if [[ "$EVENT_NAME" == "issue_comment" ]]' in text
+    assert "pinpoint-codex-review-head" in text
+    assert '"$GITHUB_EVENT_PATH"' in text
     assert 'gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}"' in text
-    assert ".head.repo.full_name == $repo and .draft == false" in text
+    assert (
+        ".head.repo.full_name == $repo and .draft == false and .head.sha == $head"
+        in text
+    )
     assert "GITHUB_ENV" not in text
 
 
