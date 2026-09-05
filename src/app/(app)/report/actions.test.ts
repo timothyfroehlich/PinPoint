@@ -63,10 +63,15 @@ vi.mock("~/lib/blob/client", () => ({
 import { getRecentIssuesAction, submitPublicIssueAction } from "./actions";
 import { db } from "~/server/db";
 import {
+  AuthSessionMissingError,
+  type SupabaseClient,
+} from "@supabase/supabase-js";
+import {
   checkAuthenticatedIssueLimit,
   checkPublicIssueLimit,
   formatResetTime,
   getClientIp,
+  type RateLimitResult,
 } from "~/lib/rate-limit";
 import { createClient } from "~/lib/supabase/server";
 
@@ -228,28 +233,59 @@ describe("getRecentIssuesAction", () => {
 // submitPublicIssueAction — Rate limiting branching
 // ---------------------------------------------------------------------------
 describe("submitPublicIssueAction — Rate limiting branching", () => {
+  const allowedLimitResult: RateLimitResult = {
+    success: true,
+    limit: 20,
+    remaining: 19,
+    reset: 0,
+  };
+
+  const blockedLimitResult: RateLimitResult = {
+    success: false,
+    limit: 20,
+    remaining: 0,
+    reset: 123456789,
+  };
+
+  type GetUserResult = Awaited<ReturnType<SupabaseClient["auth"]["getUser"]>>;
+
+  function mockAuth(userId: string | null): void {
+    const getUserResult: GetUserResult = userId
+      ? {
+          data: {
+            user: {
+              id: userId,
+              app_metadata: {},
+              user_metadata: {},
+              aud: "authenticated",
+              created_at: new Date().toISOString(),
+            },
+          },
+          error: null,
+        }
+      : { data: { user: null }, error: new AuthSessionMissingError() };
+
+    const auth: Pick<SupabaseClient["auth"], "getUser"> = {
+      getUser: vi.fn().mockResolvedValue(getUserResult),
+    };
+
+    vi.mocked(createClient).mockResolvedValue({
+      auth,
+    } as SupabaseClient);
+  }
+
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(getClientIp).mockResolvedValue("192.168.1.50");
-    vi.mocked(checkPublicIssueLimit).mockResolvedValue({
-      success: true,
-      reset: 0,
-    } as any);
-    vi.mocked(checkAuthenticatedIssueLimit).mockResolvedValue({
-      success: true,
-      reset: 0,
-    } as any);
+    vi.mocked(checkPublicIssueLimit).mockResolvedValue(allowedLimitResult);
+    vi.mocked(checkAuthenticatedIssueLimit).mockResolvedValue(
+      allowedLimitResult
+    );
     vi.mocked(formatResetTime).mockReturnValue("5 minutes");
   });
 
   it("uses checkAuthenticatedIssueLimit (keyed by user.id) and skips IP check when user is logged in", async () => {
-    vi.mocked(createClient).mockResolvedValue({
-      auth: {
-        getUser: vi
-          .fn()
-          .mockResolvedValue({ data: { user: { id: "tech-user-456" } } }),
-      },
-    } as any);
+    mockAuth("tech-user-456");
 
     await submitPublicIssueAction({}, new FormData());
 
@@ -258,11 +294,7 @@ describe("submitPublicIssueAction — Rate limiting branching", () => {
   });
 
   it("uses checkPublicIssueLimit (keyed by IP) when user is anonymous", async () => {
-    vi.mocked(createClient).mockResolvedValue({
-      auth: {
-        getUser: vi.fn().mockResolvedValue({ data: { user: null } }),
-      },
-    } as any);
+    mockAuth(null);
 
     await submitPublicIssueAction({}, new FormData());
 
@@ -271,17 +303,10 @@ describe("submitPublicIssueAction — Rate limiting branching", () => {
   });
 
   it("returns rate limit error when authenticated limit is exceeded", async () => {
-    vi.mocked(createClient).mockResolvedValue({
-      auth: {
-        getUser: vi
-          .fn()
-          .mockResolvedValue({ data: { user: { id: "tech-user-456" } } }),
-      },
-    } as any);
-    vi.mocked(checkAuthenticatedIssueLimit).mockResolvedValue({
-      success: false,
-      reset: 123456789,
-    } as any);
+    mockAuth("tech-user-456");
+    vi.mocked(checkAuthenticatedIssueLimit).mockResolvedValue(
+      blockedLimitResult
+    );
 
     const result = await submitPublicIssueAction({}, new FormData());
 
@@ -291,15 +316,8 @@ describe("submitPublicIssueAction — Rate limiting branching", () => {
   });
 
   it("returns rate limit error when anonymous limit is exceeded", async () => {
-    vi.mocked(createClient).mockResolvedValue({
-      auth: {
-        getUser: vi.fn().mockResolvedValue({ data: { user: null } }),
-      },
-    } as any);
-    vi.mocked(checkPublicIssueLimit).mockResolvedValue({
-      success: false,
-      reset: 123456789,
-    } as any);
+    mockAuth(null);
+    vi.mocked(checkPublicIssueLimit).mockResolvedValue(blockedLimitResult);
 
     const result = await submitPublicIssueAction({}, new FormData());
 
