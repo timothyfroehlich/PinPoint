@@ -35,6 +35,12 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/_pr-gates.sh"
 
 SCREENSHOT_MARKER="<!-- pr-screenshots -->"
+# A PR-body opt-out marker: when a UI-glob file changed but nothing renders differently
+# (a refactor, a non-null-`!` removal), the author records that with this marker in the
+# PR body so the report drops its "NO screenshots posted" nudge — the claim lives in the
+# PR rather than being argued in chat. Substring-matched (not whole-line) because GitHub
+# stores bodies with CRLF; a `grep -x` anchor would silently miss the marker. (PP-lhjg)
+NO_VISUAL_CHANGE_MARKER="<!-- no-visual-change -->"
 
 pr="${1:-}"
 if [[ -z "$pr" || ! "$pr" =~ ^[0-9]+$ ]]; then
@@ -46,9 +52,10 @@ fi
 # Facts from GitHub
 # ---------------------------------------------------------------------------------
 
-meta=$(gh pr view "$pr" --json number,title,url,headRefName,headRefOid,baseRefName,isDraft,state)
+meta=$(gh pr view "$pr" --json number,title,url,headRefName,headRefOid,baseRefName,isDraft,state,body)
 title=$(jq -r '.title' <<< "$meta")
 url=$(jq -r '.url' <<< "$meta")
+pr_body=$(jq -r '.body // ""' <<< "$meta")
 head_ref=$(jq -r '.headRefName' <<< "$meta")
 head_sha=$(jq -r '.headRefOid' <<< "$meta")
 base_ref=$(jq -r '.baseRefName' <<< "$meta")
@@ -362,15 +369,28 @@ if [[ "$ui_changed" == "yes" ]]; then
     "${merge_base}..${head_sha}" -- "${ui_files[@]}" 2>/dev/null || true)
 fi
 
+# The value states only what the path heuristic actually knows — a UI FILE changed, not
+# that the UI changed. Bare `ui yes` over-claimed, so it trained readers to skim the one
+# line that also flags a genuinely unscreenshotted change. (PP-lhjg)
+if [[ "$ui_changed" == "yes" ]]; then
+  ui_desc="UI file(s) changed"
+else
+  ui_desc="no UI files changed"
+fi
+
 if [[ -n "$shots" ]]; then
-  ui_line="${ui_changed} · screenshots posted ${shots}"
+  ui_line="${ui_desc} · screenshots posted ${shots}"
   if [[ -n "$last_ui_commit" && "$last_ui_commit" > "$shots" ]]; then
     ui_line="${ui_line} · STALE: UI changed at ${last_ui_commit}, after the screenshots"
   fi
 elif [[ "$ui_changed" == "yes" ]]; then
-  ui_line="yes · NO screenshots posted"
+  if grep -qF "$NO_VISUAL_CHANGE_MARKER" <<< "$pr_body"; then
+    ui_line="${ui_desc} · marked no-visual-change"
+  else
+    ui_line="${ui_desc} · NO screenshots posted"
+  fi
 else
-  ui_line="no"
+  ui_line="$ui_desc"
 fi
 
 # ---------------------------------------------------------------------------------

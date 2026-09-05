@@ -1,101 +1,213 @@
 ---
 name: pinpoint-prototype-mode
-description: Opt-in rapid-iteration mode for UI/UX prototyping — layout, components, styling, page structure, interaction/flow. Relaxes test/lint/type rigor on presentational code in favor of speed while tracking the resulting debt. NOT for backend/internal work (data layer, server-action logic, auth, permissions, migrations). What it never relaxes is as load-bearing as what it does: no commit, push or PR while the mode is on, no touching prod, no deleting or weakening a test, and every auth, permissions and data-privacy rule still applies in full. Use when the user says "prototype mode", "rapid iteration", "vibe", or asks to explore a UI/design idea quickly without worrying about tests passing. Also read this to EXIT the mode.
+description: Opt-in rapid-iteration mode for PinPoint UI/UX prototyping inside the real app under /prototype. Reuse existing routes, components, tokens, types, loaders, and seed data before creating disposable adapters or typed fixtures. Defers selected presentational lint/test/type cleanup while tracking debt, but never relaxes auth, permissions, privacy, accessibility, semantic colors, TypeScript safety, or correctness. Prototype routes stay local and uncommitted and are deleted before normal development resumes. Use when Tim explicitly asks for prototype mode, rapid iteration, a disposable UI exploration, or to exit/make real an active prototype.
 ---
 
 # PinPoint Prototype Mode
 
-A deliberately-entered, deliberately-exited mode for iterating on **UI/UX**
-fast — layout, components, styling, page structure, interaction and flow —
-without stopping to make tests, lint, and types green at every step. The work
-is **not** done when prototype mode ends; the mode tracks exactly what rigor
-was skipped so it can be repaid.
+Prototype mode is a deliberately entered and exited workflow for answering one
+UI/UX design question quickly **inside the real PinPoint application**. Build
+disposable screens at `/prototype/<slug>`, using the real shell and as much
+production code as possible so the result stays visually and behaviorally
+accurate.
 
-## Scope: UI/UX only
+The permanent `src/app/(dev)/prototype/layout.tsx` is tooling. Everything under
+its child directories is disposable, ignored by Git, and blocked from checks
+and commits until removed. Do not introduce a separate Vite app or Figma board;
+Figma is off by default unless Tim explicitly requests it again.
 
-This mode is for **visual and interaction design** — the stuff you want to see
-rendered, tweak, and see again. It is **not** a license to vibe-code internals.
+## Boundary
 
-- **In scope:** components, layouts, Tailwind/styling, page composition,
-  responsive behavior, copy, empty/loading/error states, navigation and
-  interaction flow.
-- **Out of scope (keep full rigor):** the data layer, server-action business
-  logic, queries, migrations, auth, permissions, anything in `~/lib` that isn't
-  presentational. If a UI idea needs data, **stub or hard-code it** to see the
-  screen — don't build the real backend under relaxed rigor. When the design is
-  settled, exit the mode and build the backend properly.
+- **In scope:** page composition, layout, components, styling, responsive
+  behavior, copy, visible states, and core interaction flow.
+- **Out of scope:** new data access, queries, writes, Server Actions, API routes,
+  migrations, auth or permission shortcuts, secrets, and production behavior.
+- **Local only:** no commit, push, draft PR, preview deployment, or production
+  access while `.prototype-mode` exists or a disposable prototype route remains.
 
-If the exploration starts requiring real backend/internal changes, that's the
-signal to exit prototype mode (or keep that slice rigorous) — say so rather
-than quietly relaxing rigor on logic that matters.
+If the design needs new backend behavior, stub that boundary with typed fixture
+data and record the need in the ledger. Build the backend only after exiting
+prototype mode under normal rigor.
 
-## When to use
+## Enter only on request
 
-Enter **only** when the user explicitly asks: "prototype mode", "rapid
-iteration", "let's just explore", "vibe on this UI", "don't worry about tests
-for now", or similar — and the work is **UI/UX**. **Never self-elect into this
-mode.** Full rigor (AGENTS.md §2) is always the default.
+Never self-elect into this mode. Enter only when Tim explicitly asks for
+"prototype mode", "rapid iteration", "just explore", or equivalent UI/UX
+exploration. Before editing, ensure the work has a Bead and is in an isolated
+worktree.
 
-## Entering the mode
+Concurrent prototypes require separate isolated worktrees. The marker and
+cleanup guard intentionally apply to the whole worktree, so one prototype must
+not share a worktree with another task that needs to check or commit.
 
-1. Announce: "⚡ Entering prototype mode — rigor relaxed, debt tracked."
-2. Create the marker file `.prototype-mode` at the worktree root (it is
-   gitignored). Seed it with the ledger template below.
-3. From here on, follow the relaxed rules and append to the ledger as you skip
-   things.
-
-Marker file template:
+1. Announce that prototype mode is active, local-only, and debt-tracked.
+2. Create `.prototype-mode` at the worktree root from the template below.
+3. Fill every header and complete the reuse inventory before coding.
 
 ```markdown
 # Prototype mode — entered <ISO date/time>
 
-Goal: <one line: what are we exploring?>
+Bead: <PP-id>
+Design question: <the single question this prototype should answer>
+Source route: <existing PinPoint route, external URL, or "new screen">
+Visual target: <captured source, selected option, and state>
+Prototype slug: <kebab-case slug>
+Prototype URL: /prototype/<slug>
+Data mode: <seed record | existing local fixture | existing read-only loader | typed fixture>
 
-## Debt ledger (repay before this work is "real")
+## Reuse inventory
+
+- Nearest production route:
+- Shell/layout:
+- Shared components:
+- Semantic tokens:
+- Icons/assets:
+- Domain types:
+- Domain logic/copy contracts:
+- Existing loaders:
+- Seeded records:
+
+## States to compare
+
+- <representative state needed to answer the design question>
+
+## Evidence
+
+- Before — desktop: <state, data/fixture, viewport, chrome mode>
+- Before — 390×844: <state, data/fixture, viewport, chrome mode>
+- Comparisons: <source and rendered evidence at matching state/viewport>
+
+## Prototype-only controls
+
+- (none)
+
+## Debt ledger
 
 - [ ] (nothing skipped yet)
 ```
 
-## What is RELAXED in prototype mode
+## Ground the visual target first
 
-- **Don't run `preflight`/`check`/tests before showing work.** Show the change
-  and move on. Iterate on the idea, not the gates.
-- **Don't fix every lint / type-strictness error mid-flight.** A red squiggle
-  is fine while exploring. Log it in the ledger.
-- **Don't write test coverage yet.** Log "needs tests: <what>" in the ledger.
-- **Don't polish for DRY / architecture / Rule-of-Three.** Duplicate freely;
-  note it for later.
-- **Don't spawn review subagents or worry about CI.**
+Use Product Design for visual grounding and QA when the active agent environment
+provides it, while PinPoint remains the runtime. Product Design is a preferred
+capability, not a portability requirement; preserve the same evidence and
+selection discipline with the environment's available equivalents when it is
+not installed:
 
-Every time you skip one of these, add a concrete line to the ledger. "Later"
-must be a real checklist, not an implied promise.
+- For an existing screen, capture its relevant state with the browser-control
+  capability available in the active agent environment at desktop and
+  `390×844` **before changing it**. Record both captures.
+- For a live URL, use `product-design:url-to-code`'s source-capture and visual
+  comparison discipline when that skill is available. Otherwise capture the
+  source with the supported browser capability and compare it against the
+  in-app prototype at matching state and viewport. Do not initialize a
+  standalone app, copy an asset tree, or pursue exhaustive clone fidelity
+  unless Tim separately asks.
+- For a new screen with no visual target, load `product-design:index` and route
+  to ideation when available. Otherwise use the environment's available visual
+  design or image-ideation capability. Generate **exactly three** visual options
+  and wait for Tim to pick one before coding. If the environment cannot produce
+  and show visual options, stop and ask Tim for a visual target; do not invent
+  and implement one from prose alone.
+- In Codex Desktop, use the in-app browser. In another agent environment, use
+  that environment's supported interactive browser capability. If more than one
+  browser is available, keep using the one Tim already chose or ask him to
+  choose. Do not fall back to the Playwright CLI or another browser behind his
+  back; if the environment has no browser-control capability, stop and ask.
+- `/dev/preview` fixes the mobile width at 390px, not its height. Use a direct
+  browser viewport for the exact `390×844` capture and record whether preview
+  chrome is visible or hidden.
 
-## What is NEVER relaxed (even in prototype mode)
+## Reuse before writing
 
-These are cheap and keep "fast" from becoming "unusable" or "dangerous":
+Inspect the nearest production route and complete the marker's reuse inventory.
+Use this order:
 
-- **No commit, no push, no PR.** Prototype work stays in the working tree. (If
-  you do commit, pre-commit/preflight hooks still run and will block — that's
-  expected; the point of this mode is you're _not_ committing yet.)
-- **Never touch production** (no prod DB, no prod deploy, no prod secrets).
-- **Never delete or weaken existing tests** to make something pass.
-- **Auth, permissions, and data-privacy rules still apply** (CORE-SSR-001/002
-  Supabase SSR, CORE-SEC-007 email privacy, CORE-ARCH-008 permissions matrix) — a prototype that
-  leaks data or bypasses a permission check isn't a prototype, it's a bug.
-- **`localhost` not `127.0.0.1`** (CORE-SEC-008) — breaking this wastes iteration time
-  on auth failures, so keep it.
+1. Existing production components unchanged.
+2. Existing components composed differently.
+3. Small production-component generalizations that will remain useful after
+   the prototype and can be hardened on exit.
+4. Thin prototype-only adapters and colocated typed fixtures.
 
-## Exiting the mode
+For an external destination surface such as a Discord card, reuse PinPoint's
+domain payloads, copy, types, formatters, and assets first. Do not force PinPoint
+app components or tokens to imitate platform chrome inaccurately. A thin
+prototype-only renderer for that external surface is appropriate when the
+ledger names the production components considered and explains the mismatch.
 
-Triggered when the user says "exit prototype mode", "make this real", "let's
-land it", or starts asking for tests/PR/commit.
+Before duplicating a production component or rebuilding an existing interaction,
+add a ledger item that names the original and explains why reuse cannot answer
+the design question. Prototype speed is not a reason to drift from the product.
 
-1. Read `.prototype-mode` and present the debt ledger as a checklist of what
-   must now happen: tests to write, lint/type errors to fix, `preflight` to
-   green, DRY cleanup.
-2. Delete the marker file.
-3. Announce: "✅ Exited prototype mode. Repaying debt:" followed by the
-   checklist. Then resume full AGENTS.md §2 rigor.
+Inventory the domain formatting and copy contracts plus the representative
+states needed to answer the question before choosing data. Prefer established
+local seed records or existing local fixtures, then existing read-only loaders.
+If none fits, colocate typed fixture data with the disposable route. Never copy
+production data. Never weaken auth or privacy rules to make a loader convenient.
 
-Do not silently drop the ledger. If the user wants to abandon the prototype
-entirely, confirm before deleting the marker without repaying.
+## Build and iterate
+
+Create only `src/app/(dev)/prototype/<slug>/...`. The parent layouts provide the
+real PinPoint shell. Keep fixture data inside that disposable directory.
+
+Iterate in both places:
+
+- the actual `/prototype/<slug>` route for the full shell and interactions;
+- `/dev/preview?path=/prototype/<slug>` for desktop/mobile comparison.
+
+The primary navigation, controls, inputs, selections, and state changes needed
+to answer the design question must work. A peripheral control may be visual-only
+only when it is named under `Prototype-only controls` in the ledger.
+
+At each decision point, capture the rendered prototype at the same viewport and
+state as its selected source. Put the source and rendered capture together in
+one comparison input, inspect visible differences, fix relevant mismatches, and
+compare again. A screenshot alone is not a comparison.
+
+## What is relaxed
+
+During the visual loop:
+
+- Defer `check`, preflight, tests, coverage, and unrelated cleanup until exit.
+- Log skipped tests, type work, lint work, duplication, and visual-only controls
+  as concrete debt checkboxes.
+- Disposable prototype files have narrowly scoped Oxlint relief for unused
+  variables, explicit return types, type-only import formatting, unnecessary
+  conditions, and non-blocking promise-style warnings.
+
+TypeScript still compiles prototype pages when Next renders them; the config does
+not exclude the route from type checking.
+
+## What is never relaxed
+
+- No commit, push, PR, or deployment while the mode or disposable route exists.
+- No production data, secrets, database, or external writes.
+- No new backend behavior, Server Actions, migrations, auth shortcuts, or
+  permission shortcuts.
+- No deleting, weakening, or bypassing an existing test.
+- Keep React Hooks and accessibility rules, semantic color tokens, `~/` path
+  aliases, safe types, non-null safety, privacy, and correctness rules.
+- Keep `localhost` rather than `127.0.0.1` for browser-facing local URLs
+  (CORE-SEC-008).
+
+## Exit or make it real
+
+Exit when Tim says "exit prototype mode", "make this real", "land it", or asks
+for a commit/PR.
+
+1. Read the marker and turn every ledger item into an explicit cleanup task.
+2. Retain only useful production-component changes, harden them under normal
+   PinPoint rigor, and implement the chosen direction at the real destination
+   route if requested.
+3. Delete the entire `src/app/(dev)/prototype/<slug>` directory, including its
+   fixtures. Never delete the permanent parent `layout.tsx`.
+4. Record the chosen direction, reusable changes, and remaining implementation
+   scope in the Bead.
+5. Repay the ledger, then remove `.prototype-mode`.
+6. Run `pnpm run check:prototype-clean`, the tests appropriate to the retained
+   production changes, and the normal PinPoint checks.
+7. Verify the real destination route in the browser at desktop and `390×844`.
+
+Do not silently discard the ledger. If Tim abandons the design, confirm that
+choice, delete the disposable route, record the decision in the Bead, and then
+remove the marker.
