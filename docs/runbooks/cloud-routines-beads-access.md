@@ -106,10 +106,11 @@ reproducibility across cloud sandboxes, Mac laptops, and Bazzite hosts.
 
 **The toolchain pins are single-source.** `beads-cloud-setup.sh` reads both
 `bd` and `dolt` versions from `scripts/beads-compatibility.json` and installs
-exactly those by exact release tags — so installed binaries and runtime guards
-cannot disagree, and the UI field carries no versions at all. Bumping the pins
-is an edit to `scripts/beads-compatibility.json` (a weekly-chores item); the UI
-shim never changes.
+exactly those by exact release tags. The same manifest declares the approved
+SHA-256 digest for each supported cloud platform. Setup downloads both archives
+into an isolated temporary directory, verifies both before extracting or
+installing either binary, and removes the directory on every exit. Bumping a pin
+therefore also requires updating its reviewed digest; the UI shim never changes.
 
 Why exact pins: on 2026-08-16 an accidental newer release (1.2.1) migrated the
 shared DB to a schema no supported binary could read and locked every client out
