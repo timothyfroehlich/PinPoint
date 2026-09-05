@@ -75,7 +75,11 @@ Authorization in PinPoint is partitioned between two complementary layers:
 
 **All permission helpers must live in `src/lib/permissions/` (CORE-ARCH-008).** Standalone permission predicates must never live scattered across feature domains (e.g., `src/lib/machines/settings-permissions.ts` being relocated to `src/lib/permissions/settings.ts` per PP-leli.5). Centralizing them in `src/lib/permissions/` ensures all authorization logic is discoverable in one place, cleanly separated from UI and data layers, and subject to audit scrutiny.
 
-**Role comparisons within resource-level helpers must be explicit and annotated.** As noted above, the CI role-check audit exempts only `matrix.ts` and `helpers.ts`. Resource-level predicate modules under `src/lib/permissions/` are fully audited. Where a resource predicate needs to evaluate a role comparison to handle multi-dimensional entity ownership (for example, an admin override alongside an owner check, or role-differentiated access for unowned entities), the check must be explicit and tagged with `// permissions-audit-allow: <reason>` documenting the ownership or fallback invariant. Whenever feasible, delegate the pure role dimension to `checkPermission()` and reserve explicit comparisons for the entity-ownership dimensions.
+**The role dimension must use `checkPermission()`; annotations are only for non-gating logic.** As noted above, the CI role-check audit exempts only `matrix.ts` and `helpers.ts`. Resource-level predicate modules under `src/lib/permissions/` are fully audited caller code. In resource-level helpers:
+
+- The role capability dimension (e.g., admin override or technician access) must be declared in `matrix.ts` and evaluated via `checkPermission()`, ensuring capabilities reflect on `/help/permissions` (CORE-ARCH-008).
+- Entity-specific checks handle ownership and identity comparisons (`viewer.userId === ownerId`, collaborator status) directly.
+- Hardcoded role comparisons must never be used as authorization gates—even inside resource-level predicate files. Any role comparison that merely shapes non-gating behavior (e.g., driving SQL row filters or domain invariants) must be explicit and tagged with `// permissions-audit-allow: <reason>`.
 
 ## OAuth providers
 

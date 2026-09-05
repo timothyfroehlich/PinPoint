@@ -162,7 +162,7 @@
 
 - **Severity:** Critical
 - **Why:** Prevent unauthorized access
-- **Do:** Verify authentication in Server Actions
+- **Do:** Verify authentication in Server Actions and Route Handlers
 - **Don't:** Skip auth checks in protected routes
 
 **CORE-SEC-002:** Validate all inputs
