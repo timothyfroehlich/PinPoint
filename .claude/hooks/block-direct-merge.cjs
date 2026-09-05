@@ -219,13 +219,17 @@ function ghApiEndpointEntry(args, dynamicArgs = [], splittableArgs = []) {
 
 /** Resolve an explicit `gh api` method. A dynamic, missing, or conflicting
  *  selector is ambiguous and therefore treated as potentially write-capable. */
-function ghApiMethodTarget(args, dynamicArgs = []) {
+function ghApiMethodTarget(
+  args,
+  dynamicArgs = [],
+  appendsDynamicArgs = false
+) {
   const api = ghPositionalEntries(args, dynamicArgs).find(
     ({ value }) => value === "api"
   );
   if (!api) return { ambiguous: false, method: null };
 
-  let ambiguous = false;
+  let ambiguous = appendsDynamicArgs;
   const methods = [];
   const record = (value, dynamic = false) => {
     if (dynamic || !value) {
@@ -432,10 +436,15 @@ function isProtectedTarget(target) {
 
 /** Does `args` invoke `gh api` against its actual pulls/N/merge endpoint with
  *  a write-capable (or dynamic/ambiguous) method selector? */
-function isGhApiMerge(args, dynamicArgs = [], splittableArgs = []) {
+function isGhApiMerge(
+  args,
+  dynamicArgs = [],
+  splittableArgs = [],
+  appendsDynamicArgs = false
+) {
   const endpoint = ghApiEndpointEntry(args, dynamicArgs, splittableArgs);
   if (!endpoint || !MERGE_API_PATH.test(endpoint.value)) return false;
-  const method = ghApiMethodTarget(args, dynamicArgs);
+  const method = ghApiMethodTarget(args, dynamicArgs, appendsDynamicArgs);
   return method.ambiguous || WRITE_METHODS.has(method.method);
 }
 
@@ -501,7 +510,8 @@ function classifyMerge(toolName, toolInput) {
       isGhApiMerge(
         segment.args,
         segment.dynamicArgs,
-        segment.splittableArgs
+        segment.splittableArgs,
+        segment.appendsDynamicArgs
       )
     ) {
       if (
