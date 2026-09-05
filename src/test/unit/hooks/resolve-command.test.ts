@@ -300,6 +300,23 @@ describe("wrappers resolve through to the real command", () => {
       expect(segment.appendsDynamicArgs).toBe(true);
     }
   );
+
+  it.each(["-n1", "-n 1", "--max-args=1", "--max-args 1"])(
+    "keeps xargs replacement mode for a later %s exception",
+    (mode) => {
+      const segment = firstSegment(`xargs -I{} ${mode} gh pr merge {}`);
+      expect(segment.appendsDynamicArgs).toBe(false);
+      expect(segment.dynamicArgs).toEqual([false, false, true]);
+    }
+  );
+
+  it("propagates xargs-appended arguments through an env split payload", () => {
+    const segment = firstSegment(
+      "xargs env -S 'gh pr merge 4 --repo timothyfroehlich/dotfiles'"
+    );
+    expect(segment.name).toBe("gh");
+    expect(segment.appendsDynamicArgs).toBe(true);
+  });
 });
 
 // ---------------------------------------------------------------------------

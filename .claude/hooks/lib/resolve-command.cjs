@@ -658,15 +658,28 @@ function resolveCommandSlot(words) {
       const bare = hasEquals ? flag.slice(0, flag.indexOf("=")) : flag;
       const attachedShortValue =
         !hasEquals && !bare.startsWith("--") && flag.length > 2;
-      const selectsBatchMode =
+      const isMaxArgsMode =
         flag === "-n" ||
         flag.startsWith("-n") ||
+        flag === "--max-args" ||
+        flag.startsWith("--max-args=");
+      let maxArgsValue = null;
+      if (flag === "-n" || flag === "--max-args") {
+        const next = words[i + 1];
+        if (next && !next.dynamic) maxArgsValue = next.value;
+      } else if (flag.startsWith("-n")) {
+        maxArgsValue = flag.slice(2);
+      } else if (flag.startsWith("--max-args=")) {
+        maxArgsValue = flag.slice("--max-args=".length);
+      }
+      const keepsReplacementMode =
+        replacesInputArgs && isMaxArgsMode && maxArgsValue === "1";
+      const selectsBatchMode =
+        (isMaxArgsMode && !keepsReplacementMode) ||
         flag === "-L" ||
         flag.startsWith("-L") ||
         flag === "-l" ||
         flag.startsWith("-l") ||
-        flag === "--max-args" ||
-        flag.startsWith("--max-args=") ||
         flag === "--max-lines" ||
         flag.startsWith("--max-lines=");
       if (wrapper.appendsInputArgs && selectsBatchMode) {
@@ -893,7 +906,13 @@ function resolveSegment(words, out, depth, options) {
       });
       return;
     }
+    const firstPayloadSegment = out.segments.length;
     resolveInto(payloadWord.value, out, depth + 1, options);
+    if (slot.appendsDynamicArgs) {
+      for (let i = firstPayloadSegment; i < out.segments.length; i++) {
+        out.segments[i].appendsDynamicArgs = true;
+      }
+    }
     return;
   }
 
