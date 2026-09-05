@@ -340,6 +340,14 @@ export const pinballmapAbandonedListings = pgTable(
     lmxId: integer("lmx_id").notNull(),
     // The catalog title the entry was listed under, so the UI can name it.
     pinballmapMachineId: integer("pinballmap_machine_id").notNull(),
+    // The location whose stored snapshot supplied this lmx. Abandonments remain
+    // actionable across a tracked-location change, and only records for the
+    // currently synced location may be reconciled against that lineup
+    // (pinballmap spec 10.11–10.12).
+    // Expand-deploy compatibility: the previous runtime omits this column when
+    // it records an abandonment. Keep the APC default until the contract
+    // migration after this writer is serving, then drop only the default.
+    locationId: integer("location_id").notNull().default(26454),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -1364,6 +1372,21 @@ export const pinballmapState = pgTable(
     // A configured location is the integration's sole activation signal.
     // Null retains the dormant state without permitting any Pinball Map calls.
     locationId: integer("location_id"),
+    // Monotonic configuration identity. A location id alone cannot distinguish
+    // A -> B -> A (or a same-location re-save), so every configuration attempt
+    // advances this generation before its PBM validation starts. In-flight
+    // syncs may only write back while the generation they captured still owns
+    // the singleton (pinballmap spec 10.14).
+    configurationGeneration: integer("configuration_generation")
+      .notNull()
+      .default(0),
+    // Short-lived database lease serializing a location configuration save
+    // with outbound additions. It spans the remote call without holding a DB
+    // transaction open (CORE-ARCH-011); expiry recovers a crashed invocation.
+    mutationLeaseId: uuid("mutation_lease_id"),
+    mutationLeaseExpiresAt: timestamp("mutation_lease_expires_at", {
+      withTimezone: true,
+    }),
     snapshotJson: jsonb("snapshot_json").$type<LocationSnapshot>(),
     lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
     // Timestamp of the last sync ATTEMPT (success OR failure), stamped at the
@@ -1408,6 +1431,10 @@ export const pinballmapState = pgTable(
     syncStatusCheck: check(
       "pinballmap_state_sync_status_check",
       sql`last_sync_status IN ('unknown', 'ok', 'error')`
+    ),
+    mutationLeasePairCheck: check(
+      "pinballmap_state_mutation_lease_pair_check",
+      sql`(mutation_lease_id IS NULL) = (mutation_lease_expires_at IS NULL)`
     ),
   })
 ).enableRLS();
