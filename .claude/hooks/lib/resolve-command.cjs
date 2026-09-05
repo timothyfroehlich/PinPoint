@@ -626,6 +626,8 @@ function resolveCommandSlot(words) {
 
     const wrapperIdx = i;
     let replacesInputArgs = false;
+    let wrapperReplacements = [];
+    let wrapperReplacementUnknown = false;
     i++;
     // Skip the wrapper's own flags (and the values they consume).
     while (i < words.length && words[i].value.startsWith("-")) {
@@ -646,8 +648,8 @@ function resolveCommandSlot(words) {
       const replacement = readReplacementFlag(wrapper, words, i);
       if (replacement) {
         replacesInputArgs = true;
-        if (replacement.dynamic) replacementUnknown = true;
-        else replacements.push(replacement.value);
+        wrapperReplacements = replacement.dynamic ? [] : [replacement.value];
+        wrapperReplacementUnknown = replacement.dynamic;
       }
 
       // The value may already be attached — `--max-args=3`, `-I{}`, `-n1`.
@@ -656,6 +658,20 @@ function resolveCommandSlot(words) {
       const bare = hasEquals ? flag.slice(0, flag.indexOf("=")) : flag;
       const attachedShortValue =
         !hasEquals && !bare.startsWith("--") && flag.length > 2;
+      const selectsBatchMode =
+        flag === "-n" ||
+        flag.startsWith("-n") ||
+        flag === "-L" ||
+        flag.startsWith("-L") ||
+        flag === "--max-args" ||
+        flag.startsWith("--max-args=") ||
+        flag === "--max-lines" ||
+        flag.startsWith("--max-lines=");
+      if (wrapper.appendsInputArgs && selectsBatchMode) {
+        replacesInputArgs = false;
+        wrapperReplacements = [];
+        wrapperReplacementUnknown = false;
+      }
       i++;
       if (!hasEquals && !attachedShortValue && wrapper.valueFlags.has(bare)) i++;
     }
@@ -664,6 +680,24 @@ function resolveCommandSlot(words) {
     }
     // Skip the wrapper's own positional arguments (`timeout 30 cmd`).
     for (let p = 0; p < wrapper.positionals && i < words.length; p++) i++;
+
+    if (wrapper.appendsInputArgs && replacesInputArgs && i < words.length) {
+      replacements.push(...wrapperReplacements);
+      replacementUnknown ||= wrapperReplacementUnknown;
+      // xargs does not replace its immediate COMMAND, but it does replace all
+      // INITIAL-ARGS. A nested wrapper can later expose one of those arguments
+      // as the effective command, so preserve provenance before continuing.
+      for (let j = i + 1; j < words.length; j++) {
+        const replaced = wrapperReplacements.some((marker) =>
+          words[j].value.includes(marker)
+        );
+        words[j] = {
+          ...words[j],
+          dynamic:
+            words[j].dynamic || wrapperReplacementUnknown || replaced,
+        };
+      }
+    }
 
     // Nothing left after the wrapper — the wrapper IS the command.
     if (i >= words.length) {
@@ -865,8 +899,9 @@ function resolveSegment(words, out, depth, options) {
   // parse failure — nothing to report.
   if (slot.kind === "none") return;
 
-  // xargs replacement applies only to INITIAL-ARGS, never COMMAND itself.
-  // Keeping the command static lets every guard still classify it correctly.
+  // xargs replacement does not apply to its immediate COMMAND. If a nested
+  // wrapper exposed an INITIAL-ARG here, resolveCommandSlot already retained
+  // its replacement provenance and this command will correctly be dynamic.
   const cmdWord = effectiveWords[slot.index];
   const argWords = effectiveWords
     .slice(slot.index + 1)

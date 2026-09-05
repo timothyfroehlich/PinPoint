@@ -267,6 +267,15 @@ describe("wrappers resolve through to the real command", () => {
     expect(segment.dynamicArgs).toEqual([false, false]);
   });
 
+  it("preserves replacement provenance through a nested wrapper", () => {
+    const result = resolveCommand("xargs -I tool env tool pr merge 123");
+
+    expect(result.segments).toEqual([]);
+    expect(result.unresolvable).toEqual([
+      expect.objectContaining({ reason: "substituted-command" }),
+    ]);
+  });
+
   it.each(["-i", "--replace"])(
     "does not consume the command after bare xargs %s",
     (flag) => {
@@ -283,6 +292,14 @@ describe("wrappers resolve through to the real command", () => {
     );
     expect(segment.appendsDynamicArgs).toBe(true);
   });
+
+  it.each(["-n2", "-L2", "--max-args=2", "--max-lines=2"])(
+    "honors a later xargs %s mode over replacement mode",
+    (mode) => {
+      const segment = firstSegment(`xargs -I{} ${mode} gh pr merge 4`);
+      expect(segment.appendsDynamicArgs).toBe(true);
+    }
+  );
 });
 
 // ---------------------------------------------------------------------------
