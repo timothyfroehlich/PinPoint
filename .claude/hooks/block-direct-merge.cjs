@@ -189,6 +189,10 @@ function ghApiEndpointEntry(args, dynamicArgs = [], splittableArgs = []) {
   for (let i = api.index + 1; i < args.length; i++) {
     const arg = args[i];
     if (API_VALUE_FLAGS.has(arg)) {
+      if (dynamicArgs[i] || splittableArgs[i]) {
+        ambiguousParsing = true;
+        continue;
+      }
       if (splittableArgs[i + 1]) ambiguousParsing = true;
       i++;
       continue;
@@ -224,6 +228,7 @@ function ghApiEndpointEntry(args, dynamicArgs = [], splittableArgs = []) {
 function ghApiMethodTarget(
   args,
   dynamicArgs = [],
+  splittableArgs = [],
   appendsDynamicArgs = false
 ) {
   const api = ghPositionalEntries(args, dynamicArgs).find(
@@ -243,8 +248,15 @@ function ghApiMethodTarget(
 
   for (let i = api.index + 1; i < args.length; i++) {
     const arg = args[i];
+    if (dynamicArgs[i] || splittableArgs[i]) {
+      ambiguous = true;
+      continue;
+    }
     if (arg === "-X" || arg === "--method") {
-      record(args[i + 1] || null, Boolean(dynamicArgs[i + 1]));
+      record(
+        args[i + 1] || null,
+        Boolean(dynamicArgs[i + 1] || splittableArgs[i + 1])
+      );
       i++;
       continue;
     }
@@ -446,7 +458,12 @@ function isGhApiMerge(
 ) {
   const endpoint = ghApiEndpointEntry(args, dynamicArgs, splittableArgs);
   if (!endpoint || !MERGE_API_PATH.test(endpoint.value)) return false;
-  const method = ghApiMethodTarget(args, dynamicArgs, appendsDynamicArgs);
+  const method = ghApiMethodTarget(
+    args,
+    dynamicArgs,
+    splittableArgs,
+    appendsDynamicArgs
+  );
   return method.ambiguous || WRITE_METHODS.has(method.method);
 }
 

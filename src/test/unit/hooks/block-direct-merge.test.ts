@@ -94,6 +94,7 @@ describe("block-direct-merge.cjs — gh merge paths", () => {
     'gh api -X "$METHOD" repos/timothyfroehlich/PinPoint/pulls/123/merge',
     'gh api --method="$METHOD" repos/timothyfroehlich/PinPoint/pulls/123/merge',
     "gh api -X$METHOD repos/timothyfroehlich/PinPoint/pulls/123/merge",
+    "gh api --method$(printf '=PUT') repos/timothyfroehlich/PinPoint/pulls/1/merge",
     "printf '%s\\n' '-X PUT' | xargs gh api repos/timothyfroehlich/PinPoint/pulls/1/merge",
   ])("blocks an attached or dynamic REST method selector: %s", (command) => {
     expect(runHook(bashPayload(command)).status).toBe(2);
