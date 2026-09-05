@@ -147,12 +147,20 @@ function ghPositionals(args) {
 }
 
 /** A dynamic token in option-parsing position can expand to a value-taking
- *  flag and consume a later apparent repository selector. Dynamic values of a
- *  known literal flag are safe because that flag already fixes their role. */
-function hasDynamicOptionBefore(args, dynamicArgs, endIndex, valueFlags) {
+ *  flag and consume a later apparent repository selector. A known literal
+ *  value flag fixes the next token's role only when that token cannot word-split
+ *  into additional argv entries. */
+function hasDynamicOptionBefore(
+  args,
+  dynamicArgs,
+  splittableArgs,
+  endIndex,
+  valueFlags
+) {
   for (let i = 0; i < endIndex; i++) {
     if (args[i] === "--") break;
     if (valueFlags.has(args[i])) {
+      if (splittableArgs[i + 1]) return true;
       i++;
       continue;
     }
@@ -169,7 +177,7 @@ function hasAttachedShortValue(arg) {
 
 /** The one endpoint argument `gh api` will request. Values consumed by API
  *  flags are skipped even when they resemble REST merge paths. */
-function ghApiEndpointEntry(args, dynamicArgs = []) {
+function ghApiEndpointEntry(args, dynamicArgs = [], splittableArgs = []) {
   const api = ghPositionalEntries(args, dynamicArgs).find(
     ({ value }) => value === "api"
   );
@@ -179,6 +187,7 @@ function ghApiEndpointEntry(args, dynamicArgs = []) {
   for (let i = api.index + 1; i < args.length; i++) {
     const arg = args[i];
     if (API_VALUE_FLAGS.has(arg)) {
+      if (splittableArgs[i + 1]) ambiguousParsing = true;
       i++;
       continue;
     }
@@ -196,7 +205,13 @@ function ghApiEndpointEntry(args, dynamicArgs = []) {
       value: arg,
       dynamic:
         ambiguousParsing ||
-        hasDynamicOptionBefore(args, dynamicArgs, i, API_VALUE_FLAGS),
+        hasDynamicOptionBefore(
+          args,
+          dynamicArgs,
+          splittableArgs,
+          i,
+          API_VALUE_FLAGS
+        ),
     };
   }
   return null;
@@ -278,6 +293,7 @@ function normalizeRepository(value) {
 function ghRepositoryTarget(
   args,
   dynamicArgs = [],
+  splittableArgs = [],
   commandKind,
   appendsDynamicArgs = false
 ) {
@@ -290,6 +306,7 @@ function ghRepositoryTarget(
       hasDynamicOptionBefore(
         args,
         dynamicArgs,
+        splittableArgs,
         args.length,
         GH_VALUE_FLAGS
       ));
@@ -354,7 +371,7 @@ function ghRepositoryTarget(
   }
 
   if (commandKind === "api") {
-    const endpoint = ghApiEndpointEntry(args, dynamicArgs);
+    const endpoint = ghApiEndpointEntry(args, dynamicArgs, splittableArgs);
     if (endpoint?.dynamic) {
       record(endpoint.value, true);
     } else if (endpoint) {
@@ -399,8 +416,8 @@ function isProtectedTarget(target) {
 
 /** Does `args` invoke `gh api` against its actual pulls/N/merge endpoint with
  *  a write-capable (or dynamic/ambiguous) method selector? */
-function isGhApiMerge(args, dynamicArgs = []) {
-  const endpoint = ghApiEndpointEntry(args, dynamicArgs);
+function isGhApiMerge(args, dynamicArgs = [], splittableArgs = []) {
+  const endpoint = ghApiEndpointEntry(args, dynamicArgs, splittableArgs);
   if (!endpoint || !MERGE_API_PATH.test(endpoint.value)) return false;
   const method = ghApiMethodTarget(args, dynamicArgs);
   return method.ambiguous || WRITE_METHODS.has(method.method);
@@ -454,6 +471,7 @@ function classifyMerge(toolName, toolInput) {
           ghRepositoryTarget(
             segment.args,
             segment.dynamicArgs,
+            segment.splittableArgs,
             "pr",
             segment.appendsDynamicArgs
           )
@@ -463,12 +481,19 @@ function classifyMerge(toolName, toolInput) {
       }
       return { block: true, kind: "merge", detail: "gh pr merge" };
     }
-    if (isGhApiMerge(segment.args, segment.dynamicArgs)) {
+    if (
+      isGhApiMerge(
+        segment.args,
+        segment.dynamicArgs,
+        segment.splittableArgs
+      )
+    ) {
       if (
         !isProtectedTarget(
           ghRepositoryTarget(
             segment.args,
             segment.dynamicArgs,
+            segment.splittableArgs,
             "api",
             segment.appendsDynamicArgs
           )

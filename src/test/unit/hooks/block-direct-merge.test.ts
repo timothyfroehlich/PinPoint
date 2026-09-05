@@ -136,6 +136,8 @@ describe("block-direct-merge.cjs — gh merge paths", () => {
     "FLAG=--body; gh pr merge 123 $FLAG --repo=timothyfroehlich/dotfiles",
     "ARGS='--repo timothyfroehlich/PinPoint'; gh pr merge 4 --repo timothyfroehlich/dotfiles $ARGS",
     "gh api $FLAG -X PUT repos/timothyfroehlich/dotfiles/pulls/4/merge",
+    "BODY='note --repo timothyfroehlich/PinPoint'; gh pr merge 4 --repo timothyfroehlich/dotfiles --body $BODY",
+    "INPUT='note repos/timothyfroehlich/PinPoint/pulls/123/merge'; gh api --input $INPUT -X PUT repos/timothyfroehlich/dotfiles/pulls/4/merge",
     "printf 'PinPoint\\n' | xargs -I dotfiles gh pr merge 1 --repo timothyfroehlich/dotfiles",
     "printf '123\\n' | xargs --replace gh pr merge {}",
     "printf '%s\\n' '--repo timothyfroehlich/PinPoint' | xargs gh pr merge 4 --repo timothyfroehlich/dotfiles",

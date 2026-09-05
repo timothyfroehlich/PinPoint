@@ -19,6 +19,7 @@ interface Segment {
   name: string;
   args: string[];
   dynamicArgs: boolean[];
+  splittableArgs: boolean[];
   appendsDynamicArgs: boolean;
   raw: string;
 }
@@ -93,6 +94,14 @@ describe("plain commands", () => {
       "timothyfroehlich/Pin",
     ]);
     expect(seg.dynamicArgs).toEqual([false, false, false, false, true]);
+  });
+
+  it("distinguishes unquoted expansions that may add argv entries", () => {
+    const unquoted = firstSegment("gh pr merge 4 --body $BODY");
+    const quoted = firstSegment('gh pr merge 4 --body "$BODY"');
+
+    expect(unquoted.splittableArgs).toEqual([false, false, false, false, true]);
+    expect(quoted.splittableArgs).toEqual([false, false, false, false, false]);
   });
 });
 

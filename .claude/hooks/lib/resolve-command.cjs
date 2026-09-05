@@ -63,7 +63,7 @@
  *
  * API
  *   resolveCommand(commandString, options?) → {
- *     segments:     Segment[],       // { command, name, args, dynamicArgs, raw }
+ *     segments:     Segment[],       // { command, name, args, dynamicArgs, splittableArgs, raw }
  *     unresolvable: Unresolvable[],  // { reason, text }
  *   }
  *
@@ -74,6 +74,8 @@
  *   Segment.dynamicArgs whether each argument contains shell expansion,
  *                       substitution, or wrapper replacement that can change
  *                       its resolved literal value
+ *   Segment.splittableArgs whether an argument contains an unquoted expansion
+ *                          that can become multiple argv entries
  *   Segment.appendsDynamicArgs whether a wrapper can append unknown arguments
  *                              after the statically resolved argument list
  *   Segment.raw      normalized reconstruction (`[command, ...args].join(" ")`),
@@ -241,12 +243,13 @@ function readBacktickSpan(src, openIdx) {
  * Tokenize a command string into words and separator operators.
  *
  * Returns { tokens, unbalanced } where each token is either
- *   { type: "word", value, quoted, escaped, dynamic, subs }
+ *   { type: "word", value, quoted, escaped, dynamic, splittable, subs }
  *     value   – unquoted text
  *     quoted  – any part of it came from inside quotes
  *     escaped – any part of it was escaped outside quotes
  *     dynamic – contains a variable/substitution, so its literal text is
  *               not the whole story
+ *     splittable – contains an unquoted expansion subject to shell word splitting
  *     subs    – bodies of `$( )` / backtick substitutions found inside it
  * or
  *   { type: "op", value }  – one of && || ;; ; |& | & ( ) \n
@@ -265,6 +268,7 @@ function tokenize(src) {
         quoted: false,
         escaped: false,
         dynamic: false,
+        splittable: false,
         subs: [],
       };
     }
@@ -407,6 +411,7 @@ function tokenize(src) {
       const t = ensure();
       t.subs.push(span.body);
       t.dynamic = true;
+      t.splittable = true;
       i = span.next;
       continue;
     }
@@ -416,12 +421,14 @@ function tokenize(src) {
       const t = ensure();
       t.subs.push(span.body);
       t.dynamic = true;
+      t.splittable = true;
       i = span.next;
       continue;
     }
 
     if (c === "$") {
       ensure().dynamic = true;
+      ensure().splittable = true;
       ensure().value += c;
       i++;
       continue;
@@ -951,6 +958,7 @@ function pushSegment(out, command, argWords, appendsDynamicArgs = false) {
     name: path.basename(command),
     args,
     dynamicArgs: argWords.map((w) => w.dynamic),
+    splittableArgs: argWords.map((w) => w.splittable),
     appendsDynamicArgs,
     raw: [command, ...args].join(" "),
   });
@@ -1002,7 +1010,7 @@ function resolveInto(command, out, depth, options) {
  *
  * @param {string} command
  * @param {{ splitNewlines?: boolean }} [options]
- * @returns {{ segments: Array<{command: string, name: string, args: string[], dynamicArgs: boolean[], raw: string}>,
+ * @returns {{ segments: Array<{command: string, name: string, args: string[], dynamicArgs: boolean[], splittableArgs: boolean[], raw: string}>,
  *             unresolvable: Array<{reason: string, text: string}> }}
  */
 function resolveCommand(command, options = {}) {
