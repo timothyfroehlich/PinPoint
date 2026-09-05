@@ -128,6 +128,10 @@ describe("wrapped / quoted gh pr checkout → BLOCK", () => {
     expectBlock("xargs -I{} gh pr checkout {} < prs.txt");
   });
 
+  it("keeps a replacement-shaped gh command token classifiable", () => {
+    expectBlock("printf 'gh\\n' | xargs -I gh gh pr checkout 1727");
+  });
+
   it("blocks a gh pr checkout in a later segment of a chain", () => {
     expectBlock("git fetch origin && gh pr checkout 1727");
   });

@@ -18,6 +18,9 @@ interface Segment {
   command: string;
   name: string;
   args: string[];
+  dynamicArgs: boolean[];
+  splittableArgs: boolean[];
+  appendsDynamicArgs: boolean;
   raw: string;
 }
 interface Unresolvable {
@@ -75,6 +78,30 @@ describe("plain commands", () => {
   it("returns no segments for an empty or whitespace-only command", () => {
     expect(resolveCommand("").segments).toEqual([]);
     expect(resolveCommand("   ").segments).toEqual([]);
+  });
+
+  it("marks arguments whose literal value was changed by shell expansion", () => {
+    const { segments } = resolveCommand(
+      "gh pr merge 123 --repo timothyfroehlich/Pin$(printf Point)"
+    );
+    const seg = segments.find(({ name }) => name === "gh");
+    if (seg === undefined) throw new Error("expected the outer gh segment");
+    expect(seg.args).toEqual([
+      "pr",
+      "merge",
+      "123",
+      "--repo",
+      "timothyfroehlich/Pin",
+    ]);
+    expect(seg.dynamicArgs).toEqual([false, false, false, false, true]);
+  });
+
+  it("distinguishes unquoted expansions that may add argv entries", () => {
+    const unquoted = firstSegment("gh pr merge 4 --body $BODY");
+    const quoted = firstSegment('gh pr merge 4 --body "$BODY"');
+
+    expect(unquoted.splittableArgs).toEqual([false, false, false, false, true]);
+    expect(quoted.splittableArgs).toEqual([false, false, false, false, false]);
   });
 });
 
@@ -217,6 +244,103 @@ describe("wrappers resolve through to the real command", () => {
       "merge",
       "{}",
     ]);
+  });
+
+  it("marks xargs replacement targets as dynamic", () => {
+    const segment = firstSegment(
+      "xargs -I dotfiles gh pr merge 1 --repo timothyfroehlich/dotfiles"
+    );
+    expect(segment.args).toEqual([
+      "pr",
+      "merge",
+      "1",
+      "--repo",
+      "timothyfroehlich/dotfiles",
+    ]);
+    expect(segment.dynamicArgs).toEqual([false, false, false, false, true]);
+  });
+
+  it("does not apply xargs replacement provenance to the command token", () => {
+    const segment = firstSegment("xargs -I git git checkout feature/x");
+    expect(segment.name).toBe("git");
+    expect(segment.args).toEqual(["checkout", "feature/x"]);
+    expect(segment.dynamicArgs).toEqual([false, false]);
+  });
+
+  it("preserves replacement provenance through a nested wrapper", () => {
+    const result = resolveCommand("xargs -I tool env tool pr merge 123");
+
+    expect(result.segments).toEqual([]);
+    expect(result.unresolvable).toEqual([
+      expect.objectContaining({ reason: "substituted-command" }),
+    ]);
+  });
+
+  it.each(["-i", "--replace"])(
+    "does not consume the command after bare xargs %s",
+    (flag) => {
+      const segment = firstSegment(`xargs ${flag} gh pr merge {}`);
+      expect(segment.name).toBe("gh");
+      expect(segment.args).toEqual(["pr", "merge", "{}"]);
+      expect(segment.dynamicArgs).toEqual([false, false, true]);
+    }
+  );
+
+  it("marks arguments appended by plain xargs as dynamic", () => {
+    const segment = firstSegment(
+      "xargs gh pr merge 4 --repo timothyfroehlich/dotfiles"
+    );
+    expect(segment.appendsDynamicArgs).toBe(true);
+  });
+
+  it.each(["-n2", "-L2", "-l", "-l2", "--max-args=2", "--max-lines=2"])(
+    "honors a later xargs %s mode over replacement mode",
+    (mode) => {
+      const segment = firstSegment(`xargs -I{} ${mode} gh pr merge 4`);
+      expect(segment.appendsDynamicArgs).toBe(true);
+    }
+  );
+
+  it.each([
+    "-n1",
+    "-n 1",
+    "-n01",
+    "-n+1",
+    "--max-args=1",
+    "--max-args 1",
+    "--max-args=01",
+  ])("keeps xargs replacement mode for a later %s exception", (mode) => {
+    const segment = firstSegment(`xargs -I{} ${mode} gh pr merge {}`);
+    expect(segment.appendsDynamicArgs).toBe(false);
+    expect(segment.dynamicArgs).toEqual([false, false, true]);
+  });
+
+  it("propagates xargs-appended arguments through an env split payload", () => {
+    const segment = firstSegment(
+      "xargs env -S 'gh pr merge 4 --repo timothyfroehlich/dotfiles'"
+    );
+    expect(segment.name).toBe("gh");
+    expect(segment.appendsDynamicArgs).toBe(true);
+  });
+
+  it("fails closed on env split-string escapes with non-shell semantics", () => {
+    const { segments, unresolvable } = resolveCommand(
+      "env -S 'gh pr merge 4 note\\_--repo\\_timothyfroehlich/PinPoint'"
+    );
+    expect(segments).toEqual([]);
+    expect(unresolvable.map((entry) => entry.reason)).toContain(
+      "split-string-escape"
+    );
+  });
+
+  it("fails closed when shell syntax is data in an env split string", () => {
+    const { segments, unresolvable } = resolveCommand(
+      "env -S 'gh pr merge 4 --body ; --repo timothyfroehlich/PinPoint'"
+    );
+    expect(segments).toEqual([]);
+    expect(unresolvable.map((entry) => entry.reason)).toContain(
+      "split-string-shell-syntax"
+    );
   });
 });
 
@@ -401,6 +525,30 @@ describe("env -S / --split-string re-parses its payload", () => {
     const { segments, unresolvable } = resolveCommand('env -S "$PAYLOAD"');
     expect(segments).toEqual([]);
     expect(unresolvable.map((u) => u.reason)).toContain("split-string-dynamic");
+  });
+
+  it("preserves arguments following a split-string payload", () => {
+    const segment = firstSegment(
+      "env -S 'gh pr merge 4 --repo timothyfroehlich/dotfiles' --repo timothyfroehlich/PinPoint"
+    );
+    expect(segment.args).toEqual([
+      "pr",
+      "merge",
+      "4",
+      "--repo",
+      "timothyfroehlich/dotfiles",
+      "--repo",
+      "timothyfroehlich/PinPoint",
+    ]);
+    expect(segment.dynamicArgs).toEqual([
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+    ]);
   });
 
   it("handles an unmodelled flag cluster by resolving AND flagging it", () => {
