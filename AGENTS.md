@@ -167,7 +167,7 @@ The gate accepts Codex's native GitHub approval, its exact-bot/exact-app clean c
 
 ### The `ownerless` label
 
-PinPoint's one use of GitHub labels for agent coordination. Anything opened by an **unattended** bot — a scheduled Claude cloud routine, Dependabot, Renovate — carries `ownerless` on its issue or PR, because no session is driving its lifecycle: nobody is watching CI, adjudicating review threads, or taking it to merge-ready. Dependabot and Renovate apply it from `.github/dependabot.yml` and `.github/renovate.json`; a routine applies it itself (`gh pr create --label ownerless`, `gh issue create --label ownerless`).
+PinPoint's one use of GitHub labels for agent coordination. Anything opened by an **unattended** bot — a scheduled Claude cloud routine, Dependabot, Renovate — carries `ownerless` on its issue or PR, because no session is driving its lifecycle: nobody is watching CI, adjudicating review threads, or taking it to merge-ready. Dependabot and Renovate apply it to PRs from `.github/dependabot.yml` and `.github/renovate.json`; `.github/workflows/ownerless-renovate-issues.yaml` applies it once when Renovate opens an issue; a routine applies it itself (`gh pr create --label ownerless`, `gh issue create --label ownerless`).
 
 It is the queue an orchestrator works from — `gh pr list --label ownerless` and `gh issue list --label ownerless` are the open work nobody owns. A session that **adopts** one takes over that lifecycle per "Getting a PR reviewed" and removes the label (`gh pr edit <n> --remove-label ownerless`). An interactive session **never** adds it to its own work: a PR you opened is a PR you own.
 
