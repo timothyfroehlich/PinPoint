@@ -45,6 +45,7 @@ jobs:
       EVENT_NAME: ${{ github.event_name }}
       PR_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
       EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+      REACTION_COMMENT_ID: ${{ github.event.comment.id }}
       TRIGGERED_AT: ${{ github.event.pull_request.updated_at || github.event.comment.created_at }}
     steps:
       - name: Harden Runner
@@ -79,4 +80,4 @@ jobs:
             fi
           fi
           bash scripts/workflow/codex-reaction-witness.sh \
-            "$PR_NUMBER" "$expected_head" "$TRIGGERED_AT"
+            "$PR_NUMBER" "$expected_head" "$TRIGGERED_AT" "$REACTION_COMMENT_ID"
