@@ -12,7 +12,7 @@ with unique Supabase ports — no manual setup needed.
 2. Husky's `post-checkout` hook fires → calls `scripts/worktree_setup.py`
 3. A slot (1-96) is allocated from `~/.config/pinpoint/worktree-slots.json`
 4. `supabase/config.toml`, `.env.local`, and `.claude/launch.json` are generated with unique ports
-5. If pnpm's `node_modules/.modules.yaml` completion marker is absent, setup reads the exact Node pin from `mise.toml` and the integrity-qualified pnpm pin from `package.json`, verifies both versions are already installed under mise without loading the worktree config, and runs that exact pnpm with auto-install and system fallback disabled
+5. If pnpm's `node_modules/.modules.yaml` completion marker is absent, setup reads the exact Node pin from `mise.toml` and the integrity-qualified pnpm pin from `package.json`, requires the complete tuple to match the trusted main worktree, verifies both versions are already installed under mise without loading the linked-worktree config, and runs that exact pnpm with auto-install and system fallback disabled
 
 ## Port Scheme
 

@@ -691,6 +691,15 @@ class RuntimeDiagnostics:
 
 
 @dataclass(frozen=True)
+class BootstrapToolPins:
+    """Exact branch-declared tool versions authorized by the trusted main worktree."""
+
+    node_version: str
+    pnpm_version: str
+    pnpm_integrity: str
+
+
+@dataclass(frozen=True)
 class BootstrapToolchain:
     """Exact preinstalled Node and pnpm executables for dependency bootstrap."""
 
@@ -770,7 +779,7 @@ _PNPM_PACKAGE_MANAGER_RE = re.compile(
 )
 
 
-def read_bootstrap_tool_versions(worktree_path: Path) -> tuple[str, str]:
+def read_bootstrap_tool_versions(worktree_path: Path) -> BootstrapToolPins:
     """Read the exact Node and integrity-qualified pnpm project pins."""
     try:
         mise_config = tomllib.loads((worktree_path / "mise.toml").read_text())
@@ -795,7 +804,11 @@ def read_bootstrap_tool_versions(worktree_path: Path) -> tuple[str, str]:
             "package.json packageManager must be exact pnpm@X.Y.Z+sha512.<128 hex>"
         )
 
-    return node_version, pnpm_match.group("version")
+    return BootstrapToolPins(
+        node_version=node_version,
+        pnpm_version=pnpm_match.group("version"),
+        pnpm_integrity=pnpm_match.group("integrity"),
+    )
 
 
 def _resolve_mise_install_root(
@@ -829,12 +842,30 @@ def _resolve_mise_install_root(
 
 def resolve_preinstalled_toolchain(
     worktree_path: Path,
+    trusted_worktree_path: Path,
 ) -> tuple[BootstrapToolchain | None, str | None, str | None]:
-    """Resolve exact project tools without loading or trusting project config."""
+    """Resolve tools only when branch pins match the trusted main worktree."""
     try:
-        node_version, pnpm_version = read_bootstrap_tool_versions(worktree_path)
+        pins = read_bootstrap_tool_versions(worktree_path)
     except ValueError as exc:
         return None, FAILURE_CLASS_TOOLCHAIN_CONFIG, str(exc)
+    try:
+        trusted_pins = read_bootstrap_tool_versions(trusted_worktree_path)
+    except ValueError as exc:
+        return (
+            None,
+            FAILURE_CLASS_TOOLCHAIN_CONFIG,
+            f"trusted main worktree toolchain contract is invalid: {exc}",
+        )
+    if pins != trusted_pins:
+        return (
+            None,
+            FAILURE_CLASS_TOOLCHAIN_CONFIG,
+            "worktree Node/pnpm pins do not match the trusted main worktree",
+        )
+
+    node_version = pins.node_version
+    pnpm_version = pins.pnpm_version
 
     mise_path = shutil.which("mise")
     if mise_path is None:
@@ -961,8 +992,8 @@ def are_dependencies_ready(worktree_path: Path) -> bool:
 
 def install_dependencies(
     worktree_path: Path,
+    toolchain: BootstrapToolchain,
     timeout: int | None = None,
-    toolchain: BootstrapToolchain | None = None,
 ) -> tuple[bool, str | None, str | None]:
     """Ensure node_modules exists and is completely installed.
 
@@ -971,11 +1002,6 @@ def install_dependencies(
     """
     if are_dependencies_ready(worktree_path):
         return True, None, None
-
-    if toolchain is None:
-        toolchain, failure_class, detail = resolve_preinstalled_toolchain(worktree_path)
-        if toolchain is None:
-            return False, failure_class, detail
 
     if timeout is None:
         timeout = resolve_install_timeout()
@@ -1142,7 +1168,9 @@ def main() -> int:
     toolchain: BootstrapToolchain | None = None
     toolchain_failure: tuple[str | None, str | None] = (None, None)
     if not dependencies_ready:
-        toolchain, failure_class, detail = resolve_preinstalled_toolchain(worktree_path)
+        toolchain, failure_class, detail = resolve_preinstalled_toolchain(
+            worktree_path, main_wt
+        )
         toolchain_failure = (failure_class, detail)
 
     # Never probe Node or pnpm through PATH from this branch-controlled
@@ -1196,9 +1224,7 @@ def main() -> int:
         is_ready = False
         failure_class, detail = toolchain_failure
     else:
-        is_ready, failure_class, detail = install_dependencies(
-            worktree_path, toolchain=toolchain
-        )
+        is_ready, failure_class, detail = install_dependencies(worktree_path, toolchain)
 
     if is_ready:
         print(
