@@ -161,9 +161,9 @@
 **CORE-SEC-001:** Protect APIs, Server Actions, and Server Components
 
 - **Severity:** Critical
-- **Why:** Prevent unauthorized access
-- **Do:** Verify authentication in protected Server Actions, Route Handlers, and Server Components / page loaders
-- **Don't:** Skip auth checks in protected routes or restricted server-rendered loaders
+- **Why:** Prevent unauthorized access and data disclosure
+- **Do:** Verify authentication and enforce applicable authorization checks (via `checkPermission()` or domain resource predicates in `src/lib/permissions/`) in protected Server Actions, Route Handlers, and Server Components / page loaders
+- **Don't:** Skip auth or permission checks in protected routes or restricted server-rendered loaders
 
 **CORE-SEC-002:** Validate all inputs
 
@@ -355,9 +355,9 @@
 **CORE-ARCH-008:** Permissions matrix must match server action enforcement
 
 - **Severity:** Critical
-- **Why:** The help page (`/help/permissions`) is auto-generated from `src/lib/permissions/matrix.ts`. If the matrix drifts from what server actions actually enforce, users see incorrect capability information. All permission checks MUST go through `checkPermission()` from `~/lib/permissions/helpers`; no standalone permission functions outside `src/lib/permissions/`.
-- **Do:** When changing permission logic in server actions, update `matrix.ts` values and descriptions to match. Review both directions during PR review.
-- **Don't:** Change server action authorization checks without updating the matrix (or vice versa). Don't add permission helpers outside `src/lib/permissions/`.
+- **Why:** The help page (`/help/permissions`) is auto-generated from `src/lib/permissions/matrix.ts`. If the matrix drifts from what server actions actually enforce, users see incorrect capability information. Role-based capabilities and standard ownership checks MUST go through `checkPermission()` from `~/lib/permissions/helpers`. Domain resource predicates handling multi-dimensional entity state (e.g. collaborator rosters, view tokens) are permitted but must live centralized in `src/lib/permissions/` and compose with `checkPermission()`. No standalone permission functions outside `src/lib/permissions/`.
+- **Do:** When changing permission logic in server actions or loaders, update `matrix.ts` values and descriptions to match. Keep all resource predicates in `src/lib/permissions/` and delegate their role capability dimension to `checkPermission()`. Review both directions during PR review.
+- **Don't:** Change server action authorization checks without updating the matrix (or vice versa). Don't add permission helpers outside `src/lib/permissions/`. Don't use hardcoded role checks as gates in resource predicates.
 
 **CORE-ARCH-009:** Drizzle migrations only — no `drizzle-kit push`
 
