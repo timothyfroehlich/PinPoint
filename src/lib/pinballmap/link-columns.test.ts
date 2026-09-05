@@ -166,6 +166,7 @@ describe("resolvePbmLinkColumnsForUpdate", () => {
     expect(result.abandoned).toEqual({
       lmxId: 4471,
       pinballmapMachineId: 6221,
+      locationId: 26454,
     });
   });
 
@@ -181,6 +182,7 @@ describe("resolvePbmLinkColumnsForUpdate", () => {
     expect(result.abandoned).toEqual({
       lmxId: 4471,
       pinballmapMachineId: 6221,
+      locationId: 26454,
     });
   });
 

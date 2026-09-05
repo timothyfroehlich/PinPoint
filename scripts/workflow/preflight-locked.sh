@@ -18,6 +18,8 @@
 
 set -euo pipefail
 
+bash scripts/hooks/prototype-clean-guard.sh
+
 if ! command -v sem >/dev/null 2>&1 \
    || ! sem --version 2>/dev/null | grep -q '^GNU parallel'; then
   # moreutils also ships a `sem` binary that doesn't speak --jobs/--id/--fg,
@@ -46,7 +48,12 @@ fi
 #                     end of script, not blocking on a single invocation. Using
 #                     `--fg --wait` together causes sem to return immediately —
 #                     `--fg` alone is the synchronous form.)
+# The --parallel / --sequential groups below must stay in sync with the
+# `preflight:unlocked` script in package.json — the same run under the cap.
+# In particular the parallel group type-checks all three tsconfig projects
+# (typecheck + typecheck:tests + typecheck:e2e) so preflight is never weaker
+# than `check` on type coverage (PP-mfo2).
 exec sem --jobs 2 --id pinpoint-preflight --fg \
   npm-run-all --silent \
-    --parallel typecheck fix:lint-format test check:config \
+    --parallel typecheck typecheck:tests typecheck:e2e fix:lint-format test check:config \
     --sequential db:fast-reset build test:integration test:integration:supabase smoke

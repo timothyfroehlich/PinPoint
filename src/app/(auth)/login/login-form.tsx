@@ -11,8 +11,6 @@ import { Label } from "~/components/ui/label";
 import { Checkbox } from "~/components/ui/checkbox";
 import { Alert, AlertDescription } from "~/components/ui/alert";
 import { loginAction, type LoginResult } from "~/app/(auth)/actions";
-import { TurnstileWidget } from "~/components/security/TurnstileWidget";
-import { useTurnstileGate } from "~/components/security/useTurnstileGate";
 
 // Lazily load TestAdminButton to prevent including test credentials in the production bundle
 const TestAdminButton = dynamic(() =>
@@ -33,7 +31,6 @@ export function LoginForm({
     FormData
   >(loginAction, undefined);
   const [rememberMe, setRememberMe] = useState(true);
-  const turnstile = useTurnstileGate();
 
   return (
     <>
@@ -114,28 +111,13 @@ export function LoginForm({
           </Label>
         </div>
 
-        <input type="hidden" name="captchaToken" value={turnstile.token} />
-        <TurnstileWidget
-          onVerify={turnstile.onVerify}
-          onExpire={turnstile.onExpire}
-          onError={turnstile.onError}
-        />
-        {turnstile.statusMessage && (
-          <p
-            aria-live="polite"
-            className="text-sm text-muted-foreground text-center"
-          >
-            {turnstile.statusMessage}
-          </p>
-        )}
-
         {/* Submit button */}
         <Button
           type="submit"
           className="w-full"
           size="lg"
           loading={isPending}
-          disabled={isPending || turnstile.submitDisabled}
+          disabled={isPending}
         >
           Sign In
         </Button>

@@ -13,13 +13,12 @@ import {
   serverActionError,
 } from "~/lib/observability/report-error";
 import {
+  checkAuthenticatedIssueLimit,
   checkPublicIssueLimit,
   formatResetTime,
   getClientIp,
 } from "~/lib/rate-limit";
 import { parsePublicIssueForm } from "./validation";
-import { verifyTurnstileToken } from "~/lib/security/turnstile";
-import { extractCaptchaToken } from "~/lib/auth/errors";
 import { BLOB_CONFIG } from "~/lib/blob/config";
 import { db } from "~/server/db";
 import {
@@ -89,41 +88,28 @@ export async function submitPublicIssueAction(
     redirect("/report/success");
   }
 
-  // 2. Check Rate Limit
-  const ip = await getClientIp();
-  const { success, reset } = await checkPublicIssueLimit(ip);
-
-  if (!success) {
-    const resetTime = formatResetTime(reset);
-    return {
-      error: `Too many submissions. Please try again in ${resetTime}.`,
-    };
-  }
-
-  // 3. Resolve current user (used to skip CAPTCHA for authenticated reporters
-  // and reused later for permission resolution).
+  // 2. Resolve current user (used to partition rate limits and reused later
+  // for permission resolution).
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // 4. Verify Turnstile CAPTCHA — only required for anonymous reporters.
-  // Logged-in users skip the Cloudflare round trip entirely.
-  if (!user) {
-    const captchaToken = extractCaptchaToken(formData);
-    const captchaValid = await verifyTurnstileToken(captchaToken ?? "", ip);
+  // 3. Check Rate Limit
+  // Authenticated sessions use a per-user bucket (20 per 15m) so members sharing
+  // a venue Wi-Fi/NAT (e.g. APC) don't exhaust each other's limit.
+  // Anonymous reports use the existing per-IP bucket (5 per 15m).
+  // Note: Quick-report grid intentionally bypasses IP limiting entirely via requireQuickReporter().
+  const rateLimitResult = user
+    ? await checkAuthenticatedIssueLimit(user.id)
+    : await checkPublicIssueLimit(await getClientIp());
 
-    if (!captchaValid) {
-      log.warn(
-        { action: "publicIssueReport", ip },
-        "Turnstile CAPTCHA verification failed"
-      );
-      return {
-        error: "CAPTCHA verification failed. Please try again.",
-      };
-    }
+  if (!rateLimitResult.success) {
+    const resetTime = formatResetTime(rateLimitResult.reset);
+    return {
+      error: `Too many submissions. Please try again in ${resetTime}.`,
+    };
   }
-
   const parsedValue = parsePublicIssueForm(formData);
   if (!parsedValue.success) {
     return { error: parsedValue.error };

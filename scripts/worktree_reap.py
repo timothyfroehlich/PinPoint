@@ -50,6 +50,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from worktree_orphan_sweep import get_active_worktree_branches  # noqa: E402
 
 CLEANUP_SCRIPT = Path(__file__).resolve().parent / "worktree_cleanup.py"
+PROTOTYPE_MARKER = ".prototype-mode"
+PROTOTYPE_ROOT = Path("src/app/(dev)/prototype")
+PROTOTYPE_PERMANENT_FILES = frozenset({"layout.tsx"})
 
 #: Nothing to do, or everything asked for succeeded.
 EXIT_OK = 0
@@ -240,7 +243,8 @@ def read_git_state(worktree: Path) -> GitState:
     honours `.gitignore`, so the generated `supabase/config.toml`, `.env.local`
     and `.claude/launch.json` do not make every worktree look dirty. Untracked
     files DO count as dirty — a plan doc that exists nowhere else is exactly the
-    kind of thing that must block a reap.
+    kind of thing that must block a reap. Prototype work is deliberately ignored,
+    so `_prototype_state` checks its marker and disposable subtree separately.
 
     `origin/main` is read as-is, with no fetch. A stale `origin/main` can only
     make a branch look *further* ahead than it is, which withholds a reap.
@@ -256,8 +260,12 @@ def read_git_state(worktree: Path) -> GitState:
     if status.returncode != 0:
         return GitState()
 
+    prototype_state = _prototype_state(worktree)
+    if prototype_state is None:
+        return GitState()
+
     head: str | None = None
-    dirty = False
+    dirty = prototype_state
     for line in status.stdout.splitlines():
         if line.startswith("# branch.oid "):
             oid = line[len("# branch.oid ") :].strip()
@@ -281,6 +289,27 @@ def read_git_state(worktree: Path) -> GitState:
         return GitState(head=head, dirty=dirty)
 
     return GitState(head=head, dirty=dirty, ahead=ahead)
+
+
+def _prototype_state(worktree: Path) -> bool | None:
+    """Whether ignored prototype work exists, or `None` when it cannot be read."""
+    marker = worktree / PROTOTYPE_MARKER
+    if os.path.lexists(marker):
+        return True
+
+    prototype_root = worktree / PROTOTYPE_ROOT
+    if not os.path.lexists(prototype_root):
+        return False
+    if not prototype_root.is_dir():
+        return True
+
+    try:
+        return any(
+            child.name not in PROTOTYPE_PERMANENT_FILES
+            for child in prototype_root.iterdir()
+        )
+    except OSError:
+        return None
 
 
 def live_process_cwds() -> tuple[set[str], str | None]:

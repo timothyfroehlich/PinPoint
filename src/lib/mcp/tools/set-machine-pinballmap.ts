@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 
 import { checkPermission } from "~/lib/permissions/helpers";
@@ -175,7 +175,7 @@ export function registerSetMachinePinballmap(server: McpServer): void {
       title: "Set a machine's Pinball Map title",
       description:
         "Record WHICH Pinball Map catalog title a machine is — or that it isn't on Pinball Map at all. Two steps, always in this order: (1) call search_pinballmap_catalog to find the title and get its `pinballmapMachineId`, (2) call this tool with that id. Do not guess an id; ids are not derivable from a title's name. THE ID MUST BE A `pinballmapMachineId`, NOT A `machineGroupId` — the catalog search returns both as adjacent bare integers, and they are separate id spaces that overlap numerically, so passing a group id links the machine to a real but unrelated title and nothing about the number itself will tell you. Group ids come back from families; machine ids come back from editions and from single-edition families. Alternatively pass `pinballmapExcluded: true` with a `pinballmapExcludedReason` for a machine that genuinely isn't a catalog title (homebrew, a one-off). Pass one or the other, never both, and never neither: this tool cannot clear a link back to 'nothing recorded'. Manufacturer, year, OPDB id and IPDB id are re-derived from the catalog for the id you pass — you cannot set them, and passing a wrong id rewrites all four. Re-targeting a machine that is LISTED on the public map to a different title clears its listing (the old public entry no longer describes it; PinPoint records it as an entry to remove by hand), while re-sending the SAME id it already has leaves the listing untouched. Nothing here lists or unlists a machine on pinballmap.com. Returns the machine's new Pinball Map state in the same shape get_machine reports, plus `previousPinballmap` so you can see exactly what changed. Use get_machine or list_machines(pinballmap: 'unlinked') first to find machines still needing a title.",
-      inputSchema: setMachinePinballmapSchema.shape,
+      inputSchema: setMachinePinballmapSchema,
     },
     (args, extra) =>
       runTool("set_machine_pinballmap", extra, (ctx) =>
