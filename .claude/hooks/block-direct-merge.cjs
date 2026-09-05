@@ -160,7 +160,9 @@ function hasDynamicOptionBefore(
   for (let i = 0; i < endIndex; i++) {
     if (args[i] === "--") break;
     if (valueFlags.has(args[i])) {
-      if (splittableArgs[i + 1]) return true;
+      if (dynamicArgs[i] || splittableArgs[i] || splittableArgs[i + 1]) {
+        return true;
+      }
       i++;
       continue;
     }

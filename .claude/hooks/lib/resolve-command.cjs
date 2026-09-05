@@ -532,8 +532,8 @@ function splitSegments(tokens, splitNewlines) {
  * shell program rather than a plain value? GNU `env -S 'gh pr merge 123'` is
  * the one that matters: env splits the string and runs it.
  *
- * Returns a `{ kind: "payload", word }` slot, or null. Handles all three
- * spellings: `-S STR`, `-SSTR`, `--split-string=STR`.
+ * Returns a `{ kind: "payload", word, trailingWords }` slot, or null. Handles
+ * all three spellings: `-S STR`, `-SSTR`, `--split-string=STR`.
  */
 function readPayloadFlag(wrapper, words, i) {
   const word = words[i];
@@ -543,7 +543,9 @@ function readPayloadFlag(wrapper, words, i) {
       const next = words[i + 1];
       // `env -S` with nothing after it runs nothing — fall through to the
       // ordinary flag walk rather than inventing an empty payload.
-      return next ? { kind: "payload", word: next } : null;
+      return next
+        ? { kind: "payload", word: next, trailingWords: words.slice(i + 2) }
+        : null;
     }
     const attached = pf.startsWith("--")
       ? flag.startsWith(`${pf}=`) && flag.slice(pf.length + 1)
@@ -552,6 +554,7 @@ function readPayloadFlag(wrapper, words, i) {
       return {
         kind: "payload",
         word: { value: attached, dynamic: word.dynamic, subs: [] },
+        trailingWords: words.slice(i + 1),
       };
     }
   }
@@ -922,10 +925,18 @@ function resolveSegment(words, out, depth, options) {
     }
     const firstPayloadSegment = out.segments.length;
     resolveInto(payloadWord.value, out, depth + 1, options);
-    if (slot.appendsDynamicArgs) {
-      for (let i = firstPayloadSegment; i < out.segments.length; i++) {
-        out.segments[i].appendsDynamicArgs = true;
-      }
+    const trailingWords = slot.trailingWords.map((word) =>
+      withReplacementProvenance(word, slot)
+    );
+    for (let i = firstPayloadSegment; i < out.segments.length; i++) {
+      const segment = out.segments[i];
+      segment.args.push(...trailingWords.map((word) => word.value));
+      segment.dynamicArgs.push(...trailingWords.map((word) => word.dynamic));
+      segment.splittableArgs.push(
+        ...trailingWords.map((word) => word.splittable)
+      );
+      segment.appendsDynamicArgs ||= slot.appendsDynamicArgs;
+      segment.raw = [segment.command, ...segment.args].join(" ");
     }
     return;
   }

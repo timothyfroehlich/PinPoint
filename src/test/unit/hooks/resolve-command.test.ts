@@ -517,6 +517,30 @@ describe("env -S / --split-string re-parses its payload", () => {
     expect(unresolvable.map((u) => u.reason)).toContain("split-string-dynamic");
   });
 
+  it("preserves arguments following a split-string payload", () => {
+    const segment = firstSegment(
+      "env -S 'gh pr merge 4 --repo timothyfroehlich/dotfiles' --repo timothyfroehlich/PinPoint"
+    );
+    expect(segment.args).toEqual([
+      "pr",
+      "merge",
+      "4",
+      "--repo",
+      "timothyfroehlich/dotfiles",
+      "--repo",
+      "timothyfroehlich/PinPoint",
+    ]);
+    expect(segment.dynamicArgs).toEqual([
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+    ]);
+  });
+
   it("handles an unmodelled flag cluster by resolving AND flagging it", () => {
     // `-iS` is not modelled, so the payload lands in the command slot as a
     // whitespace-containing token. Both outputs are produced on purpose: the
