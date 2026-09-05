@@ -270,7 +270,23 @@ function normalizeRepository(value) {
   if (!raw || /[\s$`{}*?]/.test(raw)) return null;
 
   const pullUrl = PULL_URL.exec(raw);
-  if (pullUrl) return `${pullUrl[1]}/${pullUrl[2]}`.toLowerCase();
+  if (pullUrl) {
+    let owner;
+    let repository;
+    try {
+      owner = decodeURIComponent(pullUrl[1]);
+      repository = decodeURIComponent(pullUrl[2]);
+    } catch {
+      return null;
+    }
+    if (
+      !/^[A-Za-z0-9_.-]+$/.test(owner) ||
+      !/^[A-Za-z0-9_.-]+$/.test(repository)
+    ) {
+      return null;
+    }
+    return `${owner}/${repository}`.toLowerCase();
+  }
 
   const parts = raw.replace(/\.git$/, "").split("/");
   if (parts.length !== 2 && parts.length !== 3) return null;

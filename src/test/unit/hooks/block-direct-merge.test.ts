@@ -111,6 +111,7 @@ describe("block-direct-merge.cjs — gh merge paths", () => {
     "gh pr merge 4 --repo timothyfroehlich/dotfiles --squash",
     "gh -R timothyfroehlich/dotfiles pr merge 4 --squash",
     "gh pr merge https://github.com/timothyfroehlich/dotfiles/pull/4 --squash",
+    "gh pr merge https://github.com/timothyfroehlich/%64otfiles/pull/4 --squash",
     "gh api -X PUT repos/timothyfroehlich/dotfiles/pulls/4/merge",
     "gh api -XPUT repos/timothyfroehlich/dotfiles/pulls/4/merge",
     'gh api -X "$METHOD" repos/timothyfroehlich/dotfiles/pulls/4/merge',
@@ -125,6 +126,9 @@ describe("block-direct-merge.cjs — gh merge paths", () => {
 
   it.each([
     'gh pr merge 4 --repo "$TARGET_REPOSITORY" --squash',
+    "gh pr merge https://github.com/timothyfroehlich/%50inPoint/pull/123",
+    "gh pr merge https://github.com/timothyfroehlich/%ZZinPoint/pull/123",
+    "gh pr merge https://github.com/timothyfroehlich/Pin%2FPoint/pull/123",
     "gh pr merge https://github.com/timothyfroehlich/PinPoint/pull/123 --repo timothyfroehlich/dotfiles",
     "GH_REPO=timothyfroehlich/dotfiles gh pr merge 123 --squash",
     "env GH_REPO=timothyfroehlich/dotfiles gh pr merge 123 --squash",
