@@ -115,6 +115,34 @@ describe("wrapped/quoted git invocations → BLOCK (PP-6t3c)", () => {
   });
 });
 
+describe("shell-control-prefixed checkout invocations → BLOCK (PP-c8xa)", () => {
+  it.each([
+    "if git checkout feature/x; then echo blocked; fi",
+    "! git checkout feature/x",
+    "{ git checkout feature/x; }",
+    "while git checkout feature/x; do echo blocked; done",
+    "function guarded { git checkout feature/x; }; guarded",
+    "coproc git checkout feature/x",
+    "coproc guarded { git checkout feature/x; }",
+    "time if git checkout feature/x; then echo blocked; fi",
+    "time { git checkout feature/x; }",
+    "time function guarded { git checkout feature/x; }; guarded",
+    "time coproc git checkout feature/x",
+    "time coproc guarded { git checkout feature/x; }",
+    "coproc guarded if git checkout feature/x; then :; fi",
+    "coproc guarded while git checkout feature/x; do :; done",
+    "coproc guarded until git checkout feature/x; do :; done",
+    "time coproc guarded if git checkout feature/x; then :; fi",
+    "coproc git -C { checkout feature/x",
+    "function guarded if git checkout feature/x; then :; fi; guarded",
+    "function guarded while git checkout feature/x; do :; done; guarded",
+    "function guarded until git checkout feature/x; do :; done; guarded",
+    "time function guarded if git checkout feature/x; then :; fi; guarded",
+  ])("blocks %s", (cmd) => {
+    expectBlock(cmd);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // git-as-argument (false-positive fix) — must ALLOW
 // ---------------------------------------------------------------------------

@@ -12,6 +12,7 @@
  */
 
 import { randomUUID } from "node:crypto";
+import { McpServer } from "@modelcontextprotocol/server";
 import { and, eq } from "drizzle-orm";
 import { describe, expect, it, vi } from "vitest";
 
@@ -2314,6 +2315,9 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
    * itself, not through this function.
    */
   it("registers every tool in the catalog", () => {
+    const server = new McpServer({ name: "pinpoint-test", version: "1.0.0" });
+    expect(() => registerPinpointTools(server)).not.toThrow();
+
     const registered: string[] = [];
     const fakeServer = {
       registerTool: (name: string) => {

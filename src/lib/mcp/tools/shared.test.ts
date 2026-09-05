@@ -10,7 +10,7 @@
  * half-applied write would leave no trace at all.
  */
 
-import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
+import type { AuthInfo, ServerContext } from "@modelcontextprotocol/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { logMcpToolCall } from "~/lib/mcp/audit";
@@ -30,7 +30,9 @@ const AUTH = {
     clientId: "claude-code-bearer",
     accessLevel: "admin",
   },
-} as unknown as AuthInfo;
+} satisfies AuthInfo;
+
+const CTX = { http: { authInfo: AUTH } } satisfies Pick<ServerContext, "http">;
 
 const audited = vi.mocked(logMcpToolCall);
 
@@ -40,7 +42,7 @@ beforeEach(() => {
 
 describe("runTool audit outcome", () => {
   it("logs ok when a tool returns no override", async () => {
-    await runTool("demo", { authInfo: AUTH }, () =>
+    await runTool("demo", CTX, () =>
       Promise.resolve({ result: { fine: true } })
     );
 
@@ -50,7 +52,7 @@ describe("runTool audit outcome", () => {
   });
 
   it("logs error with the reason when a tool overrides the outcome", async () => {
-    const response = await runTool("demo", { authInfo: AUTH }, () =>
+    const response = await runTool("demo", CTX, () =>
       Promise.resolve({
         result: { partial: true },
         issueId: "22222222-2222-4222-8222-222222222222",
@@ -73,7 +75,7 @@ describe("runTool audit outcome", () => {
   });
 
   it("logs denied without reporting an McpToolError", async () => {
-    const response = await runTool("demo", { authInfo: AUTH }, () =>
+    const response = await runTool("demo", CTX, () =>
       Promise.reject(new McpToolError("denied", "You cannot do that."))
     );
 
@@ -85,7 +87,7 @@ describe("runTool audit outcome", () => {
   });
 
   it("reports an unexpected error and keeps its text out of the response", async () => {
-    const response = await runTool("demo", { authInfo: AUTH }, () =>
+    const response = await runTool("demo", CTX, () =>
       Promise.reject(new Error('relation "issues" does not exist'))
     );
 

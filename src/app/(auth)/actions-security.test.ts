@@ -44,17 +44,7 @@ vi.mock("~/lib/supabase/server", () => ({
   createClient: vi.fn(),
 }));
 
-// Mock Turnstile — auth forms use the fail-open verifier, which by design
-// always allows the submission through (PP-20yy). Default the mock to the
-// happy "verified" outcome; individual tests can override the reason.
-vi.mock("~/lib/security/turnstile", () => ({
-  verifyTurnstileFailOpen: vi
-    .fn()
-    .mockResolvedValue({ allowed: true, reason: "verified" }),
-}));
-
 import { createClient } from "~/lib/supabase/server";
-import { verifyTurnstileFailOpen } from "~/lib/security/turnstile";
 
 describe("Auth Actions Security - Error Handling", () => {
   beforeEach(() => {
@@ -164,40 +154,6 @@ describe("Auth Actions Security - Error Handling", () => {
     }
   });
 
-  it("signupAction should return CAPTCHA error for captcha_failed", async () => {
-    const { AuthApiError } = await import("@supabase/supabase-js");
-    vi.mocked(createClient).mockResolvedValue({
-      auth: {
-        signUp: vi.fn().mockResolvedValue({
-          error: new AuthApiError(
-            "captcha protection: request disallowed (timeout-or-duplicate)",
-            400,
-            "captcha_failed"
-          ),
-          data: { user: null },
-        }),
-        getUser: vi.fn().mockResolvedValue({ data: { user: null } }),
-      },
-    } as any);
-
-    const formData = new FormData();
-    formData.set("email", "test@example.com");
-    formData.set("password", "StrongUniquePass99!");
-    formData.set("confirmPassword", "StrongUniquePass99!");
-    formData.set("firstName", "John");
-    formData.set("lastName", "Doe");
-    formData.set("termsAccepted", "on");
-
-    const result = await signupAction(undefined, formData);
-
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.code).toBe("CAPTCHA");
-      expect(result.message).toContain("refresh");
-      expect(result.message).not.toContain("timeout-or-duplicate");
-    }
-  });
-
   it("signupAction should return SERVER when createClient() throws", async () => {
     vi.mocked(createClient).mockRejectedValue(
       new Error("Missing SUPABASE_URL")
@@ -220,29 +176,7 @@ describe("Auth Actions Security - Error Handling", () => {
     }
   });
 
-  it("forgotPasswordAction should surface CAPTCHA errors", async () => {
-    vi.stubEnv("NEXT_PUBLIC_SITE_URL", "http://localhost:3000");
-    const { AuthApiError } = await import("@supabase/supabase-js");
-    vi.mocked(createClient).mockResolvedValue({
-      auth: {
-        resetPasswordForEmail: vi.fn().mockResolvedValue({
-          error: new AuthApiError("captcha failed", 400, "captcha_failed"),
-        }),
-      },
-    } as any);
-
-    const formData = new FormData();
-    formData.set("email", "test@example.com");
-
-    const result = await forgotPasswordAction(undefined, formData);
-
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.code).toBe("CAPTCHA");
-    }
-  });
-
-  it("forgotPasswordAction should return success for non-CAPTCHA errors (prevent enumeration)", async () => {
+  it("forgotPasswordAction should return success on backend errors (prevent enumeration)", async () => {
     vi.stubEnv("NEXT_PUBLIC_SITE_URL", "http://localhost:3000");
     const { AuthApiError } = await import("@supabase/supabase-js");
     vi.mocked(createClient).mockResolvedValue({
@@ -353,15 +287,7 @@ describe("Auth Actions Security - Error Handling", () => {
     }
   });
 
-  it("resetPasswordAction fails open: still updates the password when the token is unverifiable", async () => {
-    // PP-20yy: the captcha gate fails open. verifyTurnstileFailOpen never
-    // blocks — a missing/unverifiable token yields allowed:true — so the action
-    // must proceed to updateUser rather than returning a CAPTCHA error.
-    vi.mocked(verifyTurnstileFailOpen).mockResolvedValueOnce({
-      allowed: true,
-      reason: "missing-token",
-    });
-
+  it("resetPasswordAction should call updateUser when password update succeeds", async () => {
     const updateUserMock = vi.fn().mockResolvedValue({ error: null });
     const signOutMock = vi.fn().mockResolvedValue({ error: null });
     vi.mocked(createClient).mockResolvedValue({
@@ -377,43 +303,6 @@ describe("Auth Actions Security - Error Handling", () => {
     const formData = new FormData();
     formData.set("password", "NewPassword123!");
     formData.set("confirmPassword", "NewPassword123!");
-    // No captchaToken at all — the transient-Turnstile-failure case.
-
-    // resetPasswordAction calls redirect("/login") on success, which throws
-    // a NEXT_REDIRECT error in tests.
-    try {
-      await resetPasswordAction(undefined, formData);
-    } catch {
-      // redirect() throws — expected.
-    }
-
-    expect(updateUserMock).toHaveBeenCalledWith({
-      password: "NewPassword123!",
-    });
-  });
-
-  it("resetPasswordAction should call updateUser when CAPTCHA verification passes", async () => {
-    vi.mocked(verifyTurnstileFailOpen).mockResolvedValueOnce({
-      allowed: true,
-      reason: "verified",
-    });
-
-    const updateUserMock = vi.fn().mockResolvedValue({ error: null });
-    const signOutMock = vi.fn().mockResolvedValue({ error: null });
-    vi.mocked(createClient).mockResolvedValue({
-      auth: {
-        getUser: vi
-          .fn()
-          .mockResolvedValue({ data: { user: { id: "user-123" } } }),
-        updateUser: updateUserMock,
-        signOut: signOutMock,
-      },
-    } as any);
-
-    const formData = new FormData();
-    formData.set("password", "NewPassword123!");
-    formData.set("confirmPassword", "NewPassword123!");
-    formData.set("captchaToken", "valid-token");
 
     // resetPasswordAction calls redirect("/login") on success, which throws
     // a NEXT_REDIRECT error in tests. We don't assert on the return value;
@@ -427,34 +316,6 @@ describe("Auth Actions Security - Error Handling", () => {
     expect(updateUserMock).toHaveBeenCalledWith({
       password: "NewPassword123!",
     });
-  });
-
-  it("loginAction should return CAPTCHA error for captcha_failed", async () => {
-    const { AuthApiError } = await import("@supabase/supabase-js");
-    vi.mocked(createClient).mockResolvedValue({
-      auth: {
-        signInWithPassword: vi.fn().mockResolvedValue({
-          error: new AuthApiError(
-            "captcha protection: request disallowed",
-            400,
-            "captcha_failed"
-          ),
-          data: { user: null },
-        }),
-      },
-    } as any);
-
-    const formData = new FormData();
-    formData.set("email", "test@example.com");
-    formData.set("password", "Password123!");
-
-    const result = await loginAction(undefined, formData);
-
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.code).toBe("CAPTCHA");
-      expect(result.message).toContain("refresh");
-    }
   });
 
   it("loginAction should return SERVER for network failures (AuthRetryableFetchError)", async () => {

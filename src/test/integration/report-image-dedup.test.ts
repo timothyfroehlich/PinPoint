@@ -60,10 +60,6 @@ vi.mock("~/lib/logger", () => ({
   },
 }));
 
-vi.mock("~/lib/security/turnstile", () => ({
-  verifyTurnstileToken: vi.fn().mockResolvedValue(true),
-}));
-
 vi.mock("~/lib/rate-limit", () => ({
   checkPublicIssueLimit: vi.fn().mockResolvedValue({ success: true, reset: 0 }),
   getClientIp: vi.fn().mockResolvedValue("127.0.0.1"),

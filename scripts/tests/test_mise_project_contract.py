@@ -1,7 +1,7 @@
 """Tests for the PinPoint mise project contract (PP-h2ui.4, .5, .6, .8, .9).
 
 Verifies that:
-1. mise.toml defines the exact development Node/Python/Ruff/Supabase-CLI runtimes and settings.
+1. mise.toml defines the exact development Node/Python/Ruff/Supabase-CLI/zizmor tools and settings.
 2. package.json#packageManager remains the single pnpm version and checksum authority.
 3. mise.toml does not duplicate the pnpm version (idiomatic_version_file_enable_tools is used).
 4. mise.lock exists and captures resolved artifacts across platforms.
@@ -16,7 +16,10 @@ import os
 import re
 import shutil
 import subprocess
+from copy import deepcopy
 from pathlib import Path
+
+import pytest
 
 try:
     import tomllib
@@ -37,6 +40,67 @@ PREVIEW_REAPER_PATH = REPO_ROOT / ".github" / "workflows" / "preview-reaper.yaml
 PREVIEW_SYNC_PATH = REPO_ROOT / ".github" / "workflows" / "preview-sync.yaml"
 
 MINIMUM_MISE_VERSION = (2026, 8, 11)
+MISE_MANAGED_TOOLS = ("node", "python", "ruff", "supabase", "zizmor")
+EXPECTED_TOOL_BACKENDS = {
+    "node": "core:node",
+    "pnpm": "npm:pnpm",
+    "python": "core:python",
+    "ruff": "aqua:astral-sh/ruff",
+    "supabase": "aqua:supabase/cli",
+    "zizmor": "aqua:zizmorcore/zizmor",
+}
+REQUIRED_LOCK_PLATFORMS = {
+    "node": {
+        "linux-arm64",
+        "linux-arm64-musl",
+        "linux-x64",
+        "linux-x64-musl",
+        "macos-arm64",
+        "macos-x64",
+        "windows-x64",
+    },
+    "python": {
+        "linux-arm64",
+        "linux-x64",
+        "linux-x64-musl",
+        "macos-arm64",
+        "macos-x64",
+        "windows-x64",
+    },
+    "ruff": {
+        "linux-arm64",
+        "linux-arm64-musl",
+        "linux-x64",
+        "linux-x64-musl",
+        "macos-arm64",
+        "macos-x64",
+        "windows-x64",
+    },
+    "supabase": {
+        "linux-arm64",
+        "linux-arm64-musl",
+        "linux-x64",
+        "linux-x64-musl",
+        "macos-arm64",
+        "macos-x64",
+        "windows-x64",
+    },
+    "zizmor": {
+        "linux-arm64",
+        "linux-arm64-musl",
+        "linux-x64",
+        "linux-x64-musl",
+        "macos-arm64",
+        "macos-x64",
+        "windows-x64",
+    },
+}
+EXPECTED_LOCK_PROVENANCE = {
+    "python": "github-attestations",
+    "zizmor": "github-attestations",
+}
+EXACT_VERSION_RE = re.compile(r"^\d+\.\d+\.\d+$")
+SHA256_CHECKSUM_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 
 
 def _parse_mise_version(raw: str) -> tuple[int, ...]:
@@ -56,6 +120,189 @@ def _get_mise_bin() -> str:
     return mise_bin
 
 
+def _mise_managed_pins(data: dict[str, object]) -> dict[str, str]:
+    """Return exact project-authored pins for tools managed in mise.toml."""
+    tools = data.get("tools")
+    assert isinstance(tools, dict), "mise.toml must define a [tools] table"
+
+    pins: dict[str, str] = {}
+    for tool in MISE_MANAGED_TOOLS:
+        version = tools.get(tool)
+        assert isinstance(version, str) and EXACT_VERSION_RE.fullmatch(version), (
+            f"mise.toml must specify {tool} as an exact X.Y.Z pin, got {version!r}"
+        )
+        pins[tool] = version
+    return pins
+
+
+def _pnpm_pin(data: dict[str, object]) -> str:
+    """Return the pnpm version from package.json's integrity-pinned authority."""
+    package_manager = data.get("packageManager")
+    assert isinstance(package_manager, str), (
+        "package.json#packageManager must be a string"
+    )
+    match = re.fullmatch(
+        r"pnpm@(\d+\.\d+\.\d+)\+sha512\.([0-9a-f]{128})", package_manager
+    )
+    assert match is not None, (
+        "package.json#packageManager must be pnpm@<version>+sha512.<hash>, "
+        f"got {package_manager!r}"
+    )
+    return match.group(1)
+
+
+def _parse_exact_version(raw: str, *, source: str) -> tuple[int, int, int]:
+    """Parse the exact X.Y.Z versions used by this contract."""
+    assert EXACT_VERSION_RE.fullmatch(raw), (
+        f"{source} must use an exact X.Y.Z version, got {raw!r}"
+    )
+    major, minor, patch = raw.split(".")
+    return int(major), int(minor), int(patch)
+
+
+def _node_pin_satisfies_engine(pin: str, engine_range: str) -> bool:
+    """Evaluate the deliberately small engines.node grammar used by PinPoint."""
+    version = _parse_exact_version(pin, source="mise.toml node pin")
+    clauses = [clause.strip() for clause in engine_range.split("||")]
+    assert clauses and all(clauses), (
+        f"package.json#engines.node has an invalid range: {engine_range!r}"
+    )
+
+    for clause in clauses:
+        match = re.fullmatch(r"(\^|>=)?(\d+\.\d+\.\d+)", clause)
+        assert match is not None, (
+            "package.json#engines.node must use exact, caret, or >= X.Y.Z clauses "
+            f"joined by ||, got {engine_range!r}"
+        )
+        operator, floor_raw = match.groups()
+        floor = _parse_exact_version(
+            floor_raw, source="package.json#engines.node clause"
+        )
+        if operator is None and version == floor:
+            return True
+        if operator == ">=" and version >= floor:
+            return True
+        if operator == "^":
+            if floor[0] > 0:
+                ceiling = (floor[0] + 1, 0, 0)
+            elif floor[1] > 0:
+                ceiling = (0, floor[1] + 1, 0)
+            else:
+                ceiling = (0, 0, floor[2] + 1)
+            if floor <= version < ceiling:
+                return True
+    return False
+
+
+def _expected_tool_pins(
+    mise_data: dict[str, object], package_data: dict[str, object]
+) -> dict[str, str]:
+    """Combine the two project authorities into the expected lock contents."""
+    pins = _mise_managed_pins(mise_data)
+    engines = package_data.get("engines")
+    assert isinstance(engines, dict), "package.json must define an engines table"
+    node_engine = engines.get("node")
+    assert isinstance(node_engine, str), "package.json must declare engines.node"
+    assert _node_pin_satisfies_engine(pins["node"], node_engine), (
+        f"mise.toml node pin {pins['node']} must satisfy "
+        f"package.json#engines.node {node_engine!r}"
+    )
+    return {**pins, "pnpm": _pnpm_pin(package_data)}
+
+
+def _assert_platform_locks_coherent(
+    tool: str, expected_version: str, entry: dict[str, object]
+) -> None:
+    """Require baseline platforms and validate every locked platform artifact."""
+    required_platforms = REQUIRED_LOCK_PLATFORMS.get(tool)
+    if required_platforms is None:
+        return
+
+    platform_prefix = "platforms."
+    actual_platforms = {
+        key.removeprefix(platform_prefix)
+        for key in entry
+        if key.startswith(platform_prefix)
+    }
+    missing_platforms = required_platforms - actual_platforms
+    assert not missing_platforms, (
+        f"mise.lock {tool} platforms must include the required baseline; "
+        f"missing {sorted(missing_platforms)}, got {sorted(actual_platforms)}"
+    )
+    for platform in sorted(actual_platforms):
+        artifact = entry.get(f"{platform_prefix}{platform}")
+        assert isinstance(artifact, dict), (
+            f"mise.lock {tool} {platform} platform entry must be a table"
+        )
+        expected_provenance = EXPECTED_LOCK_PROVENANCE.get(tool)
+        if set(artifact) == {"provenance"}:
+            assert artifact == {"provenance": expected_provenance}, (
+                f"mise.lock {tool} {platform} must remain an explicit "
+                f"unavailable-platform marker, got {artifact!r}"
+            )
+            continue
+        if expected_provenance is not None:
+            assert artifact.get("provenance") == expected_provenance, (
+                f"mise.lock {tool} {platform} provenance must be "
+                f"{expected_provenance!r}, got {artifact.get('provenance')!r}"
+            )
+        url = artifact.get("url")
+        assert isinstance(url, str) and url.startswith("https://"), (
+            f"mise.lock {tool} {platform} platform URL must be HTTPS, got {url!r}"
+        )
+        assert expected_version in url, (
+            f"mise.lock {tool} {platform} platform URL must reference "
+            f"{expected_version}, got {url!r}"
+        )
+        checksum = artifact.get("checksum")
+        assert isinstance(checksum, str) and SHA256_CHECKSUM_RE.fullmatch(checksum), (
+            f"mise.lock {tool} {platform} checksum must be sha256:<64 lowercase hex>, "
+            f"got {checksum!r}"
+        )
+
+
+def _assert_mise_lock_coherent(
+    mise_data: dict[str, object],
+    lock_data: dict[str, object],
+    package_data: dict[str, object],
+) -> None:
+    """Require every exact project pin to have one matching locked source."""
+    assert lock_data.get("lockfile_version") == 1, (
+        f"mise.lock must use lockfile_version = 1, got {lock_data.get('lockfile_version')!r}"
+    )
+    lock_tools = lock_data.get("tools")
+    assert isinstance(lock_tools, dict), "mise.lock must define a [tools] table"
+
+    expected_pins = _expected_tool_pins(mise_data, package_data)
+    assert set(lock_tools) == set(expected_pins), (
+        "mise.lock tools must exactly match project-managed tools; "
+        f"expected {sorted(expected_pins)}, got {sorted(lock_tools)}"
+    )
+
+    for tool, expected_version in expected_pins.items():
+        entries = lock_tools.get(tool)
+        assert isinstance(entries, list) and len(entries) == 1, (
+            f"mise.lock must contain exactly one {tool} entry, got {entries!r}"
+        )
+        entry = entries[0]
+        assert isinstance(entry, dict), (
+            f"mise.lock {tool} entry must be a table, got {entry!r}"
+        )
+        assert entry.get("version") == expected_version, (
+            f"mise.lock {tool} version must match {expected_version}, "
+            f"got {entry.get('version')!r}"
+        )
+        assert entry.get("specifiers") == [expected_version], (
+            f"mise.lock {tool} specifiers must be [{expected_version!r}], "
+            f"got {entry.get('specifiers')!r}"
+        )
+        assert entry.get("backend") == EXPECTED_TOOL_BACKENDS[tool], (
+            f"mise.lock {tool} backend must be {EXPECTED_TOOL_BACKENDS[tool]!r}, "
+            f"got {entry.get('backend')!r}"
+        )
+        _assert_platform_locks_coherent(tool, expected_version, entry)
+
+
 def test_mise_toml_exists_and_is_valid() -> None:
     assert MISE_TOML_PATH.is_file(), f"expected {MISE_TOML_PATH} to exist"
     data = tomllib.loads(MISE_TOML_PATH.read_text(encoding="utf-8"))
@@ -65,20 +312,11 @@ def test_mise_toml_exists_and_is_valid() -> None:
         f"mise.toml must enforce min_version = '2026.8.11', got {data.get('min_version')!r}"
     )
 
-    # Node, Python, Ruff, and Supabase CLI development runtime must be pinned
+    # Managed development runtimes must remain exact pins. Their current values
+    # are data, not test policy; mise.lock coherence is validated separately.
+    _mise_managed_pins(data)
     tools = data.get("tools", {})
-    assert "node" in tools, "mise.toml must specify node in [tools]"
-    assert tools["node"] == "24.16.0", f"expected node 24.16.0, got {tools['node']!r}"
-    assert "python" in tools, "mise.toml must specify python in [tools]"
-    assert tools["python"] == "3.12.9", (
-        f"expected python 3.12.9, got {tools['python']!r}"
-    )
-    assert "ruff" in tools, "mise.toml must specify ruff in [tools]"
-    assert tools["ruff"] == "0.15.1", f"expected ruff 0.15.1, got {tools['ruff']!r}"
-    assert "supabase" in tools, "mise.toml must specify supabase in [tools]"
-    assert re.fullmatch(r"\d+\.\d+\.\d+", str(tools["supabase"])), (
-        f"expected an exact supabase CLI pin (X.Y.Z), got {tools['supabase']!r}"
-    )
+    assert isinstance(tools, dict)
 
     # pnpm must NOT be duplicated in [tools]
     assert "pnpm" not in tools, (
@@ -105,11 +343,7 @@ def test_package_json_pnpm_authority() -> None:
     pkg = json.loads(PACKAGE_JSON_PATH.read_text(encoding="utf-8"))
 
     # packageManager must declare pnpm version and sha512 integrity suffix
-    pkg_mgr = pkg.get("packageManager", "")
-    match = re.match(r"^pnpm@(\d+\.\d+\.\d+)\+sha512\.([0-9a-f]{128})$", pkg_mgr)
-    assert match is not None, (
-        f"package.json#packageManager must be pnpm@<version>+sha512.<hash>, got {pkg_mgr!r}"
-    )
+    _pnpm_pin(pkg)
 
     # engines.node must be defined as deployment compatibility contract
     engines = pkg.get("engines", {})
@@ -118,15 +352,142 @@ def test_package_json_pnpm_authority() -> None:
 
 def test_mise_lock_exists_and_captures_tools() -> None:
     assert MISE_LOCK_PATH.is_file(), f"expected {MISE_LOCK_PATH} to exist"
-    data = tomllib.loads(MISE_LOCK_PATH.read_text(encoding="utf-8"))
+    mise_data = tomllib.loads(MISE_TOML_PATH.read_text(encoding="utf-8"))
+    lock_data = tomllib.loads(MISE_LOCK_PATH.read_text(encoding="utf-8"))
+    package_data = json.loads(PACKAGE_JSON_PATH.read_text(encoding="utf-8"))
 
-    assert "lockfile_version" in data, "mise.lock must have lockfile_version"
-    tools = data.get("tools", {})
-    assert "node" in tools, "mise.lock must have node tool locked"
-    assert "pnpm" in tools, "mise.lock must have pnpm tool locked"
-    assert "python" in tools, "mise.lock must have python tool locked"
-    assert "ruff" in tools, "mise.lock must have ruff tool locked"
-    assert "supabase" in tools, "mise.lock must have supabase tool locked"
+    _assert_mise_lock_coherent(mise_data, lock_data, package_data)
+
+
+@pytest.mark.parametrize("tool", MISE_MANAGED_TOOLS)
+def test_mise_lock_accepts_structurally_coherent_managed_tool_bump(
+    tool: str,
+) -> None:
+    """A synthetic two-file bump passes structural config/lock validation."""
+    mise_data = tomllib.loads(MISE_TOML_PATH.read_text(encoding="utf-8"))
+    lock_data = tomllib.loads(MISE_LOCK_PATH.read_text(encoding="utf-8"))
+    package_data = json.loads(PACKAGE_JSON_PATH.read_text(encoding="utf-8"))
+    current_version = _mise_managed_pins(mise_data)[tool]
+    major, minor, patch = _parse_exact_version(
+        current_version, source=f"mise.toml {tool} pin"
+    )
+    bumped_version = f"{major}.{minor}.{patch + 1}"
+    assert bumped_version != current_version
+
+    bumped_mise = deepcopy(mise_data)
+    bumped_lock = deepcopy(lock_data)
+    bumped_mise["tools"][tool] = bumped_version
+
+    lock_entry = bumped_lock["tools"][tool][0]
+    lock_entry["version"] = bumped_version
+    lock_entry["specifiers"] = [bumped_version]
+    for key, artifact in lock_entry.items():
+        if not key.startswith("platforms."):
+            continue
+        assert isinstance(artifact, dict)
+        url = artifact.get("url")
+        if isinstance(url, str):
+            artifact["url"] = url.replace(current_version, bumped_version)
+
+    _assert_mise_lock_coherent(bumped_mise, bumped_lock, package_data)
+
+
+def test_mise_lock_validates_additional_platform_artifact() -> None:
+    """A generated platform addition passes only while version-coherent."""
+    mise_data = tomllib.loads(MISE_TOML_PATH.read_text(encoding="utf-8"))
+    lock_data = tomllib.loads(MISE_LOCK_PATH.read_text(encoding="utf-8"))
+    package_data = json.loads(PACKAGE_JSON_PATH.read_text(encoding="utf-8"))
+    current_version = _mise_managed_pins(mise_data)["python"]
+    expanded_lock = deepcopy(lock_data)
+    python_entry = expanded_lock["tools"]["python"][0]
+    platform_key = "platforms.linux-arm64-musl"
+    python_entry[platform_key] = {
+        "checksum": f"sha256:{'0' * 64}",
+        "url": (
+            "https://github.com/astral-sh/python-build-standalone/releases/"
+            f"download/test/cpython-{current_version}-arm64-musl.tar.gz"
+        ),
+        "provenance": "github-attestations",
+    }
+
+    _assert_mise_lock_coherent(mise_data, expanded_lock, package_data)
+
+    python_entry[platform_key]["url"] = python_entry[platform_key]["url"].replace(
+        current_version, "0.0.0"
+    )
+    with pytest.raises(
+        AssertionError,
+        match="linux-arm64-musl platform URL must reference",
+    ):
+        _assert_mise_lock_coherent(mise_data, expanded_lock, package_data)
+
+
+def test_mise_lock_rejects_version_mismatch() -> None:
+    mise_data = tomllib.loads(MISE_TOML_PATH.read_text(encoding="utf-8"))
+    lock_data = tomllib.loads(MISE_LOCK_PATH.read_text(encoding="utf-8"))
+    package_data = json.loads(PACKAGE_JSON_PATH.read_text(encoding="utf-8"))
+    mismatched_lock = deepcopy(lock_data)
+    mismatched_lock["tools"]["node"][0]["version"] = "0.0.0"
+
+    with pytest.raises(AssertionError, match="node version must match"):
+        _assert_mise_lock_coherent(mise_data, mismatched_lock, package_data)
+
+
+def test_mise_lock_rejects_stale_platform_artifacts() -> None:
+    mise_data = tomllib.loads(MISE_TOML_PATH.read_text(encoding="utf-8"))
+    lock_data = tomllib.loads(MISE_LOCK_PATH.read_text(encoding="utf-8"))
+    package_data = json.loads(PACKAGE_JSON_PATH.read_text(encoding="utf-8"))
+    current_version = _mise_managed_pins(mise_data)["node"]
+    major, minor, patch = _parse_exact_version(
+        current_version, source="mise.toml node pin"
+    )
+    bumped_version = f"{major}.{minor}.{patch + 1}"
+    assert bumped_version != current_version
+
+    bumped_mise = deepcopy(mise_data)
+    stale_lock = deepcopy(lock_data)
+    bumped_mise["tools"]["node"] = bumped_version
+    stale_lock["tools"]["node"][0]["version"] = bumped_version
+    stale_lock["tools"]["node"][0]["specifiers"] = [bumped_version]
+
+    with pytest.raises(
+        AssertionError,
+        match=rf"platform URL must reference {re.escape(bumped_version)}",
+    ):
+        _assert_mise_lock_coherent(bumped_mise, stale_lock, package_data)
+
+
+@pytest.mark.parametrize("invalid_pin", ("latest", "24.19", "^24.19.0"))
+def test_mise_managed_pins_reject_malformed_or_floating_versions(
+    invalid_pin: str,
+) -> None:
+    mise_data = tomllib.loads(MISE_TOML_PATH.read_text(encoding="utf-8"))
+    invalid_mise = deepcopy(mise_data)
+    invalid_mise["tools"]["node"] = invalid_pin
+
+    with pytest.raises(AssertionError, match="node as an exact X.Y.Z pin"):
+        _mise_managed_pins(invalid_mise)
+
+
+def test_mise_managed_pins_reject_node_outside_engine_range() -> None:
+    mise_data = tomllib.loads(MISE_TOML_PATH.read_text(encoding="utf-8"))
+    package_data = json.loads(PACKAGE_JSON_PATH.read_text(encoding="utf-8"))
+    invalid_mise = deepcopy(mise_data)
+    invalid_mise["tools"]["node"] = "25.0.0"
+
+    with pytest.raises(AssertionError, match="must satisfy package.json#engines.node"):
+        _expected_tool_pins(invalid_mise, package_data)
+
+
+def test_mise_lock_rejects_missing_managed_tool() -> None:
+    mise_data = tomllib.loads(MISE_TOML_PATH.read_text(encoding="utf-8"))
+    lock_data = tomllib.loads(MISE_LOCK_PATH.read_text(encoding="utf-8"))
+    package_data = json.loads(PACKAGE_JSON_PATH.read_text(encoding="utf-8"))
+    incomplete_lock = deepcopy(lock_data)
+    del incomplete_lock["tools"]["supabase"]
+
+    with pytest.raises(AssertionError, match="must exactly match"):
+        _assert_mise_lock_coherent(mise_data, incomplete_lock, package_data)
 
 
 def test_mise_cli_version_meets_minimum() -> None:
@@ -144,19 +505,112 @@ def test_mise_cli_version_meets_minimum() -> None:
     )
 
 
-def _tool_source_path(info: object) -> str:
-    """Extract the config-file source path for a tool from `mise ls --json`.
-
-    A tool entry is a list of installed versions when more than one is present
-    (e.g. a stale pnpm alongside the pinned one); only the active/requested
-    entry carries a `source`. Selecting index 0 blindly can pick an inactive
-    install that has no `source` key, so scan for the entry that declares one.
-    """
+def _selected_tool_entry(info: object) -> dict[str, object]:
+    """Select the active entry, or the sole requested entry if uninstalled."""
     candidates = info if isinstance(info, list) else [info]
-    for entry in candidates:
-        if isinstance(entry, dict) and isinstance(entry.get("source"), dict):
-            return str(entry["source"]["path"])
-    raise AssertionError(f"no active entry with a source path in {info!r}")
+    active = [
+        entry
+        for entry in candidates
+        if isinstance(entry, dict) and entry.get("active") is True
+    ]
+    assert len(active) <= 1, (
+        f"expected at most one active mise entry, got {len(active)} in {info!r}"
+    )
+    if active:
+        return active[0]
+
+    requested = [
+        entry
+        for entry in candidates
+        if isinstance(entry, dict) and isinstance(entry.get("requested_version"), str)
+    ]
+    assert len(requested) == 1, (
+        "expected exactly one project-requested mise entry when none is active, "
+        f"got {len(requested)} in {info!r}"
+    )
+    return requested[0]
+
+
+def _tool_source_path(info: object) -> str:
+    """Extract the config-file source path from the selected mise entry."""
+    entry = _selected_tool_entry(info)
+    source = entry.get("source")
+    assert isinstance(source, dict), f"selected mise entry has no source in {info!r}"
+    path = source.get("path")
+    assert isinstance(path, str) and path, (
+        f"selected mise entry has no source path in {info!r}"
+    )
+    return path
+
+
+def _assert_tool_source_path(info: object, expected_path: Path) -> None:
+    """Require the selected entry to originate from this project's authority."""
+    actual_path = Path(_tool_source_path(info)).resolve()
+    normalized_expected_path = expected_path.resolve()
+    assert actual_path == normalized_expected_path, (
+        f"selected mise source must resolve to {normalized_expected_path}, "
+        f"got {actual_path}"
+    )
+
+
+def test_tool_source_path_selects_active_entry() -> None:
+    info = [
+        {
+            "version": "1.0.0",
+            "active": False,
+        },
+        {
+            "version": "2.0.0",
+            "active": True,
+            "source": {"path": "/project/package.json"},
+        },
+    ]
+
+    assert _tool_source_path(info) == "/project/package.json"
+
+
+def test_tool_source_path_rejects_unsourced_active_entry() -> None:
+    info = [
+        {
+            "version": "1.0.0",
+            "active": False,
+            "source": {"path": "/project/mise.toml"},
+        },
+        {"version": "2.0.0", "active": True},
+    ]
+
+    with pytest.raises(AssertionError, match="selected mise entry has no source"):
+        _tool_source_path(info)
+
+
+def test_tool_source_path_accepts_requested_uninstalled_entry() -> None:
+    """CI jobs may request a project tool without installing it in that job."""
+    info = [
+        {
+            "version": "2.0.0",
+            "requested_version": "2.0.0",
+            "active": False,
+            "installed": False,
+            "source": {"path": "/project/mise.toml"},
+        }
+    ]
+
+    assert _tool_source_path(info) == "/project/mise.toml"
+
+
+def test_tool_source_path_rejects_matching_basename_from_other_project(
+    tmp_path: Path,
+) -> None:
+    expected_path = tmp_path / "project" / "mise.toml"
+    wrong_path = tmp_path / "other-project" / "mise.toml"
+    info = {
+        "version": "2.0.0",
+        "active": True,
+        "source": {"path": str(wrong_path)},
+    }
+
+    with pytest.raises(AssertionError, match="selected mise source must resolve to"):
+        _assert_tool_source_path(info, expected_path)
 
 
 def test_mise_ls_resolves_sources_correctly() -> None:
@@ -175,35 +629,51 @@ def test_mise_ls_resolves_sources_correctly() -> None:
     else:
         tools_dict = {t["name"]: t for t in tools_list if "name" in t}
 
+    mise_data = tomllib.loads(MISE_TOML_PATH.read_text(encoding="utf-8"))
+    package_data = json.loads(PACKAGE_JSON_PATH.read_text(encoding="utf-8"))
+    expected_versions = _expected_tool_pins(mise_data, package_data)
+
     assert "node" in tools_dict, "node not listed by mise ls"
     assert "pnpm" in tools_dict, "pnpm not listed by mise ls"
     assert "python" in tools_dict, "python not listed by mise ls"
     assert "ruff" in tools_dict, "ruff not listed by mise ls"
     assert "supabase" in tools_dict, "supabase not listed by mise ls"
+    assert "zizmor" in tools_dict, "zizmor not listed by mise ls"
 
     # pnpm's version is authored in package.json; the rest are pinned in mise.toml.
     expected_sources = {
-        "node": "mise.toml",
-        "pnpm": "package.json",
-        "python": "mise.toml",
-        "ruff": "mise.toml",
-        "supabase": "mise.toml",
+        "node": MISE_TOML_PATH,
+        "pnpm": PACKAGE_JSON_PATH,
+        "python": MISE_TOML_PATH,
+        "ruff": MISE_TOML_PATH,
+        "supabase": MISE_TOML_PATH,
+        "zizmor": MISE_TOML_PATH,
     }
-    for tool, expected_file in expected_sources.items():
-        source = _tool_source_path(tools_dict[tool])
-        assert source.endswith(expected_file), (
-            f"{tool} source should be {expected_file}, got {source}"
+    for tool, expected_path in expected_sources.items():
+        selected_entry = _selected_tool_entry(tools_dict[tool])
+        assert selected_entry.get("version") == expected_versions[tool], (
+            f"selected {tool} version should be {expected_versions[tool]}, "
+            f"got {selected_entry.get('version')!r}"
         )
+        assert selected_entry.get("requested_version") == expected_versions[tool], (
+            f"selected {tool} requested_version should be {expected_versions[tool]}, "
+            f"got {selected_entry.get('requested_version')!r}"
+        )
+        _assert_tool_source_path(selected_entry, expected_path)
 
 
 def test_negative_checksum_mismatch_rejected(tmp_path: Path) -> None:
     mise_bin = _get_mise_bin()
+    mise_data = tomllib.loads(MISE_TOML_PATH.read_text(encoding="utf-8"))
+    package_data = json.loads(PACKAGE_JSON_PATH.read_text(encoding="utf-8"))
+    node_version = _mise_managed_pins(mise_data)["node"]
+    pnpm_version = _pnpm_pin(package_data)
 
     # Create an isolated sandbox with mise.toml and a package.json with a bad sha512
     test_mise_toml = tmp_path / "mise.toml"
     test_mise_toml.write_text(
         'min_version = "2026.8.11"\n\n'
-        '[tools]\nnode = "24.16.0"\n\n'
+        f'[tools]\nnode = "{node_version}"\n\n'
         '[settings]\nidiomatic_version_file_enable_tools = ["pnpm"]\n',
         encoding="utf-8",
     )
@@ -214,7 +684,7 @@ def test_negative_checksum_mismatch_rejected(tmp_path: Path) -> None:
         json.dumps(
             {
                 "name": "checksum-test",
-                "packageManager": f"pnpm@11.17.0+sha512.{bad_hash}",
+                "packageManager": f"pnpm@{pnpm_version}+sha512.{bad_hash}",
             }
         ),
         encoding="utf-8",
@@ -270,6 +740,8 @@ def test_mise_install_locked_succeeds() -> None:
 
 def test_offline_corepack_free_resolution() -> None:
     mise_bin = _get_mise_bin()
+    package_data = json.loads(PACKAGE_JSON_PATH.read_text(encoding="utf-8"))
+    expected_pnpm = _pnpm_pin(package_data)
 
     # Ensure preinstallation has completed via locked install
     subprocess.run(
@@ -309,24 +781,16 @@ def test_offline_corepack_free_resolution() -> None:
     assert exec_proc.returncode == 0, (
         f"Expected offline mise exec -- pnpm --version to succeed, got:\n{exec_proc.stderr}"
     )
-    assert exec_proc.stdout.strip() == "11.17.0", (
-        f"Expected pnpm version 11.17.0, got {exec_proc.stdout.strip()}"
+    assert exec_proc.stdout.strip() == expected_pnpm, (
+        f"Expected pnpm version {expected_pnpm}, got {exec_proc.stdout.strip()}"
     )
 
 
-def test_python_and_ruff_version_alignment() -> None:
-    """Verify python version in mise.toml aligns with ruff.toml target-version."""
-    assert MISE_TOML_PATH.is_file(), f"expected {MISE_TOML_PATH} to exist"
+def test_ruff_target_version_contract() -> None:
+    """Keep the source-language floor explicit and independent of tool updates."""
     assert RUFF_TOML_PATH.is_file(), f"expected {RUFF_TOML_PATH} to exist"
 
-    mise_data = tomllib.loads(MISE_TOML_PATH.read_text(encoding="utf-8"))
     ruff_data = tomllib.loads(RUFF_TOML_PATH.read_text(encoding="utf-8"))
-
-    py_version = mise_data.get("tools", {}).get("python", "")
-    assert py_version == "3.12.9", (
-        f"expected python 3.12.9 in mise.toml, got {py_version!r}"
-    )
-
     ruff_target = ruff_data.get("target-version", "")
     assert ruff_target == "py312", (
         f"expected target-version = 'py312' in ruff.toml, got {ruff_target!r}"
@@ -410,6 +874,15 @@ def test_ci_installs_pytest_for_mise_python() -> None:
 
     assert setup_mise < install_pytest < run_pytest
     assert 'pipx install "pytest==' not in workflow
+
+
+def test_ci_installs_zizmor_from_locked_mise_toolchain() -> None:
+    """Verify local and CI zizmor use the same mise-authored exact pin."""
+    workflow = CI_WORKFLOW_PATH.read_text(encoding="utf-8")
+    linters = _workflow_job_block(workflow, "linters")
+
+    assert 'install-args: "--locked python ruff zizmor"' in linters
+    assert "pipx install" not in linters
 
 
 def _workflow_job_block(workflow: str, job_name: str) -> str:
@@ -615,6 +1088,8 @@ def test_preview_mise_compatibility_and_ordering() -> None:
 def test_offline_python_and_ruff_resolution() -> None:
     """Verify offline resolution for python3 and ruff via mise exec."""
     mise_bin = _get_mise_bin()
+    mise_data = tomllib.loads(MISE_TOML_PATH.read_text(encoding="utf-8"))
+    expected_versions = _mise_managed_pins(mise_data)
 
     env = os.environ.copy()
     env["MISE_OFFLINE"] = "1"
@@ -630,8 +1105,8 @@ def test_offline_python_and_ruff_resolution() -> None:
     assert py_proc.returncode == 0, (
         f"Expected offline mise exec -- python3 --version to succeed, got:\n{py_proc.stderr}"
     )
-    assert py_proc.stdout.strip() == "Python 3.12.9", (
-        f"Expected Python 3.12.9, got {py_proc.stdout.strip()}"
+    assert py_proc.stdout.strip() == f"Python {expected_versions['python']}", (
+        f"Expected Python {expected_versions['python']}, got {py_proc.stdout.strip()}"
     )
 
     ruff_proc = subprocess.run(
@@ -645,8 +1120,8 @@ def test_offline_python_and_ruff_resolution() -> None:
     assert ruff_proc.returncode == 0, (
         f"Expected offline mise exec -- ruff --version to succeed, got:\n{ruff_proc.stderr}"
     )
-    assert ruff_proc.stdout.strip() == "ruff 0.15.1", (
-        f"Expected ruff 0.15.1, got {ruff_proc.stdout.strip()}"
+    assert ruff_proc.stdout.strip() == f"ruff {expected_versions['ruff']}", (
+        f"Expected ruff {expected_versions['ruff']}, got {ruff_proc.stdout.strip()}"
     )
 
 

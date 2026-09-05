@@ -28,7 +28,6 @@ import { StatusSelect } from "~/components/issues/fields/StatusSelect";
 import { ImageUploadButton } from "~/components/images/ImageUploadButton";
 import { ImageGallery } from "~/components/images/ImageGallery";
 import type { AccessLevel } from "~/lib/permissions/matrix";
-import { TurnstileWidget } from "~/components/security/TurnstileWidget";
 import { getLoginUrl } from "~/lib/login-url";
 import { RecentIssuesPanelClient } from "~/components/issues/RecentIssuesPanelClient";
 import { RichTextEditor } from "~/components/editor/RichTextEditorDynamic";
@@ -100,11 +99,6 @@ export function UnifiedReportForm({
   const formRef = useRef<HTMLFormElement>(null);
   const [isClearOpen, setIsClearOpen] = useState(false);
   const [editorResetKey, setEditorResetKey] = useState(0);
-  // Bumped to remount the Turnstile widget on reset — its internal "solved"
-  // state is otherwise out of sync with the cleared hidden token.
-  const [turnstileWidgetKey, setTurnstileWidgetKey] = useState(0);
-  // CAPTCHA token is ephemeral (never persisted in the shared draft).
-  const [turnstileToken, setTurnstileToken] = useState("");
 
   // The shared draft is the single source of truth for the synced entry-#1
   // fields + the reporter identity/photos. Persistence + hydration + legacy
@@ -119,13 +113,6 @@ export function UnifiedReportForm({
     hydrated,
   } = useReportDraft();
   const entry = entries[0] ?? FALLBACK_ENTRY;
-
-  // CAPTCHA is only required for anonymous reporters. Logged-in users skip it
-  // both client-side (no widget rendered) and server-side (action checks
-  // auth.getUser() before calling verifyTurnstileToken).
-  const hasTurnstile = Boolean(process.env["NEXT_PUBLIC_TURNSTILE_SITE_KEY"]);
-  const enforceCaptcha =
-    hasTurnstile && process.env.NODE_ENV !== "test" && !userAuthenticated;
 
   // Recent issues panel state. Seed from the session cache for the currently
   // selected machine (survives a tab remount) before falling back to the
@@ -145,10 +132,6 @@ export function UnifiedReportForm({
       recentIssuesCache.set(initialMachineInitials, initialIssues);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only seed; props are the server prefetch snapshot and never change for a given mount
-  }, []);
-
-  const handleTurnstileVerify = useCallback((token: string) => {
-    setTurnstileToken(token);
   }, []);
 
   const [state, formAction, isPending] = useActionState(
@@ -190,9 +173,9 @@ export function UnifiedReportForm({
   );
 
   // Reset the single view back to a fresh report: blank entry #1 (fresh
-  // idempotency key), empty reporter identity/photos, remounted rich editor +
-  // CAPTCHA. Shared by the success effect and the Clear dialog. Machine is
-  // preserved when it came from the URL (?machine=), matching prior behavior.
+  // idempotency key), empty reporter identity/photos, remounted rich editor.
+  // Shared by the success effect and the Clear dialog. Machine is preserved
+  // when it came from the URL (?machine=), matching prior behavior.
   //
   // When entry #1 is the whole draft, clear everything (storage included). When
   // extra unsubmitted grid rows exist, reset ONLY entry #1 + identity so the
@@ -239,9 +222,7 @@ export function UnifiedReportForm({
         );
       }
     }
-    setTurnstileToken("");
     setEditorResetKey((k) => k + 1);
-    setTurnstileWidgetKey((k) => k + 1);
   }, [
     entries.length,
     clearAll,
@@ -363,9 +344,8 @@ export function UnifiedReportForm({
            * undid the reporter's Severity/Priority/Status/Frequency choices.
            * Dispatching `useActionState` directly means no form submission ever
            * completes, so React never fires the reset. This form depends on JS
-           * end to end regardless (Turnstile token, draft persistence,
-           * `window.location.assign` redirect). Success still resets
-           * explicitly via `resetSingleForm()`.
+           * end to end regardless (draft persistence, `window.location.assign`
+           * redirect). Success still resets explicitly via `resetSingleForm()`.
            */}
           <form
             onSubmit={(e) => {
@@ -714,21 +694,6 @@ export function UnifiedReportForm({
               </div>
             )}
 
-            {!userAuthenticated && (
-              <>
-                <input
-                  type="hidden"
-                  name="captchaToken"
-                  value={turnstileToken}
-                />
-                <TurnstileWidget
-                  key={turnstileWidgetKey}
-                  onVerify={handleTurnstileVerify}
-                  onExpire={() => setTurnstileToken("")}
-                />
-              </>
-            )}
-
             {/* sm-structural-allow: TODO PP-kqbk follow-up — convert to @container */}
             <div className="flex flex-col-reverse gap-2 mt-1 sm:flex-row sm:items-center">
               <Button
@@ -750,8 +715,7 @@ export function UnifiedReportForm({
                   // can't `required`-validate — gate the button instead so a
                   // report can't be filed without a machine (replaces the native
                   // <select required>).
-                  !entry.machineId ||
-                  (enforceCaptcha && !turnstileToken)
+                  !entry.machineId
                 }
               >
                 Submit Issue Report

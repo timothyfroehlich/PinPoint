@@ -2,8 +2,10 @@ import "server-only";
 
 import { createHash } from "node:crypto";
 
-import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
-import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import type {
+  CallToolResult,
+  ServerContext,
+} from "@modelcontextprotocol/server";
 import { and, count, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 
@@ -86,16 +88,16 @@ function toErrorResult(message: string): CallToolResult {
  */
 export async function runTool(
   toolName: string,
-  extra: { authInfo?: AuthInfo },
+  ctx: Pick<ServerContext, "http">,
   run: (ctx: McpAuthContext) => Promise<ToolOutcome>
 ): Promise<CallToolResult> {
-  const ctx = requireMcpAuthContext(extra.authInfo);
+  const auth = requireMcpAuthContext(ctx.http?.authInfo);
   try {
-    const outcome = await run(ctx);
+    const outcome = await run(auth);
     logMcpToolCall({
       tool: toolName,
-      userId: ctx.userId,
-      clientId: ctx.clientId,
+      userId: auth.userId,
+      clientId: auth.clientId,
       outcome: outcome.auditOutcome ?? "ok",
       machineId: outcome.machineId,
       issueId: outcome.issueId,
@@ -106,18 +108,18 @@ export async function runTool(
     if (error instanceof McpToolError) {
       logMcpToolCall({
         tool: toolName,
-        userId: ctx.userId,
-        clientId: ctx.clientId,
+        userId: auth.userId,
+        clientId: auth.clientId,
         outcome: error.reason === "denied" ? "denied" : "error",
         reason: error.reason,
       });
       return toErrorResult(error.message);
     }
-    reportError(error, { action: `mcp.tool.${toolName}`, userId: ctx.userId });
+    reportError(error, { action: `mcp.tool.${toolName}`, userId: auth.userId });
     logMcpToolCall({
       tool: toolName,
-      userId: ctx.userId,
-      clientId: ctx.clientId,
+      userId: auth.userId,
+      clientId: auth.clientId,
       outcome: "error",
       reason: "exception",
     });

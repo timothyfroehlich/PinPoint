@@ -8,8 +8,6 @@ import { PasswordInput } from "~/components/ui/password-input";
 import { Alert, AlertDescription } from "~/components/ui/alert";
 import { PasswordMismatch } from "~/components/password-mismatch";
 import { PasswordStrength } from "~/components/password-strength";
-import { TurnstileWidget } from "~/components/security/TurnstileWidget";
-import { useTurnstileGate } from "~/components/security/useTurnstileGate";
 import {
   resetPasswordAction,
   type ResetPasswordResult,
@@ -22,7 +20,6 @@ export function ResetPasswordForm(): React.JSX.Element {
   >(resetPasswordAction, undefined);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const turnstile = useTurnstileGate();
 
   return (
     <form action={formAction} className="space-y-4">
@@ -85,28 +82,13 @@ export function ResetPasswordForm(): React.JSX.Element {
         />
       </div>
 
-      <input type="hidden" name="captchaToken" value={turnstile.token} />
-      <TurnstileWidget
-        onVerify={turnstile.onVerify}
-        onExpire={turnstile.onExpire}
-        onError={turnstile.onError}
-      />
-      {turnstile.statusMessage && (
-        <p
-          aria-live="polite"
-          className="text-sm text-muted-foreground text-center"
-        >
-          {turnstile.statusMessage}
-        </p>
-      )}
-
       {/* Submit button */}
       <Button
         type="submit"
         className="w-full"
         size="lg"
         loading={isPending}
-        disabled={isPending || turnstile.submitDisabled}
+        disabled={isPending}
       >
         Update Password
       </Button>

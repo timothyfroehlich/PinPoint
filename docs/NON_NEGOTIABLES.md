@@ -306,7 +306,7 @@
 **CORE-TEST-006:** Test what we own (class-J)
 
 - **Severity:** Critical
-- **Why:** Synthesizing a third party's internal state (raw writes to `auth.identities`, OAuth handshake fakes, captcha-verification mocks, email-template regex extraction) means you're testing the third party, not PinPoint. Any production third-party hostname reachable from an E2E run can also exfiltrate test data or hit real rate limits.
+- **Why:** Synthesizing a third party's internal state (raw writes to `auth.identities`, OAuth handshake fakes, email-template regex extraction) means you're testing the third party, not PinPoint. Any production third-party hostname reachable from an E2E run can also exfiltrate test data or hit real rate limits.
 - **Do:** Mock third-party SDKs at their boundary (`fetch` inside `src/lib/<sdk>/*.ts`, with a matching `*.test.ts`). Cover PinPoint's contribution with unit tests; cover "renders without 500" with smoke. Reserve integration/E2E for the contracted public API of owned services (Mailpit, PGlite, local Supabase including local Storage).
 - **Don't:** Drive live Discord webhooks, real OAuth provider redirects, vendor email templates, or any production third-party endpoint from an E2E spec. Two-layer self-check before merging: (1) `rg 'https?://' e2e/path/spec.ts` returns only `localhost`/`127.0.0.1`/owned-domain hits; (2) any production URL reached indirectly via server actions lives inside an SDK client module with a `*.test.ts` mocking `fetch`. Casework: PP-e20, PP-uc8, PP-q9r.
 

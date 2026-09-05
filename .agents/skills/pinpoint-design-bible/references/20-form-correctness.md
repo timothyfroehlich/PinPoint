@@ -48,4 +48,4 @@ Append `<span aria-hidden="true">*</span>` to the `<Label>` of every required fi
 
 ### Submit-button enabled state
 
-Disable a submit button **after** the user has attempted submission (to prevent double-posts), not preemptively while a CAPTCHA hasn't resolved or a field isn't yet filled. Preemptive disabling gives users no feedback about _why_ the button is greyed out. The exception is the shadcn `<Button loading>` state during an in-flight submission.
+Disable a submit button **after** the user has attempted submission (to prevent double-posts), not preemptively while a field isn't yet filled. Preemptive disabling gives users no feedback about _why_ the button is greyed out. The exception is the shadcn `<Button loading>` state during an in-flight submission.

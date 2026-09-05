@@ -498,6 +498,13 @@
       "when": 1788137849110,
       "tag": "0070_normalize-disabled-pinballmap-location",
       "breakpoints": true
+    },
+    {
+      "idx": 71,
+      "version": "7",
+      "when": 1788220985115,
+      "tag": "0071_add-pinballmap-abandonment-location",
+      "breakpoints": true
     }
   ]
 }

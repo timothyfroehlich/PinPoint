@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "@modelcontextprotocol/server";
 import { after } from "next/server";
 import { z } from "zod";
 
@@ -153,7 +153,7 @@ export function registerAddMachine(server: McpServer): void {
       title: "Add machine",
       description:
         "Create a machine: name and unique initials, optional owner (member name or UUID), optional initial availability, and optional Pinball Map linking (a catalog id, or mark it excluded with a reason). Returns the new machine and its URL.",
-      inputSchema: addMachineSchema.shape,
+      inputSchema: addMachineSchema,
     },
     (args, extra) =>
       runTool("add_machine", extra, (ctx) => runAddMachine(args, ctx))
