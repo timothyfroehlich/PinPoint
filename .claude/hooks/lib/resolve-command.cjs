@@ -137,6 +137,7 @@ const WRAPPERS = new Map([
 const SHELLS = new Set(["sh", "bash", "zsh", "dash", "ksh", "ash"]);
 
 const ENV_ASSIGN = /^[A-Za-z_][A-Za-z0-9_]*[+:]?=/;
+const ENV_SPLIT_SHELL_SYNTAX = /[;&|()<>$`*?{}~'"#\n\r]|\[|\]/;
 
 // Shell reserved words that may lead a command inside one of the tokenizer's
 // separator-delimited segments. They are syntax, not the effective command:
@@ -919,6 +920,16 @@ function resolveSegment(words, out, depth, options) {
       // would be unsound, so expose ambiguity instead of trusting its target.
       out.unresolvable.push({
         reason: "split-string-escape",
+        text: describeWords(effectiveWords),
+      });
+      return;
+    }
+    if (ENV_SPLIT_SHELL_SYNTAX.test(payloadWord.value)) {
+      // env -S treats shell operators, expansions, quotes, and globs as data
+      // under its own split-string grammar. Shell reparsing could instead
+      // change argv shape or execute another command, so do not approximate it.
+      out.unresolvable.push({
+        reason: "split-string-shell-syntax",
         text: describeWords(effectiveWords),
       });
       return;

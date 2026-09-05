@@ -332,6 +332,16 @@ describe("wrappers resolve through to the real command", () => {
       "split-string-escape"
     );
   });
+
+  it("fails closed when shell syntax is data in an env split string", () => {
+    const { segments, unresolvable } = resolveCommand(
+      "env -S 'gh pr merge 4 --body ; --repo timothyfroehlich/PinPoint'"
+    );
+    expect(segments).toEqual([]);
+    expect(unresolvable.map((entry) => entry.reason)).toContain(
+      "split-string-shell-syntax"
+    );
+  });
 });
 
 // ---------------------------------------------------------------------------

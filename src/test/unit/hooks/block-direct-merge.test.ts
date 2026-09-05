@@ -474,6 +474,7 @@ describe("block-direct-merge.cjs — env -S split-string", () => {
     "env -i -S 'gh pr merge 123'",
     "env -iS 'gh pr merge 123'",
     "env -S 'gh api -X PUT repos/timothyfroehlich/PinPoint/pulls/1/merge'",
+    "env -S 'gh pr merge 4 --repo timothyfroehlich/dotfiles --body ; --repo timothyfroehlich/PinPoint'",
     "sudo env -S 'gh pr merge 1'",
     "xargs env -S 'gh pr merge 1'",
   ])("blocks %s", (command) => {
