@@ -45,32 +45,56 @@ const EMBEDDED_EMAIL_RE =
   /(?<![^\s"<>()[\]{},;:@/\\])[^\s"<>()[\]{},;:@/\\]+@[^\s"<>()[\]{},;:@/\\]+\.\p{L}{2,63}/gu;
 
 /**
- * Candidate token containing an encoded `@` (`%40`, case-insensitive).
- * Decoding and the stricter raw-address matcher below decide whether the token
- * is actually an email; malformed or non-email percent encoding is preserved.
+ * Raw address reached by decoding a URL or query string. Running this before
+ * the general matcher preserves the URL prefix instead of treating
+ * `signup?email=victim` as the local part.
  */
+const URI_DELIMITED_EMAIL_RE =
+  /(?<=[=?&#])[^\s"<>()[\]{},;:@/\\=?&#]+@[^\s"<>()[\]{},;:@/\\=?&#]+\.\p{L}{2,63}/gu;
+
+/** Candidate token containing an encoded `@`, including nested `%25` layers. */
 const EMBEDDED_ENCODED_EMAIL_CANDIDATE_RE =
-  /(?<![^\s"<>()[\]{},;:=?&#/\\])[^\s"<>()[\]{},;:=?&#/\\]*%40[^\s"<>()[\]{},;:=?&#/\\]*/giu;
+  /(?<![^\s"<>()[\]{},;:=?&#/\\])[^\s"<>()[\]{},;:=?&#/\\]*%(?:25)*40[^\s"<>()[\]{},;:=?&#/\\]*/giu;
+
+const ENCODED_AT_RE = /%(?:25)*40/iu;
+const MAX_PERCENT_DECODE_PASSES = 8;
+const REDACTED_PLACEHOLDER = "[redacted]";
+
+function maskRawEmails(value: string): string {
+  return value
+    .replace(URI_DELIMITED_EMAIL_RE, (email) => maskEmail(email))
+    .replace(EMBEDDED_EMAIL_RE, (email) => maskEmail(email));
+}
+
+function maskEncodedEmailCandidate(match: string): string {
+  let decoded = match;
+  let maskedAnyEmail = false;
+
+  for (let pass = 0; pass < MAX_PERCENT_DECODE_PASSES; pass += 1) {
+    try {
+      decoded = decodeURIComponent(decoded);
+    } catch {
+      return REDACTED_PLACEHOLDER;
+    }
+
+    const masked = maskRawEmails(decoded);
+    maskedAnyEmail ||= masked !== decoded;
+    decoded = masked;
+
+    if (!ENCODED_AT_RE.test(decoded)) {
+      return maskedAnyEmail ? decoded : match;
+    }
+  }
+
+  return REDACTED_PLACEHOLDER;
+}
 
 /** Replace every email-like substring of `value` with its {@link maskEmail} form. */
 export function maskEmailsInText(value: string): string {
-  const rawMasked = value.replace(EMBEDDED_EMAIL_RE, (match) =>
-    maskEmail(match)
+  return maskRawEmails(value).replace(
+    EMBEDDED_ENCODED_EMAIL_CANDIDATE_RE,
+    maskEncodedEmailCandidate
   );
-
-  return rawMasked.replace(EMBEDDED_ENCODED_EMAIL_CANDIDATE_RE, (match) => {
-    let decoded: string;
-    try {
-      decoded = decodeURIComponent(match);
-    } catch {
-      return match;
-    }
-
-    const masked = decoded.replace(EMBEDDED_EMAIL_RE, (email) =>
-      maskEmail(email)
-    );
-    return masked === decoded ? match : masked;
-  });
 }
 
 /** Stack-overflow guard for a deep, non-cyclic value. */

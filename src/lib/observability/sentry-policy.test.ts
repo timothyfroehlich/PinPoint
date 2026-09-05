@@ -96,6 +96,41 @@ describe("sentryBeforeSend", () => {
     expect(result?.tags).toEqual({ transport: "resend" });
   });
 
+  it("masks recursively encoded emails and fails closed past the decode limit", () => {
+    const nestedRedirect = encodeURIComponent(
+      "/signup?email=victim%40example.com"
+    );
+    let overEncoded = "victim@example.com";
+    for (let pass = 0; pass < 65; pass += 1) {
+      overEncoded = encodeURIComponent(overEncoded);
+    }
+    const event: ErrorEvent = {
+      type: undefined,
+      message: `Invite redirect ${nestedRedirect}`,
+      extra: { overEncoded },
+    };
+
+    const result = sentryBeforeSend(event);
+
+    expect(result?.message).toBe("Invite redirect /signup?email=vic***");
+    expect(result?.extra?.overEncoded).toBe("[redacted]");
+  });
+
+  it("preserves encoded non-email text and redacts undecodable email candidates", () => {
+    const event: ErrorEvent = {
+      type: undefined,
+      extra: {
+        malformedCandidate: "victim%40example.com%ZZ",
+        nonEmailEncoding: "status%40",
+      },
+    };
+
+    expect(sentryBeforeSend(event)?.extra).toEqual({
+      malformedCandidate: "[redacted]",
+      nonEmailEncoding: "status%40",
+    });
+  });
+
   it("drops the known Supabase cold-start transient on previews", () => {
     vi.stubEnv("VERCEL_ENV", "preview");
     const event: ErrorEvent = {
