@@ -41,8 +41,9 @@ vi.mock("next/navigation", () => ({
 vi.mock("next/cache", () => ({
   revalidatePath: vi.fn(),
 }));
+const mockCreateClient = vi.fn();
 vi.mock("~/lib/supabase/server", () => ({
-  createClient: vi.fn(),
+  createClient: () => mockCreateClient(),
 }));
 vi.mock("~/services/issues", () => ({
   createIssue: vi.fn(),
@@ -62,10 +63,7 @@ vi.mock("~/lib/blob/client", () => ({
 
 import { getRecentIssuesAction, submitPublicIssueAction } from "./actions";
 import { db } from "~/server/db";
-import {
-  AuthSessionMissingError,
-  type SupabaseClient,
-} from "@supabase/supabase-js";
+import { createMockSupabaseClient, createMockUser } from "~/test/helpers/mocks";
 import {
   checkAuthenticatedIssueLimit,
   checkPublicIssueLimit,
@@ -73,7 +71,6 @@ import {
   getClientIp,
   type RateLimitResult,
 } from "~/lib/rate-limit";
-import { createClient } from "~/lib/supabase/server";
 
 describe("getRecentIssuesAction", () => {
   beforeEach(() => {
@@ -247,31 +244,9 @@ describe("submitPublicIssueAction — Rate limiting branching", () => {
     reset: 123456789,
   };
 
-  type GetUserResult = Awaited<ReturnType<SupabaseClient["auth"]["getUser"]>>;
-
   function mockAuth(userId: string | null): void {
-    const getUserResult: GetUserResult = userId
-      ? {
-          data: {
-            user: {
-              id: userId,
-              app_metadata: {},
-              user_metadata: {},
-              aud: "authenticated",
-              created_at: new Date().toISOString(),
-            },
-          },
-          error: null,
-        }
-      : { data: { user: null }, error: new AuthSessionMissingError() };
-
-    const auth: Pick<SupabaseClient["auth"], "getUser"> = {
-      getUser: vi.fn().mockResolvedValue(getUserResult),
-    };
-
-    vi.mocked(createClient).mockResolvedValue({
-      auth,
-    } as SupabaseClient);
+    const user = userId ? createMockUser({ id: userId }) : null;
+    mockCreateClient.mockResolvedValue(createMockSupabaseClient(user));
   }
 
   beforeEach(() => {
