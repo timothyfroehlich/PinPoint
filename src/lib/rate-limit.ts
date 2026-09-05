@@ -8,7 +8,8 @@
  * - Login: 10 attempts per IP per 15 min, 5 attempts per email per 15 min
  * - Signup: 3 signups per IP per hour
  * - Forgot Password: 3 requests per email per hour
- * - Public Issue: 5 submissions per IP per 15 min
+ * - Public Issue (anonymous): 5 submissions per IP per 15 min
+ * - Authenticated Issue: 20 submissions per user per 15 min
  *
  * @see https://github.com/timothyfroehlich/PinPoint/issues/536
  * @see https://github.com/timothyfroehlich/PinPoint/issues/537
@@ -18,6 +19,7 @@
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
 import { headers } from "next/headers";
+import { createHash } from "node:crypto";
 import { log } from "~/lib/logger";
 import { maskEmail } from "~/lib/logging/mask";
 import { BLOB_CONFIG } from "~/lib/blob/config";
@@ -179,6 +181,22 @@ function createPublicIssueLimiter(): Ratelimit | null {
 }
 
 /**
+ * Authenticated Issue rate limiter
+ * - User-based: 20 submissions per 15 minutes (sliding window)
+ */
+function createAuthenticatedIssueLimiter(): Ratelimit | null {
+  const redis = getRedis();
+  if (!redis) return null;
+
+  return new Ratelimit({
+    redis,
+    limiter: Ratelimit.slidingWindow(20, "15 m"),
+    prefix: "ratelimit:report:user",
+    analytics: true,
+  });
+}
+
+/**
  * Image Upload rate limiter
  * - IP-based: 10 uploads per hour (sliding window)
  */
@@ -200,6 +218,7 @@ let loginAccountLimiter: Ratelimit | null | undefined;
 let signupLimiter: Ratelimit | null | undefined;
 let forgotPasswordLimiter: Ratelimit | null | undefined;
 let publicIssueLimiter: Ratelimit | null | undefined;
+let authenticatedIssueLimiter: Ratelimit | null | undefined;
 let imageUploadLimiter: Ratelimit | null | undefined;
 
 /**
@@ -341,6 +360,63 @@ export async function checkPublicIssueLimit(
     log.error(
       { err: error instanceof Error ? error.message : "Unknown", ip },
       "Public issue rate limit check failed"
+    );
+    if (isProductionEnv()) {
+      return failClosedResult();
+    }
+    return { success: true, limit: 0, remaining: 0, reset: 0 };
+  }
+}
+
+/**
+ * Hashes a user ID to a pseudonymous string so raw user identifiers
+ * are never stored in external rate-limit caches (CORE-SEC-007).
+ */
+function hashUserId(userId: string): string {
+  return createHash("sha256").update(userId, "utf8").digest("hex");
+}
+
+/**
+ * Check authenticated issue rate limit (user-based)
+ *
+ * @param userId - User ID (UUID)
+ * @returns Rate limit result, or success if Redis not configured
+ */
+export async function checkAuthenticatedIssueLimit(
+  userId: string
+): Promise<RateLimitResult> {
+  if (authenticatedIssueLimiter === undefined) {
+    authenticatedIssueLimiter = createAuthenticatedIssueLimiter();
+  }
+
+  if (!authenticatedIssueLimiter) {
+    if (isProductionEnv()) {
+      log.error(
+        { action: "rate-limit" },
+        "Rate limiting unavailable in production - blocking request"
+      );
+      return failClosedResult();
+    }
+    return { success: true, limit: 0, remaining: 0, reset: 0 };
+  }
+
+  const userKey = hashUserId(userId);
+
+  try {
+    const result = await authenticatedIssueLimiter.limit(userKey);
+    return {
+      success: result.success,
+      limit: result.limit,
+      remaining: result.remaining,
+      reset: result.reset,
+    };
+  } catch (error) {
+    log.error(
+      {
+        err: error instanceof Error ? error.message : "Unknown",
+        userKeyPrefix: userKey.slice(0, 8),
+      },
+      "Authenticated issue rate limit check failed"
     );
     if (isProductionEnv()) {
       return failClosedResult();

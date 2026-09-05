@@ -36,6 +36,20 @@ export async function GET(request: Request): Promise<NextResponse> {
   // the manual-refresh throttle (PP-hbi0, CORE-PBM-001).
   const result = await syncLocationSnapshot({ trigger: "cron" });
   if (!result.ok) {
+    if (result.reason === "superseded") {
+      log.info(
+        { action: "pinballmap.syncLocationSnapshot" },
+        "PinballMap snapshot sync was superseded by a location change"
+      );
+      return NextResponse.json({ ok: true, skipped: "superseded" });
+    }
+    if (result.reason === "busy") {
+      log.info(
+        { action: "pinballmap.syncLocationSnapshot" },
+        "PinballMap snapshot sync deferred while a configuration-sensitive mutation is running"
+      );
+      return NextResponse.json({ ok: true, skipped: "busy" });
+    }
     // The cron path is never throttled, but narrow defensively for type safety.
     const error =
       result.reason === "throttled"

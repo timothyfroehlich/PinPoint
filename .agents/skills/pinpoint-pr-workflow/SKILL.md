@@ -60,6 +60,19 @@ Preserve the PR's other labels and description content. Do not replace the origi
 or signature on a PR another agent opened; its attribution remains with the original
 implementer.
 
+### `ownerless`: the unowned-PR queue
+
+`ownerless` is the companion signal to the origin label. Origin says who opened the PR;
+`ownerless` says nobody is driving it. It is applied only by unattended bots — scheduled
+Claude cloud routines (in their own prompts), Dependabot and Renovate (from
+`.github/dependabot.yml` and `.github/renovate.json`) — which open a PR and then stop, so
+no session is watching CI, adjudicating review threads, or taking it to merge-ready.
+
+`gh pr list --label ownerless` is therefore the queue of open work with no owner. When you
+adopt one, you take on the full Phase 3 obligation for it, so remove the label in the same
+step (`gh pr edit <PR> --remove-label ownerless`) — an adopted PR is no longer unowned.
+Never apply `ownerless` to a PR you opened yourself; you own that one by definition.
+
 ### PR description template
 
 ```
@@ -243,7 +256,7 @@ there would be circular. A PR may be GitHub-ready while still lacking the final 
 
 ### 3.5 Post UI screenshots (UI-touching PRs only)
 
-If the diff touches `src/app/**`, `src/components/**`, any `.css`, or design tokens, screenshots must be posted before the PR can be called ready — Tim reviews UI by eye, not by reading a diff. The commit-time `ui-screenshot-reminder.cjs` PostToolUse hook nudges on the first `git commit` that touches a UI glob; don't ignore it.
+If the diff touches `src/app/**`, `src/components/**`, any `.css`, or design tokens, screenshots must be posted before the PR can be called ready unless the edit genuinely has no rendered effect and the PR body records `<!-- no-visual-change -->`. Tim reviews rendered UI changes by eye, not by reading a diff. The commit-time `ui-screenshot-reminder.cjs` PostToolUse hook nudges on the first `git commit` that touches a UI glob; satisfy it with screenshots or the documented opt-out.
 
 ```
 node scripts/workflow/pr-screenshots.mjs <PR>
@@ -255,9 +268,11 @@ Two `--pages` gotchas: it only accepts the **equals** form (`--pages=machine-edi
 
 Requires the local dev server (`pnpm run dev`) and Supabase (`supabase start`) running. First run (or a stale/missing login session) regenerates `e2e/.auth/*.json` via the `auth-setup` Playwright project, which resets + reseeds the local dev DB — same as running E2E tests locally, not a new risk.
 
+**No visible change?** The screenshot check keys on file **paths**, so a UI-glob edit that renders nothing new (a pure refactor, a non-null-`!` removal) still trips the "screenshots?" nudge — and two identical screenshots would satisfy it without conveying anything. Record the claim instead: put `<!-- no-visual-change -->` in the PR **body**. `merge-handoff.sh` reads that marker and clears its `NO screenshots posted` nudge (posted screenshots always take precedence over it). Use it only when the change genuinely has no rendered effect.
+
 ### 3.6 Apply `ready-for-review` label
 
-Once CI green + either exact-head automatic Codex coverage (including an adjudicated finding-bearing review per 3.4) or manual attestation of head + zero unresolved review threads + no merge conflict + screenshots posted (if UI-touching, per 3.5), apply the label via `mcp__github__issue_write(method: "update", …)` or `gh pr edit <PR> --add-label ready-for-review`.
+Once CI green + either exact-head automatic Codex coverage (including an adjudicated finding-bearing review per 3.4) or manual attestation of head + zero unresolved review threads + no merge conflict + the screenshot requirement or documented opt-out in 3.5 satisfied, apply the label via `mcp__github__issue_write(method: "update", …)` or `gh pr edit <PR> --add-label ready-for-review`.
 
 The label is a hint to Tim that the PR is ready for **him** to merge — it does not authorize an agent to merge. `merge-pr.sh --human` re-checks all gates when Tim runs it.
 
@@ -271,7 +286,7 @@ The label is a hint to Tim that the PR is ready for **him** to merge — it does
 
 ### 4.1 Agent's terminal state: hand off (the default), or run it and let Tim approve
 
-Once 3.1–3.6 are satisfied (CI green, a review whose `commit_id` matches head per 3.4, threads resolved, no conflict, screenshots posted if UI-touching), your job on this PR is done. The **default and preferred** close is a handoff: **run the handoff report and paste its output** — do not write the summary yourself. (You may instead run `bash scripts/workflow/merge-pr.sh <PR> --human` and let Tim approve the prompt; the handoff report is still the better hand-off because it shows him the state he is approving.)
+Once 3.1–3.6 are satisfied (CI green, a review whose `commit_id` matches head per 3.4, threads resolved, no conflict, and the screenshot requirement or documented opt-out satisfied), your job on this PR is done. The **default and preferred** close is a handoff: **run the handoff report and paste its output** — do not write the summary yourself. (You may instead run `bash scripts/workflow/merge-pr.sh <PR> --human` and let Tim approve the prompt; the handoff report is still the better hand-off because it shows him the state he is approving.)
 
 ```bash
 bash scripts/workflow/merge-handoff.sh <PR>
