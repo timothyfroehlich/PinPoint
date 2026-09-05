@@ -22,6 +22,8 @@ import {
 /** One entry this machine walked away from and nobody has taken down (PP-l81u). */
 export interface AbandonedEntry {
   lmxId: number;
+  /** Public Pinball Map page for the location this entry was abandoned at. */
+  locationUrl: string;
   /** Catalog title at the time, or null if the mirror no longer carries it. */
   title: string | null;
   /** Comments on the entry, for the remove confirm (spec 4.6). */
@@ -46,12 +48,10 @@ export interface AbandonedEntry {
 export function PinballmapAbandonedEntries({
   machineId,
   entries,
-  locationUrl,
   canPush,
 }: {
   machineId: string;
   entries: readonly AbandonedEntry[];
-  locationUrl: string;
   canPush: boolean;
 }): React.JSX.Element {
   const [pending, startTransition] = useTransition();
@@ -100,7 +100,7 @@ export function PinballmapAbandonedEntries({
               />
             ) : (
               <a
-                href={locationUrl}
+                href={entry.locationUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-primary underline underline-offset-2 hover:no-underline"

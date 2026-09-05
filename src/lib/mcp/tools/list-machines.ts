@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "@modelcontextprotocol/server";
 import {
   and,
   count,
@@ -269,7 +269,7 @@ export function registerListMachines(server: McpServer): void {
       title: "List machines",
       description:
         "List machines with their initials, name, availability, owner name, and open-issue count. Use this to find a machine's initials before acting on it (e.g. disambiguate 'the Medieval Madness by the door'). Supports a name/initials search, a presence filter (one status, or an array of them to accept several at once), and a PinballMap link-state filter (pinballmap: 'unlinked' | 'linked' | 'excluded') — use pinballmap: 'unlinked' to get the machines still needing a PinballMap catalog match. For that linking pass, ask for pinballmap: 'unlinked' TOGETHER WITH presence: ['on_the_floor', 'on_loan', 'off_the_floor'], which is the actionable worklist. 'unlinked' on its own also returns cabinets that are 'removed' (no longer in the collection) or 'pending_arrival' (not here yet) — nobody will ever link those, so they come back on every page of every sweep and you would have to recognise and skip them by hand each time. Narrowing presence drops them from 'total' as well as from the page, so 'total' is the size of the work actually left. Returns 'count' (this page), 'total' (every match), 'offset', and 'hasMore'. Answer counting questions from 'total', never from 'count' or the array length. To enumerate a collection larger than one page, keep requesting with offset += limit until hasMore is false — raising limit alone caps at 100 and will not reach the rest. That works only while the matching set holds still, and your own calls can move it: set_machine_availability changes presence, set_machine_name changes name (the search target and the sort key), add_machine adds rows. So if you are ACTING on the machines as you page them — 'put every off-the-floor machine back on the floor' — do NOT advance the offset. Each machine you fix leaves the filter and the rest shift up, so offset += limit steps over exactly as many machines as you just fixed, and the sweep ends on hasMore:false having never shown them. Re-request offset 0 and let the list drain instead. Raise offset only past machines you deliberately left unchanged, so they don't keep coming back. You are done when a request returns EMPTY (count 0), NOT when total reaches 0 — machines you left unchanged hold total above 0 forever. Narrowing the filter so it matches only rows you can actually act on, as the presence set above does, is what lets total fall to 0 at all.",
-      inputSchema: listMachinesSchema.shape,
+      inputSchema: listMachinesSchema,
     },
     (args, extra) =>
       runTool("list_machines", extra, (ctx) => runListMachines(args, ctx))

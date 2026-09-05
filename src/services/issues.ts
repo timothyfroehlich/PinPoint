@@ -211,7 +211,7 @@ export async function createIssue({
     //    client-generated key. If a row already exists for it, return that row
     //    verbatim with an empty delivery plan — no counter increment, no second
     //    notification. The check runs first so a retry never advances the
-    //    machine's nextIssueNumber. (Rate-limit + CAPTCHA already ran in the
+    //    machine's nextIssueNumber. (Rate-limit already ran in the
     //    action, BEFORE this check — so a same-key retry DOES still consume a
     //    rate-limit slot. Making retries slot-exempt would mean moving an
     //    idempotency lookup ahead of the rate limiter; deferred as a follow-up.)

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { AuthApiError, AuthWeakPasswordError } from "@supabase/supabase-js";
-import { extractCaptchaToken, getUserMessageForAuthError } from "./errors";
+import { getUserMessageForAuthError } from "./errors";
 
 describe("getUserMessageForAuthError", () => {
   it("returns breach message for weak_password with pwned reason", () => {
@@ -49,15 +49,6 @@ describe("getUserMessageForAuthError", () => {
     expect(result?.code).toBe("EMAIL_TAKEN");
   });
 
-  it("returns captcha message for captcha_failed", () => {
-    const error = new AuthApiError("captcha failed", 400, "captcha_failed");
-    const result = getUserMessageForAuthError(error);
-    expect(result).toEqual({
-      code: "CAPTCHA",
-      message: "Verification failed. Please refresh the page and try again.",
-    });
-  });
-
   it("returns rate limit message for over_request_rate_limit", () => {
     const error = new AuthApiError(
       "rate limit",
@@ -66,6 +57,16 @@ describe("getUserMessageForAuthError", () => {
     );
     const result = getUserMessageForAuthError(error);
     expect(result?.code).toBe("RATE_LIMIT");
+  });
+
+  it("returns actionable SERVER message for captcha_failed", () => {
+    const error = new AuthApiError("captcha failed", 400, "captcha_failed");
+    const result = getUserMessageForAuthError(error);
+    expect(result).toEqual({
+      code: "SERVER",
+      message:
+        "Authentication failed due to unexpected CAPTCHA requirement. Please contact an administrator.",
+    });
   });
 
   it("returns email confirmation message for email_not_confirmed", () => {
@@ -126,30 +127,5 @@ describe("getUserMessageForAuthError", () => {
     const error = new AuthApiError("no code", 500, undefined);
     const result = getUserMessageForAuthError(error);
     expect(result).toBeUndefined();
-  });
-});
-
-describe("extractCaptchaToken", () => {
-  it("returns string token from formData", () => {
-    const fd = new FormData();
-    fd.set("captchaToken", "abc123");
-    expect(extractCaptchaToken(fd)).toBe("abc123");
-  });
-
-  it("returns undefined when captchaToken is missing", () => {
-    const fd = new FormData();
-    expect(extractCaptchaToken(fd)).toBeUndefined();
-  });
-
-  it("returns undefined when captchaToken is empty string", () => {
-    const fd = new FormData();
-    fd.set("captchaToken", "");
-    expect(extractCaptchaToken(fd)).toBeUndefined();
-  });
-
-  it("returns undefined when captchaToken is a File", () => {
-    const fd = new FormData();
-    fd.set("captchaToken", new File([""], "file.txt"));
-    expect(extractCaptchaToken(fd)).toBeUndefined();
   });
 });

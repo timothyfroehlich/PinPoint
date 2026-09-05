@@ -142,8 +142,8 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
         label: "Report issues",
         description: "Submit new issue reports",
         access: {
-          // Unauthenticated issue reporting is rate-limited and protected by
-          // Turnstile CAPTCHA. See src/app/report/actions.ts and src/lib/rate-limit.ts
+          // Unauthenticated issue reporting is rate-limited.
+          // See src/app/(app)/report/actions.ts and src/lib/rate-limit.ts
           unauthenticated: true,
           guest: true,
           member: true,

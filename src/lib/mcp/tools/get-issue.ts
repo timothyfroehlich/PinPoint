@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "@modelcontextprotocol/server";
 import { and, count, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 
@@ -176,7 +176,7 @@ export function registerGetIssue(server: McpServer): void {
       title: "Get issue detail",
       description:
         "Get one issue in full — title, description, status, severity, priority, frequency, reporter and assignee names, timestamps, URL, and the comment thread. Identify it by machine (initials or UUID) plus the issue number shown in its URL and returned by list_issues, get_machine, and create_issue. Use this before commenting or updating, so you are acting on the issue you think you are. The thread returns the MOST RECENT comments (20 by default, up to 100 via commentLimit), listed oldest-first within that window; 'commentCount' is the full thread length and 'commentsTruncated' is true when older comments were left out, so raise commentLimit if you need the earlier history. Timeline/system rows are not included in the thread; the issue's current status is what they would describe.",
-      inputSchema: getIssueSchema.shape,
+      inputSchema: getIssueSchema,
     },
     (args, extra) =>
       runTool("get_issue", extra, (ctx) => runGetIssue(args, ctx))

@@ -2,6 +2,7 @@
 
 import json
 import re
+import shutil
 import sys
 from pathlib import Path
 
@@ -18,10 +19,13 @@ from worktree_setup import (
     FAILURE_CLASS_MISSING_TOOL,
     FAILURE_CLASS_NETWORK,
     FAILURE_CLASS_TIMEOUT,
+    FAILURE_CLASS_TOOLCHAIN_CONFIG,
     LOCAL_SUPABASE_PUBLISHABLE_KEY,
     LOCAL_SUPABASE_SERVICE_ROLE_KEY,
     MANAGED_ENV_KEYS,
     MAX_INSTALL_TIMEOUT,
+    BootstrapToolchain,
+    BootstrapToolPins,
     PortConfig,
     RuntimeDiagnostics,
     RuntimeInfo,
@@ -37,9 +41,11 @@ from worktree_setup import (
     merge_env_local,
     parse_env_file,
     prune_manifest,
+    read_bootstrap_tool_versions,
     read_pinned_project_id,
     resolve_brainstorm_server_path,
     resolve_install_timeout,
+    resolve_preinstalled_toolchain,
     resolve_project_id,
 )
 
@@ -216,18 +222,6 @@ class TestMergeEnvLocal:
         assert "MAILPIT_PORT=58324" in result
         assert "INBUCKET_SMTP_PORT=58325" in result
         assert "MAILPIT_SMTP_PORT=58325" in result
-
-    def test_turnstile_keys_are_absent(
-        self, tmp_path: Path, port_config: PortConfig
-    ) -> None:
-        result = merge_env_local(tmp_path, port_config)
-
-        # Turnstile keys must not appear at all — not even commented out.
-        # The application already handles unset keys gracefully:
-        # - Client (TurnstileWidget): if (!siteKey) return null
-        # - Server (turnstile.ts): if (!secretKey && !production) return true
-        assert "NEXT_PUBLIC_TURNSTILE_SITE_KEY" not in result
-        assert "TURNSTILE_SECRET_KEY" not in result
 
 
 class TestManagedKeys:
@@ -763,6 +757,23 @@ class TestRuntimeDiagnostics:
         assert isinstance(diag.pnpm, RuntimeInfo)
         assert isinstance(diag.git, RuntimeInfo)
 
+    def test_path_tool_probes_can_be_disabled(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        original_which = shutil.which
+
+        def guarded_which(tool: str) -> str | None:
+            if tool in {"node", "pnpm"}:
+                pytest.fail(f"must not probe {tool} through PATH")
+            return original_which(tool)
+
+        monkeypatch.setattr("worktree_setup.shutil.which", guarded_which)
+
+        diag = collect_runtime_diagnostics(probe_path_tools=False)
+
+        assert diag.node == RuntimeInfo(path=None, version=None)
+        assert diag.pnpm == RuntimeInfo(path=None, version=None)
+
     def test_format_summary_with_all_runtimes(self) -> None:
         diag = RuntimeDiagnostics(
             python=RuntimeInfo(path="/usr/bin/python3", version="3.14.0"),
@@ -817,28 +828,161 @@ class TestClassifyInstallFailure:
         assert result == FAILURE_CLASS_INSTALL
 
 
+class TestBootstrapToolVersions:
+    """Test the narrow branch-controlled inputs accepted by bootstrap."""
+
+    def _write_contract(self, root: Path, package_manager: str) -> None:
+        (root / "mise.toml").write_text('[tools]\nnode = "24.19.0"\n')
+        (root / "package.json").write_text(
+            json.dumps({"packageManager": package_manager}) + "\n"
+        )
+
+    def test_reads_exact_node_and_integrity_qualified_pnpm(
+        self, tmp_path: Path
+    ) -> None:
+        self._write_contract(
+            tmp_path,
+            "pnpm@11.17.0+sha512." + "a" * 128,
+        )
+
+        assert read_bootstrap_tool_versions(tmp_path) == BootstrapToolPins(
+            node_version="24.19.0",
+            pnpm_version="11.17.0",
+            pnpm_integrity="a" * 128,
+        )
+
+    @pytest.mark.parametrize(
+        "package_manager",
+        [
+            "pnpm@11.17.0",
+            "pnpm@11.17+sha512." + "a" * 128,
+            "pnpm@11.17.0+sha512." + "a" * 127,
+            "npm@11.17.0+sha512." + "a" * 128,
+        ],
+    )
+    def test_rejects_non_exact_or_unqualified_pnpm(
+        self, tmp_path: Path, package_manager: str
+    ) -> None:
+        self._write_contract(tmp_path, package_manager)
+
+        with pytest.raises(ValueError, match="exact pnpm"):
+            read_bootstrap_tool_versions(tmp_path)
+
+    def test_resolution_reports_invalid_contract_without_running_mise(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        self._write_contract(tmp_path, "pnpm@11.17.0")
+        monkeypatch.setattr(
+            "worktree_setup.shutil.which",
+            lambda tool: pytest.fail(
+                f"must not resolve {tool} for an invalid contract"
+            ),
+        )
+
+        toolchain, failure_class, detail = resolve_preinstalled_toolchain(
+            tmp_path, tmp_path
+        )
+
+        assert toolchain is None
+        assert failure_class == FAILURE_CLASS_TOOLCHAIN_CONFIG
+        assert "exact pnpm" in (detail or "")
+
+    def test_resolution_rejects_invalid_trusted_main_before_running_mise(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        trusted_root = tmp_path / "trusted-main"
+        branch_root = tmp_path / "branch"
+        trusted_root.mkdir()
+        branch_root.mkdir()
+        self._write_contract(branch_root, "pnpm@11.17.0+sha512." + "a" * 128)
+        (trusted_root / "mise.toml").write_text("not valid toml =")
+        (trusted_root / "package.json").write_text("{}\n")
+        monkeypatch.setattr(
+            "worktree_setup.shutil.which",
+            lambda tool: pytest.fail(
+                f"must not resolve {tool} for an invalid trusted contract"
+            ),
+        )
+
+        toolchain, failure_class, detail = resolve_preinstalled_toolchain(
+            branch_root, trusted_root
+        )
+
+        assert toolchain is None
+        assert failure_class == FAILURE_CLASS_TOOLCHAIN_CONFIG
+        assert "trusted main worktree toolchain contract is invalid" in (detail or "")
+
+    @pytest.mark.parametrize(
+        ("node_version", "package_manager"),
+        [
+            ("24.20.0", "pnpm@11.17.0+sha512." + "a" * 128),
+            ("24.19.0", "pnpm@11.18.0+sha512." + "a" * 128),
+            ("24.19.0", "pnpm@11.17.0+sha512." + "b" * 128),
+        ],
+    )
+    def test_resolution_rejects_pins_not_authorized_by_trusted_main(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        node_version: str,
+        package_manager: str,
+    ) -> None:
+        trusted_root = tmp_path / "trusted-main"
+        branch_root = tmp_path / "branch"
+        trusted_root.mkdir()
+        branch_root.mkdir()
+        self._write_contract(trusted_root, "pnpm@11.17.0+sha512." + "a" * 128)
+        (branch_root / "mise.toml").write_text(f'[tools]\nnode = "{node_version}"\n')
+        (branch_root / "package.json").write_text(
+            json.dumps({"packageManager": package_manager}) + "\n"
+        )
+        monkeypatch.setattr(
+            "worktree_setup.shutil.which",
+            lambda tool: pytest.fail(f"must not resolve {tool} for untrusted pins"),
+        )
+
+        toolchain, failure_class, detail = resolve_preinstalled_toolchain(
+            branch_root, trusted_root
+        )
+
+        assert toolchain is None
+        assert failure_class == FAILURE_CLASS_TOOLCHAIN_CONFIG
+        assert "trusted main worktree" in (detail or "")
+
+
 class TestInstallDependencies:
     """Test dependency installation logic."""
 
-    def test_existing_node_modules_is_ready_immediately(self, tmp_path: Path) -> None:
+    @pytest.fixture
+    def toolchain(self, tmp_path: Path) -> BootstrapToolchain:
+        return BootstrapToolchain(
+            node_path=tmp_path / "mise" / "node" / "bin" / "node",
+            node_version="24.19.0",
+            pnpm_path=tmp_path / "mise" / "pnpm" / "bin" / "pnpm",
+            pnpm_version="11.17.0",
+        )
+
+    def test_existing_node_modules_is_ready_immediately(
+        self, tmp_path: Path, toolchain: BootstrapToolchain
+    ) -> None:
         nm = tmp_path / "node_modules"
         nm.mkdir()
         (nm / ".modules.yaml").touch()
-        is_ready, failure_class, detail = install_dependencies(tmp_path)
+        is_ready, failure_class, detail = install_dependencies(tmp_path, toolchain)
         assert is_ready is True
         assert failure_class is None
         assert detail is None
 
     def test_partial_node_modules_runs_install(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        toolchain: BootstrapToolchain,
     ) -> None:
         import subprocess
 
         # node_modules exists without .modules.yaml (interrupted install)
         (tmp_path / "node_modules").mkdir()
-        monkeypatch.setattr(
-            "worktree_setup.shutil.which", lambda tool: "/usr/local/bin/pnpm"
-        )
         mock_res = subprocess.CompletedProcess(
             args=["pnpm", "install"], returncode=0, stdout="Done", stderr=""
         )
@@ -846,30 +990,36 @@ class TestInstallDependencies:
             "worktree_setup.subprocess.run", lambda *args, **kwargs: mock_res
         )
 
-        is_ready, failure_class, detail = install_dependencies(tmp_path)
+        is_ready, failure_class, detail = install_dependencies(tmp_path, toolchain)
         assert is_ready is True
         assert failure_class is None
 
-    def test_missing_pnpm_returns_missing_tool_failure(
+    def test_missing_mise_returns_missing_tool_failure(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
+        (tmp_path / "mise.toml").write_text('[tools]\nnode = "24.19.0"\n')
+        (tmp_path / "package.json").write_text(
+            '{"packageManager":"pnpm@11.17.0+sha512.' + "a" * 128 + '"}\n'
+        )
         monkeypatch.setattr(
             "worktree_setup.shutil.which",
-            lambda tool: None if tool == "pnpm" else f"/bin/{tool}",
+            lambda tool: None if tool == "mise" else f"/bin/{tool}",
         )
-        is_ready, failure_class, detail = install_dependencies(tmp_path)
-        assert is_ready is False
+        toolchain, failure_class, detail = resolve_preinstalled_toolchain(
+            tmp_path, tmp_path
+        )
+        assert toolchain is None
         assert failure_class == FAILURE_CLASS_MISSING_TOOL
-        assert "pnpm executable not found in PATH" in (detail or "")
+        assert "mise executable not found in PATH" in (detail or "")
 
     def test_successful_pnpm_install_returns_ready(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        toolchain: BootstrapToolchain,
     ) -> None:
         import subprocess
 
-        monkeypatch.setattr(
-            "worktree_setup.shutil.which", lambda tool: "/usr/local/bin/pnpm"
-        )
         mock_res = subprocess.CompletedProcess(
             args=["pnpm", "install"], returncode=0, stdout="Done", stderr=""
         )
@@ -877,19 +1027,19 @@ class TestInstallDependencies:
             "worktree_setup.subprocess.run", lambda *args, **kwargs: mock_res
         )
 
-        is_ready, failure_class, detail = install_dependencies(tmp_path)
+        is_ready, failure_class, detail = install_dependencies(tmp_path, toolchain)
         assert is_ready is True
         assert failure_class is None
         assert detail is None
 
     def test_nonzero_install_returns_install_failure(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        toolchain: BootstrapToolchain,
     ) -> None:
         import subprocess
 
-        monkeypatch.setattr(
-            "worktree_setup.shutil.which", lambda tool: "/usr/local/bin/pnpm"
-        )
         mock_res = subprocess.CompletedProcess(
             args=["pnpm", "install"],
             returncode=1,
@@ -900,19 +1050,19 @@ class TestInstallDependencies:
             "worktree_setup.subprocess.run", lambda *args, **kwargs: mock_res
         )
 
-        is_ready, failure_class, detail = install_dependencies(tmp_path)
+        is_ready, failure_class, detail = install_dependencies(tmp_path, toolchain)
         assert is_ready is False
         assert failure_class == FAILURE_CLASS_INSTALL
         assert "pnpm install failed (exit 1)" in (detail or "")
 
     def test_network_failure_classified(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        toolchain: BootstrapToolchain,
     ) -> None:
         import subprocess
 
-        monkeypatch.setattr(
-            "worktree_setup.shutil.which", lambda tool: "/usr/local/bin/pnpm"
-        )
         mock_res = subprocess.CompletedProcess(
             args=["pnpm", "install"],
             returncode=1,
@@ -923,25 +1073,26 @@ class TestInstallDependencies:
             "worktree_setup.subprocess.run", lambda *args, **kwargs: mock_res
         )
 
-        is_ready, failure_class, detail = install_dependencies(tmp_path)
+        is_ready, failure_class, detail = install_dependencies(tmp_path, toolchain)
         assert is_ready is False
         assert failure_class == FAILURE_CLASS_NETWORK
 
     def test_timeout_returns_timeout_failure(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        toolchain: BootstrapToolchain,
     ) -> None:
         import subprocess
-
-        monkeypatch.setattr(
-            "worktree_setup.shutil.which", lambda tool: "/usr/local/bin/pnpm"
-        )
 
         def _mock_run(*args, **kwargs):
             raise subprocess.TimeoutExpired(cmd=["pnpm", "install"], timeout=10)
 
         monkeypatch.setattr("worktree_setup.subprocess.run", _mock_run)
 
-        is_ready, failure_class, detail = install_dependencies(tmp_path, timeout=10)
+        is_ready, failure_class, detail = install_dependencies(
+            tmp_path, toolchain, timeout=10
+        )
         assert is_ready is False
         assert failure_class == FAILURE_CLASS_TIMEOUT
         assert "timed out after 10s" in (detail or "")
@@ -1013,9 +1164,19 @@ class TestWorktreeSetupMainReadiness:
     def test_linked_worktree_incomplete_on_install_failure(
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
     ) -> None:
+        toolchain = BootstrapToolchain(
+            node_path=Path("/mise/node/bin/node"),
+            node_version="24.19.0",
+            pnpm_path=Path("/mise/pnpm/bin/pnpm"),
+            pnpm_version="11.17.0",
+        )
+        monkeypatch.setattr(
+            "worktree_setup.resolve_preinstalled_toolchain",
+            lambda path, trusted_path: (toolchain, None, None),
+        )
         monkeypatch.setattr(
             "worktree_setup.install_dependencies",
-            lambda path, timeout=None: (
+            lambda path, toolchain, timeout=None: (
                 False,
                 FAILURE_CLASS_MISSING_TOOL,
                 "pnpm not found",
@@ -1029,6 +1190,34 @@ class TestWorktreeSetupMainReadiness:
         # Generated files must still be written with 444 permissions
         assert (self.linked_wt / ".env.local").exists()
         assert (self.linked_wt / "supabase" / "config.toml").exists()
+
+    def test_failed_toolchain_resolution_never_probes_path_node_or_pnpm(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+    ) -> None:
+        monkeypatch.setattr(
+            "worktree_setup.resolve_preinstalled_toolchain",
+            lambda path, trusted_path: (
+                None,
+                FAILURE_CLASS_MISSING_TOOL,
+                "preinstalled pnpm is missing",
+            ),
+        )
+        original_which = shutil.which
+
+        def guarded_which(tool: str) -> str | None:
+            if tool in {"node", "pnpm"}:
+                pytest.fail(f"must not probe {tool} through PATH")
+            return original_which(tool)
+
+        monkeypatch.setattr("worktree_setup.shutil.which", guarded_which)
+
+        code = main()
+
+        assert code == EXIT_INCOMPLETE
+        captured = capsys.readouterr()
+        assert "node=<not found>" in captured.err
+        assert "pnpm=<not found>" in captured.err
+        assert "failure_class=missing-tool" in captured.err
 
 
 if __name__ == "__main__":

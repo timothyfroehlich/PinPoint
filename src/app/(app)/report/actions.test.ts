@@ -41,19 +41,18 @@ vi.mock("next/navigation", () => ({
 vi.mock("next/cache", () => ({
   revalidatePath: vi.fn(),
 }));
+const mockCreateClient = vi.fn();
 vi.mock("~/lib/supabase/server", () => ({
-  createClient: vi.fn(),
+  createClient: () => mockCreateClient(),
 }));
 vi.mock("~/services/issues", () => ({
   createIssue: vi.fn(),
 }));
 vi.mock("~/lib/rate-limit", () => ({
+  checkAuthenticatedIssueLimit: vi.fn(),
   checkPublicIssueLimit: vi.fn(),
   formatResetTime: vi.fn(),
   getClientIp: vi.fn(),
-}));
-vi.mock("~/lib/security/turnstile", () => ({
-  verifyTurnstileToken: vi.fn(),
 }));
 vi.mock("~/lib/blob/config", () => ({
   BLOB_CONFIG: { maxFiles: 5, maxFileSizeMB: 10 },
@@ -64,13 +63,14 @@ vi.mock("~/lib/blob/client", () => ({
 
 import { getRecentIssuesAction, submitPublicIssueAction } from "./actions";
 import { db } from "~/server/db";
-import { verifyTurnstileToken } from "~/lib/security/turnstile";
+import { createMockSupabaseClient, createMockUser } from "~/test/helpers/mocks";
 import {
+  checkAuthenticatedIssueLimit,
   checkPublicIssueLimit,
   formatResetTime,
   getClientIp,
+  type RateLimitResult,
 } from "~/lib/rate-limit";
-import { createClient } from "~/lib/supabase/server";
 
 describe("getRecentIssuesAction", () => {
   beforeEach(() => {
@@ -226,91 +226,78 @@ describe("getRecentIssuesAction", () => {
     });
   });
 });
+// ---------------------------------------------------------------------------
+// submitPublicIssueAction — Rate limiting branching
+// ---------------------------------------------------------------------------
+describe("submitPublicIssueAction — Rate limiting branching", () => {
+  const allowedLimitResult: RateLimitResult = {
+    success: true,
+    limit: 20,
+    remaining: 19,
+    reset: 0,
+  };
 
-// ---------------------------------------------------------------------------
-// submitPublicIssueAction — CAPTCHA branching
-//
-// These tests focus narrowly on whether verifyTurnstileToken gets called and
-// what the action returns on CAPTCHA failure. They short-circuit at form
-// validation (empty FormData is rejected by parsePublicIssueForm) rather than
-// mocking the full happy path.
-// ---------------------------------------------------------------------------
-describe("submitPublicIssueAction — CAPTCHA branching", () => {
+  const blockedLimitResult: RateLimitResult = {
+    success: false,
+    limit: 20,
+    remaining: 0,
+    reset: 123456789,
+  };
+
+  function mockAuth(userId: string | null): void {
+    const user = userId ? createMockUser({ id: userId }) : null;
+    mockCreateClient.mockResolvedValue(createMockSupabaseClient(user));
+  }
+
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(getClientIp).mockResolvedValue("127.0.0.1");
-    vi.mocked(checkPublicIssueLimit).mockResolvedValue({
-      success: true,
-      reset: 0,
-    } as any);
-    vi.mocked(formatResetTime).mockReturnValue("0s");
+    vi.mocked(getClientIp).mockResolvedValue("192.168.1.50");
+    vi.mocked(checkPublicIssueLimit).mockResolvedValue(allowedLimitResult);
+    vi.mocked(checkAuthenticatedIssueLimit).mockResolvedValue(
+      allowedLimitResult
+    );
+    vi.mocked(formatResetTime).mockReturnValue("5 minutes");
   });
 
-  it("skips verifyTurnstileToken when the user is logged in", async () => {
-    vi.mocked(createClient).mockResolvedValue({
-      auth: {
-        getUser: vi
-          .fn()
-          .mockResolvedValue({ data: { user: { id: "user-123" } } }),
-      },
-    } as any);
-    vi.mocked(verifyTurnstileToken).mockResolvedValue(true);
-
-    // Empty FormData fails parsePublicIssueForm, returning { error: "..." }
-    // BEFORE any further side effects. We don't care about that error — we
-    // only care that the CAPTCHA verifier was never called.
-    await submitPublicIssueAction({}, new FormData());
-
-    expect(verifyTurnstileToken).not.toHaveBeenCalled();
-  });
-
-  it("calls verifyTurnstileToken when the user is anonymous", async () => {
-    vi.mocked(createClient).mockResolvedValue({
-      auth: {
-        getUser: vi.fn().mockResolvedValue({ data: { user: null } }),
-      },
-    } as any);
-    vi.mocked(verifyTurnstileToken).mockResolvedValue(true);
+  it("uses checkAuthenticatedIssueLimit (keyed by user.id) and skips IP check when user is logged in", async () => {
+    mockAuth("tech-user-456");
 
     await submitPublicIssueAction({}, new FormData());
 
-    expect(verifyTurnstileToken).toHaveBeenCalledOnce();
+    expect(checkAuthenticatedIssueLimit).toHaveBeenCalledWith("tech-user-456");
+    expect(checkPublicIssueLimit).not.toHaveBeenCalled();
   });
 
-  it("returns CAPTCHA error when anonymous user fails verification", async () => {
-    vi.mocked(createClient).mockResolvedValue({
-      auth: {
-        getUser: vi.fn().mockResolvedValue({ data: { user: null } }),
-      },
-    } as any);
-    vi.mocked(verifyTurnstileToken).mockResolvedValue(false);
+  it("uses checkPublicIssueLimit (keyed by IP) when user is anonymous", async () => {
+    mockAuth(null);
 
-    const formData = new FormData();
-    formData.set("captchaToken", "invalid-token");
+    await submitPublicIssueAction({}, new FormData());
 
-    const result = await submitPublicIssueAction({}, formData);
+    expect(checkPublicIssueLimit).toHaveBeenCalledWith("192.168.1.50");
+    expect(checkAuthenticatedIssueLimit).not.toHaveBeenCalled();
+  });
+
+  it("returns rate limit error when authenticated limit is exceeded", async () => {
+    mockAuth("tech-user-456");
+    vi.mocked(checkAuthenticatedIssueLimit).mockResolvedValue(
+      blockedLimitResult
+    );
+
+    const result = await submitPublicIssueAction({}, new FormData());
 
     expect(result).toEqual({
-      error: "CAPTCHA verification failed. Please try again.",
+      error: "Too many submissions. Please try again in 5 minutes.",
     });
   });
 
-  it("reads the token from the captchaToken FormData field", async () => {
-    vi.mocked(createClient).mockResolvedValue({
-      auth: {
-        getUser: vi.fn().mockResolvedValue({ data: { user: null } }),
-      },
-    } as any);
-    vi.mocked(verifyTurnstileToken).mockResolvedValue(true);
+  it("returns rate limit error when anonymous limit is exceeded", async () => {
+    mockAuth(null);
+    vi.mocked(checkPublicIssueLimit).mockResolvedValue(blockedLimitResult);
 
-    const formData = new FormData();
-    formData.set("captchaToken", "valid-cf-token");
+    const result = await submitPublicIssueAction({}, new FormData());
 
-    await submitPublicIssueAction({}, formData);
-
-    expect(verifyTurnstileToken).toHaveBeenCalledWith(
-      "valid-cf-token",
-      "127.0.0.1"
-    );
+    expect(result).toEqual({
+      error: "Too many submissions. Please try again in 5 minutes.",
+    });
   });
 });

@@ -2,5 +2,11 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "PinPoint compatibility contract for bd (Beads CLI) and Dolt database engine",
   "bd": "1.2.2",
-  "dolt": "2.3.1"
+  "dolt": "2.3.1",
+  "cloudAssets": {
+    "linux-amd64": {
+      "bdSha256": "8140098a51d3b81d5548d1c5e6db1a2d9930e5d141efe2a4bff7d079c4d321e8",
+      "doltSha256": "0a2a318f27c5e1088a2883038573c2054e00f356dc9752e74bca934f8321959a"
+    }
+  }
 }

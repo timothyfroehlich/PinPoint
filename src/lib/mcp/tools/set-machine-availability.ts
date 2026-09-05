@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 
 import { checkPermission } from "~/lib/permissions/helpers";
@@ -80,7 +80,7 @@ export function registerSetMachineAvailability(server: McpServer): void {
       title: "Set machine availability",
       description:
         "Change a machine's availability (presence). Statuses: on_the_floor, off_the_floor, on_loan, pending_arrival, removed. Identify the machine by initials or UUID. No-op if already at that status.",
-      inputSchema: setAvailabilitySchema.shape,
+      inputSchema: setAvailabilitySchema,
     },
     (args, extra) =>
       runTool("set_machine_availability", extra, (ctx) =>

@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "@modelcontextprotocol/server";
 import { and, count, eq, inArray, type SQL } from "drizzle-orm";
 import { z } from "zod";
 
@@ -211,7 +211,7 @@ export function registerListIssues(server: McpServer): void {
       title: "List issues",
       description:
         "Find issues across the whole collection, or on one machine. Every row carries the machine initials and issue number you need to act on it with get_issue, add_issue_comment, or update_issue. Filters: machine, status ('open' by default, or 'closed', or a specific set like ['need_parts','need_help']), severity, and assignee. Returns 'count' (this page), 'total' (every match), 'offset', and 'hasMore'. Answer counting questions from 'total', never from 'count' or the array length. To enumerate more than one page, keep requesting with offset += limit until hasMore is false — raising limit alone caps at 100 and will not reach the rest. That works only while the matching set holds still, and your own calls move it: update_issue changes status, severity, and assignee, which are exactly the filters here. So if you are ACTING on the issues as you page them — 'triage every new issue', 'close everything already fixed' — do NOT advance the offset. Each issue you action leaves the filter and the rest shift up, so offset += limit steps over exactly as many issues as you just handled, and the sweep ends on hasMore:false having never shown them. Re-request offset 0 and let the list drain instead. Raise offset only past issues you deliberately left unchanged, so they don't keep coming back. You are done when a request returns EMPTY (count 0), NOT when total reaches 0 — issues you left unchanged hold total above 0 forever.",
-      inputSchema: listIssuesSchema.shape,
+      inputSchema: listIssuesSchema,
     },
     (args, extra) =>
       runTool("list_issues", extra, (ctx) => runListIssues(args, ctx))

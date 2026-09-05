@@ -13,8 +13,13 @@ This runbook documents the cloud **environment** configuration that grants a
 routine full read + write to that DB. Proven end-to-end on 2026-07-11 (PP-3x7s).
 
 **Model:** hybrid — routines run unattended and may write beads; a local
-"chores" session reviews and acts on them. Concurrent writers are acceptable:
-Dolt is merge-native, and the beads remote-migrate gate is the backstop.
+"chores" session reviews and acts on them. Dolt merges independent rows and
+tables, but it does not semantically merge two edits to the same issue row.
+Concurrent cloud and live-server updates to one issue can therefore stop the
+bridge with a conflict even when both edits are legitimate. The bridge fails
+closed so an operator can preserve the intended fields from both sides; never
+resolve these conflicts with a blanket newest-row, `--ours`, or `--theirs`
+policy. The beads remote-migrate gate remains the schema-version backstop.
 
 ## The three things that make it work
 
@@ -101,10 +106,11 @@ reproducibility across cloud sandboxes, Mac laptops, and Bazzite hosts.
 
 **The toolchain pins are single-source.** `beads-cloud-setup.sh` reads both
 `bd` and `dolt` versions from `scripts/beads-compatibility.json` and installs
-exactly those by exact release tags — so installed binaries and runtime guards
-cannot disagree, and the UI field carries no versions at all. Bumping the pins
-is an edit to `scripts/beads-compatibility.json` (a weekly-chores item); the UI
-shim never changes.
+exactly those by exact release tags. The same manifest declares the approved
+SHA-256 digest for each supported cloud platform. Setup downloads both archives
+into an isolated temporary directory, verifies both before extracting or
+installing either binary, and removes the directory on every exit. Bumping a pin
+therefore also requires updating its reviewed digest; the UI shim never changes.
 
 Why exact pins: on 2026-08-16 an accidental newer release (1.2.1) migrated the
 shared DB to a schema no supported binary could read and locked every client out
@@ -199,6 +205,28 @@ unlike the setup script in the claude.ai UI.
 - **Diagnose an egress denial** from inside a session:
   `curl "$HTTPS_PROXY/__agentproxy/status"` — it logs `connect_rejected` with the
   blocked host, distinguishing a policy denial from a DoltHub-side auth error.
+
+## Routine inventory (trigger IDs)
+
+`RemoteTrigger {action: "list"}` returns only the 20 most recent triggers and
+**ignores the pagination cursor** — `cursor` is wired for `list_runs` and
+`get_run_log` only, so `list` cannot page past the first 20. One-shot
+`created_kind: "reminder"` triggers (a session telling itself to re-check a PR)
+accumulate fast and bury the real routines, which is why the IDs are written
+down here. Recovering one otherwise means opening `claude.ai/code/routines` in a
+logged-in browser and clicking each row, since the ID appears only in the
+address bar, never in the list DOM.
+
+| Routine                           | Trigger ID                      | Cron            | Opens                              |
+| --------------------------------- | ------------------------------- | --------------- | ---------------------------------- |
+| Nightly Bead Session              | `trig_011UapxF7gznEG6nuXDpxctf` | `30 7 * * *`    | a PR per worked bead               |
+| Biweekly Spec Conformance Audit   | `trig_01YHuiRgrSEe8krSgmjnZNrZ` | `0 10 1,15 * *` | beads only, never a PR             |
+| Weekly Review Agent               | `trig_01Dp3rMq8LevE4P9gQ1mFSj4` | `0 10 * * 6`    | the changelog PR, plus beads       |
+| Flaky test tracker (**disabled**) | `trig_015aQdBtdaWhpSJRPcBPRMyC` | `0 9 * * 6`     | superseded by Weekly Review Part C |
+
+Every routine that opens a GitHub PR or issue labels it `ownerless` at creation
+— see AGENTS.md §5 "The `ownerless` label". The Spec Conformance Audit is
+exempt because it opens neither.
 
 ## Related
 
