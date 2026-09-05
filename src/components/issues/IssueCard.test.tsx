@@ -35,6 +35,31 @@ const issue: IssueCardIssue = {
 };
 
 describe("IssueCard", () => {
+  it("uses the elevated card surface for open issues", () => {
+    renderCard(<IssueCard issue={issue} machine={{ name: "Godzilla" }} />);
+
+    expect(screen.getByTestId("issue-card")).toHaveClass(
+      "bg-card",
+      "hover:glow-primary"
+    );
+  });
+
+  it("keeps closed issues on the dimmed surface without a hover glow", () => {
+    renderCard(
+      <IssueCard
+        issue={{ ...issue, status: "fixed" }}
+        machine={{ name: "Godzilla" }}
+      />
+    );
+
+    expect(screen.getByTestId("issue-card")).toHaveClass(
+      "bg-surface-variant/30"
+    );
+    expect(screen.getByTestId("issue-card")).not.toHaveClass(
+      "hover:glow-primary"
+    );
+  });
+
   it("renders the machine name by default", () => {
     renderCard(<IssueCard issue={issue} machine={{ name: "Godzilla" }} />);
     expect(screen.getByText("Godzilla")).toBeInTheDocument();
