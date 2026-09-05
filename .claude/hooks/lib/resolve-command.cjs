@@ -63,7 +63,7 @@
  *
  * API
  *   resolveCommand(commandString, options?) → {
- *     segments:     Segment[],       // { command, name, args, raw }
+ *     segments:     Segment[],       // { command, name, args, dynamicArgs, splittableArgs, raw }
  *     unresolvable: Unresolvable[],  // { reason, text }
  *   }
  *
@@ -71,6 +71,13 @@
  *                    (e.g. "./scripts/workflow/merge-pr.sh")
  *   Segment.name     its basename (e.g. "merge-pr.sh") — what guards match on
  *   Segment.args     the tokens after it, unquoted, in order
+ *   Segment.dynamicArgs whether each argument contains shell expansion,
+ *                       substitution, or wrapper replacement that can change
+ *                       its resolved literal value
+ *   Segment.splittableArgs whether an argument contains an unquoted expansion
+ *                          that can become multiple argv entries
+ *   Segment.appendsDynamicArgs whether a wrapper can append unknown arguments
+ *                              after the statically resolved argument list
  *   Segment.raw      normalized reconstruction (`[command, ...args].join(" ")`),
  *                    for messages only — NOT source-exact
  *
@@ -99,6 +106,9 @@ const path = require("node:path");
 const makeWrapper = (valueFlags, options = {}) => ({
   valueFlags: new Set(valueFlags),
   payloadFlags: options.payloadFlags ?? [],
+  replacementFlags: options.replacementFlags ?? [],
+  optionalReplacementFlags: new Set(options.optionalReplacementFlags ?? []),
+  appendsInputArgs: options.appendsInputArgs ?? false,
   positionals: options.positionals ?? 0,
 });
 
@@ -119,7 +129,7 @@ const WRAPPERS = new Map([
   // `xargs [flags] CMD ARGS…` — CMD really does run, with extra args appended
   // from stdin. Treating xargs as a wrapper is what closes
   // `xargs -I{} gh pr merge {} < prs.txt`.
-  ["xargs", makeWrapper(["-I", "-i", "-n", "-P", "-d", "-E", "-L", "-s", "-a", "--replace", "--max-args", "--max-procs", "--delimiter", "--eof", "--max-lines", "--max-chars", "--arg-file"])],
+  ["xargs", makeWrapper(["-I", "-n", "-P", "-d", "-E", "-L", "-s", "-a", "--max-args", "--max-procs", "--delimiter", "--eof", "--max-lines", "--max-chars", "--arg-file"], { replacementFlags: ["-I", "-i", "--replace"], optionalReplacementFlags: ["-i", "--replace"], appendsInputArgs: true })],
 ]);
 
 // Shells: `sh -c "<program>"` re-parses its argument, and `sh <file>` makes the
@@ -127,6 +137,7 @@ const WRAPPERS = new Map([
 const SHELLS = new Set(["sh", "bash", "zsh", "dash", "ksh", "ash"]);
 
 const ENV_ASSIGN = /^[A-Za-z_][A-Za-z0-9_]*[+:]?=/;
+const ENV_SPLIT_SHELL_SYNTAX = /[;&|()<>$`*?{}~'"#\n\r]|\[|\]/;
 
 // Shell reserved words that may lead a command inside one of the tokenizer's
 // separator-delimited segments. They are syntax, not the effective command:
@@ -233,12 +244,13 @@ function readBacktickSpan(src, openIdx) {
  * Tokenize a command string into words and separator operators.
  *
  * Returns { tokens, unbalanced } where each token is either
- *   { type: "word", value, quoted, escaped, dynamic, subs }
+ *   { type: "word", value, quoted, escaped, dynamic, splittable, subs }
  *     value   – unquoted text
  *     quoted  – any part of it came from inside quotes
  *     escaped – any part of it was escaped outside quotes
  *     dynamic – contains a variable/substitution, so its literal text is
  *               not the whole story
+ *     splittable – contains an unquoted expansion subject to shell word splitting
  *     subs    – bodies of `$( )` / backtick substitutions found inside it
  * or
  *   { type: "op", value }  – one of && || ;; ; |& | & ( ) \n
@@ -257,6 +269,7 @@ function tokenize(src) {
         quoted: false,
         escaped: false,
         dynamic: false,
+        splittable: false,
         subs: [],
       };
     }
@@ -399,6 +412,7 @@ function tokenize(src) {
       const t = ensure();
       t.subs.push(span.body);
       t.dynamic = true;
+      t.splittable = true;
       i = span.next;
       continue;
     }
@@ -408,12 +422,14 @@ function tokenize(src) {
       const t = ensure();
       t.subs.push(span.body);
       t.dynamic = true;
+      t.splittable = true;
       i = span.next;
       continue;
     }
 
     if (c === "$") {
       ensure().dynamic = true;
+      ensure().splittable = true;
       ensure().value += c;
       i++;
       continue;
@@ -517,8 +533,8 @@ function splitSegments(tokens, splitNewlines) {
  * shell program rather than a plain value? GNU `env -S 'gh pr merge 123'` is
  * the one that matters: env splits the string and runs it.
  *
- * Returns a `{ kind: "payload", word }` slot, or null. Handles all three
- * spellings: `-S STR`, `-SSTR`, `--split-string=STR`.
+ * Returns a `{ kind: "payload", word, trailingWords }` slot, or null. Handles
+ * all three spellings: `-S STR`, `-SSTR`, `--split-string=STR`.
  */
 function readPayloadFlag(wrapper, words, i) {
   const word = words[i];
@@ -528,7 +544,9 @@ function readPayloadFlag(wrapper, words, i) {
       const next = words[i + 1];
       // `env -S` with nothing after it runs nothing — fall through to the
       // ordinary flag walk rather than inventing an empty payload.
-      return next ? { kind: "payload", word: next } : null;
+      return next
+        ? { kind: "payload", word: next, trailingWords: words.slice(i + 2) }
+        : null;
     }
     const attached = pf.startsWith("--")
       ? flag.startsWith(`${pf}=`) && flag.slice(pf.length + 1)
@@ -537,7 +555,36 @@ function readPayloadFlag(wrapper, words, i) {
       return {
         kind: "payload",
         word: { value: attached, dynamic: word.dynamic, subs: [] },
+        trailingWords: words.slice(i + 1),
       };
+    }
+  }
+  return null;
+}
+
+/** Return the literal replacement marker configured by a wrapper flag. GNU
+ *  xargs replaces every occurrence of this marker in the command arguments,
+ *  so affected words are dynamic even when their shell spelling is literal. */
+function readReplacementFlag(wrapper, words, i) {
+  const word = words[i];
+  const flag = word.value;
+  for (const replacementFlag of wrapper.replacementFlags) {
+    if (flag === replacementFlag) {
+      if (wrapper.optionalReplacementFlags.has(replacementFlag)) {
+        return { value: "{}", dynamic: false };
+      }
+      const next = words[i + 1];
+      if (!next) return null;
+      return { value: next.value, dynamic: next.dynamic || !next.value };
+    }
+    const attached = replacementFlag.startsWith("--")
+      ? flag.startsWith(`${replacementFlag}=`) &&
+        flag.slice(replacementFlag.length + 1)
+      : flag.length > replacementFlag.length &&
+        flag.startsWith(replacementFlag) &&
+        flag.slice(replacementFlag.length);
+    if (attached) {
+      return { value: attached, dynamic: word.dynamic };
     }
   }
   return null;
@@ -561,6 +608,9 @@ function readPayloadFlag(wrapper, words, i) {
  */
 function resolveCommandSlot(words) {
   let i = 0;
+  const replacements = [];
+  let replacementUnknown = false;
+  let appendsDynamicArgs = false;
   while (i < words.length) {
     const w = words[i];
     if (ENV_ASSIGN.test(w.value)) {
@@ -568,9 +618,20 @@ function resolveCommandSlot(words) {
       continue;
     }
     const wrapper = WRAPPERS.get(path.basename(w.value));
-    if (!wrapper) return { kind: "command", index: i };
+    if (!wrapper) {
+      return {
+        kind: "command",
+        index: i,
+        replacements,
+        replacementUnknown,
+        appendsDynamicArgs,
+      };
+    }
 
     const wrapperIdx = i;
+    let replacesInputArgs = false;
+    let wrapperReplacements = [];
+    let wrapperReplacementUnknown = false;
     i++;
     // Skip the wrapper's own flags (and the values they consume).
     while (i < words.length && words[i].value.startsWith("-")) {
@@ -580,7 +641,20 @@ function resolveCommandSlot(words) {
         break;
       }
       const payload = readPayloadFlag(wrapper, words, i);
-      if (payload) return payload;
+      if (payload) {
+        return {
+          ...payload,
+          replacements,
+          replacementUnknown,
+          appendsDynamicArgs,
+        };
+      }
+      const replacement = readReplacementFlag(wrapper, words, i);
+      if (replacement) {
+        replacesInputArgs = true;
+        wrapperReplacements = replacement.dynamic ? [] : [replacement.value];
+        wrapperReplacementUnknown = replacement.dynamic;
+      }
 
       // The value may already be attached — `--max-args=3`, `-I{}`, `-n1`.
       // Only a bare flag consumes the following token.
@@ -588,16 +662,88 @@ function resolveCommandSlot(words) {
       const bare = hasEquals ? flag.slice(0, flag.indexOf("=")) : flag;
       const attachedShortValue =
         !hasEquals && !bare.startsWith("--") && flag.length > 2;
+      const isMaxArgsMode =
+        flag === "-n" ||
+        flag.startsWith("-n") ||
+        flag === "--max-args" ||
+        flag.startsWith("--max-args=");
+      let maxArgsValue = null;
+      if (flag === "-n" || flag === "--max-args") {
+        const next = words[i + 1];
+        if (next && !next.dynamic) maxArgsValue = next.value;
+      } else if (flag.startsWith("-n")) {
+        maxArgsValue = flag.slice(2);
+      } else if (flag.startsWith("--max-args=")) {
+        maxArgsValue = flag.slice("--max-args=".length);
+      }
+      const maxArgsCount =
+        maxArgsValue !== null && /^\+?\d+$/.test(maxArgsValue)
+          ? Number.parseInt(maxArgsValue, 10)
+          : null;
+      const keepsReplacementMode =
+        replacesInputArgs && isMaxArgsMode && maxArgsCount === 1;
+      const selectsBatchMode =
+        (isMaxArgsMode && !keepsReplacementMode) ||
+        flag === "-L" ||
+        flag.startsWith("-L") ||
+        flag === "-l" ||
+        flag.startsWith("-l") ||
+        flag === "--max-lines" ||
+        flag.startsWith("--max-lines=");
+      if (wrapper.appendsInputArgs && selectsBatchMode) {
+        replacesInputArgs = false;
+        wrapperReplacements = [];
+        wrapperReplacementUnknown = false;
+      }
       i++;
       if (!hasEquals && !attachedShortValue && wrapper.valueFlags.has(bare)) i++;
+    }
+    if (wrapper.appendsInputArgs && !replacesInputArgs) {
+      appendsDynamicArgs = true;
     }
     // Skip the wrapper's own positional arguments (`timeout 30 cmd`).
     for (let p = 0; p < wrapper.positionals && i < words.length; p++) i++;
 
+    if (wrapper.appendsInputArgs && replacesInputArgs && i < words.length) {
+      replacements.push(...wrapperReplacements);
+      replacementUnknown ||= wrapperReplacementUnknown;
+      // xargs does not replace its immediate COMMAND, but it does replace all
+      // INITIAL-ARGS. A nested wrapper can later expose one of those arguments
+      // as the effective command, so preserve provenance before continuing.
+      for (let j = i + 1; j < words.length; j++) {
+        const replaced = wrapperReplacements.some((marker) =>
+          words[j].value.includes(marker)
+        );
+        words[j] = {
+          ...words[j],
+          dynamic:
+            words[j].dynamic || wrapperReplacementUnknown || replaced,
+        };
+      }
+    }
+
     // Nothing left after the wrapper — the wrapper IS the command.
-    if (i >= words.length) return { kind: "command", index: wrapperIdx };
+    if (i >= words.length) {
+      return {
+        kind: "command",
+        index: wrapperIdx,
+        replacements: [],
+        replacementUnknown: false,
+        appendsDynamicArgs: false,
+      };
+    }
   }
   return { kind: "none" };
+}
+
+function withReplacementProvenance(word, slot) {
+  const replaced = slot.replacements.some((marker) =>
+    word.value.includes(marker)
+  );
+  return {
+    ...word,
+    dynamic: word.dynamic || slot.replacementUnknown || replaced,
+  };
 }
 
 /** Best-effort human-readable text for an unresolvable report. A word that is
@@ -760,14 +906,49 @@ function resolveSegment(words, out, depth, options) {
 
   // `env -S '<program>'` — GNU env splits the string and runs it.
   if (slot.kind === "payload") {
-    if (slot.word.dynamic) {
+    const payloadWord = withReplacementProvenance(slot.word, slot);
+    if (payloadWord.dynamic) {
       out.unresolvable.push({
         reason: "split-string-dynamic",
         text: describeWords(effectiveWords),
       });
       return;
     }
-    resolveInto(slot.word.value, out, depth + 1, options);
+    if (payloadWord.value.includes("\\")) {
+      // env -S has its own escape grammar (`\_` can create an argv boundary,
+      // `\c` can truncate the payload). Re-parsing such a string as shell text
+      // would be unsound, so expose ambiguity instead of trusting its target.
+      out.unresolvable.push({
+        reason: "split-string-escape",
+        text: describeWords(effectiveWords),
+      });
+      return;
+    }
+    if (ENV_SPLIT_SHELL_SYNTAX.test(payloadWord.value)) {
+      // env -S treats shell operators, expansions, quotes, and globs as data
+      // under its own split-string grammar. Shell reparsing could instead
+      // change argv shape or execute another command, so do not approximate it.
+      out.unresolvable.push({
+        reason: "split-string-shell-syntax",
+        text: describeWords(effectiveWords),
+      });
+      return;
+    }
+    const firstPayloadSegment = out.segments.length;
+    resolveInto(payloadWord.value, out, depth + 1, options);
+    const trailingWords = slot.trailingWords.map((word) =>
+      withReplacementProvenance(word, slot)
+    );
+    for (let i = firstPayloadSegment; i < out.segments.length; i++) {
+      const segment = out.segments[i];
+      segment.args.push(...trailingWords.map((word) => word.value));
+      segment.dynamicArgs.push(...trailingWords.map((word) => word.dynamic));
+      segment.splittableArgs.push(
+        ...trailingWords.map((word) => word.splittable)
+      );
+      segment.appendsDynamicArgs ||= slot.appendsDynamicArgs;
+      segment.raw = [segment.command, ...segment.args].join(" ");
+    }
     return;
   }
 
@@ -775,8 +956,13 @@ function resolveSegment(words, out, depth, options) {
   // parse failure — nothing to report.
   if (slot.kind === "none") return;
 
+  // xargs replacement does not apply to its immediate COMMAND. If a nested
+  // wrapper exposed an INITIAL-ARG here, resolveCommandSlot already retained
+  // its replacement provenance and this command will correctly be dynamic.
   const cmdWord = effectiveWords[slot.index];
-  const argWords = effectiveWords.slice(slot.index + 1);
+  const argWords = effectiveWords
+    .slice(slot.index + 1)
+    .map((word) => withReplacementProvenance(word, slot));
 
   // The command slot itself is a substitution/variable → we cannot know what
   // runs. `$(pick-tool) pr merge 1`, `$CMD --squash`.
@@ -854,15 +1040,18 @@ function resolveSegment(words, out, depth, options) {
     }
   }
 
-  pushSegment(out, cmdWord.value, argWords);
+  pushSegment(out, cmdWord.value, argWords, slot.appendsDynamicArgs);
 }
 
-function pushSegment(out, command, argWords) {
+function pushSegment(out, command, argWords, appendsDynamicArgs = false) {
   const args = argWords.map((w) => w.value);
   out.segments.push({
     command,
     name: path.basename(command),
     args,
+    dynamicArgs: argWords.map((w) => w.dynamic),
+    splittableArgs: argWords.map((w) => w.splittable),
+    appendsDynamicArgs,
     raw: [command, ...args].join(" "),
   });
 }
@@ -913,7 +1102,7 @@ function resolveInto(command, out, depth, options) {
  *
  * @param {string} command
  * @param {{ splitNewlines?: boolean }} [options]
- * @returns {{ segments: Array<{command: string, name: string, args: string[], raw: string}>,
+ * @returns {{ segments: Array<{command: string, name: string, args: string[], dynamicArgs: boolean[], splittableArgs: boolean[], raw: string}>,
  *             unresolvable: Array<{reason: string, text: string}> }}
  */
 function resolveCommand(command, options = {}) {
