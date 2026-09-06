@@ -355,6 +355,10 @@ def _record_watcher_run(
     elapsed_sec: float,
 ) -> None:
     try:
+        try:
+            model_wake_count = int(os.environ.get("GH_MONITOR_WAKES", "1"))
+        except ValueError:
+            model_wake_count = 1
         log_dir = Path(LOG_DIR)
         log_dir.mkdir(parents=True, exist_ok=True)
         ts_slug = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
@@ -368,7 +372,7 @@ def _record_watcher_run(
             "phase": phase,
             "expected_head": expected_head,
             "observed_head": observed_head,
-            "model_wake_count": int(os.environ.get("GH_MONITOR_WAKES", "1")),
+            "model_wake_count": model_wake_count,
             "elapsed_wait": round(elapsed_sec, 2),
             "terminal_outcome": outcome,
             "provider_usage": None,

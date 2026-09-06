@@ -1801,6 +1801,7 @@ def test_watcher_records_telemetry_file(tmp_path, monkeypatch):
     monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path))
     monkeypatch.setenv("GH_MONITOR_HARNESS", "antigravity")
     monkeypatch.setenv("GH_MONITOR_MODEL", "gemini-3.5-flash-lite")
+    monkeypatch.setenv("GH_MONITOR_WAKES", "unknown")
     log_dir = tmp_path / "telemetry_logs"
     monkeypatch.setattr(pr_watch, "LOG_DIR", str(log_dir))
     fake = snapshot_gh([ci_snapshot(gate=_gate("SUCCESS"))])
@@ -1822,6 +1823,7 @@ def test_watcher_records_telemetry_file(tmp_path, monkeypatch):
     record = json.loads(log_files[0].read_text(encoding="utf-8"))
     assert record["harness"] == "antigravity"
     assert record["resolved_model"] == "gemini-3.5-flash-lite"
+    assert record["model_wake_count"] == 1
     assert record["phase"] == "ci"
     assert record["expected_head"] == HEAD_SHA
     assert record["observed_head"] == HEAD_SHA
