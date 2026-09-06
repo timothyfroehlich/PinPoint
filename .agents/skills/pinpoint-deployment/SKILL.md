@@ -1,6 +1,24 @@
 ---
 name: pinpoint-deployment
-description: Deployment reference for PinPoint — the Postgres connection and the Supavisor poolers (transaction vs session, IPv4/IPv6, and why `prepare:false` is mandatory on a `:6543` client — PP-d8l8 traced silent prod commit loss to its absence); the Drizzle migration loop and CORE-ARCH-009 migrations-not-push; resolving `drizzle/meta` conflicts without corrupting the snapshot chain; the Vercel production build, where `vercel-build` runs `migrate:production` first so a failed build has already migrated prod, plus diagnosing a failed deploy with no build logs and the write-only SENSITIVE default on `vercel env add`; why `supabase start` died with "FATAL: invalid secret key" on SELinux hosts under CLI 2.111.0 (PP-9mg0); on-demand TTL'd preview branches, `/preview`, and the hourly reaper; and the per-PR `/audit-override` for advisories unrelated to a PR. Use when changing the schema or writing a migration; touching `src/server/db/**`, `scripts/migrate-production.ts`, or `scripts/lib/pg-client.mjs`; resolving a `drizzle/meta` conflict; when a production deploy fails or you are setting a production env var; when a preview deployment needs setting up or debugging; when the audit job goes red on something unrelated to the PR; or when the local Supabase stack will not start.
+description: >-
+  Deployment reference for PinPoint — the Postgres connection and the Supavisor
+  poolers (transaction vs session, IPv4/IPv6, and why `prepare:false` is
+  mandatory on a `:6543` client — PP-d8l8 traced silent prod commit loss to its
+  absence); the Drizzle migration loop and CORE-ARCH-009 migrations-not-push;
+  resolving `drizzle/meta` conflicts without corrupting the snapshot chain; the
+  Vercel production build, where `vercel-build` runs `migrate:production` first
+  so a failed build has already migrated prod, plus diagnosing a failed deploy
+  with no build logs and the write-only SENSITIVE default on `vercel env add`;
+  why `supabase start` died with "FATAL: invalid secret key" on SELinux hosts
+  under CLI 2.111.0 (PP-9mg0); on-demand TTL'd preview branches, `/preview`, and
+  the hourly reaper; and the per-PR `/audit-override` for advisories unrelated to
+  a PR. Use when changing the schema or writing a migration; touching
+  `src/server/db/**`, `scripts/migrate-production.ts`, or
+  `scripts/lib/pg-client.mjs`; resolving a `drizzle/meta` conflict; when a
+  production deploy fails or you are setting a production env var; when a
+  preview deployment needs setting up or debugging; when the audit job goes red
+  on something unrelated to the PR; or when the local Supabase stack will not
+  start.
 ---
 
 # PinPoint Deployment
