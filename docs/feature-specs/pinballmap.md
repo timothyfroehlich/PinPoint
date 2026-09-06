@@ -198,8 +198,10 @@ intent agrees with the lineup; _out of sync_ means they disagree.
   - **In sync**: green styling for `On`, `Off`, `Shared`, or `Covered`.
   - **Out of sync**: error/warning styling for `Missing` (intent On, absent from lineup) or `Lingering` (intent Off, present on lineup).
   - **Advisory**: warning-styled badge for `Alert` (invalid availability) or note-styled badge for `Flag` (on loan / off floor).
+  - **Blocked**: quiet/muted styling for `Blocked` (intent Off, availability disallows adding to lineup).
   - **Sync off**: neutral badge indicating the machine is excluded from sync.
-  - **Unlinked / Uncataloged**: neutral badge indicating no catalog model is linked or the machine is uncataloged.
+  - **Unlinked / Uncataloged**: neutral badge indicating no catalog model is linked (`No model`) or the machine is uncataloged (`Uncataloged`).
+  - **Integration inactive**: when the integration is `Not configured` or `Waiting` for its first snapshot, the PBM column group surfaces the integration-level status rather than per-row evaluation.
 
 ## 5. Automatic behavior
 

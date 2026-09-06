@@ -13,7 +13,7 @@
 - **Machine & PinballMap Status Dashboard** — the operational route (`/fleet`) providing a status table of every machine in the collection.
 - **Fleet Table** — a fleet audit table displaying machine identity, operational/availability status, ownership, issue count, and Pinball Map sync status.
 - **Filter Presets** — URL-driven filter configurations that allow members and technicians to rapidly narrow the fleet by operational, listing, and synchronization criteria.
-- **Per-Machine Inspection Surface** — a contextual detail pane for the selected machine. On desktop viewports (`≥1024px`), it renders as a side-by-side pane alongside the table without obscuring pinned columns. On mobile viewports (`<1024px`), it transitions to a bottom sheet (`Drawer` / `Sheet`) overlay with swipe/drag dismissibility and thumb-friendly action targets.
+- **Per-Machine Inspection Surface** — a contextual detail pane for the selected machine. On desktop and tablet viewports (`≥768px` / `md:`), it renders as a side-by-side pane alongside the table without obscuring pinned columns. On mobile viewports (`<768px`), it transitions to a bottom drawer (`Drawer`) overlay with swipe/drag dismissibility and thumb-friendly action targets.
 - **Edition Near-Miss** — a machine state where a local machine and a Pinball Map lineup entry share a title family (`machineGroupId`), but differ in edition (defined in `docs/feature-specs/pinballmap.md` §1).
 
 ---
@@ -59,7 +59,7 @@
 - **6.1** Selecting a row or clicking its inspect action opens the **Per-Machine Inspection Surface** for the focused machine.
 - **6.2** On desktop and tablet viewports (`≥768px` / `md:`), the inspection surface opens as an anchored side-by-side pane, adjusting the main table container width without obscuring the pinned machine column.
 - **6.3** On mobile viewports (`<768px`), the inspection surface opens as a full-width bottom drawer (`Drawer`) with drag-to-dismiss behavior and touch-optimized action targets.
-- **6.4** The inspection surface presents detailed per-machine PBM sync diagnostics, local vs. PBM edition comparisons, owner attribution notes, and action triggers (Trigger Snapshot Sync, Edit Match Link, Open on PinballMap.com).
+- **6.4** The inspection surface presents detailed per-machine PBM sync diagnostics, local vs. PBM edition comparisons, owner attribution notes, and action triggers (Refresh, Edit Match Link, Open on PinballMap.com).
 
 ---
 
