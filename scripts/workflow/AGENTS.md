@@ -8,6 +8,48 @@ Scripts are designed for the **PinPoint orchestrator workflow** where multiple s
 
 **The PinPoint merge decision is Tim's (PP-wi85, reversed for the script per Tim 2026-08-19).** An agent MAY run `merge-pr.sh`, but the `block-direct-merge.cjs` PreToolUse hook turns any invocation of it (including `--dry-run`) into an approval prompt Tim must accept before it runs — the merge is still his call. The raw PinPoint channels (`gh pr merge`, `gh api PUT .../merge`, MCP `merge_pull_request`) stay hard-blocked, because they skip the script's gate re-checks. This boundary applies to implicit current-repository targets and explicit `timothyfroehlich/PinPoint` targets; a non-PinPoint target statically explicit in command arguments or MCP input follows that repository's policy and the user's authorization. Environment-only selectors remain fail-closed. Agents run every other script in this directory freely, including `pr-screenshots.mjs` and `merge-handoff.sh` (which _prints_ the merge command). The normal close follows `pinpoint-pr-workflow`: draft PR, current-head CI, one manual Codex request for that head, exact-head coverage, resolved threads, final label, then handoff.
 
+## Codex Git Mutations
+
+Codex uses the rule-approved fixed interface for Git operations whose free-form flags
+can bypass hooks or rewrite remote history:
+
+```bash
+bash scripts/workflow/codex-git.sh commit "<conventional commit message>"
+bash scripts/workflow/codex-git.sh push
+bash scripts/workflow/codex-git.sh branch codex/<name>
+bash scripts/workflow/codex-git.sh merge-main
+```
+
+The wrapper rejects extra arguments, creates only `codex/` branches from an existing
+non-`main` worktree branch without a force or discard flag, pushes only the current
+non-`main` branch to the same branch name on `origin`, and merges only `origin/main`.
+Raw `git commit`, `git push`, `git checkout`, `git switch`, and `git merge` invocations
+intentionally require approval.
+`merge-main` fetches `origin` immediately before the merge so the tracking ref cannot be
+stale.
+
+Raw `gh` stays forbidden because case-insensitive and host-qualified repository selectors
+cannot be normalized by an exact argv-prefix rule. Routine read-only commands stay
+approval-free through fixed-subcommand wrapper operations:
+
+```bash
+bash scripts/workflow/codex-gh.sh pr-list [args...]
+bash scripts/workflow/codex-gh.sh pr-view [args...]
+bash scripts/workflow/codex-gh.sh pr-checks [args...]
+bash scripts/workflow/codex-gh.sh pr-diff [args...]
+bash scripts/workflow/codex-gh.sh run-list [args...]
+bash scripts/workflow/codex-gh.sh run-view [args...]
+```
+
+An explicitly authorized merge in another repository uses the validating,
+approval-gated route instead:
+
+```bash
+bash scripts/workflow/codex-gh.sh merge-external <owner/repo> <PR-number> <merge|squash|rebase>
+```
+
+It rejects PinPoint targets case-insensitively; PinPoint still uses `merge-pr.sh --human`.
+
 ## Scripts
 
 ### PR Monitoring
