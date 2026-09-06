@@ -8,6 +8,21 @@ Scripts are designed for the **PinPoint orchestrator workflow** where multiple s
 
 **The PinPoint merge decision is Tim's (PP-wi85, reversed for the script per Tim 2026-08-19).** An agent MAY run `merge-pr.sh`, but the `block-direct-merge.cjs` PreToolUse hook turns any invocation of it (including `--dry-run`) into an approval prompt Tim must accept before it runs — the merge is still his call. The raw PinPoint channels (`gh pr merge`, `gh api PUT .../merge`, MCP `merge_pull_request`) stay hard-blocked, because they skip the script's gate re-checks. This boundary applies to implicit current-repository targets and explicit `timothyfroehlich/PinPoint` targets; a non-PinPoint target statically explicit in command arguments or MCP input follows that repository's policy and the user's authorization. Environment-only selectors remain fail-closed. Agents run every other script in this directory freely, including `pr-screenshots.mjs` and `merge-handoff.sh` (which _prints_ the merge command). The normal close follows `pinpoint-pr-workflow`: draft PR, current-head CI, one manual Codex request for that head, exact-head coverage, resolved threads, final label, then handoff.
 
+## Codex Git Mutations
+
+Codex uses the rule-approved fixed interface for Git operations whose free-form flags
+can bypass hooks or rewrite remote history:
+
+```bash
+bash scripts/workflow/codex-git.sh commit "<conventional commit message>"
+bash scripts/workflow/codex-git.sh push
+bash scripts/workflow/codex-git.sh merge-main
+```
+
+The wrapper rejects extra arguments, pushes only the current non-`main` branch to the
+same branch name on `origin`, and merges only `origin/main`. Raw `git commit`, `git push`,
+and `git merge` invocations intentionally require approval.
+
 ## Scripts
 
 ### PR Monitoring
