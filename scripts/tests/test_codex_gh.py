@@ -42,6 +42,29 @@ def run_wrapper(
     return result, recorded
 
 
+@pytest.mark.parametrize(
+    ("args", "expected"),
+    [
+        (("pr-list", "--limit", "20"), ["gh", "pr", "list", "--limit", "20"]),
+        (
+            ("pr-view", "17", "--json", "title"),
+            ["gh", "pr", "view", "17", "--json", "title"],
+        ),
+        (("pr-checks", "17"), ["gh", "pr", "checks", "17"]),
+        (("pr-diff", "17"), ["gh", "pr", "diff", "17"]),
+        (("run-list", "--limit", "20"), ["gh", "run", "list", "--limit", "20"]),
+        (("run-view", "12345"), ["gh", "run", "view", "12345"]),
+    ],
+)
+def test_read_operations_fix_the_gh_subcommand(
+    tmp_path: Path, args: tuple[str, ...], expected: list[str]
+) -> None:
+    result, calls = run_wrapper(tmp_path, *args)
+
+    assert result.returncode == 0, result.stderr
+    assert calls == ["git", "rev-parse", "--show-toplevel", *expected]
+
+
 def test_merges_only_a_statically_named_external_repository(tmp_path: Path) -> None:
     result, calls = run_wrapper(
         tmp_path, "merge-external", "owner/other", "17", "squash"
@@ -88,6 +111,8 @@ def test_refuses_pinpoint_targets(tmp_path: Path, repository: str) -> None:
         ("merge-external", "owner/other", "17", "force"),
         ("merge-external", "https://github.com/owner/other", "17", "squash"),
         ("merge-external", "owner/other", "17", "squash", "--admin"),
+        ("api", "repos/owner/other"),
+        ("pr-merge", "17"),
     ],
 )
 def test_rejects_unknown_or_extra_arguments(

@@ -25,17 +25,27 @@ discard flag, pushes only the current non-`main` branch to the same branch name 
 `origin`, and merges only `origin/main`. Raw `git commit`, `git push`, `git checkout`,
 `git switch`, and `git merge` invocations intentionally require approval.
 
-Raw `gh pr merge` stays forbidden because a suffix-position `--repo` target is not
-inspectable by a prefix rule. An explicitly authorized merge in another repository uses
-the validating, approval-gated route instead:
+Raw `gh` stays forbidden because case-insensitive and host-qualified repository selectors
+cannot be normalized by an exact argv-prefix rule. Routine read-only commands stay
+approval-free through fixed-subcommand wrapper operations:
+
+```bash
+bash scripts/workflow/codex-gh.sh pr-list [args...]
+bash scripts/workflow/codex-gh.sh pr-view [args...]
+bash scripts/workflow/codex-gh.sh pr-checks [args...]
+bash scripts/workflow/codex-gh.sh pr-diff [args...]
+bash scripts/workflow/codex-gh.sh run-list [args...]
+bash scripts/workflow/codex-gh.sh run-view [args...]
+```
+
+An explicitly authorized merge in another repository uses the validating,
+approval-gated route instead:
 
 ```bash
 bash scripts/workflow/codex-gh.sh merge-external <owner/repo> <PR-number> <merge|squash|rebase>
 ```
 
 It rejects PinPoint targets case-insensitively; PinPoint still uses `merge-pr.sh --human`.
-Raw global selectors for PinPoint are blocked in both bare `owner/repo` and configured-host
-`github.com/owner/repo` forms, including the separated, equals, and compact `-R` spellings.
 
 ## Scripts
 

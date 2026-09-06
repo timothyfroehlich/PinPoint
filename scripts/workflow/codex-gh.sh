@@ -2,7 +2,16 @@
 set -euo pipefail
 
 usage() {
-  echo "Usage: bash scripts/workflow/codex-gh.sh merge-external <owner/repo> <PR-number> <merge|squash|rebase>" >&2
+  cat >&2 <<'EOF'
+Usage:
+  bash scripts/workflow/codex-gh.sh pr-list [args...]
+  bash scripts/workflow/codex-gh.sh pr-view [args...]
+  bash scripts/workflow/codex-gh.sh pr-checks [args...]
+  bash scripts/workflow/codex-gh.sh pr-diff [args...]
+  bash scripts/workflow/codex-gh.sh run-list [args...]
+  bash scripts/workflow/codex-gh.sh run-view [args...]
+  bash scripts/workflow/codex-gh.sh merge-external <owner/repo> <PR-number> <merge|squash|rebase>
+EOF
   exit 2
 }
 
@@ -18,10 +27,25 @@ if [[ -z "$repository_root" || "$repository_root" != "$expected_root" ]]; then
   exit 1
 fi
 
-[[ $# -eq 4 && "$1" == "merge-external" ]] || usage
-readonly target_repository=$2
-readonly pr_number=$3
-readonly strategy=$4
+[[ $# -ge 1 ]] || usage
+readonly operation=$1
+shift
+
+case "$operation" in
+  pr-list) exec gh pr list "$@" ;;
+  pr-view) exec gh pr view "$@" ;;
+  pr-checks) exec gh pr checks "$@" ;;
+  pr-diff) exec gh pr diff "$@" ;;
+  run-list) exec gh run list "$@" ;;
+  run-view) exec gh run view "$@" ;;
+  merge-external) ;;
+  *) usage ;;
+esac
+
+[[ $# -eq 3 ]] || usage
+readonly target_repository=$1
+readonly pr_number=$2
+readonly strategy=$3
 
 [[ "$target_repository" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]] || usage
 [[ "$pr_number" =~ ^[0-9]+$ ]] || usage

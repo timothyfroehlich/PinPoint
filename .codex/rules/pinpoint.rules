@@ -78,19 +78,20 @@ prefix_rule(pattern=["git", "worktree", "prune"], decision="prompt", justificati
 prefix_rule(pattern=["git", "stash", "drop"], decision="prompt", justification="Dropping a stash deletes preserved changes")
 prefix_rule(pattern=["git", "stash", "clear"], decision="prompt", justification="Clearing stashes deletes all preserved changes")
 
-# Read-only GitHub status used throughout the PR lifecycle.
-prefix_rule(pattern=["gh", "pr", "view"], decision="allow", justification="Read PinPoint pull request status")
-prefix_rule(pattern=["gh", "pr", "checks"], decision="allow", justification="Read PinPoint pull request checks")
-prefix_rule(pattern=["gh", "pr", "diff"], decision="allow", justification="Read PinPoint pull request changes")
-prefix_rule(pattern=["gh", "run", "list"], decision="allow", justification="Read PinPoint workflow run status")
-prefix_rule(pattern=["gh", "run", "view"], decision="allow", justification="Read PinPoint workflow run details")
+# Fixed-subcommand GitHub reads used throughout the PR lifecycle. Raw `gh` is
+# forbidden below because repository selectors are case-insensitive and cannot
+# be normalized by exact argv-prefix policy.
 prefix_rule(
-    pattern=["gh", "pr", "merge"],
-    decision="forbidden",
-    justification="For PinPoint use merge-pr.sh --human; for an explicit other repo use codex-gh.sh merge-external",
+    pattern=["bash", "scripts/workflow/codex-gh.sh"],
+    decision="allow",
+    justification="Run a fixed read-only GitHub command through the PinPoint wrapper",
     match=[
-        "gh pr merge 2058",
-        "gh pr merge 2058 --repo timothyfroehlich/PinPoint",
+        "bash scripts/workflow/codex-gh.sh pr-list --limit 20",
+        "bash scripts/workflow/codex-gh.sh pr-view 2058 --json headRefOid",
+        "bash scripts/workflow/codex-gh.sh pr-checks 2058",
+        "bash scripts/workflow/codex-gh.sh pr-diff 2058",
+        "bash scripts/workflow/codex-gh.sh run-list --limit 20",
+        "bash scripts/workflow/codex-gh.sh run-view 12345",
     ],
 )
 prefix_rule(
@@ -102,47 +103,17 @@ prefix_rule(
     ],
 )
 prefix_rule(
-    pattern=["gh", ["--repo", "-R"], ["timothyfroehlich/PinPoint", "github.com/timothyfroehlich/PinPoint"], "pr", "merge"],
+    pattern=["gh"],
     decision="forbidden",
-    justification="Use bash scripts/workflow/merge-pr.sh <PR> --human so Tim approves after gate checks",
+    justification="Use codex-gh.sh, typed GitHub tools, or a gate-enforced workflow script; raw gh can bypass PinPoint merge guards through aliased repository selectors",
     match=[
-        "gh --repo timothyfroehlich/PinPoint pr merge 2058",
-        "gh -R timothyfroehlich/PinPoint pr merge 2058",
-        "gh --repo github.com/timothyfroehlich/PinPoint pr merge 2058",
-        "gh -R github.com/timothyfroehlich/PinPoint pr merge 2058",
-    ],
-)
-prefix_rule(
-    pattern=["gh", ["--repo=timothyfroehlich/PinPoint", "-R=timothyfroehlich/PinPoint", "-Rtimothyfroehlich/PinPoint", "--repo=github.com/timothyfroehlich/PinPoint", "-R=github.com/timothyfroehlich/PinPoint", "-Rgithub.com/timothyfroehlich/PinPoint"], "pr", "merge"],
-    decision="forbidden",
-    justification="Use bash scripts/workflow/merge-pr.sh <PR> --human so Tim approves after gate checks",
-    match=[
-        "gh --repo=timothyfroehlich/PinPoint pr merge 2058",
-        "gh -R=timothyfroehlich/PinPoint pr merge 2058",
-        "gh -Rtimothyfroehlich/PinPoint pr merge 2058",
-        "gh --repo=github.com/timothyfroehlich/PinPoint pr merge 2058",
-        "gh -R=github.com/timothyfroehlich/PinPoint pr merge 2058",
-        "gh -Rgithub.com/timothyfroehlich/PinPoint pr merge 2058",
-    ],
-)
-prefix_rule(
-    pattern=["gh", "api"],
-    decision="forbidden",
-    justification="Use typed GitHub tools or a gate-enforced workflow script; raw API calls can bypass PinPoint merge guards",
-    match=[
+        "gh pr view 2058",
+        "gh pr merge 2058",
+        "gh pr merge 2058 --repo owner/other",
+        "gh -R github.com/TimothyFroehlich/pinpoint pr merge 2058",
         "gh api --method PUT repos/timothyfroehlich/PinPoint/pulls/2058/merge",
         "gh api repos/timothyfroehlich/PinPoint/pulls/2058/merge -X PUT",
     ],
-)
-prefix_rule(
-    pattern=["gh", ["--repo", "-R"], "timothyfroehlich/PinPoint", "api"],
-    decision="forbidden",
-    justification="Use typed GitHub tools or a gate-enforced workflow script; raw API calls can bypass PinPoint merge guards",
-)
-prefix_rule(
-    pattern=["gh", ["--repo=timothyfroehlich/PinPoint", "-R=timothyfroehlich/PinPoint", "-Rtimothyfroehlich/PinPoint"], "api"],
-    decision="forbidden",
-    justification="Use typed GitHub tools or a gate-enforced workflow script; raw API calls can bypass PinPoint merge guards",
 )
 
 # Trusted PinPoint workflow entry points and routine local validation.
