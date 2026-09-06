@@ -6,13 +6,11 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from check_skill_frontmatter import (  # noqa: E402
-    FrontmatterEntry,
     check_skill_file,
     extract_frontmatter,
     find_skill_files,
-    parse_frontmatter_entries,
     parse_top_level_keys,
-    validate_string_entry,
+    parse_yaml_frontmatter,
 )
 
 CONFIG_PATH = Path(".yamllint.yml")
@@ -37,16 +35,16 @@ def test_parse_top_level_keys():
     assert "description" in keys
 
 
-def test_parse_frontmatter_entries():
+def test_parse_yaml_frontmatter():
     fm = (
         "# Top comment\nname: my-skill\ndescription: >-\n  Line 1\n  Line 2\nversion: 1"
     )
-    entries = parse_frontmatter_entries(fm)
-    assert entries["name"].first_line == "my-skill"
-    assert entries["name"].continuation_lines == []
-    assert entries["description"].first_line == ">-"
-    assert len(entries["description"].continuation_lines) == 2
-    assert entries["version"].first_line == "1"
+    data, err = parse_yaml_frontmatter(fm)
+    assert err is None
+    assert data is not None
+    assert data["name"] == "my-skill"
+    assert "Line 1" in data["description"]
+    assert data["version"] == 1
 
 
 def test_valid_skill_file(tmp_path: Path):
@@ -145,7 +143,7 @@ def test_description_non_string_mapping(tmp_path: Path):
     )
 
     errors = check_skill_file(skill_file, config_path=CONFIG_PATH)
-    assert any("must be a string, got mapping" in err for err in errors)
+    assert any("must be a string, got dict" in err for err in errors)
 
 
 def test_description_non_string_list(tmp_path: Path):
@@ -171,7 +169,7 @@ def test_description_block_mapping(tmp_path: Path):
     )
 
     errors = check_skill_file(skill_file, config_path=CONFIG_PATH)
-    assert any("must be a string, got mapping" in err for err in errors)
+    assert any("must be a string, got dict" in err for err in errors)
 
 
 def test_description_block_list(tmp_path: Path):
@@ -187,6 +185,32 @@ def test_description_block_list(tmp_path: Path):
     assert any("must be a string, got list" in err for err in errors)
 
 
+def test_description_comment_only(tmp_path: Path):
+    skill_dir = tmp_path / "comment-desc"
+    skill_dir.mkdir()
+    skill_file = skill_dir / "SKILL.md"
+    skill_file.write_text(
+        "---\nname: comment-desc\ndescription:  # TODO\n---\n\n# Body\n",
+        encoding="utf-8",
+    )
+
+    errors = check_skill_file(skill_file, config_path=CONFIG_PATH)
+    assert any("Missing or empty 'description'" in err for err in errors)
+
+
+def test_description_tagged_mapping(tmp_path: Path):
+    skill_dir = tmp_path / "tagged-desc"
+    skill_dir.mkdir()
+    skill_file = skill_dir / "SKILL.md"
+    skill_file.write_text(
+        "---\nname: tagged-desc\ndescription: !!map {trigger: text}\n---\n\n# Body\n",
+        encoding="utf-8",
+    )
+
+    errors = check_skill_file(skill_file, config_path=CONFIG_PATH)
+    assert any("must be a string, got dict" in err for err in errors)
+
+
 def test_description_empty(tmp_path: Path):
     skill_dir = tmp_path / "empty-desc"
     skill_dir.mkdir()
@@ -200,20 +224,24 @@ def test_description_empty(tmp_path: Path):
     assert any("Missing or empty 'description'" in err for err in errors)
 
 
-def test_validate_string_entry_scalars():
-    entry_int = FrontmatterEntry(
-        key="description", first_line="123", continuation_lines=[], line_number=1
+def test_description_scalar_non_strings(tmp_path: Path):
+    skill_dir = tmp_path / "int-desc"
+    skill_dir.mkdir()
+    skill_file = skill_dir / "SKILL.md"
+    skill_file.write_text(
+        "---\nname: int-desc\ndescription: 123\n---\n\n# Body\n",
+        encoding="utf-8",
     )
-    valid, reason = validate_string_entry(entry_int)
-    assert not valid
-    assert "got integer (123)" in reason
 
-    entry_bool = FrontmatterEntry(
-        key="description", first_line="true", continuation_lines=[], line_number=1
+    errors = check_skill_file(skill_file, config_path=CONFIG_PATH)
+    assert any("must be a string, got int" in err for err in errors)
+
+    skill_file.write_text(
+        "---\nname: int-desc\ndescription: true\n---\n\n# Body\n",
+        encoding="utf-8",
     )
-    valid, reason = validate_string_entry(entry_bool)
-    assert not valid
-    assert "got boolean (true)" in reason
+    errors = check_skill_file(skill_file, config_path=CONFIG_PATH)
+    assert any("must be a string, got bool" in err for err in errors)
 
 
 def test_find_skill_files(tmp_path: Path):
