@@ -51,18 +51,18 @@
 
 - **4.1** Quick report exposes and supplies issue values as follows:
 
-| Issue field | Reporter interaction                      | Submitted value                       |
-| :---------- | :---------------------------------------- | :------------------------------------ |
-| Machine     | Select or confirm                         | Selected machine                      |
-| Title       | Select a template or enter Something else | Template label or entered text        |
-| Frequency   | Select during confirmation                | Template default until changed        |
-| Severity    | Hidden                                    | Template default                      |
-| Priority    | Hidden                                    | Medium                                |
-| Status      | Hidden                                    | New                                   |
-| Assignee    | Hidden                                    | Unassigned                            |
-| Description | Not present                               | None                                  |
-| Images      | Not present                               | None                                  |
-| Watch       | Not present                               | On when the reporter can watch issues |
+| Issue field | Reporter interaction | Submitted value |
+| :-- | :-- | :-- |
+| Machine | Select or confirm | Selected machine |
+| Title | Select a template or enter Something else | Template label or entered text |
+| Frequency | Select during confirmation | Template default until changed |
+| Severity | Hidden | Template default |
+| Priority | Hidden | Medium |
+| Status | Hidden | New |
+| Assignee | Hidden | Unassigned |
+| Description | Not present | None |
+| Images | Not present | None |
+| Watch | Not present | On when the reporter can watch issues |
 
 - **4.2** Not specified is a valid issue-frequency value.
 - **4.3** A template whose frequency is not self-evident defaults to Not specified.
@@ -74,23 +74,23 @@
 
 - **5.1** Quick report provides this template catalog:
 
-| Group           | Problem                              | Severity   | Default frequency | Additional behavior                                   |
-| :-------------- | :----------------------------------- | :--------- | :---------------- | :---------------------------------------------------- |
-| Ball            | Ball stuck                           | Major      | Not specified     | Deflection guidance (§6)                              |
-| Ball            | Ball loading problem                 | Major      | Not specified     | Covers no ball served and multiple balls served       |
-| Ball            | Plunger or launch button not working | Major      | Not specified     | —                                                     |
-| Playfield       | Flipper not working                  | Major      | Not specified     | —                                                     |
-| Playfield       | Flipper weak or sticking             | Minor      | Not specified     | —                                                     |
-| Playfield       | Bumper, sling, or kicker not firing  | Minor      | Not specified     | —                                                     |
-| Playfield       | Shot or target not registering       | Minor      | Not specified     | —                                                     |
-| Playfield       | Broken rubber                        | Minor      | Constant          | —                                                     |
-| Playfield       | Loose or broken part                 | Minor      | Constant          | —                                                     |
-| Display & sound | Lights out                           | Minor      | Constant          | —                                                     |
-| Display & sound | Display / score reel problem         | Minor      | Not specified     | Covers electronic displays and mechanical score reels |
-| Display & sound | Sound problem                        | Minor      | Not specified     | —                                                     |
-| Machine         | Game won’t start                     | Unplayable | Constant          | —                                                     |
-| Machine         | Game resets or freezes               | Major      | Intermittent      | —                                                     |
-| Something else  | Reporter-entered problem             | Major      | Not specified     | Short free text (§3.12)                               |
+| Group | Problem | Severity | Default frequency | Additional behavior |
+| :-- | :-- | :-- | :-- | :-- |
+| Ball | Ball stuck | Major | Not specified | Deflection guidance (§6) |
+| Ball | Ball loading problem | Major | Not specified | Covers no ball served and multiple balls served |
+| Ball | Plunger or launch button not working | Major | Not specified | — |
+| Playfield | Flipper not working | Major | Not specified | — |
+| Playfield | Flipper weak or sticking | Minor | Not specified | — |
+| Playfield | Bumper, sling, or kicker not firing | Minor | Not specified | — |
+| Playfield | Shot or target not registering | Minor | Not specified | — |
+| Playfield | Broken rubber | Minor | Constant | — |
+| Playfield | Loose or broken part | Minor | Constant | — |
+| Display & sound | Lights out | Minor | Constant | — |
+| Display & sound | Display / score reel problem | Minor | Not specified | Covers electronic displays and mechanical score reels |
+| Display & sound | Sound problem | Minor | Not specified | — |
+| Machine | Game won’t start | Unplayable | Constant | — |
+| Machine | Game resets or freezes | Major | Intermittent | — |
+| Something else | Reporter-entered problem | Major | Not specified | Short free text (§3.12) |
 
 - **5.2** Template groups organize the picker but do not classify the resulting issue.
 - **5.3** The complete template catalog is available for every machine; PinPoint does not hide templates based on machine era.
@@ -140,15 +140,15 @@
 
 ## Known divergences
 
-| Requirement                                                                                       | Code today                                                                                                                                                                | Resolution  |
-| :------------------------------------------------------------------------------------------------ | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | :---------- |
+| Requirement | Code today | Resolution |
+| :-- | :-- | :-- |
 | §2.1–§2.2, §2.4–§2.10, §3.1–§3.4, §3.8, §3.12–§3.13, §4.1, §4.3–§4.6, §7.1, §7.4–§7.5, §8.9–§8.10 | `/report` opens the complete single form; Quick, Something else, and draft-preserving mode handoffs do not exist; the existing modes are named Single issue and Multiple. | `PP-ek0e.2` |
-| §2.3, §3.5–§3.11, §5–§6                                                                           | Quick report templates, progressive problem selection, template confirmation, and deflection guidance do not exist.                                                       | `PP-ek0e.3` |
-| §4.2                                                                                              | Issue frequency requires Intermittent, Frequent, or Constant; Not specified is unavailable.                                                                               | `PP-ek0e.2` |
-| §9.1, §9.6                                                                                        | Recent issues show three rows on mobile and five on desktop with different visual prominence.                                                                             | `PP-ek0e.2` |
+| §2.3, §3.5–§3.11, §5–§6 | Quick report templates, progressive problem selection, template confirmation, and deflection guidance do not exist. | `PP-ek0e.3` |
+| §4.2 | Issue frequency requires Intermittent, Frequent, or Constant; Not specified is unavailable. | `PP-ek0e.2` |
+| §9.1, §9.6 | Recent issues show three rows on mobile and five on desktop with different visual prominence. | `PP-ek0e.2` |
 
 ## Changelog
 
-| Date       | Change                                                                                                                                |
-| :--------- | :------------------------------------------------------------------------------------------------------------------------------------ |
+| Date | Change |
+| :-- | :-- |
 | 2026-09-05 | Initial draft: three report modes, draft continuity, Quick report templates and defaults, deflection, and recent-open-issue behavior. |
