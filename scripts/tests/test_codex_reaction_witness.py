@@ -30,7 +30,8 @@ def run_witness(
     heads: list[str] | None = None,
     reaction_pages: list[list[dict]] | None = None,
     reviews: list[dict] | None = None,
-) -> tuple[subprocess.CompletedProcess[str], list[dict]]:
+    reaction_comment_id: str | None = None,
+) -> tuple[subprocess.CompletedProcess[str], list[dict], list[str]]:
     heads_path = tmp_path / "heads.json"
     heads_path.write_text(json.dumps(heads or [HEAD]))
     reactions_path = tmp_path / "reactions.json"
@@ -40,6 +41,8 @@ def run_witness(
     posts_path = tmp_path / "posts.jsonl"
     calls_path = tmp_path / "reaction-call-count"
     calls_path.write_text("0")
+    targets_path = tmp_path / "reaction-targets"
+    targets_path.write_text("")
 
     gh = tmp_path / "gh"
     gh.write_text(
@@ -53,6 +56,9 @@ def run_witness(
         "elif any('/pulls/' in a and '/reviews' in a for a in args):\n"
         "    print(json.dumps(json.load(open(os.environ['STUB_REVIEWS']))))\n"
         "elif any('/reactions' in a for a in args):\n"
+        "    target = next(a for a in args if '/reactions' in a)\n"
+        "    with open(os.environ['STUB_REACTION_TARGETS'], 'a') as f:\n"
+        "        f.write(target + '\\n')\n"
         "    count_path = os.environ['STUB_REACTION_CALLS']\n"
         "    count = int(open(count_path).read())\n"
         "    pages = json.load(open(os.environ['STUB_REACTIONS']))\n"
@@ -82,10 +88,14 @@ def run_witness(
             "STUB_REVIEWS": str(reviews_path),
             "STUB_POSTS": str(posts_path),
             "STUB_REACTION_CALLS": str(calls_path),
+            "STUB_REACTION_TARGETS": str(targets_path),
         }
     )
+    args = ["bash", str(SCRIPT), "123", HEAD, TRIGGERED_AT]
+    if reaction_comment_id is not None:
+        args.append(reaction_comment_id)
     result = subprocess.run(
-        ["bash", str(SCRIPT), "123", HEAD, TRIGGERED_AT],
+        args,
         capture_output=True,
         text=True,
         env=env,
@@ -96,13 +106,13 @@ def run_witness(
         if posts_path.exists()
         else []
     )
-    return result, posts
+    return result, posts, targets_path.read_text().splitlines()
 
 
 def test_fresh_eyes_then_clean_reaction_posts_sha_pinned_witness(
     tmp_path: Path,
 ) -> None:
-    result, posts = run_witness(
+    result, posts, targets = run_witness(
         tmp_path,
         reaction_pages=[
             [reaction("eyes", "2026-08-28T03:01:00Z")],
@@ -114,6 +124,27 @@ def test_fresh_eyes_then_clean_reaction_posts_sha_pinned_witness(
     assert f"<!-- pinpoint-codex-reaction-witness: {HEAD} -->" in posts[0]["body"]
     assert "03:01:00Z" in posts[0]["body"]
     assert "03:02:00Z" in posts[0]["body"]
+    assert targets == [
+        "repos/acme/widget/issues/123/reactions?per_page=100",
+        "repos/acme/widget/issues/123/reactions?per_page=100",
+    ]
+
+
+def test_manual_fallback_watches_the_trigger_comment_reactions(tmp_path: Path) -> None:
+    result, posts, targets = run_witness(
+        tmp_path,
+        reaction_comment_id="456",
+        reaction_pages=[
+            [reaction("eyes", "2026-08-28T03:01:00Z")],
+            [reaction("+1", "2026-08-28T03:02:00Z")],
+        ],
+    )
+    assert result.returncode == 0, result.stderr
+    assert len(posts) == 1
+    assert targets == [
+        "repos/acme/widget/issues/comments/456/reactions?per_page=100",
+        "repos/acme/widget/issues/comments/456/reactions?per_page=100",
+    ]
 
 
 @pytest.mark.parametrize(
@@ -126,21 +157,21 @@ def test_fresh_eyes_then_clean_reaction_posts_sha_pinned_witness(
 def test_old_or_untrusted_eyes_cannot_create_witness(
     tmp_path: Path, reaction_pages: list[list[dict]]
 ) -> None:
-    result, posts = run_witness(tmp_path, reaction_pages=reaction_pages)
+    result, posts, _targets = run_witness(tmp_path, reaction_pages=reaction_pages)
     assert result.returncode == 0, result.stderr
     assert posts == []
     assert "No commit-safe" in result.stdout
 
 
 def test_head_movement_supersedes_witness(tmp_path: Path) -> None:
-    result, posts = run_witness(tmp_path, heads=[OTHER_HEAD])
+    result, posts, _targets = run_witness(tmp_path, heads=[OTHER_HEAD])
     assert result.returncode == 0, result.stderr
     assert posts == []
     assert "superseded" in result.stdout
 
 
 def test_sha_pinned_native_review_needs_no_witness(tmp_path: Path) -> None:
-    result, posts = run_witness(
+    result, posts, _targets = run_witness(
         tmp_path,
         reviews=[
             {
@@ -160,11 +191,33 @@ def test_workflow_uses_trusted_main_and_narrow_permissions() -> None:
     text = WORKFLOW.read_text()
     assert "pull_request_target:" in text
     assert "types: [opened, ready_for_review, synchronize, reopened]" in text
+    assert "issue_comment:" in text
+    assert "types: [created]" in text
+    assert (
+        "github.event.pull_request.number || format('{0}-comment-{1}', "
+        "github.event.issue.number, github.event.comment.id)" in text
+    )
     assert "issues: write" not in text
     assert "pull-requests: write" in text
     assert "ref: ${{ github.event.repository.default_branch }}" in text
     assert "persist-credentials: false" in text
     assert "github.event.pull_request.head.repo.full_name == github.repository" in text
+    assert "github.event.issue.pull_request" in text
+    assert "github.event.comment.user.login == github.repository_owner" in text
+    assert "startsWith(github.event.comment.body, '@codex review')" in text
+    assert "github.event.comment.created_at" in text
+    assert "EVENT_NAME: ${{ github.event_name }}" in text
+    assert "REACTION_COMMENT_ID: ${{ github.event.comment.id }}" in text
+    assert 'if [[ "$EVENT_NAME" == "issue_comment" ]]' in text
+    assert "pinpoint-codex-review-head" in text
+    assert '"$GITHUB_EVENT_PATH"' in text
+    assert 'gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}"' in text
+    assert '"$TRIGGERED_AT" "$REACTION_COMMENT_ID"' in text
+    assert (
+        ".head.repo.full_name == $repo and .draft == false and .head.sha == $head"
+        in text
+    )
+    assert "GITHUB_ENV" not in text
 
 
 def test_default_budget_has_a_quiet_window_and_at_most_108_loop_reads() -> None:

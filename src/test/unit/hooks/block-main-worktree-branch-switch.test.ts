@@ -108,6 +108,7 @@ describe("wrapped/quoted git invocations → BLOCK (PP-6t3c)", () => {
     'bash -c "git checkout -b new-branch"',
     "sudo -u root git checkout feature/x",
     "timeout 30 git switch feature/x",
+    "printf 'git\\n' | xargs -I git git checkout feature/x",
     "/usr/bin/git checkout feature/x",
     "git status\ngit checkout feature/x",
   ])("blocks %s", (cmd) => {
