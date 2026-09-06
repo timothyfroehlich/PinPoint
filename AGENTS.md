@@ -142,7 +142,7 @@ When the user explicitly asks for "prototype mode" / "rapid iteration" / "just e
 When building or modifying user interfaces:
 
 - **Fast logic first:** write/update component unit tests (`pnpm run test`) to verify props, state, and rendering fundamentals.
-- **Surface rendered visuals early:** before investing time authoring or fixing Playwright/E2E specs or running preflight, capture screenshots (via `pnpm run screenshots` or local dev server) and ask Tim for visual sign-off on layout, spacing, and styling.
+- **Surface rendered visuals early:** before investing time authoring or fixing Playwright/E2E specs or running preflight, capture screenshots (via local dev server preview or `node scripts/workflow/pr-screenshots.mjs <PR>`) and ask Tim for visual sign-off on layout, spacing, and styling.
 - **Why:** eliminates throwaway test work when visual layout or interaction hierarchy needs rework.
 - **Proceed after sign-off:** once Tim approves the visual presentation, proceed to author/update smoke and E2E specs, run preflight, and prepare the PR.
 
