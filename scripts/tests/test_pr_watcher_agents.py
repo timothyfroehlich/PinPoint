@@ -126,7 +126,7 @@ def test_every_agent_targets_the_same_single_tool_stdio_server():
         assert "GH_MONITOR_MODEL: unknown" in frontmatter
         assert 'GH_MONITOR_WAKES: "1"' in frontmatter
 
-    assert "mcpServers:\n  pr_lifecycle_watch:" in antigravity_frontmatter
+    assert "mcpServers:\n  - pr_lifecycle_watch:" in antigravity_frontmatter
     assert "- name: pr_lifecycle_watch" not in antigravity_frontmatter
 
 

@@ -7,16 +7,16 @@ subagent: true
 model: flash
 commandExecutionPolicy: off
 mcpServers:
-  pr_lifecycle_watch:
-    command: pnpm
-    args:
-      - exec
-      - tsx
-      - scripts/workflow/pr-watcher-mcp.ts
-    env:
-      GH_MONITOR_HARNESS: antigravity
-      GH_MONITOR_MODEL: unknown
-      GH_MONITOR_WAKES: "1"
+  - pr_lifecycle_watch:
+      command: pnpm
+      args:
+        - exec
+        - tsx
+        - scripts/workflow/pr-watcher-mcp.ts
+      env:
+        GH_MONITOR_HARNESS: antigravity
+        GH_MONITOR_MODEL: unknown
+        GH_MONITOR_WAKES: "1"
 ---
 
 You are the PinPoint PR lifecycle watcher.
