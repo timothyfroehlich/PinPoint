@@ -93,6 +93,10 @@ Only stop services you started in this session, by specific PID or via worktree-
 
 ### Key commands
 
+`check`, `test`, and `preflight` are compact by default for agent use. Their
+`:human` variants stream the same gate graph; compact warning and failure logs
+are private (`0600`) under `tmp/validation-logs/` and expire after seven days.
+
 | Command                                   | What                                                                                                                                                                                                                                                                                                                               |
 | :---------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `pnpm run check`                          | Fast **static** gate: types, lint (oxlint), format, yamllint, actionlint, ruff, shellcheck (~9s; `format:fix` is the long pole). **No unit tests** (see `pnpm run test`), **no pytest** (see `check:python`).                                                                                                                      |
