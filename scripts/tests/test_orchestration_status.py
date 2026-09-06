@@ -36,7 +36,7 @@ def test_empty_dashboard_is_a_success_not_an_error(tmp_path: Path) -> None:
 
     assert result.returncode == 0
     assert "No open PRs found." in result.stdout
-    assert "ERROR:" not in result.stdout
+    assert "FAIL:" not in result.stdout
 
 
 def test_producer_failure_is_nonzero_and_reports_bounded_sanitized_cause(
@@ -53,9 +53,9 @@ def test_producer_failure_is_nonzero_and_reports_bounded_sanitized_cause(
     assert result.returncode == 1
     assert "partial misleading table" not in result.stdout
     error = next(
-        line for line in result.stdout.splitlines() if line.startswith("ERROR:")
+        line for line in result.stdout.splitlines() if line.startswith("FAIL:")
     )
-    assert error.startswith("ERROR: PR dashboard unavailable (exit 7): fatal: ")
+    assert error.startswith("FAIL: PR dashboard unavailable (exit 7): fatal: ")
     assert "[REDACTED]" in error
     assert secret not in result.stdout
     assert len(error) <= 290
@@ -66,7 +66,7 @@ def test_failure_without_stderr_says_no_diagnostic(tmp_path: Path) -> None:
 
     assert result.returncode == 1
     assert (
-        "ERROR: PR dashboard unavailable (exit 4): no diagnostic emitted"
+        "FAIL: PR dashboard unavailable (exit 4): no diagnostic emitted"
         in result.stdout
     )
 
@@ -80,7 +80,7 @@ def test_verbose_mode_streams_the_producer_diagnostic(tmp_path: Path) -> None:
 
     assert result.returncode == 1
     assert "full troubleshooting detail" in result.stderr
-    assert "ERROR: PR dashboard unavailable (exit 3)" in result.stdout
+    assert "FAIL: PR dashboard unavailable (exit 3)" in result.stdout
     assert "no diagnostic emitted" not in result.stdout
 
 

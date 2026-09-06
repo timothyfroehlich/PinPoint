@@ -76,9 +76,9 @@ report_failure() {
     detail=$(first_error_line)
   fi
   if [ -n "$detail" ]; then
-    printf 'ERROR: %s unavailable (exit %s): %s\n' "$label" "$rc" "$detail"
+    printf 'FAIL: %s unavailable (exit %s): %s\n' "$label" "$rc" "$detail"
   else
-    printf 'ERROR: %s unavailable (exit %s)\n' "$label" "$rc"
+    printf 'FAIL: %s unavailable (exit %s)\n' "$label" "$rc"
   fi
   overall_status=1
 }
