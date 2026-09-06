@@ -35,6 +35,8 @@ def _markdown_agent(path: Path) -> tuple[dict[str, object], str, str]:
                 parsed[key] = int(value)
             elif value == "[]":
                 parsed[key] = []
+            elif len(value) >= 2 and value[0] == value[-1] and value[0] in {'"', "'"}:
+                parsed[key] = value[1:-1]
             else:
                 parsed[key] = value
             index += 1
@@ -67,9 +69,9 @@ def test_all_harnesses_define_the_same_named_agent_and_stable_contract():
     } == {"pr-lifecycle-watcher"}
     assert codex["developer_instructions"].strip() == claude_body == antigravity_body
     assert "Call watch_pr_lifecycle exactly once" in claude_body
-    assert "Return the tool's terminal JSON result verbatim with no commentary" in (
-        claude_body
-    )
+    assert "Return the tool's terminal JSON result verbatim" in claude_body
+    assert "the first character is `{` and the last character is `}`" in claude_body
+    assert "no commentary, Markdown code fence, or other wrapping" in claude_body
     assert "retry" in claude_body
 
 
@@ -77,7 +79,7 @@ def test_agent_models_and_native_boundaries_match_the_approved_plan():
     with CODEX_AGENT.open("rb") as handle:
         codex = tomllib.load(handle)
     claude, _claude_body, _claude_frontmatter = _markdown_agent(CLAUDE_AGENT)
-    antigravity, _antigravity_body, _antigravity_frontmatter = _markdown_agent(
+    antigravity, _antigravity_body, antigravity_frontmatter = _markdown_agent(
         ANTIGRAVITY_AGENT
     )
 
@@ -94,6 +96,7 @@ def test_agent_models_and_native_boundaries_match_the_approved_plan():
     assert antigravity["mainAgent"] is False
     assert antigravity["subagent"] is True
     assert antigravity["commandExecutionPolicy"] == "off"
+    assert 'commandExecutionPolicy: "off"' in antigravity_frontmatter
     assert antigravity["tools"] == []
 
 
@@ -126,8 +129,7 @@ def test_every_agent_targets_the_same_single_tool_stdio_server():
         assert "GH_MONITOR_MODEL: unknown" in frontmatter
         assert 'GH_MONITOR_WAKES: "1"' in frontmatter
 
-    assert "mcpServers:\n  - pr_lifecycle_watch:" in antigravity_frontmatter
-    assert "- name: pr_lifecycle_watch" not in antigravity_frontmatter
+    assert "mcpServers:\n  - name: pr_lifecycle_watch" in antigravity_frontmatter
 
 
 def test_claude_project_permissions_allow_only_the_watcher_mcp_tool():
