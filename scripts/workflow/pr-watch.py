@@ -78,15 +78,14 @@ LEGACY_CLAUDE_MARKER_PREFIX = "<!-- pinpoint-claude-review:"
 # Kept deliberately in sync with scripts/workflow/_pr-gates.sh. This watcher only
 # reports the state; merge-pr.sh is the enforcement point.
 REVIEW_HINT = (
-    "await automatic Codex review of PR #{pr} at the current head; if its bounded "
-    "witness conclusively ends without exact-head evidence, post one @codex review "
-    "for this unchanged head and never repeat it; a slow or running attempt is not "
-    "eligible, and a new head restarts automatic-first"
+    "after current-head CI succeeds and the PR is ready, run "
+    "request-codex-review.sh #{pr} exactly once for this head; a new head requires "
+    "replacement CI and one new request"
 )
-FALLBACK_EXHAUSTED_HINT = (
-    "the one manual @codex review fallback for this head was already used; do not "
-    "post another; wait for exact-head evidence, or use review-preflight + mark-review "
-    "only after Tim runs a local review; a new head restarts automatic-first"
+REVIEW_REQUESTED_HINT = (
+    "the manual Codex review for this head was already requested; wait for exact-head "
+    "evidence and do not request the same head again; a new head requires replacement "
+    "CI and one new request"
 )
 
 LOG_DIR = "tmp/gh-monitor"
@@ -518,10 +517,10 @@ def _codex_reviews(pr: int) -> list[dict]:
 def _comment_review_records(
     pr: int,
 ) -> tuple[list[tuple[str, str, str]], list[tuple[str, str]], list[tuple[str, str]]]:
-    """Return automatic evidence, fallback requests, and manual markers."""
+    """Return Codex evidence, manual review requests, and local-review markers."""
     repo = f"repos/{REPO_OWNER}/{REPO_NAME}"
-    automatic: list[tuple[str, str, str]] = []
-    fallback_requests: list[tuple[str, str]] = []
+    codex_results: list[tuple[str, str, str]] = []
+    review_requests: list[tuple[str, str]] = []
     markers: list[tuple[str, str]] = []
     for comment in _gh_api_list(f"{repo}/issues/{pr}/comments"):
         body = comment.get("body") or ""
@@ -539,7 +538,7 @@ def _comment_review_records(
                 )
             )
         ):
-            automatic.append(
+            codex_results.append(
                 (
                     "clean_comment",
                     match.group(1),
@@ -549,7 +548,7 @@ def _comment_review_records(
         if comment.get("user", {}).get("login") == REPO_OWNER and (
             match := CODEX_REVIEW_REQUEST_RE.fullmatch(body)
         ):
-            fallback_requests.append((match.group(1), comment.get("created_at") or ""))
+            review_requests.append((match.group(1), comment.get("created_at") or ""))
         if (
             comment.get("user", {}).get("login") == GITHUB_ACTIONS_BOT
             and app.get("slug") == GITHUB_ACTIONS_APP_SLUG
@@ -561,7 +560,7 @@ def _comment_review_records(
                 )
             )
         ):
-            automatic.append(
+            codex_results.append(
                 (
                     "clean_reaction",
                     match.group(1),
@@ -582,7 +581,7 @@ def _comment_review_records(
                     comment.get("updated_at") or "",
                 )
             )
-    return automatic, fallback_requests, markers
+    return codex_results, review_requests, markers
 
 
 def review_state(pr: int) -> tuple[str, str]:
@@ -602,15 +601,15 @@ def review_state(pr: int) -> tuple[str, str]:
             return "approval", f"Codex approved head {head_sha[:7]}"
 
     # A current native approval is sufficient. Defer the paginated comments request
-    # unless it is needed to find the independent manual-attestation fallback.
-    automatic_comments, fallback_requests, markers = _comment_review_records(pr)
+    # unless it is needed to find another accepted record or request state.
+    codex_results, review_requests, markers = _comment_review_records(pr)
     if any(marker_sha == head_sha for marker_sha, _at in markers):
         return "marker", f"manual review marker pins head {head_sha[:7]}"
 
     current_clean = max(
         (
             record
-            for record in automatic_comments
+            for record in codex_results
             if (record[0] == "clean_comment" and head_sha.startswith(record[1]))
             or (record[0] == "clean_reaction" and record[1] == head_sha)
         ),
@@ -641,14 +640,14 @@ def review_state(pr: int) -> tuple[str, str]:
             f"Codex reviewed head {head_sha[:7]} with {state}; thread gate owns findings",
         )
 
-    if any(request_sha == head_sha for request_sha, _at in fallback_requests):
-        return "fallback_exhausted", FALLBACK_EXHAUSTED_HINT
+    if any(request_sha == head_sha for request_sha, _at in review_requests):
+        return "review_requested", REVIEW_REQUESTED_HINT
 
     latest_marker_sha, latest_marker_at = max(
         markers, key=lambda marker: marker[1], default=("", "")
     )
     latest_clean_state, latest_clean_sha, latest_clean_at = max(
-        automatic_comments, key=lambda record: record[2], default=("", "", "")
+        codex_results, key=lambda record: record[2], default=("", "", "")
     )
     latest_comment_sha, latest_comment_at, latest_comment_state = (
         (latest_marker_sha, latest_marker_at, "stale_marker")
@@ -872,7 +871,8 @@ def run_audit(pr: int) -> bool:
     )
 
     # Reported, but NOT part of the verdict. This mode answers "can this head leave
-    # draft and enter automatic review?"; gating on review here would make the check
+    # draft and become eligible for a manual review request?"; gating on review here
+    # would make the check
     # circular and permanently red. merge-pr.sh's `reviewed` gate refuses to merge an
     # unreviewed head. A stale Codex approval is worth seeing here anyway: it means the
     # PR looks reviewed and is not.
