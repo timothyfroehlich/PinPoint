@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+# Delegate file reading to Gemini Flash bulk-reader mode
+# Usage: scripts/bulk-read --question "what does this do?" --paths file1.ts file2.ts
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+WORKER_PY="${SCRIPT_DIR}/lib/gemini_worker.py"
+
+question=""
+paths=()
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --question)
+      question="$2"
+      shift 2
+      ;;
+    --paths)
+      shift
+      while [[ $# -gt 0 && ! "$1" =~ ^-- ]]; do
+        paths+=("$1")
+        shift
+      done
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
+
+if [[ -z "$question" ]]; then
+  echo "Error: --question is required" >&2
+  echo "Usage: scripts/bulk-read --question \"<question>\" --paths <file1> [<file2> ...]" >&2
+  exit 1
+fi
+
+if [[ ${#paths[@]} -eq 0 ]]; then
+  echo "Error: --paths is required" >&2
+  echo "Usage: scripts/bulk-read --question \"<question>\" --paths <file1> [<file2> ...]" >&2
+  exit 1
+fi
+
+# Validate paths
+for path in "${paths[@]}"; do
+  if [[ ! -f "$path" || ! -r "$path" ]]; then
+    echo "Error: file not found or unreadable: $path" >&2
+    exit 1
+  fi
+done
+
+# Temp file for prompt
+tmp_prompt="$(mktemp)"
+trap 'rm -f "${tmp_prompt}"' EXIT
+
+for path in "${paths[@]}"; do
+  {
+    printf '<file path="%s">\n' "$path"
+    cat "$path"
+    printf '\n</file>\n\n'
+  } >> "${tmp_prompt}"
+done
+
+printf 'Question: %s\n' "$question" >> "${tmp_prompt}"
+
+SYSTEM_INSTRUCTION="You are a precise code analyst. Read the provided files and answer the question concisely. Output structured bullets only. No greetings, no prose, no preambles, no summaries. Lead every bullet with the exact name, type, or line number. Use nested bullets for details. Skip anything the caller did not ask for."
+
+python3 "${WORKER_PY}" \
+  --prompt-file "${tmp_prompt}" \
+  --system-instruction "${SYSTEM_INSTRUCTION}" \
+  --temperature 0.2

@@ -103,6 +103,26 @@
             "timeout": 5000
           }
         ]
+      },
+      {
+        "matcher": "Read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/subway-file-size.cjs",
+            "timeout": 5000
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/subway-bash-read.cjs",
+            "timeout": 5000
+          }
+        ]
       }
     ],
     "PostToolUse": [
