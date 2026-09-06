@@ -8,6 +8,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 CODEX_AGENT = ROOT / ".codex/agents/pr-lifecycle-watcher.toml"
+CODEX_CONFIG = ROOT / ".codex/config.toml"
 CLAUDE_AGENT = ROOT / ".claude/agents/pr-lifecycle-watcher.md"
 ANTIGRAVITY_AGENT = ROOT / ".agents/agents/pr-lifecycle-watcher.md"
 ANTIGRAVITY_MCP = ROOT / ".agents/mcp_config.json"
@@ -121,11 +122,11 @@ def test_antigravity_registers_watcher_in_workspace_mcp_config():
 
 
 def test_every_agent_targets_the_same_single_tool_stdio_server():
-    with CODEX_AGENT.open("rb") as handle:
-        codex = tomllib.load(handle)
+    with CODEX_CONFIG.open("rb") as handle:
+        codex_config = tomllib.load(handle)
     _claude, _claude_body, claude_frontmatter = _markdown_agent(CLAUDE_AGENT)
 
-    codex_server = codex["mcp_servers"]["pr_lifecycle_watch"]
+    codex_server = codex_config["mcp_servers"]["pr_lifecycle_watch"]
     assert codex_server["command"] == "pnpm"
     assert codex_server["args"] == SERVER_ARGS
     assert codex_server["required"] is True
