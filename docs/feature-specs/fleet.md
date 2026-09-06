@@ -72,18 +72,18 @@
 
 ## Known divergences (code vs spec)
 
-| Spec                                           | Code today                                  | Resolution                     |
-| :--------------------------------------------- | :------------------------------------------ | :----------------------------- |
-| §2.1 `/fleet` route                            | Route does not exist                        | Implementation of route        |
-| §3.2 Sticky first column & sticky header       | No sticky table layout component            | Sticky table component         |
-| §4.1 Filter presets & URL state                | `MachineFilters` lacks PBM filter axes      | PBM filter extension           |
-| §5.1 PBM column group & near-miss detection    | Dashboard table not yet built               | Dashboard table implementation |
-| §6.1 Responsive per-machine inspection surface | No per-machine inspection pane/drawer built | Inspection surface component   |
+| Spec | Code today | Resolution |
+| :-- | :-- | :-- |
+| §2.1 `/fleet` route | Route does not exist | Implementation of route |
+| §3.2 Sticky first column & sticky header | No sticky table layout component | Sticky table component |
+| §4.1 Filter presets & URL state | `MachineFilters` lacks PBM filter axes | PBM filter extension |
+| §5.1 PBM column group & near-miss detection | Dashboard table not yet built | Dashboard table implementation |
+| §6.1 Responsive per-machine inspection surface | No per-machine inspection pane/drawer built | Inspection surface component |
 
 ---
 
 ## Changelog
 
-| Date       | Change                                                                                                                                                                                                                                              |
-| :--------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Date | Change |
+| :-- | :-- |
 | 2026-09-05 | Created. Establishes requirements for member+ status table at `/fleet` (§2–§3), URL-driven filter presets (§4), PBM column group & edition near-misses (§5), desktop side-pane / mobile bottom-sheet inspection surface (§6), and permissions (§7). |

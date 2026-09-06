@@ -95,16 +95,71 @@ Closes #N (if applicable)
 
 ## Phase 3: Review (CI + review + label)
 
+### Delegated Watcher Architecture (Lightweight Subagents)
+
+Watching CI and awaiting review are passive waits. To conserve token quota and context in capable reasoning models (Claude 3.7 Sonnet / Opus, OpenAI o3 / GPT-5, Gemini 2.5 Pro), **delegate the wait to lightweight, fast watcher subagents** running deterministic `pr-watch.py --json`.
+
+#### Recommended Watcher Models
+
+| Harness         | Subagent Tool     | Recommended Model                                                        | Invocation Shape                                                                                                     |
+| :-------------- | :---------------- | :----------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------- |
+| **Claude Code** | `Agent`           | `haiku`                                                                  | `Agent(subagent_type: "general-purpose", model: "haiku", prompt: "...")`                                             |
+| **Antigravity** | `invoke_subagent` | `flash_lite` (or `flash`)                                                | `invoke_subagent(Subagents: [{TypeName: "self", Role: "PR Lifecycle Watcher", Model: "flash_lite", Prompt: "..."}])` |
+| **Codex**       | `spawn_agent`     | Prefer `gpt-5.3-codex-spark`; otherwise the fastest callable model shown | `spawn_agent(task_name: "pr_watch", fork_turns: "none", message: "...")`                                             |
+
+Model availability is a runtime capability, not a name this skill may invent. In
+Codex, use Spark only when `spawn_agent` lists it as a supported override; otherwise
+choose the fastest advertised callable model. Pass `model` and `reasoning_effort` only
+when the current tool schema exposes those fields; older Codex harnesses accept only
+the required context-isolation and message fields. Record the exact model ID reported
+by the harness in telemetry, or `unknown` when the harness exposes no resolved ID.
+
+#### Division of Responsibilities
+
+- **Capable Owner Model**: Owns all mutations and strategic decisions. Formats/edits code, commits, pushes, promotes draft PRs (`gh pr ready`), executes `request-codex-review.sh <PR>`, inspects and replies to review comments, resolves review threads, shoots screenshots, and runs `merge-handoff.sh`.
+- **Lightweight Watcher Subagent**: Strictly read-only. Runs `scripts/workflow/pr-watch.py <PR> --phase <ci|review> --expected-head <SHA> --json`. Blocks until exit, returns the terminal JSON payload to the owning agent, and exits. Never mutates files, never requests review, never comments or resolves threads.
+
+#### Bounded Dispatch Envelope
+
+Give the watcher only the worktree path, PR number and title, phase, full expected
+head SHA, exact command, and the instruction to return stdout's terminal JSON record.
+Never include implementation diffs, history, or the owning task's transcript. Codex
+must set `fork_turns: "none"`; use the equivalent isolated-context option when another
+harness exposes one.
+
+Set telemetry on the deterministic command, using the model ID the harness actually
+resolved rather than its selector alias:
+
+```bash
+GH_MONITOR_HARNESS=<harness> GH_MONITOR_MODEL=<resolved-model-id> \
+  python3 scripts/workflow/pr-watch.py <PR> --phase <ci|review> \
+  --expected-head <FULL_HEAD_SHA> --json
+```
+
+---
+
 ### 3.1 Watch CI
 
-`./scripts/workflow/pr-watch.py <PR>`, via the Monitor tool. Exit 0 = all passed. Exit 1 =
-failure — read `tmp/gh-monitor/failure-<RUN_ID>.md`.
+After pushing a commit (at `HEAD_SHA`), dispatch a lightweight watcher subagent (or run directly via Monitor):
+
+```bash
+python3 scripts/workflow/pr-watch.py <PR> --phase ci --expected-head <HEAD_SHA> --json
+```
 
 For a new draft PR, keep it draft until `CI Gate` succeeds for the current head, then
 run `gh pr ready <PR>`, then request the review in 3.4. Promotion alone does not start a
 Codex review. A green run for an older SHA does not qualify.
 
-If you judge the failure to be a GitHub Actions **infra** flake (network timeout, runner loss, download 5xx, Supabase container-start) rather than a real code/test failure, log it before rerunning: `bash scripts/workflow/log-gha-flake.sh <pr> <run-id> <class> "<symptom>"` (see `docs/runbooks/gha-flake-log.md`).
+**Stream discipline**: In `--json` mode, progressive logs go to `stderr`, and `stdout` receives strictly the terminal JSON object upon exit. Foreground subagents block until exit without token-wasting intermediate wakeups.
+
+**Handling the CI result**:
+
+- `outcome: "passed"` (exit 0): CI Gate passed on `HEAD_SHA`. If the PR is draft, run `gh pr ready <PR>`, then proceed to request Codex review in 3.4.
+- `outcome: "failed"` (exit 1): A run or CI Gate failed. Inspect the failure artifact at `failure_artifact` (under `tmp/gh-monitor/`), address the failure, commit, and push.
+  - If judged to be a GitHub Actions **infra** flake (network timeout, runner loss, download 5xx, container start): log it with `bash scripts/workflow/log-gha-flake.sh <pr> <run-id> <class> "<symptom>"` before retrying.
+- `outcome: "stale"` (exit 1): The PR head moved away from `expected_head`. The owner re-checks branch state.
+- `outcome: "conflicting"` (exit 1): Merge conflict developed (`DIRTY` or `CONFLICTING`). Merge `origin/main` into the branch and push.
+- `outcome: "timed_out"` or `"undetermined"` (exit 2): Re-run or investigate API reachability.
 
 ### 3.2 Check for review comments
 
@@ -119,23 +174,28 @@ Every unresolved thread counts, whoever opened it — the `threads` gate is auth
 ### 3.4 Get the head commit reviewed
 
 **Codex review is manual-only.** Tim's personal automatic-review trigger stays off.
-After current-head CI succeeds and the PR is ready, the owner requests exactly one
-review for that head. The gate accepts a native `APPROVED` review whose
-`commit_id` equals the PR head, the connector's no-major-issues issue comment naming a
-10- or 40-character prefix of that head, or a trusted GitHub Actions comment witnessing
-a fresh connector-bot `eyes`→`+1` transition while that exact SHA remained head. Direct
-reactions are never merge evidence because GitHub reactions carry no commit SHA. Codex
-reviews and clean comments require exact account `chatgpt-codex-connector[bot]`; clean
-comments also require exact app slug `chatgpt-codex-connector` and the known clean-result
-prefix. A reaction witness requires exact account `github-actions[bot]`, exact app slug
-`github-actions`, and the SHA-pinned witness marker. An older result is stale.
-Among records for the same head, a later native finding overrides an earlier clean
-comment; no delayed review, clean comment, or manual marker for an older SHA can
-invalidate current-head coverage.
-A native `COMMENTED` or `CHANGES_REQUESTED` review also completes review coverage for
-its exact head once every associated thread has been replied to and resolved. Dismissed,
-pending, or unknown review states fail closed. The adjudicated terminal state needs no
-manual re-review when a finding is explicitly declined without a push.
+After current-head CI succeeds and the PR is ready:
+
+1. **Owner requests review**:
+
+   ```bash
+   bash scripts/workflow/request-codex-review.sh <PR>
+   ```
+
+   This verifies current-head CI passed and posts the SHA-pinned `@codex review` comment. Exactly one request per intended head commit.
+
+2. **Owner dispatches lightweight review watcher**:
+
+   ```bash
+   python3 scripts/workflow/pr-watch.py <PR> --phase review --expected-head <HEAD_SHA> --json
+   ```
+
+3. **Handling the review result**:
+   - `outcome: "passed"` (exit 0): Exact-head review coverage present (native approval, clean reaction witness, clean comment, marker, or reviewed) AND 0 unresolved threads. Proceed to UI screenshots in 3.5, apply the `ready-for-review` label in 3.6, then enter the Phase 4 merge handoff.
+   - `outcome: "action_required"` (exit 1): Either exact-head review present but unresolved threads remain (>0), or review was `not_approved`. The owner adjudicates findings: fixes code or replies to/declines threads, then resolves them. If code changed, push and re-start at Phase 3.1. If all threads were resolved with no code change, exact-head coverage is complete.
+   - `outcome: "stale"` (exit 1): Branch head moved; re-orient to the new head.
+   - `outcome: "conflicting"` (exit 1): Merge conflict; merge `main` and push.
+   - `outcome: "timed_out"` / `"undetermined"` (exit 2): Re-run watch or inspect GitHub API.
 
 The owning agent stays assigned through the whole loop: monitor current-head CI and
 review, address or explicitly decline every finding, resolve every thread, push fixes,
@@ -318,7 +378,7 @@ Never say "ready to push when you are" — you push. Never say a PR is "merged" 
 
 **On any FAIL the script removes the `ready-for-review` label if present** (and likewise on the `--automerge` RED path). The label's contract is "click-merge-without-thinking"; if a gate fails at merge time that contract is broken, so the label goes. Practical consequence: after Tim reports a FAIL, fix the underlying issue, push, and **re-apply the label** (3.6) before re-handing him the `--human` command — don't assume it survived.
 
-**A `reviewed` FAIL is almost never a `--force` case.** `unreviewed` means neither path covers head, `stale_approval` / `stale_clean_comment` / `stale_marker` mean you pushed past the review record, and `not_approved` means the latest non-approval review covers another SHA — all describe an unfinished PR, not a broken gate. Take either honest path in 3.4 and cover head.
+**A `reviewed` FAIL is almost never a `--force` case.** `unreviewed` means neither path covers head, `stale_approval` / `stale_clean_comment` / `stale_marker` mean you pushed past the review record, and `not_approved` means the current-head review is unusable — all describe an unfinished PR, not a broken gate. Take either honest path in 3.4 and cover head.
 
 `--bypass-merge-requirements` is for a required check failing for known-irrelevant reasons (infrastructure flake, unrelated job) where the change has been manually verified safe — log the flake first with `bash scripts/workflow/log-gha-flake.sh <pr> <run-id> <class> "<symptom>"` (see `docs/runbooks/gha-flake-log.md`) — or an emergency hotfix where waiting for CI is not acceptable. Do NOT suggest bypassing when a merge conflict exists, or when the underlying state hasn't been manually verified.
 
