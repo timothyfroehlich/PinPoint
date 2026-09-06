@@ -9,25 +9,28 @@ vi.mock("~/app/(app)/m/pinballmap-actions", () => ({
 }));
 
 describe("PinballmapAbandonedEntries", () => {
-  it("links each manual cleanup to the location where that entry was abandoned", () => {
+  const entries = [
+    {
+      lmxId: 101,
+      locationUrl: "https://pinballmap.com/map?by_location_id=10",
+      title: "Old title",
+      commentCount: 0,
+    },
+    {
+      lmxId: 202,
+      locationUrl: "https://pinballmap.com/map?by_location_id=20",
+      title: "Older title",
+      commentCount: 0,
+    },
+  ] as const;
+
+  it("links each manual cleanup to its location when an authorized viewer lacks credentials", () => {
     render(
       <PinballmapAbandonedEntries
         machineId="machine-1"
-        entries={[
-          {
-            lmxId: 101,
-            locationUrl: "https://pinballmap.com/map?by_location_id=10",
-            title: "Old title",
-            commentCount: 0,
-          },
-          {
-            lmxId: 202,
-            locationUrl: "https://pinballmap.com/map?by_location_id=20",
-            title: "Older title",
-            commentCount: 0,
-          },
-        ]}
-        canPush={false}
+        entries={entries}
+        canPush={true}
+        writeEnabled={false}
       />
     );
 
@@ -42,5 +45,25 @@ describe("PinballmapAbandonedEntries", () => {
       "href",
       "https://pinballmap.com/map?by_location_id=20"
     );
+  });
+
+  it("shows no cleanup affordance to a viewer without the push capability", () => {
+    render(
+      <PinballmapAbandonedEntries
+        machineId="machine-1"
+        entries={entries}
+        canPush={false}
+        writeEnabled={true}
+      />
+    );
+
+    expect(
+      screen.queryByRole("link", { name: "Remove it on Pinball Map" })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", {
+        name: "Remove machine from Pinball Map",
+      })
+    ).not.toBeInTheDocument();
   });
 });
