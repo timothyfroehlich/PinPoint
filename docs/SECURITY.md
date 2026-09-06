@@ -26,6 +26,20 @@ The `'strict-dynamic'` directive allows scripts loaded by nonce'd scripts to exe
 
 **Supabase project-level captcha protection must remain disabled** for the project. Because PinPoint does not send captcha tokens with authentication or report requests, enabling captcha at the Supabase project level will cause auth requests to fail with `captcha_failed`.
 
+## Database Authorization & RPC Perimeter
+
+PinPoint is a single-tenant application with no multi-tenancy and no database-level Row Level Security (RLS) enforcement on application queries:
+
+- **Drizzle connects via `POSTGRES_URL` with `BYPASSRLS`**: The Drizzle database user has `BYPASSRLS`. Database RLS policies are not evaluated for application queries, and the database does not filter rows based on session context.
+- **Application endpoints and page loaders form the primary application authorization perimeter**: Because the database does not enforce row security for application queries, all request entry points—Server Components and page data loaders (`src/app/**`), Server Actions (`"use server"`), Route Handlers (`src/app/api/**`), and MCP endpoints—must enforce authorization at the application layer before disclosing restricted data or persisting mutations.
+- **Layered endpoint authorization**:
+  - **Server Components & Page Loaders**: Layouts and data-loaders query Drizzle directly with `BYPASSRLS`. Restricted layouts (such as `src/app/(app)/admin/layout.tsx`) gate rendering by checking permissions, and resource-specific pages apply access predicates (e.g. `canViewCollection`) before disclosing entity data.
+  - **Protected Server Actions**: Non-anonymous Server Actions must authenticate the user (`getUser()`). Actions exercising role- or matrix-governed capabilities verify authorization via `checkPermission()` against `src/lib/permissions/matrix.ts` (or domain predicates under `src/lib/permissions/`), while pre-auth actions (`loginAction`, `signupAction`, `forgotPasswordAction`) remain intentionally open.
+  - **Route Handlers**: Enforce route-specific authorization guards appropriate to the surface, such as HMAC token verification (`/api/unsubscribe`), CRON secret headers via `assertCronAuthorized()` (`/api/cron/*`), or webhook signature checks.
+  - **MCP Tools**: Protected by a layered gate—HTTP-level admin bearer token authentication (`withMcpAuth` in `src/app/api/mcp/mcp/route.ts`) before dispatch, followed by per-tool permission and ownership checks.
+- **SECURITY DEFINER RPCs (Database-level boundary)**: Postgres functions returning secrets (e.g., `get_discord_config()`, `get_pinballmap_credentials()`) are exposed directly to HTTP callers over PostgREST (`POST /rest/v1/rpc/<name>`). Because Supabase re-grants `EXECUTE` on `public.*` functions to `authenticated` at connection time, `REVOKE`/`GRANT` alone is insufficient defense in depth. These functions enforce an explicit database-level authorization boundary via an in-body `IF COALESCE(auth.role(), '') <> 'service_role' THEN RAISE EXCEPTION ...` check (see migrations 0029 and 0062) to prevent authenticated members from retrieving Vault secrets.
+- **Client and UI checks are UX affordances only**: Client-side checks (`canEdit`, `getPermissionDeniedReason`, `getPermissionState`) exist only to drive UI state (e.g., disabling buttons or rendering explanatory messages). They are never security boundaries.
+
 ## Threat Model
 
 ### Not Protected Against
