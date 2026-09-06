@@ -59,6 +59,7 @@ case "$1" in
   merge-main)
     [[ $# -eq 1 ]] || usage
     development_branch >/dev/null
+    git fetch origin
     exec git merge origin/main
     ;;
   *) usage ;;

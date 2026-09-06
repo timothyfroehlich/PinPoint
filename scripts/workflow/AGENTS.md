@@ -25,6 +25,8 @@ non-`main` worktree branch without a force or discard flag, pushes only the curr
 non-`main` branch to the same branch name on `origin`, and merges only `origin/main`.
 Raw `git commit`, `git push`, `git checkout`, `git switch`, and `git merge` invocations
 intentionally require approval.
+`merge-main` fetches `origin` immediately before the merge so the tracking ref cannot be
+stale.
 
 Raw `gh` stays forbidden because case-insensitive and host-qualified repository selectors
 cannot be normalized by an exact argv-prefix rule. Routine read-only commands stay

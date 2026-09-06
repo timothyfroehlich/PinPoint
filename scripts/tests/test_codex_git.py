@@ -11,7 +11,10 @@ SCRIPT = Path(__file__).parent.parent / "workflow" / "codex-git.sh"
 
 
 def run_wrapper(
-    tmp_path: Path, *args: str, branch: str = "codex/test"
+    tmp_path: Path,
+    *args: str,
+    branch: str = "codex/test",
+    fail_command: str = "",
 ) -> tuple[subprocess.CompletedProcess[str], list[str]]:
     calls = tmp_path / "git-calls"
     git = tmp_path / "git"
@@ -19,6 +22,7 @@ def run_wrapper(
         "#!/usr/bin/env bash\n"
         "set -euo pipefail\n"
         'printf \'%s\\0\' "$@" >> "$STUB_GIT_CALLS"\n'
+        'if [[ -n "$STUB_FAIL_COMMAND" && $1 == "$STUB_FAIL_COMMAND" ]]; then exit 42; fi\n'
         "if [[ $1 == rev-parse && $2 == --show-toplevel ]]; then\n"
         "  printf '%s\\n' \"$STUB_REPOSITORY_ROOT\"\n"
         "elif [[ $1 == symbolic-ref ]]; then\n"
@@ -30,6 +34,7 @@ def run_wrapper(
         **os.environ,
         "PATH": f"{tmp_path}{os.pathsep}{os.environ['PATH']}",
         "STUB_BRANCH": branch,
+        "STUB_FAIL_COMMAND": fail_command,
         "STUB_GIT_CALLS": str(calls),
         "STUB_REPOSITORY_ROOT": str(SCRIPT.parent.parent.parent),
     }
@@ -85,6 +90,8 @@ def run_wrapper(
                 "--quiet",
                 "--short",
                 "HEAD",
+                "fetch",
+                "origin",
                 "merge",
                 "origin/main",
             ],
@@ -160,4 +167,20 @@ def test_refuses_mutations_on_main(tmp_path: Path, args: tuple[str, ...]) -> Non
         "--quiet",
         "--short",
         "HEAD",
+    ]
+
+
+def test_merge_main_stops_when_fetch_fails(tmp_path: Path) -> None:
+    result, calls = run_wrapper(tmp_path, "merge-main", fail_command="fetch")
+
+    assert result.returncode == 42
+    assert calls == [
+        "rev-parse",
+        "--show-toplevel",
+        "symbolic-ref",
+        "--quiet",
+        "--short",
+        "HEAD",
+        "fetch",
+        "origin",
     ]
