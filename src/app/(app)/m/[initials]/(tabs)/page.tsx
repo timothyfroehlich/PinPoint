@@ -11,6 +11,7 @@ import { MachineRecentActivity } from "~/components/machines/timeline/MachineRec
 import {
   getAccessLevel,
   checkPermission,
+  canAccessMachineManage,
   type OwnershipContext,
 } from "~/lib/permissions/index";
 import { getMachineForLayout } from "../_data";
@@ -163,14 +164,10 @@ export default async function MachineInfoTab({
       // wrong.
       (await listSurfacingAbandonedForMachine(machine.id)).length > 0);
 
-  // The Manage tab gates on `machines.edit`, which is a narrower grant than
-  // `diagnose` — so a member who can see the warning may not be able to open
-  // the page it would link to.
-  const canOpenManage = checkPermission(
-    "machines.edit",
-    accessLevel,
-    ownershipContext
-  );
+  // Manage admits editors to the full page and refresh-capable members to its
+  // read-only Pinball Map section (spec 4.9). Keep this in step with the shared
+  // tab layout and the route-level deep-link guard.
+  const canOpenManage = canAccessMachineManage(accessLevel, ownershipContext);
 
   const rail = (
     <InfoRail

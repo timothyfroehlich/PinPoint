@@ -99,7 +99,7 @@ test.describe("Technician Role Permissions", () => {
     // Navigate to a machine owned by admin (Addams Family initials are TAF in seed)
     await page.goto("/m/TAF");
 
-    // The Manage tab only renders for viewers holding `machines.edit`
+    // Technicians hold `machines.edit`, so Manage renders its full surface.
     await openMachineManageTab(page);
     await expect(page).toHaveURL(/\/edit$/);
 
