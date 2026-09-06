@@ -363,7 +363,10 @@ jobs:
         run: python3 -m pip install -r scripts/requirements.txt
 
       - name: YAML lint
-        run: yamllint .github/workflows/ .github/actions/setup-mise/action.yml
+        run: yamllint .
+
+      - name: Check skill frontmatter
+        run: python3 scripts/check_skill_frontmatter.py
 
       - name: Action lint
         env:
