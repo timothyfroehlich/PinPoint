@@ -191,6 +191,14 @@ def test_package_scripts_share_canonical_gate_graphs() -> None:
         "python3 scripts/quiet-run.py --label test -- pnpm run test:_run"
     )
     assert scripts["test:human"].startswith("pnpm run test:_run")
+    assert scripts["test:changed"].endswith(
+        "-- pnpm run test:changed:_run -- --silent --no-color --reporter=dot"
+    )
+    assert scripts["test:changed:human"] == (
+        "pnpm run test:changed:_run -- --reporter=verbose"
+    )
+    assert scripts["e2e:all"].endswith("-- pnpm run e2e:all:_run")
+    assert scripts["e2e:all:human"] == "pnpm run e2e:all:_run"
     assert scripts["preflight:unlocked"].endswith("-- pnpm run preflight:_run")
     assert scripts["preflight:unlocked:human"] == "pnpm run preflight:_run"
 
