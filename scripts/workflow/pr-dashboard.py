@@ -306,16 +306,18 @@ def _native_review_record(reviews: list[dict[str, Any]], head: str) -> ReviewRec
         return ReviewRecord("approval", sha, submitted_at)
     if state == "APPROVED":
         return ReviewRecord("stale_approval", sha, submitted_at)
-    if sha == head and state in {"COMMENTED", "CHANGES_REQUESTED"}:
-        return ReviewRecord("reviewed", sha, submitted_at)
-    return ReviewRecord("not_approved", sha, submitted_at)
+    if sha == head:
+        if state in {"COMMENTED", "CHANGES_REQUESTED"}:
+            return ReviewRecord("reviewed", sha, submitted_at)
+        return ReviewRecord("not_approved", sha, submitted_at)
+    return ReviewRecord("stale_approval", sha, submitted_at)
 
 
 def _comment_records(
     comments: list[dict[str, Any]], head: str, owner: str
 ) -> tuple[list[ReviewRecord], list[ReviewRecord], list[ReviewRecord]]:
-    automatic: list[ReviewRecord] = []
-    fallback_requests: list[ReviewRecord] = []
+    codex_results: list[ReviewRecord] = []
+    review_requests: list[ReviewRecord] = []
     markers: list[ReviewRecord] = []
     for comment in comments:
         body = comment.get("body") or ""
@@ -333,7 +335,7 @@ def _comment_records(
                 r"\*\*Reviewed commit:\*\* `([0-9a-f]{10}|[0-9a-f]{40})`", body
             )
             if match is not None:
-                automatic.append(ReviewRecord("clean_comment", match.group(1), at))
+                codex_results.append(ReviewRecord("clean_comment", match.group(1), at))
         if (
             login == GITHUB_ACTIONS_BOT
             and app == GITHUB_ACTIONS_APP_SLUG
@@ -343,11 +345,9 @@ def _comment_records(
                 r"<!-- pinpoint-codex-reaction-witness: ([0-9a-f]{40}) -->", body
             )
             if match is not None:
-                automatic.append(ReviewRecord("clean_reaction", match.group(1), at))
+                codex_results.append(ReviewRecord("clean_reaction", match.group(1), at))
         if login == owner and (match := CODEX_REVIEW_REQUEST_RE.fullmatch(body)):
-            fallback_requests.append(
-                ReviewRecord("fallback_exhausted", match.group(1), at)
-            )
+            review_requests.append(ReviewRecord("review_requested", match.group(1), at))
         if body.startswith(REVIEW_MARKER_PREFIX) or body.startswith(
             LEGACY_REVIEW_MARKER_PREFIX
         ):
@@ -357,34 +357,34 @@ def _comment_records(
             )
             if match is not None:
                 markers.append(ReviewRecord("marker", match.group(1), at))
-    automatic.sort(key=lambda record: record.at)
-    fallback_requests.sort(key=lambda record: record.at)
+    codex_results.sort(key=lambda record: record.at)
+    review_requests.sort(key=lambda record: record.at)
     markers.sort(key=lambda record: record.at)
-    return automatic, fallback_requests, markers
+    return codex_results, review_requests, markers
 
 
 def _comment_review_record(
     comments: list[dict[str, Any]], head: str, owner: str
 ) -> ReviewRecord:
-    automatic, fallback_requests, markers = _comment_records(comments, head, owner)
+    codex_results, review_requests, markers = _comment_records(comments, head, owner)
     current_markers = [record for record in markers if record.sha == head]
     if current_markers:
         return current_markers[-1]
-    current_automatic = [
+    current_codex_results = [
         record
-        for record in automatic
+        for record in codex_results
         if (
             head.startswith(record.sha)
             if record.state == "clean_comment"
             else record.sha == head
         )
     ]
-    if current_automatic:
-        return current_automatic[-1]
-    current_fallbacks = [record for record in fallback_requests if record.sha == head]
-    if current_fallbacks:
-        return current_fallbacks[-1]
-    stale = markers + automatic
+    if current_codex_results:
+        return current_codex_results[-1]
+    current_requests = [record for record in review_requests if record.sha == head]
+    if current_requests:
+        return current_requests[-1]
+    stale = markers + codex_results
     if not stale:
         return ReviewRecord("unreviewed")
     latest = max(stale, key=lambda record: record.at)
@@ -408,7 +408,13 @@ def _combined_review_state(native: ReviewRecord, comment: ReviewRecord) -> str:
         return comment.state if comment.at > native.at else native.state
     if native.state == "reviewed":
         return native.state
-    if comment.state == "fallback_exhausted":
+    if (
+        native.state == "not_approved"
+        and comment.state == "review_requested"
+        and native.sha == comment.sha
+    ):
+        return native.state
+    if comment.state == "review_requested":
         return comment.state
     if comment.state == "unreviewed":
         return native.state
@@ -424,8 +430,8 @@ def _review_label(state: str) -> str:
         return "NOT APPROVED"
     if state == "unreviewed":
         return "NOT REVIEWED"
-    if state == "fallback_exhausted":
-        return "FALLBACK USED"
+    if state == "review_requested":
+        return "REQUESTED"
     return "?"
 
 
