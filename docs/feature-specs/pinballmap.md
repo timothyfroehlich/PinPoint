@@ -170,7 +170,7 @@ Replacing the tracked location is a rare, near-never operation — PinPoint trac
 | 7.3 comment marking on removal | Not implemented | PP-o355.36 |
 | §10 admin section (whole surface) | No Pinball Map admin section exists — `src/app/(app)/admin/integrations/` has only the standalone Discord route. The section itself and every action in it — the location field, Sync now (§10.3), link-out (§10.4), clearing (§10.7), and the validate/commit + confirmation flow (§10.9, §10.15) — are unbuilt | PP-o355.51.6 |
 | 10.2 sync-health readout | Fields exist on `pinballmap_state`; nothing renders them in admin | PP-o355.51.6 |
-| 10.9 / 10.13 validate-then-switch through allowance | No location-save path exists | PP-o355.51.6 |
+| §10.9 / §10.13 Check ID decoupled from Save | `setTrackedLocation` exists (PP-o355.51.6.1) but couples the fetch to the save — it validates via `syncLocationSnapshot` on the save call itself | Reshape so the Check ID action performs the fetch and Save commits that already-fetched snapshot — one allowance token, not two. PP-o355.51.6 |
 | 10.9 comment re-marking on location change | No comment import exists | PP-o355.4 (import); permanent mark-on-location-change after |
 
 ---

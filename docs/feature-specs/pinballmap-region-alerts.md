@@ -20,7 +20,7 @@ Related: `docs/feature-specs/pinballmap.md` (the location-sync integration), `do
 
 - **2.1** Fields:
   - **Region** — which Pinball Map region to watch, one at a time, chosen from a list of regions read from Pinball Map (not free text).
-  - **Alert channel** — the text channel the alerts post to, chosen from a list of the server's channels read from Discord (`GET /guilds/{guild_id}/channels`), not a hand-entered id. Clearing it turns region alerts off (§2.2).
+  - **Alert channel** — the text channel the alerts post to, chosen from a list of the channels in the Discord server configured in `discord.md` (its Server ID), read from Discord (`GET /guilds/{guild_id}/channels`) — not a hand-entered id. A configured Discord integration (token + server ID, `discord.md` §2.2) is a prerequisite for choosing or changing the channel; clearing the Server ID turns Discord off (`discord.md` §2.6), which turns region alerts off too. Clearing just the channel turns region alerts off (§2.2).
 - **2.2** No enable flag. Region alerts are on when a region and an alert channel are configured and the Discord bot token is present. To turn them off, clear the alert channel.
 - **2.3** Saving checks the alert channel against Discord — reachable, and the bot's permissions look sufficient to post — and stores the result as the channel status (§3). The check is best-effort: only a real post fully confirms the bot can post (§2.4, §3.3). The save always persists the entered config, even when the check fails (CORE-ARCH-012).
 - **2.4** A **Send test message** action posts a test line to the alert channel. A real post is the only definitive proof the bot can post, so this both lets an admin confirm the setup and updates the channel status (§3.3).
