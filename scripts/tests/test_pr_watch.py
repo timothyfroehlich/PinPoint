@@ -1169,7 +1169,11 @@ def test_review_state_unusable_current_head_state_fails_closed(monkeypatch, stat
             comments=[manual_review_request()],
         ),
     )
-    assert pr_watch.review_state(PR)[0] == "not_approved"
+    review_state, detail = pr_watch.review_state(PR)
+    assert review_state == "not_approved"
+    assert "already requested" in detail
+    assert "do not request the same head again" in detail
+    assert "request-codex-review.sh" not in detail
 
 
 @pytest.mark.unit
@@ -1607,6 +1611,39 @@ def test_watch_phase_review_action_required_when_not_approved(monkeypatch):
     assert last_args[1] == "action_required"
     assert last_kwargs.get("outcome") == "action_required"
     assert last_kwargs.get("review_state") == "not_approved"
+
+
+@pytest.mark.unit
+def test_watch_phase_review_timeout_preserves_last_observed_state(monkeypatch):
+    monkeypatch.setattr(
+        pr_watch,
+        "_current_head_merge_snapshot",
+        lambda _pr: (HEAD_SHA, "CLEAN"),
+    )
+    monkeypatch.setattr(
+        pr_watch,
+        "review_state",
+        lambda _pr, *, head_sha: ("review_requested", "already requested"),
+    )
+    monotonic_values = iter([0.0, 0.0, 1.0])
+    monkeypatch.setattr(pr_watch.time, "monotonic", lambda: next(monotonic_values))
+    monkeypatch.setattr(pr_watch.time, "sleep", lambda _seconds: None)
+    states = []
+
+    exit_code = pr_watch._watch_phase_review(
+        PR,
+        HEAD_SHA,
+        timeout_sec=0.5,
+        poll_sec=0,
+        state_sink=lambda *args, **kwargs: states.append((args, kwargs)),
+    )
+
+    assert exit_code == pr_watch.EXIT_UNDETERMINED
+    last_args, last_kwargs = states[-1]
+    assert last_args[1] == "timed_out"
+    assert last_kwargs.get("outcome") == "timed_out"
+    assert last_kwargs.get("review_state") == "review_requested"
+    assert last_kwargs.get("merge_state") == "CLEAN"
 
 
 @pytest.mark.unit

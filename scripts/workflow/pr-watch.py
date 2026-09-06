@@ -885,15 +885,20 @@ def review_state(pr: int, *, head_sha: str | None = None) -> tuple[str, str]:
             f"Codex reviewed head {head_sha[:7]} with {state}; thread gate owns findings",
         )
 
+    review_requested = any(
+        request_sha == head_sha for request_sha, _at in review_requests
+    )
     if reviews and review_sha == head_sha:
+        remediation = (
+            REVIEW_REQUESTED_HINT if review_requested else REVIEW_HINT.format(pr=pr)
+        )
         return (
             "not_approved",
             f"Codex reviewed current head {review_sha[:7]} with unusable state "
-            f"{state}; "
-            f"{REVIEW_HINT.format(pr=pr)}",
+            f"{state}; {remediation}",
         )
 
-    if any(request_sha == head_sha for request_sha, _at in review_requests):
+    if review_requested:
         return "review_requested", REVIEW_REQUESTED_HINT
 
     latest_marker_sha, latest_marker_at = max(
@@ -1592,6 +1597,8 @@ def _watch_phase_review(
     """
     deadline = time.monotonic() + timeout_sec
     last_signature: tuple[str, str, int] | None = None
+    last_review_state = "unreviewed"
+    last_merge_state = "UNKNOWN"
 
     def read_review_evidence(head_sha: str) -> tuple[str, str, bool, int]:
         state_kind, state_desc = review_state(pr, head_sha=head_sha)
@@ -1777,6 +1784,8 @@ def _watch_phase_review(
                 if not terminal_candidate:
                     break
 
+        last_review_state = state_kind
+        last_merge_state = merge_state
         if accepted_review:
             if unresolved == 0:
                 detail = f"Review coverage complete on {head_sha[:7]} ({state_kind}) with 0 unresolved threads ✓"
@@ -1859,6 +1868,8 @@ def _watch_phase_review(
             detail,
             None,
             outcome="timed_out",
+            review_state=last_review_state,
+            merge_state=last_merge_state,
         )
     return EXIT_UNDETERMINED
 
