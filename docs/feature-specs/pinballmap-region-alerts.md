@@ -20,8 +20,8 @@ Related: `docs/feature-specs/pinballmap.md` (the location-sync integration), `do
 
 - **2.1** Fields:
   - **Region** — which Pinball Map region to watch, one at a time, chosen from a list of regions read from Pinball Map (not free text).
-  - **Alert channel** — the text channel the alerts post to, chosen from the channel list of the Discord server configured in `discord.md` (its Server ID), read from Discord — not a hand-entered id. With no configured Discord server there is nothing to pick from. Clearing the channel turns region alerts off (§2.2).
-- **2.2** No enable flag. Region alerts are on when a region and an alert channel are configured and the Discord bot token is present. To turn them off, clear the alert channel. (The Server ID's role in activation, validated-Discord state, and the status for a cleared Server ID are region-alerts feature design — PP-o355.51.7; see the divergence table.)
+  - **Alert channel** — the Discord channel id the alerts post to.
+- **2.2** No enable flag. Region alerts are on when a region and an alert channel are configured and the Discord bot token is present. To turn them off, clear the alert channel.
 - **2.3** Saving checks the alert channel against Discord — reachable, and the bot's permissions look sufficient to post — and stores the result as the channel status (§3). The check is best-effort: only a real post fully confirms the bot can post (§2.4, §3.3). The save always persists the entered config, even when the check fails (CORE-ARCH-012).
 - **2.4** A **Send test message** action posts a test line to the alert channel. A real post is the only definitive proof the bot can post, so this both lets an admin confirm the setup and updates the channel status (§3.3).
 - **2.5** Changing the region starts the new region from a clean slate: its seen-set is bootstrapped so the switch does not announce the new region's whole existing state as "new" (§4.4).
@@ -60,7 +60,6 @@ Related: `docs/feature-specs/pinballmap.md` (the location-sync integration), `do
 | :-- | :-- | :-- |
 | §2.1 region chosen from a list | Region is the hardcoded `PBM_AUSTIN_REGION` constant | Add a regions-list read from Pinball Map; make it a stored field |
 | §2.1 alert channel in config | Channel is the `DISCORD_PBM_ALERT_CHANNEL_ID` env var (`getRegionAlertChannelId`) | Move to DB; configure in the admin card |
-| §2 activation vs the Discord Server ID / validated state | `runRegionNewMachineAlerts` gates only on the alert channel + bot token (`getRegionAlertChannelId`, `getDiscordBotToken`) — it ignores the Server ID and Discord validation/health, so a Server-ID change or a not-yet-validated Discord state does not deactivate alerts, and §3.2 has no status for a cleared Server ID | PP-o355.51.7 (region-alerts feature) defines the Server ID's role in activation, whether a non-validated Discord state deactivates, guild-change channel invalidation, and the missing-Server-ID status |
 | §2.3 channel validated + status | Channel is used blind; no validation, no stored status | Validate on save; store channel status |
 | §2.4 Send test message | No test action; the channel is only exercised by the hourly cron | Add a Send test message button |
 | §3 stored status | No status surfaced anywhere in admin | Build the status readout |
@@ -74,7 +73,6 @@ Related: `docs/feature-specs/pinballmap.md` (the location-sync integration), `do
 
 ## Changelog
 
-| Date | Change |
-| :-- | :-- |
-| 2026-09-05 | Alert channel (§2.1) is a dropdown of the server's text channels read from Discord (`GET /guilds/{guild_id}/channels`), not a hand-entered id. Config-card design, PP-o355.51.6.2. |
+| Date       | Change   |
+| :--------- | :------- |
 | 2026-08-22 | Created. |
