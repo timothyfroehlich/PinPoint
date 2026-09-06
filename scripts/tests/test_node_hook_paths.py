@@ -83,6 +83,7 @@ EXPECTED_NODE_HOOK_BASENAMES = [
     "inject-beads-actor.cjs",
     "block-direct-merge.cjs",
     "block-main-worktree-branch-switch.cjs",
+    "block-direct-pr-watch.cjs",
     "ui-screenshot-reminder.cjs",
     "verify-guard-stack.cjs",
 ]

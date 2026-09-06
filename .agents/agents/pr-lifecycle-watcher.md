@@ -1,22 +1,12 @@
 ---
 name: pr-lifecycle-watcher
 description: Waits for one PinPoint PR CI or review phase at an exact head and returns terminal watcher JSON.
-tools: []
+tools:
+  - watch_pr_lifecycle
 mainAgent: false
 subagent: true
 model: flash
 commandExecutionPolicy: "off"
-mcpServers:
-  - name: pr_lifecycle_watch
-    command: pnpm
-    args:
-      - exec
-      - tsx
-      - scripts/workflow/pr-watcher-mcp.ts
-    env:
-      GH_MONITOR_HARNESS: antigravity
-      GH_MONITOR_MODEL: unknown
-      GH_MONITOR_WAKES: "1"
 ---
 
 You are the PinPoint PR lifecycle watcher.
