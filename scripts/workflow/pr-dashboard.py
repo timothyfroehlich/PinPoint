@@ -18,6 +18,9 @@ CODEX_CLEAN_REVIEW_PREFIX = "Codex Review: Didn't find any major issues."
 GITHUB_ACTIONS_BOT = "github-actions[bot]"
 GITHUB_ACTIONS_APP_SLUG = "github-actions"
 CODEX_REACTION_WITNESS_PREFIX = "<!-- pinpoint-codex-reaction-witness:"
+CODEX_REVIEW_REQUEST_RE = re.compile(
+    r"^@codex review\n<!-- pinpoint-codex-review-head: ([0-9a-f]{40}) -->$"
+)
 REVIEW_MARKER_PREFIX = "<!-- pinpoint-review:"
 LEGACY_REVIEW_MARKER_PREFIX = "<!-- pinpoint-claude-review:"
 CONNECTION_PAGE_SIZE = 100
@@ -309,9 +312,10 @@ def _native_review_record(reviews: list[dict[str, Any]], head: str) -> ReviewRec
 
 
 def _comment_records(
-    comments: list[dict[str, Any]], head: str
-) -> tuple[list[ReviewRecord], list[ReviewRecord]]:
+    comments: list[dict[str, Any]], head: str, owner: str
+) -> tuple[list[ReviewRecord], list[ReviewRecord], list[ReviewRecord]]:
     automatic: list[ReviewRecord] = []
+    fallback_requests: list[ReviewRecord] = []
     markers: list[ReviewRecord] = []
     for comment in comments:
         body = comment.get("body") or ""
@@ -340,6 +344,10 @@ def _comment_records(
             )
             if match is not None:
                 automatic.append(ReviewRecord("clean_reaction", match.group(1), at))
+        if login == owner and (match := CODEX_REVIEW_REQUEST_RE.fullmatch(body)):
+            fallback_requests.append(
+                ReviewRecord("fallback_exhausted", match.group(1), at)
+            )
         if body.startswith(REVIEW_MARKER_PREFIX) or body.startswith(
             LEGACY_REVIEW_MARKER_PREFIX
         ):
@@ -350,12 +358,15 @@ def _comment_records(
             if match is not None:
                 markers.append(ReviewRecord("marker", match.group(1), at))
     automatic.sort(key=lambda record: record.at)
+    fallback_requests.sort(key=lambda record: record.at)
     markers.sort(key=lambda record: record.at)
-    return automatic, markers
+    return automatic, fallback_requests, markers
 
 
-def _comment_review_record(comments: list[dict[str, Any]], head: str) -> ReviewRecord:
-    automatic, markers = _comment_records(comments, head)
+def _comment_review_record(
+    comments: list[dict[str, Any]], head: str, owner: str
+) -> ReviewRecord:
+    automatic, fallback_requests, markers = _comment_records(comments, head, owner)
     current_markers = [record for record in markers if record.sha == head]
     if current_markers:
         return current_markers[-1]
@@ -370,6 +381,9 @@ def _comment_review_record(comments: list[dict[str, Any]], head: str) -> ReviewR
     ]
     if current_automatic:
         return current_automatic[-1]
+    current_fallbacks = [record for record in fallback_requests if record.sha == head]
+    if current_fallbacks:
+        return current_fallbacks[-1]
     stale = markers + automatic
     if not stale:
         return ReviewRecord("unreviewed")
@@ -394,6 +408,8 @@ def _combined_review_state(native: ReviewRecord, comment: ReviewRecord) -> str:
         return comment.state if comment.at > native.at else native.state
     if native.state == "reviewed":
         return native.state
+    if comment.state == "fallback_exhausted":
+        return comment.state
     if comment.state == "unreviewed":
         return native.state
     return comment.state if comment.at > native.at else native.state
@@ -408,6 +424,8 @@ def _review_label(state: str) -> str:
         return "NOT APPROVED"
     if state == "unreviewed":
         return "NOT REVIEWED"
+    if state == "fallback_exhausted":
+        return "FALLBACK USED"
     return "?"
 
 
@@ -627,7 +645,7 @@ def _row_for_pr(owner: str, repo: str, pr_data: dict[str, Any]) -> dict[str, str
                         comments = _issue_comments(owner, repo, number)
                         review = _review_label(
                             _combined_review_state(
-                                native, _comment_review_record(comments, head)
+                                native, _comment_review_record(comments, head, owner)
                             )
                         )
                 except DashboardError:

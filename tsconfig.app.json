@@ -80,8 +80,6 @@
     "eslint-rules/__fixtures__/**/*",
     "vitest.config.ts",
     "drizzle.config.ts",
-    "postcss.config.mjs",
-    "src/app/(app)/mockup/**/*",
-    "src/components/mockups/**/*"
+    "postcss.config.mjs"
   ]
 }

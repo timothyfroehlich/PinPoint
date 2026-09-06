@@ -18,6 +18,7 @@ import shutil
 import stat
 import subprocess
 import sys
+import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -32,6 +33,7 @@ FAILURE_CLASS_MISSING_TOOL = "missing-tool"
 FAILURE_CLASS_TIMEOUT = "timeout"
 FAILURE_CLASS_NETWORK = "network"
 FAILURE_CLASS_INSTALL = "install"
+FAILURE_CLASS_TOOLCHAIN_CONFIG = "toolchain-config"
 
 # Exit codes for worktree_setup.py
 EXIT_READY = 0
@@ -688,13 +690,44 @@ class RuntimeDiagnostics:
         return " ".join(parts)
 
 
-def _probe_version(executable_path: str, args: list[str]) -> str | None:
+@dataclass(frozen=True)
+class BootstrapToolPins:
+    """Exact branch-declared tool versions authorized by the trusted main worktree."""
+
+    node_version: str
+    pnpm_version: str
+    pnpm_integrity: str
+
+
+@dataclass(frozen=True)
+class BootstrapToolchain:
+    """Exact preinstalled Node and pnpm executables for dependency bootstrap."""
+
+    node_path: Path
+    node_version: str
+    pnpm_path: Path
+    pnpm_version: str
+
+    def environment(self) -> dict[str, str]:
+        env = os.environ.copy()
+        env["MISE_NOT_FOUND_AUTO_INSTALL"] = "false"
+        env["MISE_NOT_FOUND_SYSTEM_FALLBACK"] = "false"
+        env["PATH"] = f"{self.node_path.parent}{os.pathsep}{env.get('PATH', '')}"
+        return env
+
+
+def _probe_version(
+    executable_path: str | Path,
+    args: list[str],
+    env: dict[str, str] | None = None,
+) -> str | None:
     try:
         res = subprocess.run(
             [executable_path, *args],
             capture_output=True,
             text=True,
             timeout=5,
+            env=env,
         )
         if res.returncode == 0:
             return res.stdout.strip()
@@ -703,17 +736,32 @@ def _probe_version(executable_path: str, args: list[str]) -> str | None:
     return None
 
 
-def collect_runtime_diagnostics() -> RuntimeDiagnostics:
+def collect_runtime_diagnostics(
+    toolchain: BootstrapToolchain | None = None,
+    *,
+    probe_path_tools: bool = True,
+) -> RuntimeDiagnostics:
     """Collect paths and versions for python, node, pnpm, and git."""
     py_info = RuntimeInfo(path=sys.executable, version=platform.python_version())
 
-    node_path = shutil.which("node")
-    node_ver = _probe_version(node_path, ["--version"]) if node_path else None
-    node_info = RuntimeInfo(path=node_path, version=node_ver)
+    if toolchain is not None:
+        node_info = RuntimeInfo(
+            path=str(toolchain.node_path), version=f"v{toolchain.node_version}"
+        )
+        pnpm_info = RuntimeInfo(
+            path=str(toolchain.pnpm_path), version=toolchain.pnpm_version
+        )
+    elif probe_path_tools:
+        node_path = shutil.which("node")
+        node_ver = _probe_version(node_path, ["--version"]) if node_path else None
+        node_info = RuntimeInfo(path=node_path, version=node_ver)
 
-    pnpm_path = shutil.which("pnpm")
-    pnpm_ver = _probe_version(pnpm_path, ["--version"]) if pnpm_path else None
-    pnpm_info = RuntimeInfo(path=pnpm_path, version=pnpm_ver)
+        pnpm_path = shutil.which("pnpm")
+        pnpm_ver = _probe_version(pnpm_path, ["--version"]) if pnpm_path else None
+        pnpm_info = RuntimeInfo(path=pnpm_path, version=pnpm_ver)
+    else:
+        node_info = RuntimeInfo(path=None, version=None)
+        pnpm_info = RuntimeInfo(path=None, version=None)
 
     git_path = shutil.which("git")
     git_raw = _probe_version(git_path, ["--version"]) if git_path else None
@@ -723,6 +771,169 @@ def collect_runtime_diagnostics() -> RuntimeDiagnostics:
     return RuntimeDiagnostics(
         python=py_info, node=node_info, pnpm=pnpm_info, git=git_info
     )
+
+
+_EXACT_VERSION_RE = re.compile(r"[0-9]+\.[0-9]+\.[0-9]+")
+_PNPM_PACKAGE_MANAGER_RE = re.compile(
+    r"pnpm@(?P<version>[0-9]+\.[0-9]+\.[0-9]+)\+sha512\.(?P<integrity>[0-9a-f]{128})"
+)
+
+
+def read_bootstrap_tool_versions(worktree_path: Path) -> BootstrapToolPins:
+    """Read the exact Node and integrity-qualified pnpm project pins."""
+    try:
+        mise_config = tomllib.loads((worktree_path / "mise.toml").read_text())
+        node_version = mise_config["tools"]["node"]
+    except (OSError, tomllib.TOMLDecodeError, KeyError, TypeError) as exc:
+        raise ValueError(f"cannot read mise.toml Node pin: {exc}") from exc
+    if not isinstance(node_version, str) or not _EXACT_VERSION_RE.fullmatch(
+        node_version
+    ):
+        raise ValueError("mise.toml [tools].node must be an exact X.Y.Z version")
+
+    try:
+        package_config = json.loads((worktree_path / "package.json").read_text())
+        package_manager = package_config["packageManager"]
+    except (OSError, json.JSONDecodeError, KeyError, TypeError) as exc:
+        raise ValueError(f"cannot read package.json packageManager pin: {exc}") from exc
+    if not isinstance(package_manager, str):
+        raise ValueError("package.json packageManager must be a string")
+    pnpm_match = _PNPM_PACKAGE_MANAGER_RE.fullmatch(package_manager)
+    if pnpm_match is None:
+        raise ValueError(
+            "package.json packageManager must be exact pnpm@X.Y.Z+sha512.<128 hex>"
+        )
+
+    return BootstrapToolPins(
+        node_version=node_version,
+        pnpm_version=pnpm_match.group("version"),
+        pnpm_integrity=pnpm_match.group("integrity"),
+    )
+
+
+def _resolve_mise_install_root(
+    mise_path: str, tool: str, version: str
+) -> tuple[Path | None, str | None]:
+    env = os.environ.copy()
+    env["MISE_NOT_FOUND_AUTO_INSTALL"] = "false"
+    env["MISE_NOT_FOUND_SYSTEM_FALLBACK"] = "false"
+    try:
+        result = subprocess.run(
+            [mise_path, "--no-config", "where", f"{tool}@{version}"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            env=env,
+        )
+    except subprocess.TimeoutExpired:
+        return None, "mise where timed out after 10s"
+    except OSError as exc:
+        return None, f"failed to execute mise: {exc}"
+    if result.returncode != 0:
+        lines = (result.stderr or result.stdout).strip().splitlines()
+        detail = lines[-1] if lines else f"mise where exited {result.returncode}"
+        return None, detail
+
+    install_root = Path(result.stdout.strip())
+    if not install_root.is_dir():
+        return None, f"mise reported missing install directory: {install_root}"
+    return install_root, None
+
+
+def resolve_preinstalled_toolchain(
+    worktree_path: Path,
+    trusted_worktree_path: Path,
+) -> tuple[BootstrapToolchain | None, str | None, str | None]:
+    """Resolve tools only when branch pins match the trusted main worktree."""
+    try:
+        pins = read_bootstrap_tool_versions(worktree_path)
+    except ValueError as exc:
+        return None, FAILURE_CLASS_TOOLCHAIN_CONFIG, str(exc)
+    try:
+        trusted_pins = read_bootstrap_tool_versions(trusted_worktree_path)
+    except ValueError as exc:
+        return (
+            None,
+            FAILURE_CLASS_TOOLCHAIN_CONFIG,
+            f"trusted main worktree toolchain contract is invalid: {exc}",
+        )
+    if pins != trusted_pins:
+        return (
+            None,
+            FAILURE_CLASS_TOOLCHAIN_CONFIG,
+            "worktree Node/pnpm pins do not match the trusted main worktree",
+        )
+
+    node_version = pins.node_version
+    pnpm_version = pins.pnpm_version
+
+    mise_path = shutil.which("mise")
+    if mise_path is None:
+        return None, FAILURE_CLASS_MISSING_TOOL, "mise executable not found in PATH"
+
+    node_root, node_error = _resolve_mise_install_root(mise_path, "node", node_version)
+    if node_root is None:
+        return (
+            None,
+            FAILURE_CLASS_MISSING_TOOL,
+            f"preinstalled node@{node_version} not found: {node_error}",
+        )
+    pnpm_root, pnpm_error = _resolve_mise_install_root(mise_path, "pnpm", pnpm_version)
+    if pnpm_root is None:
+        return (
+            None,
+            FAILURE_CLASS_MISSING_TOOL,
+            f"preinstalled pnpm@{pnpm_version} not found: {pnpm_error}",
+        )
+
+    node_path = node_root / "bin" / "node"
+    pnpm_candidates = [
+        pnpm_root / "bin" / "pnpm",
+        pnpm_root / "node_modules" / ".bin" / "pnpm",
+    ]
+    pnpm_path = next(
+        (
+            path
+            for path in pnpm_candidates
+            if path.is_file() and os.access(path, os.X_OK)
+        ),
+        None,
+    )
+    if not node_path.is_file() or not os.access(node_path, os.X_OK):
+        return (
+            None,
+            FAILURE_CLASS_MISSING_TOOL,
+            f"preinstalled node@{node_version} has no executable at {node_path}",
+        )
+    if pnpm_path is None:
+        return (
+            None,
+            FAILURE_CLASS_MISSING_TOOL,
+            f"preinstalled pnpm@{pnpm_version} has no pnpm executable",
+        )
+
+    toolchain = BootstrapToolchain(
+        node_path=node_path,
+        node_version=node_version,
+        pnpm_path=pnpm_path,
+        pnpm_version=pnpm_version,
+    )
+    actual_node = _probe_version(node_path, ["--version"], toolchain.environment())
+    if actual_node != f"v{node_version}":
+        return (
+            None,
+            FAILURE_CLASS_MISSING_TOOL,
+            f"node pin mismatch: expected v{node_version}, got {actual_node or '<none>'}",
+        )
+    actual_pnpm = _probe_version(pnpm_path, ["--version"], toolchain.environment())
+    if actual_pnpm != pnpm_version:
+        return (
+            None,
+            FAILURE_CLASS_MISSING_TOOL,
+            f"pnpm pin mismatch: expected {pnpm_version}, got {actual_pnpm or '<none>'}",
+        )
+
+    return toolchain, None, None
 
 
 NETWORK_ERROR_PATTERNS = [
@@ -780,7 +991,9 @@ def are_dependencies_ready(worktree_path: Path) -> bool:
 
 
 def install_dependencies(
-    worktree_path: Path, timeout: int | None = None
+    worktree_path: Path,
+    toolchain: BootstrapToolchain,
+    timeout: int | None = None,
 ) -> tuple[bool, str | None, str | None]:
     """Ensure node_modules exists and is completely installed.
 
@@ -790,20 +1003,17 @@ def install_dependencies(
     if are_dependencies_ready(worktree_path):
         return True, None, None
 
-    pnpm_path = shutil.which("pnpm")
-    if not pnpm_path:
-        return False, FAILURE_CLASS_MISSING_TOOL, "pnpm executable not found in PATH"
-
     if timeout is None:
         timeout = resolve_install_timeout()
 
     try:
         res = subprocess.run(
-            [pnpm_path, "install", "--frozen-lockfile"],
+            [str(toolchain.pnpm_path), "install", "--frozen-lockfile"],
             cwd=worktree_path,
             capture_output=True,
             text=True,
             timeout=timeout,
+            env=toolchain.environment(),
         )
         if res.returncode == 0:
             return True, None, None
@@ -954,7 +1164,19 @@ def main() -> int:
     except (subprocess.CalledProcessError, RuntimeError):
         return EXIT_READY
 
-    diagnostics = collect_runtime_diagnostics()
+    dependencies_ready = are_dependencies_ready(worktree_path)
+    toolchain: BootstrapToolchain | None = None
+    toolchain_failure: tuple[str | None, str | None] = (None, None)
+    if not dependencies_ready:
+        toolchain, failure_class, detail = resolve_preinstalled_toolchain(
+            worktree_path, main_wt
+        )
+        toolchain_failure = (failure_class, detail)
+
+    # Never probe Node or pnpm through PATH from this branch-controlled
+    # worktree. A failed exact resolution can otherwise re-enter an untrusted
+    # mise shim merely while formatting diagnostics.
+    diagnostics = collect_runtime_diagnostics(toolchain, probe_path_tools=False)
     print(f"worktree_setup: runtimes: {diagnostics.format_summary()}", file=sys.stderr)
 
     branch = get_branch()
@@ -996,7 +1218,13 @@ def main() -> int:
             redirect_file.write_text(rel_path + "\n")
 
     # Verify / install dependencies
-    is_ready, failure_class, detail = install_dependencies(worktree_path)
+    if dependencies_ready:
+        is_ready, failure_class, detail = True, None, None
+    elif toolchain is None:
+        is_ready = False
+        failure_class, detail = toolchain_failure
+    else:
+        is_ready, failure_class, detail = install_dependencies(worktree_path, toolchain)
 
     if is_ready:
         print(

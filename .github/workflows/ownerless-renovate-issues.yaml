@@ -1,0 +1,34 @@
+# Label unattended Renovate issues once, when they are opened.
+#
+# Renovate's dependencyDashboardLabels setting always reapplies configured labels,
+# even after a human removes one. Using an opened-only workflow keeps `ownerless`
+# removable when a session adopts the Dependency Dashboard or another Renovate issue.
+
+name: Label Ownerless Renovate Issues
+
+on:
+  issues:
+    types: [opened]
+
+permissions: {}
+
+jobs:
+  label-ownerless:
+    name: Label unattended Renovate issue
+    if: github.event.issue.user.login == 'renovate[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      issues: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GITHUB_REPOSITORY: ${{ github.repository }}
+      ISSUE_NUMBER: ${{ github.event.issue.number }}
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@b09bb98e06d4d774595224525879c09bc6e98c40  # ratchet:step-security/harden-runner@v2.20.1
+        with:
+          egress-policy: audit
+
+      - name: Add ownerless label
+        run: gh issue edit "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" --add-label ownerless

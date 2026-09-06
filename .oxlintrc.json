@@ -328,6 +328,22 @@
       }
     },
     {
+      "files": [
+        "src/app/(dev)/prototype/**/*.ts",
+        "src/app/(dev)/prototype/**/*.tsx"
+      ],
+      "excludeFiles": ["src/app/(dev)/prototype/layout.tsx"],
+      "rules": {
+        "no-unused-vars": "off",
+        "typescript/explicit-function-return-type": "off",
+        "typescript/consistent-type-imports": "off",
+        "typescript/no-unnecessary-condition": "off",
+        "promise/no-nesting": "off",
+        "promise/no-promise-in-callback": "off",
+        "promise/no-callback-in-promise": "off"
+      }
+    },
+    {
       "files": ["src/**/*.ts", "src/**/*.tsx"],
       "excludeFiles": [
         "**/*.test.ts",
