@@ -1,6 +1,14 @@
 ---
 name: pinpoint-typescript
-description: The PinPoint-specific database typing decision — `InferSelectModel` yields camelCase types directly, so there is no db→app converter layer and none should be built; narrow with `Pick<>` at boundaries instead, and convert only on the reads and writes Drizzle does not map. Also carries the `exactOptionalPropertyTypes` resolution the compiler flags but does not teach, and which parts of CORE-TS-006/007 no tool enforces. Use when typing a database row on its way to a component, when tempted to write a row-mapping function, when reviewing an `as` cast between two known types (the one third of CORE-TS-007 no tool checks), or when the user mentions InferSelectModel, exactOptionalPropertyTypes, or snake_case/camelCase. General TypeScript technique is deliberately not covered.
+description: >-
+  The PinPoint-specific database typing decision — InferSelectModel yields
+  camelCase types directly, so there is no db-to-app converter layer and none
+  should be built; narrow with Pick at boundaries instead, and convert only on
+  the reads and writes Drizzle does not map. Also carries the
+  exactOptionalPropertyTypes resolution and unenforced parts of
+  CORE-TS-006/007. Use when typing database rows for components, reviewing as
+  casts between known types, or when working with InferSelectModel,
+  exactOptionalPropertyTypes, or snake_case/camelCase conversions.
 ---
 
 # PinPoint TypeScript

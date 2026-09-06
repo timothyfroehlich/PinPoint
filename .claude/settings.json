@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(bash scripts/workflow/mark-review.sh *)",
-      "Bash(bash scripts/workflow/review-preflight.sh *)"
+      "Bash(bash scripts/workflow/review-preflight.sh *)",
+      "mcp__pr_lifecycle_watch__watch_pr_lifecycle"
     ],
     "deny": [
       "Bash(supabase db push:*)",
