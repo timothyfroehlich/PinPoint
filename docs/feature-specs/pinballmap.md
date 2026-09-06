@@ -367,7 +367,11 @@ honest rather than building a workflow around it.
     previews the candidate **in the field**, not the live configuration, so a
     wrong or unresolved id can never read as the tracked location.
   - **Then save commits the switch.** Save is disabled until the lookup
-    succeeds. In one transaction: store the new id, replace
+    succeeds, and editing the id after a successful lookup invalidates it —
+    Save disables again until the new value is checked — so Save can only ever
+    commit the exact id that passed Check ID together with that lookup's
+    snapshot, never a later-typed id against an earlier fetch. In one
+    transaction: store the new id, replace
     the stored snapshot with the freshly fetched one, and set the sync-health
     fields (§10.2) to reflect that fetch. The old location's observed state is
     gone only because it has been replaced, never left half-cleared.
