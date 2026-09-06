@@ -176,6 +176,21 @@ def make_gh(
                         "statusCheckRollup": list(rollup),
                     }
                 )
+            if fields == "headRefOid,statusCheckRollup,mergeStateStatus":
+                return json.dumps(
+                    {
+                        "headRefOid": HEAD_SHA,
+                        "statusCheckRollup": list(rollup),
+                        "mergeStateStatus": merge_state,
+                    }
+                )
+            if fields == "headRefOid,mergeStateStatus":
+                return json.dumps(
+                    {
+                        "headRefOid": HEAD_SHA,
+                        "mergeStateStatus": merge_state,
+                    }
+                )
             if fields == "statusCheckRollup":
                 return json.dumps({"statusCheckRollup": list(rollup)})
             if fields == "mergeStateStatus,labels":
@@ -421,8 +436,13 @@ def snapshot_gh(snapshots, merge_state="CLEAN"):
         assert args[:2] == ("pr", "view"), args
         if args[4] == "mergeStateStatus,labels":
             return json.dumps({"mergeStateStatus": merge_state, "labels": []})
-        assert args[4] == "headRefOid,statusCheckRollup", args
+        assert args[4] in {
+            "headRefOid,statusCheckRollup",
+            "headRefOid,statusCheckRollup,mergeStateStatus",
+        }, args
         snapshot = remaining.pop(0) if len(remaining) > 1 else remaining[0]
+        if args[4] == "headRefOid,statusCheckRollup,mergeStateStatus":
+            snapshot = {**snapshot, "mergeStateStatus": merge_state}
         return json.dumps(snapshot)
 
     fake_gh.calls = []
@@ -1235,7 +1255,13 @@ def test_parse_args_phase_expected_head_and_json():
     assert parsed_ci.json_mode is True
 
     parsed_rev = pr_watch._parse_args(
-        ["pr-watch.py", "1734", "--phase=review", f"--expected-head={HEAD_SHA}"]
+        [
+            "pr-watch.py",
+            "1734",
+            "--phase=review",
+            f"--expected-head={HEAD_SHA}",
+            "--json",
+        ]
     )
     assert parsed_rev is not None
     assert parsed_rev.phase == "review"
@@ -1246,6 +1272,27 @@ def test_parse_args_phase_expected_head_and_json():
     assert pr_watch._parse_args(["pr-watch.py", "1734", "--phase"]) is None
     assert pr_watch._parse_args(["pr-watch.py", "1734", "--expected-head"]) is None
     assert pr_watch._parse_args(["pr-watch.py", "1734", "--unknown-flag"]) is None
+    assert pr_watch._parse_args(["pr-watch.py", "1734", "--json"]) is None
+    assert (
+        pr_watch._parse_args(
+            ["pr-watch.py", "1734", "--phase", "ci", "--expected-head", HEAD_SHA]
+        )
+        is None
+    )
+    assert (
+        pr_watch._parse_args(
+            [
+                "pr-watch.py",
+                "1734",
+                "--phase",
+                "ci",
+                "--expected-head",
+                HEAD_SHA[:10],
+                "--json",
+            ]
+        )
+        is None
+    )
 
 
 @pytest.mark.unit
@@ -1287,6 +1334,9 @@ def test_watch_phase_ci_passes_on_matching_head_and_success_gate(monkeypatch):
     assert last_args[1] == "passed"
     assert last_kwargs.get("outcome") == "passed"
     assert last_kwargs.get("ci_gate") == "SUCCESS"
+    assert [call[4] for call in fake.calls] == [
+        "headRefOid,statusCheckRollup,mergeStateStatus"
+    ]
 
 
 @pytest.mark.unit
@@ -1391,6 +1441,28 @@ def test_watch_phase_ci_undetermined_on_api_error(monkeypatch):
     last_args, last_kwargs = states[-1]
     assert last_args[1] == "undetermined"
     assert last_kwargs.get("outcome") == "undetermined"
+
+
+@pytest.mark.unit
+def test_watch_phase_ci_undetermined_when_merge_state_stays_unknown(monkeypatch):
+    fake = snapshot_gh([ci_snapshot(gate=_gate("SUCCESS"))], merge_state="UNKNOWN")
+    monkeypatch.setattr(pr_watch, "gh", fake)
+    monkeypatch.setattr(pr_watch.time, "sleep", lambda _seconds: None)
+    states = []
+
+    exit_code = pr_watch._watch_phase_ci(
+        PR,
+        HEAD_SHA,
+        timeout_sec=10,
+        poll_sec=0,
+        state_sink=lambda *args, **kwargs: states.append((args, kwargs)),
+    )
+
+    assert exit_code == pr_watch.EXIT_UNDETERMINED
+    last_args, last_kwargs = states[-1]
+    assert last_args[1] == "undetermined"
+    assert last_kwargs.get("outcome") == "undetermined"
+    assert last_kwargs.get("merge_state") == "UNKNOWN"
 
 
 @pytest.mark.unit
@@ -1505,6 +1577,68 @@ def test_watch_phase_review_exits_conflicting_on_conflict(monkeypatch):
 
 
 @pytest.mark.unit
+def test_watch_phase_review_undetermined_when_merge_state_stays_unknown(monkeypatch):
+    fake = make_gh(
+        merge_state="UNKNOWN", reviews=[codex_review(HEAD_SHA, state="APPROVED")]
+    )
+    monkeypatch.setattr(pr_watch, "gh", fake)
+    monkeypatch.setattr(pr_watch.time, "sleep", lambda _seconds: None)
+    states = []
+
+    exit_code = pr_watch._watch_phase_review(
+        PR,
+        HEAD_SHA,
+        timeout_sec=10,
+        poll_sec=0,
+        state_sink=lambda *args, **kwargs: states.append((args, kwargs)),
+    )
+
+    assert exit_code == pr_watch.EXIT_UNDETERMINED
+    last_args, last_kwargs = states[-1]
+    assert last_args[1] == "undetermined"
+    assert last_kwargs.get("outcome") == "undetermined"
+    assert last_kwargs.get("merge_state") == "UNKNOWN"
+
+
+@pytest.mark.unit
+def test_watch_phase_review_exits_stale_if_head_moves_before_terminal_verdict(
+    monkeypatch,
+):
+    base = make_gh(
+        reviews=[codex_review(HEAD_SHA, state="APPROVED")],
+        threads=[{"isResolved": True}],
+    )
+    observed_heads = [HEAD_SHA, OLD_SHA]
+
+    def moving_head_gh(*args: str) -> str:
+        if args[:2] == ("pr", "view") and args[4] == "headRefOid,mergeStateStatus":
+            return json.dumps(
+                {
+                    "headRefOid": observed_heads.pop(0),
+                    "mergeStateStatus": "CLEAN",
+                }
+            )
+        return base(*args)
+
+    monkeypatch.setattr(pr_watch, "gh", moving_head_gh)
+    states = []
+
+    exit_code = pr_watch._watch_phase_review(
+        PR,
+        HEAD_SHA,
+        timeout_sec=10,
+        poll_sec=0,
+        state_sink=lambda *args, **kwargs: states.append((args, kwargs)),
+    )
+
+    assert exit_code == 1
+    last_args, last_kwargs = states[-1]
+    assert last_args[0] == OLD_SHA
+    assert last_args[1] == "stale"
+    assert last_kwargs.get("outcome") == "stale"
+
+
+@pytest.mark.unit
 def test_json_mode_strict_stream_separation(tmp_path, monkeypatch, capsys):
     monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path))
     monkeypatch.setattr(pr_watch, "JSON_MODE", True)
@@ -1549,7 +1683,7 @@ def test_json_mode_strict_stream_separation(tmp_path, monkeypatch, capsys):
 def test_watcher_records_telemetry_file(tmp_path, monkeypatch):
     monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path))
     monkeypatch.setenv("GH_MONITOR_HARNESS", "antigravity")
-    monkeypatch.setenv("GH_MONITOR_MODEL", "flash_lite")
+    monkeypatch.setenv("GH_MONITOR_MODEL", "gemini-3.5-flash-lite")
     log_dir = tmp_path / "telemetry_logs"
     monkeypatch.setattr(pr_watch, "LOG_DIR", str(log_dir))
     fake = snapshot_gh([ci_snapshot(gate=_gate("SUCCESS"))])
@@ -1570,7 +1704,7 @@ def test_watcher_records_telemetry_file(tmp_path, monkeypatch):
     assert f"-{os.getpid()}-" in log_files[0].name
     record = json.loads(log_files[0].read_text(encoding="utf-8"))
     assert record["harness"] == "antigravity"
-    assert record["resolved_model"] == "flash_lite"
+    assert record["resolved_model"] == "gemini-3.5-flash-lite"
     assert record["phase"] == "ci"
     assert record["expected_head"] == HEAD_SHA
     assert record["observed_head"] == HEAD_SHA

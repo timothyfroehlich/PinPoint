@@ -824,11 +824,12 @@ def _comment_review_records(
     return codex_results, review_requests, markers
 
 
-def review_state(pr: int) -> tuple[str, str]:
+def review_state(pr: int, *, head_sha: str | None = None) -> tuple[str, str]:
     """Return the current-head state across both valid review paths."""
-    head_sha = json.loads(gh("pr", "view", str(pr), "--json", "headRefOid"))[
-        "headRefOid"
-    ]
+    if head_sha is None:
+        head_sha = json.loads(gh("pr", "view", str(pr), "--json", "headRefOid"))[
+            "headRefOid"
+        ]
     reviews = _codex_reviews(pr)
     if reviews:
         head_reviews = [
@@ -971,6 +972,43 @@ def _current_ci_snapshot(pr: int) -> tuple[str, dict | None]:
     return data.get("headRefOid") or "", _select_ci_gate(
         data.get("statusCheckRollup") or []
     )
+
+
+def _current_phase_ci_snapshot(pr: int) -> tuple[str, dict | None, str]:
+    """Fetch one head-pinned CI and merge-state snapshot for delegated watches."""
+    for attempt in range(2):
+        raw = gh(
+            "pr",
+            "view",
+            str(pr),
+            "--json",
+            "headRefOid,statusCheckRollup,mergeStateStatus",
+        )
+        data = json.loads(raw)
+        if not isinstance(data, dict):
+            raise RuntimeError("GitHub returned invalid PR metadata")
+        head_sha = str(data.get("headRefOid") or "")
+        gate = _select_ci_gate(data.get("statusCheckRollup") or [])
+        merge_state = str(data.get("mergeStateStatus") or "UNKNOWN")
+        if merge_state != "UNKNOWN" or attempt == 1:
+            return head_sha, gate, merge_state
+        time.sleep(2)
+    return "", None, "UNKNOWN"
+
+
+def _current_head_merge_snapshot(pr: int) -> tuple[str, str]:
+    """Fetch head and merge state atomically, retrying GitHub's lazy UNKNOWN."""
+    for attempt in range(2):
+        raw = gh("pr", "view", str(pr), "--json", "headRefOid,mergeStateStatus")
+        data = json.loads(raw)
+        if not isinstance(data, dict):
+            raise RuntimeError("GitHub returned invalid PR metadata")
+        head_sha = str(data.get("headRefOid") or "")
+        merge_state = str(data.get("mergeStateStatus") or "UNKNOWN")
+        if merge_state != "UNKNOWN" or attempt == 1:
+            return head_sha, merge_state
+        time.sleep(2)
+    return "", "UNKNOWN"
 
 
 def _current_ci_gate(pr: int) -> dict | None:
@@ -1347,7 +1385,7 @@ def _watch_phase_ci(
 
     while time.monotonic() < deadline:
         try:
-            head_sha, gate = _current_ci_snapshot(pr)
+            head_sha, gate, merge_state = _current_phase_ci_snapshot(pr)
         except (RuntimeError, json.JSONDecodeError) as exc:
             detail = (
                 "⚠  Could not determine CI Gate state — "
@@ -1390,24 +1428,32 @@ def _watch_phase_ci(
         if not expected_head:
             expected_head = head_sha
 
-        # Check merge conflict
-        try:
-            merge_state, _labels = _fetch_merge_state(pr)
-            if merge_state in ("DIRTY", "CONFLICTING"):
-                detail = f"PR merge state is {merge_state} — conflict must be resolved"
-                emit(detail)
-                if state_sink is not None:
-                    state_sink(
-                        head_sha,
-                        "conflicting",
-                        detail,
-                        None,
-                        outcome="conflicting",
-                        merge_state=merge_state,
-                    )
-                return 1
-        except (RuntimeError, json.JSONDecodeError):
-            merge_state = "UNKNOWN"
+        if merge_state == "UNKNOWN":
+            detail = "⚠  Could not determine CI Gate state — merge state is unknown."
+            emit(detail)
+            if state_sink is not None:
+                state_sink(
+                    head_sha,
+                    "undetermined",
+                    detail,
+                    None,
+                    outcome="undetermined",
+                    merge_state=merge_state,
+                )
+            return EXIT_UNDETERMINED
+        if merge_state in ("DIRTY", "CONFLICTING"):
+            detail = f"PR merge state is {merge_state} — conflict must be resolved"
+            emit(detail)
+            if state_sink is not None:
+                state_sink(
+                    head_sha,
+                    "conflicting",
+                    detail,
+                    None,
+                    outcome="conflicting",
+                    merge_state=merge_state,
+                )
+            return 1
 
         status = (gate or {}).get("status") or ""
         conclusion = (gate or {}).get("conclusion") or ""
@@ -1543,8 +1589,7 @@ def _watch_phase_review(
 
     while time.monotonic() < deadline:
         try:
-            head_data = json.loads(gh("pr", "view", str(pr), "--json", "headRefOid"))
-            head_sha = str(head_data.get("headRefOid") or "")
+            head_sha, merge_state = _current_head_merge_snapshot(pr)
         except (RuntimeError, json.JSONDecodeError) as exc:
             detail = (
                 "⚠  Could not determine review state — "
@@ -1584,28 +1629,36 @@ def _watch_phase_review(
         if not expected_head:
             expected_head = head_sha
 
-        # Check merge state
-        try:
-            merge_state, _labels = _fetch_merge_state(pr)
-            if merge_state in ("DIRTY", "CONFLICTING"):
-                detail = f"PR merge state is {merge_state} — conflict must be resolved"
-                emit(detail)
-                if state_sink is not None:
-                    state_sink(
-                        head_sha,
-                        "conflicting",
-                        detail,
-                        None,
-                        outcome="conflicting",
-                        merge_state=merge_state,
-                    )
-                return 1
-        except (RuntimeError, json.JSONDecodeError):
-            merge_state = "UNKNOWN"
+        if merge_state == "UNKNOWN":
+            detail = "⚠  Could not determine review state — merge state is unknown."
+            emit(detail)
+            if state_sink is not None:
+                state_sink(
+                    head_sha,
+                    "undetermined",
+                    detail,
+                    None,
+                    outcome="undetermined",
+                    merge_state=merge_state,
+                )
+            return EXIT_UNDETERMINED
+        if merge_state in ("DIRTY", "CONFLICTING"):
+            detail = f"PR merge state is {merge_state} — conflict must be resolved"
+            emit(detail)
+            if state_sink is not None:
+                state_sink(
+                    head_sha,
+                    "conflicting",
+                    detail,
+                    None,
+                    outcome="conflicting",
+                    merge_state=merge_state,
+                )
+            return 1
 
         # Check review state
         try:
-            state_kind, state_desc = review_state(pr)
+            state_kind, state_desc = review_state(pr, head_sha=head_sha)
         except (RuntimeError, json.JSONDecodeError) as exc:
             detail = (
                 "⚠  Could not determine review state — "
@@ -1622,13 +1675,15 @@ def _watch_phase_review(
                 )
             return EXIT_UNDETERMINED
 
-        if state_kind in (
+        accepted_review = state_kind in (
             "approval",
             "clean_comment",
             "clean_reaction",
             "marker",
             "reviewed",
-        ):
+        )
+        unresolved = 0
+        if accepted_review or state_kind == "not_approved":
             try:
                 threads = get_review_threads(pr)
                 unresolved = _unresolved_threads(threads)
@@ -1645,6 +1700,67 @@ def _watch_phase_review(
                     )
                 return EXIT_UNDETERMINED
 
+        try:
+            terminal_head, terminal_merge_state = _current_head_merge_snapshot(pr)
+        except (RuntimeError, json.JSONDecodeError) as exc:
+            detail = (
+                "⚠  Could not finalize review state — "
+                f"the GitHub API was unreachable ({exc})."
+            )
+            emit(detail)
+            if state_sink is not None:
+                state_sink(
+                    head_sha,
+                    "undetermined",
+                    detail,
+                    None,
+                    outcome="undetermined",
+                )
+            return EXIT_UNDETERMINED
+        if not terminal_head or terminal_merge_state == "UNKNOWN":
+            detail = "⚠  Could not finalize review target head and merge state."
+            emit(detail)
+            if state_sink is not None:
+                state_sink(
+                    terminal_head,
+                    "undetermined",
+                    detail,
+                    None,
+                    outcome="undetermined",
+                    merge_state=terminal_merge_state,
+                )
+            return EXIT_UNDETERMINED
+        if terminal_head != expected_head:
+            detail = f"PR head moved {expected_head[:7]} → {terminal_head[:7]} — review watch is stale"
+            emit(detail)
+            if state_sink is not None:
+                state_sink(
+                    terminal_head,
+                    "stale",
+                    detail,
+                    None,
+                    outcome="stale",
+                    merge_state=terminal_merge_state,
+                )
+            return 1
+        if terminal_merge_state in ("DIRTY", "CONFLICTING"):
+            detail = (
+                f"PR merge state is {terminal_merge_state} — conflict must be resolved"
+            )
+            emit(detail)
+            if state_sink is not None:
+                state_sink(
+                    terminal_head,
+                    "conflicting",
+                    detail,
+                    None,
+                    outcome="conflicting",
+                    merge_state=terminal_merge_state,
+                )
+            return 1
+        merge_state = terminal_merge_state
+
+        if accepted_review:
             if unresolved == 0:
                 detail = f"Review coverage complete on {head_sha[:7]} ({state_kind}) with 0 unresolved threads ✓"
                 emit(detail)
@@ -1680,12 +1796,6 @@ def _watch_phase_review(
                 return 1
 
         elif state_kind == "not_approved":
-            unresolved = 0
-            try:
-                threads = get_review_threads(pr)
-                unresolved = _unresolved_threads(threads)
-            except (RuntimeError, json.JSONDecodeError):
-                pass
             detail = f"Review on {head_sha[:7]} is not approved ({state_desc})"
             emit(detail)
             if state_sink is not None:
@@ -1898,6 +2008,29 @@ def _parse_args(argv: list[str]) -> ParsedArgs | None:
         else:
             rest.append(arg)
             i += 1
+
+    delegated_flags = (phase is not None, expected_head is not None, json_mode)
+    if any(delegated_flags) and not all(delegated_flags):
+        print(
+            "Error: delegated watch mode requires --phase, --expected-head, and --json together.",
+            file=sys.stderr,
+        )
+        return None
+    if (
+        expected_head is not None
+        and re.fullmatch(r"[0-9a-f]{40}", expected_head) is None
+    ):
+        print(
+            "Error: --expected-head must be a full 40-character lowercase commit SHA.",
+            file=sys.stderr,
+        )
+        return None
+    if check_ready and any(delegated_flags):
+        print(
+            "Error: --check-ready cannot be combined with delegated watch mode.",
+            file=sys.stderr,
+        )
+        return None
 
     if len(rest) != 1 or not rest[0].isdigit():
         print(

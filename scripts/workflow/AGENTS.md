@@ -22,8 +22,13 @@ Scripts are designed for the **PinPoint orchestrator workflow** where multiple s
 #### `pr-watch.py` flags and delegated watcher contract
 
 ```bash
-./scripts/workflow/pr-watch.py <PR> [--phase <ci|review>] [--expected-head <SHA>] [--json] [--verbose] [--force]
+./scripts/workflow/pr-watch.py <PR> [--verbose] [--force]
+./scripts/workflow/pr-watch.py <PR> --phase <ci|review> --expected-head <FULL_SHA> --json [--verbose] [--force]
 ```
+
+Delegated mode is the second form: `--phase`, `--expected-head`, and `--json` are
+required together, and the expected head must be a full lowercase 40-character SHA.
+The no-flag legacy form keeps following replacement heads for interactive use.
 
 - `--phase <ci|review>`: Phase to watch. Defaults to `ci` (or legacy watch if neither `--phase` nor `--expected-head` nor `--json` is given).
   - `ci`: Polls CI Gate for `expected_head`. Terminal outcomes: `passed` (exit 0), `failed` (exit 1), `stale` (exit 1), `conflicting` (exit 1), `timed_out` (exit 2), `undetermined` (exit 2).

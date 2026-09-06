@@ -101,16 +101,37 @@ Watching CI and awaiting review are passive waits. To conserve token quota and c
 
 #### Recommended Watcher Models
 
-| Harness         | Subagent Tool       | Recommended Model         | Invocation Shape                                                                                                     |
-| :-------------- | :------------------ | :------------------------ | :------------------------------------------------------------------------------------------------------------------- |
-| **Claude Code** | `Agent`             | `haiku`                   | `Agent(subagent_type: "general-purpose", model: "haiku", prompt: "...")`                                             |
-| **Antigravity** | `invoke_subagent`   | `flash_lite` (or `flash`) | `invoke_subagent(Subagents: [{TypeName: "self", Role: "PR Lifecycle Watcher", Model: "flash_lite", Prompt: "..."}])` |
-| **Codex**       | `dispatch_subagent` | `gpt-5.3-codex-spark`     | `dispatch_subagent(model: "gpt-5.3-codex-spark", reasoning_effort: "low", prompt: "...")`                            |
+| Harness         | Subagent Tool     | Recommended Model                                                        | Invocation Shape                                                                                                                |
+| :-------------- | :---------------- | :----------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------ |
+| **Claude Code** | `Agent`           | `haiku`                                                                  | `Agent(subagent_type: "general-purpose", model: "haiku", prompt: "...")`                                                        |
+| **Antigravity** | `invoke_subagent` | `flash_lite` (or `flash`)                                                | `invoke_subagent(Subagents: [{TypeName: "self", Role: "PR Lifecycle Watcher", Model: "flash_lite", Prompt: "..."}])`            |
+| **Codex**       | `spawn_agent`     | Prefer `gpt-5.3-codex-spark`; otherwise the fastest callable model shown | `spawn_agent(task_name: "pr_watch", fork_turns: "none", model: "<resolved-model-id>", reasoning_effort: "low", message: "...")` |
+
+Model availability is a runtime capability, not a name this skill may invent. In
+Codex, use Spark only when `spawn_agent` lists it as a supported override; otherwise
+choose the fastest advertised callable model and record that exact resolved ID.
 
 #### Division of Responsibilities
 
 - **Capable Owner Model**: Owns all mutations and strategic decisions. Formats/edits code, commits, pushes, promotes draft PRs (`gh pr ready`), executes `request-codex-review.sh <PR>`, inspects and replies to review comments, resolves review threads, shoots screenshots, and runs `merge-handoff.sh`.
 - **Lightweight Watcher Subagent**: Strictly read-only. Runs `scripts/workflow/pr-watch.py <PR> --phase <ci|review> --expected-head <SHA> --json`. Blocks until exit, returns the terminal JSON payload to the owning agent, and exits. Never mutates files, never requests review, never comments or resolves threads.
+
+#### Bounded Dispatch Envelope
+
+Give the watcher only the worktree path, PR number and title, phase, full expected
+head SHA, exact command, and the instruction to return stdout's terminal JSON record.
+Never include implementation diffs, history, or the owning task's transcript. Codex
+must set `fork_turns: "none"`; use the equivalent isolated-context option when another
+harness exposes one.
+
+Set telemetry on the deterministic command, using the model ID the harness actually
+resolved rather than its selector alias:
+
+```bash
+GH_MONITOR_HARNESS=<harness> GH_MONITOR_MODEL=<resolved-model-id> \
+  python3 scripts/workflow/pr-watch.py <PR> --phase <ci|review> \
+  --expected-head <FULL_HEAD_SHA> --json
+```
 
 ---
 
