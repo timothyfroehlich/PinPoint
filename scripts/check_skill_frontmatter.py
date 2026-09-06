@@ -129,7 +129,15 @@ def check_skill_file(skill_file: Path, config_path: Path | None = None) -> list[
 
     assert data is not None
 
-    unexpected_keys = sorted(set(data.keys()) - ALLOWED_KEYS)
+    non_string_keys = [k for k in data.keys() if not isinstance(k, str)]
+    if non_string_keys:
+        formatted = ", ".join(repr(k) for k in sorted(non_string_keys, key=str))
+        errors.append(
+            f"{skill_file}: Frontmatter keys must be strings, got non-string key(s): {formatted}"
+        )
+
+    string_keys = {k for k in data.keys() if isinstance(k, str)}
+    unexpected_keys = sorted(string_keys - ALLOWED_KEYS)
     if unexpected_keys:
         errors.append(
             f"{skill_file}: Unsupported frontmatter key(s): {', '.join(unexpected_keys)} "

@@ -297,6 +297,19 @@ def test_unsupported_frontmatter_key(tmp_path: Path):
     assert any("Unsupported frontmatter key(s): metdata" in err for err in errors)
 
 
+def test_non_string_frontmatter_key(tmp_path: Path):
+    skill_dir = tmp_path / "int-key"
+    skill_dir.mkdir()
+    skill_file = skill_dir / "SKILL.md"
+    skill_file.write_text(
+        "---\nname: int-key\ndescription: Valid description\n1: typo\n---\n\n# Body\n",
+        encoding="utf-8",
+    )
+
+    errors = check_skill_file(skill_file, config_path=CONFIG_PATH)
+    assert any("Frontmatter keys must be strings" in err for err in errors)
+
+
 def test_find_skill_files(tmp_path: Path):
     (tmp_path / "skill-a").mkdir()
     (tmp_path / "skill-a" / "SKILL.md").write_text("a", encoding="utf-8")
