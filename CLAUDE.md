@@ -18,7 +18,9 @@ PinPoint uses single-context domain documentation. See `docs/agents/domain.md`.
 
 `REVIEW.md` at the repo root is the canonical review rubric. Read it before launching the code-review skill.
 
-Codex reviews every eligible PR update automatically. Author-side draft/CI/review ownership, the 51-line re-draft threshold, and explicit-request-only manual review paths are canonical in `pinpoint-pr-workflow` Phase 3.
+Codex reviews every eligible PR update automatically. Author-side draft/CI/review
+ownership, the 51-line re-draft threshold, and the single manual fallback after a
+conclusive bounded automatic miss are canonical in `pinpoint-pr-workflow` Phase 3.
 
 ### Sandbox network isolation
 
