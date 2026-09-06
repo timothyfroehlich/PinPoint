@@ -15,7 +15,7 @@ set -euo pipefail
 marker="${CLAUDE_PROJECT_DIR:-.}/.prototype-mode"
 [ -f "$marker" ] || exit 0
 
-goal=$(grep -m1 '^Goal:' "$marker" 2>/dev/null || true)
+design_question=$(grep -m1 '^Design question:' "$marker" 2>/dev/null || true)
 
 # Emit a compact plain-markdown reminder — the harness presents
 # UserPromptSubmit/SessionStart stdout as a reminder, and this fires every
@@ -23,8 +23,9 @@ goal=$(grep -m1 '^Goal:' "$marker" 2>/dev/null || true)
 # convention (no literal wrapper tags). Full rules live in the skill.
 printf '⚡ **Prototype mode ACTIVE — UI/UX only.** Relax test/lint/type rigor '
 printf 'on presentation; keep full rigor on backend/data/auth (stub data, do '
-printf 'not build it). Log skips to the .prototype-mode ledger; never '
-printf 'commit/push, touch prod, or delete tests. '
-[ -n "$goal" ] && printf '%s ' "$goal"
+printf 'not build it). Reuse real components and seed/read-only data first. '
+printf 'Build only under /prototype/<slug>; log skips and duplication to the '
+printf '.prototype-mode ledger; never commit/push, touch prod, or delete tests. '
+[ -n "$design_question" ] && printf '%s ' "$design_question"
 printf 'Exit: "exit prototype mode" / "make this real" → repay the ledger. '
 printf 'Full rules: pinpoint-prototype-mode skill.\n'

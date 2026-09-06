@@ -67,18 +67,21 @@ _codex_review_record() {
                  $latest + { state: "approval" }
                elif $latest.detail == "APPROVED" then
                  $latest + { state: "stale_approval" }
-               elif $latest.sha == $head and ($latest.detail == "COMMENTED" or $latest.detail == "CHANGES_REQUESTED") then
-                 $latest + { state: "reviewed" }
+               elif $latest.sha == $head then
+                 if $latest.detail == "COMMENTED" or $latest.detail == "CHANGES_REQUESTED"
+                 then $latest + { state: "reviewed" }
+                 else $latest + { state: "not_approved" }
+                 end
                else
-                 $latest + { state: "not_approved" }
+                 $latest + { state: "stale_approval" }
                end
            end
          | [ .state, .sha, .reviewer, .detail, .at, .summary ] | @tsv'
 }
 
-# Issue comments carry three review records: the connector's clean automatic result,
-# the trusted workflow's SHA-pinned witness of a fresh eyes-to-+1 transition, and the
-# independent manual attestation.
+# Issue comments carry four review records: the connector's clean result, the trusted
+# workflow's SHA-pinned witness of a fresh eyes-to-+1 transition, the SHA-bound manual
+# review request, and the independent local-review attestation.
 _comment_review_record() {
   local pr=$1 owner_repo=$2 head=$3
   gh api --paginate "repos/${owner_repo}/issues/${pr}/comments" \
@@ -87,6 +90,7 @@ _comment_review_record() {
         --arg witness_prefix "$CODEX_REACTION_WITNESS_PREFIX" \
         --arg clean_prefix "$CODEX_CLEAN_REVIEW_PREFIX" --arg prefix "$REVIEW_MARKER_PREFIX" \
         --arg legacy "$LEGACY_CLAUDE_MARKER_PREFIX" --arg head "$head" \
+        --arg owner "${owner_repo%%/*}" \
         '[ .[] | flatten | .[] ] as $comments
          | ([ $comments[]
            | (.body // "") as $body
@@ -115,6 +119,17 @@ _comment_review_record() {
          ] | sort_by(.at)) as $witness
          | ([ $comments[]
            | (.body // "") as $body
+           | select(.user.login? == $owner)
+           | { sha: ($body | [scan("^@codex review\\n<!-- pinpoint-codex-review-head: ([0-9a-f]{40}) -->$")] | flatten | (.[0] // "")),
+               reviewer: (.user.login // ""),
+               detail: "MANUAL_REVIEW_REQUESTED",
+               at: (.created_at // ""),
+               summary: "Manual Codex review requested",
+               state: "review_requested" }
+           | select((.sha | length) == 40)
+         ] | sort_by(.at)) as $review_requests
+         | ([ $comments[]
+           | (.body // "") as $body
            | select($body | startswith($prefix) or startswith($legacy))
            | { sha: (if $body | startswith($prefix) then ($body | ltrimstr($prefix)) else ($body | ltrimstr($legacy)) end | split("-->")[0] | gsub("^\\s+|\\s+$"; "")),
                reviewer: (if $body | startswith($prefix)
@@ -127,22 +142,24 @@ _comment_review_record() {
                summary: (($body | split("\n") | last) // "") }
          ] | sort_by(.at)) as $markers
          | [ $markers[] | select(.sha == $head) ] as $pinned
-         | (($clean + $witness) | sort_by(.at)) as $automatic
-         | [ $automatic[]
+         | (($clean + $witness) | sort_by(.at)) as $codex_results
+         | [ $codex_results[]
              | select(if .state == "clean_comment"
                       then (.sha as $sha | $head | startswith($sha))
                       else .sha == $head
                       end)
-           ] as $automatic_pinned
+         ] as $codex_pinned
+         | [ $review_requests[] | select(.sha == $head) ] as $request_sent
          | if ($pinned | length) > 0 then ($pinned | last) + { state: "marker" }
-           elif ($automatic_pinned | length) > 0 then ($automatic_pinned | last)
-           elif ($markers | length) > 0 and ($automatic | length) > 0 then
-             if $markers[-1].at > $automatic[-1].at
+           elif ($codex_pinned | length) > 0 then ($codex_pinned | last)
+           elif ($request_sent | length) > 0 then ($request_sent | last)
+           elif ($markers | length) > 0 and ($codex_results | length) > 0 then
+             if $markers[-1].at > $codex_results[-1].at
              then $markers[-1] + { state: "stale_marker" }
-             else $automatic[-1] + { state: (if $automatic[-1].state == "clean_reaction" then "stale_clean_reaction" else "stale_clean_comment" end) }
+             else $codex_results[-1] + { state: (if $codex_results[-1].state == "clean_reaction" then "stale_clean_reaction" else "stale_clean_comment" end) }
              end
            elif ($markers | length) > 0 then $markers[-1] + { state: "stale_marker" }
-           elif ($automatic | length) > 0 then $automatic[-1] + { state: (if $automatic[-1].state == "clean_reaction" then "stale_clean_reaction" else "stale_clean_comment" end) }
+           elif ($codex_results | length) > 0 then $codex_results[-1] + { state: (if $codex_results[-1].state == "clean_reaction" then "stale_clean_reaction" else "stale_clean_comment" end) }
            else { state: "unreviewed", sha: "", reviewer: "", detail: "", at: "", summary: "" }
            end
          | [ .state, .sha, .reviewer, .detail, .at, .summary ] | @tsv'
@@ -156,6 +173,7 @@ _review_record() {
   local codex_sha codex_at comment_at
   codex=$(_codex_review_record "$@")
   codex_state=$(cut -f1 <<< "$codex")
+  codex_sha=$(cut -f2 <<< "$codex")
   # A current native approval already passes the gate. Do not spend a second
   # paginated GitHub request looking up a marker that cannot change that result.
   if [[ "$codex_state" == "approval" ]]; then
@@ -168,7 +186,6 @@ _review_record() {
   if [[ "$comment_state" == "marker" ]]; then
     printf '%s\n' "$comment"
   elif [[ "$comment_state" == "clean_comment" || "$comment_state" == "clean_reaction" ]]; then
-    codex_sha=$(cut -f2 <<< "$codex")
     codex_at=$(cut -f5 <<< "$codex")
     comment_at=$(cut -f5 <<< "$comment")
     if [[ "$codex_state" == "unreviewed" || "$codex_sha" != "$head" || "$comment_at" > "$codex_at" ]]; then
@@ -180,6 +197,15 @@ _review_record() {
     # A current-head native finding review is coverage. A delayed comment for an
     # older SHA cannot invalidate it; current clean comments were handled above.
     printf '%s\n' "$codex"
+  elif [[ "$codex_state" == "not_approved" && "$codex_sha" == "$head" ]]; then
+    # A current-head unusable native review is actionable even when the durable
+    # request marker remains. Keep every workflow consumer fail-closed here.
+    printf '%s\n' "$codex"
+  elif [[ "$comment_state" == "review_requested" ]]; then
+    # A request pinned to the current head is durable workflow state, not review
+    # evidence. Report it regardless of older stale review records so no caller
+    # recommends spending the same head's one request twice.
+    printf '%s\n' "$comment"
   else
     codex_at=$(cut -f5 <<< "$codex")
     if [[ "$comment_state" == "unreviewed" ]]; then
@@ -246,8 +272,8 @@ check_ci() {
 }
 
 # ---------------------------------------------------------------------------------
-# Shared review state — a trusted automatic Codex result or manual attestation pinned
-# to the PR head.
+# Shared review state — a trusted Codex result or manual attestation pinned to the PR
+# head, plus a durable record that the current head's one manual request was sent.
 # ---------------------------------------------------------------------------------
 #
 #   approval        Codex approved the current head SHA
@@ -260,6 +286,7 @@ check_ci() {
 #   stale_clean_reaction  A reaction witness names a different SHA
 #   stale_marker    A manual marker names a different SHA
 #   not_approved    Codex's most-recent review covers a different SHA and is not an approval
+#   review_requested  The one manual Codex review was requested for this head
 #   unreviewed      Neither review path has a record
 #
 # Sets globals: RS_STATE RS_HEAD_SHA RS_REVIEW_SHA
@@ -282,9 +309,17 @@ _compute_review_state() {
 
 _review_remedy() {
   local pr=$1
-  echo "  remedy: await a clean automatic Codex result on this head of PR #${pr}. Use @codex"
-  echo "          review only when Tim explicitly requests it; use review-preflight +"
-  echo "          mark-review only after Tim explicitly runs a local review."
+  echo "  remedy: after current-head CI succeeds and the PR is ready, run"
+  echo "          request-codex-review.sh ${pr} exactly once for this head. A new head"
+  echo "          requires replacement CI and one new request. Use review-preflight +"
+  echo "          mark-review only after Tim runs a local review."
+}
+
+_review_requested_remedy() {
+  local pr=$1
+  echo "  remedy: the manual Codex review for this head of PR #${pr} was already requested."
+  echo "          Wait for exact-head evidence; do not request the same head again. A new"
+  echo "          head requires replacement CI and one new request."
 }
 
 # Gate 2: Zero unresolved review threads. Uses GraphQL with cursor pagination.
@@ -346,6 +381,7 @@ check_unresolved_threads() {
 #   marker          → PASS
 #   stale_approval  → FAIL: Codex approved an earlier commit
 #   not_approved    → FAIL: Codex posted a non-approval review
+#   review_requested → FAIL: the manual review was requested but has not produced evidence
 #   unreviewed      → FAIL: Codex has not reviewed the PR
 check_review_happened() {
   local pr=$1
@@ -396,6 +432,11 @@ check_review_happened() {
     stale_marker)
       echo "FAIL: reviewed: the review marker pins ${RS_REVIEW_SHA:0:7}, but head is ${RS_HEAD_SHA:0:7}"
       _review_remedy "$pr"
+      return 1
+      ;;
+    review_requested)
+      echo "FAIL: reviewed: manual Codex review requested for head ${RS_HEAD_SHA:0:7}; result pending"
+      _review_requested_remedy "$pr"
       return 1
       ;;
     unreviewed)

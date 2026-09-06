@@ -193,6 +193,42 @@ describe("re-matching an intent-On machine", () => {
     expect(after?.pinballmapIntent).toBe("off");
   });
 
+  it("stamps the abandonment from the retained snapshot while Not configured", async () => {
+    const db = await getTestDb();
+    const { updateMachineAction } = await import("~/app/(app)/m/actions");
+    const admin = await createAdmin();
+    await mockAuthAs(admin.id);
+    await seedCatalog();
+    await seedLineup();
+    await db
+      .update(pinballmapState)
+      .set({ locationId: null })
+      .where(eq(pinballmapState.id, "singleton"));
+
+    const [machine] = await db
+      .insert(machines)
+      .values({
+        name: "Godzilla",
+        initials: "GZN",
+        pinballmapMachineId: 6221,
+        pinballmapIntent: "on",
+      })
+      .returning();
+    if (!machine) throw new Error("failed to seed machine");
+
+    const result = await updateMachineAction(
+      undefined,
+      retitleForm(machine.id, 6222)
+    );
+    expect(result.ok).toBe(true);
+
+    const [record] = await db
+      .select()
+      .from(pinballmapAbandonedListings)
+      .where(eq(pinballmapAbandonedListings.machineId, machine.id));
+    expect(record?.locationId).toBe(26454);
+  });
+
   it("records a second abandonment without losing the first", async () => {
     const db = await getTestDb();
     const { updateMachineAction } = await import("~/app/(app)/m/actions");

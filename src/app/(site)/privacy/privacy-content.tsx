@@ -194,8 +194,8 @@ export function PrivacyContent(): React.JSX.Element {
             <strong className="text-foreground">
               Upstash Redis (Rate Limiting)
             </strong>{" "}
-            — Stores temporary rate limit counters keyed by IP address. Data
-            expires automatically.
+            — Stores temporary rate limit counters keyed by IP address or
+            pseudonymous account hash. Data expires automatically.
           </li>
           <li>
             <strong className="text-foreground">Resend (Email Delivery)</strong>{" "}

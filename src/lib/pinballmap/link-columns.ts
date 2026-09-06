@@ -38,6 +38,8 @@ export interface StoredPbmLinkState {
 export interface AbandonedListing {
   lmxId: number;
   pinballmapMachineId: number;
+  /** The location of the snapshot that supplied this lmx. */
+  locationId: number;
 }
 
 export type ResolvePbmLinkResult =
@@ -219,11 +221,16 @@ async function resolveAbandonedEntry(
   oldPinballmapMachineId: number
 ): Promise<AbandonedListing | null> {
   const state = await getPinballMapState();
-  if (state?.locationId === null || state?.locationId === undefined)
-    return null;
-  const snapshot = state.snapshotJson ?? null;
+  const snapshot = state?.snapshotJson ?? null;
   if (!snapshot) return null;
   const lmx = findLmxForMachine(snapshot, oldPinballmapMachineId);
   if (!lmx) return null;
-  return { lmxId: lmx.id, pinballmapMachineId: oldPinballmapMachineId };
+  return {
+    lmxId: lmx.id,
+    pinballmapMachineId: oldPinballmapMachineId,
+    // The singleton may be Not configured or already point elsewhere while its
+    // retained snapshot still describes the listing being abandoned. The
+    // snapshot cannot disagree with the lmx it just supplied (spec 10.7/10.11).
+    locationId: snapshot.locationId,
+  };
 }

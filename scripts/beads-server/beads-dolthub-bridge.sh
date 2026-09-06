@@ -10,11 +10,12 @@
 #
 # LOUD FAILURE — deliberately NOT fail-open (contrast the huddle hooks, cf.
 # PP-0b7p). Any step failing exits non-zero so systemd marks the unit `failed`
-# and it stays failed until a human restarts it. On a pull CONFLICT we do NOT
-# leave the live server sitting in a conflicted working set that both machines
-# read/write: we verify whether unresolved conflicts remain, abort an active
-# merge when needed, verify again, alert, and stop (nonzero). A human resolves
-# the remote divergence before re-enabling the timer.
+# for that invocation; the timer remains active and retries on its normal
+# cadence. On a pull CONFLICT we do NOT leave the live server sitting in a
+# conflicted working set that both machines read/write: we verify whether
+# unresolved conflicts remain, abort an active merge when needed, verify again,
+# alert, and stop the cycle (nonzero). A human resolves the remote divergence
+# before the next successful cycle.
 #
 # Required env:
 #   BEADS_DOLT_PASSWORD  — password for the `beads` SQL user (env only, never
@@ -126,7 +127,7 @@ if [[ "$pull_rc" -ne 0 ]]; then
       fi
       log "merge aborted; no merge remains active"
     fi
-    die "DoltHub pull hit a merge conflict — bridge stopped. Resolve manually, then: systemctl --user restart beads-dolthub-bridge.timer"
+    die "DoltHub pull hit a merge conflict — this cycle stopped; the timer will retry. Resolve manually, then wait for the timer or run: systemctl --user start beads-dolthub-bridge.service"
   fi
   die "bd dolt pull failed (non-conflict): $pull_out"
 fi

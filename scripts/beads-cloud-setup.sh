@@ -26,7 +26,8 @@
 # THE PINS ARE READ FROM COMPATIBILITY CONTRACT, NOT DUPLICATED. bd and dolt are
 # installed at exactly the versions this script parses out of
 # scripts/beads-compatibility.json. So bumping the pin is an edit to the manifest;
-# the installed binaries and runtime guards move together and cannot disagree.
+# the approved cloud-asset digests, installed binaries, and runtime guards move
+# together and cannot disagree.
 # (Rationale for exact pins: an accidental newer release, e.g. bd 1.2.1 on
 # 2026-08-16, migrated the shared DB to a schema no supported binary could read
 # and locked every client out for two days. An exact pin fails loud; a floor fails
@@ -36,6 +37,43 @@ set -euo pipefail
 
 log()  { printf '[beads-cloud-setup] %s\n' "$*" >&2; }
 die()  { printf '[beads-cloud-setup] ERROR: %s\n' "$*" >&2; exit 1; }
+
+verify_sha256() {
+  local archive="$1"
+  local expected="$2"
+  local actual=""
+
+  if command -v sha256sum >/dev/null 2>&1; then
+    actual="$(sha256sum "$archive" | awk '{print $1}')"
+  elif command -v shasum >/dev/null 2>&1; then
+    actual="$(shasum -a 256 "$archive" | awk '{print $1}')"
+  else
+    die "cannot verify $(basename "$archive"): sha256sum or shasum is required"
+  fi
+
+  [[ "$actual" == "$expected" ]] \
+    || die "SHA-256 mismatch for $(basename "$archive") (expected $expected, got $actual)"
+}
+
+manifest_platform_digest() {
+  local platform="$1"
+  local field="$2"
+
+  awk -v platform="$platform" -v field="$field" '
+    $0 ~ "^[[:space:]]*\\\"" platform "\\\"[[:space:]]*:" {
+      in_platform = 1
+      next
+    }
+    in_platform && $0 ~ "^[[:space:]]*}" { exit }
+    in_platform && $0 ~ "\\\"" field "\\\"[[:space:]]*:" {
+      value = $0
+      sub(/^.*:[[:space:]]*"/, "", value)
+      sub(/".*$/, "", value)
+      print value
+      exit
+    }
+  ' "$COMPAT_FILE"
+}
 
 # Resolve this script's directory so the pin read below works regardless of the
 # setup script's cwd (it runs from $HOME, not the repo root).
@@ -48,27 +86,61 @@ BD_VER="$(sed -nE 's/^[[:space:]]*"bd"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/p'
 [[ -n "$BD_VER" ]] || die "could not parse \"bd\" version from $COMPAT_FILE"
 DOLT_VER="$(sed -nE 's/^[[:space:]]*"dolt"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/p' "$COMPAT_FILE" | head -n1 || true)"
 [[ -n "$DOLT_VER" ]] || die "could not parse \"dolt\" version from $COMPAT_FILE"
+
+UNAME_S="$(uname -s)"
+UNAME_M="$(uname -m)"
+case "$UNAME_S:$UNAME_M" in
+  Linux:x86_64|Linux:amd64)
+    CLOUD_PLATFORM="linux-amd64"
+    ;;
+  *)
+    die "unsupported cloud platform $UNAME_S/$UNAME_M; declare its assets and digests in $COMPAT_FILE first"
+    ;;
+esac
+
+BD_SHA256="$(manifest_platform_digest "$CLOUD_PLATFORM" "bdSha256")"
+[[ "$BD_SHA256" =~ ^[0-9a-f]{64}$ ]] \
+  || die "could not parse bd SHA-256 for $CLOUD_PLATFORM from $COMPAT_FILE"
+DOLT_SHA256="$(manifest_platform_digest "$CLOUD_PLATFORM" "doltSha256")"
+[[ "$DOLT_SHA256" =~ ^[0-9a-f]{64}$ ]] \
+  || die "could not parse dolt SHA-256 for $CLOUD_PLATFORM from $COMPAT_FILE"
 # ------------------------------------------------------------------------------
 
-BIN=/usr/local/bin
+BIN="${BEADS_CLOUD_BIN_DIR:-/usr/local/bin}"
 export PATH="$BIN:$PATH"
 
-# dolt: pinned to the version read above. Download by exact tag.
-log "installing dolt $DOLT_VER (pinned via beads-compatibility.json)"
-DOLT_TAG="v${DOLT_VER}"
-curl -fsSL -o /tmp/dolt.tgz \
-  "https://github.com/dolthub/dolt/releases/download/${DOLT_TAG}/dolt-linux-amd64.tar.gz"
-tar xzf /tmp/dolt.tgz -C /tmp
-install /tmp/dolt-linux-amd64/bin/dolt "$BIN/dolt"
+# Downloads are isolated and removed on every exit, including checksum failure.
+WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/beads-cloud-setup.XXXXXXXX")"
+cleanup() {
+  rm -rf -- "$WORK_DIR"
+}
+trap cleanup EXIT
 
-# bd: pinned to the version read above. Download by exact tag — no latest-tag
-# resolution, which is exactly the drift this rewrite removes.
-log "installing bd $BD_VER (pinned via beads-compatibility.json)"
+# Download both exact-tag assets before extracting or installing either one.
+# This ensures a mismatch in either archive performs no privileged installation.
+log "downloading dolt $DOLT_VER + bd $BD_VER for $CLOUD_PLATFORM"
+DOLT_TAG="v${DOLT_VER}"
+curl -fsSL -o "$WORK_DIR/dolt.tgz" \
+  "https://github.com/dolthub/dolt/releases/download/${DOLT_TAG}/dolt-linux-amd64.tar.gz"
 BD_TAG="v${BD_VER}"
-curl -fsSL -o /tmp/bd.tgz \
+curl -fsSL -o "$WORK_DIR/bd.tgz" \
   "https://github.com/steveyegge/beads/releases/download/${BD_TAG}/beads_${BD_VER}_linux_amd64.tar.gz"
-tar xzf /tmp/bd.tgz -C /tmp
-install /tmp/bd "$BIN/bd"
+
+log "verifying approved release-asset digests"
+verify_sha256 "$WORK_DIR/dolt.tgz" "$DOLT_SHA256"
+verify_sha256 "$WORK_DIR/bd.tgz" "$BD_SHA256"
+
+mkdir "$WORK_DIR/dolt-extract" "$WORK_DIR/bd-extract"
+tar xzf "$WORK_DIR/dolt.tgz" -C "$WORK_DIR/dolt-extract"
+tar xzf "$WORK_DIR/bd.tgz" -C "$WORK_DIR/bd-extract"
+[[ -f "$WORK_DIR/dolt-extract/dolt-linux-amd64/bin/dolt" ]] \
+  || die "verified dolt archive did not contain the expected binary"
+[[ -f "$WORK_DIR/bd-extract/bd" ]] \
+  || die "verified bd archive did not contain the expected binary"
+
+log "installing verified dolt $DOLT_VER + bd $BD_VER"
+install "$WORK_DIR/dolt-extract/dolt-linux-amd64/bin/dolt" "$BIN/dolt"
+install "$WORK_DIR/bd-extract/bd" "$BIN/bd"
 
 log "verifying installed versions:"
 dolt_installed="$(dolt version 2>&1 | sed -nE 's/^dolt version ([0-9]+\.[0-9]+\.[0-9]+).*/\1/p' | head -n1 || true)"

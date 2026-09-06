@@ -2,9 +2,9 @@
 # Witness a clean Codex review transition and pin it to the triggering PR head.
 #
 # A GitHub reaction has no commit SHA. This script is therefore run only from the
-# trusted pull_request_target workflow on main: it requires a fresh Codex `eyes`
-# reaction created after that head's review-trigger event, observes the transition to
-# `+1` without any head movement, then posts a SHA-pinned github-actions comment.
+# trusted issue_comment workflow on main: it requires the repository owner's exact
+# SHA-bound review request, then observes a fresh Codex `eyes` to `+1` transition
+# without any head movement and posts a SHA-pinned github-actions comment.
 
 set -euo pipefail
 
@@ -14,18 +14,20 @@ readonly GITHUB_ACTIONS_APP="github-actions"
 readonly WITNESS_PREFIX="<!-- pinpoint-codex-reaction-witness:"
 
 usage() {
-  echo "Usage: $0 <PR_NUMBER> <EXPECTED_HEAD_SHA> <TRIGGERED_AT>" >&2
+  echo "Usage: $0 <PR_NUMBER> <EXPECTED_HEAD_SHA> <TRIGGERED_AT> [REACTION_COMMENT_ID]" >&2
   exit 2
 }
 
-[[ $# -eq 3 ]] || usage
+[[ $# -ge 3 && $# -le 4 ]] || usage
 readonly PR_NUMBER=$1
 readonly EXPECTED_HEAD=$2
 readonly TRIGGERED_AT=$3
+readonly REACTION_COMMENT_ID=${4:-}
 
 [[ "$PR_NUMBER" =~ ^[1-9][0-9]*$ ]] || usage
 [[ "$EXPECTED_HEAD" =~ ^[0-9a-f]{40}$ ]] || usage
 [[ "$TRIGGERED_AT" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$ ]] || usage
+[[ -z "$REACTION_COMMENT_ID" || "$REACTION_COMMENT_ID" =~ ^[1-9][0-9]*$ ]] || usage
 
 readonly INITIAL_DELAY_SECONDS=${CODEX_WITNESS_INITIAL_DELAY_SECONDS:-120}
 readonly MAX_ATTEMPTS=${CODEX_WITNESS_MAX_ATTEMPTS:-36}
@@ -47,9 +49,14 @@ fi
 readonly OWNER_REPO
 
 reaction_at() {
-  local content=$1 lower_bound=$2
+  local content=$1 lower_bound=$2 endpoint
+  if [[ -n "$REACTION_COMMENT_ID" ]]; then
+    endpoint="repos/${OWNER_REPO}/issues/comments/${REACTION_COMMENT_ID}/reactions?per_page=100"
+  else
+    endpoint="repos/${OWNER_REPO}/issues/${PR_NUMBER}/reactions?per_page=100"
+  fi
   gh api --paginate -H "Accept: application/vnd.github+json" \
-    "repos/${OWNER_REPO}/issues/${PR_NUMBER}/reactions?per_page=100" \
+    "$endpoint" \
     | jq -rs --arg bot "$CODEX_REVIEW_BOT" --arg content "$content" \
         --arg lower_bound "$lower_bound" '
         [ .[] | flatten | .[]

@@ -54,9 +54,10 @@ import subprocess
 import sys
 import tempfile
 import time
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Callable
+from typing import Callable, NamedTuple
 
 REPO_OWNER = "timothyfroehlich"
 REPO_NAME = "PinPoint"
@@ -68,6 +69,9 @@ CODEX_CLEAN_REVIEW_PREFIX = "Codex Review: Didn't find any major issues."
 GITHUB_ACTIONS_BOT = "github-actions[bot]"
 GITHUB_ACTIONS_APP_SLUG = "github-actions"
 CODEX_REACTION_WITNESS_PREFIX = "<!-- pinpoint-codex-reaction-witness:"
+CODEX_REVIEW_REQUEST_RE = re.compile(
+    r"^@codex review\n<!-- pinpoint-codex-review-head: ([0-9a-f]{40}) -->$"
+)
 REVIEW_MARKER_PREFIX = "<!-- pinpoint-review:"
 LEGACY_CLAUDE_MARKER_PREFIX = "<!-- pinpoint-claude-review:"
 
@@ -75,8 +79,14 @@ LEGACY_CLAUDE_MARKER_PREFIX = "<!-- pinpoint-claude-review:"
 # Kept deliberately in sync with scripts/workflow/_pr-gates.sh. This watcher only
 # reports the state; merge-pr.sh is the enforcement point.
 REVIEW_HINT = (
-    "await automatic Codex review of PR #{pr} at the current head; use @codex review "
-    "only when Tim explicitly requests it"
+    "after current-head CI succeeds and the PR is ready, run "
+    "request-codex-review.sh #{pr} exactly once for this head; a new head requires "
+    "replacement CI and one new request"
+)
+REVIEW_REQUESTED_HINT = (
+    "the manual Codex review for this head was already requested; wait for exact-head "
+    "evidence and do not request the same head again; a new head requires replacement "
+    "CI and one new request"
 )
 
 LOG_DIR = "tmp/gh-monitor"
@@ -94,19 +104,26 @@ EXIT_UNDETERMINED = 2
 
 MONITOR_SCHEMA_VERSION = 1
 MONITOR_REPOSITORY = f"{REPO_OWNER}/{REPO_NAME}"
-MONITOR_TERMINAL_STATUSES = {"passed", "failed", "superseded", "undetermined"}
+MONITOR_TERMINAL_STATUSES = {
+    "passed",
+    "failed",
+    "superseded",
+    "undetermined",
+    "action_required",
+    "stale",
+    "conflicting",
+    "timed_out",
+}
 MONITOR_STATUSES = MONITOR_TERMINAL_STATUSES | {"starting", "pending"}
 FOLLOWER_POLL_SECONDS = 0.25
-MonitorStateSink = Callable[[str, str, str, str | None], None]
+MonitorStateSink = Callable[..., None]
 MonitorActionSink = Callable[[str | None], None]
 
-# Set by main() from --verbose flag. When False (the default), emit_event() is
-# a no-op so the script only emits terminal verdicts and action items. This
-# keeps pr-watch quiet under Claude Code's Monitor — each emit line becomes a
-# notification cycle, so progressive per-job updates wake the agent for events
-# that don't change what the user would do next. Pass --verbose for full output
-# when running interactively.
+# Set by main() from --verbose and --json flags. When JSON_MODE is True, all
+# informational messages emitted by emit() go to sys.stderr so that sys.stdout
+# is strictly reserved for the terminal JSON payload.
 VERBOSE_MODE = False
+JSON_MODE = False
 
 
 def ts() -> str:
@@ -114,7 +131,8 @@ def ts() -> str:
 
 
 def emit(msg: str) -> None:
-    print(f"[{ts()}] {msg}", flush=True)
+    target = sys.stderr if JSON_MODE else sys.stdout
+    print(f"[{ts()}] {msg}", file=target, flush=True)
 
 
 def emit_event(msg: str) -> None:
@@ -150,9 +168,17 @@ def _monitor_dir() -> Path:
     return root / "pinpoint" / "pr-watch"
 
 
-def _monitor_paths(pr: int, *, force: bool = False) -> tuple[Path, Path]:
+def _monitor_paths(
+    pr: int,
+    *,
+    force: bool = False,
+    phase: str | None = None,
+    expected_head: str | None = None,
+) -> tuple[Path, Path]:
     mode_suffix = "-force" if force else ""
-    stem = f"{REPO_OWNER}-{REPO_NAME}-{pr}{mode_suffix}"
+    phase_suffix = f"-{phase}" if phase else ""
+    head_suffix = f"-{expected_head[:10]}" if expected_head else ""
+    stem = f"{REPO_OWNER}-{REPO_NAME}-{pr}{phase_suffix}{head_suffix}{mode_suffix}"
     root = _monitor_dir()
     return root / f"{stem}.lock", root / f"{stem}.json"
 
@@ -171,6 +197,14 @@ def _write_monitor_state(
     detail: str,
     failure_artifact: str | None = None,
     action_item: str | None = None,
+    phase: str | None = None,
+    expected_head: str | None = None,
+    outcome: str | None = None,
+    ci_gate: str | None = None,
+    review_state: str | None = None,
+    unresolved_threads: int | None = None,
+    merge_state: str | None = None,
+    detail_url: str | None = None,
 ) -> None:
     """Atomically publish one versioned monitor snapshot."""
     if status not in MONITOR_STATUSES:
@@ -190,6 +224,22 @@ def _write_monitor_state(
         state["failure_artifact"] = str(Path(failure_artifact).resolve())
     if action_item is not None:
         state["action_item"] = action_item[:240]
+    if phase is not None:
+        state["phase"] = phase
+    if expected_head is not None:
+        state["expected_head"] = expected_head
+    if outcome is not None:
+        state["outcome"] = outcome
+    if ci_gate is not None:
+        state["ci_gate"] = ci_gate
+    if review_state is not None:
+        state["review_state"] = review_state
+    if unresolved_threads is not None:
+        state["unresolved_threads"] = unresolved_threads
+    if merge_state is not None:
+        state["merge_state"] = merge_state
+    if detail_url is not None:
+        state["detail_url"] = detail_url
 
     temp_path: Path | None = None
     try:
@@ -271,9 +321,83 @@ def _read_lock_owner(lock_handle) -> int | None:
 def _monitor_exit_code(status: str) -> int:
     if status == "passed":
         return 0
-    if status in {"failed", "superseded"}:
+    if status in {"failed", "superseded", "action_required", "stale", "conflicting"}:
         return 1
     return EXIT_UNDETERMINED
+
+
+def _emit_terminal_json(state: dict[str, object]) -> None:
+    payload = {
+        "schema_version": MONITOR_SCHEMA_VERSION,
+        "repository": str(state.get("repository") or MONITOR_REPOSITORY),
+        "pr": int(state.get("pr") or 0),
+        "phase": str(state.get("phase") or "ci"),
+        "expected_head": str(state.get("expected_head") or state.get("head_sha") or ""),
+        "observed_head": str(state.get("head_sha") or ""),
+        "outcome": str(state.get("outcome") or state.get("status") or "failed"),
+        "ci_gate": str(state.get("ci_gate") or "UNKNOWN"),
+        "review_state": str(state.get("review_state") or "unreviewed"),
+        "unresolved_threads": int(state.get("unresolved_threads") or 0),
+        "merge_state": str(state.get("merge_state") or "UNKNOWN"),
+        "detail_url": state.get("detail_url") or None,
+        "failure_artifact": state.get("failure_artifact") or None,
+        "timestamp": str(state.get("timestamp") or _utc_now()),
+    }
+    print(json.dumps(payload, separators=(",", ":")), file=sys.stdout)
+
+
+def _record_watcher_run(
+    pr: int,
+    phase: str,
+    expected_head: str,
+    observed_head: str,
+    outcome: str,
+    elapsed_sec: float,
+) -> None:
+    try:
+        try:
+            model_wake_count = int(os.environ.get("GH_MONITOR_WAKES", "1"))
+        except ValueError:
+            model_wake_count = 1
+        log_dir = Path(LOG_DIR)
+        log_dir.mkdir(parents=True, exist_ok=True)
+        ts_slug = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        nonce = uuid.uuid4().hex[:8]
+        target = (
+            log_dir / f"watcher-run-{pr}-{phase}-{ts_slug}-{os.getpid()}-{nonce}.json"
+        )
+        record = {
+            "harness": os.environ.get("GH_MONITOR_HARNESS", "unknown"),
+            "resolved_model": os.environ.get("GH_MONITOR_MODEL", "unknown"),
+            "phase": phase,
+            "expected_head": expected_head,
+            "observed_head": observed_head,
+            "model_wake_count": model_wake_count,
+            "elapsed_wait": round(elapsed_sec, 2),
+            "terminal_outcome": outcome,
+            "provider_usage": None,
+            "timestamp": _utc_now(),
+        }
+        temp_path: Path | None = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                mode="w",
+                encoding="utf-8",
+                dir=log_dir,
+                prefix=f".{target.name}.",
+                delete=False,
+            ) as handle:
+                temp_path = Path(handle.name)
+                json.dump(record, handle, indent=2)
+                handle.write("\n")
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(temp_path, target)
+        finally:
+            if temp_path is not None and temp_path.exists():
+                temp_path.unlink()
+    except OSError:
+        pass
 
 
 def _run_coordinated_watch(
@@ -281,6 +405,8 @@ def _run_coordinated_watch(
     owned_watch: Callable[[MonitorStateSink, MonitorActionSink], int],
     *,
     force: bool = False,
+    phase: str | None = None,
+    expected_head: str | None = None,
     follower_poll_sec: float = FOLLOWER_POLL_SECONDS,
 ) -> int:
     """Own the remote watch or follow a live owner's local atomic state.
@@ -291,8 +417,11 @@ def _run_coordinated_watch(
     state record before a follower accepts that state, closing the stale-file
     race between consecutive owners.
     """
-    lock_path, state_path = _monitor_paths(pr, force=force)
+    lock_path, state_path = _monitor_paths(
+        pr, force=force, phase=phase, expected_head=expected_head
+    )
     lock_path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    start_time = time.monotonic()
     with lock_path.open("a+", encoding="utf-8") as lock_handle:
         attached_pid: int | None = None
         last_signature: tuple[str, str, str] | None = None
@@ -318,12 +447,47 @@ def _run_coordinated_watch(
                     and attached_state["leader_pid"] == attached_pid
                     and attached_state["status"] in MONITOR_TERMINAL_STATUSES
                 ):
+                    leader_expected = str(
+                        attached_state.get("expected_head")
+                        or attached_state.get("head_sha")
+                        or ""
+                    )
+                    if (
+                        expected_head
+                        and leader_expected
+                        and not (
+                            leader_expected == expected_head
+                            or leader_expected.startswith(expected_head)
+                            or expected_head.startswith(leader_expected)
+                        )
+                    ):
+                        attached_pid = None
+                        time.sleep(follower_poll_sec)
+                        continue
                     surface_action_item(attached_state)
                     detail = str(attached_state["detail"])
                     emit(detail)
                     artifact = attached_state.get("failure_artifact")
                     if artifact:
                         emit(f"Failure details: {artifact}")
+                    elapsed = time.monotonic() - start_time
+                    observed_head = str(attached_state.get("head_sha") or "")
+                    outcome = str(
+                        attached_state.get("outcome")
+                        or attached_state.get("status")
+                        or "failed"
+                    )
+                    _record_watcher_run(
+                        pr=pr,
+                        phase=phase or str(attached_state.get("phase") or "ci"),
+                        expected_head=expected_head
+                        or str(attached_state.get("expected_head") or observed_head),
+                        observed_head=observed_head,
+                        outcome=outcome,
+                        elapsed_sec=elapsed,
+                    )
+                    if JSON_MODE:
+                        _emit_terminal_json(attached_state)
                     return _monitor_exit_code(str(attached_state["status"]))
             try:
                 fcntl.flock(lock_handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -335,6 +499,20 @@ def _run_coordinated_watch(
                     and lock_owner is not None
                     and state["leader_pid"] == lock_owner
                 ):
+                    leader_expected = str(
+                        state.get("expected_head") or state.get("head_sha") or ""
+                    )
+                    if (
+                        expected_head
+                        and leader_expected
+                        and not (
+                            leader_expected == expected_head
+                            or leader_expected.startswith(expected_head)
+                            or expected_head.startswith(leader_expected)
+                        )
+                    ):
+                        time.sleep(follower_poll_sec)
+                        continue
                     if attached_pid != lock_owner:
                         attached_pid = lock_owner
                         last_signature = None
@@ -357,6 +535,22 @@ def _run_coordinated_watch(
                         artifact = state.get("failure_artifact")
                         if artifact:
                             emit(f"Failure details: {artifact}")
+                        elapsed = time.monotonic() - start_time
+                        observed_head = str(state.get("head_sha") or "")
+                        outcome = str(
+                            state.get("outcome") or state.get("status") or "failed"
+                        )
+                        _record_watcher_run(
+                            pr=pr,
+                            phase=phase or str(state.get("phase") or "ci"),
+                            expected_head=expected_head
+                            or str(state.get("expected_head") or observed_head),
+                            observed_head=observed_head,
+                            outcome=outcome,
+                            elapsed_sec=elapsed,
+                        )
+                        if JSON_MODE:
+                            _emit_terminal_json(state)
                         return _monitor_exit_code(str(state["status"]))
                 time.sleep(follower_poll_sec)
                 continue
@@ -369,11 +563,24 @@ def _run_coordinated_watch(
                 nonlocal action_item
                 action_item = value
 
+            outer_phase = phase
+            outer_expected_head = expected_head
+
             def publish(
                 head_sha: str,
                 status: str,
                 detail: str,
                 failure_artifact: str | None = None,
+                *,
+                phase: str | None = None,
+                expected_head: str | None = None,
+                outcome: str | None = None,
+                ci_gate: str | None = None,
+                review_state: str | None = None,
+                unresolved_threads: int | None = None,
+                merge_state: str | None = None,
+                detail_url: str | None = None,
+                **_kwargs: object,
             ) -> None:
                 _write_monitor_state(
                     state_path,
@@ -384,11 +591,57 @@ def _run_coordinated_watch(
                     detail=detail,
                     failure_artifact=failure_artifact,
                     action_item=action_item,
+                    phase=phase if phase is not None else outer_phase,
+                    expected_head=expected_head
+                    if expected_head is not None
+                    else outer_expected_head,
+                    outcome=outcome,
+                    ci_gate=ci_gate,
+                    review_state=review_state,
+                    unresolved_threads=unresolved_threads,
+                    merge_state=merge_state,
+                    detail_url=detail_url,
                 )
 
             publish("", "starting", f"PR #{pr} monitor is starting")
             try:
-                return owned_watch(publish, set_action_item)
+                exit_code = owned_watch(publish, set_action_item)
+                final_state = _read_monitor_state(state_path, pr)
+                if final_state is not None and final_state["leader_pid"] == leader_pid:
+                    elapsed = time.monotonic() - start_time
+                    observed_head = str(final_state.get("head_sha") or "")
+                    outcome = str(
+                        final_state.get("outcome")
+                        or final_state.get("status")
+                        or ("passed" if exit_code == 0 else "failed")
+                    )
+                    _record_watcher_run(
+                        pr=pr,
+                        phase=phase or str(final_state.get("phase") or "ci"),
+                        expected_head=expected_head
+                        or str(final_state.get("expected_head") or observed_head),
+                        observed_head=observed_head,
+                        outcome=outcome,
+                        elapsed_sec=elapsed,
+                    )
+                    if JSON_MODE:
+                        _emit_terminal_json(final_state)
+                elif JSON_MODE:
+                    fallback_state = {
+                        "repository": MONITOR_REPOSITORY,
+                        "pr": pr,
+                        "phase": phase or "ci",
+                        "expected_head": expected_head or "",
+                        "head_sha": "",
+                        "outcome": "failed" if exit_code != 0 else "passed",
+                        "status": "failed" if exit_code != 0 else "passed",
+                        "ci_gate": "UNKNOWN",
+                        "review_state": "unreviewed",
+                        "unresolved_threads": 0,
+                        "merge_state": "UNKNOWN",
+                    }
+                    _emit_terminal_json(fallback_state)
+                return exit_code
             finally:
                 fcntl.flock(lock_handle.fileno(), fcntl.LOCK_UN)
 
@@ -507,10 +760,11 @@ def _codex_reviews(pr: int) -> list[dict]:
 
 def _comment_review_records(
     pr: int,
-) -> tuple[list[tuple[str, str, str]], list[tuple[str, str]]]:
-    """Return SHA-pinned automatic comments and independent manual markers."""
+) -> tuple[list[tuple[str, str, str]], list[tuple[str, str]], list[tuple[str, str]]]:
+    """Return Codex evidence, manual review requests, and local-review markers."""
     repo = f"repos/{REPO_OWNER}/{REPO_NAME}"
-    automatic: list[tuple[str, str, str]] = []
+    codex_results: list[tuple[str, str, str]] = []
+    review_requests: list[tuple[str, str]] = []
     markers: list[tuple[str, str]] = []
     for comment in _gh_api_list(f"{repo}/issues/{pr}/comments"):
         body = comment.get("body") or ""
@@ -528,13 +782,17 @@ def _comment_review_records(
                 )
             )
         ):
-            automatic.append(
+            codex_results.append(
                 (
                     "clean_comment",
                     match.group(1),
                     comment.get("updated_at") or comment.get("created_at") or "",
                 )
             )
+        if comment.get("user", {}).get("login") == REPO_OWNER and (
+            match := CODEX_REVIEW_REQUEST_RE.fullmatch(body)
+        ):
+            review_requests.append((match.group(1), comment.get("created_at") or ""))
         if (
             comment.get("user", {}).get("login") == GITHUB_ACTIONS_BOT
             and app.get("slug") == GITHUB_ACTIONS_APP_SLUG
@@ -546,7 +804,7 @@ def _comment_review_records(
                 )
             )
         ):
-            automatic.append(
+            codex_results.append(
                 (
                     "clean_reaction",
                     match.group(1),
@@ -567,14 +825,15 @@ def _comment_review_records(
                     comment.get("updated_at") or "",
                 )
             )
-    return automatic, markers
+    return codex_results, review_requests, markers
 
 
-def review_state(pr: int) -> tuple[str, str]:
+def review_state(pr: int, *, head_sha: str | None = None) -> tuple[str, str]:
     """Return the current-head state across both valid review paths."""
-    head_sha = json.loads(gh("pr", "view", str(pr), "--json", "headRefOid"))[
-        "headRefOid"
-    ]
+    if head_sha is None:
+        head_sha = json.loads(gh("pr", "view", str(pr), "--json", "headRefOid"))[
+            "headRefOid"
+        ]
     reviews = _codex_reviews(pr)
     if reviews:
         head_reviews = [
@@ -587,15 +846,15 @@ def review_state(pr: int) -> tuple[str, str]:
             return "approval", f"Codex approved head {head_sha[:7]}"
 
     # A current native approval is sufficient. Defer the paginated comments request
-    # unless it is needed to find the independent manual-attestation fallback.
-    automatic_comments, markers = _comment_review_records(pr)
+    # unless it is needed to find another accepted record or request state.
+    codex_results, review_requests, markers = _comment_review_records(pr)
     if any(marker_sha == head_sha for marker_sha, _at in markers):
         return "marker", f"manual review marker pins head {head_sha[:7]}"
 
     current_clean = max(
         (
             record
-            for record in automatic_comments
+            for record in codex_results
             if (record[0] == "clean_comment" and head_sha.startswith(record[1]))
             or (record[0] == "clean_reaction" and record[1] == head_sha)
         ),
@@ -626,11 +885,27 @@ def review_state(pr: int) -> tuple[str, str]:
             f"Codex reviewed head {head_sha[:7]} with {state}; thread gate owns findings",
         )
 
+    review_requested = any(
+        request_sha == head_sha for request_sha, _at in review_requests
+    )
+    if reviews and review_sha == head_sha:
+        remediation = (
+            REVIEW_REQUESTED_HINT if review_requested else REVIEW_HINT.format(pr=pr)
+        )
+        return (
+            "not_approved",
+            f"Codex reviewed current head {review_sha[:7]} with unusable state "
+            f"{state}; {remediation}",
+        )
+
+    if review_requested:
+        return "review_requested", REVIEW_REQUESTED_HINT
+
     latest_marker_sha, latest_marker_at = max(
         markers, key=lambda marker: marker[1], default=("", "")
     )
     latest_clean_state, latest_clean_sha, latest_clean_at = max(
-        automatic_comments, key=lambda record: record[2], default=("", "", "")
+        codex_results, key=lambda record: record[2], default=("", "", "")
     )
     latest_comment_sha, latest_comment_at, latest_comment_state = (
         (latest_marker_sha, latest_marker_at, "stale_marker")
@@ -651,15 +926,10 @@ def review_state(pr: int) -> tuple[str, str]:
                 latest_comment_state,
                 f"review record pins {latest_comment_sha[:7]} but head is {head_sha[:7]}",
             )
-        if state == "APPROVED":
-            return (
-                "stale_approval",
-                f"Codex approved {review_sha[:7]} but head is {head_sha[:7]} — "
-                f"{REVIEW_HINT.format(pr=pr)}",
-            )
         return (
-            "not_approved",
-            f"Codex last reviewed {review_sha[:7]} with {state}, not APPROVED; "
+            "stale_approval",
+            f"Codex reviewed {review_sha[:7]} with {state}, but head is "
+            f"{head_sha[:7]} — "
             f"{REVIEW_HINT.format(pr=pr)}",
         )
     if latest_marker_sha:
@@ -714,6 +984,43 @@ def _current_ci_snapshot(pr: int) -> tuple[str, dict | None]:
     return data.get("headRefOid") or "", _select_ci_gate(
         data.get("statusCheckRollup") or []
     )
+
+
+def _current_phase_ci_snapshot(pr: int) -> tuple[str, dict | None, str]:
+    """Fetch one head-pinned CI and merge-state snapshot for delegated watches."""
+    for attempt in range(2):
+        raw = gh(
+            "pr",
+            "view",
+            str(pr),
+            "--json",
+            "headRefOid,statusCheckRollup,mergeStateStatus",
+        )
+        data = json.loads(raw)
+        if not isinstance(data, dict):
+            raise RuntimeError("GitHub returned invalid PR metadata")
+        head_sha = str(data.get("headRefOid") or "")
+        gate = _select_ci_gate(data.get("statusCheckRollup") or [])
+        merge_state = str(data.get("mergeStateStatus") or "UNKNOWN")
+        if merge_state != "UNKNOWN" or attempt == 1:
+            return head_sha, gate, merge_state
+        time.sleep(2)
+    return "", None, "UNKNOWN"
+
+
+def _current_head_merge_snapshot(pr: int) -> tuple[str, str]:
+    """Fetch head and merge state atomically, retrying GitHub's lazy UNKNOWN."""
+    for attempt in range(2):
+        raw = gh("pr", "view", str(pr), "--json", "headRefOid,mergeStateStatus")
+        data = json.loads(raw)
+        if not isinstance(data, dict):
+            raise RuntimeError("GitHub returned invalid PR metadata")
+        head_sha = str(data.get("headRefOid") or "")
+        merge_state = str(data.get("mergeStateStatus") or "UNKNOWN")
+        if merge_state != "UNKNOWN" or attempt == 1:
+            return head_sha, merge_state
+        time.sleep(2)
+    return "", "UNKNOWN"
 
 
 def _current_ci_gate(pr: int) -> dict | None:
@@ -786,8 +1093,10 @@ def _pre_check_blocking(pr: int) -> tuple[bool, str, str]:
     semantics — there, CI-Gate-absent IS correctly a "no, not ready right now".
     """
     merge_state, _labels = _fetch_merge_state(pr)
-    if merge_state in ("DIRTY", "CONFLICTING", "BEHIND"):
+    if merge_state in ("DIRTY", "CONFLICTING"):
         return False, f"merge state {merge_state} — resolve before watching", ""
+    if merge_state == "BEHIND":
+        emit_event("Branch is behind main (non-blocking for CI)")
 
     ci_status, ci_conclusion = _ci_gate_state(pr)
     if ci_status == "COMPLETED":
@@ -854,7 +1163,8 @@ def run_audit(pr: int) -> bool:
     )
 
     # Reported, but NOT part of the verdict. This mode answers "can this head leave
-    # draft and enter automatic review?"; gating on review here would make the check
+    # draft and become eligible for a manual review request?"; gating on review here
+    # would make the check
     # circular and permanently red. merge-pr.sh's `reviewed` gate refuses to merge an
     # unreviewed head. A stale Codex approval is worth seeing here anyway: it means the
     # PR looks reviewed and is not.
@@ -1067,30 +1377,591 @@ def _watch_ci_gate(
     return EXIT_UNDETERMINED
 
 
+def _watch_phase_ci(
+    pr: int,
+    expected_head: str,
+    *,
+    timeout_sec: int = WATCH_TIMEOUT_SECONDS,
+    poll_sec: int = WATCH_POLL_SECONDS,
+    state_sink: MonitorStateSink | None = None,
+) -> int:
+    """Watch CI Gate for one intended commit head.
+
+    If expected_head is specified and the PR head moves, this watch terminates
+    as stale rather than following replacement heads. If merge conflicts
+    develop (DIRTY/CONFLICTING), it terminates as conflicting.
+    """
+    deadline = time.monotonic() + timeout_sec
+    superseded_deadline: float | None = None
+    last_signature: tuple[str, str, str] | None = None
+
+    while time.monotonic() < deadline:
+        try:
+            head_sha, gate, merge_state = _current_phase_ci_snapshot(pr)
+        except (RuntimeError, json.JSONDecodeError) as exc:
+            detail = (
+                "⚠  Could not determine CI Gate state — "
+                f"the GitHub API was unreachable ({exc})."
+            )
+            emit(detail)
+            if state_sink is not None:
+                state_sink(
+                    expected_head,
+                    "undetermined",
+                    detail,
+                    None,
+                    outcome="undetermined",
+                )
+            return EXIT_UNDETERMINED
+
+        if not head_sha:
+            detail = "⚠  Could not determine CI Gate state — PR head SHA was empty."
+            emit(detail)
+            if state_sink is not None:
+                state_sink("", "undetermined", detail, None, outcome="undetermined")
+            return EXIT_UNDETERMINED
+
+        if expected_head and head_sha != expected_head:
+            detail = f"PR head moved {expected_head[:7]} → {head_sha[:7]} — CI watch is stale"
+            emit(detail)
+            if state_sink is not None:
+                state_sink(
+                    head_sha,
+                    "stale",
+                    detail,
+                    None,
+                    outcome="stale",
+                    ci_gate=(gate or {}).get("conclusion")
+                    or (gate or {}).get("status")
+                    or "UNKNOWN",
+                )
+            return 1
+
+        if not expected_head:
+            expected_head = head_sha
+
+        if merge_state == "UNKNOWN":
+            detail = "⚠  Could not determine CI Gate state — merge state is unknown."
+            emit(detail)
+            if state_sink is not None:
+                state_sink(
+                    head_sha,
+                    "undetermined",
+                    detail,
+                    None,
+                    outcome="undetermined",
+                    merge_state=merge_state,
+                )
+            return EXIT_UNDETERMINED
+        if merge_state in ("DIRTY", "CONFLICTING"):
+            detail = f"PR merge state is {merge_state} — conflict must be resolved"
+            emit(detail)
+            if state_sink is not None:
+                state_sink(
+                    head_sha,
+                    "conflicting",
+                    detail,
+                    None,
+                    outcome="conflicting",
+                    merge_state=merge_state,
+                )
+            return 1
+
+        status = (gate or {}).get("status") or ""
+        conclusion = (gate or {}).get("conclusion") or ""
+        details_url = (gate or {}).get("detailsUrl") or ""
+        signature = (head_sha, status, conclusion)
+        if signature != last_signature:
+            detail = (
+                f"CI Gate {status.lower() or 'not yet posted'} on {head_sha[:7]}"
+                + (f" ({conclusion})" if conclusion else "")
+            )
+            emit_event(detail)
+            if state_sink is not None:
+                state_sink(
+                    head_sha,
+                    "pending",
+                    detail,
+                    None,
+                    ci_gate=conclusion or status,
+                    detail_url=details_url,
+                    merge_state=merge_state,
+                )
+            last_signature = signature
+
+        if status == "COMPLETED":
+            if _is_passing(conclusion):
+                detail = f"CI Gate passed on {head_sha[:7]} (conclusion={conclusion}) ✓"
+                emit(detail)
+                if state_sink is not None:
+                    state_sink(
+                        head_sha,
+                        "passed",
+                        detail,
+                        None,
+                        outcome="passed",
+                        ci_gate=conclusion,
+                        detail_url=details_url,
+                        merge_state=merge_state,
+                    )
+                return 0
+            if _is_superseded(conclusion):
+                if superseded_deadline is None:
+                    superseded_deadline = time.monotonic() + SUPERSEDED_GATE_GRACE
+                    emit_event(
+                        "CI Gate cancelled (superseded) — waiting for a replacement run"
+                    )
+                elif time.monotonic() >= superseded_deadline:
+                    detail = (
+                        "⊘  CI Gate cancelled (superseded) — "
+                        "no replacement run appeared"
+                    )
+                    emit(detail)
+                    if state_sink is not None:
+                        state_sink(
+                            head_sha,
+                            "undetermined",
+                            detail,
+                            None,
+                            outcome="undetermined",
+                            ci_gate=conclusion,
+                            detail_url=details_url,
+                            merge_state=merge_state,
+                        )
+                    return EXIT_UNDETERMINED
+            else:
+                detail = (
+                    f"CI Gate failed on {head_sha[:7]} "
+                    f"(conclusion={conclusion or 'unknown'})"
+                )
+                emit(detail)
+                artifact: str | None = None
+                try:
+                    run_id = _failed_ci_run_id(head_sha, details_url)
+                    if run_id is not None:
+                        artifact = write_failure_artifact(run_id)
+                        emit(f"Failure details: {artifact}")
+                except (RuntimeError, json.JSONDecodeError, OSError, ValueError) as exc:
+                    emit(f"Failure logs unavailable: {exc}")
+                if state_sink is not None:
+                    state_sink(
+                        head_sha,
+                        "failed",
+                        detail,
+                        artifact,
+                        outcome="failed",
+                        ci_gate=conclusion,
+                        detail_url=details_url,
+                        merge_state=merge_state,
+                    )
+                return 1
+        else:
+            superseded_deadline = None
+
+        time.sleep(poll_sec)
+
+    detail = (
+        f"⚠  Could not determine CI Gate state — no terminal verdict "
+        f"within {timeout_sec}s."
+    )
+    emit(detail)
+    if state_sink is not None:
+        state_sink(
+            expected_head,
+            "timed_out",
+            detail,
+            None,
+            outcome="timed_out",
+        )
+    return EXIT_UNDETERMINED
+
+
+def _watch_phase_review(
+    pr: int,
+    expected_head: str,
+    *,
+    timeout_sec: int = WATCH_TIMEOUT_SECONDS,
+    poll_sec: int = WATCH_POLL_SECONDS,
+    state_sink: MonitorStateSink | None = None,
+) -> int:
+    """Watch review coverage and threads for one intended commit head.
+
+    Terminal states:
+    - passed (exit 0): exact-head coverage present AND 0 unresolved threads.
+    - action_required (exit 1): exact-head coverage present with >0 unresolved threads,
+      or review is not_approved.
+    - stale (exit 1): PR head moved away from expected_head.
+    - conflicting (exit 1): merge state is DIRTY or CONFLICTING.
+    - timed_out (exit 2): deadline reached without terminal verdict.
+    - undetermined (exit 2): GitHub API error.
+    """
+    deadline = time.monotonic() + timeout_sec
+    last_signature: tuple[str, str, int] | None = None
+    last_review_state = "unreviewed"
+    last_merge_state = "UNKNOWN"
+
+    def read_review_evidence(head_sha: str) -> tuple[str, str, bool, int]:
+        state_kind, state_desc = review_state(pr, head_sha=head_sha)
+        accepted_review = state_kind in (
+            "approval",
+            "clean_comment",
+            "clean_reaction",
+            "marker",
+            "reviewed",
+        )
+        unresolved = 0
+        if accepted_review or state_kind == "not_approved":
+            unresolved = _unresolved_threads(get_review_threads(pr))
+        return state_kind, state_desc, accepted_review, unresolved
+
+    while time.monotonic() < deadline:
+        try:
+            head_sha, merge_state = _current_head_merge_snapshot(pr)
+        except (RuntimeError, json.JSONDecodeError) as exc:
+            detail = (
+                "⚠  Could not determine review state — "
+                f"the GitHub API was unreachable ({exc})."
+            )
+            emit(detail)
+            if state_sink is not None:
+                state_sink(
+                    expected_head,
+                    "undetermined",
+                    detail,
+                    None,
+                    outcome="undetermined",
+                )
+            return EXIT_UNDETERMINED
+
+        if not head_sha:
+            detail = "⚠  Could not determine review state — PR head SHA was empty."
+            emit(detail)
+            if state_sink is not None:
+                state_sink("", "undetermined", detail, None, outcome="undetermined")
+            return EXIT_UNDETERMINED
+
+        if expected_head and head_sha != expected_head:
+            detail = f"PR head moved {expected_head[:7]} → {head_sha[:7]} — review watch is stale"
+            emit(detail)
+            if state_sink is not None:
+                state_sink(
+                    head_sha,
+                    "stale",
+                    detail,
+                    None,
+                    outcome="stale",
+                )
+            return 1
+
+        if not expected_head:
+            expected_head = head_sha
+
+        if merge_state == "UNKNOWN":
+            detail = "⚠  Could not determine review state — merge state is unknown."
+            emit(detail)
+            if state_sink is not None:
+                state_sink(
+                    head_sha,
+                    "undetermined",
+                    detail,
+                    None,
+                    outcome="undetermined",
+                    merge_state=merge_state,
+                )
+            return EXIT_UNDETERMINED
+        if merge_state in ("DIRTY", "CONFLICTING"):
+            detail = f"PR merge state is {merge_state} — conflict must be resolved"
+            emit(detail)
+            if state_sink is not None:
+                state_sink(
+                    head_sha,
+                    "conflicting",
+                    detail,
+                    None,
+                    outcome="conflicting",
+                    merge_state=merge_state,
+                )
+            return 1
+
+        try:
+            state_kind, state_desc, accepted_review, unresolved = read_review_evidence(
+                head_sha
+            )
+        except (RuntimeError, json.JSONDecodeError) as exc:
+            detail = (
+                "⚠  Could not determine review state — "
+                f"the GitHub API was unreachable ({exc})."
+            )
+            emit(detail)
+            if state_sink is not None:
+                state_sink(
+                    head_sha,
+                    "undetermined",
+                    detail,
+                    None,
+                    outcome="undetermined",
+                )
+            return EXIT_UNDETERMINED
+
+        terminal_candidate = accepted_review or state_kind == "not_approved"
+        for check_index in range(2 if terminal_candidate else 1):
+            try:
+                terminal_head, terminal_merge_state = _current_head_merge_snapshot(pr)
+            except (RuntimeError, json.JSONDecodeError) as exc:
+                detail = (
+                    "⚠  Could not finalize review state — "
+                    f"the GitHub API was unreachable ({exc})."
+                )
+                emit(detail)
+                if state_sink is not None:
+                    state_sink(
+                        head_sha,
+                        "undetermined",
+                        detail,
+                        None,
+                        outcome="undetermined",
+                    )
+                return EXIT_UNDETERMINED
+            if not terminal_head or terminal_merge_state == "UNKNOWN":
+                detail = "⚠  Could not finalize review target head and merge state."
+                emit(detail)
+                if state_sink is not None:
+                    state_sink(
+                        terminal_head,
+                        "undetermined",
+                        detail,
+                        None,
+                        outcome="undetermined",
+                        merge_state=terminal_merge_state,
+                    )
+                return EXIT_UNDETERMINED
+            if terminal_head != expected_head:
+                detail = f"PR head moved {expected_head[:7]} → {terminal_head[:7]} — review watch is stale"
+                emit(detail)
+                if state_sink is not None:
+                    state_sink(
+                        terminal_head,
+                        "stale",
+                        detail,
+                        None,
+                        outcome="stale",
+                        merge_state=terminal_merge_state,
+                    )
+                return 1
+            if terminal_merge_state in ("DIRTY", "CONFLICTING"):
+                detail = f"PR merge state is {terminal_merge_state} — conflict must be resolved"
+                emit(detail)
+                if state_sink is not None:
+                    state_sink(
+                        terminal_head,
+                        "conflicting",
+                        detail,
+                        None,
+                        outcome="conflicting",
+                        merge_state=terminal_merge_state,
+                    )
+                return 1
+            merge_state = terminal_merge_state
+
+            if check_index == 0 and terminal_candidate:
+                try:
+                    state_kind, state_desc, accepted_review, unresolved = (
+                        read_review_evidence(head_sha)
+                    )
+                except (RuntimeError, json.JSONDecodeError) as exc:
+                    detail = f"⚠  Could not revalidate review evidence — {exc}"
+                    emit(detail)
+                    if state_sink is not None:
+                        state_sink(
+                            head_sha,
+                            "undetermined",
+                            detail,
+                            None,
+                            outcome="undetermined",
+                        )
+                    return EXIT_UNDETERMINED
+                terminal_candidate = accepted_review or state_kind == "not_approved"
+                if not terminal_candidate:
+                    break
+
+        last_review_state = state_kind
+        last_merge_state = merge_state
+        if accepted_review:
+            if unresolved == 0:
+                detail = f"Review coverage complete on {head_sha[:7]} ({state_kind}) with 0 unresolved threads ✓"
+                emit(detail)
+                if state_sink is not None:
+                    state_sink(
+                        head_sha,
+                        "passed",
+                        detail,
+                        None,
+                        outcome="passed",
+                        review_state=state_kind,
+                        unresolved_threads=0,
+                        merge_state=merge_state,
+                    )
+                return 0
+            else:
+                detail = (
+                    f"Review coverage present on {head_sha[:7]} ({state_kind}), "
+                    f"but {unresolved} unresolved thread(s) require action"
+                )
+                emit(detail)
+                if state_sink is not None:
+                    state_sink(
+                        head_sha,
+                        "action_required",
+                        detail,
+                        None,
+                        outcome="action_required",
+                        review_state=state_kind,
+                        unresolved_threads=unresolved,
+                        merge_state=merge_state,
+                    )
+                return 1
+
+        elif state_kind == "not_approved":
+            detail = f"Review on {head_sha[:7]} is not approved ({state_desc})"
+            emit(detail)
+            if state_sink is not None:
+                state_sink(
+                    head_sha,
+                    "action_required",
+                    detail,
+                    None,
+                    outcome="action_required",
+                    review_state=state_kind,
+                    unresolved_threads=unresolved,
+                    merge_state=merge_state,
+                )
+            return 1
+
+        else:
+            # In progress: review_requested, unreviewed, stale_approval, etc.
+            signature = (head_sha, state_kind, 0)
+            if signature != last_signature:
+                detail = f"Review pending on {head_sha[:7]}: {state_kind}"
+                emit_event(detail)
+                if state_sink is not None:
+                    state_sink(
+                        head_sha,
+                        "pending",
+                        detail,
+                        None,
+                        review_state=state_kind,
+                        merge_state=merge_state,
+                    )
+                last_signature = signature
+
+        time.sleep(poll_sec)
+
+    detail = (
+        f"⚠  Could not determine review state — no terminal verdict "
+        f"within {timeout_sec}s."
+    )
+    emit(detail)
+    if state_sink is not None:
+        state_sink(
+            expected_head,
+            "timed_out",
+            detail,
+            None,
+            outcome="timed_out",
+            review_state=last_review_state,
+            merge_state=last_merge_state,
+        )
+    return EXIT_UNDETERMINED
+
+
 def _run_owned_watch(
     pr: int,
     force: bool,
     state_sink: MonitorStateSink,
     action_item_sink: MonitorActionSink,
+    *,
+    phase: str | None = None,
+    expected_head: str | None = None,
 ) -> int:
     """Run pre-checks and remote polling for the process holding the lock."""
+    if phase == "review":
+        emit_event(
+            f"Watching PR #{pr} — review coverage on {expected_head or 'current head'}"
+        )
+        state_sink(
+            expected_head or "",
+            "pending",
+            f"Watching PR #{pr} — review coverage",
+            None,
+            phase="review",
+            expected_head=expected_head,
+        )
+        return _watch_phase_review(
+            pr,
+            expected_head or "",
+            state_sink=state_sink,
+        )
+
+    if phase == "ci" or expected_head is not None:
+        emit_event(f"Watching PR #{pr} — aggregate CI Gate")
+        state_sink(
+            expected_head or "",
+            "pending",
+            f"Watching PR #{pr} — aggregate CI Gate",
+            None,
+            phase="ci",
+            expected_head=expected_head,
+        )
+        return _watch_phase_ci(
+            pr,
+            expected_head or "",
+            state_sink=state_sink,
+        )
+
+    # Legacy CI mode keeps its current-head prechecks. Delegated CI mode above
+    # must compare the pinned head first so replacement-head failures or
+    # conflicts are reported as stale rather than attributed to expected_head.
     if not force:
         try:
             blocking_ok, reason, action_item = _pre_check_blocking(pr)
         except (RuntimeError, json.JSONDecodeError, KeyError, ValueError) as exc:
             detail = f"⚠  Could not complete pre-check — {exc}"
             emit(detail)
-            state_sink("", "undetermined", detail, None)
+            state_sink(
+                expected_head or "",
+                "undetermined",
+                detail,
+                None,
+                phase="ci",
+                expected_head=expected_head,
+                outcome="undetermined",
+            )
             return EXIT_UNDETERMINED
         if not blocking_ok:
             detail = f"Pre-check failed: {reason}"
             emit(detail)
-            state_sink("", "failed", detail, None)
+            outcome = "conflicting" if "merge state" in reason else "failed"
+            state_sink(
+                expected_head or "",
+                outcome,
+                detail,
+                None,
+                phase="ci",
+                expected_head=expected_head,
+                outcome=outcome,
+            )
             return 1
         action_item_sink(action_item or None)
 
     emit_event(f"Watching PR #{pr} — aggregate CI Gate")
-    state_sink("", "pending", f"Watching PR #{pr} — aggregate CI Gate", None)
+    state_sink(
+        expected_head or "",
+        "pending",
+        f"Watching PR #{pr} — aggregate CI Gate",
+        None,
+        phase="ci",
+        expected_head=expected_head,
+    )
     return _watch_ci_gate(pr, "", state_sink=state_sink)
 
 
@@ -1099,44 +1970,153 @@ def _run_owned_watch(
 # ---------------------------------------------------------------------------
 
 
-def _parse_args(argv: list[str]) -> tuple[int, bool, bool, bool] | None:
-    """Return (pr, check_ready, force, verbose) or None on usage error."""
+class ParsedArgs(NamedTuple):
+    pr: int
+    check_ready: bool
+    force: bool
+    verbose: bool
+    phase: str | None
+    expected_head: str | None
+    json_mode: bool
+
+
+def _parse_args(argv: list[str]) -> ParsedArgs | None:
+    """Return ParsedArgs or None on usage error."""
     check_ready = "--check-ready" in argv
     force = "--force" in argv
     verbose = "--verbose" in argv
-    rest = [a for a in argv[1:] if a not in ("--check-ready", "--force", "--verbose")]
+    json_mode = "--json" in argv
     if check_ready and force:
         print(
             "Error: --check-ready and --force are mutually exclusive.", file=sys.stderr
         )
         return None
-    if len(rest) != 1 or not rest[0].isdigit():
+
+    phase: str | None = None
+    expected_head: str | None = None
+    rest: list[str] = []
+    i = 1
+    while i < len(argv):
+        arg = argv[i]
+        if arg in ("--check-ready", "--force", "--verbose", "--json"):
+            i += 1
+        elif arg == "--phase":
+            if i + 1 >= len(argv):
+                print(
+                    "Error: --phase requires an argument ('ci' or 'review').",
+                    file=sys.stderr,
+                )
+                return None
+            phase = argv[i + 1]
+            if phase not in ("ci", "review"):
+                print(
+                    f"Error: invalid phase '{phase}', must be 'ci' or 'review'.",
+                    file=sys.stderr,
+                )
+                return None
+            i += 2
+        elif arg.startswith("--phase="):
+            phase = arg.split("=", 1)[1]
+            if phase not in ("ci", "review"):
+                print(
+                    f"Error: invalid phase '{phase}', must be 'ci' or 'review'.",
+                    file=sys.stderr,
+                )
+                return None
+            i += 1
+        elif arg == "--expected-head":
+            if i + 1 >= len(argv):
+                print(
+                    "Error: --expected-head requires a commit SHA argument.",
+                    file=sys.stderr,
+                )
+                return None
+            expected_head = argv[i + 1]
+            if not expected_head:
+                print("Error: --expected-head cannot be empty.", file=sys.stderr)
+                return None
+            i += 2
+        elif arg.startswith("--expected-head="):
+            expected_head = arg.split("=", 1)[1]
+            if not expected_head:
+                print("Error: --expected-head cannot be empty.", file=sys.stderr)
+                return None
+            i += 1
+        elif arg.startswith("-"):
+            print(f"Error: unrecognized option '{arg}'.", file=sys.stderr)
+            return None
+        else:
+            rest.append(arg)
+            i += 1
+
+    delegated_flags = (phase is not None, expected_head is not None, json_mode)
+    if any(delegated_flags) and not all(delegated_flags):
         print(
-            f"Usage: {argv[0]} [--check-ready | --force] [--verbose] <PR_NUMBER>",
+            "Error: delegated watch mode requires --phase, --expected-head, and --json together.",
             file=sys.stderr,
         )
         return None
-    return int(rest[0]), check_ready, force, verbose
+    if (
+        expected_head is not None
+        and re.fullmatch(r"[0-9a-f]{40}", expected_head) is None
+    ):
+        print(
+            "Error: --expected-head must be a full 40-character lowercase commit SHA.",
+            file=sys.stderr,
+        )
+        return None
+    if check_ready and any(delegated_flags):
+        print(
+            "Error: --check-ready cannot be combined with delegated watch mode.",
+            file=sys.stderr,
+        )
+        return None
+
+    if len(rest) != 1 or not rest[0].isdigit():
+        print(
+            f"Usage: {argv[0]} [--check-ready | --force] [--verbose] [--phase <ci|review>] [--expected-head <SHA>] [--json] <PR_NUMBER>",
+            file=sys.stderr,
+        )
+        return None
+    return ParsedArgs(
+        int(rest[0]),
+        check_ready,
+        force,
+        verbose,
+        phase,
+        expected_head,
+        json_mode,
+    )
 
 
 def main() -> int:
     parsed = _parse_args(sys.argv)
     if parsed is None:
         return 1
-    pr, check_ready, force, verbose = parsed
 
-    global VERBOSE_MODE
-    VERBOSE_MODE = verbose
+    global VERBOSE_MODE, JSON_MODE
+    VERBOSE_MODE = parsed.verbose
+    JSON_MODE = parsed.json_mode
 
-    if check_ready:
-        return 0 if run_audit(pr) else 1
+    if parsed.check_ready:
+        return 0 if run_audit(parsed.pr) else 1
+
+    phase = parsed.phase
+    expected_head = parsed.expected_head
 
     return _run_coordinated_watch(
-        pr,
+        parsed.pr,
         lambda state_sink, action_item_sink: _run_owned_watch(
-            pr, force, state_sink, action_item_sink
+            parsed.pr,
+            parsed.force,
+            state_sink,
+            action_item_sink,
+            phase=phase,
+            expected_head=expected_head,
         ),
-        force=force,
+        force=parsed.force,
+        phase=phase,
+        expected_head=expected_head,
     )
 
 

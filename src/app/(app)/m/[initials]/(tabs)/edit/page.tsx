@@ -206,6 +206,7 @@ export default async function MachineEditPage({
   const abandoned = await Promise.all(
     abandonedRows.map(async (row) => ({
       lmxId: row.lmxId,
+      locationUrl: pinballmapLocationUrl(row.locationId),
       title: (await getCatalogEntry(row.pinballmapMachineId))?.name ?? null,
       commentCount:
         snapshot?.lmxes.find((l) => l.id === row.lmxId)?.conditions.length ??
@@ -324,7 +325,6 @@ export default async function MachineEditPage({
             <PinballmapAbandonedEntries
               machineId={machine.id}
               entries={abandoned}
-              locationUrl={locationUrl}
               canPush={canPush && writeEnabled}
             />
           ) : null}

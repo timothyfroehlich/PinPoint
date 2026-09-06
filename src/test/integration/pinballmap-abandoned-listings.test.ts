@@ -6,11 +6,16 @@
  * table itself has to enforce.
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { eq } from "drizzle-orm";
 
 import { getTestDb, setupTestDb } from "~/test/setup/pglite";
 import { machines, pinballmapAbandonedListings } from "~/server/db/schema";
+
+vi.mock("~/server/db", async () => {
+  const { getTestDb } = await import("~/test/setup/pglite");
+  return { db: await getTestDb() };
+});
 
 describe("pinballmap_abandoned_listings", () => {
   setupTestDb();
@@ -26,6 +31,7 @@ describe("pinballmap_abandoned_listings", () => {
       machineId: machine.id,
       lmxId: 4471,
       pinballmapMachineId: 6221,
+      locationId: 26454,
     });
 
     await db.delete(machines).where(eq(machines.id, machine.id));
@@ -49,6 +55,7 @@ describe("pinballmap_abandoned_listings", () => {
       machineId: a.id,
       lmxId: 4471,
       pinballmapMachineId: 6221,
+      locationId: 26454,
     });
 
     await expect(
@@ -56,6 +63,7 @@ describe("pinballmap_abandoned_listings", () => {
         machineId: b.id,
         lmxId: 4471,
         pinballmapMachineId: 6221,
+        locationId: 26454,
       })
     ).rejects.toThrow();
   });
@@ -68,8 +76,18 @@ describe("pinballmap_abandoned_listings", () => {
       .returning();
 
     await db.insert(pinballmapAbandonedListings).values([
-      { machineId: machine.id, lmxId: 4471, pinballmapMachineId: 6221 },
-      { machineId: machine.id, lmxId: 5120, pinballmapMachineId: 6222 },
+      {
+        machineId: machine.id,
+        lmxId: 4471,
+        pinballmapMachineId: 6221,
+        locationId: 26454,
+      },
+      {
+        machineId: machine.id,
+        lmxId: 5120,
+        pinballmapMachineId: 6222,
+        locationId: 26454,
+      },
     ]);
 
     const rows = await db
@@ -77,5 +95,73 @@ describe("pinballmap_abandoned_listings", () => {
       .from(pinballmapAbandonedListings)
       .where(eq(pinballmapAbandonedListings.machineId, machine.id));
     expect(rows).toHaveLength(2);
+  });
+});
+
+describe("abandoned-listing location scoping", () => {
+  setupTestDb();
+
+  async function seedRecord(locationId: number): Promise<string> {
+    const db = await getTestDb();
+    const [machine] = await db
+      .insert(machines)
+      .values({ name: "Orphan owner", initials: `O${String(locationId)}` })
+      .returning();
+    if (!machine) throw new Error("failed to seed machine");
+    await db.insert(pinballmapAbandonedListings).values({
+      machineId: machine.id,
+      lmxId: locationId,
+      pinballmapMachineId: 6221,
+      locationId,
+    });
+    await db.insert(machines).values({
+      name: "Same-title sibling",
+      initials: `S${String(locationId)}`,
+      pinballmapMachineId: 6221,
+    });
+    return machine.id;
+  }
+
+  it("keeps cross-location records visible when a current-location sibling has the title", async () => {
+    const machineId = await seedRecord(99999);
+    const { listSurfacingAbandonedForMachine } =
+      await import("~/lib/pinballmap/abandoned-listings");
+
+    const records = await listSurfacingAbandonedForMachine(machineId, 26454);
+    expect(records).toHaveLength(1);
+    expect(records[0]?.locationId).toBe(99999);
+  });
+
+  it("reconciles only records stamped with the synced location", async () => {
+    const db = await getTestDb();
+    const sameLocationMachineId = await seedRecord(26454);
+    const crossLocationMachineId = await seedRecord(99999);
+    // Coverage would clear both rows without the location predicate.
+    await db
+      .update(machines)
+      .set({ pinballmapIntent: "on" })
+      .where(eq(machines.pinballmapMachineId, 6221));
+
+    const { clearResolvedAbandonments } =
+      await import("~/lib/pinballmap/abandoned-listings");
+    const cleared = await clearResolvedAbandonments(
+      {
+        locationId: 26454,
+        name: "APC",
+        dateLastUpdated: null,
+        lastUpdatedByUsername: null,
+        machineCount: 0,
+        lmxes: [],
+        fetchedAtIso: "2026-08-31T00:00:00.000Z",
+        raw: {},
+      },
+      26454
+    );
+
+    expect(cleared).toBe(1);
+    const records = await db.select().from(pinballmapAbandonedListings);
+    expect(records).toHaveLength(1);
+    expect(records[0]?.machineId).toBe(crossLocationMachineId);
+    expect(records[0]?.machineId).not.toBe(sameLocationMachineId);
   });
 });

@@ -1,6 +1,7 @@
 // Unit tests for .claude/hooks/block-direct-merge.cjs — the PreToolUse hook that
-// governs agent-initiated PR merges. Two outcomes, by channel (PP-wi85 reversed
-// for the script only, per Tim 2026-08-19):
+// governs agent-initiated PinPoint PR merges. Explicit targets in other
+// repositories follow their own policy. Two outcomes, by channel (PP-wi85
+// reversed for the script only, per Tim 2026-08-19):
 //   - merge-pr.sh (the gate-enforced script) → ASK: exit 0 with a PreToolUse
 //     "ask" decision on stdout, so Tim approves the prompt before it runs.
 //   - gh pr merge / gh api PUT .../merge / MCP merge_pull_request → DENY: exit 2,
@@ -80,10 +81,87 @@ describe("block-direct-merge.cjs — gh merge paths", () => {
 
   it("blocks `gh api PUT .../pulls/N/merge`", () => {
     const { status, stderr } = runHook(
-      bashPayload("gh api -X PUT repos/o/r/pulls/123/merge")
+      bashPayload(
+        "gh api -X PUT repos/timothyfroehlich/PinPoint/pulls/123/merge"
+      )
     );
     expect(status).toBe(2);
     expect(stderr).toContain("gh api PUT .../merge");
+  });
+
+  it.each([
+    "gh api -XPUT repos/timothyfroehlich/PinPoint/pulls/123/merge",
+    'gh api -X "$METHOD" repos/timothyfroehlich/PinPoint/pulls/123/merge',
+    'gh api --method="$METHOD" repos/timothyfroehlich/PinPoint/pulls/123/merge',
+    "gh api -X$METHOD repos/timothyfroehlich/PinPoint/pulls/123/merge",
+    "gh api --method$(printf '=PUT') repos/timothyfroehlich/PinPoint/pulls/1/merge",
+    "printf '%s\\n' '-X PUT' | xargs gh api repos/timothyfroehlich/PinPoint/pulls/1/merge",
+  ])("blocks an attached or dynamic REST method selector: %s", (command) => {
+    expect(runHook(bashPayload(command)).status).toBe(2);
+  });
+
+  it("fails closed on a dynamic REST endpoint despite a dotfiles-shaped input filename", () => {
+    const { status } = runHook(
+      bashPayload(
+        'gh api -X PUT "repos/$TARGET/pulls/123/merge" --input repos/timothyfroehlich/dotfiles/pulls/4/merge'
+      )
+    );
+    expect(status).toBe(2);
+  });
+
+  it.each([
+    "gh pr merge 4 --repo timothyfroehlich/dotfiles --squash",
+    "gh -R timothyfroehlich/dotfiles pr merge 4 --squash",
+    "gh pr merge https://github.com/timothyfroehlich/dotfiles/pull/4 --squash",
+    "gh pr merge https://github.com/timothyfroehlich/%64otfiles/pull/4 --squash",
+    "gh api -X PUT repos/timothyfroehlich/dotfiles/pulls/4/merge",
+    "gh api -XPUT repos/timothyfroehlich/dotfiles/pulls/4/merge",
+    'gh api -X "$METHOD" repos/timothyfroehlich/dotfiles/pulls/4/merge',
+    "gh api -X PUT repos/timothyfroehlich/dotfiles/pulls/4/merge --input repos/timothyfroehlich/PinPoint/pulls/123/merge",
+    "GH_REPO=timothyfroehlich/PinPoint gh pr merge 4 --repo timothyfroehlich/dotfiles",
+    'gh pr merge 4 --repo timothyfroehlich/dotfiles --body "$(printf note)"',
+    'gh pr merge 4 --body "$BODY" --repo timothyfroehlich/dotfiles',
+    'gh api --input "$FILE" -X PUT repos/timothyfroehlich/dotfiles/pulls/4/merge',
+    "xargs -I{} -n1 gh pr merge 4 --repo timothyfroehlich/dotfiles --body {}",
+    "xargs -I{} -n01 gh pr merge 4 --repo timothyfroehlich/dotfiles --body {}",
+  ])("allows an explicit non-PinPoint target: %s", (command) => {
+    expectAllow(runHook(bashPayload(command)));
+  });
+
+  it.each([
+    'gh pr merge 4 --repo "$TARGET_REPOSITORY" --squash',
+    "gh pr merge https://github.com/timothyfroehlich/%50inPoint/pull/123",
+    "gh pr merge https://github.com/timothyfroehlich/%ZZinPoint/pull/123",
+    "gh pr merge https://github.com/timothyfroehlich/Pin%2FPoint/pull/123",
+    "gh pr merge https://github.com/timothyfroehlich/PinPoint/pull/123 --repo timothyfroehlich/dotfiles",
+    "GH_REPO=timothyfroehlich/dotfiles gh pr merge 123 --squash",
+    "env GH_REPO=timothyfroehlich/dotfiles gh pr merge 123 --squash",
+    "env GH_REPO=timothyfroehlich/dotfiles sh -c 'unset GH_REPO; gh pr merge 123'",
+    "gh pr merge 123 --body https://github.com/timothyfroehlich/dotfiles/pull/4",
+    "gh pr merge 123 --body repos/timothyfroehlich/dotfiles/pulls/4/merge",
+    "gh pr merge 123 --repo timothyfroehlich/Pin$(printf Point)",
+    "gh pr merge 123 --body --repo=timothyfroehlich/dotfiles",
+    "FLAG=--body; gh pr merge 123 $FLAG --repo=timothyfroehlich/dotfiles",
+    "ARGS='--repo timothyfroehlich/PinPoint'; gh pr merge 4 --repo timothyfroehlich/dotfiles $ARGS",
+    "gh api $FLAG -X PUT repos/timothyfroehlich/dotfiles/pulls/4/merge",
+    "BODY='note --repo timothyfroehlich/PinPoint'; gh pr merge 4 --repo timothyfroehlich/dotfiles --body $BODY",
+    "INPUT='note repos/timothyfroehlich/PinPoint/pulls/123/merge'; gh api --input $INPUT -X PUT repos/timothyfroehlich/dotfiles/pulls/4/merge",
+    "printf 'gh\\n' | xargs -I tool env tool pr merge 123",
+    "printf '%s\\n' '--repo timothyfroehlich/PinPoint' | xargs -I{} -n2 gh pr merge 4 --repo timothyfroehlich/dotfiles",
+    "printf '%s\\n' '--repo timothyfroehlich/PinPoint' | xargs -I{} -L2 gh pr merge 4 --repo timothyfroehlich/dotfiles",
+    "printf '%s\\n' '--repo timothyfroehlich/PinPoint' | xargs -I{} -l gh pr merge 4 --repo timothyfroehlich/dotfiles",
+    "printf '%s\\n' '--repo timothyfroehlich/PinPoint' | xargs -I{} -l2 gh pr merge 4 --repo timothyfroehlich/dotfiles",
+    "printf '%s\\n' '--repo timothyfroehlich/PinPoint' | xargs env -S 'gh pr merge 4 --repo timothyfroehlich/dotfiles'",
+    "env -S 'gh pr merge 4 --repo timothyfroehlich/dotfiles note\\_--repo\\_timothyfroehlich/PinPoint'",
+    "env -S 'gh pr merge 4 --repo timothyfroehlich/dotfiles' --repo timothyfroehlich/PinPoint",
+    "gh pr merge 4 --repo timothyfroehlich/dotfiles --body$(printf '=note --repo timothyfroehlich/PinPoint')",
+    "printf 'PinPoint\\n' | xargs -I dotfiles gh pr merge 1 --repo timothyfroehlich/dotfiles",
+    "printf '123\\n' | xargs --replace gh pr merge {}",
+    "printf '%s\\n' '--repo timothyfroehlich/PinPoint' | xargs gh pr merge 4 --repo timothyfroehlich/dotfiles",
+    "gh pr merge -- --repo=timothyfroehlich/dotfiles",
+  ])("fails closed on an ambiguous repository target: %s", (command) => {
+    const { status } = runHook(bashPayload(command));
+    expect(status).toBe(2);
   });
 
   it("does not block gh api GET on a pulls/N/merge path (no write method)", () => {
@@ -103,13 +181,38 @@ describe("block-direct-merge.cjs — gh merge paths", () => {
 });
 
 describe("block-direct-merge.cjs — MCP merge", () => {
-  it("blocks mcp__github__merge_pull_request regardless of tool_input", () => {
+  it("blocks mcp__github__merge_pull_request for PinPoint", () => {
     const { status, stderr } = runHook({
       tool_name: "mcp__github__merge_pull_request",
-      tool_input: { owner: "o", repo: "r", pullNumber: 123 },
+      tool_input: {
+        owner: "timothyfroehlich",
+        repo: "PinPoint",
+        pullNumber: 123,
+      },
     });
     expect(status).toBe(2);
     expect(stderr).toContain("MCP merge_pull_request");
+  });
+
+  it("allows mcp__github__merge_pull_request for an explicit other repo", () => {
+    expectAllow(
+      runHook({
+        tool_name: "mcp__github__merge_pull_request",
+        tool_input: {
+          owner: "timothyfroehlich",
+          repo: "dotfiles",
+          pullNumber: 4,
+        },
+      })
+    );
+  });
+
+  it("fails closed when the MCP repository target is missing", () => {
+    const { status } = runHook({
+      tool_name: "mcp__github__merge_pull_request",
+      tool_input: { pullNumber: 123 },
+    });
+    expect(status).toBe(2);
   });
 });
 
@@ -261,18 +364,18 @@ describe("block-direct-merge.cjs — wrapped invocations (PP-6t3c, PP-ar8a)", ()
   });
 
   it.each([
-    'eval "gh api -X PUT repos/o/r/pulls/123/merge"',
-    'sh -c "gh api --method PUT repos/o/r/pulls/123/merge"',
-    "env gh api -X POST repos/o/r/pulls/123/merge",
+    'eval "gh api -X PUT repos/timothyfroehlich/PinPoint/pulls/123/merge"',
+    'sh -c "gh api --method PUT repos/timothyfroehlich/PinPoint/pulls/123/merge"',
+    "env gh api -X POST repos/timothyfroehlich/PinPoint/pulls/123/merge",
   ])("blocks %s", (command) => {
     const { status } = runHook(bashPayload(command));
     expect(status).toBe(2);
   });
 
   it.each([
-    "gh -R owner/repo pr merge 123",
-    "gh pr --repo owner/repo merge 123",
-    "gh --repo=owner/repo pr merge 123",
+    "gh -R timothyfroehlich/PinPoint pr merge 123",
+    "gh pr --repo timothyfroehlich/PinPoint merge 123",
+    "gh --repo=timothyfroehlich/PinPoint pr merge 123",
   ])("blocks %s (repo selector between gh and its subcommand)", (command) => {
     const { status } = runHook(bashPayload(command));
     expect(status).toBe(2);
@@ -287,7 +390,9 @@ describe("block-direct-merge.cjs — wrapped invocations (PP-6t3c, PP-ar8a)", ()
 
   it("blocks `gh api --method=PUT` (attached flag value)", () => {
     const { status } = runHook(
-      bashPayload("gh api --method=PUT repos/o/r/pulls/123/merge")
+      bashPayload(
+        "gh api --method=PUT repos/timothyfroehlich/PinPoint/pulls/123/merge"
+      )
     );
     expect(status).toBe(2);
   });
@@ -369,7 +474,8 @@ describe("block-direct-merge.cjs — env -S split-string", () => {
     "env -S'gh pr merge 123'",
     "env -i -S 'gh pr merge 123'",
     "env -iS 'gh pr merge 123'",
-    "env -S 'gh api -X PUT repos/o/r/pulls/1/merge'",
+    "env -S 'gh api -X PUT repos/timothyfroehlich/PinPoint/pulls/1/merge'",
+    "env -S 'gh pr merge 4 --repo timothyfroehlich/dotfiles --body ; --repo timothyfroehlich/PinPoint'",
     "sudo env -S 'gh pr merge 1'",
     "xargs env -S 'gh pr merge 1'",
   ])("blocks %s", (command) => {

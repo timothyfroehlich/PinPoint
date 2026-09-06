@@ -35,6 +35,12 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/_pr-gates.sh"
 
 SCREENSHOT_MARKER="<!-- pr-screenshots -->"
+# A PR-body opt-out marker: when a UI-glob file changed but nothing renders differently
+# (a refactor, a non-null-`!` removal), the author records that with this marker in the
+# PR body so the report drops its "NO screenshots posted" nudge — the claim lives in the
+# PR rather than being argued in chat. Substring-matched (not whole-line) because GitHub
+# stores bodies with CRLF; a `grep -x` anchor would silently miss the marker. (PP-lhjg)
+NO_VISUAL_CHANGE_MARKER="<!-- no-visual-change -->"
 
 pr="${1:-}"
 if [[ -z "$pr" || ! "$pr" =~ ^[0-9]+$ ]]; then
@@ -46,9 +52,10 @@ fi
 # Facts from GitHub
 # ---------------------------------------------------------------------------------
 
-meta=$(gh pr view "$pr" --json number,title,url,headRefName,headRefOid,baseRefName,isDraft,state)
+meta=$(gh pr view "$pr" --json number,title,url,headRefName,headRefOid,baseRefName,isDraft,state,body)
 title=$(jq -r '.title' <<< "$meta")
 url=$(jq -r '.url' <<< "$meta")
+pr_body=$(jq -r '.body // ""' <<< "$meta")
 head_ref=$(jq -r '.headRefName' <<< "$meta")
 head_sha=$(jq -r '.headRefOid' <<< "$meta")
 base_ref=$(jq -r '.baseRefName' <<< "$meta")
@@ -176,6 +183,9 @@ case "$rv_state" in
     ;;
   marker)
     review_desc="$(review_phrase "$rv_reviewer" "$rv_detail") · ${rv_at} · covers head ${short_head}"
+    ;;
+  review_requested)
+    review_desc="PENDING — manual Codex review requested for head ${short_head}; no exact-head evidence yet"
     ;;
   stale_approval)
     if git cat-file -e "${rv_sha}^{commit}" 2>/dev/null \
@@ -362,15 +372,28 @@ if [[ "$ui_changed" == "yes" ]]; then
     "${merge_base}..${head_sha}" -- "${ui_files[@]}" 2>/dev/null || true)
 fi
 
+# The value states only what the path heuristic actually knows — a UI FILE changed, not
+# that the UI changed. Bare `ui yes` over-claimed, so it trained readers to skim the one
+# line that also flags a genuinely unscreenshotted change. (PP-lhjg)
+if [[ "$ui_changed" == "yes" ]]; then
+  ui_desc="UI file(s) changed"
+else
+  ui_desc="no UI files changed"
+fi
+
 if [[ -n "$shots" ]]; then
-  ui_line="${ui_changed} · screenshots posted ${shots}"
+  ui_line="${ui_desc} · screenshots posted ${shots}"
   if [[ -n "$last_ui_commit" && "$last_ui_commit" > "$shots" ]]; then
     ui_line="${ui_line} · STALE: UI changed at ${last_ui_commit}, after the screenshots"
   fi
 elif [[ "$ui_changed" == "yes" ]]; then
-  ui_line="yes · NO screenshots posted"
+  if grep -qF "$NO_VISUAL_CHANGE_MARKER" <<< "$pr_body"; then
+    ui_line="${ui_desc} · marked no-visual-change"
+  else
+    ui_line="${ui_desc} · NO screenshots posted"
+  fi
 else
-  ui_line="no"
+  ui_line="$ui_desc"
 fi
 
 # ---------------------------------------------------------------------------------
@@ -438,7 +461,11 @@ add_block() { blocking+=("$1"); }
 if [[ "$(gate_token "$ci_out")" != "PASS" ]]; then add_block "ci: $(gate_state "$ci_out")"; fi
 if [[ "$(gate_token "$threads_out")" != "PASS" ]]; then add_block "threads: $(gate_state "$threads_out")"; fi
 if [[ "$(gate_token "$conflict_out")" != "PASS" ]]; then add_block "no_conflict: $(gate_state "$conflict_out")"; fi
-if [[ "$rv_state" != "approval" && "$rv_state" != "clean_comment" && "$rv_state" != "clean_reaction" && "$rv_state" != "reviewed" && "$rv_state" != "marker" ]]; then add_block "reviewed: ${rv_state} — await a clean automatic Codex result on the current head; use a manual trigger only when Tim explicitly requests it"; fi
+if [[ "$rv_state" == "review_requested" ]]; then
+  add_block "reviewed: review_requested — the manual Codex review for this head was already requested; do not request it again; wait for exact-head evidence"
+elif [[ "$rv_state" != "approval" && "$rv_state" != "clean_comment" && "$rv_state" != "clean_reaction" && "$rv_state" != "reviewed" && "$rv_state" != "marker" ]]; then
+  add_block "reviewed: ${rv_state} — after current-head CI succeeds and the PR is ready, run request-codex-review.sh ${pr} exactly once for this head; a new head requires replacement CI and one new request"
+fi
 if [[ "$is_draft" == "true" ]]; then add_block "draft: wait for current-head CI Gate success, then mark the PR ready"; fi
 if [[ "$pr_state" != "OPEN" ]]; then add_block "state: PR is ${pr_state}, not open"; fi
 # The gate answers came from `gh` at one SHA and the diff from git at another, so no

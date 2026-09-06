@@ -7,6 +7,7 @@ import { machines, pinballmapAbandonedListings } from "~/server/db/schema";
 import { createMachineTimelineEvent } from "~/lib/timeline/machine-events";
 import type { LocationSnapshot } from "./types";
 import type { AbandonedListing } from "./link-columns";
+import { getPinballMapState } from "./state";
 
 /**
  * Write down a live PinballMap entry a machine just walked away from (PP-l81u).
@@ -36,12 +37,14 @@ export async function recordAbandonedListing(
       machineId,
       lmxId: abandoned.lmxId,
       pinballmapMachineId: abandoned.pinballmapMachineId,
+      locationId: abandoned.locationId,
     })
     .onConflictDoUpdate({
       target: pinballmapAbandonedListings.lmxId,
       set: {
         machineId,
         pinballmapMachineId: abandoned.pinballmapMachineId,
+        locationId: abandoned.locationId,
         createdAt: new Date(),
       },
     });
@@ -95,11 +98,14 @@ export async function retireAbandonmentForLmx(
  */
 export async function listAbandonedForMachine(
   machineId: string
-): Promise<{ lmxId: number; pinballmapMachineId: number }[]> {
+): Promise<
+  { lmxId: number; pinballmapMachineId: number; locationId: number }[]
+> {
   const rows = await db
     .select({
       lmxId: pinballmapAbandonedListings.lmxId,
       pinballmapMachineId: pinballmapAbandonedListings.pinballmapMachineId,
+      locationId: pinballmapAbandonedListings.locationId,
     })
     .from(pinballmapAbandonedListings)
     .where(eq(pinballmapAbandonedListings.machineId, machineId));
@@ -125,14 +131,33 @@ export async function listAbandonedForMachine(
  * way.** The chip's only job is to send a reader to the alert; when the filter
  * lived on the Manage page alone the chip fired on entries the alert then hid,
  * pointing at a page that showed nothing wrong.
+ *
+ * Cross-location records always surface. A same-title cabinet at the tracked
+ * venue says nothing about an orphan retained at a different venue, and hiding
+ * that record would strand its only explicit cleanup path (spec 10.11–10.12).
  */
 export async function listSurfacingAbandonedForMachine(
-  machineId: string
-): Promise<{ lmxId: number; pinballmapMachineId: number }[]> {
+  machineId: string,
+  trackedLocationId?: number | null
+): Promise<
+  { lmxId: number; pinballmapMachineId: number; locationId: number }[]
+> {
   const rows = await listAbandonedForMachine(machineId);
   if (rows.length === 0) return rows;
 
-  const titleIds = rows.map((r) => r.pinballmapMachineId);
+  const effectiveLocationId =
+    trackedLocationId === undefined
+      ? ((await getPinballMapState())?.locationId ?? null)
+      : trackedLocationId;
+  const sameLocation = rows.filter(
+    (row) => row.locationId === effectiveLocationId
+  );
+  const crossLocation = rows.filter(
+    (row) => row.locationId !== effectiveLocationId
+  );
+  if (sameLocation.length === 0) return crossLocation;
+
+  const titleIds = sameLocation.map((r) => r.pinballmapMachineId);
   const matched = await db
     .selectDistinct({ pinballmapMachineId: machines.pinballmapMachineId })
     .from(machines)
@@ -143,7 +168,12 @@ export async function listSurfacingAbandonedForMachine(
     )
   );
 
-  return rows.filter((r) => !stillInTheFleet.has(r.pinballmapMachineId));
+  return [
+    ...sameLocation.filter(
+      (row) => !stillInTheFleet.has(row.pinballmapMachineId)
+    ),
+    ...crossLocation,
+  ];
 }
 
 /**
@@ -176,10 +206,15 @@ export async function listSurfacingAbandonedForMachine(
  * there as "cleaned up" would wipe every record and report cleanup nobody
  * performed (CORE-ARCH-012).
  *
+ * The location predicate is load-bearing: an old-location lmx is necessarily
+ * absent from the current lineup, but that absence is not evidence that anyone
+ * removed it. Only records stamped with the synced location may reconcile.
+ *
  * Returns how many were cleared.
  */
 export async function clearResolvedAbandonments(
-  snapshot: LocationSnapshot
+  snapshot: LocationSnapshot,
+  trackedLocationId: number
 ): Promise<number> {
   const liveLmxIds = snapshot.lmxes.map((l) => l.id);
 
@@ -264,7 +299,12 @@ export async function clearResolvedAbandonments(
 
   const cleared = await db
     .delete(pinballmapAbandonedListings)
-    .where(or(...conditions))
+    .where(
+      and(
+        eq(pinballmapAbandonedListings.locationId, trackedLocationId),
+        or(...conditions)
+      )
+    )
     .returning({ id: pinballmapAbandonedListings.id });
 
   return cleared.length;

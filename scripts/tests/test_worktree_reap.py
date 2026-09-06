@@ -117,6 +117,20 @@ class World:
         target = self.gh_data / f"{branch.replace('/', '__')}.json"
         target.write_text(json.dumps(list(prs)))
 
+    def add_prototype_scaffold_to_main(self) -> None:
+        prototype_root = self.repo / "src/app/(dev)/prototype"
+        prototype_root.mkdir(parents=True)
+        self.commit_on_main(
+            "src/app/(dev)/prototype/layout.tsx", "export default null;\n"
+        )
+        self.commit_on_main(
+            ".gitignore",
+            ".prototype-mode\n"
+            "/src/app/(dev)/prototype/**\n"
+            "!/src/app/(dev)/prototype/layout.tsx\n",
+        )
+        git("push", "origin", "main", cwd=self.repo)
+
 
 @pytest.fixture
 def world(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> World:
@@ -365,6 +379,57 @@ class TestEmptyTier:
 
         assert code == reap.EXIT_OK, err
         assert tier_of(err, "worktree-bridge-generated") == reap.TIER_REAP
+
+    def test_permanent_prototype_layout_does_not_block_the_empty_reap(
+        self,
+        world: World,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        world.add_prototype_scaffold_to_main()
+        world.add_worktree("worktree-bridge-prototype-layout")
+
+        code, _, err = run_reap(world, monkeypatch, capsys)
+
+        assert code == reap.EXIT_OK, err
+        assert tier_of(err, "worktree-bridge-prototype-layout") == reap.TIER_REAP
+
+    def test_ignored_prototype_marker_blocks_the_empty_reap(
+        self,
+        world: World,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        world.add_prototype_scaffold_to_main()
+        wt = world.add_worktree("worktree-bridge-prototype-marker")
+        marker = wt / ".prototype-mode"
+        marker.write_text("# Prototype mode\n")
+        assert git("status", "--porcelain", cwd=wt) == ""
+
+        code, _, err = run_reap(world, monkeypatch, capsys)
+
+        assert code == reap.EXIT_OK, err
+        assert tier_of(err, "worktree-bridge-prototype-marker") == reap.TIER_REVIEW
+        assert marker.exists()
+
+    def test_ignored_disposable_prototype_route_blocks_the_empty_reap(
+        self,
+        world: World,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        world.add_prototype_scaffold_to_main()
+        wt = world.add_worktree("worktree-bridge-prototype-route")
+        route = wt / "src/app/(dev)/prototype/region-alerts/page.tsx"
+        route.parent.mkdir()
+        route.write_text("export default null;\n")
+        assert git("status", "--porcelain", cwd=wt) == ""
+
+        code, _, err = run_reap(world, monkeypatch, capsys)
+
+        assert code == reap.EXIT_OK, err
+        assert tier_of(err, "worktree-bridge-prototype-route") == reap.TIER_REVIEW
+        assert route.exists()
 
 
 class TestKeepTier:

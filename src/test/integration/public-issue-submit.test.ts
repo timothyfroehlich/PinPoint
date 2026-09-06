@@ -65,6 +65,9 @@ vi.mock("~/lib/logger", () => ({
 }));
 
 vi.mock("~/lib/rate-limit", () => ({
+  checkAuthenticatedIssueLimit: vi
+    .fn()
+    .mockResolvedValue({ success: true, reset: 0 }),
   checkPublicIssueLimit: vi.fn().mockResolvedValue({ success: true, reset: 0 }),
   getClientIp: vi.fn().mockResolvedValue("127.0.0.1"),
   formatResetTime: vi.fn().mockReturnValue("0s"),
