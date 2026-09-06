@@ -31,7 +31,9 @@ Related: `docs/feature-specs/pinballmap.md` (the location-sync integration),
 - **2.1** Fields:
   - **Region** — which Pinball Map region to watch, one at a time, chosen from a
     list of regions read from Pinball Map (not free text).
-  - **Alert channel** — the Discord channel id the alerts post to.
+  - **Alert channel** — the text channel the alerts post to, chosen from a list
+    of the server's channels read from Discord (`GET /guilds/{guild_id}/channels`),
+    not a hand-entered id. Clearing it turns region alerts off (§2.2).
 - **2.2** No enable flag. Region alerts are on when a region and an alert channel
   are configured and the Discord bot token is present. To turn them off, clear
   the alert channel.
@@ -118,6 +120,7 @@ Related: `docs/feature-specs/pinballmap.md` (the location-sync integration),
 
 ## Changelog
 
-| Date       | Change   |
-| :--------- | :------- |
-| 2026-08-22 | Created. |
+| Date       | Change                                                                                                                                                                             |
+| :--------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-09-05 | Alert channel (§2.1) is a dropdown of the server's text channels read from Discord (`GET /guilds/{guild_id}/channels`), not a hand-entered id. Config-card design, PP-o355.51.6.2. |
+| 2026-08-22 | Created.                                                                                                                                                                           |

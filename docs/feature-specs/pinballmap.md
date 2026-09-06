@@ -318,7 +318,7 @@ dashboard with member+ access, `docs/feature-specs/fleet.md`). The region-alert 
   retained health is not presented as current.
 - **10.3** A **Sync now** action refreshes the stored snapshot on demand while
   configured. It draws from the same global allowance as the machine listing
-  control's Refresh and location validation (§3.2) — all three share one budget — and
+  control's Refresh and the location **Check ID** lookup (§3.2) — all three share one budget — and
   disables with a countdown when the allowance is spent. While Not configured it
   is unavailable and the section states a location must be saved first.
 - **10.4** While configured, the section links to the location's Pinball Map
@@ -363,7 +363,9 @@ honest rather than building a workflow around it.
     network or auth error, or no token currently available — aborts the whole
     change with nothing wiped and the previous configuration unchanged. A
     location with zero machines is valid (a legitimately empty venue) and
-    proceeds.
+    proceeds. The resolved venue it returns — name, city, lineup size —
+    previews the candidate **in the field**, not the live configuration, so a
+    wrong or unresolved id can never read as the tracked location.
   - **Then save commits the switch.** Save is disabled until the lookup
     succeeds. In one transaction: store the new id, replace
     the stored snapshot with the freshly fetched one, and set the sync-health
@@ -400,16 +402,19 @@ honest rather than building a workflow around it.
   close.
 - **10.13** The shared allowance (§3.2) is traffic-shaping toward Pinball Map,
   not observed location state; a location change does not reset it. The
-  validating fetch in §10.9 is human-triggered and spends from that same
-  allowance; when none is available, the save leaves the previous configuration
-  unchanged and shows the retry countdown.
+  Check ID lookup in §10.9 is human-triggered and spends from that same
+  allowance; when none is available, Check ID is unavailable and shows the retry
+  countdown, and Save stays disabled — the previous configuration is left
+  unchanged.
 - **10.14** The switch is atomic with respect to any in-flight sync. A
   concurrent hourly cron or manual Sync now — which reads the location id, fetches,
   then writes the snapshot back under the id it read — must not overwrite the new
   id or store an old-location snapshot under it. A configuration save is the
   authoritative writer for the duration of the change.
-- **10.15** Replacing one configured location with another confirms first,
-  naming the consequences in plain terms: the snapshot is replaced by a fresh
+- **10.15** Replacing one configured location with another confirms first.
+  Because the Check ID lookup has already resolved the destination, the
+  confirmation names both venues rather than reciting ids, and states the
+  consequences in plain terms: the snapshot is replaced by a fresh
   read of the new location; every intent-On machine whose title is not on the
   new lineup shows as **Missing** (§4.2) until an operator pushes it there; any
   intent-Off machine whose title is already on the new lineup shows as
@@ -447,6 +452,7 @@ logged here.
 
 | Date       | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | :--------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-09-05 | Surfaced §10.9's validating fetch as an explicit admin-triggered **Check ID** step: look up first — the resolved venue previews the candidate in the field, not the live configuration — then Save, disabled until the lookup succeeds. Aligned §10.3/§10.13 terminology (Check ID lookup, not "validation") and §10.15 (the confirmation names both venues, not ids). Config-card design, PP-o355.51.6.2.                                                                                                                                                                                                                                                                                                                                             |
 | 2026-09-05 | Defined the Edition Near-Miss concept (§1) and catalog matching rule (§2.6) for machines sharing a title family (`machineGroupId`) with differing editions. Defined dense diagnostic status badges (§4.10) and reconciled fleet-wide views to the `/fleet` dashboard (§10).                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | 2026-08-27 | Named the machine edit form's source label for an uncataloged game as **Manual Entry**, keeping "uncataloged" as the concept and state name. Made all three manual-model fields optional and blank by default: the title is suggested rather than pre-filled, so leaving it blank keeps following a later rename, and a blank manufacturer or year reads as Unknown under its own label while the machine header omits blanks. Split the old "No model / Uncataloged" state in two — uncataloged now has no control at all, collapsing the section to one line while keeping its place so an abandoned entry still surfaces. Stated that line as a requirement — it names the section and why it is unavailable — rather than prescribing its wording. |
 | 2026-08-27 | Added §10 (admin configuration): the Pinball Map section's behavior moved here from the Admin Integrations spec when that spec was slimmed to a page shell (PP-o355.51.8) — the section and its sync-health readout / Sync now (was admin §4), the configuration-presence state model (was admin §5), and the location-change safety rules (was admin §6). Added the tracked-location concept (§1). No behavior changed; this is a relocation, and the on/off model is unchanged (configuration presence, not an enable flag).                                                                                                                                                                                                                         |
