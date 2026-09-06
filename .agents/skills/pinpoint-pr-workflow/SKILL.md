@@ -1,6 +1,6 @@
 ---
 name: pinpoint-pr-workflow
-description: The PR-lifecycle decisions the scripts and gates do not state — draft-first creation, automatic Codex review on every push, exact-head review evidence, the single manual fallback after a conclusive automatic miss, and why every push needs a fresh review. Also covers the merge handoff, screenshot gotchas, Dependabot lockfile trap, merge escape hatches, broken merge scripts, and GitHub MCP gotchas. Use when committing, opening or updating a PR, monitoring CI or review, addressing review comments, posting screenshots, handing a PR over to merge, landing the plane after Tim merges, or when a GitHub MCP call does something unexpected.
+description: The PR-lifecycle decisions the scripts and gates do not state — draft-first creation, one manual Codex review request after current-head CI, exact-head review evidence, and why every push needs fresh CI and review. Also covers the merge handoff, screenshot gotchas, Dependabot lockfile trap, merge escape hatches, broken merge scripts, and GitHub MCP gotchas. Use when committing, opening or updating a PR, monitoring CI or review, addressing review comments, posting screenshots, handing a PR over to merge, landing the plane after Tim merges, or when a GitHub MCP call does something unexpected.
 ---
 
 # PinPoint PR Workflow
@@ -39,9 +39,9 @@ PinPoint scopes: `issues`, `machines`, `auth`, `ui`, `db`, `e2e`, `agents`, `wor
 
 Prefer MCP `create_pull_request` for typed argument handling, or `gh pr create` if you're
 already in a shell. Open every agent-created PR as a **GitHub draft**, regardless of
-size (`gh pr create --draft ...`). GitHub draft/ready state controls when automatic
-Codex review begins; it is separate from the PinPoint `ready-for-review` label applied
-only at the end of Phase 3.
+size (`gh pr create --draft ...`). GitHub draft/ready state controls whether a manual
+Codex review request is eligible; it is separate from the PinPoint `ready-for-review`
+label applied only at the end of Phase 3.
 
 ### Agent origin
 
@@ -101,8 +101,8 @@ Closes #N (if applicable)
 failure — read `tmp/gh-monitor/failure-<RUN_ID>.md`.
 
 For a new draft PR, keep it draft until `CI Gate` succeeds for the current head, then
-run `gh pr ready <PR>`. Promotion starts the automatic Codex review. A green run for an
-older SHA does not qualify.
+run `gh pr ready <PR>`, then request the review in 3.4. Promotion alone does not start a
+Codex review. A green run for an older SHA does not qualify.
 
 If you judge the failure to be a GitHub Actions **infra** flake (network timeout, runner loss, download 5xx, Supabase container-start) rather than a real code/test failure, log it before rerunning: `bash scripts/workflow/log-gha-flake.sh <pr> <run-id> <class> "<symptom>"` (see `docs/runbooks/gha-flake-log.md`).
 
@@ -118,9 +118,9 @@ Every unresolved thread counts, whoever opened it — the `threads` gate is auth
 
 ### 3.4 Get the head commit reviewed
 
-**Automatic Codex review is the normal path.** Tim's personal review trigger is set to
-**On every push**: it runs when a PR is opened for review and again when commits are
-pushed to an already-ready PR. The gate accepts a native `APPROVED` review whose
+**Codex review is manual-only.** Tim's personal automatic-review trigger stays off.
+After current-head CI succeeds and the PR is ready, the owner requests exactly one
+review for that head. The gate accepts a native `APPROVED` review whose
 `commit_id` equals the PR head, the connector's no-major-issues issue comment naming a
 10- or 40-character prefix of that head, or a trusted GitHub Actions comment witnessing
 a fresh connector-bot `eyes`→`+1` transition while that exact SHA remained head. Direct
@@ -139,48 +139,40 @@ manual re-review when a finding is explicitly declined without a push.
 
 The owning agent stays assigned through the whole loop: monitor current-head CI and
 review, address or explicitly decline every finding, resolve every thread, push fixes,
-and wait for the replacement automatic review. A slow or still-running automatic
-attempt is a wait state, not permission to comment `@codex review`, self-attest, or
+and request a replacement review only after replacement CI succeeds. A slow or
+still-running review is a wait state; never request the same head twice, self-attest, or
 hand off an unreviewed PR. Use the harness's Monitor/wait mechanism rather than a
 hand-written polling loop.
 
-#### Later uploads: keep the PR eligible
+#### Later uploads: revalidate before re-requesting
 
-Leave an existing ready PR ready when pushing later commits. The **On every push**
-personal trigger starts a replacement review automatically; monitor both current-head CI
-and that review. If the PR is already draft, leave it draft through the push, wait for
-the replacement current-head `CI Gate` to succeed, then run `gh pr ready <PR>` to make
-the head review-eligible.
+Leave an existing ready PR ready when pushing later commits, but do not request review
+until the replacement current-head `CI Gate` succeeds. If the PR is already draft,
+leave it draft through the push, wait for replacement CI, then run `gh pr ready <PR>`.
+After those checks, request one review for the new head.
 
 The upload's size does not change this sequence. Every push invalidates the previous
-head's coverage, even if Smart detect or another personal trigger would choose not to
-run a replacement review. PinPoint relies on **On every push** for deterministic
-exact-head coverage.
+head's coverage. Deterministic exact-head coverage comes from the SHA-bound manual
+request, not an automatic trigger.
 
-#### Manual GitHub fallback — once after a conclusive automatic miss
+#### Request the GitHub review — exactly once per head
 
-Automatic review is first for every head. If its bounded witness conclusively finishes
-without exact-head evidence — for example, it reports that no commit-safe Codex
-reaction transition was observed — comment exactly once for that unchanged head. Bind
-the comment to the head you inspected so a concurrent push makes the witness fail closed:
+After current-head CI succeeds and the PR is ready, run:
 
 ```bash
-head=$(gh pr view <PR> --json headRefOid --jq .headRefOid)
-body=$(printf '@codex review\n<!-- pinpoint-codex-review-head: %s -->' "$head")
-gh pr comment <PR> --body "$body"
+bash scripts/workflow/request-codex-review.sh <PR>
 ```
 
-The visible first line is Codex's documented review trigger; the hidden marker binds the
-trusted-main reaction witness to that SHA. The witness rejects the request if another
-commit becomes head before it starts, and its helper keeps checking the head throughout
-the reaction transition.
+The helper verifies the authenticated account is the repository owner, the PR is open
+and ready, the latest `CI Gate` passed, the head lacks review coverage and a prior
+request, and the head did not move during validation. It then posts Codex's documented
+`@codex review` trigger with a hidden marker binding the trusted-main reaction witness
+to that SHA. The witness keeps checking that head throughout the reaction transition.
 
-Respect the same eligibility sequence: wait for current-head CI and promote the PR
-before commenting. A slow or still-running automatic attempt is not a conclusive miss.
-Never repeat the comment for the same head. A trusted clean automatic result satisfies
-the gate directly, so do not add a trigger or marker for it. Every new head resets this
-state and returns to automatic-first; only that head's own conclusive miss permits its
-single fallback.
+Never repeat the request for the same head. A result may arrive as a native review,
+trusted clean connector comment, or trusted SHA-pinned reaction witness; any of those
+completes exact-head coverage. If no evidence arrives, keep waiting or use Tim's local
+review route below. A new head requires replacement CI and exactly one new request.
 
 #### Local review and manual-attestation route
 
@@ -227,12 +219,12 @@ That posts the sticky SHA-pinned marker `<!-- pinpoint-review: <head_sha> -->` t
 
 #### Pushing after the review
 
-Any push invalidates a clean automatic result or marker for the previous SHA. Return to
-the automatic path for the new head; a manual trigger for an older head neither carries
-over nor permits one for the new head. Never copy or refresh a marker over code that the
-named local review did not inspect. Historical
+Any push invalidates a clean Codex result or marker for the previous SHA. Wait for
+replacement current-head CI, then request one Codex review for the new head. Never copy
+or refresh a marker over code that the named local review did not inspect. Historical
 `claude-code:trivial` markers remain readable for old PRs, but agents must not create new
-self-attestations: automatic Codex review now covers every update.
+self-attestations: the exact-head Codex review or Tim-run local review must inspect every
+update.
 
 #### Why the review-handoff commands carry permission allow rules
 
@@ -263,9 +255,10 @@ Two limits worth knowing:
 #### Readiness is not review
 
 `pr-watch.py --check-ready` reports review state but does **not** gate on it. It answers
-whether the current head may leave draft and enter automatic review; gating on review
-there would be circular. A PR may be GitHub-ready while still lacking the final PinPoint
-`ready-for-review` label. Do not call it merge-ready until 3.6 is satisfied.
+whether the current head may leave draft and receive its manual review request; gating
+on review there would be circular. A PR may be GitHub-ready while still lacking the
+final PinPoint `ready-for-review` label. Do not call it merge-ready until 3.6 is
+satisfied.
 
 ### 3.5 Post UI screenshots (UI-touching PRs only)
 
@@ -285,7 +278,7 @@ Requires the local dev server (`pnpm run dev`) and Supabase (`supabase start`) r
 
 ### 3.6 Apply `ready-for-review` label
 
-Once CI green + either exact-head automatic Codex coverage (including an adjudicated finding-bearing review per 3.4) or manual attestation of head + zero unresolved review threads + no merge conflict + the screenshot requirement or documented opt-out in 3.5 satisfied, apply the label via `mcp__github__issue_write(method: "update", …)` or `gh pr edit <PR> --add-label ready-for-review`.
+Once CI green + either exact-head Codex coverage (including an adjudicated finding-bearing review per 3.4) or manual attestation of head + zero unresolved review threads + no merge conflict + the screenshot requirement or documented opt-out in 3.5 satisfied, apply the label via `mcp__github__issue_write(method: "update", …)` or `gh pr edit <PR> --add-label ready-for-review`.
 
 The label is a hint to Tim that the PR is ready for **him** to merge — it does not authorize an agent to merge. `merge-pr.sh --human` re-checks all gates when Tim runs it.
 
@@ -311,7 +304,7 @@ It prints what Tim needs to decide whether to merge — which review ran and whe
 
 **The re-run line is part of the report, not decoration.** The block is a snapshot and is stale as soon as CI re-runs or anyone pushes. Tim re-runs it himself rather than asking you to re-check.
 
-**The merge command only appears when all four gates actually pass.** An un-ready PR gets the blocking reasons instead — so don't hand over a merge command the report didn't print. If CI is still running, the report says so; hand him the automerge form, which waits rather than making him come back. Get the head reviewed first (Phase 3.4); automerge waits out CI, not an unreviewed head. The owning agent monitors automatic review outside this script:
+**The merge command only appears when all four gates actually pass.** An un-ready PR gets the blocking reasons instead — so don't hand over a merge command the report didn't print. If CI is still running, the report says so; hand him the automerge form, which waits rather than making him come back. Get the head reviewed first (Phase 3.4); automerge waits out CI, not an unreviewed head. The owning agent monitors the manually requested review outside this script:
 
 ```
 ! scripts/workflow/merge-pr.sh <PR> --human --automerge

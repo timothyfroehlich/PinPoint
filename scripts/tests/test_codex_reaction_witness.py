@@ -130,7 +130,7 @@ def test_fresh_eyes_then_clean_reaction_posts_sha_pinned_witness(
     ]
 
 
-def test_manual_fallback_watches_the_trigger_comment_reactions(tmp_path: Path) -> None:
+def test_manual_request_watches_the_trigger_comment_reactions(tmp_path: Path) -> None:
     result, posts, targets = run_witness(
         tmp_path,
         reaction_comment_id="456",
@@ -189,26 +189,24 @@ def test_sha_pinned_native_review_needs_no_witness(tmp_path: Path) -> None:
 
 def test_workflow_uses_trusted_main_and_narrow_permissions() -> None:
     text = WORKFLOW.read_text()
-    assert "pull_request_target:" in text
-    assert "types: [opened, ready_for_review, synchronize, reopened]" in text
+    assert "pull_request_target:" not in text
     assert "issue_comment:" in text
     assert "types: [created]" in text
+    assert "cancel-in-progress: false" in text
     assert (
-        "github.event.pull_request.number || format('{0}-comment-{1}', "
+        "format('{0}-comment-{1}', "
         "github.event.issue.number, github.event.comment.id)" in text
     )
     assert "issues: write" not in text
     assert "pull-requests: write" in text
     assert "ref: ${{ github.event.repository.default_branch }}" in text
     assert "persist-credentials: false" in text
-    assert "github.event.pull_request.head.repo.full_name == github.repository" in text
     assert "github.event.issue.pull_request" in text
     assert "github.event.comment.user.login == github.repository_owner" in text
     assert "startsWith(github.event.comment.body, '@codex review')" in text
     assert "github.event.comment.created_at" in text
-    assert "EVENT_NAME: ${{ github.event_name }}" in text
     assert "REACTION_COMMENT_ID: ${{ github.event.comment.id }}" in text
-    assert 'if [[ "$EVENT_NAME" == "issue_comment" ]]' in text
+    assert "PR_NUMBER: ${{ github.event.issue.number }}" in text
     assert "pinpoint-codex-review-head" in text
     assert '"$GITHUB_EVENT_PATH"' in text
     assert 'gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}"' in text
