@@ -54,6 +54,7 @@ Use this skill when:
 8. **Baseline Widely available is the floor** (CORE-UI-005): use `<dialog>`, container queries, `:has()`, `:user-invalid`, `inert`, `aspect-ratio`, native form validation directly — no polyfills. Newly-available features (Popover API, View Transitions, anchor positioning) require a per-feature opt-in in `pinpoint-design-bible` §19; `fetchpriority` and `text-wrap: balance` are the two that have one. Never trust a cached Baseline date — look it up live (`references/browser-support.md`).
 9. **Form correctness** (CORE-FORM-001..006): right `type`, correct `autocomplete` token, `:user-invalid` styling, `aria-invalid` blur sync, visible required-field indicator, `enterkeyhint` on sequential mobile fields. Conventions are owned by `pinpoint-design-bible` §20; the code is in `references/form-correctness.md`.
 10. **Accessibility floor** (CORE-A11Y-001..006): skip link, `motion-reduce:` paired with animations, semantic `<table>` markup, real `<button>` (no `<div role="button">`), `title` is not a tooltip, `inert` background on modals. See **Accessibility** in `references/accessibility.md`.
+11. **Early UI review gate (pre-E2E)** (PP-4c4b): Present rendered screenshots to Tim for visual approval before authoring or updating Playwright/E2E specs or running preflight. Fast unit tests (`pnpm run test`) run early; heavy E2E suites wait until layout and visual hierarchy are approved.
 
 ## Reference Files
 
