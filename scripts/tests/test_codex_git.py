@@ -89,6 +89,19 @@ def run_wrapper(
                 "origin/main",
             ],
         ),
+        (
+            ("branch", "codex/new-task"),
+            [
+                "rev-parse",
+                "--show-toplevel",
+                "check-ref-format",
+                "--branch",
+                "codex/new-task",
+                "switch",
+                "-c",
+                "codex/new-task",
+            ],
+        ),
     ],
 )
 def test_runs_only_fixed_git_arguments(
@@ -108,6 +121,8 @@ def test_runs_only_fixed_git_arguments(
         ("commit", "safe", "--no-verify"),
         ("push", "--force"),
         ("merge-main", "--no-verify"),
+        ("branch", "topic"),
+        ("branch", "codex/topic", "--discard-changes"),
         ("unknown",),
     ],
 )

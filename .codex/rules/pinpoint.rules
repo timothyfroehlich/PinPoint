@@ -3,8 +3,9 @@
 # review-gated; allow the routine development lifecycle inside this repository.
 
 # Routine Git mutations for user-authorized PinPoint development. Commit, push,
-# and merge run through a fixed-interface wrapper so later-positioned flags cannot
-# smuggle in --no-verify, force-push behavior, or another merge target.
+# branch creation, and merge run through a fixed-interface wrapper so
+# later-positioned flags cannot smuggle in discards, --no-verify, force-push
+# behavior, or another merge target.
 prefix_rule(pattern=["git", "add"], decision="allow", justification="Stage PinPoint changes for the current task")
 prefix_rule(
     pattern=["bash", "scripts/workflow/codex-git.sh"],
@@ -13,11 +14,10 @@ prefix_rule(
     match=[
         "bash scripts/workflow/codex-git.sh commit 'fix(workflow): validate git mutations'",
         "bash scripts/workflow/codex-git.sh push",
+        "bash scripts/workflow/codex-git.sh branch codex/example",
         "bash scripts/workflow/codex-git.sh merge-main",
     ],
 )
-prefix_rule(pattern=["git", "checkout", "-b"], decision="allow", justification="Create a PinPoint development branch")
-prefix_rule(pattern=["git", "switch", "-c"], decision="allow", justification="Create a PinPoint development branch")
 prefix_rule(pattern=["git", "stash", "push"], decision="allow", justification="Temporarily preserve PinPoint working-tree changes")
 prefix_rule(pattern=["git", "stash", "apply"], decision="allow", justification="Restore preserved PinPoint changes without deleting the stash")
 prefix_rule(pattern=["git", "stash", "pop"], decision="allow", justification="Restore preserved PinPoint changes")
@@ -55,6 +55,15 @@ prefix_rule(
         "git merge origin/main --no-verify",
     ],
 )
+prefix_rule(
+    pattern=["git", ["checkout", "switch"]],
+    decision="prompt",
+    justification="Use bash scripts/workflow/codex-git.sh branch codex/<name>; raw checkout/switch flags can discard changes",
+    match=[
+        "git checkout -b topic HEAD~1 --force",
+        "git switch -c topic HEAD~1 --discard-changes",
+    ],
+)
 prefix_rule(pattern=["git", "worktree", "add"], decision="prompt", justification="Worktree creation paths and force flags require approval")
 
 # Discards, branch deletion, and manual worktree teardown.
@@ -78,10 +87,18 @@ prefix_rule(pattern=["gh", "run", "view"], decision="allow", justification="Read
 prefix_rule(
     pattern=["gh", "pr", "merge"],
     decision="forbidden",
-    justification="Use bash scripts/workflow/merge-pr.sh <PR> --human so Tim approves after gate checks",
+    justification="For PinPoint use merge-pr.sh --human; for an explicit other repo use codex-gh.sh merge-external",
     match=[
         "gh pr merge 2058",
         "gh pr merge 2058 --repo timothyfroehlich/PinPoint",
+    ],
+)
+prefix_rule(
+    pattern=["bash", "scripts/workflow/codex-gh.sh", "merge-external"],
+    decision="prompt",
+    justification="An explicit non-PinPoint repository merge requires user approval",
+    match=[
+        "bash scripts/workflow/codex-gh.sh merge-external owner/other 17 squash",
     ],
 )
 prefix_rule(

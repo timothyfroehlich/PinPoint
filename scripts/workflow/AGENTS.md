@@ -16,12 +16,24 @@ can bypass hooks or rewrite remote history:
 ```bash
 bash scripts/workflow/codex-git.sh commit "<conventional commit message>"
 bash scripts/workflow/codex-git.sh push
+bash scripts/workflow/codex-git.sh branch codex/<name>
 bash scripts/workflow/codex-git.sh merge-main
 ```
 
-The wrapper rejects extra arguments, pushes only the current non-`main` branch to the
-same branch name on `origin`, and merges only `origin/main`. Raw `git commit`, `git push`,
-and `git merge` invocations intentionally require approval.
+The wrapper rejects extra arguments, creates only `codex/` branches without a force or
+discard flag, pushes only the current non-`main` branch to the same branch name on
+`origin`, and merges only `origin/main`. Raw `git commit`, `git push`, `git checkout`,
+`git switch`, and `git merge` invocations intentionally require approval.
+
+Raw `gh pr merge` stays forbidden because a suffix-position `--repo` target is not
+inspectable by a prefix rule. An explicitly authorized merge in another repository uses
+the validating, approval-gated route instead:
+
+```bash
+bash scripts/workflow/codex-gh.sh merge-external <owner/repo> <PR-number> <merge|squash|rebase>
+```
+
+It rejects PinPoint targets case-insensitively; PinPoint still uses `merge-pr.sh --human`.
 
 ## Scripts
 

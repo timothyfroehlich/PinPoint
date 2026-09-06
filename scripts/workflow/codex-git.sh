@@ -6,6 +6,7 @@ usage() {
 Usage:
   bash scripts/workflow/codex-git.sh commit <message>
   bash scripts/workflow/codex-git.sh push
+  bash scripts/workflow/codex-git.sh branch codex/<name>
   bash scripts/workflow/codex-git.sh merge-main
 EOF
   exit 2
@@ -48,6 +49,11 @@ case "$1" in
     [[ $# -eq 1 ]] || usage
     branch=$(development_branch)
     exec git push --set-upstream origin "HEAD:refs/heads/${branch}"
+    ;;
+  branch)
+    [[ $# -eq 2 && "$2" == codex/* ]] || usage
+    git check-ref-format --branch "$2" >/dev/null
+    exec git switch -c "$2"
     ;;
   merge-main)
     [[ $# -eq 1 ]] || usage
