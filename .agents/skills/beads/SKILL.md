@@ -30,10 +30,15 @@ Use the `bd` CLI when shell access is available. It is the most compact and dire
 1. Find work:
 
 ```bash
-bd ready
-bd list --status=open
-bd list --status=in_progress
+bd ready --plain --limit 20
+bd list --status=open --limit 20 --flat
+bd list --status=in_progress --limit 20 --flat
 ```
+
+Treat these as discovery indexes, not bulk context. Refine at the source with
+`--priority`, `--type`, `--assignee`, `--label`, or `--parent` before raising the
+limit. Inspect the selected issue separately instead of loading every issue's
+description, design, notes, dependencies, and comments.
 
 2. Inspect before editing:
 
@@ -75,6 +80,19 @@ Use agent-local planning tools only for the current turn's execution checklist. 
 
 - Do not create markdown TODO files as the source of truth when Beads is available.
 - Do not use `bd edit`; it opens an interactive editor. Use `bd update` flags instead.
-- Prefer `--json` when parsing `bd` output programmatically.
+- Keep collection queries bounded. Do not request default-cap or unlimited JSON from
+  `bd ready` or `bd list`; use a small `--limit`, source-side filters, and another page
+  only when the first page cannot answer the question.
+- Prefer `--json` when parsing `bd` output programmatically, but project it immediately
+  to the fields needed for selection. For example:
+
+  ```bash
+  bd ready --limit 20 --json \
+    | jq -c '.[] | {id, priority, issue_type, status, title}'
+  ```
+
+  After choosing an ID, use `bd show <id> --json` when detailed structured context is
+  actually needed.
+
 - If hooks are installed, `bd prime` may already be injected. Run it manually when context is missing.
 - Do not auto-close or mutate tasks unless the work is actually complete.
