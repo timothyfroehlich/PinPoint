@@ -1534,6 +1534,37 @@ def test_watch_phase_review_action_required_when_threads_unresolved(monkeypatch)
 
 
 @pytest.mark.unit
+def test_watch_phase_review_revalidates_threads_before_passing(monkeypatch):
+    fake = make_gh(reviews=[codex_review(HEAD_SHA, state="APPROVED")])
+    monkeypatch.setattr(pr_watch, "gh", fake)
+    thread_snapshots = iter(
+        [
+            [{"isResolved": True}],
+            [{"isResolved": False}],
+        ]
+    )
+    monkeypatch.setattr(
+        pr_watch,
+        "get_review_threads",
+        lambda _pr: next(thread_snapshots),
+    )
+    states = []
+
+    exit_code = pr_watch._watch_phase_review(
+        PR,
+        HEAD_SHA,
+        timeout_sec=10,
+        poll_sec=0,
+        state_sink=lambda *args, **kwargs: states.append((args, kwargs)),
+    )
+
+    assert exit_code == 1
+    last_args, last_kwargs = states[-1]
+    assert last_args[1] == "action_required"
+    assert last_kwargs.get("unresolved_threads") == 1
+
+
+@pytest.mark.unit
 def test_watch_phase_review_action_required_when_not_approved(monkeypatch):
     fake = make_gh(
         reviews=[codex_review(HEAD_SHA, state="PENDING")],
@@ -1567,6 +1598,7 @@ def test_watch_phase_review_keeps_old_head_finding_pending(monkeypatch):
         [
             ("stale_approval", "old-head finding"),
             ("approval", "current-head approval"),
+            ("approval", "current-head approval revalidated"),
         ]
     )
     monkeypatch.setattr(
