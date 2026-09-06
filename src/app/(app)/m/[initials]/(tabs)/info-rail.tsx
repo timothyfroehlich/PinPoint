@@ -83,11 +83,10 @@ interface InfoRailProps {
      * Where the warning sends the reader to resolve it (the Manage tab), or
      * null when this viewer cannot open that tab.
      *
-     * `diagnose` is deliberately wider than `machines.edit` — any member may be
-     * the one to notice a wrong entry on a public map — so the two do come
-     * apart, and linking regardless would send those viewers to a route that
-     * redirects them straight back (CORE-ARCH-012). They still see the warning;
-     * it just is not a link.
+     * Manage access is deliberately wider than `machines.edit`: a member who
+     * can diagnose a public-map disagreement may follow this link to the
+     * read-only Pinball Map section (PP-o355.38). This stays nullable for a
+     * viewer who holds neither Manage-route capability.
      */
     manageHref: string | null;
   };

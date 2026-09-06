@@ -7,6 +7,7 @@ import { userProfiles, machines } from "~/server/db/schema";
 import {
   getAccessLevel,
   checkPermission,
+  canAccessMachineManage,
   type OwnershipContext,
 } from "~/lib/permissions/index";
 import { pinballmapLocationUrl } from "~/lib/pinballmap/public-url";
@@ -44,8 +45,10 @@ import { MachineOwnerTransfer } from "./machine-owner-transfer";
  *
  * Lives INSIDE the `(tabs)` group, so the machine header, tab strip, and
  * translite come from the shared layout and this file renders only the panel.
- * The Manage tab itself is hidden from viewers who lack `machines.edit`, so the
- * redirect below is the deep-link guard, not the primary gate.
+ * Editors see the whole page. A member without `machines.edit` may still open
+ * it for the read-only Pinball Map control (spec 4.9); Details and the Danger
+ * zone remain absent. The redirect below is the deep-link guard for viewers who
+ * hold neither route capability.
  *
  * Removing the Dialog wrapper also removes PP-o355.13's repro path — a Radix
  * popover portalled to <body> being read as an outside-click and dismissing the
@@ -81,15 +84,15 @@ export default async function MachineEditPage({
     machineOwnerId: machine.ownerId ?? undefined,
   };
 
-  // Send anyone who may not edit back to the machine's Info tab. They never see
-  // the Manage tab, so this only fires on a deep link or a stale bookmark. A bare
-  // 404 would be a lie — the machine exists, the viewer just cannot edit it.
-  if (
-    !user ||
-    !checkPermission("machines.edit", accessLevel, ownershipContext)
-  ) {
+  if (!user) {
     redirect(`/m/${initials}`);
   }
+
+  const canEdit = checkPermission(
+    "machines.edit",
+    accessLevel,
+    ownershipContext
+  );
 
   // The three Pinball Map capabilities, spec 8.1 / 8.2 / 8.3. `link` and `push`
   // resolve to the same tier today and `sync` is wider than both, but they are
@@ -110,6 +113,13 @@ export default async function MachineEditPage({
     accessLevel,
     ownershipContext
   );
+
+  // A refresh-capable member gets the read-only Pinball Map section and no
+  // machine mutation surfaces. Everyone else is sent back to Info: a 404 would
+  // be a lie because the machine exists (CORE-SEC-001, spec 4.9 / 8.3).
+  if (!canAccessMachineManage(accessLevel, ownershipContext)) {
+    redirect(`/m/${initials}`);
+  }
 
   // The matched title's display name, joined onto the machine by the loader
   // (PP-3bbr.1). This page used to query the mirror for it a second time; the
@@ -134,9 +144,12 @@ export default async function MachineEditPage({
           .where(eq(machines.pinballmapMachineId, machine.pinballmapMachineId))
       : Promise.resolve([]);
 
+  const allUsersPromise = canEdit
+    ? getUnifiedUsers({ includeEmails: false })
+    : Promise.resolve([]);
   const [pbmState, allUsersRaw, sameTitle, allowance] = await Promise.all([
     getPinballMapState(),
-    getUnifiedUsers({ includeEmails: false }),
+    allUsersPromise,
     sameTitlePromise,
     getRefreshAllowance(),
   ]);
@@ -242,37 +255,43 @@ export default async function MachineEditPage({
           unsaved state and this provider goes with it. */}
       <DetailsDirtyProvider>
         {/* Details — these fields save together. */}
-        <section className="space-y-4" aria-labelledby="section-details">
-          <h2 id="section-details" className="text-base font-semibold">
-            Details
-          </h2>
-          <MachineDetailsForm
-            machineId={machine.id}
-            name={machine.name}
-            presenceStatus={machine.presenceStatus}
-            description={machine.description}
-            canLink={canSetIntent}
-            pinballmapMachineId={machine.pinballmapMachineId}
-            pinballmapExcluded={machine.pinballmapExcluded}
-            pinballmapTitleName={pinballmapTitleName}
-            // Straight off the row. These used to come from a second query,
-            // because `getMachineForLayout` nulled `manufacturer` and `year` via
-            // `PBM_METADATA_PLACEHOLDER` and the hand-entry panel would have
-            // opened blank on a machine that had them — then written the nulls
-            // back on save. PP-3bbr.1 took those two fields out of the
-            // placeholder, so the loader carries the real values and the extra
-            // round-trip was pure cost.
-            modelName={machine.modelName}
-            manufacturer={machine.manufacturer}
-            year={machine.year}
-          />
-        </section>
+        {canEdit ? (
+          <section className="space-y-4" aria-labelledby="section-details">
+            <h2 id="section-details" className="text-base font-semibold">
+              Details
+            </h2>
+            <MachineDetailsForm
+              machineId={machine.id}
+              name={machine.name}
+              presenceStatus={machine.presenceStatus}
+              description={machine.description}
+              canLink={canSetIntent}
+              pinballmapMachineId={machine.pinballmapMachineId}
+              pinballmapExcluded={machine.pinballmapExcluded}
+              pinballmapTitleName={pinballmapTitleName}
+              // Straight off the row. These used to come from a second query,
+              // because `getMachineForLayout` nulled `manufacturer` and `year`
+              // via `PBM_METADATA_PLACEHOLDER` and the hand-entry panel would
+              // have opened blank on a machine that had them — then written the
+              // nulls back on save. PP-3bbr.1 took those two fields out of the
+              // placeholder, so the loader carries the real values and the
+              // extra round-trip was pure cost.
+              modelName={machine.modelName}
+              manufacturer={machine.manufacturer}
+              year={machine.year}
+            />
+          </section>
+        ) : null}
 
         {/* Pinball Map — no save bar: every control here acts on its own, and
           the section heading lives inside the control (its header carries the
           location name, the refresh state and the out-of-sync alert). */}
         <section
-          className="space-y-4 border-t border-outline-variant pt-6"
+          className={
+            canEdit
+              ? "space-y-4 border-t border-outline-variant pt-6"
+              : "space-y-4"
+          }
           aria-labelledby="section-pinballmap"
         >
           <h2 id="section-pinballmap" className="sr-only">
@@ -333,27 +352,29 @@ export default async function MachineEditPage({
 
       {/* Danger zone — applies immediately. Machine deletion joins this
           section in PP-o355.25. */}
-      <section
-        className="space-y-4 border-t border-outline-variant pt-6"
-        aria-labelledby="section-danger"
-      >
-        <h2 id="section-danger" className="text-base font-semibold">
-          Danger zone
-        </h2>
-        <div className="rounded-lg border border-destructive/35 px-4 py-2">
-          <MachineOwnerTransfer
-            machineId={machine.id}
-            machineName={machine.name}
-            ownerId={machine.ownerId}
-            invitedOwnerId={machine.invitedOwnerId}
-            ownerName={machine.owner?.name ?? null}
-            invitedOwnerName={machine.invitedOwner?.name ?? null}
-            allUsers={allUsers}
-            canEditAnyMachine={canEditAnyMachine}
-            isOwner={isOwner}
-          />
-        </div>
-      </section>
+      {canEdit ? (
+        <section
+          className="space-y-4 border-t border-outline-variant pt-6"
+          aria-labelledby="section-danger"
+        >
+          <h2 id="section-danger" className="text-base font-semibold">
+            Danger zone
+          </h2>
+          <div className="rounded-lg border border-destructive/35 px-4 py-2">
+            <MachineOwnerTransfer
+              machineId={machine.id}
+              machineName={machine.name}
+              ownerId={machine.ownerId}
+              invitedOwnerId={machine.invitedOwnerId}
+              ownerName={machine.owner?.name ?? null}
+              invitedOwnerName={machine.invitedOwner?.name ?? null}
+              allUsers={allUsers}
+              canEditAnyMachine={canEditAnyMachine}
+              isOwner={isOwner}
+            />
+          </div>
+        </section>
+      ) : null}
     </div>
   );
 }

@@ -35,3 +35,6 @@ export {
   getRawPermissionValue,
   isConditionalPermission,
 } from "./helpers";
+
+// Resource and route predicates
+export { canAccessMachineManage } from "./machines";

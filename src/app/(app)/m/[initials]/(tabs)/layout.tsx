@@ -6,7 +6,7 @@ import { db } from "~/server/db";
 import { userProfiles } from "~/server/db/schema";
 import {
   getAccessLevel,
-  checkPermission,
+  canAccessMachineManage,
   type OwnershipContext,
 } from "~/lib/permissions/index";
 import { PageContainer } from "~/components/layout/PageContainer";
@@ -42,8 +42,9 @@ export default async function MachineDetailLayout({
     status: deriveMachineStatus(machine.issues),
   };
 
-  // The Manage tab is only rendered for viewers who hold `machines.edit`; the
-  // Edit route re-checks the same permission so a deep link is still guarded.
+  // Manage is reachable either as the full editing surface or as the read-only
+  // Pinball Map surface (spec 4.9). The route repeats both checks so a deep link
+  // remains guarded; mutation controls keep their own narrower capabilities.
   const currentUserProfile = user
     ? await db.query.userProfiles.findFirst({
         where: eq(userProfiles.id, user.id),
@@ -54,13 +55,9 @@ export default async function MachineDetailLayout({
     userId: user?.id,
     machineOwnerId: machine.ownerId ?? undefined,
   };
-  const canEdit =
-    user !== null &&
-    checkPermission(
-      "machines.edit",
-      getAccessLevel(currentUserProfile?.role),
-      ownershipContext
-    );
+  const accessLevel = getAccessLevel(currentUserProfile?.role);
+  const canManage =
+    user !== null && canAccessMachineManage(accessLevel, ownershipContext);
 
   return (
     <PageContainer size="standard">
@@ -76,7 +73,7 @@ export default async function MachineDetailLayout({
             <MachineTabStrip
               initials={machine.initials}
               maintenance={maintenance}
-              canEdit={canEdit}
+              canManage={canManage}
             />
           </div>
           <MachineBackboxTranslite
