@@ -94,6 +94,10 @@ def run_wrapper(
             [
                 "rev-parse",
                 "--show-toplevel",
+                "symbolic-ref",
+                "--quiet",
+                "--short",
+                "HEAD",
                 "check-ref-format",
                 "--branch",
                 "codex/new-task",
@@ -141,6 +145,7 @@ def test_rejects_extra_flags_and_unknown_operations(
         ("commit", "safe"),
         ("push",),
         ("merge-main",),
+        ("branch", "codex/new-task"),
     ],
 )
 def test_refuses_mutations_on_main(tmp_path: Path, args: tuple[str, ...]) -> None:

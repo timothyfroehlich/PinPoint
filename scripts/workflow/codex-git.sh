@@ -52,6 +52,7 @@ case "$1" in
     ;;
   branch)
     [[ $# -eq 2 && "$2" == codex/* ]] || usage
+    development_branch >/dev/null
     git check-ref-format --branch "$2" >/dev/null
     exec git switch -c "$2"
     ;;

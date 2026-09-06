@@ -20,10 +20,11 @@ bash scripts/workflow/codex-git.sh branch codex/<name>
 bash scripts/workflow/codex-git.sh merge-main
 ```
 
-The wrapper rejects extra arguments, creates only `codex/` branches without a force or
-discard flag, pushes only the current non-`main` branch to the same branch name on
-`origin`, and merges only `origin/main`. Raw `git commit`, `git push`, `git checkout`,
-`git switch`, and `git merge` invocations intentionally require approval.
+The wrapper rejects extra arguments, creates only `codex/` branches from an existing
+non-`main` worktree branch without a force or discard flag, pushes only the current
+non-`main` branch to the same branch name on `origin`, and merges only `origin/main`.
+Raw `git commit`, `git push`, `git checkout`, `git switch`, and `git merge` invocations
+intentionally require approval.
 
 Raw `gh` stays forbidden because case-insensitive and host-qualified repository selectors
 cannot be normalized by an exact argv-prefix rule. Routine read-only commands stay
