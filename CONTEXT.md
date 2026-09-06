@@ -15,8 +15,22 @@ _Avoid_: Game, title
 A reported operational problem associated with exactly one machine.
 _Avoid_: Ticket
 
+**Report draft**:
+An unsaved description of an operational problem associated with a machine. It
+becomes an issue only when submitted.
+_Avoid_: Issue, ticket
+
+**Report template**:
+A reusable, player-facing description of an observable machine problem that
+seeds a report draft and may provide guidance before submission.
+_Avoid_: Issue type, issue category
+
 **Issue status**:
 The current stage of an issue's maintenance lifecycle.
+
+**Issue frequency**:
+How often an issue occurs. It may be not specified when the reporter cannot
+establish whether the problem is intermittent, frequent, or constant.
 
 **Machine status**:
 The current operating condition of a machine, inferred from its open issues

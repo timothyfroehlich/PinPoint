@@ -55,21 +55,43 @@ test.describe("Machine Info tab — player landing", () => {
     ).toBeVisible();
   });
 
-  // Companion to public-routes-audit.spec.ts's anonymous-viewer case: a
-  // signed-in member who doesn't own this machine (TAF is admin-owned) also
-  // lacks `machines.edit`, so the edit page's own permission gate — not
-  // middleware — must send them back here rather than let them in (PP-o355.19).
-  test("a member without edit permission is redirected away from the edit page (deep link)", async ({
+  // Companion to public-routes-audit.spec.ts's anonymous-viewer case. A member
+  // who does not own this machine may open Manage for the read-only Pinball Map
+  // control, but none of its machine-mutation surfaces (PP-o355.38, spec 4.9).
+  test("a member without edit permission gets read-only Pinball Map access on Manage", async ({
     page,
   }) => {
-    await page.goto(`/m/${initials}/edit`);
+    const readOnlyInitials = seededMachines.medievalMadness.initials;
+    await page.goto(`/m/${readOnlyInitials}/edit`);
 
-    await expect(page).toHaveURL(`/m/${initials}`);
+    await expect(page).toHaveURL(`/m/${readOnlyInitials}/edit`);
+    await expect(page.getByTestId("machine-tab-edit")).toHaveAttribute(
+      "aria-current",
+      "page"
+    );
+    await expect(page.getByTestId("pbm-listing-control")).toBeVisible();
+    await expect(page.getByTestId("pbm-listing-status")).toBeVisible();
+
+    for (const position of ["on", "off", "no_sync"]) {
+      await expect(
+        page.getByTestId(`pbm-listing-intent-${position}`)
+      ).toBeDisabled();
+    }
+    await expect(page.getByTestId("pbm-listing-refresh")).toBeVisible();
+    await expect(page.getByTestId("pbm-listing-add")).toHaveCount(0);
+    await expect(
+      page.getByRole("link", { name: "Add it on Pinball Map" })
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole("link", { name: "Remove it on Pinball Map" })
+    ).toHaveCount(0);
+
+    // The same route still withholds every machine-editing surface.
     await expect(
       page.getByRole("button", { name: "Save details" })
-    ).not.toBeVisible();
-    // ...and the Manage tab that would take them there is not offered in the
-    // first place. The redirect is the deep-link guard; hiding it is the gate.
-    await expect(page.getByTestId("machine-tab-edit")).toHaveCount(0);
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole("heading", { name: "Danger zone" })
+    ).toHaveCount(0);
   });
 });

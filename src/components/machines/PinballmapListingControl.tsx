@@ -149,6 +149,7 @@ export function PinballmapListingControl({
 
   const game = modelName ?? "this machine";
   const canWriteOut = canPush && writeEnabled && locationUrl !== null;
+  const showExternalFallback = canPush && !writeEnabled && locationUrl !== null;
   const disabled = view.disabled !== null;
 
   return (
@@ -216,7 +217,7 @@ export function PinballmapListingControl({
               className="text-sm text-foreground"
               data-testid="pbm-listing-status"
             >
-              {statusSentence(view, locationUrl, canWriteOut)}
+              {statusSentence(view, locationUrl, showExternalFallback)}
             </span>
           </div>
 
@@ -529,14 +530,15 @@ function StatusIcon({ view }: { view: PbmListingView }): React.JSX.Element {
  * (spec 4.2, 4.8 — "listing" never appears; the object is an entry, the set is
  * the lineup).
  *
- * Without credentials the sentence carries the action as a link out to Pinball
- * Map instead (4.4): a control that cannot perform its action must not be shown
- * (CORE-ARCH-012).
+ * For a push-capable viewer without credentials, the sentence carries the
+ * action as a link out to Pinball Map instead (4.4). A read-only viewer gets
+ * status only (4.9), and a control that cannot perform its action is never
+ * shown (CORE-ARCH-012).
  */
 function statusSentence(
   view: PbmListingView,
   locationUrl: string | null,
-  canWriteOut: boolean
+  showExternalFallback: boolean
 ): React.ReactNode {
   const sub = (text: string): React.JSX.Element => (
     <span className="text-muted-foreground">{text}</span>
@@ -621,14 +623,14 @@ function statusSentence(
       return (
         <>
           Not on the location&apos;s lineup.
-          {canWriteOut ? null : linkOut("Add it on Pinball Map")}
+          {showExternalFallback ? linkOut("Add it on Pinball Map") : null}
         </>
       );
     case "lingering":
       return (
         <>
           Still on the location&apos;s lineup.
-          {canWriteOut ? null : linkOut("Remove it on Pinball Map")}
+          {showExternalFallback ? linkOut("Remove it on Pinball Map") : null}
         </>
       );
   }

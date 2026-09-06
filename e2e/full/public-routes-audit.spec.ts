@@ -12,8 +12,10 @@
  *   2. /m/[initials]/edit redirects an anonymous viewer to the machine detail
  *      page — page-level protection again (PP-o355.19). `/m/` is public at
  *      middleware (src/lib/supabase/middleware.ts), so the gate lives entirely
- *      in the edit page's own `checkPermission("machines.edit", …)` +
- *      `redirect()` call, unreachable by a middleware-array test.
+ *      in the edit page's own capability checks + `redirect()` call,
+ *      unreachable by a middleware-array test. Members may open its read-only
+ *      Pinball Map section (PP-o355.38); anonymous viewers hold neither route
+ *      capability.
  *
  * The "machine detail Report Issue button navigates without login wall" test
  * was removed when the tabbed-layout redesign dropped the Report Issue button
