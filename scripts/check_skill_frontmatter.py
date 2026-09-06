@@ -29,6 +29,9 @@ except ImportError:
 
 FRONTMATTER_RE = re.compile(r"\A---\r?\n(.*?)\r?\n---(?:\r?\n|\Z)", re.DOTALL)
 KEY_VAL_RE = re.compile(r"^([A-Za-z0-9_-]+):\s*(.*)$")
+SKILL_NAME_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
+MAX_NAME_LENGTH = 64
+MAX_DESCRIPTION_LENGTH = 1024
 
 
 def extract_frontmatter(content: str) -> str | None:
@@ -133,6 +136,14 @@ def check_skill_file(skill_file: Path, config_path: Path | None = None) -> list[
         errors.append(f"{skill_file}: Missing or empty 'name' in frontmatter")
     else:
         skill_name = data["name"].strip()
+        if len(skill_name) > MAX_NAME_LENGTH:
+            errors.append(
+                f"{skill_file}: 'name' exceeds {MAX_NAME_LENGTH} characters ({len(skill_name)} > {MAX_NAME_LENGTH})"
+            )
+        if not SKILL_NAME_RE.match(skill_name):
+            errors.append(
+                f"{skill_file}: 'name' '{skill_name}' must consist of lowercase alphanumeric characters and hyphens"
+            )
         expected_name = skill_file.parent.name
         if skill_name != expected_name:
             errors.append(
@@ -151,6 +162,16 @@ def check_skill_file(skill_file: Path, config_path: Path | None = None) -> list[
             errors.append(
                 f"{skill_file}: 'description' in frontmatter must be a string, got {type(desc).__name__}"
             )
+        else:
+            desc_text = desc.strip()
+            if len(desc_text) > MAX_DESCRIPTION_LENGTH:
+                errors.append(
+                    f"{skill_file}: 'description' exceeds {MAX_DESCRIPTION_LENGTH} characters ({len(desc_text)} > {MAX_DESCRIPTION_LENGTH})"
+                )
+            if "<" in desc_text or ">" in desc_text:
+                errors.append(
+                    f"{skill_file}: 'description' contains disallowed angle brackets ('<' or '>')"
+                )
 
     return errors
 

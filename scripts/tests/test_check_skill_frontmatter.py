@@ -244,6 +244,46 @@ def test_description_scalar_non_strings(tmp_path: Path):
     assert any("must be a string, got bool" in err for err in errors)
 
 
+def test_description_length_exceeded(tmp_path: Path):
+    skill_dir = tmp_path / "long-desc"
+    skill_dir.mkdir()
+    skill_file = skill_dir / "SKILL.md"
+    long_desc = "a" * 1025
+    skill_file.write_text(
+        f"---\nname: long-desc\ndescription: {long_desc}\n---\n\n# Body\n",
+        encoding="utf-8",
+    )
+
+    errors = check_skill_file(skill_file, config_path=CONFIG_PATH)
+    assert any("exceeds 1024 characters" in err for err in errors)
+
+
+def test_description_angle_brackets(tmp_path: Path):
+    skill_dir = tmp_path / "angle-desc"
+    skill_dir.mkdir()
+    skill_file = skill_dir / "SKILL.md"
+    skill_file.write_text(
+        "---\nname: angle-desc\ndescription: Has <select> tag\n---\n\n# Body\n",
+        encoding="utf-8",
+    )
+
+    errors = check_skill_file(skill_file, config_path=CONFIG_PATH)
+    assert any("disallowed angle brackets" in err for err in errors)
+
+
+def test_name_constraints(tmp_path: Path):
+    skill_dir = tmp_path / "bad_name"
+    skill_dir.mkdir()
+    skill_file = skill_dir / "SKILL.md"
+    skill_file.write_text(
+        "---\nname: bad_name\ndescription: Valid description\n---\n\n# Body\n",
+        encoding="utf-8",
+    )
+
+    errors = check_skill_file(skill_file, config_path=CONFIG_PATH)
+    assert any("lowercase alphanumeric characters and hyphens" in err for err in errors)
+
+
 def test_find_skill_files(tmp_path: Path):
     (tmp_path / "skill-a").mkdir()
     (tmp_path / "skill-a" / "SKILL.md").write_text("a", encoding="utf-8")

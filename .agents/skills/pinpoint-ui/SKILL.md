@@ -1,25 +1,15 @@
 ---
 name: pinpoint-ui
 description: >-
-  shadcn/ui patterns, Server Action forms, Server Components, Client Components,
-  form handling, Tailwind CSS v4, accessibility. The color system is here:
-  semantic tokens only, never a raw palette class or hex, and the app is
-  dark-only so `dark:` variants are wrong. Also the Radix Select form-reset
-  footgun (useActionState dispatch, PP-0fvr/PP-1ajq), CREATE form reset
-  (return-redirect + dual-pass reset), the native `<select>` stale-option-ID
-  silent fallback (PP-lql), authoring config-driven enums with rich metadata
-  (labels/icons/styles), discriminated-union component props, Server Action
-  conventions (`Action` suffix, `checkPermission`, `Result`,
-  `serverActionError`), colocated data access with React `cache()` and
-  `revalidatePath`, the transactional-service pattern (plan-in-transaction /
-  dispatch-after-commit, CORE-ARCH-011, the Doodle Bug), derived machine status,
-  and why `console.*` is correct inside client components. Use when building UI,
-  forms, components, badges, server actions, or data fetching, or when user
-  mentions UI/styling/components/forms/enums/dropdowns/logging. Design-system
-  depth — page archetypes, spacing rhythm, severity vocabulary, the
-  form-correctness conventions themselves, and whether a web platform feature
-  clears the Baseline floor — is owned by `pinpoint-design-bible`; this skill
-  states the rules and how to build against them.
+  shadcn/ui patterns, Server Action forms, Server and Client Components,
+  Tailwind CSS v4, and accessibility. Covers semantic color tokens (dark-only,
+  no dark: variants), Radix Select form resets, native select stale-option
+  fallbacks, config-driven enums with rich metadata, discriminated-union props,
+  Server Action conventions (Action suffix, checkPermission, Result), colocated
+  data access via cache() and revalidatePath, and transactional-service
+  patterns. Use when building UI, forms, components, badges, server actions, or
+  data fetching, or when user mentions UI/styling/components/forms/dropdowns.
+  Design-system depth is owned by pinpoint-design-bible.
 ---
 
 # PinPoint UI Guide
