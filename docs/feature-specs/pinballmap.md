@@ -324,8 +324,8 @@ dashboard). The region-alert channel that shares the section is its own feature
   machine's catalog match and listing intent, imported comments, and
   location-stamped abandoned-entry records; turning the integration off this way
   is reversible and manufactures no external change.
-- **10.8** Setting a location while Not configured follows the validate-then-
-  commit sequence in §10.9. Setting the previously tracked location resumes
+- **10.8** Setting a location while Not configured follows the look-up-then-
+  save sequence in §10.9. Setting the previously tracked location resumes
   tracking without treating its entries as having disappeared; setting a
   different location applies the change consequences below.
 
@@ -335,18 +335,19 @@ Replacing the tracked location is a rare, near-never operation — PinPoint trac
 at most one venue and it does not move. These rules make replacement safe and
 honest rather than building a workflow around it.
 
-- **10.9 Validate, then commit.** Saving a non-empty location id runs as an
+- **10.9 Look up, then save.** Setting a non-empty location id runs as an
   ordered sequence, **not one transaction** — the validation is a Pinball Map
   fetch and an external effect never runs inside a DB transaction
   (CORE-ARCH-011):
-  - **Validate first.** PinPoint fetches the new location before changing any
-    stored state, using the shared allowance (§3.2, §10.13). A successful fetch
+  - **Look up first.** Clicking Check ID fetches the candidate location before
+    changing any stored state, using the shared allowance (§3.2, §10.13). A successful lookup
     is what makes the id valid; a failed or throttled attempt — unknown id,
     network or auth error, or no token currently available — aborts the whole
     change with nothing wiped and the previous configuration unchanged. A
     location with zero machines is valid (a legitimately empty venue) and
     proceeds.
-  - **Then commit the switch.** In one transaction: store the new id, replace
+  - **Then save commits the switch.** Save is disabled until the lookup
+    succeeds. In one transaction: store the new id, replace
     the stored snapshot with the freshly fetched one, and set the sync-health
     fields (§10.2) to reflect that fetch. The old location's observed state is
     gone only because it has been replaced, never left half-cleared.
