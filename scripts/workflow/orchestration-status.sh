@@ -97,7 +97,7 @@ run_snapshot() {
       rc=$?
     fi
   elif "$@" >"$capture_stdout" 2>"$capture_stderr"; then
-    cat "$capture_stdout"
+    cat "$capture_stdout" "$capture_stderr"
     return
   else
     rc=$?

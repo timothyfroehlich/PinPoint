@@ -91,7 +91,7 @@ def test_worktree_section_passes_only_the_expected_arguments(tmp_path: Path) -> 
     script = workflow / "orchestration-status.sh"
     shutil.copy2(SCRIPT_PATH, script)
     (scripts / "worktree_reap.py").write_text(
-        "import sys\nprint('ARGS=' + '|'.join(sys.argv[1:]))\n"
+        "import sys\nprint('ARGS=' + '|'.join(sys.argv[1:]), file=sys.stderr)\n"
     )
 
     result = subprocess.run(
@@ -106,4 +106,5 @@ def test_worktree_section_passes_only_the_expected_arguments(tmp_path: Path) -> 
     assert result.returncode == 0, result.stdout + result.stderr
     assert result.stdout.count("ARGS=") == 1
     assert "ARGS=--repo-dir|" in result.stdout
+    assert result.stderr == ""
     assert "|+|" not in result.stdout
