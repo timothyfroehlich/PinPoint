@@ -97,50 +97,19 @@ Closes #N (if applicable)
 
 ### Delegated Watcher Architecture (Lightweight Subagents)
 
-Watching CI and awaiting review are passive waits. To conserve token quota and context in capable reasoning models (Claude 3.7 Sonnet / Opus, OpenAI o3 / GPT-5, Gemini 2.5 Pro), **delegate the wait to lightweight, fast watcher subagents** running deterministic `pr-watch.py --json`.
-
-#### Recommended Watcher Models
-
-| Harness         | Subagent Tool     | Recommended Model                                                        | Invocation Shape                                                                                                     |
-| :-------------- | :---------------- | :----------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------- |
-| **Claude Code** | `Agent`           | `haiku`                                                                  | `Agent(subagent_type: "general-purpose", model: "haiku", prompt: "...")`                                             |
-| **Antigravity** | `invoke_subagent` | `flash_lite` (or `flash`)                                                | `invoke_subagent(Subagents: [{TypeName: "self", Role: "PR Lifecycle Watcher", Model: "flash_lite", Prompt: "..."}])` |
-| **Codex**       | `spawn_agent`     | Prefer `gpt-5.3-codex-spark`; otherwise the fastest callable model shown | `spawn_agent(task_name: "pr_watch", fork_turns: "none", message: "...")`                                             |
-
-Model availability is a runtime capability, not a name this skill may invent. In
-Codex, use Spark only when `spawn_agent` lists it as a supported override; otherwise
-choose the fastest advertised callable model. Pass `model` and `reasoning_effort` only
-when the current tool schema exposes those fields; older Codex harnesses accept only
-the required context-isolation and message fields. Record the exact model ID reported
-by the harness in telemetry, or `unknown` when the harness exposes no resolved ID.
-
-#### Division of Responsibilities
-
-- **Capable Owner Model**: Owns all mutations and strategic decisions. Formats/edits code, commits, pushes, promotes draft PRs (`gh pr ready`), executes `request-codex-review.sh <PR>`, inspects and replies to review comments, resolves review threads, shoots screenshots, and runs `merge-handoff.sh`.
-- **Lightweight Watcher Subagent**: Strictly read-only. Runs `scripts/workflow/pr-watch.py <PR> --phase <ci|review> --expected-head <SHA> --json`. Blocks until exit, returns the terminal JSON payload to the owning agent, and exits. Never mutates files, never requests review, never comments or resolves threads.
-
-#### Bounded Dispatch Envelope
-
-Give the watcher only the worktree path, PR number and title, phase, full expected
-head SHA, exact command, and the instruction to return stdout's terminal JSON record.
-Never include implementation diffs, history, or the owning task's transcript. Codex
-must set `fork_turns: "none"`; use the equivalent isolated-context option when another
-harness exposes one.
-
-Set telemetry on the deterministic command, using the model ID the harness actually
-resolved rather than its selector alias:
-
-```bash
-GH_MONITOR_HARNESS=<harness> GH_MONITOR_MODEL=<resolved-model-id> \
-  python3 scripts/workflow/pr-watch.py <PR> --phase <ci|review> \
-  --expected-head <FULL_HEAD_SHA> --json
-```
+Watching CI and awaiting review are passive waits. Invoke the project-scoped named
+agent `pr-lifecycle-watcher`; read
+`references/native-pr-lifecycle-watcher.md` before either wait. Give it only the
+five-field envelope documented there. If named-agent discovery is unavailable, the
+capable owner may run the canonical watcher through its native monitor directly; do
+not recreate the old prompt-only generic subagent.
 
 ---
 
 ### 3.1 Watch CI
 
-After pushing a commit (at `HEAD_SHA`), dispatch a lightweight watcher subagent (or run directly via Monitor):
+After pushing a commit at `HEAD_SHA`, invoke the named `pr-lifecycle-watcher` with
+`phase: "ci"` (or use the owner-run native-monitor fallback):
 
 ```bash
 python3 scripts/workflow/pr-watch.py <PR> --phase ci --expected-head <HEAD_SHA> --json
@@ -184,7 +153,7 @@ After current-head CI succeeds and the PR is ready:
 
    This verifies current-head CI passed and posts the SHA-pinned `@codex review` comment. Exactly one request per intended head commit.
 
-2. **Owner dispatches lightweight review watcher**:
+2. **Owner invokes the named `pr-lifecycle-watcher` with `phase: "review"`**:
 
    ```bash
    python3 scripts/workflow/pr-watch.py <PR> --phase review --expected-head <HEAD_SHA> --json

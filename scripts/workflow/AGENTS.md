@@ -16,14 +16,37 @@ Scripts are designed for the **PinPoint orchestrator workflow** where multiple s
 | --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `pr-dashboard.sh [PR...]`                     | Status table: CI checks, review state, merge state, draft state. All open PRs if no args. One repository GraphQL snapshot batches metadata, checks, native reviews, and threads; targeted pagination is exceptional, and REST comments are fetched only where native exact-head evidence is insufficient. The Review column shows unresolved threads when there are any, otherwise: `reviewed`, `RE-REVIEW` (`stale_approval`), `NOT APPROVED` (`not_approved`), or `NOT REVIEWED` (`unreviewed`).                                                                                                                                                                                                                                                                           |
 | `pr-watch.py <PR>`                            | Stream CI or review events. One timestamped line per event (logs to stderr in `--json` mode; stdout reserved strictly for terminal JSON). The first host process for a repository+PR+watch mode holds the XDG-state lock and polls GitHub; concurrent invocations with the same precheck semantics follow its atomic local state with zero GitHub reads. Normal and `--force` watches have separate owners. CI and review phases use distinct locks (`...-<pr>-ci.lock`, `...-<pr>-review.lock`). Writes failure artifacts and watcher telemetry to `tmp/gh-monitor/`. Unresolved threads persist in shared state so every follower prints the reminder, but do **not** stop the CI watch. `--check-ready` remains a direct readiness snapshot rather than a shared monitor. |
+| `pr-watcher-mcp.ts`                           | Local stdio MCP server exposing only `watch_pr_lifecycle`. It validates a five-field envelope, verifies the absolute worktree matches its own current Git worktree, then runs the exact delegated `pr-watch.py` argv without a shell.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | `request-codex-review.sh <PR>`                | Request exactly one manual Codex review for the current head. Refuses non-owner auth, draft/closed PRs, non-green current-head CI, heads already reviewed/requested, and a head that moves during validation. Posts the SHA-bound `@codex review` comment consumed by the trusted reaction witness.                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | `codex-reaction-witness.sh <PR> <SHA> <TIME>` | Trusted helper for `.github/workflows/codex-reaction-witness.yaml`. After the SHA-bound manual request it requires a fresh connector-bot `eyes`, continuously verifies that the named SHA remains head, then posts a SHA-pinned witness only if that same reaction changes to `+1`. A native exact-head review supersedes the need for a witness.                                                                                                                                                                                                                                                                                                                                                                                                                            |
 
 #### `pr-watch.py` flags and delegated watcher contract
 
+Named harness agents call the watcher through `watch_pr_lifecycle`, never by accepting
+or constructing a command in their prompt. Its strict input is exactly:
+
+```json
+{
+  "worktree": "/absolute/path/to/the-server-worktree",
+  "pr": 1234,
+  "title": "Exact PR title",
+  "phase": "ci",
+  "expected_head": "40-character-lowercase-head-sha"
+}
+```
+
+`title` is context only. The tool rejects extra fields, a relative or mismatched
+worktree, non-positive PR numbers, empty titles, unknown phases, and non-full lowercase
+SHAs. It can launch only the exact second command below with `shell: false`. Exits 0,
+1, and 2 return valid terminal watcher JSON unchanged; malformed stdout, startup
+failure, or any other exit is an MCP tool error. Child stderr stays on server stderr
+and never contaminates the returned JSON. Harness and resolved-model telemetry arrive
+through `GH_MONITOR_HARNESS` and `GH_MONITOR_MODEL`; the server fixes
+`GH_MONITOR_WAKES=1` while preserving the rest of the environment.
+
 ```bash
 ./scripts/workflow/pr-watch.py <PR> [--verbose] [--force]
-./scripts/workflow/pr-watch.py <PR> --phase <ci|review> --expected-head <FULL_SHA> --json [--verbose] [--force]
+python3 scripts/workflow/pr-watch.py <PR> --phase <ci|review> --expected-head <FULL_SHA> --json
 ```
 
 Delegated mode is the second form: `--phase`, `--expected-head`, and `--json` are
