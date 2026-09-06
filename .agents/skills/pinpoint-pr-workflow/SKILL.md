@@ -24,6 +24,19 @@ AGENTS.md §5 "Branches". Which gate to run before committing is AGENTS.md §2.2
 and the §5 key-commands table; which tests to run is AGENTS.md §5 "Which tests to run" —
 canonical, don't duplicate here.
 
+For Codex, use the rule-approved fixed interface for Git operations whose free-form flags
+can bypass hooks or rewrite remote history:
+
+```bash
+bash scripts/workflow/codex-git.sh commit "<conventional commit message>"
+bash scripts/workflow/codex-git.sh push
+bash scripts/workflow/codex-git.sh merge-main
+```
+
+The wrapper rejects extra arguments, pushes only the current non-`main` branch to the
+same branch name on `origin`, and merges only `origin/main`. Raw `git commit`, `git push`,
+and `git merge` invocations intentionally require approval.
+
 ### Commit message
 
 Conventional commits: `<type>(<scope>): <description>`. Nothing enforces this — there is no

@@ -2,23 +2,62 @@
 # .codex layer is trusted. Keep external publication and destructive operations
 # review-gated; allow the routine development lifecycle inside this repository.
 
-# Routine Git mutations for user-authorized PinPoint development.
+# Routine Git mutations for user-authorized PinPoint development. Commit, push,
+# and merge run through a fixed-interface wrapper so later-positioned flags cannot
+# smuggle in --no-verify, force-push behavior, or another merge target.
 prefix_rule(pattern=["git", "add"], decision="allow", justification="Stage PinPoint changes for the current task")
-prefix_rule(pattern=["git", "commit"], decision="allow", justification="Commit PinPoint changes for the current task")
-prefix_rule(pattern=["git", "push"], decision="allow", justification="Push the current PinPoint development branch")
+prefix_rule(
+    pattern=["bash", "scripts/workflow/codex-git.sh"],
+    decision="allow",
+    justification="Run a validated PinPoint commit, current-branch push, or origin/main merge",
+    match=[
+        "bash scripts/workflow/codex-git.sh commit 'fix(workflow): validate git mutations'",
+        "bash scripts/workflow/codex-git.sh push",
+        "bash scripts/workflow/codex-git.sh merge-main",
+    ],
+)
 prefix_rule(pattern=["git", "checkout", "-b"], decision="allow", justification="Create a PinPoint development branch")
 prefix_rule(pattern=["git", "switch", "-c"], decision="allow", justification="Create a PinPoint development branch")
-prefix_rule(pattern=["git", "merge", "origin/main"], decision="allow", justification="Synchronize a PinPoint branch from origin/main without rebasing")
-prefix_rule(pattern=["git", "worktree", "add"], decision="allow", justification="Create an isolated PinPoint worktree")
 prefix_rule(pattern=["git", "stash", "push"], decision="allow", justification="Temporarily preserve PinPoint working-tree changes")
 prefix_rule(pattern=["git", "stash", "apply"], decision="allow", justification="Restore preserved PinPoint changes without deleting the stash")
 prefix_rule(pattern=["git", "stash", "pop"], decision="allow", justification="Restore preserved PinPoint changes")
 
-# History rewriting, discards, branch deletion, and manual worktree teardown.
-prefix_rule(pattern=["git", "commit", "--amend"], decision="prompt", justification="Amending rewrites existing commit history")
-prefix_rule(pattern=["git", "push", "--force"], decision="prompt", justification="Force-pushing rewrites remote history")
-prefix_rule(pattern=["git", "push", "-f"], decision="prompt", justification="Force-pushing rewrites remote history")
-prefix_rule(pattern=["git", "push", "--force-with-lease"], decision="prompt", justification="Force-pushing rewrites remote history")
+# Raw forms always prompt because prefix rules cannot constrain arbitrary suffixes.
+# Use codex-git.sh for the frictionless safe path.
+prefix_rule(
+    pattern=["git", "commit"],
+    decision="prompt",
+    justification="Use bash scripts/workflow/codex-git.sh commit <message>; raw commit flags require approval",
+    match=[
+        "git commit -m safe",
+        "git commit --no-verify -m bypass",
+        "git commit -m bypass --no-verify",
+        "git commit --amend -m rewrite",
+    ],
+)
+prefix_rule(
+    pattern=["git", "push"],
+    decision="prompt",
+    justification="Use bash scripts/workflow/codex-git.sh push; raw push flags require approval",
+    match=[
+        "git push",
+        "git push origin --no-verify feature",
+        "git push origin --force main",
+        "git push --mirror origin",
+    ],
+)
+prefix_rule(
+    pattern=["git", "merge"],
+    decision="prompt",
+    justification="Use bash scripts/workflow/codex-git.sh merge-main; raw merge targets or flags require approval",
+    match=[
+        "git merge origin/main",
+        "git merge origin/main --no-verify",
+    ],
+)
+prefix_rule(pattern=["git", "worktree", "add"], decision="prompt", justification="Worktree creation paths and force flags require approval")
+
+# Discards, branch deletion, and manual worktree teardown.
 prefix_rule(pattern=["git", "reset"], decision="prompt", justification="Reset can discard commits or working-tree changes")
 prefix_rule(pattern=["git", "clean"], decision="prompt", justification="Clean can permanently delete untracked files")
 prefix_rule(pattern=["git", "restore"], decision="prompt", justification="Restore can discard working-tree changes")
@@ -36,7 +75,53 @@ prefix_rule(pattern=["gh", "pr", "checks"], decision="allow", justification="Rea
 prefix_rule(pattern=["gh", "pr", "diff"], decision="allow", justification="Read PinPoint pull request changes")
 prefix_rule(pattern=["gh", "run", "list"], decision="allow", justification="Read PinPoint workflow run status")
 prefix_rule(pattern=["gh", "run", "view"], decision="allow", justification="Read PinPoint workflow run details")
-prefix_rule(pattern=["gh", "pr", "merge"], decision="forbidden", justification="Use bash scripts/workflow/merge-pr.sh <PR> --human so Tim approves after gate checks")
+prefix_rule(
+    pattern=["gh", "pr", "merge"],
+    decision="forbidden",
+    justification="Use bash scripts/workflow/merge-pr.sh <PR> --human so Tim approves after gate checks",
+    match=[
+        "gh pr merge 2058",
+        "gh pr merge 2058 --repo timothyfroehlich/PinPoint",
+    ],
+)
+prefix_rule(
+    pattern=["gh", ["--repo", "-R"], "timothyfroehlich/PinPoint", "pr", "merge"],
+    decision="forbidden",
+    justification="Use bash scripts/workflow/merge-pr.sh <PR> --human so Tim approves after gate checks",
+    match=[
+        "gh --repo timothyfroehlich/PinPoint pr merge 2058",
+        "gh -R timothyfroehlich/PinPoint pr merge 2058",
+    ],
+)
+prefix_rule(
+    pattern=["gh", ["--repo=timothyfroehlich/PinPoint", "-R=timothyfroehlich/PinPoint", "-Rtimothyfroehlich/PinPoint"], "pr", "merge"],
+    decision="forbidden",
+    justification="Use bash scripts/workflow/merge-pr.sh <PR> --human so Tim approves after gate checks",
+    match=[
+        "gh --repo=timothyfroehlich/PinPoint pr merge 2058",
+        "gh -R=timothyfroehlich/PinPoint pr merge 2058",
+        "gh -Rtimothyfroehlich/PinPoint pr merge 2058",
+    ],
+)
+prefix_rule(
+    pattern=["gh", "api"],
+    decision="forbidden",
+    justification="Use typed GitHub tools or a gate-enforced workflow script; raw API calls can bypass PinPoint merge guards",
+    match=[
+        "gh api --method PUT repos/timothyfroehlich/PinPoint/pulls/2058/merge",
+        "gh api repos/timothyfroehlich/PinPoint/pulls/2058/merge -X PUT",
+    ],
+)
+prefix_rule(
+    pattern=["gh", ["--repo", "-R"], "timothyfroehlich/PinPoint", "api"],
+    decision="forbidden",
+    justification="Use typed GitHub tools or a gate-enforced workflow script; raw API calls can bypass PinPoint merge guards",
+)
+prefix_rule(
+    pattern=["gh", ["--repo=timothyfroehlich/PinPoint", "-R=timothyfroehlich/PinPoint", "-Rtimothyfroehlich/PinPoint"], "api"],
+    decision="forbidden",
+    justification="Use typed GitHub tools or a gate-enforced workflow script; raw API calls can bypass PinPoint merge guards",
+)
 
 # Trusted PinPoint workflow entry points and routine local validation.
 prefix_rule(pattern=["./scripts/workflow/pr-watch.py"], decision="allow", justification="Monitor a PinPoint pull request through the repository workflow")
