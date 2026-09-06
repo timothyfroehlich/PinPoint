@@ -1017,11 +1017,11 @@ export type RefreshPinballmapResult = Result<
  * Re-read what Pinball Map shows for the location — the control header's
  * Refresh button (spec 3.2, 8.3).
  *
- * Reading needs only page access, so this is gated on
- * `machines.pinballmap.sync`, which every signed-in member holds. That is safe
- * precisely because the rate limit does not depend on who asks: the token bucket
- * at the `syncLocationSnapshot` seam is global, so widening the audience widens
- * nobody's allowance (CORE-PBM-001). An empty bucket surfaces as `THROTTLED`,
+ * Manual reading requires signed-in membership plus page access, so this is
+ * gated on `machines.pinballmap.sync`, which every signed-in member holds. That
+ * is safe precisely because the rate limit does not depend on which eligible
+ * member asks: the token bucket at the `syncLocationSnapshot` seam is global
+ * (CORE-PBM-001). An empty bucket surfaces as `THROTTLED`,
  * which the header shows as a disabled button with a countdown rather than an
  * error nobody could have avoided.
  *
