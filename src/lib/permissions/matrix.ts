@@ -448,9 +448,9 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
         access: {
           unauthenticated: false,
           guest: false,
-          // Reading needs only page access (spec 8.3). A refresh writes nothing
-          // anywhere and is throttled globally regardless of who clicks, so the
-          // only thing a tighter gate protected was the button itself.
+          // Manual reads require signed-in membership plus page access (spec
+          // 8.3). A refresh writes nothing anywhere and remains globally
+          // throttled regardless of which eligible member clicks.
           member: true,
           technician: true,
           admin: true,

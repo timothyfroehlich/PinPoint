@@ -11,14 +11,14 @@ interface MachineTabStripProps {
     openCount: number;
     status: MachineStatus;
   };
-  /** Viewer holds `machines.edit` — see the Manage tab note below. */
-  canEdit: boolean;
+  /** Viewer may open Manage to edit the machine or read Pinball Map status. */
+  canManage: boolean;
 }
 
 export function MachineTabStrip({
   initials,
   maintenance,
-  canEdit,
+  canManage,
 }: MachineTabStripProps): React.JSX.Element {
   return (
     <RouteTabStrip
@@ -43,10 +43,10 @@ export function MachineTabStrip({
         // DIP switches, software settings, and Jones plugs. Calling this one
         // "Edit" invited "do I change availability in Edit or Settings?".
         //
-        // Permission-gated, and therefore LAST: appending it keeps every other
-        // tab at the same index for every role, so the strip doesn't reflow
-        // depending on who is looking at it.
-        ...(canEdit ? [{ slug: "edit", label: "Manage" }] : []),
+        // Access-gated, and therefore LAST: appending it keeps every other tab
+        // at the same index for every role. Editors get the full page; members
+        // without edit access get its read-only Pinball Map section (spec 4.9).
+        ...(canManage ? [{ slug: "edit", label: "Manage" }] : []),
       ]}
     />
   );
