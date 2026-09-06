@@ -32,6 +32,9 @@ KEY_VAL_RE = re.compile(r"^([A-Za-z0-9_-]+):\s*(.*)$")
 SKILL_NAME_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 MAX_NAME_LENGTH = 64
 MAX_DESCRIPTION_LENGTH = 1024
+ALLOWED_KEYS = frozenset(
+    {"name", "description", "license", "allowed-tools", "metadata"}
+)
 
 
 def extract_frontmatter(content: str) -> str | None:
@@ -125,6 +128,13 @@ def check_skill_file(skill_file: Path, config_path: Path | None = None) -> list[
         return errors
 
     assert data is not None
+
+    unexpected_keys = sorted(set(data.keys()) - ALLOWED_KEYS)
+    if unexpected_keys:
+        errors.append(
+            f"{skill_file}: Unsupported frontmatter key(s): {', '.join(unexpected_keys)} "
+            f"(allowed: {', '.join(sorted(ALLOWED_KEYS))})"
+        )
 
     if "name" not in data or data["name"] is None:
         errors.append(f"{skill_file}: Missing or empty 'name' in frontmatter")

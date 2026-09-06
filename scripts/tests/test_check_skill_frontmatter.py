@@ -284,6 +284,19 @@ def test_name_constraints(tmp_path: Path):
     assert any("lowercase alphanumeric characters and hyphens" in err for err in errors)
 
 
+def test_unsupported_frontmatter_key(tmp_path: Path):
+    skill_dir = tmp_path / "bad-key"
+    skill_dir.mkdir()
+    skill_file = skill_dir / "SKILL.md"
+    skill_file.write_text(
+        "---\nname: bad-key\ndescription: Valid description\nmetdata:\n  foo: bar\n---\n\n# Body\n",
+        encoding="utf-8",
+    )
+
+    errors = check_skill_file(skill_file, config_path=CONFIG_PATH)
+    assert any("Unsupported frontmatter key(s): metdata" in err for err in errors)
+
+
 def test_find_skill_files(tmp_path: Path):
     (tmp_path / "skill-a").mkdir()
     (tmp_path / "skill-a" / "SKILL.md").write_text("a", encoding="utf-8")
