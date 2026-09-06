@@ -85,8 +85,6 @@ EXPECTED_NODE_HOOK_BASENAMES = [
     "block-main-worktree-branch-switch.cjs",
     "ui-screenshot-reminder.cjs",
     "verify-guard-stack.cjs",
-    "subway-file-size.cjs",
-    "subway-bash-read.cjs",
 ]
 
 
