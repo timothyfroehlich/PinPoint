@@ -109,6 +109,7 @@ def test_every_agent_targets_the_same_single_tool_stdio_server():
     assert codex_server["command"] == "pnpm"
     assert codex_server["args"] == SERVER_ARGS
     assert codex_server["required"] is True
+    assert codex_server["startup_timeout_sec"] >= 120
     assert codex_server["tool_timeout_sec"] > 3600
     assert codex_server["enabled_tools"] == ["watch_pr_lifecycle"]
 
@@ -124,6 +125,20 @@ def test_every_agent_targets_the_same_single_tool_stdio_server():
         assert f"GH_MONITOR_HARNESS: {harness}" in frontmatter
         assert "GH_MONITOR_MODEL: unknown" in frontmatter
         assert 'GH_MONITOR_WAKES: "1"' in frontmatter
+
+    assert "mcpServers:\n  pr_lifecycle_watch:" in antigravity_frontmatter
+    assert "- name: pr_lifecycle_watch" not in antigravity_frontmatter
+
+
+def test_claude_project_permissions_allow_only_the_watcher_mcp_tool():
+    settings = json.loads((ROOT / ".claude/settings.json").read_text())
+    watcher_rules = [
+        rule
+        for rule in settings["permissions"]["allow"]
+        if rule.startswith("mcp__pr_lifecycle_watch")
+    ]
+
+    assert watcher_rules == ["mcp__pr_lifecycle_watch__watch_pr_lifecycle"]
 
 
 def test_agent_definitions_have_no_mutation_capable_watcher_command():

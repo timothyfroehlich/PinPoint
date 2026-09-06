@@ -7,8 +7,7 @@ subagent: true
 model: flash
 commandExecutionPolicy: off
 mcpServers:
-  - name: pr_lifecycle_watch
-    type: stdio
+  pr_lifecycle_watch:
     command: pnpm
     args:
       - exec

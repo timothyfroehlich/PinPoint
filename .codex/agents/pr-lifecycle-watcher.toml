@@ -15,7 +15,7 @@ Never inspect implementation, modify repository or GitHub state, request reviews
 command = "pnpm"
 args = ["exec", "tsx", "scripts/workflow/pr-watcher-mcp.ts"]
 required = true
-startup_timeout_sec = 30
+startup_timeout_sec = 120
 tool_timeout_sec = 3900
 enabled_tools = ["watch_pr_lifecycle"]
 
