@@ -1,0 +1,49 @@
+# PinPoint-local Codex permissions. This file is loaded only when the repository's
+# .codex layer is trusted. Keep external publication and destructive operations
+# review-gated; allow the routine development lifecycle inside this repository.
+
+# Routine Git mutations for user-authorized PinPoint development.
+prefix_rule(pattern=["git", "add"], decision="allow", justification="Stage PinPoint changes for the current task")
+prefix_rule(pattern=["git", "commit"], decision="allow", justification="Commit PinPoint changes for the current task")
+prefix_rule(pattern=["git", "push"], decision="allow", justification="Push the current PinPoint development branch")
+prefix_rule(pattern=["git", "checkout", "-b"], decision="allow", justification="Create a PinPoint development branch")
+prefix_rule(pattern=["git", "switch", "-c"], decision="allow", justification="Create a PinPoint development branch")
+prefix_rule(pattern=["git", "merge", "origin/main"], decision="allow", justification="Synchronize a PinPoint branch from origin/main without rebasing")
+prefix_rule(pattern=["git", "worktree", "add"], decision="allow", justification="Create an isolated PinPoint worktree")
+prefix_rule(pattern=["git", "stash", "push"], decision="allow", justification="Temporarily preserve PinPoint working-tree changes")
+prefix_rule(pattern=["git", "stash", "apply"], decision="allow", justification="Restore preserved PinPoint changes without deleting the stash")
+prefix_rule(pattern=["git", "stash", "pop"], decision="allow", justification="Restore preserved PinPoint changes")
+
+# History rewriting, discards, branch deletion, and manual worktree teardown.
+prefix_rule(pattern=["git", "commit", "--amend"], decision="prompt", justification="Amending rewrites existing commit history")
+prefix_rule(pattern=["git", "push", "--force"], decision="prompt", justification="Force-pushing rewrites remote history")
+prefix_rule(pattern=["git", "push", "-f"], decision="prompt", justification="Force-pushing rewrites remote history")
+prefix_rule(pattern=["git", "push", "--force-with-lease"], decision="prompt", justification="Force-pushing rewrites remote history")
+prefix_rule(pattern=["git", "reset"], decision="prompt", justification="Reset can discard commits or working-tree changes")
+prefix_rule(pattern=["git", "clean"], decision="prompt", justification="Clean can permanently delete untracked files")
+prefix_rule(pattern=["git", "restore"], decision="prompt", justification="Restore can discard working-tree changes")
+prefix_rule(pattern=["git", "checkout", "--"], decision="prompt", justification="Checkout with a path can discard working-tree changes")
+prefix_rule(pattern=["git", "branch", "-d"], decision="prompt", justification="Deleting a branch requires confirmation")
+prefix_rule(pattern=["git", "branch", "-D"], decision="prompt", justification="Force-deleting a branch requires confirmation")
+prefix_rule(pattern=["git", "worktree", "remove"], decision="prompt", justification="Use scripts/worktree_cleanup.py so worktree resources are released safely")
+prefix_rule(pattern=["git", "worktree", "prune"], decision="prompt", justification="Pruning worktree metadata requires confirmation")
+prefix_rule(pattern=["git", "stash", "drop"], decision="prompt", justification="Dropping a stash deletes preserved changes")
+prefix_rule(pattern=["git", "stash", "clear"], decision="prompt", justification="Clearing stashes deletes all preserved changes")
+
+# Read-only GitHub status used throughout the PR lifecycle.
+prefix_rule(pattern=["gh", "pr", "view"], decision="allow", justification="Read PinPoint pull request status")
+prefix_rule(pattern=["gh", "pr", "checks"], decision="allow", justification="Read PinPoint pull request checks")
+prefix_rule(pattern=["gh", "pr", "diff"], decision="allow", justification="Read PinPoint pull request changes")
+prefix_rule(pattern=["gh", "run", "list"], decision="allow", justification="Read PinPoint workflow run status")
+prefix_rule(pattern=["gh", "run", "view"], decision="allow", justification="Read PinPoint workflow run details")
+prefix_rule(pattern=["gh", "pr", "merge"], decision="forbidden", justification="Use bash scripts/workflow/merge-pr.sh <PR> --human so Tim approves after gate checks")
+
+# Trusted PinPoint workflow entry points and routine local validation.
+prefix_rule(pattern=["./scripts/workflow/pr-watch.py"], decision="allow", justification="Monitor a PinPoint pull request through the repository workflow")
+prefix_rule(pattern=["python3", "scripts/workflow/pr-watch.py"], decision="allow", justification="Monitor a PinPoint pull request through the repository workflow")
+prefix_rule(pattern=["bash", "scripts/workflow/merge-handoff.sh"], decision="allow", justification="Generate the read-only PinPoint merge handoff")
+prefix_rule(pattern=["bash", "scripts/workflow/request-codex-review.sh"], decision="allow", justification="Request the repository-required Codex review after CI")
+prefix_rule(pattern=["pnpm", "run", "check"], decision="allow", justification="Run PinPoint's static quality gate")
+prefix_rule(pattern=["pnpm", "run", "check:python"], decision="allow", justification="Run PinPoint's Python quality gate")
+prefix_rule(pattern=["pnpm", "run", "test"], decision="allow", justification="Run PinPoint's unit test suite")
+prefix_rule(pattern=["pnpm", "run", "preflight"], decision="allow", justification="Run PinPoint's preflight gate")
