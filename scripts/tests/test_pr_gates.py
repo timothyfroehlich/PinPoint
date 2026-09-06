@@ -460,6 +460,17 @@ def test_unusable_current_head_review_state_fails_closed(state: str) -> None:
     assert "without approval" in result.stdout
 
 
+@pytest.mark.parametrize("state", ["DISMISSED", "PENDING", "UNKNOWN"])
+def test_unusable_current_head_review_overrides_request_marker(state: str) -> None:
+    with gate_env(
+        review_pages=[[codex_review(state=state)]],
+        comment_pages=[[manual_review_request()]],
+    ) as env:
+        record = review_record(env)
+
+    assert record[:4] == ["not_approved", HEAD_SHA, CODEX_BOT, state]
+
+
 def test_delayed_old_head_review_does_not_override_current_native_approval() -> None:
     reviews = [
         codex_review(submitted_at="2026-08-22T12:00:00Z"),

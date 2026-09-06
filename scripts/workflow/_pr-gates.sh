@@ -170,6 +170,7 @@ _review_record() {
   local codex_sha codex_at comment_at
   codex=$(_codex_review_record "$@")
   codex_state=$(cut -f1 <<< "$codex")
+  codex_sha=$(cut -f2 <<< "$codex")
   # A current native approval already passes the gate. Do not spend a second
   # paginated GitHub request looking up a marker that cannot change that result.
   if [[ "$codex_state" == "approval" ]]; then
@@ -182,7 +183,6 @@ _review_record() {
   if [[ "$comment_state" == "marker" ]]; then
     printf '%s\n' "$comment"
   elif [[ "$comment_state" == "clean_comment" || "$comment_state" == "clean_reaction" ]]; then
-    codex_sha=$(cut -f2 <<< "$codex")
     codex_at=$(cut -f5 <<< "$codex")
     comment_at=$(cut -f5 <<< "$comment")
     if [[ "$codex_state" == "unreviewed" || "$codex_sha" != "$head" || "$comment_at" > "$codex_at" ]]; then
@@ -193,6 +193,10 @@ _review_record() {
   elif [[ "$codex_state" == "reviewed" ]]; then
     # A current-head native finding review is coverage. A delayed comment for an
     # older SHA cannot invalidate it; current clean comments were handled above.
+    printf '%s\n' "$codex"
+  elif [[ "$codex_state" == "not_approved" && "$codex_sha" == "$head" ]]; then
+    # A current-head unusable native review is actionable even when the durable
+    # request marker remains. Keep every workflow consumer fail-closed here.
     printf '%s\n' "$codex"
   elif [[ "$comment_state" == "review_requested" ]]; then
     # A request pinned to the current head is durable workflow state, not review
