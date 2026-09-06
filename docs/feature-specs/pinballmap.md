@@ -68,7 +68,7 @@ The control's states (§4) are comparisons across these: _in sync_ means intent 
 - **4.6** The remove confirmation shows the entry's comment count and states the consequence accurately: recoverable only by re-adding the game within Pinball Map's 7-day window (7.2), permanently lost after. If the stored lineup is over 5 minutes old, a fresh refresh runs and confirmation is blocked until the current count shows; if it fails, the last-known count and its age are shown and the person may proceed or cancel.
 - **4.7** Same-title cabinets: every intent-On cabinet shows the entry as its own (**Shared**, naming the others); an intent-Off cabinet whose siblings cover the entry shows **Covered**, quiet, with the covering cabinets linked. Sibling names always link to their machine pages.
 - **4.8** User-facing vocabulary: "listing" never appears — the object is an "entry", the set is the "lineup" (Pinball Map's word), comments are "comments", the read is "Refresh". "Sync" survives only in the relationship senses (Don't sync, Out of sync).
-- **4.9** A viewer without the machine-linking capability — machine owner, technician, or admin (8.1) — sees the header and both rows, never the status row's push actions; the toggle renders read-only. The header Refresh stays available to them (8.3).
+- **4.9** A signed-in member without the machine-linking capability sees the header and both rows, never the status row's push actions; the toggle renders read-only. The header Refresh stays available to them (8.3).
 - **4.10** In dense summary and table views (such as the fleet dashboard, `docs/feature-specs/fleet.md`), listing and sync states render as compact diagnostic badges:
   - **In sync**: green styling for `On`, `Off`, `Shared`, or `Covered`.
   - **Out of sync**: error/warning styling for `Missing` (intent On, absent from lineup) or `Lingering` (intent Off, present on lineup).
@@ -114,7 +114,7 @@ The control's states (§4) are comparisons across these: _in sync_ means intent 
 
 - **8.1** Setting intent (any toggle position) requires the machine-linking capability: machine owner, technician, or admin.
 - **8.2** Pushing to Pinball Map requires the machine-linking capability (8.1) plus provisioned operator credentials. Pinball Map itself is publicly editable, so gating writes tighter than PinPoint's own bookkeeping buys nothing. Absent credentials, push buttons are not shown.
-- **8.3** Reading status and the header Refresh require only page access (refreshes stay throttled regardless of who clicks, 3.2).
+- **8.3** Reading status in this control and using the header Refresh require signed-in membership plus machine-page access. Anonymous visitors and guests do not see the control. Refreshes stay throttled regardless of who clicks (3.2).
 
 ## 9. Conduct toward Pinball Map
 
@@ -166,7 +166,6 @@ Replacing the tracked location is a rare, near-never operation — PinPoint trac
 | Spec | Code today | Resolution |
 | :-- | :-- | :-- |
 | 7.1 comment fan-out | No comment import exists | PP-o355.4 (reshape to fan-out); PP-o355.36 depends on it |
-| 4.9 read-only viewer | No surface reaches it — the only page carrying the control is the Manage tab, which gates on `machines.edit` | PP-o355.38 |
 | 7.3 comment marking on removal | Not implemented | PP-o355.36 |
 | §10 admin section (whole surface) | No Pinball Map admin section exists — `src/app/(app)/admin/integrations/` has only the standalone Discord route. The section itself and every action in it — the location field, Sync now (§10.3), link-out (§10.4), clearing (§10.7), and the validate/commit + confirmation flow (§10.9, §10.15) — are unbuilt | PP-o355.51.6 |
 | 10.2 sync-health readout | Fields exist on `pinballmap_state`; nothing renders them in admin | PP-o355.51.6 |
@@ -181,6 +180,7 @@ Changes to this document. Divergence-table rows are working state and are not lo
 
 | Date | Change |
 | :-- | :-- |
+| 2026-09-06 | Restricted the read-only control and manual Refresh in §§4.9 and 8.3 to signed-in members; anonymous visitors and guests remain excluded. |
 | 2026-09-05 | Surfaced §10.9's validating fetch as an explicit admin-triggered **Check ID** step: look up first — the resolved venue previews the candidate in the field, not the live configuration — then Save, disabled until the lookup succeeds. Editing the id after a successful lookup re-disables Save (§10.9). Aligned §10.3/§10.13 terminology (Check ID lookup, not "validation") and §10.15 (the confirmation names both venues, not ids). Config-card design, PP-o355.51.6.2. |
 | 2026-09-05 | Defined the Edition Near-Miss concept (§1) and catalog matching rule (§2.6) for machines sharing a title family (`machineGroupId`) with differing editions. Defined dense diagnostic status badges (§4.10) and reconciled fleet-wide views to the `/fleet` dashboard (§10). |
 | 2026-08-27 | Named the machine edit form's source label for an uncataloged game as **Manual Entry**, keeping "uncataloged" as the concept and state name. Made all three manual-model fields optional and blank by default: the title is suggested rather than pre-filled, so leaving it blank keeps following a later rename, and a blank manufacturer or year reads as Unknown under its own label while the machine header omits blanks. Split the old "No model / Uncataloged" state in two — uncataloged now has no control at all, collapsing the section to one line while keeping its place so an abandoned entry still surfaces. Stated that line as a requirement — it names the section and why it is unavailable — rather than prescribing its wording. |
