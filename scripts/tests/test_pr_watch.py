@@ -1138,6 +1138,19 @@ def test_review_state_stale_approval(monkeypatch):
 
 
 @pytest.mark.unit
+def test_review_state_old_head_finding_is_stale_not_actionable(monkeypatch):
+    monkeypatch.setattr(
+        pr_watch,
+        "gh",
+        make_gh(reviews=[codex_review(OLD_SHA, state="CHANGES_REQUESTED")]),
+    )
+    state, detail = pr_watch.review_state(PR)
+    assert state == "stale_approval"
+    assert OLD_SHA[:7] in detail
+    assert HEAD_SHA[:7] in detail
+
+
+@pytest.mark.unit
 def test_review_state_current_head_finding_completes_review_coverage(monkeypatch):
     monkeypatch.setattr(
         pr_watch, "gh", make_gh(reviews=[codex_review(state="COMMENTED")])
@@ -1516,7 +1529,7 @@ def test_watch_phase_review_action_required_when_threads_unresolved(monkeypatch)
 @pytest.mark.unit
 def test_watch_phase_review_action_required_when_not_approved(monkeypatch):
     fake = make_gh(
-        reviews=[codex_review(OLD_SHA, state="CHANGES_REQUESTED")],
+        reviews=[codex_review(HEAD_SHA, state="PENDING")],
     )
     monkeypatch.setattr(pr_watch, "gh", fake)
     states = []
@@ -1533,6 +1546,43 @@ def test_watch_phase_review_action_required_when_not_approved(monkeypatch):
     assert last_args[1] == "action_required"
     assert last_kwargs.get("outcome") == "action_required"
     assert last_kwargs.get("review_state") == "not_approved"
+
+
+@pytest.mark.unit
+def test_watch_phase_review_keeps_old_head_finding_pending(monkeypatch):
+    fake = make_gh(
+        reviews=[codex_review(OLD_SHA, state="CHANGES_REQUESTED")],
+        threads=[{"isResolved": True}],
+    )
+    monkeypatch.setattr(pr_watch, "gh", fake)
+    states = []
+    reviews = iter(
+        [
+            ("stale_approval", "old-head finding"),
+            ("approval", "current-head approval"),
+        ]
+    )
+    monkeypatch.setattr(
+        pr_watch,
+        "review_state",
+        lambda _pr, *, head_sha: next(reviews),
+    )
+    monkeypatch.setattr(pr_watch.time, "sleep", lambda _seconds: None)
+
+    exit_code = pr_watch._watch_phase_review(
+        PR,
+        HEAD_SHA,
+        timeout_sec=10,
+        poll_sec=0,
+        state_sink=lambda *args, **kwargs: states.append((args, kwargs)),
+    )
+
+    assert exit_code == 0
+    assert any(
+        args[1] == "pending" and kwargs.get("review_state") == "stale_approval"
+        for args, kwargs in states
+    )
+    assert states[-1][0][1] == "passed"
 
 
 @pytest.mark.unit

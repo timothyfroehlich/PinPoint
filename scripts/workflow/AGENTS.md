@@ -106,11 +106,11 @@ Watcher run telemetry is recorded under `tmp/gh-monitor/watcher-run-<pr>-<phase>
 | `clean_reaction`       | Trusted workflow pins a fresh Codex `eyes`→`+1` transition to head         | PASS       |
 | `reviewed`             | `COMMENTED`/`CHANGES_REQUESTED` review pins head; threads own adjudication | PASS       |
 | `marker`               | Manual review marker pins the current head SHA                             | PASS       |
-| `stale_approval`       | Latest Codex approval names a different SHA                                | FAIL       |
+| `stale_approval`       | Latest native Codex review names a different SHA                           | FAIL       |
 | `stale_clean_comment`  | Trusted Codex clean comment names another SHA                              | FAIL       |
 | `stale_clean_reaction` | Trusted reaction witness names another SHA                                 | FAIL       |
 | `stale_marker`         | Manual review marker names a different SHA                                 | FAIL       |
-| `not_approved`         | Non-approval review is stale or unusable (`DISMISSED`/`PENDING`/unknown)   | FAIL       |
+| `not_approved`         | Current-head review is unusable (`DISMISSED`/`PENDING`/unknown)            | FAIL       |
 | `review_requested`     | Manual Codex request for head exists; exact-head result is pending         | FAIL       |
 | `unreviewed`           | Neither review path covers this PR                                         | FAIL       |
 

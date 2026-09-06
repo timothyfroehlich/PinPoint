@@ -909,15 +909,17 @@ def review_state(pr: int, *, head_sha: str | None = None) -> tuple[str, str]:
                 latest_comment_state,
                 f"review record pins {latest_comment_sha[:7]} but head is {head_sha[:7]}",
             )
-        if state == "APPROVED":
+        if review_sha != head_sha:
             return (
                 "stale_approval",
-                f"Codex approved {review_sha[:7]} but head is {head_sha[:7]} — "
+                f"Codex reviewed {review_sha[:7]} with {state}, but head is "
+                f"{head_sha[:7]} — "
                 f"{REVIEW_HINT.format(pr=pr)}",
             )
         return (
             "not_approved",
-            f"Codex last reviewed {review_sha[:7]} with {state}, not APPROVED; "
+            f"Codex reviewed current head {review_sha[:7]} with unusable state "
+            f"{state}; "
             f"{REVIEW_HINT.format(pr=pr)}",
         )
     if latest_marker_sha:

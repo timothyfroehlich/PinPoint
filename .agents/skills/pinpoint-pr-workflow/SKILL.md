@@ -378,7 +378,7 @@ Never say "ready to push when you are" — you push. Never say a PR is "merged" 
 
 **On any FAIL the script removes the `ready-for-review` label if present** (and likewise on the `--automerge` RED path). The label's contract is "click-merge-without-thinking"; if a gate fails at merge time that contract is broken, so the label goes. Practical consequence: after Tim reports a FAIL, fix the underlying issue, push, and **re-apply the label** (3.6) before re-handing him the `--human` command — don't assume it survived.
 
-**A `reviewed` FAIL is almost never a `--force` case.** `unreviewed` means neither path covers head, `stale_approval` / `stale_clean_comment` / `stale_marker` mean you pushed past the review record, and `not_approved` means the latest non-approval review covers another SHA — all describe an unfinished PR, not a broken gate. Take either honest path in 3.4 and cover head.
+**A `reviewed` FAIL is almost never a `--force` case.** `unreviewed` means neither path covers head, `stale_approval` / `stale_clean_comment` / `stale_marker` mean you pushed past the review record, and `not_approved` means the current-head review is unusable — all describe an unfinished PR, not a broken gate. Take either honest path in 3.4 and cover head.
 
 `--bypass-merge-requirements` is for a required check failing for known-irrelevant reasons (infrastructure flake, unrelated job) where the change has been manually verified safe — log the flake first with `bash scripts/workflow/log-gha-flake.sh <pr> <run-id> <class> "<symptom>"` (see `docs/runbooks/gha-flake-log.md`) — or an emergency hotfix where waiting for CI is not acceptable. Do NOT suggest bypassing when a merge conflict exists, or when the underlying state hasn't been manually verified.
 
