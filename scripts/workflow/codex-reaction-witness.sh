@@ -2,9 +2,9 @@
 # Witness a clean Codex review transition and pin it to the triggering PR head.
 #
 # A GitHub reaction has no commit SHA. This script is therefore run only from the
-# trusted pull_request_target workflow on main: it requires a fresh Codex `eyes`
-# reaction created after that head's review-trigger event, observes the transition to
-# `+1` without any head movement, then posts a SHA-pinned github-actions comment.
+# trusted issue_comment workflow on main: it requires the repository owner's exact
+# SHA-bound review request, then observes a fresh Codex `eyes` to `+1` transition
+# without any head movement and posts a SHA-pinned github-actions comment.
 
 set -euo pipefail
 
