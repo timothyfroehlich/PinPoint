@@ -84,6 +84,7 @@ class Scenario:
     clean_comment: bool = False
     clean_reaction: bool = False
     clean_reaction_sha: str = "head"
+    manual_fallback: bool = False
     manual_review: bool = False
     gh_head: str = "head"
     threads: list[dict] = field(default_factory=list)
@@ -211,6 +212,17 @@ def repo_with_pr(
                         "<!-- pinpoint-review-detail: medium -->\nreviewed"
                     ),
                     "updated_at": "2026-08-02T20:43:19Z",
+                }
+            )
+        if scenario.manual_fallback:
+            comments.append(
+                {
+                    "user": {"login": "acme"},
+                    "body": (
+                        "@codex review\n"
+                        f"<!-- pinpoint-codex-review-head: {head_sha} -->"
+                    ),
+                    "created_at": "2026-08-02T20:43:19Z",
                 }
             )
         if scenario.review is not None:
@@ -381,10 +393,25 @@ def test_an_unready_pr_gets_the_reason_instead_of_the_merge_command(
 
 
 def test_an_unreviewed_head_is_named_as_the_blocker() -> None:
-    """The one gate an agent cannot clear on its own — so it must be legible."""
+    """An unreviewed head names the bounded, single-fallback route."""
     with repo_with_pr(branch_changes={"src/lib/thing.ts": "x\n"}) as (_head, run):
         assert MERGE_CMD not in run.stdout, run.stdout
         assert "reviewed: unreviewed" in run.stdout
+        assert "after a conclusive bounded miss" in run.stdout
+        assert "post one @codex review" in run.stdout
+        assert "do not repeat it" in run.stdout
+        assert "restart automatic-first on a new head" in run.stdout
+
+
+def test_an_exhausted_fallback_is_not_recommended_again() -> None:
+    with repo_with_pr(
+        branch_changes={"src/lib/thing.ts": "x\n"},
+        scenario=Scenario(manual_fallback=True),
+    ) as (_head, run):
+        assert MERGE_CMD not in run.stdout, run.stdout
+        assert "reviewed: fallback_exhausted" in run.stdout
+        assert "do not post another" in run.stdout
+        assert "post one @codex review" not in run.stdout
 
 
 def test_the_report_always_offers_to_re_run_itself() -> None:
