@@ -6,7 +6,7 @@ if [[ $# -ne 1 || ! $1 =~ ^[0-9]+$ ]]; then
   exit 2
 fi
 
-readonly pr=$1
+readonly pr_number=$1
 script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 readonly script_dir
 # shellcheck source=scripts/workflow/_pr-gates.sh
@@ -20,17 +20,17 @@ if [[ "$actor" != "$owner" ]]; then
   exit 1
 fi
 
-metadata=$(gh pr view "$pr" --json headRefOid,isDraft,state,statusCheckRollup)
+metadata=$(gh pr view "$pr_number" --json headRefOid,isDraft,state,statusCheckRollup)
 head_sha=$(jq -r .headRefOid <<< "$metadata")
 pr_state=$(jq -r .state <<< "$metadata")
 is_draft=$(jq -r .isDraft <<< "$metadata")
 
 if [[ "$pr_state" != "OPEN" ]]; then
-  echo "BLOCK: review request: PR #${pr} is ${pr_state}, not OPEN" >&2
+  echo "BLOCK: review request: PR #${pr_number} is ${pr_state}, not OPEN" >&2
   exit 1
 fi
 if [[ "$is_draft" == "true" ]]; then
-  echo "BLOCK: review request: PR #${pr} is draft; wait for current-head CI, then mark it ready" >&2
+  echo "BLOCK: review request: PR #${pr_number} is draft; wait for current-head CI, then mark it ready" >&2
   exit 1
 fi
 
@@ -53,7 +53,7 @@ case "$ci_conclusion" in
     ;;
 esac
 
-review_record=$(_review_record "$pr" "$owner_repo" "$head_sha")
+review_record=$(_review_record "$pr_number" "$owner_repo" "$head_sha")
 review_state=$(cut -f1 <<< "$review_record")
 case "$review_state" in
   approval | clean_comment | clean_reaction | reviewed | marker)
@@ -66,13 +66,13 @@ case "$review_state" in
     ;;
 esac
 
-latest_head=$(gh pr view "$pr" --json headRefOid --jq .headRefOid)
+latest_head=$(gh pr view "$pr_number" --json headRefOid --jq .headRefOid)
 if [[ "$latest_head" != "$head_sha" ]]; then
   echo "BLOCK: review request: PR head moved from ${head_sha:0:7} to ${latest_head:0:7}; re-check CI" >&2
   exit 1
 fi
 
 body=$(printf '@codex review\n<!-- pinpoint-codex-review-head: %s -->' "$head_sha")
-url=$(gh api --method POST "repos/${owner_repo}/issues/${pr}/comments" -f "body=${body}" --jq .html_url)
-echo "PASS: review request: requested Codex review for PR #${pr} head ${head_sha:0:7}"
+url=$(gh api --method POST "repos/${owner_repo}/issues/${pr_number}/comments" -f "body=${body}" --jq .html_url)
+echo "PASS: review request: requested Codex review for PR #${pr_number} head ${head_sha:0:7}"
 echo "  ${url}"

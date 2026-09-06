@@ -115,6 +115,7 @@ def test_requests_sha_bound_review_after_green_ci(tmp_path: Path) -> None:
     result, posts = run_request(tmp_path)
 
     assert result.returncode == 0, result.stderr
+    assert result.stderr == ""
     assert posts == [f"@codex review\n<!-- pinpoint-codex-review-head: {HEAD} -->"]
     assert f"head {HEAD[:7]}" in result.stdout
 
