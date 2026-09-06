@@ -101,15 +101,18 @@ Watching CI and awaiting review are passive waits. To conserve token quota and c
 
 #### Recommended Watcher Models
 
-| Harness         | Subagent Tool     | Recommended Model                                                        | Invocation Shape                                                                                                                |
-| :-------------- | :---------------- | :----------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------ |
-| **Claude Code** | `Agent`           | `haiku`                                                                  | `Agent(subagent_type: "general-purpose", model: "haiku", prompt: "...")`                                                        |
-| **Antigravity** | `invoke_subagent` | `flash_lite` (or `flash`)                                                | `invoke_subagent(Subagents: [{TypeName: "self", Role: "PR Lifecycle Watcher", Model: "flash_lite", Prompt: "..."}])`            |
-| **Codex**       | `spawn_agent`     | Prefer `gpt-5.3-codex-spark`; otherwise the fastest callable model shown | `spawn_agent(task_name: "pr_watch", fork_turns: "none", model: "<resolved-model-id>", reasoning_effort: "low", message: "...")` |
+| Harness         | Subagent Tool     | Recommended Model                                                        | Invocation Shape                                                                                                     |
+| :-------------- | :---------------- | :----------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------- |
+| **Claude Code** | `Agent`           | `haiku`                                                                  | `Agent(subagent_type: "general-purpose", model: "haiku", prompt: "...")`                                             |
+| **Antigravity** | `invoke_subagent` | `flash_lite` (or `flash`)                                                | `invoke_subagent(Subagents: [{TypeName: "self", Role: "PR Lifecycle Watcher", Model: "flash_lite", Prompt: "..."}])` |
+| **Codex**       | `spawn_agent`     | Prefer `gpt-5.3-codex-spark`; otherwise the fastest callable model shown | `spawn_agent(task_name: "pr_watch", fork_turns: "none", message: "...")`                                             |
 
 Model availability is a runtime capability, not a name this skill may invent. In
 Codex, use Spark only when `spawn_agent` lists it as a supported override; otherwise
-choose the fastest advertised callable model and record that exact resolved ID.
+choose the fastest advertised callable model. Pass `model` and `reasoning_effort` only
+when the current tool schema exposes those fields; older Codex harnesses accept only
+the required context-isolation and message fields. Record the exact model ID reported
+by the harness in telemetry, or `unknown` when the harness exposes no resolved ID.
 
 #### Division of Responsibilities
 
@@ -188,7 +191,7 @@ After current-head CI succeeds and the PR is ready:
    ```
 
 3. **Handling the review result**:
-   - `outcome: "passed"` (exit 0): Exact-head review coverage present (native approval, clean reaction witness, clean comment, marker, or reviewed) AND 0 unresolved threads. Proceed to UI screenshots (Phase 4) and merge handoff (Phase 5).
+   - `outcome: "passed"` (exit 0): Exact-head review coverage present (native approval, clean reaction witness, clean comment, marker, or reviewed) AND 0 unresolved threads. Proceed to UI screenshots in 3.5, apply the `ready-for-review` label in 3.6, then enter the Phase 4 merge handoff.
    - `outcome: "action_required"` (exit 1): Either exact-head review present but unresolved threads remain (>0), or review was `not_approved`. The owner adjudicates findings: fixes code or replies to/declines threads, then resolves them. If code changed, push and re-start at Phase 3.1. If all threads were resolved with no code change, exact-head coverage is complete.
    - `outcome: "stale"` (exit 1): Branch head moved; re-orient to the new head.
    - `outcome: "conflicting"` (exit 1): Merge conflict; merge `main` and push.
