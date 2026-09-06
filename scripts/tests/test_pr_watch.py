@@ -6,7 +6,7 @@ is supersession rather than failure, while an API outage is undetermined rather
 than a fabricated red result. Detailed run logs are fetched only after the
 aggregate gate has conclusively failed. (PP-r63o, PP-qkl8)
 
-Review state: `--check-ready` reports which automatic Codex-review state a PR is
+Review state: `--check-ready` reports which Codex-review state a PR is
 in without gating on it — "reviewed", "reviewed then pushed past", and "not yet
 reviewed" need different actions, and flattening a stale approval into "reviewed"
 is how a commit nobody read reaches the merge command.
@@ -17,6 +17,7 @@ reach GitHub (CORE-TEST-006).
 
 import importlib.util
 import json
+import os
 import re
 import subprocess
 import sys
@@ -173,6 +174,21 @@ def make_gh(
                     {
                         "headRefOid": HEAD_SHA,
                         "statusCheckRollup": list(rollup),
+                    }
+                )
+            if fields == "headRefOid,statusCheckRollup,mergeStateStatus":
+                return json.dumps(
+                    {
+                        "headRefOid": HEAD_SHA,
+                        "statusCheckRollup": list(rollup),
+                        "mergeStateStatus": merge_state,
+                    }
+                )
+            if fields == "headRefOid,mergeStateStatus":
+                return json.dumps(
+                    {
+                        "headRefOid": HEAD_SHA,
+                        "mergeStateStatus": merge_state,
                     }
                 )
             if fields == "statusCheckRollup":
@@ -382,20 +398,51 @@ def test_pre_check_reports_unresolved_threads_without_blocking(monkeypatch, caps
     assert "1 unresolved review thread(s)" in capsys.readouterr().out
 
 
+@pytest.mark.unit
+def test_pre_check_allows_behind_merge_state(monkeypatch):
+    monkeypatch.setattr(
+        pr_watch,
+        "gh",
+        make_gh(rollup=[_gate("SUCCESS")], merge_state="BEHIND"),
+    )
+    ok, reason, _action_item = pr_watch._pre_check_blocking(PR)
+    assert ok, reason
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("merge_state", ["DIRTY", "CONFLICTING"])
+def test_pre_check_blocks_on_conflicting_merge_state(monkeypatch, merge_state):
+    monkeypatch.setattr(
+        pr_watch,
+        "gh",
+        make_gh(rollup=[_gate("SUCCESS")], merge_state=merge_state),
+    )
+    ok, reason, _action_item = pr_watch._pre_check_blocking(PR)
+    assert not ok
+    assert f"merge state {merge_state}" in reason
+
+
 # ---------------------------------------------------------------------------
 # Aggregate CI Gate watcher — one exact-head query per interval
 # ---------------------------------------------------------------------------
 
 
-def snapshot_gh(snapshots):
+def snapshot_gh(snapshots, merge_state="CLEAN"):
     """Return snapshots in sequence and record every remote call."""
     remaining = list(snapshots)
 
     def fake_gh(*args: str) -> str:
         fake_gh.calls.append(args)
         assert args[:2] == ("pr", "view"), args
-        assert args[4] == "headRefOid,statusCheckRollup", args
+        if args[4] == "mergeStateStatus,labels":
+            return json.dumps({"mergeStateStatus": merge_state, "labels": []})
+        assert args[4] in {
+            "headRefOid,statusCheckRollup",
+            "headRefOid,statusCheckRollup,mergeStateStatus",
+        }, args
         snapshot = remaining.pop(0) if len(remaining) > 1 else remaining[0]
+        if args[4] == "headRefOid,statusCheckRollup,mergeStateStatus":
+            snapshot = {**snapshot, "mergeStateStatus": merge_state}
         return json.dumps(snapshot)
 
     fake_gh.calls = []
@@ -867,7 +914,7 @@ def test_codex_login_is_identical_to_the_bash_gate():
         "stale_clean_reaction",
         "stale_marker",
         "not_approved",
-        "fallback_exhausted",
+        "review_requested",
         "unreviewed",
     ],
 )
@@ -881,35 +928,31 @@ def test_review_state_unreviewed(monkeypatch):
     monkeypatch.setattr(pr_watch, "gh", make_gh(reviews=()))
     state, detail = pr_watch.review_state(PR)
     assert state == "unreviewed"
-    assert "automatic Codex review" in detail
-    assert "bounded witness conclusively ends" in detail
-    assert "post one @codex review" in detail
-    assert "never repeat it" in detail
-    assert "slow or running attempt is not eligible" in detail
-    assert "new head restarts automatic-first" in detail
+    assert "request-codex-review.sh" in detail
+    assert "replacement CI and one new request" in detail
 
 
 @pytest.mark.unit
-def test_review_state_reports_current_head_fallback_as_exhausted(monkeypatch):
+def test_review_state_reports_current_head_request_as_pending(monkeypatch):
     monkeypatch.setattr(pr_watch, "gh", make_gh(comments=[manual_review_request()]))
     state, detail = pr_watch.review_state(PR)
-    assert state == "fallback_exhausted"
-    assert "already used" in detail
-    assert "do not post another" in detail
+    assert state == "review_requested"
+    assert "already requested" in detail
+    assert "do not request the same head again" in detail
 
 
 @pytest.mark.unit
 @pytest.mark.parametrize(
-    "fallback_comment",
+    "review_request_comment",
     [manual_review_request(OLD_SHA), manual_review_request(login="someone-else")],
 )
-def test_review_state_does_not_exhaust_for_old_or_untrusted_request(
-    monkeypatch, fallback_comment
+def test_review_state_ignores_old_or_untrusted_request(
+    monkeypatch, review_request_comment
 ):
-    monkeypatch.setattr(pr_watch, "gh", make_gh(comments=[fallback_comment]))
+    monkeypatch.setattr(pr_watch, "gh", make_gh(comments=[review_request_comment]))
     state, detail = pr_watch.review_state(PR)
     assert state == "unreviewed"
-    assert "post one @codex review" in detail
+    assert "request-codex-review.sh" in detail
 
 
 @pytest.mark.unit
@@ -1095,6 +1138,19 @@ def test_review_state_stale_approval(monkeypatch):
 
 
 @pytest.mark.unit
+def test_review_state_old_head_finding_is_stale_not_actionable(monkeypatch):
+    monkeypatch.setattr(
+        pr_watch,
+        "gh",
+        make_gh(reviews=[codex_review(OLD_SHA, state="CHANGES_REQUESTED")]),
+    )
+    state, detail = pr_watch.review_state(PR)
+    assert state == "stale_approval"
+    assert OLD_SHA[:7] in detail
+    assert HEAD_SHA[:7] in detail
+
+
+@pytest.mark.unit
 def test_review_state_current_head_finding_completes_review_coverage(monkeypatch):
     monkeypatch.setattr(
         pr_watch, "gh", make_gh(reviews=[codex_review(state="COMMENTED")])
@@ -1105,8 +1161,19 @@ def test_review_state_current_head_finding_completes_review_coverage(monkeypatch
 @pytest.mark.unit
 @pytest.mark.parametrize("state", ["DISMISSED", "PENDING", "UNKNOWN"])
 def test_review_state_unusable_current_head_state_fails_closed(monkeypatch, state):
-    monkeypatch.setattr(pr_watch, "gh", make_gh(reviews=[codex_review(state=state)]))
-    assert pr_watch.review_state(PR)[0] == "not_approved"
+    monkeypatch.setattr(
+        pr_watch,
+        "gh",
+        make_gh(
+            reviews=[codex_review(state=state)],
+            comments=[manual_review_request()],
+        ),
+    )
+    review_state, detail = pr_watch.review_state(PR)
+    assert review_state == "not_approved"
+    assert "already requested" in detail
+    assert "do not request the same head again" in detail
+    assert "request-codex-review.sh" not in detail
 
 
 @pytest.mark.unit
@@ -1186,3 +1253,679 @@ def test_run_audit_still_fails_on_unresolved_threads(monkeypatch, capsys):
     )
     assert pr_watch.run_audit(PR) is False
     assert "✗ threads-resolved: 1 unresolved" in capsys.readouterr().out
+
+
+# ---------------------------------------------------------------------------
+# Delegated watcher lifecycle (PP-cf0x)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+def test_parse_args_phase_expected_head_and_json():
+    parsed = pr_watch._parse_args(["pr-watch.py", "1734"])
+    assert parsed is not None
+    assert parsed.pr == 1734
+    assert parsed.phase is None
+    assert parsed.expected_head is None
+    assert parsed.json_mode is False
+
+    parsed_ci = pr_watch._parse_args(
+        ["pr-watch.py", "1734", "--phase", "ci", "--expected-head", HEAD_SHA, "--json"]
+    )
+    assert parsed_ci is not None
+    assert parsed_ci.pr == 1734
+    assert parsed_ci.phase == "ci"
+    assert parsed_ci.expected_head == HEAD_SHA
+    assert parsed_ci.json_mode is True
+
+    parsed_rev = pr_watch._parse_args(
+        [
+            "pr-watch.py",
+            "1734",
+            "--phase=review",
+            f"--expected-head={HEAD_SHA}",
+            "--json",
+        ]
+    )
+    assert parsed_rev is not None
+    assert parsed_rev.phase == "review"
+    assert parsed_rev.expected_head == HEAD_SHA
+
+    # Usage errors
+    assert pr_watch._parse_args(["pr-watch.py", "1734", "--phase", "unknown"]) is None
+    assert pr_watch._parse_args(["pr-watch.py", "1734", "--phase"]) is None
+    assert pr_watch._parse_args(["pr-watch.py", "1734", "--expected-head"]) is None
+    assert pr_watch._parse_args(["pr-watch.py", "1734", "--unknown-flag"]) is None
+    assert pr_watch._parse_args(["pr-watch.py", "1734", "--json"]) is None
+    assert (
+        pr_watch._parse_args(
+            ["pr-watch.py", "1734", "--phase", "ci", "--expected-head", HEAD_SHA]
+        )
+        is None
+    )
+    assert (
+        pr_watch._parse_args(
+            [
+                "pr-watch.py",
+                "1734",
+                "--phase",
+                "ci",
+                "--expected-head",
+                HEAD_SHA[:10],
+                "--json",
+            ]
+        )
+        is None
+    )
+
+
+@pytest.mark.unit
+def test_phase_monitor_paths_isolate_ci_and_review(tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path))
+    lock_default, state_default = pr_watch._monitor_paths(PR)
+    lock_ci, state_ci = pr_watch._monitor_paths(PR, phase="ci")
+    lock_review, state_review = pr_watch._monitor_paths(PR, phase="review")
+    lock_ci_head, state_ci_head = pr_watch._monitor_paths(
+        PR, phase="ci", expected_head=HEAD_SHA
+    )
+
+    assert lock_default != lock_ci != lock_review != lock_ci_head
+    assert "-ci.lock" in lock_ci.name
+    assert "-review.lock" in lock_review.name
+    assert f"-ci-{HEAD_SHA[:10]}.lock" in lock_ci_head.name
+    assert "-ci.json" in state_ci.name
+    assert "-review.json" in state_review.name
+    assert f"-ci-{HEAD_SHA[:10]}.json" in state_ci_head.name
+
+
+@pytest.mark.unit
+def test_watch_phase_ci_passes_on_matching_head_and_success_gate(monkeypatch):
+    fake = snapshot_gh([ci_snapshot(gate=_gate("SUCCESS"))])
+    monkeypatch.setattr(pr_watch, "gh", fake)
+    states = []
+
+    exit_code = pr_watch._watch_phase_ci(
+        PR,
+        HEAD_SHA,
+        timeout_sec=10,
+        poll_sec=0,
+        state_sink=lambda *args, **kwargs: states.append((args, kwargs)),
+    )
+    assert exit_code == 0
+    assert len(states) >= 1
+    last_args, last_kwargs = states[-1]
+    assert last_args[0] == HEAD_SHA
+    assert last_args[1] == "passed"
+    assert last_kwargs.get("outcome") == "passed"
+    assert last_kwargs.get("ci_gate") == "SUCCESS"
+    assert [call[4] for call in fake.calls] == [
+        "headRefOid,statusCheckRollup,mergeStateStatus"
+    ]
+
+
+@pytest.mark.unit
+def test_watch_phase_ci_fails_on_failure_gate(monkeypatch):
+    fake = snapshot_gh([ci_snapshot(gate=_gate("FAILURE"))])
+    monkeypatch.setattr(pr_watch, "gh", fake)
+    monkeypatch.setattr(pr_watch, "_failed_ci_run_id", lambda _sha, _url: None)
+    states = []
+
+    exit_code = pr_watch._watch_phase_ci(
+        PR,
+        HEAD_SHA,
+        timeout_sec=10,
+        poll_sec=0,
+        state_sink=lambda *args, **kwargs: states.append((args, kwargs)),
+    )
+    assert exit_code == 1
+    last_args, last_kwargs = states[-1]
+    assert last_args[1] == "failed"
+    assert last_kwargs.get("outcome") == "failed"
+    assert last_kwargs.get("ci_gate") == "FAILURE"
+
+
+@pytest.mark.unit
+def test_watch_phase_ci_reports_abandoned_superseded_gate_as_undetermined(monkeypatch):
+    fake = snapshot_gh([ci_snapshot(gate=_gate("CANCELLED"))])
+    monkeypatch.setattr(pr_watch, "gh", fake)
+    monkeypatch.setattr(pr_watch, "SUPERSEDED_GATE_GRACE", 0)
+    monkeypatch.setattr(pr_watch.time, "sleep", lambda _seconds: None)
+    states = []
+
+    exit_code = pr_watch._watch_phase_ci(
+        PR,
+        HEAD_SHA,
+        timeout_sec=10,
+        poll_sec=0,
+        state_sink=lambda *args, **kwargs: states.append((args, kwargs)),
+    )
+
+    assert exit_code == pr_watch.EXIT_UNDETERMINED
+    last_args, last_kwargs = states[-1]
+    assert last_args[1] == "undetermined"
+    assert last_kwargs.get("outcome") == "undetermined"
+    assert last_kwargs.get("ci_gate") == "CANCELLED"
+
+
+@pytest.mark.unit
+def test_watch_phase_ci_exits_stale_when_head_moves(monkeypatch):
+    fake = snapshot_gh([ci_snapshot(head=OLD_SHA, gate=_gate("SUCCESS"))])
+    monkeypatch.setattr(pr_watch, "gh", fake)
+    states = []
+
+    exit_code = pr_watch._watch_phase_ci(
+        PR,
+        HEAD_SHA,
+        timeout_sec=10,
+        poll_sec=0,
+        state_sink=lambda *args, **kwargs: states.append((args, kwargs)),
+    )
+    assert exit_code == 1
+    last_args, last_kwargs = states[-1]
+    assert last_args[0] == OLD_SHA
+    assert last_args[1] == "stale"
+    assert last_kwargs.get("outcome") == "stale"
+
+
+@pytest.mark.unit
+def test_watch_phase_ci_exits_conflicting_on_dirty_merge(monkeypatch):
+    fake = snapshot_gh(
+        [ci_snapshot(gate=_gate("", status="IN_PROGRESS"))],
+        merge_state="DIRTY",
+    )
+    monkeypatch.setattr(pr_watch, "gh", fake)
+    states = []
+
+    exit_code = pr_watch._watch_phase_ci(
+        PR,
+        HEAD_SHA,
+        timeout_sec=10,
+        poll_sec=0,
+        state_sink=lambda *args, **kwargs: states.append((args, kwargs)),
+    )
+    assert exit_code == 1
+    last_args, last_kwargs = states[-1]
+    assert last_args[1] == "conflicting"
+    assert last_kwargs.get("outcome") == "conflicting"
+    assert last_kwargs.get("merge_state") == "DIRTY"
+
+
+@pytest.mark.unit
+def test_watch_phase_ci_times_out(monkeypatch):
+    fake = snapshot_gh([ci_snapshot(gate=_gate("", status="IN_PROGRESS"))])
+    monkeypatch.setattr(pr_watch, "gh", fake)
+    states = []
+
+    exit_code = pr_watch._watch_phase_ci(
+        PR,
+        HEAD_SHA,
+        timeout_sec=0,
+        poll_sec=0,
+        state_sink=lambda *args, **kwargs: states.append((args, kwargs)),
+    )
+    assert exit_code == pr_watch.EXIT_UNDETERMINED
+    last_args, last_kwargs = states[-1]
+    assert last_args[1] == "timed_out"
+    assert last_kwargs.get("outcome") == "timed_out"
+
+
+@pytest.mark.unit
+def test_watch_phase_ci_undetermined_on_api_error(monkeypatch):
+    def bad_gh(*_args):
+        raise RuntimeError("network down")
+
+    monkeypatch.setattr(pr_watch, "gh", bad_gh)
+    states = []
+
+    exit_code = pr_watch._watch_phase_ci(
+        PR,
+        HEAD_SHA,
+        timeout_sec=10,
+        poll_sec=0,
+        state_sink=lambda *args, **kwargs: states.append((args, kwargs)),
+    )
+    assert exit_code == pr_watch.EXIT_UNDETERMINED
+    last_args, last_kwargs = states[-1]
+    assert last_args[1] == "undetermined"
+    assert last_kwargs.get("outcome") == "undetermined"
+
+
+@pytest.mark.unit
+def test_watch_phase_ci_undetermined_when_merge_state_stays_unknown(monkeypatch):
+    fake = snapshot_gh([ci_snapshot(gate=_gate("SUCCESS"))], merge_state="UNKNOWN")
+    monkeypatch.setattr(pr_watch, "gh", fake)
+    monkeypatch.setattr(pr_watch.time, "sleep", lambda _seconds: None)
+    states = []
+
+    exit_code = pr_watch._watch_phase_ci(
+        PR,
+        HEAD_SHA,
+        timeout_sec=10,
+        poll_sec=0,
+        state_sink=lambda *args, **kwargs: states.append((args, kwargs)),
+    )
+
+    assert exit_code == pr_watch.EXIT_UNDETERMINED
+    last_args, last_kwargs = states[-1]
+    assert last_args[1] == "undetermined"
+    assert last_kwargs.get("outcome") == "undetermined"
+    assert last_kwargs.get("merge_state") == "UNKNOWN"
+
+
+@pytest.mark.unit
+def test_watch_phase_review_passes_when_approved_and_zero_threads(monkeypatch):
+    fake = make_gh(
+        reviews=[codex_review(HEAD_SHA, state="APPROVED")],
+        threads=[{"isResolved": True}],
+    )
+    monkeypatch.setattr(pr_watch, "gh", fake)
+    states = []
+
+    exit_code = pr_watch._watch_phase_review(
+        PR,
+        HEAD_SHA,
+        timeout_sec=10,
+        poll_sec=0,
+        state_sink=lambda *args, **kwargs: states.append((args, kwargs)),
+    )
+    assert exit_code == 0
+    last_args, last_kwargs = states[-1]
+    assert last_args[0] == HEAD_SHA
+    assert last_args[1] == "passed"
+    assert last_kwargs.get("outcome") == "passed"
+    assert last_kwargs.get("review_state") == "approval"
+    assert last_kwargs.get("unresolved_threads") == 0
+
+
+@pytest.mark.unit
+def test_watch_phase_review_action_required_when_threads_unresolved(monkeypatch):
+    fake = make_gh(
+        reviews=[codex_review(HEAD_SHA, state="APPROVED")],
+        threads=[{"isResolved": False}],
+    )
+    monkeypatch.setattr(pr_watch, "gh", fake)
+    states = []
+
+    exit_code = pr_watch._watch_phase_review(
+        PR,
+        HEAD_SHA,
+        timeout_sec=10,
+        poll_sec=0,
+        state_sink=lambda *args, **kwargs: states.append((args, kwargs)),
+    )
+    assert exit_code == 1
+    last_args, last_kwargs = states[-1]
+    assert last_args[1] == "action_required"
+    assert last_kwargs.get("outcome") == "action_required"
+    assert last_kwargs.get("unresolved_threads") == 1
+
+
+@pytest.mark.unit
+def test_watch_phase_review_revalidates_threads_before_passing(monkeypatch):
+    fake = make_gh(reviews=[codex_review(HEAD_SHA, state="APPROVED")])
+    monkeypatch.setattr(pr_watch, "gh", fake)
+    thread_snapshots = iter(
+        [
+            [{"isResolved": True}],
+            [{"isResolved": False}],
+        ]
+    )
+    monkeypatch.setattr(
+        pr_watch,
+        "get_review_threads",
+        lambda _pr: next(thread_snapshots),
+    )
+    states = []
+
+    exit_code = pr_watch._watch_phase_review(
+        PR,
+        HEAD_SHA,
+        timeout_sec=10,
+        poll_sec=0,
+        state_sink=lambda *args, **kwargs: states.append((args, kwargs)),
+    )
+
+    assert exit_code == 1
+    last_args, last_kwargs = states[-1]
+    assert last_args[1] == "action_required"
+    assert last_kwargs.get("unresolved_threads") == 1
+
+
+@pytest.mark.unit
+def test_watch_phase_review_action_required_when_not_approved(monkeypatch):
+    fake = make_gh(
+        reviews=[codex_review(HEAD_SHA, state="PENDING")],
+    )
+    monkeypatch.setattr(pr_watch, "gh", fake)
+    states = []
+
+    exit_code = pr_watch._watch_phase_review(
+        PR,
+        HEAD_SHA,
+        timeout_sec=10,
+        poll_sec=0,
+        state_sink=lambda *args, **kwargs: states.append((args, kwargs)),
+    )
+    assert exit_code == 1
+    last_args, last_kwargs = states[-1]
+    assert last_args[1] == "action_required"
+    assert last_kwargs.get("outcome") == "action_required"
+    assert last_kwargs.get("review_state") == "not_approved"
+
+
+@pytest.mark.unit
+def test_watch_phase_review_timeout_preserves_last_observed_state(monkeypatch):
+    monkeypatch.setattr(
+        pr_watch,
+        "_current_head_merge_snapshot",
+        lambda _pr: (HEAD_SHA, "CLEAN"),
+    )
+    monkeypatch.setattr(
+        pr_watch,
+        "review_state",
+        lambda _pr, *, head_sha: ("review_requested", "already requested"),
+    )
+    monotonic_values = iter([0.0, 0.0, 1.0])
+    monkeypatch.setattr(pr_watch.time, "monotonic", lambda: next(monotonic_values))
+    monkeypatch.setattr(pr_watch.time, "sleep", lambda _seconds: None)
+    states = []
+
+    exit_code = pr_watch._watch_phase_review(
+        PR,
+        HEAD_SHA,
+        timeout_sec=0.5,
+        poll_sec=0,
+        state_sink=lambda *args, **kwargs: states.append((args, kwargs)),
+    )
+
+    assert exit_code == pr_watch.EXIT_UNDETERMINED
+    last_args, last_kwargs = states[-1]
+    assert last_args[1] == "timed_out"
+    assert last_kwargs.get("outcome") == "timed_out"
+    assert last_kwargs.get("review_state") == "review_requested"
+    assert last_kwargs.get("merge_state") == "CLEAN"
+
+
+@pytest.mark.unit
+def test_watch_phase_review_keeps_old_head_finding_pending(monkeypatch):
+    fake = make_gh(
+        reviews=[codex_review(OLD_SHA, state="CHANGES_REQUESTED")],
+        threads=[{"isResolved": True}],
+    )
+    monkeypatch.setattr(pr_watch, "gh", fake)
+    states = []
+    reviews = iter(
+        [
+            ("stale_approval", "old-head finding"),
+            ("approval", "current-head approval"),
+            ("approval", "current-head approval revalidated"),
+        ]
+    )
+    monkeypatch.setattr(
+        pr_watch,
+        "review_state",
+        lambda _pr, *, head_sha: next(reviews),
+    )
+    monkeypatch.setattr(pr_watch.time, "sleep", lambda _seconds: None)
+
+    exit_code = pr_watch._watch_phase_review(
+        PR,
+        HEAD_SHA,
+        timeout_sec=10,
+        poll_sec=0,
+        state_sink=lambda *args, **kwargs: states.append((args, kwargs)),
+    )
+
+    assert exit_code == 0
+    assert any(
+        args[1] == "pending" and kwargs.get("review_state") == "stale_approval"
+        for args, kwargs in states
+    )
+    assert states[-1][0][1] == "passed"
+
+
+@pytest.mark.unit
+def test_watch_phase_review_exits_stale_when_head_moves(monkeypatch):
+    fake = make_gh()
+    monkeypatch.setattr(pr_watch, "gh", fake)
+    states = []
+
+    # PR head in fake_gh is HEAD_SHA, but watcher expects OLD_SHA
+    exit_code = pr_watch._watch_phase_review(
+        PR,
+        OLD_SHA,
+        timeout_sec=10,
+        poll_sec=0,
+        state_sink=lambda *args, **kwargs: states.append((args, kwargs)),
+    )
+    assert exit_code == 1
+    last_args, last_kwargs = states[-1]
+    assert last_args[0] == HEAD_SHA
+    assert last_args[1] == "stale"
+    assert last_kwargs.get("outcome") == "stale"
+
+
+@pytest.mark.unit
+def test_watch_phase_review_exits_conflicting_on_conflict(monkeypatch):
+    fake = make_gh(merge_state="CONFLICTING")
+    monkeypatch.setattr(pr_watch, "gh", fake)
+    states = []
+
+    exit_code = pr_watch._watch_phase_review(
+        PR,
+        HEAD_SHA,
+        timeout_sec=10,
+        poll_sec=0,
+        state_sink=lambda *args, **kwargs: states.append((args, kwargs)),
+    )
+    assert exit_code == 1
+    last_args, last_kwargs = states[-1]
+    assert last_args[1] == "conflicting"
+    assert last_kwargs.get("outcome") == "conflicting"
+    assert last_kwargs.get("merge_state") == "CONFLICTING"
+
+
+@pytest.mark.unit
+def test_watch_phase_review_undetermined_when_merge_state_stays_unknown(monkeypatch):
+    fake = make_gh(
+        merge_state="UNKNOWN", reviews=[codex_review(HEAD_SHA, state="APPROVED")]
+    )
+    monkeypatch.setattr(pr_watch, "gh", fake)
+    monkeypatch.setattr(pr_watch.time, "sleep", lambda _seconds: None)
+    states = []
+
+    exit_code = pr_watch._watch_phase_review(
+        PR,
+        HEAD_SHA,
+        timeout_sec=10,
+        poll_sec=0,
+        state_sink=lambda *args, **kwargs: states.append((args, kwargs)),
+    )
+
+    assert exit_code == pr_watch.EXIT_UNDETERMINED
+    last_args, last_kwargs = states[-1]
+    assert last_args[1] == "undetermined"
+    assert last_kwargs.get("outcome") == "undetermined"
+    assert last_kwargs.get("merge_state") == "UNKNOWN"
+
+
+@pytest.mark.unit
+def test_watch_phase_review_exits_stale_if_head_moves_before_terminal_verdict(
+    monkeypatch,
+):
+    base = make_gh(
+        reviews=[codex_review(HEAD_SHA, state="APPROVED")],
+        threads=[{"isResolved": True}],
+    )
+    observed_heads = [HEAD_SHA, OLD_SHA]
+
+    def moving_head_gh(*args: str) -> str:
+        if args[:2] == ("pr", "view") and args[4] == "headRefOid,mergeStateStatus":
+            return json.dumps(
+                {
+                    "headRefOid": observed_heads.pop(0),
+                    "mergeStateStatus": "CLEAN",
+                }
+            )
+        return base(*args)
+
+    monkeypatch.setattr(pr_watch, "gh", moving_head_gh)
+    states = []
+
+    exit_code = pr_watch._watch_phase_review(
+        PR,
+        HEAD_SHA,
+        timeout_sec=10,
+        poll_sec=0,
+        state_sink=lambda *args, **kwargs: states.append((args, kwargs)),
+    )
+
+    assert exit_code == 1
+    last_args, last_kwargs = states[-1]
+    assert last_args[0] == OLD_SHA
+    assert last_args[1] == "stale"
+    assert last_kwargs.get("outcome") == "stale"
+
+
+@pytest.mark.unit
+def test_json_mode_strict_stream_separation(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path))
+    monkeypatch.setattr(pr_watch, "JSON_MODE", True)
+    fake = snapshot_gh([ci_snapshot(gate=_gate("SUCCESS"))])
+    monkeypatch.setattr(pr_watch, "gh", fake)
+
+    def run():
+        return pr_watch._run_coordinated_watch(
+            PR,
+            lambda sink, _action: pr_watch._watch_phase_ci(
+                PR, HEAD_SHA, timeout_sec=10, poll_sec=0, state_sink=sink
+            ),
+            phase="ci",
+            expected_head=HEAD_SHA,
+        )
+
+    exit_code = run()
+    assert exit_code == 0
+
+    captured = capsys.readouterr()
+    stdout_lines = [line for line in captured.out.strip().split("\n") if line]
+    assert len(stdout_lines) == 1, (
+        f"stdout should be exactly 1 line, got: {stdout_lines}"
+    )
+
+    payload = json.loads(stdout_lines[0])
+    assert payload["schema_version"] == 1
+    assert payload["repository"] == f"{pr_watch.REPO_OWNER}/{pr_watch.REPO_NAME}"
+    assert payload["pr"] == PR
+    assert payload["phase"] == "ci"
+    assert payload["expected_head"] == HEAD_SHA
+    assert payload["observed_head"] == HEAD_SHA
+    assert payload["outcome"] == "passed"
+    assert payload["ci_gate"] == "SUCCESS"
+    assert "timestamp" in payload
+
+    # Ensure informational logs were sent to stderr
+    assert "CI Gate passed" in captured.err
+
+
+@pytest.mark.unit
+def test_json_mode_emits_terminal_payload_when_ci_fails(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path))
+    monkeypatch.setattr(pr_watch, "JSON_MODE", True)
+    fake = snapshot_gh([ci_snapshot(gate=_gate("FAILURE"))])
+    monkeypatch.setattr(pr_watch, "gh", fake)
+    monkeypatch.setattr(pr_watch, "_failed_ci_run_id", lambda _sha, _url: None)
+
+    exit_code = pr_watch._run_coordinated_watch(
+        PR,
+        lambda sink, _action: pr_watch._watch_phase_ci(
+            PR, HEAD_SHA, timeout_sec=10, poll_sec=0, state_sink=sink
+        ),
+        phase="ci",
+        expected_head=HEAD_SHA,
+    )
+
+    assert exit_code == 1
+    captured = capsys.readouterr()
+    stdout_lines = [line for line in captured.out.strip().split("\n") if line]
+    assert len(stdout_lines) == 1
+    payload = json.loads(stdout_lines[0])
+    assert payload["expected_head"] == HEAD_SHA
+    assert payload["observed_head"] == HEAD_SHA
+    assert payload["outcome"] == "failed"
+    assert payload["ci_gate"] == "FAILURE"
+
+
+@pytest.mark.unit
+def test_delegated_ci_checks_pinned_head_before_legacy_prechecks(monkeypatch):
+    monkeypatch.setattr(
+        pr_watch,
+        "_pre_check_blocking",
+        lambda _pr: pytest.fail("delegated CI must not run current-head prechecks"),
+    )
+    states = []
+
+    def stale_watch(pr, expected_head, *, state_sink):
+        assert pr == PR
+        assert expected_head == HEAD_SHA
+        state_sink(
+            OLD_SHA,
+            "stale",
+            "head moved",
+            None,
+            phase="ci",
+            expected_head=expected_head,
+            outcome="stale",
+        )
+        return 1
+
+    monkeypatch.setattr(pr_watch, "_watch_phase_ci", stale_watch)
+
+    exit_code = pr_watch._run_owned_watch(
+        PR,
+        False,
+        lambda *args, **kwargs: states.append((args, kwargs)),
+        lambda _action: None,
+        phase="ci",
+        expected_head=HEAD_SHA,
+    )
+
+    assert exit_code == 1
+    assert states[-1][0][0] == OLD_SHA
+    assert states[-1][1]["outcome"] == "stale"
+
+
+@pytest.mark.unit
+def test_watcher_records_telemetry_file(tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path))
+    monkeypatch.setenv("GH_MONITOR_HARNESS", "antigravity")
+    monkeypatch.setenv("GH_MONITOR_MODEL", "gemini-3.5-flash-lite")
+    monkeypatch.setenv("GH_MONITOR_WAKES", "unknown")
+    log_dir = tmp_path / "telemetry_logs"
+    monkeypatch.setattr(pr_watch, "LOG_DIR", str(log_dir))
+    fake = snapshot_gh([ci_snapshot(gate=_gate("SUCCESS"))])
+    monkeypatch.setattr(pr_watch, "gh", fake)
+
+    exit_code = pr_watch._run_coordinated_watch(
+        PR,
+        lambda sink, _action: pr_watch._watch_phase_ci(
+            PR, HEAD_SHA, timeout_sec=10, poll_sec=0, state_sink=sink
+        ),
+        phase="ci",
+        expected_head=HEAD_SHA,
+    )
+    assert exit_code == 0
+
+    log_files = list(log_dir.glob("watcher-run-*.json"))
+    assert len(log_files) == 1
+    assert f"-{os.getpid()}-" in log_files[0].name
+    record = json.loads(log_files[0].read_text(encoding="utf-8"))
+    assert record["harness"] == "antigravity"
+    assert record["resolved_model"] == "gemini-3.5-flash-lite"
+    assert record["model_wake_count"] == 1
+    assert record["phase"] == "ci"
+    assert record["expected_head"] == HEAD_SHA
+    assert record["observed_head"] == HEAD_SHA
+    assert record["terminal_outcome"] == "passed"
+    assert "elapsed_wait" in record
+    assert "timestamp" in record
