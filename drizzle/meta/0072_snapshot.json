@@ -1,5 +1,5 @@
 {
-  "id": "fdf5280b-6e4e-404b-a7d0-478ed7d0a485",
+  "id": "011bcfe0-7f52-48a4-b30e-eb13de8b24e4",
   "prevId": "21e9fff2-48cd-4f57-8abe-50cffbfbf05c",
   "version": "7",
   "dialect": "postgresql",
@@ -2293,6 +2293,42 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
+      "isRLSEnabled": true
+    },
+    "public.pinballmap_region_alert_state": {
+      "name": "pinballmap_region_alert_state",
+      "schema": "",
+      "columns": {
+        "region": {
+          "name": "region",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "run_lease_id": {
+          "name": "run_lease_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "run_lease_expires_at": {
+          "name": "run_lease_expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "pinballmap_region_alert_state_run_lease_pair_check": {
+          "name": "pinballmap_region_alert_state_run_lease_pair_check",
+          "value": "(run_lease_id IS NULL) = (run_lease_expires_at IS NULL)"
+        }
+      },
       "isRLSEnabled": true
     },
     "public.pinballmap_region_seen_machines": {

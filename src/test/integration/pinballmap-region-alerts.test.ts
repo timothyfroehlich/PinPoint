@@ -33,6 +33,8 @@ vi.mock("~/server/db", async () => {
 /** What PBM "currently shows" for the region, plus per-endpoint call counters. */
 const pbm = {
   entries: [] as PbmRegionLmx[],
+  entriesPromise: null as Promise<PbmRegionLmx[]> | null,
+  onEntriesFetch: null as (() => void) | null,
   locations: [] as PbmRegionLocation[],
   /** When set, `fetchRegionLocations` rejects with it instead of returning. */
   locationsError: null as Error | null,
@@ -47,7 +49,8 @@ vi.mock("~/lib/pinballmap/client", () => ({
       fetchRegionLmxes: (region: string) => {
         pbm.calls += 1;
         pbm.regions.push(region);
-        return Promise.resolve(pbm.entries);
+        pbm.onEntriesFetch?.();
+        return pbm.entriesPromise ?? Promise.resolve(pbm.entries);
       },
       fetchRegionLocations: (region: string) => {
         pbm.locationCalls += 1;
@@ -197,6 +200,8 @@ describe("PinballMap region machine-change alerts (PGlite)", () => {
   beforeEach(() => {
     vi.stubEnv("DISCORD_PBM_ALERT_CHANNEL_ID", "channel-1");
     pbm.entries = [];
+    pbm.entriesPromise = null;
+    pbm.onEntriesFetch = null;
     pbm.locations = [
       { locationId: 26454, name: "Austin Pinball Collective" },
       { locationId: 999, name: "Pinballz Arcade" },
@@ -578,6 +583,42 @@ describe("PinballMap region machine-change alerts (PGlite)", () => {
         announcedAt: null,
       }),
     ]);
+  });
+
+  it("does not let overlapping runs count one absence twice", async () => {
+    pbm.entries = [lmx({ lmxId: 1 }), lmx({ lmxId: 2 })];
+    await runRegionMachineAlerts();
+
+    let finishFetch: ((entries: PbmRegionLmx[]) => void) | undefined;
+    pbm.entriesPromise = new Promise((resolve) => {
+      finishFetch = resolve;
+    });
+    let markFetchStarted: (() => void) | undefined;
+    const fetchStarted = new Promise<void>((resolve) => {
+      markFetchStarted = resolve;
+    });
+    pbm.onEntriesFetch = () => markFetchStarted?.();
+
+    const firstRun = runRegionMachineAlerts();
+    await fetchStarted;
+    const overlappingRun = await runRegionMachineAlerts();
+
+    expect(overlappingRun).toMatchObject({
+      skipped: "already_running",
+      observed: 0,
+      removed: 0,
+    });
+    // Bootstrap + the lease-owning read. The overlapping run stops before PBM.
+    expect(pbm.calls).toBe(2);
+
+    finishFetch?.([lmx({ lmxId: 1 })]);
+    const firstResult = await firstRun;
+    expect(firstResult).toMatchObject({ skipped: null, removed: 0 });
+    expect((await seenRows()).find((row) => row.lmxId === 2)).toMatchObject({
+      isPresent: true,
+      missedRuns: 1,
+    });
+    expect(await eventRows()).toEqual([]);
   });
 
   it("adopts an old-runtime pending addition into the event queue", async () => {

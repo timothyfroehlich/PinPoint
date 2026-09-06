@@ -11,6 +11,14 @@ CREATE TABLE "pinballmap_region_alert_events" (
 );
 --> statement-breakpoint
 ALTER TABLE "pinballmap_region_alert_events" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
+CREATE TABLE "pinballmap_region_alert_state" (
+	"region" text PRIMARY KEY NOT NULL,
+	"run_lease_id" uuid,
+	"run_lease_expires_at" timestamp with time zone,
+	CONSTRAINT "pinballmap_region_alert_state_run_lease_pair_check" CHECK ((run_lease_id IS NULL) = (run_lease_expires_at IS NULL))
+);
+--> statement-breakpoint
+ALTER TABLE "pinballmap_region_alert_state" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 ALTER TABLE "pinballmap_region_seen_machines" ADD COLUMN "is_present" boolean DEFAULT true NOT NULL;--> statement-breakpoint
 ALTER TABLE "pinballmap_region_seen_machines" ADD COLUMN "missed_runs" integer DEFAULT 0 NOT NULL;--> statement-breakpoint
 ALTER TABLE "pinballmap_region_seen_machines" ADD COLUMN "generation" integer DEFAULT 0 NOT NULL;--> statement-breakpoint

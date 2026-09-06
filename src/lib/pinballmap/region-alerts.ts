@@ -1,8 +1,10 @@
 import "server-only";
-import { and, asc, count, eq, inArray, isNull, sql } from "drizzle-orm";
+import { randomUUID } from "node:crypto";
+import { and, asc, count, eq, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import { db } from "~/server/db";
 import {
   pinballmapRegionAlertEvents,
+  pinballmapRegionAlertState,
   pinballmapRegionSeenMachines,
 } from "~/server/db/schema";
 import { postChannelMessage } from "~/lib/discord/client";
@@ -85,6 +87,9 @@ const INSERT_CHUNK = 1000;
  */
 const PENDING_READ_LIMIT = 500;
 
+/** A killed invocation cannot strand a region indefinitely. */
+const RUN_LEASE_MS = 10 * 60 * 1000;
+
 /**
  * Abort ceiling on a single region payload — the flood guard.
  *
@@ -142,6 +147,7 @@ export interface RegionAlertRun {
     | "empty_payload"
     | "implausible_payload"
     | "incomplete_payload"
+    | "already_running"
     | null;
   /** Entries PBM reported for the region. */
   observed: number;
@@ -163,7 +169,8 @@ function noop(
     | "not_configured"
     | "empty_payload"
     | "implausible_payload"
-    | "incomplete_payload",
+    | "incomplete_payload"
+    | "already_running",
   observed = 0
 ): RegionAlertRun {
   return {
@@ -176,6 +183,49 @@ function noop(
     announced: 0,
     pending: 0,
   };
+}
+
+/**
+ * Claim the region before any PBM read. An atomic conditional update makes an
+ * overlapping invocation stop before HTTP, while expiry recovers a crashed run.
+ */
+async function claimRunLease(region: string): Promise<string | null> {
+  await db
+    .insert(pinballmapRegionAlertState)
+    .values({ region })
+    .onConflictDoNothing();
+
+  const now = new Date();
+  const leaseId = randomUUID();
+  const [claimed] = await db
+    .update(pinballmapRegionAlertState)
+    .set({
+      runLeaseId: leaseId,
+      runLeaseExpiresAt: new Date(now.getTime() + RUN_LEASE_MS),
+    })
+    .where(
+      and(
+        eq(pinballmapRegionAlertState.region, region),
+        or(
+          isNull(pinballmapRegionAlertState.runLeaseId),
+          lt(pinballmapRegionAlertState.runLeaseExpiresAt, now)
+        )
+      )
+    )
+    .returning({ region: pinballmapRegionAlertState.region });
+  return claimed === undefined ? null : leaseId;
+}
+
+async function releaseRunLease(region: string, leaseId: string): Promise<void> {
+  await db
+    .update(pinballmapRegionAlertState)
+    .set({ runLeaseId: null, runLeaseExpiresAt: null })
+    .where(
+      and(
+        eq(pinballmapRegionAlertState.region, region),
+        eq(pinballmapRegionAlertState.runLeaseId, leaseId)
+      )
+    );
 }
 
 /** The configured alert channel, or null when the feature is unconfigured. */
@@ -735,158 +785,165 @@ export async function runRegionMachineAlerts(opts?: {
   const botToken = await getDiscordBotToken();
   if (botToken === null) return noop(region, "not_configured");
 
-  const client = await getPinballMapClient();
-  const observed = await client.fetchRegionLmxes(region);
-  // An empty payload is a bad read (outage, wrong region slug), not "the region
-  // has no machines". Recording it would be harmless, but treating it as a
-  // bootstrap on a fresh install would silence the very first real run.
-  if (observed.length === 0) {
-    // ERROR, not warn: the line above calls this a bad read, so it is logged as
-    // one. A quiet hour and a broken integration must never look alike, and this
-    // is the branch where they otherwise would — the run still returns 200 to the
-    // cron, so the log level is the whole signal. The `skipped` field keeps the
-    // two distinguishable in the payload as well: a bad read is
-    // {skipped:"empty_payload", observed:0}, a genuinely quiet hour is
-    // {skipped:null, observed:487, discovered:0}.
-    log.error(
-      { region, action: "pinballmap.regionAlerts" },
-      "PinballMap region payload was empty; treating as a failed read"
-    );
-    return noop(region, "empty_payload");
-  }
+  const leaseId = await claimRunLease(region);
+  if (leaseId === null) return noop(region, "already_running");
 
-  if (observed.length > MAX_REGION_ENTRIES) {
-    // Almost certainly an unscoped query (see MAX_REGION_ENTRIES). Write nothing:
-    // recording a global dump would permanently poison this region's seen-set.
-    log.error(
-      {
-        region,
-        observed: observed.length,
-        ceiling: MAX_REGION_ENTRIES,
-        action: "pinballmap.regionAlerts",
-      },
-      "PinballMap region payload is implausibly large; aborting without writing"
-    );
-    return noop(region, "implausible_payload", observed.length);
-  }
+  try {
+    const client = await getPinballMapClient();
+    const observed = await client.fetchRegionLmxes(region);
+    // An empty payload is a bad read (outage, wrong region slug), not "the region
+    // has no machines". Recording it would be harmless, but treating it as a
+    // bootstrap on a fresh install would silence the very first real run.
+    if (observed.length === 0) {
+      // ERROR, not warn: the line above calls this a bad read, so it is logged as
+      // one. A quiet hour and a broken integration must never look alike, and this
+      // is the branch where they otherwise would — the run still returns 200 to the
+      // cron, so the log level is the whole signal. The `skipped` field keeps the
+      // two distinguishable in the payload as well: a bad read is
+      // {skipped:"empty_payload", observed:0}, a genuinely quiet hour is
+      // {skipped:null, observed:487, discovered:0}.
+      log.error(
+        { region, action: "pinballmap.regionAlerts" },
+        "PinballMap region payload was empty; treating as a failed read"
+      );
+      return noop(region, "empty_payload");
+    }
 
-  const snapshot = await applySnapshot(region, observed);
-  if (snapshot.incompleteMissing > 0) {
-    reportError(
-      new Error(
-        "PinballMap region payload is implausibly incomplete; discarded without updating membership"
-      ),
-      {
-        region,
-        observed: observed.length,
-        missing: snapshot.incompleteMissing,
-        threshold: REBOOTSTRAP_THRESHOLD,
-        action: "pinballmap.regionAlerts",
-      }
-    );
-    return noop(region, "incomplete_payload", observed.length);
-  }
+    if (observed.length > MAX_REGION_ENTRIES) {
+      // Almost certainly an unscoped query (see MAX_REGION_ENTRIES). Write nothing:
+      // recording a global dump would permanently poison this region's seen-set.
+      log.error(
+        {
+          region,
+          observed: observed.length,
+          ceiling: MAX_REGION_ENTRIES,
+          action: "pinballmap.regionAlerts",
+        },
+        "PinballMap region payload is implausibly large; aborting without writing"
+      );
+      return noop(region, "implausible_payload", observed.length);
+    }
 
-  const base = {
-    region,
-    skipped: null,
-    observed: observed.length,
-    bootstrapped: snapshot.bootstrapped,
-    discovered: snapshot.discovered,
-    removed: snapshot.removed,
-  } as const;
-
-  // A run that "discovers" a large fraction of the whole region did not witness
-  // an arrival — it re-synced against a seen-set that was wrong. The way there is
-  // a TRUNCATED first payload: the empty and implausibly-large guards above catch
-  // 0 and >20k, but nothing catches PBM returning a partial region (an upstream
-  // default change, a partial outage). Bootstrap on 5 of 487 entries, and the
-  // next run reads the other 482 as brand-new and posts "482 new machines" — the
-  // exact flood the bootstrap stamp exists to prevent, and a Discord post is
-  // immutable.
-  //
-  // `discovered` is the right signal because it counts rows INSERTED this run.
-  // A genuine backlog behaves differently: a long Discord outage leaves many rows
-  // PENDING while each run still discovers only the day's 1-3, so draining one is
-  // untouched by this guard.
-  //
-  // Treated as a re-bootstrap rather than an abort: the rows are stamped
-  // announced so the region self-heals to a correct seen-set on the next tick,
-  // and it is reported, because a silent re-bootstrap would hide a real upstream
-  // change.
-  if (snapshot.rebootstrapped) {
-    reportError(
-      new Error(
-        "PinballMap region alert re-bootstrapped: one run discovered an implausible share of the region"
-      ),
-      {
-        region,
-        discovered: snapshot.discovered,
-        observed: observed.length,
-        threshold: REBOOTSTRAP_THRESHOLD,
-        action: "pinballmap.regionAlerts",
-      }
-    );
-  }
-
-  await synchronizeLegacyEvents(region);
-  const pending = await readPending(region);
-  if (pending.length === 0) {
-    return { ...base, announced: 0, pending: 0 };
-  }
-
-  // BOTH Discord gates clear before any label lookup. Resolving labels costs a
-  // region-locations call and can cost a full catalog refresh, and a pending row
-  // never clears without a successful post — so checking this after the lookup
-  // would burn those requests on EVERY hourly run, forever, for an install whose
-  // Discord integration is off. Same reasoning as the channel-id check above; it
-  // is only correct once both gates sit on the same side of the fetch.
-  const entries = await resolveLabels(region, pending);
-  const content = formatRegionAlertMessage({
-    entries,
-    regionLabel: regionLabel(region),
-  });
-  if (content === null) return { ...base, announced: 0, pending: 0 };
-
-  const sent = await postChannelMessage({
-    botToken,
-    channelId,
-    content,
-  });
-  if (!sent.ok) {
-    const detail = {
-      region,
-      pending: pending.length,
-      reason: sent.reason,
-      action: "pinballmap.regionAlerts",
-    };
-    if (sent.reason === "blocked") {
-      // `blocked` is DiscordSendResult's "retrying will not fix this" — a 404 for
-      // a channel that does not exist, or a bot that is not in the guild. Left at
-      // warn it is indistinguishable from Discord having a bad afternoon, so a
-      // mistyped channel snowflake would queue rows and spend PBM calls hourly
-      // and forever while looking like transient noise. Reported, not just logged
-      // (PP-a5y: a caught error is invisible to Sentry unless reported).
+    const snapshot = await applySnapshot(region, observed);
+    if (snapshot.incompleteMissing > 0) {
       reportError(
         new Error(
-          "Pinball Map region changes pending: Discord post permanently rejected — check the configured channel"
+          "PinballMap region payload is implausibly incomplete; discarded without updating membership"
         ),
-        detail
+        {
+          region,
+          observed: observed.length,
+          missing: snapshot.incompleteMissing,
+          threshold: REBOOTSTRAP_THRESHOLD,
+          action: "pinballmap.regionAlerts",
+        }
       );
-    } else {
-      log.warn(
-        detail,
-        "Pinball Map region changes pending: Discord post failed"
+      return noop(region, "incomplete_payload", observed.length);
+    }
+
+    const base = {
+      region,
+      skipped: null,
+      observed: observed.length,
+      bootstrapped: snapshot.bootstrapped,
+      discovered: snapshot.discovered,
+      removed: snapshot.removed,
+    } as const;
+
+    // A run that "discovers" a large fraction of the whole region did not witness
+    // an arrival — it re-synced against a seen-set that was wrong. The way there is
+    // a TRUNCATED first payload: the empty and implausibly-large guards above catch
+    // 0 and >20k, but nothing catches PBM returning a partial region (an upstream
+    // default change, a partial outage). Bootstrap on 5 of 487 entries, and the
+    // next run reads the other 482 as brand-new and posts "482 new machines" — the
+    // exact flood the bootstrap stamp exists to prevent, and a Discord post is
+    // immutable.
+    //
+    // `discovered` is the right signal because it counts rows INSERTED this run.
+    // A genuine backlog behaves differently: a long Discord outage leaves many rows
+    // PENDING while each run still discovers only the day's 1-3, so draining one is
+    // untouched by this guard.
+    //
+    // Treated as a re-bootstrap rather than an abort: the rows are stamped
+    // announced so the region self-heals to a correct seen-set on the next tick,
+    // and it is reported, because a silent re-bootstrap would hide a real upstream
+    // change.
+    if (snapshot.rebootstrapped) {
+      reportError(
+        new Error(
+          "PinballMap region alert re-bootstrapped: one run discovered an implausible share of the region"
+        ),
+        {
+          region,
+          discovered: snapshot.discovered,
+          observed: observed.length,
+          threshold: REBOOTSTRAP_THRESHOLD,
+          action: "pinballmap.regionAlerts",
+        }
       );
     }
-    return { ...base, announced: 0, pending: await countPending(region) };
-  }
 
-  await markAnnounced(region, pending);
-  // `readPending` caps at PENDING_READ_LIMIT, so "announced everything we read"
-  // is not "announced everything queued" — a long Discord outage can leave more
-  // rows behind than one run can drain. This log line is the monitoring signal
-  // for the job, so the remainder is measured rather than assumed to be zero.
-  const remaining = await countPending(region);
-  return { ...base, announced: pending.length, pending: remaining };
+    await synchronizeLegacyEvents(region);
+    const pending = await readPending(region);
+    if (pending.length === 0) {
+      return { ...base, announced: 0, pending: 0 };
+    }
+
+    // BOTH Discord gates clear before any label lookup. Resolving labels costs a
+    // region-locations call and can cost a full catalog refresh, and a pending row
+    // never clears without a successful post — so checking this after the lookup
+    // would burn those requests on EVERY hourly run, forever, for an install whose
+    // Discord integration is off. Same reasoning as the channel-id check above; it
+    // is only correct once both gates sit on the same side of the fetch.
+    const entries = await resolveLabels(region, pending);
+    const content = formatRegionAlertMessage({
+      entries,
+      regionLabel: regionLabel(region),
+    });
+    if (content === null) return { ...base, announced: 0, pending: 0 };
+
+    const sent = await postChannelMessage({
+      botToken,
+      channelId,
+      content,
+    });
+    if (!sent.ok) {
+      const detail = {
+        region,
+        pending: pending.length,
+        reason: sent.reason,
+        action: "pinballmap.regionAlerts",
+      };
+      if (sent.reason === "blocked") {
+        // `blocked` is DiscordSendResult's "retrying will not fix this" — a 404 for
+        // a channel that does not exist, or a bot that is not in the guild. Left at
+        // warn it is indistinguishable from Discord having a bad afternoon, so a
+        // mistyped channel snowflake would queue rows and spend PBM calls hourly
+        // and forever while looking like transient noise. Reported, not just logged
+        // (PP-a5y: a caught error is invisible to Sentry unless reported).
+        reportError(
+          new Error(
+            "Pinball Map region changes pending: Discord post permanently rejected — check the configured channel"
+          ),
+          detail
+        );
+      } else {
+        log.warn(
+          detail,
+          "Pinball Map region changes pending: Discord post failed"
+        );
+      }
+      return { ...base, announced: 0, pending: await countPending(region) };
+    }
+
+    await markAnnounced(region, pending);
+    // `readPending` caps at PENDING_READ_LIMIT, so "announced everything we read"
+    // is not "announced everything queued" — a long Discord outage can leave more
+    // rows behind than one run can drain. This log line is the monitoring signal
+    // for the job, so the remainder is measured rather than assumed to be zero.
+    const remaining = await countPending(region);
+    return { ...base, announced: pending.length, pending: remaining };
+  } finally {
+    await releaseRunLease(region, leaseId);
+  }
 }

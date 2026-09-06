@@ -410,6 +410,31 @@ export const pinballmapRegionSeenMachines = pgTable(
 ).enableRLS();
 
 /**
+ * Per-region lease for the region-alert cron.
+ *
+ * The lease spans Pinball Map's HTTP read without holding a database transaction
+ * open. That prevents overlapping invocations from treating one transiently
+ * incomplete upstream snapshot as two consecutive successful absences. Expiry
+ * recovers a killed invocation.
+ */
+export const pinballmapRegionAlertState = pgTable(
+  "pinballmap_region_alert_state",
+  {
+    region: text("region").primaryKey(),
+    runLeaseId: uuid("run_lease_id"),
+    runLeaseExpiresAt: timestamp("run_lease_expires_at", {
+      withTimezone: true,
+    }),
+  },
+  (_t) => ({
+    runLeasePairCheck: check(
+      "pinballmap_region_alert_state_run_lease_pair_check",
+      sql`(run_lease_id IS NULL) = (run_lease_expires_at IS NULL)`
+    ),
+  })
+).enableRLS();
+
+/**
  * Durable add/remove transitions awaiting Discord delivery.
  *
  * Membership and delivery are intentionally separate: if a removal post fails

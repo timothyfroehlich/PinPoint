@@ -93,6 +93,7 @@ export default defineConfig({
     "timeline_event_people",
     "pinballmap_catalog",
     "pinballmap_region_seen_machines",
+    "pinballmap_region_alert_state",
     "pinballmap_region_alert_events",
     "pinballmap_state",
     "machine_settings_sets",
