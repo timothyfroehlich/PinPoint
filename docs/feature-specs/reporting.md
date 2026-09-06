@@ -121,7 +121,7 @@
 - **8.1** Multiple issues lets a permitted reporter prepare more than one issue row and submit rows individually or as a batch.
 - **8.2** Each row provides machine, problem, severity, priority, status, frequency, assignee, watch, and an optional rich-text description.
 - **8.3** Rows may collapse for fast entry or expand to expose their complete field set.
-- **8.4** A batch submission creates every valid row and leaves each invalid or failed row editable with its error.
+- **8.4** A batch submission attempts every complete row, creates each valid row, leaves each failed submitted row editable with its error, and leaves incomplete rows editable without submitting them.
 - **8.5** A successful row cannot be created twice by overlapping submission attempts.
 - **8.6** Unsubmitted batch content survives ordinary navigation between reporting modes and a page reload.
 - **8.7** PinPoint warns before navigation that would discard non-empty, unsubmitted batch content.
@@ -142,13 +142,14 @@
 
 | Requirement | Code today | Resolution |
 | :-- | :-- | :-- |
-| §2.1–§2.2, §2.4–§2.10, §3.1–§3.4, §3.8, §3.12–§3.13, §4.1, §4.3–§4.6, §7.1, §7.4–§7.5, §8.9–§8.10 | `/report` opens the complete single form; Quick, Something else, and draft-preserving mode handoffs do not exist; the existing modes are named Single issue and Multiple. | `PP-ek0e.2` |
-| §2.3, §3.5–§3.11, §5–§6 | Quick report templates, progressive problem selection, template confirmation, and deflection guidance do not exist. | `PP-ek0e.3` |
+| §2.1–§2.2, §2.4–§2.9, §3.1–§3.4, §3.8, §3.12–§3.13, §4.1, §4.5–§4.6, §7.1, §7.4–§7.5, §8.9–§8.10 | `/report` opens the complete single form; Quick and its draft handoffs do not exist; the existing single-issue mode is named Single issue rather than Detailed report. | `PP-ek0e.2` |
+| §2.3, §3.5–§3.11, §4.1, §4.3–§4.4, §5–§6 | Quick report templates, progressive problem selection, template values and confirmation, and deflection guidance do not exist. | `PP-ek0e.3` |
 | §4.2 | Issue frequency requires Intermittent, Frequent, or Constant; Not specified is unavailable. | `PP-ek0e.2` |
-| §9.1, §9.6 | Recent issues show three rows on mobile and five on desktop with different visual prominence. | `PP-ek0e.2` |
+| §9.1, §9.6 | Recent issues are not filtered to open status, and they show three rows on mobile and five on desktop with different visual prominence. | `PP-ek0e.2` |
 
 ## Changelog
 
 | Date | Change |
 | :-- | :-- |
+| 2026-09-06 | Aligned batch-row behavior and divergence coverage with the existing report flow after conformance review. |
 | 2026-09-05 | Initial draft: three report modes, draft continuity, Quick report templates and defaults, deflection, and recent-open-issue behavior. |
