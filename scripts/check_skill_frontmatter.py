@@ -14,10 +14,21 @@ import argparse
 import re
 import subprocess
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 
 FRONTMATTER_RE = re.compile(r"\A---\r?\n(.*?)\r?\n---(?:\r?\n|\Z)", re.DOTALL)
 KEY_VAL_RE = re.compile(r"^([A-Za-z0-9_-]+):\s*(.*)$")
+KEY_VAL_LINE_RE = re.compile(r"^\s*([A-Za-z0-9_-]+):\s*(.*)$")
+BLOCK_SCALAR_RE = re.compile(r"^[>|][0-9]*[+-]?$")
+
+
+@dataclass
+class FrontmatterEntry:
+    key: str
+    first_line: str
+    continuation_lines: list[str]
+    line_number: int
 
 
 def extract_frontmatter(content: str) -> str | None:
@@ -38,6 +49,88 @@ def parse_top_level_keys(frontmatter: str) -> dict[str, str]:
                 current_key = match.group(1)
                 keys[current_key] = match.group(2).strip()
     return keys
+
+
+def parse_frontmatter_entries(frontmatter: str) -> dict[str, FrontmatterEntry]:
+    """Extract top-level keys with multiline continuation blocks."""
+    entries: dict[str, FrontmatterEntry] = {}
+    current_entry: FrontmatterEntry | None = None
+
+    for idx, line in enumerate(frontmatter.splitlines(), start=1):
+        if line.startswith("#"):
+            continue
+        if line and not line[0].isspace():
+            match = KEY_VAL_RE.match(line)
+            if match:
+                key = match.group(1)
+                first_line = match.group(2).strip()
+                current_entry = FrontmatterEntry(
+                    key=key,
+                    first_line=first_line,
+                    continuation_lines=[],
+                    line_number=idx,
+                )
+                entries[key] = current_entry
+                continue
+        if current_entry is not None:
+            current_entry.continuation_lines.append(line)
+
+    return entries
+
+
+def validate_string_entry(entry: FrontmatterEntry) -> tuple[bool, str]:
+    """Validate that a frontmatter entry represents a non-empty string."""
+    first = entry.first_line
+
+    if BLOCK_SCALAR_RE.match(first):
+        non_empty = [line.strip() for line in entry.continuation_lines if line.strip()]
+        if not non_empty:
+            return False, "is empty"
+        return True, ""
+
+    if first.startswith("["):
+        return False, "must be a string, got list"
+
+    if first.startswith("{"):
+        return False, "must be a string, got mapping"
+
+    if (first.startswith('"') and first.endswith('"') and len(first) >= 2) or (
+        first.startswith("'") and first.endswith("'") and len(first) >= 2
+    ):
+        unquoted = first[1:-1].strip()
+        if not unquoted and not any(line.strip() for line in entry.continuation_lines):
+            return False, "is empty"
+        return True, ""
+
+    if not first:
+        non_empty_lines = [line for line in entry.continuation_lines if line.strip()]
+        if not non_empty_lines:
+            return False, "is empty"
+        first_content = non_empty_lines[0].strip()
+        if first_content.startswith("- ") or first_content == "-":
+            return False, "must be a string, got list"
+        if KEY_VAL_LINE_RE.match(first_content):
+            return False, "must be a string, got mapping"
+        return True, ""
+
+    lower_first = first.lower()
+    if lower_first in ("true", "false", "yes", "no", "on", "off"):
+        return False, f"must be a string, got boolean ({first})"
+    if lower_first in ("null", "~"):
+        return False, "is empty"
+
+    try:
+        int(first)
+        return False, f"must be a string, got integer ({first})"
+    except ValueError:
+        pass
+    try:
+        float(first)
+        return False, f"must be a string, got number ({first})"
+    except ValueError:
+        pass
+
+    return True, ""
 
 
 def lint_yaml(frontmatter: str, config_path: Path | None = None) -> tuple[bool, str]:
@@ -88,19 +181,35 @@ def check_skill_file(skill_file: Path, config_path: Path | None = None) -> list[
     if not is_clean:
         errors.append(f"{skill_file}: YAML frontmatter syntax error:\n{lint_output}")
 
-    keys = parse_top_level_keys(fm)
-    if "name" not in keys or not keys["name"]:
+    entries = parse_frontmatter_entries(fm)
+    if "name" not in entries:
         errors.append(f"{skill_file}: Missing or empty 'name' in frontmatter")
     else:
-        skill_name = keys["name"].strip("\"'")
-        expected_name = skill_file.parent.name
-        if skill_name != expected_name:
-            errors.append(
-                f"{skill_file}: Frontmatter name '{skill_name}' does not match folder '{expected_name}'"
-            )
+        valid, reason = validate_string_entry(entries["name"])
+        if not valid:
+            if reason == "is empty":
+                errors.append(f"{skill_file}: Missing or empty 'name' in frontmatter")
+            else:
+                errors.append(f"{skill_file}: 'name' in frontmatter {reason}")
+        else:
+            skill_name = entries["name"].first_line.strip("\"'")
+            expected_name = skill_file.parent.name
+            if skill_name != expected_name:
+                errors.append(
+                    f"{skill_file}: Frontmatter name '{skill_name}' does not match folder '{expected_name}'"
+                )
 
-    if "description" not in keys:
+    if "description" not in entries:
         errors.append(f"{skill_file}: Missing 'description' in frontmatter")
+    else:
+        valid, reason = validate_string_entry(entries["description"])
+        if not valid:
+            if reason == "is empty":
+                errors.append(
+                    f"{skill_file}: Missing or empty 'description' in frontmatter"
+                )
+            else:
+                errors.append(f"{skill_file}: 'description' in frontmatter {reason}")
 
     return errors
 
