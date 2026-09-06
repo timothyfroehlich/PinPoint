@@ -230,7 +230,7 @@ def test_comments_are_fetched_only_for_missing_native_evidence_and_verify_app(
 
 
 @pytest.mark.unit
-def test_current_head_manual_fallback_is_visible_as_used(run_dashboard):
+def test_current_head_manual_request_is_visible_as_pending(run_dashboard):
     response = open_pr_response([pr_node(4, reviews=[])])
     comments = [
         {
@@ -247,8 +247,71 @@ def test_current_head_manual_fallback_is_visible_as_used(run_dashboard):
     )
 
     assert result.returncode == 0, result.stderr
-    assert "FALLBACK USED" in result.stdout.splitlines()[2]
+    assert "REQUESTED" in result.stdout.splitlines()[2]
     assert len(calls) == 2
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("state", ["DISMISSED", "PENDING", "UNKNOWN"])
+def test_unusable_current_head_review_overrides_request_marker(run_dashboard, state):
+    response = open_pr_response([pr_node(4, reviews=[review(state=state)])])
+    comments = [
+        {
+            "user": {"login": "timothyfroehlich"},
+            "body": f"@codex review\n<!-- pinpoint-codex-review-head: {HEAD} -->",
+            "created_at": "2026-08-30T12:01:00Z",
+        }
+    ]
+    result, _calls = run_dashboard(
+        [
+            {"contains": ["pullRequests(first: 100"], "stdout": json.dumps(response)},
+            {"contains": ["issues/4/comments"], "stdout": json.dumps(comments)},
+        ]
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "NOT APPROVED" in result.stdout.splitlines()[2]
+
+
+@pytest.mark.unit
+def test_old_unusable_review_does_not_override_newer_stale_marker(run_dashboard):
+    old_head = "b" * 40
+    response = open_pr_response(
+        [pr_node(4, reviews=[review(sha=old_head, state="DISMISSED")])]
+    )
+    comments = [
+        {
+            "user": {"login": "timothyfroehlich"},
+            "body": f"<!-- pinpoint-review: {old_head} -->\nreviewed by hand",
+            "updated_at": "2026-08-30T12:01:00Z",
+        }
+    ]
+    result, _calls = run_dashboard(
+        [
+            {"contains": ["pullRequests(first: 100"], "stdout": json.dumps(response)},
+            {"contains": ["issues/4/comments"], "stdout": json.dumps(comments)},
+        ]
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "RE-REVIEW" in result.stdout.splitlines()[2]
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("state", ["DISMISSED", "PENDING", "UNKNOWN"])
+def test_old_unusable_review_without_comments_is_stale(run_dashboard, state):
+    response = open_pr_response(
+        [pr_node(4, reviews=[review(sha="b" * 40, state=state)])]
+    )
+    result, _calls = run_dashboard(
+        [
+            {"contains": ["pullRequests(first: 100"], "stdout": json.dumps(response)},
+            {"contains": ["issues/4/comments"], "stdout": "[]"},
+        ]
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "RE-REVIEW" in result.stdout.splitlines()[2]
 
 
 @pytest.mark.unit

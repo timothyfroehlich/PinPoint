@@ -84,7 +84,7 @@ class Scenario:
     clean_comment: bool = False
     clean_reaction: bool = False
     clean_reaction_sha: str = "head"
-    manual_fallback: bool = False
+    manual_request: bool = False
     manual_review: bool = False
     gh_head: str = "head"
     threads: list[dict] = field(default_factory=list)
@@ -214,7 +214,7 @@ def repo_with_pr(
                     "updated_at": "2026-08-02T20:43:19Z",
                 }
             )
-        if scenario.manual_fallback:
+        if scenario.manual_request:
             comments.append(
                 {
                     "user": {"login": "acme"},
@@ -393,25 +393,23 @@ def test_an_unready_pr_gets_the_reason_instead_of_the_merge_command(
 
 
 def test_an_unreviewed_head_is_named_as_the_blocker() -> None:
-    """An unreviewed head names the bounded, single-fallback route."""
+    """An unreviewed head names the one-per-head manual request route."""
     with repo_with_pr(branch_changes={"src/lib/thing.ts": "x\n"}) as (_head, run):
         assert MERGE_CMD not in run.stdout, run.stdout
         assert "reviewed: unreviewed" in run.stdout
-        assert "after a conclusive bounded miss" in run.stdout
-        assert "post one @codex review" in run.stdout
-        assert "do not repeat it" in run.stdout
-        assert "restart automatic-first on a new head" in run.stdout
+        assert "request-codex-review.sh 123 exactly once" in run.stdout
+        assert "replacement CI and one new request" in run.stdout
 
 
-def test_an_exhausted_fallback_is_not_recommended_again() -> None:
+def test_a_pending_manual_request_is_not_recommended_again() -> None:
     with repo_with_pr(
         branch_changes={"src/lib/thing.ts": "x\n"},
-        scenario=Scenario(manual_fallback=True),
+        scenario=Scenario(manual_request=True),
     ) as (_head, run):
         assert MERGE_CMD not in run.stdout, run.stdout
-        assert "reviewed: fallback_exhausted" in run.stdout
-        assert "do not post another" in run.stdout
-        assert "post one @codex review" not in run.stdout
+        assert "reviewed: review_requested" in run.stdout
+        assert "do not request it again" in run.stdout
+        assert "request-codex-review.sh" not in run.stdout
 
 
 def test_the_report_always_offers_to_re_run_itself() -> None:

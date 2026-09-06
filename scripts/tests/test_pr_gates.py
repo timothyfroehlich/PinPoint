@@ -1,4 +1,4 @@
-"""Regression tests for the merge gate's automatic and manual review records.
+"""Regression tests for the merge gate's Codex and local-review records.
 
 A native approval, trusted clean connector comment or reaction-witness comment, or the
 existing SHA-pinned manual attestation, may cover the current head.
@@ -460,6 +460,25 @@ def test_unusable_current_head_review_state_fails_closed(state: str) -> None:
     assert "without approval" in result.stdout
 
 
+@pytest.mark.parametrize("state", ["DISMISSED", "PENDING", "UNKNOWN"])
+def test_unusable_current_head_review_overrides_request_marker(state: str) -> None:
+    with gate_env(
+        review_pages=[[codex_review(state=state)]],
+        comment_pages=[[manual_review_request()]],
+    ) as env:
+        record = review_record(env)
+
+    assert record[:4] == ["not_approved", HEAD_SHA, CODEX_BOT, state]
+
+
+@pytest.mark.parametrize("state", ["DISMISSED", "PENDING", "UNKNOWN"])
+def test_old_unusable_review_is_stale(state: str) -> None:
+    with gate_env(review_pages=[[codex_review(sha=OTHER_SHA, state=state)]]) as env:
+        record = review_record(env)
+
+    assert record[:4] == ["stale_approval", OTHER_SHA, CODEX_BOT, state]
+
+
 def test_delayed_old_head_review_does_not_override_current_native_approval() -> None:
     reviews = [
         codex_review(submitted_at="2026-08-22T12:00:00Z"),
@@ -481,43 +500,39 @@ def test_reviews_are_read_across_all_pages() -> None:
     assert result.returncode == 0, result.stdout
 
 
-def test_stale_approval_reports_both_commits_and_the_automatic_review_remedy() -> None:
+def test_stale_approval_reports_both_commits_and_the_manual_request_remedy() -> None:
     with gate_env(review_pages=[[codex_review(sha=OTHER_SHA)]]) as env:
         result = run_gate("check_review_happened", env)
     assert OTHER_SHA[:7] in result.stdout
     assert HEAD_SHA[:7] in result.stdout
-    assert "await a clean automatic Codex result" in result.stdout
-    assert "bounded witness conclusively ends" in result.stdout
-    assert "post one\n          @codex review" in result.stdout
-    assert "never repeat it" in result.stdout
-    assert "slow or running\n          attempt is not eligible" in result.stdout
-    assert "new head restarts automatic-first" in result.stdout
+    assert "request-codex-review.sh 123 exactly once" in result.stdout
+    assert "replacement CI and one new request" in result.stdout
 
 
-def test_current_head_fallback_request_is_exhausted_not_recommended_again() -> None:
+def test_current_head_review_request_is_pending_not_recommended_again() -> None:
     with gate_env(comment_pages=[[manual_review_request()]]) as env:
         result = run_gate("check_review_happened", env)
     assert result.returncode == 1, result.stdout
-    assert "fallback already used" in result.stdout
-    assert "Do not post another" in result.stdout
-    assert "post one\n          @codex review" not in result.stdout
+    assert "manual Codex review requested" in result.stdout
+    assert "do not request the same head again" in result.stdout
+    assert "request-codex-review.sh" not in result.stdout
 
 
 @pytest.mark.parametrize(
-    "fallback_comment",
+    "review_request_comment",
     [
         manual_review_request(OTHER_SHA),
         manual_review_request(login="someone-else"),
     ],
 )
-def test_old_or_untrusted_fallback_request_does_not_exhaust_current_head(
-    fallback_comment: dict,
+def test_old_or_untrusted_review_request_does_not_mark_current_head_requested(
+    review_request_comment: dict,
 ) -> None:
-    with gate_env(comment_pages=[[fallback_comment]]) as env:
+    with gate_env(comment_pages=[[review_request_comment]]) as env:
         result = run_gate("check_review_happened", env)
     assert result.returncode == 1, result.stdout
-    assert "fallback already used" not in result.stdout
-    assert "post one\n          @codex review" in result.stdout
+    assert "manual Codex review requested" not in result.stdout
+    assert "request-codex-review.sh 123 exactly once" in result.stdout
 
 
 def test_review_gate_never_waits() -> None:
