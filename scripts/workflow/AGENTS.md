@@ -12,16 +12,55 @@ Scripts are designed for the **PinPoint orchestrator workflow** where multiple s
 
 ### PR Monitoring
 
-| Script                                        | Purpose                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pr-dashboard.sh [PR...]`                     | Status table: CI checks, review state, merge state, draft state. All open PRs if no args. One repository GraphQL snapshot batches metadata, checks, native reviews, and threads; targeted pagination is exceptional, and REST comments are fetched only where native exact-head evidence is insufficient. The Review column shows unresolved threads when there are any, otherwise: `reviewed`, `RE-REVIEW` (`stale_approval`), `NOT APPROVED` (`not_approved`), or `NOT REVIEWED` (`unreviewed`).                                                                                                                                                                           |
-| `pr-watch.py <PR>`                            | Stream CI run events. One timestamped line per event. Use with the Claude Code Monitor tool. The first host process for a repository+PR+watch mode holds the XDG-state lock and polls GitHub; concurrent invocations with the same precheck semantics follow its atomic local state with zero GitHub reads. Normal and `--force` watches have separate owners. A later invocation never trusts an unlocked terminal cache. Writes failure artifacts to `tmp/gh-monitor/`. Unresolved threads persist in shared state so every follower prints the reminder, but do **not** stop the watch. `--check-ready` remains a direct readiness snapshot rather than a shared monitor. |
-| `request-codex-review.sh <PR>`                | Request exactly one manual Codex review for the current head. Refuses non-owner auth, draft/closed PRs, non-green current-head CI, heads already reviewed/requested, and a head that moves during validation. Posts the SHA-bound `@codex review` comment consumed by the trusted reaction witness.                                                                                                                                                                                                                                                                                                                                                                          |
-| `codex-reaction-witness.sh <PR> <SHA> <TIME>` | Trusted helper for `.github/workflows/codex-reaction-witness.yaml`. After the SHA-bound manual request it requires a fresh connector-bot `eyes`, continuously verifies that the named SHA remains head, then posts a SHA-pinned witness only if that same reaction changes to `+1`. A native exact-head review supersedes the need for a witness.                                                                                                                                                                                                                                                                                                                            |
+| Script                                        | Purpose                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pr-dashboard.sh [PR...]`                     | Status table: CI checks, review state, merge state, draft state. All open PRs if no args. One repository GraphQL snapshot batches metadata, checks, native reviews, and threads; targeted pagination is exceptional, and REST comments are fetched only where native exact-head evidence is insufficient. The Review column shows unresolved threads when there are any, otherwise: `reviewed`, `RE-REVIEW` (`stale_approval`), `NOT APPROVED` (`not_approved`), or `NOT REVIEWED` (`unreviewed`).                                                                                                                                                                                                                                                                           |
+| `pr-watch.py <PR>`                            | Stream CI or review events. One timestamped line per event (logs to stderr in `--json` mode; stdout reserved strictly for terminal JSON). The first host process for a repository+PR+watch mode holds the XDG-state lock and polls GitHub; concurrent invocations with the same precheck semantics follow its atomic local state with zero GitHub reads. Normal and `--force` watches have separate owners. CI and review phases use distinct locks (`...-<pr>-ci.lock`, `...-<pr>-review.lock`). Writes failure artifacts and watcher telemetry to `tmp/gh-monitor/`. Unresolved threads persist in shared state so every follower prints the reminder, but do **not** stop the CI watch. `--check-ready` remains a direct readiness snapshot rather than a shared monitor. |
+| `request-codex-review.sh <PR>`                | Request exactly one manual Codex review for the current head. Refuses non-owner auth, draft/closed PRs, non-green current-head CI, heads already reviewed/requested, and a head that moves during validation. Posts the SHA-bound `@codex review` comment consumed by the trusted reaction witness.                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `codex-reaction-witness.sh <PR> <SHA> <TIME>` | Trusted helper for `.github/workflows/codex-reaction-witness.yaml`. After the SHA-bound manual request it requires a fresh connector-bot `eyes`, continuously verifies that the named SHA remains head, then posts a SHA-pinned witness only if that same reaction changes to `+1`. A native exact-head review supersedes the need for a witness.                                                                                                                                                                                                                                                                                                                                                                                                                            |
 
-`pr-watch.py` exit codes: **0** passed, **1** a run or the CI Gate actually failed, **2** the outcome could not be determined — the GitHub API was unreachable (rate-limit 403, network drop, auth failure) or the bounded watch expired without a terminal verdict. Exit 2 is not a red CI: re-run the watch once evidence is available rather than hunting for a broken test. (PP-qkl8)
+#### `pr-watch.py` flags and delegated watcher contract
+
+```bash
+./scripts/workflow/pr-watch.py <PR> [--phase <ci|review>] [--expected-head <SHA>] [--json] [--verbose] [--force]
+```
+
+- `--phase <ci|review>`: Phase to watch. Defaults to `ci` (or legacy watch if neither `--phase` nor `--expected-head` nor `--json` is given).
+  - `ci`: Polls CI Gate for `expected_head`. Terminal outcomes: `passed` (exit 0), `failed` (exit 1), `stale` (exit 1), `conflicting` (exit 1), `timed_out` (exit 2), `undetermined` (exit 2).
+  - `review`: Polls review state and review threads for `expected_head`. Terminal outcomes: `passed` (exact-head review present AND 0 unresolved threads; exit 0), `action_required` (exact-head review present BUT unresolved threads > 0, OR review is `not_approved`; exit 1), `stale` (PR head moved away from `expected_head`; exit 1), `conflicting` (exit 1), `timed_out` (exit 2), `undetermined` (exit 2). In-progress review states (`review_requested`, `unreviewed`, old-head reviews) sleep until terminal verdict or timeout.
+- `--expected-head <SHA>`: Pins watch to the intended commit SHA. If the PR head moves, the watch immediately terminates with outcome `stale` (exit 1) rather than chasing replacement heads.
+- `--json`: Enables machine-readable output with strict stream separation: `stdout` outputs ONLY the final compact single-line JSON payload upon exit. All progressive logs, error notices, and diagnostic messages are emitted to `stderr`.
+
+Terminal JSON schema (`stdout`):
+
+```json
+{
+  "schema_version": 1,
+  "repository": "timothyfroehlich/PinPoint",
+  "pr": 1234,
+  "phase": "ci",
+  "expected_head": "40-char-sha",
+  "observed_head": "40-char-sha",
+  "outcome": "passed",
+  "ci_gate": "SUCCESS",
+  "review_state": "unreviewed",
+  "unresolved_threads": 0,
+  "merge_state": "CLEAN",
+  "detail_url": "https://github.com/...",
+  "failure_artifact": null,
+  "timestamp": "2026-09-05T12:00:00Z"
+}
+```
+
+`pr-watch.py` exit codes:
+
+- **0**: `passed` (clean gate verdict or exact-head review with 0 unresolved threads).
+- **1**: Action required or failure (`failed`, `action_required`, `stale`, `conflicting`).
+- **2**: Undetermined / unavailable evidence (`undetermined`, `timed_out`). Exit 2 is not a red CI: re-run the watch once evidence is available rather than hunting for a broken test. (PP-qkl8)
 
 Shared monitor state lives under `$XDG_STATE_HOME/pinpoint/pr-watch/` (falling back to `~/.local/state`) and carries schema version, repository, PR, current head, leader PID, status, timestamp, short detail, and an optional failure-artifact path. The process-held lock is the liveness proof; JSON alone is never ownership or reusable terminal evidence.
+
+Watcher run telemetry is recorded under `tmp/gh-monitor/watcher-run-<pr>-<phase>-<timestamp>.json` with harness, resolved model, expected/observed heads, elapsed wait, and terminal outcome.
 
 ### UI Screenshots
 

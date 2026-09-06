@@ -387,13 +387,15 @@ def test_pre_check_reports_unresolved_threads_without_blocking(monkeypatch, caps
 # ---------------------------------------------------------------------------
 
 
-def snapshot_gh(snapshots):
+def snapshot_gh(snapshots, merge_state="CLEAN"):
     """Return snapshots in sequence and record every remote call."""
     remaining = list(snapshots)
 
     def fake_gh(*args: str) -> str:
         fake_gh.calls.append(args)
         assert args[:2] == ("pr", "view"), args
+        if args[4] == "mergeStateStatus,labels":
+            return json.dumps({"mergeStateStatus": merge_state, "labels": []})
         assert args[4] == "headRefOid,statusCheckRollup", args
         snapshot = remaining.pop(0) if len(remaining) > 1 else remaining[0]
         return json.dumps(snapshot)
@@ -1182,3 +1184,365 @@ def test_run_audit_still_fails_on_unresolved_threads(monkeypatch, capsys):
     )
     assert pr_watch.run_audit(PR) is False
     assert "✗ threads-resolved: 1 unresolved" in capsys.readouterr().out
+
+
+# ---------------------------------------------------------------------------
+# Delegated watcher lifecycle (PP-cf0x)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+def test_parse_args_phase_expected_head_and_json():
+    parsed = pr_watch._parse_args(["pr-watch.py", "1734"])
+    assert parsed is not None
+    assert parsed.pr == 1734
+    assert parsed.phase is None
+    assert parsed.expected_head is None
+    assert parsed.json_mode is False
+
+    parsed_ci = pr_watch._parse_args(
+        ["pr-watch.py", "1734", "--phase", "ci", "--expected-head", HEAD_SHA, "--json"]
+    )
+    assert parsed_ci is not None
+    assert parsed_ci.pr == 1734
+    assert parsed_ci.phase == "ci"
+    assert parsed_ci.expected_head == HEAD_SHA
+    assert parsed_ci.json_mode is True
+
+    parsed_rev = pr_watch._parse_args(
+        ["pr-watch.py", "1734", "--phase=review", f"--expected-head={HEAD_SHA}"]
+    )
+    assert parsed_rev is not None
+    assert parsed_rev.phase == "review"
+    assert parsed_rev.expected_head == HEAD_SHA
+
+    # Usage errors
+    assert pr_watch._parse_args(["pr-watch.py", "1734", "--phase", "unknown"]) is None
+    assert pr_watch._parse_args(["pr-watch.py", "1734", "--phase"]) is None
+    assert pr_watch._parse_args(["pr-watch.py", "1734", "--expected-head"]) is None
+    assert pr_watch._parse_args(["pr-watch.py", "1734", "--unknown-flag"]) is None
+
+
+@pytest.mark.unit
+def test_phase_monitor_paths_isolate_ci_and_review(tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path))
+    lock_default, state_default = pr_watch._monitor_paths(PR)
+    lock_ci, state_ci = pr_watch._monitor_paths(PR, phase="ci")
+    lock_review, state_review = pr_watch._monitor_paths(PR, phase="review")
+
+    assert lock_default != lock_ci != lock_review
+    assert "-ci.lock" in lock_ci.name
+    assert "-review.lock" in lock_review.name
+    assert "-ci.json" in state_ci.name
+    assert "-review.json" in state_review.name
+
+
+@pytest.mark.unit
+def test_watch_phase_ci_passes_on_matching_head_and_success_gate(monkeypatch):
+    fake = snapshot_gh([ci_snapshot(gate=_gate("SUCCESS"))])
+    monkeypatch.setattr(pr_watch, "gh", fake)
+    states = []
+
+    exit_code = pr_watch._watch_phase_ci(
+        PR,
+        HEAD_SHA,
+        timeout_sec=10,
+        poll_sec=0,
+        state_sink=lambda *args, **kwargs: states.append((args, kwargs)),
+    )
+    assert exit_code == 0
+    assert len(states) >= 1
+    last_args, last_kwargs = states[-1]
+    assert last_args[0] == HEAD_SHA
+    assert last_args[1] == "passed"
+    assert last_kwargs.get("outcome") == "passed"
+    assert last_kwargs.get("ci_gate") == "SUCCESS"
+
+
+@pytest.mark.unit
+def test_watch_phase_ci_fails_on_failure_gate(monkeypatch):
+    fake = snapshot_gh([ci_snapshot(gate=_gate("FAILURE"))])
+    monkeypatch.setattr(pr_watch, "gh", fake)
+    monkeypatch.setattr(pr_watch, "_failed_ci_run_id", lambda _sha, _url: None)
+    states = []
+
+    exit_code = pr_watch._watch_phase_ci(
+        PR,
+        HEAD_SHA,
+        timeout_sec=10,
+        poll_sec=0,
+        state_sink=lambda *args, **kwargs: states.append((args, kwargs)),
+    )
+    assert exit_code == 1
+    last_args, last_kwargs = states[-1]
+    assert last_args[1] == "failed"
+    assert last_kwargs.get("outcome") == "failed"
+    assert last_kwargs.get("ci_gate") == "FAILURE"
+
+
+@pytest.mark.unit
+def test_watch_phase_ci_exits_stale_when_head_moves(monkeypatch):
+    fake = snapshot_gh([ci_snapshot(head=OLD_SHA, gate=_gate("SUCCESS"))])
+    monkeypatch.setattr(pr_watch, "gh", fake)
+    states = []
+
+    exit_code = pr_watch._watch_phase_ci(
+        PR,
+        HEAD_SHA,
+        timeout_sec=10,
+        poll_sec=0,
+        state_sink=lambda *args, **kwargs: states.append((args, kwargs)),
+    )
+    assert exit_code == 1
+    last_args, last_kwargs = states[-1]
+    assert last_args[0] == OLD_SHA
+    assert last_args[1] == "stale"
+    assert last_kwargs.get("outcome") == "stale"
+
+
+@pytest.mark.unit
+def test_watch_phase_ci_exits_conflicting_on_dirty_merge(monkeypatch):
+    fake = snapshot_gh(
+        [ci_snapshot(gate=_gate("", status="IN_PROGRESS"))],
+        merge_state="DIRTY",
+    )
+    monkeypatch.setattr(pr_watch, "gh", fake)
+    states = []
+
+    exit_code = pr_watch._watch_phase_ci(
+        PR,
+        HEAD_SHA,
+        timeout_sec=10,
+        poll_sec=0,
+        state_sink=lambda *args, **kwargs: states.append((args, kwargs)),
+    )
+    assert exit_code == 1
+    last_args, last_kwargs = states[-1]
+    assert last_args[1] == "conflicting"
+    assert last_kwargs.get("outcome") == "conflicting"
+    assert last_kwargs.get("merge_state") == "DIRTY"
+
+
+@pytest.mark.unit
+def test_watch_phase_ci_times_out(monkeypatch):
+    fake = snapshot_gh([ci_snapshot(gate=_gate("", status="IN_PROGRESS"))])
+    monkeypatch.setattr(pr_watch, "gh", fake)
+    states = []
+
+    exit_code = pr_watch._watch_phase_ci(
+        PR,
+        HEAD_SHA,
+        timeout_sec=0,
+        poll_sec=0,
+        state_sink=lambda *args, **kwargs: states.append((args, kwargs)),
+    )
+    assert exit_code == pr_watch.EXIT_UNDETERMINED
+    last_args, last_kwargs = states[-1]
+    assert last_args[1] == "timed_out"
+    assert last_kwargs.get("outcome") == "timed_out"
+
+
+@pytest.mark.unit
+def test_watch_phase_ci_undetermined_on_api_error(monkeypatch):
+    def bad_gh(*_args):
+        raise RuntimeError("network down")
+
+    monkeypatch.setattr(pr_watch, "gh", bad_gh)
+    states = []
+
+    exit_code = pr_watch._watch_phase_ci(
+        PR,
+        HEAD_SHA,
+        timeout_sec=10,
+        poll_sec=0,
+        state_sink=lambda *args, **kwargs: states.append((args, kwargs)),
+    )
+    assert exit_code == pr_watch.EXIT_UNDETERMINED
+    last_args, last_kwargs = states[-1]
+    assert last_args[1] == "undetermined"
+    assert last_kwargs.get("outcome") == "undetermined"
+
+
+@pytest.mark.unit
+def test_watch_phase_review_passes_when_approved_and_zero_threads(monkeypatch):
+    fake = make_gh(
+        reviews=[codex_review(HEAD_SHA, state="APPROVED")],
+        threads=[{"isResolved": True}],
+    )
+    monkeypatch.setattr(pr_watch, "gh", fake)
+    states = []
+
+    exit_code = pr_watch._watch_phase_review(
+        PR,
+        HEAD_SHA,
+        timeout_sec=10,
+        poll_sec=0,
+        state_sink=lambda *args, **kwargs: states.append((args, kwargs)),
+    )
+    assert exit_code == 0
+    last_args, last_kwargs = states[-1]
+    assert last_args[0] == HEAD_SHA
+    assert last_args[1] == "passed"
+    assert last_kwargs.get("outcome") == "passed"
+    assert last_kwargs.get("review_state") == "approval"
+    assert last_kwargs.get("unresolved_threads") == 0
+
+
+@pytest.mark.unit
+def test_watch_phase_review_action_required_when_threads_unresolved(monkeypatch):
+    fake = make_gh(
+        reviews=[codex_review(HEAD_SHA, state="APPROVED")],
+        threads=[{"isResolved": False}],
+    )
+    monkeypatch.setattr(pr_watch, "gh", fake)
+    states = []
+
+    exit_code = pr_watch._watch_phase_review(
+        PR,
+        HEAD_SHA,
+        timeout_sec=10,
+        poll_sec=0,
+        state_sink=lambda *args, **kwargs: states.append((args, kwargs)),
+    )
+    assert exit_code == 1
+    last_args, last_kwargs = states[-1]
+    assert last_args[1] == "action_required"
+    assert last_kwargs.get("outcome") == "action_required"
+    assert last_kwargs.get("unresolved_threads") == 1
+
+
+@pytest.mark.unit
+def test_watch_phase_review_action_required_when_not_approved(monkeypatch):
+    fake = make_gh(
+        reviews=[codex_review(OLD_SHA, state="CHANGES_REQUESTED")],
+    )
+    monkeypatch.setattr(pr_watch, "gh", fake)
+    states = []
+
+    exit_code = pr_watch._watch_phase_review(
+        PR,
+        HEAD_SHA,
+        timeout_sec=10,
+        poll_sec=0,
+        state_sink=lambda *args, **kwargs: states.append((args, kwargs)),
+    )
+    assert exit_code == 1
+    last_args, last_kwargs = states[-1]
+    assert last_args[1] == "action_required"
+    assert last_kwargs.get("outcome") == "action_required"
+    assert last_kwargs.get("review_state") == "not_approved"
+
+
+@pytest.mark.unit
+def test_watch_phase_review_exits_stale_when_head_moves(monkeypatch):
+    fake = make_gh()
+    monkeypatch.setattr(pr_watch, "gh", fake)
+    states = []
+
+    # PR head in fake_gh is HEAD_SHA, but watcher expects OLD_SHA
+    exit_code = pr_watch._watch_phase_review(
+        PR,
+        OLD_SHA,
+        timeout_sec=10,
+        poll_sec=0,
+        state_sink=lambda *args, **kwargs: states.append((args, kwargs)),
+    )
+    assert exit_code == 1
+    last_args, last_kwargs = states[-1]
+    assert last_args[0] == HEAD_SHA
+    assert last_args[1] == "stale"
+    assert last_kwargs.get("outcome") == "stale"
+
+
+@pytest.mark.unit
+def test_watch_phase_review_exits_conflicting_on_conflict(monkeypatch):
+    fake = make_gh(merge_state="CONFLICTING")
+    monkeypatch.setattr(pr_watch, "gh", fake)
+    states = []
+
+    exit_code = pr_watch._watch_phase_review(
+        PR,
+        HEAD_SHA,
+        timeout_sec=10,
+        poll_sec=0,
+        state_sink=lambda *args, **kwargs: states.append((args, kwargs)),
+    )
+    assert exit_code == 1
+    last_args, last_kwargs = states[-1]
+    assert last_args[1] == "conflicting"
+    assert last_kwargs.get("outcome") == "conflicting"
+    assert last_kwargs.get("merge_state") == "CONFLICTING"
+
+
+@pytest.mark.unit
+def test_json_mode_strict_stream_separation(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path))
+    monkeypatch.setattr(pr_watch, "JSON_MODE", True)
+    fake = snapshot_gh([ci_snapshot(gate=_gate("SUCCESS"))])
+    monkeypatch.setattr(pr_watch, "gh", fake)
+
+    def run():
+        return pr_watch._run_coordinated_watch(
+            PR,
+            lambda sink, _action: pr_watch._watch_phase_ci(
+                PR, HEAD_SHA, timeout_sec=10, poll_sec=0, state_sink=sink
+            ),
+            phase="ci",
+            expected_head=HEAD_SHA,
+        )
+
+    exit_code = run()
+    assert exit_code == 0
+
+    captured = capsys.readouterr()
+    stdout_lines = [line for line in captured.out.strip().split("\n") if line]
+    assert len(stdout_lines) == 1, (
+        f"stdout should be exactly 1 line, got: {stdout_lines}"
+    )
+
+    payload = json.loads(stdout_lines[0])
+    assert payload["schema_version"] == 1
+    assert payload["repository"] == f"{pr_watch.REPO_OWNER}/{pr_watch.REPO_NAME}"
+    assert payload["pr"] == PR
+    assert payload["phase"] == "ci"
+    assert payload["expected_head"] == HEAD_SHA
+    assert payload["observed_head"] == HEAD_SHA
+    assert payload["outcome"] == "passed"
+    assert payload["ci_gate"] == "SUCCESS"
+    assert "timestamp" in payload
+
+    # Ensure informational logs were sent to stderr
+    assert "CI Gate passed" in captured.err
+
+
+@pytest.mark.unit
+def test_watcher_records_telemetry_file(tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path))
+    monkeypatch.setenv("GH_MONITOR_HARNESS", "antigravity")
+    monkeypatch.setenv("GH_MONITOR_MODEL", "flash_lite")
+    log_dir = tmp_path / "telemetry_logs"
+    monkeypatch.setattr(pr_watch, "LOG_DIR", str(log_dir))
+    fake = snapshot_gh([ci_snapshot(gate=_gate("SUCCESS"))])
+    monkeypatch.setattr(pr_watch, "gh", fake)
+
+    exit_code = pr_watch._run_coordinated_watch(
+        PR,
+        lambda sink, _action: pr_watch._watch_phase_ci(
+            PR, HEAD_SHA, timeout_sec=10, poll_sec=0, state_sink=sink
+        ),
+        phase="ci",
+        expected_head=HEAD_SHA,
+    )
+    assert exit_code == 0
+
+    log_files = list(log_dir.glob("watcher-run-*.json"))
+    assert len(log_files) == 1
+    record = json.loads(log_files[0].read_text(encoding="utf-8"))
+    assert record["harness"] == "antigravity"
+    assert record["resolved_model"] == "flash_lite"
+    assert record["phase"] == "ci"
+    assert record["expected_head"] == HEAD_SHA
+    assert record["observed_head"] == HEAD_SHA
+    assert record["terminal_outcome"] == "passed"
+    assert "elapsed_wait" in record
+    assert "timestamp" in record
