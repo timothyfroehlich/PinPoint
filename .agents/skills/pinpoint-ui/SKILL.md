@@ -6,9 +6,11 @@ description: >-
   no dark: variants), Radix Select form resets, native select stale-option
   fallbacks, config-driven enums with rich metadata, discriminated-union props,
   Server Action conventions (Action suffix, checkPermission, Result), colocated
-  data access via cache() and revalidatePath, and transactional-service
-  patterns. Use when building UI, forms, components, badges, server actions, or
-  data fetching, or when user mentions UI/styling/components/forms/dropdowns.
+  data access via cache() and revalidatePath, transactional-service patterns,
+  and why console.* is expected in Client Components (logger imports fs and
+  cannot run on client; PII logging rules). Use when building UI, forms,
+  components, badges, server actions, data fetching, or logging, or when user
+  mentions UI/styling/components/forms/dropdowns/logging/console.
   Design-system depth is owned by pinpoint-design-bible.
 ---
 
