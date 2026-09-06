@@ -1680,6 +1680,73 @@ def test_json_mode_strict_stream_separation(tmp_path, monkeypatch, capsys):
 
 
 @pytest.mark.unit
+def test_json_mode_emits_terminal_payload_when_ci_fails(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path))
+    monkeypatch.setattr(pr_watch, "JSON_MODE", True)
+    fake = snapshot_gh([ci_snapshot(gate=_gate("FAILURE"))])
+    monkeypatch.setattr(pr_watch, "gh", fake)
+    monkeypatch.setattr(pr_watch, "_failed_ci_run_id", lambda _sha, _url: None)
+
+    exit_code = pr_watch._run_coordinated_watch(
+        PR,
+        lambda sink, _action: pr_watch._watch_phase_ci(
+            PR, HEAD_SHA, timeout_sec=10, poll_sec=0, state_sink=sink
+        ),
+        phase="ci",
+        expected_head=HEAD_SHA,
+    )
+
+    assert exit_code == 1
+    captured = capsys.readouterr()
+    stdout_lines = [line for line in captured.out.strip().split("\n") if line]
+    assert len(stdout_lines) == 1
+    payload = json.loads(stdout_lines[0])
+    assert payload["expected_head"] == HEAD_SHA
+    assert payload["observed_head"] == HEAD_SHA
+    assert payload["outcome"] == "failed"
+    assert payload["ci_gate"] == "FAILURE"
+
+
+@pytest.mark.unit
+def test_delegated_ci_checks_pinned_head_before_legacy_prechecks(monkeypatch):
+    monkeypatch.setattr(
+        pr_watch,
+        "_pre_check_blocking",
+        lambda _pr: pytest.fail("delegated CI must not run current-head prechecks"),
+    )
+    states = []
+
+    def stale_watch(pr, expected_head, *, state_sink):
+        assert pr == PR
+        assert expected_head == HEAD_SHA
+        state_sink(
+            OLD_SHA,
+            "stale",
+            "head moved",
+            None,
+            phase="ci",
+            expected_head=expected_head,
+            outcome="stale",
+        )
+        return 1
+
+    monkeypatch.setattr(pr_watch, "_watch_phase_ci", stale_watch)
+
+    exit_code = pr_watch._run_owned_watch(
+        PR,
+        False,
+        lambda *args, **kwargs: states.append((args, kwargs)),
+        lambda _action: None,
+        phase="ci",
+        expected_head=HEAD_SHA,
+    )
+
+    assert exit_code == 1
+    assert states[-1][0][0] == OLD_SHA
+    assert states[-1][1]["outcome"] == "stale"
+
+
+@pytest.mark.unit
 def test_watcher_records_telemetry_file(tmp_path, monkeypatch):
     monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path))
     monkeypatch.setenv("GH_MONITOR_HARNESS", "antigravity")

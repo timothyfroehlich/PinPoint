@@ -1540,7 +1540,6 @@ def _watch_phase_ci(
                         outcome="failed",
                         ci_gate=conclusion,
                         detail_url=details_url,
-                        failure_artifact=artifact,
                         merge_state=merge_state,
                     )
                 return 1
@@ -1874,7 +1873,25 @@ def _run_owned_watch(
             state_sink=state_sink,
         )
 
-    # CI Phase (phase == "ci" or legacy)
+    if phase == "ci" or expected_head is not None:
+        emit_event(f"Watching PR #{pr} — aggregate CI Gate")
+        state_sink(
+            expected_head or "",
+            "pending",
+            f"Watching PR #{pr} — aggregate CI Gate",
+            None,
+            phase="ci",
+            expected_head=expected_head,
+        )
+        return _watch_phase_ci(
+            pr,
+            expected_head or "",
+            state_sink=state_sink,
+        )
+
+    # Legacy CI mode keeps its current-head prechecks. Delegated CI mode above
+    # must compare the pinned head first so replacement-head failures or
+    # conflicts are reported as stale rather than attributed to expected_head.
     if not force:
         try:
             blocking_ok, reason, action_item = _pre_check_blocking(pr)
@@ -1916,12 +1933,6 @@ def _run_owned_watch(
         phase="ci",
         expected_head=expected_head,
     )
-    if phase == "ci" or expected_head is not None or JSON_MODE:
-        return _watch_phase_ci(
-            pr,
-            expected_head or "",
-            state_sink=state_sink,
-        )
     return _watch_ci_gate(pr, "", state_sink=state_sink)
 
 
