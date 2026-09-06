@@ -143,6 +143,10 @@ After pushing a commit (at `HEAD_SHA`), dispatch a lightweight watcher subagent 
 python3 scripts/workflow/pr-watch.py <PR> --phase ci --expected-head <HEAD_SHA> --json
 ```
 
+For a new draft PR, keep it draft until `CI Gate` succeeds for the current head, then
+run `gh pr ready <PR>`, then request the review in 3.4. Promotion alone does not start a
+Codex review. A green run for an older SHA does not qualify.
+
 **Stream discipline**: In `--json` mode, progressive logs go to `stderr`, and `stdout` receives strictly the terminal JSON object upon exit. Foreground subagents block until exit without token-wasting intermediate wakeups.
 
 **Handling the CI result**:
