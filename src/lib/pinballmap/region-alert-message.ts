@@ -2,7 +2,7 @@ import { sanitizeDiscordText } from "~/lib/discord/messages";
 import { pinballmapLocationUrl } from "./public-url";
 
 /**
- * Discord copy for the "new machines in the Austin region" alert (PP-o355.18).
+ * Discord copy for added and removed machines in a Pinball Map region.
  *
  * Pure formatting, no IO — the diff and the send live in `./region-alerts`.
  *
@@ -27,6 +27,7 @@ const DISCORD_MAX_MESSAGE_LENGTH = 2000;
 export const REGION_ALERT_MAX_LINES = 10;
 
 export interface RegionAlertEntry {
+  eventType: "added" | "removed";
   locationId: number;
   locationName: string | null;
   machineName: string | null;
@@ -74,14 +75,15 @@ function formatEntry(entry: RegionAlertEntry): string {
     entry.locationName === null
       ? `location #${String(entry.locationId)}`
       : sanitizeDiscordText(entry.locationName);
-  return `• ${machine} — [${venue}](${pinballmapLocationUrl(entry.locationId)})`;
+  const action = entry.eventType === "added" ? "Added" : "Removed";
+  return `• ${action}: ${machine} — [${venue}](${pinballmapLocationUrl(entry.locationId)})`;
 }
 
 /**
  * Build the announcement, or null when there is nothing to announce.
  *
- * Singular and plural get their own headline because "1 new machines" reads as a
- * bug in a channel post.
+ * A stable headline lets one digest carry both transition types in detection
+ * order without implying that a mixed post contains additions only.
  */
 export function formatRegionAlertMessage(
   input: RegionAlertMessageInput
@@ -90,10 +92,7 @@ export function formatRegionAlertMessage(
   if (entries.length === 0) return null;
 
   const region = sanitizeDiscordText(regionLabel);
-  const headline =
-    entries.length === 1
-      ? `**New on Pinball Map in ${region}**`
-      : `**${String(entries.length)} new machines on Pinball Map in ${region}**`;
+  const headline = `**Pinball Map changes in ${region}**`;
 
   const shown = entries.slice(0, REGION_ALERT_MAX_LINES);
   const entryLines = shown.map(formatEntry);
@@ -117,7 +116,7 @@ export function formatRegionAlertMessage(
   // they ever get: the rows are marked announced either way, so a line lost here
   // is lost permanently.
   const overflowLine = (n: number): string =>
-    `• …and ${String(n)} more (see the map for the full picture)`;
+    `• …and ${String(n)} more changes (see the map for the full picture)`;
   // Reserved unconditionally, sized for the largest count it could ever carry.
   // Adding it after the budget was spent is how a line-based trim reintroduces
   // the overflow it exists to prevent.

@@ -365,33 +365,16 @@ export const pinballmapAbandonedListings = pgTable(
 ).enableRLS();
 
 /**
- * Machine-at-location entries PinPoint has already seen in a PinballMap region
- * (PP-o355.18) — the memory behind the "new machine in Austin" Discord alert.
+ * Current membership of each Pinball Map machine-at-location xref in a region.
  *
- * One row per (region, lmx id). The daily job reads the whole region in one bulk
- * call and inserts every observed entry with ON CONFLICT DO NOTHING; the rows
- * that actually insert ARE the newly-added machines, so the diff is a single
- * statement rather than a set comparison in application memory.
+ * Rows survive removals because Pinball Map can revive the same LMX id within
+ * seven days. `generation` distinguishes each confirmed absent -> present return,
+ * while `missedRuns` requires two consecutive successful absences before removal.
+ * The separate event table below owns delivery and retry state.
  *
- * `announcedAt` is what keeps the announcement honest in both directions:
- * - the FIRST run for a region back-fills the entire region with `announcedAt`
- *   already set, so bootstrapping a few thousand existing entries announces
- *   nothing (no flood);
- * - afterwards a new row lands with `announcedAt` null and only clears once a
- *   Discord post has actually succeeded, so a failed or unconfigured post retries
- *   on the next run instead of silently swallowing the discovery.
- *
- * Rows are never deleted, and pruning would be actively wrong: PBM soft-deletes
- * an xref and REVIVES THE SAME ROW, id intact, if the machine is re-added within
- * seven days. Forgetting the id would turn that revival into a false "new
- * machine". Past seven days a re-add mints a fresh id and is announced, which is
- * the honest answer — by then it really is a new arrival.
- *
- * No name columns. The region endpoint carries none (six columns: id, timestamps,
- * location_id, machine_id, ic_enabled), so labels are resolved at announce time —
- * the machine from our own catalog mirror, the venue from the bulk
- * region-locations read. That also means the second PBM call happens only on days
- * with something to announce.
+ * `announcedAt` is retained for migrate-before-build compatibility with the old
+ * additions-only runtime. New generation-zero additions keep it in sync until
+ * delivered; newer generations use only the event queue.
  */
 export const pinballmapRegionSeenMachines = pgTable(
   "pinballmap_region_seen_machines",
@@ -409,7 +392,10 @@ export const pinballmapRegionSeenMachines = pgTable(
     firstSeenAt: timestamp("first_seen_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
-    // Null = discovered but not yet announced to Discord (retried next run).
+    isPresent: boolean("is_present").notNull().default(true),
+    missedRuns: integer("missed_runs").notNull().default(0),
+    generation: integer("generation").notNull().default(0),
+    // Legacy additions-only delivery state; see the table comment above.
     announcedAt: timestamp("announced_at", { withTimezone: true }),
   },
   (t) => ({
@@ -419,6 +405,38 @@ export const pinballmapRegionSeenMachines = pgTable(
     // and are never scanned again.
     pendingIdx: index("idx_pinballmap_region_seen_pending")
       .on(t.region, t.firstSeenAt)
+      .where(sql`announced_at is null`),
+  })
+).enableRLS();
+
+/**
+ * Durable add/remove transitions awaiting Discord delivery.
+ *
+ * Membership and delivery are intentionally separate: if a removal post fails
+ * and the same LMX returns, both the removal and the next-generation addition
+ * remain queued in detection order rather than collapsing into current state.
+ */
+export const pinballmapRegionAlertEvents = pgTable(
+  "pinballmap_region_alert_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    region: text("region").notNull(),
+    lmxId: integer("lmx_id").notNull(),
+    generation: integer("generation").notNull(),
+    eventType: text("event_type", { enum: ["added", "removed"] }).notNull(),
+    locationId: integer("location_id").notNull(),
+    pinballmapMachineId: integer("pinballmap_machine_id").notNull(),
+    detectedAt: timestamp("detected_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    announcedAt: timestamp("announced_at", { withTimezone: true }),
+  },
+  (t) => ({
+    transitionUnique: uniqueIndex(
+      "pinballmap_region_alert_events_transition_unique"
+    ).on(t.region, t.lmxId, t.generation, t.eventType),
+    pendingIdx: index("idx_pinballmap_region_alert_events_pending")
+      .on(t.region, t.detectedAt)
       .where(sql`announced_at is null`),
   })
 ).enableRLS();

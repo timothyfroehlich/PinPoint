@@ -41,9 +41,8 @@ describe("parseRegionLmxes against the captured Austin payload", () => {
     const parsed = parseRegionLmxes(regionLmxFixture);
 
     expect(parsed).toHaveLength(487);
-    // The real assertion: nothing was skipped. `parseRegionLmx` drops records it
-    // cannot place, silently and without a count, so a shrinking parse is how a
-    // shape change would reach us. Pinning parsed === raw makes that loud.
+    // A shrinking parse is how a shape change would reach us. The parser now
+    // rejects malformed entries rather than silently turning them into removals.
     expect(parsed).toHaveLength(raw.length);
   });
 
@@ -70,6 +69,28 @@ describe("parseRegionLmxes against the captured Austin payload", () => {
       locationId: 26454,
       machineId: 4532,
     });
+  });
+
+  it("rejects a malformed entry instead of creating a false absence", () => {
+    expect(() =>
+      parseRegionLmxes({
+        location_machine_xrefs: [
+          { id: 1, location_id: 2, machine_id: 3 },
+          { id: 4, machine_id: 5 },
+        ],
+      })
+    ).toThrow(/malformed entry at index 1/);
+  });
+
+  it("rejects duplicate LMX ids instead of silently deduplicating", () => {
+    expect(() =>
+      parseRegionLmxes({
+        location_machine_xrefs: [
+          { id: 1, location_id: 2, machine_id: 3 },
+          { id: 1, location_id: 4, machine_id: 5 },
+        ],
+      })
+    ).toThrow(/repeats LMX id 1/);
   });
 });
 

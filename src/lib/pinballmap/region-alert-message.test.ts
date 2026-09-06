@@ -7,6 +7,7 @@ import {
 
 function entry(overrides: Partial<RegionAlertEntry> = {}): RegionAlertEntry {
   return {
+    eventType: "added",
     locationId: 26454,
     locationName: "Austin Pinball Collective",
     machineName: "Godzilla (Premium)",
@@ -28,8 +29,8 @@ describe("formatRegionAlertMessage", () => {
       regionLabel: "Austin",
     });
 
-    expect(message).toContain("**New on Pinball Map in Austin**");
-    expect(message).toContain("Godzilla (Premium)");
+    expect(message).toContain("**Pinball Map changes in Austin**");
+    expect(message).toContain("• Added: Godzilla (Premium)");
     // The venue is the LINK TEXT of a masked link, not a trailing bare URL: a bare
     // one makes Discord stack a preview card under every line.
     expect(message).toContain(
@@ -90,12 +91,22 @@ describe("formatRegionAlertMessage", () => {
     );
   });
 
-  it("pluralizes the headline with the count", () => {
+  it("combines additions and removals in one digest", () => {
     const message = formatRegionAlertMessage({
-      entries: [entry(), entry({ locationId: 999, pinballmapMachineId: 1 })],
+      entries: [
+        entry(),
+        entry({
+          eventType: "removed",
+          locationId: 999,
+          machineName: "Medieval Madness",
+          pinballmapMachineId: 1,
+        }),
+      ],
       regionLabel: "Austin",
     });
-    expect(message).toContain("**2 new machines on Pinball Map in Austin**");
+    expect(message).toContain("**Pinball Map changes in Austin**");
+    expect(message).toContain("• Added: Godzilla (Premium)");
+    expect(message).toContain("• Removed: Medieval Madness");
   });
 
   it("falls back to ids when PBM gave us no names", () => {
@@ -123,10 +134,7 @@ describe("formatRegionAlertMessage", () => {
     expect(message).toContain(`Machine ${String(REGION_ALERT_MAX_LINES - 1)}`);
     expect(message).not.toContain(`Machine ${String(REGION_ALERT_MAX_LINES)}`);
     expect(message).toContain("…and 3 more");
-    // The headline still reports the true total, not the truncated list length.
-    expect(message).toContain(
-      `**${String(REGION_ALERT_MAX_LINES + 3)} new machines`
-    );
+    expect(message).toContain("**Pinball Map changes in Austin**");
   });
 
   it("neutralizes mentions and Markdown in third-party names", () => {
