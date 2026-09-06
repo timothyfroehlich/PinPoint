@@ -1161,7 +1161,14 @@ def test_review_state_current_head_finding_completes_review_coverage(monkeypatch
 @pytest.mark.unit
 @pytest.mark.parametrize("state", ["DISMISSED", "PENDING", "UNKNOWN"])
 def test_review_state_unusable_current_head_state_fails_closed(monkeypatch, state):
-    monkeypatch.setattr(pr_watch, "gh", make_gh(reviews=[codex_review(state=state)]))
+    monkeypatch.setattr(
+        pr_watch,
+        "gh",
+        make_gh(
+            reviews=[codex_review(state=state)],
+            comments=[manual_review_request()],
+        ),
+    )
     assert pr_watch.review_state(PR)[0] == "not_approved"
 
 

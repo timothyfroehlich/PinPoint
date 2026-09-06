@@ -885,6 +885,14 @@ def review_state(pr: int, *, head_sha: str | None = None) -> tuple[str, str]:
             f"Codex reviewed head {head_sha[:7]} with {state}; thread gate owns findings",
         )
 
+    if reviews and review_sha == head_sha:
+        return (
+            "not_approved",
+            f"Codex reviewed current head {review_sha[:7]} with unusable state "
+            f"{state}; "
+            f"{REVIEW_HINT.format(pr=pr)}",
+        )
+
     if any(request_sha == head_sha for request_sha, _at in review_requests):
         return "review_requested", REVIEW_REQUESTED_HINT
 
@@ -913,17 +921,10 @@ def review_state(pr: int, *, head_sha: str | None = None) -> tuple[str, str]:
                 latest_comment_state,
                 f"review record pins {latest_comment_sha[:7]} but head is {head_sha[:7]}",
             )
-        if review_sha != head_sha:
-            return (
-                "stale_approval",
-                f"Codex reviewed {review_sha[:7]} with {state}, but head is "
-                f"{head_sha[:7]} — "
-                f"{REVIEW_HINT.format(pr=pr)}",
-            )
         return (
-            "not_approved",
-            f"Codex reviewed current head {review_sha[:7]} with unusable state "
-            f"{state}; "
+            "stale_approval",
+            f"Codex reviewed {review_sha[:7]} with {state}, but head is "
+            f"{head_sha[:7]} — "
             f"{REVIEW_HINT.format(pr=pr)}",
         )
     if latest_marker_sha:
