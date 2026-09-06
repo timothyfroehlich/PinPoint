@@ -1515,15 +1515,15 @@ def _watch_phase_ci(
                     if state_sink is not None:
                         state_sink(
                             head_sha,
-                            "failed",
+                            "undetermined",
                             detail,
                             None,
-                            outcome="failed",
+                            outcome="undetermined",
                             ci_gate=conclusion,
                             detail_url=details_url,
                             merge_state=merge_state,
                         )
-                    return 1
+                    return EXIT_UNDETERMINED
             else:
                 detail = (
                     f"CI Gate failed on {head_sha[:7]} "

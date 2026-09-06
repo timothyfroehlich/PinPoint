@@ -298,6 +298,23 @@ def test_old_unusable_review_does_not_override_newer_stale_marker(run_dashboard)
 
 
 @pytest.mark.unit
+@pytest.mark.parametrize("state", ["DISMISSED", "PENDING", "UNKNOWN"])
+def test_old_unusable_review_without_comments_is_stale(run_dashboard, state):
+    response = open_pr_response(
+        [pr_node(4, reviews=[review(sha="b" * 40, state=state)])]
+    )
+    result, _calls = run_dashboard(
+        [
+            {"contains": ["pullRequests(first: 100"], "stdout": json.dumps(response)},
+            {"contains": ["issues/4/comments"], "stdout": "[]"},
+        ]
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "RE-REVIEW" in result.stdout.splitlines()[2]
+
+
+@pytest.mark.unit
 def test_comment_rate_limit_renders_review_unknown(run_dashboard):
     response = open_pr_response([pr_node(9, reviews=[])])
     result, calls = run_dashboard(

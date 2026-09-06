@@ -306,9 +306,11 @@ def _native_review_record(reviews: list[dict[str, Any]], head: str) -> ReviewRec
         return ReviewRecord("approval", sha, submitted_at)
     if state == "APPROVED":
         return ReviewRecord("stale_approval", sha, submitted_at)
-    if sha == head and state in {"COMMENTED", "CHANGES_REQUESTED"}:
-        return ReviewRecord("reviewed", sha, submitted_at)
-    return ReviewRecord("not_approved", sha, submitted_at)
+    if sha == head:
+        if state in {"COMMENTED", "CHANGES_REQUESTED"}:
+            return ReviewRecord("reviewed", sha, submitted_at)
+        return ReviewRecord("not_approved", sha, submitted_at)
+    return ReviewRecord("stale_approval", sha, submitted_at)
 
 
 def _comment_records(

@@ -471,6 +471,14 @@ def test_unusable_current_head_review_overrides_request_marker(state: str) -> No
     assert record[:4] == ["not_approved", HEAD_SHA, CODEX_BOT, state]
 
 
+@pytest.mark.parametrize("state", ["DISMISSED", "PENDING", "UNKNOWN"])
+def test_old_unusable_review_is_stale(state: str) -> None:
+    with gate_env(review_pages=[[codex_review(sha=OTHER_SHA, state=state)]]) as env:
+        record = review_record(env)
+
+    assert record[:4] == ["stale_approval", OTHER_SHA, CODEX_BOT, state]
+
+
 def test_delayed_old_head_review_does_not_override_current_native_approval() -> None:
     reviews = [
         codex_review(submitted_at="2026-08-22T12:00:00Z"),

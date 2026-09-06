@@ -1381,6 +1381,29 @@ def test_watch_phase_ci_fails_on_failure_gate(monkeypatch):
 
 
 @pytest.mark.unit
+def test_watch_phase_ci_reports_abandoned_superseded_gate_as_undetermined(monkeypatch):
+    fake = snapshot_gh([ci_snapshot(gate=_gate("CANCELLED"))])
+    monkeypatch.setattr(pr_watch, "gh", fake)
+    monkeypatch.setattr(pr_watch, "SUPERSEDED_GATE_GRACE", 0)
+    monkeypatch.setattr(pr_watch.time, "sleep", lambda _seconds: None)
+    states = []
+
+    exit_code = pr_watch._watch_phase_ci(
+        PR,
+        HEAD_SHA,
+        timeout_sec=10,
+        poll_sec=0,
+        state_sink=lambda *args, **kwargs: states.append((args, kwargs)),
+    )
+
+    assert exit_code == pr_watch.EXIT_UNDETERMINED
+    last_args, last_kwargs = states[-1]
+    assert last_args[1] == "undetermined"
+    assert last_kwargs.get("outcome") == "undetermined"
+    assert last_kwargs.get("ci_gate") == "CANCELLED"
+
+
+@pytest.mark.unit
 def test_watch_phase_ci_exits_stale_when_head_moves(monkeypatch):
     fake = snapshot_gh([ci_snapshot(head=OLD_SHA, gate=_gate("SUCCESS"))])
     monkeypatch.setattr(pr_watch, "gh", fake)
