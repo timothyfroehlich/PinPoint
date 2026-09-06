@@ -306,9 +306,11 @@ def _native_review_record(reviews: list[dict[str, Any]], head: str) -> ReviewRec
         return ReviewRecord("approval", sha, submitted_at)
     if state == "APPROVED":
         return ReviewRecord("stale_approval", sha, submitted_at)
-    if sha == head and state in {"COMMENTED", "CHANGES_REQUESTED"}:
-        return ReviewRecord("reviewed", sha, submitted_at)
-    return ReviewRecord("not_approved", sha, submitted_at)
+    if sha == head:
+        if state in {"COMMENTED", "CHANGES_REQUESTED"}:
+            return ReviewRecord("reviewed", sha, submitted_at)
+        return ReviewRecord("not_approved", sha, submitted_at)
+    return ReviewRecord("stale_approval", sha, submitted_at)
 
 
 def _comment_records(
@@ -368,7 +370,7 @@ def _comment_review_record(
     current_markers = [record for record in markers if record.sha == head]
     if current_markers:
         return current_markers[-1]
-    current_automatic = [
+    current_codex_results = [
         record
         for record in codex_results
         if (
@@ -377,8 +379,8 @@ def _comment_review_record(
             else record.sha == head
         )
     ]
-    if current_automatic:
-        return current_automatic[-1]
+    if current_codex_results:
+        return current_codex_results[-1]
     current_requests = [record for record in review_requests if record.sha == head]
     if current_requests:
         return current_requests[-1]
@@ -405,6 +407,12 @@ def _combined_review_state(native: ReviewRecord, comment: ReviewRecord) -> str:
             return comment.state
         return comment.state if comment.at > native.at else native.state
     if native.state == "reviewed":
+        return native.state
+    if (
+        native.state == "not_approved"
+        and comment.state == "review_requested"
+        and native.sha == comment.sha
+    ):
         return native.state
     if comment.state == "review_requested":
         return comment.state
