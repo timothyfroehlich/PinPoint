@@ -1,6 +1,6 @@
 ---
 name: pinpoint-security
-description: The security choices PinPoint made that its own code does not state — which modules may touch `@supabase/ssr` directly, the CSP authoring posture and what is already allowlisted, what counts as a non-gating role comparison under the `permissions-audit-allow` contract, why a `SECURITY DEFINER` RPC returning a secret needs an in-body `auth.role()` check rather than `REVOKE`/`GRANT` alone (and which migrations to copy), the multi-provider OAuth registry and unlink guard, the shared `sanitize-html` allowlist, and the `~/lib/url` seam (`getSiteUrl` / `requireSiteUrl` / `resolveRequestUrl` / `isInternalUrl` / `getSafeRedirect`) that makes hand-rolled `process.env` URL building a bug. Use when creating a Supabase server client, writing a Server Action's auth check, a Postgres function that reads Vault, a redirect, an absolute URL in an email or webhook, a CSP change, an OAuth flow, a sanitizer, or a permission gate. The enforced rules themselves are `CORE-SEC-*` / `CORE-SSR-*` in `docs/NON_NEGOTIABLES.md`; recorded threat-model decisions are in `docs/SECURITY.md`.
+description: The security choices PinPoint made that its own code does not state — which modules may touch `@supabase/ssr` directly, the CSP authoring posture and what is already allowlisted, matrix permissions vs resource-level predicates (`collections.ts`, `settings.ts`) under `src/lib/permissions/`, what counts as a non-gating role comparison under the `permissions-audit-allow` contract, why a `SECURITY DEFINER` RPC returning a secret needs an in-body `auth.role()` check rather than `REVOKE`/`GRANT` alone (and which migrations to copy), the multi-provider OAuth registry and unlink guard, the shared `sanitize-html` allowlist, and the `~/lib/url` seam (`getSiteUrl` / `requireSiteUrl` / `resolveRequestUrl` / `isInternalUrl` / `getSafeRedirect`) that makes hand-rolled `process.env` URL building a bug. Use when creating a Supabase server client, writing a Server Action's auth check, a Postgres function that reads Vault, a redirect, an absolute URL in an email or webhook, a CSP change, an OAuth flow, a sanitizer, or a permission gate. The enforced rules themselves are `CORE-SEC-*` / `CORE-SSR-*` in `docs/NON_NEGOTIABLES.md`; recorded threat-model decisions are in `docs/SECURITY.md`.
 ---
 
 # PinPoint Security
@@ -48,9 +48,11 @@ The `permissions-audit-allow` annotation contract is **enforced**, not documenta
 The line the audit cannot draw for you: a role comparison that **gates a request
 or enforces authorization** is forbidden outright and must go through
 `checkPermission()` / `getPermissionState()`. Comparisons that merely _shape_
-behaviour are allowed with an annotation — SQL/query row filtering (an `isAdmin`
-flag driving a `where` clause), UI display flags and badges, business-logic
-preconditions.
+behaviour are allowed with an annotation — non-protective UI display hints,
+badges, or domain invariants that do not govern access to protected data or
+capabilities. If a query row filter controls access to protected data or search
+scopes (such as matching reporter or user emails), that decision is an
+authorization capability and belongs under `checkPermission()`.
 
 **`getRawPermissionValue` is introspection-only.** It returns the raw matrix
 entry — `boolean | "own" | "owner" | "own_or_owner"` — so every conditional
@@ -65,6 +67,21 @@ directly: derive the `AccessLevel` and `OwnershipContext` server-side, pass them
 down as props, then call `getPermissionState` / `getPermissionDeniedReason` in
 the component. Deriving server-side also keeps the client payload minimal
 (CORE-SEC-006).
+
+### Matrix-level permissions vs. resource-level permission predicates
+
+Authorization in PinPoint is partitioned between two complementary layers:
+
+- **Matrix-level permissions (`matrix.ts` / `helpers.ts`)**: Model role-based capabilities and standard ownership rules across the application (e.g. `issues.create`, `machines.edit`, `collections.view.private`). `checkPermission(permission, accessLevel, context)` evaluates role levels and resolves `own`, `owner`, and `own_or_owner` against an `OwnershipContext` (`reporterId`, `machineOwnerId`). When an ownership rule fits this model, prefer extending the matrix and `OwnershipContext` so capabilities stay visible on `/help/permissions` (CORE-ARCH-008).
+- **Resource-level permission predicates (`collections.ts`, upcoming `settings.ts`)**: Reserved for authorization rules depending on multi-dimensional entity state that `OwnershipContext` cannot represent—such as collaborator rosters, compound record relationships (e.g., machine owner vs settings set creator), public/private draft visibility, or capability tokens (e.g. `canViewCollection`, `canEditCollection`, `canManageCollection`, `canViewSet`, `canEditSet`).
+
+**All permission helpers must live in `src/lib/permissions/` (CORE-ARCH-008).** Standalone permission predicates must never live scattered across feature domains (e.g., `src/lib/machines/settings-permissions.ts` being relocated to `src/lib/permissions/settings.ts` per PP-leli.5). Centralizing them in `src/lib/permissions/` ensures all authorization logic is discoverable in one place, cleanly separated from UI and data layers, and subject to audit scrutiny.
+
+**The role dimension must use `checkPermission()`; annotations are only for non-gating logic.** As noted above, the CI role-check audit exempts only `matrix.ts` and `helpers.ts`. Resource-level predicate modules under `src/lib/permissions/` are fully audited caller code. In resource-level helpers:
+
+- The role capability dimension (e.g., admin override or technician access) must be declared in `matrix.ts` and evaluated via `checkPermission()`, ensuring capabilities reflect on `/help/permissions` (CORE-ARCH-008).
+- Entity-specific checks handle ownership and identity comparisons (`viewer.userId === ownerId`, collaborator status) directly.
+- Hardcoded role comparisons must never be used as authorization gates—even inside resource-level predicate files. Any role comparison that merely shapes presentation or domain invariants without controlling access to protected data or capabilities must be explicit and tagged with `// permissions-audit-allow: <reason>`.
 
 ## OAuth providers
 

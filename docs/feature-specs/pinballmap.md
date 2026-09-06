@@ -42,6 +42,11 @@ Six independent facts. No one of them ever implies another.
   2026-08-15.)_
 - **Availability** — where the machine physically is (on the floor, on loan,
   removed, …). Never drives listing intent or the lineup automatically.
+- **Edition near-miss** — a candidate match relationship where a local machine
+  and a Pinball Map lineup entry share a title family (`machineGroupId`), but
+  differ in edition (e.g., Pro on Pinball Map vs. Premium in PinPoint). It will
+  not auto-link automatically and surfaces as a candidate match for operator
+  confirmation rather than an unrelated missing machine.
 
 **Sync participation** is the intent tri-state's third position: a machine
 set to Don't sync is exempt from alerts, reconciliation, and comment import — but its observed status stays visible, because
@@ -87,6 +92,9 @@ intent agrees with the lineup; _out of sync_ means they disagree.
   the entry on that machine's page, with the same removal action and
   matching copy. Listing the machine under its new title is likewise the
   standard flow — two actions, taken independently.
+- **2.6** An edition near-miss (§1) is flagged as a candidate match for operator
+  confirmation in fleet audit surfaces. Resolving an edition near-miss by selecting
+  or changing a match follows standard match reset and entry rules (§2.3, §2.5).
 
 ## 3. Reading from Pinball Map
 
@@ -184,6 +192,16 @@ intent agrees with the lineup; _out of sync_ means they disagree.
   technician, or admin (8.1) — sees the header and both rows, never the
   status row's push actions; the toggle renders read-only. The header
   Refresh stays available to them (8.3).
+- **4.10** In dense summary and table views (such as the fleet dashboard,
+  `docs/feature-specs/fleet.md`), listing and sync states render as compact
+  diagnostic badges:
+  - **In sync**: green styling for `On`, `Off`, `Shared`, or `Covered`.
+  - **Out of sync**: error/warning styling for `Missing` (intent On, absent from lineup) or `Lingering` (intent Off, present on lineup).
+  - **Advisory**: warning-styled badge for `Alert` (invalid availability) or note-styled badge for `Flag` (on loan / off floor).
+  - **Blocked**: quiet/muted styling for `Blocked` (intent Off, availability disallows adding to lineup).
+  - **Sync off**: neutral badge indicating the machine is excluded from sync.
+  - **Unlinked / Uncataloged**: neutral badge indicating no catalog model is linked (`No model`) or the machine is uncataloged (`Uncataloged`).
+  - **Integration inactive**: when the integration is `Not configured` or `Waiting` for its first snapshot, the PBM column group surfaces the integration-level status rather than per-row evaluation.
 
 ## 5. Automatic behavior
 
@@ -284,8 +302,8 @@ The Pinball Map section of the Admin Integrations page
 PinPoint-wide state: the tracked location (§1), its sync health, and an
 on-demand refresh. It is a configuration surface only — it does not show
 per-machine listing state or the listing control (those live on the machine
-edit page, §4), or fleet-wide Pinball Map views (those live on the admin fleet
-dashboard). The region-alert channel that shares the section is its own feature
+edit page, §4), or fleet-wide Pinball Map views (those live on the `/fleet`
+dashboard with member+ access, `docs/feature-specs/fleet.md`). The region-alert channel that shares the section is its own feature
 (`docs/feature-specs/pinballmap-region-alerts.md`).
 
 ### The section
@@ -429,6 +447,7 @@ logged here.
 
 | Date       | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | :--------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-09-05 | Defined the Edition Near-Miss concept (§1) and catalog matching rule (§2.6) for machines sharing a title family (`machineGroupId`) with differing editions. Defined dense diagnostic status badges (§4.10) and reconciled fleet-wide views to the `/fleet` dashboard (§10).                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | 2026-08-27 | Named the machine edit form's source label for an uncataloged game as **Manual Entry**, keeping "uncataloged" as the concept and state name. Made all three manual-model fields optional and blank by default: the title is suggested rather than pre-filled, so leaving it blank keeps following a later rename, and a blank manufacturer or year reads as Unknown under its own label while the machine header omits blanks. Split the old "No model / Uncataloged" state in two — uncataloged now has no control at all, collapsing the section to one line while keeping its place so an abandoned entry still surfaces. Stated that line as a requirement — it names the section and why it is unavailable — rather than prescribing its wording. |
 | 2026-08-27 | Added §10 (admin configuration): the Pinball Map section's behavior moved here from the Admin Integrations spec when that spec was slimmed to a page shell (PP-o355.51.8) — the section and its sync-health readout / Sync now (was admin §4), the configuration-presence state model (was admin §5), and the location-change safety rules (was admin §6). Added the tracked-location concept (§1). No behavior changed; this is a relocation, and the on/off model is unchanged (configuration presence, not an enable flag).                                                                                                                                                                                                                         |
 | 2026-08-23 | Replaced the distinct integration enable flag with configuration presence: a stored location means configured and no location means Not configured. Defined the dormant-state behavior, made all human-triggered lineup reads share the refresh allowance, and rewrote Waiting so it lasts until a valid snapshot arrives. Clarified that this state governs location tracking, not the separately configured region-alert feature.                                                                                                                                                                                                                                                                                                                    |

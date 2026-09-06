@@ -45,9 +45,12 @@ updates:
         update-types:
           - "minor"
           - "patch"
+    # "ownerless": opened by an unattended bot, so nobody owns the PR lifecycle
+    # (CI, review, merge readiness) until a human or orchestrator picks it up.
     labels:
       - "dependencies"
       - "pnpm"
+      - "ownerless"
 
   # GitHub Actions with 2-week cooldown
   - package-ecosystem: "github-actions"
@@ -65,3 +68,4 @@ updates:
     labels:
       - "dependencies"
       - "github-actions"
+      - "ownerless"

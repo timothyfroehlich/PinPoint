@@ -77,7 +77,7 @@ export function IssueCard({
       <Card
         className={cn(
           "transition-colors duration-150 h-full cursor-pointer border-outline-variant hover:border-primary/50 relative overflow-hidden",
-          isClosed ? "bg-surface-variant/30" : "bg-surface hover:glow-primary",
+          isClosed ? "bg-surface-variant/30" : "bg-card hover:glow-primary",
           className
         )}
         data-testid={dataTestId ?? "issue-card"}
