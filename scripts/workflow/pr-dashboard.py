@@ -406,7 +406,11 @@ def _combined_review_state(native: ReviewRecord, comment: ReviewRecord) -> str:
         return comment.state if comment.at > native.at else native.state
     if native.state == "reviewed":
         return native.state
-    if native.state == "not_approved" and native.sha == comment.sha:
+    if (
+        native.state == "not_approved"
+        and comment.state == "review_requested"
+        and native.sha == comment.sha
+    ):
         return native.state
     if comment.state == "review_requested":
         return comment.state
