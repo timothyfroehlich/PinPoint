@@ -166,4 +166,6 @@ MCP field-naming gotcha: responses use snake_case (`is_resolved`, `submitted_at`
 
 ## Related Docs
 
-- `.agents/skills/pinpoint-pr-workflow/SKILL.md` — Full skill: the review handoff, the merge handoff, and the MCP call sequences. Status-token responses are the table above, not there.
+- `.agents/skills/pinpoint-pr-workflow/SKILL.md` — Phase router for lifecycle decisions;
+  it points to the required review, screenshot, merge, post-merge, and exceptional-case
+  references. Status-token responses remain authoritative in the table above.
