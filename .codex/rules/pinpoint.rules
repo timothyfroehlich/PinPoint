@@ -102,22 +102,27 @@ prefix_rule(
     ],
 )
 prefix_rule(
-    pattern=["gh", ["--repo", "-R"], "timothyfroehlich/PinPoint", "pr", "merge"],
+    pattern=["gh", ["--repo", "-R"], ["timothyfroehlich/PinPoint", "github.com/timothyfroehlich/PinPoint"], "pr", "merge"],
     decision="forbidden",
     justification="Use bash scripts/workflow/merge-pr.sh <PR> --human so Tim approves after gate checks",
     match=[
         "gh --repo timothyfroehlich/PinPoint pr merge 2058",
         "gh -R timothyfroehlich/PinPoint pr merge 2058",
+        "gh --repo github.com/timothyfroehlich/PinPoint pr merge 2058",
+        "gh -R github.com/timothyfroehlich/PinPoint pr merge 2058",
     ],
 )
 prefix_rule(
-    pattern=["gh", ["--repo=timothyfroehlich/PinPoint", "-R=timothyfroehlich/PinPoint", "-Rtimothyfroehlich/PinPoint"], "pr", "merge"],
+    pattern=["gh", ["--repo=timothyfroehlich/PinPoint", "-R=timothyfroehlich/PinPoint", "-Rtimothyfroehlich/PinPoint", "--repo=github.com/timothyfroehlich/PinPoint", "-R=github.com/timothyfroehlich/PinPoint", "-Rgithub.com/timothyfroehlich/PinPoint"], "pr", "merge"],
     decision="forbidden",
     justification="Use bash scripts/workflow/merge-pr.sh <PR> --human so Tim approves after gate checks",
     match=[
         "gh --repo=timothyfroehlich/PinPoint pr merge 2058",
         "gh -R=timothyfroehlich/PinPoint pr merge 2058",
         "gh -Rtimothyfroehlich/PinPoint pr merge 2058",
+        "gh --repo=github.com/timothyfroehlich/PinPoint pr merge 2058",
+        "gh -R=github.com/timothyfroehlich/PinPoint pr merge 2058",
+        "gh -Rgithub.com/timothyfroehlich/PinPoint pr merge 2058",
     ],
 )
 prefix_rule(

@@ -34,6 +34,8 @@ bash scripts/workflow/codex-gh.sh merge-external <owner/repo> <PR-number> <merge
 ```
 
 It rejects PinPoint targets case-insensitively; PinPoint still uses `merge-pr.sh --human`.
+Raw global selectors for PinPoint are blocked in both bare `owner/repo` and configured-host
+`github.com/owner/repo` forms, including the separated, equals, and compact `-R` spellings.
 
 ## Scripts
 
