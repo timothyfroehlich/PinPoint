@@ -6,7 +6,7 @@ is supersession rather than failure, while an API outage is undetermined rather
 than a fabricated red result. Detailed run logs are fetched only after the
 aggregate gate has conclusively failed. (PP-r63o, PP-qkl8)
 
-Review state: `--check-ready` reports which automatic Codex-review state a PR is
+Review state: `--check-ready` reports which Codex-review state a PR is
 in without gating on it — "reviewed", "reviewed then pushed past", and "not yet
 reviewed" need different actions, and flattening a stale approval into "reviewed"
 is how a commit nobody read reaches the merge command.
@@ -867,7 +867,7 @@ def test_codex_login_is_identical_to_the_bash_gate():
         "stale_clean_reaction",
         "stale_marker",
         "not_approved",
-        "fallback_exhausted",
+        "review_requested",
         "unreviewed",
     ],
 )
@@ -881,35 +881,31 @@ def test_review_state_unreviewed(monkeypatch):
     monkeypatch.setattr(pr_watch, "gh", make_gh(reviews=()))
     state, detail = pr_watch.review_state(PR)
     assert state == "unreviewed"
-    assert "automatic Codex review" in detail
-    assert "bounded witness conclusively ends" in detail
-    assert "post one @codex review" in detail
-    assert "never repeat it" in detail
-    assert "slow or running attempt is not eligible" in detail
-    assert "new head restarts automatic-first" in detail
+    assert "request-codex-review.sh" in detail
+    assert "replacement CI and one new request" in detail
 
 
 @pytest.mark.unit
-def test_review_state_reports_current_head_fallback_as_exhausted(monkeypatch):
+def test_review_state_reports_current_head_request_as_pending(monkeypatch):
     monkeypatch.setattr(pr_watch, "gh", make_gh(comments=[manual_review_request()]))
     state, detail = pr_watch.review_state(PR)
-    assert state == "fallback_exhausted"
-    assert "already used" in detail
-    assert "do not post another" in detail
+    assert state == "review_requested"
+    assert "already requested" in detail
+    assert "do not request the same head again" in detail
 
 
 @pytest.mark.unit
 @pytest.mark.parametrize(
-    "fallback_comment",
+    "review_request_comment",
     [manual_review_request(OLD_SHA), manual_review_request(login="someone-else")],
 )
-def test_review_state_does_not_exhaust_for_old_or_untrusted_request(
-    monkeypatch, fallback_comment
+def test_review_state_ignores_old_or_untrusted_request(
+    monkeypatch, review_request_comment
 ):
-    monkeypatch.setattr(pr_watch, "gh", make_gh(comments=[fallback_comment]))
+    monkeypatch.setattr(pr_watch, "gh", make_gh(comments=[review_request_comment]))
     state, detail = pr_watch.review_state(PR)
     assert state == "unreviewed"
-    assert "post one @codex review" in detail
+    assert "request-codex-review.sh" in detail
 
 
 @pytest.mark.unit

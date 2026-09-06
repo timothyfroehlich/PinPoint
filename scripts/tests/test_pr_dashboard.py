@@ -230,7 +230,7 @@ def test_comments_are_fetched_only_for_missing_native_evidence_and_verify_app(
 
 
 @pytest.mark.unit
-def test_current_head_manual_fallback_is_visible_as_used(run_dashboard):
+def test_current_head_manual_request_is_visible_as_pending(run_dashboard):
     response = open_pr_response([pr_node(4, reviews=[])])
     comments = [
         {
@@ -247,7 +247,7 @@ def test_current_head_manual_fallback_is_visible_as_used(run_dashboard):
     )
 
     assert result.returncode == 0, result.stderr
-    assert "FALLBACK USED" in result.stdout.splitlines()[2]
+    assert "REQUESTED" in result.stdout.splitlines()[2]
     assert len(calls) == 2
 
 
