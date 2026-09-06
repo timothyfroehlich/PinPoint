@@ -79,6 +79,12 @@ test.describe("Machine Info tab — player landing", () => {
     }
     await expect(page.getByTestId("pbm-listing-refresh")).toBeVisible();
     await expect(page.getByTestId("pbm-listing-add")).toHaveCount(0);
+    await expect(
+      page.getByRole("link", { name: "Add it on Pinball Map" })
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole("link", { name: "Remove it on Pinball Map" })
+    ).toHaveCount(0);
 
     // The same route still withholds every machine-editing surface.
     await expect(

@@ -344,7 +344,8 @@ export default async function MachineEditPage({
             <PinballmapAbandonedEntries
               machineId={machine.id}
               entries={abandoned}
-              canPush={canPush && writeEnabled}
+              canPush={canPush}
+              writeEnabled={writeEnabled}
             />
           ) : null}
         </section>
