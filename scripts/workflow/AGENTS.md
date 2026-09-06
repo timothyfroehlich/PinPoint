@@ -60,7 +60,7 @@ Terminal JSON schema (`stdout`):
 
 Shared monitor state lives under `$XDG_STATE_HOME/pinpoint/pr-watch/` (falling back to `~/.local/state`) and carries schema version, repository, PR, current head, leader PID, status, timestamp, short detail, and an optional failure-artifact path. The process-held lock is the liveness proof; JSON alone is never ownership or reusable terminal evidence.
 
-Watcher run telemetry is recorded under `tmp/gh-monitor/watcher-run-<pr>-<phase>-<timestamp>.json` with harness, resolved model, expected/observed heads, elapsed wait, and terminal outcome.
+Watcher run telemetry is recorded under `tmp/gh-monitor/watcher-run-<pr>-<phase>-<timestamp>-<pid>-<nonce>.json` with harness, resolved model, expected/observed heads, elapsed wait, and terminal outcome.
 
 ### UI Screenshots
 

@@ -54,6 +54,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, NamedTuple
@@ -168,11 +169,16 @@ def _monitor_dir() -> Path:
 
 
 def _monitor_paths(
-    pr: int, *, force: bool = False, phase: str | None = None
+    pr: int,
+    *,
+    force: bool = False,
+    phase: str | None = None,
+    expected_head: str | None = None,
 ) -> tuple[Path, Path]:
     mode_suffix = "-force" if force else ""
     phase_suffix = f"-{phase}" if phase else ""
-    stem = f"{REPO_OWNER}-{REPO_NAME}-{pr}{phase_suffix}{mode_suffix}"
+    head_suffix = f"-{expected_head[:10]}" if expected_head else ""
+    stem = f"{REPO_OWNER}-{REPO_NAME}-{pr}{phase_suffix}{head_suffix}{mode_suffix}"
     root = _monitor_dir()
     return root / f"{stem}.lock", root / f"{stem}.json"
 
@@ -352,7 +358,10 @@ def _record_watcher_run(
         log_dir = Path(LOG_DIR)
         log_dir.mkdir(parents=True, exist_ok=True)
         ts_slug = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-        target = log_dir / f"watcher-run-{pr}-{phase}-{ts_slug}.json"
+        nonce = uuid.uuid4().hex[:8]
+        target = (
+            log_dir / f"watcher-run-{pr}-{phase}-{ts_slug}-{os.getpid()}-{nonce}.json"
+        )
         record = {
             "harness": os.environ.get("GH_MONITOR_HARNESS", "unknown"),
             "resolved_model": os.environ.get("GH_MONITOR_MODEL", "unknown"),
@@ -365,7 +374,24 @@ def _record_watcher_run(
             "provider_usage": None,
             "timestamp": _utc_now(),
         }
-        target.write_text(json.dumps(record, indent=2), encoding="utf-8")
+        temp_path: Path | None = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                mode="w",
+                encoding="utf-8",
+                dir=log_dir,
+                prefix=f".{target.name}.",
+                delete=False,
+            ) as handle:
+                temp_path = Path(handle.name)
+                json.dump(record, handle, indent=2)
+                handle.write("\n")
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(temp_path, target)
+        finally:
+            if temp_path is not None and temp_path.exists():
+                temp_path.unlink()
     except OSError:
         pass
 
@@ -387,7 +413,9 @@ def _run_coordinated_watch(
     state record before a follower accepts that state, closing the stale-file
     race between consecutive owners.
     """
-    lock_path, state_path = _monitor_paths(pr, force=force, phase=phase)
+    lock_path, state_path = _monitor_paths(
+        pr, force=force, phase=phase, expected_head=expected_head
+    )
     lock_path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     start_time = time.monotonic()
     with lock_path.open("a+", encoding="utf-8") as lock_handle:
@@ -415,6 +443,23 @@ def _run_coordinated_watch(
                     and attached_state["leader_pid"] == attached_pid
                     and attached_state["status"] in MONITOR_TERMINAL_STATUSES
                 ):
+                    leader_expected = str(
+                        attached_state.get("expected_head")
+                        or attached_state.get("head_sha")
+                        or ""
+                    )
+                    if (
+                        expected_head
+                        and leader_expected
+                        and not (
+                            leader_expected == expected_head
+                            or leader_expected.startswith(expected_head)
+                            or expected_head.startswith(leader_expected)
+                        )
+                    ):
+                        attached_pid = None
+                        time.sleep(follower_poll_sec)
+                        continue
                     surface_action_item(attached_state)
                     detail = str(attached_state["detail"])
                     emit(detail)
@@ -450,6 +495,20 @@ def _run_coordinated_watch(
                     and lock_owner is not None
                     and state["leader_pid"] == lock_owner
                 ):
+                    leader_expected = str(
+                        state.get("expected_head") or state.get("head_sha") or ""
+                    )
+                    if (
+                        expected_head
+                        and leader_expected
+                        and not (
+                            leader_expected == expected_head
+                            or leader_expected.startswith(expected_head)
+                            or expected_head.startswith(leader_expected)
+                        )
+                    ):
+                        time.sleep(follower_poll_sec)
+                        continue
                     if attached_pid != lock_owner:
                         attached_pid = lock_owner
                         last_signature = None
@@ -984,8 +1043,10 @@ def _pre_check_blocking(pr: int) -> tuple[bool, str, str]:
     semantics — there, CI-Gate-absent IS correctly a "no, not ready right now".
     """
     merge_state, _labels = _fetch_merge_state(pr)
-    if merge_state in ("DIRTY", "CONFLICTING", "BEHIND"):
+    if merge_state in ("DIRTY", "CONFLICTING"):
         return False, f"merge state {merge_state} — resolve before watching", ""
+    if merge_state == "BEHIND":
+        emit_event("Branch is behind main (non-blocking for CI)")
 
     ci_status, ci_conclusion = _ci_gate_state(pr)
     if ci_status == "COMPLETED":

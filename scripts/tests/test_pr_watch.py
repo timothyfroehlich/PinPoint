@@ -17,6 +17,7 @@ reach GitHub (CORE-TEST-006).
 
 import importlib.util
 import json
+import os
 import re
 import subprocess
 import sys
@@ -380,6 +381,30 @@ def test_pre_check_reports_unresolved_threads_without_blocking(monkeypatch, caps
     assert (ok, reason) == (True, "")
     assert action_item == "1 unresolved review thread(s) — resolve before merge"
     assert "1 unresolved review thread(s)" in capsys.readouterr().out
+
+
+@pytest.mark.unit
+def test_pre_check_allows_behind_merge_state(monkeypatch):
+    monkeypatch.setattr(
+        pr_watch,
+        "gh",
+        make_gh(rollup=[_gate("SUCCESS")], merge_state="BEHIND"),
+    )
+    ok, reason, _action_item = pr_watch._pre_check_blocking(PR)
+    assert ok, reason
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("merge_state", ["DIRTY", "CONFLICTING"])
+def test_pre_check_blocks_on_conflicting_merge_state(monkeypatch, merge_state):
+    monkeypatch.setattr(
+        pr_watch,
+        "gh",
+        make_gh(rollup=[_gate("SUCCESS")], merge_state=merge_state),
+    )
+    ok, reason, _action_item = pr_watch._pre_check_blocking(PR)
+    assert not ok
+    assert f"merge state {merge_state}" in reason
 
 
 # ---------------------------------------------------------------------------
@@ -1229,12 +1254,17 @@ def test_phase_monitor_paths_isolate_ci_and_review(tmp_path, monkeypatch):
     lock_default, state_default = pr_watch._monitor_paths(PR)
     lock_ci, state_ci = pr_watch._monitor_paths(PR, phase="ci")
     lock_review, state_review = pr_watch._monitor_paths(PR, phase="review")
+    lock_ci_head, state_ci_head = pr_watch._monitor_paths(
+        PR, phase="ci", expected_head=HEAD_SHA
+    )
 
-    assert lock_default != lock_ci != lock_review
+    assert lock_default != lock_ci != lock_review != lock_ci_head
     assert "-ci.lock" in lock_ci.name
     assert "-review.lock" in lock_review.name
+    assert f"-ci-{HEAD_SHA[:10]}.lock" in lock_ci_head.name
     assert "-ci.json" in state_ci.name
     assert "-review.json" in state_review.name
+    assert f"-ci-{HEAD_SHA[:10]}.json" in state_ci_head.name
 
 
 @pytest.mark.unit
@@ -1537,6 +1567,7 @@ def test_watcher_records_telemetry_file(tmp_path, monkeypatch):
 
     log_files = list(log_dir.glob("watcher-run-*.json"))
     assert len(log_files) == 1
+    assert f"-{os.getpid()}-" in log_files[0].name
     record = json.loads(log_files[0].read_text(encoding="utf-8"))
     assert record["harness"] == "antigravity"
     assert record["resolved_model"] == "flash_lite"
