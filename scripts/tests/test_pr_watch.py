@@ -18,6 +18,7 @@ reach GitHub (CORE-TEST-006).
 import importlib.util
 import json
 import re
+import stat
 import subprocess
 import sys
 import time
@@ -710,7 +711,7 @@ def test_watch_fetches_failure_artifact_only_after_red(monkeypatch, capsys):
     monkeypatch.setattr(
         pr_watch,
         "write_failure_artifact",
-        lambda run_id: f"tmp/gh-monitor/failure-{run_id}.md",
+        lambda _pr, _head, run_id, _url: f"tmp/gh-monitor/failure-{run_id}.md",
     )
 
     assert pr_watch._watch_ci_gate(PR, HEAD_SHA, timeout_sec=60, poll_sec=0) == 1
@@ -816,6 +817,87 @@ def test_failure_run_lookup_is_terminal_only_and_head_scoped(monkeypatch):
     assert len(calls) == 1
     assert calls[0][:2] == ("run", "list")
     assert "--workflow" not in calls[0]
+
+
+@pytest.mark.unit
+def test_failure_artifact_indexes_jobs_tests_annotations_and_bounded_excerpts(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setattr(pr_watch, "LOG_DIR", str(tmp_path))
+    secret = "ghp_abcdefghijklmnopqrstuvwxyz123456"
+    log_lines = [
+        f"SERVICE_TOKEN={secret}",
+        "early root cause",
+        *[f"filler {number}" for number in range(60)],
+        "Unit Tests\tRun unit tests\tFAILED scripts/tests/test_example.py::test_failure - AssertionError",
+        "Unit Tests\tRun unit tests\tFAIL src/test/unit/example.test.ts > example > rejects bad input",
+        "E2E Full\tRun Playwright\t  1) [chromium] › e2e/full/example.spec.ts:12:3 › example flow",
+        "late cleanup failure",
+    ]
+    run_data = {
+        "conclusion": "failure",
+        "headSha": HEAD_SHA,
+        "url": "https://github.com/timothyfroehlich/PinPoint/actions/runs/555",
+        "workflowName": "CI",
+        "jobs": [
+            {
+                "name": "Unit Tests",
+                "conclusion": "failure",
+                "url": "https://github.com/o/r/actions/runs/555/job/999",
+                "steps": [
+                    {"name": "Run unit tests", "conclusion": "failure"},
+                    {"name": "Upload results", "conclusion": "success"},
+                ],
+            }
+        ],
+    }
+
+    def fake_run(args, **_kwargs):
+        if args[-1:] == ["--log-failed"]:
+            return subprocess.CompletedProcess(args, 0, "\n".join(log_lines), "")
+        if "--json" in args and args[:3] == ["gh", "run", "view"]:
+            return subprocess.CompletedProcess(args, 0, json.dumps(run_data), "")
+        if args[:3] == ["gh", "run", "view"]:
+            return subprocess.CompletedProcess(
+                args,
+                0,
+                "ANNOTATIONS\nX failure annotation at example.ts:12\n"
+                "For more information about the job, try: gh run view\n",
+                "",
+            )
+        if args[:3] == ["gh", "pr", "view"]:
+            return subprocess.CompletedProcess(
+                args, 0, "Compact CI failure report\n", ""
+            )
+        raise AssertionError(f"unexpected command: {args}")
+
+    monkeypatch.setattr(pr_watch.subprocess, "run", fake_run)
+
+    artifact = Path(
+        pr_watch.write_failure_artifact(
+            PR,
+            HEAD_SHA,
+            555,
+            "https://github.com/o/r/actions/runs/555/job/999",
+        )
+    )
+    report = artifact.read_text()
+
+    assert f"PR: #{PR} — Compact CI failure report" in report
+    assert f"Head: `{HEAD_SHA}`" in report
+    assert "**Unit Tests** — `failure`" in report
+    assert "step: **Run unit tests** — `failure`" in report
+    assert "test_example.py::test_failure" in report
+    assert "example.test.ts > example" in report
+    assert "example.spec.ts:12:3" in report
+    assert "failure annotation at example.ts:12" in report
+    assert "early root cause" in report
+    assert "late cleanup failure" in report
+    assert "lines omitted" in report
+    assert secret not in report
+    assert "SERVICE_TOKEN=[REDACTED]" in report
+    assert stat.S_IMODE(artifact.stat().st_mode) == 0o600
+    assert len(report.encode()) < 12_000
 
 
 # ---------------------------------------------------------------------------

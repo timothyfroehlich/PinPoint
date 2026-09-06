@@ -90,6 +90,11 @@ FALLBACK_EXHAUSTED_HINT = (
 )
 
 LOG_DIR = "tmp/gh-monitor"
+FAILURE_REPORT_RETENTION_SECONDS = 7 * 24 * 60 * 60
+FAILURE_REPORT_HEAD_LINES = 12
+FAILURE_REPORT_TAIL_LINES = 20
+FAILURE_REPORT_ITEM_LIMIT = 20
+FAILURE_REPORT_LINE_LIMIT = 240
 WATCH_POLL_SECONDS = 30
 # PR CI currently has a 30-minute job backstop. Leave another 30 minutes for
 # runner queueing while still bounding unattended harness waits.
@@ -902,13 +907,144 @@ def run_audit(pr: int) -> bool:
     return all_ok
 
 
-def write_failure_artifact(run_id: int) -> str:
-    """Fetch failure logs and write a markdown report. Returns the file path."""
+ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
+SENSITIVE_VALUE_RE = re.compile(
+    r"(?i)(\b(?:[A-Z0-9_]*(?:TOKEN|SECRET|PASSWORD|PASSWD|API_KEY|CREDENTIAL|AUTH)"
+    r"[A-Z0-9_]*)(?:['\"]?\s*[:=]\s*['\"]?))([^'\"\s,}]+)"
+)
+GITHUB_TOKEN_RE = re.compile(r"\bgh[pousr]_[A-Za-z0-9_]{20,}\b")
+
+
+def _clean_failure_line(line: str) -> str:
+    clean = ANSI_ESCAPE_RE.sub("", line).strip()
+    clean = SENSITIVE_VALUE_RE.sub(r"\1[REDACTED]", clean)
+    clean = GITHUB_TOKEN_RE.sub("[REDACTED]", clean)
+    if len(clean) > FAILURE_REPORT_LINE_LIMIT:
+        return f"{clean[: FAILURE_REPORT_LINE_LIMIT - 1]}…"
+    return clean
+
+
+def _unique_bounded(lines: list[str]) -> list[str]:
+    items: list[str] = []
+    seen: set[str] = set()
+    for line in lines:
+        clean = _clean_failure_line(line)
+        if not clean or clean in seen:
+            continue
+        seen.add(clean)
+        items.append(clean)
+        if len(items) == FAILURE_REPORT_ITEM_LIMIT:
+            break
+    return items
+
+
+def _failure_excerpt(lines: list[str]) -> list[str]:
+    clean = [_clean_failure_line(line) for line in lines]
+    nonempty = [line for line in clean if line]
+    limit = FAILURE_REPORT_HEAD_LINES + FAILURE_REPORT_TAIL_LINES
+    if len(nonempty) <= limit:
+        return nonempty
+    omitted = len(nonempty) - limit
+    return [
+        *nonempty[:FAILURE_REPORT_HEAD_LINES],
+        f"… {omitted} lines omitted; use the GitHub run for complete logs …",
+        *nonempty[-FAILURE_REPORT_TAIL_LINES:],
+    ]
+
+
+def _failed_test_lines(lines: list[str]) -> list[str]:
+    candidates: list[str] = []
+    patterns = (
+        re.compile(r"(?:^|\t)(FAILED\s+\S+.*)$"),
+        re.compile(r"(?:^|\t)(FAIL\s+(?:src|scripts|e2e)/.*)$"),
+        re.compile(r"(?:^|\t)\s*(\d+\)\s+\[[^]]+\]\s+›\s+.*)$"),
+    )
+    for line in lines:
+        clean = ANSI_ESCAPE_RE.sub("", line).strip()
+        for pattern in patterns:
+            match = pattern.search(clean)
+            if match is not None:
+                candidates.append(match.group(1))
+                break
+    return _unique_bounded(candidates)
+
+
+def _annotation_lines(lines: list[str]) -> list[str]:
+    annotations: list[str] = []
+    in_annotations = False
+    for line in lines:
+        clean = ANSI_ESCAPE_RE.sub("", line).strip()
+        if clean == "ANNOTATIONS":
+            in_annotations = True
+            continue
+        if not in_annotations:
+            continue
+        if clean in {"ARTIFACTS", "JOBS"} or clean.startswith("For more information"):
+            break
+        if clean:
+            annotations.append(clean)
+    return _unique_bounded(annotations)
+
+
+def _failed_job_lines(run_data: dict) -> list[str]:
+    lines: list[str] = []
+    jobs = run_data.get("jobs")
+    if not isinstance(jobs, list):
+        return lines
+    for job in jobs:
+        if not isinstance(job, dict):
+            continue
+        conclusion = str(job.get("conclusion") or "unknown")
+        if conclusion.lower() in {"success", "skipped", "neutral"}:
+            continue
+        name = _clean_failure_line(str(job.get("name") or "unnamed job"))
+        url = str(job.get("url") or "")
+        lines.append(f"- **{name}** — `{conclusion}`" + (f" — {url}" if url else ""))
+        steps = job.get("steps")
+        if not isinstance(steps, list):
+            continue
+        for step in steps:
+            if not isinstance(step, dict):
+                continue
+            step_conclusion = str(step.get("conclusion") or "")
+            if step_conclusion.lower() in {"success", "skipped", "neutral", ""}:
+                continue
+            step_name = _clean_failure_line(str(step.get("name") or "unnamed step"))
+            lines.append(f"  - step: **{step_name}** — `{step_conclusion}`")
+    return lines[:FAILURE_REPORT_ITEM_LIMIT]
+
+
+def _prune_failure_reports(now: float) -> None:
+    for report in Path(LOG_DIR).glob("failure-*.md"):
+        try:
+            if now - report.stat().st_mtime > FAILURE_REPORT_RETENTION_SECONDS:
+                report.unlink()
+        except FileNotFoundError:
+            continue
+
+
+def write_failure_artifact(
+    pr: int, head_sha: str, run_id: int, details_url: str = ""
+) -> str:
+    """Write a compact failure index while GitHub retains the complete evidence."""
     os.makedirs(LOG_DIR, exist_ok=True)
+    _prune_failure_reports(time.time())
     path = f"{LOG_DIR}/failure-{run_id}.md"
 
     log = subprocess.run(
         ["gh", "run", "view", str(run_id), "--log-failed"],
+        capture_output=True,
+        text=True,
+    )
+    run_json = subprocess.run(
+        [
+            "gh",
+            "run",
+            "view",
+            str(run_id),
+            "--json",
+            "conclusion,headSha,jobs,url,workflowName",
+        ],
         capture_output=True,
         text=True,
     )
@@ -917,15 +1053,77 @@ def write_failure_artifact(run_id: int) -> str:
         capture_output=True,
         text=True,
     )
-    log_tail = "\n".join(log.stdout.splitlines()[-100:]) or "(no log available)"
+    title_result = subprocess.run(
+        ["gh", "pr", "view", str(pr), "--json", "title", "--jq", ".title"],
+        capture_output=True,
+        text=True,
+    )
+
+    run_data: dict = {}
+    if run_json.returncode == 0:
+        try:
+            parsed = json.loads(run_json.stdout)
+            if isinstance(parsed, dict):
+                run_data = parsed
+        except json.JSONDecodeError:
+            pass
+
+    run_url = str(run_data.get("url") or "")
+    if not run_url and details_url:
+        run_url = details_url.split("/job/", 1)[0]
+    if not run_url:
+        run_url = f"https://github.com/{REPO_OWNER}/{REPO_NAME}/actions/runs/{run_id}"
+    observed_head = str(run_data.get("headSha") or head_sha)
+    conclusion = str(run_data.get("conclusion") or "unknown")
+    workflow = _clean_failure_line(str(run_data.get("workflowName") or "CI"))
+    title = (
+        _clean_failure_line(title_result.stdout) if title_result.returncode == 0 else ""
+    )
+    title = title or "(title unavailable)"
+    log_lines = log.stdout.splitlines()
+    if not log_lines and log.returncode != 0:
+        diagnostic = _clean_failure_line(log.stderr)
+        log_lines = [
+            f"failed-log retrieval unavailable (exit {log.returncode})"
+            + (f": {diagnostic}" if diagnostic else "")
+        ]
+    failed_jobs = _failed_job_lines(run_data)
+    failed_tests = _failed_test_lines(log_lines)
+    annotations = _annotation_lines(summary.stdout.splitlines())
+    excerpt = _failure_excerpt(log_lines)
     now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
-    with open(path, "w", encoding="utf-8") as f:
-        f.write("# GitHub Actions Failure Report\n")
-        f.write(f"Run ID: {run_id}\nGenerated: {now}\n\n")
-        f.write(f"## Failed Steps Log\n\n```text\n{log_tail}\n```\n\n")
-        summary_text = summary.stdout or "(no summary available)"
-        f.write(f"## Run Summary\n\n```text\n{summary_text}\n```\n")
+    descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    os.chmod(path, 0o600)
+    with os.fdopen(descriptor, "w", encoding="utf-8") as report:
+        report.write("# GitHub Actions Failure Index\n\n")
+        report.write(f"- PR: #{pr} — {title}\n")
+        report.write(f"- Head: `{observed_head}`\n")
+        report.write(f"- Workflow: {workflow} — `{conclusion}`\n")
+        report.write(f"- Run: [{run_id}]({run_url})\n")
+        report.write(f"- Generated: {now}\n")
+        report.write(
+            "- Complete evidence: use the GitHub run for full logs and downloadable "
+            "Playwright artifacts.\n\n"
+        )
+
+        report.write("## Failed jobs and steps\n\n")
+        report.write("\n".join(failed_jobs) if failed_jobs else "(none identified)")
+        report.write("\n\n## Failing tests\n\n")
+        report.write(
+            "\n".join(f"- `{test}`" for test in failed_tests)
+            if failed_tests
+            else "(none parsed)"
+        )
+        report.write("\n\n## Surfaced annotations\n\n")
+        report.write(
+            "\n".join(f"- {annotation}" for annotation in annotations)
+            if annotations
+            else "(none surfaced by gh run view)"
+        )
+        report.write("\n\n## Bounded failed-log excerpt\n\n```text\n")
+        report.write("\n".join(excerpt) if excerpt else "(failed log unavailable)")
+        report.write("\n```\n")
 
     return path
 
@@ -1063,7 +1261,12 @@ def _watch_ci_gate(
                         head_sha, str((gate or {}).get("detailsUrl") or "")
                     )
                     if run_id is not None:
-                        artifact = write_failure_artifact(run_id)
+                        artifact = write_failure_artifact(
+                            pr,
+                            head_sha,
+                            run_id,
+                            str((gate or {}).get("detailsUrl") or ""),
+                        )
                         emit(f"Failure details: {artifact}")
                 except (RuntimeError, json.JSONDecodeError, OSError, ValueError) as exc:
                     emit(f"Failure logs unavailable: {exc}")
