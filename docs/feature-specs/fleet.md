@@ -50,15 +50,15 @@
 - **5.1** Pinball Map columns render from stored snapshot state without making live third-party API calls on page render.
 - **5.2** The table displays the last snapshot sync timestamp in the section header.
 - **5.3** Edition near-misses (matching title family / `machineGroupId`, differing edition) are visually highlighted as distinct from genuinely unmatched machines to guide catalog linking.
-- **5.4** Desync statuses (e.g., condition mismatch, unlisted cabinet present on floor, listed cabinet removed) render explicit diagnostic badges derived from `derivePbmMachineStatus()`.
+- **5.4** Pinball Map sync and advisory states (such as In Sync, Missing, Lingering, Alert, and Flag) render explicit diagnostic status badges defined in `docs/feature-specs/pinballmap.md` §4.10.
 
 ---
 
 ## 6. Per-Machine Inspection Surface & Responsive Behavior
 
 - **6.1** Selecting a row or clicking its inspect action opens the **Per-Machine Inspection Surface** for the focused machine.
-- **6.2** On desktop viewports (`≥1024px`), the inspection surface opens as an anchored side-by-side pane, adjusting the main table container width without obscuring the pinned machine column.
-- **6.3** On narrower viewports, the inspection surface opens as a full-width bottom sheet (`Drawer` / `Sheet`) with drag-to-dismiss behavior and touch-optimized action targets.
+- **6.2** On desktop and tablet viewports (`≥768px` / `md:`), the inspection surface opens as an anchored side-by-side pane, adjusting the main table container width without obscuring the pinned machine column.
+- **6.3** On mobile viewports (`<768px`), the inspection surface opens as a full-width bottom drawer (`Drawer`) with drag-to-dismiss behavior and touch-optimized action targets.
 - **6.4** The inspection surface presents detailed per-machine PBM sync diagnostics, local vs. PBM edition comparisons, owner attribution notes, and action triggers (Trigger Snapshot Sync, Edit Match Link, Open on PinballMap.com).
 
 ---
