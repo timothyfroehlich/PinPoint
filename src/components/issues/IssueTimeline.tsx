@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useTransition } from "react";
+import { checkPermission } from "~/lib/permissions/helpers";
 import { formatDateTime } from "~/lib/dates";
 import { useRelativeNow } from "~/components/issues/RelativeTimeProvider";
 import { Avatar, AvatarFallback } from "~/components/ui/avatar";
@@ -227,7 +228,8 @@ function TimelineItem({
     currentUserId === event.author.id && !event.isSystem && !isIssue;
   // Delete: author can delete own comments, admins can delete any comment
   const canDelete =
-    (currentUserId === event.author.id || currentUserRole === "admin") &&
+    (currentUserId === event.author.id ||
+      checkPermission("comments.delete.any", currentUserRole)) &&
     !event.isSystem &&
     !isIssue;
 

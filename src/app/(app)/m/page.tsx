@@ -24,7 +24,7 @@ import {
   sortMachines,
 } from "~/lib/machines/filters-queries";
 import { MachineFilters } from "~/components/machines/MachineFilters";
-import { getAccessLevel } from "~/lib/permissions/helpers";
+import { getAccessLevel, checkPermission } from "~/lib/permissions/helpers";
 import { formatDate } from "~/lib/dates";
 import { PageContainer } from "~/components/layout/PageContainer";
 import { PageHeader } from "~/components/layout/PageHeader";
@@ -150,19 +150,18 @@ export default async function MachinesPage({
     filters.sort ?? "name_asc"
   );
 
-  const addMachineButton =
-    accessLevel === "admin" || accessLevel === "technician" ? (
-      <Button
-        asChild
-        className="bg-primary text-on-primary hover:bg-primary/90"
-        data-testid="add-machine-button"
-      >
-        <Link href="/m/new">
-          <Plus className="mr-2 size-4" />
-          Add Machine
-        </Link>
-      </Button>
-    ) : undefined;
+  const addMachineButton = checkPermission("machines.create", accessLevel) ? (
+    <Button
+      asChild
+      className="bg-primary text-on-primary hover:bg-primary/90"
+      data-testid="add-machine-button"
+    >
+      <Link href="/m/new">
+        <Plus className="mr-2 size-4" />
+        Add Machine
+      </Link>
+    </Button>
+  ) : undefined;
 
   return (
     <PageContainer size="wide">
@@ -189,12 +188,12 @@ export default async function MachinesPage({
               icon={Plus}
               title="No machines yet"
               description={
-                accessLevel === "admin" || accessLevel === "technician"
+                checkPermission("machines.create", accessLevel)
                   ? "Get started by adding your first machine to the collection."
                   : "No machines have been added to the collection yet."
               }
               action={
-                accessLevel === "admin" || accessLevel === "technician" ? (
+                checkPermission("machines.create", accessLevel) ? (
                   <Button
                     asChild
                     className="bg-primary text-on-primary hover:bg-primary/90"

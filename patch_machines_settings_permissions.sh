@@ -1,0 +1,4 @@
+sed -i 's/  access === "technician" || access === "admin";/  access === "technician" || access === "admin"; \/\/ permissions-audit-allow: per-set authorization matrix logic/g' src/lib/machines/settings-permissions.ts
+sed -i 's/  if (set.isPublic || set.isPreferred || access === "admin") return true;/  if (set.isPublic || set.isPreferred || access === "admin") return true; \/\/ permissions-audit-allow: per-set authorization matrix logic/g' src/lib/machines/settings-permissions.ts
+sed -i 's/  if (access === "admin") return true;/  if (access === "admin") return true; \/\/ permissions-audit-allow: per-set authorization matrix logic/g' src/lib/machines/settings-permissions.ts
+sed -i 's/  return access === "admin" || isMachineOwner(machineOwnerId, viewerId);/  return access === "admin" || isMachineOwner(machineOwnerId, viewerId); \/\/ permissions-audit-allow: per-set authorization matrix logic/g' src/lib/machines/settings-permissions.ts

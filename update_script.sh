@@ -1,0 +1,1 @@
+sed -i 's/raw=$(rg -n -B1 -A1 '\''.*'\'' src \\/raw=$(rg -n -B1 -A1 '\''\\b[A-Za-z_$][A-Za-z0-9_$.]*\\s*(===|!==)\\s*"(admin|technician|member|guest)"'\'' src \\/' scripts/audit/no-hardcoded-role-checks.sh

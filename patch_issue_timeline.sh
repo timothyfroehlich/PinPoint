@@ -1,0 +1,1 @@
+sed -i 's/    (currentUserId === event.author.id || currentUserRole === "admin") &&/    (currentUserId === event.author.id || checkPermission("comments.delete.any", currentUserRole)) \&\&/g' src/components/issues/IssueTimeline.tsx

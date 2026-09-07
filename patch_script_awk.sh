@@ -1,0 +1,1 @@
+sed -i 's/    # Record allow markers at this (file, lineno)./    # Exclude JSDoc and comment lines for the exact match line.\n    if (content ~ \/^[[:space:]]*(\\*|\\\/\\\/|{\\\/\\*)\/) {\n      if (sep == ":") {\n        next\n      }\n    }\n\n    # Record allow markers at this (file, lineno)./g' scripts/audit/no-hardcoded-role-checks.sh
