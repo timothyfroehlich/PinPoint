@@ -176,7 +176,7 @@ _comment_review_record() {
                 end) as $resolved_sha
              | { sha: $resolved_sha,
                  reviewer: (if ($body | test("—\\s*Antigravity|antigravity-code"; "i")) then "antigravity" else "claude-code" end),
-                 detail: (($body | [scan("/code-review\\s+([a-z0-9-]+)")] | flatten | (.[0] // "two-axis"))),
+                 detail: "two-axis",
                  at: $at,
                  summary: (($body | [scan("(?m)^\\*\\*Summary[^\n]*")] | flatten | (.[0] // ($body | split("\n")[0]))) // "") }
            else empty end

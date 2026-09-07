@@ -391,7 +391,7 @@ def _comment_records(
                 elif head_committed_date:
                     sha = "stale"
                 else:
-                    sha = head
+                    continue
             markers.append(ReviewRecord("marker", sha, at))
     codex_results.sort(key=lambda record: record.at)
     review_requests.sort(key=lambda record: record.at)
