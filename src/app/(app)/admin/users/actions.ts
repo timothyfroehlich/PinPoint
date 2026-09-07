@@ -207,7 +207,7 @@ export async function updateUserRole(
     if (
       validated.userType === "active" &&
       validated.userId === user.id &&
-      validated.newRole !== "admin"
+      validated.newRole !== "admin" // permissions-audit-allow: self-demotion invariant
     ) {
       throw new Error("Admins cannot demote themselves");
     }

@@ -26,7 +26,7 @@ export interface SettingsSetAuth {
 }
 
 const isTechPlus = (access: AccessLevel): boolean =>
-  access === "technician" || access === "admin";
+  access === "technician" || access === "admin"; // permissions-audit-allow: per-set authorization matrix logic
 
 const isMachineOwner = (
   machineOwnerId: string | null,
@@ -42,7 +42,7 @@ export function canViewSet(
   viewerId: string | null,
   access: AccessLevel
 ): boolean {
-  if (set.isPublic || set.isPreferred || access === "admin") return true;
+  if (set.isPublic || set.isPreferred || access === "admin") return true; // permissions-audit-allow: per-set authorization matrix logic
   return set.createdById !== null && set.createdById === viewerId;
 }
 
@@ -57,7 +57,7 @@ export function canEditSet(
   access: AccessLevel
 ): boolean {
   if (!canViewSet(set, viewerId, access)) return false;
-  if (access === "admin") return true;
+  if (access === "admin") return true; // permissions-audit-allow: per-set authorization matrix logic
   if (isMachineOwner(machineOwnerId, viewerId)) return true;
   // An owner set on a machine with NO owner has nobody to protect it for — the
   // 0060 backfill turns every pre-existing preferred set into an owner set,
@@ -79,7 +79,7 @@ export function canSetOwnerDefault(
   access: AccessLevel
 ): boolean {
   if (!set.isOwnerSet) return false;
-  return access === "admin" || isMachineOwner(machineOwnerId, viewerId);
+  return access === "admin" || isMachineOwner(machineOwnerId, viewerId); // permissions-audit-allow: per-set authorization matrix logic
 }
 
 /** Publishing (public toggle) needs the same rights as editing. */

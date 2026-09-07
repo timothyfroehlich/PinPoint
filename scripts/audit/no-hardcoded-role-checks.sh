@@ -25,7 +25,7 @@ if ! command -v rg >/dev/null 2>&1; then
   echo "Install with: brew install ripgrep   (or: apt-get install ripgrep)" >&2
   exit 2
 fi
-raw=$(rg -n -B1 -A1 '\brole\s*(===|!==)\s*"(admin|technician|member|guest)"' src \
+raw=$(rg -n -B1 -A1 '\b[A-Za-z_$][A-Za-z0-9_$.]*\s*(===|!==)\s*"(admin|technician|member|guest)"' src \
   --glob '!src/lib/permissions/matrix.ts' \
   --glob '!src/lib/permissions/helpers.ts' \
   --glob '!**/*.test.*' \
@@ -62,6 +62,14 @@ matches=$(echo "$raw" | awk '
     if (parsed == "") next
     n = split(parsed, parts, SUBSEP)
     file = parts[1]; lineno = parts[2] + 0; sep = parts[3]; content = parts[4]
+
+    # Skip pure comment/JSDoc lines — they describe role checks, not perform them.
+    if (content ~ /^[[:space:]]*(\*|\/\/|{\/\*)/) {
+      if (sep == ":") {
+        next
+      }
+    }
+
     # Record allow markers at this (file, lineno).
     if (content ~ /permissions-audit-allow:/) {
       allow[file, lineno] = 1

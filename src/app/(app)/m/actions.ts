@@ -395,7 +395,7 @@ export async function createMachineAction(
     if (activeOwner) {
       // Validate assignee is not a guest
       // permissions-audit-allow: business-logic data validation, not a permission gate
-      if (activeOwner.role === "guest") {
+      if (activeOwner.role === "guest") { // permissions-audit-allow: ownership transfer guest rejection
         return err(
           "ASSIGNEE_NOT_MEMBER",
           "Selected owner is a guest and must be promoted to member first.",
@@ -420,7 +420,7 @@ export async function createMachineAction(
       }
       // Validate invited assignee is not a guest
       // permissions-audit-allow: business-logic data validation, not a permission gate
-      if (invitedOwner.role === "guest") {
+      if (invitedOwner.role === "guest") { // permissions-audit-allow: ownership transfer guest rejection
         return err(
           "ASSIGNEE_NOT_MEMBER",
           "Selected owner is a guest and must be promoted to member first.",
@@ -944,7 +944,7 @@ export async function updateMachineAction(
       if (activeOwner) {
         // Validate assignee is not a guest
         // permissions-audit-allow: business-logic data validation, not a permission gate
-        if (activeOwner.role === "guest") {
+        if (activeOwner.role === "guest") { // permissions-audit-allow: ownership transfer guest rejection
           return err(
             "ASSIGNEE_NOT_MEMBER",
             "Selected owner is a guest and must be promoted to member first.",
@@ -970,7 +970,7 @@ export async function updateMachineAction(
         }
         // Validate invited assignee is not a guest
         // permissions-audit-allow: business-logic data validation, not a permission gate
-        if (invitedOwner.role === "guest") {
+        if (invitedOwner.role === "guest") { // permissions-audit-allow: ownership transfer guest rejection
           return err(
             "ASSIGNEE_NOT_MEMBER",
             "Selected owner is a guest and must be promoted to member first.",

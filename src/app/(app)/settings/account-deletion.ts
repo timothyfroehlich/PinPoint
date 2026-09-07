@@ -62,7 +62,7 @@ export async function anonymizeUserReferences(
       throw new Error("Profile not found");
     }
 
-    if (profile.role === "admin") {
+    if (profile.role === "admin") { // permissions-audit-allow: sole-admin deletion invariant
       // permissions-audit-allow: sole-admin invariant
       const [adminCount] = await tx
         .select({ count: count() })

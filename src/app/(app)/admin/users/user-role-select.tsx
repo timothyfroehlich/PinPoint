@@ -34,7 +34,7 @@ export function UserRoleSelect({
     if (
       userType === "active" &&
       userId === currentUserId &&
-      newRole !== "admin"
+      newRole !== "admin" // permissions-audit-allow: self-demotion invariant
     ) {
       toast.error("You cannot demote yourself.");
       return;
@@ -58,7 +58,7 @@ export function UserRoleSelect({
       defaultValue={currentRole}
       onValueChange={handleRoleChange}
       disabled={
-        isPending || (userId === currentUserId && currentRole === "admin")
+        isPending || (userId === currentUserId && currentRole === "admin") // permissions-audit-allow: self-demotion invariant
       }
     >
       <SelectTrigger
