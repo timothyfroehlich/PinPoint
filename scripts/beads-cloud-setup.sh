@@ -12,7 +12,8 @@
 # WHY THIS LIVES IN THE REPO. The claude.ai environment's "Setup script" field
 # used to hold this inline. That copy could not be reviewed or diffed, and its
 # version pins silently drifted. Moving the body here makes it reviewable and
-# collapses the pin to a SINGLE source of truth: scripts/beads-compatibility.json.
+# keeps the fresh-cloud pin in one reviewable snapshot:
+# scripts/beads-cloud-compatibility.json.
 # The UI field is now just a one-line shim — the repo is already cloned at
 # container-provision time, so the shim locates the checkout and runs this script:
 #
@@ -23,9 +24,9 @@
 # ~/PinPoint resolves to /root/PinPoint and misses it. This script itself uses
 # BASH_SOURCE below, so it works no matter which of those paths invoked it.
 #
-# THE PINS ARE READ FROM COMPATIBILITY CONTRACT, NOT DUPLICATED. bd and dolt are
+# THE CLOUD PINS ARE READ FROM THE SNAPSHOT, NOT DUPLICATED. bd and dolt are
 # installed at exactly the versions this script parses out of
-# scripts/beads-compatibility.json. So bumping the pin is an edit to the manifest;
+# scripts/beads-cloud-compatibility.json. So bumping the pin is an edit to the manifest;
 # the approved cloud-asset digests, installed binaries, and runtime guards move
 # together and cannot disagree.
 # (Rationale for exact pins: an accidental newer release, e.g. bd 1.2.1 on
@@ -78,7 +79,7 @@ manifest_platform_digest() {
 # Resolve this script's directory so the pin read below works regardless of the
 # setup script's cwd (it runs from $HOME, not the repo root).
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-COMPAT_FILE="$SCRIPT_DIR/beads-compatibility.json"
+COMPAT_FILE="$SCRIPT_DIR/beads-cloud-compatibility.json"
 
 # --- The pins: read from the compatibility manifest (single source of truth). --
 [[ -f "$COMPAT_FILE" ]] || die "cannot find $COMPAT_FILE — is this the PinPoint checkout?"

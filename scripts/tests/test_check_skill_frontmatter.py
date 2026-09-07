@@ -323,7 +323,8 @@ def test_find_skill_files(tmp_path: Path):
 
 def test_real_repo_skills_pass():
     skills = find_skill_files([Path(".agents/skills")])
-    assert len(skills) >= 16
+    # The generic Beads skill is user-global in dotfiles, not repository-local.
+    assert len(skills) >= 15
     for skill_file in skills:
         errors = check_skill_file(skill_file, config_path=CONFIG_PATH)
         assert errors == [], f"Errors in {skill_file}: {errors}"

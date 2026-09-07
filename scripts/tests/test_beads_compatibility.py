@@ -1,8 +1,7 @@
-"""Tests for PinPoint bd & Dolt compatibility contract and cloud/service integration.
+"""Tests for PinPoint cloud Beads compatibility and bootstrap integration.
 
-Tests the machine-readable manifest at scripts/beads-compatibility.json,
-version parsing across setup/init scripts, fail-closed guard behaviors,
-and Bazzite systemd service unit template configuration.
+Tests the vendored fresh-cloud compatibility snapshot, cloud setup/init scripts,
+and fail-closed guard behaviors.
 """
 
 import hashlib
@@ -19,12 +18,9 @@ import pytest
 pytestmark = pytest.mark.integration
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
-MANIFEST_PATH = REPO_ROOT / "scripts" / "beads-compatibility.json"
+MANIFEST_PATH = REPO_ROOT / "scripts" / "beads-cloud-compatibility.json"
 SETUP_SCRIPT = REPO_ROOT / "scripts" / "beads-cloud-setup.sh"
 INIT_SCRIPT = REPO_ROOT / "scripts" / "beads-cloud-init.sh"
-DOLT_SERVICE = REPO_ROOT / "scripts" / "beads-server" / "dolt-sql-server.service"
-BRIDGE_SERVICE = REPO_ROOT / "scripts" / "beads-server" / "beads-dolthub-bridge.service"
-SETUP_MD = REPO_ROOT / "scripts" / "beads-server" / "SETUP.md"
 RUNBOOK_MD = REPO_ROOT / "docs" / "runbooks" / "cloud-routines-beads-access.md"
 
 
@@ -58,7 +54,7 @@ class TestBeadsCompatibilityManifest:
 class TestVersionParsing:
     def test_setup_script_regex_extracts_versions(self):
         setup_content = SETUP_SCRIPT.read_text(encoding="utf-8")
-        assert "beads-compatibility.json" in setup_content
+        assert "beads-cloud-compatibility.json" in setup_content
 
         manifest_content = MANIFEST_PATH.read_text(encoding="utf-8")
         data = json.loads(manifest_content)
@@ -78,7 +74,7 @@ class TestVersionParsing:
 
     def test_init_script_regex_extracts_versions(self):
         init_content = INIT_SCRIPT.read_text(encoding="utf-8")
-        assert "beads-compatibility.json" in init_content
+        assert "beads-cloud-compatibility.json" in init_content
 
         manifest_content = MANIFEST_PATH.read_text(encoding="utf-8")
         data = json.loads(manifest_content)
@@ -378,241 +374,9 @@ class TestCloudInitGuards:
         assert proc.returncode != 0
 
 
-DOLT_LAUNCHER = REPO_ROOT / "scripts" / "beads-server" / "dolt-sql-server.sh"
-BRIDGE_SCRIPT = REPO_ROOT / "scripts" / "beads-server" / "beads-dolthub-bridge.sh"
-
-
-def run_bridge_pull_conflict(
-    tmp_path: Path, *, conflict_state: str
-) -> tuple[subprocess.CompletedProcess[str], list[str]]:
-    """Run one bridge conflict cycle against deterministic bd/dolt stubs."""
-    bin_dir = tmp_path / "bin"
-    bin_dir.mkdir()
-    calls_file = tmp_path / "dolt-calls"
-    state_file = tmp_path / "dolt-state"
-
-    data = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
-    bd_bin = bin_dir / "bd"
-    bd_bin.write_text(
-        f"""#!/bin/sh
-case "$*" in
-  version) echo 'bd version {data["bd"]} (test)' ;;
-  'dolt commit') exit 0 ;;
-  'dolt pull') echo 'merge conflicts in issues require operator resolution' >&2; exit 1 ;;
-  *) echo "unexpected bd call: $*" >&2; exit 88 ;;
-esac
-""",
-        encoding="utf-8",
-    )
-    bd_bin.chmod(0o755)
-
-    dolt_bin = bin_dir / "dolt"
-    dolt_bin.write_text(
-        f"""#!/bin/sh
-if [ "$1" = version ]; then
-  echo 'dolt version {data["dolt"]}'
-  exit 0
-fi
-printf '%s\\n' "$*" >> "$DOLT_CALLS_FILE"
-if printf '%s' "$*" | grep -q 'is_merging'; then
-  printf 'is_merging\\n'
-  if [ "$DOLT_TEST_CONFLICT_STATE" = clean ] || [ -f "$DOLT_STATE_FILE" ]; then
-    printf '0\\n'
-  else
-    printf '1\\n'
-  fi
-elif printf '%s' "$*" | grep -q 'DOLT_MERGE'; then
-  touch "$DOLT_STATE_FILE"
-else
-  echo "unexpected dolt call: $*" >&2
-  exit 89
-fi
-""",
-        encoding="utf-8",
-    )
-    dolt_bin.chmod(0o755)
-
-    env = {
-        "PATH": f"{bin_dir}:/usr/bin:/bin",
-        "HOME": str(tmp_path),
-        "PINPOINT_DIR": str(REPO_ROOT),
-        "BEADS_DOLT_PASSWORD": "dummy",
-        "BEADS_SERVER_HOST": "test-host",
-        "BEADS_SERVER_PORT": "13306",
-        "BEADS_SERVER_USER": "test-user",
-        "BEADS_DB": "PP",
-        "DOLT_CALLS_FILE": str(calls_file),
-        "DOLT_STATE_FILE": str(state_file),
-        "DOLT_TEST_CONFLICT_STATE": conflict_state,
-    }
-    proc = subprocess.run(
-        ["bash", str(BRIDGE_SCRIPT)], env=env, capture_output=True, text=True
-    )
-    calls = calls_file.read_text(encoding="utf-8").splitlines()
-    return proc, calls
-
-
-class TestBazziteServiceTemplates:
-    def test_dolt_service_uses_mise_exec_and_launcher(self):
-        content = DOLT_SERVICE.read_text(encoding="utf-8")
-        assert (
-            "mise exec -- /usr/bin/bash %h/.beads-server/dolt-sql-server.sh" in content
-        )
-        assert "MISE_EXEC_AUTO_INSTALL=false" in content
-        assert "MISE_NOT_FOUND_AUTO_INSTALL=false" in content
-        assert "MISE_NOT_FOUND_SYSTEM_FALLBACK=false" in content
-        assert "linuxbrew" not in content
-
-    def test_bridge_service_uses_mise_exec(self):
-        content = BRIDGE_SERVICE.read_text(encoding="utf-8")
-        assert (
-            "mise exec -- /usr/bin/bash %h/.beads-server/beads-dolthub-bridge.sh"
-            in content
-        )
-        assert "MISE_EXEC_AUTO_INSTALL=false" in content
-        assert "MISE_NOT_FOUND_AUTO_INSTALL=false" in content
-        assert "MISE_NOT_FOUND_SYSTEM_FALLBACK=false" in content
-        assert "linuxbrew" not in content
-
-
-class TestBazziteServiceGuards:
-    def test_dolt_launcher_validates_manifest(self, tmp_path: Path):
-        bin_dir = tmp_path / "bin"
-        bin_dir.mkdir()
-
-        data = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
-        dolt_ver = data["dolt"]
-
-        dolt_bin = bin_dir / "dolt"
-        dolt_bin.write_text(
-            f"#!/bin/sh\nif [ \"$1\" = 'version' ]; then echo 'dolt version {dolt_ver}'; exit 0; fi\necho \"server mock $@\"\n",
-            encoding="utf-8",
-        )
-        dolt_bin.chmod(0o755)
-
-        env = {
-            "PATH": f"{bin_dir}:/usr/bin:/bin",
-            "HOME": str(tmp_path),
-            "PINPOINT_DIR": str(REPO_ROOT),
-        }
-
-        proc = subprocess.run(
-            ["bash", str(DOLT_LAUNCHER), "--help"],
-            env=env,
-            capture_output=True,
-            text=True,
-        )
-        assert proc.returncode == 0
-        assert "matches compatibility contract" in proc.stderr
-
-    def test_dolt_launcher_fails_on_version_mismatch(self, tmp_path: Path):
-        bin_dir = tmp_path / "bin"
-        bin_dir.mkdir()
-
-        dolt_bin = bin_dir / "dolt"
-        dolt_bin.write_text(
-            "#!/bin/sh\necho 'dolt version 9.9.9'\n",
-            encoding="utf-8",
-        )
-        dolt_bin.chmod(0o755)
-
-        env = {
-            "PATH": f"{bin_dir}:/usr/bin:/bin",
-            "HOME": str(tmp_path),
-            "PINPOINT_DIR": str(REPO_ROOT),
-        }
-
-        proc = subprocess.run(
-            ["bash", str(DOLT_LAUNCHER), "--help"],
-            env=env,
-            capture_output=True,
-            text=True,
-        )
-        assert proc.returncode != 0
-        assert "refusing to start server" in proc.stderr
-
-    def test_bridge_script_fails_on_bd_version_mismatch(self, tmp_path: Path):
-        bin_dir = tmp_path / "bin"
-        bin_dir.mkdir()
-
-        data = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
-        dolt_ver = data["dolt"]
-
-        bd_bin = bin_dir / "bd"
-        bd_bin.write_text(
-            "#!/bin/sh\necho 'bd version 0.0.1'\n",
-            encoding="utf-8",
-        )
-        bd_bin.chmod(0o755)
-
-        dolt_bin = bin_dir / "dolt"
-        dolt_bin.write_text(
-            f"#!/bin/sh\necho 'dolt version {dolt_ver}'\n",
-            encoding="utf-8",
-        )
-        dolt_bin.chmod(0o755)
-
-        env = {
-            "PATH": f"{bin_dir}:/usr/bin:/bin",
-            "HOME": str(tmp_path),
-            "PINPOINT_DIR": str(REPO_ROOT),
-            "BEADS_DOLT_PASSWORD": "dummy",
-        }
-
-        proc = subprocess.run(
-            ["bash", str(BRIDGE_SCRIPT)],
-            env=env,
-            capture_output=True,
-            text=True,
-        )
-        assert proc.returncode != 0
-        assert "refusing bridge cycle" in proc.stderr
-
-    def test_bridge_conflict_recovery_uses_remote_dolt_connection_flags(
-        self, tmp_path: Path
-    ):
-        """Connection flags belong to the root `dolt` command, before `sql`."""
-        proc, calls = run_bridge_pull_conflict(tmp_path, conflict_state="clean")
-
-        assert proc.returncode != 0
-        assert calls
-        assert all(
-            call.startswith(
-                "--host test-host --port 13306 --user test-user "
-                "--password dummy --no-tls --use-db PP sql "
-            )
-            for call in calls
-        )
-
-    def test_bridge_skips_abort_when_pull_already_restored_conflicts(
-        self, tmp_path: Path
-    ):
-        proc, calls = run_bridge_pull_conflict(tmp_path, conflict_state="clean")
-
-        assert proc.returncode != 0
-        assert any("is_merging" in call for call in calls)
-        assert all("DOLT_MERGE" not in call for call in calls)
-        assert "no merge remains active" in proc.stderr
-
-    def test_bridge_aborts_and_verifies_a_schema_only_conflict(self, tmp_path: Path):
-        proc, calls = run_bridge_pull_conflict(tmp_path, conflict_state="active")
-
-        assert proc.returncode != 0
-        assert sum("is_merging" in call for call in calls) == 2
-        assert sum("DOLT_MERGE" in call for call in calls) == 1
-        assert "merge aborted; no merge remains active" in proc.stderr
-
-
 class TestDocumentationReferences:
-    def test_setup_md_references_manifest(self):
-        content = SETUP_MD.read_text(encoding="utf-8")
-        assert "scripts/beads-compatibility.json" in content
-        assert "mise exec -- dolt" in content
-        assert "mise exec -- bd" in content
-        assert "Disposable compatibility testing" in content
-
     def test_runbook_references_manifest(self):
         content = RUNBOOK_MD.read_text(encoding="utf-8")
-        assert "scripts/beads-compatibility.json" in content
+        assert "scripts/beads-cloud-compatibility.json" in content
         assert "dolt" in content
         assert "bd" in content

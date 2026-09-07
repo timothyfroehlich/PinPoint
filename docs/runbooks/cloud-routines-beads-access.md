@@ -100,12 +100,13 @@ That script installs `dolt` (pinned) and `bd` (pinned); the agent then runs
 **The compatibility contract pins both `bd` and `dolt`.** The 2026-08-16
 lockout was a `bd` schema migration — `bd` owns `schema_migrations` and the
 additive migrations that broke it, while `dolt` is the storage engine. Pinning
-both `bd` and `dolt` to exact versions in `scripts/beads-compatibility.json`
-guarantees consistent schema handling, client-server wire compatibility, and
-reproducibility across cloud sandboxes, Mac laptops, and Bazzite hosts.
+both `bd` and `dolt` to exact versions in `scripts/beads-cloud-compatibility.json`
+guarantees consistent schema handling and reproducibility across fresh cloud
+sandboxes. The matching local/Bazzite runtime contract lives in Tim's dotfiles
+at `all/.agents/beads/compatibility.json`.
 
-**The toolchain pins are single-source.** `beads-cloud-setup.sh` reads both
-`bd` and `dolt` versions from `scripts/beads-compatibility.json` and installs
+**The cloud pins are single-source inside this checkout.** `beads-cloud-setup.sh` reads both
+`bd` and `dolt` versions from `scripts/beads-cloud-compatibility.json` and installs
 exactly those by exact release tags. The same manifest declares the approved
 SHA-256 digest for each supported cloud platform. Setup downloads both archives
 into an isolated temporary directory, verifies both before extracting or
@@ -122,7 +123,10 @@ Caveat, now narrowed: only the one-line shim lives in the un-diffable UI — the
 install logic it calls is in git. The reviewable, enforced backstop remains the
 version guard in `scripts/beads-cloud-init.sh`, which refuses to touch the DB
 unless both the installed `bd` and `dolt` equal their pins in
-`scripts/beads-compatibility.json`.
+`scripts/beads-cloud-compatibility.json`.
+
+An upgrade is a paired rollout: update and validate the dotfiles runtime
+contract first, then refresh this cloud snapshot and its archive digests.
 
 ## Credential setup (one-time)
 
@@ -163,7 +167,7 @@ bd dolt push
 The script reads `DOLT_CREDS_JWK`, `DOLT_CREDS_PUB`, and `BEADS_SYNC_REMOTE` from
 the environment (agent-runtime only — see #55440 above), writes the DoltHub
 credential and `~/.dolt/config_global.json`, checks `bd version` and
-`dolt version` against `scripts/beads-compatibility.json`, then clones into
+`dolt version` against `scripts/beads-cloud-compatibility.json`, then clones into
 `~/beads`. It exits non-zero — refusing to touch the DB — on a version mismatch
 or any missing env var, so a routine fails fast instead of running against a
 wrong binary. The generated `user.name`/`user.email` are Dolt commit metadata
