@@ -11,7 +11,6 @@ CODEX_AGENT = ROOT / ".codex/agents/pr-lifecycle-watcher.toml"
 CODEX_CONFIG = ROOT / ".codex/config.toml"
 CLAUDE_AGENT = ROOT / ".claude/agents/pr-lifecycle-watcher.md"
 ANTIGRAVITY_AGENT = ROOT / ".agents/agents/pr-lifecycle-watcher.md"
-ANTIGRAVITY_MCP = ROOT / ".agents/mcp_config.json"
 ANTIGRAVITY_HOOKS = ROOT / ".agents/hooks.json"
 CODEX_HOOKS = ROOT / ".codex/hooks.json"
 CLAUDE_SETTINGS = ROOT / ".claude/settings.json"
@@ -103,28 +102,16 @@ def test_agent_models_and_native_boundaries_match_the_approved_plan():
     assert antigravity["subagent"] is True
     assert antigravity["commandExecutionPolicy"] == "off"
     assert 'commandExecutionPolicy: "off"' in antigravity_frontmatter
-    assert antigravity["tools"] == ["watch_pr_lifecycle"]
-
-
-def test_antigravity_registers_watcher_in_workspace_mcp_config():
-    config = json.loads(ANTIGRAVITY_MCP.read_text(encoding="utf-8"))
-    assert set(config) == {"mcpServers"}
-    assert set(config["mcpServers"]) == {"pr_lifecycle_watch"}
-
-    server = config["mcpServers"]["pr_lifecycle_watch"]
-    assert server["command"] == "pnpm"
-    assert server["args"] == SERVER_ARGS
-    assert server["env"] == {
-        "GH_MONITOR_HARNESS": "antigravity",
-        "GH_MONITOR_MODEL": "unknown",
-        "GH_MONITOR_WAKES": "1",
-    }
+    assert antigravity["tools"] == []
 
 
 def test_every_agent_targets_the_same_single_tool_stdio_server():
     with CODEX_CONFIG.open("rb") as handle:
         codex_config = tomllib.load(handle)
     _claude, _claude_body, claude_frontmatter = _markdown_agent(CLAUDE_AGENT)
+    _antigravity, _antigravity_body, antigravity_frontmatter = _markdown_agent(
+        ANTIGRAVITY_AGENT
+    )
 
     codex_server = codex_config["mcp_servers"]["pr_lifecycle_watch"]
     assert codex_server["command"] == "pnpm"
@@ -142,6 +129,15 @@ def test_every_agent_targets_the_same_single_tool_stdio_server():
     assert "GH_MONITOR_HARNESS: claude-code" in claude_frontmatter
     assert "GH_MONITOR_MODEL: unknown" in claude_frontmatter
     assert 'GH_MONITOR_WAKES: "1"' in claude_frontmatter
+
+    assert "mcpServers:" in antigravity_frontmatter
+    assert "pr_lifecycle_watch" in antigravity_frontmatter
+    assert "command: pnpm" in antigravity_frontmatter
+    for argument in SERVER_ARGS:
+        assert f"- {argument}" in antigravity_frontmatter
+    assert "GH_MONITOR_HARNESS: antigravity" in antigravity_frontmatter
+    assert "GH_MONITOR_MODEL: unknown" in antigravity_frontmatter
+    assert 'GH_MONITOR_WAKES: "1"' in antigravity_frontmatter
 
 
 def test_claude_project_permissions_allow_only_the_watcher_mcp_tool():

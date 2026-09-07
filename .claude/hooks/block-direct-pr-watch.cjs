@@ -24,14 +24,30 @@ const BLOCK_REASON =
   "expected_head. If named-agent discovery is unavailable, report that as " +
   "a blocker instead of running pr-watch.py in the parent agent.";
 
-function watcherArgs(segment) {
-  if (segment.name === "pr-watch.py") return segment.args;
+function watcherArgsForInvocation(name, args) {
+  if (name === "pr-watch.py") return args;
 
-  if (!/^python(?:3(?:\.\d+)?)?$/.test(segment.name)) return null;
-  const scriptIndex = segment.args.findIndex(
+  if (!/^python(?:3(?:\.\d+)?)?$/.test(name)) return null;
+  const scriptIndex = args.findIndex(
     (arg) => path.posix.basename(arg) === "pr-watch.py",
   );
-  return scriptIndex === -1 ? null : segment.args.slice(scriptIndex + 1);
+  return scriptIndex === -1 ? null : args.slice(scriptIndex + 1);
+}
+
+function watcherArgs(segment) {
+  const direct = watcherArgsForInvocation(segment.name, segment.args);
+  if (direct !== null) return direct;
+
+  let nested;
+  if (segment.name === "mise" && segment.args[0] === "exec") {
+    const separatorIndex = segment.args.indexOf("--");
+    if (separatorIndex !== -1) nested = segment.args.slice(separatorIndex + 1);
+  } else if (segment.name === "uv" && segment.args[0] === "run") {
+    nested = segment.args.slice(1);
+  }
+
+  if (!nested || nested.length === 0) return null;
+  return watcherArgsForInvocation(path.posix.basename(nested[0]), nested.slice(1));
 }
 
 /** Return whether a shell command starts a direct long-running PR watch. */
