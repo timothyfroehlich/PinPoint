@@ -12,14 +12,14 @@
 
 - **Machine & PinballMap Status Dashboard** — the operational route (`/fleet`) providing a status table of every machine in the collection.
 - **Fleet Table** — a fleet audit table displaying machine identity, operational/availability status, ownership, issue count, and Pinball Map sync status.
-- **Filter Presets** — URL-driven filter configurations that allow members and technicians to rapidly narrow the fleet by operational, listing, and synchronization criteria.
+- **Filters & URL State** — a unified search and multi-select filter toolbar that allows members and technicians to rapidly narrow the fleet by operational, listing, and ownership criteria, synchronized with URL search parameters.
 - **KPI Summary Cards** — a strip of connected summary cards above the table summarizing fleet-wide operational health:
   - **Total Machines**: count of all machines in the collection.
   - **On Floor**: count of machines with `on_the_floor` presence, and percentage of total collection machines (`on_the_floor / total`).
   - **Operational**: count of operational machines among on-floor machines, and percentage of on-floor machines (`operational / on_the_floor`).
   - **Open Issues**: total open issues count across all machines, and count of machines with at least one open issue.
-  - **In Sync with PBM**: count of machines with listing intent On whose lineup observation matches intent without availability contradiction (canonical states `on`, `shared`, and `flag`; `intent === 'on'` and `outOfSync === false` without `alert`), and percentage of all machines with listing intent On (`in_sync_intent_on / total_intent_on`). When Pinball Map is Not configured or Waiting for its first snapshot, no valid lineup observation exists and the KPI card displays "—".
-  - **Discrepancies**: count of unique machines requiring operator action: playability `needs_service` or `unplayable`, Pinball Map lineup out-of-sync (`outOfSync === true`: states `missing` and `lingering`), or Pinball Map availability contradiction (state `alert`).
+  - **In Sync with PBM**: count of machines with listing intent On whose lineup observation matches intent without availability contradiction (canonical states `on`, `shared`, and `flag`), and percentage of all machines with listing intent On (`in_sync_intent_on / total_intent_on`). Empty and inactive state behavior is defined in §2.4.
+  - **Discrepancies**: count of unique machines requiring operator action: playability `needs_service` or `unplayable`, Pinball Map lineup out-of-sync (canonical states `missing` and `lingering`), or Pinball Map availability contradiction (canonical state `alert`).
 - **Last Serviced** — the recency of the most recent maintenance-tagged timeline event or service touch recorded on a machine. Machines with no recorded service history display "Never".
 - **Per-Machine Inspection Surface** — a contextual detail pane for the selected machine. On desktop and tablet viewports (`≥768px` / `md:`), it renders as a side-by-side pane alongside the table without obscuring pinned columns. On mobile viewports (`<768px`), it transitions to a bottom drawer (`Drawer`) overlay with swipe/drag dismissibility and thumb-friendly action targets.
 - **Edition Near-Miss** — a machine state where a local machine and a Pinball Map lineup entry share a title family (`machineGroupId`), but differ in edition (defined in `docs/feature-specs/pinballmap.md` §1).
@@ -47,7 +47,7 @@
 
 ---
 
-## 4. Filter Presets & URL State
+## 4. Filter Controls & URL State
 
 - **4.1** The filter toolbar provides a unified search input matching across machine name, initials, manufacturer, and model name.
 - **4.2** Multi-select dropdown filters allow combining criteria across Presence, Playability, Pinball Map sync state, and Owner.
@@ -88,7 +88,7 @@
 | :-- | :-- | :-- |
 | §2.1 `/fleet` route | Route does not exist | Implementation of route |
 | §3.2 Sticky first column & sticky header | No sticky table layout component | Sticky table component |
-| §4.1–§4.4 Filter toolbar & URL state | `MachineFilters` lacks PBM filter axis and manufacturer/model search matching; existing URL state uses composite `sort` (e.g. `name_desc`) rather than split `sort`/`dir` parameters and lacks `pageSize` URL sync | Fleet filter toolbar |
+| §4.1–§4.5 Filter toolbar & URL state | `MachineFilters` lacks PBM filter axis and manufacturer/model search matching; existing URL state uses composite `sort` (e.g. `name_desc`) rather than split `sort`/`dir` parameters and lacks `pageSize` URL sync | Fleet filter toolbar |
 | §5.1 PBM column group & near-miss detection | Dashboard table not yet built | Dashboard table implementation |
 | §6.1 Responsive per-machine inspection surface | No per-machine inspection pane/drawer built | Inspection surface component |
 
