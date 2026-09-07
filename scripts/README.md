@@ -38,6 +38,12 @@ Main worktree uses default ports (slot 0). All others get dynamically allocated 
 # Run all script and hook tests
 pnpm run check:python
 
-# Or run pytest directly
-pytest scripts/tests/ -v
+# Or run pytest directly with the repository's compact defaults
+python3 -m pytest scripts/tests/
 ```
+
+The default traceback policy does not serialize local variables because tests may
+retain environment credentials. For deep local debugging only, first sanitize the
+environment, then explicitly opt in with
+`python3 -m pytest -vv --showlocals -s <test>`. Never use that override in CI or
+agent-visible logs.

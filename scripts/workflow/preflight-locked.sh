@@ -10,15 +10,24 @@
 # who keep multiple worktrees open and accidentally fire preflight in two of
 # them at once.
 #
-# Escape hatch: `pnpm run preflight:unlocked` bypasses the cap (useful when
-# `sem` isn't installed, or for one-off debugging).
+# Escape hatch: `pnpm run preflight:unlocked` bypasses the cap. Add `:human`
+# to either public command to stream the same gate graph instead of receiving
+# the compact agent-facing verdict.
 #
 # Companion: PR #1403 (PP-pblt) shipped the per-run memory reduction.
 # This script adds the cross-session bound.
 
 set -euo pipefail
 
-bash scripts/hooks/prototype-clean-guard.sh
+human=false
+if [[ ${1:-} == "--human" ]]; then
+  human=true
+  shift
+fi
+if [[ $# -ne 0 ]]; then
+  echo "Usage: bash scripts/workflow/preflight-locked.sh [--human]" >&2
+  exit 64
+fi
 
 if ! command -v sem >/dev/null 2>&1 \
    || ! sem --version 2>/dev/null | grep -q '^GNU parallel'; then
@@ -34,9 +43,10 @@ concurrency at 2. Install it:
   macOS:  brew install parallel
   Linux:  apt install parallel  (or your distro equivalent)
 
-If you cannot or do not want to install it, run the uncapped variant:
+If you cannot or do not want to install it, run the matching uncapped variant:
 
   pnpm run preflight:unlocked
+  pnpm run preflight:unlocked:human
 EOF
   exit 1
 fi
@@ -48,12 +58,16 @@ fi
 #                     end of script, not blocking on a single invocation. Using
 #                     `--fg --wait` together causes sem to return immediately —
 #                     `--fg` alone is the synchronous form.)
-# The --parallel / --sequential groups below must stay in sync with the
-# `preflight:unlocked` script in package.json — the same run under the cap.
-# In particular the parallel group type-checks all three tsconfig projects
-# (typecheck + typecheck:tests + typecheck:e2e) so preflight is never weaker
-# than `check` on type coverage (PP-mfo2).
-exec sem --jobs 2 --id pinpoint-preflight --fg \
-  npm-run-all --silent \
-    --parallel typecheck typecheck:tests typecheck:e2e fix:lint-format test check:config \
-    --sequential db:fast-reset build test:integration test:integration:supabase smoke
+# `preflight:_run` is the one canonical graph for capped, uncapped, compact,
+# and human runs. The presentation layer is the only difference.
+run_command=(pnpm run preflight:_run)
+if [[ $human == false ]]; then
+  run_command=(
+    python3 scripts/quiet-run.py --label preflight -- "${run_command[@]}"
+  )
+fi
+
+# sem re-parses a command string through a shell. Quote each argument first so
+# future paths or arguments containing spaces survive that boundary.
+printf -v quoted_command '%q ' "${run_command[@]}"
+exec sem --jobs 2 --id pinpoint-preflight --fg "$quoted_command"

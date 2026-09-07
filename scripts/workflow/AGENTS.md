@@ -8,6 +8,48 @@ Scripts are designed for the **PinPoint orchestrator workflow** where multiple s
 
 **The PinPoint merge decision is Tim's (PP-wi85, reversed for the script per Tim 2026-08-19).** An agent MAY run `merge-pr.sh`, but the `block-direct-merge.cjs` PreToolUse hook turns any invocation of it (including `--dry-run`) into an approval prompt Tim must accept before it runs — the merge is still his call. The raw PinPoint channels (`gh pr merge`, `gh api PUT .../merge`, MCP `merge_pull_request`) stay hard-blocked, because they skip the script's gate re-checks. This boundary applies to implicit current-repository targets and explicit `timothyfroehlich/PinPoint` targets; a non-PinPoint target statically explicit in command arguments or MCP input follows that repository's policy and the user's authorization. Environment-only selectors remain fail-closed. Agents run every other script in this directory freely, including `pr-screenshots.mjs` and `merge-handoff.sh` (which _prints_ the merge command). The normal close follows `pinpoint-pr-workflow`: draft PR, current-head CI, one manual Codex request for that head, exact-head coverage, resolved threads, final label, then handoff.
 
+## Codex Git Mutations
+
+Codex uses the rule-approved fixed interface for Git operations whose free-form flags
+can bypass hooks or rewrite remote history:
+
+```bash
+bash scripts/workflow/codex-git.sh commit "<conventional commit message>"
+bash scripts/workflow/codex-git.sh push
+bash scripts/workflow/codex-git.sh branch codex/<name>
+bash scripts/workflow/codex-git.sh merge-main
+```
+
+The wrapper rejects extra arguments, creates only `codex/` branches from an existing
+non-`main` worktree branch without a force or discard flag, pushes only the current
+non-`main` branch to the same branch name on `origin`, and merges only `origin/main`.
+Raw `git commit`, `git push`, `git checkout`, `git switch`, and `git merge` invocations
+intentionally require approval.
+`merge-main` fetches `origin` immediately before the merge so the tracking ref cannot be
+stale.
+
+Raw `gh` stays forbidden because case-insensitive and host-qualified repository selectors
+cannot be normalized by an exact argv-prefix rule. Routine read-only commands stay
+approval-free through fixed-subcommand wrapper operations:
+
+```bash
+bash scripts/workflow/codex-gh.sh pr-list [args...]
+bash scripts/workflow/codex-gh.sh pr-view [args...]
+bash scripts/workflow/codex-gh.sh pr-checks [args...]
+bash scripts/workflow/codex-gh.sh pr-diff [args...]
+bash scripts/workflow/codex-gh.sh run-list [args...]
+bash scripts/workflow/codex-gh.sh run-view [args...]
+```
+
+An explicitly authorized merge in another repository uses the validating,
+approval-gated route instead:
+
+```bash
+bash scripts/workflow/codex-gh.sh merge-external <owner/repo> <PR-number> <merge|squash|rebase>
+```
+
+It rejects PinPoint targets case-insensitively; PinPoint still uses `merge-pr.sh --human`.
+
 ## Scripts
 
 ### PR Monitoring
@@ -16,14 +58,37 @@ Scripts are designed for the **PinPoint orchestrator workflow** where multiple s
 | --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `pr-dashboard.sh [PR...]`                     | Status table: CI checks, review state, merge state, draft state. All open PRs if no args. One repository GraphQL snapshot batches metadata, checks, native reviews, and threads; targeted pagination is exceptional, and REST comments are fetched only where native exact-head evidence is insufficient. The Review column shows unresolved threads when there are any, otherwise: `reviewed`, `RE-REVIEW` (`stale_approval`), `NOT APPROVED` (`not_approved`), or `NOT REVIEWED` (`unreviewed`).                                                                                                                                                                                                                                                                           |
 | `pr-watch.py <PR>`                            | Stream CI or review events. One timestamped line per event (logs to stderr in `--json` mode; stdout reserved strictly for terminal JSON). The first host process for a repository+PR+watch mode holds the XDG-state lock and polls GitHub; concurrent invocations with the same precheck semantics follow its atomic local state with zero GitHub reads. Normal and `--force` watches have separate owners. CI and review phases use distinct locks (`...-<pr>-ci.lock`, `...-<pr>-review.lock`). Writes failure artifacts and watcher telemetry to `tmp/gh-monitor/`. Unresolved threads persist in shared state so every follower prints the reminder, but do **not** stop the CI watch. `--check-ready` remains a direct readiness snapshot rather than a shared monitor. |
+| `pr-watcher-mcp.ts`                           | Local stdio MCP server exposing only `watch_pr_lifecycle`. It validates a five-field envelope, verifies the absolute worktree matches its own current Git worktree, then runs the exact delegated `pr-watch.py` argv without a shell.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | `request-codex-review.sh <PR>`                | Request exactly one manual Codex review for the current head. Refuses non-owner auth, draft/closed PRs, non-green current-head CI, heads already reviewed/requested, and a head that moves during validation. Posts the SHA-bound `@codex review` comment consumed by the trusted reaction witness.                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | `codex-reaction-witness.sh <PR> <SHA> <TIME>` | Trusted helper for `.github/workflows/codex-reaction-witness.yaml`. After the SHA-bound manual request it requires a fresh connector-bot `eyes`, continuously verifies that the named SHA remains head, then posts a SHA-pinned witness only if that same reaction changes to `+1`. A native exact-head review supersedes the need for a witness.                                                                                                                                                                                                                                                                                                                                                                                                                            |
 
 #### `pr-watch.py` flags and delegated watcher contract
 
+Named harness agents call the watcher through `watch_pr_lifecycle`, never by accepting
+or constructing a command in their prompt. Its strict input is exactly:
+
+```json
+{
+  "worktree": "/absolute/path/to/the-server-worktree",
+  "pr": 1234,
+  "title": "Exact PR title",
+  "phase": "ci",
+  "expected_head": "40-character-lowercase-head-sha"
+}
+```
+
+`title` is context only. The tool rejects extra fields, a relative or mismatched
+worktree, non-positive PR numbers, empty titles, unknown phases, and non-full lowercase
+SHAs. It can launch only the exact second command below with `shell: false`. Exits 0,
+1, and 2 return valid terminal watcher JSON unchanged; malformed stdout, startup
+failure, or any other exit is an MCP tool error. Child stderr stays on server stderr
+and never contaminates the returned JSON. Harness and resolved-model telemetry arrive
+through `GH_MONITOR_HARNESS` and `GH_MONITOR_MODEL`; the server fixes
+`GH_MONITOR_WAKES=1` while preserving the rest of the environment.
+
 ```bash
 ./scripts/workflow/pr-watch.py <PR> [--verbose] [--force]
-./scripts/workflow/pr-watch.py <PR> --phase <ci|review> --expected-head <FULL_SHA> --json [--verbose] [--force]
+python3 scripts/workflow/pr-watch.py <PR> --phase <ci|review> --expected-head <FULL_SHA> --json
 ```
 
 Delegated mode is the second form: `--phase`, `--expected-head`, and `--json` are

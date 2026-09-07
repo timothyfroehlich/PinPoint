@@ -1,6 +1,13 @@
 ---
 name: pinpoint-security
-description: The security choices PinPoint made that its own code does not state — which modules may touch `@supabase/ssr` directly, the CSP authoring posture and what is already allowlisted, matrix permissions vs resource-level predicates (`collections.ts`, `settings.ts`) under `src/lib/permissions/`, what counts as a non-gating role comparison under the `permissions-audit-allow` contract, why a `SECURITY DEFINER` RPC returning a secret needs an in-body `auth.role()` check rather than `REVOKE`/`GRANT` alone (and which migrations to copy), the multi-provider OAuth registry and unlink guard, the shared `sanitize-html` allowlist, and the `~/lib/url` seam (`getSiteUrl` / `requireSiteUrl` / `resolveRequestUrl` / `isInternalUrl` / `getSafeRedirect`) that makes hand-rolled `process.env` URL building a bug. Use when creating a Supabase server client, writing a Server Action's auth check, a Postgres function that reads Vault, a redirect, an absolute URL in an email or webhook, a CSP change, an OAuth flow, a sanitizer, or a permission gate. The enforced rules themselves are `CORE-SEC-*` / `CORE-SSR-*` in `docs/NON_NEGOTIABLES.md`; recorded threat-model decisions are in `docs/SECURITY.md`.
+description: >-
+  Security architectural choices for PinPoint — Supabase SSR client allowlist,
+  CSP policy, permissions matrix vs resource predicates, SECURITY DEFINER RPC
+  guards, multi-provider OAuth unlink protections, sanitize-html allowlists, and
+  the ~/lib/url seam. Use when creating Supabase server clients, writing Server
+  Action auth checks, Postgres Vault functions, redirects, absolute URLs in
+  emails/webhooks, CSP updates, OAuth flows, sanitizers, or permission gates.
+  Rules are CORE-SEC-* and CORE-SSR-* in docs/NON_NEGOTIABLES.md.
 ---
 
 # PinPoint Security

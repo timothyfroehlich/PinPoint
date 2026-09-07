@@ -1,5 +1,6 @@
 # PinPoint Python workflow dependencies for scripts/tests.
 # Python runtime: exact pin in mise.toml, target py312 in ruff.toml.
-# All workflow and hook scripts rely strictly on the Python standard library.
 # pytest is the test runner dependency for scripts/tests/.
+# pyyaml is the YAML parser dependency for scripts/check_skill_frontmatter.py.
 pytest==9.0.3
+pyyaml==6.0.3
