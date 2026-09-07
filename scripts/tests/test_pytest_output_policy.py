@@ -40,6 +40,8 @@ def test_intentional_failure():
             sys.executable,
             "-m",
             "pytest",
+            "-p",
+            "xdist",
             "-c",
             str(PYTEST_CONFIG),
             str(failing_test),

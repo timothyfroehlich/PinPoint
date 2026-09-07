@@ -19,9 +19,9 @@ EOF
   exit 1
 fi
 
-if ! python3 -c 'import pytest' >/dev/null 2>&1; then
+if ! python3 -c 'import pytest, xdist' >/dev/null 2>&1; then
   cat >&2 <<'EOF'
-Error: pytest is not installed for the selected Python runtime.
+Error: pytest is not installed for the selected Python runtime (including pytest-xdist).
 
 `pnpm run check:python` requires pytest to run hook and script tests.
 Install the declared Python dependencies into the mise-selected runtime:
@@ -31,5 +31,6 @@ Install the declared Python dependencies into the mise-selected runtime:
 EOF
   exit 1
 fi
+
 
 exec python3 -m pytest "$@"

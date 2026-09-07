@@ -21,7 +21,8 @@ from pathlib import Path
 
 import pytest
 
-pytestmark = pytest.mark.integration
+pytestmark = [pytest.mark.integration, pytest.mark.xdist_group("mise")]
+
 
 try:
     import tomllib
@@ -1092,6 +1093,14 @@ def test_offline_python_and_ruff_resolution() -> None:
     mise_bin = _get_mise_bin()
     mise_data = tomllib.loads(MISE_TOML_PATH.read_text(encoding="utf-8"))
     expected_versions = _mise_managed_pins(mise_data)
+
+    # Ensure preinstallation has completed via locked install
+    subprocess.run(
+        [mise_bin, "install", "--locked"],
+        cwd=REPO_ROOT,
+        check=True,
+        capture_output=True,
+    )
 
     env = os.environ.copy()
     env["MISE_OFFLINE"] = "1"
