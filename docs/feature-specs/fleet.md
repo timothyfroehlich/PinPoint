@@ -12,7 +12,15 @@
 
 - **Machine & PinballMap Status Dashboard** — the operational route (`/fleet`) providing a status table of every machine in the collection.
 - **Fleet Table** — a fleet audit table displaying machine identity, operational/availability status, ownership, issue count, and Pinball Map sync status.
-- **Filter Presets** — URL-driven filter configurations that allow members and technicians to rapidly narrow the fleet by operational, listing, and synchronization criteria.
+- **Filters & URL State** — a unified search and multi-select filter toolbar that allows members and technicians to rapidly narrow the fleet by operational, listing, and ownership criteria, synchronized with URL search parameters.
+- **KPI Summary Cards** — a strip of connected summary cards above the table summarizing fleet-wide operational health:
+  - **Total Machines**: count of all machines in the collection.
+  - **On Floor**: count of machines with `on_the_floor` presence, and percentage of total collection machines (`on_the_floor / total`).
+  - **Operational**: count of operational machines among on-floor machines, and percentage of on-floor machines (`operational / on_the_floor`).
+  - **Open Issues**: total open issues count across all machines, and count of machines with at least one open issue.
+  - **In Sync with PBM**: count of machines with listing intent On whose lineup observation matches intent without availability contradiction (canonical states `on`, `shared`, and `flag`), and percentage of all machines with listing intent On (`in_sync_intent_on / total_intent_on`). Empty and inactive state behavior is defined in §2.4.
+  - **Discrepancies**: count of unique machines requiring operator action: playability `needs_service` or `unplayable`, Pinball Map lineup out-of-sync (canonical states `missing` and `lingering`), or Pinball Map availability contradiction (canonical state `alert`).
+- **Last Serviced** — the recency of the most recent maintenance-tagged timeline event or service touch recorded on a machine. Machines with no recorded service history display "Never".
 - **Per-Machine Inspection Surface** — a contextual detail pane for the selected machine. On desktop and tablet viewports (`≥768px` / `md:`), it renders as a side-by-side pane alongside the table without obscuring pinned columns. On mobile viewports (`<768px`), it transitions to a bottom drawer (`Drawer`) overlay with swipe/drag dismissibility and thumb-friendly action targets.
 - **Edition Near-Miss** — a machine state where a local machine and a Pinball Map lineup entry share a title family (`machineGroupId`), but differ in edition (defined in `docs/feature-specs/pinballmap.md` §1).
 
@@ -23,25 +31,29 @@
 - **2.1** A single operational route (`/fleet`) lists every collection machine in a paginated status table.
 - **2.2** Page view access is `member+` (available to all authenticated members, technicians, and admins; guests are denied access).
 - **2.3** The table is paginated with a user-selectable number of rows per page (e.g. 25, 50, 100) to keep performance snappy while accommodating fleet auditing.
+- **2.4** The page renders the KPI Summary Cards strip above the filter controls using the population formulas defined in §1. When a percentage denominator is zero, or when the Pinball Map integration is inactive (`not_configured` or `waiting`), the percentage displays "—".
 
 ---
 
 ## 3. Fleet Table & Navigation
 
 - **3.1** The header row remains sticky at the top of the container during vertical scrolling.
-- **3.2** The first column (Machine Identity: Title, with availability and playability statuses as primary candidates) remains sticky on the left during horizontal scrolling.
-- **3.3** Horizontal scrolling is enabled across remaining columns (e.g. Owner, Open Issues, PBM Catalog Match, PBM Listed status, PBM Sync state). Default column visibility is deliberately lean and curated to prevent an overly wide, cluttered spreadsheet layout.
+- **3.2** The first column (Machine Identity) remains sticky on the left during horizontal scrolling. It displays strictly two lines: Line 1 renders the machine title and uppercase initials badge; Line 2 renders manufacturer, year, and owner (`[Manufacturer] · [Year] · [Owner]`).
+- **3.3** Default column visibility is curated and lean: Machine (pinned), Presence, Playability, Open Issues, Last Serviced (positioned immediately adjacent to Open Issues), and Pinball Map Status default to visible. The Owner column defaults to off as an independent column since owner identity is surfaced on Line 2 of the Machine Identity column. Additional toggleable columns (Manufacturer, Year, PBM Intent) default to off.
 - **3.4** Sorting is client-side URL-driven: clicking column headers updates `sort` and `dir` URL search parameters via soft client navigation without triggering a page refresh, and applies accessible `aria-sort` attributes.
 - **3.5** Column display adheres to accessibility standard `CORE-A11Y-003` with `<th scope="col">` and accessible table labeling.
 - **3.6** The table does not hide columns responsively on narrower viewports (`CORE-RESP-001`); instead, it allows horizontal scrolling while keeping the first column pinned.
+- **3.7** A View Options control allows operators to toggle optional column visibility and select page size (25, 50, 100).
 
 ---
 
-## 4. Filter Presets & URL State
+## 4. Filter Controls & URL State
 
-- **4.1** Filter controls render as quick-selection preset pills above the table to filter fleet machines by operational, catalog link, and Pinball Map sync states.
-- **4.2** All filter states, search queries, and sort parameters round-trip through URL search parameters (`q`, `status`, `pbm_state`, `sort`, `dir`) via client-side soft navigation without full page reloads.
-- **4.3** Pasting or opening a URL with search parameters initializes the exact filter, sort, and search view.
+- **4.1** The filter toolbar provides a unified search input matching across machine name, initials, manufacturer, and model name.
+- **4.2** Multi-select dropdown filters allow combining criteria across Presence, Playability, Pinball Map sync state, and Owner.
+- **4.3** Active filters render in a dismissible chips tray above the table with individual removal buttons and a clear-all action.
+- **4.4** All filter states, search queries, sort parameters, and pagination round-trip through URL search parameters (`q`, `presence`, `status`, `pbm`, `owner`, `sort`, `dir`, `page`, `pageSize`) via client-side soft navigation without full page reloads.
+- **4.5** Pasting or opening a URL with search parameters initializes the exact filter, sort, pagination, and search view.
 
 ---
 
@@ -76,7 +88,7 @@
 | :-- | :-- | :-- |
 | §2.1 `/fleet` route | Route does not exist | Implementation of route |
 | §3.2 Sticky first column & sticky header | No sticky table layout component | Sticky table component |
-| §4.1 Filter presets & URL state | `MachineFilters` lacks PBM filter axes | PBM filter extension |
+| §4.1–§4.5 Filter toolbar & URL state | `MachineFilters` lacks PBM filter axis and manufacturer/model search matching; existing URL state uses composite `sort` (e.g. `name_desc`) rather than split `sort`/`dir` parameters and lacks `pageSize` URL sync | Fleet filter toolbar |
 | §5.1 PBM column group & near-miss detection | Dashboard table not yet built | Dashboard table implementation |
 | §6.1 Responsive per-machine inspection surface | No per-machine inspection pane/drawer built | Inspection surface component |
 
@@ -86,4 +98,5 @@
 
 | Date | Change |
 | :-- | :-- |
+| 2026-09-06 | Clarify strictly two-line machine identity column (§3.2), lean column defaults and Last Serviced positioning (§3.3), View Options control (§3.7), canonical PBM KPI formulas and empty/inactive states (§1, §2.4), and unified search/multi-select filter toolbar and sort parameter divergence (§4.1–§4.5). |
 | 2026-09-05 | Created. Establishes requirements for member+ status table at `/fleet` (§2–§3), URL-driven filter presets (§4), PBM column group & edition near-misses (§5), desktop side-pane / mobile bottom-sheet inspection surface (§6), and permissions (§7). |
