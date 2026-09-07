@@ -18,6 +18,18 @@ const path = require("node:path");
 const { resolveCommand } = require("./lib/resolve-command.cjs");
 
 const DIAGNOSTIC_FLAGS = new Set(["--check-ready", "--help", "-h"]);
+const UV_RUN_VALUE_FLAGS = new Set([
+  "--config-file",
+  "--directory",
+  "--env-file",
+  "--index",
+  "--project",
+  "--python",
+  "--with",
+  "--with-editable",
+  "--with-requirements",
+]);
+const MAX_WRAPPER_DEPTH = 5;
 const BLOCK_REASON =
   "Blocked direct PR lifecycle wait. Invoke the project-scoped named agent " +
   "`pr-lifecycle-watcher` with exactly: worktree, pr, title, phase, and " +
@@ -34,20 +46,37 @@ function watcherArgsForInvocation(name, args) {
   return scriptIndex === -1 ? null : args.slice(scriptIndex + 1);
 }
 
-function watcherArgs(segment) {
-  const direct = watcherArgsForInvocation(segment.name, segment.args);
+function uvRunCommand(args) {
+  for (let index = 1; index < args.length; index++) {
+    const arg = args[index];
+    if (arg === "--") return args.slice(index + 1);
+    if (!arg.startsWith("-")) return args.slice(index);
+    if (!arg.includes("=") && UV_RUN_VALUE_FLAGS.has(arg)) index++;
+  }
+  return [];
+}
+
+function watcherArgsForTokens(tokens, depth = 0) {
+  if (tokens.length === 0 || depth >= MAX_WRAPPER_DEPTH) return null;
+
+  const name = path.posix.basename(tokens[0]);
+  const args = tokens.slice(1);
+  const direct = watcherArgsForInvocation(name, args);
   if (direct !== null) return direct;
 
   let nested;
-  if (segment.name === "mise" && segment.args[0] === "exec") {
-    const separatorIndex = segment.args.indexOf("--");
-    if (separatorIndex !== -1) nested = segment.args.slice(separatorIndex + 1);
-  } else if (segment.name === "uv" && segment.args[0] === "run") {
-    nested = segment.args.slice(1);
+  if (name === "mise" && ["exec", "x"].includes(args[0])) {
+    const separatorIndex = args.indexOf("--");
+    if (separatorIndex !== -1) nested = args.slice(separatorIndex + 1);
+  } else if (name === "uv" && args[0] === "run") {
+    nested = uvRunCommand(args);
   }
 
-  if (!nested || nested.length === 0) return null;
-  return watcherArgsForInvocation(path.posix.basename(nested[0]), nested.slice(1));
+  return nested ? watcherArgsForTokens(nested, depth + 1) : null;
+}
+
+function watcherArgs(segment) {
+  return watcherArgsForTokens([segment.command, ...segment.args]);
 }
 
 /** Return whether a shell command starts a direct long-running PR watch. */

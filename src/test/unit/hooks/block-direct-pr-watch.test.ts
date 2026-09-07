@@ -31,7 +31,10 @@ describe("block-direct-pr-watch classifier", () => {
     "python3 scripts/workflow/pr-watch.py 2068 --force",
     "python3 scripts/workflow/pr-watch.py 2068 --phase ci --expected-head abc --json",
     "mise exec -- python3 scripts/workflow/pr-watch.py 2068 --phase ci",
+    "mise x -- python3 scripts/workflow/pr-watch.py 2068 --phase ci",
     "uv run python3 scripts/workflow/pr-watch.py 2068 --phase review",
+    "uv run --python 3.12 python3 scripts/workflow/pr-watch.py 2068 --phase review",
+    "mise exec -- uv run python3 scripts/workflow/pr-watch.py 2068 --phase ci",
     'eval "python3 scripts/workflow/pr-watch.py 2068 --phase=review"',
     "git status && ./scripts/workflow/pr-watch.py 2068",
   ])("blocks a direct lifecycle wait: %s", (command) => {

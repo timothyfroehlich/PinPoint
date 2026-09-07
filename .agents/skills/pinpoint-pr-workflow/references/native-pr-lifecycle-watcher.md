@@ -18,11 +18,11 @@ Invoke the project-scoped agent named `pr-lifecycle-watcher`. Give it exactly th
 
 The same named agent handles `phase: "ci"` and `phase: "review"`. Project definitions keep the logical name and system contract aligned:
 
-| Harness     | Definition                                | Model                      | Boundary                                                                                                                               |
-| :---------- | :---------------------------------------- | :------------------------- | :------------------------------------------------------------------------------------------------------------------------------------- |
-| Codex       | `.codex/agents/pr-lifecycle-watcher.toml` | `gpt-5.3-codex-spark`, low | Read-only sandbox; required watcher MCP server with only `watch_pr_lifecycle` enabled. Codex has no per-agent built-in-tool allowlist. |
-| Claude Code | `.claude/agents/pr-lifecycle-watcher.md`  | `haiku`, low               | Background, two turns, only `mcp__pr_lifecycle_watch__watch_pr_lifecycle`.                                                             |
-| Antigravity | `.agents/agents/pr-lifecycle-watcher.md`  | `flash`                    | Subagent-only, command execution off, no built-in tools, and an inline watcher MCP server exposing only `watch_pr_lifecycle`.          |
+| Harness     | Definition                                | Model                      | Boundary                                                                                                                                 |
+| :---------- | :---------------------------------------- | :------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------- |
+| Codex       | `.codex/agents/pr-lifecycle-watcher.toml` | `gpt-5.3-codex-spark`, low | Read-only sandbox; `.codex/config.toml` registers the required watcher MCP with only `watch_pr_lifecycle` enabled for child inheritance. |
+| Claude Code | `.claude/agents/pr-lifecycle-watcher.md`  | `haiku`, low               | Background, two turns, only `mcp__pr_lifecycle_watch__watch_pr_lifecycle`.                                                               |
+| Antigravity | `.agents/agents/pr-lifecycle-watcher.md`  | `flash`                    | Subagent-only, command execution off, no built-in tools, and an inline watcher MCP server exposing only `watch_pr_lifecycle`.            |
 
 Each agent calls `watch_pr_lifecycle` exactly once and returns its terminal JSON unchanged. It cannot inspect implementation, mutate state, request review, adjudicate findings, resolve threads, run another command, or retry.
 
