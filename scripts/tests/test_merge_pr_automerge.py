@@ -24,6 +24,10 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
+import pytest
+
+pytestmark = pytest.mark.integration
+
 MERGE_SCRIPT = Path(__file__).parent.parent / "workflow" / "merge-pr.sh"
 
 HEAD_SHA = "d084c14a43af3ac021f0838f5c7bf4b77f72fb62"

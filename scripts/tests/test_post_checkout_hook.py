@@ -9,6 +9,8 @@ from pathlib import Path
 
 import pytest
 
+pytestmark = pytest.mark.integration
+
 HOOK_PATH = Path(__file__).parent.parent.parent / ".husky" / "post-checkout"
 ZERO_SHA = "0" * 40
 HEAD_SHA = "ce94995ee0e88904d5c4e1660619c6c047cc6b6c"

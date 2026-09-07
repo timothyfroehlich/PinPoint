@@ -15,6 +15,8 @@ from pathlib import Path
 
 import pytest
 
+pytestmark = pytest.mark.integration
+
 GATES_PATH = Path(__file__).parent.parent / "workflow" / "_pr-gates.sh"
 CODEX_BOT = "chatgpt-codex-connector[bot]"
 CODEX_APP = "chatgpt-codex-connector"
