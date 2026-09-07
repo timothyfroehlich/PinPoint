@@ -39,15 +39,25 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Detect which files changed to skip expensive jobs for non-app-code PRs.
-  # "Non-app-code" covers: docs (docs/**, **/*.md), beads (.beads/**), agent
-  # configs (.agent[s]/**, .claude/**), local dev / developer-utility scripts
-  # (scripts/hooks/**, scripts/workflow/**), LICENSE, .gitignore. A few
-  # scripts/workflow/** scripts DO run in CI (e.g. the preview/*.sh scripts via
-  # the Preview Controller + Preview Reaper workflows), but none of them are
-  # gated by PR CI, so skipping E2E when only those change is correct.
-  # .github/** is intentionally NOT excluded — any change there directly
-  # affects what CI runs, so we keep triggering E2E to validate it.
+  # Detect which files changed to skip expensive jobs for non-website PRs.
+  # "Non-website" covers: docs (docs/**, **/*.md), beads (.beads/**), agent
+  # configs (.agent[s]/**, .claude/**, .codex/**), developer / test / maintenance
+  # scripts (scripts/**), package.json (script/metadata edits; dependency changes
+  # update pnpm-lock.yaml / pnpm-workspace.yaml), editor / IDE / git configs
+  # (.husky/**, .vscode/**, pinpoint.code-workspace, .gitattributes, .gitignore),
+  # test/linter configs (pytest.ini, ruff.toml, .yamllint.yml, .gitleaks.toml),
+  # agent hook / script unit tests (src/test/unit/hooks/**, src/test/unit/scripts/**),
+  # and non-PR GitHub Action configs/workflows (dependabot.yml, renovate.json,
+  # CODEOWNERS, ownerless-renovate-issues.yaml, preview-*.yaml, audit-override.yaml,
+  # codex-reaction-witness.yaml).
+  #
+  # Note: scripts/**, python tests, and shell scripts are already tested on every
+  # PR by the always-running `linters` job (Fast Linters: pytest scripts/tests/,
+  # ruff, shellcheck).
+  #
+  # .github/workflows/ci.yml and .github/actions/** are intentionally NOT excluded —
+  # any change to the CI workflow or its composite actions directly affects what
+  # CI runs, so we keep triggering full CI to validate it.
   #
   # Uses predicate-quantifier: 'every' with a positive '**' plus negative
   # exclusions. A changed file counts as "code" only when it matches every
@@ -85,15 +95,36 @@ jobs:
             has_code:
               - '**'
               - '!docs/**'
+              - '!*.md'
               - '!**/*.md'
               - '!.beads/**'
               - '!.agent/**'
               - '!.agents/**'
               - '!.claude/**'
-              - '!scripts/hooks/**'
-              - '!scripts/workflow/**'
+              - '!.codex/**'
+              - '!.husky/**'
+              - '!.vscode/**'
+              - '!pinpoint.code-workspace'
               - '!LICENSE'
               - '!.gitignore'
+              - '!.gitattributes'
+              - '!pytest.ini'
+              - '!ruff.toml'
+              - '!.yamllint.yml'
+              - '!.gitleaks.toml'
+              - '!scripts/**'
+              - '!package.json'
+              - '!.github/dependabot.yml'
+              - '!.github/renovate.json'
+              - '!.github/CODEOWNERS'
+              - '!.github/workflows/audit-override.yaml'
+              - '!.github/workflows/codex-reaction-witness.yaml'
+              - '!.github/workflows/ownerless-renovate-issues.yaml'
+              - '!.github/workflows/preview-control.yaml'
+              - '!.github/workflows/preview-reaper.yaml'
+              - '!.github/workflows/preview-sync.yaml'
+              - '!src/test/unit/hooks/**'
+              - '!src/test/unit/scripts/**'
       # Separate filter for dependency changes using default "some" quantifier
       # so deps=true when ANY changed file is a dependency file (not ALL).
       - id: deps-filter
@@ -101,8 +132,8 @@ jobs:
         with:
           filters: |
             deps:
-              - 'package.json'
               - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
       - name: Determine code changes
         id: set-code
         env:
@@ -206,7 +237,7 @@ jobs:
     name: Setup Dependencies
     runs-on: ubuntu-latest
     needs: changes
-    if: needs.changes.outputs.code == 'true'
+    if: needs.changes.outputs.code == 'true' || needs.changes.outputs.deps == 'true'
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c  # ratchet:step-security/harden-runner@v2.21.0
