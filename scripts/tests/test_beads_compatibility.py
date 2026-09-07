@@ -14,6 +14,10 @@ import subprocess
 import tarfile
 from pathlib import Path
 
+import pytest
+
+pytestmark = pytest.mark.integration
+
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 MANIFEST_PATH = REPO_ROOT / "scripts" / "beads-compatibility.json"
 SETUP_SCRIPT = REPO_ROOT / "scripts" / "beads-cloud-setup.sh"

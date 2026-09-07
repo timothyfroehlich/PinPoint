@@ -28,6 +28,8 @@ from pathlib import Path
 
 import pytest
 
+pytestmark = pytest.mark.integration
+
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import worktree_reap as reap  # noqa: E402

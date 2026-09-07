@@ -7,6 +7,8 @@ from pathlib import Path
 
 import pytest
 
+pytestmark = pytest.mark.integration
+
 HOOK_PATH = Path(__file__).parent.parent.parent / ".claude/hooks/worktree-create.sh"
 
 # Default SHA the mock git returns for `rev-parse FETCH_HEAD` when a fetch "succeeds".

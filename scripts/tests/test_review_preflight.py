@@ -24,6 +24,8 @@ from pathlib import Path
 
 import pytest
 
+pytestmark = pytest.mark.integration
+
 SCRIPT = Path(__file__).parent.parent / "workflow" / "review-preflight.sh"
 
 PR = 123
