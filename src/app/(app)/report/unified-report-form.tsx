@@ -28,6 +28,7 @@ import { StatusSelect } from "~/components/issues/fields/StatusSelect";
 import { ImageUploadButton } from "~/components/images/ImageUploadButton";
 import { ImageGallery } from "~/components/images/ImageGallery";
 import type { AccessLevel } from "~/lib/permissions/matrix";
+import { checkPermission } from "~/lib/permissions/helpers";
 import { getLoginUrl } from "~/lib/login-url";
 import { RecentIssuesPanelClient } from "~/components/issues/RecentIssuesPanelClient";
 import { RichTextEditor } from "~/components/editor/RichTextEditorDynamic";
@@ -315,9 +316,7 @@ export function UnifiedReportForm({
   }, [currentInitials]);
 
   const canSetWorkflowFields =
-    accessLevel === "admin" ||
-    accessLevel === "technician" ||
-    accessLevel === "member";
+    checkPermission("issues.report.assignee", accessLevel);
 
   return (
     <div className="w-full">

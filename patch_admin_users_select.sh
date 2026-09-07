@@ -1,0 +1,2 @@
+sed -i 's/      newRole !== "admin"/      newRole !== "admin" \/\/ permissions-audit-allow: self-demotion invariant/g' src/app/\(app\)/admin/users/user-role-select.tsx
+sed -i 's/        isPending || (userId === currentUserId && currentRole === "admin")/        isPending || (userId === currentUserId \&\& currentRole === "admin") \/\/ permissions-audit-allow: self-demotion invariant/g' src/app/\(app\)/admin/users/user-role-select.tsx

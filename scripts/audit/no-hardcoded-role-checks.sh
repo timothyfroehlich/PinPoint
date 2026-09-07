@@ -62,6 +62,13 @@ matches=$(echo "$raw" | awk '
     if (parsed == "") next
     n = split(parsed, parts, SUBSEP)
     file = parts[1]; lineno = parts[2] + 0; sep = parts[3]; content = parts[4]
+    # Exclude JSDoc and comment lines for the exact match line.
+    if (content ~ /^[[:space:]]*(\*|\/\/|{\/\*)/) {
+      if (sep == ":") {
+        next
+      }
+    }
+
     # Record allow markers at this (file, lineno).
     if (content ~ /permissions-audit-allow:/) {
       allow[file, lineno] = 1

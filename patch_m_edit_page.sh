@@ -1,0 +1,2 @@
+sed -i 's/import { getAccessLevel } from "~\/lib\/permissions\/matrix";/import { getAccessLevel } from "~\/lib\/permissions\/matrix";\nimport { checkPermission } from "~\/lib\/permissions\/helpers";/g' src/app/\(app\)/m/\[initials\]/\(tabs\)/edit/page.tsx
+sed -i 's/accessLevel === "admin" || accessLevel === "technician"/checkPermission("machines.edit", accessLevel)/g' src/app/\(app\)/m/\[initials\]/\(tabs\)/edit/page.tsx

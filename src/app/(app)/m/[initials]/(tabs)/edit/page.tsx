@@ -228,7 +228,7 @@ export default async function MachineEditPage({
   );
 
   const canEditAnyMachine =
-    accessLevel === "admin" || accessLevel === "technician";
+    checkPermission("machines.edit", accessLevel);
   const isOwner =
     user.id === machine.ownerId || user.id === machine.invitedOwnerId;
 
