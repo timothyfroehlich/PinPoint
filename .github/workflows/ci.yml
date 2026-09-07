@@ -123,8 +123,6 @@ jobs:
               - '!.github/workflows/preview-control.yaml'
               - '!.github/workflows/preview-reaper.yaml'
               - '!.github/workflows/preview-sync.yaml'
-              - '!src/test/unit/hooks/**'
-              - '!src/test/unit/scripts/**'
       # Separate filter for dependency changes using default "some" quantifier
       # so deps=true when ANY changed file is a dependency file (not ALL).
       - id: deps-filter
