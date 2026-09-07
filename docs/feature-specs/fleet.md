@@ -18,7 +18,7 @@
   - **On Floor**: count of machines with `on_the_floor` presence, and percentage of total collection machines (`on_the_floor / total`).
   - **Operational**: count of operational machines among on-floor machines, and percentage of on-floor machines (`operational / on_the_floor`).
   - **Open Issues**: total open issues count across all machines, and count of machines with at least one open issue.
-  - **In Sync with PBM**: count of machines with listing intent On whose lineup observation matches intent without availability contradiction (canonical states `on`, `shared`, and `flag`; `intent === 'on'` and `outOfSync === false` without `alert`), and percentage of all machines with listing intent On (`in_sync_intent_on / total_intent_on`).
+  - **In Sync with PBM**: count of machines with listing intent On whose lineup observation matches intent without availability contradiction (canonical states `on`, `shared`, and `flag`; `intent === 'on'` and `outOfSync === false` without `alert`), and percentage of all machines with listing intent On (`in_sync_intent_on / total_intent_on`). When Pinball Map is Not configured or Waiting for its first snapshot, no valid lineup observation exists and the KPI card displays "—".
   - **Discrepancies**: count of unique machines requiring operator action: playability `needs_service` or `unplayable`, Pinball Map lineup out-of-sync (`outOfSync === true`: states `missing` and `lingering`), or Pinball Map availability contradiction (state `alert`).
 - **Last Serviced** — the recency of the most recent maintenance-tagged timeline event or service touch recorded on a machine. Machines with no recorded service history display "Never".
 - **Per-Machine Inspection Surface** — a contextual detail pane for the selected machine. On desktop and tablet viewports (`≥768px` / `md:`), it renders as a side-by-side pane alongside the table without obscuring pinned columns. On mobile viewports (`<768px`), it transitions to a bottom drawer (`Drawer`) overlay with swipe/drag dismissibility and thumb-friendly action targets.
@@ -31,7 +31,7 @@
 - **2.1** A single operational route (`/fleet`) lists every collection machine in a paginated status table.
 - **2.2** Page view access is `member+` (available to all authenticated members, technicians, and admins; guests are denied access).
 - **2.3** The table is paginated with a user-selectable number of rows per page (e.g. 25, 50, 100) to keep performance snappy while accommodating fleet auditing.
-- **2.4** The page renders the KPI Summary Cards strip above the filter controls using the population formulas defined in §1. When a percentage denominator is zero, the percentage displays "—".
+- **2.4** The page renders the KPI Summary Cards strip above the filter controls using the population formulas defined in §1. When a percentage denominator is zero, or when the Pinball Map integration is inactive (`not_configured` or `waiting`), the percentage displays "—".
 
 ---
 
@@ -88,7 +88,7 @@
 | :-- | :-- | :-- |
 | §2.1 `/fleet` route | Route does not exist | Implementation of route |
 | §3.2 Sticky first column & sticky header | No sticky table layout component | Sticky table component |
-| §4.1–§4.4 Filter toolbar & URL state | `MachineFilters` lacks PBM filter axis, manufacturer/model search matching, and `pageSize` URL sync | Fleet filter toolbar |
+| §4.1–§4.4 Filter toolbar & URL state | `MachineFilters` lacks PBM filter axis and manufacturer/model search matching; existing URL state uses composite `sort` (e.g. `name_desc`) rather than split `sort`/`dir` parameters and lacks `pageSize` URL sync | Fleet filter toolbar |
 | §5.1 PBM column group & near-miss detection | Dashboard table not yet built | Dashboard table implementation |
 | §6.1 Responsive per-machine inspection surface | No per-machine inspection pane/drawer built | Inspection surface component |
 
@@ -98,5 +98,5 @@
 
 | Date | Change |
 | :-- | :-- |
-| 2026-09-06 | Clarify strictly two-line machine identity column (§3.2), lean column defaults and Last Serviced positioning (§3.3), View Options control (§3.7), KPI formulas and empty-state rules (§1, §2.4), and unified search/multi-select filter toolbar (§4.1–§4.5). |
+| 2026-09-06 | Clarify strictly two-line machine identity column (§3.2), lean column defaults and Last Serviced positioning (§3.3), View Options control (§3.7), canonical PBM KPI formulas and empty/inactive states (§1, §2.4), and unified search/multi-select filter toolbar and sort parameter divergence (§4.1–§4.5). |
 | 2026-09-05 | Created. Establishes requirements for member+ status table at `/fleet` (§2–§3), URL-driven filter presets (§4), PBM column group & edition near-misses (§5), desktop side-pane / mobile bottom-sheet inspection surface (§6), and permissions (§7). |
