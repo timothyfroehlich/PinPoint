@@ -183,8 +183,8 @@ def stub_repo(
         env["STUB_LIVE_LABELS"] = ",".join(
             live_labels if live_labels is not None else (labels or [])
         )
-        env["AUTOMERGE_POLL_INTERVAL"] = "1"
-        env["AUTOMERGE_TIMEOUT"] = "3"
+        env["AUTOMERGE_POLL_INTERVAL"] = "0.05"
+        env["AUTOMERGE_TIMEOUT"] = "0.2"
 
         yield {
             "env": env,

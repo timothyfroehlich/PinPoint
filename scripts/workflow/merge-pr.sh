@@ -317,10 +317,20 @@ gate_signature() {
   printf '%s' "$sig"
 }
 
+_automerge_now() {
+  if [ -n "${EPOCHREALTIME:-}" ]; then
+    printf '%s' "$EPOCHREALTIME"
+  elif command -v perl >/dev/null 2>&1; then
+    perl -MTime::HiRes=time -e 'printf "%.6f\n", time'
+  else
+    date -u +%s
+  fi
+}
+
 # --- Decide ---
 if [ "$AUTOMERGE" = "true" ]; then
-  automerge_started=$(date -u +%s)
-  automerge_deadline=$((automerge_started + AUTOMERGE_TIMEOUT))
+  automerge_started=$(_automerge_now)
+  automerge_deadline=$(awk -v s="$automerge_started" -v t="$AUTOMERGE_TIMEOUT" 'BEGIN { printf "%.6f\n", s + t }')
   poll=0
   last_signature="__unset__"
   final_audit_fresh=false
@@ -345,7 +355,8 @@ if [ "$AUTOMERGE" = "true" ]; then
     if [ ${#GATE_FAILURES[@]} -gt 0 ]; then
       echo "RESULT: ${#GATE_FAILURES[@]} gate(s) failed: ${GATE_FAILURES[*]}"
       drop_ready_label
-      echo "AUTOMERGE: RED after ${poll} poll(s), $(( $(date -u +%s) - automerge_started ))s — not merged."
+      elapsed=$(awk -v n="$(_automerge_now)" -v s="$automerge_started" 'BEGIN { d = n - s; if (d == int(d)) printf "%d", d; else if (d >= 10) printf "%d", int(d + 0.5); else printf "%.2f", d }')
+      echo "AUTOMERGE: RED after ${poll} poll(s), ${elapsed}s — not merged."
       exit 1
     fi
 
@@ -362,19 +373,22 @@ if [ "$AUTOMERGE" = "true" ]; then
         fi
       fi
       echo "RESULT: all gates passed"
-      echo "AUTOMERGE: green after ${poll} poll(s), $(( $(date -u +%s) - automerge_started ))s — merging."
+      elapsed=$(awk -v n="$(_automerge_now)" -v s="$automerge_started" 'BEGIN { d = n - s; if (d == int(d)) printf "%d", d; else if (d >= 10) printf "%d", int(d + 0.5); else printf "%.2f", d }')
+      echo "AUTOMERGE: green after ${poll} poll(s), ${elapsed}s — merging."
       break
     fi
 
-    now=$(date -u +%s)
-    if [ "$now" -ge "$automerge_deadline" ]; then
+    now=$(_automerge_now)
+    if awk -v n="$now" -v d="$automerge_deadline" 'BEGIN { exit !(n >= d) }'; then
       echo "RESULT: still waiting on: ${GATE_WAITS[*]}"
-      echo "AUTOMERGE: TIMED OUT after $((now - automerge_started))s — not merged, nothing failed."
+      elapsed=$(awk -v n="$now" -v s="$automerge_started" 'BEGIN { d = n - s; if (d == int(d)) printf "%d", d; else if (d >= 10) printf "%d", int(d + 0.5); else printf "%.2f", d }')
+      echo "AUTOMERGE: TIMED OUT after ${elapsed}s — not merged, nothing failed."
       echo "  The PR is untouched and the label is intact. Re-run once the pending gate(s) settle,"
       echo "  or raise the budget: AUTOMERGE_TIMEOUT=7200 $0 $PR --human --automerge"
       exit 2
     fi
     sleep "$AUTOMERGE_POLL_INTERVAL"
+
 
     poll_rc=0
     poll_waiting_gates "$POLL_HEAD_SHA" || poll_rc=$?
