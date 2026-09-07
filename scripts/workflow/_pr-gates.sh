@@ -81,88 +81,129 @@ _codex_review_record() {
 
 # Issue comments carry four review records: the connector's clean result, the trusted
 # workflow's SHA-pinned witness of a fresh eyes-to-+1 transition, the SHA-bound manual
-# review request, and the independent local-review attestation.
+# review request, and the independent local-review attestation (including two-axis reviews).
 _comment_review_record() {
   local pr=$1 owner_repo=$2 head=$3
-  gh api --paginate "repos/${owner_repo}/issues/${pr}/comments" \
-    | jq -rs --arg bot "$CODEX_REVIEW_BOT" --arg app "$CODEX_REVIEW_APP_SLUG" \
-        --arg actions_bot "$GITHUB_ACTIONS_BOT" --arg actions_app "$GITHUB_ACTIONS_APP_SLUG" \
-        --arg witness_prefix "$CODEX_REACTION_WITNESS_PREFIX" \
-        --arg clean_prefix "$CODEX_CLEAN_REVIEW_PREFIX" --arg prefix "$REVIEW_MARKER_PREFIX" \
-        --arg legacy "$LEGACY_CLAUDE_MARKER_PREFIX" --arg head "$head" \
-        --arg owner "${owner_repo%%/*}" \
-        '[ .[] | flatten | .[] ] as $comments
-         | ([ $comments[]
-           | (.body // "") as $body
-           | select(.user.login? == $bot and .performed_via_github_app.slug? == $app)
-           | { sha: ($body | [scan("\\*\\*Reviewed commit:\\*\\* `([0-9a-f]{10}|[0-9a-f]{40})`")] | flatten | (.[0] // "")),
-               reviewer: (.user.login // ""),
-               detail: "NO_FINDINGS",
-               at: (.updated_at // .created_at // ""),
-               summary: (($body | split("\n")[0]) // ""),
-               state: "clean_comment" }
-           | select(.summary | startswith($clean_prefix))
-           | select((.sha | length) == 10 or (.sha | length) == 40)
-         ] | sort_by(.at)) as $clean
-         | ([ $comments[]
-           | (.body // "") as $body
-           | select(.user.login? == $actions_bot
-                    and .performed_via_github_app.slug? == $actions_app
-                    and ($body | startswith($witness_prefix)))
-           | { sha: ($body | [scan("^<!-- pinpoint-codex-reaction-witness: ([0-9a-f]{40}) -->")] | flatten | (.[0] // "")),
-               reviewer: (.user.login // ""),
-               detail: "REACTION_WITNESS",
-               at: (.updated_at // .created_at // ""),
-               summary: "Codex clean reaction witnessed by GitHub Actions",
-               state: "clean_reaction" }
-           | select((.sha | length) == 40)
-         ] | sort_by(.at)) as $witness
-         | ([ $comments[]
-           | (.body // "") as $body
-           | select(.user.login? == $owner)
-           | { sha: ($body | [scan("^@codex review\\n<!-- pinpoint-codex-review-head: ([0-9a-f]{40}) -->$")] | flatten | (.[0] // "")),
-               reviewer: (.user.login // ""),
-               detail: "MANUAL_REVIEW_REQUESTED",
-               at: (.created_at // ""),
-               summary: "Manual Codex review requested",
-               state: "review_requested" }
-           | select((.sha | length) == 40)
-         ] | sort_by(.at)) as $review_requests
-         | ([ $comments[]
-           | (.body // "") as $body
-           | select($body | startswith($prefix) or startswith($legacy))
-           | { sha: (if $body | startswith($prefix) then ($body | ltrimstr($prefix)) else ($body | ltrimstr($legacy)) end | split("-->")[0] | gsub("^\\s+|\\s+$"; "")),
+  local commits_json="${4:-}"
+  local comments_json
+  comments_json=$(gh api --paginate "repos/${owner_repo}/issues/${pr}/comments")
+
+  if [[ -z "$commits_json" ]]; then
+    if jq -ers --arg owner "${owner_repo%%/*}" '
+      [ .[] | flatten | .[] ] as $comments
+      | any($comments[];
+        (.user.login? == $owner) and
+        ((.body // "") as $b |
+         ($b | test("(^|\\n)##\\s+(?:Two-axis\\s+code\\s+review|Code\\s+review)\\b"; "i")) and
+         ($b | test("(^|\\n)##\\s+Standards\\b")) and
+         ($b | test("(^|\\n)##\\s+Spec\\b")) and
+         (($b | split("\n## Standards")[0] | [scan("(?:\\.{2,3}|(?:^|\\s)(?:head|commit)\\s+`?)([0-9a-f]{7,40})`?")] | flatten | length) == 0)
+        )
+      )
+    ' <<< "$comments_json" >/dev/null 2>&1; then
+      commits_json=$(gh pr view "$pr" --json commits --jq .commits 2>/dev/null || echo "[]")
+    else
+      commits_json="[]"
+    fi
+  fi
+
+  jq -rs --arg bot "$CODEX_REVIEW_BOT" --arg app "$CODEX_REVIEW_APP_SLUG" \
+      --arg actions_bot "$GITHUB_ACTIONS_BOT" --arg actions_app "$GITHUB_ACTIONS_APP_SLUG" \
+      --arg witness_prefix "$CODEX_REACTION_WITNESS_PREFIX" \
+      --arg clean_prefix "$CODEX_CLEAN_REVIEW_PREFIX" --arg prefix "$REVIEW_MARKER_PREFIX" \
+      --arg legacy "$LEGACY_CLAUDE_MARKER_PREFIX" --arg head "$head" \
+      --arg owner "${owner_repo%%/*}" \
+      --argjson commits "$commits_json" \
+      '[ .[] | flatten | .[] ] as $comments
+       | ([ $comments[]
+         | (.body // "") as $body
+         | select(.user.login? == $bot and .performed_via_github_app.slug? == $app)
+         | { sha: ($body | [scan("\\*\\*Reviewed commit:\\*\\* `([0-9a-f]{10}|[0-9a-f]{40})`")] | flatten | (.[0] // "")),
+             reviewer: (.user.login // ""),
+             detail: "NO_FINDINGS",
+             at: (.updated_at // .created_at // ""),
+             summary: (($body | split("\n")[0]) // ""),
+             state: "clean_comment" }
+         | select(.summary | startswith($clean_prefix))
+         | select((.sha | length) == 10 or (.sha | length) == 40)
+       ] | sort_by(.at)) as $clean
+       | ([ $comments[]
+         | (.body // "") as $body
+         | select(.user.login? == $actions_bot
+                  and .performed_via_github_app.slug? == $actions_app
+                  and ($body | startswith($witness_prefix)))
+         | { sha: ($body | [scan("^<!-- pinpoint-codex-reaction-witness: ([0-9a-f]{40}) -->")] | flatten | (.[0] // "")),
+             reviewer: (.user.login // ""),
+             detail: "REACTION_WITNESS",
+             at: (.updated_at // .created_at // ""),
+             summary: "Codex clean reaction witnessed by GitHub Actions",
+             state: "clean_reaction" }
+         | select((.sha | length) == 40)
+       ] | sort_by(.at)) as $witness
+       | ([ $comments[]
+         | (.body // "") as $body
+         | select(.user.login? == $owner)
+         | { sha: ($body | [scan("^@codex review\\n<!-- pinpoint-codex-review-head: ([0-9a-f]{40}) -->$")] | flatten | (.[0] // "")),
+             reviewer: (.user.login // ""),
+             detail: "MANUAL_REVIEW_REQUESTED",
+             at: (.created_at // ""),
+             summary: "Manual Codex review requested",
+             state: "review_requested" }
+         | select((.sha | length) == 40)
+       ] | sort_by(.at)) as $review_requests
+       | ([ $comments[]
+         | (.body // "") as $body
+         | (.updated_at // .created_at // "") as $at
+         | if ($body | startswith($prefix) or startswith($legacy)) then
+             { sha: (if $body | startswith($prefix) then ($body | ltrimstr($prefix)) else ($body | ltrimstr($legacy)) end | split("-->")[0] | gsub("^\\s+|\\s+$"; "")),
                reviewer: (if $body | startswith($prefix)
                           then ($body | [scan("<!-- pinpoint-reviewer:\\s*([a-z0-9-]+)\\s*-->")] | flatten | (.[0] // "unrecorded"))
                           else "claude-code" end),
                detail: (if $body | startswith($prefix)
                         then ($body | [scan("<!-- pinpoint-review-detail:\\s*([a-z0-9-]+)\\s*-->")] | flatten | (.[0] // "unrecorded"))
                         else ($body | [scan("<!-- pinpoint-review-depth:\\s*([a-z]+)\\s*-->")] | flatten | (.[0] // "unrecorded")) end),
-               at: (.updated_at // ""),
+               at: $at,
                summary: (($body | split("\n") | last) // "") }
-         ] | sort_by(.at)) as $markers
-         | [ $markers[] | select(.sha == $head) ] as $pinned
-         | (($clean + $witness) | sort_by(.at)) as $codex_results
-         | [ $codex_results[]
-             | select(if .state == "clean_comment"
-                      then (.sha as $sha | $head | startswith($sha))
-                      else .sha == $head
-                      end)
-         ] as $codex_pinned
-         | [ $review_requests[] | select(.sha == $head) ] as $request_sent
-         | if ($pinned | length) > 0 then ($pinned | last) + { state: "marker" }
-           elif ($codex_pinned | length) > 0 then ($codex_pinned | last)
-           elif ($request_sent | length) > 0 then ($request_sent | last)
-           elif ($markers | length) > 0 and ($codex_results | length) > 0 then
-             if $markers[-1].at > $codex_results[-1].at
-             then $markers[-1] + { state: "stale_marker" }
-             else $codex_results[-1] + { state: (if $codex_results[-1].state == "clean_reaction" then "stale_clean_reaction" else "stale_clean_comment" end) }
-             end
-           elif ($markers | length) > 0 then $markers[-1] + { state: "stale_marker" }
-           elif ($codex_results | length) > 0 then $codex_results[-1] + { state: (if $codex_results[-1].state == "clean_reaction" then "stale_clean_reaction" else "stale_clean_comment" end) }
-           else { state: "unreviewed", sha: "", reviewer: "", detail: "", at: "", summary: "" }
+           elif (.user.login? == $owner
+                 and ($body | test("(^|\\n)##\\s+(?:Two-axis\\s+code\\s+review|Code\\s+review)\\b"; "i"))
+                 and ($body | test("(^|\\n)##\\s+Standards\\b"))
+                 and ($body | test("(^|\\n)##\\s+Spec\\b"))) then
+             ($body | split("\n## Standards")[0] | [scan("(?:\\.{2,3}|(?:^|\\s)(?:head|commit)\\s+`?)([0-9a-f]{7,40})`?")] | flatten | (.[-1] // "")) as $explicit_sha
+             | (if $explicit_sha != "" then
+                  ($commits | map(select(.oid | startswith($explicit_sha))) | (.[0].oid // $explicit_sha))
+                else
+                  ($commits | map(select((.committedDate // "") <= $at)) | (last.oid // ""))
+                end) as $resolved_sha
+             | { sha: $resolved_sha,
+                 reviewer: (if ($body | test("—\\s*Antigravity|antigravity-code"; "i")) then "antigravity" else "claude-code" end),
+                 detail: (($body | [scan("/code-review\\s+([a-z0-9-]+)")] | flatten | (.[0] // "two-axis"))),
+                 at: $at,
+                 summary: (($body | [scan("(?m)^\\*\\*Summary[^\n]*")] | flatten | (.[0] // ($body | split("\n")[0]))) // "") }
+           else empty end
+         | select((.sha | length) >= 7)
+       ] | sort_by(.at)) as $markers
+       | [ $markers[] | select((.sha | length) >= 7 and ($head | length) >= 7 and (.sha as $s | ($head | startswith($s)) or ($s | startswith($head)))) ] as $pinned
+       | (($clean + $witness) | sort_by(.at)) as $codex_results
+       | [ $codex_results[]
+           | select(if .state == "clean_comment"
+                    then (.sha as $sha | $head | startswith($sha))
+                    else .sha == $head
+                    end)
+       ] as $codex_pinned
+       | [ $review_requests[] | select(.sha == $head) ] as $request_sent
+       | if ($pinned | length) > 0 then ($pinned | last) + { state: "marker" }
+         elif ($codex_pinned | length) > 0 then ($codex_pinned | last)
+         elif ($request_sent | length) > 0 then ($request_sent | last)
+         elif ($markers | length) > 0 and ($codex_results | length) > 0 then
+           if $markers[-1].at > $codex_results[-1].at
+           then $markers[-1] + { state: "stale_marker" }
+           else $codex_results[-1] + { state: (if $codex_results[-1].state == "clean_reaction" then "stale_clean_reaction" else "stale_clean_comment" end) }
            end
-         | [ .state, .sha, .reviewer, .detail, .at, .summary ] | @tsv'
+         elif ($markers | length) > 0 then $markers[-1] + { state: "stale_marker" }
+         elif ($codex_results | length) > 0 then $codex_results[-1] + { state: (if $codex_results[-1].state == "clean_reaction" then "stale_clean_reaction" else "stale_clean_comment" end) }
+         else { state: "unreviewed", sha: "", reviewer: "", detail: "", at: "", summary: "" }
+         end
+       | [ .state, .sha, .reviewer, .detail, .at, .summary ] | @tsv' <<< "$comments_json"
 }
 
 # A manual marker is an independent valid record. Native reviews, clean connector

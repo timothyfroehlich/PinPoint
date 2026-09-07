@@ -157,9 +157,16 @@ review_phrase() {
     codex-plugin-cc:base-main) printf 'codex review, branch diff vs main\n' ;;
     claude-code:trivial) printf 'attested trivial (no /code-review run)\n' ;;
     claude-code:unrecorded) printf 'depth unrecorded (legacy marker predates PP-9onv)\n' ;;
+    claude-code:two-axis) printf 'Claude review (two-axis)\n' ;;
     claude-code:low | claude-code:medium | claude-code:high | claude-code:xhigh | claude-code:max | claude-code:ultra)
       printf '/code-review %s\n' "$2"
       ;;
+    antigravity:trivial) printf 'attested trivial (no Antigravity review run)\n' ;;
+    antigravity:two-axis) printf 'Antigravity review (two-axis)\n' ;;
+    antigravity:low | antigravity:medium | antigravity:high | antigravity:xhigh | antigravity:max | antigravity:ultra)
+      printf 'Antigravity review (%s)\n' "$2"
+      ;;
+    antigravity:*) printf 'Antigravity review (%s)\n' "$2" ;;
     unrecorded:*) printf 'reviewer/detail unrecorded\n' ;;
     *) printf '%s %s\n' "$1" "$2" ;;
   esac

@@ -74,6 +74,8 @@ PR_FIELDS = f"""
   commits(last: 1) {{
     nodes {{
       commit {{
+        oid
+        committedDate
         statusCheckRollup {{
           contexts(first: {CONNECTION_PAGE_SIZE}) {{
             pageInfo {{ hasNextPage endCursor }}
@@ -313,8 +315,32 @@ def _native_review_record(reviews: list[dict[str, Any]], head: str) -> ReviewRec
     return ReviewRecord("stale_approval", sha, submitted_at)
 
 
+def _is_two_axis_review(body: str) -> bool:
+    if not re.search(r"(?im)^##\s+(?:Two-axis\s+code\s+review|Code\s+review)\b", body):
+        return False
+    return bool(
+        re.search(r"(?m)^##\s+Standards\b", body)
+        and re.search(r"(?m)^##\s+Spec\b", body)
+    )
+
+
+def _extract_two_axis_sha(body: str) -> str | None:
+    preamble = body.split("\n## Standards")[0]
+    matches = re.findall(
+        r"(?:\.{2,3}|(?:^|\s)(?:head|commit)\s+`?)([0-9a-f]{7,40})`?",
+        preamble,
+        re.IGNORECASE,
+    )
+    if matches:
+        return matches[-1]
+    return None
+
+
 def _comment_records(
-    comments: list[dict[str, Any]], head: str, owner: str
+    comments: list[dict[str, Any]],
+    head: str,
+    owner: str,
+    head_committed_date: str | None = None,
 ) -> tuple[list[ReviewRecord], list[ReviewRecord], list[ReviewRecord]]:
     codex_results: list[ReviewRecord] = []
     review_requests: list[ReviewRecord] = []
@@ -357,6 +383,16 @@ def _comment_records(
             )
             if match is not None:
                 markers.append(ReviewRecord("marker", match.group(1), at))
+        elif login == owner and _is_two_axis_review(body):
+            sha = _extract_two_axis_sha(body)
+            if sha is None:
+                if head_committed_date and head_committed_date <= at:
+                    sha = head
+                elif head_committed_date:
+                    sha = "stale"
+                else:
+                    sha = head
+            markers.append(ReviewRecord("marker", sha, at))
     codex_results.sort(key=lambda record: record.at)
     review_requests.sort(key=lambda record: record.at)
     markers.sort(key=lambda record: record.at)
@@ -364,10 +400,21 @@ def _comment_records(
 
 
 def _comment_review_record(
-    comments: list[dict[str, Any]], head: str, owner: str
+    comments: list[dict[str, Any]],
+    head: str,
+    owner: str,
+    head_committed_date: str | None = None,
 ) -> ReviewRecord:
-    codex_results, review_requests, markers = _comment_records(comments, head, owner)
-    current_markers = [record for record in markers if record.sha == head]
+    codex_results, review_requests, markers = _comment_records(
+        comments, head, owner, head_committed_date
+    )
+    current_markers = [
+        record
+        for record in markers
+        if len(record.sha) >= 7
+        and len(head) >= 7
+        and (head.startswith(record.sha) or record.sha.startswith(head))
+    ]
     if current_markers:
         return current_markers[-1]
     current_codex_results = [
@@ -649,9 +696,22 @@ def _row_for_pr(owner: str, repo: str, pr_data: dict[str, Any]) -> dict[str, str
                         review = "reviewed"
                     else:
                         comments = _issue_comments(owner, repo, number)
+                        committed_date = None
+                        commits_data = pr_data.get("commits")
+                        if isinstance(commits_data, dict) and commits_data.get("nodes"):
+                            first_node = commits_data["nodes"][0]
+                            if isinstance(first_node, dict) and isinstance(
+                                first_node.get("commit"), dict
+                            ):
+                                raw_date = first_node["commit"].get("committedDate")
+                                if isinstance(raw_date, str):
+                                    committed_date = raw_date
                         review = _review_label(
                             _combined_review_state(
-                                native, _comment_review_record(comments, head, owner)
+                                native,
+                                _comment_review_record(
+                                    comments, head, owner, committed_date
+                                ),
                             )
                         )
                 except DashboardError:

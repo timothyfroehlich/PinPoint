@@ -16,12 +16,13 @@ set -euo pipefail
 # Usage:
 #   bash scripts/workflow/mark-review.sh <PR> <reviewer> <detail> ["one-line findings"]
 #
-#   <reviewer>  codex-plugin-cc | claude-code
+#   <reviewer>  codex-plugin-cc | claude-code | antigravity
 #   <detail>    codex-plugin-cc: base-main   (i.e. Codex reviewed the branch diff against
 #                                             `main` — the target, not the flags; bare
 #                                             `/codex:review` on a clean tree resolves to
 #                                             exactly that)
-#               claude-code: low | medium | high | xhigh | max | ultra | trivial
+#               claude-code: low | medium | high | xhigh | max | ultra | trivial | two-axis
+#               antigravity: low | medium | high | xhigh | max | ultra | trivial | two-axis
 
 MARKER_PREFIX="<!-- pinpoint-review:"
 LEGACY_MARKER_PREFIX="<!-- pinpoint-claude-review:"
@@ -35,9 +36,10 @@ summary="${4:-no serious findings}"
 
 usage() {
   echo "usage: mark-review.sh <PR> <reviewer> <detail> [\"one-line findings summary\"]" >&2
-  echo "       reviewer: codex-plugin-cc | claude-code" >&2
+  echo "       reviewer: codex-plugin-cc | claude-code | antigravity" >&2
   echo "       codex-plugin-cc detail: base-main" >&2
-  echo "       claude-code detail: low | medium | high | xhigh | max | ultra | trivial" >&2
+  echo "       claude-code detail: low | medium | high | xhigh | max | ultra | trivial | two-axis" >&2
+  echo "       antigravity detail: low | medium | high | xhigh | max | ultra | trivial | two-axis" >&2
 }
 
 if [[ -z "$pr" || ! "$pr" =~ ^[0-9]+$ ]]; then
@@ -47,7 +49,8 @@ fi
 
 case "$reviewer:$detail" in
   codex-plugin-cc:base-main) ;;
-  claude-code:low | claude-code:medium | claude-code:high | claude-code:xhigh | claude-code:max | claude-code:ultra | claude-code:trivial) ;;
+  claude-code:low | claude-code:medium | claude-code:high | claude-code:xhigh | claude-code:max | claude-code:ultra | claude-code:trivial | claude-code:two-axis) ;;
+  antigravity:low | antigravity:medium | antigravity:high | antigravity:xhigh | antigravity:max | antigravity:ultra | antigravity:trivial | antigravity:two-axis) ;;
   *)
     echo "mark-review.sh: unsupported reviewer/detail pair: '${reviewer}:${detail}'" >&2
     usage
@@ -70,8 +73,20 @@ case "$reviewer:$detail" in
   claude-code:trivial)
     visible="Claude review of head ${short_sha} — trivial change, no /code-review run — ${summary}"
     ;;
+  claude-code:two-axis)
+    visible="Claude review of head ${short_sha} — two-axis review — ${summary}"
+    ;;
   claude-code:*)
     visible="Claude review of head ${short_sha} — \`/code-review ${detail}\` — ${summary}"
+    ;;
+  antigravity:trivial)
+    visible="Antigravity review of head ${short_sha} — trivial change — ${summary}"
+    ;;
+  antigravity:two-axis)
+    visible="Antigravity review of head ${short_sha} — two-axis review — ${summary}"
+    ;;
+  antigravity:*)
+    visible="Antigravity review of head ${short_sha} — review ${detail} — ${summary}"
     ;;
 esac
 
