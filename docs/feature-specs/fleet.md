@@ -18,8 +18,8 @@
   - **On Floor**: count of machines with `on_the_floor` presence, and percentage of total collection machines (`on_the_floor / total`).
   - **Operational**: count of operational machines among on-floor machines, and percentage of on-floor machines (`operational / on_the_floor`).
   - **Open Issues**: total open issues count across all machines, and count of machines with at least one open issue.
-  - **In Sync with PBM**: count of machines with an in-sync Pinball Map status (`in_sync`, `on`, `covered`), and percentage of machines intended for public listing (`in_sync / intent_on`).
-  - **Discrepancies**: count of machines requiring operator action (playability `needs_service` or `unplayable`, or Pinball Map `outOfSync` states `missing`, `lingering`, `alert`).
+  - **In Sync with PBM**: count of machines with listing intent On whose lineup observation matches intent without availability contradiction (canonical states `on`, `shared`, and `flag`; `intent === 'on'` and `outOfSync === false` without `alert`), and percentage of all machines with listing intent On (`in_sync_intent_on / total_intent_on`).
+  - **Discrepancies**: count of unique machines requiring operator action: playability `needs_service` or `unplayable`, Pinball Map lineup out-of-sync (`outOfSync === true`: states `missing` and `lingering`), or Pinball Map availability contradiction (state `alert`).
 - **Last Serviced** — the recency of the most recent maintenance-tagged timeline event or service touch recorded on a machine. Machines with no recorded service history display "Never".
 - **Per-Machine Inspection Surface** — a contextual detail pane for the selected machine. On desktop and tablet viewports (`≥768px` / `md:`), it renders as a side-by-side pane alongside the table without obscuring pinned columns. On mobile viewports (`<768px`), it transitions to a bottom drawer (`Drawer`) overlay with swipe/drag dismissibility and thumb-friendly action targets.
 - **Edition Near-Miss** — a machine state where a local machine and a Pinball Map lineup entry share a title family (`machineGroupId`), but differ in edition (defined in `docs/feature-specs/pinballmap.md` §1).
