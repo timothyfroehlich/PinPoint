@@ -162,7 +162,7 @@ describe("AssigneePicker — Me quick-select", () => {
     expect(onAssign).toHaveBeenCalledWith("2");
   });
 
-  it("excludes current user from the alphabetical list (they appear only as 'Me')", () => {
+  it("includes current user in the alphabetical list in addition to 'Me'", () => {
     const onAssign = vi.fn();
     render(
       <AssigneePicker
@@ -178,8 +178,8 @@ describe("AssigneePicker — Me quick-select", () => {
 
     // "Me" is present
     expect(screen.getByTestId("assignee-option-me")).toBeInTheDocument();
-    // Alice (id=1) must NOT also appear in the alphabetical section
-    expect(screen.queryByTestId("assignee-option-1")).not.toBeInTheDocument();
+    // Alice (id=1) also appears under her real name so search-by-name finds her
+    expect(screen.getByTestId("assignee-option-1")).toBeInTheDocument();
     // Other users ARE in the alphabetical section
     expect(screen.getByTestId("assignee-option-2")).toBeInTheDocument();
     expect(screen.getByTestId("assignee-option-3")).toBeInTheDocument();
