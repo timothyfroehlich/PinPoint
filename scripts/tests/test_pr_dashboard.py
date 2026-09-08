@@ -586,3 +586,57 @@ def test_malformed_repository_response_renders_requested_pr_unknown(run_dashboar
     assert result.stdout.splitlines()[2].count("?") >= 5
     assert "malformed GitHub response" in result.stderr
     assert len(calls) == 1
+
+
+@pytest.mark.unit
+def test_claude_two_axis_review_passes_dashboard(run_dashboard):
+    response = open_pr_response([pr_node(4, reviews=[])])
+    comment_body = (
+        f"## Code review — PR #4 (two-axis)\n\n"
+        f"Reviewed `origin/main...{HEAD[:8]}` across **Standards** and **Spec**.\n\n"
+        f"## Standards\n\nNo breaches.\n\n"
+        f"## Spec\n\nFaithful.\n\n"
+        f"---\n\n**Summary** — Clean.\n\n—Claude"
+    )
+    comments = [
+        {
+            "user": {"login": "timothyfroehlich"},
+            "body": comment_body,
+            "created_at": "2026-08-30T12:01:00Z",
+        }
+    ]
+    result, _calls = run_dashboard(
+        [
+            {"contains": ["pullRequests(first: 100"], "stdout": json.dumps(response)},
+            {"contains": ["issues/4/comments"], "stdout": json.dumps(comments)},
+        ]
+    )
+    assert result.returncode == 0, result.stderr
+    assert "reviewed" in result.stdout.splitlines()[2]
+
+
+@pytest.mark.unit
+def test_claude_two_axis_review_stale_shows_re_review(run_dashboard):
+    response = open_pr_response([pr_node(4, reviews=[])])
+    comment_body = (
+        "## Code review — PR #4 (two-axis)\n\n"
+        "Reviewed `origin/main...bbbbbbbb` across **Standards** and **Spec**.\n\n"
+        "## Standards\n\nNo breaches.\n\n"
+        "## Spec\n\nFaithful.\n\n"
+        "---\n\n**Summary** — Clean.\n\n—Claude"
+    )
+    comments = [
+        {
+            "user": {"login": "timothyfroehlich"},
+            "body": comment_body,
+            "created_at": "2026-08-30T12:01:00Z",
+        }
+    ]
+    result, _calls = run_dashboard(
+        [
+            {"contains": ["pullRequests(first: 100"], "stdout": json.dumps(response)},
+            {"contains": ["issues/4/comments"], "stdout": json.dumps(comments)},
+        ]
+    )
+    assert result.returncode == 0, result.stderr
+    assert "RE-REVIEW" in result.stdout.splitlines()[2]
