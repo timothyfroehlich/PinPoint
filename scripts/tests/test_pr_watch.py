@@ -105,6 +105,31 @@ def manual_marker(sha=HEAD_SHA):
     }
 
 
+def claude_two_axis_review(
+    sha: str | None = HEAD_SHA[:8],
+    *,
+    login: str = pr_watch.REPO_OWNER,
+    base: str = "origin/main",
+    updated_at: str = "2026-08-22T12:00:00Z",
+):
+    if sha is not None:
+        preamble = f"Reviewed `{base}...{sha}` across **Standards** and **Spec**."
+    else:
+        preamble = f"Two-axis review against merge-base `{base}`. Docs-only."
+    body = (
+        f"## Code review — PR #{PR} (two-axis)\n\n"
+        f"{preamble}\n\n"
+        f"## Standards\n\nNo breaches.\n\n"
+        f"## Spec\n\nFaithful.\n\n"
+        f"---\n\n**Summary** — Clean.\n\n—Claude"
+    )
+    return {
+        "user": {"login": login},
+        "body": body,
+        "updated_at": updated_at,
+    }
+
+
 def clean_codex_comment(
     sha=HEAD_SHA[:10],
     *,
@@ -1089,6 +1114,26 @@ def test_review_state_current_finding_outranks_delayed_stale_clean_comment(monke
 def test_review_state_manual_marker_pins_head(monkeypatch):
     monkeypatch.setattr(pr_watch, "gh", make_gh(comments=[manual_marker()]))
     assert pr_watch.review_state(PR)[0] == "marker"
+
+
+@pytest.mark.unit
+def test_review_state_claude_two_axis_review_pins_head(monkeypatch):
+    monkeypatch.setattr(
+        pr_watch, "gh", make_gh(comments=[claude_two_axis_review(HEAD_SHA[:8])])
+    )
+    state, detail = pr_watch.review_state(PR)
+    assert state == "marker"
+    assert HEAD_SHA[:7] in detail
+
+
+@pytest.mark.unit
+def test_review_state_claude_two_axis_review_stale(monkeypatch):
+    monkeypatch.setattr(
+        pr_watch, "gh", make_gh(comments=[claude_two_axis_review(OLD_SHA[:8])])
+    )
+    state, detail = pr_watch.review_state(PR)
+    assert state == "stale_marker"
+    assert OLD_SHA[:7] in detail
 
 
 @pytest.mark.unit

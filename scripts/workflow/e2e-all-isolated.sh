@@ -27,7 +27,8 @@
 #
 # Usage:
 #   bash scripts/workflow/e2e-all-isolated.sh
-#   pnpm run e2e:all
+#   pnpm run e2e:all        # compact agent default
+#   pnpm run e2e:all:human  # streamed human diagnostics
 #
 # On failure, exits with the failing suite's non-zero code and prints
 # which suite failed. Stops at the first failure.

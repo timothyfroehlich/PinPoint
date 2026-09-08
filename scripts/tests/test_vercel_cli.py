@@ -14,6 +14,10 @@ import stat
 import subprocess
 from pathlib import Path
 
+import pytest
+
+pytestmark = pytest.mark.integration
+
 REPO_ROOT = Path(__file__).parent.parent.parent
 VERCEL_WRAPPER = REPO_ROOT / "scripts" / "workflow" / "preview" / "vercel-cli.sh"
 PREVIEW_CREATE = REPO_ROOT / "scripts" / "workflow" / "preview" / "preview-create.sh"

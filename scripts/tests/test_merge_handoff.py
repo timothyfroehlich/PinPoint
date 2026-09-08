@@ -29,6 +29,8 @@ from pathlib import Path
 
 import pytest
 
+pytestmark = pytest.mark.integration
+
 SCRIPT = Path(__file__).parent.parent / "workflow" / "merge-handoff.sh"
 
 PR = 123
@@ -86,6 +88,8 @@ class Scenario:
     clean_reaction_sha: str = "head"
     manual_request: bool = False
     manual_review: bool = False
+    manual_reviewer: str = "claude-code"
+    manual_detail: str = "medium"
     gh_head: str = "head"
     threads: list[dict] = field(default_factory=list)
     comments: list[dict] = field(default_factory=list)
@@ -208,8 +212,8 @@ def repo_with_pr(
                 {
                     "body": (
                         f"<!-- pinpoint-review: {head_sha} -->\n"
-                        "<!-- pinpoint-reviewer: claude-code -->\n"
-                        "<!-- pinpoint-review-detail: medium -->\nreviewed"
+                        f"<!-- pinpoint-reviewer: {scenario.manual_reviewer} -->\n"
+                        f"<!-- pinpoint-review-detail: {scenario.manual_detail} -->\nreviewed"
                     ),
                     "updated_at": "2026-08-02T20:43:19Z",
                 }
@@ -611,6 +615,28 @@ def test_a_manual_attestation_covering_head_is_merge_ready() -> None:
     ) as (_head, run):
         assert MERGE_CMD in run.stdout, run.stdout
         assert "/code-review medium" in run.stdout, run.stdout
+
+
+def test_a_claude_two_axis_review_is_named_in_the_handoff() -> None:
+    with repo_with_pr(
+        branch_changes={"src/lib/thing.ts": "x\n"},
+        scenario=Scenario(manual_review=True, manual_detail="two-axis"),
+    ) as (_head, run):
+        assert "Claude review (two-axis)" in run.stdout, run.stdout
+        assert MERGE_CMD in run.stdout, run.stdout
+
+
+def test_an_antigravity_two_axis_review_is_named_in_the_handoff() -> None:
+    with repo_with_pr(
+        branch_changes={"src/lib/thing.ts": "x\n"},
+        scenario=Scenario(
+            manual_review=True,
+            manual_reviewer="antigravity",
+            manual_detail="two-axis",
+        ),
+    ) as (_head, run):
+        assert "Antigravity review (two-axis)" in run.stdout, run.stdout
+        assert MERGE_CMD in run.stdout, run.stdout
 
 
 def test_a_codex_review_with_no_open_threads_is_merge_ready() -> None:

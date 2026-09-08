@@ -32,6 +32,7 @@
     "src/**/*.spec.ts",
     "src/**/*.spec.tsx",
     "src/test/**/*",
+    "scripts/**/*.test.ts",
     "vitest.config.ts"
   ]
 }

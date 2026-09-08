@@ -9,6 +9,9 @@ from pathlib import Path
 
 import pytest
 
+pytestmark = [pytest.mark.integration, pytest.mark.xdist_group("mise")]
+
+
 HOOK_PATH = Path(__file__).parent.parent.parent / ".husky" / "post-checkout"
 ZERO_SHA = "0" * 40
 HEAD_SHA = "ce94995ee0e88904d5c4e1660619c6c047cc6b6c"
@@ -187,12 +190,21 @@ def test_real_untrusted_dependency_empty_worktree_uses_project_pins(
     assert isinstance(package_manager, str)
     pnpm_version = package_manager.removeprefix("pnpm@").split("+", 1)[0]
 
+    # Ensure node and pnpm are preinstalled before querying where
+    subprocess.run(
+        [str(mise_path), "install", "--locked"],
+        cwd=REPO_ROOT,
+        check=True,
+        capture_output=True,
+    )
+
     node_where = subprocess.run(
         [str(mise_path), "--no-config", "where", f"node@{node_version}"],
         capture_output=True,
         text=True,
         check=True,
     )
+
     pnpm_where = subprocess.run(
         [str(mise_path), "--no-config", "where", f"pnpm@{pnpm_version}"],
         capture_output=True,

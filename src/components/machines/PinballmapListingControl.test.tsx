@@ -258,16 +258,23 @@ describe("push actions", () => {
     expect(status()).toContain("then Refresh to update");
   });
 
-  it("withholds the push from a viewer without the push capability", () => {
-    renderControl({
-      view: VIEWS.lingering,
-      canPush: false,
-    });
-    expect(screen.queryByTestId("pbm-listing-remove")).not.toBeInTheDocument();
-    expect(
-      screen.getByRole("link", { name: "Remove it on Pinball Map" })
-    ).toBeInTheDocument();
-  });
+  it.each([
+    ["missing", "pbm-listing-add", "Add it on Pinball Map"],
+    ["lingering", "pbm-listing-remove", "Remove it on Pinball Map"],
+  ] as const)(
+    "shows no %s edit affordance to a viewer without the push capability",
+    (view, testId, linkName) => {
+      renderControl({
+        view: VIEWS[view],
+        canPush: false,
+      });
+      expect(screen.queryByTestId(testId)).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("link", { name: linkName })
+      ).not.toBeInTheDocument();
+      expect(status()).not.toContain("then Refresh to update");
+    }
+  );
 
   it("confirms a remove with the comment count and the 7-day window", async () => {
     const user = userEvent.setup();

@@ -15,6 +15,8 @@ from pathlib import Path
 
 import pytest
 
+pytestmark = pytest.mark.integration
+
 GATES_PATH = Path(__file__).parent.parent / "workflow" / "_pr-gates.sh"
 CODEX_BOT = "chatgpt-codex-connector[bot]"
 CODEX_APP = "chatgpt-codex-connector"
@@ -114,6 +116,39 @@ def legacy_claude_marker(sha: str = HEAD_SHA, detail: str = "high") -> dict:
     }
 
 
+def claude_two_axis_review(
+    sha: str | None = HEAD_SHA[:8],
+    *,
+    login: str = "acme",
+    base: str = "origin/main",
+    standards_findings: str = "No breaches of documented standards.",
+    spec_findings: str = "Faithful to bead.",
+    summary: str = "Standards: 0 hard, Spec: 0 findings.",
+    updated_at: str = "2026-08-22T12:00:00Z",
+    reviewer_sig: str = "—Claude",
+) -> dict:
+    if sha is not None:
+        preamble = f"Reviewed `{base}...{sha}` across **Standards** and **Spec** in parallel sub-agents."
+    else:
+        preamble = f"Two-axis review against merge-base `{base}`. Docs-only."
+
+    body = (
+        f"## Code review — PR #123 (two-axis)\n\n"
+        f"{preamble}\n\n"
+        f"## Standards\n\n{standards_findings}\n\n"
+        f"## Spec\n\n{spec_findings}\n\n"
+        f"---\n\n"
+        f"**Summary** — {summary}\n\n"
+        f"{reviewer_sig}"
+    )
+    return {
+        "user": {"login": login},
+        "body": body,
+        "created_at": updated_at,
+        "updated_at": updated_at,
+    }
+
+
 def thread(*, resolved: bool, author: str) -> dict:
     return {
         "isResolved": resolved,
@@ -127,6 +162,7 @@ def gate_env(
     review_pages: list[list[dict]] | None = None,
     comment_pages: list[list[dict]] | None = None,
     threads: list[dict] | None = None,
+    commits: list[dict] | None = None,
     head_sha: str = HEAD_SHA,
 ) -> Iterator[dict]:
     """Yield an environment whose gh executable serves paginated review records."""
@@ -138,6 +174,7 @@ def gate_env(
         (tmp_path / "comments.json").write_text(
             "\n".join(json.dumps(page) for page in (comment_pages or [[]]))
         )
+        (tmp_path / "commits.json").write_text(json.dumps(commits or []))
         (tmp_path / "threads.json").write_text(
             json.dumps(
                 {
@@ -171,6 +208,7 @@ def gate_env(
             '  *"api graphql"*) cat "$STUB_THREADS" ;;\n'
             '  *"/pulls/"*"/reviews"*) cat "$STUB_REVIEWS" ;;\n'
             '  *"/issues/"*"/comments"*) cat "$STUB_COMMENTS" ;;\n'
+            '  *"commits"*) cat "$STUB_COMMITS" ;;\n'
             '  *) printf "UNEXPECTED gh call: %s\\n" "$args" >&2; exit 1 ;;\n'
             "esac\n"
         )
@@ -183,6 +221,7 @@ def gate_env(
         env["STUB_HEAD_SHA"] = head_sha
         env["STUB_REVIEWS"] = str(tmp_path / "reviews.json")
         env["STUB_COMMENTS"] = str(tmp_path / "comments.json")
+        env["STUB_COMMITS"] = str(tmp_path / "commits.json")
         env["STUB_THREADS"] = str(tmp_path / "threads.json")
         env["STUB_CALLS"] = str(calls_path)
         yield env
@@ -637,3 +676,62 @@ def test_resolved_threads_do_not_block() -> None:
     with gate_env(threads=[thread(resolved=True, author="codex")]) as env:
         result = run_gate("check_unresolved_threads", env)
     assert result.returncode == 0, result.stdout
+
+
+def test_claude_two_axis_review_with_explicit_short_sha_pins_head() -> None:
+    comment = claude_two_axis_review(sha=HEAD_SHA[:8])
+    with gate_env(comment_pages=[[comment]]) as env:
+        state, sha, reviewer, detail, at, summary = review_record(env)
+        assert state == "marker"
+        assert sha == HEAD_SHA[:8]
+        assert reviewer == "claude-code"
+        assert detail == "two-axis"
+        assert "Standards: 0 hard, Spec: 0 findings" in summary
+        gate_res = run_gate("check_review_happened", env)
+        assert gate_res.returncode == 0, gate_res.stdout
+        assert f"review marker pins head SHA {HEAD_SHA[:7]}" in gate_res.stdout
+
+
+def test_claude_two_axis_review_with_merge_base_only_correlates_commit_timestamp() -> (
+    None
+):
+    comment = claude_two_axis_review(sha=None, updated_at="2026-08-22T12:05:00Z")
+    commits = [
+        {
+            "oid": "1111111111111111111111111111111111111111",
+            "committedDate": "2026-08-22T12:00:00Z",
+        },
+        {"oid": HEAD_SHA, "committedDate": "2026-08-22T12:04:00Z"},
+    ]
+    with gate_env(comment_pages=[[comment]], commits=commits) as env:
+        state, sha, reviewer, detail, at, summary = review_record(env)
+        assert state == "marker"
+        assert sha == HEAD_SHA
+        assert reviewer == "claude-code"
+        assert detail == "two-axis"
+        gate_res = run_gate("check_review_happened", env)
+        assert gate_res.returncode == 0, gate_res.stdout
+        assert f"review marker pins head SHA {HEAD_SHA[:7]}" in gate_res.stdout
+
+
+def test_claude_two_axis_review_becomes_stale_marker_when_head_moves() -> None:
+    comment = claude_two_axis_review(sha=OTHER_SHA[:8])
+    with gate_env(comment_pages=[[comment]]) as env:
+        state, sha, reviewer, detail, at, summary = review_record(env)
+        assert state == "stale_marker"
+        assert sha == OTHER_SHA[:8]
+        gate_res = run_gate("check_review_happened", env)
+        assert gate_res.returncode == 1, gate_res.stdout
+        assert (
+            f"the review marker pins {OTHER_SHA[:7]}, but head is {HEAD_SHA[:7]}"
+            in gate_res.stdout
+        )
+
+
+def test_antigravity_two_axis_review_records_antigravity_reviewer() -> None:
+    comment = claude_two_axis_review(sha=HEAD_SHA[:8], reviewer_sig="—Antigravity")
+    with gate_env(comment_pages=[[comment]]) as env:
+        state, sha, reviewer, detail, at, summary = review_record(env)
+        assert state == "marker"
+        assert reviewer == "antigravity"
+        assert detail == "two-axis"

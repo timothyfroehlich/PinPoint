@@ -8,6 +8,8 @@ from pathlib import Path
 
 import pytest
 
+pytestmark = pytest.mark.integration
+
 SCRIPT = Path(__file__).parent.parent / "workflow" / "request-codex-review.sh"
 HEAD = "a" * 40
 OTHER_HEAD = "b" * 40

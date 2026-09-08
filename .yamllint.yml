@@ -1,5 +1,13 @@
-# yamllint configuration for GitHub Actions workflows
+# yamllint configuration for PinPoint
 extends: default
+
+ignore: |
+  pnpm-lock.yaml
+  *.lock.yml
+  node_modules/
+  .next/
+  .git/
+  docs/
 
 rules:
   # GitHub Actions workflows often have long lines due to nested structure

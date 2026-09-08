@@ -758,6 +758,27 @@ def _codex_reviews(pr: int) -> list[dict]:
     return sorted(reviews, key=lambda review: review.get("submitted_at") or "")
 
 
+def _is_two_axis_review(body: str) -> bool:
+    if not re.search(r"(?im)^##\s+(?:Two-axis\s+code\s+review|Code\s+review)\b", body):
+        return False
+    return bool(
+        re.search(r"(?m)^##\s+Standards\b", body)
+        and re.search(r"(?m)^##\s+Spec\b", body)
+    )
+
+
+def _extract_two_axis_sha(body: str) -> str | None:
+    preamble = body.split("\n## Standards")[0]
+    matches = re.findall(
+        r"(?:\.{2,3}|(?:^|\s)(?:head|commit)\s+`?)([0-9a-f]{7,40})`?",
+        preamble,
+        re.IGNORECASE,
+    )
+    if matches:
+        return matches[-1]
+    return None
+
+
 def _comment_review_records(
     pr: int,
 ) -> tuple[list[tuple[str, str, str]], list[tuple[str, str]], list[tuple[str, str]]]:
@@ -825,6 +846,27 @@ def _comment_review_records(
                     comment.get("updated_at") or "",
                 )
             )
+        elif (
+            comment.get("user", {}).get("login") == REPO_OWNER
+        ) and _is_two_axis_review(body):
+            sha = _extract_two_axis_sha(body)
+            at = comment.get("updated_at") or comment.get("created_at") or ""
+            if sha is None:
+                try:
+                    commits_json = gh("pr", "view", str(pr), "--json", "commits")
+                    commits_info = json.loads(commits_json)
+                    commits = commits_info.get("commits") or []
+                    matching = [
+                        c["oid"]
+                        for c in commits
+                        if (c.get("committedDate") or "") <= at
+                    ]
+                    if matching:
+                        sha = matching[-1]
+                except Exception:
+                    pass
+            if sha:
+                markers.append((sha, at))
     return codex_results, review_requests, markers
 
 
@@ -848,7 +890,12 @@ def review_state(pr: int, *, head_sha: str | None = None) -> tuple[str, str]:
     # A current native approval is sufficient. Defer the paginated comments request
     # unless it is needed to find another accepted record or request state.
     codex_results, review_requests, markers = _comment_review_records(pr)
-    if any(marker_sha == head_sha for marker_sha, _at in markers):
+    if any(
+        len(marker_sha) >= 7
+        and len(head_sha) >= 7
+        and (head_sha.startswith(marker_sha) or marker_sha.startswith(head_sha))
+        for marker_sha, _at in markers
+    ):
         return "marker", f"manual review marker pins head {head_sha[:7]}"
 
     current_clean = max(
