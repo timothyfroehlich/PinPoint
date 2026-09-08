@@ -410,6 +410,28 @@ export const pinballmapRegionSeenMachines = pgTable(
 ).enableRLS();
 
 /**
+ * Last known names for locations observed in a Pinball Map region.
+ *
+ * Rows are retained when a location leaves the region so a later removal event
+ * can still name the venue after Pinball Map's current region-locations response
+ * has stopped returning it.
+ */
+export const pinballmapRegionLocationNames = pgTable(
+  "pinballmap_region_location_names",
+  {
+    region: text("region").notNull(),
+    locationId: integer("location_id").notNull(),
+    name: text("name").notNull(),
+    refreshedAt: timestamp("refreshed_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.region, t.locationId] }),
+  })
+).enableRLS();
+
+/**
  * Per-region lease for the region-alert cron.
  *
  * The lease spans Pinball Map's HTTP read without holding a database transaction

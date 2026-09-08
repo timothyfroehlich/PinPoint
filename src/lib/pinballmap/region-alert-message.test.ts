@@ -1,8 +1,9 @@
 import { describe, it, expect } from "vitest";
 import {
-  formatRegionAlertMessage,
+  formatRegionAlertMessage as buildRegionAlertMessage,
   REGION_ALERT_MAX_LINES,
   type RegionAlertEntry,
+  type RegionAlertMessageInput,
 } from "./region-alert-message";
 
 function entry(overrides: Partial<RegionAlertEntry> = {}): RegionAlertEntry {
@@ -14,6 +15,12 @@ function entry(overrides: Partial<RegionAlertEntry> = {}): RegionAlertEntry {
     pinballmapMachineId: 6412,
     ...overrides,
   };
+}
+
+function formatRegionAlertMessage(
+  input: RegionAlertMessageInput
+): string | null {
+  return buildRegionAlertMessage(input)?.content ?? null;
 }
 
 describe("formatRegionAlertMessage", () => {
@@ -231,13 +238,23 @@ describe("formatRegionAlertMessage", () => {
         regionLabel: "Austin",
       }) ?? "";
 
-    // The rows are marked announced either way, so a machine dropped here is
-    // never mentioned again — the count is its only trace.
+    // The count tells readers that later queued entries were deferred.
     expect(message).toMatch(/…and \d+ more/);
     const shown = message
       .split("\n")
       .filter((l) => l.startsWith("• ") && !l.includes("…and")).length;
     const claimed = Number(/…and (\d+) more/.exec(message)?.[1] ?? "0");
     expect(shown + claimed).toBe(REGION_ALERT_MAX_LINES);
+  });
+
+  it("reports exactly how many leading entries the digest rendered", () => {
+    const entries = Array.from({ length: REGION_ALERT_MAX_LINES + 3 }, (_, i) =>
+      entry({ locationId: 1000 + i, machineName: `Machine ${String(i)}` })
+    );
+
+    const message = buildRegionAlertMessage({ entries, regionLabel: "Austin" });
+
+    expect(message?.renderedEntries).toBe(REGION_ALERT_MAX_LINES);
+    expect(message?.content).toContain("…and 3 more");
   });
 });

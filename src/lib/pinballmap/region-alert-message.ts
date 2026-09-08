@@ -41,6 +41,12 @@ export interface RegionAlertMessageInput {
   regionLabel: string;
 }
 
+export interface FormattedRegionAlertMessage {
+  content: string;
+  /** Leading entries represented by individual lines in this message. */
+  renderedEntries: number;
+}
+
 /**
  * One line per new machine: the title, then the venue as a MASKED LINK to its
  * PinballMap page.
@@ -80,14 +86,16 @@ function formatEntry(entry: RegionAlertEntry): string {
 }
 
 /**
- * Build the announcement, or null when there is nothing to announce.
+ * Build one announcement batch, or null when there is nothing to announce.
  *
  * A stable headline lets one digest carry both transition types in detection
- * order without implying that a mixed post contains additions only.
+ * order without implying that a mixed post contains additions only. The caller
+ * must settle only `renderedEntries`; everything omitted by the line/length cap
+ * remains queued for a later digest.
  */
 export function formatRegionAlertMessage(
   input: RegionAlertMessageInput
-): string | null {
+): FormattedRegionAlertMessage | null {
   const { entries, regionLabel } = input;
   if (entries.length === 0) return null;
 
@@ -113,8 +121,7 @@ export function formatRegionAlertMessage(
   // at a time cannot produce either, and it keeps the "…and N more" count — which
   // a from-the-end trim would remove first, leaving a headline announcing N
   // machines with no account of the missing ones. That count is the only trace
-  // they ever get: the rows are marked announced either way, so a line lost here
-  // is lost permanently.
+  // they get in this digest. Omitted rows stay queued for a later run.
   const overflowLine = (n: number): string =>
     `• …and ${String(n)} more changes (see the map for the full picture)`;
   // Reserved unconditionally, sized for the largest count it could ever carry.
@@ -133,14 +140,37 @@ export function formatRegionAlertMessage(
 
   const kept: string[] = [];
   let used = 0;
-  for (const line of entryLines) {
-    if (used + line.length + 1 > budget) break;
+  for (let i = 0; i < entryLines.length; i += 1) {
+    const line = entryLines[i];
+    if (line === undefined) break;
+    if (used + line.length + 1 > budget) {
+      // A pathological third-party label must not strand the first queued event
+      // forever. Its id-only form is short and still carries the specific PBM
+      // location link; later entries remain pending for the next digest.
+      if (kept.length === 0) {
+        const compactEntry = entries[i];
+        if (compactEntry !== undefined) {
+          kept.push(
+            formatEntry({
+              ...compactEntry,
+              locationName: null,
+              machineName: null,
+            })
+          );
+        }
+      }
+      break;
+    }
     kept.push(line);
     used += line.length + 1;
   }
 
-  const omitted = entries.length - kept.length;
+  const renderedEntries = kept.length;
+  const omitted = entries.length - renderedEntries;
   if (omitted > 0) kept.push(overflowLine(omitted));
 
-  return [headline, ...kept, attribution].join("\n");
+  return {
+    content: [headline, ...kept, attribution].join("\n"),
+    renderedEntries,
+  };
 }

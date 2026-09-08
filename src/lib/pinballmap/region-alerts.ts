@@ -4,6 +4,7 @@ import { and, asc, count, eq, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import { db } from "~/server/db";
 import {
   pinballmapRegionAlertEvents,
+  pinballmapRegionLocationNames,
   pinballmapRegionAlertState,
   pinballmapRegionSeenMachines,
 } from "~/server/db/schema";
@@ -20,7 +21,7 @@ import { getPinballMapClient } from "./client";
 import { PBM_AUSTIN_REGION, normalizeRegion } from "./config";
 import { formatRegionAlertMessage } from "./region-alert-message";
 import type { RegionAlertEntry } from "./region-alert-message";
-import type { PbmRegionLmx } from "./types";
+import type { PbmRegionLmx, PbmRegionLocation } from "./types";
 
 /**
  * Pinball Map region membership changes → Discord (PP-o355.51.9).
@@ -251,6 +252,69 @@ async function countPending(region: string): Promise<number> {
       )
     );
   return row?.n ?? 0;
+}
+
+async function readLocationNames(region: string): Promise<Map<number, string>> {
+  const rows = await db
+    .select({
+      locationId: pinballmapRegionLocationNames.locationId,
+      name: pinballmapRegionLocationNames.name,
+    })
+    .from(pinballmapRegionLocationNames)
+    .where(eq(pinballmapRegionLocationNames.region, region));
+  return new Map(rows.map((row) => [row.locationId, row.name]));
+}
+
+/**
+ * Refresh the current names while retaining historical rows for departed venues.
+ * A failed label read never blocks detection or delivery; cached names still win.
+ */
+async function refreshLocationNames(
+  region: string,
+  cached: Map<number, string>
+): Promise<Map<number, string>> {
+  let locations: PbmRegionLocation[];
+  try {
+    const client = await getPinballMapClient();
+    locations = await client.fetchRegionLocations(region);
+  } catch (err) {
+    log.warn(
+      { err, region, action: "pinballmap.regionAlerts" },
+      "Region locations lookup failed; using last-known venue names"
+    );
+    return cached;
+  }
+
+  if (locations.length > 0) {
+    const refreshedAt = new Date();
+    await db
+      .insert(pinballmapRegionLocationNames)
+      .values(
+        locations.map((location) => ({
+          region,
+          locationId: location.locationId,
+          name: location.name,
+          refreshedAt,
+        }))
+      )
+      .onConflictDoUpdate({
+        target: [
+          pinballmapRegionLocationNames.region,
+          pinballmapRegionLocationNames.locationId,
+        ],
+        set: {
+          name: sql`excluded.name`,
+          refreshedAt,
+        },
+      });
+  }
+
+  return new Map([
+    ...cached,
+    ...locations.map(
+      (location) => [location.locationId, location.name] as const
+    ),
+  ]);
 }
 
 interface PendingRegionAlertEvent {
@@ -738,26 +802,12 @@ async function resolveMachineNames(
  * the message falls back to the id — which is why this never fails the run.
  */
 async function resolveLabels(
-  region: string,
-  pending: PendingRegionAlertEvent[]
+  pending: PendingRegionAlertEvent[],
+  locationNames: Map<number, string>
 ): Promise<RegionAlertEntry[]> {
   const machineNames = await resolveMachineNames(
     pending.map((p) => p.pinballmapMachineId)
   );
-
-  let locationNames = new Map<number, string>();
-  try {
-    const client = await getPinballMapClient();
-    const locations = await client.fetchRegionLocations(region);
-    locationNames = new Map(locations.map((l) => [l.locationId, l.name]));
-  } catch (err) {
-    // A venue name is nice to have; the alert is still useful without it, and
-    // failing the whole run over a label would strand the discovery.
-    log.warn(
-      { err, region, action: "pinballmap.regionAlerts" },
-      "Region locations lookup failed; announcing with location ids"
-    );
-  }
 
   return pending.map((p) => ({
     eventType: p.eventType,
@@ -885,6 +935,10 @@ export async function runRegionMachineAlerts(opts?: {
 
     await synchronizeLegacyEvents(region);
     const pending = await readPending(region);
+    let locationNames = await readLocationNames(region);
+    if (locationNames.size === 0 || pending.length > 0) {
+      locationNames = await refreshLocationNames(region, locationNames);
+    }
     if (pending.length === 0) {
       return { ...base, announced: 0, pending: 0 };
     }
@@ -895,17 +949,26 @@ export async function runRegionMachineAlerts(opts?: {
     // would burn those requests on EVERY hourly run, forever, for an install whose
     // Discord integration is off. Same reasoning as the channel-id check above; it
     // is only correct once both gates sit on the same side of the fetch.
-    const entries = await resolveLabels(region, pending);
-    const content = formatRegionAlertMessage({
+    const entries = await resolveLabels(pending, locationNames);
+    const message = formatRegionAlertMessage({
       entries,
       regionLabel: regionLabel(region),
     });
-    if (content === null) return { ...base, announced: 0, pending: 0 };
+    if (message === null) return { ...base, announced: 0, pending: 0 };
+
+    const delivered = pending.slice(0, message.renderedEntries);
+    if (delivered.length === 0) {
+      log.error(
+        { region, pending: pending.length, action: "pinballmap.regionAlerts" },
+        "Pinball Map region alert could not render a queued event"
+      );
+      return { ...base, announced: 0, pending: await countPending(region) };
+    }
 
     const sent = await postChannelMessage({
       botToken,
       channelId,
-      content,
+      content: message.content,
     });
     if (!sent.ok) {
       const detail = {
@@ -936,13 +999,13 @@ export async function runRegionMachineAlerts(opts?: {
       return { ...base, announced: 0, pending: await countPending(region) };
     }
 
-    await markAnnounced(region, pending);
+    await markAnnounced(region, delivered);
     // `readPending` caps at PENDING_READ_LIMIT, so "announced everything we read"
     // is not "announced everything queued" — a long Discord outage can leave more
     // rows behind than one run can drain. This log line is the monitoring signal
     // for the job, so the remainder is measured rather than assumed to be zero.
     const remaining = await countPending(region);
-    return { ...base, announced: pending.length, pending: remaining };
+    return { ...base, announced: delivered.length, pending: remaining };
   } finally {
     await releaseRunLease(region, leaseId);
   }

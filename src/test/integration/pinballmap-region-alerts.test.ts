@@ -13,6 +13,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   pinballmapCatalog,
   pinballmapRegionAlertEvents,
+  pinballmapRegionLocationNames,
   pinballmapRegionSeenMachines,
 } from "~/server/db/schema";
 import { getTestDb, setupTestDb } from "~/test/setup/pglite";
@@ -160,6 +161,19 @@ async function eventRows(): Promise<
     .orderBy(pinballmapRegionAlertEvents.detectedAt);
 }
 
+async function cachedLocationNames(): Promise<
+  { locationId: number; name: string }[]
+> {
+  const db = await getTestDb();
+  return db
+    .select({
+      locationId: pinballmapRegionLocationNames.locationId,
+      name: pinballmapRegionLocationNames.name,
+    })
+    .from(pinballmapRegionLocationNames)
+    .orderBy(pinballmapRegionLocationNames.locationId);
+}
+
 /**
  * Seed the catalog mirror — the only source of a machine's title.
  *
@@ -237,8 +251,13 @@ describe("PinballMap region machine-change alerts (PGlite)", () => {
     const rows = await seenRows();
     expect(rows).toHaveLength(2);
     expect(rows.every((r) => r.announcedAt !== null)).toBe(true);
-    // And a bootstrap never spends the second call — there is nothing to name.
-    expect(pbm.locationCalls).toBe(0);
+    // The one-time location snapshot preserves venue names for a later removal,
+    // after that venue no longer appears in Pinball Map's current region list.
+    expect(pbm.locationCalls).toBe(1);
+    expect(await cachedLocationNames()).toEqual([
+      { locationId: 999, name: "Pinballz Arcade" },
+      { locationId: 26454, name: "Austin Pinball Collective" },
+    ]);
   });
 
   it("announces only entries it has not seen before, named from our own data", async () => {
@@ -298,6 +317,7 @@ describe("PinballMap region machine-change alerts (PGlite)", () => {
     // `resolveLabels` swallows it; what must NOT happen is the whole run failing
     // and stranding a discovery that the seen-set has already recorded.
     await seedCatalog([{ machineId: 7, name: "Medieval Madness" }]);
+    pbm.locations = [{ locationId: 26454, name: "Austin Pinball Collective" }];
     pbm.entries = [lmx({ lmxId: 1 })];
     await runRegionMachineAlerts();
 
@@ -534,6 +554,26 @@ describe("PinballMap region machine-change alerts (PGlite)", () => {
     ]);
   });
 
+  it("keeps the venue name when a removed location leaves the region list", async () => {
+    await seedCatalog([{ machineId: 7, name: "Medieval Madness" }]);
+    pbm.entries = [
+      lmx({ lmxId: 1 }),
+      lmx({ lmxId: 2, locationId: 999, machineId: 7 }),
+    ];
+    await runRegionMachineAlerts();
+
+    pbm.entries = [lmx({ lmxId: 1 })];
+    pbm.locations = [{ locationId: 26454, name: "Austin Pinball Collective" }];
+    await runRegionMachineAlerts();
+    const removed = await runRegionMachineAlerts();
+
+    expect(removed).toMatchObject({ removed: 1, announced: 1, pending: 0 });
+    expect(discord.posts.at(-1)?.content).toContain(
+      "• Removed: Medieval Madness — [Pinballz Arcade]"
+    );
+    expect(discord.posts.at(-1)?.content).not.toContain("location #999");
+  });
+
   it("DOES announce a re-add past the window — PBM mints a fresh lmx id", async () => {
     pbm.entries = [lmx({ lmxId: 1 })];
     await runRegionMachineAlerts();
@@ -718,8 +758,12 @@ describe("PinballMap region machine-change alerts (PGlite)", () => {
     discord.hasToken = true;
     const run = await runRegionMachineAlerts();
 
-    expect(run.announced).toBe(500);
-    expect(run.pending).toBe(120);
+    expect(run.announced).toBe(10);
+    expect(run.pending).toBe(610);
+
+    const nextRun = await runRegionMachineAlerts();
+    expect(nextRun.announced).toBe(10);
+    expect(nextRun.pending).toBe(600);
   });
 
   it("re-bootstraps instead of announcing when one run discovers a huge share of the region", async () => {
