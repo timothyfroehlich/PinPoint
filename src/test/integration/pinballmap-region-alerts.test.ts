@@ -289,8 +289,8 @@ describe("PinballMap region machine-change alerts (PGlite)", () => {
     expect(discord.posts[0]?.content).toContain("Pinballz Arcade");
     // The already-seen entry is not re-announced.
     expect(discord.posts[0]?.content).not.toContain("Godzilla");
-    // Exactly one locations call, and only because there was news.
-    expect(pbm.locationCalls).toBe(1);
+    // One baseline location snapshot plus one refresh because there was news.
+    expect(pbm.locationCalls).toBe(2);
   });
 
   it("falls back to ids when neither lookup can name the entry", async () => {
@@ -842,11 +842,12 @@ describe("PinballMap region machine-change alerts (PGlite)", () => {
     expect(await seenRows()).toEqual([]);
   });
 
-  it("reads the Austin region by default and does exactly one bulk call", async () => {
+  it("reads the Austin region through both bootstrap bulk calls", async () => {
     pbm.entries = [lmx({ lmxId: 1 })];
     await runRegionMachineAlerts();
     expect(pbm.calls).toBe(1);
-    expect(pbm.regions).toEqual(["austin"]);
+    expect(pbm.locationCalls).toBe(1);
+    expect(pbm.regions).toEqual(["austin", "austin"]);
   });
 
   it("lowercases the region before anything can use it", async () => {
@@ -855,7 +856,7 @@ describe("PinballMap region machine-change alerts (PGlite)", () => {
     pbm.entries = [lmx({ lmxId: 1 })];
     const run = await runRegionMachineAlerts({ region: "  AuStIn " });
     expect(run.region).toBe("austin");
-    expect(pbm.regions).toEqual(["austin"]);
+    expect(pbm.regions).toEqual(["austin", "austin"]);
   });
 
   it("aborts without writing when a payload is implausibly large", async () => {
