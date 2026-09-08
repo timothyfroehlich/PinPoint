@@ -261,7 +261,7 @@ export async function resolveOwner(
     });
     if (active) {
       // permissions-audit-allow: business-logic data validation, not a permission gate
-      if (active.role === "guest") { // permissions-audit-allow: user lookup filter, not a permission gate
+      if (active.role === "guest") {
         throw new McpToolError(
           "invalid",
           "That user is a guest and must be promoted to member before owning a machine."
@@ -275,7 +275,7 @@ export async function resolveOwner(
     });
     if (invited) {
       // permissions-audit-allow: business-logic data validation, not a permission gate
-      if (invited.role === "guest") { // permissions-audit-allow: user lookup filter, not a permission gate
+      if (invited.role === "guest") {
         throw new McpToolError(
           "invalid",
           "That invited user is a guest and must be promoted before owning a machine."
@@ -288,7 +288,7 @@ export async function resolveOwner(
 
   const matches = await findProfilesByFullName(value);
   // permissions-audit-allow: business-logic data validation, not a permission gate
-  const eligible = matches.filter((m) => m.role !== "guest"); // permissions-audit-allow: user lookup filter, not a permission gate
+  const eligible = matches.filter((m) => m.role !== "guest");
   const [first] = eligible;
   if (!first) {
     throw new McpToolError(
@@ -398,7 +398,7 @@ export async function resolveAssignee(
       );
     }
     // permissions-audit-allow: business-logic data validation, not a permission gate
-    if (user.role === "guest") { // permissions-audit-allow: user lookup filter, not a permission gate
+    if (user.role === "guest") {
       throw new McpToolError(
         "invalid",
         "That user is a guest and cannot be assigned issues."
@@ -409,7 +409,7 @@ export async function resolveAssignee(
 
   const matches = await findProfilesByFullName(value);
   // permissions-audit-allow: business-logic data validation, not a permission gate
-  const eligible = matches.filter((m) => m.role !== "guest"); // permissions-audit-allow: user lookup filter, not a permission gate
+  const eligible = matches.filter((m) => m.role !== "guest");
   const [first] = eligible;
   if (!first) {
     throw new McpToolError(

@@ -57,7 +57,8 @@ export default async function OAuthConsentPage({
   }
 
   const accessLevel = await getUserAccessLevel(user.id);
-  if (accessLevel !== "admin") { // permissions-audit-allow: OAuth consent gate
+  if (accessLevel !== "admin") {
+    // permissions-audit-allow: OAuth consent gate
     return (
       <ConsentNotice
         title="Admin access required"

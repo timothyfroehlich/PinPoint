@@ -317,7 +317,7 @@ export async function addCollectionCollaboratorAction(input: {
   // granted edit access either — enforced here, not just hidden in the picker
   // (PP-wqit.7, "all members").
   // permissions-audit-allow: collaborator eligibility on the target, not an actor gate
-  if (target.role === "guest") { // permissions-audit-allow: guest membership validation, not a permission gate
+  if (target.role === "guest") {
     return { success: false, error: "Guests can't be given edit access" };
   }
 

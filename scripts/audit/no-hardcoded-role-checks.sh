@@ -64,7 +64,7 @@ matches=$(echo "$raw" | awk '
     file = parts[1]; lineno = parts[2] + 0; sep = parts[3]; content = parts[4]
 
     # Skip pure comment/JSDoc lines — they describe role checks, not perform them.
-    if (content ~ /^[[:space:]]*(\*|\/\/|{\/\*)/) {
+    if (content ~ /^[[:space:]]*(\*|\/\/|\/\*)/) {
       if (sep == ":") {
         next
       }

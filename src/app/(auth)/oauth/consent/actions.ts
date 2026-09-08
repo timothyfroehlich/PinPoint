@@ -44,7 +44,8 @@ async function decideConsent(
   }
 
   const accessLevel = await getUserAccessLevel(user.id);
-  if (accessLevel !== "admin") { // permissions-audit-allow: OAuth consent gate
+  if (accessLevel !== "admin") {
+    // permissions-audit-allow: OAuth consent gate
     // Non-admins can't authorize the MCP surface. Bounce back to the page,
     // which renders the admin-only notice.
     redirect(consentUrl(authorizationId));
