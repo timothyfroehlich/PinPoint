@@ -54,7 +54,10 @@ const SwitchWithFormSupport = React.forwardRef<
         {...props}
         ref={ref}
       />
-      {name && (
+      {/* Mirror native checkbox submission: a disabled control contributes
+          nothing to FormData. Rendering the hidden input while disabled let a
+          disabled Switch silently write a value on submit (PP-bhd7.7). */}
+      {name && !props.disabled && (
         <input
           type="hidden"
           name={name}
