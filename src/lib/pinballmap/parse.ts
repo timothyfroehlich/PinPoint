@@ -91,6 +91,8 @@ export function parseLocation(
   return {
     locationId,
     name: asString(r["name"]) ?? "",
+    city: asString(r["city"]),
+    state: asString(r["state"]),
     dateLastUpdated: asString(r["date_last_updated"]),
     lastUpdatedByUsername: asString(r["last_updated_by_username"]),
     machineCount: asNumber(r["machine_count"]) ?? lmxes.length,

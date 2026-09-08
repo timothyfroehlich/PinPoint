@@ -18,6 +18,7 @@ import { getTestDb, setupTestDb } from "~/test/setup/pglite";
 import {
   machines,
   pinballmapAbandonedListings,
+  pinballmapLocationChecks,
   pinballmapState,
 } from "~/server/db/schema";
 import type { LocationSnapshot } from "~/lib/pinballmap/types";
@@ -33,6 +34,8 @@ vi.mock("~/lib/pinballmap/client", async () => {
   const { getMockClient } = await import("~/lib/pinballmap/client-mock");
   return { getPinballMapClient: () => Promise.resolve(getMockClient()) };
 });
+
+const CHECKED_BY = "00000000-0000-4000-8000-000000000001";
 
 function snapshotAt(
   locationId: number,
@@ -385,12 +388,15 @@ describe("a failed sync clears nothing (PP-l81u)", () => {
 describe("tracked-location changes", () => {
   setupTestDb();
 
-  it("validates before committing and accepts an empty location", async () => {
+  it("checks before committing, accepts an empty location, and fetches only once", async () => {
     const db = await getTestDb();
     const { getMockClient } = await import("~/lib/pinballmap/client-mock");
     const { PBM_REFRESH_BURST } = await import("~/lib/pinballmap/config");
-    const { getPinballMapState, setTrackedLocation } =
-      await import("~/lib/pinballmap/state");
+    const {
+      checkTrackedLocation,
+      commitCheckedTrackedLocation,
+      getPinballMapState,
+    } = await import("~/lib/pinballmap/state");
     await db.insert(pinballmapState).values({
       id: "singleton",
       locationId: 26454,
@@ -418,31 +424,67 @@ describe("tracked-location changes", () => {
       .spyOn(getMockClient(), "fetchLocation")
       .mockResolvedValueOnce(emptyLocation);
 
-    await expect(setTrackedLocation(99999)).resolves.toEqual({ ok: true });
+    const checked = await checkTrackedLocation(99999, CHECKED_BY);
+    expect(checked).toMatchObject({
+      ok: true,
+      candidate: { locationId: 99999, machineCount: 0 },
+    });
+    const unchanged = await getPinballMapState();
+    expect(unchanged?.locationId).toBe(26454);
+    expect(unchanged?.lastSyncStatus).toBe("ok");
+    if (!checked.ok) throw new Error("expected a checked candidate");
+    expect(checked.candidate).not.toHaveProperty("snapshotJson");
+    const [storedCandidate] = await db.select().from(pinballmapLocationChecks);
+    expect(storedCandidate).toMatchObject({
+      expectedLocationId: 26454,
+      expectedGeneration: 0,
+      checkedBy: CHECKED_BY,
+      snapshotJson: emptyLocation,
+    });
+    expect(
+      checked.candidate.expiresAt.getTime() -
+        checked.candidate.checkedAt.getTime()
+    ).toBe(10 * 60 * 1000);
+    await expect(
+      commitCheckedTrackedLocation(checked.candidate.checkId, CHECKED_BY)
+    ).resolves.toEqual({ ok: true });
 
     const state = await getPinballMapState();
     expect(fetchSpy).toHaveBeenCalledWith(99999);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
     expect(state?.locationId).toBe(99999);
     expect(state?.snapshotJson).toEqual(emptyLocation);
     expect(state?.lastSyncStatus).toBe("ok");
     expect(state?.lastSyncError).toBeNull();
-    expect(state?.lastSyncedAt).toBeInstanceOf(Date);
+    expect(state?.lastSyncedAt?.getTime()).toBe(
+      checked.candidate.checkedAt.getTime()
+    );
+    expect(state?.lastSyncAttemptAt?.getTime()).toBe(
+      checked.candidate.checkedAt.getTime()
+    );
     expect(state?.refreshTokens).toBe(PBM_REFRESH_BURST - 1);
     expect((await db.query.machines.findFirst())?.pinballmapIntent).toBe("on");
     expect(await db.select().from(pinballmapAbandonedListings)).toHaveLength(1);
     fetchSpy.mockRestore();
   });
 
-  it("configures from an uninitialized state only after validation", async () => {
+  it("configures from an uninitialized state only after a checked commit", async () => {
     const { getMockClient } = await import("~/lib/pinballmap/client-mock");
-    const { getPinballMapState, setTrackedLocation } =
-      await import("~/lib/pinballmap/state");
+    const {
+      checkTrackedLocation,
+      commitCheckedTrackedLocation,
+      getPinballMapState,
+    } = await import("~/lib/pinballmap/state");
     const fetched = snapshotAt(99999, "First venue");
     const fetchSpy = vi
       .spyOn(getMockClient(), "fetchLocation")
       .mockResolvedValueOnce(fetched);
 
-    await expect(setTrackedLocation(99999)).resolves.toEqual({ ok: true });
+    const checked = await checkTrackedLocation(99999, CHECKED_BY);
+    if (!checked.ok) throw new Error("expected a checked candidate");
+    await expect(
+      commitCheckedTrackedLocation(checked.candidate.checkId, CHECKED_BY)
+    ).resolves.toEqual({ ok: true });
     expect(await getPinballMapState()).toMatchObject({
       locationId: 99999,
       snapshotJson: fetched,
@@ -454,7 +496,8 @@ describe("tracked-location changes", () => {
   it("resumes the retained location without reconciling its abandonments", async () => {
     const db = await getTestDb();
     const { getMockClient } = await import("~/lib/pinballmap/client-mock");
-    const { setTrackedLocation } = await import("~/lib/pinballmap/state");
+    const { checkTrackedLocation, commitCheckedTrackedLocation } =
+      await import("~/lib/pinballmap/state");
     await db.insert(pinballmapState).values({
       id: "singleton",
       locationId: null,
@@ -478,7 +521,11 @@ describe("tracked-location changes", () => {
       .spyOn(getMockClient(), "fetchLocation")
       .mockResolvedValueOnce(snapshotAt(26454, "APC now"));
 
-    await expect(setTrackedLocation(26454)).resolves.toEqual({ ok: true });
+    const checked = await checkTrackedLocation(26454, CHECKED_BY);
+    if (!checked.ok) throw new Error("expected a checked candidate");
+    await expect(
+      commitCheckedTrackedLocation(checked.candidate.checkId, CHECKED_BY)
+    ).resolves.toEqual({ ok: true });
     expect(await db.select().from(pinballmapAbandonedListings)).toHaveLength(1);
     fetchSpy.mockRestore();
   });
@@ -486,7 +533,7 @@ describe("tracked-location changes", () => {
   it("returns a fetch error without replacing the previous configuration", async () => {
     const db = await getTestDb();
     const { getMockClient } = await import("~/lib/pinballmap/client-mock");
-    const { getPinballMapState, setTrackedLocation } =
+    const { checkTrackedLocation, getPinballMapState } =
       await import("~/lib/pinballmap/state");
     const original = snapshotAt(26454, "APC", [{ id: 1, machineId: 100 }]);
     const previousAttempt = new Date("2026-08-30T12:00:00.000Z");
@@ -503,9 +550,9 @@ describe("tracked-location changes", () => {
       .spyOn(getMockClient(), "fetchLocation")
       .mockRejectedValueOnce(new Error("unknown location"));
 
-    await expect(setTrackedLocation(99999)).resolves.toEqual({
+    await expect(checkTrackedLocation(99999, CHECKED_BY)).resolves.toEqual({
       ok: false,
-      reason: "error",
+      reason: "fetch_failed",
       error: "unknown location",
     });
     const state = await getPinballMapState();
@@ -517,10 +564,115 @@ describe("tracked-location changes", () => {
     fetchSpy.mockRestore();
   });
 
+  it("classifies a missing Pinball Map location without storing a candidate", async () => {
+    const db = await getTestDb();
+    const { getMockClient } = await import("~/lib/pinballmap/client-mock");
+    const { PinballMapReadError } = await import("~/lib/pinballmap/types");
+    const { checkTrackedLocation } = await import("~/lib/pinballmap/state");
+    const fetchSpy = vi
+      .spyOn(getMockClient(), "fetchLocation")
+      .mockRejectedValueOnce(
+        new PinballMapReadError("not_found", "Location not found")
+      );
+
+    await expect(checkTrackedLocation(99999, CHECKED_BY)).resolves.toEqual({
+      ok: false,
+      reason: "not_found",
+    });
+    expect(await db.select().from(pinballmapLocationChecks)).toHaveLength(0);
+    fetchSpy.mockRestore();
+  });
+
+  it("binds candidates to the checking administrator", async () => {
+    const db = await getTestDb();
+    const { getMockClient } = await import("~/lib/pinballmap/client-mock");
+    const { checkTrackedLocation, commitCheckedTrackedLocation } =
+      await import("~/lib/pinballmap/state");
+    const otherAdmin = "00000000-0000-4000-8000-000000000002";
+    const fetchSpy = vi
+      .spyOn(getMockClient(), "fetchLocation")
+      .mockResolvedValueOnce(snapshotAt(99999, "Checked venue"));
+
+    const checked = await checkTrackedLocation(99999, CHECKED_BY);
+    if (!checked.ok) throw new Error("expected a checked candidate");
+    await expect(
+      commitCheckedTrackedLocation(checked.candidate.checkId, otherAdmin)
+    ).resolves.toEqual({ ok: false, reason: "unauthorized" });
+    expect(await db.select().from(pinballmapLocationChecks)).toHaveLength(1);
+    await expect(
+      commitCheckedTrackedLocation(checked.candidate.checkId, CHECKED_BY)
+    ).resolves.toEqual({ ok: true });
+    fetchSpy.mockRestore();
+  });
+
+  it("expires candidates using database time and deletes them on commit", async () => {
+    const db = await getTestDb();
+    const { getMockClient } = await import("~/lib/pinballmap/client-mock");
+    const { checkTrackedLocation, commitCheckedTrackedLocation } =
+      await import("~/lib/pinballmap/state");
+    const fetchSpy = vi
+      .spyOn(getMockClient(), "fetchLocation")
+      .mockResolvedValueOnce(snapshotAt(99999, "Short-lived venue"));
+
+    const checked = await checkTrackedLocation(99999, CHECKED_BY);
+    if (!checked.ok) throw new Error("expected a checked candidate");
+    await db
+      .update(pinballmapLocationChecks)
+      .set({
+        checkedAt: sql`now() - interval '2 seconds'`,
+        expiresAt: sql`now() - interval '1 second'`,
+      })
+      .where(eq(pinballmapLocationChecks.id, checked.candidate.checkId));
+
+    await expect(
+      commitCheckedTrackedLocation(checked.candidate.checkId, CHECKED_BY)
+    ).resolves.toEqual({ ok: false, reason: "expired" });
+    expect(await db.select().from(pinballmapLocationChecks)).toHaveLength(0);
+    expect(
+      (await db.query.pinballmapState.findFirst())?.configurationGeneration
+    ).toBe(0);
+    fetchSpy.mockRestore();
+  });
+
+  it("lets concurrent administrators check independently but commits only the current generation", async () => {
+    const db = await getTestDb();
+    const { getMockClient } = await import("~/lib/pinballmap/client-mock");
+    const {
+      checkTrackedLocation,
+      commitCheckedTrackedLocation,
+      getPinballMapState,
+    } = await import("~/lib/pinballmap/state");
+    const otherAdmin = "00000000-0000-4000-8000-000000000002";
+    const fetchSpy = vi
+      .spyOn(getMockClient(), "fetchLocation")
+      .mockResolvedValueOnce(snapshotAt(11111, "First venue"))
+      .mockResolvedValueOnce(snapshotAt(22222, "Second venue"));
+
+    const first = await checkTrackedLocation(11111, CHECKED_BY);
+    const second = await checkTrackedLocation(22222, otherAdmin);
+    if (!first.ok || !second.ok) {
+      throw new Error("expected independent checked candidates");
+    }
+    expect(await db.select().from(pinballmapLocationChecks)).toHaveLength(2);
+
+    await expect(
+      commitCheckedTrackedLocation(first.candidate.checkId, CHECKED_BY)
+    ).resolves.toEqual({ ok: true });
+    await expect(
+      commitCheckedTrackedLocation(second.candidate.checkId, otherAdmin)
+    ).resolves.toEqual({ ok: false, reason: "concurrent_change" });
+    expect(await getPinballMapState()).toMatchObject({
+      locationId: 11111,
+      configurationGeneration: 1,
+    });
+    expect(await db.select().from(pinballmapLocationChecks)).toHaveLength(0);
+    fetchSpy.mockRestore();
+  });
+
   it("returns the shared-allowance retry countdown without fetching", async () => {
     const { getMockClient } = await import("~/lib/pinballmap/client-mock");
     const { PBM_REFRESH_BURST } = await import("~/lib/pinballmap/config");
-    const { setTrackedLocation, syncLocationSnapshot } =
+    const { checkTrackedLocation, syncLocationSnapshot } =
       await import("~/lib/pinballmap/state");
     const db = await getTestDb();
     await db.insert(pinballmapState).values({
@@ -533,7 +685,7 @@ describe("tracked-location changes", () => {
     }
     const callsBeforeSave = fetchSpy.mock.calls.length;
 
-    const result = await setTrackedLocation(99999);
+    const result = await checkTrackedLocation(99999, CHECKED_BY);
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.reason).toBe("throttled");
@@ -550,7 +702,7 @@ describe("tracked-location changes", () => {
   it("clears only the location and makes no external call", async () => {
     const db = await getTestDb();
     const { getMockClient } = await import("~/lib/pinballmap/client-mock");
-    const { getPinballMapState, setTrackedLocation } =
+    const { clearTrackedLocation, getPinballMapState } =
       await import("~/lib/pinballmap/state");
     const original = snapshotAt(26454, "APC", [{ id: 1, machineId: 100 }]);
     const lastSyncedAt = new Date("2026-08-31T01:00:00.000Z");
@@ -560,6 +712,8 @@ describe("tracked-location changes", () => {
       snapshotJson: original,
       lastSyncedAt,
       lastSyncStatus: "ok",
+      mutationLeaseId: "00000000-0000-4000-8000-000000000098",
+      mutationLeaseExpiresAt: sql`now() - interval '1 minute'`,
     });
     const [machine] = await db
       .insert(machines)
@@ -579,14 +733,17 @@ describe("tracked-location changes", () => {
     });
     const fetchSpy = vi.spyOn(getMockClient(), "fetchLocation");
 
-    await expect(setTrackedLocation(null)).resolves.toEqual({ ok: true });
+    await expect(clearTrackedLocation(26454, 0)).resolves.toEqual({ ok: true });
 
     const state = await getPinballMapState();
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(state?.locationId).toBeNull();
+    expect(state?.configurationGeneration).toBe(1);
     expect(state?.snapshotJson).toEqual(original);
     expect(state?.lastSyncedAt?.getTime()).toBe(lastSyncedAt.getTime());
     expect(state?.lastSyncStatus).toBe("ok");
+    expect(state?.mutationLeaseId).toBeNull();
+    expect(state?.mutationLeaseExpiresAt).toBeNull();
     expect((await db.query.machines.findFirst())?.pinballmapIntent).toBe("on");
     expect(await db.select().from(pinballmapAbandonedListings)).toHaveLength(1);
     fetchSpy.mockRestore();
@@ -627,11 +784,15 @@ describe("tracked-location concurrency guards", () => {
     fetchSpy.mockRestore();
   });
 
-  it("drops an older sync after a same-location configuration save", async () => {
+  it("drops an older sync after a same-location checked commit", async () => {
     const db = await getTestDb();
     const { getMockClient } = await import("~/lib/pinballmap/client-mock");
-    const { getPinballMapState, setTrackedLocation, syncLocationSnapshot } =
-      await import("~/lib/pinballmap/state");
+    const {
+      checkTrackedLocation,
+      commitCheckedTrackedLocation,
+      getPinballMapState,
+      syncLocationSnapshot,
+    } = await import("~/lib/pinballmap/state");
     await db.insert(pinballmapState).values({
       id: "singleton",
       locationId: 26454,
@@ -644,7 +805,11 @@ describe("tracked-location concurrency guards", () => {
     const fetchSpy = vi
       .spyOn(getMockClient(), "fetchLocation")
       .mockImplementationOnce(async () => {
-        await expect(setTrackedLocation(26454)).resolves.toEqual({ ok: true });
+        const checked = await checkTrackedLocation(26454, CHECKED_BY);
+        if (!checked.ok) throw new Error("expected a checked candidate");
+        await expect(
+          commitCheckedTrackedLocation(checked.candidate.checkId, CHECKED_BY)
+        ).resolves.toEqual({ ok: true });
         return snapshotAt(26454, "Stale APC", [{ id: 2, machineId: 200 }]);
       })
       .mockResolvedValueOnce(freshlyValidated);
@@ -660,11 +825,10 @@ describe("tracked-location concurrency guards", () => {
     fetchSpy.mockRestore();
   });
 
-  it("does not start another sync during configuration validation", async () => {
+  it("does not check through an active configuration lease", async () => {
     const db = await getTestDb();
     const { getMockClient } = await import("~/lib/pinballmap/client-mock");
-    const { setTrackedLocation, syncLocationSnapshot } =
-      await import("~/lib/pinballmap/state");
+    const { checkTrackedLocation } = await import("~/lib/pinballmap/state");
     await db.insert(pinballmapState).values({
       id: "singleton",
       locationId: 26454,
@@ -672,24 +836,27 @@ describe("tracked-location concurrency guards", () => {
       lastSyncStatus: "ok",
     });
 
-    let concurrentSync: unknown;
-    const fetchSpy = vi
-      .spyOn(getMockClient(), "fetchLocation")
-      .mockImplementationOnce(async () => {
-        concurrentSync = await syncLocationSnapshot({ trigger: "cron" });
-        return snapshotAt(26454, "Validated APC");
-      });
+    await db
+      .update(pinballmapState)
+      .set({
+        mutationLeaseId: "00000000-0000-4000-8000-000000000099",
+        mutationLeaseExpiresAt: sql`now() + interval '1 minute'`,
+      })
+      .where(eq(pinballmapState.id, "singleton"));
+    const fetchSpy = vi.spyOn(getMockClient(), "fetchLocation");
 
-    await expect(setTrackedLocation(26454)).resolves.toEqual({ ok: true });
-    expect(concurrentSync).toEqual({ ok: false, reason: "busy" });
-    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    await expect(checkTrackedLocation(26454, CHECKED_BY)).resolves.toEqual({
+      ok: false,
+      reason: "busy",
+    });
+    expect(fetchSpy).not.toHaveBeenCalled();
     fetchSpy.mockRestore();
   });
 
-  it("does not overwrite a concurrent configuration save", async () => {
+  it("does not store a check over a concurrent configuration save", async () => {
     const db = await getTestDb();
     const { getMockClient } = await import("~/lib/pinballmap/client-mock");
-    const { getPinballMapState, setTrackedLocation } =
+    const { checkTrackedLocation, getPinballMapState } =
       await import("~/lib/pinballmap/state");
     await db.insert(pinballmapState).values({
       id: "singleton",
@@ -710,13 +877,104 @@ describe("tracked-location concurrency guards", () => {
         return snapshotAt(99999, "Requested venue");
       });
 
-    await expect(setTrackedLocation(99999)).resolves.toEqual({
+    await expect(checkTrackedLocation(99999, CHECKED_BY)).resolves.toEqual({
       ok: false,
       reason: "concurrent_change",
     });
     const state = await getPinballMapState();
     expect(state?.locationId).toBe(77777);
     expect(state?.snapshotJson?.name).toBe("Concurrent venue");
+    expect(await db.select().from(pinballmapLocationChecks)).toHaveLength(0);
     fetchSpy.mockRestore();
+  });
+
+  it("returns busy when commit or clear meets an active mutation lease", async () => {
+    const db = await getTestDb();
+    const { getMockClient } = await import("~/lib/pinballmap/client-mock");
+    const {
+      checkTrackedLocation,
+      clearTrackedLocation,
+      commitCheckedTrackedLocation,
+    } = await import("~/lib/pinballmap/state");
+    await db.insert(pinballmapState).values({
+      id: "singleton",
+      locationId: 26454,
+      snapshotJson: snapshotAt(26454, "APC"),
+      lastSyncStatus: "ok",
+    });
+    const fetchSpy = vi
+      .spyOn(getMockClient(), "fetchLocation")
+      .mockResolvedValueOnce(snapshotAt(99999, "Checked venue"));
+    const checked = await checkTrackedLocation(99999, CHECKED_BY);
+    if (!checked.ok) throw new Error("expected a checked candidate");
+    await db
+      .update(pinballmapState)
+      .set({
+        mutationLeaseId: "00000000-0000-4000-8000-000000000099",
+        mutationLeaseExpiresAt: sql`now() + interval '1 minute'`,
+      })
+      .where(eq(pinballmapState.id, "singleton"));
+
+    await expect(
+      commitCheckedTrackedLocation(checked.candidate.checkId, CHECKED_BY)
+    ).resolves.toEqual({ ok: false, reason: "busy" });
+    await expect(clearTrackedLocation(26454, 0)).resolves.toEqual({
+      ok: false,
+      reason: "busy",
+    });
+    expect(
+      (await db.query.pinballmapState.findFirst())?.configurationGeneration
+    ).toBe(0);
+    fetchSpy.mockRestore();
+  });
+
+  it("reclaims an expired mutation lease when committing", async () => {
+    const db = await getTestDb();
+    const { getMockClient } = await import("~/lib/pinballmap/client-mock");
+    const {
+      checkTrackedLocation,
+      commitCheckedTrackedLocation,
+      getPinballMapState,
+    } = await import("~/lib/pinballmap/state");
+    await db.insert(pinballmapState).values({
+      id: "singleton",
+      locationId: 26454,
+      mutationLeaseId: "00000000-0000-4000-8000-000000000098",
+      mutationLeaseExpiresAt: sql`now() - interval '1 minute'`,
+    });
+    const fetchSpy = vi
+      .spyOn(getMockClient(), "fetchLocation")
+      .mockResolvedValueOnce(snapshotAt(99999, "Checked venue"));
+
+    const checked = await checkTrackedLocation(99999, CHECKED_BY);
+    if (!checked.ok) throw new Error("expected a checked candidate");
+    await expect(
+      commitCheckedTrackedLocation(checked.candidate.checkId, CHECKED_BY)
+    ).resolves.toEqual({ ok: true });
+
+    expect(await getPinballMapState()).toMatchObject({
+      locationId: 99999,
+      mutationLeaseId: null,
+      mutationLeaseExpiresAt: null,
+    });
+    fetchSpy.mockRestore();
+  });
+
+  it("guards clear with the expected location and generation", async () => {
+    const db = await getTestDb();
+    const { clearTrackedLocation, getPinballMapState } =
+      await import("~/lib/pinballmap/state");
+    await db.insert(pinballmapState).values({
+      id: "singleton",
+      locationId: 26454,
+      configurationGeneration: 2,
+      snapshotJson: snapshotAt(26454, "APC"),
+    });
+
+    await expect(clearTrackedLocation(26454, 1)).resolves.toEqual({
+      ok: false,
+      reason: "concurrent_change",
+    });
+    expect((await getPinballMapState())?.locationId).toBe(26454);
   });
 });

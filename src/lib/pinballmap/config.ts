@@ -92,3 +92,5 @@ export function normalizeRegion(region: string): string {
  */
 export const PBM_REFRESH_BURST = 3;
 export const PBM_REFRESH_REFILL_MS = 3 * 60 * 1000;
+/** Checked location snapshots remain committable for ten minutes. */
+export const PBM_LOCATION_CHECK_TTL_MS = 10 * 60 * 1000;

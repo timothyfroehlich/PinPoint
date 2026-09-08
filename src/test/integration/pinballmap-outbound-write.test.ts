@@ -238,7 +238,7 @@ describe("PinballMap outbound writes (PGlite)", () => {
     const db = await getTestDb();
     const { addMachineToPinballMapAction } =
       await import("~/app/(app)/m/pinballmap-actions");
-    const { getPinballMapState, setTrackedLocation } =
+    const { checkTrackedLocation, getPinballMapState } =
       await import("~/lib/pinballmap/state");
     const admin = await createUser("admin");
     await mockAuthAs(admin.id);
@@ -257,14 +257,14 @@ describe("PinballMap outbound writes (PGlite)", () => {
     let switchResult: unknown;
     pbm.beforeAdd = async () => {
       pbm.beforeAdd = null;
-      switchResult = await setTrackedLocation(99999, admin.id);
+      switchResult = await checkTrackedLocation(99999, admin.id);
     };
 
     await expect(
       addMachineToPinballMapAction(undefined, form(machine.id))
     ).resolves.toMatchObject({ ok: true });
 
-    expect(switchResult).toEqual({ ok: false, reason: "concurrent_change" });
+    expect(switchResult).toEqual({ ok: false, reason: "busy" });
     expect(pbm.lineup).toEqual([{ id: 500, machineId: TITLE_ID }]);
     const state = await getPinballMapState();
     expect(state?.locationId).toBe(26454);
@@ -1088,7 +1088,7 @@ describe("PinballMap outbound writes (PGlite)", () => {
     const db = await getTestDb();
     const { removeMachineFromPinballMapAction } =
       await import("~/app/(app)/m/pinballmap-actions");
-    const { getPinballMapState, setTrackedLocation } =
+    const { checkTrackedLocation, getPinballMapState } =
       await import("~/lib/pinballmap/state");
     const admin = await createUser("admin");
     await mockAuthAs(admin.id);
@@ -1120,7 +1120,7 @@ describe("PinballMap outbound writes (PGlite)", () => {
     let switchResult: unknown;
     pbm.beforeRemove = async () => {
       pbm.beforeRemove = null;
-      switchResult = await setTrackedLocation(26454, admin.id);
+      switchResult = await checkTrackedLocation(26454, admin.id);
     };
 
     await expect(
@@ -1130,7 +1130,7 @@ describe("PinballMap outbound writes (PGlite)", () => {
       )
     ).resolves.toMatchObject({ ok: true });
 
-    expect(switchResult).toEqual({ ok: false, reason: "concurrent_change" });
+    expect(switchResult).toEqual({ ok: false, reason: "busy" });
     expect(pbm.lineup).toEqual([]);
     expect((await getPinballMapState())?.locationId).toBe(99999);
     expect(await db.select().from(pinballmapAbandonedListings)).toHaveLength(0);
