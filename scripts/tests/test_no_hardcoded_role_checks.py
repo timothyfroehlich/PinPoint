@@ -1,10 +1,17 @@
 from __future__ import annotations
 
+import shutil
 import subprocess
 from pathlib import Path
 
+import pytest
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "scripts/audit/no-hardcoded-role-checks.sh"
+pytestmark = pytest.mark.skipif(
+    shutil.which("rg") is None,
+    reason="role-audit regression tests require the script's ripgrep prerequisite",
+)
 
 
 def run_audit(tmp_path: Path, source: str) -> subprocess.CompletedProcess[str]:
