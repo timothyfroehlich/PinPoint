@@ -4,9 +4,11 @@
  * READ-ONLY against PinballMap (GET only). Run manually when the captured
  * snapshot drifts enough to be unrepresentative:
  *
- *   PINBALLMAP_API_TOKEN=<token> pnpm tsx scripts/pinballmap/refresh-fixture.ts
+ *   pnpm tsx scripts/pinballmap/refresh-fixture.ts
  *
- * Requires PINBALLMAP_API_TOKEN in the environment: since PBM's
+ * Requires PINBALLMAP_API_TOKEN to be populated in the environment before
+ * invoking this command (do not put the sensitive value on the command line):
+ * since PBM's
  * REQUIRE_API_TOKEN gate went live (2026-07-30), every v1 GET — reads included —
  * needs the blanket X-Api-Token header (CORE-PBM-001, PP-uusr). Without it PBM
  * answers 401. This script inlines the token read for the same reason it inlines
@@ -200,7 +202,7 @@ async function main(): Promise<void> {
     throw new Error(
       "PINBALLMAP_API_TOKEN is not set. PinballMap's REQUIRE_API_TOKEN gate " +
         "(live since 2026-07-30) rejects every v1 GET without it. Set the env " +
-        "var and re-run: PINBALLMAP_API_TOKEN=<token> pnpm tsx " +
+        "var from your secure credential source, then re-run: pnpm tsx " +
         "scripts/pinballmap/refresh-fixture.ts"
     );
   }
