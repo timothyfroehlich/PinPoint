@@ -53,9 +53,9 @@
 
 | Spec | Code today | Resolution |
 | :-- | :-- | :-- |
-| §2 one combined page | One Discord-only page at `/admin/integrations/discord`; no combined page | PP-o355.51.5 and PP-o355.51.6 |
-| §2.3 per-section save | Only the Discord form exists, with its own save | PP-o355.51.5 and PP-o355.51.6 |
-| §3.1 Discord credential-entry card | The standalone card has per-field validation | PP-o355.51.5 |
+| §2 one combined page | `/admin/integrations` hosts the Discord section; the Pinball Map section is not built yet | PP-o355.51.6 |
+| §2.3 per-section save | The Discord section has independent save and reset state; the Pinball Map section is not built yet | PP-o355.51.6 |
+| §2.3 unsaved-edit warning on browser Back | The combined page warns on document unload and same-app link navigation; same-app browser Back remains unguarded because App Router exposes no cancellable Back-navigation hook | Accepted platform limitation; revisit when a Baseline Widely available navigation-interception API can cover Back without synthetic history |
 | §4 Pinball Map section | No Pinball Map section anywhere in admin | PP-o355.51.6 |
 
 ---
