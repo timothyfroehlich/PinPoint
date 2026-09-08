@@ -45,10 +45,13 @@
 // production. Subsequent runs reuse the saved storage state and do not reset
 // the DB, unless it's missing or --force-auth is passed.
 //
+// Session staleness is detected automatically: before reusing e2e/.auth/*.json
+// the saved Supabase session's expiry is decoded, and an expired/near-expired or
+// unparseable session is regenerated just like a missing file (PP-chhn.1). See
+// ensureAuthStorageState + auth-storage-state.mjs.
+//
 // Hardening follow-ups (deferred — see PR description / spec doc):
 //   - No retry/backoff on flaky navigation (single attempt per page).
-//   - Session staleness is only handled via the manual --force-auth escape
-//     hatch, not detected automatically.
 //   - The pr-screenshots branch has no pruning/TTL (unlike the preview-deployment
 //     reaper) — it will grow unbounded over time.
 //   - PR-number/branch mismatch is a warning, not a hard failure.
@@ -57,7 +60,6 @@ import { chromium, firefox } from "@playwright/test";
 import nextEnv from "@next/env";
 import { execFileSync, spawnSync } from "node:child_process";
 import {
-  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -67,6 +69,8 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+
+import { evaluateStorageState } from "./auth-storage-state.mjs";
 
 const { loadEnvConfig } = nextEnv;
 
@@ -165,18 +169,34 @@ async function checkServerReachable(baseUrl) {
 }
 
 function ensureAuthStorageState(rolesNeeded, forceAuth) {
-  const missing = forceAuth
-    ? rolesNeeded
-    : rolesNeeded.filter((role) => !existsSync(STORAGE_STATE[role]));
+  // A file that merely EXISTS is not enough: an expired session passes an
+  // existence check but hands the browser a dead cookie, so the capture is of a
+  // logged-out / redirected page rather than the real one (PP-chhn.1). Treat a
+  // missing file, a corrupt one, and an expired-or-about-to-expire session all
+  // as "regenerate", and say which it is.
+  const needsRegen = [];
+  for (const role of rolesNeeded) {
+    if (forceAuth) {
+      needsRegen.push({ role, reason: "--force-auth" });
+      continue;
+    }
+    const { fresh, reason } = evaluateStorageState(STORAGE_STATE[role]);
+    if (!fresh) needsRegen.push({ role, reason });
+  }
 
-  if (missing.length === 0) {
-    console.log(`✅ Auth storage state present for: ${rolesNeeded.join(", ")}`);
+  if (needsRegen.length === 0) {
+    console.log(
+      `✅ Auth storage state present and unexpired for: ${rolesNeeded.join(", ")}`
+    );
     return;
   }
 
   console.log(
-    `🔐 Auth storage state missing/stale for: ${missing.join(", ")}. ` +
-      "Regenerating via `pnpm exec playwright test --project=auth-setup` " +
+    "🔐 Auth storage state needs regeneration:\n" +
+      needsRegen
+        .map(({ role, reason }) => `   • ${role} — ${reason}`)
+        .join("\n") +
+      "\nRegenerating via `pnpm exec playwright test --project=auth-setup` " +
       "(this resets + reseeds the local dev DB — same as running E2E tests locally)."
   );
   const result = spawnSync(
