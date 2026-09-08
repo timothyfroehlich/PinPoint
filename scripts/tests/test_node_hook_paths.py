@@ -26,6 +26,7 @@ import pytest
 REPO_ROOT = Path(__file__).parent.parent.parent
 SETTINGS_PATH = REPO_ROOT / ".claude" / "settings.json"
 CODEX_HOOKS_PATH = REPO_ROOT / ".codex" / "hooks.json"
+CODEX_RULES_PATH = REPO_ROOT / ".codex" / "rules" / "pinpoint.rules"
 
 # Matches `node "${CLAUDE_PROJECT_DIR:-.}"/.claude/hooks/<name>.cjs` -- the
 # same anchoring form the bash hooks in this file already use.
@@ -105,6 +106,21 @@ def test_project_hooks_do_not_register_global_huddle_runtime() -> None:
     assert ".agents/huddle/" not in registered
     assert "huddle-main-watch" not in registered
     assert "huddle-service" not in registered
+
+
+def test_codex_wires_the_direct_merge_guard_without_blanket_blocking_gh() -> None:
+    codex_hooks = json.loads(CODEX_HOOKS_PATH.read_text(encoding="utf-8"))
+    codex_commands: list[str] = []
+    for event_entries in codex_hooks.get("hooks", {}).values():
+        codex_commands.extend(_collect_commands(event_entries))
+
+    merge_guards = [
+        command for command in codex_commands if "block-direct-merge.cjs" in command
+    ]
+    assert len(merge_guards) == 1, f"Codex merge guard wiring: {merge_guards}"
+
+    compact_rules = re.sub(r"\s+", "", CODEX_RULES_PATH.read_text(encoding="utf-8"))
+    assert 'pattern=["gh"],decision="forbidden"' not in compact_rules
 
 
 def test_all_expected_node_hooks_are_wired() -> None:
