@@ -162,7 +162,7 @@ describe("AssigneePicker — Me quick-select", () => {
     expect(onAssign).toHaveBeenCalledWith("2");
   });
 
-  it("includes current user in the alphabetical list in addition to 'Me'", () => {
+  it("finds and selects the current user by name in addition to 'Me'", () => {
     const onAssign = vi.fn();
     render(
       <AssigneePicker
@@ -176,13 +176,21 @@ describe("AssigneePicker — Me quick-select", () => {
 
     fireEvent.click(screen.getByTestId("assignee-picker-trigger"));
 
-    // "Me" is present
+    fireEvent.change(screen.getByTestId("assignee-search-input"), {
+      target: { value: "ali" },
+    });
+
+    // The quick-select remains visible while the alphabetical list is filtered.
     expect(screen.getByTestId("assignee-option-me")).toBeInTheDocument();
-    // Alice (id=1) also appears under her real name so search-by-name finds her
-    expect(screen.getByTestId("assignee-option-1")).toBeInTheDocument();
-    // Other users ARE in the alphabetical section
-    expect(screen.getByTestId("assignee-option-2")).toBeInTheDocument();
-    expect(screen.getByTestId("assignee-option-3")).toBeInTheDocument();
+    const aliceOption = screen.getByTestId("assignee-option-1");
+    expect(aliceOption).toBeInTheDocument();
+    expect(screen.queryByTestId("assignee-option-2")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("assignee-option-3")).not.toBeInTheDocument();
+
+    fireEvent.click(aliceOption);
+
+    expect(onAssign).toHaveBeenCalledOnce();
+    expect(onAssign).toHaveBeenCalledWith("1");
   });
 
   it("marks 'Me' with data-assigned when the current user is assigned", () => {
