@@ -2,7 +2,7 @@ import { sanitizeDiscordText } from "~/lib/discord/messages";
 import { pinballmapLocationUrl } from "./public-url";
 
 /**
- * Discord copy for the "new machines in the Austin region" alert (PP-o355.18).
+ * Discord copy for added and removed machines in a Pinball Map region.
  *
  * Pure formatting, no IO — the diff and the send live in `./region-alerts`.
  *
@@ -27,10 +27,10 @@ const DISCORD_MAX_MESSAGE_LENGTH = 2000;
 export const REGION_ALERT_MAX_LINES = 10;
 
 export interface RegionAlertEntry {
+  eventType: "added" | "removed";
   locationId: number;
-  locationName: string | null;
-  machineName: string | null;
-  pinballmapMachineId: number;
+  locationName: string;
+  machineName: string;
 }
 
 export interface RegionAlertMessageInput {
@@ -38,6 +38,12 @@ export interface RegionAlertMessageInput {
   entries: RegionAlertEntry[];
   /** Human label for the region, e.g. "Austin". */
   regionLabel: string;
+}
+
+export interface FormattedRegionAlertMessage {
+  content: string;
+  /** Leading entries represented by individual lines in this message. */
+  renderedEntries: number;
 }
 
 /**
@@ -62,38 +68,32 @@ export interface RegionAlertMessageInput {
  * without it, and never "simplify" by dropping the sanitize call because the value
  * looks like a plain name.
  *
- * The id fallbacks (`location #123`) are our own literals, and they take the label
- * position too so every line reads the same whether or not a name resolved.
+ * Both names are required at the type boundary because Discord posts are immutable;
+ * unresolved events remain queued until the catalog and location cache can name them.
  */
 function formatEntry(entry: RegionAlertEntry): string {
-  const machine =
-    entry.machineName === null
-      ? `PinballMap machine #${String(entry.pinballmapMachineId)}`
-      : sanitizeDiscordText(entry.machineName);
-  const venue =
-    entry.locationName === null
-      ? `location #${String(entry.locationId)}`
-      : sanitizeDiscordText(entry.locationName);
-  return `• ${machine} — [${venue}](${pinballmapLocationUrl(entry.locationId)})`;
+  const machine = sanitizeDiscordText(entry.machineName);
+  const venue = sanitizeDiscordText(entry.locationName);
+  const action = entry.eventType === "added" ? "Added" : "Removed";
+  return `• ${action}: ${machine} — [${venue}](${pinballmapLocationUrl(entry.locationId)})`;
 }
 
 /**
- * Build the announcement, or null when there is nothing to announce.
+ * Build one announcement batch, or null when there is nothing to announce.
  *
- * Singular and plural get their own headline because "1 new machines" reads as a
- * bug in a channel post.
+ * A stable headline lets one digest carry both transition types in detection
+ * order without implying that a mixed post contains additions only. The caller
+ * must settle only `renderedEntries`; everything omitted by the line/length cap
+ * remains queued for a later digest.
  */
 export function formatRegionAlertMessage(
   input: RegionAlertMessageInput
-): string | null {
+): FormattedRegionAlertMessage | null {
   const { entries, regionLabel } = input;
   if (entries.length === 0) return null;
 
   const region = sanitizeDiscordText(regionLabel);
-  const headline =
-    entries.length === 1
-      ? `**New on Pinball Map in ${region}**`
-      : `**${String(entries.length)} new machines on Pinball Map in ${region}**`;
+  const headline = `**Pinball Map changes in ${region}**`;
 
   const shown = entries.slice(0, REGION_ALERT_MAX_LINES);
   const entryLines = shown.map(formatEntry);
@@ -114,10 +114,9 @@ export function formatRegionAlertMessage(
   // at a time cannot produce either, and it keeps the "…and N more" count — which
   // a from-the-end trim would remove first, leaving a headline announcing N
   // machines with no account of the missing ones. That count is the only trace
-  // they ever get: the rows are marked announced either way, so a line lost here
-  // is lost permanently.
+  // they get in this digest. Omitted rows stay queued for a later run.
   const overflowLine = (n: number): string =>
-    `• …and ${String(n)} more (see the map for the full picture)`;
+    `• …and ${String(n)} more changes (see the map for the full picture)`;
   // Reserved unconditionally, sized for the largest count it could ever carry.
   // Adding it after the budget was spent is how a line-based trim reintroduces
   // the overflow it exists to prevent.
@@ -134,14 +133,44 @@ export function formatRegionAlertMessage(
 
   const kept: string[] = [];
   let used = 0;
-  for (const line of entryLines) {
-    if (used + line.length + 1 > budget) break;
+  for (let i = 0; i < entryLines.length; i += 1) {
+    const line = entryLines[i];
+    if (line === undefined) break;
+    if (used + line.length + 1 > budget) {
+      // A pathological third-party label must not strand the first queued event
+      // forever. Bound both names before sanitizing rather than falling back to
+      // ids; the immutable post must still identify the machine and venue.
+      if (kept.length === 0) {
+        const compactEntry = entries[i];
+        if (compactEntry !== undefined) {
+          kept.push(
+            formatEntry({
+              ...compactEntry,
+              locationName: truncateName(compactEntry.locationName),
+              machineName: truncateName(compactEntry.machineName),
+            })
+          );
+        }
+      }
+      break;
+    }
     kept.push(line);
     used += line.length + 1;
   }
 
-  const omitted = entries.length - kept.length;
+  const renderedEntries = kept.length;
+  const omitted = entries.length - renderedEntries;
   if (omitted > 0) kept.push(overflowLine(omitted));
 
-  return [headline, ...kept, attribution].join("\n");
+  return {
+    content: [headline, ...kept, attribution].join("\n"),
+    renderedEntries,
+  };
+}
+
+/** Bound untrusted labels without splitting a Unicode code point. */
+function truncateName(name: string, maxCodePoints = 80): string {
+  const codePoints = [...name];
+  if (codePoints.length <= maxCodePoints) return name;
+  return `${codePoints.slice(0, maxCodePoints - 1).join("")}…`;
 }

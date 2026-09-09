@@ -1,18 +1,25 @@
 import { describe, it, expect } from "vitest";
 import {
-  formatRegionAlertMessage,
+  formatRegionAlertMessage as buildRegionAlertMessage,
   REGION_ALERT_MAX_LINES,
   type RegionAlertEntry,
+  type RegionAlertMessageInput,
 } from "./region-alert-message";
 
 function entry(overrides: Partial<RegionAlertEntry> = {}): RegionAlertEntry {
   return {
+    eventType: "added",
     locationId: 26454,
     locationName: "Austin Pinball Collective",
     machineName: "Godzilla (Premium)",
-    pinballmapMachineId: 6412,
     ...overrides,
   };
+}
+
+function formatRegionAlertMessage(
+  input: RegionAlertMessageInput
+): string | null {
+  return buildRegionAlertMessage(input)?.content ?? null;
 }
 
 describe("formatRegionAlertMessage", () => {
@@ -28,8 +35,8 @@ describe("formatRegionAlertMessage", () => {
       regionLabel: "Austin",
     });
 
-    expect(message).toContain("**New on Pinball Map in Austin**");
-    expect(message).toContain("Godzilla (Premium)");
+    expect(message).toContain("**Pinball Map changes in Austin**");
+    expect(message).toContain("• Added: Godzilla (Premium)");
     // The venue is the LINK TEXT of a masked link, not a trailing bare URL: a bare
     // one makes Discord stack a preview card under every line.
     expect(message).toContain(
@@ -79,34 +86,21 @@ describe("formatRegionAlertMessage", () => {
     );
   });
 
-  it("keeps the id fallback in the label position so every line reads alike", () => {
-    const message = formatRegionAlertMessage({
-      entries: [entry({ locationName: null, locationId: 1234 })],
-      regionLabel: "Austin",
-    });
-
-    expect(message).toContain(
-      "[location #1234](https://pinballmap.com/map/?by_location_id=1234)"
-    );
-  });
-
-  it("pluralizes the headline with the count", () => {
-    const message = formatRegionAlertMessage({
-      entries: [entry(), entry({ locationId: 999, pinballmapMachineId: 1 })],
-      regionLabel: "Austin",
-    });
-    expect(message).toContain("**2 new machines on Pinball Map in Austin**");
-  });
-
-  it("falls back to ids when PBM gave us no names", () => {
+  it("combines additions and removals in one digest", () => {
     const message = formatRegionAlertMessage({
       entries: [
-        entry({ locationName: null, machineName: null, locationId: 1234 }),
+        entry(),
+        entry({
+          eventType: "removed",
+          locationId: 999,
+          machineName: "Medieval Madness",
+        }),
       ],
       regionLabel: "Austin",
     });
-    expect(message).toContain("PinballMap machine #6412");
-    expect(message).toContain("location #1234");
+    expect(message).toContain("**Pinball Map changes in Austin**");
+    expect(message).toContain("• Added: Godzilla (Premium)");
+    expect(message).toContain("• Removed: Medieval Madness");
   });
 
   it("lists at most the line cap and collapses the rest into a count", () => {
@@ -123,10 +117,7 @@ describe("formatRegionAlertMessage", () => {
     expect(message).toContain(`Machine ${String(REGION_ALERT_MAX_LINES - 1)}`);
     expect(message).not.toContain(`Machine ${String(REGION_ALERT_MAX_LINES)}`);
     expect(message).toContain("…and 3 more");
-    // The headline still reports the true total, not the truncated list length.
-    expect(message).toContain(
-      `**${String(REGION_ALERT_MAX_LINES + 3)} new machines`
-    );
+    expect(message).toContain("**Pinball Map changes in Austin**");
   });
 
   it("neutralizes mentions and Markdown in third-party names", () => {
@@ -159,6 +150,24 @@ describe("formatRegionAlertMessage", () => {
 
     expect(message).not.toBeNull();
     expect((message ?? "").length).toBeLessThanOrEqual(2000);
+  });
+
+  it("compacts pathological names without replacing them with ids", () => {
+    const message = formatRegionAlertMessage({
+      entries: [
+        entry({
+          machineName: `Machine ${"M".repeat(2000)}`,
+          locationName: `Venue ${"L".repeat(2000)}`,
+        }),
+      ],
+      regionLabel: "Austin",
+    });
+
+    expect((message ?? "").length).toBeLessThanOrEqual(2000);
+    expect(message).toContain("Machine M");
+    expect(message).toContain("Venue L");
+    expect(message).not.toContain("PinballMap machine #");
+    expect(message).not.toContain("[location #");
   });
 
   it("keeps the CC BY-SA attribution when the message has to be trimmed", () => {
@@ -223,13 +232,23 @@ describe("formatRegionAlertMessage", () => {
         regionLabel: "Austin",
       }) ?? "";
 
-    // The rows are marked announced either way, so a machine dropped here is
-    // never mentioned again — the count is its only trace.
+    // The count tells readers that later queued entries were deferred.
     expect(message).toMatch(/…and \d+ more/);
     const shown = message
       .split("\n")
       .filter((l) => l.startsWith("• ") && !l.includes("…and")).length;
     const claimed = Number(/…and (\d+) more/.exec(message)?.[1] ?? "0");
     expect(shown + claimed).toBe(REGION_ALERT_MAX_LINES);
+  });
+
+  it("reports exactly how many leading entries the digest rendered", () => {
+    const entries = Array.from({ length: REGION_ALERT_MAX_LINES + 3 }, (_, i) =>
+      entry({ locationId: 1000 + i, machineName: `Machine ${String(i)}` })
+    );
+
+    const message = buildRegionAlertMessage({ entries, regionLabel: "Austin" });
+
+    expect(message?.renderedEntries).toBe(REGION_ALERT_MAX_LINES);
+    expect(message?.content).toContain("…and 3 more");
   });
 });
