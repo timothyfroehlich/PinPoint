@@ -947,7 +947,7 @@ describe("GET /api/cron/pinballmap-region-alerts", () => {
     vi.stubEnv("CRON_SECRET", CRON_SECRET);
     vi.stubEnv("DISCORD_PBM_ALERT_CHANNEL_ID", "channel-1");
     pbm.entries = [lmx({ lmxId: 1 })];
-    pbm.locations = [];
+    pbm.locations = [{ locationId: 26454, name: "Austin Pinball Collective" }];
     pbm.calls = 0;
     pbm.locationCalls = 0;
     discord.posts = [];
