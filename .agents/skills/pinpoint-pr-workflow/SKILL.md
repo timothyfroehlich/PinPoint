@@ -100,16 +100,16 @@ Closes #N (if applicable)
 Watching CI and awaiting review are passive waits. Invoke the project-scoped named
 agent `pr-lifecycle-watcher`; read
 `references/native-pr-lifecycle-watcher.md` before either wait. Give it only the
-five-field envelope documented there. If named-agent discovery is unavailable, the
-capable owner may run the canonical watcher through its native monitor directly; do
-not recreate the old prompt-only generic subagent.
+five-field envelope documented there. If named-agent discovery is unavailable,
+report the broken installation as a blocker; parent-agent hooks reject direct
+long-running watcher calls.
 
 ---
 
 ### 3.1 Watch CI
 
 After pushing a commit at `HEAD_SHA`, invoke the named `pr-lifecycle-watcher` with
-`phase: "ci"` (or use the owner-run native-monitor fallback):
+`phase: "ci"`:
 
 ```bash
 python3 scripts/workflow/pr-watch.py <PR> --phase ci --expected-head <HEAD_SHA> --json
