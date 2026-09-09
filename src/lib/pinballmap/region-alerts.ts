@@ -348,6 +348,7 @@ interface PendingRegionAlertEvent {
   eventType: "added" | "removed";
   locationId: number;
   pinballmapMachineId: number;
+  requiresLocationName: boolean;
 }
 
 interface RegionAlertTransition {
@@ -376,9 +377,9 @@ async function synchronizeLegacyEvents(region: string): Promise<void> {
     await tx.execute(sql`
       insert into ${pinballmapRegionAlertEvents}
         (region, lmx_id, generation, event_type, location_id,
-         pinballmap_machine_id, detected_at)
+         pinballmap_machine_id, detected_at, requires_location_name)
       select region, lmx_id, 0, 'added', location_id,
-             pinballmap_machine_id, first_seen_at
+             pinballmap_machine_id, first_seen_at, true
       from ${pinballmapRegionSeenMachines}
       where region = ${region}
         and generation = 0
@@ -600,10 +601,12 @@ async function applySnapshot(
     // with one miss. Only a second consecutive absence may baseline it as gone;
     // a transient return resets the miss without creating a false Added event.
     const initializationNeedsAnotherSnapshot =
-      initializeRemovals && missing.some((row) => row.missedRuns === 0);
+      initializeRemovals &&
+      !rebootstrapped &&
+      missing.some((row) => row.missedRuns === 0);
 
     if (
-      initializeRemovals &&
+      (initializeRemovals || rebootstrapped) &&
       missing.length > 0 &&
       !initializationNeedsAnotherSnapshot
     ) {
@@ -622,7 +625,9 @@ async function applySnapshot(
         );
     }
 
-    const firstMiss = missing.filter((row) => row.missedRuns === 0);
+    const firstMiss = rebootstrapped
+      ? []
+      : missing.filter((row) => row.missedRuns === 0);
     if (firstMiss.length > 0) {
       await tx
         .update(pinballmapRegionSeenMachines)
@@ -639,9 +644,10 @@ async function applySnapshot(
         );
     }
 
-    const confirmedMissing = initializeRemovals
-      ? []
-      : missing.filter((row) => row.missedRuns > 0);
+    const confirmedMissing =
+      initializeRemovals || rebootstrapped
+        ? []
+        : missing.filter((row) => row.missedRuns > 0);
     const removals =
       confirmedMissing.length === 0
         ? []
@@ -716,6 +722,7 @@ async function readPending(region: string): Promise<PendingRegionAlertEvent[]> {
       eventType: pinballmapRegionAlertEvents.eventType,
       locationId: pinballmapRegionAlertEvents.locationId,
       pinballmapMachineId: pinballmapRegionAlertEvents.pinballmapMachineId,
+      requiresLocationName: pinballmapRegionAlertEvents.requiresLocationName,
     })
     .from(pinballmapRegionAlertEvents)
     .where(
@@ -1036,20 +1043,43 @@ export async function runRegionMachineAlerts(opts?: {
       return { ...base, announced: 0, pending: 0 };
     }
 
+    const blockedLmxIds = new Set<number>();
+    const announceable = pending.filter((event) => {
+      if (blockedLmxIds.has(event.lmxId)) return false;
+      if (event.requiresLocationName && !locationNames.has(event.locationId)) {
+        blockedLmxIds.add(event.lmxId);
+        return false;
+      }
+      return true;
+    });
+    if (announceable.length < pending.length) {
+      log.warn(
+        {
+          region,
+          deferred: pending.length - announceable.length,
+          action: "pinballmap.regionAlerts",
+        },
+        "Legacy Pinball Map additions are waiting for historical venue names"
+      );
+    }
+    if (announceable.length === 0) {
+      return { ...base, announced: 0, pending: await countPending(region) };
+    }
+
     // BOTH Discord gates clear before any label lookup. Resolving labels costs a
     // region-locations call and can cost a full catalog refresh, and a pending row
     // never clears without a successful post — so checking this after the lookup
     // would burn those requests on EVERY hourly run, forever, for an install whose
     // Discord integration is off. Same reasoning as the channel-id check above; it
     // is only correct once both gates sit on the same side of the fetch.
-    const entries = await resolveLabels(pending, locationNames);
+    const entries = await resolveLabels(announceable, locationNames);
     const message = formatRegionAlertMessage({
       entries,
       regionLabel: regionLabel(region),
     });
     if (message === null) return { ...base, announced: 0, pending: 0 };
 
-    const delivered = pending.slice(0, message.renderedEntries);
+    const delivered = announceable.slice(0, message.renderedEntries);
     if (delivered.length === 0) {
       log.error(
         { region, pending: pending.length, action: "pinballmap.regionAlerts" },

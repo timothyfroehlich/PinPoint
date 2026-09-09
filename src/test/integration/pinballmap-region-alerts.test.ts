@@ -147,6 +147,7 @@ async function eventRows(): Promise<
     generation: number;
     eventType: "added" | "removed";
     announcedAt: Date | null;
+    requiresLocationName: boolean;
   }[]
 > {
   const db = await getTestDb();
@@ -156,6 +157,7 @@ async function eventRows(): Promise<
       generation: pinballmapRegionAlertEvents.generation,
       eventType: pinballmapRegionAlertEvents.eventType,
       announcedAt: pinballmapRegionAlertEvents.announcedAt,
+      requiresLocationName: pinballmapRegionAlertEvents.requiresLocationName,
     })
     .from(pinballmapRegionAlertEvents)
     .orderBy(pinballmapRegionAlertEvents.detectedAt);
@@ -800,6 +802,50 @@ describe("PinballMap region machine-change alerts (PGlite)", () => {
     ]);
   });
 
+  it("keeps a migrated addition pending until its departed venue can be named", async () => {
+    const db = await getTestDb();
+    await db.insert(pinballmapRegionSeenMachines).values([
+      {
+        region: "austin",
+        lmxId: 1,
+        locationId: 26454,
+        pinballmapMachineId: 6412,
+        announcedAt: new Date(),
+      },
+      {
+        region: "austin",
+        lmxId: 2,
+        locationId: 999,
+        pinballmapMachineId: 7,
+        announcedAt: null,
+      },
+    ]);
+    pbm.entries = [lmx({ lmxId: 1 })];
+    pbm.locations = [{ locationId: 26454, name: "Austin Pinball Collective" }];
+
+    const unnamed = await runRegionMachineAlerts();
+
+    expect(unnamed).toMatchObject({ announced: 0, pending: 1 });
+    expect(discord.posts).toEqual([]);
+    expect(await eventRows()).toEqual([
+      expect.objectContaining({
+        lmxId: 2,
+        eventType: "added",
+        announcedAt: null,
+        requiresLocationName: true,
+      }),
+    ]);
+
+    pbm.locations = [
+      { locationId: 26454, name: "Austin Pinball Collective" },
+      { locationId: 999, name: "Pinballz Arcade" },
+    ];
+    const named = await runRegionMachineAlerts();
+
+    expect(named).toMatchObject({ announced: 1, pending: 0 });
+    expect(discord.posts.at(-1)?.content).toContain("Pinballz Arcade");
+  });
+
   it("retains a failed removal and later same-ID addition as separate pending events", async () => {
     await seedCatalog([{ machineId: 7, name: "Medieval Madness" }]);
     pbm.entries = [lmx({ lmxId: 1 }), lmx({ lmxId: 2, machineId: 7 })];
@@ -901,6 +947,32 @@ describe("PinballMap region machine-change alerts (PGlite)", () => {
     const rows = await seenRows();
     expect(rows).toHaveLength(300);
     expect(rows.every((r) => r.announcedAt !== null)).toBe(true);
+  });
+
+  it("silently reconciles removals from the same snapshot that triggers re-bootstrap", async () => {
+    pbm.entries = [lmx({ lmxId: 1 }), lmx({ lmxId: 2 })];
+    await runRegionMachineAlerts();
+
+    pbm.entries = [lmx({ lmxId: 1 })];
+    await runRegionMachineAlerts();
+
+    pbm.entries = [
+      lmx({ lmxId: 1 }),
+      ...Array.from({ length: 51 }, (_, i) => lmx({ lmxId: i + 100 })),
+    ];
+    const rebootstrapped = await runRegionMachineAlerts();
+
+    expect(rebootstrapped).toMatchObject({
+      discovered: 51,
+      removed: 0,
+      announced: 0,
+      pending: 0,
+    });
+    expect(await seenRows()).toContainEqual(
+      expect.objectContaining({ lmxId: 2, isPresent: false, missedRuns: 2 })
+    );
+    expect(await eventRows()).toEqual([]);
+    expect(discord.posts).toEqual([]);
   });
 
   it("discards a read missing more than 50 active entries without advancing misses", async () => {

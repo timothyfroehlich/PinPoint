@@ -476,6 +476,9 @@ export const pinballmapRegionAlertEvents = pgTable(
     eventType: text("event_type", { enum: ["added", "removed"] }).notNull(),
     locationId: integer("location_id").notNull(),
     pinballmapMachineId: integer("pinballmap_machine_id").notNull(),
+    requiresLocationName: boolean("requires_location_name")
+      .notNull()
+      .default(false),
     detectedAt: timestamp("detected_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
