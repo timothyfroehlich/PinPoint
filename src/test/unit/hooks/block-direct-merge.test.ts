@@ -40,6 +40,10 @@ function bashPayload(command: string): unknown {
   return { tool_name: "Bash", tool_input: { command } };
 }
 
+function codexPayload(cmd: string): unknown {
+  return { tool_name: "exec_command", tool_input: { cmd } };
+}
+
 /** Assert the hook emitted a PreToolUse "ask" decision (exit 0 + stdout JSON). */
 function expectAsk(result: { status: number; stdout: string }): void {
   expect(result.status).toBe(0);
@@ -177,6 +181,26 @@ describe("block-direct-merge.cjs — gh merge paths", () => {
   it("does not block an unrelated gh command", () => {
     const { status } = runHook(bashPayload("gh pr view 123"));
     expect(status).toBe(0);
+  });
+});
+
+describe("block-direct-merge.cjs — Codex exec_command payloads", () => {
+  it("allows ordinary gh lifecycle commands", () => {
+    expectAllow(runHook(codexPayload("gh pr ready 2070")));
+  });
+
+  it("blocks a direct PinPoint merge", () => {
+    const { status, stderr } = runHook(
+      codexPayload("gh pr merge 2070 --squash")
+    );
+    expect(status).toBe(2);
+    expect(stderr).toContain("Direct merge blocked: gh pr merge");
+  });
+
+  it("asks before running the gate-enforced merge script", () => {
+    expectAsk(
+      runHook(codexPayload("bash scripts/workflow/merge-pr.sh 2070 --human"))
+    );
   });
 });
 

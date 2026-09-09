@@ -490,12 +490,11 @@ function classifyMerge(toolName, toolInput) {
     }
     return { block: true, kind: "merge", detail: "MCP merge_pull_request" };
   }
-  if (toolName !== "Bash") return { block: false, kind: null, detail: "" };
-
   const cmd =
     typeof toolInput === "string"
       ? toolInput
-      : String((toolInput && toolInput.command) || "");
+      : String((toolInput && (toolInput.command || toolInput.cmd)) || "");
+  if (!cmd) return { block: false, kind: null, detail: "" };
   const { segments, unresolvable } = resolveCommand(cmd);
 
   for (const segment of segments) {
