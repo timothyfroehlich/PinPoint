@@ -16,6 +16,7 @@ GH_MONITOR_WAKES = "1"
 
 [mcp_servers.pinpoint]
 url = "https://pinpoint.austinpinballcollective.org/api/mcp/mcp"
+oauth_resource = "https://pinpoint.austinpinballcollective.org/api/mcp/mcp"
 required = false
 default_tools_approval_mode = "prompt"
 startup_timeout_sec = 30
