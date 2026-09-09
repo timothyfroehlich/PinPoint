@@ -13,6 +13,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   pinballmapCatalog,
   pinballmapRegionAlertEvents,
+  pinballmapRegionAlertState,
   pinballmapRegionLocationNames,
   pinballmapRegionSeenMachines,
 } from "~/server/db/schema";
@@ -798,14 +799,15 @@ describe("PinballMap region machine-change alerts (PGlite)", () => {
         generation: 0,
         eventType: "added",
         announcedAt: expect.any(Date),
+        requiresLocationName: true,
       }),
     ]);
   });
 
   it("keeps a migrated addition pending until its departed venue can be named", async () => {
     const db = await getTestDb();
-    // The shared PGlite worker may already know this venue from an earlier case;
-    // this scenario specifically models migration with no historical cache row.
+    // Model the exact post-migration state: the legacy addition was backfilled,
+    // but its departed venue never had a historical cache row.
     await db.delete(pinballmapRegionLocationNames);
     await db.insert(pinballmapRegionSeenMachines).values([
       {
@@ -820,11 +822,26 @@ describe("PinballMap region machine-change alerts (PGlite)", () => {
         lmxId: 2,
         locationId: 999,
         pinballmapMachineId: 7,
+        isPresent: false,
+        missedRuns: 2,
         announcedAt: null,
       },
     ]);
+    await db.insert(pinballmapRegionAlertState).values({
+      region: "austin",
+      removalTrackingInitializedAt: new Date(),
+    });
+    await db.insert(pinballmapRegionAlertEvents).values({
+      region: "austin",
+      lmxId: 2,
+      generation: 0,
+      eventType: "added",
+      locationId: 999,
+      pinballmapMachineId: 7,
+      requiresLocationName: true,
+    });
     pbm.entries = [lmx({ lmxId: 1 })];
-    pbm.locations = [{ locationId: 26454, name: "Austin Pinball Collective" }];
+    pbm.locationsError = new Error("departed venue is absent");
 
     const unnamed = await runRegionMachineAlerts();
 
@@ -839,6 +856,7 @@ describe("PinballMap region machine-change alerts (PGlite)", () => {
       }),
     ]);
 
+    pbm.locationsError = null;
     pbm.locations = [
       { locationId: 26454, name: "Austin Pinball Collective" },
       { locationId: 999, name: "Pinballz Arcade" },
