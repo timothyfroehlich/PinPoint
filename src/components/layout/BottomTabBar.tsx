@@ -210,7 +210,7 @@ export function BottomTabBar({
                   <span>User Management</span>
                 </Link>
                 <Link
-                  href="/admin/integrations/discord"
+                  href="/admin/integrations"
                   onClick={() => setMoreOpen(false)}
                   className={sheetItemClass}
                   data-testid="more-sheet-admin-integrations"

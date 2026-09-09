@@ -197,10 +197,7 @@ describe("BottomTabBar", () => {
       "more-sheet-admin-integrations"
     );
     expect(integrationsLink).toBeInTheDocument();
-    expect(integrationsLink).toHaveAttribute(
-      "href",
-      "/admin/integrations/discord"
-    );
+    expect(integrationsLink).toHaveAttribute("href", "/admin/integrations");
     expect(integrationsLink).toHaveTextContent("Integrations");
   });
 });
