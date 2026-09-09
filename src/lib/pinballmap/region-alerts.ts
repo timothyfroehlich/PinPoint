@@ -390,7 +390,7 @@ async function synchronizeLegacyEvents(region: string): Promise<void> {
         )
       );
     for (let i = 0; i < pendingLegacy.length; i += INSERT_CHUNK) {
-      await tx
+      const inserted = await tx
         .insert(pinballmapRegionAlertEvents)
         .values(
           pendingLegacy.slice(i, i + INSERT_CHUNK).map((event) => ({
@@ -401,10 +401,24 @@ async function synchronizeLegacyEvents(region: string): Promise<void> {
             locationId: event.locationId,
             pinballmapMachineId: event.pinballmapMachineId,
             detectedAt: event.firstSeenAt,
-            requiresLocationName: true,
           }))
         )
-        .onConflictDoNothing();
+        .onConflictDoNothing()
+        .returning({ id: pinballmapRegionAlertEvents.id });
+      // Only rows adopted by this synchronizer need the migration-only policy.
+      // A conflict may be a native queue row for the same generation; using the
+      // returned ids avoids reclassifying that row as legacy.
+      if (inserted.length > 0) {
+        await tx
+          .update(pinballmapRegionAlertEvents)
+          .set({ requiresLocationName: true })
+          .where(
+            inArray(
+              pinballmapRegionAlertEvents.id,
+              inserted.map((event) => event.id)
+            )
+          );
+      }
     }
     await tx.execute(sql`
       update ${pinballmapRegionAlertEvents} as event
