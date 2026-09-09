@@ -60,11 +60,10 @@ export async function updateNotificationPreferencesAction(
     return err("UNAUTHORIZED", "Unauthorized");
   }
 
-  // Absent fields are preserved (not coerced to false). The SwitchWithFormSupport
-  // hidden input always submits "on" or "off" from the resolved switch state, so
-  // a normal save sends every rendered field. Anything missing — direct API
-  // call, a future per-toggle save, a partial submit — leaves that column
-  // untouched.
+  // Absent fields are preserved, not coerced to false: only "on"/"off" write.
+  // A disabled toggle submits nothing (like a native checkbox; PP-bhd7.7), as
+  // do a direct API call or a partial submit — each leaves its column
+  // untouched, so a disabled Discord switch never overwrites the saved value.
   const rawData: Partial<Record<PrefField, boolean>> = {};
   for (const name of PREF_FIELDS) {
     const value = formData.get(name);

@@ -62,6 +62,7 @@ const ALL_EXPECTED_HOOKS = [
   "block-direct-merge.cjs",
   "block-main-worktree-branch-switch.cjs",
   "block-gh-pr-checkout.cjs",
+  "block-direct-pr-watch.cjs",
 ];
 
 /** Build a settings object wiring the given hook basenames under PreToolUse. */
