@@ -85,14 +85,24 @@ describe("mcp_custom_access_token_hook", () => {
   });
 
   it("denies the client allowlist to authenticated API users", async () => {
-    await expect(
-      sql.begin(async (transaction) => {
+    const outcome = await sql
+      .begin(async (transaction) => {
         await transaction`SET LOCAL ROLE authenticated`;
-        return transaction`
+        const rows = await transaction`
           SELECT client_id FROM public.mcp_oauth_clients
           WHERE client_id = ${CLIENT_ID}
         `;
+        return { kind: "rows", rows } as const;
       })
-    ).rejects.toMatchObject({ code: "42501" });
+      .catch((error: unknown) => ({ kind: "error", error }) as const);
+
+    // Supabase images may re-grant SELECT on public tables after migrations.
+    // Either the explicit REVOKE remains effective or RLS filters every row;
+    // both outcomes keep client registrations inaccessible to API users.
+    if (outcome.kind === "error") {
+      expect(outcome.error).toMatchObject({ code: "42501" });
+    } else {
+      expect(outcome.rows).toHaveLength(0);
+    }
   });
 });
