@@ -107,6 +107,7 @@ the degradation is a known, documented choice — not an oversight.
 | `NEXT_PUBLIC_SENTRY_DSN`                         | 🟢    | ⭕                  | `src/components/SentryInitializer.tsx`    | Sentry not initialized                                                                                                                                                                                                                                                                                                       |
 | `MCP_BEARER_TOKEN`                               | 🔴    | ⚪                  | `src/lib/mcp/verify-token.ts`             | MCP auth fails closed — `/api/mcp/mcp` 401s, warns `reason: "not_configured"`. Rest of PinPoint unaffected.                                                                                                                                                                                                                  |
 | `MCP_ADMIN_USER_ID`                              | 🔴    | ⚪                  | `src/lib/mcp/verify-token.ts`             | as above                                                                                                                                                                                                                                                                                                                     |
+| `MCP_OAUTH_DCR_CANARY`                           | 🟢    | ⚪                  | `src/lib/mcp/verify-token.ts`             | unset/false keeps the final client-allowlist + resource-audience gate; `true` temporarily accepts Tim's DCR client with Supabase's default `authenticated` audience during the documented OAuth canary. Never leave enabled after pinning the client.                                                                        |
 | `PINBALLMAP_OUTBOUND_EMAIL`                      | 🟢    | ⚪                  | `supabase/seed-pinballmap-creds.mjs`      | **Seed-time only, never read at runtime.** Absent → outbound list/unlist stays unprovisioned and both actions return `NOT_PROVISIONED`.                                                                                                                                                                                      |
 | `PINBALLMAP_OUTBOUND_TOKEN`                      | 🔴    | ⚪                  | `supabase/seed-pinballmap-creds.mjs`      | as above; the value lands in Supabase Vault, not in a column.                                                                                                                                                                                                                                                                |
 | `DISCORD_PBM_ALERT_CHANNEL_ID`                   | 🟢    | ⚪                  | `src/lib/pinballmap/region-alerts.ts`     | region new-machine alert is off: the hourly cron makes **no** PBM call and records nothing, so nothing is queued and nothing floods when it is later set. Not a secret (a channel snowflake), but never `NEXT_PUBLIC_`.                                                                                                      |
@@ -153,6 +154,13 @@ the degradation is a known, documented choice — not an oversight.
 > must resolve to an `admin` access level, re-checked on every request. Neither
 > is `NEXT_PUBLIC_`; neither is reused as another var's fallback. Rotate by
 > changing `MCP_BEARER_TOKEN`.
+>
+> OAuth uses the same `MCP_ADMIN_USER_ID` as a subject allowlist and re-checks
+> that user's live admin role. `MCP_OAUTH_DCR_CANARY=true` is a temporary
+> activation flag only; see `docs/runbooks/mcp-oauth-codex.md`. OAuth otherwise
+> requires an enabled `mcp_oauth_clients` row whose audience exactly matches the
+> MCP endpoint. The legacy bearer stays available only for the existing Claude
+> connection.
 >
 > **Deliberately not build-gated.** These are required for **MCP** to work, not
 > for **PinPoint** to work. Both are unset → the MCP endpoint 401s and every
