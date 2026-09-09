@@ -596,7 +596,17 @@ async function applySnapshot(
       }
     }
 
-    if (initializeRemovals && missing.length > 0) {
+    // A legacy row missing from the first post-migration snapshot stays active
+    // with one miss. Only a second consecutive absence may baseline it as gone;
+    // a transient return resets the miss without creating a false Added event.
+    const initializationNeedsAnotherSnapshot =
+      initializeRemovals && missing.some((row) => row.missedRuns === 0);
+
+    if (
+      initializeRemovals &&
+      missing.length > 0 &&
+      !initializationNeedsAnotherSnapshot
+    ) {
       await tx
         .update(pinballmapRegionSeenMachines)
         .set({ isPresent: false, missedRuns: 2 })
@@ -612,9 +622,7 @@ async function applySnapshot(
         );
     }
 
-    const firstMiss = initializeRemovals
-      ? []
-      : missing.filter((row) => row.missedRuns === 0);
+    const firstMiss = missing.filter((row) => row.missedRuns === 0);
     if (firstMiss.length > 0) {
       await tx
         .update(pinballmapRegionSeenMachines)
@@ -682,7 +690,7 @@ async function applySnapshot(
         .onConflictDoNothing();
     }
 
-    if (initializeRemovals) {
+    if (initializeRemovals && !initializationNeedsAnotherSnapshot) {
       await tx
         .update(pinballmapRegionAlertState)
         .set({ removalTrackingInitializedAt: detectedAt })

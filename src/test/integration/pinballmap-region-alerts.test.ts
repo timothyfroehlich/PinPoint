@@ -279,7 +279,7 @@ describe("PinballMap region machine-change alerts (PGlite)", () => {
     expect(retried).toMatchObject({ bootstrapped: true, discovered: 1 });
   });
 
-  it("baselines legacy absences without announcing an uncached venue", async () => {
+  it("requires two initialization misses before baselining a legacy absence", async () => {
     const db = await getTestDb();
     await db.insert(pinballmapRegionSeenMachines).values([
       {
@@ -300,14 +300,22 @@ describe("PinballMap region machine-change alerts (PGlite)", () => {
     pbm.entries = [lmx({ lmxId: 1 })];
     pbm.locations = [{ locationId: 26454, name: "Austin Pinball Collective" }];
 
-    const initialized = await runRegionMachineAlerts();
+    const firstMiss = await runRegionMachineAlerts();
 
-    expect(initialized).toMatchObject({
+    expect(firstMiss).toMatchObject({
       skipped: null,
       discovered: 0,
       removed: 0,
       announced: 0,
     });
+    expect(await seenRows()).toContainEqual(
+      expect.objectContaining({ lmxId: 2, isPresent: true, missedRuns: 1 })
+    );
+    expect(discord.posts).toEqual([]);
+
+    const initialized = await runRegionMachineAlerts();
+
+    expect(initialized).toMatchObject({ removed: 0, announced: 0 });
     expect(await seenRows()).toContainEqual(
       expect.objectContaining({ lmxId: 2, isPresent: false, missedRuns: 2 })
     );
@@ -315,6 +323,55 @@ describe("PinballMap region machine-change alerts (PGlite)", () => {
 
     const nextRun = await runRegionMachineAlerts();
     expect(nextRun).toMatchObject({ removed: 0, announced: 0 });
+    expect(discord.posts).toEqual([]);
+  });
+
+  it("silently adopts a transient omission during removal initialization", async () => {
+    const db = await getTestDb();
+    await db.insert(pinballmapRegionSeenMachines).values([
+      {
+        region: "austin",
+        lmxId: 1,
+        locationId: 26454,
+        pinballmapMachineId: 6412,
+        announcedAt: new Date(),
+      },
+      {
+        region: "austin",
+        lmxId: 2,
+        locationId: 999,
+        pinballmapMachineId: 7,
+        announcedAt: new Date(),
+      },
+    ]);
+    pbm.entries = [lmx({ lmxId: 1 })];
+
+    await runRegionMachineAlerts();
+    expect(await seenRows()).toContainEqual(
+      expect.objectContaining({ lmxId: 2, isPresent: true, missedRuns: 1 })
+    );
+
+    pbm.entries = [
+      lmx({ lmxId: 1 }),
+      lmx({ lmxId: 2, locationId: 999, machineId: 7 }),
+    ];
+    const returned = await runRegionMachineAlerts();
+
+    expect(returned).toMatchObject({
+      discovered: 0,
+      removed: 0,
+      announced: 0,
+      pending: 0,
+    });
+    expect(await seenRows()).toContainEqual(
+      expect.objectContaining({
+        lmxId: 2,
+        isPresent: true,
+        missedRuns: 0,
+        generation: 0,
+      })
+    );
+    expect(await eventRows()).toEqual([]);
     expect(discord.posts).toEqual([]);
   });
 
