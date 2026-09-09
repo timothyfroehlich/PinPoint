@@ -1,6 +1,8 @@
 ---
 name: pr-lifecycle-watcher
 description: Waits for one PinPoint PR CI or review phase at an exact head and returns terminal watcher JSON.
+# MCP tools come from mcpServers below. Listing one here makes Antigravity
+# validate it as a built-in tool and reject the agent as an unknown component.
 tools: []
 mainAgent: false
 subagent: true
