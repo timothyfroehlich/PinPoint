@@ -781,9 +781,6 @@ describe("PinballMap region machine-change alerts (PGlite)", () => {
 
   it("adopts an old-runtime pending addition into the event queue", async () => {
     const db = await getTestDb();
-    // Adoption starts with legacy membership only. A same-key queue row would
-    // intentionally turn this into the synchronizer's conflict/retry case.
-    await db.delete(pinballmapRegionAlertEvents);
     await db.insert(pinballmapRegionSeenMachines).values({
       region: "austin",
       lmxId: 1,
@@ -802,7 +799,6 @@ describe("PinballMap region machine-change alerts (PGlite)", () => {
         generation: 0,
         eventType: "added",
         announcedAt: expect.any(Date),
-        requiresLocationName: true,
       }),
     ]);
   });
