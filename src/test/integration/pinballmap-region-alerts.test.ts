@@ -260,6 +260,64 @@ describe("PinballMap region machine-change alerts (PGlite)", () => {
     ]);
   });
 
+  it("does not initialize removal tracking without a complete venue-name baseline", async () => {
+    pbm.entries = [lmx({ lmxId: 1 })];
+    pbm.locationsError = new Error("PinballMap fetchRegionLocations failed");
+
+    const failed = await runRegionMachineAlerts();
+
+    expect(failed).toMatchObject({
+      skipped: "location_cache_unavailable",
+      observed: 1,
+      discovered: 0,
+      removed: 0,
+    });
+    expect(await seenRows()).toEqual([]);
+
+    pbm.locationsError = null;
+    const retried = await runRegionMachineAlerts();
+    expect(retried).toMatchObject({ bootstrapped: true, discovered: 1 });
+  });
+
+  it("baselines legacy absences without announcing an uncached venue", async () => {
+    const db = await getTestDb();
+    await db.insert(pinballmapRegionSeenMachines).values([
+      {
+        region: "austin",
+        lmxId: 1,
+        locationId: 26454,
+        pinballmapMachineId: 6412,
+        announcedAt: new Date(),
+      },
+      {
+        region: "austin",
+        lmxId: 2,
+        locationId: 999,
+        pinballmapMachineId: 7,
+        announcedAt: new Date(),
+      },
+    ]);
+    pbm.entries = [lmx({ lmxId: 1 })];
+    pbm.locations = [{ locationId: 26454, name: "Austin Pinball Collective" }];
+
+    const initialized = await runRegionMachineAlerts();
+
+    expect(initialized).toMatchObject({
+      skipped: null,
+      discovered: 0,
+      removed: 0,
+      announced: 0,
+    });
+    expect(await seenRows()).toContainEqual(
+      expect.objectContaining({ lmxId: 2, isPresent: false, missedRuns: 2 })
+    );
+    expect(discord.posts).toEqual([]);
+
+    const nextRun = await runRegionMachineAlerts();
+    expect(nextRun).toMatchObject({ removed: 0, announced: 0 });
+    expect(discord.posts).toEqual([]);
+  });
+
   it("announces only entries it has not seen before, named from our own data", async () => {
     await seedCatalog([
       { machineId: 6412, name: "Godzilla (Premium)" },

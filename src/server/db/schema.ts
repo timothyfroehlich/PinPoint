@@ -443,6 +443,9 @@ export const pinballmapRegionAlertState = pgTable(
   "pinballmap_region_alert_state",
   {
     region: text("region").primaryKey(),
+    removalTrackingInitializedAt: timestamp("removal_tracking_initialized_at", {
+      withTimezone: true,
+    }),
     runLeaseId: uuid("run_lease_id"),
     runLeaseExpiresAt: timestamp("run_lease_expires_at", {
       withTimezone: true,

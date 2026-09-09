@@ -148,6 +148,7 @@ export interface RegionAlertRun {
     | "empty_payload"
     | "implausible_payload"
     | "incomplete_payload"
+    | "location_cache_unavailable"
     | "already_running"
     | null;
   /** Entries PBM reported for the region. */
@@ -171,6 +172,7 @@ function noop(
     | "empty_payload"
     | "implausible_payload"
     | "incomplete_payload"
+    | "location_cache_unavailable"
     | "already_running",
   observed = 0
 ): RegionAlertRun {
@@ -229,6 +231,16 @@ async function releaseRunLease(region: string, leaseId: string): Promise<void> {
     );
 }
 
+async function isRemovalTrackingInitialized(region: string): Promise<boolean> {
+  const [state] = await db
+    .select({
+      initializedAt: pinballmapRegionAlertState.removalTrackingInitializedAt,
+    })
+    .from(pinballmapRegionAlertState)
+    .where(eq(pinballmapRegionAlertState.region, region));
+  return state?.initializedAt !== null && state?.initializedAt !== undefined;
+}
+
 /** The configured alert channel, or null when the feature is unconfigured. */
 export function getRegionAlertChannelId(): string | null {
   const raw = process.env[ALERT_CHANNEL_ENV]?.trim();
@@ -272,7 +284,10 @@ async function readLocationNames(region: string): Promise<Map<number, string>> {
 async function refreshLocationNames(
   region: string,
   cached: Map<number, string>
-): Promise<Map<number, string>> {
+): Promise<{
+  names: Map<number, string>;
+  succeeded: boolean;
+}> {
   let locations: PbmRegionLocation[];
   try {
     const client = await getPinballMapClient();
@@ -282,39 +297,48 @@ async function refreshLocationNames(
       { err, region, action: "pinballmap.regionAlerts" },
       "Region locations lookup failed; using last-known venue names"
     );
-    return cached;
+    return { names: cached, succeeded: false };
   }
 
-  if (locations.length > 0) {
-    const refreshedAt = new Date();
-    await db
-      .insert(pinballmapRegionLocationNames)
-      .values(
-        locations.map((location) => ({
-          region,
-          locationId: location.locationId,
-          name: location.name,
-          refreshedAt,
-        }))
-      )
-      .onConflictDoUpdate({
-        target: [
-          pinballmapRegionLocationNames.region,
-          pinballmapRegionLocationNames.locationId,
-        ],
-        set: {
-          name: sql`excluded.name`,
-          refreshedAt,
-        },
-      });
+  if (locations.length === 0) {
+    log.error(
+      { region, action: "pinballmap.regionAlerts" },
+      "Region locations payload was empty; keeping last-known venue names"
+    );
+    return { names: cached, succeeded: false };
   }
 
-  return new Map([
-    ...cached,
-    ...locations.map(
-      (location) => [location.locationId, location.name] as const
-    ),
-  ]);
+  const refreshedAt = new Date();
+  await db
+    .insert(pinballmapRegionLocationNames)
+    .values(
+      locations.map((location) => ({
+        region,
+        locationId: location.locationId,
+        name: location.name,
+        refreshedAt,
+      }))
+    )
+    .onConflictDoUpdate({
+      target: [
+        pinballmapRegionLocationNames.region,
+        pinballmapRegionLocationNames.locationId,
+      ],
+      set: {
+        name: sql`excluded.name`,
+        refreshedAt,
+      },
+    });
+
+  return {
+    names: new Map([
+      ...cached,
+      ...locations.map(
+        (location) => [location.locationId, location.name] as const
+      ),
+    ]),
+    succeeded: true,
+  };
 }
 
 interface PendingRegionAlertEvent {
@@ -379,7 +403,8 @@ async function synchronizeLegacyEvents(region: string): Promise<void> {
 /** Apply one validated full-region snapshot using only database work. */
 async function applySnapshot(
   region: string,
-  observed: PbmRegionLmx[]
+  observed: PbmRegionLmx[],
+  initializeRemovals: boolean
 ): Promise<SnapshotResult> {
   const observedById = new Map(observed.map((entry) => [entry.lmxId, entry]));
 
@@ -415,6 +440,12 @@ async function applySnapshot(
           .onConflictDoNothing()
           .returning({ lmxId: pinballmapRegionSeenMachines.lmxId });
         discovered += inserted.length;
+      }
+      if (initializeRemovals) {
+        await tx
+          .update(pinballmapRegionAlertState)
+          .set({ removalTrackingInitializedAt: now })
+          .where(eq(pinballmapRegionAlertState.region, region));
       }
       return {
         bootstrapped: true,
@@ -565,7 +596,25 @@ async function applySnapshot(
       }
     }
 
-    const firstMiss = missing.filter((row) => row.missedRuns === 0);
+    if (initializeRemovals && missing.length > 0) {
+      await tx
+        .update(pinballmapRegionSeenMachines)
+        .set({ isPresent: false, missedRuns: 2 })
+        .where(
+          and(
+            eq(pinballmapRegionSeenMachines.region, region),
+            inArray(
+              pinballmapRegionSeenMachines.lmxId,
+              missing.map((row) => row.lmxId)
+            ),
+            eq(pinballmapRegionSeenMachines.isPresent, true)
+          )
+        );
+    }
+
+    const firstMiss = initializeRemovals
+      ? []
+      : missing.filter((row) => row.missedRuns === 0);
     if (firstMiss.length > 0) {
       await tx
         .update(pinballmapRegionSeenMachines)
@@ -582,7 +631,9 @@ async function applySnapshot(
         );
     }
 
-    const confirmedMissing = missing.filter((row) => row.missedRuns > 0);
+    const confirmedMissing = initializeRemovals
+      ? []
+      : missing.filter((row) => row.missedRuns > 0);
     const removals =
       confirmedMissing.length === 0
         ? []
@@ -629,6 +680,13 @@ async function applySnapshot(
           }))
         )
         .onConflictDoNothing();
+    }
+
+    if (initializeRemovals) {
+      await tx
+        .update(pinballmapRegionAlertState)
+        .set({ removalTrackingInitializedAt: detectedAt })
+        .where(eq(pinballmapRegionAlertState.region, region));
     }
 
     return {
@@ -874,7 +932,35 @@ export async function runRegionMachineAlerts(opts?: {
       return noop(region, "implausible_payload", observed.length);
     }
 
-    const snapshot = await applySnapshot(region, observed);
+    const initializeRemovals = !(await isRemovalTrackingInitialized(region));
+    let locationNames = await readLocationNames(region);
+    let locationNamesFresh = false;
+    if (initializeRemovals) {
+      const refreshed = await refreshLocationNames(region, locationNames);
+      const unnamedObservedLocations = new Set(
+        observed
+          .map((entry) => entry.locationId)
+          .filter((locationId) => !refreshed.names.has(locationId))
+      );
+      if (!refreshed.succeeded || unnamedObservedLocations.size > 0) {
+        reportError(
+          new Error(
+            "PinballMap removal tracking not initialized: current venue names were unavailable"
+          ),
+          {
+            region,
+            observed: observed.length,
+            unnamedLocations: unnamedObservedLocations.size,
+            action: "pinballmap.regionAlerts",
+          }
+        );
+        return noop(region, "location_cache_unavailable", observed.length);
+      }
+      locationNames = refreshed.names;
+      locationNamesFresh = true;
+    }
+
+    const snapshot = await applySnapshot(region, observed, initializeRemovals);
     if (snapshot.incompleteMissing > 0) {
       reportError(
         new Error(
@@ -935,9 +1021,8 @@ export async function runRegionMachineAlerts(opts?: {
 
     await synchronizeLegacyEvents(region);
     const pending = await readPending(region);
-    let locationNames = await readLocationNames(region);
-    if (locationNames.size === 0 || pending.length > 0) {
-      locationNames = await refreshLocationNames(region, locationNames);
+    if (pending.length > 0 && !locationNamesFresh) {
+      locationNames = (await refreshLocationNames(region, locationNames)).names;
     }
     if (pending.length === 0) {
       return { ...base, announced: 0, pending: 0 };
