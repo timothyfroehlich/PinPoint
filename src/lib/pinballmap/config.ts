@@ -48,10 +48,10 @@ export const APC_LOCATION_ID = 26454;
  * PBM region slug for the Austin metro — the `:region` path segment of the bulk
  * region endpoints (lowercase region name, vendored llms.txt §Regions).
  *
- * Scope note (PP-o355.18): this is the whole metro, not just our location. The
- * new-machine alert is region-wide discovery — "a game appeared somewhere in
- * Austin" — which is a different question from the APC-location snapshot sync
- * (PP-o355.11) and reads a different endpoint.
+ * Scope note (PP-o355.18, PP-o355.51.9): this is the whole metro, not just our
+ * location. The machine-change alert is region-wide discovery — "a game appeared
+ * or disappeared somewhere in Austin" — which is a different question from the
+ * APC-location snapshot sync (PP-o355.11) and reads a different endpoint.
  *
  * **Lowercase is load-bearing.** PBM's route matches the region name
  * case-insensitively, but the scopes behind it look it up with

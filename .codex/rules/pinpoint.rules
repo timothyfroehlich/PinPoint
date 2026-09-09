@@ -78,9 +78,7 @@ prefix_rule(pattern=["git", "worktree", "prune"], decision="prompt", justificati
 prefix_rule(pattern=["git", "stash", "drop"], decision="prompt", justification="Dropping a stash deletes preserved changes")
 prefix_rule(pattern=["git", "stash", "clear"], decision="prompt", justification="Clearing stashes deletes all preserved changes")
 
-# Fixed-subcommand GitHub reads used throughout the PR lifecycle. Raw `gh` is
-# forbidden below because repository selectors are case-insensitive and cannot
-# be normalized by exact argv-prefix policy.
+# Fixed-subcommand GitHub reads used throughout the PR lifecycle.
 prefix_rule(
     pattern=["bash", "scripts/workflow/codex-gh.sh"],
     decision="allow",
@@ -102,20 +100,6 @@ prefix_rule(
         "bash scripts/workflow/codex-gh.sh merge-external owner/other 17 squash",
     ],
 )
-prefix_rule(
-    pattern=["gh"],
-    decision="forbidden",
-    justification="Use codex-gh.sh, typed GitHub tools, or a gate-enforced workflow script; raw gh can bypass PinPoint merge guards through aliased repository selectors",
-    match=[
-        "gh pr view 2058",
-        "gh pr merge 2058",
-        "gh pr merge 2058 --repo owner/other",
-        "gh -R github.com/TimothyFroehlich/pinpoint pr merge 2058",
-        "gh api --method PUT repos/timothyfroehlich/PinPoint/pulls/2058/merge",
-        "gh api repos/timothyfroehlich/PinPoint/pulls/2058/merge -X PUT",
-    ],
-)
-
 # Trusted PinPoint workflow entry points and routine local validation.
 prefix_rule(pattern=["./scripts/workflow/pr-watch.py"], decision="allow", justification="Monitor a PinPoint pull request through the repository workflow")
 prefix_rule(pattern=["python3", "scripts/workflow/pr-watch.py"], decision="allow", justification="Monitor a PinPoint pull request through the repository workflow")

@@ -50,6 +50,7 @@ const EXPECTED_GUARD_HOOKS = [
   "block-direct-merge.cjs",
   "block-main-worktree-branch-switch.cjs",
   "block-gh-pr-checkout.cjs",
+  "block-direct-pr-watch.cjs",
 ];
 
 // --- Registered-script extraction --------------------------------------------
@@ -342,6 +343,19 @@ const BEHAVIOR_PROBES = [
       "gh pr diff 123",
       "gh pr comment 123",
       "echo gh pr checkout 123",
+    ],
+  },
+  {
+    hook: "block-direct-pr-watch.cjs",
+    export: "classifyCommand",
+    outcome: (fn, command) => (fn(command).block ? "deny" : "allow"),
+    mustDeny: [
+      "./scripts/workflow/pr-watch.py 123",
+      "python3 scripts/workflow/pr-watch.py 123 --phase ci --expected-head abc --json",
+    ],
+    mustAllow: [
+      "./scripts/workflow/pr-watch.py 123 --check-ready",
+      "echo pr-watch.py 123",
     ],
   },
 ];

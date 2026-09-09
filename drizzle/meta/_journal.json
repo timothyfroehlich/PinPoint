@@ -509,8 +509,29 @@
     {
       "idx": 72,
       "version": "7",
-      "when": 1788707705766,
-      "tag": "0072_pinballmap_location_checks",
+      "when": 1788707739523,
+      "tag": "0072_pinballmap_region_removals",
+      "breakpoints": true
+    },
+    {
+      "idx": 73,
+      "version": "7",
+      "when": 1788872912608,
+      "tag": "0073_cache-region-location-names",
+      "breakpoints": true
+    },
+    {
+      "idx": 74,
+      "version": "7",
+      "when": 1788916852003,
+      "tag": "0074_initialize-region-removal-tracking",
+      "breakpoints": true
+    },
+    {
+      "idx": 75,
+      "version": "7",
+      "when": 1788957037043,
+      "tag": "0075_pinballmap-location-checks",
       "breakpoints": true
     }
   ]

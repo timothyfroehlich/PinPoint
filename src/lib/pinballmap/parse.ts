@@ -130,13 +130,39 @@ function parseRegionLmx(raw: unknown): PbmRegionLmx | null {
  * `location_machine_xrefs.id desc`, unpaginated and uncapped. The bare-array
  * branch is tolerance, not a shape PBM actually sends.
  *
- * Records missing an id, location or machine are skipped rather than coerced: an
- * entry we cannot place is one we could never announce or link.
+ * This parser is deliberately all-or-nothing. A malformed or duplicate row makes
+ * a full-list diff look like a removal, so silently dropping it could publish a
+ * false alert and advance the two-read confirmation counter.
  */
 export function parseRegionLmxes(raw: unknown): PbmRegionLmx[] {
   const r = asRecord(raw);
-  const list = r ? asArray(r["location_machine_xrefs"]) : asArray(raw);
-  return list.map(parseRegionLmx).filter((l): l is PbmRegionLmx => l !== null);
+  const candidate = r ? r["location_machine_xrefs"] : raw;
+  if (!Array.isArray(candidate)) {
+    throw new Error(
+      "PinballMap region machine payload missing location_machine_xrefs array"
+    );
+  }
+
+  const parsed = candidate.map((entry, index) => {
+    const lmx = parseRegionLmx(entry);
+    if (lmx === null) {
+      throw new Error(
+        `PinballMap region machine payload has malformed entry at index ${String(index)}`
+      );
+    }
+    return lmx;
+  });
+
+  const seen = new Set<number>();
+  for (const entry of parsed) {
+    if (seen.has(entry.lmxId)) {
+      throw new Error(
+        `PinballMap region machine payload repeats LMX id ${String(entry.lmxId)}`
+      );
+    }
+    seen.add(entry.lmxId);
+  }
+  return parsed;
 }
 
 /**

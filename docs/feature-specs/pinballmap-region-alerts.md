@@ -64,10 +64,6 @@ Related: `docs/feature-specs/pinballmap.md` (the location-sync integration), `do
 | §2.4 Send test message | No test action; the channel is only exercised by the hourly cron | Add a Send test message button |
 | §3 stored status | No status surfaced anywhere in admin | Build the status readout |
 | §4.1 fixed hourly schedule | Hardcoded Vercel cron at `23 * * * *` | Keep; spec documents the fixed cadence |
-| §4.2 added AND removed | Code diffs the full region machine list (`fetchRegionLmxes`) — additions only, removals never announced | Preferred: the region activity feed filtered to `submission_type[]=new_lmx&submission_type[]=remove_machine`, if the region feed is confirmed to accept the filter. Fallback: a bidirectional diff of the region machine list (`fetchRegionLmxes`) — additions = newly present, removals = newly absent — needing no unverified endpoint. Either way excludes non-add/remove activity. |
-| §4.2 activity-feed assumptions | Vendored docs scope `submission_type` to the index/location/list_within_range endpoints, not explicitly the region feed; and it is unconfirmed the feed carries venue/machine names inline | Verify and record the region feed's supported filter + payload (a dated wire contract) before adopting it; until verified, the list-diff fallback is the baseline, so a conforming implementation always exists |
-| §4.3–4.5 dedup / bootstrap / bad-read guards | Built in `region-alerts.ts` for the list-diff approach (`pinballmap_region_seen_machines`) | Keep the intent; rework the dedup store for the activity-feed model |
-| §4.6 message content + attribution | `region-alert-message.ts` builds the post (masked venue links + CC BY-SA attribution) from the list-diff data | Keep the attribution + location link-back; rebuild the message from the activity-feed model |
 
 ---
 

@@ -1,5 +1,5 @@
 {
-  "id": "437f76dd-3b6d-4281-ab10-5c41b941d200",
+  "id": "011bcfe0-7f52-48a4-b30e-eb13de8b24e4",
   "prevId": "21e9fff2-48cd-4f57-8abe-50cffbfbf05c",
   "version": "7",
   "dialect": "postgresql",
@@ -2170,8 +2170,8 @@
       "checkConstraints": {},
       "isRLSEnabled": true
     },
-    "public.pinballmap_location_checks": {
-      "name": "pinballmap_location_checks",
+    "public.pinballmap_region_alert_events": {
+      "name": "pinballmap_region_alert_events",
       "schema": "",
       "columns": {
         "id": {
@@ -2181,62 +2181,108 @@
           "notNull": true,
           "default": "gen_random_uuid()"
         },
+        "region": {
+          "name": "region",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "lmx_id": {
+          "name": "lmx_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "generation": {
+          "name": "generation",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "event_type": {
+          "name": "event_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
         "location_id": {
           "name": "location_id",
           "type": "integer",
           "primaryKey": false,
           "notNull": true
         },
-        "expected_location_id": {
-          "name": "expected_location_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "expected_configuration_generation": {
-          "name": "expected_configuration_generation",
+        "pinballmap_machine_id": {
+          "name": "pinballmap_machine_id",
           "type": "integer",
           "primaryKey": false,
           "notNull": true
         },
-        "snapshot_json": {
-          "name": "snapshot_json",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "checked_by": {
-          "name": "checked_by",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "checked_at": {
-          "name": "checked_at",
+        "detected_at": {
+          "name": "detected_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
         },
-        "expires_at": {
-          "name": "expires_at",
+        "announced_at": {
+          "name": "announced_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         }
       },
       "indexes": {
-        "pinballmap_location_checks_expires_at_idx": {
-          "name": "pinballmap_location_checks_expires_at_idx",
+        "pinballmap_region_alert_events_transition_unique": {
+          "name": "pinballmap_region_alert_events_transition_unique",
           "columns": [
             {
-              "expression": "expires_at",
+              "expression": "region",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "lmx_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "generation",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "event_type",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_pinballmap_region_alert_events_pending": {
+          "name": "idx_pinballmap_region_alert_events_pending",
+          "columns": [
+            {
+              "expression": "region",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "detected_at",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
             }
           ],
           "isUnique": false,
+          "where": "announced_at is null",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -2246,10 +2292,41 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": true
+    },
+    "public.pinballmap_region_alert_state": {
+      "name": "pinballmap_region_alert_state",
+      "schema": "",
+      "columns": {
+        "region": {
+          "name": "region",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "run_lease_id": {
+          "name": "run_lease_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "run_lease_expires_at": {
+          "name": "run_lease_expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
       "checkConstraints": {
-        "pinballmap_location_checks_expiry_order_check": {
-          "name": "pinballmap_location_checks_expiry_order_check",
-          "value": "expires_at > checked_at"
+        "pinballmap_region_alert_state_run_lease_pair_check": {
+          "name": "pinballmap_region_alert_state_run_lease_pair_check",
+          "value": "(run_lease_id IS NULL) = (run_lease_expires_at IS NULL)"
         }
       },
       "isRLSEnabled": true
@@ -2288,6 +2365,27 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
+        },
+        "is_present": {
+          "name": "is_present",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "missed_runs": {
+          "name": "missed_runs",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "generation": {
+          "name": "generation",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
         },
         "announced_at": {
           "name": "announced_at",

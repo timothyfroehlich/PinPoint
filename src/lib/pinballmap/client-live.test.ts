@@ -179,7 +179,7 @@ describe("live client — reads", () => {
     ]);
   });
 
-  it("fetchRegionLmxes skips entries it could not place", async () => {
+  it("fetchRegionLmxes rejects the whole payload when one entry is malformed", async () => {
     installFetchMock(() =>
       json([
         { id: 1, location_id: 2, machine_id: 3 },
@@ -191,9 +191,9 @@ describe("live client — reads", () => {
       ])
     );
 
-    const entries = await createLiveClient(null).fetchRegionLmxes("austin");
-
-    expect(entries).toEqual([{ lmxId: 1, locationId: 2, machineId: 3 }]);
+    await expect(
+      createLiveClient(null).fetchRegionLmxes("austin")
+    ).rejects.toThrow(/malformed entry at index 1/);
   });
 
   it("fetchRegionLmxes lowercases the region before it reaches the URL", async () => {
