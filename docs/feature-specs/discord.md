@@ -23,7 +23,7 @@ The card uses the credential-entry pattern: fields, a Save that validates and re
 - **2.1** Fields:
   - **Bot token** — the secret. Write-only: a configured token shows as "Saved" and is replaced by pasting a new one.
   - **Server ID** — required. The Discord server whose members the bot may DM.
-  - **Invite link** — optional. Shown to a member who cannot receive DMs (§4.2).
+  - **Invite link** — optional. Shown only when the Test DM determines that the member and bot share no Discord server (§4.2).
 - **2.2** No enable flag. The integration is on when a bot token and a server ID are both on file and validated. To turn it off, clear either one.
 - **2.3** Saving validates the token against the server and stores the result as the connection status (§3). The save always persists the entered config, even when validation fails — a failed check records "not working" rather than discarding input (CORE-ARCH-012).
 - **2.4** A **Test connection** action re-checks the stored config without editing it.
@@ -43,7 +43,7 @@ The card uses the credential-entry pattern: fields, a Save that validates and re
 ## 4. Sending
 
 - **4.1** A notification is DM'd to the member's linked Discord account. A member with no linked account is skipped, not errored.
-- **4.2** The invite link is shown where a DM failure is already surfaced to a member — the Test DM response (settings §Connected accounts). A persistent member-facing surface for background notification failures is out of scope; ordinary notification sends are background fan-out and only log a failed DM.
+- **4.2** If a Test DM fails because the member and bot share no Discord server, the response shows the configured invite link so the member can join and retry; no other Test DM failure shows the invite link.
 - **4.3** Comment content is not rendered in the DM body — a notification links to the resource, it does not quote it. The text is available to the channel but deliberately withheld from the message (privacy).
 - **4.4** No outbound Discord call runs inside a database transaction (CORE-ARCH-011).
 
@@ -57,18 +57,18 @@ The card uses the credential-entry pattern: fields, a Save that validates and re
 
 | Spec | Code today | Resolution |
 | :-- | :-- | :-- |
-| §2.3 save validates and records | An enabled save is rejected on a failed probe rather than recording it | Always persist; write the outcome to status |
-| §2.4 one Test connection | Two per-field Validate buttons; results held in client state, lost on reload | Collapse to Save-validates + a stored-config Test connection |
-| §3 stored status | `bot_health_status` / `last_bot_check_at` columns exist but are never written | Wire the write path; widen the enum (rejected vs unreachable) |
-| §3.3 traffic updates status | `sendDm` 401s classified for the send result but never persisted to config health | On a 401, write Not working |
-| §2.5 invite-link inline check | Validated on save (`schema.ts`: URL regex, max 512); no as-you-type check | Add the inline/as-you-type check |
-| §4.3 comment text excluded | Already done — `commentContent` is passed through but deliberately not rendered (`messages.ts`) | Keep; spec documents existing behavior |
-| §4.2 invite link on Test DM | Invite link is stored but never surfaced | Show it in the Test DM response; a general failed-notification surface is out of scope |
+| §2.3 save validates and records | An enabled save is rejected on a failed probe rather than recording it | Always persist and write the outcome to status (PP-o355.51.5) |
+| §2.4 one Test connection | Two per-field Validate buttons; results held in client state, lost on reload | Collapse to Save-validates + a stored-config Test connection (PP-o355.51.5) |
+| §3 stored status | `bot_health_status` / `last_bot_check_at` are only reset to their default values; production never records a successful or failed check | Wire the write path; widen the enum (rejected vs unreachable) (PP-o355.51.5) |
+| §3.3 traffic updates status | `sendDm` 401s classified for the send result but never persisted to config health | On a 401, write Not working (PP-eps) |
+| §2.5 invite-link inline check | Validated on save (`schema.ts`: URL regex, max 512); no as-you-type check | Add the inline/as-you-type check (PP-o355.51.5) |
+| §4.2 invite link on Test DM | Test DM collapses Discord's no-mutual-guilds response into `blocked`, and its response never includes the invite link | Preserve the specific outcome and show the configured link only for it (PP-o355.51.10) |
 
 ---
 
 ## Changelog
 
-| Date       | Change   |
-| :--------- | :------- |
+| Date | Change |
+| :-- | :-- |
+| 2026-09-08 | Limited the Test DM invite link to the no-shared-server failure. |
 | 2026-08-22 | Created. |
