@@ -374,18 +374,38 @@ interface SnapshotResult {
  */
 async function synchronizeLegacyEvents(region: string): Promise<void> {
   await db.transaction(async (tx) => {
-    await tx.execute(sql`
-      insert into ${pinballmapRegionAlertEvents}
-        (region, lmx_id, generation, event_type, location_id,
-         pinballmap_machine_id, detected_at, requires_location_name)
-      select region, lmx_id, 0, 'added', location_id,
-             pinballmap_machine_id, first_seen_at, true
-      from ${pinballmapRegionSeenMachines}
-      where region = ${region}
-        and generation = 0
-        and announced_at is null
-      on conflict (region, lmx_id, generation, event_type) do nothing
-    `);
+    const pendingLegacy = await tx
+      .select({
+        lmxId: pinballmapRegionSeenMachines.lmxId,
+        locationId: pinballmapRegionSeenMachines.locationId,
+        pinballmapMachineId: pinballmapRegionSeenMachines.pinballmapMachineId,
+        firstSeenAt: pinballmapRegionSeenMachines.firstSeenAt,
+      })
+      .from(pinballmapRegionSeenMachines)
+      .where(
+        and(
+          eq(pinballmapRegionSeenMachines.region, region),
+          eq(pinballmapRegionSeenMachines.generation, 0),
+          isNull(pinballmapRegionSeenMachines.announcedAt)
+        )
+      );
+    for (let i = 0; i < pendingLegacy.length; i += INSERT_CHUNK) {
+      await tx
+        .insert(pinballmapRegionAlertEvents)
+        .values(
+          pendingLegacy.slice(i, i + INSERT_CHUNK).map((event) => ({
+            region,
+            lmxId: event.lmxId,
+            generation: 0,
+            eventType: "added" as const,
+            locationId: event.locationId,
+            pinballmapMachineId: event.pinballmapMachineId,
+            detectedAt: event.firstSeenAt,
+            requiresLocationName: true,
+          }))
+        )
+        .onConflictDoNothing();
+    }
     await tx.execute(sql`
       update ${pinballmapRegionAlertEvents} as event
       set announced_at = membership.announced_at
