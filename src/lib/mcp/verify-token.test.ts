@@ -158,7 +158,7 @@ describe("createVerifyToken", () => {
     expect(getUserAccessLevel).toHaveBeenCalledWith(ADMIN_USER_ID);
     expect(warnMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        reason: "not_admin",
+        reason: "permission_denied",
         accessLevel: "technician",
       }),
       expect.any(String)

@@ -15,9 +15,10 @@ import {
   type VerifiedOAuthToken,
 } from "~/lib/mcp/oauth";
 import { getUserAccessLevel } from "~/lib/permissions/access";
+import { checkPermission } from "~/lib/permissions/helpers";
 import { ACCESS_LEVELS, type AccessLevel } from "~/lib/permissions/matrix";
 
-const REQUIRED_ACCESS_LEVEL: AccessLevel = "admin";
+const REQUIRED_PERMISSION = "admin.access";
 const MIN_BEARER_TOKEN_LENGTH = 32;
 const BEARER_CLIENT_ID = "claude-code-bearer";
 const REQUIRED_OAUTH_ALGORITHM = "ES256";
@@ -103,8 +104,13 @@ async function requireLiveAdmin(
   clientId: string
 ): Promise<AccessLevel | undefined> {
   const accessLevel = await deps.getUserAccessLevel(userId);
-  if (accessLevel !== REQUIRED_ACCESS_LEVEL) {
-    reject("not_admin", { userId, clientId, accessLevel });
+  if (!checkPermission(REQUIRED_PERMISSION, accessLevel)) {
+    reject("permission_denied", {
+      userId,
+      clientId,
+      accessLevel,
+      permission: REQUIRED_PERMISSION,
+    });
     return undefined;
   }
   return accessLevel;
