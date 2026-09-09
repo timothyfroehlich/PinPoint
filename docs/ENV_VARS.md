@@ -136,7 +136,8 @@ the degradation is a known, documented choice — not an oversight.
 > only for the refresh session without echoing it or saving it in shell history:
 >
 > ```bash
-> read -rsp 'PinballMap API token: ' PINBALLMAP_API_TOKEN && printf '\n'
+> printf 'PinballMap API token: '
+> read -rs PINBALLMAP_API_TOKEN && printf '\n'
 > PINBALLMAP_API_TOKEN="$PINBALLMAP_API_TOKEN" pnpm tsx scripts/pinballmap/refresh-fixture.ts
 > unset PINBALLMAP_API_TOKEN
 > ```
