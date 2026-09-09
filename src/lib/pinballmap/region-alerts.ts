@@ -348,7 +348,6 @@ interface PendingRegionAlertEvent {
   eventType: "added" | "removed";
   locationId: number;
   pinballmapMachineId: number;
-  requiresLocationName: boolean;
 }
 
 interface RegionAlertTransition {
@@ -374,52 +373,18 @@ interface SnapshotResult {
  */
 async function synchronizeLegacyEvents(region: string): Promise<void> {
   await db.transaction(async (tx) => {
-    const pendingLegacy = await tx
-      .select({
-        lmxId: pinballmapRegionSeenMachines.lmxId,
-        locationId: pinballmapRegionSeenMachines.locationId,
-        pinballmapMachineId: pinballmapRegionSeenMachines.pinballmapMachineId,
-        firstSeenAt: pinballmapRegionSeenMachines.firstSeenAt,
-      })
-      .from(pinballmapRegionSeenMachines)
-      .where(
-        and(
-          eq(pinballmapRegionSeenMachines.region, region),
-          eq(pinballmapRegionSeenMachines.generation, 0),
-          isNull(pinballmapRegionSeenMachines.announcedAt)
-        )
-      );
-    for (let i = 0; i < pendingLegacy.length; i += INSERT_CHUNK) {
-      const inserted = await tx
-        .insert(pinballmapRegionAlertEvents)
-        .values(
-          pendingLegacy.slice(i, i + INSERT_CHUNK).map((event) => ({
-            region,
-            lmxId: event.lmxId,
-            generation: 0,
-            eventType: "added" as const,
-            locationId: event.locationId,
-            pinballmapMachineId: event.pinballmapMachineId,
-            detectedAt: event.firstSeenAt,
-          }))
-        )
-        .onConflictDoNothing()
-        .returning({ id: pinballmapRegionAlertEvents.id });
-      // Only rows adopted by this synchronizer need the migration-only policy.
-      // A conflict may be a native queue row for the same generation; using the
-      // returned ids avoids reclassifying that row as legacy.
-      if (inserted.length > 0) {
-        await tx
-          .update(pinballmapRegionAlertEvents)
-          .set({ requiresLocationName: true })
-          .where(
-            inArray(
-              pinballmapRegionAlertEvents.id,
-              inserted.map((event) => event.id)
-            )
-          );
-      }
-    }
+    await tx.execute(sql`
+      insert into ${pinballmapRegionAlertEvents}
+        (region, lmx_id, generation, event_type, location_id,
+         pinballmap_machine_id, detected_at)
+      select region, lmx_id, 0, 'added', location_id,
+             pinballmap_machine_id, first_seen_at
+      from ${pinballmapRegionSeenMachines}
+      where region = ${region}
+        and generation = 0
+        and announced_at is null
+      on conflict (region, lmx_id, generation, event_type) do nothing
+    `);
     await tx.execute(sql`
       update ${pinballmapRegionAlertEvents} as event
       set announced_at = membership.announced_at
@@ -756,7 +721,6 @@ async function readPending(region: string): Promise<PendingRegionAlertEvent[]> {
       eventType: pinballmapRegionAlertEvents.eventType,
       locationId: pinballmapRegionAlertEvents.locationId,
       pinballmapMachineId: pinballmapRegionAlertEvents.pinballmapMachineId,
-      requiresLocationName: pinballmapRegionAlertEvents.requiresLocationName,
     })
     .from(pinballmapRegionAlertEvents)
     .where(
@@ -1080,7 +1044,7 @@ export async function runRegionMachineAlerts(opts?: {
     const blockedLmxIds = new Set<number>();
     const announceable = pending.filter((event) => {
       if (blockedLmxIds.has(event.lmxId)) return false;
-      if (event.requiresLocationName && !locationNames.has(event.locationId)) {
+      if (!locationNames.has(event.locationId)) {
         blockedLmxIds.add(event.lmxId);
         return false;
       }
@@ -1093,7 +1057,7 @@ export async function runRegionMachineAlerts(opts?: {
           deferred: pending.length - announceable.length,
           action: "pinballmap.regionAlerts",
         },
-        "Legacy Pinball Map additions are waiting for historical venue names"
+        "Pinball Map alerts are waiting for venue names"
       );
     }
     if (announceable.length === 0) {

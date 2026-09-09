@@ -526,13 +526,6 @@
       "when": 1788916852003,
       "tag": "0074_initialize-region-removal-tracking",
       "breakpoints": true
-    },
-    {
-      "idx": 75,
-      "version": "7",
-      "when": 1788923769168,
-      "tag": "0075_require-location-name-for-legacy-region-alerts",
-      "breakpoints": true
     }
   ]
 }

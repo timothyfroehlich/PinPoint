@@ -148,7 +148,6 @@ async function eventRows(): Promise<
     generation: number;
     eventType: "added" | "removed";
     announcedAt: Date | null;
-    requiresLocationName: boolean;
   }[]
 > {
   const db = await getTestDb();
@@ -158,7 +157,6 @@ async function eventRows(): Promise<
       generation: pinballmapRegionAlertEvents.generation,
       eventType: pinballmapRegionAlertEvents.eventType,
       announcedAt: pinballmapRegionAlertEvents.announcedAt,
-      requiresLocationName: pinballmapRegionAlertEvents.requiresLocationName,
     })
     .from(pinballmapRegionAlertEvents)
     .orderBy(pinballmapRegionAlertEvents.detectedAt);
@@ -411,7 +409,7 @@ describe("PinballMap region machine-change alerts (PGlite)", () => {
     expect(pbm.locationCalls).toBe(2);
   });
 
-  it("falls back to ids when neither lookup can name the entry", async () => {
+  it("keeps an event pending when its current venue cannot be named", async () => {
     pbm.entries = [lmx({ lmxId: 1 })];
     await runRegionMachineAlerts();
 
@@ -423,17 +421,14 @@ describe("PinballMap region machine-change alerts (PGlite)", () => {
     ];
     const run = await runRegionMachineAlerts();
 
-    expect(run).toMatchObject({ discovered: 1, announced: 1 });
-    expect(discord.posts[0]?.content).toContain("PinballMap machine #31337");
-    expect(discord.posts[0]?.content).toContain("location #4242");
+    expect(run).toMatchObject({ discovered: 1, announced: 0, pending: 1 });
+    expect(discord.posts).toEqual([]);
   });
 
-  it("still announces when the locations lookup THROWS, naming venues by id", async () => {
-    // Distinct from the case above: there the locations call succeeded and simply
-    // did not contain the venue. Here the call itself fails — a PBM outage or a
-    // 429 on the second request of the run. A venue label is nice to have, so
-    // `resolveLabels` swallows it; what must NOT happen is the whole run failing
-    // and stranding a discovery that the seen-set has already recorded.
+  it("keeps an event pending when the locations lookup throws, then retries it", async () => {
+    // Distinct from the case above: there the locations call succeeded and omitted
+    // the venue. Here the call itself fails — a PBM outage or a 429 on the second
+    // request of the run. The immutable post waits rather than naming a venue by id.
     await seedCatalog([{ machineId: 7, name: "Medieval Madness" }]);
     pbm.locations = [{ locationId: 26454, name: "Austin Pinball Collective" }];
     pbm.entries = [lmx({ lmxId: 1 })];
@@ -446,15 +441,22 @@ describe("PinballMap region machine-change alerts (PGlite)", () => {
     ];
     const run = await runRegionMachineAlerts();
 
-    expect(run).toMatchObject({ discovered: 1, announced: 1, pending: 0 });
-    // The machine title survives — it comes from our own mirror, not from PBM.
-    expect(discord.posts[0]?.content).toContain("Medieval Madness");
-    // The venue falls back to its id rather than taking the run down with it.
-    expect(discord.posts[0]?.content).toContain("location #999");
-    // And the row is marked announced, so it is not re-posted next run.
+    expect(run).toMatchObject({ discovered: 1, announced: 0, pending: 1 });
+    expect(discord.posts).toEqual([]);
     expect(await seenRows()).toContainEqual(
-      expect.objectContaining({ lmxId: 2, announcedAt: expect.any(Date) })
+      expect.objectContaining({ lmxId: 2, announcedAt: null })
     );
+
+    pbm.locationsError = null;
+    pbm.locations = [
+      { locationId: 26454, name: "Austin Pinball Collective" },
+      { locationId: 999, name: "Pinballz Arcade" },
+    ];
+    const retried = await runRegionMachineAlerts();
+
+    expect(retried).toMatchObject({ discovered: 0, announced: 1, pending: 0 });
+    expect(discord.posts[0]?.content).toContain("Medieval Madness");
+    expect(discord.posts[0]?.content).toContain("Pinballz Arcade");
   });
 
   it("refreshes the catalog when a discovered machine is unknown, then names it", async () => {
@@ -837,7 +839,6 @@ describe("PinballMap region machine-change alerts (PGlite)", () => {
       eventType: "added",
       locationId: 999,
       pinballmapMachineId: 7,
-      requiresLocationName: true,
     });
     pbm.entries = [lmx({ lmxId: 1 })];
     pbm.locationsError = new Error("departed venue is absent");
@@ -851,7 +852,6 @@ describe("PinballMap region machine-change alerts (PGlite)", () => {
         lmxId: 2,
         eventType: "added",
         announcedAt: null,
-        requiresLocationName: true,
       }),
     ]);
 
