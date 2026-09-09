@@ -804,6 +804,9 @@ describe("PinballMap region machine-change alerts (PGlite)", () => {
 
   it("keeps a migrated addition pending until its departed venue can be named", async () => {
     const db = await getTestDb();
+    // The shared PGlite worker may already know this venue from an earlier case;
+    // this scenario specifically models migration with no historical cache row.
+    await db.delete(pinballmapRegionLocationNames);
     await db.insert(pinballmapRegionSeenMachines).values([
       {
         region: "austin",
