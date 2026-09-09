@@ -699,6 +699,7 @@ describe("PinballMap region machine-change alerts (PGlite)", () => {
   });
 
   it("DOES announce a re-add past the window — PBM mints a fresh lmx id", async () => {
+    await seedCatalog([{ machineId: 6412, name: "Godzilla" }]);
     pbm.entries = [lmx({ lmxId: 1 })];
     await runRegionMachineAlerts();
 
@@ -712,6 +713,7 @@ describe("PinballMap region machine-change alerts (PGlite)", () => {
   });
 
   it("keeps a discovery pending when the Discord post fails, then announces it next run", async () => {
+    await seedCatalog([{ machineId: 7, name: "Medieval Madness" }]);
     pbm.entries = [lmx({ lmxId: 1 })];
     await runRegionMachineAlerts();
 
@@ -786,6 +788,7 @@ describe("PinballMap region machine-change alerts (PGlite)", () => {
   });
 
   it("adopts an old-runtime pending addition into the event queue", async () => {
+    await seedCatalog([{ machineId: 6412, name: "Godzilla" }]);
     const db = await getTestDb();
     await db.insert(pinballmapRegionSeenMachines).values({
       region: "austin",
@@ -810,6 +813,7 @@ describe("PinballMap region machine-change alerts (PGlite)", () => {
   });
 
   it("keeps a migrated addition pending until its departed venue can be named", async () => {
+    await seedCatalog([{ machineId: 7, name: "Medieval Madness" }]);
     const db = await getTestDb();
     // Model the exact post-migration state: the legacy addition was backfilled,
     // but its departed venue never had a historical cache row.
@@ -934,6 +938,7 @@ describe("PinballMap region machine-change alerts (PGlite)", () => {
     // `readPending` caps at PENDING_READ_LIMIT (500), so a long Discord outage
     // can queue more than one run can drain. `pending` is the job's monitoring
     // signal, so it has to be counted, not inferred from "we announced them all".
+    await seedCatalog([{ machineId: 1, name: "Backlog Fixture" }]);
     pbm.entries = Array.from({ length: 620 }, (_, i) =>
       lmx({ lmxId: i + 1, machineId: 1 })
     );
