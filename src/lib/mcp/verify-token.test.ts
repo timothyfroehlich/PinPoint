@@ -1,7 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { getUserAccessLevelMock, warnMock } = vi.hoisted(() => ({
+const {
+  getMcpOAuthConfigMock,
+  getUserAccessLevelMock,
+  verifySupabaseOAuthTokenMock,
+  findMcpOAuthClientMock,
+  warnMock,
+} = vi.hoisted(() => ({
+  getMcpOAuthConfigMock: vi.fn(),
   getUserAccessLevelMock: vi.fn(),
+  verifySupabaseOAuthTokenMock: vi.fn(),
+  findMcpOAuthClientMock: vi.fn(),
   warnMock: vi.fn(),
 }));
 
@@ -11,6 +20,11 @@ vi.mock("~/lib/logger", () => ({
 }));
 vi.mock("~/lib/permissions/access", () => ({
   getUserAccessLevel: getUserAccessLevelMock,
+}));
+vi.mock("~/lib/mcp/oauth", () => ({
+  getMcpOAuthConfig: getMcpOAuthConfigMock,
+  verifySupabaseOAuthToken: verifySupabaseOAuthTokenMock,
+  findMcpOAuthClient: findMcpOAuthClientMock,
 }));
 
 import {
@@ -26,12 +40,38 @@ const request = new Request("https://pinpoint.test/api/mcp/mcp");
 /** 64 hex chars, matching what `openssl rand -hex 32` produces. */
 const TOKEN = "a".repeat(64);
 const ADMIN_USER_ID = "3fe49d22-af58-47ac-aecb-9345a882ba0c";
+const OAUTH_TOKEN = "header.payload.signature";
+const OAUTH_CLIENT_ID = "codex-client";
+const RESOURCE = "https://pinpoint.test/api/mcp/mcp";
+const ISSUER = "https://project.supabase.co/auth/v1";
+
+const OAUTH_CONFIG = {
+  issuer: ISSUER,
+  resource: RESOURCE,
+  adminUserId: ADMIN_USER_ID,
+  dcrCanary: false,
+};
+
+const VERIFIED_OAUTH = {
+  algorithm: "ES256",
+  claims: {
+    iss: ISSUER,
+    aud: RESOURCE,
+    exp: 2_000_000_000,
+    sub: ADMIN_USER_ID,
+    client_id: OAUTH_CLIENT_ID,
+    scope: "openid email",
+  },
+};
 
 function deps(overrides: Partial<VerifyTokenDeps> = {}): VerifyTokenDeps {
   return {
     getConfig: vi
       .fn<() => McpBearerConfig | undefined>()
       .mockReturnValue({ bearerToken: TOKEN, adminUserId: ADMIN_USER_ID }),
+    getOAuthConfig: vi.fn().mockReturnValue(undefined),
+    verifyOAuthToken: vi.fn().mockResolvedValue(undefined),
+    findOAuthClient: vi.fn().mockResolvedValue(undefined),
     getUserAccessLevel: vi.fn().mockResolvedValue("admin"),
     ...overrides,
   };
@@ -64,6 +104,7 @@ describe("createVerifyToken", () => {
         userId: ADMIN_USER_ID,
         accessLevel: "admin",
         clientId: "claude-code-bearer",
+        authMode: "bearer",
       },
     });
   });
@@ -123,11 +164,114 @@ describe("createVerifyToken", () => {
       expect.any(String)
     );
   });
+
+  it("admits a registered ES256 OAuth client with the exact resource audience", async () => {
+    const verify = createVerifyToken(
+      deps({
+        getConfig: () => undefined,
+        getOAuthConfig: () => OAUTH_CONFIG,
+        verifyOAuthToken: vi.fn().mockResolvedValue(VERIFIED_OAUTH),
+        findOAuthClient: vi.fn().mockResolvedValue({
+          clientId: OAUTH_CLIENT_ID,
+          audience: RESOURCE,
+          enabled: true,
+        }),
+      })
+    );
+
+    const result = await verify(request, OAUTH_TOKEN);
+
+    expect(result).toEqual({
+      token: OAUTH_TOKEN,
+      clientId: OAUTH_CLIENT_ID,
+      scopes: ["openid", "email"],
+      expiresAt: 2_000_000_000,
+      extra: {
+        userId: ADMIN_USER_ID,
+        accessLevel: "admin",
+        clientId: OAUTH_CLIENT_ID,
+        authMode: "oauth",
+      },
+    });
+  });
+
+  it.each([
+    ["the wrong algorithm", { algorithm: "HS256" }],
+    [
+      "the wrong issuer",
+      {
+        claims: { ...VERIFIED_OAUTH.claims, iss: "https://other.test/auth/v1" },
+      },
+    ],
+    [
+      "another subject",
+      {
+        claims: {
+          ...VERIFIED_OAUTH.claims,
+          sub: "11111111-1111-4111-8111-111111111111",
+        },
+      },
+    ],
+    [
+      "the wrong audience",
+      { claims: { ...VERIFIED_OAUTH.claims, aud: "authenticated" } },
+    ],
+  ])("rejects an OAuth token with %s", async (_label, override) => {
+    const verify = createVerifyToken(
+      deps({
+        getConfig: () => undefined,
+        getOAuthConfig: () => OAUTH_CONFIG,
+        verifyOAuthToken: vi
+          .fn()
+          .mockResolvedValue({ ...VERIFIED_OAUTH, ...override }),
+        findOAuthClient: vi.fn().mockResolvedValue({
+          clientId: OAUTH_CLIENT_ID,
+          audience: RESOURCE,
+          enabled: true,
+        }),
+      })
+    );
+
+    expect(await verify(request, OAUTH_TOKEN)).toBeUndefined();
+  });
+
+  it("rejects an unregistered OAuth client outside the DCR canary", async () => {
+    const verify = createVerifyToken(
+      deps({
+        getConfig: () => undefined,
+        getOAuthConfig: () => OAUTH_CONFIG,
+        verifyOAuthToken: vi.fn().mockResolvedValue(VERIFIED_OAUTH),
+      })
+    );
+
+    expect(await verify(request, OAUTH_TOKEN)).toBeUndefined();
+  });
+
+  it("accepts Tim's unregistered default-audience token only during the DCR canary", async () => {
+    const verify = createVerifyToken(
+      deps({
+        getConfig: () => undefined,
+        getOAuthConfig: () => ({ ...OAUTH_CONFIG, dcrCanary: true }),
+        verifyOAuthToken: vi.fn().mockResolvedValue({
+          ...VERIFIED_OAUTH,
+          claims: { ...VERIFIED_OAUTH.claims, aud: "authenticated" },
+        }),
+      })
+    );
+
+    expect((await verify(request, OAUTH_TOKEN))?.extra).toMatchObject({
+      authMode: "oauth",
+      clientId: OAUTH_CLIENT_ID,
+    });
+  });
 });
 
 describe("verifyToken (default env-backed config)", () => {
   beforeEach(() => {
     setEnv({ MCP_BEARER_TOKEN: TOKEN, MCP_ADMIN_USER_ID: ADMIN_USER_ID });
+    getMcpOAuthConfigMock.mockReturnValue(undefined);
+    verifySupabaseOAuthTokenMock.mockResolvedValue(undefined);
+    findMcpOAuthClientMock.mockResolvedValue(undefined);
   });
 
   it("admits the configured token and acts as the configured admin", async () => {
@@ -140,6 +284,7 @@ describe("verifyToken (default env-backed config)", () => {
       userId: ADMIN_USER_ID,
       accessLevel: "admin",
       clientId: "claude-code-bearer",
+      authMode: "bearer",
     });
   });
 
@@ -151,7 +296,7 @@ describe("verifyToken (default env-backed config)", () => {
     expect(result).toBeUndefined();
     expect(getUserAccessLevelMock).not.toHaveBeenCalled();
     expect(warnMock).toHaveBeenCalledWith(
-      expect.objectContaining({ reason: "not_configured" }),
+      expect.objectContaining({ reason: "oauth_not_configured" }),
       expect.any(String)
     );
   });
@@ -209,6 +354,7 @@ describe("requireMcpAuthContext", () => {
         userId: "u",
         accessLevel: "admin",
         clientId: "claude-code-bearer",
+        authMode: "bearer",
       },
     });
 
@@ -216,6 +362,7 @@ describe("requireMcpAuthContext", () => {
       userId: "u",
       accessLevel: "admin",
       clientId: "claude-code-bearer",
+      authMode: "bearer",
     });
   });
 

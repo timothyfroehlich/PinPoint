@@ -505,6 +505,13 @@
       "when": 1788220985115,
       "tag": "0071_add-pinballmap-abandonment-location",
       "breakpoints": true
+    },
+    {
+      "idx": 72,
+      "version": "7",
+      "when": 1788925785734,
+      "tag": "0072_powerful_nehzno",
+      "breakpoints": true
     }
   ]
 }

@@ -12,6 +12,7 @@ import {
   resolveMachine,
   runTool,
   type ToolOutcome,
+  WRITE_TOOL_ANNOTATIONS,
 } from "./shared";
 import type { McpAuthContext } from "~/lib/mcp/verify-token";
 
@@ -85,8 +86,16 @@ export function registerSetMachineName(server: McpServer): void {
       description:
         "Change a machine's display name. Identify the machine by initials or UUID. Initials cannot be changed by this tool. No-op if the name already matches.",
       inputSchema: setNameSchema,
+      annotations: WRITE_TOOL_ANNOTATIONS,
     },
     (args, extra) =>
-      runTool("set_machine_name", extra, (ctx) => runSetMachineName(args, ctx))
+      runTool(
+        "set_machine_name",
+        extra,
+        (ctx) => runSetMachineName(args, ctx),
+        {
+          mutates: true,
+        }
+      )
   );
 }

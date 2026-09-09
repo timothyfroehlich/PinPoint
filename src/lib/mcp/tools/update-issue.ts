@@ -29,6 +29,7 @@ import {
   resolveIssue,
   runTool,
   type ToolOutcome,
+  WRITE_TOOL_ANNOTATIONS,
 } from "./shared";
 import type { McpAuthContext } from "~/lib/mcp/verify-token";
 
@@ -345,8 +346,11 @@ export function registerUpdateIssue(server: McpServer): void {
       description:
         "Change one or more fields on an issue: title, status, severity, frequency, priority, or assignee. Identify the issue by machine (initials or UUID) plus the issue number shown in its URL. Supply only the fields you want to change; at least one is required. The response returns 'applied' — one entry per field with 'from', 'to', and 'changed', where changed:false means the issue already held that value and nothing was written. Fields are applied one at a time and are NOT a single transaction: if one fails, the fields before it stay written and the response comes back with 'partial': true plus 'failed' naming the field that stopped it. Read 'applied' rather than assuming the whole call landed.",
       inputSchema: updateIssueSchema,
+      annotations: WRITE_TOOL_ANNOTATIONS,
     },
     (args, extra) =>
-      runTool("update_issue", extra, (ctx) => runUpdateIssue(args, ctx))
+      runTool("update_issue", extra, (ctx) => runUpdateIssue(args, ctx), {
+        mutates: true,
+      })
   );
 }

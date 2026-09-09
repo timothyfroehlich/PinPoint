@@ -1,9 +1,14 @@
 import { createMcpHandler, withMcpAuth } from "mcp-handler";
 
-import { logMcpToolCall } from "~/lib/mcp/audit";
-import { MCP_ENDPOINT_PATH } from "~/lib/mcp/config";
+import {
+  getMcpResourceUrl,
+  MCP_ENDPOINT_PATH,
+  MCP_RESOURCE_METADATA_PATH,
+} from "~/lib/mcp/config";
 import { registerPinpointTools } from "~/lib/mcp/tools";
+import { READ_ONLY_TOOL_ANNOTATIONS, runTool } from "~/lib/mcp/tools/shared";
 import { requireMcpAuthContext, verifyToken } from "~/lib/mcp/verify-token";
+import { checkMcpRequestLimit } from "~/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -11,7 +16,7 @@ export const maxDuration = 60;
 /**
  * PinPoint MCP server — remote admin surface. Original spec:
  * docs/superpowers/specs/2026-07-18-mcp-remote-admin.md, whose OAuth 2.1 auth
- * design was superseded by static bearer tokens in PP-u4ab.7 — see
+ * design was temporarily superseded by static bearer tokens in PP-u4ab.7 — see
  * docs/plans/2026-07-22-mcp-bearer-token-pivot-handoff.md. Streamable HTTP only;
  * every request is admin-gated by {@link verifyToken} via `withMcpAuth`, and
  * each tool additionally runs `checkPermission()` underneath (defense in depth).
@@ -28,47 +33,54 @@ const handler = createMcpHandler(
       {
         title: "Who am I",
         description:
-          "Return the PinPoint identity and access level resolved from the bearer token. Use this to confirm the connection is authenticated and authorized.",
+          "Return the PinPoint identity, access level, client id, and auth mode resolved from the credential. Use this to confirm the connection is authenticated and authorized.",
+        annotations: READ_ONLY_TOOL_ANNOTATIONS,
       },
-      (ctx) => {
-        const auth = requireMcpAuthContext(ctx.http?.authInfo);
-        logMcpToolCall({
-          tool: "whoami",
-          userId: auth.userId,
-          clientId: auth.clientId,
-          outcome: "ok",
-        });
-        return {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify({
-                userId: auth.userId,
-                accessLevel: auth.accessLevel,
-              }),
+      (ctx) =>
+        runTool("whoami", ctx, (auth) =>
+          Promise.resolve({
+            result: {
+              userId: auth.userId,
+              accessLevel: auth.accessLevel,
+              clientId: auth.clientId,
+              authMode: auth.authMode,
             },
-          ],
-        };
-      }
+          })
+        )
     );
 
     registerPinpointTools(server);
   },
-  { serverInfo: { name: "pinpoint", version: "1.0.0" } }
+  {
+    serverInfo: { name: "pinpoint", version: "1.1.0" },
+    instructions:
+      "PinPoint is the Austin Pinball Collective issue tracker. Read tools may be used to answer questions. Mutation tools change production records: inspect the target with a read tool first, describe the intended change, and obtain explicit user confirmation before calling one. Use machine initials and issue numbers returned by the read tools; never guess Pinball Map ids.",
+  }
 );
 
-// Static-bearer auth (PP-u4ab.7). `withMcpAuth` does the useful part — pull the
-// `Authorization: Bearer …` header, run `verifyToken`, and 401 when it returns
-// undefined.
-//
-// We no longer pass `resourceMetadataPath`, but mcp-handler still falls back to
-// its own default and stamps `resource_metadata="<origin>/.well-known/
-// oauth-protected-resource"` into every 401 `WWW-Authenticate` header. That path
-// 404s now (the RFC 9728 route was deleted with the OAuth flow), which is the
-// honest answer — there is no authorization server to discover. Harmless for a
-// bearer client, which is handed its credential out of band and never walks the
-// discovery chain.
-const authHandler = withMcpAuth(handler, verifyToken, { required: true });
+const resourceUrl = getMcpResourceUrl();
+
+async function rateLimitedHandler(request: Request): Promise<Response> {
+  const auth = requireMcpAuthContext(request.auth);
+  const result = await checkMcpRequestLimit(`${auth.userId}:${auth.clientId}`);
+  if (!result.success) {
+    const retryAfterSeconds = Math.max(
+      1,
+      Math.ceil((result.reset - Date.now()) / 1000)
+    );
+    return new Response("MCP request limit reached", {
+      status: 429,
+      headers: { "Retry-After": String(retryAfterSeconds) },
+    });
+  }
+  return handler(request);
+}
+
+const authHandler = withMcpAuth(rateLimitedHandler, verifyToken, {
+  required: true,
+  resourceMetadataPath: MCP_RESOURCE_METADATA_PATH,
+  resourceUrl: new URL(resourceUrl).origin,
+});
 
 /**
  * Keep the v1 transport boundary explicit. mcp-handler 2.x serves every

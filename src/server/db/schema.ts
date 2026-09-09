@@ -43,6 +43,27 @@ export const authUsers = authSchema.table("users", {
 });
 
 /**
+ * OAuth clients allowed to use PinPoint's write-capable MCP resource.
+ *
+ * Supabase owns OAuth client registration in auth.oauth_clients. This smaller
+ * application-owned allowlist binds an approved client id to the exact RFC 9728
+ * resource audience PinPoint accepts. The custom access-token hook consults it
+ * when issuing OAuth tokens; the MCP verifier checks it again on every request.
+ */
+export const mcpOauthClients = pgTable("mcp_oauth_clients", {
+  clientId: text("client_id").primaryKey(),
+  name: text("name").notNull(),
+  audience: text("audience").notNull(),
+  enabled: boolean("enabled").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+/**
  * User Profiles Table
  *
  * The id column references auth.users(id) from Supabase Auth (enforced by database FK).

@@ -6,125 +6,68 @@ import type { AuthInfo } from "@modelcontextprotocol/server";
 import { z } from "zod";
 
 import { log } from "~/lib/logger";
+import {
+  findMcpOAuthClient,
+  getMcpOAuthConfig,
+  verifySupabaseOAuthToken,
+  type McpOAuthClient,
+  type McpOAuthConfig,
+  type VerifiedOAuthToken,
+} from "~/lib/mcp/oauth";
 import { getUserAccessLevel } from "~/lib/permissions/access";
 import { ACCESS_LEVELS, type AccessLevel } from "~/lib/permissions/matrix";
 
-/**
- * The minimum access level the bearer-mapped user must hold to reach ANY MCP
- * tool.
- *
- * Re-checked on every request rather than baked into the token: if the mapped
- * user's role is ever demoted, the token stops working immediately. Per-tool
- * `checkPermission()` still runs underneath each tool as defense in depth — the
- * admin gate is not a substitute for it.
- */
 const REQUIRED_ACCESS_LEVEL: AccessLevel = "admin";
-
-/**
- * Minimum accepted length for `MCP_BEARER_TOKEN`. `openssl rand -hex 32` (the
- * documented way to generate it) yields 64 chars; this rejects a hand-typed
- * weak secret at startup-of-request rather than letting it quietly guard a
- * write-capable production surface.
- */
 const MIN_BEARER_TOKEN_LENGTH = 32;
-
-/**
- * Synthetic `client_id` recorded for every bearer-authenticated call. There is
- * no OAuth client registration behind a static token, but the audit trail
- * (`logMcpToolCall`) and {@link McpAuthContext} both want a stable identifier
- * for how the caller got in.
- */
 const BEARER_CLIENT_ID = "claude-code-bearer";
+const REQUIRED_OAUTH_ALGORITHM = "ES256";
+const SUPABASE_DEFAULT_AUDIENCE = "authenticated";
 
 const adminUserIdSchema = z.string().uuid();
 
-/**
- * Resolved identity attached to every authorized MCP request, carried in
- * `AuthInfo.extra` and read back by tool handlers via
- * {@link requireMcpAuthContext}.
- *
- * Built inline (via `satisfies`) when populating `AuthInfo.extra` so the value
- * keeps its literal type and stays assignable to `Record<string, unknown>`.
- */
 export interface McpAuthContext {
   userId: string;
   accessLevel: AccessLevel;
-  /** How the caller authenticated. Always {@link BEARER_CLIENT_ID} today. */
   clientId: string;
+  authMode: "bearer" | "oauth";
 }
 
-/**
- * The two env vars that configure bearer auth, resolved together so a partial
- * configuration fails closed instead of half-working.
- */
 export interface McpBearerConfig {
-  /** Shared secret the client must present as `Authorization: Bearer …`. */
   bearerToken: string;
-  /** Supabase user UUID that every MCP tool call acts as. */
   adminUserId: string;
 }
 
 export interface VerifyTokenDeps {
-  /**
-   * Read the bearer configuration. Returns `undefined` when either var is
-   * missing or malformed — the caller then rejects the request (fail closed).
-   * Injectable so unit tests stay hermetic and don't mutate `process.env`.
-   */
   getConfig: () => McpBearerConfig | undefined;
+  getOAuthConfig: () => McpOAuthConfig | undefined;
+  verifyOAuthToken: (token: string) => Promise<VerifiedOAuthToken | undefined>;
+  findOAuthClient: (clientId: string) => Promise<McpOAuthClient | undefined>;
   getUserAccessLevel: (userId: string) => Promise<AccessLevel>;
 }
 
-/**
- * Default configuration source: `MCP_BEARER_TOKEN` + `MCP_ADMIN_USER_ID` from
- * the environment (CORE-SEC-009 — both registered in the `next.config.ts` build
- * registry, neither reused as another var's fallback, neither `NEXT_PUBLIC_`).
- *
- * Every rejection here is a deployment misconfiguration, so it warns loudly
- * rather than failing silently — the resulting 401 would otherwise be
- * indistinguishable from a wrong token.
- */
+function reject(reason: string, detail: Record<string, unknown> = {}): void {
+  log.warn(
+    { scope: "mcp.auth", outcome: "rejected", reason, ...detail },
+    "mcp.auth rejected"
+  );
+}
+
+/** OAuth remains usable when the legacy Claude bearer token is absent. */
 function readConfigFromEnv(): McpBearerConfig | undefined {
   const bearerToken = process.env["MCP_BEARER_TOKEN"];
   const adminUserId = process.env["MCP_ADMIN_USER_ID"];
 
-  if (!bearerToken || !adminUserId) {
-    log.warn(
-      {
-        scope: "mcp.auth",
-        outcome: "rejected",
-        reason: "not_configured",
-        hasBearerToken: Boolean(bearerToken),
-        hasAdminUserId: Boolean(adminUserId),
-      },
-      "mcp.auth rejected"
-    );
+  if (!bearerToken) return undefined;
+  if (!adminUserId) {
+    reject("bearer_admin_user_id_missing");
     return undefined;
   }
-
   if (bearerToken.length < MIN_BEARER_TOKEN_LENGTH) {
-    log.warn(
-      {
-        scope: "mcp.auth",
-        outcome: "rejected",
-        reason: "bearer_token_too_short",
-        minLength: MIN_BEARER_TOKEN_LENGTH,
-      },
-      "mcp.auth rejected"
-    );
+    reject("bearer_token_too_short", { minLength: MIN_BEARER_TOKEN_LENGTH });
     return undefined;
   }
-
-  // The mapped id goes into a `uuid` column lookup; a malformed value would
-  // surface as a Postgres cast error (500) instead of a clean 401.
   if (!adminUserIdSchema.safeParse(adminUserId).success) {
-    log.warn(
-      {
-        scope: "mcp.auth",
-        outcome: "rejected",
-        reason: "admin_user_id_not_uuid",
-      },
-      "mcp.auth rejected"
-    );
+    reject("admin_user_id_not_uuid");
     return undefined;
   }
 
@@ -133,100 +76,158 @@ function readConfigFromEnv(): McpBearerConfig | undefined {
 
 const defaultDeps: VerifyTokenDeps = {
   getConfig: readConfigFromEnv,
+  getOAuthConfig: getMcpOAuthConfig,
+  verifyOAuthToken: verifySupabaseOAuthToken,
+  findOAuthClient: findMcpOAuthClient,
   getUserAccessLevel,
 };
 
-/**
- * Compare two secrets without leaking their contents through timing.
- *
- * Hashing first is what makes this safe: `timingSafeEqual` throws on
- * mismatched buffer lengths, so comparing the raw strings would both crash and
- * leak the secret's length. Fixed-width SHA-256 digests sidestep the
- * length-based early return entirely.
- */
 function secretsMatch(presented: string, expected: string): boolean {
   const digest = (value: string): Buffer =>
     createHash("sha256").update(value, "utf8").digest();
   return timingSafeEqual(digest(presented), digest(expected));
 }
 
+function audienceIncludes(
+  audience: string | string[],
+  expected: string
+): boolean {
+  return Array.isArray(audience)
+    ? audience.includes(expected)
+    : audience === expected;
+}
+
+async function requireLiveAdmin(
+  deps: VerifyTokenDeps,
+  userId: string,
+  clientId: string
+): Promise<AccessLevel | undefined> {
+  const accessLevel = await deps.getUserAccessLevel(userId);
+  if (accessLevel !== REQUIRED_ACCESS_LEVEL) {
+    reject("not_admin", { userId, clientId, accessLevel });
+    return undefined;
+  }
+  return accessLevel;
+}
+
+function authInfo(
+  token: string,
+  context: McpAuthContext,
+  scopes: string[] = [],
+  expiresAt?: number
+): AuthInfo {
+  const base = {
+    token,
+    clientId: context.clientId,
+    scopes,
+    extra: { ...context } satisfies McpAuthContext,
+  };
+  return expiresAt === undefined ? base : { ...base, expiresAt };
+}
+
 /**
- * Build the `verifyToken` callback for `withMcpAuth`.
+ * Build the dual-mode verifier used by `withMcpAuth`.
  *
- * Flow: extract bearer → constant-time compare against `MCP_BEARER_TOKEN` →
- * resolve `MCP_ADMIN_USER_ID`'s access level → require
- * {@link REQUIRED_ACCESS_LEVEL} → hand back an {@link AuthInfo} whose `extra`
- * carries the {@link McpAuthContext}. Any failure (missing token, wrong token,
- * unconfigured server, non-admin mapped user) returns `undefined`, which
- * `withMcpAuth` turns into a 401.
- *
- * Security posture: a static bearer token is a long-lived admin secret, chosen
- * deliberately for this private single-user server (see
- * `docs/plans/2026-07-22-mcp-bearer-token-pivot-handoff.md`). It is
- * server-only, HTTPS-only, hashed before comparison, fails closed when unset,
- * and re-checks the mapped user's role on every call. Rotate by changing the
- * env var.
+ * The static bearer path remains solely for the existing Claude connection.
+ * OAuth requires a Supabase-verified ES256 signature, exact issuer/resource,
+ * Tim's subject UUID, an enabled client registration, and a live admin role.
+ * The explicit DCR canary temporarily accepts Supabase's default audience and
+ * an unregistered client for Tim so Codex's generated client id can be pinned.
  */
 export function createVerifyToken(deps: VerifyTokenDeps = defaultDeps) {
   return async function verifyToken(
     _request: Request,
     bearerToken?: string
   ): Promise<AuthInfo | undefined> {
-    if (!bearerToken) {
-      return undefined;
-    }
+    if (!bearerToken) return undefined;
 
-    const config = deps.getConfig();
-    if (!config) {
-      return undefined;
-    }
-
-    if (!secretsMatch(bearerToken, config.bearerToken)) {
-      log.warn(
-        {
-          scope: "mcp.auth",
-          outcome: "rejected",
-          reason: "bad_token",
-        },
-        "mcp.auth rejected"
+    const bearerConfig = deps.getConfig();
+    if (bearerConfig && secretsMatch(bearerToken, bearerConfig.bearerToken)) {
+      const accessLevel = await requireLiveAdmin(
+        deps,
+        bearerConfig.adminUserId,
+        BEARER_CLIENT_ID
       );
+      return accessLevel
+        ? authInfo(bearerToken, {
+            userId: bearerConfig.adminUserId,
+            accessLevel,
+            clientId: BEARER_CLIENT_ID,
+            authMode: "bearer",
+          })
+        : undefined;
+    }
+
+    const oauthConfig = deps.getOAuthConfig();
+    if (
+      !oauthConfig ||
+      !adminUserIdSchema.safeParse(oauthConfig.adminUserId).success
+    ) {
+      reject("oauth_not_configured");
       return undefined;
     }
 
-    const { adminUserId } = config;
-    const accessLevel = await deps.getUserAccessLevel(adminUserId);
-    if (accessLevel !== REQUIRED_ACCESS_LEVEL) {
-      // The token is right but the user it maps to is no longer an admin (or
-      // never was). This is a write-capable production surface — a denied admin
-      // gate is audit-worthy.
-      log.warn(
-        {
-          scope: "mcp.auth",
-          outcome: "rejected",
-          reason: "not_admin",
-          userId: adminUserId,
-          clientId: BEARER_CLIENT_ID,
-          accessLevel,
-        },
-        "mcp.auth rejected"
-      );
+    const verified = await deps.verifyOAuthToken(bearerToken);
+    if (!verified) {
+      reject("invalid_token");
       return undefined;
     }
 
-    return {
-      token: bearerToken,
-      clientId: BEARER_CLIENT_ID,
-      scopes: [],
-      extra: {
-        userId: adminUserId,
+    const { claims, algorithm } = verified;
+    if (algorithm !== REQUIRED_OAUTH_ALGORITHM) {
+      reject("oauth_algorithm", { algorithm });
+      return undefined;
+    }
+    if (claims.iss !== oauthConfig.issuer) {
+      reject("oauth_issuer");
+      return undefined;
+    }
+    if (claims.sub !== oauthConfig.adminUserId) {
+      reject("oauth_subject", { clientId: claims.client_id });
+      return undefined;
+    }
+
+    if (oauthConfig.dcrCanary) {
+      if (
+        !audienceIncludes(claims.aud, oauthConfig.resource) &&
+        !audienceIncludes(claims.aud, SUPABASE_DEFAULT_AUDIENCE)
+      ) {
+        reject("oauth_audience", { clientId: claims.client_id });
+        return undefined;
+      }
+    } else {
+      const client = await deps.findOAuthClient(claims.client_id);
+      if (
+        !client?.enabled ||
+        client.audience !== oauthConfig.resource ||
+        !audienceIncludes(claims.aud, oauthConfig.resource)
+      ) {
+        reject("oauth_client_or_audience", { clientId: claims.client_id });
+        return undefined;
+      }
+    }
+
+    const accessLevel = await requireLiveAdmin(
+      deps,
+      claims.sub,
+      claims.client_id
+    );
+    if (!accessLevel) return undefined;
+
+    return authInfo(
+      bearerToken,
+      {
+        userId: claims.sub,
         accessLevel,
-        clientId: BEARER_CLIENT_ID,
-      } satisfies McpAuthContext,
-    };
+        clientId: claims.client_id,
+        authMode: "oauth",
+      },
+      claims.scope?.split(/\s+/).filter(Boolean) ?? [],
+      claims.exp
+    );
   };
 }
 
-/** The production `verifyToken` used by the route handler. */
 export const verifyToken = createVerifyToken();
 
 function isAccessLevel(value: unknown): value is AccessLevel {
@@ -236,19 +237,15 @@ function isAccessLevel(value: unknown): value is AccessLevel {
   );
 }
 
-/**
- * Read the {@link McpAuthContext} back out of a tool handler's `authInfo`.
- * Throws if it is missing or malformed — that would mean the tool was reached
- * without `withMcpAuth` in front of it, which is a wiring bug, not a user error.
- */
 export function requireMcpAuthContext(
-  authInfo: AuthInfo | undefined
+  authInfoValue: AuthInfo | undefined
 ): McpAuthContext {
-  const extra = authInfo?.extra;
+  const extra = authInfoValue?.extra;
   if (
     !extra ||
     typeof extra["userId"] !== "string" ||
     typeof extra["clientId"] !== "string" ||
+    (extra["authMode"] !== "bearer" && extra["authMode"] !== "oauth") ||
     !isAccessLevel(extra["accessLevel"])
   ) {
     throw new Error(
@@ -259,5 +256,6 @@ export function requireMcpAuthContext(
     userId: extra["userId"],
     accessLevel: extra["accessLevel"],
     clientId: extra["clientId"],
+    authMode: extra["authMode"],
   };
 }

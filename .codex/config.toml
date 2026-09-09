@@ -13,3 +13,30 @@ enabled_tools = ["watch_pr_lifecycle"]
 GH_MONITOR_HARNESS = "codex"
 GH_MONITOR_MODEL = "gpt-5.3-codex-spark"
 GH_MONITOR_WAKES = "1"
+
+[mcp_servers.pinpoint]
+url = "https://pinpoint.austinpinballcollective.org/api/mcp/mcp"
+required = false
+default_tools_approval_mode = "prompt"
+startup_timeout_sec = 30
+tool_timeout_sec = 60
+
+# Read-only tools are safe to call without interrupting the task. Every other
+# tool inherits the server-level prompt requirement.
+[mcp_servers.pinpoint.tools.whoami]
+approval_mode = "auto"
+
+[mcp_servers.pinpoint.tools.list_machines]
+approval_mode = "auto"
+
+[mcp_servers.pinpoint.tools.get_machine]
+approval_mode = "auto"
+
+[mcp_servers.pinpoint.tools.list_issues]
+approval_mode = "auto"
+
+[mcp_servers.pinpoint.tools.get_issue]
+approval_mode = "auto"
+
+[mcp_servers.pinpoint.tools.search_pinballmap_catalog]
+approval_mode = "auto"

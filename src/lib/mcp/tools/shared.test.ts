@@ -13,6 +13,10 @@
 import type { AuthInfo, ServerContext } from "@modelcontextprotocol/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+const { writeLimitMock } = vi.hoisted(() => ({
+  writeLimitMock: vi.fn(),
+}));
+
 import { logMcpToolCall } from "~/lib/mcp/audit";
 import { reportError } from "~/lib/observability/report-error";
 
@@ -20,6 +24,10 @@ import { McpToolError, runTool } from "./shared";
 
 vi.mock("~/lib/mcp/audit", () => ({ logMcpToolCall: vi.fn() }));
 vi.mock("~/lib/observability/report-error", () => ({ reportError: vi.fn() }));
+vi.mock("~/lib/rate-limit", () => ({
+  checkMcpWriteLimit: writeLimitMock,
+  formatResetTime: vi.fn(() => "30 seconds"),
+}));
 
 const AUTH = {
   token: "test-token",
@@ -29,6 +37,7 @@ const AUTH = {
     userId: "11111111-1111-4111-8111-111111111111",
     clientId: "claude-code-bearer",
     accessLevel: "admin",
+    authMode: "bearer",
   },
 } satisfies AuthInfo;
 
@@ -38,6 +47,12 @@ const audited = vi.mocked(logMcpToolCall);
 
 beforeEach(() => {
   vi.clearAllMocks();
+  writeLimitMock.mockResolvedValue({
+    success: true,
+    limit: 20,
+    remaining: 19,
+    reset: 0,
+  });
 });
 
 describe("runTool audit outcome", () => {
@@ -96,5 +111,37 @@ describe("runTool audit outcome", () => {
       expect.objectContaining({ outcome: "error", reason: "exception" })
     );
     expect(JSON.stringify(response)).not.toContain("relation");
+  });
+
+  it("checks the write budget only for mutating tools", async () => {
+    await runTool(
+      "demo_write",
+      CTX,
+      () => Promise.resolve({ result: { fine: true } }),
+      { mutates: true }
+    );
+
+    expect(writeLimitMock).toHaveBeenCalledWith(
+      "11111111-1111-4111-8111-111111111111:claude-code-bearer"
+    );
+  });
+
+  it("returns a clean audited error when the write budget is exhausted", async () => {
+    writeLimitMock.mockResolvedValue({
+      success: false,
+      limit: 20,
+      remaining: 0,
+      reset: Date.now() + 30_000,
+    });
+    const run = vi.fn();
+
+    const response = await runTool("demo", CTX, run, { mutates: true });
+
+    expect(run).not.toHaveBeenCalled();
+    expect(response).toMatchObject({ isError: true });
+    expect(JSON.stringify(response)).toContain("30 seconds");
+    expect(audited).toHaveBeenCalledWith(
+      expect.objectContaining({ outcome: "error", reason: "rate_limited" })
+    );
   });
 });

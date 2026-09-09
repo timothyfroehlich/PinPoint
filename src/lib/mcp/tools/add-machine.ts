@@ -18,10 +18,11 @@ import {
   resolveOwner,
   runTool,
   type ToolOutcome,
+  WRITE_TOOL_ANNOTATIONS,
 } from "./shared";
 import type { McpAuthContext } from "~/lib/mcp/verify-token";
 
-const addMachineSchema = z.object({
+export const addMachineSchema = z.object({
   name: z
     .string()
     .trim()
@@ -58,8 +59,9 @@ const addMachineSchema = z.object({
   pinballmapExcludedReason: z
     .string()
     .trim()
+    .max(200, "Exclusion reason must be 200 characters or fewer")
     .optional()
-    .describe("Reason the machine is excluded from Pinball Map."),
+    .describe("Reason the machine is excluded from Pinball Map (max 200)."),
 });
 
 type AddMachineArgs = z.infer<typeof addMachineSchema>;
@@ -154,8 +156,11 @@ export function registerAddMachine(server: McpServer): void {
       description:
         "Create a machine: name and unique initials, optional owner (member name or UUID), optional initial availability, and optional Pinball Map linking (a catalog id, or mark it excluded with a reason). Returns the new machine and its URL.",
       inputSchema: addMachineSchema,
+      annotations: WRITE_TOOL_ANNOTATIONS,
     },
     (args, extra) =>
-      runTool("add_machine", extra, (ctx) => runAddMachine(args, ctx))
+      runTool("add_machine", extra, (ctx) => runAddMachine(args, ctx), {
+        mutates: true,
+      })
   );
 }

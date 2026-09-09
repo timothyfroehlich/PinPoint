@@ -17,6 +17,7 @@ import {
   retryWindowPart,
   runTool,
   type ToolOutcome,
+  WRITE_TOOL_ANNOTATIONS,
 } from "./shared";
 import type { McpAuthContext } from "~/lib/mcp/verify-token";
 
@@ -109,10 +110,14 @@ export function registerAddIssueComment(server: McpServer): void {
       description:
         "Post a comment on an issue, attributed to the authenticated user. Identify the issue by machine (initials or UUID) plus the issue number shown in its URL and returned by list_issues, get_machine, and create_issue. Plain text only — markdown is not rendered. Retrying an identical comment shortly after one usually resolves to the comment already posted instead of a duplicate — check 'created' in the response: false means nothing new was written, so report it as already posted rather than as a new comment.",
       inputSchema: addIssueCommentSchema,
+      annotations: WRITE_TOOL_ANNOTATIONS,
     },
     (args, extra) =>
-      runTool("add_issue_comment", extra, (ctx) =>
-        runAddIssueComment(args, ctx)
+      runTool(
+        "add_issue_comment",
+        extra,
+        (ctx) => runAddIssueComment(args, ctx),
+        { mutates: true }
       )
   );
 }
