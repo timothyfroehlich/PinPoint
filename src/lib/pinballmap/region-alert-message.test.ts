@@ -12,7 +12,6 @@ function entry(overrides: Partial<RegionAlertEntry> = {}): RegionAlertEntry {
     locationId: 26454,
     locationName: "Austin Pinball Collective",
     machineName: "Godzilla (Premium)",
-    pinballmapMachineId: 6412,
     ...overrides,
   };
 }
@@ -87,17 +86,6 @@ describe("formatRegionAlertMessage", () => {
     );
   });
 
-  it("keeps the id fallback in the label position so every line reads alike", () => {
-    const message = formatRegionAlertMessage({
-      entries: [entry({ locationName: null, locationId: 1234 })],
-      regionLabel: "Austin",
-    });
-
-    expect(message).toContain(
-      "[location #1234](https://pinballmap.com/map/?by_location_id=1234)"
-    );
-  });
-
   it("combines additions and removals in one digest", () => {
     const message = formatRegionAlertMessage({
       entries: [
@@ -106,7 +94,6 @@ describe("formatRegionAlertMessage", () => {
           eventType: "removed",
           locationId: 999,
           machineName: "Medieval Madness",
-          pinballmapMachineId: 1,
         }),
       ],
       regionLabel: "Austin",
@@ -114,17 +101,6 @@ describe("formatRegionAlertMessage", () => {
     expect(message).toContain("**Pinball Map changes in Austin**");
     expect(message).toContain("• Added: Godzilla (Premium)");
     expect(message).toContain("• Removed: Medieval Madness");
-  });
-
-  it("falls back to ids when PBM gave us no names", () => {
-    const message = formatRegionAlertMessage({
-      entries: [
-        entry({ locationName: null, machineName: null, locationId: 1234 }),
-      ],
-      regionLabel: "Austin",
-    });
-    expect(message).toContain("PinballMap machine #6412");
-    expect(message).toContain("location #1234");
   });
 
   it("lists at most the line cap and collapses the rest into a count", () => {
@@ -174,6 +150,24 @@ describe("formatRegionAlertMessage", () => {
 
     expect(message).not.toBeNull();
     expect((message ?? "").length).toBeLessThanOrEqual(2000);
+  });
+
+  it("compacts pathological names without replacing them with ids", () => {
+    const message = formatRegionAlertMessage({
+      entries: [
+        entry({
+          machineName: `Machine ${"M".repeat(2000)}`,
+          locationName: `Venue ${"L".repeat(2000)}`,
+        }),
+      ],
+      regionLabel: "Austin",
+    });
+
+    expect((message ?? "").length).toBeLessThanOrEqual(2000);
+    expect(message).toContain("Machine M");
+    expect(message).toContain("Venue L");
+    expect(message).not.toContain("PinballMap machine #");
+    expect(message).not.toContain("[location #");
   });
 
   it("keeps the CC BY-SA attribution when the message has to be trimmed", () => {

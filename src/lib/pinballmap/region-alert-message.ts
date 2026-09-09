@@ -29,9 +29,8 @@ export const REGION_ALERT_MAX_LINES = 10;
 export interface RegionAlertEntry {
   eventType: "added" | "removed";
   locationId: number;
-  locationName: string | null;
-  machineName: string | null;
-  pinballmapMachineId: number;
+  locationName: string;
+  machineName: string;
 }
 
 export interface RegionAlertMessageInput {
@@ -69,18 +68,12 @@ export interface FormattedRegionAlertMessage {
  * without it, and never "simplify" by dropping the sanitize call because the value
  * looks like a plain name.
  *
- * The id fallbacks (`location #123`) are our own literals, and they take the label
- * position too so every line reads the same whether or not a name resolved.
+ * Both names are required at the type boundary because Discord posts are immutable;
+ * unresolved events remain queued until the catalog and location cache can name them.
  */
 function formatEntry(entry: RegionAlertEntry): string {
-  const machine =
-    entry.machineName === null
-      ? `PinballMap machine #${String(entry.pinballmapMachineId)}`
-      : sanitizeDiscordText(entry.machineName);
-  const venue =
-    entry.locationName === null
-      ? `location #${String(entry.locationId)}`
-      : sanitizeDiscordText(entry.locationName);
+  const machine = sanitizeDiscordText(entry.machineName);
+  const venue = sanitizeDiscordText(entry.locationName);
   const action = entry.eventType === "added" ? "Added" : "Removed";
   return `• ${action}: ${machine} — [${venue}](${pinballmapLocationUrl(entry.locationId)})`;
 }
@@ -145,16 +138,16 @@ export function formatRegionAlertMessage(
     if (line === undefined) break;
     if (used + line.length + 1 > budget) {
       // A pathological third-party label must not strand the first queued event
-      // forever. Its id-only form is short and still carries the specific PBM
-      // location link; later entries remain pending for the next digest.
+      // forever. Bound both names before sanitizing rather than falling back to
+      // ids; the immutable post must still identify the machine and venue.
       if (kept.length === 0) {
         const compactEntry = entries[i];
         if (compactEntry !== undefined) {
           kept.push(
             formatEntry({
               ...compactEntry,
-              locationName: null,
-              machineName: null,
+              locationName: truncateName(compactEntry.locationName),
+              machineName: truncateName(compactEntry.machineName),
             })
           );
         }
@@ -173,4 +166,11 @@ export function formatRegionAlertMessage(
     content: [headline, ...kept, attribution].join("\n"),
     renderedEntries,
   };
+}
+
+/** Bound untrusted labels without splitting a Unicode code point. */
+function truncateName(name: string, maxCodePoints = 80): string {
+  const codePoints = [...name];
+  if (codePoints.length <= maxCodePoints) return name;
+  return `${codePoints.slice(0, maxCodePoints - 1).join("")}…`;
 }

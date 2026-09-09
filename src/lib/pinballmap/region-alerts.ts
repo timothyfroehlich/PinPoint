@@ -810,10 +810,9 @@ async function markAnnounced(
  * against an endpoint that is already failing. Closing it properly needs an
  * attempt clock that persists across invocations — PP-o355.44.
  *
- * **A refresh failure is never fatal.** The alert is the product; the name is an
- * enhancement. Every failure path here returns the names we already had and lets
- * the caller announce with the id fallback — withholding the alert to wait for a
- * name would mean the announcement never happens.
+ * **A refresh failure leaves the event pending.** Every failure path here returns
+ * the names we already had; the caller withholds only events whose titles remain
+ * unresolved, because the immutable announcement must include the machine name.
  *
  * Cost, stated honestly: `machines.json` is PBM's largest payload (~10k titles),
  * so this trades one big fetch for correctly naming a new release. It runs outside
@@ -836,7 +835,7 @@ async function resolveMachineNames(
         sinceRefreshMs: sinceRefresh,
         action: "pinballmap.regionAlerts",
       },
-      "Unknown machine ids but catalog was refreshed recently; announcing with id fallback"
+      "Unknown machine ids but catalog was refreshed recently; keeping alerts pending"
     );
     return names;
   }
@@ -848,45 +847,21 @@ async function resolveMachineNames(
   } catch (err) {
     log.warn(
       { err, missing, action: "pinballmap.regionAlerts" },
-      "Catalog refresh failed; announcing with id fallback"
+      "Catalog refresh failed; keeping unnamed alerts pending"
     );
     return names;
   }
 
   const stillMissing = machineIds.filter((id) => !refreshed.has(id));
   if (stillMissing.length > 0) {
-    // PBM has not catalogued these either. The cooldown now suppresses further
-    // attempts; the announcement goes out with ids rather than waiting.
+    // PBM has not catalogued these either. The cooldown suppresses another full
+    // refresh until it expires; the unresolved events remain pending meanwhile.
     log.warn(
       { stillMissing, action: "pinballmap.regionAlerts" },
-      "Machine ids absent from PinballMap's catalog after refresh; announcing with id fallback"
+      "Machine ids absent from PinballMap's catalog after refresh; keeping alerts pending"
     );
   }
   return refreshed;
-}
-
-/**
- * Turn pending rows into announceable entries by resolving both labels.
- *
- * Machine titles come from our own catalog mirror (one query); venue names come
- * from ONE bulk region-locations call. Either lookup missing a given id is fine —
- * the message falls back to the id — which is why this never fails the run.
- */
-async function resolveLabels(
-  pending: PendingRegionAlertEvent[],
-  locationNames: Map<number, string>
-): Promise<RegionAlertEntry[]> {
-  const machineNames = await resolveMachineNames(
-    pending.map((p) => p.pinballmapMachineId)
-  );
-
-  return pending.map((p) => ({
-    eventType: p.eventType,
-    locationId: p.locationId,
-    locationName: locationNames.get(p.locationId) ?? null,
-    machineName: machineNames.get(p.pinballmapMachineId) ?? null,
-    pinballmapMachineId: p.pinballmapMachineId,
-  }));
 }
 
 /**
@@ -1042,7 +1017,7 @@ export async function runRegionMachineAlerts(opts?: {
     }
 
     const blockedLmxIds = new Set<number>();
-    const announceable = pending.filter((event) => {
+    const venueNamed = pending.filter((event) => {
       if (blockedLmxIds.has(event.lmxId)) return false;
       if (!locationNames.has(event.locationId)) {
         blockedLmxIds.add(event.lmxId);
@@ -1050,6 +1025,27 @@ export async function runRegionMachineAlerts(opts?: {
       }
       return true;
     });
+    const machineNames = await resolveMachineNames(
+      venueNamed.map((event) => event.pinballmapMachineId)
+    );
+    const announceable: PendingRegionAlertEvent[] = [];
+    const entries: RegionAlertEntry[] = [];
+    for (const event of venueNamed) {
+      if (blockedLmxIds.has(event.lmxId)) continue;
+      const machineName = machineNames.get(event.pinballmapMachineId);
+      const locationName = locationNames.get(event.locationId);
+      if (machineName === undefined || locationName === undefined) {
+        blockedLmxIds.add(event.lmxId);
+        continue;
+      }
+      announceable.push(event);
+      entries.push({
+        eventType: event.eventType,
+        locationId: event.locationId,
+        locationName,
+        machineName,
+      });
+    }
     if (announceable.length < pending.length) {
       log.warn(
         {
@@ -1057,7 +1053,7 @@ export async function runRegionMachineAlerts(opts?: {
           deferred: pending.length - announceable.length,
           action: "pinballmap.regionAlerts",
         },
-        "Pinball Map alerts are waiting for venue names"
+        "Pinball Map alerts are waiting for machine or venue names"
       );
     }
     if (announceable.length === 0) {
@@ -1070,7 +1066,6 @@ export async function runRegionMachineAlerts(opts?: {
     // would burn those requests on EVERY hourly run, forever, for an install whose
     // Discord integration is off. Same reasoning as the channel-id check above; it
     // is only correct once both gates sit on the same side of the fetch.
-    const entries = await resolveLabels(announceable, locationNames);
     const message = formatRegionAlertMessage({
       entries,
       regionLabel: regionLabel(region),

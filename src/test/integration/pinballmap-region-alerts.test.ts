@@ -501,9 +501,9 @@ describe("PinballMap region machine-change alerts (PGlite)", () => {
     expect(discord.posts[0]?.content).toContain("Medieval Madness");
   });
 
-  it("announces with the id fallback when a refresh does not resolve the name", async () => {
-    // PBM has not catalogued it either. The alert must still go out — withholding
-    // it to wait for a name means it never happens.
+  it("keeps an event pending when a refresh does not resolve the machine name", async () => {
+    // PBM has not catalogued it either. The immutable alert waits for a later
+    // catalog refresh rather than permanently publishing a numeric fallback.
     await seedCatalog([{ machineId: 6412, name: "Godzilla" }], STALE_MIRROR);
     pbm.entries = [lmx({ lmxId: 1 })];
     await runRegionMachineAlerts();
@@ -514,12 +514,17 @@ describe("PinballMap region machine-change alerts (PGlite)", () => {
     const run = await runRegionMachineAlerts();
 
     expect(catalog.refreshCalls).toBe(1);
-    expect(run).toMatchObject({ announced: 1, pending: 0 });
-    expect(discord.posts[0]?.content).toContain("PinballMap machine #9999");
-    // And the row is marked announced, so it is not retried forever.
+    expect(run).toMatchObject({ announced: 0, pending: 1 });
+    expect(discord.posts).toEqual([]);
     expect(await seenRows()).toContainEqual(
-      expect.objectContaining({ lmxId: 2, announcedAt: expect.any(Date) })
+      expect.objectContaining({ lmxId: 2, announcedAt: null })
     );
+
+    catalog.seeds = [{ machineId: 9999, name: "Bon Jovi (Premium)" }];
+    const retried = await runRegionMachineAlerts();
+
+    expect(retried).toMatchObject({ discovered: 0, announced: 1, pending: 0 });
+    expect(discord.posts[0]?.content).toContain("Bon Jovi (Premium)");
   });
 
   it("does not re-trigger a refresh within the cooldown", async () => {
@@ -546,11 +551,11 @@ describe("PinballMap region machine-change alerts (PGlite)", () => {
     const run = await runRegionMachineAlerts();
 
     expect(catalog.refreshCalls).toBe(1);
-    expect(run).toMatchObject({ discovered: 1, announced: 1 });
-    expect(discord.posts.at(-1)?.content).toContain("PinballMap machine #8888");
+    expect(run).toMatchObject({ discovered: 1, announced: 0, pending: 2 });
+    expect(discord.posts).toEqual([]);
   });
 
-  it("still announces when the catalog refresh itself throws", async () => {
+  it("keeps an event pending when the catalog refresh itself throws", async () => {
     await seedCatalog([{ machineId: 6412, name: "Godzilla" }], STALE_MIRROR);
     pbm.entries = [lmx({ lmxId: 1 })];
     await runRegionMachineAlerts();
@@ -561,9 +566,8 @@ describe("PinballMap region machine-change alerts (PGlite)", () => {
     const run = await runRegionMachineAlerts();
 
     expect(catalog.refreshCalls).toBe(1);
-    // The alert is the product; the name is an enhancement.
-    expect(run).toMatchObject({ announced: 1, pending: 0 });
-    expect(discord.posts[0]?.content).toContain("PinballMap machine #9999");
+    expect(run).toMatchObject({ announced: 0, pending: 1 });
+    expect(discord.posts).toEqual([]);
   });
 
   it("posts nothing when the region is unchanged", async () => {
