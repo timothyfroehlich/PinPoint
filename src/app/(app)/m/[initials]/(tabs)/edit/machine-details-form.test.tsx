@@ -559,13 +559,19 @@ describe("MachineDetailsForm", () => {
       await user.type(screen.getByLabelText(/Machine Name/), "!");
       await user.click(screen.getByRole("button", { name: "Save details" }));
 
+      // The save settles the "Saved" note and tears down the beforeunload
+      // guard off the same isDirty flip; asserting the disarm synchronously
+      // right after the note settled flaked on CI (PP-78tm) — including a red
+      // required gate on main. Poll both together so the check waits for the
+      // guard to actually unsubscribe rather than sampling the settle.
+      // (beforeUnloadWasBlocked() dispatches a real but preventDefault-only,
+      // harmless beforeunload each poll.)
       await waitFor(() => {
         expect(screen.getByTestId("details-dirty-note")).toHaveTextContent(
           "Saved"
         );
+        expect(beforeUnloadWasBlocked()).toBe(false);
       });
-
-      expect(beforeUnloadWasBlocked()).toBe(false);
 
       await user.click(screen.getByRole("link", { name: "Settings" }));
 
