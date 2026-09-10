@@ -399,8 +399,20 @@ def cleanup_worktree(worktree_path: Path) -> int:
                 check=True,
             )
             branch = result.stdout.strip()
-        except subprocess.CalledProcessError:
+        except (OSError, subprocess.CalledProcessError):
             branch = ""
+
+        # A present marker is not enough evidence to continue: without a branch,
+        # cleanup cannot target this worktree's Supabase project. Keep both the
+        # worktree and its slot so a transient or corrupt Git state cannot turn
+        # into another successful-looking resource leak.
+        if not branch:
+            print(
+                f"Failed to derive a branch for {worktree_path} — refusing cleanup "
+                "and keeping the worktree and slot manifest entry for investigation.",
+                file=sys.stderr,
+            )
+            return EXIT_FAILED
 
     if branch:
         project_id = resolve_project_id(worktree_path, branch)

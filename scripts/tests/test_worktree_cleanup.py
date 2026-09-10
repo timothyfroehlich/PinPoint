@@ -517,6 +517,30 @@ class TestMainTeardown:
         assert stub.calls_of("worktree_remove")[0][:3] == ["git", "-C", "/repo"]
         assert stub.calls_of("worktree_prune")[0][:3] == ["git", "-C", "/repo"]
 
+    def test_unreadable_branch_refuses_cleanup_instead_of_reporting_success(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        fake_worktree: Path,
+        deallocated: list[str],
+    ) -> None:
+        """A `.git` marker without a readable branch is not cleanup evidence."""
+        stub = install(
+            monkeypatch,
+            RunStub(rev_parse=(128, "", "fatal: invalid gitfile format")),
+        )
+
+        exit_code = _run_main(monkeypatch, fake_worktree)
+
+        err = capsys.readouterr().err
+        assert exit_code == cleanup.EXIT_FAILED
+        assert "Failed to derive a branch" in err
+        assert "keeping the worktree and slot" in err
+        assert "Cleaned up worktree" not in err
+        assert stub.calls_of("volume_ls") == []
+        assert stub.calls_of("worktree_remove") == []
+        assert deallocated == []
+
     def test_renamed_branch_still_tears_down_the_pinned_project(
         self,
         monkeypatch: pytest.MonkeyPatch,
