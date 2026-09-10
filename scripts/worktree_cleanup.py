@@ -563,9 +563,10 @@ def cleanup_worktree(worktree_path: Path) -> int:
             print(
                 f"Deallocated the slot for {worktree_path} but never queried Docker "
                 f"({volumes_unknown_reason}) — cleanup is INCOMPLETE; any Supabase "
-                "volumes that exist are still on disk. First remove any stale Git "
-                "registration with `git worktree prune`, then reclaim them with "
-                f"`{SWEEP_HINT}`.",
+                "volumes that exist are still on disk. Inspect the residual directory "
+                f"at {worktree_path}, preserve anything needed, and remove it manually. "
+                "Then remove any stale Git registration with `git worktree prune` and "
+                f"reclaim Docker resources with `{SWEEP_HINT}`.",
                 file=sys.stderr,
             )
         return EXIT_DOCKER_UNKNOWN
