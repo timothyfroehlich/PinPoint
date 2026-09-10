@@ -668,6 +668,7 @@ class TestMainTeardown:
         # The slot is still reclaimed, so the sweep can find any leaked volumes by
         # their Docker label — a delayed leak, not a permanent one.
         assert deallocated == [str(worktree)]
+        assert "git worktree prune" in err
         assert "worktree_orphan_sweep.py --apply" in err
         assert "INCOMPLETE" in err
         assert "no .git marker" in err

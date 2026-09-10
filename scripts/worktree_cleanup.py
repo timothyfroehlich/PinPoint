@@ -63,7 +63,9 @@ EXIT_STALE_TARGET = 3
 #: Cleanup ran but the Supabase volumes were neither counted nor removed —
 #: either Docker could not be enumerated, or it was never queried because no
 #: branch yielded a project_id (the `.git`-less PP-qlzu path, PP-ew10). Either
-#: way `worktree_orphan_sweep.py` is the backstop.
+#: way `worktree_orphan_sweep.py` is the backstop. The `.git`-less case must
+#: prune any stale Git registration first so the sweep no longer treats that
+#: project's retained config as active.
 #: NOTE: `worktree_orphan_sweep.py` spells its equivalent `EXIT_DOCKER_UNKNOWN = 1`
 #: — the same name with a different value, deliberately. In that script 1 is free;
 #: here it already means "failed", and callers distinguish these codes per script.
@@ -369,7 +371,8 @@ def cleanup_worktree(worktree_path: Path) -> int:
     # Claude in Web sandbox sessions), we can't derive the branch and therefore
     # can't safely target the Supabase project_id. Skip the Docker/Supabase
     # phase but still deallocate the slot — otherwise the manifest entry leaks
-    # forever. worktree_orphan_sweep.py picks up any leaked Docker resources.
+    # forever. After any stale Git registration is pruned,
+    # worktree_orphan_sweep.py picks up any leaked Docker resources.
     #
     # PP-ew10: skipping that phase means the volumes were never queried, so their
     # state is UNKNOWN — the same "success without evidence" shape as PP-omz3 and
@@ -560,7 +563,9 @@ def cleanup_worktree(worktree_path: Path) -> int:
             print(
                 f"Deallocated the slot for {worktree_path} but never queried Docker "
                 f"({volumes_unknown_reason}) — cleanup is INCOMPLETE; any Supabase "
-                f"volumes that exist are still on disk. Reclaim them with `{SWEEP_HINT}`.",
+                "volumes that exist are still on disk. First remove any stale Git "
+                "registration with `git worktree prune`, then reclaim them with "
+                f"`{SWEEP_HINT}`.",
                 file=sys.stderr,
             )
         return EXIT_DOCKER_UNKNOWN
