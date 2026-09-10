@@ -20,7 +20,9 @@ rules follow from that, both of them regressions we have actually shipped:
   `worktree_orphan_sweep.py`). A failed `docker volume ls` used to collapse
   into `volumes = []`, indistinguishable from "no volumes exist", after which
   the worktree was removed and the slot deallocated while the volumes leaked.
-  An unqueryable Docker now yields an explicit unknown and a non-zero exit.
+  An unqueryable Docker now yields an explicit unknown and a non-zero exit — as
+  does a `.git`-less worktree, whose missing branch leaves no project_id to query
+  with, so the volumes are never counted at all (PP-ew10, the PP-qlzu path).
 
 Targeting matters as much as reporting: the Supabase project id comes from the
 worktree's pinned `supabase/config.toml`, not from its current branch name
@@ -58,8 +60,10 @@ EXIT_MAIN_WORKTREE = 2
 #: manifest entry, a git worktree registration, or an unreadable source of
 #: truth for either). Nothing was reclaimed, so this must not read as success.
 EXIT_STALE_TARGET = 3
-#: Cleanup ran but Docker could not be enumerated, so the Supabase volumes were
-#: neither counted nor removed. `worktree_orphan_sweep.py` is the backstop.
+#: Cleanup ran but the Supabase volumes were neither counted nor removed —
+#: either Docker could not be enumerated, or it was never queried because no
+#: branch yielded a project_id (the `.git`-less PP-qlzu path, PP-ew10). Either
+#: way `worktree_orphan_sweep.py` is the backstop.
 #: NOTE: `worktree_orphan_sweep.py` spells its equivalent `EXIT_DOCKER_UNKNOWN = 1`
 #: — the same name with a different value, deliberately. In that script 1 is free;
 #: here it already means "failed", and callers distinguish these codes per script.
@@ -366,15 +370,24 @@ def cleanup_worktree(worktree_path: Path) -> int:
     # can't safely target the Supabase project_id. Skip the Docker/Supabase
     # phase but still deallocate the slot — otherwise the manifest entry leaks
     # forever. worktree_orphan_sweep.py picks up any leaked Docker resources.
+    #
+    # PP-ew10: skipping that phase means the volumes were never queried, so their
+    # state is UNKNOWN — the same "success without evidence" shape as PP-omz3 and
+    # PP-3w4g, reached from a third direction. Record it as unknown here so the run
+    # returns EXIT_DOCKER_UNKNOWN and points at the sweep, instead of a false
+    # EXIT_OK for a teardown that never touched Docker.
     git_marker_present = git_marker.is_file()
+
+    volumes_unknown_reason: str | None = None
     if not git_marker_present:
+        volumes_unknown_reason = (
+            "no .git marker, so no branch to derive the Supabase project_id"
+        )
         print(
             f"Warning: {worktree_path} has no .git marker — skipping Supabase/Docker "
             "cleanup (no branch to derive project_id from); deallocating slot only.",
             file=sys.stderr,
         )
-
-    volumes_unknown_reason: str | None = None
 
     branch = ""
     if git_marker_present:
@@ -515,16 +528,29 @@ def cleanup_worktree(worktree_path: Path) -> int:
     deallocate_slot(str(worktree_path))
 
     if volumes_unknown_reason is not None:
-        # The worktree and slot are gone, so the sweep (which matches on the
-        # Docker label, not the manifest) will still find any leaked volumes —
-        # a delayed leak, not a permanent one. But this run did NOT finish the
-        # job, so it must not report success to the WorktreeRemove hook.
-        print(
-            f"Removed worktree {worktree_path} and deallocated its slot, but Supabase "
-            "volume state was UNKNOWN — cleanup is INCOMPLETE. Run "
-            f"`{SWEEP_HINT}` once Docker is reachable.",
-            file=sys.stderr,
-        )
+        # The slot is deallocated and (when we had a .git marker) the worktree
+        # removed, so the sweep — which matches on the Docker label, not the
+        # manifest — will still find any leaked volumes: a delayed leak, not a
+        # permanent one. But this run did NOT finish the job, so it must not
+        # report success to the WorktreeRemove hook.
+        if git_marker_present:
+            print(
+                f"Removed worktree {worktree_path} and deallocated its slot, but Supabase "
+                "volume state was UNKNOWN — cleanup is INCOMPLETE. Run "
+                f"`{SWEEP_HINT}` once Docker is reachable.",
+                file=sys.stderr,
+            )
+        else:
+            # PP-ew10: the .git-absent path never queried Docker, so word it for
+            # that case rather than borrowing the "once Docker is reachable" story.
+            # We never looked, so we can't claim volumes exist — only that any that
+            # do are unreclaimed. The reason string set above is surfaced here.
+            print(
+                f"Deallocated the slot for {worktree_path} but never queried Docker "
+                f"({volumes_unknown_reason}) — cleanup is INCOMPLETE; any Supabase "
+                f"volumes that exist are still on disk. Reclaim them with `{SWEEP_HINT}`.",
+                file=sys.stderr,
+            )
         return EXIT_DOCKER_UNKNOWN
 
     print(f"Cleaned up worktree: {worktree_path}", file=sys.stderr)
