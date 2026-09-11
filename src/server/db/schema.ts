@@ -1441,21 +1441,25 @@ export const pinballmapState = pgTable(
     // Null retains the dormant state without permitting any Pinball Map calls.
     locationId: integer("location_id"),
     // Monotonic configuration identity. A location id alone cannot distinguish
-    // A -> B -> A (or a same-location re-save), so every configuration attempt
-    // advances this generation before its PBM validation starts. In-flight
-    // syncs may only write back while the generation they captured still owns
-    // the singleton (pinballmap spec 10.14).
+    // A -> B -> A (or a same-location re-save), so each successful commit or
+    // clear advances this generation atomically with the configuration change.
+    // In-flight syncs may only write back while the generation they captured
+    // still owns the singleton (pinballmap spec 10.14).
     configurationGeneration: integer("configuration_generation")
       .notNull()
       .default(0),
-    // Short-lived database lease serializing a location configuration save
-    // with outbound additions. It spans the remote call without holding a DB
-    // transaction open (CORE-ARCH-011); expiry recovers a crashed invocation.
+    // Short-lived database lease held by an outbound mutation across its remote
+    // call (CORE-ARCH-011). Configuration commits and clears require this lease
+    // to be available, so exactly one side of the race can change live state.
     mutationLeaseId: uuid("mutation_lease_id"),
     mutationLeaseExpiresAt: timestamp("mutation_lease_expires_at", {
       withTimezone: true,
     }),
     snapshotJson: jsonb("snapshot_json").$type<LocationSnapshot>(),
+    // Monotonic identity for the stored snapshot. Unlike configurationGeneration,
+    // this advances for syncs and outbound lineup edits as well as checked
+    // configuration commits, so Save cannot overwrite a newer snapshot.
+    snapshotRevision: integer("snapshot_revision").notNull().default(0),
     lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
     // Timestamp of the last sync ATTEMPT (success OR failure), stamped at the
     // START of the attempt. Distinct from `lastSyncedAt` ("last SUCCESSFUL
@@ -1503,6 +1507,38 @@ export const pinballmapState = pgTable(
     mutationLeasePairCheck: check(
       "pinballmap_state_mutation_lease_pair_check",
       sql`(mutation_lease_id IS NULL) = (mutation_lease_expires_at IS NULL)`
+    ),
+  })
+).enableRLS();
+
+/**
+ * Short-lived, server-only snapshots produced by the Admin Integrations
+ * "Check ID" action. The browser receives only `id` plus a minimal preview;
+ * Save resolves the snapshot here so a client can never author or substitute
+ * Pinball Map data. Separate rows let multiple admins check independently.
+ */
+export const pinballmapLocationChecks = pgTable(
+  "pinballmap_location_checks",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    locationId: integer("location_id").notNull(),
+    expectedLocationId: integer("expected_location_id"),
+    expectedGeneration: integer("expected_configuration_generation").notNull(),
+    expectedSnapshotRevision: integer("expected_snapshot_revision").notNull(),
+    snapshotJson: jsonb("snapshot_json").$type<LocationSnapshot>().notNull(),
+    checkedBy: uuid("checked_by").notNull(),
+    checkedAt: timestamp("checked_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  },
+  (table) => ({
+    expiresAtIdx: index("pinballmap_location_checks_expires_at_idx").on(
+      table.expiresAt
+    ),
+    expiryOrderCheck: check(
+      "pinballmap_location_checks_expiry_order_check",
+      sql`expires_at > checked_at`
     ),
   })
 ).enableRLS();

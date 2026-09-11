@@ -97,6 +97,7 @@ export default defineConfig({
     "pinballmap_region_alert_events",
     "pinballmap_region_location_names",
     "pinballmap_state",
+    "pinballmap_location_checks",
     "machine_settings_sets",
     "collections",
     "collection_machines",

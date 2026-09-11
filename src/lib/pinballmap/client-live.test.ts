@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createLiveClient } from "./client-live";
+import { PinballMapReadError } from "./types";
 
 const ORIGINAL_FETCH = globalThis.fetch;
 const CREDS = { email: "tim@example.com", token: "secret-tok" };
@@ -42,6 +43,8 @@ describe("live client — reads", () => {
       json({
         id: 26454,
         name: "APC",
+        city: "Austin",
+        state: "TX",
         date_last_updated: "2026-06-01",
         last_updated_by_username: "qixx",
         machine_count: 2,
@@ -79,6 +82,7 @@ describe("live client — reads", () => {
     });
     expect(snap.lmxes).toHaveLength(1);
     expect(snap.lmxes[0]?.conditions[0]?.id).toBe(100);
+    expect(snap).toMatchObject({ city: "Austin", state: "TX" });
   });
 
   it("fetchLocation throws on a non-2xx so sync can record an error", async () => {
@@ -91,9 +95,12 @@ describe("live client — reads", () => {
   it("fetchLocation throws on a 200 that carries an errors body", async () => {
     // PBM reports a bad id as HTTP 200 + {errors}, not a 404.
     installFetchMock(() => json({ errors: "Failed to find location" }));
-    await expect(createLiveClient(null).fetchLocation(999)).rejects.toThrow(
-      /Failed to find location/
-    );
+    const request = createLiveClient(null).fetchLocation(999);
+    await expect(request).rejects.toThrow(/Failed to find location/);
+    await expect(request).rejects.toBeInstanceOf(PinballMapReadError);
+    await expect(request).rejects.toMatchObject({
+      reason: "not_found",
+    });
   });
 
   it("fetchCatalog requests the full machines payload (no no_details)", async () => {

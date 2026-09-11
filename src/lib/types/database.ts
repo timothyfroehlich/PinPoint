@@ -112,6 +112,7 @@ export type PinballmapRuntimeState = Pick<
   | "mutationLeaseId"
   | "mutationLeaseExpiresAt"
   | "snapshotJson"
+  | "snapshotRevision"
   | "lastSyncedAt"
   | "lastSyncAttemptAt"
   | "lastSyncStatus"

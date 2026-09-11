@@ -526,6 +526,13 @@
       "when": 1788916852003,
       "tag": "0074_initialize-region-removal-tracking",
       "breakpoints": true
+    },
+    {
+      "idx": 75,
+      "version": "7",
+      "when": 1789085853996,
+      "tag": "0075_pinballmap-location-checks",
+      "breakpoints": true
     }
   ]
 }

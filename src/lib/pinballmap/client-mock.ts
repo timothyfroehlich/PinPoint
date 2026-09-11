@@ -63,6 +63,8 @@ export function createMockClient(): PinballMapClient {
   const snapshot = (): LocationSnapshot => ({
     locationId: APC_LOCATION_ID,
     name: "Austin Pinball Collective",
+    city: "Austin",
+    state: "TX",
     dateLastUpdated: new Date().toISOString().slice(0, 10),
     lastUpdatedByUsername: "pinpoint-mock",
     machineCount: lmxes.length,
