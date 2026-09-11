@@ -88,13 +88,13 @@ Homebrew, or another version manager.
 
 ### Tool Ownership
 
-| Surface                                      | Authority                                                                                                                                |
-| :------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------- |
-| Project Node, Python, Ruff, and Supabase CLI | Exact pins in `mise.toml`; resolved artifacts in `mise.lock`                                                                             |
-| pnpm executable                              | Exact version and sha512 integrity in `package.json#packageManager`, installed by mise                                                   |
-| Project commands                             | `package.json#scripts`; mise resolves tools but does not duplicate the task namespace                                                    |
-| Local/Bazzite `bd` and Dolt                  | Dotfiles `all/.agents/beads/compatibility.json` and its user-global mise declarations                                                    |
-| Cloud-routine `bd` and Dolt                  | `scripts/beads-cloud-compatibility.json`, setup, and init; this vendored path remains because fresh cloud checkouts do not have dotfiles |
+| Surface                                      | Authority                                                                                                                            |
+| :------------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------- |
+| Project Node, Python, Ruff, and Supabase CLI | Exact pins in `mise.toml`; resolved artifacts in `mise.lock`                                                                         |
+| pnpm executable                              | Exact version and sha512 integrity in `package.json#packageManager`, installed by mise                                               |
+| Project commands                             | `package.json#scripts`; mise resolves tools but does not duplicate the task namespace                                                |
+| Local `bd` and Dolt                          | User-global mise declarations in dotfiles, checked against `scripts/beads-compatibility.json` by a dotfiles test                     |
+| Cloud-routine `bd` and Dolt                  | `scripts/beads-cloud-setup.sh` plus `scripts/beads-cloud-init.sh`, installing exactly the pins in `scripts/beads-compatibility.json` |
 
 Vercel does not install or invoke mise. `package.json#engines` is its Node
 compatibility contract, `vercel-build` retains the production migration/build

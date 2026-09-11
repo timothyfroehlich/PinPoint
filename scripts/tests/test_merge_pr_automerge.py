@@ -138,7 +138,7 @@ def stub_repo(
         )
 
         # Keep `bd` shadowed as a regression tripwire: merge-pr.sh must not post
-        # Huddle notices itself. The global Bazzite leader service owns that
+        # Huddle notices itself. The global huddle leader service owns that
         # side effect.
         bd_stub = tmp_path / "bd"
         bd_stub.write_text(

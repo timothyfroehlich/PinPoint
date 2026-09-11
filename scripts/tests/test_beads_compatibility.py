@@ -18,7 +18,7 @@ import pytest
 pytestmark = pytest.mark.integration
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
-MANIFEST_PATH = REPO_ROOT / "scripts" / "beads-cloud-compatibility.json"
+MANIFEST_PATH = REPO_ROOT / "scripts" / "beads-compatibility.json"
 SETUP_SCRIPT = REPO_ROOT / "scripts" / "beads-cloud-setup.sh"
 INIT_SCRIPT = REPO_ROOT / "scripts" / "beads-cloud-init.sh"
 RUNBOOK_MD = REPO_ROOT / "docs" / "runbooks" / "cloud-routines-beads-access.md"
@@ -54,7 +54,7 @@ class TestBeadsCompatibilityManifest:
 class TestVersionParsing:
     def test_setup_script_regex_extracts_versions(self):
         setup_content = SETUP_SCRIPT.read_text(encoding="utf-8")
-        assert "beads-cloud-compatibility.json" in setup_content
+        assert "beads-compatibility.json" in setup_content
 
         manifest_content = MANIFEST_PATH.read_text(encoding="utf-8")
         data = json.loads(manifest_content)
@@ -74,7 +74,7 @@ class TestVersionParsing:
 
     def test_init_script_regex_extracts_versions(self):
         init_content = INIT_SCRIPT.read_text(encoding="utf-8")
-        assert "beads-cloud-compatibility.json" in init_content
+        assert "beads-compatibility.json" in init_content
 
         manifest_content = MANIFEST_PATH.read_text(encoding="utf-8")
         data = json.loads(manifest_content)
@@ -377,6 +377,6 @@ class TestCloudInitGuards:
 class TestDocumentationReferences:
     def test_runbook_references_manifest(self):
         content = RUNBOOK_MD.read_text(encoding="utf-8")
-        assert "scripts/beads-cloud-compatibility.json" in content
+        assert "scripts/beads-compatibility.json" in content
         assert "dolt" in content
         assert "bd" in content

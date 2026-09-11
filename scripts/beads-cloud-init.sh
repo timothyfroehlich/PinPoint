@@ -14,7 +14,7 @@
 #     bash scripts/beads-cloud-init.sh && cd ~/beads
 #
 # THE VERSION PINS (loud, exact, deliberate). This refuses to proceed unless bd
-# and dolt are EXACTLY the versions declared in scripts/beads-cloud-compatibility.json.
+# and dolt are EXACTLY the versions declared in scripts/beads-compatibility.json.
 # Rationale: an accidental newer beads release (1.2.1, 2026-08-16) migrated the
 # shared DB to a schema no supported binary could read and locked every client out
 # for two days. A stale exact pin fails LOUD ("routine refuses to run") — the safe
@@ -24,7 +24,7 @@
 # shim in the claude.ai UI cannot be diffed. These guards are the reviewable,
 # enforced backstop.
 #
-# When upgrading past the pins, bump scripts/beads-cloud-compatibility.json. It is a
+# When upgrading past the pins, bump scripts/beads-compatibility.json. It is a
 # weekly-chores checklist item so the bump is a known recurring task, not a
 # surprise Saturday outage.
 #
@@ -51,7 +51,7 @@ set -euo pipefail
 # hit exactly this after #1908 shipped the repair but computed SCRIPT_DIR too
 # late). Resolving here, pre-cd, is the fix.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-COMPAT_FILE="$SCRIPT_DIR/beads-cloud-compatibility.json"
+COMPAT_FILE="$SCRIPT_DIR/beads-compatibility.json"
 
 log() { printf '[beads-cloud-init] %s\n' "$*" >&2; }
 die() { printf '[beads-cloud-init] ERROR: %s\n' "$*" >&2; exit 1; }
@@ -92,7 +92,7 @@ bd_ver="$(printf '%s\n' "$bd_raw" | sed -nE 's/^bd version ([0-9]+\.[0-9]+\.[0-9
 # 2. bd GUARD. Exact-pin — refuse anything else, newer OR older.
 if [[ "$bd_ver" != "$BD_PINNED_VERSION" ]]; then
   die "bd $bd_ver != pinned $BD_PINNED_VERSION — refusing to touch the shared beads DB.
-       If this is a deliberate upgrade, bump \"bd\" in scripts/beads-cloud-compatibility.json.
+       If this is a deliberate upgrade, bump \"bd\" in scripts/beads-compatibility.json.
        Do NOT install, build, or 'upgrade' bd inside a cloud routine to get past this."
 fi
 log "bd $bd_ver matches pin — proceeding"
@@ -107,7 +107,7 @@ dolt_ver="$(printf '%s\n' "$dolt_raw" | sed -nE 's/^dolt version ([0-9]+\.[0-9]+
 
 if [[ "$dolt_ver" != "$DOLT_PINNED_VERSION" ]]; then
   die "dolt $dolt_ver != pinned $DOLT_PINNED_VERSION — refusing to touch the shared beads DB.
-       If this is a deliberate upgrade, bump \"dolt\" in scripts/beads-cloud-compatibility.json.
+       If this is a deliberate upgrade, bump \"dolt\" in scripts/beads-compatibility.json.
        Do NOT install, build, or 'upgrade' dolt inside a cloud routine to get past this."
 fi
 log "dolt $dolt_ver matches pin — proceeding"
