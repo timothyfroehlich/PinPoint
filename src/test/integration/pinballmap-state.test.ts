@@ -888,6 +888,41 @@ describe("tracked-location concurrency guards", () => {
     fetchSpy.mockRestore();
   });
 
+  it("does not store a check over a concurrent snapshot update", async () => {
+    const db = await getTestDb();
+    const { getMockClient } = await import("~/lib/pinballmap/client-mock");
+    const { checkTrackedLocation, getPinballMapState } =
+      await import("~/lib/pinballmap/state");
+    await db.insert(pinballmapState).values({
+      id: "singleton",
+      locationId: 26454,
+      snapshotJson: snapshotAt(26454, "Original APC"),
+      lastSyncStatus: "ok",
+    });
+    const fetchSpy = vi
+      .spyOn(getMockClient(), "fetchLocation")
+      .mockImplementationOnce(async () => {
+        await db
+          .update(pinballmapState)
+          .set({
+            snapshotJson: snapshotAt(26454, "Concurrent snapshot"),
+            snapshotRevision: sql`${pinballmapState.snapshotRevision} + 1`,
+          })
+          .where(eq(pinballmapState.id, "singleton"));
+        return snapshotAt(99999, "Requested venue");
+      });
+
+    await expect(checkTrackedLocation(99999, CHECKED_BY)).resolves.toEqual({
+      ok: false,
+      reason: "concurrent_change",
+    });
+    expect((await getPinballMapState())?.snapshotJson?.name).toBe(
+      "Concurrent snapshot"
+    );
+    expect(await db.select().from(pinballmapLocationChecks)).toHaveLength(0);
+    fetchSpy.mockRestore();
+  });
+
   it("returns busy when commit or clear meets an active mutation lease", async () => {
     const db = await getTestDb();
     const { getMockClient } = await import("~/lib/pinballmap/client-mock");

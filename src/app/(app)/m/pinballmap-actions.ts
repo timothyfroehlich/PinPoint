@@ -12,7 +12,7 @@
 
 "use server";
 
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { createClient } from "~/lib/supabase/server";
 import { db, type Tx } from "~/server/db";
@@ -451,7 +451,11 @@ async function editStoredSnapshot(
   if (row?.locationId !== expectedLocationId || !row.snapshotJson) return;
   await tx
     .update(pinballmapState)
-    .set({ snapshotJson: edit(row.snapshotJson), updatedAt: new Date() })
+    .set({
+      snapshotJson: edit(row.snapshotJson),
+      snapshotRevision: sql`${pinballmapState.snapshotRevision} + 1`,
+      updatedAt: new Date(),
+    })
     .where(eq(pinballmapState.id, "singleton"));
 }
 

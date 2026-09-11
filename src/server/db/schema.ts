@@ -1456,6 +1456,10 @@ export const pinballmapState = pgTable(
       withTimezone: true,
     }),
     snapshotJson: jsonb("snapshot_json").$type<LocationSnapshot>(),
+    // Monotonic identity for the stored snapshot. Unlike configurationGeneration,
+    // this advances for syncs and outbound lineup edits as well as checked
+    // configuration commits, so Save cannot overwrite a newer snapshot.
+    snapshotRevision: integer("snapshot_revision").notNull().default(0),
     lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
     // Timestamp of the last sync ATTEMPT (success OR failure), stamped at the
     // START of the attempt. Distinct from `lastSyncedAt` ("last SUCCESSFUL
@@ -1520,6 +1524,7 @@ export const pinballmapLocationChecks = pgTable(
     locationId: integer("location_id").notNull(),
     expectedLocationId: integer("expected_location_id"),
     expectedGeneration: integer("expected_configuration_generation").notNull(),
+    expectedSnapshotRevision: integer("expected_snapshot_revision").notNull(),
     snapshotJson: jsonb("snapshot_json").$type<LocationSnapshot>().notNull(),
     checkedBy: uuid("checked_by").notNull(),
     checkedAt: timestamp("checked_at", { withTimezone: true })

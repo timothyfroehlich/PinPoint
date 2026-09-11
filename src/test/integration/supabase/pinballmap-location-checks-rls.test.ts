@@ -42,6 +42,7 @@ describe("PinballMap location-check candidates RLS", () => {
         location_id: 26454,
         expected_location_id: 26454,
         expected_configuration_generation: 0,
+        expected_snapshot_revision: 0,
         snapshot_json: { locationId: 26454, name: "Server-only fixture" },
         checked_by: memberId,
         expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
@@ -89,6 +90,7 @@ describe("PinballMap location-check candidates RLS", () => {
       .insert({
         location_id: 99999,
         expected_configuration_generation: 0,
+        expected_snapshot_revision: 0,
         snapshot_json: { locationId: 99999, name: "Forged candidate" },
         checked_by: memberId,
         expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),

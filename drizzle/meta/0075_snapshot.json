@@ -1,5 +1,5 @@
 {
-  "id": "4c9206d7-5d1d-46e2-9392-756dad2906fd",
+  "id": "f963b420-d249-4a75-960c-182d2a7c7c97",
   "prevId": "b578a837-a08d-4dd9-af4f-83579f3cb5c2",
   "version": "7",
   "dialect": "postgresql",
@@ -2199,6 +2199,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "expected_snapshot_revision": {
+          "name": "expected_snapshot_revision",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
         "snapshot_json": {
           "name": "snapshot_json",
           "type": "jsonb",
@@ -2611,6 +2617,13 @@
           "type": "jsonb",
           "primaryKey": false,
           "notNull": false
+        },
+        "snapshot_revision": {
+          "name": "snapshot_revision",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
         },
         "last_synced_at": {
           "name": "last_synced_at",

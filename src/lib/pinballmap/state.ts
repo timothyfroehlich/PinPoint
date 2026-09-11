@@ -46,6 +46,7 @@ export async function getPinballMapState(): Promise<PinballmapRuntimeState | nul
       mutationLeaseId: pinballmapState.mutationLeaseId,
       mutationLeaseExpiresAt: pinballmapState.mutationLeaseExpiresAt,
       snapshotJson: pinballmapState.snapshotJson,
+      snapshotRevision: pinballmapState.snapshotRevision,
       lastSyncedAt: pinballmapState.lastSyncedAt,
       lastSyncAttemptAt: pinballmapState.lastSyncAttemptAt,
       lastSyncStatus: pinballmapState.lastSyncStatus,
@@ -215,6 +216,7 @@ async function recordSyncSuccess(
       "id",
       "location_id",
       "snapshot_json",
+      "snapshot_revision",
       "last_synced_at",
       "last_sync_status",
       "last_sync_error",
@@ -225,6 +227,7 @@ async function recordSyncSuccess(
       ${SINGLETON_ID},
       ${locationId},
       ${JSON.stringify(snapshot)}::text::jsonb,
+      1,
       ${syncedAt.toISOString()}::timestamptz,
       'ok',
       NULL,
@@ -234,6 +237,7 @@ async function recordSyncSuccess(
     ON CONFLICT ("id") DO UPDATE SET
       "location_id" = EXCLUDED."location_id",
       "snapshot_json" = EXCLUDED."snapshot_json",
+      "snapshot_revision" = "pinballmap_state"."snapshot_revision" + 1,
       "last_synced_at" = EXCLUDED."last_synced_at",
       "last_sync_status" = EXCLUDED."last_sync_status",
       "last_sync_error" = EXCLUDED."last_sync_error",
@@ -661,6 +665,18 @@ export async function checkTrackedLocation(
     };
   }
 
+  const baseline = await getPinballMapState();
+  if (
+    baseline === null ||
+    (baseline.locationId ?? null) !== expectedLocationId ||
+    baseline.configurationGeneration !== expectedGeneration
+  ) {
+    return { ok: false, reason: "concurrent_change" };
+  }
+  if (hasActiveMutationLease(baseline, attemptedAt)) {
+    return { ok: false, reason: "busy" };
+  }
+
   let snapshot: LocationSnapshot;
   try {
     snapshot = await (await getPinballMapClient()).fetchLocation(locationId);
@@ -687,7 +703,8 @@ export async function checkTrackedLocation(
   const current = await getPinballMapState();
   if (
     (current?.locationId ?? null) !== expectedLocationId ||
-    (current?.configurationGeneration ?? 0) !== expectedGeneration
+    (current?.configurationGeneration ?? 0) !== expectedGeneration ||
+    current?.snapshotRevision !== baseline.snapshotRevision
   ) {
     return { ok: false, reason: "concurrent_change" };
   }
@@ -702,6 +719,7 @@ export async function checkTrackedLocation(
       locationId,
       expectedLocationId,
       expectedGeneration,
+      expectedSnapshotRevision: baseline.snapshotRevision,
       snapshotJson: snapshot,
       checkedBy,
       checkedAt: sql`now()`,
@@ -798,6 +816,7 @@ export async function commitCheckedTrackedLocation(
         locationId: freshCandidate.locationId,
         configurationGeneration: sql`${pinballmapState.configurationGeneration} + 1`,
         snapshotJson: freshCandidate.snapshotJson,
+        snapshotRevision: sql`${pinballmapState.snapshotRevision} + 1`,
         lastSyncedAt: freshCandidate.checkedAt,
         lastSyncAttemptAt: freshCandidate.checkedAt,
         lastSyncStatus: "ok",
@@ -814,6 +833,10 @@ export async function commitCheckedTrackedLocation(
           eq(
             pinballmapState.configurationGeneration,
             freshCandidate.expectedGeneration
+          ),
+          eq(
+            pinballmapState.snapshotRevision,
+            freshCandidate.expectedSnapshotRevision
           ),
           availableMutationLease(commitAt)
         )

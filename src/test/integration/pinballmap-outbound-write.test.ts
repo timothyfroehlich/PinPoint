@@ -350,6 +350,45 @@ describe("PinballMap outbound writes (PGlite)", () => {
     ]);
   });
 
+  it("does not let an older checked snapshot overwrite a completed addition", async () => {
+    const db = await getTestDb();
+    const { addMachineToPinballMapAction } =
+      await import("~/app/(app)/m/pinballmap-actions");
+    const {
+      checkTrackedLocation,
+      commitCheckedTrackedLocation,
+      getPinballMapState,
+    } = await import("~/lib/pinballmap/state");
+    const admin = await createUser("admin");
+    await mockAuthAs(admin.id);
+    await seedState([]);
+
+    const checked = await checkTrackedLocation(26454, admin.id);
+    if (!checked.ok) throw new Error("expected a checked candidate");
+
+    const [machine] = await db
+      .insert(machines)
+      .values({
+        name: "Godzilla",
+        initials: "GZ",
+        pinballmapMachineId: TITLE_ID,
+        pinballmapIntent: "on",
+      })
+      .returning();
+    if (!machine) throw new Error("failed to seed machine");
+
+    await expect(
+      addMachineToPinballMapAction(undefined, form(machine.id))
+    ).resolves.toMatchObject({ ok: true });
+    await expect(
+      commitCheckedTrackedLocation(checked.candidate.checkId, admin.id)
+    ).resolves.toEqual({ ok: false, reason: "concurrent_change" });
+
+    expect((await getPinballMapState())?.snapshotJson?.lmxes).toEqual([
+      expect.objectContaining({ id: 500, machineId: TITLE_ID }),
+    ]);
+  });
+
   it("writes nothing to our DB when PinballMap rejects the add", async () => {
     // CORE-ARCH-012: a control that could not perform its action must not
     // report that it did.
