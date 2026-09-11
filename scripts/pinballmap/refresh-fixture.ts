@@ -6,13 +6,23 @@
  *
  *   pnpm tsx scripts/pinballmap/refresh-fixture.ts
  *
+ * Requires PINBALLMAP_API_TOKEN to be populated ephemerally in the environment
+ * before invoking this command (do not put the sensitive value on the command
+ * line or persist it in a local env file; see docs/ENV_VARS.md): since PBM's
+ * REQUIRE_API_TOKEN gate went live (2026-07-30), every v1 GET — reads included —
+ * needs the blanket X-Api-Token header (CORE-PBM-001, PP-uusr). Without it PBM
+ * answers 401. This script inlines the token read for the same reason it inlines
+ * everything else (no app/path-alias dependency); the app path is the
+ * getPinballMapApiToken() accessor in src/lib/pinballmap/api-token.ts.
+ *
  * Writes:
  * - src/lib/pinballmap/fixtures/location-26454.json  — raw location payload (verbatim)
  * - src/lib/pinballmap/fixtures/catalog-apc.json      — catalog trimmed to our machine ids
  * - src/lib/pinballmap/fixtures/machine-groups.json   — groups referenced by those machines
  *
- * Constants mirror src/lib/pinballmap/config.ts (kept inline so this script has
- * no app/path-alias dependencies).
+ * Constants mirror src/lib/pinballmap/config.ts — except the token, which
+ * mirrors src/lib/pinballmap/api-token.ts — kept inline so this script has no
+ * app/path-alias dependencies.
  */
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -20,6 +30,8 @@ import { join } from "node:path";
 const PBM_API_BASE = "https://pinballmap.com/api/v1";
 const PBM_USER_AGENT =
   "PinPoint/1.0 (Austin Pinball Collective issue tracker; +https://github.com/timothyfroehlich/PinPoint)";
+// Mandatory blanket access gate; mirrors api-token.ts (empty/whitespace -> absent).
+const PBM_API_TOKEN = process.env["PINBALLMAP_API_TOKEN"]?.trim() ?? "";
 const APC_LOCATION_ID = 26454;
 
 const FIXTURES = join(process.cwd(), "src/lib/pinballmap/fixtures");
@@ -176,7 +188,8 @@ const DEMO_FAMILY_MACHINES = [
 
 async function getText(path: string): Promise<string> {
   const res = await fetch(`${PBM_API_BASE}${path}`, {
-    headers: { "User-Agent": PBM_USER_AGENT },
+    // X-Api-Token on every request — matches client-live.ts safeFetch.
+    headers: { "User-Agent": PBM_USER_AGENT, "X-Api-Token": PBM_API_TOKEN },
   });
   if (!res.ok) {
     throw new Error(`GET ${path} failed: HTTP ${res.status}`);
@@ -185,6 +198,15 @@ async function getText(path: string): Promise<string> {
 }
 
 async function main(): Promise<void> {
+  if (PBM_API_TOKEN === "") {
+    throw new Error(
+      "PINBALLMAP_API_TOKEN is not set. PinballMap's REQUIRE_API_TOKEN gate " +
+        "(live since 2026-07-30) rejects every v1 GET without it. Set the env " +
+        "var from your secure credential source, then re-run: pnpm tsx " +
+        "scripts/pinballmap/refresh-fixture.ts"
+    );
+  }
+
   // 1. Location snapshot — written verbatim so future refreshes diff cleanly.
   const locationText = await getText(`/locations/${APC_LOCATION_ID}.json`);
   writeFileSync(join(FIXTURES, "location-26454.json"), locationText);

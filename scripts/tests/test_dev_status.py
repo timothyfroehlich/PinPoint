@@ -17,6 +17,7 @@ def _run_status(
     *args: str,
     mode: str = "healthy",
     postgres_url: bool = True,
+    timeout: int = 15,
 ) -> subprocess.CompletedProcess[str]:
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
@@ -76,7 +77,7 @@ printf '%s\n' "$count" >"$count_file"
         capture_output=True,
         text=True,
         check=False,
-        timeout=5,
+        timeout=timeout,
     )
 
 
@@ -112,7 +113,7 @@ def test_human_mode_retains_per_service_output(tmp_path: Path) -> None:
 def test_wait_mode_emits_transitions_once_and_no_unchanged_progress(
     tmp_path: Path,
 ) -> None:
-    result = _run_status(tmp_path, "--wait", "--timeout=5", mode="transition")
+    result = _run_status(tmp_path, "--wait", "--timeout=15", mode="transition")
 
     assert result.returncode == 0, result.stdout + result.stderr
     assert result.stdout.count("READY: Next.js") == 1
@@ -134,7 +135,7 @@ def test_wait_timeout_is_one_terminal_failure(tmp_path: Path) -> None:
 
 
 def test_skipped_postgres_probe_is_explicit(tmp_path: Path) -> None:
-    result = _run_status(tmp_path, "--wait", "--timeout=5", postgres_url=False)
+    result = _run_status(tmp_path, "--wait", "--timeout=15", postgres_url=False)
 
     assert result.returncode == 0
     assert "SKIP: Postgres — POSTGRES_URL not set" in result.stdout

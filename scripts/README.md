@@ -31,7 +31,8 @@ Main worktree uses default ports (slot 0). All others get dynamically allocated 
 
 - **Runtime:** Python and Ruff use the exact pins in `mise.toml`, with artifacts locked in `mise.lock`.
 - **Scripts:** All scripts use `#!/usr/bin/env python3` and rely strictly on the Python standard library.
-- **Dependencies:** `scripts/requirements.txt` explicitly documents `pytest==9.0.3` for the test suite. Install it into the selected runtime with `mise exec -- python3 -m pip install -r scripts/requirements.txt`.
+- **Dependencies:** `scripts/requirements.txt` explicitly documents `pytest==9.0.3` and `pytest-xdist==3.8.0` for parallel test execution. Install them into the selected runtime with `mise exec -- python3 -m pip install -r scripts/requirements.txt`.
+
 - **Checks:** `pnpm run check:python` runs `ruff check`, `ruff format --check`, and fast unit tests (`pytest scripts/tests/ -m "not integration"`).
 - **Full suite:** `pnpm run test:python:all` runs the complete unit and integration test suite (`pytest scripts/tests/`).
 

@@ -30,13 +30,14 @@ import {
  * - Trigger button shows the selected user's avatar initial + name, or "Unassigned"
  * - CommandInput provides the search field; items are filtered manually so that
  *   "Me" and "Unassigned" are always visible regardless of query
- * - Alphabetical user list (excluding the "Me" user) filters by name as the user types
+ * - Alphabetical user list also includes the current user (under their real name),
+ *   so searching by name finds them even though they already appear as "Me"
  * - `onAssign(userId | null)` fires on selection; `null` means unassigned
  *
  * ## Key Abstractions
  * - `assignedToId: string | null` — `null` represents the unassigned state
  * - `currentUserId` — when provided, shows "Me" as a quick-select above
- *   "Unassigned", and removes that user from the alphabetical list
+ *   "Unassigned"; that user still also appears in the alphabetical list
  * - `isPending` shows a spinner overlay during optimistic update transitions
  * - `disabled` / `disabledReason` support permission-gated assignment
  */
@@ -89,19 +90,15 @@ export function AssigneePicker({
     [currentUserId, users]
   );
 
-  // Alphabetical list excludes current user (they appear as "Me"), filtered by query.
+  // Alphabetical list includes the current user under their real name (in
+  // addition to the "Me" quick-select) so searching by name still finds them.
   const filteredUsers = React.useMemo(() => {
     const normalized = query.trim().toLowerCase();
-    const candidates = currentUser
-      ? users.filter((u) => u.id !== currentUser.id)
-      : users;
     if (!normalized) {
-      return candidates;
+      return users;
     }
-    return candidates.filter((user) =>
-      user.name.toLowerCase().includes(normalized)
-    );
-  }, [query, users, currentUser]);
+    return users.filter((user) => user.name.toLowerCase().includes(normalized));
+  }, [query, users]);
 
   const handleSelect = (userId: string | null): void => {
     onAssign(userId);

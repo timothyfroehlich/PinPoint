@@ -8,8 +8,13 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 CODEX_AGENT = ROOT / ".codex/agents/pr-lifecycle-watcher.toml"
+CODEX_CONFIG = ROOT / ".codex/config.toml"
 CLAUDE_AGENT = ROOT / ".claude/agents/pr-lifecycle-watcher.md"
 ANTIGRAVITY_AGENT = ROOT / ".agents/agents/pr-lifecycle-watcher.md"
+ANTIGRAVITY_HOOKS = ROOT / ".agents/hooks.json"
+CODEX_HOOKS = ROOT / ".codex/hooks.json"
+CLAUDE_SETTINGS = ROOT / ".claude/settings.json"
+GUARD_BASENAME = "block-direct-pr-watch.cjs"
 SERVER_ARGS = ["exec", "tsx", "scripts/workflow/pr-watcher-mcp.ts"]
 
 
@@ -101,14 +106,14 @@ def test_agent_models_and_native_boundaries_match_the_approved_plan():
 
 
 def test_every_agent_targets_the_same_single_tool_stdio_server():
-    with CODEX_AGENT.open("rb") as handle:
-        codex = tomllib.load(handle)
+    with CODEX_CONFIG.open("rb") as handle:
+        codex_config = tomllib.load(handle)
     _claude, _claude_body, claude_frontmatter = _markdown_agent(CLAUDE_AGENT)
     _antigravity, _antigravity_body, antigravity_frontmatter = _markdown_agent(
         ANTIGRAVITY_AGENT
     )
 
-    codex_server = codex["mcp_servers"]["pr_lifecycle_watch"]
+    codex_server = codex_config["mcp_servers"]["pr_lifecycle_watch"]
     assert codex_server["command"] == "pnpm"
     assert codex_server["args"] == SERVER_ARGS
     assert codex_server["required"] is True
@@ -116,24 +121,27 @@ def test_every_agent_targets_the_same_single_tool_stdio_server():
     assert codex_server["tool_timeout_sec"] > 3600
     assert codex_server["enabled_tools"] == ["watch_pr_lifecycle"]
 
-    for frontmatter, harness in (
-        (claude_frontmatter, "claude-code"),
-        (antigravity_frontmatter, "antigravity"),
-    ):
-        assert "mcpServers:" in frontmatter
-        assert "pr_lifecycle_watch" in frontmatter
-        assert "command: pnpm" in frontmatter
-        for argument in SERVER_ARGS:
-            assert f"- {argument}" in frontmatter
-        assert f"GH_MONITOR_HARNESS: {harness}" in frontmatter
-        assert "GH_MONITOR_MODEL: unknown" in frontmatter
-        assert 'GH_MONITOR_WAKES: "1"' in frontmatter
+    assert "mcpServers:" in claude_frontmatter
+    assert "pr_lifecycle_watch" in claude_frontmatter
+    assert "command: pnpm" in claude_frontmatter
+    for argument in SERVER_ARGS:
+        assert f"- {argument}" in claude_frontmatter
+    assert "GH_MONITOR_HARNESS: claude-code" in claude_frontmatter
+    assert "GH_MONITOR_MODEL: unknown" in claude_frontmatter
+    assert 'GH_MONITOR_WAKES: "1"' in claude_frontmatter
 
-    assert "mcpServers:\n  - name: pr_lifecycle_watch" in antigravity_frontmatter
+    assert "mcpServers:" in antigravity_frontmatter
+    assert "pr_lifecycle_watch" in antigravity_frontmatter
+    assert "command: pnpm" in antigravity_frontmatter
+    for argument in SERVER_ARGS:
+        assert f"- {argument}" in antigravity_frontmatter
+    assert "GH_MONITOR_HARNESS: antigravity" in antigravity_frontmatter
+    assert "GH_MONITOR_MODEL: unknown" in antigravity_frontmatter
+    assert 'GH_MONITOR_WAKES: "1"' in antigravity_frontmatter
 
 
 def test_claude_project_permissions_allow_only_the_watcher_mcp_tool():
-    settings = json.loads((ROOT / ".claude/settings.json").read_text())
+    settings = json.loads(CLAUDE_SETTINGS.read_text())
     watcher_rules = [
         rule
         for rule in settings["permissions"]["allow"]
@@ -141,6 +149,33 @@ def test_claude_project_permissions_allow_only_the_watcher_mcp_tool():
     ]
 
     assert watcher_rules == ["mcp__pr_lifecycle_watch__watch_pr_lifecycle"]
+
+
+def _hook_commands(config: object) -> list[str]:
+    commands: list[str] = []
+    if isinstance(config, dict):
+        if isinstance(config.get("command"), str):
+            commands.append(config["command"])
+        for value in config.values():
+            commands.extend(_hook_commands(value))
+    elif isinstance(config, list):
+        for value in config:
+            commands.extend(_hook_commands(value))
+    return commands
+
+
+def test_all_harnesses_wire_the_direct_watch_guard():
+    configs = {
+        "claude": json.loads(CLAUDE_SETTINGS.read_text()),
+        "codex": json.loads(CODEX_HOOKS.read_text()),
+        "antigravity": json.loads(ANTIGRAVITY_HOOKS.read_text()),
+    }
+
+    for harness, config in configs.items():
+        matching = [
+            command for command in _hook_commands(config) if GUARD_BASENAME in command
+        ]
+        assert len(matching) == 1, f"{harness} guard wiring: {matching}"
 
 
 def test_agent_definitions_have_no_mutation_capable_watcher_command():

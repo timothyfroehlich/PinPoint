@@ -17,6 +17,7 @@ import type {
   issueWatchers,
   issueImages,
   pinballmapCatalog,
+  pinballmapRegionAlertEvents,
   pinballmapRegionSeenMachines,
   pinballmapState,
 } from "~/server/db/schema";
@@ -123,10 +124,16 @@ export type PinballmapRuntimeState = Pick<
   | "updatedBy"
 >;
 
-// Region-wide seen-machine memory behind the new-machine alert (PP-o355.18)
+// Region-wide machine membership and delivery queue (PP-o355.18, PP-o355.51.9)
 export type PinballmapRegionSeenMachine = InferSelectModel<
   typeof pinballmapRegionSeenMachines
 >;
 export type NewPinballmapRegionSeenMachine = InferInsertModel<
   typeof pinballmapRegionSeenMachines
+>;
+export type PinballmapRegionAlertEvent = InferSelectModel<
+  typeof pinballmapRegionAlertEvents
+>;
+export type NewPinballmapRegionAlertEvent = InferInsertModel<
+  typeof pinballmapRegionAlertEvents
 >;
