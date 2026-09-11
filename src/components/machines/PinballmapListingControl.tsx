@@ -5,6 +5,7 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import {
   CheckCircle2,
+  Clock3,
   ExternalLink,
   MapPin,
   RefreshCw,
@@ -29,7 +30,6 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "~/components/ui/alert-dialog";
-import { formatRelative } from "~/lib/dates";
 import { RelativeTime } from "~/components/issues/RelativeTime";
 import { useRelativeNow } from "~/components/issues/RelativeTimeProvider";
 import type {
@@ -301,6 +301,19 @@ function Header({
   const spent = refreshRemaining <= 0;
   // `null` until the shared ticker's first tick, which is also every SSR pass.
   const now = useRelativeNow();
+  const refreshAvailableTime = refreshAvailableAt?.getTime() ?? null;
+  const hasValidRefreshTime =
+    refreshAvailableTime !== null && Number.isFinite(refreshAvailableTime);
+  const refreshCooldownMinutes =
+    now !== null && spent && hasValidRefreshTime && now < refreshAvailableTime
+      ? Math.max(1, Math.ceil((refreshAvailableTime - now) / 60_000))
+      : null;
+  // Keep the button inert through SSR and whenever the next refill is unknown.
+  // Once the shared ticker reaches the refill instant, the server-side token
+  // bucket will refill on the next press, so the control can become live.
+  const refreshDisabled =
+    spent &&
+    (now === null || !hasValidRefreshTime || now < refreshAvailableTime);
   return (
     <div className="mb-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
       <h3 className="text-base font-semibold">
@@ -321,7 +334,7 @@ function Header({
         ) : null}
       </h3>
 
-      <div className="flex items-center gap-2.5">
+      <div className="flex flex-wrap items-center justify-end gap-x-2.5 gap-y-1">
         {outOfSync ? (
           <span
             className="inline-flex items-center gap-1.5 rounded-full border border-warning/50 bg-warning-container/50 px-2 py-0.5 text-xs font-medium text-on-warning-container"
@@ -359,25 +372,18 @@ function Header({
             variant="outline"
             size="sm"
             loading={pending}
-            disabled={spent}
+            disabled={refreshDisabled}
             onClick={onRefresh}
             data-testid="pbm-listing-refresh"
-            // The countdown lives in the title rather than the label so the
-            // button does not change width as it ticks — the header sits above
-            // a fixed-height box and a resizing control undoes that (4.1).
-            //
-            // Gated on the ticker having started, so the attribute is simply
-            // absent during SSR rather than carrying a label computed at a
-            // different minute than hydration's. React patches mismatched TEXT
-            // but not mismatched attributes, so this one would stick.
-            title={
-              now !== null && spent && refreshAvailableAt !== null
-                ? `Refreshes again ${formatRelative(refreshAvailableAt)}`
-                : undefined
-            }
           >
-            <RefreshCw aria-hidden="true" className="size-3.5" />
-            Refresh
+            {refreshCooldownMinutes === null ? (
+              <RefreshCw aria-hidden="true" className="size-3.5" />
+            ) : (
+              <Clock3 aria-hidden="true" className="size-3.5" />
+            )}
+            {refreshCooldownMinutes === null
+              ? "Refresh"
+              : `Refresh in ${String(refreshCooldownMinutes)}m`}
           </Button>
         ) : null}
       </div>

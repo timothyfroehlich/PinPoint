@@ -433,10 +433,18 @@ describe("the header", () => {
     renderControl({ refreshRemaining: 0, refreshAvailableAt: availableAt });
     const button = screen.getByTestId("pbm-listing-refresh");
     expect(button).toBeDisabled();
-    expect(button).toHaveAttribute(
-      "title",
-      expect.stringContaining("Refreshes again")
-    );
+    expect(button).toHaveTextContent("Refresh in 2m");
+    expect(screen.queryByText(/Refreshes again/)).toBeNull();
+    expect(button).not.toHaveAttribute("title");
+  });
+
+  it("re-enables Refresh after the spent allowance refills", () => {
+    const availableAt = new Date(Date.now() - 60 * 1000);
+    renderControl({ refreshRemaining: 0, refreshAvailableAt: availableAt });
+    const button = screen.getByTestId("pbm-listing-refresh");
+    expect(button).toBeEnabled();
+    expect(button).toHaveTextContent(/^Refresh$/);
+    expect(screen.queryByText(/Refreshes again/)).toBeNull();
   });
 
   it("keeps Refresh live in the disabled Waiting state, as the escape hatch", () => {
