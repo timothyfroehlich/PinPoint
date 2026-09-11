@@ -88,7 +88,7 @@ def test_agent_models_and_native_boundaries_match_the_approved_plan():
         ANTIGRAVITY_AGENT
     )
 
-    assert codex["model"] == "gpt-5.3-codex-spark"
+    assert codex["model"] == "gpt-5.6-luna"
     assert codex["model_reasoning_effort"] == "low"
     assert codex["sandbox_mode"] == "read-only"
     assert claude["model"] == "haiku"
