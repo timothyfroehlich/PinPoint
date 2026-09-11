@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import {
   CheckCircle2,
@@ -304,16 +304,37 @@ function Header({
   const refreshAvailableTime = refreshAvailableAt?.getTime() ?? null;
   const hasValidRefreshTime =
     refreshAvailableTime !== null && Number.isFinite(refreshAvailableTime);
+  const [reachedRefreshTime, setReachedRefreshTime] = useState<number | null>(
+    null
+  );
+
+  useEffect(() => {
+    if (!spent || !hasValidRefreshTime) return undefined;
+
+    const timer = window.setTimeout(
+      () => {
+        setReachedRefreshTime(refreshAvailableTime);
+      },
+      Math.max(0, refreshAvailableTime - Date.now())
+    );
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [hasValidRefreshTime, refreshAvailableTime, spent]);
+
+  const refreshDeadlineReached =
+    hasValidRefreshTime &&
+    (reachedRefreshTime === refreshAvailableTime ||
+      (now !== null && now >= refreshAvailableTime));
   const refreshCooldownMinutes =
-    now !== null && spent && hasValidRefreshTime && now < refreshAvailableTime
+    now !== null && spent && hasValidRefreshTime && !refreshDeadlineReached
       ? Math.max(1, Math.ceil((refreshAvailableTime - now) / 60_000))
       : null;
   // Keep the button inert through SSR and whenever the next refill is unknown.
   // Once the shared ticker reaches the refill instant, the server-side token
   // bucket will refill on the next press, so the control can become live.
   const refreshDisabled =
-    spent &&
-    (now === null || !hasValidRefreshTime || now < refreshAvailableTime);
+    spent && (!hasValidRefreshTime || !refreshDeadlineReached);
   return (
     <div className="mb-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
       <h3 className="text-base font-semibold">

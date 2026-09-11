@@ -9,7 +9,7 @@
 
 import type React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom/vitest";
 
@@ -445,6 +445,32 @@ describe("the header", () => {
     expect(button).toBeEnabled();
     expect(button).toHaveTextContent(/^Refresh$/);
     expect(screen.queryByText(/Refreshes again/)).toBeNull();
+  });
+
+  it("re-enables Refresh at a refill deadline between shared ticker ticks", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-11T01:00:00.000Z"));
+    const availableAt = new Date(Date.now() + 1500);
+    const control = renderControl({
+      refreshRemaining: 0,
+      refreshAvailableAt: availableAt,
+    });
+
+    try {
+      const button = screen.getByTestId("pbm-listing-refresh");
+      expect(button).toBeDisabled();
+      expect(button).toHaveTextContent("Refresh in 1m");
+
+      act(() => {
+        vi.advanceTimersByTime(1500);
+      });
+
+      expect(button).toBeEnabled();
+      expect(button).toHaveTextContent(/^Refresh$/);
+    } finally {
+      control.unmount();
+      vi.useRealTimers();
+    }
   });
 
   it("keeps Refresh live in the disabled Waiting state, as the escape hatch", () => {
