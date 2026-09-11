@@ -12,14 +12,24 @@ the cloud checkout has no beads data).
 This runbook documents the cloud **environment** configuration that grants a
 routine full read + write to that DB. Proven end-to-end on 2026-07-11 (PP-3x7s).
 
-**Model:** hybrid — routines run unattended and may write beads; a local
-"chores" session reviews and acts on them. Dolt merges independent rows and
-tables, but it does not semantically merge two edits to the same issue row.
-Concurrent cloud and live-server updates to one issue can therefore stop the
-bridge with a conflict even when both edits are legitimate. The bridge fails
-closed so an operator can preserve the intended fields from both sides; never
-resolve these conflicts with a blanket newest-row, `--ours`, or `--theirs`
-policy. The beads remote-migrate gate remains the schema-version backstop.
+**Model:** hub and spokes, with DoltHub as the hub. Tim's Mac holds a local
+embedded Dolt database; it pushes to DoltHub automatically (`dolt.auto-push`,
+debounced) and the huddle hooks push and pull on every throttled session poll,
+so the Mac converges within minutes of any write. A cloud routine is the other
+spoke: `beads-cloud-init.sh` clones from DoltHub (or pulls, if the sandbox
+survived), the routine writes, and it pushes with `bd dolt push` before the
+sandbox ends. There is no server and no bridge; a local "chores" session
+reviews what routines wrote.
+
+Dolt merges independent rows and cells on pull, so two sides editing different
+issues, or different fields of one issue, never conflict. Two edits to the same
+cell do. Where that surfaces depends on who moves second: a cloud push that is
+not a fast-forward is rejected, so the routine must `bd dolt pull` and push
+again in the same run or its writes end with the sandbox; a conflicting pull on
+the Mac fails, and the huddle rotation refuses to proceed until `bd dolt pull`
+succeeds. Resolve it there, on the Mac, preserving the intended fields from both
+sides; never with `--force` on a push or a blanket newest-row policy. The beads
+remote-migrate gate remains the schema-version backstop.
 
 ## The three things that make it work
 
