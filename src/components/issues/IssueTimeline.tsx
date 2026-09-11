@@ -47,6 +47,7 @@ import {
   AlertDialogTitle,
 } from "~/components/ui/alert-dialog";
 import { type AccessLevel } from "~/lib/permissions/matrix";
+import { checkPermission } from "~/lib/permissions/helpers";
 import { RichTextDisplay } from "~/components/editor/RichTextDisplay";
 import { RichTextEditor } from "~/components/editor/RichTextEditorDynamic";
 import { type ProseMirrorDoc } from "~/lib/tiptap/types";
@@ -225,11 +226,14 @@ function TimelineItem({
   // Edit: only the comment author can edit their own comments
   const canEdit =
     currentUserId === event.author.id && !event.isSystem && !isIssue;
-  // Delete: author can delete own comments, admins can delete any comment
+  // Delete: authors can delete their own comments; admins can delete any.
+  const canDeleteOwn = checkPermission("comments.delete", currentUserRole, {
+    userId: currentUserId ?? undefined,
+    reporterId: event.author.id,
+  });
+  const canDeleteAny = checkPermission("comments.delete.any", currentUserRole);
   const canDelete =
-    (currentUserId === event.author.id || currentUserRole === "admin") &&
-    !event.isSystem &&
-    !isIssue;
+    (canDeleteOwn || canDeleteAny) && !event.isSystem && !isIssue;
 
   const canShowActions = canEdit || canDelete;
 

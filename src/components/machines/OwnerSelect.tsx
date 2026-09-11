@@ -210,19 +210,19 @@ export function OwnerSelect({
               {selectedUser ? (
                 <>
                   {selectedUser.name}
-                  {selectedUser.role !== "guest" &&
+                  {selectedUser.role !== "guest" && // permissions-audit-allow: UI display filter
                     selectedUser.status === "invited" && ( // permissions-audit-allow: UI badge display, not a permission gate
                       <span className="ml-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
                         (Invited)
                       </span>
                     )}
-                  {selectedUser.role === "guest" &&
+                  {selectedUser.role === "guest" && // permissions-audit-allow: UI display filter
                     selectedUser.status !== "invited" && ( // permissions-audit-allow: UI badge display, not a permission gate
                       <span className="ml-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
                         (GUEST)
                       </span>
                     )}
-                  {selectedUser.role === "guest" &&
+                  {selectedUser.role === "guest" && // permissions-audit-allow: UI display filter
                     selectedUser.status === "invited" && ( // permissions-audit-allow: UI badge display, not a permission gate
                       <span className="ml-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
                         (INVITED · GUEST)
