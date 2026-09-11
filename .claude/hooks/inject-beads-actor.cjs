@@ -42,10 +42,14 @@ function resolveActor(sessionId, cwd) {
     if (!home) {
       return fallback;
     }
+    // The huddle is a plugin checked out at ~/Code/huddle; the launchd job in
+    // dotfiles uses the same path. Not the harness plugin cache, whose path
+    // carries the plugin version and changes on every release.
     const whoami = path.join(
       home,
-      ".agents",
+      "Code",
       "huddle",
+      "lib",
       "huddle-whoami.sh"
     );
     const name = execFileSync("bash", [whoami, "whoami", sessionId], {

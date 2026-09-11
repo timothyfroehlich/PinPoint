@@ -24,7 +24,7 @@ NODE = find_node()
 
 
 def install_whoami_stub(home: Path) -> Path:
-    script = home / ".agents" / "huddle" / "huddle-whoami.sh"
+    script = home / "Code" / "huddle" / "lib" / "huddle-whoami.sh"
     script.parent.mkdir(parents=True, exist_ok=True)
     script.write_text(
         "#!/usr/bin/env bash\n"
