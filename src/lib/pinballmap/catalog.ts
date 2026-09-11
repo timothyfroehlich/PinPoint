@@ -236,11 +236,11 @@ export async function isCatalogEmpty(): Promise<boolean> {
  * Titles for a set of PBM machine ids, from the local mirror — one query, never a
  * lookup per id.
  *
- * This is how the region new-machine alert (PP-o355.18) names a machine at all:
- * PBM's region endpoint returns ids only, so the weekly-refreshed mirror is the
- * only naming source that does not cost a request. An id the mirror has not seen
- * (a title added upstream since the last refresh) is simply absent from the map,
- * and the caller falls back to the id.
+ * This is how the region machine-change alert (PP-o355.18, PP-o355.51.9) names a
+ * machine at all: PBM's region endpoint returns ids only, so the weekly-refreshed
+ * mirror is the only naming source that does not cost a request. An id the mirror
+ * has not seen (a title added upstream since the last refresh) is simply absent
+ * from the map, and the caller falls back to the id.
  */
 export async function getCatalogNames(
   machineIds: number[]
