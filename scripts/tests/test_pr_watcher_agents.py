@@ -88,7 +88,7 @@ def test_agent_models_and_native_boundaries_match_the_approved_plan():
         ANTIGRAVITY_AGENT
     )
 
-    assert codex["model"] == "gpt-5.3-codex-spark"
+    assert codex["model"] == "gpt-5.6-luna"
     assert codex["model_reasoning_effort"] == "low"
     assert codex["sandbox_mode"] == "read-only"
     assert claude["model"] == "haiku"
@@ -116,7 +116,7 @@ def test_every_agent_targets_the_same_single_tool_stdio_server():
     codex_server = codex_config["mcp_servers"]["pr_lifecycle_watch"]
     assert codex_server["command"] == "pnpm"
     assert codex_server["args"] == SERVER_ARGS
-    assert codex_server["required"] is True
+    assert codex_server["required"] is False
     assert codex_server["startup_timeout_sec"] >= 120
     assert codex_server["tool_timeout_sec"] > 3600
     assert codex_server["enabled_tools"] == ["watch_pr_lifecycle"]

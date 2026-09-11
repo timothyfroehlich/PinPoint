@@ -4,12 +4,14 @@ hooks = true
 [mcp_servers.pr_lifecycle_watch]
 command = "pnpm"
 args = ["exec", "tsx", "scripts/workflow/pr-watcher-mcp.ts"]
-required = true
+# A transient local pnpm/tsx failure must not prevent the parent task from opening.
+# The PR workflow still fails closed when its named watcher is unavailable.
+required = false
 startup_timeout_sec = 120
 tool_timeout_sec = 3900
 enabled_tools = ["watch_pr_lifecycle"]
 
 [mcp_servers.pr_lifecycle_watch.env]
 GH_MONITOR_HARNESS = "codex"
-GH_MONITOR_MODEL = "gpt-5.3-codex-spark"
+GH_MONITOR_MODEL = "gpt-5.6-luna"
 GH_MONITOR_WAKES = "1"
