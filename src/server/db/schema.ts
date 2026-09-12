@@ -365,33 +365,16 @@ export const pinballmapAbandonedListings = pgTable(
 ).enableRLS();
 
 /**
- * Machine-at-location entries PinPoint has already seen in a PinballMap region
- * (PP-o355.18) — the memory behind the "new machine in Austin" Discord alert.
+ * Current membership of each Pinball Map machine-at-location xref in a region.
  *
- * One row per (region, lmx id). The daily job reads the whole region in one bulk
- * call and inserts every observed entry with ON CONFLICT DO NOTHING; the rows
- * that actually insert ARE the newly-added machines, so the diff is a single
- * statement rather than a set comparison in application memory.
+ * Rows survive removals because Pinball Map can revive the same LMX id within
+ * seven days. `generation` distinguishes each confirmed absent -> present return,
+ * while `missedRuns` requires two consecutive successful absences before removal.
+ * The separate event table below owns delivery and retry state.
  *
- * `announcedAt` is what keeps the announcement honest in both directions:
- * - the FIRST run for a region back-fills the entire region with `announcedAt`
- *   already set, so bootstrapping a few thousand existing entries announces
- *   nothing (no flood);
- * - afterwards a new row lands with `announcedAt` null and only clears once a
- *   Discord post has actually succeeded, so a failed or unconfigured post retries
- *   on the next run instead of silently swallowing the discovery.
- *
- * Rows are never deleted, and pruning would be actively wrong: PBM soft-deletes
- * an xref and REVIVES THE SAME ROW, id intact, if the machine is re-added within
- * seven days. Forgetting the id would turn that revival into a false "new
- * machine". Past seven days a re-add mints a fresh id and is announced, which is
- * the honest answer — by then it really is a new arrival.
- *
- * No name columns. The region endpoint carries none (six columns: id, timestamps,
- * location_id, machine_id, ic_enabled), so labels are resolved at announce time —
- * the machine from our own catalog mirror, the venue from the bulk
- * region-locations read. That also means the second PBM call happens only on days
- * with something to announce.
+ * `announcedAt` is retained for migrate-before-build compatibility with the old
+ * additions-only runtime. New generation-zero additions keep it in sync until
+ * delivered; newer generations use only the event queue.
  */
 export const pinballmapRegionSeenMachines = pgTable(
   "pinballmap_region_seen_machines",
@@ -409,7 +392,10 @@ export const pinballmapRegionSeenMachines = pgTable(
     firstSeenAt: timestamp("first_seen_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
-    // Null = discovered but not yet announced to Discord (retried next run).
+    isPresent: boolean("is_present").notNull().default(true),
+    missedRuns: integer("missed_runs").notNull().default(0),
+    generation: integer("generation").notNull().default(0),
+    // Legacy additions-only delivery state; see the table comment above.
     announcedAt: timestamp("announced_at", { withTimezone: true }),
   },
   (t) => ({
@@ -419,6 +405,88 @@ export const pinballmapRegionSeenMachines = pgTable(
     // and are never scanned again.
     pendingIdx: index("idx_pinballmap_region_seen_pending")
       .on(t.region, t.firstSeenAt)
+      .where(sql`announced_at is null`),
+  })
+).enableRLS();
+
+/**
+ * Last known names for locations observed in a Pinball Map region.
+ *
+ * Rows are retained when a location leaves the region so a later removal event
+ * can still name the venue after Pinball Map's current region-locations response
+ * has stopped returning it.
+ */
+export const pinballmapRegionLocationNames = pgTable(
+  "pinballmap_region_location_names",
+  {
+    region: text("region").notNull(),
+    locationId: integer("location_id").notNull(),
+    name: text("name").notNull(),
+    refreshedAt: timestamp("refreshed_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.region, t.locationId] }),
+  })
+).enableRLS();
+
+/**
+ * Per-region lease for the region-alert cron.
+ *
+ * The lease spans Pinball Map's HTTP read without holding a database transaction
+ * open. That prevents overlapping invocations from treating one transiently
+ * incomplete upstream snapshot as two consecutive successful absences. Expiry
+ * recovers a killed invocation.
+ */
+export const pinballmapRegionAlertState = pgTable(
+  "pinballmap_region_alert_state",
+  {
+    region: text("region").primaryKey(),
+    removalTrackingInitializedAt: timestamp("removal_tracking_initialized_at", {
+      withTimezone: true,
+    }),
+    runLeaseId: uuid("run_lease_id"),
+    runLeaseExpiresAt: timestamp("run_lease_expires_at", {
+      withTimezone: true,
+    }),
+  },
+  (_t) => ({
+    runLeasePairCheck: check(
+      "pinballmap_region_alert_state_run_lease_pair_check",
+      sql`(run_lease_id IS NULL) = (run_lease_expires_at IS NULL)`
+    ),
+  })
+).enableRLS();
+
+/**
+ * Durable add/remove transitions awaiting Discord delivery.
+ *
+ * Membership and delivery are intentionally separate: if a removal post fails
+ * and the same LMX returns, both the removal and the next-generation addition
+ * remain queued in detection order rather than collapsing into current state.
+ */
+export const pinballmapRegionAlertEvents = pgTable(
+  "pinballmap_region_alert_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    region: text("region").notNull(),
+    lmxId: integer("lmx_id").notNull(),
+    generation: integer("generation").notNull(),
+    eventType: text("event_type", { enum: ["added", "removed"] }).notNull(),
+    locationId: integer("location_id").notNull(),
+    pinballmapMachineId: integer("pinballmap_machine_id").notNull(),
+    detectedAt: timestamp("detected_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    announcedAt: timestamp("announced_at", { withTimezone: true }),
+  },
+  (t) => ({
+    transitionUnique: uniqueIndex(
+      "pinballmap_region_alert_events_transition_unique"
+    ).on(t.region, t.lmxId, t.generation, t.eventType),
+    pendingIdx: index("idx_pinballmap_region_alert_events_pending")
+      .on(t.region, t.detectedAt)
       .where(sql`announced_at is null`),
   })
 ).enableRLS();
@@ -1373,21 +1441,25 @@ export const pinballmapState = pgTable(
     // Null retains the dormant state without permitting any Pinball Map calls.
     locationId: integer("location_id"),
     // Monotonic configuration identity. A location id alone cannot distinguish
-    // A -> B -> A (or a same-location re-save), so every configuration attempt
-    // advances this generation before its PBM validation starts. In-flight
-    // syncs may only write back while the generation they captured still owns
-    // the singleton (pinballmap spec 10.14).
+    // A -> B -> A (or a same-location re-save), so each successful commit or
+    // clear advances this generation atomically with the configuration change.
+    // In-flight syncs may only write back while the generation they captured
+    // still owns the singleton (pinballmap spec 10.14).
     configurationGeneration: integer("configuration_generation")
       .notNull()
       .default(0),
-    // Short-lived database lease serializing a location configuration save
-    // with outbound additions. It spans the remote call without holding a DB
-    // transaction open (CORE-ARCH-011); expiry recovers a crashed invocation.
+    // Short-lived database lease held by an outbound mutation across its remote
+    // call (CORE-ARCH-011). Configuration commits and clears require this lease
+    // to be available, so exactly one side of the race can change live state.
     mutationLeaseId: uuid("mutation_lease_id"),
     mutationLeaseExpiresAt: timestamp("mutation_lease_expires_at", {
       withTimezone: true,
     }),
     snapshotJson: jsonb("snapshot_json").$type<LocationSnapshot>(),
+    // Monotonic identity for the stored snapshot. Unlike configurationGeneration,
+    // this advances for syncs and outbound lineup edits as well as checked
+    // configuration commits, so Save cannot overwrite a newer snapshot.
+    snapshotRevision: integer("snapshot_revision").notNull().default(0),
     lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
     // Timestamp of the last sync ATTEMPT (success OR failure), stamped at the
     // START of the attempt. Distinct from `lastSyncedAt` ("last SUCCESSFUL
@@ -1435,6 +1507,38 @@ export const pinballmapState = pgTable(
     mutationLeasePairCheck: check(
       "pinballmap_state_mutation_lease_pair_check",
       sql`(mutation_lease_id IS NULL) = (mutation_lease_expires_at IS NULL)`
+    ),
+  })
+).enableRLS();
+
+/**
+ * Short-lived, server-only snapshots produced by the Admin Integrations
+ * "Check ID" action. The browser receives only `id` plus a minimal preview;
+ * Save resolves the snapshot here so a client can never author or substitute
+ * Pinball Map data. Separate rows let multiple admins check independently.
+ */
+export const pinballmapLocationChecks = pgTable(
+  "pinballmap_location_checks",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    locationId: integer("location_id").notNull(),
+    expectedLocationId: integer("expected_location_id"),
+    expectedGeneration: integer("expected_configuration_generation").notNull(),
+    expectedSnapshotRevision: integer("expected_snapshot_revision").notNull(),
+    snapshotJson: jsonb("snapshot_json").$type<LocationSnapshot>().notNull(),
+    checkedBy: uuid("checked_by").notNull(),
+    checkedAt: timestamp("checked_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  },
+  (table) => ({
+    expiresAtIdx: index("pinballmap_location_checks_expires_at_idx").on(
+      table.expiresAt
+    ),
+    expiryOrderCheck: check(
+      "pinballmap_location_checks_expiry_order_check",
+      sql`expires_at > checked_at`
     ),
   })
 ).enableRLS();

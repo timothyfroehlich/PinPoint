@@ -44,8 +44,9 @@ export interface PostChannelMessageInput {
  * retry, error classification — is the same code path, so a fix to any of it
  * applies to both.
  *
- * Used by the PinballMap region new-machine alert (PP-o355.18), which broadcasts
- * a public fact to one operator-chosen channel rather than DM-ing every member.
+ * Used by the PinballMap region machine-change alert (PP-o355.18,
+ * PP-o355.51.9), which broadcasts a public fact to one operator-chosen channel
+ * rather than DM-ing every member.
  */
 export async function postChannelMessage(
   input: PostChannelMessageInput

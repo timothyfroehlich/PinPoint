@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { cn } from "~/lib/utils";
+import { useIntegrationDirtyState } from "../integrations-dirty-state";
 import {
   saveDiscordConfigAction,
   clearDiscordBotTokenAction,
@@ -111,28 +112,11 @@ export function DiscordConfigForm({
   const canValidateToken = tokenAvailable;
   const canValidateServer = tokenAvailable && guildIdInput.trim().length > 0;
 
-  // Unsaved-changes guard. Browser-level beforeunload fires on tab close,
-  // refresh, and external navigation. (App Router does not expose router
-  // events, so internal client-side nav via <Link> will not trigger this —
-  // accepted limitation.)
   const isDirty =
     tokenInput.length > 0 ||
     guildIdInput !== guildId ||
-    inviteLinkInput !== inviteLink ||
-    false;
-
-  React.useEffect(() => {
-    if (!isDirty) return;
-    const handler = (e: BeforeUnloadEvent): void => {
-      e.preventDefault();
-      // Legacy browsers ignored without setting returnValue.
-      e.returnValue = "";
-    };
-    window.addEventListener("beforeunload", handler);
-    return () => {
-      window.removeEventListener("beforeunload", handler);
-    };
-  }, [isDirty]);
+    inviteLinkInput !== inviteLink;
+  useIntegrationDirtyState("discord", isDirty);
 
   // Build a per-field error map from the latest save result.
   const fieldErrors = React.useMemo(() => {

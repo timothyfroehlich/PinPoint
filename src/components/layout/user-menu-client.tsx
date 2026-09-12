@@ -163,7 +163,7 @@ export function UserMenu({
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
               <a
-                href="/admin/integrations/discord"
+                href="/admin/integrations"
                 className="flex items-center cursor-pointer"
                 data-testid="user-menu-admin-integrations"
               >

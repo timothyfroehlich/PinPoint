@@ -518,7 +518,7 @@ export async function saveDiscordConfig(
     }
   }
 
-  revalidatePath("/admin/integrations/discord");
+  revalidatePath("/admin/integrations");
   return probedBotUsername
     ? { ok: true, botUsername: probedBotUsername }
     : { ok: true };
@@ -568,7 +568,7 @@ export async function clearDiscordBotTokenAction(): Promise<ClearDiscordBotToken
         updatedBy: userId,
       })
       .where(eq(discordIntegrationConfig.id, "singleton"));
-    revalidatePath("/admin/integrations/discord");
+    revalidatePath("/admin/integrations");
     return { ok: true };
   }
 
@@ -625,6 +625,6 @@ export async function clearDiscordBotTokenAction(): Promise<ClearDiscordBotToken
     });
   }
 
-  revalidatePath("/admin/integrations/discord");
+  revalidatePath("/admin/integrations");
   return { ok: true };
 }

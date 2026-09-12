@@ -1,10 +1,16 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
-import { and, eq, isNull, lt, or, sql } from "drizzle-orm";
+import { and, eq, isNull, lt, lte, or, sql } from "drizzle-orm";
 import { db } from "~/server/db";
-import { pinballmapState } from "~/server/db/schema";
+import { pinballmapLocationChecks, pinballmapState } from "~/server/db/schema";
 import { getPinballMapClient } from "./client";
-import { PBM_REFRESH_BURST, PBM_REFRESH_REFILL_MS } from "./config";
+import {
+  PBM_LOCATION_CHECK_TTL_MS,
+  PBM_REFRESH_BURST,
+  PBM_REFRESH_REFILL_MS,
+} from "./config";
+import { PinballMapReadError } from "./types";
+import type { LocationSnapshot } from "./types";
 import type { PinballmapRuntimeState } from "~/lib/types";
 
 /**
@@ -40,6 +46,7 @@ export async function getPinballMapState(): Promise<PinballmapRuntimeState | nul
       mutationLeaseId: pinballmapState.mutationLeaseId,
       mutationLeaseExpiresAt: pinballmapState.mutationLeaseExpiresAt,
       snapshotJson: pinballmapState.snapshotJson,
+      snapshotRevision: pinballmapState.snapshotRevision,
       lastSyncedAt: pinballmapState.lastSyncedAt,
       lastSyncAttemptAt: pinballmapState.lastSyncAttemptAt,
       lastSyncStatus: pinballmapState.lastSyncStatus,
@@ -57,15 +64,6 @@ export async function getPinballMapState(): Promise<PinballmapRuntimeState | nul
   return row ?? null;
 }
 
-/** Materialize the singleton without naming deploy-order compatibility columns. */
-async function ensureStateRow(): Promise<void> {
-  await db.execute(sql`
-    INSERT INTO "pinballmap_state" ("id")
-    VALUES (${SINGLETON_ID})
-    ON CONFLICT ("id") DO NOTHING
-  `);
-}
-
 function availableMutationLease(now: Date): ReturnType<typeof or> {
   return or(
     isNull(pinballmapState.mutationLeaseId),
@@ -76,10 +74,10 @@ function availableMutationLease(now: Date): ReturnType<typeof or> {
 /**
  * Reserve the configured location for one outbound addition.
  *
- * A configuration save claims the same singleton lease before its validating
- * fetch, so exactly one of the save and add can own the location. The lease is
- * deliberately time-bounded: a killed server action cannot strand integration
- * configuration forever.
+ * Configuration commits and clears require this singleton lease to be
+ * available in their atomic update, so exactly one of configuration or the
+ * outbound mutation can own the location. The lease is deliberately
+ * time-bounded: a killed server action cannot strand the integration forever.
  */
 export async function claimPinballMapMutationLease(
   trackedLocationId: number | null,
@@ -123,40 +121,6 @@ export async function releasePinballMapMutationLease(
     );
 }
 
-async function claimConfigurationLease(
-  expectedLocationId: number | null,
-  expectedGeneration: number
-): Promise<{ id: string; configurationGeneration: number } | null> {
-  await ensureStateRow();
-  const now = new Date();
-  const id = randomUUID();
-  const locationGuard =
-    expectedLocationId === null
-      ? isNull(pinballmapState.locationId)
-      : eq(pinballmapState.locationId, expectedLocationId);
-  const [claimed] = await db
-    .update(pinballmapState)
-    .set({
-      configurationGeneration: sql`${pinballmapState.configurationGeneration} + 1`,
-      mutationLeaseId: id,
-      mutationLeaseExpiresAt: new Date(now.getTime() + MUTATION_LEASE_MS),
-    })
-    .where(
-      and(
-        eq(pinballmapState.id, SINGLETON_ID),
-        locationGuard,
-        eq(pinballmapState.configurationGeneration, expectedGeneration),
-        availableMutationLease(now)
-      )
-    )
-    .returning({
-      configurationGeneration: pinballmapState.configurationGeneration,
-    });
-  return claimed
-    ? { id, configurationGeneration: claimed.configurationGeneration }
-    : null;
-}
-
 /**
  * Which caller kicked off a sync — decides throttle policy (PP-hbi0).
  *
@@ -181,28 +145,10 @@ type SyncFailure =
 export type SyncResult =
   { ok: true; machineCount: number; syncedAt: Date } | SyncFailure;
 
-export type ValidationSyncResult =
-  | {
-      ok: true;
-      machineCount: number;
-      syncedAt: Date;
-      snapshot: NonNullable<PinballmapRuntimeState["snapshotJson"]>;
-    }
-  | SyncFailure;
-
 interface SyncOptions {
   updatedBy?: string;
   trigger?: SyncTrigger;
   mutationLeaseId?: string;
-}
-
-interface ValidationSyncOptions {
-  updatedBy?: string;
-  validation: {
-    locationId: number;
-    expectedLocationId: number | null;
-    mutationLeaseId: string;
-  };
 }
 
 /**
@@ -270,6 +216,7 @@ async function recordSyncSuccess(
       "id",
       "location_id",
       "snapshot_json",
+      "snapshot_revision",
       "last_synced_at",
       "last_sync_status",
       "last_sync_error",
@@ -280,6 +227,7 @@ async function recordSyncSuccess(
       ${SINGLETON_ID},
       ${locationId},
       ${JSON.stringify(snapshot)}::text::jsonb,
+      1,
       ${syncedAt.toISOString()}::timestamptz,
       'ok',
       NULL,
@@ -289,6 +237,7 @@ async function recordSyncSuccess(
     ON CONFLICT ("id") DO UPDATE SET
       "location_id" = EXCLUDED."location_id",
       "snapshot_json" = EXCLUDED."snapshot_json",
+      "snapshot_revision" = "pinballmap_state"."snapshot_revision" + 1,
       "last_synced_at" = EXCLUDED."last_synced_at",
       "last_sync_status" = EXCLUDED."last_sync_status",
       "last_sync_error" = EXCLUDED."last_sync_error",
@@ -441,7 +390,7 @@ async function stampSyncAttempt(
   }
 
   if (!recordHealth) {
-    // Candidate validation spends the shared traffic allowance but is not an
+    // Check ID spends the shared traffic allowance but is not an
     // attempt to refresh the CURRENT location. Leave its health untouched; the
     // successful configuration commit writes coherent health for the candidate.
     const claimed = await db.execute(sql`
@@ -524,34 +473,14 @@ async function stampSyncAttempt(
  * attempt over a stale snapshot — read `lastSyncStatus` for attempt outcome.
  */
 export async function syncLocationSnapshot(
-  opts: ValidationSyncOptions
-): Promise<ValidationSyncResult>;
-export async function syncLocationSnapshot(
   opts?: SyncOptions
-): Promise<SyncResult>;
-export async function syncLocationSnapshot(
-  opts?: SyncOptions | ValidationSyncOptions
-): Promise<SyncResult | ValidationSyncResult> {
-  const validation = opts && "validation" in opts ? opts.validation : null;
-  const trigger =
-    validation === null && opts && !("validation" in opts)
-      ? (opts.trigger ?? "manual")
-      : "manual";
-  const mutationLeaseId =
-    validation?.mutationLeaseId ??
-    (validation === null && opts && !("validation" in opts)
-      ? opts.mutationLeaseId
-      : undefined);
+): Promise<SyncResult> {
+  const trigger = opts?.trigger ?? "manual";
+  const mutationLeaseId = opts?.mutationLeaseId;
   const state = await getPinballMapState();
   const trackedLocationId = state?.locationId ?? null;
   const configurationGeneration = state?.configurationGeneration ?? 0;
-  const expectedLocationId =
-    validation?.expectedLocationId ?? trackedLocationId;
-  const locationId = validation?.locationId ?? trackedLocationId;
-  if (trackedLocationId !== expectedLocationId) {
-    return { ok: false, reason: "superseded" };
-  }
-  if (locationId === null) {
+  if (trackedLocationId === null) {
     return { ok: false, reason: "not_configured" };
   }
   const syncedAt = new Date();
@@ -559,17 +488,17 @@ export async function syncLocationSnapshot(
   // Chokepoint: stamp the attempt before the fetch. Manual spends a token
   // (TOCTOU-safe); cron records unconditionally.
   const claimed = await stampSyncAttempt(
-    expectedLocationId,
+    trackedLocationId,
     configurationGeneration,
     syncedAt,
     trigger === "manual",
-    validation === null,
+    true,
     mutationLeaseId
   );
   if (!claimed) {
     const current = await getPinballMapState();
     if (
-      (current?.locationId ?? null) !== expectedLocationId ||
+      (current?.locationId ?? null) !== trackedLocationId ||
       (current?.configurationGeneration ?? 0) !== configurationGeneration
     ) {
       return { ok: false, reason: "superseded" };
@@ -607,17 +536,9 @@ export async function syncLocationSnapshot(
   try {
     const snapshot = await (
       await getPinballMapClient()
-    ).fetchLocation(locationId);
-    if (validation !== null) {
-      return {
-        ok: true,
-        machineCount: snapshot.machineCount,
-        syncedAt,
-        snapshot,
-      };
-    }
+    ).fetchLocation(trackedLocationId);
     const stored = await recordSyncSuccess(
-      locationId,
+      trackedLocationId,
       configurationGeneration,
       snapshot,
       syncedAt,
@@ -627,13 +548,10 @@ export async function syncLocationSnapshot(
     return { ok: true, machineCount: snapshot.machineCount, syncedAt };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown sync error";
-    if (validation !== null) {
-      return { ok: false, reason: "error", error: message };
-    }
     // Note: no `lastSyncedAt` here — a failed attempt must not advance the
     // last-successful-sync clock. `updatedAt` still records that we wrote.
     const stored = await recordSyncFailure(
-      locationId,
+      trackedLocationId,
       configurationGeneration,
       message,
       syncedAt,
@@ -644,130 +562,367 @@ export async function syncLocationSnapshot(
   }
 }
 
-export type SetTrackedLocationResult =
-  | { ok: true }
+export interface CheckedLocationPreview {
+  checkId: string;
+  locationId: number;
+  name: string;
+  city: string | null;
+  state: string | null;
+  machineCount: number;
+  checkedAt: Date;
+  expiresAt: Date;
+}
+
+export type CheckTrackedLocationResult =
+  | { ok: true; candidate: CheckedLocationPreview }
+  | { ok: false; reason: "invalid" }
+  | { ok: false; reason: "not_found" }
+  | { ok: false; reason: "busy" }
   | { ok: false; reason: "concurrent_change" }
-  | { ok: false; reason: "error"; error: string }
+  | { ok: false; reason: "fetch_failed"; error: string }
   | { ok: false; reason: "throttled"; retryAfterMs: number };
 
-/**
- * Validate and atomically store the tracked Pinball Map location (spec 10.7–10.14).
- *
- * A non-empty save validates through `syncLocationSnapshot` before opening the
- * transaction, so the external read obeys CORE-ARCH-011 and spends from the
- * shared manual-refresh allowance. The transaction then replaces the location,
- * snapshot, and health together. Clearing writes only the nullable location;
- * the retained snapshot, health, links, intent, comments, and abandonments stay
- * dormant and reversible.
- */
-export async function setTrackedLocation(
-  locationId: number | null,
-  updatedBy?: string
-): Promise<SetTrackedLocationResult> {
-  const state = await getPinballMapState();
-  const previousLocationId = state?.locationId ?? null;
-  const previousGeneration = state?.configurationGeneration ?? 0;
-  const previousLocationGuard =
-    previousLocationId === null
-      ? isNull(pinballmapState.locationId)
-      : eq(pinballmapState.locationId, previousLocationId);
-  const actor = updatedBy === undefined ? {} : { updatedBy };
+export type CommitCheckedLocationResult =
+  | { ok: true }
+  | { ok: false; reason: "not_found" }
+  | { ok: false; reason: "unauthorized" }
+  | { ok: false; reason: "expired" }
+  | { ok: false; reason: "busy" }
+  | { ok: false; reason: "concurrent_change" };
 
-  if (locationId === null && !state) return { ok: true };
+export type ClearTrackedLocationResult =
+  | { ok: true }
+  | { ok: false; reason: "busy" }
+  | { ok: false; reason: "concurrent_change" };
 
-  // Claim before validation so an Add cannot begin halfway through a switch,
-  // and advance the generation immediately so every older sync is superseded
-  // even for A -> B -> A or a same-location re-save (spec 10.9, 10.14).
-  const lease = await claimConfigurationLease(
-    previousLocationId,
-    previousGeneration
+function hasActiveMutationLease(
+  state: Pick<
+    PinballmapRuntimeState,
+    "mutationLeaseId" | "mutationLeaseExpiresAt"
+  > | null,
+  now: Date
+): boolean {
+  return (
+    state?.mutationLeaseId !== null &&
+    state?.mutationLeaseId !== undefined &&
+    state.mutationLeaseExpiresAt !== null &&
+    state.mutationLeaseExpiresAt.getTime() > now.getTime()
   );
-  if (!lease) return { ok: false, reason: "concurrent_change" };
+}
 
+async function deleteExpiredLocationChecks(): Promise<void> {
+  await db
+    .delete(pinballmapLocationChecks)
+    .where(lte(pinballmapLocationChecks.expiresAt, sql`now()`));
+}
+
+/**
+ * Spend one human refresh token and fetch a candidate without changing the
+ * configured location or its health. The snapshot stays server-side behind an
+ * opaque, admin-bound id until Save commits it (spec 10.9, 10.13, 10.14).
+ */
+export async function checkTrackedLocation(
+  locationId: number,
+  checkedBy: string
+): Promise<CheckTrackedLocationResult> {
+  if (!Number.isSafeInteger(locationId) || locationId <= 0) {
+    return { ok: false, reason: "invalid" };
+  }
+
+  const state = await getPinballMapState();
+  const expectedLocationId = state?.locationId ?? null;
+  const expectedGeneration = state?.configurationGeneration ?? 0;
+  const attemptedAt = new Date();
+  const claimed = await stampSyncAttempt(
+    expectedLocationId,
+    expectedGeneration,
+    attemptedAt,
+    true,
+    false,
+    undefined
+  );
+
+  if (!claimed) {
+    const current = await getPinballMapState();
+    if (
+      (current?.locationId ?? null) !== expectedLocationId ||
+      (current?.configurationGeneration ?? 0) !== expectedGeneration
+    ) {
+      return { ok: false, reason: "concurrent_change" };
+    }
+    if (hasActiveMutationLease(current, attemptedAt)) {
+      return { ok: false, reason: "busy" };
+    }
+    const { nextRefillAt } = await getRefreshAllowance(attemptedAt);
+    return {
+      ok: false,
+      reason: "throttled",
+      retryAfterMs: Math.max(
+        0,
+        (nextRefillAt?.getTime() ??
+          attemptedAt.getTime() + PBM_REFRESH_REFILL_MS) - attemptedAt.getTime()
+      ),
+    };
+  }
+
+  const baseline = await getPinballMapState();
+  if (
+    baseline === null ||
+    (baseline.locationId ?? null) !== expectedLocationId ||
+    baseline.configurationGeneration !== expectedGeneration
+  ) {
+    return { ok: false, reason: "concurrent_change" };
+  }
+  if (hasActiveMutationLease(baseline, attemptedAt)) {
+    return { ok: false, reason: "busy" };
+  }
+
+  let snapshot: LocationSnapshot;
   try {
-    if (locationId === null) {
-      const cleared = await db
-        .update(pinballmapState)
-        .set({
-          locationId: null,
-          mutationLeaseId: null,
-          mutationLeaseExpiresAt: null,
-          updatedAt: new Date(),
-          ...actor,
-        })
-        .where(
-          and(
-            eq(pinballmapState.id, SINGLETON_ID),
-            previousLocationGuard,
-            eq(pinballmapState.mutationLeaseId, lease.id),
-            eq(
-              pinballmapState.configurationGeneration,
-              lease.configurationGeneration
-            )
-          )
-        )
-        .returning({ id: pinballmapState.id });
-      return cleared.length > 0
-        ? { ok: true }
-        : { ok: false, reason: "concurrent_change" };
+    snapshot = await (await getPinballMapClient()).fetchLocation(locationId);
+  } catch (error) {
+    if (error instanceof PinballMapReadError && error.reason === "not_found") {
+      return { ok: false, reason: "not_found" };
     }
+    return {
+      ok: false,
+      reason: "fetch_failed",
+      error: error instanceof Error ? error.message : "Unknown check error",
+    };
+  }
 
-    const validated = await syncLocationSnapshot({
-      validation: {
-        locationId,
-        expectedLocationId: previousLocationId,
-        mutationLeaseId: lease.id,
-      },
-      ...(updatedBy === undefined ? {} : { updatedBy }),
+  if (snapshot.locationId !== locationId) {
+    return {
+      ok: false,
+      reason: "fetch_failed",
+      error: "Pinball Map returned a different location than requested.",
+    };
+  }
+
+  const checkedAt = new Date();
+  const current = await getPinballMapState();
+  if (
+    (current?.locationId ?? null) !== expectedLocationId ||
+    (current?.configurationGeneration ?? 0) !== expectedGeneration ||
+    current?.snapshotRevision !== baseline.snapshotRevision
+  ) {
+    return { ok: false, reason: "concurrent_change" };
+  }
+  if (hasActiveMutationLease(current, checkedAt)) {
+    return { ok: false, reason: "busy" };
+  }
+
+  await deleteExpiredLocationChecks();
+  const [stored] = await db
+    .insert(pinballmapLocationChecks)
+    .values({
+      locationId,
+      expectedLocationId,
+      expectedGeneration,
+      expectedSnapshotRevision: baseline.snapshotRevision,
+      snapshotJson: snapshot,
+      checkedBy,
+      checkedAt: sql`now()`,
+      expiresAt: sql`now() + (${PBM_LOCATION_CHECK_TTL_MS} * interval '1 millisecond')`,
+    })
+    .returning({
+      id: pinballmapLocationChecks.id,
+      checkedAt: pinballmapLocationChecks.checkedAt,
+      expiresAt: pinballmapLocationChecks.expiresAt,
     });
-    if (!validated.ok) {
-      if (validated.reason === "throttled") return validated;
-      if (validated.reason === "superseded") {
-        return { ok: false, reason: "concurrent_change" };
-      }
-      if (validated.reason === "busy") {
-        return { ok: false, reason: "concurrent_change" };
-      }
-      return {
-        ok: false,
-        reason: "error",
-        error:
-          validated.reason === "error"
-            ? validated.error
-            : "Pinball Map is not configured.",
-      };
-    }
+  if (!stored) {
+    return {
+      ok: false,
+      reason: "fetch_failed",
+      error: "PinPoint could not retain the checked location.",
+    };
+  }
 
-    const committed = await db
+  return {
+    ok: true,
+    candidate: {
+      checkId: stored.id,
+      locationId,
+      name: snapshot.name,
+      city: snapshot.city ?? null,
+      state: snapshot.state ?? null,
+      machineCount: snapshot.machineCount,
+      checkedAt: stored.checkedAt,
+      expiresAt: stored.expiresAt,
+    },
+  };
+}
+
+/** Commit one unexpired, admin-bound candidate without another PBM request. */
+export async function commitCheckedTrackedLocation(
+  checkId: string,
+  checkedBy: string,
+  updatedBy?: string
+): Promise<CommitCheckedLocationResult> {
+  const [selected] = await db
+    .select({
+      candidate: pinballmapLocationChecks,
+      isExpired: sql<boolean>`${pinballmapLocationChecks.expiresAt} <= now()`,
+    })
+    .from(pinballmapLocationChecks)
+    .where(eq(pinballmapLocationChecks.id, checkId))
+    .limit(1);
+  if (!selected) return { ok: false, reason: "not_found" };
+  const { candidate } = selected;
+  if (candidate.checkedBy !== checkedBy) {
+    return { ok: false, reason: "unauthorized" };
+  }
+
+  if (selected.isExpired) {
+    await db
+      .delete(pinballmapLocationChecks)
+      .where(eq(pinballmapLocationChecks.id, checkId));
+    return { ok: false, reason: "expired" };
+  }
+
+  return db.transaction(async (tx) => {
+    const commitAt = new Date();
+    const [fresh] = await tx
+      .select({
+        candidate: pinballmapLocationChecks,
+        isExpired: sql<boolean>`${pinballmapLocationChecks.expiresAt} <= now()`,
+      })
+      .from(pinballmapLocationChecks)
+      .where(
+        and(
+          eq(pinballmapLocationChecks.id, checkId),
+          eq(pinballmapLocationChecks.checkedBy, checkedBy)
+        )
+      )
+      .limit(1);
+    if (!fresh) {
+      return { ok: false, reason: "not_found" };
+    }
+    if (fresh.isExpired) {
+      await tx
+        .delete(pinballmapLocationChecks)
+        .where(eq(pinballmapLocationChecks.id, checkId));
+      return { ok: false, reason: "expired" };
+    }
+    const freshCandidate = fresh.candidate;
+    const locationGuard =
+      freshCandidate.expectedLocationId === null
+        ? isNull(pinballmapState.locationId)
+        : eq(pinballmapState.locationId, freshCandidate.expectedLocationId);
+    const actor = updatedBy === undefined ? {} : { updatedBy };
+    const committed = await tx
       .update(pinballmapState)
       .set({
-        locationId,
-        snapshotJson: validated.snapshot,
-        lastSyncedAt: validated.syncedAt,
-        lastSyncAttemptAt: validated.syncedAt,
+        locationId: freshCandidate.locationId,
+        configurationGeneration: sql`${pinballmapState.configurationGeneration} + 1`,
+        snapshotJson: freshCandidate.snapshotJson,
+        snapshotRevision: sql`${pinballmapState.snapshotRevision} + 1`,
+        lastSyncedAt: freshCandidate.checkedAt,
+        lastSyncAttemptAt: freshCandidate.checkedAt,
         lastSyncStatus: "ok",
         lastSyncError: null,
         mutationLeaseId: null,
         mutationLeaseExpiresAt: null,
-        updatedAt: validated.syncedAt,
+        updatedAt: commitAt,
         ...actor,
       })
       .where(
         and(
           eq(pinballmapState.id, SINGLETON_ID),
-          previousLocationGuard,
-          eq(pinballmapState.mutationLeaseId, lease.id),
+          locationGuard,
           eq(
             pinballmapState.configurationGeneration,
-            lease.configurationGeneration
-          )
+            freshCandidate.expectedGeneration
+          ),
+          eq(
+            pinballmapState.snapshotRevision,
+            freshCandidate.expectedSnapshotRevision
+          ),
+          availableMutationLease(commitAt)
         )
       )
       .returning({ id: pinballmapState.id });
-    return committed.length > 0
-      ? { ok: true }
-      : { ok: false, reason: "concurrent_change" };
-  } finally {
-    await releasePinballMapMutationLease(lease.id);
+    if (committed.length === 0) {
+      const [current] = await tx
+        .select({
+          locationId: pinballmapState.locationId,
+          configurationGeneration: pinballmapState.configurationGeneration,
+          mutationLeaseId: pinballmapState.mutationLeaseId,
+          mutationLeaseExpiresAt: pinballmapState.mutationLeaseExpiresAt,
+        })
+        .from(pinballmapState)
+        .where(eq(pinballmapState.id, SINGLETON_ID))
+        .limit(1);
+      if (
+        (current?.locationId ?? null) === freshCandidate.expectedLocationId &&
+        (current?.configurationGeneration ?? 0) ===
+          freshCandidate.expectedGeneration &&
+        hasActiveMutationLease(current ?? null, commitAt)
+      ) {
+        return { ok: false, reason: "busy" };
+      }
+      await tx
+        .delete(pinballmapLocationChecks)
+        .where(eq(pinballmapLocationChecks.id, checkId));
+      return { ok: false, reason: "concurrent_change" };
+    }
+    await tx
+      .delete(pinballmapLocationChecks)
+      .where(eq(pinballmapLocationChecks.id, checkId));
+    return { ok: true };
+  });
+}
+
+/** Clear only the configured location under the same generation/lease guard. */
+export async function clearTrackedLocation(
+  expectedLocationId: number,
+  expectedGeneration: number,
+  updatedBy?: string
+): Promise<ClearTrackedLocationResult> {
+  const state = await getPinballMapState();
+  const clearAt = new Date();
+  if (
+    state?.locationId === expectedLocationId &&
+    hasActiveMutationLease(state, clearAt)
+  ) {
+    return { ok: false, reason: "busy" };
   }
+  if (
+    state?.locationId !== expectedLocationId ||
+    state.configurationGeneration !== expectedGeneration
+  ) {
+    return { ok: false, reason: "concurrent_change" };
+  }
+
+  const actor = updatedBy === undefined ? {} : { updatedBy };
+  const cleared = await db
+    .update(pinballmapState)
+    .set({
+      locationId: null,
+      configurationGeneration: sql`${pinballmapState.configurationGeneration} + 1`,
+      mutationLeaseId: null,
+      mutationLeaseExpiresAt: null,
+      updatedAt: clearAt,
+      ...actor,
+    })
+    .where(
+      and(
+        eq(pinballmapState.id, SINGLETON_ID),
+        eq(pinballmapState.locationId, expectedLocationId),
+        eq(pinballmapState.configurationGeneration, expectedGeneration),
+        availableMutationLease(clearAt)
+      )
+    )
+    .returning({ id: pinballmapState.id });
+  if (cleared.length > 0) return { ok: true };
+
+  const current = await getPinballMapState();
+  if (
+    current?.locationId === expectedLocationId &&
+    current.configurationGeneration === expectedGeneration &&
+    hasActiveMutationLease(current, clearAt)
+  ) {
+    return { ok: false, reason: "busy" };
+  }
+  return { ok: false, reason: "concurrent_change" };
 }

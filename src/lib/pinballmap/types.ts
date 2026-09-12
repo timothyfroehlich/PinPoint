@@ -42,6 +42,10 @@ export interface PbmLmx {
 export interface LocationSnapshot {
   locationId: number;
   name: string;
+  /** Optional locality supplied by PBM; absent on snapshots stored before this field existed. */
+  city?: string | null;
+  /** Optional region abbreviation supplied by PBM; absent on older stored snapshots. */
+  state?: string | null;
   /** PBM's `date_last_updated` (YYYY-MM-DD) or null. */
   dateLastUpdated: string | null;
   lastUpdatedByUsername: string | null;
@@ -51,6 +55,25 @@ export interface LocationSnapshot {
   fetchedAtIso: string;
   /** The untouched PBM payload, for storage/debugging. */
   raw: unknown;
+}
+
+/** Why a PinballMap read failed before it could produce a trustworthy payload. */
+export type PbmReadFailureReason =
+  | "not_found"
+  | "rate_limited"
+  | "unauthorized"
+  | "transient"
+  | "invalid_response";
+
+/** Typed read failure used by the client seam without exposing HTTP details to UI callers. */
+export class PinballMapReadError extends Error {
+  constructor(
+    readonly reason: PbmReadFailureReason,
+    message: string
+  ) {
+    super(message);
+    this.name = "PinballMapReadError";
+  }
 }
 
 /**
