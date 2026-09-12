@@ -37,6 +37,16 @@ def test_detects_arbitrary_identifiers_and_property_access(tmp_path: Path) -> No
     assert 'accessLevel === "admin"' in result.stderr
 
 
+def test_detects_literal_first_role_comparisons(tmp_path: Path) -> None:
+    result = run_audit(
+        tmp_path,
+        'if ("admin" === accessLevel || "guest" !== currentUser.role) {}\n',
+    )
+
+    assert result.returncode == 1
+    assert '"admin" === accessLevel' in result.stderr
+
+
 def test_ignores_role_comparisons_on_pure_comment_lines(tmp_path: Path) -> None:
     result = run_audit(
         tmp_path,

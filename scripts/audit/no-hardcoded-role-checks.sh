@@ -25,7 +25,7 @@ if ! command -v rg >/dev/null 2>&1; then
   echo "Install with: brew install ripgrep   (or: apt-get install ripgrep)" >&2
   exit 2
 fi
-raw=$(rg -n -B1 -A1 '\b[A-Za-z_$][A-Za-z0-9_$.]*\s*(===|!==)\s*"(admin|technician|member|guest)"' src \
+raw=$(rg -n -B1 -A1 '(\b[A-Za-z_$][A-Za-z0-9_$.]*\s*(===|!==)\s*"(admin|technician|member|guest)"|"(admin|technician|member|guest)"\s*(===|!==)\s*[A-Za-z_$][A-Za-z0-9_$.]*)' src \
   --glob '!src/lib/permissions/matrix.ts' \
   --glob '!src/lib/permissions/helpers.ts' \
   --glob '!**/*.test.*' \
