@@ -98,14 +98,20 @@ if [[ -z "$database_url" ]]; then
   exit 1
 fi
 
-if [[ "$stack_overridden" == true \
-  && ( "$postgres_url_was_defined" != true \
-    || "$non_pooling_url_was_defined" != true \
-    || "$supabase_url_was_defined" != true \
-    || "${POSTGRES_URL_NON_POOLING:-}" != "$database_url" ) ]]; then
-  printf '%s\n' \
-    "FAIL: preflight readiness — local stack overrides must be defined together and match" \
-    "Run: unset POSTGRES_URL POSTGRES_URL_NON_POOLING NEXT_PUBLIC_SUPABASE_URL" >&2
+if [[ ( "$stack_overridden" == true \
+    && ( "$postgres_url_was_defined" != true \
+      || "$non_pooling_url_was_defined" != true \
+      || "$supabase_url_was_defined" != true ) ) \
+  || "$POSTGRES_URL_NON_POOLING" != "$database_url" ]]; then
+  if [[ "$stack_overridden" == true ]]; then
+    printf '%s\n' \
+      "FAIL: preflight readiness — local stack overrides must be defined together and match" \
+      "Run: unset POSTGRES_URL POSTGRES_URL_NON_POOLING NEXT_PUBLIC_SUPABASE_URL" >&2
+  else
+    printf '%s\n' \
+      "FAIL: preflight readiness — local stack configuration does not identify one worktree stack" \
+      "Run: python3 scripts/worktree_setup.py" >&2
+  fi
   exit 1
 fi
 

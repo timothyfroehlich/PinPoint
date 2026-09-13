@@ -22,6 +22,9 @@ def _run_readiness(
     database_url_override: str | None = None,
     non_pooling_url_override: str | None = None,
     supabase_url_override: str | None = None,
+    dotenv_non_pooling_url: str = (
+        "postgresql://postgres:postgres@localhost:61234/postgres"
+    ),
     dotenv_extra: str = "",
 ) -> subprocess.CompletedProcess[str]:
     bin_dir = tmp_path / "bin"
@@ -68,7 +71,7 @@ fi
     )
     (tmp_path / ".env.local").write_text(
         "POSTGRES_URL=postgresql://postgres:postgres@localhost:61234/postgres\n"
-        "POSTGRES_URL_NON_POOLING=postgresql://postgres:postgres@localhost:61234/postgres\n"
+        f"POSTGRES_URL_NON_POOLING={dotenv_non_pooling_url}\n"
         "NEXT_PUBLIC_SUPABASE_URL=http://localhost:61233\n"
         f"{dotenv_extra}"
     )
@@ -285,6 +288,23 @@ def test_non_pooling_only_override_is_preserved_and_rejected(
     assert result.stderr.splitlines() == [
         "FAIL: preflight readiness — local stack overrides must be defined together and match",
         "Run: unset POSTGRES_URL POSTGRES_URL_NON_POOLING NEXT_PUBLIC_SUPABASE_URL",
+    ]
+
+
+def test_stale_dotenv_non_pooling_target_is_rejected(tmp_path: Path) -> None:
+    result = _run_readiness(
+        tmp_path,
+        "ready",
+        dotenv_non_pooling_url=(
+            "postgresql://postgres:postgres@localhost:62345/postgres"
+        ),
+    )
+
+    assert result.returncode == 1
+    assert result.stdout == ""
+    assert result.stderr.splitlines() == [
+        "FAIL: preflight readiness — local stack configuration does not identify one worktree stack",
+        "Run: python3 scripts/worktree_setup.py",
     ]
 
 
