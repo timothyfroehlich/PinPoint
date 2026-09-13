@@ -53,10 +53,7 @@
 
 | Spec | Code today | Resolution |
 | :-- | :-- | :-- |
-| §2 one combined page | `/admin/integrations` hosts the Discord section; the Pinball Map section is not built yet | PP-o355.51.6 |
-| §2.3 per-section save | The Discord section has independent save and reset state; the Pinball Map section is not built yet | PP-o355.51.6 |
 | §2.3 unsaved-edit warning on browser Back | The combined page warns on document unload and same-app link navigation; same-app browser Back remains unguarded because App Router exposes no cancellable Back-navigation hook | Accepted platform limitation; revisit when a Baseline Widely available navigation-interception API can cover Back without synthetic history |
-| §4 Pinball Map section | No Pinball Map section anywhere in admin | PP-o355.51.6 |
 
 ---
 
