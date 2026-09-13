@@ -1,73 +1,63 @@
 "use server";
 
+import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
-import { createClient } from "~/lib/supabase/server";
-import { serverActionError } from "~/lib/observability/report-error";
-import { type Result, ok, err } from "~/lib/result";
+import { z } from "zod";
+
+import {
+  createProtectedAction,
+  type ProtectedActionResult,
+} from "~/lib/actions";
 import {
   toggleMachineWatcher,
   updateMachineWatchMode,
 } from "~/services/machines";
 import { db } from "~/server/db";
 import { machines } from "~/server/db/schema";
-import { eq } from "drizzle-orm";
 
-export type ToggleMachineWatcherResult = Result<
+export type ToggleMachineWatcherResult = ProtectedActionResult<
   { isWatching: boolean; watchMode: string },
-  "UNAUTHORIZED" | "SERVER"
+  "SERVER"
 >;
 
-export type UpdateWatchModeResult = Result<
+export type UpdateWatchModeResult = ProtectedActionResult<
   { watchMode: string },
-  "UNAUTHORIZED" | "SERVER"
+  "SERVER" | "VALIDATION"
 >;
 
-export async function toggleMachineWatcherAction(
-  machineId: string
-): Promise<ToggleMachineWatcherResult> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return err("UNAUTHORIZED", "Unauthorized");
-  }
-
-  try {
+const toggleMachineWatcherProtected = createProtectedAction({
+  actionName: "toggleMachineWatcherAction",
+  schema: z.string().uuid(),
+  permission: "machines.watch",
+  handler: async (machineId, { user }) => {
     const result = await toggleMachineWatcher({ machineId, userId: user.id });
 
     if (!result.ok) {
-      return err("SERVER", "Failed to toggle machine watcher");
+      return result;
     }
 
     await revalidateMachinePath(machineId);
 
-    return ok(result.value);
-  } catch (error) {
-    return serverActionError(
-      error,
-      "SERVER",
-      "Failed to toggle machine watcher",
-      { action: "toggleMachineWatcherAction", machineId }
-    );
-  }
+    return result;
+  },
+});
+
+export async function toggleMachineWatcherAction(
+  machineId: string
+): Promise<ToggleMachineWatcherResult> {
+  return await toggleMachineWatcherProtected(machineId);
 }
 
-export async function updateMachineWatchModeAction(
-  machineId: string,
-  watchMode: "notify" | "subscribe"
-): Promise<UpdateWatchModeResult> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+const updateWatchModeSchema = z.object({
+  machineId: z.string().uuid(),
+  watchMode: z.enum(["notify", "subscribe"]),
+});
 
-  if (!user) {
-    return err("UNAUTHORIZED", "Unauthorized");
-  }
-
-  try {
+const updateMachineWatchModeProtected = createProtectedAction({
+  actionName: "updateMachineWatchModeAction",
+  schema: updateWatchModeSchema,
+  permission: "machines.watch",
+  handler: async ({ machineId, watchMode }, { user }) => {
     const result = await updateMachineWatchMode({
       machineId,
       userId: user.id,
@@ -75,26 +65,20 @@ export async function updateMachineWatchModeAction(
     });
 
     if (!result.ok) {
-      if (result.code === "VALIDATION") {
-        return err("SERVER", "Invalid watch mode"); // Mapping to server error based on type def, or should update type def?
-        // Existing type def allows "SERVER" | "UNAUTHORIZED". "VALIDATION" isn't there.
-        // Let's stick to SERVER for now or update type.
-        // Wait, I should probably expose VALIDATION but for now SERVER is safe.
-      }
-      return err("SERVER", "Failed to update machine watch mode");
+      return result;
     }
 
     await revalidateMachinePath(machineId);
 
-    return ok(result.value);
-  } catch (error) {
-    return serverActionError(
-      error,
-      "SERVER",
-      "Failed to update machine watch mode",
-      { action: "updateMachineWatchModeAction", machineId, watchMode }
-    );
-  }
+    return result;
+  },
+});
+
+export async function updateMachineWatchModeAction(
+  machineId: string,
+  watchMode: "notify" | "subscribe"
+): Promise<UpdateWatchModeResult> {
+  return await updateMachineWatchModeProtected({ machineId, watchMode });
 }
 
 async function revalidateMachinePath(machineId: string): Promise<void> {
