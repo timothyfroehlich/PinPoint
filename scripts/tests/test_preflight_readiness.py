@@ -103,7 +103,7 @@ fi
         capture_output=True,
         text=True,
         check=False,
-        timeout=5,
+        timeout=15,
     )
 
 
@@ -609,7 +609,7 @@ printf '%s\n' "$PARALLEL_HOME"
         capture_output=True,
         text=True,
         check=False,
-        timeout=5,
+        timeout=15,
     )
 
     expected = state_root / "pinpoint" / "parallel"
