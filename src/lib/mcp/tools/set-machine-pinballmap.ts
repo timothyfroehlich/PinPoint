@@ -38,7 +38,7 @@ export const setMachinePinballmapSchema = z.object({
       "The Pinball Map catalog id of the title/edition this machine IS. Must be a `pinballmapMachineId` from search_pinballmap_catalog — never a `machineGroupId`, which identifies an edition family."
     ),
   pinballmapExcluded: z
-    .boolean()
+    .literal(true)
     .optional()
     .describe(
       "Pass true to record that this machine is deliberately NOT on Pinball Map (homebrew, a one-off, a title the catalog doesn't carry). Mutually exclusive with pinballmapMachineId."

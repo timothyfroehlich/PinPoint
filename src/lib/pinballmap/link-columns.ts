@@ -131,14 +131,15 @@ async function resolveCore(
     };
   }
 
+  if (pinballmapMachineId === null && input.intent !== undefined) {
+    return {
+      ok: false,
+      message:
+        "A machine must be linked to a Pinball Map title to set lineup intent.",
+    };
+  }
+
   if (input.intent === "on") {
-    if (pinballmapExcluded || pinballmapMachineId === null) {
-      return {
-        ok: false,
-        message:
-          "A machine must be linked to a Pinball Map title to set intent to 'on'.",
-      };
-    }
     if (presenceStatus && INVALID_WHEN_ON.includes(presenceStatus)) {
       return {
         ok: false,
@@ -261,7 +262,6 @@ async function resolveCore(
     ok: true,
     columns: {
       ...empty,
-      pinballmapIntent: targetIntent === "on" ? "off" : targetIntent,
     },
     abandoned,
   };

@@ -866,7 +866,7 @@ export function carryStoredLinkTarget(
 ): PbmLinkSelection {
   if (
     selection.pinballmapMachineId !== undefined ||
-    selection.pinballmapExcluded !== undefined
+    selection.pinballmapExcluded === true
   ) {
     return selection;
   }

@@ -82,7 +82,10 @@ import {
   setMachinePinballmapSchema,
 } from "~/lib/mcp/tools/set-machine-pinballmap";
 import { updateMachineSchema } from "~/app/(app)/m/schemas";
-import { updateMachinePbmLink } from "~/services/machines";
+import {
+  carryStoredLinkTarget,
+  updateMachinePbmLink,
+} from "~/services/machines";
 import { runUpdateIssue } from "~/lib/mcp/tools/update-issue";
 import {
   McpToolError,
@@ -2187,7 +2190,7 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
       });
     });
 
-    it("refuses intent on for an unlinked machine", async () => {
+    it("refuses lineup intent for an unlinked machine", async () => {
       const admin = await makeUser("admin");
       const machine = await seedMachine({ name: "Unlinked Machine" });
 
@@ -2199,8 +2202,61 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
       ).rejects.toMatchObject({
         reason: "invalid",
         message:
-          "A machine must be linked to a Pinball Map title to set intent to 'on'.",
+          "A machine must be linked to a Pinball Map title to set lineup intent.",
       });
+
+      await expect(
+        runSetMachinePinballmap(
+          { machine: machine.initials, intent: "no_sync" },
+          ctx("admin", admin)
+        )
+      ).rejects.toMatchObject({
+        reason: "invalid",
+        message:
+          "A machine must be linked to a Pinball Map title to set lineup intent.",
+      });
+
+      await expect(
+        runSetMachinePinballmap(
+          { machine: machine.initials, intent: "off" },
+          ctx("admin", admin)
+        )
+      ).rejects.toMatchObject({
+        reason: "invalid",
+        message:
+          "A machine must be linked to a Pinball Map title to set lineup intent.",
+      });
+    });
+
+    it("rejects pinballmapExcluded: false at schema validation", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine({ name: "Unlinked Machine" });
+
+      await expect(
+        runSetMachinePinballmap(
+          // @ts-expect-error test schema validation for false
+          { machine: machine.initials, pinballmapExcluded: false },
+          ctx("admin", admin)
+        )
+      ).rejects.toMatchObject({
+        reason: "invalid",
+      });
+    });
+
+    it("preserves stored link when carryStoredLinkTarget receives false for exclusion", () => {
+      const stored = {
+        pinballmapMachineId: ELVIRA_PREMIUM_ID,
+        pinballmapExcluded: false,
+        pinballmapExcludedReason: null,
+        modelName: null,
+        manufacturer: "Stern",
+        year: 2019,
+      };
+      const carried = carryStoredLinkTarget(
+        { intent: "off", pinballmapExcluded: false },
+        stored
+      );
+      expect(carried.pinballmapMachineId).toBe(ELVIRA_PREMIUM_ID);
     });
 
     it("refuses sync intent for an excluded machine", async () => {
