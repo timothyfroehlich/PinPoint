@@ -29,6 +29,8 @@ def _run_readiness(
         """
 if [[ "$STUB_MODE" == "uninitialized" ]]; then
   printf 'f\\n'
+elif [[ "$STUB_MODE" == "stale" && "$*" == *"MAX(created_at)"* ]]; then
+  printf 'f\\n'
 else
   printf 't\\n'
 fi
@@ -68,6 +70,19 @@ def test_uninitialized_database_fails_fast_with_port_and_one_remediation(
     tmp_path: Path,
 ) -> None:
     result = _run_readiness(tmp_path, "uninitialized")
+
+    assert result.returncode == 1
+    assert result.stdout == ""
+    assert result.stderr.splitlines() == [
+        "FAIL: preflight readiness — Postgres at localhost:61234 is not migrated",
+        "Run: supabase start && pnpm run db:migrate",
+    ]
+
+
+def test_stale_database_fails_fast_with_port_and_one_remediation(
+    tmp_path: Path,
+) -> None:
+    result = _run_readiness(tmp_path, "stale")
 
     assert result.returncode == 1
     assert result.stdout == ""

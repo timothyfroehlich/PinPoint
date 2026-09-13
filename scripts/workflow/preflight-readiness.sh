@@ -3,6 +3,11 @@
 
 set -euo pipefail
 
+script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
+readonly script_dir
+repository_root=$(cd "${script_dir}/../.." && pwd -P)
+readonly repository_root
+
 quiet_success=false
 if [[ ${1:-} == "--quiet-success" ]]; then
   quiet_success=true
@@ -54,12 +59,41 @@ if ! command -v psql >/dev/null 2>&1; then
   exit 1
 fi
 
-initialized="$({
+relations_ready="$({
   psql "$database_url" -XqAt -v ON_ERROR_STOP=1 \
     -c "SELECT to_regclass('public.machines') IS NOT NULL AND to_regclass('drizzle.__drizzle_migrations') IS NOT NULL;"
 } 2>/dev/null || true)"
 
-if [[ "$initialized" != "t" ]]; then
+if [[ "$relations_ready" != "t" ]]; then
+  printf '%s\n' \
+    "FAIL: preflight readiness — Postgres at ${database_target} is not migrated" \
+    "Run: ${remediation}" >&2
+  exit 1
+fi
+
+latest_migration_at="$({
+  node -e '
+    const fs = require("node:fs");
+    const journal = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+    const latest = journal.entries.at(-1)?.when;
+    if (!Number.isSafeInteger(latest)) process.exit(1);
+    process.stdout.write(String(latest));
+  ' "${repository_root}/drizzle/meta/_journal.json"
+} 2>/dev/null || true)"
+
+if [[ ! "$latest_migration_at" =~ ^[0-9]+$ ]]; then
+  printf '%s\n' \
+    "FAIL: preflight readiness — current migration journal is unreadable" \
+    "Run: mise install --locked" >&2
+  exit 1
+fi
+
+migrations_current="$({
+  psql "$database_url" -XqAt -v ON_ERROR_STOP=1 \
+    -c "SELECT COALESCE(MAX(created_at), 0) >= ${latest_migration_at} FROM drizzle.__drizzle_migrations;"
+} 2>/dev/null || true)"
+
+if [[ "$migrations_current" != "t" ]]; then
   printf '%s\n' \
     "FAIL: preflight readiness — Postgres at ${database_target} is not migrated" \
     "Run: ${remediation}" >&2
