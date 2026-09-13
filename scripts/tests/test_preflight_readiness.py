@@ -235,6 +235,7 @@ printf '%s\n' "$PARALLEL_HOME"
     env = os.environ.copy()
     env["PATH"] = f"{bin_dir}{os.pathsep}{env['PATH']}"
     env["XDG_STATE_HOME"] = str(state_root)
+    env["POSTGRES_URL"] = "postgresql://postgres:postgres@localhost:61234/postgres"
     script = REPO_ROOT / "scripts" / "workflow" / "preflight-locked.sh"
 
     result = subprocess.run(

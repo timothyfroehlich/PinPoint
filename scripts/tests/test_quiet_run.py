@@ -229,6 +229,7 @@ printf '%s\\n' "$@"
     fake_psql.chmod(0o755)
     env = os.environ.copy()
     env["PATH"] = f"{fake_bin}{os.pathsep}{env['PATH']}"
+    env["POSTGRES_URL"] = "postgresql://postgres:postgres@localhost:61234/postgres"
     script = REPO_ROOT / "scripts" / "workflow" / "preflight-locked.sh"
 
     compact = subprocess.run(
