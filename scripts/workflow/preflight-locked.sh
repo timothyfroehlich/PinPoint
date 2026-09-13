@@ -33,10 +33,8 @@ fi
 # preflight slot. The canonical graph repeats this cheap read-only probe inside
 # the captured/streamed run so every uncapped entrypoint enforces the same gate.
 script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
-readonly script_dir
-if [[ "${PINPOINT_SKIP_PREFLIGHT_READINESS:-false}" != "true" ]]; then
-  bash "$script_dir"/preflight-readiness.sh --quiet-success
-fi
+readiness_script="${PINPOINT_PREFLIGHT_READINESS_BIN:-${script_dir}/preflight-readiness.sh}"
+bash "${readiness_script}" --quiet-success # preflight-readiness.sh --quiet-success
 
 # GNU parallel defaults to ~/.parallel, which is not writable in every agent
 # sandbox. Keep every worktree on one host-wide semaphore while using the

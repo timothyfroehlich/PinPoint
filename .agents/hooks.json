@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node .claude/hooks/block-direct-pr-watch.cjs",
+            "command": "node ../.claude/hooks/block-direct-pr-watch.cjs",
             "timeout": 5
           }
         ]
