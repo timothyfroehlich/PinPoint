@@ -60,7 +60,7 @@
 
 ## 6. Host coordination
 
-- **6.1** Concurrent watches on the same PR and phase on a host machine coalesce under a single polling leader.
+- **6.1** Concurrent watches on the same PR, phase, and expected head on a host machine coalesce under a single polling leader.
 - **6.2** Follower processes attach to the leader's state and exit with identical verdicts without issuing duplicate GitHub API requests.
 - **6.3** Coordination is host-local and relies on file locks and atomic state snapshots.
 
@@ -90,5 +90,6 @@
 
 | Date | Amendment |
 | :-- | :-- |
+| 2026-09-12 | Qualify §6.1 host coalescing by expected head SHA to match leader-lock isolation. |
 | 2026-09-12 | Clarify actor as the main agent across concepts and requirements; align §2.1 parameter contract with optional worktree defaulting; align §3.6 conflict resolution to merge origin/main per AGENTS.md branch policy. |
 | 2026-09-12 | Initial draft from first principles: background monitoring, structured verdicts, failure reporting, zero-token waiting, and unified CLI invocation via Subway. |
