@@ -104,6 +104,8 @@ describe("getPinballMapAdminViewState", () => {
         failedAtIso: "2026-09-12T11:54:00.000Z",
         error: "Pinball Map returned HTTP 503",
         retainedSnapshot: {
+          locationId: 26454,
+          name: "Austin Pinball Collective",
           syncedAtIso: "2026-09-12T09:00:00.000Z",
           machineCount: 47,
         },
@@ -149,6 +151,8 @@ describe("getPinballMapAdminViewState", () => {
     expect(result.health).toMatchObject({
       kind: "error",
       retainedSnapshot: {
+        locationId: 26454,
+        name: "Austin Pinball Collective",
         syncedAtIso: "2026-09-12T09:00:00.000Z",
         machineCount: 47,
       },

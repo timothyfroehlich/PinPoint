@@ -395,26 +395,30 @@ export function PinballMapConfigForm({
       return;
     }
     const deadline = Date.parse(allowance.nextRefillAtIso);
+    const observedAt = Date.parse(allowance.observedAtIso);
+    const monotonicStart = performance.now();
+    const estimatedServerNow = (): number =>
+      observedAt + (performance.now() - monotonicStart);
     const release = (): void => {
-      setClockMs(Date.now());
+      setClockMs(deadline);
       setAllowance((current) => ({
         remaining: Math.max(1, current.remaining),
         nextRefillAtIso: null,
-        observedAtIso: new Date().toISOString(),
+        observedAtIso: current.observedAtIso,
       }));
     };
-    const tick = (): void => setClockMs(Date.now());
+    const tick = (): void => setClockMs(estimatedServerNow());
     tick();
     const interval = window.setInterval(tick, 1000);
     const timeout = window.setTimeout(
       release,
-      Math.max(0, deadline - Date.now())
+      Math.max(0, deadline - observedAt)
     );
     return () => {
       window.clearInterval(interval);
       window.clearTimeout(timeout);
     };
-  }, [allowance.nextRefillAtIso, allowance.remaining]);
+  }, [allowance.nextRefillAtIso, allowance.observedAtIso, allowance.remaining]);
 
   const baselineValue = initialState.configuredLocationId?.toString() ?? "";
   const normalizedInput = inputValue.trim();
@@ -885,10 +889,22 @@ function HealthSummary({
             {health.error}
           </p>
           {health.retainedSnapshot ? (
-            <p className="text-muted-foreground text-xs">
-              Showing the snapshot from{" "}
-              <RelativeTime value={health.retainedSnapshot.syncedAtIso} /> ·{" "}
-              {lineupLabel(health.retainedSnapshot.machineCount)}
+            <p className="text-muted-foreground flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs">
+              <span>
+                Showing the {health.retainedSnapshot.name} snapshot from{" "}
+                <RelativeTime value={health.retainedSnapshot.syncedAtIso} /> ·{" "}
+                {lineupLabel(health.retainedSnapshot.machineCount)}
+              </span>
+              <span aria-hidden>·</span>
+              <a
+                href={pinballmapLocationUrl(health.retainedSnapshot.locationId)}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 text-link"
+              >
+                View on Pinball Map
+                <ExternalLink className="size-3" aria-hidden />
+              </a>
             </p>
           ) : (
             <p className="text-muted-foreground text-xs">

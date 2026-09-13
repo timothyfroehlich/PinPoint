@@ -96,6 +96,8 @@ export async function getPinballMapAdminViewState(): Promise<PinballMapAdminView
         retainedSnapshot:
           snapshot && state.lastSyncedAt
             ? {
+                locationId: snapshot.locationId,
+                name: snapshot.name,
                 syncedAtIso: state.lastSyncedAt.toISOString(),
                 machineCount: snapshot.machineCount,
               }

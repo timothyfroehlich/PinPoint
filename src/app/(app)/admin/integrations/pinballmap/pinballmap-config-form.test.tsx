@@ -161,6 +161,8 @@ describe("PinballMapConfigForm", () => {
           failedAtIso: "2026-09-12T11:54:00.000Z",
           error: "Pinball Map returned HTTP 503",
           retainedSnapshot: {
+            locationId: 26454,
+            name: "Austin Pinball Collective",
             syncedAtIso: "2026-09-12T09:00:00.000Z",
             machineCount: 47,
           },
@@ -207,6 +209,35 @@ describe("PinballMapConfigForm", () => {
     expect(
       screen.queryByText("No snapshot is available yet.")
     ).not.toBeInTheDocument();
+  });
+
+  it("links retained snapshot health to the snapshot's location", () => {
+    renderForm({
+      ...CONFIGURED,
+      configuredLocationId: 33871,
+      currentLocation: null,
+      health: {
+        kind: "error",
+        failedAtIso: "2026-09-12T11:54:00.000Z",
+        error: "Pinball Map returned HTTP 503",
+        retainedSnapshot: {
+          locationId: 26454,
+          name: "Austin Pinball Collective",
+          syncedAtIso: "2026-09-12T09:00:00.000Z",
+          machineCount: 47,
+        },
+      },
+    });
+
+    expect(
+      screen.getByText(/Showing the Austin Pinball Collective snapshot/)
+    ).toBeInTheDocument();
+    expect(
+      screen.getAllByRole("link", { name: /View on Pinball Map/ })[1]
+    ).toHaveAttribute(
+      "href",
+      "https://pinballmap.com/map/?by_location_id=26454"
+    );
   });
 
   it("moves from Not checked to a resolved replacement and invalidates it on edit", async () => {
@@ -533,7 +564,7 @@ describe("PinballMapConfigForm", () => {
 
   it("shows one non-live countdown and re-enables Check and Sync at its exact deadline", () => {
     vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-09-12T12:00:00.000Z"));
+    vi.setSystemTime(new Date("2026-09-13T12:00:00.000Z"));
     renderForm({
       ...CONFIGURED,
       allowance: {

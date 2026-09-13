@@ -34,6 +34,8 @@ export type PinballMapHealthView =
       failedAtIso: string;
       error: string;
       retainedSnapshot: {
+        locationId: number;
+        name: string;
         syncedAtIso: string;
         machineCount: number;
       } | null;
