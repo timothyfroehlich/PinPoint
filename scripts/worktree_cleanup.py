@@ -33,6 +33,7 @@ query filtered on a label nothing carries returns a clean, wrong zero.
 
 import fcntl
 import json
+import os
 import shlex
 import subprocess
 import sys
@@ -424,12 +425,15 @@ def cleanup_worktree(worktree_path: Path) -> int:
         # a stack that was never started both look like errors but don't block
         # slot deallocation.
         print(f"Stopping Supabase for {branch}...", file=sys.stderr)
+        supabase_env = os.environ.copy()
+        supabase_env["SUPABASE_TELEMETRY_DISABLED"] = "1"
         try:
             stop_result = subprocess.run(
                 ["supabase", "stop"],
                 cwd=worktree_path,
                 capture_output=True,
                 text=True,
+                env=supabase_env,
             )
             if stop_result.returncode != 0:
                 print(
