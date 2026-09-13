@@ -75,8 +75,10 @@ def test_both_preflight_paths_run_the_cleanup_guard() -> None:
     package = json.loads((REPO_ROOT / "package.json").read_text())
     locked_script = (REPO_ROOT / "scripts/workflow/preflight-locked.sh").read_text()
 
-    assert package["scripts"]["preflight:_run"].startswith(
-        "pnpm run check:prototype-clean && "
+    preflight = package["scripts"]["preflight:_run"]
+    assert preflight.startswith("pnpm run preflight:readiness && ")
+    assert preflight.index("preflight:readiness") < preflight.index(
+        "check:prototype-clean"
     )
     assert "pnpm run preflight:_run" in locked_script
     assert package["scripts"]["preflight:unlocked"].endswith(

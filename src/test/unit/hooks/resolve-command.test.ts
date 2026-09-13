@@ -370,6 +370,82 @@ describe("literal shell payloads are re-parsed, not skipped", () => {
     ]);
   });
 
+  it("treats `bash -n <script>` (noexec) as the shell, not the script (PP-mslx)", () => {
+    // `-n` reads and parses the file but executes nothing, so the script is
+    // data: a syntax check on merge-pr.sh must not read as running merge-pr.sh.
+    // The unattended nightly hung twice (2026-09-11/12) on exactly this.
+    for (const cmd of [
+      "bash -n scripts/workflow/merge-pr.sh",
+      "sh -n scripts/workflow/merge-pr.sh",
+      "bash -nv scripts/workflow/merge-pr.sh",
+      "bash -xn scripts/workflow/merge-pr.sh",
+      "bash -n -- scripts/workflow/merge-pr.sh",
+      "bash -n -c 'gh pr merge 123'",
+    ]) {
+      expect(names(cmd), cmd).not.toContain("merge-pr.sh");
+      expect(names(cmd), cmd).not.toContain("gh");
+    }
+    expect(names("bash -n scripts/workflow/merge-pr.sh")).toEqual(["bash"]);
+  });
+
+  it("honors a later `+n` / `+o noexec` that turns execution back on", () => {
+    // `+` flags switch an option off, and the last one wins — `bash -n +n
+    // script` runs the script. Only the final noexec state counts.
+    for (const cmd of [
+      "bash -n +n scripts/workflow/merge-pr.sh 123 --human",
+      "bash -n +on noexec scripts/workflow/merge-pr.sh 123",
+      "bash -n +o noexec scripts/workflow/merge-pr.sh 123",
+      "bash -o noexec +n scripts/workflow/merge-pr.sh 123",
+    ]) {
+      expect(names(cmd), cmd).toEqual(["merge-pr.sh"]);
+    }
+    // And the other way round: a trailing `-n` / `-o noexec` wins too.
+    for (const cmd of [
+      "bash +n -n scripts/workflow/merge-pr.sh 123",
+      "bash -o noexec scripts/workflow/merge-pr.sh 123",
+      "bash +n -o noexec scripts/workflow/merge-pr.sh 123",
+    ]) {
+      expect(names(cmd), cmd).toEqual(["bash"]);
+    }
+  });
+
+  it("consumes value-taking options before deciding noexec", () => {
+    // `-O shopt`, `-o name`, `--rcfile file`, `--init-file file` each take the
+    // next word; a `+n` after them still counts, and their values are never
+    // the script.
+    for (const cmd of [
+      "bash -n -O nullglob +n scripts/workflow/merge-pr.sh 123 --human",
+      "bash -n +O nullglob +n scripts/workflow/merge-pr.sh 123",
+      "bash -n --rcfile /dev/null +n scripts/workflow/merge-pr.sh 123",
+      "bash -n --init-file /dev/null +n scripts/workflow/merge-pr.sh 123",
+      "bash -O nullglob scripts/workflow/merge-pr.sh 123",
+      "bash --rcfile /dev/null scripts/workflow/merge-pr.sh 123",
+    ]) {
+      expect(names(cmd), cmd).toEqual(["merge-pr.sh"]);
+    }
+    expect(names("bash -O nullglob -n scripts/workflow/merge-pr.sh")).toEqual([
+      "bash",
+    ]);
+  });
+
+  it("finds the `-c` payload past other options", () => {
+    // Options are parsed to the first operand, wherever `-c` sits in them.
+    expect(names('bash -c -x "gh pr merge 1"')).toEqual(["gh"]);
+    expect(names('bash -O nullglob -c "gh pr merge 1"')).toEqual(["gh"]);
+    expect(names('bash -n +n -c "gh pr merge 1"')).toEqual(["gh"]);
+  });
+
+  it("does not mistake a `-n`-shaped flag after the script for noexec", () => {
+    // Once the script is named, later words are its arguments.
+    expect(names("bash scripts/workflow/merge-pr.sh -n")).toEqual([
+      "merge-pr.sh",
+    ]);
+    // A long option is not a short-flag cluster; `--norc` is not noexec.
+    expect(names("bash --norc scripts/workflow/merge-pr.sh")).toEqual([
+      "merge-pr.sh",
+    ]);
+  });
+
   it("resolves commands inside $() and backtick substitutions", () => {
     expect(names("$(gh pr merge 5)")).toContain("gh");
     expect(names("`gh pr merge 5`")).toContain("gh");
@@ -593,6 +669,40 @@ describe("unresolvable", () => {
     expect(
       resolveCommand('sh -c "$PAYLOAD"').unresolvable.map((u) => u.reason)
     ).toContain("shell-c-dynamic");
+  });
+
+  it("reports a dynamic word in a noexec shell's option span (PP-mslx)", () => {
+    // `FLAGS=+n; bash -n $FLAGS script` runs the script — the expansion can
+    // switch noexec back off, so the literal `-n` proves nothing. Anything
+    // dynamic up to and including the first operand makes the shell state
+    // unresolvable rather than "noexec, allow".
+    for (const cmd of [
+      "bash -n $FLAGS scripts/workflow/merge-pr.sh 123 --human",
+      "bash -n +o $OPT scripts/workflow/merge-pr.sh 123",
+      "bash -n $SCRIPT",
+      "bash -n $(pick-flags) scripts/workflow/merge-pr.sh 123",
+    ]) {
+      const { segments, unresolvable } = resolveCommand(cmd);
+      // (a `$(…)` in the span still contributes its own inner segment)
+      expect(
+        segments.map((s) => s.name),
+        cmd
+      ).not.toContain("merge-pr.sh");
+      expect(
+        segments.map((s) => s.name),
+        cmd
+      ).not.toContain("bash");
+      expect(
+        unresolvable.map((u) => u.reason),
+        cmd
+      ).toContain("shell-option-dynamic");
+    }
+    // A dynamic word AFTER the script is the script's argument: still noexec.
+    expect(
+      resolveCommand("bash -n scripts/workflow/merge-pr.sh $ARG").segments.map(
+        (s) => s.name
+      )
+    ).toEqual(["bash"]);
   });
 
   it("reports a substituted command slot", () => {

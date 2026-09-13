@@ -16,16 +16,21 @@ import {
 } from "~/components/ui/card";
 import { DiscordConfigForm } from "./discord/discord-config-form";
 import { IntegrationsDirtyStateProvider } from "./integrations-dirty-state";
+import { PinballMapConfigForm } from "./pinballmap/pinballmap-config-form";
+import { getPinballMapAdminViewState } from "./pinballmap/read-model";
 
 export default async function AdminIntegrationsPage(): Promise<React.JSX.Element> {
-  const discordConfig = await db.query.discordIntegrationConfig.findFirst({
-    where: eq(discordIntegrationConfig.id, "singleton"),
-    columns: {
-      guildId: true,
-      inviteLink: true,
-      botTokenVaultId: true,
-    },
-  });
+  const [discordConfig, pinballMapState] = await Promise.all([
+    db.query.discordIntegrationConfig.findFirst({
+      where: eq(discordIntegrationConfig.id, "singleton"),
+      columns: {
+        guildId: true,
+        inviteLink: true,
+        botTokenVaultId: true,
+      },
+    }),
+    getPinballMapAdminViewState(),
+  ]);
 
   return (
     <IntegrationsDirtyStateProvider>
@@ -33,7 +38,7 @@ export default async function AdminIntegrationsPage(): Promise<React.JSX.Element
         <PageHeader title="Integrations" />
 
         <div className="flex flex-col gap-6">
-          <Card>
+          <Card data-testid="discord-integration-card">
             <CardHeader>
               <CardTitle>Discord</CardTitle>
               <CardDescription>Bot notifications.</CardDescription>
@@ -53,6 +58,19 @@ export default async function AdminIntegrationsPage(): Promise<React.JSX.Element
                 inviteLink={discordConfig?.inviteLink ?? ""}
                 hasToken={!!discordConfig?.botTokenVaultId}
               />
+            </CardContent>
+          </Card>
+
+          <Card data-testid="pinballmap-integration-card">
+            <CardHeader>
+              <CardTitle>Pinball Map</CardTitle>
+              <CardDescription>
+                Syncs the tracked location&apos;s lineup and watches a region
+                for new machines.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <PinballMapConfigForm initialState={pinballMapState} />
             </CardContent>
           </Card>
         </div>

@@ -39,7 +39,10 @@
  *     to `chmod`.
  *   - Literal shell payloads are re-parsed, not skipped: `eval "…"`,
  *     `sh -c "…"`, `bash -c '…'`, `$(…)` and backtick substitutions all
- *     contribute their own segments.
+ *     contribute their own segments. `bash <script>` resolves to the script.
+ *   - A noexec shell (`bash -n …`, any `-n`-bearing short-flag cluster before
+ *     the script or `-c` payload) resolves to the shell itself: it parses and
+ *     runs nothing, so a syntax check on a guarded script is not an invocation.
  *   - Anything whose command slot cannot be known statically — `eval "$CMD"`,
  *     `sh -c "$X"`, `$(pick) pr merge`, an unbalanced quote — is reported in
  *     `unresolvable` instead of being silently dropped.
@@ -1009,10 +1012,41 @@ function resolveSegment(words, out, depth, options) {
   }
 
   if (SHELLS.has(name)) {
-    // `-c`, and combined short-flag forms that end in it (`bash -lc "…"`).
-    const dashCIdx = argWords.findIndex((w) => /^-[A-Za-z]*c$/.test(w.value));
-    if (dashCIdx !== -1) {
-      const payload = argWords[dashCIdx + 1];
+    // `-n` (noexec) parses and executes nothing, so whatever follows — a
+    // script path or a `-c` payload — is data, not a command. Resolve to the
+    // shell itself; a guard keyed on the script's basename then stays quiet.
+    // Only the option words before the first operand count: after the script
+    // is named, `-n` is the script's own argument, and `--norc`-style long
+    // options are not clusters. The FINAL state decides, not the first
+    // mention: `+n` / `+o noexec` switch it back off, so `bash -n +n script`
+    // runs the script and must still resolve to it (Codex review on
+    // PP-mslx). A `bash -n merge-pr.sh` syntax check hung the unattended
+    // nightly twice when this read as running merge-pr.sh.
+    const opts = walkShellOptions(argWords);
+    if (opts.noexec) {
+      // The literal flags say noexec, but a dynamic word anywhere up to and
+      // including the first operand can expand to `+n` (or be `+o` value
+      // `noexec`, or hide the real script) and turn execution back on. That
+      // is unresolvable, not "noexec, allow" (Codex review on PP-mslx).
+      const optionSpan =
+        opts.operandIdx === -1
+          ? argWords
+          : argWords.slice(0, opts.operandIdx + 1);
+      if (optionSpan.some((w) => w.dynamic)) {
+        out.unresolvable.push({
+          reason: "shell-option-dynamic",
+          text: `${name} ${optionSpan.map((w) => w.value).join(" ")}`.trim(),
+        });
+        return;
+      }
+      pushSegment(out, cmdWord.value, argWords, slot.appendsDynamicArgs);
+      return;
+    }
+    // `-c` anywhere in the options (`bash -lc "…"`, `bash -c -x "…"`): the
+    // payload is the first operand, not the word right after `-c`.
+    if (opts.commandString) {
+      const payload =
+        opts.operandIdx === -1 ? undefined : argWords[opts.operandIdx];
       if (!payload) return;
       if (payload.dynamic) {
         out.unresolvable.push({
@@ -1024,8 +1058,9 @@ function resolveSegment(words, out, depth, options) {
       resolveInto(payload.value, out, depth + 1, options);
       return;
     }
-    // `bash script.sh args…` — the script is the effective command.
-    const scriptIdx = argWords.findIndex((w) => !w.value.startsWith("-"));
+    // `bash script.sh args…` — the first operand after the options (`+n`
+    // and `-o name` included) is the script, and the effective command.
+    const scriptIdx = opts.operandIdx;
     if (scriptIdx !== -1) {
       const script = argWords[scriptIdx];
       if (script.dynamic) {
@@ -1041,6 +1076,57 @@ function resolveSegment(words, out, depth, options) {
   }
 
   pushSegment(out, cmdWord.value, argWords, slot.appendsDynamicArgs);
+}
+
+/** Options that take the next word as their value: `-o name` / `+o name`
+ *  (set -o), `-O shopt` / `+O shopt` (bash), `--rcfile f`, `--init-file f`. */
+const SHELL_VALUE_LETTERS = new Set(["o", "O"]);
+const SHELL_VALUE_LONG_OPTIONS = new Set(["--rcfile", "--init-file"]);
+
+/** Walk a shell's leading option words in order. Returns the effective
+ *  noexec state when option parsing ends, whether `-c` was seen, and the
+ *  index of the first operand (the script, or the `-c` command string), or
+ *  -1 when there is none. `-n` / `-o noexec` turn noexec on, `+n` /
+ *  `+o noexec` turn it off, last one wins; `--`, `-`, or the first word that
+ *  is not an option ends the walk. Clusters (`-xn`, `+on`) are read letter by
+ *  letter; a value-taking letter consumes the next word, and so does a
+ *  value-taking long option, so `bash -n -O nullglob +n script` still lands
+ *  on `+n` (Codex review on PP-mslx). */
+function walkShellOptions(argWords) {
+  let noexec = false;
+  let commandString = false;
+  let i = 0;
+  while (i < argWords.length) {
+    const word = argWords[i].value;
+    if (word === "--" || word === "-") {
+      i += 1;
+      break;
+    }
+    const sign = word[0];
+    if (sign !== "-" && sign !== "+") break;
+    i += 1;
+    if (word.startsWith("--")) {
+      if (SHELL_VALUE_LONG_OPTIONS.has(word)) i += 1;
+      continue; // long option: never a cluster
+    }
+    const on = sign === "-";
+    for (const letter of word.slice(1)) {
+      if (letter === "n") {
+        noexec = on;
+      } else if (letter === "c") {
+        commandString = true;
+      } else if (SHELL_VALUE_LETTERS.has(letter)) {
+        const value = argWords[i];
+        if (letter === "o" && value && value.value === "noexec") noexec = on;
+        i += 1;
+      }
+    }
+  }
+  return {
+    noexec,
+    commandString,
+    operandIdx: i < argWords.length ? i : -1,
+  };
 }
 
 function pushSegment(out, command, argWords, appendsDynamicArgs = false) {

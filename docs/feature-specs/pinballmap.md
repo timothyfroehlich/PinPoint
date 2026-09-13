@@ -167,9 +167,6 @@ Replacing the tracked location is a rare, near-never operation — PinPoint trac
 | :-- | :-- | :-- |
 | 7.1 comment fan-out | No comment import exists | PP-o355.4 (reshape to fan-out); PP-o355.36 depends on it |
 | 7.3 comment marking on removal | Not implemented | PP-o355.36 |
-| §10 admin section (whole surface) | The combined `/admin/integrations` page exists with the Discord card, but no Pinball Map section exists. The location field, Sync now (§10.3), link-out (§10.4), clearing (§10.7), and the Check ID/Save + confirmation flow (§10.9, §10.15) remain unbuilt | PP-o355.51.6.2.3 |
-| 10.2 sync-health readout | Fields exist on `pinballmap_state`; nothing renders them in admin | PP-o355.51.6 |
-| §10.9 / §10.13 Check ID decoupled from Save | Checked-candidate storage and separate check/commit services exist, but no admin action or UI wires them into the combined integrations page | Wire Check ID and Save to the checked-candidate services in the Pinball Map admin section. PP-o355.51.6.2.3 |
 | 10.9 comment re-marking on location change | No comment import exists | PP-o355.4 (import); permanent mark-on-location-change after |
 
 ---

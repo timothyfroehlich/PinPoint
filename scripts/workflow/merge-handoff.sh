@@ -27,7 +27,8 @@ set -euo pipefail
 #
 # Environment:
 #   gh must be authenticated; the repo slug is resolved dynamically.
-#   Fetches from origin (the PR head and main) — read-only, touches no local branch.
+#   Fetches from origin (the PR head and main) — read-only, touches no local branch or
+#   shared FETCH_HEAD. Per-invocation refs are removed before the script exits.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=./_pr-gates.sh
@@ -63,29 +64,45 @@ is_draft=$(jq -r '.isDraft' <<< "$meta")
 pr_state=$(jq -r '.state' <<< "$meta")
 short_head="${head_sha:0:7}"
 
-# Both sides are read back off FETCH_HEAD as bare SHAs, and `--refmap=` suppresses the
-# opportunistic remote-tracking update that `git fetch origin main` would otherwise do
-# through the configured `refs/heads/*:refs/remotes/origin/*` refspec. So this genuinely
-# updates no ref of yours — not `origin/main`, not a local branch. It runs from whatever
-# worktree Tim happens to be in, often while agents hold worktrees of the same repo, and
-# a reporting command has no business moving refs those depend on.
+# Each invocation fetches into refs private to its process. `--no-write-fetch-head`
+# prevents a concurrent report (or any other fetch in this checkout) from changing the
+# commit between our fetch and revision lookup, while `--refmap=` suppresses configured
+# remote-tracking updates. The temporary refs are the only refs this report moves, and
+# the exit trap removes them on success, failure, or an interrupt.
 #
 # The PR head comes from its pull ref rather than its branch name: the branch may not exist
 # locally, may be checked out in another worktree, or may live on a fork.
-if ! git fetch -q --refmap= origin "$base_ref"; then
+fetch_ref_root="refs/pinpoint/merge-handoff/${pr}/$$"
+base_fetch_ref="${fetch_ref_root}/base"
+head_fetch_ref="${fetch_ref_root}/head"
+
+cleanup_fetch_refs() {
+  local exit_status=$?
+  git update-ref -d "$base_fetch_ref" >/dev/null 2>&1 || true
+  git update-ref -d "$head_fetch_ref" >/dev/null 2>&1 || true
+  return "$exit_status"
+}
+trap cleanup_fetch_refs EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+if ! git fetch -q --no-write-fetch-head --refmap= origin \
+  "+refs/heads/${base_ref}:${base_fetch_ref}"; then
   echo "merge-handoff.sh: could not fetch ${base_ref} from origin" >&2
   exit 1
 fi
-base_sha=$(git rev-parse FETCH_HEAD)
+base_sha=$(git rev-parse --verify "${base_fetch_ref}^{commit}")
 
 fetch_pr_head() {
-  if ! git fetch -q --refmap= origin "pull/${pr}/head"; then
+  if ! git fetch -q --no-write-fetch-head --refmap= origin \
+    "+refs/pull/${pr}/head:${head_fetch_ref}"; then
     echo "merge-handoff.sh: could not fetch head of PR #${pr} from origin" >&2
     exit 1
   fi
-  git rev-parse FETCH_HEAD
+  fetched_head=$(git rev-parse --verify "${head_fetch_ref}^{commit}")
 }
-fetched_head=$(fetch_pr_head)
+fetch_pr_head
 
 # `gh` and the pull ref disagreeing means a push landed mid-report (or GitHub has not
 # propagated one to the other yet). ONE retry, because the pull ref catches up in seconds.
@@ -99,7 +116,7 @@ fetched_head=$(fetch_pr_head)
 # green this script exists to prevent.
 head_raced=""
 if [[ "$head_sha" != "$fetched_head" ]]; then
-  fetched_head=$(fetch_pr_head)
+  fetch_pr_head
 fi
 if [[ "$head_sha" != "$fetched_head" ]]; then
   head_raced="gh says ${short_head}, pull ref says ${fetched_head:0:7}"
