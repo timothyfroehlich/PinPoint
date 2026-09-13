@@ -821,7 +821,7 @@ export const machineSettingsSets = pgTable(
     // The machine owner's canonical set. Exactly one per machine (partial
     // unique index below). Always an owner set + public.
     isPreferred: boolean("is_preferred").notNull().default(false),
-    // Kind (drives who may EDIT — see ~/lib/machines/settings-permissions):
+    // Kind (drives who may EDIT — see ~/lib/permissions/settings):
     // true = owner set (created by the machine owner; only owner + admin edit,
     // protected from techs). false = community set (co-edited by technicians+
     // and the machine owner). Captured at creation; stored not derived, so it
