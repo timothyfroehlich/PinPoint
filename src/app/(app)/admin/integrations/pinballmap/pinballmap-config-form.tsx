@@ -560,6 +560,7 @@ export function PinballMapConfigForm({
               placeholder="e.g. 26454"
               value={inputValue}
               onChange={handleInputChange}
+              disabled={anyPending}
               aria-describedby="pinballmap-location-hint pinballmap-location-result"
               aria-invalid={feedback?.invalidField ?? undefined}
               className="min-w-0 max-w-[360px] flex-1"

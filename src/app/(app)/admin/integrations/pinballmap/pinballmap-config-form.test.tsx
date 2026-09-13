@@ -253,6 +253,33 @@ describe("PinballMapConfigForm", () => {
     expect(checkActionMock).not.toHaveBeenCalled();
   });
 
+  it("freezes the location field while a Check ID action is pending", async () => {
+    let resolveCheck: (
+      value: ReturnType<typeof successfulCheck>
+    ) => void = () => undefined;
+    checkActionMock.mockReturnValue(
+      new Promise<ReturnType<typeof successfulCheck>>((resolve) => {
+        resolveCheck = resolve;
+      })
+    );
+    const user = userEvent.setup();
+    renderForm();
+    const input = screen.getByLabelText("Location ID");
+    await user.clear(input);
+    await user.type(input, "33871");
+    await user.click(screen.getByRole("button", { name: "Check ID" }));
+
+    expect(input).toBeDisabled();
+
+    await act(async () => {
+      resolveCheck(successfulCheck());
+      await Promise.resolve();
+    });
+
+    expect(input).toBeEnabled();
+    expect(input).toHaveValue("33871");
+  });
+
   it("shows the exact replacement confirmation before committing", async () => {
     const user = userEvent.setup();
     renderForm();
