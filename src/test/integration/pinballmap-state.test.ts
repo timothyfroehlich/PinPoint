@@ -493,7 +493,7 @@ describe("tracked-location changes", () => {
     fetchSpy.mockRestore();
   });
 
-  it("resumes the retained location without reconciling its abandonments", async () => {
+  it("reconciles same-location abandonments when resuming from a fresh check", async () => {
     const db = await getTestDb();
     const { getMockClient } = await import("~/lib/pinballmap/client-mock");
     const { checkTrackedLocation, commitCheckedTrackedLocation } =
@@ -526,7 +526,7 @@ describe("tracked-location changes", () => {
     await expect(
       commitCheckedTrackedLocation(checked.candidate.checkId, CHECKED_BY)
     ).resolves.toEqual({ ok: true });
-    expect(await db.select().from(pinballmapAbandonedListings)).toHaveLength(1);
+    expect(await db.select().from(pinballmapAbandonedListings)).toHaveLength(0);
     fetchSpy.mockRestore();
   });
 

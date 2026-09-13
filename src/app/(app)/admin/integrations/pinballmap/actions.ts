@@ -119,7 +119,6 @@ export async function commitCheckedPinballMapLocationAction(
       authorization.userId,
       authorization.userId
     );
-    if (result.ok) await reconcileAfterSync();
     revalidatePath(INTEGRATIONS_PATH);
     return result;
   } catch (error) {

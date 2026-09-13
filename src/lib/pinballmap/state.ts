@@ -4,6 +4,7 @@ import { and, eq, isNull, lt, lte, or, sql } from "drizzle-orm";
 import { db } from "~/server/db";
 import { pinballmapLocationChecks, pinballmapState } from "~/server/db/schema";
 import { getPinballMapClient } from "./client";
+import { clearResolvedAbandonments } from "./abandoned-listings";
 import {
   PBM_LOCATION_CHECK_TTL_MS,
   PBM_REFRESH_BURST,
@@ -866,6 +867,11 @@ export async function commitCheckedTrackedLocation(
         .where(eq(pinballmapLocationChecks.id, checkId));
       return { ok: false, reason: "concurrent_change" };
     }
+    await clearResolvedAbandonments(
+      freshCandidate.snapshotJson,
+      freshCandidate.locationId,
+      tx
+    );
     await tx
       .delete(pinballmapLocationChecks)
       .where(eq(pinballmapLocationChecks.id, checkId));
