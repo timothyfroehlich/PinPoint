@@ -207,6 +207,7 @@ describe("Pinball Map admin actions", () => {
         })
       );
       expect(result).toEqual({ ok: false, reason });
+      expect(revalidatePathMock).toHaveBeenCalledWith("/admin/integrations");
     }
   );
 
@@ -223,6 +224,21 @@ describe("Pinball Map admin actions", () => {
     expect(clearTrackedLocationMock).toHaveBeenCalledWith(26454, 7, ADMIN_ID);
     expect(revalidatePathMock).toHaveBeenCalledWith("/admin/integrations");
   });
+
+  it.each(["busy", "concurrent_change"] as const)(
+    "preserves the typed clear outcome and revalidates: %s",
+    async (reason) => {
+      clearTrackedLocationMock.mockResolvedValue({ ok: false, reason });
+
+      await expect(
+        clearPinballMapLocationAction(
+          undefined,
+          formData({ expectedLocationId: "26454", expectedGeneration: "7" })
+        )
+      ).resolves.toEqual({ ok: false, reason });
+      expect(revalidatePathMock).toHaveBeenCalledWith("/admin/integrations");
+    }
+  );
 
   it("syncs manually, reconciles, returns allowance, and refreshes the page", async () => {
     syncLocationSnapshotMock.mockResolvedValue({

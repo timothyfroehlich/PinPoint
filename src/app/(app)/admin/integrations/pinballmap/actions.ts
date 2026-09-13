@@ -119,15 +119,14 @@ export async function commitCheckedPinballMapLocationAction(
       authorization.userId,
       authorization.userId
     );
-    if (result.ok || result.reason === "concurrent_change") {
-      revalidatePath(INTEGRATIONS_PATH);
-    }
+    revalidatePath(INTEGRATIONS_PATH);
     return result;
   } catch (error) {
     reportError(error, {
       action: "commitCheckedPinballMapLocationAction",
       bestEffort: false,
     });
+    revalidatePath(INTEGRATIONS_PATH);
     return { ok: false, reason: "server_error" };
   }
 }
@@ -151,15 +150,14 @@ export async function clearPinballMapLocationAction(
       parsed.data.expectedGeneration,
       authorization.userId
     );
-    if (result.ok || result.reason === "concurrent_change") {
-      revalidatePath(INTEGRATIONS_PATH);
-    }
+    revalidatePath(INTEGRATIONS_PATH);
     return result;
   } catch (error) {
     reportError(error, {
       action: "clearPinballMapLocationAction",
       bestEffort: false,
     });
+    revalidatePath(INTEGRATIONS_PATH);
     return { ok: false, reason: "server_error" };
   }
 }
