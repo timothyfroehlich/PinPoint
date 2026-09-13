@@ -193,6 +193,7 @@ describe("Pinball Map admin actions", () => {
       ADMIN_ID
     );
     expect(commitCheckedTrackedLocationMock).toHaveBeenCalledTimes(1);
+    expect(reconcileAfterSyncMock).toHaveBeenCalledTimes(1);
     expect(revalidatePathMock).toHaveBeenCalledWith("/admin/integrations");
   });
 
@@ -207,6 +208,7 @@ describe("Pinball Map admin actions", () => {
         })
       );
       expect(result).toEqual({ ok: false, reason });
+      expect(reconcileAfterSyncMock).not.toHaveBeenCalled();
       expect(revalidatePathMock).toHaveBeenCalledWith("/admin/integrations");
     }
   );
