@@ -7,7 +7,6 @@ import { machines, pinballmapAbandonedListings } from "~/server/db/schema";
 import { createMachineTimelineEvent } from "~/lib/timeline/machine-events";
 import type { LocationSnapshot } from "./types";
 import type { AbandonedListing } from "./link-columns";
-import { getPinballMapState } from "./state";
 
 /**
  * Write down a live PinballMap entry a machine just walked away from (PP-l81u).
@@ -147,7 +146,11 @@ export async function listSurfacingAbandonedForMachine(
 
   const effectiveLocationId =
     trackedLocationId === undefined
-      ? ((await getPinballMapState())?.locationId ?? null)
+      ? ((
+          await import("./state").then(({ getPinballMapState }) =>
+            getPinballMapState()
+          )
+        )?.locationId ?? null)
       : trackedLocationId;
   const sameLocation = rows.filter(
     (row) => row.locationId === effectiveLocationId
@@ -214,7 +217,8 @@ export async function listSurfacingAbandonedForMachine(
  */
 export async function clearResolvedAbandonments(
   snapshot: LocationSnapshot,
-  trackedLocationId: number
+  trackedLocationId: number,
+  database: typeof db | DbTransaction = db
 ): Promise<number> {
   const liveLmxIds = snapshot.lmxes.map((l) => l.id);
 
@@ -259,7 +263,7 @@ export async function clearResolvedAbandonments(
     // id, so it holds the record open.
     const coveredTitleIds = new Set(
       (
-        await db
+        await database
           .select({ pinballmapMachineId: machines.pinballmapMachineId })
           .from(machines)
           .where(
@@ -297,7 +301,7 @@ export async function clearResolvedAbandonments(
     );
   }
 
-  const cleared = await db
+  const cleared = await database
     .delete(pinballmapAbandonedListings)
     .where(
       and(
