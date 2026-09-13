@@ -209,6 +209,7 @@ describe("updateSession public route access", () => {
     "/whats-new",
     "/privacy",
     "/terms",
+    "/.well-known/oauth-protected-resource",
     "/api/health",
     "/issues",
   ];

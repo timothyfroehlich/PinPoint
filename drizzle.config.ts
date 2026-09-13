@@ -79,6 +79,7 @@ export default defineConfig({
   //Prevent Drizzle Kit from parsing Supabase system tables
   tablesFilter: [
     "user_profiles",
+    "mcp_oauth_clients",
     "machines",
     "issues",
     "issue_comments",

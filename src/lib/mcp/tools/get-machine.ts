@@ -15,6 +15,7 @@ import {
   issueUrl,
   machineUrl,
   McpToolError,
+  READ_ONLY_TOOL_ANNOTATIONS,
   resolveMachine,
   runTool,
   type ToolOutcome,
@@ -98,6 +99,7 @@ export function registerGetMachine(server: McpServer): void {
       description:
         "Get one machine's detail — name, initials, availability (returned as `presence`), owner name, its Pinball Map state (linked catalog title and edition, manufacturer, year, OPDB/IPDB, and the operator's lineup intent — `on`, `off`, or `no_sync` — which says whether it SHOULD be on the location's public lineup, not whether it currently is; or marked as not on Pinball Map; or null when neither has been recorded — and when a linked title is null, read `catalogLookup` before calling the link broken: `mirror_unpopulated` means PinPoint's catalog copy is empty, not that the link is stale), and its recent open issues (each with number, title, severity, status, and URL). Identify the machine by initials or UUID.",
       inputSchema: getMachineSchema,
+      annotations: READ_ONLY_TOOL_ANNOTATIONS,
     },
     (args, extra) =>
       runTool("get_machine", extra, (ctx) => runGetMachine(args, ctx))
