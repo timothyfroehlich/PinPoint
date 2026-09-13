@@ -32,7 +32,11 @@ fi
 # Reject a missing or unmigrated worktree database before waiting for a host-wide
 # preflight slot. The canonical graph repeats this cheap read-only probe inside
 # the captured/streamed run so every uncapped entrypoint enforces the same gate.
-bash scripts/workflow/preflight-readiness.sh --quiet-success
+script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
+readonly script_dir
+if [[ "${PINPOINT_SKIP_PREFLIGHT_READINESS:-false}" != "true" ]]; then
+  bash "$script_dir"/preflight-readiness.sh --quiet-success
+fi
 
 # GNU parallel defaults to ~/.parallel, which is not writable in every agent
 # sandbox. Keep every worktree on one host-wide semaphore while using the

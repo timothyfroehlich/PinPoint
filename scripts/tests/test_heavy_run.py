@@ -275,6 +275,7 @@ exit 64
     fake_pnpm.chmod(0o755)
     env["PINPOINT_REPO_ROOT"] = str(REPO_ROOT)
     env["PINPOINT_TEST_PYTHON"] = sys.executable
+    env["PINPOINT_SKIP_PREFLIGHT_READINESS"] = "true"
     worktrees = [tmp_path / f"preflight-worktree-{number}" for number in range(2)]
     for worktree in worktrees:
         worktree.mkdir()
