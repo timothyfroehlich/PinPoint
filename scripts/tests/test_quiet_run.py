@@ -221,6 +221,12 @@ printf '%s\\n' "$@"
 """
     )
     fake_sem.chmod(0o755)
+    fake_pg_isready = fake_bin / "pg_isready"
+    fake_pg_isready.write_text("#!/bin/bash\nexit 0\n")
+    fake_pg_isready.chmod(0o755)
+    fake_psql = fake_bin / "psql"
+    fake_psql.write_text("#!/bin/bash\nprintf 't\\n'\n")
+    fake_psql.chmod(0o755)
     env = os.environ.copy()
     env["PATH"] = f"{fake_bin}{os.pathsep}{env['PATH']}"
     script = REPO_ROOT / "scripts" / "workflow" / "preflight-locked.sh"
