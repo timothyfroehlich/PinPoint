@@ -64,7 +64,12 @@ matches=$(echo "$raw" | awk '
     file = parts[1]; lineno = parts[2] + 0; sep = parts[3]; content = parts[4]
 
     # Skip pure comment/JSDoc lines — they describe role checks, not perform them.
-    if (content ~ /^[[:space:]]*(\*|\/\/|\/\*)/) {
+    # Exclude lines that start with // or * (JSDoc body), or single-line block comments /* ... */
+    # where nothing executable follows.
+    trimmed = content
+    sub(/^[[:space:]]+/, "", trimmed)
+    sub(/[[:space:]]+$/, "", trimmed)
+    if (trimmed ~ /^(\/\/|\*)/ || trimmed ~ /^\/\*.*\*\/$/ || trimmed ~ /^\{\/\*.*\*\/\}$/ || (trimmed ~ /^(\/\*|\{\/\*)/ && trimmed !~ /\*\//)) {
       if (sep == ":") {
         next
       }

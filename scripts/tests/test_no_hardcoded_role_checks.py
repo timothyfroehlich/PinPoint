@@ -63,6 +63,18 @@ export const harmless = true;
     assert result.stderr == ""
 
 
+def test_detects_role_comparison_following_leading_block_comment(
+    tmp_path: Path,
+) -> None:
+    result = run_audit(
+        tmp_path,
+        '/* istanbul ignore next */ if (accessLevel === "admin") {}\n',
+    )
+
+    assert result.returncode == 1
+    assert 'accessLevel === "admin"' in result.stderr
+
+
 def test_accepts_an_adjacent_allow_marker(tmp_path: Path) -> None:
     result = run_audit(
         tmp_path,
