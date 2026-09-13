@@ -10,6 +10,7 @@ import {
 import { eq, and, isNull } from "drizzle-orm";
 import type { User } from "@supabase/supabase-js";
 import { log } from "~/lib/logger";
+import { errorMessage } from "~/lib/errors";
 import { reportError } from "~/lib/observability/report-error";
 import { deriveName } from "~/lib/auth/derive-name";
 import type { UserRole } from "~/lib/types";
@@ -188,7 +189,7 @@ export async function ensureUserProfile(user: User): Promise<void> {
     log.error(
       {
         userId: user.id,
-        err: error instanceof Error ? error.message : "Unknown",
+        err: errorMessage(error, "Unknown"),
       },
       "Failed to auto-heal user profile"
     );
