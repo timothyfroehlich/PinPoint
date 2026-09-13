@@ -1027,10 +1027,11 @@ function resolveSegment(words, out, depth, options) {
       pushSegment(out, cmdWord.value, argWords, slot.appendsDynamicArgs);
       return;
     }
-    // `-c`, and combined short-flag forms that end in it (`bash -lc "…"`).
-    const dashCIdx = argWords.findIndex((w) => /^-[A-Za-z]*c$/.test(w.value));
-    if (dashCIdx !== -1) {
-      const payload = argWords[dashCIdx + 1];
+    // `-c` anywhere in the options (`bash -lc "…"`, `bash -c -x "…"`): the
+    // payload is the first operand, not the word right after `-c`.
+    if (opts.commandString) {
+      const payload =
+        opts.operandIdx === -1 ? undefined : argWords[opts.operandIdx];
       if (!payload) return;
       if (payload.dynamic) {
         out.unresolvable.push({
@@ -1062,38 +1063,55 @@ function resolveSegment(words, out, depth, options) {
   pushSegment(out, cmdWord.value, argWords, slot.appendsDynamicArgs);
 }
 
+/** Options that take the next word as their value: `-o name` / `+o name`
+ *  (set -o), `-O shopt` / `+O shopt` (bash), `--rcfile f`, `--init-file f`. */
+const SHELL_VALUE_LETTERS = new Set(["o", "O"]);
+const SHELL_VALUE_LONG_OPTIONS = new Set(["--rcfile", "--init-file"]);
+
 /** Walk a shell's leading option words in order. Returns the effective
- *  noexec state when option parsing ends and the index of the first operand
- *  (the script), or -1 when there is none. `-n` / `-o noexec` turn noexec on,
- *  `+n` / `+o noexec` turn it off, last one wins; `--` or the first word that
+ *  noexec state when option parsing ends, whether `-c` was seen, and the
+ *  index of the first operand (the script, or the `-c` command string), or
+ *  -1 when there is none. `-n` / `-o noexec` turn noexec on, `+n` /
+ *  `+o noexec` turn it off, last one wins; `--`, `-`, or the first word that
  *  is not an option ends the walk. Clusters (`-xn`, `+on`) are read letter by
- *  letter; an `o` in a cluster consumes the next word as its option name. */
+ *  letter; a value-taking letter consumes the next word, and so does a
+ *  value-taking long option, so `bash -n -O nullglob +n script` still lands
+ *  on `+n` (Codex review on PP-mslx). */
 function walkShellOptions(argWords) {
   let noexec = false;
+  let commandString = false;
   let i = 0;
   while (i < argWords.length) {
     const word = argWords[i].value;
-    if (word === "--") {
+    if (word === "--" || word === "-") {
       i += 1;
       break;
     }
     const sign = word[0];
-    if ((sign !== "-" && sign !== "+") || word === "-" || word === "+") break;
+    if (sign !== "-" && sign !== "+") break;
     i += 1;
-    if (word.startsWith("--")) continue; // long option: never a cluster
+    if (word.startsWith("--")) {
+      if (SHELL_VALUE_LONG_OPTIONS.has(word)) i += 1;
+      continue; // long option: never a cluster
+    }
     const on = sign === "-";
     for (const letter of word.slice(1)) {
       if (letter === "n") {
         noexec = on;
-      } else if (letter === "o") {
-        // `-o name` / `+o name`: the name is the next word.
-        const optName = argWords[i];
-        if (optName && optName.value === "noexec") noexec = on;
+      } else if (letter === "c") {
+        commandString = true;
+      } else if (SHELL_VALUE_LETTERS.has(letter)) {
+        const value = argWords[i];
+        if (letter === "o" && value && value.value === "noexec") noexec = on;
         i += 1;
       }
     }
   }
-  return { noexec, operandIdx: i < argWords.length ? i : -1 };
+  return {
+    noexec,
+    commandString,
+    operandIdx: i < argWords.length ? i : -1,
+  };
 }
 
 function pushSegment(out, command, argWords, appendsDynamicArgs = false) {

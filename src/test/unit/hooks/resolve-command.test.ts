@@ -409,6 +409,32 @@ describe("literal shell payloads are re-parsed, not skipped", () => {
     }
   });
 
+  it("consumes value-taking options before deciding noexec", () => {
+    // `-O shopt`, `-o name`, `--rcfile file`, `--init-file file` each take the
+    // next word; a `+n` after them still counts, and their values are never
+    // the script.
+    for (const cmd of [
+      "bash -n -O nullglob +n scripts/workflow/merge-pr.sh 123 --human",
+      "bash -n +O nullglob +n scripts/workflow/merge-pr.sh 123",
+      "bash -n --rcfile /dev/null +n scripts/workflow/merge-pr.sh 123",
+      "bash -n --init-file /dev/null +n scripts/workflow/merge-pr.sh 123",
+      "bash -O nullglob scripts/workflow/merge-pr.sh 123",
+      "bash --rcfile /dev/null scripts/workflow/merge-pr.sh 123",
+    ]) {
+      expect(names(cmd), cmd).toEqual(["merge-pr.sh"]);
+    }
+    expect(names("bash -O nullglob -n scripts/workflow/merge-pr.sh")).toEqual([
+      "bash",
+    ]);
+  });
+
+  it("finds the `-c` payload past other options", () => {
+    // Options are parsed to the first operand, wherever `-c` sits in them.
+    expect(names('bash -c -x "gh pr merge 1"')).toEqual(["gh"]);
+    expect(names('bash -O nullglob -c "gh pr merge 1"')).toEqual(["gh"]);
+    expect(names('bash -n +n -c "gh pr merge 1"')).toEqual(["gh"]);
+  });
+
   it("does not mistake a `-n`-shaped flag after the script for noexec", () => {
     // Once the script is named, later words are its arguments.
     expect(names("bash scripts/workflow/merge-pr.sh -n")).toEqual([
