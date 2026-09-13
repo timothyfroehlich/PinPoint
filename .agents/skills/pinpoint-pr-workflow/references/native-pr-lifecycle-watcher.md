@@ -2,9 +2,19 @@
 
 Read this reference whenever waiting for current-head CI or exact-head Codex review evidence.
 
-## Named agent
+## Primary Method: Subway Watch
 
-Invoke the project-scoped agent named `pr-lifecycle-watcher`. Give it exactly this five-field envelope and no implementation context, command, history, or transcript:
+Run the watcher as a non-blocking background command via Subway:
+
+```bash
+subway watch --pr <PR> --phase <ci|review> --expected-head <SHA>
+```
+
+`subway watch` directly invokes `scripts/workflow/pr-watch.py` without LLM mediation, saving 100% of context tokens during passive waiting. On failure, it automatically injects a `failure_summary` into the terminal JSON on `stdout`.
+
+## Fallback: Named Agent
+
+If Subway is unavailable, invoke the project-scoped agent named `pr-lifecycle-watcher`. Give it exactly this five-field envelope:
 
 ```json
 {
