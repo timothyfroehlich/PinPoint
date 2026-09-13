@@ -20,7 +20,7 @@
 
 ## 2. Launching a watch
 
-- **2.1** A watch is defined by five parameters: the worktree path, the PR number, the PR title, the phase (`ci` | `review`), and the expected head SHA. The launching command defaults the worktree to the current working directory when invoked in place.
+- **2.1** A watch is defined by four core parameters: the worktree path, the PR number, the phase (`ci` | `review`), and the expected head SHA. An optional PR title may be supplied for diagnostic logging. The launching command defaults the worktree to the current working directory when invoked in place.
 - **2.2** A watch executes as a non-blocking background process, consuming zero main-agent context tokens while running.
 - **2.3** Invalid parameters, missing executables, or corrupt worktrees fail immediately at launch rather than hanging or polling.
 - **2.4** Invocation syntax and semantics are identical across all agent harnesses.
@@ -90,6 +90,7 @@
 
 | Date | Amendment |
 | :-- | :-- |
+| 2026-09-12 | Clarify §2.1: watch is defined by four core parameters with optional title for diagnostic logging. |
 | 2026-09-12 | Qualify §6.1 host coalescing by expected head SHA to match leader-lock isolation. |
 | 2026-09-12 | Clarify actor as the main agent across concepts and requirements; align §2.1 parameter contract with optional worktree defaulting; align §3.6 conflict resolution to merge origin/main per AGENTS.md branch policy. |
 | 2026-09-12 | Initial draft from first principles: background monitoring, structured verdicts, failure reporting, zero-token waiting, and unified CLI invocation via Subway. |
