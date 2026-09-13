@@ -162,6 +162,36 @@ describe("deleteMachineAction", () => {
     expect(deletedMachine).toBeUndefined();
   });
 
+  it("does not delete after an admin is demoted", async () => {
+    const { deleteMachineAction } = await import("~/app/(app)/m/actions");
+    const db = await getTestDb();
+    const owner = await createUser("member");
+    const admin = await createUser("admin");
+    const machine = await createMachine(owner.id);
+    authState.userId = admin.id;
+    accessState.afterLookup = async () => {
+      await db
+        .update(userProfiles)
+        .set({ role: "member" })
+        .where(eq(userProfiles.id, admin.id));
+    };
+
+    const formData = new FormData();
+    formData.set("id", machine.id);
+
+    const result = await deleteMachineAction(undefined, formData);
+
+    expect(result).toEqual({
+      ok: false,
+      code: "NOT_FOUND",
+      message: "Machine not found.",
+    });
+    const retainedMachine = await db.query.machines.findFirst({
+      where: eq(machines.id, machine.id),
+    });
+    expect(retainedMachine?.id).toBe(machine.id);
+  });
+
   it("allows a member to delete a machine they own", async () => {
     const { deleteMachineAction } = await import("~/app/(app)/m/actions");
     const db = await getTestDb();

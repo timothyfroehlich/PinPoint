@@ -28,7 +28,7 @@ import { createMachineSchema, updateMachineSchema } from "./schemas";
 import { resolvePbmLinkColumnsForCreate } from "~/lib/pinballmap/link-columns";
 import { type Result, ok, err } from "~/lib/result";
 import { z } from "zod";
-import { eq, and } from "drizzle-orm";
+import { eq, and, exists } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { log } from "~/lib/logger";
 import {
@@ -1252,14 +1252,24 @@ export async function deleteMachineAction(
       );
     }
 
-    const deleteWhere =
-      deletePermission === true
-        ? eq(machines.id, machineId)
-        : and(eq(machines.id, machineId), eq(machines.ownerId, user.id));
+    const deleteAuthorization =
+      deletePermission === true && accessLevel !== "unauthenticated"
+        ? exists(
+            db
+              .select({ id: userProfiles.id })
+              .from(userProfiles)
+              .where(
+                and(
+                  eq(userProfiles.id, user.id),
+                  eq(userProfiles.role, accessLevel)
+                )
+              )
+          )
+        : eq(machines.ownerId, user.id);
 
     const [deletedMachine] = await db
       .delete(machines)
-      .where(deleteWhere)
+      .where(and(eq(machines.id, machineId), deleteAuthorization))
       .returning({ id: machines.id });
 
     if (!deletedMachine) {
