@@ -298,6 +298,19 @@ describe("block-direct-merge.cjs — merge-pr.sh (PP-wi85 ask-gated)", () => {
     );
   });
 
+  it("does NOT act on a `bash -n` syntax check of merge-pr.sh (PP-mslx)", () => {
+    // noexec: the script is parsed, never run. An ask here hangs an unattended
+    // routine — the nightly lost two runs to it in September 2026.
+    expectAllow(runHook(bashPayload("bash -n scripts/workflow/merge-pr.sh")));
+    expectAllow(
+      runHook(
+        bashPayload(
+          'bash -n scripts/workflow/merge-pr.sh && echo "bash -n: OK"'
+        )
+      )
+    );
+  });
+
   it("does NOT act on a quoted mention (echo)", () => {
     expectAllow(runHook(bashPayload('echo "run merge-pr.sh when ready"')));
   });
