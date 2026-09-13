@@ -250,7 +250,7 @@ export async function setPinballmapIntentAction(
   const raw = formData.get("intent");
   const intent =
     raw === "on" || raw === "off" || raw === "no_sync" ? raw : null;
-  if (intent === null) return err("VALIDATION", "Unknown listing setting");
+  if (intent === null) return err("VALIDATION", "Unknown lineup setting");
 
   const authed = await authorizeListingAction(
     formData,
@@ -399,7 +399,7 @@ async function classifyRemoveNotFound(args: {
   return {
     kind: "refuse",
     message:
-      "Pinball Map still lists this machine but rejected the removal. Nothing was changed — an admin should check the listing on pinballmap.com.",
+      "Pinball Map still shows this entry but rejected the removal. Nothing was changed — an admin should check the lineup on pinballmap.com.",
   };
 }
 
