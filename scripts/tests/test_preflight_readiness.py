@@ -274,6 +274,24 @@ def test_stack_override_requires_adjacent_api_and_database_ports(
     ]
 
 
+def test_stack_override_requires_http_supabase_origin(tmp_path: Path) -> None:
+    database_url = "postgresql://postgres:postgres@localhost:62345/postgres"
+    result = _run_readiness(
+        tmp_path,
+        "ready",
+        database_url_override=database_url,
+        non_pooling_url_override=database_url,
+        supabase_url_override="https://localhost:62344",
+    )
+
+    assert result.returncode == 1
+    assert result.stdout == ""
+    assert result.stderr.splitlines() == [
+        "FAIL: preflight readiness — local stack overrides do not identify one worktree stack",
+        "Run: unset POSTGRES_URL POSTGRES_URL_NON_POOLING NEXT_PUBLIC_SUPABASE_URL",
+    ]
+
+
 def _run_targeted_integration(
     tmp_path: Path, *, ensure_schema_succeeds: bool = True, args: list[str]
 ) -> tuple[subprocess.CompletedProcess[str], Path]:

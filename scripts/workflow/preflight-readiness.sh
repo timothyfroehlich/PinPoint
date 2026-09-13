@@ -88,12 +88,18 @@ if [[ "$stack_overridden" == true \
 fi
 
 # Strip the scheme, credentials, path, and query without ever printing them.
+if [[ "$database_url" != postgres://* && "$database_url" != postgresql://* ]]; then
+  printf '%s\n' \
+    "FAIL: preflight readiness — POSTGRES_URL is not a local PostgreSQL URL" \
+    "Run: python3 scripts/worktree_setup.py" >&2
+  exit 1
+fi
 database_target="${database_url#*://}"
 database_target="${database_target#*@}"
 database_target="${database_target%%/*}"
 database_target="${database_target%%\?*}"
 
-if [[ "$database_target" != localhost:* ]]; then
+if [[ ! "$database_target" =~ ^localhost:[0-9]+$ ]]; then
   printf '%s\n' \
     "FAIL: preflight readiness — POSTGRES_URL is not a localhost worktree database" \
     "Run: python3 scripts/worktree_setup.py" >&2
@@ -101,15 +107,15 @@ if [[ "$database_target" != localhost:* ]]; then
 fi
 
 if [[ "$stack_overridden" == true ]]; then
-  supabase_target="${NEXT_PUBLIC_SUPABASE_URL#*://}"
-  supabase_target="${supabase_target%%/*}"
-  supabase_target="${supabase_target%%\?*}"
   database_port="${database_target##*:}"
-  supabase_port="${supabase_target##*:}"
-  if [[ "$supabase_target" != localhost:* \
-    || ! "$database_port" =~ ^[0-9]+$ \
-    || ! "$supabase_port" =~ ^[0-9]+$ ]] \
-    || (( 10#$database_port != 10#$supabase_port + 1 )); then
+  if [[ ! "${NEXT_PUBLIC_SUPABASE_URL:-}" =~ ^http://localhost:([0-9]+)$ ]]; then
+    printf '%s\n' \
+      "FAIL: preflight readiness — local stack overrides do not identify one worktree stack" \
+      "Run: unset POSTGRES_URL POSTGRES_URL_NON_POOLING NEXT_PUBLIC_SUPABASE_URL" >&2
+    exit 1
+  fi
+  supabase_port="${BASH_REMATCH[1]}"
+  if (( 10#$database_port != 10#$supabase_port + 1 )); then
     printf '%s\n' \
       "FAIL: preflight readiness — local stack overrides do not identify one worktree stack" \
       "Run: unset POSTGRES_URL POSTGRES_URL_NON_POOLING NEXT_PUBLIC_SUPABASE_URL" >&2
