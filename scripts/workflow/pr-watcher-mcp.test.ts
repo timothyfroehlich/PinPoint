@@ -75,7 +75,7 @@ describe("canonical watcher invocation", () => {
       NODE_ENV: "test",
       PATH: "/usr/bin",
       GH_MONITOR_HARNESS: "codex",
-      GH_MONITOR_MODEL: "gpt-5.3-codex-spark",
+      GH_MONITOR_MODEL: "gpt-5.6-luna",
       GH_MONITOR_WAKES: "99",
     });
 
@@ -96,7 +96,7 @@ describe("canonical watcher invocation", () => {
           NODE_ENV: "test",
           PATH: "/usr/bin",
           GH_MONITOR_HARNESS: "codex",
-          GH_MONITOR_MODEL: "gpt-5.3-codex-spark",
+          GH_MONITOR_MODEL: "gpt-5.6-luna",
           GH_MONITOR_WAKES: "1",
         },
         shell: false,

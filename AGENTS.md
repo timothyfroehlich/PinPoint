@@ -45,14 +45,16 @@ Before exploring or changing non-mechanical product behavior, read
 ADRs. Skip it for mechanical changes that do not affect product behavior or
 domain language.
 
-**The huddle is global, not a PinPoint subsystem.** Its implementation, trusted
-repository registry, harness registrations, tests, and user services live in
-Tim's dotfiles. Shared scripts are at `~/.agents/huddle/`; agent-writable state
-lives under `$XDG_STATE_HOME/agents-huddle/agent/`. Global hooks silently
-self-disable outside registered repositories. The Mac updater and Bazzite
-leader service own fetch/fast-forward work; Bazzite alone posts merge
-announcements. PinPoint keeps only its Beads actor hook, which asks the global
-`huddle-whoami.sh` interface for the registered identity.
+**The huddle is global, not a PinPoint subsystem.** Its implementation, skill,
+and tests live in the public `timothyfroehlich/huddle` repository, installed as
+a plugin in each harness and checked out at `~/Code/huddle`; the trusted
+repository registry and the Mac launchd job stay in Tim's dotfiles. Shared
+scripts are at `~/Code/huddle/lib/`; agent-writable state lives under
+`$XDG_STATE_HOME/agents-huddle/agent/`. Plugin hooks silently self-disable
+outside registered repositories. The Mac leader service owns fetch and
+fast-forward work and posts merge announcements. PinPoint keeps only its Beads
+actor hook, which asks the global `huddle-whoami.sh` interface for the
+registered identity.
 
 ## 4. Environment
 
