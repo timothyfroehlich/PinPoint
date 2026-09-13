@@ -20,6 +20,7 @@ def _run_readiness(
     mode: str,
     *args: str,
     database_url_override: str | None = None,
+    non_pooling_url_override: str | None = None,
 ) -> subprocess.CompletedProcess[str]:
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
@@ -60,6 +61,8 @@ fi
     env["STUB_MODE"] = mode
     if database_url_override is not None:
         env["POSTGRES_URL"] = database_url_override
+    if non_pooling_url_override is not None:
+        env["POSTGRES_URL_NON_POOLING"] = non_pooling_url_override
     return subprocess.run(
         ["/bin/bash", str(READINESS_SCRIPT), *args],
         cwd=tmp_path,
@@ -158,6 +161,9 @@ def test_explicit_database_url_overrides_dotenv_target(tmp_path: Path) -> None:
         database_url_override=(
             "postgresql://postgres:postgres@localhost:62345/postgres"
         ),
+        non_pooling_url_override=(
+            "postgresql://postgres:postgres@localhost:62345/postgres"
+        ),
     )
 
     assert result.returncode == 0
@@ -165,6 +171,45 @@ def test_explicit_database_url_overrides_dotenv_target(tmp_path: Path) -> None:
     assert result.stdout == (
         "PASS: preflight readiness — Postgres ready at localhost:62345\n"
     )
+
+
+def test_explicit_empty_database_url_is_not_replaced_from_dotenv(
+    tmp_path: Path,
+) -> None:
+    result = _run_readiness(
+        tmp_path,
+        "ready",
+        database_url_override="",
+    )
+
+    assert result.returncode == 1
+    assert result.stdout == ""
+    assert result.stderr.splitlines() == [
+        "FAIL: preflight readiness — POSTGRES_URL is explicitly empty",
+        "Run: unset POSTGRES_URL POSTGRES_URL_NON_POOLING",
+    ]
+
+
+def test_explicit_database_override_requires_matching_non_pooling_url(
+    tmp_path: Path,
+) -> None:
+    result = _run_readiness(
+        tmp_path,
+        "ready",
+        database_url_override=(
+            "postgresql://postgres:postgres@localhost:62345/postgres"
+        ),
+        non_pooling_url_override=(
+            "postgresql://postgres:postgres@localhost:61234/postgres"
+        ),
+    )
+
+    assert result.returncode == 1
+    assert result.stdout == ""
+    assert result.stderr.splitlines() == [
+        "FAIL: preflight readiness — POSTGRES_URL override does not match POSTGRES_URL_NON_POOLING",
+        'Run: export POSTGRES_URL_NON_POOLING="$POSTGRES_URL"',
+    ]
 
 
 def _run_targeted_integration(
@@ -311,6 +356,7 @@ printf '%s\n' "$PARALLEL_HOME"
     env["PATH"] = f"{bin_dir}{os.pathsep}{env['PATH']}"
     env["XDG_STATE_HOME"] = str(state_root)
     env["POSTGRES_URL"] = "postgresql://postgres:postgres@localhost:61234/postgres"
+    env["POSTGRES_URL_NON_POOLING"] = env["POSTGRES_URL"]
     script = REPO_ROOT / "scripts" / "workflow" / "preflight-locked.sh"
 
     result = subprocess.run(

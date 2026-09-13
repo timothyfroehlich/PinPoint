@@ -233,6 +233,7 @@ printf '%s\\n' "$@"
     env = os.environ.copy()
     env["PATH"] = f"{fake_bin}{os.pathsep}{env['PATH']}"
     env["POSTGRES_URL"] = "postgresql://postgres:postgres@localhost:61234/postgres"
+    env["POSTGRES_URL_NON_POOLING"] = env["POSTGRES_URL"]
     script = REPO_ROOT / "scripts" / "workflow" / "preflight-locked.sh"
 
     compact = subprocess.run(

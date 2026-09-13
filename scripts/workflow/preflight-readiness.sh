@@ -18,9 +18,12 @@ if [[ $# -ne 0 ]]; then
   exit 64
 fi
 
-# Match Node's --env-file behavior: an explicit environment value wins, while
-# .env.local remains the ordinary worktree-local fallback.
-if [[ -z ${POSTGRES_URL:-} ]]; then
+# Match Node's --env-file behavior: a defined environment value wins even when
+# it is empty, while .env.local remains the ordinary worktree-local fallback.
+database_url_overridden=false
+if [[ ${POSTGRES_URL+x} == x ]]; then
+  database_url_overridden=true
+else
   # shellcheck source=/dev/null
   source .env.local 2>/dev/null || true
 fi
@@ -29,9 +32,23 @@ database_url="${POSTGRES_URL:-}"
 remediation="supabase start && pnpm run db:migrate"
 
 if [[ -z "$database_url" ]]; then
+  if [[ "$database_url_overridden" == true ]]; then
+    printf '%s\n' \
+      "FAIL: preflight readiness — POSTGRES_URL is explicitly empty" \
+      "Run: unset POSTGRES_URL POSTGRES_URL_NON_POOLING" >&2
+    exit 1
+  fi
   printf '%s\n' \
     "FAIL: preflight readiness — POSTGRES_URL is not configured" \
     "Run: python3 scripts/worktree_setup.py" >&2
+  exit 1
+fi
+
+if [[ "$database_url_overridden" == true \
+  && "${POSTGRES_URL_NON_POOLING:-}" != "$database_url" ]]; then
+  printf '%s\n' \
+    "FAIL: preflight readiness — POSTGRES_URL override does not match POSTGRES_URL_NON_POOLING" \
+    "Run: export POSTGRES_URL_NON_POOLING=\"\$POSTGRES_URL\"" >&2
   exit 1
 fi
 
@@ -48,11 +65,19 @@ if [[ "$database_target" != localhost:* ]]; then
   exit 1
 fi
 
+availability_remediation="$remediation"
+divergence_remediation="pnpm run db:reset"
+if [[ "$database_url_overridden" == true ]]; then
+  remediation="pnpm run db:migrate"
+  availability_remediation="start the local Supabase stack that owns ${database_target}"
+  divergence_remediation="reset ${database_target} from its owning worktree"
+fi
+
 if ! command -v pg_isready >/dev/null 2>&1 \
   || ! pg_isready -d "$database_url" -t 1 >/dev/null 2>&1; then
   printf '%s\n' \
     "FAIL: preflight readiness — Postgres is unavailable at ${database_target}" \
-    "Run: ${remediation}" >&2
+    "Run: ${availability_remediation}" >&2
   exit 1
 fi
 
@@ -155,7 +180,7 @@ migration_status="$({
 if [[ "$migration_status" == "diverged" ]]; then
   printf '%s\n' \
     "FAIL: preflight readiness — Postgres at ${database_target} has a divergent migration history" \
-    "Run: pnpm run db:reset" >&2
+    "Run: ${divergence_remediation}" >&2
   exit 1
 fi
 
