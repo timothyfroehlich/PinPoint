@@ -5,7 +5,7 @@ import {
   canViewSet,
   canEditSet,
   canSetOwnerDefault,
-} from "./settings-permissions";
+} from "./settings";
 
 const OWNER = "owner-1";
 const TECH = "tech-1";
