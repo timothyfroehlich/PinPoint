@@ -22,6 +22,7 @@ def _run_readiness(
     database_url_override: str | None = None,
     non_pooling_url_override: str | None = None,
     supabase_url_override: str | None = None,
+    service_role_key_override: str | None = None,
     dotenv_non_pooling_url: str = (
         "postgresql://postgres:postgres@localhost:61234/postgres"
     ),
@@ -35,7 +36,15 @@ def _run_readiness(
     )
     _write_executable(
         bin_dir / "curl",
-        '[[ "$STUB_MODE" == "api_unreachable" ]] && exit 1\nexit 0\n',
+        """
+[[ "$STUB_MODE" == "api_unreachable" ]] && exit 1
+if [[ "$STUB_MODE" == "invalid_service_key" \
+  && "$*" == *"/auth/v1/admin/users"* \
+  && "$*" == *"invalid-service-role-key"* ]]; then
+  exit 1
+fi
+exit 0
+""",
     )
     _write_executable(
         bin_dir / "psql",
@@ -73,6 +82,7 @@ fi
         "POSTGRES_URL=postgresql://postgres:postgres@localhost:61234/postgres\n"
         f"POSTGRES_URL_NON_POOLING={dotenv_non_pooling_url}\n"
         "NEXT_PUBLIC_SUPABASE_URL=http://localhost:61233\n"
+        "SUPABASE_SERVICE_ROLE_KEY=test-service-role-key\n"
         f"{dotenv_extra}"
     )
     env = os.environ.copy()
@@ -84,6 +94,8 @@ fi
         env["POSTGRES_URL_NON_POOLING"] = non_pooling_url_override
     if supabase_url_override is not None:
         env["NEXT_PUBLIC_SUPABASE_URL"] = supabase_url_override
+    if service_role_key_override is not None:
+        env["SUPABASE_SERVICE_ROLE_KEY"] = service_role_key_override
     return subprocess.run(
         ["/bin/bash", str(READINESS_SCRIPT), *args],
         cwd=tmp_path,
@@ -131,6 +143,23 @@ def test_unavailable_supabase_api_fails_before_schema_inspection(
     assert result.stderr.splitlines() == [
         "FAIL: preflight readiness — Supabase Auth is unavailable at localhost:61233",
         "Run: supabase start && pnpm run db:migrate",
+    ]
+
+
+def test_invalid_exported_service_role_key_fails_before_schema_inspection(
+    tmp_path: Path,
+) -> None:
+    result = _run_readiness(
+        tmp_path,
+        "invalid_service_key",
+        service_role_key_override="invalid-service-role-key",
+    )
+
+    assert result.returncode == 1
+    assert result.stdout == ""
+    assert result.stderr.splitlines() == [
+        "FAIL: preflight readiness — Supabase service-role authentication failed at localhost:61233",
+        "Run: unset SUPABASE_SERVICE_ROLE_KEY SUPABASE_SECRET_KEY && python3 scripts/worktree_setup.py",
     ]
 
 
@@ -532,6 +561,16 @@ def test_package_scripts_put_readiness_first_and_share_integration_setup() -> No
     assert parallel_home_at < semaphore_at
 
 
+def test_migration_manifest_allows_repeated_sql_hashes() -> None:
+    readiness = READINESS_SCRIPT.read_text()
+
+    assert "new Set(migrations.map(({ hash }) => hash))" not in readiness
+    assert "new Set(migrations.map(({ tag }) => tag))" in readiness
+    assert "new Set(migrations.map(({ when }) => when))" in readiness
+    assert "brew install libpq" in readiness
+    assert "install postgresql-client" in readiness
+
+
 def test_locked_preflight_uses_writable_shared_semaphore_state(
     tmp_path: Path,
 ) -> None:
@@ -560,6 +599,7 @@ printf '%s\n' "$PARALLEL_HOME"
     env["POSTGRES_URL"] = "postgresql://postgres:postgres@localhost:61234/postgres"
     env["POSTGRES_URL_NON_POOLING"] = env["POSTGRES_URL"]
     env["NEXT_PUBLIC_SUPABASE_URL"] = "http://localhost:61233"
+    env["SUPABASE_SERVICE_ROLE_KEY"] = "test-service-role-key"
     script = REPO_ROOT / "scripts" / "workflow" / "preflight-locked.sh"
 
     result = subprocess.run(

@@ -37,12 +37,14 @@ fi
 dotenv_postgres_url="${POSTGRES_URL-}"
 dotenv_non_pooling_url="${POSTGRES_URL_NON_POOLING-}"
 dotenv_supabase_url="${NEXT_PUBLIC_SUPABASE_URL-}"
+dotenv_service_role_key="${SUPABASE_SERVICE_ROLE_KEY:-${SUPABASE_SECRET_KEY-}}"
 if [[ -f .env.local ]]; then
   dotenv_load_status=""
   {
     IFS= read -r dotenv_postgres_url || true
     IFS= read -r dotenv_non_pooling_url || true
     IFS= read -r dotenv_supabase_url || true
+    IFS= read -r dotenv_service_role_key || true
     IFS= read -r dotenv_load_status || true
   } < <(
     # JavaScript template literals expand in Node, not Bash.
@@ -55,6 +57,9 @@ if [[ -f .env.local ]]; then
       ]) {
         process.stdout.write(`${process.env[key] ?? ""}\n`);
       }
+      process.stdout.write(
+        `${process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY || ""}\n`,
+      );
       process.stdout.write("pinpoint-env-ready\n");
     ' 2>/dev/null || true
   )
@@ -69,6 +74,7 @@ fi
 POSTGRES_URL="$dotenv_postgres_url"
 POSTGRES_URL_NON_POOLING="$dotenv_non_pooling_url"
 NEXT_PUBLIC_SUPABASE_URL="$dotenv_supabase_url"
+supabase_service_role_key="$dotenv_service_role_key"
 
 database_url="$POSTGRES_URL"
 remediation="supabase start && pnpm run db:migrate"
@@ -202,10 +208,26 @@ if ! command -v curl >/dev/null 2>&1 \
   exit 1
 fi
 
+credential_remediation="unset SUPABASE_SERVICE_ROLE_KEY SUPABASE_SECRET_KEY && python3 scripts/worktree_setup.py"
+if [[ "$stack_overridden" == true ]]; then
+  credential_remediation="load the service-role key for the stack that owns ${database_target}"
+fi
+if [[ -z "$supabase_service_role_key" ]] \
+  || ! curl -fsS --max-time 2 \
+    -H "apikey: ${supabase_service_role_key}" \
+    -H "Authorization: Bearer ${supabase_service_role_key}" \
+    "${NEXT_PUBLIC_SUPABASE_URL}/auth/v1/admin/users?page=1&per_page=1" \
+    >/dev/null 2>&1; then
+  printf '%s\n' \
+    "FAIL: preflight readiness — Supabase service-role authentication failed at ${supabase_target}" \
+    "Run: ${credential_remediation}" >&2
+  exit 1
+fi
+
 if ! command -v psql >/dev/null 2>&1; then
   printf '%s\n' \
     "FAIL: preflight readiness — psql is required to inspect ${database_target}" \
-    "Run: mise install --locked" >&2
+    "Run: install a PostgreSQL client (macOS: brew install libpq; Linux: install postgresql-client) and add psql to PATH" >&2
   exit 1
 fi
 
@@ -241,7 +263,8 @@ migration_manifest="$({
     });
     if (
       migrations.length === 0 ||
-      new Set(migrations.map(({ hash }) => hash)).size !== migrations.length
+      new Set(migrations.map(({ tag }) => tag)).size !== migrations.length ||
+      new Set(migrations.map(({ when }) => when)).size !== migrations.length
     ) process.exit(1);
     const quote = String.fromCharCode(39);
     const rows = migrations.map(
