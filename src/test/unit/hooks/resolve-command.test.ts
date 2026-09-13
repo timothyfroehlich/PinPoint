@@ -388,6 +388,27 @@ describe("literal shell payloads are re-parsed, not skipped", () => {
     expect(names("bash -n scripts/workflow/merge-pr.sh")).toEqual(["bash"]);
   });
 
+  it("honors a later `+n` / `+o noexec` that turns execution back on", () => {
+    // `+` flags switch an option off, and the last one wins — `bash -n +n
+    // script` runs the script. Only the final noexec state counts.
+    for (const cmd of [
+      "bash -n +n scripts/workflow/merge-pr.sh 123 --human",
+      "bash -n +on noexec scripts/workflow/merge-pr.sh 123",
+      "bash -n +o noexec scripts/workflow/merge-pr.sh 123",
+      "bash -o noexec +n scripts/workflow/merge-pr.sh 123",
+    ]) {
+      expect(names(cmd), cmd).toEqual(["merge-pr.sh"]);
+    }
+    // And the other way round: a trailing `-n` / `-o noexec` wins too.
+    for (const cmd of [
+      "bash +n -n scripts/workflow/merge-pr.sh 123",
+      "bash -o noexec scripts/workflow/merge-pr.sh 123",
+      "bash +n -o noexec scripts/workflow/merge-pr.sh 123",
+    ]) {
+      expect(names(cmd), cmd).toEqual(["bash"]);
+    }
+  });
+
   it("does not mistake a `-n`-shaped flag after the script for noexec", () => {
     // Once the script is named, later words are its arguments.
     expect(names("bash scripts/workflow/merge-pr.sh -n")).toEqual([
