@@ -241,6 +241,35 @@ describe("deleteMachineAction", () => {
     expect(retainedMachine?.ownerId).toBe(newOwner.id);
   });
 
+  it("does not delete after an owning member becomes a technician", async () => {
+    const { deleteMachineAction } = await import("~/app/(app)/m/actions");
+    const db = await getTestDb();
+    const owner = await createUser("member");
+    const machine = await createMachine(owner.id);
+    authState.userId = owner.id;
+    accessState.afterLookup = async () => {
+      await db
+        .update(userProfiles)
+        .set({ role: "technician" })
+        .where(eq(userProfiles.id, owner.id));
+    };
+
+    const formData = new FormData();
+    formData.set("id", machine.id);
+
+    const result = await deleteMachineAction(undefined, formData);
+
+    expect(result).toEqual({
+      ok: false,
+      code: "NOT_FOUND",
+      message: "Machine not found.",
+    });
+    const retainedMachine = await db.query.machines.findFirst({
+      where: eq(machines.id, machine.id),
+    });
+    expect(retainedMachine?.id).toBe(machine.id);
+  });
+
   it("denies a member deleting another member's machine", async () => {
     const { deleteMachineAction } = await import("~/app/(app)/m/actions");
     const db = await getTestDb();

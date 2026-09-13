@@ -1251,21 +1251,25 @@ export async function deleteMachineAction(
         "You do not have permission to delete this machine."
       );
     }
+    if (accessLevel === "unauthenticated") {
+      return err(
+        "FORBIDDEN",
+        "You do not have permission to delete this machine."
+      );
+    }
 
+    const currentAccessLevel = exists(
+      db
+        .select({ id: userProfiles.id })
+        .from(userProfiles)
+        .where(
+          and(eq(userProfiles.id, user.id), eq(userProfiles.role, accessLevel))
+        )
+    );
     const deleteAuthorization =
-      deletePermission === true && accessLevel !== "unauthenticated"
-        ? exists(
-            db
-              .select({ id: userProfiles.id })
-              .from(userProfiles)
-              .where(
-                and(
-                  eq(userProfiles.id, user.id),
-                  eq(userProfiles.role, accessLevel)
-                )
-              )
-          )
-        : eq(machines.ownerId, user.id);
+      deletePermission === true
+        ? currentAccessLevel
+        : and(currentAccessLevel, eq(machines.ownerId, user.id));
 
     const [deletedMachine] = await db
       .delete(machines)
