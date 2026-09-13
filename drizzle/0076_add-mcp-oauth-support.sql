@@ -7,17 +7,9 @@ CREATE TABLE "mcp_oauth_clients" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-ALTER TABLE "mcp_oauth_clients" ENABLE ROW LEVEL SECURITY;
---> statement-breakpoint
 REVOKE ALL ON TABLE "mcp_oauth_clients" FROM anon, authenticated, public;
 --> statement-breakpoint
 GRANT SELECT ON TABLE "mcp_oauth_clients" TO supabase_auth_admin;
---> statement-breakpoint
-CREATE POLICY "Supabase Auth reads enabled MCP OAuth clients"
-ON "mcp_oauth_clients"
-FOR SELECT
-TO supabase_auth_admin
-USING (true);
 --> statement-breakpoint
 CREATE OR REPLACE FUNCTION public.mcp_custom_access_token_hook(event jsonb)
 RETURNS jsonb
