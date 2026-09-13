@@ -16,7 +16,10 @@ def _write_executable(path: Path, body: str) -> None:
 
 
 def _run_readiness(
-    tmp_path: Path, mode: str, *args: str
+    tmp_path: Path,
+    mode: str,
+    *args: str,
+    database_url_override: str | None = None,
 ) -> subprocess.CompletedProcess[str]:
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
@@ -55,6 +58,8 @@ fi
     env = os.environ.copy()
     env["PATH"] = f"{bin_dir}{os.pathsep}{env['PATH']}"
     env["STUB_MODE"] = mode
+    if database_url_override is not None:
+        env["POSTGRES_URL"] = database_url_override
     return subprocess.run(
         ["/bin/bash", str(READINESS_SCRIPT), *args],
         cwd=tmp_path,
@@ -144,6 +149,22 @@ def test_quiet_success_supports_the_locked_pre_semaphore_probe(tmp_path: Path) -
     assert result.returncode == 0
     assert result.stdout == ""
     assert result.stderr == ""
+
+
+def test_explicit_database_url_overrides_dotenv_target(tmp_path: Path) -> None:
+    result = _run_readiness(
+        tmp_path,
+        "ready",
+        database_url_override=(
+            "postgresql://postgres:postgres@localhost:62345/postgres"
+        ),
+    )
+
+    assert result.returncode == 0
+    assert result.stderr == ""
+    assert result.stdout == (
+        "PASS: preflight readiness — Postgres ready at localhost:62345\n"
+    )
 
 
 def _run_targeted_integration(

@@ -18,8 +18,12 @@ if [[ $# -ne 0 ]]; then
   exit 64
 fi
 
-# shellcheck source=/dev/null
-source .env.local 2>/dev/null || true
+# Match Node's --env-file behavior: an explicit environment value wins, while
+# .env.local remains the ordinary worktree-local fallback.
+if [[ -z ${POSTGRES_URL:-} ]]; then
+  # shellcheck source=/dev/null
+  source .env.local 2>/dev/null || true
+fi
 
 database_url="${POSTGRES_URL:-}"
 remediation="supabase start && pnpm run db:migrate"
