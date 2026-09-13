@@ -582,14 +582,15 @@ export function PinballMapConfigForm({
             role="status"
             aria-live="polite"
             aria-atomic="true"
-            className="min-h-5"
+            className="min-h-5 space-y-2"
           >
-            {cooldownActive ? (
+            {cooldownActive && (
               <p className="text-warning flex items-center gap-1.5 text-xs">
                 <AlertCircle className="size-3.5 shrink-0" aria-hidden />
                 Pinball Map&apos;s refresh limit is used up for now.
               </p>
-            ) : destination ? (
+            )}
+            {destination ? (
               <LocationResult
                 location={destination}
                 pendingLine={candidatePendingLine(destination, initialState)}
@@ -608,10 +609,24 @@ export function PinballMapConfigForm({
             ) : initialState.currentLocation ? (
               <LocationResult location={initialState.currentLocation} />
             ) : initialState.configuredLocationId !== null ? (
-              <p className="text-muted-foreground text-xs">
-                Location {String(initialState.configuredLocationId)} is
-                configured; its first snapshot is still waiting.
-              </p>
+              <div className="text-muted-foreground flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs">
+                <span>
+                  Location {String(initialState.configuredLocationId)} is
+                  configured; its first snapshot is still waiting.
+                </span>
+                <span aria-hidden>·</span>
+                <a
+                  href={pinballmapLocationUrl(
+                    initialState.configuredLocationId
+                  )}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 text-link"
+                >
+                  View on Pinball Map
+                  <ExternalLink className="size-3" aria-hidden />
+                </a>
+              </div>
             ) : null}
           </div>
         </section>
@@ -833,10 +848,15 @@ function HealthSummary({
       return (
         <div className="space-y-0.5 text-sm">
           <p className="text-warning">Waiting for the first successful sync</p>
-          {health.lastAttemptAtIso && health.error ? (
-            <p className="text-destructive-text text-xs">
-              Last attempt <RelativeTime value={health.lastAttemptAtIso} /> —{" "}
-              {health.error}
+          {health.lastAttemptAtIso ? (
+            <p
+              className={cn(
+                "text-xs",
+                health.error ? "text-destructive-text" : "text-muted-foreground"
+              )}
+            >
+              Last attempt <RelativeTime value={health.lastAttemptAtIso} />
+              {health.error ? ` — ${health.error}` : null}
             </p>
           ) : (
             <p className="text-muted-foreground text-xs">

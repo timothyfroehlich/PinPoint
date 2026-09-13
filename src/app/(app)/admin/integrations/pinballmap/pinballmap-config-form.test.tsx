@@ -173,6 +173,42 @@ describe("PinballMapConfigForm", () => {
     expect(screen.getByText(new RegExp(expected))).toBeInTheDocument();
   });
 
+  it("links the configured location while its first snapshot is waiting", () => {
+    renderForm({
+      ...CONFIGURED,
+      currentLocation: null,
+      health: {
+        kind: "waiting",
+        lastAttemptAtIso: null,
+        error: null,
+      },
+    });
+
+    expect(
+      screen.getByRole("link", { name: /View on Pinball Map/ })
+    ).toHaveAttribute(
+      "href",
+      "https://pinballmap.com/map/?by_location_id=26454"
+    );
+  });
+
+  it("shows a recorded waiting attempt even when no error was persisted", () => {
+    renderForm({
+      ...CONFIGURED,
+      currentLocation: null,
+      health: {
+        kind: "waiting",
+        lastAttemptAtIso: "2026-09-12T11:56:00.000Z",
+        error: null,
+      },
+    });
+
+    expect(screen.getByText(/Last attempt 4 minutes ago/)).toBeInTheDocument();
+    expect(
+      screen.queryByText("No snapshot is available yet.")
+    ).not.toBeInTheDocument();
+  });
+
   it("moves from Not checked to a resolved replacement and invalidates it on edit", async () => {
     const user = userEvent.setup();
     renderForm();
@@ -497,6 +533,68 @@ describe("PinballMapConfigForm", () => {
     ).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Check ID" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Sync now" })).toBeEnabled();
+  });
+
+  it("keeps a successful final-token Check result visible beside the cooldown", async () => {
+    const user = userEvent.setup();
+    checkActionMock.mockResolvedValue({
+      ...successfulCheck(),
+      allowance: {
+        remaining: 0,
+        nextRefillAtIso: new Date(Date.now() + 120_000).toISOString(),
+        observedAtIso: new Date().toISOString(),
+      },
+    });
+    renderForm({
+      ...CONFIGURED,
+      configuredLocationId: null,
+      currentLocation: null,
+      retainedLocation: null,
+      health: { kind: "not_configured" },
+    });
+    const input = screen.getByLabelText("Location ID");
+    await user.type(input, "33871");
+    await user.click(screen.getByRole("button", { name: "Check ID" }));
+
+    expect(
+      await screen.findByText("Pinball Wizard Arcade")
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Pinball Map's refresh limit is used up for now.")
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save changes" })).toBeEnabled();
+  });
+
+  it("keeps a failed final-token Check result visible beside the cooldown", async () => {
+    const user = userEvent.setup();
+    checkActionMock.mockResolvedValue({
+      ok: false,
+      reason: "not_found",
+      allowance: {
+        remaining: 0,
+        nextRefillAtIso: new Date(Date.now() + 120_000).toISOString(),
+        observedAtIso: new Date().toISOString(),
+      },
+    });
+    renderForm({
+      ...CONFIGURED,
+      configuredLocationId: null,
+      currentLocation: null,
+      retainedLocation: null,
+      health: { kind: "not_configured" },
+    });
+    const input = screen.getByLabelText("Location ID");
+    await user.type(input, "99999");
+    await user.click(screen.getByRole("button", { name: "Check ID" }));
+
+    expect(
+      await screen.findByText(
+        "No location 99999 on Pinball Map. Nothing was saved."
+      )
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Pinball Map's refresh limit is used up for now.")
+    ).toBeInTheDocument();
   });
 
   it("uses wrapping, shrink-safe controls for the narrow card", () => {
