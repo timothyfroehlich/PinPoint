@@ -170,6 +170,11 @@ GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
 GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
 GRANT ALL ON ALL FUNCTIONS IN SCHEMA public TO anon, authenticated, service_role;
 
+-- The MCP OAuth client allowlist is server-only. Restore its migration-level
+-- privilege boundary after the broad local-development grants above.
+REVOKE ALL ON TABLE public.mcp_oauth_clients FROM anon, authenticated, public;
+GRANT SELECT ON TABLE public.mcp_oauth_clients TO supabase_auth_admin;
+
 -- Ensure default privileges for future tables created in public schema
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated, service_role;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;

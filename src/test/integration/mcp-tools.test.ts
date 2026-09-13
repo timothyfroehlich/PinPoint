@@ -98,7 +98,12 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
     accessLevel: McpAuthContext["accessLevel"],
     userId: string
   ): McpAuthContext {
-    return { userId, accessLevel, clientId: "test-client" };
+    return {
+      userId,
+      accessLevel,
+      clientId: "test-client",
+      authMode: "oauth",
+    };
   }
 
   async function makeUser(

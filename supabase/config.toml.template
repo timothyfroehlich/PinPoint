@@ -89,6 +89,10 @@ enable_anonymous_sign_ins = false
 enable_manual_linking = true
 minimum_password_length = 6
 
+[auth.hook.custom_access_token]
+enabled = true
+uri = "pg-functions://postgres/public/mcp_custom_access_token_hook"
+
 [auth.rate_limit]
 email_sent = 100  # Increased for local development testing
 token_refresh = 150

@@ -130,6 +130,7 @@ export async function updateSession(
     path.startsWith("/whats-new") ||
     path.startsWith("/privacy") ||
     path.startsWith("/terms") ||
+    path === "/.well-known/oauth-protected-resource" ||
     // API routes authenticate themselves (e.g. the MCP server's bearer gate) and
     // must return 401/403 to their callers rather than a /login redirect.
     path.startsWith("/api");
