@@ -207,8 +207,27 @@ def test_explicit_database_override_requires_matching_non_pooling_url(
     assert result.returncode == 1
     assert result.stdout == ""
     assert result.stderr.splitlines() == [
-        "FAIL: preflight readiness — POSTGRES_URL override does not match POSTGRES_URL_NON_POOLING",
+        "FAIL: preflight readiness — database URL overrides must be defined together and match",
         'Run: export POSTGRES_URL_NON_POOLING="$POSTGRES_URL"',
+    ]
+
+
+def test_non_pooling_only_override_is_preserved_and_rejected(
+    tmp_path: Path,
+) -> None:
+    result = _run_readiness(
+        tmp_path,
+        "ready",
+        non_pooling_url_override=(
+            "postgresql://postgres:postgres@localhost:62345/postgres"
+        ),
+    )
+
+    assert result.returncode == 1
+    assert result.stdout == ""
+    assert result.stderr.splitlines() == [
+        "FAIL: preflight readiness — database URL overrides must be defined together and match",
+        'Run: export POSTGRES_URL="$POSTGRES_URL_NON_POOLING"',
     ]
 
 

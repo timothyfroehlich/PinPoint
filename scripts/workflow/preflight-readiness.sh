@@ -18,24 +18,47 @@ if [[ $# -ne 0 ]]; then
   exit 64
 fi
 
-# Match Node's --env-file behavior: a defined environment value wins even when
-# it is empty, while .env.local remains the ordinary worktree-local fallback.
-database_url_overridden=false
+# Match Node's --env-file behavior for both database selectors: load worktree
+# defaults, then restore every value the caller defined (including empty ones).
+postgres_url_was_defined=false
+postgres_url_override="${POSTGRES_URL-}"
 if [[ ${POSTGRES_URL+x} == x ]]; then
-  database_url_overridden=true
-else
-  # shellcheck source=/dev/null
-  source .env.local 2>/dev/null || true
+  postgres_url_was_defined=true
+fi
+non_pooling_url_was_defined=false
+non_pooling_url_override="${POSTGRES_URL_NON_POOLING-}"
+if [[ ${POSTGRES_URL_NON_POOLING+x} == x ]]; then
+  non_pooling_url_was_defined=true
+fi
+
+# shellcheck source=/dev/null
+source .env.local 2>/dev/null || true
+if [[ "$postgres_url_was_defined" == true ]]; then
+  POSTGRES_URL="$postgres_url_override"
+fi
+if [[ "$non_pooling_url_was_defined" == true ]]; then
+  POSTGRES_URL_NON_POOLING="$non_pooling_url_override"
 fi
 
 database_url="${POSTGRES_URL:-}"
 remediation="supabase start && pnpm run db:migrate"
+database_url_overridden=false
+if [[ "$postgres_url_was_defined" == true \
+  || "$non_pooling_url_was_defined" == true ]]; then
+  database_url_overridden=true
+fi
 
 if [[ -z "$database_url" ]]; then
-  if [[ "$database_url_overridden" == true ]]; then
+  if [[ "$postgres_url_was_defined" == true ]]; then
     printf '%s\n' \
       "FAIL: preflight readiness — POSTGRES_URL is explicitly empty" \
       "Run: unset POSTGRES_URL POSTGRES_URL_NON_POOLING" >&2
+    exit 1
+  fi
+  if [[ "$non_pooling_url_was_defined" == true ]]; then
+    printf '%s\n' \
+      "FAIL: preflight readiness — database URL overrides must be defined together and match" \
+      "Run: export POSTGRES_URL=\"\$POSTGRES_URL_NON_POOLING\"" >&2
     exit 1
   fi
   printf '%s\n' \
@@ -45,10 +68,16 @@ if [[ -z "$database_url" ]]; then
 fi
 
 if [[ "$database_url_overridden" == true \
-  && "${POSTGRES_URL_NON_POOLING:-}" != "$database_url" ]]; then
+  && ( "$postgres_url_was_defined" != true \
+    || "$non_pooling_url_was_defined" != true \
+    || "${POSTGRES_URL_NON_POOLING:-}" != "$database_url" ) ]]; then
+  override_remediation="export POSTGRES_URL_NON_POOLING=\"\$POSTGRES_URL\""
+  if [[ "$postgres_url_was_defined" != true ]]; then
+    override_remediation="export POSTGRES_URL=\"\$POSTGRES_URL_NON_POOLING\""
+  fi
   printf '%s\n' \
-    "FAIL: preflight readiness — POSTGRES_URL override does not match POSTGRES_URL_NON_POOLING" \
-    "Run: export POSTGRES_URL_NON_POOLING=\"\$POSTGRES_URL\"" >&2
+    "FAIL: preflight readiness — database URL overrides must be defined together and match" \
+    "Run: ${override_remediation}" >&2
   exit 1
 fi
 
