@@ -517,6 +517,30 @@ class TestMainTeardown:
         assert stub.calls_of("worktree_remove")[0][:3] == ["git", "-C", "/repo"]
         assert stub.calls_of("worktree_prune")[0][:3] == ["git", "-C", "/repo"]
 
+    def test_unreadable_branch_refuses_cleanup_instead_of_reporting_success(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        fake_worktree: Path,
+        deallocated: list[str],
+    ) -> None:
+        """A `.git` marker without a readable branch is not cleanup evidence."""
+        stub = install(
+            monkeypatch,
+            RunStub(rev_parse=(128, "", "fatal: invalid gitfile format")),
+        )
+
+        exit_code = _run_main(monkeypatch, fake_worktree)
+
+        err = capsys.readouterr().err
+        assert exit_code == cleanup.EXIT_FAILED
+        assert "Failed to derive a branch" in err
+        assert "keeping the worktree and slot" in err
+        assert "Cleaned up worktree" not in err
+        assert stub.calls_of("volume_ls") == []
+        assert stub.calls_of("worktree_remove") == []
+        assert deallocated == []
+
     def test_renamed_branch_still_tears_down_the_pinned_project(
         self,
         monkeypatch: pytest.MonkeyPatch,
@@ -616,6 +640,45 @@ class TestMainTeardown:
         # find the leaked project by its Docker label (delayed, not permanent).
         assert stub.calls_of("worktree_remove") != []
         assert deallocated == [str(fake_worktree)]
+
+    def test_missing_git_marker_is_incomplete_not_success(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        tmp_path: Path,
+        deallocated: list[str],
+    ) -> None:
+        """PP-ew10: `.git` absent means the volumes were never queried.
+
+        Partial removal, `rm -rf` without the hook, or a Web-sandbox session
+        leaves a directory with no `.git` marker (the PP-qlzu path). Without a
+        branch there is no project_id, so Docker is never asked — the volume state
+        is UNKNOWN. A run that never touched Docker used to exit 0 ("Cleaned up
+        worktree") anyway; it must instead read as incomplete, the same
+        success-without-evidence class as PP-omz3 and PP-3w4g.
+        """
+        worktree = (tmp_path / "agent-alpha").resolve()
+        worktree.mkdir()  # exists on disk, but with no `.git` inside
+        stub = install(monkeypatch, RunStub())
+
+        exit_code = _run_main(monkeypatch, worktree)
+
+        err = capsys.readouterr().err
+        assert exit_code == cleanup.EXIT_DOCKER_UNKNOWN
+        # The slot is still reclaimed, so the sweep can find any leaked volumes by
+        # their Docker label — a delayed leak, not a permanent one.
+        assert deallocated == [str(worktree)]
+        assert f"residual directory at {worktree}" in err
+        assert "preserve anything needed" in err
+        assert "remove it manually" in err
+        assert "git worktree prune" in err
+        assert "worktree_orphan_sweep.py --apply" in err
+        assert "INCOMPLETE" in err
+        assert "no .git marker" in err
+        assert "Cleaned up worktree" not in err
+        # No branch, so no Supabase/Docker phase ran, and no git worktree removal
+        # either — nothing was queried or reclaimed beyond the slot deallocation.
+        assert stub.calls == []
 
     def test_docker_not_installed_still_reports_success(
         self,

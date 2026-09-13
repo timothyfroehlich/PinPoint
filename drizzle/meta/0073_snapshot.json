@@ -1,6 +1,6 @@
 {
-  "id": "011bcfe0-7f52-48a4-b30e-eb13de8b24e4",
-  "prevId": "21e9fff2-48cd-4f57-8abe-50cffbfbf05c",
+  "id": "d9086856-366f-4154-9f30-a8c68d408b39",
+  "prevId": "011bcfe0-7f52-48a4-b30e-eb13de8b24e4",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -2329,6 +2329,49 @@
           "value": "(run_lease_id IS NULL) = (run_lease_expires_at IS NULL)"
         }
       },
+      "isRLSEnabled": true
+    },
+    "public.pinballmap_region_location_names": {
+      "name": "pinballmap_region_location_names",
+      "schema": "",
+      "columns": {
+        "region": {
+          "name": "region",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "location_id": {
+          "name": "location_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "refreshed_at": {
+          "name": "refreshed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "pinballmap_region_location_names_region_location_id_pk": {
+          "name": "pinballmap_region_location_names_region_location_id_pk",
+          "columns": ["region", "location_id"]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
       "isRLSEnabled": true
     },
     "public.pinballmap_region_seen_machines": {

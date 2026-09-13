@@ -28,6 +28,7 @@ import { StatusSelect } from "~/components/issues/fields/StatusSelect";
 import { ImageUploadButton } from "~/components/images/ImageUploadButton";
 import { ImageGallery } from "~/components/images/ImageGallery";
 import type { AccessLevel } from "~/lib/permissions/matrix";
+import { checkPermission } from "~/lib/permissions/helpers";
 import { getLoginUrl } from "~/lib/login-url";
 import { RecentIssuesPanelClient } from "~/components/issues/RecentIssuesPanelClient";
 import { RichTextEditor } from "~/components/editor/RichTextEditorDynamic";
@@ -314,10 +315,9 @@ export function UnifiedReportForm({
     };
   }, [currentInitials]);
 
-  const canSetWorkflowFields =
-    accessLevel === "admin" ||
-    accessLevel === "technician" ||
-    accessLevel === "member";
+  const canSetStatus = checkPermission("issues.report.status", accessLevel);
+  const canSetPriority = checkPermission("issues.report.priority", accessLevel);
+  const canSetAssignee = checkPermission("issues.report.assignee", accessLevel);
 
   return (
     <div className="w-full">
@@ -491,36 +491,44 @@ export function UnifiedReportForm({
               </div>
             </div>
 
-            {/* Priority + Status: always side-by-side when visible */}
-            {canSetWorkflowFields && (
+            {/* Priority + Status: side-by-side when both are visible */}
+            {(canSetPriority || canSetStatus) && (
               <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label htmlFor="priority" className="text-foreground">
-                    Priority *
-                  </Label>
-                  <input type="hidden" name="priority" value={entry.priority} />
-                  <PrioritySelect
-                    id="priority"
-                    value={entry.priority}
-                    onValueChange={(v) => patchEntry(0, { priority: v })}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="status" className="text-foreground">
-                    Status *
-                  </Label>
-                  <input type="hidden" name="status" value={entry.status} />
-                  <StatusSelect
-                    id="status"
-                    value={entry.status}
-                    onValueChange={(v) => patchEntry(0, { status: v })}
-                  />
-                </div>
+                {canSetPriority && (
+                  <div className="space-y-1.5">
+                    <Label htmlFor="priority" className="text-foreground">
+                      Priority *
+                    </Label>
+                    <input
+                      type="hidden"
+                      name="priority"
+                      value={entry.priority}
+                    />
+                    <PrioritySelect
+                      id="priority"
+                      value={entry.priority}
+                      onValueChange={(v) => patchEntry(0, { priority: v })}
+                    />
+                  </div>
+                )}
+                {canSetStatus && (
+                  <div className="space-y-1.5">
+                    <Label htmlFor="status" className="text-foreground">
+                      Status *
+                    </Label>
+                    <input type="hidden" name="status" value={entry.status} />
+                    <StatusSelect
+                      id="status"
+                      value={entry.status}
+                      onValueChange={(v) => patchEntry(0, { status: v })}
+                    />
+                  </div>
+                )}
               </div>
             )}
 
             {/* Assign To: full-width */}
-            {canSetWorkflowFields && assignees.length > 0 && (
+            {canSetAssignee && assignees.length > 0 && (
               <div className="space-y-1.5">
                 <Label htmlFor="assignedTo" className="text-foreground">
                   Assign To

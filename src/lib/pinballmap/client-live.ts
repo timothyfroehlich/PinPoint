@@ -9,6 +9,7 @@ import {
   parseRegionLmxes,
   parseRegionLocations,
 } from "./parse";
+import { PinballMapReadError } from "./types";
 import type {
   CatalogMachine,
   LocationSnapshot,
@@ -290,7 +291,18 @@ async function readJson(
     apiToken
   );
   if (!res.ok) {
-    throw new Error(`PinballMap ${label} failed: HTTP ${res.status}`);
+    const reason =
+      res.status === 404
+        ? "not_found"
+        : res.status === 429
+          ? "rate_limited"
+          : res.status === 401 || res.status === 403
+            ? "unauthorized"
+            : "transient";
+    throw new PinballMapReadError(
+      reason,
+      `PinballMap ${label} failed: HTTP ${res.status}`
+    );
   }
   // A 200 with a non-JSON body (e.g. an HTML maintenance/edge page during an
   // outage) is a read failure, not a crash — surface it as a structured error.
@@ -298,11 +310,24 @@ async function readJson(
   try {
     data = await res.json();
   } catch {
-    throw new Error(`PinballMap ${label} failed: response was not valid JSON`);
+    throw new PinballMapReadError(
+      "invalid_response",
+      `PinballMap ${label} failed: response was not valid JSON`
+    );
   }
   const message = pbmErrorMessage(asRecord(data));
   if (message) {
-    throw new Error(`PinballMap ${label} failed: ${message}`);
+    const lower = message.toLowerCase();
+    const reason =
+      lower.includes("failed to find location") || lower.includes("not found")
+        ? "not_found"
+        : lower.includes("authentication") || lower.includes("api token")
+          ? "unauthorized"
+          : "transient";
+    throw new PinballMapReadError(
+      reason,
+      `PinballMap ${label} failed: ${message}`
+    );
   }
   return data;
 }

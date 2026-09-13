@@ -2,10 +2,10 @@ import { NextResponse } from "next/server";
 import { assertCronAuthorized } from "~/lib/cron/auth";
 import { log } from "~/lib/logger";
 import { reportError } from "~/lib/observability/report-error";
-import { runRegionNewMachineAlerts } from "~/lib/pinballmap/region-alerts";
+import { runRegionMachineAlerts } from "~/lib/pinballmap/region-alerts";
 
 /**
- * Hourly "new machines in the Austin region" Discord alert (PP-o355.18).
+ * Hourly Pinball Map machine additions/removals Discord alert (PP-o355.51.9).
  *
  * One bulk region read, diffed against the stored seen-set, announced to the
  * configured Discord channel. CRON_SECRET-gated like the other cron routes.
@@ -24,7 +24,7 @@ import { runRegionNewMachineAlerts } from "~/lib/pinballmap/region-alerts";
  * prompt.
  *
  * The configured alert channel and shared Discord bot token are checked inside
- * `runRegionNewMachineAlerts` before any Pinball Map call. Region alerts are
+ * `runRegionMachineAlerts` before any Pinball Map call. Region alerts are
  * independent from a tracked Pinball Map location.
  */
 
@@ -47,10 +47,10 @@ export async function GET(request: Request): Promise<NextResponse> {
   if (denied) return denied;
 
   try {
-    const run = await runRegionNewMachineAlerts();
+    const run = await runRegionMachineAlerts();
     log.info(
       { ...run, action: "pinballmap.regionAlerts" },
-      "PinballMap region new-machine alert run"
+      "Pinball Map region machine-alert run"
     );
     return NextResponse.json({ ok: true, ...run });
   } catch (err) {

@@ -509,8 +509,36 @@
     {
       "idx": 72,
       "version": "7",
-      "when": 1788925785734,
-      "tag": "0072_powerful_nehzno",
+      "when": 1788707739523,
+      "tag": "0072_pinballmap_region_removals",
+      "breakpoints": true
+    },
+    {
+      "idx": 73,
+      "version": "7",
+      "when": 1788872912608,
+      "tag": "0073_cache-region-location-names",
+      "breakpoints": true
+    },
+    {
+      "idx": 74,
+      "version": "7",
+      "when": 1788916852003,
+      "tag": "0074_initialize-region-removal-tracking",
+      "breakpoints": true
+    },
+    {
+      "idx": 75,
+      "version": "7",
+      "when": 1789085853996,
+      "tag": "0075_pinballmap-location-checks",
+      "breakpoints": true
+    },
+    {
+      "idx": 76,
+      "version": "7",
+      "when": 1789263814414,
+      "tag": "0076_add-mcp-oauth-support",
       "breakpoints": true
     }
   ]

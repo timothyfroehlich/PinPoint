@@ -1,0 +1,1 @@
+ALTER TABLE "pinballmap_region_alert_state" ADD COLUMN "removal_tracking_initialized_at" timestamp with time zone;

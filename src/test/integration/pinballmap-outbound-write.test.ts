@@ -238,7 +238,7 @@ describe("PinballMap outbound writes (PGlite)", () => {
     const db = await getTestDb();
     const { addMachineToPinballMapAction } =
       await import("~/app/(app)/m/pinballmap-actions");
-    const { getPinballMapState, setTrackedLocation } =
+    const { checkTrackedLocation, getPinballMapState } =
       await import("~/lib/pinballmap/state");
     const admin = await createUser("admin");
     await mockAuthAs(admin.id);
@@ -257,14 +257,14 @@ describe("PinballMap outbound writes (PGlite)", () => {
     let switchResult: unknown;
     pbm.beforeAdd = async () => {
       pbm.beforeAdd = null;
-      switchResult = await setTrackedLocation(99999, admin.id);
+      switchResult = await checkTrackedLocation(99999, admin.id);
     };
 
     await expect(
       addMachineToPinballMapAction(undefined, form(machine.id))
     ).resolves.toMatchObject({ ok: true });
 
-    expect(switchResult).toEqual({ ok: false, reason: "concurrent_change" });
+    expect(switchResult).toEqual({ ok: false, reason: "busy" });
     expect(pbm.lineup).toEqual([{ id: 500, machineId: TITLE_ID }]);
     const state = await getPinballMapState();
     expect(state?.locationId).toBe(26454);
@@ -346,6 +346,45 @@ describe("PinballMap outbound writes (PGlite)", () => {
 
     const state = await db.query.pinballmapState.findFirst();
     expect(state?.snapshotJson?.lmxes).toEqual([
+      expect.objectContaining({ id: 500, machineId: TITLE_ID }),
+    ]);
+  });
+
+  it("does not let an older checked snapshot overwrite a completed addition", async () => {
+    const db = await getTestDb();
+    const { addMachineToPinballMapAction } =
+      await import("~/app/(app)/m/pinballmap-actions");
+    const {
+      checkTrackedLocation,
+      commitCheckedTrackedLocation,
+      getPinballMapState,
+    } = await import("~/lib/pinballmap/state");
+    const admin = await createUser("admin");
+    await mockAuthAs(admin.id);
+    await seedState([]);
+
+    const checked = await checkTrackedLocation(26454, admin.id);
+    if (!checked.ok) throw new Error("expected a checked candidate");
+
+    const [machine] = await db
+      .insert(machines)
+      .values({
+        name: "Godzilla",
+        initials: "GZ",
+        pinballmapMachineId: TITLE_ID,
+        pinballmapIntent: "on",
+      })
+      .returning();
+    if (!machine) throw new Error("failed to seed machine");
+
+    await expect(
+      addMachineToPinballMapAction(undefined, form(machine.id))
+    ).resolves.toMatchObject({ ok: true });
+    await expect(
+      commitCheckedTrackedLocation(checked.candidate.checkId, admin.id)
+    ).resolves.toEqual({ ok: false, reason: "concurrent_change" });
+
+    expect((await getPinballMapState())?.snapshotJson?.lmxes).toEqual([
       expect.objectContaining({ id: 500, machineId: TITLE_ID }),
     ]);
   });
@@ -1088,7 +1127,7 @@ describe("PinballMap outbound writes (PGlite)", () => {
     const db = await getTestDb();
     const { removeMachineFromPinballMapAction } =
       await import("~/app/(app)/m/pinballmap-actions");
-    const { getPinballMapState, setTrackedLocation } =
+    const { checkTrackedLocation, getPinballMapState } =
       await import("~/lib/pinballmap/state");
     const admin = await createUser("admin");
     await mockAuthAs(admin.id);
@@ -1120,7 +1159,7 @@ describe("PinballMap outbound writes (PGlite)", () => {
     let switchResult: unknown;
     pbm.beforeRemove = async () => {
       pbm.beforeRemove = null;
-      switchResult = await setTrackedLocation(26454, admin.id);
+      switchResult = await checkTrackedLocation(26454, admin.id);
     };
 
     await expect(
@@ -1130,7 +1169,7 @@ describe("PinballMap outbound writes (PGlite)", () => {
       )
     ).resolves.toMatchObject({ ok: true });
 
-    expect(switchResult).toEqual({ ok: false, reason: "concurrent_change" });
+    expect(switchResult).toEqual({ ok: false, reason: "busy" });
     expect(pbm.lineup).toEqual([]);
     expect((await getPinballMapState())?.locationId).toBe(99999);
     expect(await db.select().from(pinballmapAbandonedListings)).toHaveLength(0);
