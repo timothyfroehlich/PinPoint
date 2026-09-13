@@ -29,7 +29,20 @@ def _run_readiness(
         """
 if [[ "$STUB_MODE" == "uninitialized" ]]; then
   printf 'f\\n'
-elif [[ "$STUB_MODE" == "diverged" && "$*" == *"COUNT(DISTINCT hash)"* ]]; then
+elif [[ "$*" == *"WITH expected"* ]]; then
+  case "$STUB_MODE" in
+    missing) printf 'behind\\n' ;;
+    unexpected) printf 'diverged\\n' ;;
+    tagged)
+      if [[ "$*" == *"0076_add-mcp-oauth-support"* && "$*" == *"a.hash = e.tag"* ]]; then
+        printf 'ready\\n'
+      else
+        printf 'behind\\n'
+      fi
+      ;;
+    *) printf 'ready\\n' ;;
+  esac
+elif [[ "$STUB_MODE" == "tagged" && "$*" != *"to_regclass"* ]]; then
   printf 'f\\n'
 else
   printf 't\\n'
@@ -82,7 +95,7 @@ def test_uninitialized_database_fails_fast_with_port_and_one_remediation(
 def test_database_missing_current_migration_hash_fails_fast(
     tmp_path: Path,
 ) -> None:
-    result = _run_readiness(tmp_path, "diverged")
+    result = _run_readiness(tmp_path, "missing")
 
     assert result.returncode == 1
     assert result.stdout == ""
@@ -90,6 +103,29 @@ def test_database_missing_current_migration_hash_fails_fast(
         "FAIL: preflight readiness — Postgres at localhost:61234 is not migrated",
         "Run: supabase start && pnpm run db:migrate",
     ]
+
+
+def test_database_with_unexpected_migration_requires_local_reset(
+    tmp_path: Path,
+) -> None:
+    result = _run_readiness(tmp_path, "unexpected")
+
+    assert result.returncode == 1
+    assert result.stdout == ""
+    assert result.stderr.splitlines() == [
+        "FAIL: preflight readiness — Postgres at localhost:61234 has a divergent migration history",
+        "Run: pnpm run db:reset",
+    ]
+
+
+def test_recovery_script_tag_marker_is_accepted(tmp_path: Path) -> None:
+    result = _run_readiness(tmp_path, "tagged")
+
+    assert result.returncode == 0
+    assert result.stderr == ""
+    assert result.stdout == (
+        "PASS: preflight readiness — Postgres ready at localhost:61234\n"
+    )
 
 
 def test_initialized_database_emits_one_success_line(tmp_path: Path) -> None:
@@ -235,7 +271,10 @@ def test_locked_preflight_uses_writable_shared_semaphore_state(
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     _write_executable(bin_dir / "pg_isready", "exit 0\n")
-    _write_executable(bin_dir / "psql", "printf 't\\n'\n")
+    _write_executable(
+        bin_dir / "psql",
+        "[[ \"$*\" == *\"WITH expected\"* ]] && printf 'ready\\n' || printf 't\\n'\n",
+    )
     _write_executable(
         bin_dir / "sem",
         """
