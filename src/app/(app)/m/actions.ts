@@ -47,6 +47,7 @@ import {
 } from "~/lib/tiptap/types";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import { getUserAccessLevel } from "~/lib/permissions/access";
+import { getPermission } from "~/lib/permissions/matrix";
 import { isPgErrorCode } from "~/lib/db/postgres-errors";
 import {
   emitMachineUpdated,
@@ -1238,6 +1239,7 @@ export async function deleteMachineAction(
     }
 
     const accessLevel = await getUserAccessLevel(user.id);
+    const deletePermission = getPermission("machines.delete", accessLevel);
     if (
       !checkPermission("machines.delete", accessLevel, {
         userId: user.id,
@@ -1250,9 +1252,14 @@ export async function deleteMachineAction(
       );
     }
 
+    const deleteWhere =
+      deletePermission === true
+        ? eq(machines.id, machineId)
+        : and(eq(machines.id, machineId), eq(machines.ownerId, user.id));
+
     const [deletedMachine] = await db
       .delete(machines)
-      .where(eq(machines.id, machineId))
+      .where(deleteWhere)
       .returning({ id: machines.id });
 
     if (!deletedMachine) {

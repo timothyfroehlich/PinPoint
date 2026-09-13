@@ -2,11 +2,19 @@ import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { describe, expect, it, vi } from "vitest";
 
+import type * as PermissionsAccess from "~/lib/permissions/access";
 import { machines, authUsers, userProfiles } from "~/server/db/schema";
 import { getTestDb, setupTestDb } from "~/test/setup/pglite";
 
 const authState = vi.hoisted(() => {
   const state: { userId: string | null } = { userId: null };
+  return state;
+});
+
+const accessState = vi.hoisted(() => {
+  const state: { afterLookup: (() => Promise<void>) | null } = {
+    afterLookup: null,
+  };
   return state;
 });
 
@@ -28,6 +36,23 @@ vi.mock("~/lib/supabase/server", () => ({
     },
   })),
 }));
+
+vi.mock("~/lib/permissions/access", async (importOriginal) => {
+  const actual = await importOriginal<typeof PermissionsAccess>();
+
+  return {
+    ...actual,
+    getUserAccessLevel: vi.fn(async (userId: string) => {
+      const accessLevel = await actual.getUserAccessLevel(userId);
+      const afterLookup = accessState.afterLookup;
+      accessState.afterLookup = null;
+      if (afterLookup) {
+        await afterLookup();
+      }
+      return accessLevel;
+    }),
+  };
+});
 
 vi.mock("next/cache", () => ({
   revalidatePath: vi.fn(),
@@ -154,6 +179,36 @@ describe("deleteMachineAction", () => {
       where: eq(machines.id, machine.id),
     });
     expect(deletedMachine).toBeUndefined();
+  });
+
+  it("does not delete a machine transferred after ownership is read", async () => {
+    const { deleteMachineAction } = await import("~/app/(app)/m/actions");
+    const db = await getTestDb();
+    const originalOwner = await createUser("member");
+    const newOwner = await createUser("member");
+    const machine = await createMachine(originalOwner.id);
+    authState.userId = originalOwner.id;
+    accessState.afterLookup = async () => {
+      await db
+        .update(machines)
+        .set({ ownerId: newOwner.id })
+        .where(eq(machines.id, machine.id));
+    };
+
+    const formData = new FormData();
+    formData.set("id", machine.id);
+
+    const result = await deleteMachineAction(undefined, formData);
+
+    expect(result).toEqual({
+      ok: false,
+      code: "NOT_FOUND",
+      message: "Machine not found.",
+    });
+    const retainedMachine = await db.query.machines.findFirst({
+      where: eq(machines.id, machine.id),
+    });
+    expect(retainedMachine?.ownerId).toBe(newOwner.id);
   });
 
   it("denies a member deleting another member's machine", async () => {
