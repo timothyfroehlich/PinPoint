@@ -46,6 +46,7 @@ import {
   proseMirrorDocSchema,
 } from "~/lib/tiptap/types";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
+import { getUserAccessLevel } from "~/lib/permissions/access";
 import { isPgErrorCode } from "~/lib/db/postgres-errors";
 import {
   emitMachineUpdated,
@@ -150,8 +151,16 @@ export type UpdateMachineResult = Result<
 
 export type DeleteMachineResult = Result<
   { machineId: string },
-  "UNAUTHORIZED" | "NOT_FOUND" | "SERVER"
+  "VALIDATION" | "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "SERVER"
 >;
+
+const deleteMachineSchema = z.object({
+  id: z
+    .string()
+    .trim()
+    .min(1, "Machine ID is required")
+    .uuid("Invalid machine ID"),
+});
 
 /** True when the submitted form expresses any PinballMap link intent. */
 function wantsPbmLinkChange(input: {
@@ -1206,15 +1215,47 @@ export async function deleteMachineAction(
     return err("UNAUTHORIZED", "Unauthorized. Please log in.");
   }
 
-  const machineId = formData.get("id") as string;
+  const validation = deleteMachineSchema.safeParse({
+    id: formData.get("id"),
+  });
+  if (!validation.success) {
+    return err(
+      "VALIDATION",
+      validation.error.issues[0]?.message ?? "Invalid input"
+    );
+  }
+
+  const { id: machineId } = validation.data;
 
   try {
-    const [machine] = await db
-      .delete(machines)
-      .where(and(eq(machines.id, machineId), eq(machines.ownerId, user.id)))
-      .returning();
+    const machine = await db.query.machines.findFirst({
+      where: eq(machines.id, machineId),
+      columns: { id: true, ownerId: true },
+    });
 
     if (!machine) {
+      return err("NOT_FOUND", "Machine not found.");
+    }
+
+    const accessLevel = await getUserAccessLevel(user.id);
+    if (
+      !checkPermission("machines.delete", accessLevel, {
+        userId: user.id,
+        machineOwnerId: machine.ownerId,
+      })
+    ) {
+      return err(
+        "FORBIDDEN",
+        "You do not have permission to delete this machine."
+      );
+    }
+
+    const [deletedMachine] = await db
+      .delete(machines)
+      .where(eq(machines.id, machineId))
+      .returning({ id: machines.id });
+
+    if (!deletedMachine) {
       return err("NOT_FOUND", "Machine not found.");
     }
 

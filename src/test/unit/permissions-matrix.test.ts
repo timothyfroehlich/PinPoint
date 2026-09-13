@@ -231,6 +231,14 @@ describe("Permission hierarchy", () => {
         const memberValue = permission.access.member;
         const techValue = permission.access.technician;
 
+        // Machine deletion is deliberately ownership/admin-only: technicians
+        // may maintain any machine, but cannot permanently remove one.
+        if (permission.id === "machines.delete") {
+          expect(memberValue).toBe("owner");
+          expect(techValue).toBe(false);
+          continue;
+        }
+
         // If member has unconditional permission, technician should too (unconditional)
         if (memberValue === true) {
           expect(techValue).toBe(true);
@@ -409,6 +417,14 @@ describe("Specific permission rules from design", () => {
       expect(getPermission("machines.edit", "member")).toBe("owner");
       expect(getPermission("machines.edit", "technician")).toBe(true);
       expect(getPermission("machines.edit", "admin")).toBe(true);
+    });
+
+    it("should allow only machine owners and admins to delete machines", () => {
+      expect(getPermission("machines.delete", "unauthenticated")).toBe(false);
+      expect(getPermission("machines.delete", "guest")).toBe(false);
+      expect(getPermission("machines.delete", "member")).toBe("owner");
+      expect(getPermission("machines.delete", "technician")).toBe(false);
+      expect(getPermission("machines.delete", "admin")).toBe(true);
     });
 
     it("should mirror machines.edit for PinballMap linking (owner/tech/admin)", () => {
