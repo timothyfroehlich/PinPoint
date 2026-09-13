@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 import tomllib
 from pathlib import Path
 
@@ -176,6 +177,26 @@ def test_all_harnesses_wire_the_direct_watch_guard():
             command for command in _hook_commands(config) if GUARD_BASENAME in command
         ]
         assert len(matching) == 1, f"{harness} guard wiring: {matching}"
+
+
+def test_antigravity_direct_watch_guard_resolves_from_agents_dir():
+    config = json.loads(ANTIGRAVITY_HOOKS.read_text())
+    commands = [
+        command for command in _hook_commands(config) if GUARD_BASENAME in command
+    ]
+    assert len(commands) == 1
+    result = subprocess.run(
+        ["sh", "-c", commands[0]],
+        cwd=ANTIGRAVITY_HOOKS.parent,
+        input="{}",
+        capture_output=True,
+        text=True,
+        timeout=15,
+        check=False,
+    )
+    assert result.returncode == 0, f"stdout: {result.stdout}, stderr: {result.stderr}"
+    assert "MODULE_NOT_FOUND" not in result.stderr
+    assert "Cannot find module" not in result.stderr
 
 
 def test_agent_definitions_have_no_mutation_capable_watcher_command():
