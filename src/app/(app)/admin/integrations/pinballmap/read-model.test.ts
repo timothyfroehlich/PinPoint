@@ -83,7 +83,29 @@ describe("getPinballMapAdminViewState", () => {
     expect(result.health).toEqual({
       kind: "healthy",
       syncedAtIso: "2026-09-12T10:00:00.000Z",
+      lastAttemptAtIso: null,
       machineCount: 47,
+    });
+  });
+
+  it("keeps a newer interrupted attempt distinct from healthy snapshot time", async () => {
+    getPinballMapStateMock.mockResolvedValue({
+      locationId: 26454,
+      configurationGeneration: 2,
+      snapshotJson: SNAPSHOT,
+      lastSyncedAt: new Date("2026-09-12T10:00:00.000Z"),
+      lastSyncAttemptAt: new Date("2026-09-12T11:54:00.000Z"),
+      lastSyncStatus: "ok",
+      lastSyncError: null,
+    });
+
+    await expect(getPinballMapAdminViewState()).resolves.toMatchObject({
+      health: {
+        kind: "healthy",
+        syncedAtIso: "2026-09-12T10:00:00.000Z",
+        lastAttemptAtIso: "2026-09-12T11:54:00.000Z",
+        machineCount: 47,
+      },
     });
   });
 

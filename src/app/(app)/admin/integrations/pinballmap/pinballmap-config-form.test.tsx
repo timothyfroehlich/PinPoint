@@ -66,6 +66,7 @@ const CONFIGURED: PinballMapAdminViewState = {
   health: {
     kind: "healthy",
     syncedAtIso: "2026-09-12T11:56:00.000Z",
+    lastAttemptAtIso: null,
     machineCount: 47,
   },
   allowance: {
@@ -211,6 +212,21 @@ describe("PinballMapConfigForm", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("shows a newer attempt separately from a healthy snapshot", () => {
+    renderForm({
+      ...CONFIGURED,
+      health: {
+        kind: "healthy",
+        syncedAtIso: "2026-09-12T10:00:00.000Z",
+        lastAttemptAtIso: "2026-09-12T11:54:00.000Z",
+        machineCount: 47,
+      },
+    });
+
+    expect(screen.getByText(/Synced 4 minutes ago/)).toBeInTheDocument();
+    expect(screen.getByText(/Last attempt 4 minutes ago/)).toBeInTheDocument();
+  });
+
   it("links retained snapshot health to the snapshot's location", () => {
     renderForm({
       ...CONFIGURED,
@@ -260,6 +276,14 @@ describe("PinballMapConfigForm", () => {
         "Replaces Austin Pinball Collective (26454) when you save."
       )
     ).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", {
+        name: "View tracked location on Pinball Map",
+      })
+    ).toHaveAttribute(
+      "href",
+      "https://pinballmap.com/map/?by_location_id=26454"
+    );
     expect(screen.getByRole("button", { name: "Save changes" })).toBeEnabled();
 
     await user.type(input, "2");
@@ -457,6 +481,16 @@ describe("PinballMapConfigForm", () => {
 
       expect(await screen.findByText(expected)).toBeInTheDocument();
       expect(input).toHaveAttribute("aria-invalid", "true");
+      if (initialState.configuredLocationId !== null) {
+        expect(
+          screen.getByRole("link", {
+            name: "View tracked location on Pinball Map",
+          })
+        ).toHaveAttribute(
+          "href",
+          "https://pinballmap.com/map/?by_location_id=26454"
+        );
+      }
     }
   );
 

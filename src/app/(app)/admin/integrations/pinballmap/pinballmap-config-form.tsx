@@ -528,6 +528,11 @@ export function PinballMapConfigForm({
 
   const destination = candidateMatches ? candidate : null;
   const currentName = currentLocationName(initialState);
+  const primaryResultLinksConfiguredLocation =
+    destination?.locationId === initialState.configuredLocationId ||
+    (destination === null &&
+      feedback === null &&
+      !(isDirty && normalizedInput.length > 0));
 
   return (
     <>
@@ -633,6 +638,22 @@ export function PinballMapConfigForm({
                 </a>
               </div>
             ) : null}
+            {initialState.configuredLocationId !== null &&
+              !primaryResultLinksConfiguredLocation && (
+                <p>
+                  <a
+                    href={pinballmapLocationUrl(
+                      initialState.configuredLocationId
+                    )}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 text-xs text-link"
+                  >
+                    View tracked location on Pinball Map
+                    <ExternalLink className="size-3" aria-hidden />
+                  </a>
+                </p>
+              )}
           </div>
         </section>
 
@@ -876,6 +897,11 @@ function HealthSummary({
           <p className="text-muted-foreground">
             Synced <RelativeTime value={health.syncedAtIso} />
           </p>
+          {health.lastAttemptAtIso && (
+            <p className="text-muted-foreground text-xs">
+              Last attempt <RelativeTime value={health.lastAttemptAtIso} />
+            </p>
+          )}
           <p className="text-muted-foreground text-xs">
             {lineupLabel(health.machineCount)} in the snapshot
           </p>

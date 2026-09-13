@@ -27,6 +27,7 @@ export type PinballMapHealthView =
   | {
       kind: "healthy";
       syncedAtIso: string;
+      lastAttemptAtIso: string | null;
       machineCount: number;
     }
   | {

@@ -116,6 +116,11 @@ export async function getPinballMapAdminViewState(): Promise<PinballMapAdminView
       health: {
         kind: "healthy",
         syncedAtIso: state.lastSyncedAt.toISOString(),
+        lastAttemptAtIso:
+          state.lastSyncAttemptAt &&
+          state.lastSyncAttemptAt > state.lastSyncedAt
+            ? state.lastSyncAttemptAt.toISOString()
+            : null,
         machineCount: currentSnapshot.machineCount,
       },
       allowance: allowanceView(allowance, observedAt),
