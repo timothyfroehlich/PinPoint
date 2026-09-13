@@ -25,6 +25,7 @@ import {
 import { type MachinePresenceStatus } from "~/lib/machines/presence";
 import { type ProseMirrorDoc } from "~/lib/tiptap/types";
 import { recordAbandonedListing } from "~/lib/pinballmap/abandoned-listings";
+import { createMachineTimelineEvent } from "~/lib/timeline/machine-events";
 import {
   resolvePbmLinkColumnsForUpdate,
   type AbandonedListing,
@@ -616,8 +617,13 @@ export interface PlanMachinePbmLinkParams {
 export async function planMachinePbmLink({
   selection,
   stored,
+  presenceStatus,
 }: PlanMachinePbmLinkParams): Promise<PlanMachinePbmLinkResult> {
-  const resolved = await resolvePbmLinkColumnsForUpdate(selection, stored);
+  const resolved = await resolvePbmLinkColumnsForUpdate(
+    selection,
+    stored,
+    presenceStatus
+  );
   if (!resolved.ok) {
     return { ok: false, message: resolved.message };
   }
@@ -647,12 +653,32 @@ export async function applyMachinePbmLink(
   tx: DbTransaction,
   machineId: string,
   plan: MachinePbmLinkPlan,
-  actorUserId: string
+  actorUserId: string,
+  previousIntent?: PbmListingIntent
 ): Promise<void> {
   await tx.update(machines).set(plan.columns).where(eq(machines.id, machineId));
 
   if (plan.abandoned) {
     await recordAbandonedListing(tx, machineId, plan.abandoned, actorUserId);
+  }
+
+  if (
+    previousIntent !== undefined &&
+    plan.columns.pinballmapIntent !== previousIntent
+  ) {
+    await createMachineTimelineEvent(
+      machineId,
+      {
+        sourceType: "lifecycle",
+        tag: "lifecycle",
+        eventData: {
+          kind: "pinballmap_intent",
+          intent: plan.columns.pinballmapIntent,
+        },
+        actorId: actorUserId,
+      },
+      tx
+    );
   }
 }
 
@@ -816,6 +842,57 @@ export function carryExcludedReason(
 }
 
 /**
+ * Carry over stored Pinball Map catalog title or exclusion when the caller
+ * specifies intent only (PP-enu4).
+ *
+ * If the caller provided `pinballmapMachineId` or `pinballmapExcluded`, that
+ * explicit selection stands. If both were omitted (intent-only update), keep
+ * the machine's existing catalog link or exclusion so updating intent does
+ * not un-link the game.
+ *
+ * Returns a copy; never mutates `selection`.
+ */
+export function carryStoredLinkTarget(
+  selection: PbmLinkSelection,
+  stored: Pick<
+    PbmLinkBasis,
+    | "pinballmapMachineId"
+    | "pinballmapExcluded"
+    | "pinballmapExcludedReason"
+    | "modelName"
+    | "manufacturer"
+    | "year"
+  >
+): PbmLinkSelection {
+  if (
+    selection.pinballmapMachineId !== undefined ||
+    selection.pinballmapExcluded !== undefined
+  ) {
+    return selection;
+  }
+
+  if (stored.pinballmapMachineId !== null) {
+    return {
+      ...selection,
+      pinballmapMachineId: stored.pinballmapMachineId,
+    };
+  }
+
+  if (stored.pinballmapExcluded) {
+    return {
+      ...selection,
+      pinballmapExcluded: true,
+      pinballmapExcludedReason: stored.pinballmapExcludedReason ?? undefined,
+      modelName: stored.modelName ?? undefined,
+      manufacturer: stored.manufacturer ?? undefined,
+      year: stored.year ?? undefined,
+    };
+  }
+
+  return selection;
+}
+
+/**
  * Change a machine's PinballMap link and nothing else — the focused slice of
  * `updateMachineAction`'s PBM logic, for the MCP `set_machine_pinballmap` tool.
  *
@@ -833,10 +910,18 @@ export function carryExcludedReason(
  * one — could record no abandonment, leaving a live pinballmap.com entry nobody
  * tracks. That is the PP-l81u defect exactly. The fleet linking pass (PP-h059)
  * drives this tool across ~100 machines in one session, so the window is wide
- * open in practice, not theoretically.
+ * enough to hit. A lost CAS means someone else wrote between the plan and the
+ * lock; the loop retries up to {@link PBM_LINK_MAX_ATTEMPTS} times, re-reading
+ * the basis each time, before reporting `conflict`.
  *
- * The `FOR UPDATE` re-read inside the transaction closes it: whoever holds the
- * lock sees the other writer's committed state, and a basis that moved means the
+ * The CAS compares every column {@link planMachinePbmLink} derives its output
+ * from: `pinballmap_machine_id`, `pinballmap_intent`, and `presence_status`.
+ * The model metadata columns (manufacturer, year, OPDB/IPDB) are NOT in the
+ * basis: they are derived from the catalog mirror for whichever machine id
+ * lands here, so they cannot move independently. If the catalog row changed in
+ * between, that is the catalog changing, not the machine.
+ *
+ * If the locked row is missing entirely, the machine was deleted mid-flight; the
  * plan is void, so it is thrown away and re-planned rather than written. Same
  * read-modify-write serialization `editStoredSnapshot` uses in
  * `m/pinballmap-actions.ts`, for the same reason.
@@ -866,9 +951,14 @@ export async function updateMachinePbmLink({
       return { ok: false, reason: "not_found", message: MACHINE_GONE_MESSAGE };
     }
 
+    const effectiveSelection = carryStoredLinkTarget(
+      carryExcludedFields(selection, basisRow),
+      basisRow
+    );
+
     const planned = await planMachinePbmLink({
       machineId,
-      selection: carryExcludedFields(selection, basisRow),
+      selection: effectiveSelection,
       stored: {
         pinballmapMachineId: basisRow.pinballmapMachineId,
         pinballmapIntent: basisRow.pinballmapIntent,
@@ -907,7 +997,13 @@ export async function updateMachinePbmLink({
         return { state: "stale" } as const;
       }
 
-      await applyMachinePbmLink(tx, machineId, planned.plan, actorUserId);
+      await applyMachinePbmLink(
+        tx,
+        machineId,
+        planned.plan,
+        actorUserId,
+        locked.pinballmapIntent
+      );
       const { presenceStatus: _presence, ...previous } = locked;
       return { state: "applied", previous } as const;
     });

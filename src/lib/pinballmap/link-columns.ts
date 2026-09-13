@@ -1,16 +1,25 @@
+import {
+  getMachinePresenceLabel,
+  type MachinePresenceStatus,
+} from "~/lib/machines/presence";
 import type { MachinePbmColumns } from "~/services/machines";
 
 import { getCatalogEntry } from "./catalog";
-import type { PbmListingIntent } from "./listing-state";
+import { INVALID_WHEN_ON, type PbmListingIntent } from "./listing-state";
 import { validatePbmLinkSelection } from "./linking";
 import { findLmxForMachine } from "./resolve-lmx";
 import { getPinballMapState } from "./state";
 
-/** The submitted link selection. Listing state is never part of it (PP-o355.29). */
+/** The submitted link selection. Listing state is optional input (PP-enu4). */
 export interface PbmLinkSelection {
   pinballmapMachineId?: number | undefined;
   pinballmapExcluded?: boolean | undefined;
   pinballmapExcludedReason?: string | undefined;
+  /**
+   * Operator lineup intent for Pinball Map (PP-enu4).
+   * Optional: omitting it preserves stored intent (or carry-over logic across re-match).
+   */
+  intent?: PbmListingIntent | undefined;
   /**
    * Hand-entered model identity for a machine PinballMap's catalog cannot cover
    * (PP-3bbr). Read ONLY on the excluded branch below — on any other branch the
@@ -81,14 +90,16 @@ export async function resolvePbmLinkColumnsForCreate(
  */
 export async function resolvePbmLinkColumnsForUpdate(
   input: PbmLinkSelection,
-  stored: StoredPbmLinkState
+  stored: StoredPbmLinkState,
+  presenceStatus?: MachinePresenceStatus
 ): Promise<ResolvePbmLinkUpdateResult> {
-  return resolveCore(input, stored);
+  return resolveCore(input, stored, presenceStatus);
 }
 
 async function resolveCore(
   input: PbmLinkSelection,
-  stored: StoredPbmLinkState
+  stored: StoredPbmLinkState,
+  presenceStatus?: MachinePresenceStatus
 ): Promise<ResolvePbmLinkUpdateResult> {
   const pinballmapMachineId = input.pinballmapMachineId ?? null;
   const pinballmapExcluded = input.pinballmapExcluded ?? false;
@@ -112,6 +123,22 @@ async function resolveCore(
     };
   }
 
+  if (input.intent === "on") {
+    if (pinballmapExcluded || pinballmapMachineId === null) {
+      return {
+        ok: false,
+        message:
+          "A machine must be linked to a Pinball Map title to set intent to 'on'.",
+      };
+    }
+    if (presenceStatus && INVALID_WHEN_ON.includes(presenceStatus)) {
+      return {
+        ok: false,
+        message: `Blocked by Availability: ${getMachinePresenceLabel(presenceStatus)}`,
+      };
+    }
+  }
+
   // Intent survives only while the link target is unchanged. Every other
   // outcome — re-target, excluded, unlinked — leaves the old decision attached
   // to a title this cabinet no longer claims (spec 2.3).
@@ -129,6 +156,8 @@ async function resolveCore(
     : stored.pinballmapIntent === "no_sync"
       ? "no_sync"
       : "off";
+
+  const targetIntent: PbmListingIntent = input.intent ?? carriedIntent;
 
   // Walking away from a title while intent was On leaves a LIVE entry on
   // pinballmap.com that this machine no longer claims — that is the thing to
@@ -151,7 +180,7 @@ async function resolveCore(
     pinballmapExcludedReason: null,
     // Intent On presupposes a link — only the linked branch below can keep it,
     // so every not-linked outcome lands on Off (or a carried Don't sync).
-    pinballmapIntent: carriedIntent === "no_sync" ? "no_sync" : "off",
+    pinballmapIntent: targetIntent === "no_sync" ? "no_sync" : "off",
     // `machines_model_name_requires_excluded` forbids a hand-entered model on
     // anything but an excluded machine, so the linked and unlinked branches
     // below must leave this null or the UPDATE throws.
@@ -169,6 +198,7 @@ async function resolveCore(
         ...empty,
         pinballmapExcluded: true,
         pinballmapExcludedReason: input.pinballmapExcludedReason ?? null,
+        pinballmapIntent: targetIntent === "on" ? "off" : targetIntent,
         // The only branch where model metadata comes from the request — see
         // `PbmLinkSelection.modelName`. Absent stays null rather than keeping a
         // stored value: a save that omits these fields is a save that cleared
@@ -195,7 +225,7 @@ async function resolveCore(
       columns: {
         ...empty,
         pinballmapMachineId,
-        pinballmapIntent: carriedIntent,
+        pinballmapIntent: targetIntent,
         manufacturer: entry.manufacturer,
         year: entry.year,
         opdbId: entry.opdbId,
@@ -206,7 +236,14 @@ async function resolveCore(
   }
 
   // Neither linked nor excluded (requirement off): all PBM columns stay empty.
-  return { ok: true, columns: empty, abandoned };
+  return {
+    ok: true,
+    columns: {
+      ...empty,
+      pinballmapIntent: targetIntent === "on" ? "off" : targetIntent,
+    },
+    abandoned,
+  };
 }
 
 /**

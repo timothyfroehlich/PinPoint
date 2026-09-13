@@ -1558,6 +1558,22 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
       return row;
     }
 
+    async function timelineFor(machineId: string): Promise<
+      {
+        eventData: unknown;
+        authorId: string | null;
+      }[]
+    > {
+      const db = await getTestDb();
+      return db
+        .select({
+          eventData: timelineEvents.eventData,
+          authorId: timelineEvents.authorId,
+        })
+        .from(timelineEvents)
+        .where(eq(timelineEvents.machineId, machineId));
+    }
+
     it("links an unlinked machine and derives the metadata from the catalog", async () => {
       const admin = await makeUser("admin");
       await seedElviraCatalog();
@@ -2080,6 +2096,168 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
           .pick({ pinballmapExcludedReason: true })
           .safeParse(atLimit).success
       ).toBe(true);
+    });
+
+    it("sets intent to on for an already linked machine and records a lifecycle timeline event", async () => {
+      const admin = await makeUser("admin");
+      await seedElviraCatalog();
+      const machine = await seedMachine({
+        name: "Elvira",
+        pbm: {
+          pinballmapMachineId: ELVIRA_PREMIUM_ID,
+          manufacturer: "Stern",
+          pinballmapIntent: "off",
+        },
+      });
+
+      const outcome = await runSetMachinePinballmap(
+        { machine: machine.initials, intent: "on" },
+        ctx("admin", admin)
+      );
+
+      expect(outcome.result).toMatchObject({
+        pinballmap: { status: "linked", intent: "on" },
+      });
+      expect(await pbmRow(machine.id)).toMatchObject({
+        pinballmapMachineId: ELVIRA_PREMIUM_ID,
+        pinballmapIntent: "on",
+      });
+
+      const events = await timelineFor(machine.id);
+      expect(events).toContainEqual({
+        authorId: admin,
+        eventData: { kind: "pinballmap_intent", intent: "on" },
+      });
+    });
+
+    it("sets intent to no_sync or off", async () => {
+      const admin = await makeUser("admin");
+      await seedElviraCatalog();
+      const machine = await seedMachine({
+        name: "Elvira",
+        pbm: {
+          pinballmapMachineId: ELVIRA_PREMIUM_ID,
+          manufacturer: "Stern",
+          pinballmapIntent: "on",
+        },
+      });
+
+      await runSetMachinePinballmap(
+        { machine: machine.initials, intent: "no_sync" },
+        ctx("admin", admin)
+      );
+      expect(await pbmRow(machine.id)).toMatchObject({
+        pinballmapIntent: "no_sync",
+      });
+
+      await runSetMachinePinballmap(
+        { machine: machine.initials, intent: "off" },
+        ctx("admin", admin)
+      );
+      expect(await pbmRow(machine.id)).toMatchObject({
+        pinballmapIntent: "off",
+      });
+    });
+
+    it("links a title and sets intent in a single call", async () => {
+      const admin = await makeUser("admin");
+      await seedElviraCatalog();
+      const machine = await seedMachine({ name: "Elvira" });
+
+      const outcome = await runSetMachinePinballmap(
+        {
+          machine: machine.initials,
+          pinballmapMachineId: ELVIRA_PREMIUM_ID,
+          intent: "on",
+        },
+        ctx("admin", admin)
+      );
+
+      expect(outcome.result).toMatchObject({
+        pinballmap: {
+          status: "linked",
+          pinballmapMachineId: ELVIRA_PREMIUM_ID,
+          intent: "on",
+        },
+      });
+      expect(await pbmRow(machine.id)).toMatchObject({
+        pinballmapMachineId: ELVIRA_PREMIUM_ID,
+        pinballmapIntent: "on",
+      });
+    });
+
+    it("refuses intent on for an unlinked machine", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine({ name: "Unlinked Machine" });
+
+      await expect(
+        runSetMachinePinballmap(
+          { machine: machine.initials, intent: "on" },
+          ctx("admin", admin)
+        )
+      ).rejects.toMatchObject({
+        reason: "invalid",
+        message:
+          "A machine must be linked to a Pinball Map title to set intent to 'on'.",
+      });
+    });
+
+    it("refuses intent on for an excluded machine", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine({
+        name: "Homebrew",
+        pbm: {
+          pinballmapExcluded: true,
+          pinballmapExcludedReason: "custom one-off",
+        },
+      });
+
+      await expect(
+        runSetMachinePinballmap(
+          { machine: machine.initials, intent: "on" },
+          ctx("admin", admin)
+        )
+      ).rejects.toMatchObject({
+        reason: "invalid",
+        message:
+          "A machine must be linked to a Pinball Map title to set intent to 'on'.",
+      });
+    });
+
+    it("refuses intent on when machine presence is pending_arrival or removed", async () => {
+      const admin = await makeUser("admin");
+      await seedElviraCatalog();
+      const pendingMachine = await seedMachine({
+        name: "Pending Elvira",
+        presenceStatus: "pending_arrival",
+        pbm: { pinballmapMachineId: ELVIRA_PREMIUM_ID },
+      });
+
+      await expect(
+        runSetMachinePinballmap(
+          { machine: pendingMachine.initials, intent: "on" },
+          ctx("admin", admin)
+        )
+      ).rejects.toMatchObject({
+        reason: "invalid",
+        message: "Blocked by Availability: Pending Arrival",
+      });
+
+      const removedMachine = await seedMachine({
+        name: "Removed Elvira",
+        presenceStatus: "removed",
+        pbm: { pinballmapMachineId: ELVIRA_PREMIUM_ID },
+      });
+
+      await expect(
+        runSetMachinePinballmap(
+          { machine: removedMachine.initials, intent: "on" },
+          ctx("admin", admin)
+        )
+      ).rejects.toMatchObject({
+        reason: "invalid",
+        message: "Blocked by Availability: Removed",
+      });
     });
   });
 

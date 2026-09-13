@@ -111,7 +111,7 @@ export interface PbmListingView {
  * renders Alert, because changing where a machine is must never rewrite what the
  * operator decided about the lineup (6.1).
  */
-const INVALID_WHEN_ON: readonly MachinePresenceStatus[] = [
+export const INVALID_WHEN_ON: readonly MachinePresenceStatus[] = [
   "pending_arrival",
   "removed",
 ];
