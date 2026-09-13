@@ -29,7 +29,7 @@ def _run_readiness(
         """
 if [[ "$STUB_MODE" == "uninitialized" ]]; then
   printf 'f\\n'
-elif [[ "$STUB_MODE" == "stale" && "$*" == *"MAX(created_at)"* ]]; then
+elif [[ "$STUB_MODE" == "diverged" && "$*" == *"COUNT(DISTINCT hash)"* ]]; then
   printf 'f\\n'
 else
   printf 't\\n'
@@ -79,10 +79,10 @@ def test_uninitialized_database_fails_fast_with_port_and_one_remediation(
     ]
 
 
-def test_stale_database_fails_fast_with_port_and_one_remediation(
+def test_database_missing_current_migration_hash_fails_fast(
     tmp_path: Path,
 ) -> None:
-    result = _run_readiness(tmp_path, "stale")
+    result = _run_readiness(tmp_path, "diverged")
 
     assert result.returncode == 1
     assert result.stdout == ""
