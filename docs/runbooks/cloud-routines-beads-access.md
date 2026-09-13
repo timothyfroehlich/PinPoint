@@ -201,6 +201,31 @@ isn't 1.2.2") is the weakest enforcement — a model can reason past it. A scrip
 that exits non-zero cannot. Keeping the logic in git also makes it reviewable,
 unlike the setup script in the claude.ai UI.
 
+**Every beads-writing routine prompt must use this one-liner, not a hand-rolled
+copy of its steps.** The prompts live in the claude.ai UI, so they do not move
+when the script does. The Weekly Review and Spec Audit prompts kept the
+pre-script preamble (write the JWK, `bd init --remote …`) until 2026-09-13; that
+path has no table repair, so the symptom was `bd comment` working while
+`bd create` failed with `Error 1146: table not found: events` — the Weekly
+Review of 2026-09-12 lost two security findings to it (refiled as PP-9jar and
+PP-my5a). When the script changes, re-read all three prompts
+(`RemoteTrigger {action: "get"}` on the IDs below) and check Step 0 still
+invokes it.
+
+## Permission prompts hang unattended runs
+
+A routine has nobody to click Approve. A command that raises a permission
+prompt does not fail — the run sits in `requires_action` until the sandbox is
+reclaimed, and every step after it (bead notes, `nightly-report`, `bd dolt
+push`) is lost. Three nightly runs went this way in September 2026: one on
+`git reset --hard` (2026-09-04), two on `bash -n scripts/workflow/merge-pr.sh`
+(2026-09-11, 2026-09-12 — a syntax check that the merge guard read as running
+the script; fixed in resolve-command.cjs, PP-mslx). The nightly prompt now
+carries the `ask`/`deny` list from `.claude/settings.json` and the guard hooks'
+triggers as a do-not-run list, and keeps `scripts/workflow/`, `.claude/hooks/`
+and the settings files out of its work scope. Keep that list in step with the
+settings file when adding an `ask` rule.
+
 ## Guardrails
 
 - **Never** run `bd migrate` or set `BD_ALLOW_REMOTE_MIGRATE` from a cloud
