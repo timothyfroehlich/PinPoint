@@ -210,24 +210,34 @@ migration_status="$({
           WHEN EXISTS (
             SELECT 1 FROM applied a
             WHERE NOT EXISTS (
-              SELECT 1 FROM expected e WHERE a.hash = e.hash OR a.hash = e.tag
+              SELECT 1 FROM expected e
+              WHERE (a.hash = e.hash AND a.created_at = e.created_at)
+                OR a.hash = e.tag
             )
           ) THEN 'diverged'
           WHEN EXISTS (
             SELECT 1 FROM expected e
-            WHERE (SELECT COUNT(*) FROM applied a WHERE a.hash = e.hash OR a.hash = e.tag) > 1
+            WHERE (
+              SELECT COUNT(*) FROM applied a
+              WHERE (a.hash = e.hash AND a.created_at = e.created_at)
+                OR a.hash = e.tag
+            ) > 1
           ) THEN 'diverged'
           WHEN EXISTS (
             SELECT 1 FROM expected e
             WHERE NOT EXISTS (
-              SELECT 1 FROM applied a WHERE a.hash = e.hash OR a.hash = e.tag
+              SELECT 1 FROM applied a
+              WHERE (a.hash = e.hash AND a.created_at = e.created_at)
+                OR a.hash = e.tag
             )
               AND e.created_at <= COALESCE((SELECT MAX(created_at) FROM applied), 0)
           ) THEN 'diverged'
           WHEN EXISTS (
             SELECT 1 FROM expected e
             WHERE NOT EXISTS (
-              SELECT 1 FROM applied a WHERE a.hash = e.hash OR a.hash = e.tag
+              SELECT 1 FROM applied a
+              WHERE (a.hash = e.hash AND a.created_at = e.created_at)
+                OR a.hash = e.tag
             )
           ) THEN 'behind'
           WHEN (SELECT COUNT(*) FROM applied) <> ${expected_migration_count} THEN 'diverged'

@@ -38,6 +38,13 @@ elif [[ "$*" == *"WITH expected"* ]]; then
   case "$STUB_MODE" in
     missing) printf 'behind\\n' ;;
     unexpected) printf 'diverged\\n' ;;
+    wrong_timestamp)
+      if [[ "$*" == *"a.created_at = e.created_at"* ]]; then
+        printf 'diverged\\n'
+      else
+        printf 'ready\\n'
+      fi
+      ;;
     tagged)
       if [[ "$*" == *"0076_add-mcp-oauth-support"* && "$*" == *"a.hash = e.tag"* ]]; then
         printf 'ready\\n'
@@ -120,6 +127,19 @@ def test_database_with_unexpected_migration_requires_local_reset(
     tmp_path: Path,
 ) -> None:
     result = _run_readiness(tmp_path, "unexpected")
+
+    assert result.returncode == 1
+    assert result.stdout == ""
+    assert result.stderr.splitlines() == [
+        "FAIL: preflight readiness — Postgres at localhost:61234 has a divergent migration history",
+        "Run: pnpm run db:reset",
+    ]
+
+
+def test_hash_record_with_wrong_journal_timestamp_requires_local_reset(
+    tmp_path: Path,
+) -> None:
+    result = _run_readiness(tmp_path, "wrong_timestamp")
 
     assert result.returncode == 1
     assert result.stdout == ""
