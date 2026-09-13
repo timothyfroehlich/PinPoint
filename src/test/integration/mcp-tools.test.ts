@@ -186,6 +186,7 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
 
   const ELVIRA_GROUP_ID = 7001;
   const ELVIRA_PREMIUM_ID = 70012;
+  const ELVIRA_LE_ID = 70013;
 
   /** The Elvira family (Pro/Premium/LE) plus one standalone title. */
   async function seedElviraCatalog(): Promise<void> {
@@ -2202,7 +2203,7 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
       });
     });
 
-    it("refuses intent on for an excluded machine", async () => {
+    it("refuses sync intent for an excluded machine", async () => {
       const admin = await makeUser("admin");
       const machine = await seedMachine({
         name: "Homebrew",
@@ -2220,7 +2221,61 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
       ).rejects.toMatchObject({
         reason: "invalid",
         message:
-          "A machine must be linked to a Pinball Map title to set intent to 'on'.",
+          "Uncataloged (excluded) machines do not participate in Pinball Map sync and cannot have a sync intent.",
+      });
+
+      await expect(
+        runSetMachinePinballmap(
+          { machine: machine.initials, intent: "no_sync" },
+          ctx("admin", admin)
+        )
+      ).rejects.toMatchObject({
+        reason: "invalid",
+        message:
+          "Uncataloged (excluded) machines do not participate in Pinball Map sync and cannot have a sync intent.",
+      });
+
+      await expect(
+        runSetMachinePinballmap(
+          {
+            machine: machine.initials,
+            pinballmapExcluded: true,
+            intent: "off",
+          },
+          ctx("admin", admin)
+        )
+      ).rejects.toMatchObject({
+        reason: "invalid",
+        message:
+          "Uncataloged (excluded) machines do not participate in Pinball Map sync and cannot have a sync intent.",
+      });
+    });
+
+    it("refuses intent on when retargeting to a different title", async () => {
+      const admin = await makeUser("admin");
+      await seedElviraCatalog();
+      const machine = await seedMachine({
+        name: "Elvira",
+        pbm: {
+          pinballmapMachineId: ELVIRA_PREMIUM_ID,
+          manufacturer: "Stern",
+          pinballmapIntent: "off",
+        },
+      });
+
+      await expect(
+        runSetMachinePinballmap(
+          {
+            machine: machine.initials,
+            pinballmapMachineId: ELVIRA_LE_ID,
+            intent: "on",
+          },
+          ctx("admin", admin)
+        )
+      ).rejects.toMatchObject({
+        reason: "invalid",
+        message:
+          "Retargeting a machine to a different title resets intent to 'off'. Setting intent to 'on' requires a separate action.",
       });
     });
 

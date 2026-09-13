@@ -123,6 +123,14 @@ async function resolveCore(
     };
   }
 
+  if (pinballmapExcluded && input.intent !== undefined) {
+    return {
+      ok: false,
+      message:
+        "Uncataloged (excluded) machines do not participate in Pinball Map sync and cannot have a sync intent.",
+    };
+  }
+
   if (input.intent === "on") {
     if (pinballmapExcluded || pinballmapMachineId === null) {
       return {
@@ -145,6 +153,19 @@ async function resolveCore(
   const linkUnchanged =
     pinballmapMachineId !== null &&
     pinballmapMachineId === stored.pinballmapMachineId;
+
+  const isRetargeting =
+    stored.pinballmapMachineId !== null &&
+    pinballmapMachineId !== null &&
+    stored.pinballmapMachineId !== pinballmapMachineId;
+
+  if (isRetargeting && input.intent === "on") {
+    return {
+      ok: false,
+      message:
+        "Retargeting a machine to a different title resets intent to 'off'. Setting intent to 'on' requires a separate action.",
+    };
+  }
 
   // A Don't-sync setting is kept across a re-match (spec 2.3): it says "leave
   // this cabinet out of the integration", which is a standing preference about
@@ -198,7 +219,7 @@ async function resolveCore(
         ...empty,
         pinballmapExcluded: true,
         pinballmapExcludedReason: input.pinballmapExcludedReason ?? null,
-        pinballmapIntent: targetIntent === "on" ? "off" : targetIntent,
+        pinballmapIntent: "off",
         // The only branch where model metadata comes from the request — see
         // `PbmLinkSelection.modelName`. Absent stays null rather than keeping a
         // stored value: a save that omits these fields is a save that cleared

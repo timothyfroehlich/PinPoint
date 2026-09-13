@@ -68,7 +68,7 @@ export const setMachinePinballmapSchema = z.object({
     .enum(["on", "off", "no_sync"])
     .optional()
     .describe(
-      "Operator lineup intent for Pinball Map: 'on' (cabinet should appear on the public location lineup), 'off' (take off / do not list), or 'no_sync' (exempt this cabinet from sync entirely). Only 'on' requires a linked title and non-pending/removed availability."
+      "Operator lineup intent for Pinball Map: 'on' (cabinet should appear on the public location lineup), 'off' (take off / do not list), or 'no_sync' (exempt this cabinet from sync entirely). Only valid for catalog-linked machines. 'on' requires non-pending/removed availability and cannot be set in the same call as retargeting an already-linked machine to a different title."
     ),
 });
 
@@ -87,8 +87,9 @@ type SetMachinePinballmapArgs = z.infer<typeof setMachinePinballmapSchema>;
  *
  *  - **List or unlist a machine on pinballmap.com directly.** Outbound network writes
  *    to pinballmap.com are gated on `machines.pinballmap.push` and owned by the web UI.
- *    Setting intent here changes PinPoint's local operator intent; background sync or
- *    the web push action resolves the difference.
+ *    Setting intent here changes PinPoint's local operator intent; only an explicit
+ *    operator push action in the web UI reconciles it with pinballmap.com (the background
+ *    hourly sync only reads the lineup and never performs outbound writes).
  *  - **Clear a link back to "nothing recorded".** Every accepted call states a
  *    fact — this title, not on Pinball Map, or setting intent. Silence on all three
  *    is rejected rather than read as "unlink".
@@ -129,6 +130,12 @@ export async function runSetMachinePinballmap(
     throw new McpToolError(
       "invalid",
       "A machine can't be both linked to a Pinball Map title and marked as not on Pinball Map. Pass one or the other."
+    );
+  }
+  if (excluding && hasIntent) {
+    throw new McpToolError(
+      "invalid",
+      "Uncataloged (excluded) machines do not participate in Pinball Map sync and cannot have a sync intent."
     );
   }
 
@@ -181,7 +188,7 @@ export function registerSetMachinePinballmap(server: McpServer): void {
     {
       title: "Set a machine's Pinball Map title and lineup intent",
       description:
-        "Record WHICH Pinball Map catalog title a machine is, mark it as not on Pinball Map, or set its lineup sync intent ('on' | 'off' | 'no_sync'). Two steps to link a title: (1) call search_pinballmap_catalog to find the title and get its `pinballmapMachineId`, (2) call this tool with that id. Do not guess an id; ids are not derivable from a title's name. THE ID MUST BE A `pinballmapMachineId`, NOT A `machineGroupId` — the catalog search returns both as adjacent bare integers, and they are separate id spaces that overlap numerically, so passing a group id links the machine to a real but unrelated title and nothing about the number itself will tell you. Group ids come back from families; machine ids come back from editions and from single-edition families. Alternatively pass `pinballmapExcluded: true` with a `pinballmapExcludedReason` for a machine that genuinely isn't a catalog title (homebrew, a one-off). You may also pass `intent: 'on' | 'off' | 'no_sync'` to set operator lineup intent (either alongside linking/exclusion or alone on an already linked or excluded machine). Pass at least one of pinballmapMachineId, pinballmapExcluded: true, or intent: this tool cannot clear a link back to 'nothing recorded'. Setting intent 'on' requires a linked catalog title and non-pending/removed availability. Re-targeting a machine that is LISTED on the public map to a different title clears its listing (the old public entry no longer describes it; PinPoint records it as an entry to remove by hand), while re-sending the SAME id it already has leaves the listing untouched. Nothing here lists or unlists a machine directly on pinballmap.com. Returns the machine's new Pinball Map state in the same shape get_machine reports, plus `previousPinballmap` so you can see exactly what changed. Use get_machine or list_machines(pinballmap: 'unlinked') first to find machines still needing a title.",
+        "Record WHICH Pinball Map catalog title a machine is, mark it as not on Pinball Map, or set its lineup sync intent ('on' | 'off' | 'no_sync'). Two steps to link a title: (1) call search_pinballmap_catalog to find the title and get its `pinballmapMachineId`, (2) call this tool with that id. Do not guess an id; ids are not derivable from a title's name. THE ID MUST BE A `pinballmapMachineId`, NOT A `machineGroupId` — the catalog search returns both as adjacent bare integers, and they are separate id spaces that overlap numerically, so passing a group id links the machine to a real but unrelated title and nothing about the number itself will tell you. Group ids come back from families; machine ids come back from editions and from single-edition families. Alternatively pass `pinballmapExcluded: true` with a `pinballmapExcludedReason` for a machine that genuinely isn't a catalog title (homebrew, a one-off). You may also pass `intent: 'on' | 'off' | 'no_sync'` to set operator lineup intent (either alongside initial linking or alone on an already linked machine). Excluded (uncataloged) machines do not participate in sync and cannot have an intent. Retargeting an already-linked machine to a different title resets intent to 'off' and requires intent 'on' to be set in a separate follow-up action. Pass at least one of pinballmapMachineId, pinballmapExcluded: true, or intent: this tool cannot clear a link back to 'nothing recorded'. Setting intent 'on' requires a linked catalog title and non-pending/removed availability. Re-targeting a machine that is LISTED on the public map to a different title clears its listing (the old public entry no longer describes it; PinPoint records it as an entry to remove by hand), while re-sending the SAME id it already has leaves the listing untouched. Nothing here lists or unlists a machine directly on pinballmap.com; background sync only reads the public lineup and never writes to it, so reconciling local intent with the live lineup requires an explicit push action in the web UI. Returns the machine's new Pinball Map state in the same shape get_machine reports, plus `previousPinballmap` so you can see exactly what changed. Use get_machine or list_machines(pinballmap: 'unlinked') first to find machines still needing a title.",
       inputSchema: setMachinePinballmapSchema,
       annotations: WRITE_TOOL_ANNOTATIONS,
     },
