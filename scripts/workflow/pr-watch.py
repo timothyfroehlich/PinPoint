@@ -1261,7 +1261,9 @@ def write_failure_artifact(run_id: int) -> str:
 
     with open(path, "w", encoding="utf-8") as f:
         f.write("# GitHub Actions Failure Report\n")
-        f.write(f"Run ID: {run_id}\nGenerated: {now}\n\n")
+        f.write(f"Run ID: {run_id}\n")
+        f.write(f"URL: https://github.com/{MONITOR_REPOSITORY}/actions/runs/{run_id}\n")
+        f.write(f"Generated: {now}\n\n")
         f.write(f"## Failed Steps Log\n\n```text\n{log_tail}\n```\n\n")
         summary_text = summary.stdout or "(no summary available)"
         f.write(f"## Run Summary\n\n```text\n{summary_text}\n```\n")
