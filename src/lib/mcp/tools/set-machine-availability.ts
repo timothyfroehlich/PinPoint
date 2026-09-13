@@ -13,6 +13,7 @@ import {
   resolveMachine,
   runTool,
   type ToolOutcome,
+  WRITE_TOOL_ANNOTATIONS,
 } from "./shared";
 import type { McpAuthContext } from "~/lib/mcp/verify-token";
 
@@ -81,10 +82,14 @@ export function registerSetMachineAvailability(server: McpServer): void {
       description:
         "Change a machine's availability (presence). Statuses: on_the_floor, off_the_floor, on_loan, pending_arrival, removed. Identify the machine by initials or UUID. No-op if already at that status.",
       inputSchema: setAvailabilitySchema,
+      annotations: WRITE_TOOL_ANNOTATIONS,
     },
     (args, extra) =>
-      runTool("set_machine_availability", extra, (ctx) =>
-        runSetMachineAvailability(args, ctx)
+      runTool(
+        "set_machine_availability",
+        extra,
+        (ctx) => runSetMachineAvailability(args, ctx),
+        { mutates: true }
       )
   );
 }

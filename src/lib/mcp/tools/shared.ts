@@ -17,6 +17,7 @@ import {
 import { OPEN_STATUSES, type IssueStatus } from "~/lib/issues/status";
 import type { MachinePresenceStatus } from "~/lib/machines/presence";
 import { reportError } from "~/lib/observability/report-error";
+import { checkMcpWriteLimit, formatResetTime } from "~/lib/rate-limit";
 import type { ProseMirrorDoc } from "~/lib/tiptap/types";
 import type {
   IssueFrequency,
@@ -45,13 +46,29 @@ export class McpToolError extends Error {
     // about concurrency, not about the arguments. Collapsing it into `invalid`
     // would tell `mcp_tool_calls` — the only server-side record of MCP
     // mutations — to blame the caller for a burst of failures it did not cause.
-    readonly reason: "denied" | "not_found" | "invalid" | "conflict",
+    readonly reason:
+      "denied" | "not_found" | "invalid" | "conflict" | "rate_limited",
     message: string
   ) {
     super(message);
     this.name = "McpToolError";
   }
 }
+
+/** Conservative MCP hints used by clients to distinguish reads from writes. */
+export const READ_ONLY_TOOL_ANNOTATIONS = {
+  readOnlyHint: true,
+  destructiveHint: false,
+  idempotentHint: true,
+  openWorldHint: false,
+} as const;
+
+export const WRITE_TOOL_ANNOTATIONS = {
+  readOnlyHint: false,
+  destructiveHint: true,
+  idempotentHint: false,
+  openWorldHint: false,
+} as const;
 
 /** A tool's structured success payload plus entity ids for the audit line. */
 export interface ToolOutcome {
@@ -89,10 +106,22 @@ function toErrorResult(message: string): CallToolResult {
 export async function runTool(
   toolName: string,
   ctx: Pick<ServerContext, "http">,
-  run: (ctx: McpAuthContext) => Promise<ToolOutcome>
+  run: (ctx: McpAuthContext) => Promise<ToolOutcome>,
+  options: { mutates?: boolean } = {}
 ): Promise<CallToolResult> {
   const auth = requireMcpAuthContext(ctx.http?.authInfo);
   try {
+    const rateLimitKey = `${auth.userId}:${auth.clientId}`;
+    if (options.mutates) {
+      const writeLimit = await checkMcpWriteLimit(rateLimitKey);
+      if (!writeLimit.success) {
+        throw new McpToolError(
+          "rate_limited",
+          `MCP write limit reached. Try again in ${formatResetTime(writeLimit.reset)}.`
+        );
+      }
+    }
+
     const outcome = await run(auth);
     logMcpToolCall({
       tool: toolName,

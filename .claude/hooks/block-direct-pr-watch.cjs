@@ -31,10 +31,11 @@ const UV_RUN_VALUE_FLAGS = new Set([
 ]);
 const MAX_WRAPPER_DEPTH = 5;
 const BLOCK_REASON =
-  "Blocked direct PR lifecycle wait. Invoke the project-scoped named agent " +
-  "`pr-lifecycle-watcher` with exactly: worktree, pr, title, phase, and " +
-  "expected_head. If named-agent discovery is unavailable, report that as " +
-  "a blocker instead of running pr-watch.py in the parent agent.";
+  "Blocked direct PR lifecycle wait. Run in background: " +
+  "`subway watch --pr <N> --phase <ci|review> --expected-head <SHA>` " +
+  "(or invoke the project-scoped named agent `pr-lifecycle-watcher` with " +
+  "worktree, pr, title, phase, and expected_head). " +
+  "Direct pr-watch.py execution is disallowed in the parent agent.";
 
 function watcherArgsForInvocation(name, args) {
   if (name === "pr-watch.py") return args;

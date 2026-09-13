@@ -14,7 +14,12 @@ import {
   type CatalogFamily,
 } from "~/lib/pinballmap/catalog";
 
-import { McpToolError, runTool, type ToolOutcome } from "./shared";
+import {
+  McpToolError,
+  READ_ONLY_TOOL_ANNOTATIONS,
+  runTool,
+  type ToolOutcome,
+} from "./shared";
 import type { McpAuthContext } from "~/lib/mcp/verify-token";
 
 /**
@@ -226,6 +231,7 @@ export function registerSearchPinballmapCatalog(server: McpServer): void {
       description:
         "Find a Pinball Map catalog title to identify a machine's model/edition. Two steps, like the web picker: pass `query` to get matching families (an edition group such as 'Elvira's House of Horrors', or a standalone title) with an `editionCount`; then, ONLY for a family with a non-null `machineGroupId` and `editionCount` above 1, pass that `machineGroupId` to list its individual editions (Pro/Premium/LE) with the `pinballmapMachineId` of each. A standalone title — `machineGroupId` null, or `editionCount` 1 — already carries its `pinballmapMachineId`: that is the answer, don't call again. Most pre-1990s machines are standalone. Pass one argument or the other, never both. CHECK `familyName` ON THE EDITIONS RESPONSE before using any id from it: machine ids and machine-group ids are separate id spaces, so the wrong integer can return a real but unrelated family's editions. If `familyName` is not the title you searched for, you passed an edition's `pinballmapMachineId` instead of a family's `machineGroupId` — search by name again. `returned` is this page's size, not a total — this tool cannot answer 'how many titles are there'; when `hasMore` is true, narrow the query, as families come back best-match first and there is no paging. Read-only, served from PinPoint's local catalog mirror.",
       inputSchema: searchPinballmapCatalogSchema,
+      annotations: READ_ONLY_TOOL_ANNOTATIONS,
     },
     (args, extra) =>
       runTool("search_pinballmap_catalog", extra, (ctx) =>

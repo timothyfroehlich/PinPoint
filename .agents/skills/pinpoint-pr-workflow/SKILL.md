@@ -95,36 +95,36 @@ Closes #N (if applicable)
 
 ## Phase 3: Review (CI + review + label)
 
-### Delegated Watcher Architecture (Lightweight Subagents)
+### Delegated Watcher Architecture (Subway Watch)
 
-Watching CI and awaiting review are passive waits. Invoke the project-scoped named
-agent `pr-lifecycle-watcher`; read
-`references/native-pr-lifecycle-watcher.md` before either wait. Give it only the
-five-field envelope documented there. If named-agent discovery is unavailable,
-report the broken installation as a blocker; parent-agent hooks reject direct
-long-running watcher calls.
+Watching CI and awaiting review are passive waits that consume 0 LLM reasoning tokens. Launch `subway watch` in the background:
+
+```bash
+subway watch --pr <PR> --phase <ci|review> --expected-head <HEAD_SHA>
+```
+
+Alternatively, you may invoke the project-scoped named agent `pr-lifecycle-watcher` with the five-field envelope (see `references/native-pr-lifecycle-watcher.md`). Parent-agent hooks reject direct `pr-watch.py` calls to prevent blocking polling loops.
 
 ---
 
 ### 3.1 Watch CI
 
-After pushing a commit at `HEAD_SHA`, invoke the named `pr-lifecycle-watcher` with
-`phase: "ci"`:
+After pushing a commit at `HEAD_SHA`, launch `subway watch` with `phase: "ci"`:
 
 ```bash
-python3 scripts/workflow/pr-watch.py <PR> --phase ci --expected-head <HEAD_SHA> --json
+subway watch --pr <PR> --phase ci --expected-head <HEAD_SHA>
 ```
 
 For a new draft PR, keep it draft until `CI Gate` succeeds for the current head, then
 run `gh pr ready <PR>`, then request the review in 3.4. Promotion alone does not start a
 Codex review. A green run for an older SHA does not qualify.
 
-**Stream discipline**: In `--json` mode, progressive logs go to `stderr`, and `stdout` receives strictly the terminal JSON object upon exit. Foreground subagents block until exit without token-wasting intermediate wakeups.
+**Stream discipline**: Progressive logs go to `stderr`, and `stdout` receives strictly the terminal JSON object upon exit. Background tasks run silently without token-wasting intermediate wakeups.
 
 **Handling the CI result**:
 
 - `outcome: "passed"` (exit 0): CI Gate passed on `HEAD_SHA`. If the PR is draft, run `gh pr ready <PR>`, then proceed to request Codex review in 3.4.
-- `outcome: "failed"` (exit 1): A run or CI Gate failed. Inspect the failure artifact at `failure_artifact` (under `tmp/gh-monitor/`), address the failure, commit, and push.
+- `outcome: "failed"` (exit 1): A run or CI Gate failed. Subway automatically extracts the failed steps log and provides `failure_summary` in the terminal JSON (and saves the full report to `failure_artifact` under `tmp/gh-monitor/`). Address the failure, commit, and push.
   - If judged to be a GitHub Actions **infra** flake (network timeout, runner loss, download 5xx, container start): log it with `bash scripts/workflow/log-gha-flake.sh <pr> <run-id> <class> "<symptom>"` before retrying.
 - `outcome: "stale"` (exit 1): The PR head moved away from `expected_head`. The owner re-checks branch state.
 - `outcome: "conflicting"` (exit 1): Merge conflict developed (`DIRTY` or `CONFLICTING`). Merge `origin/main` into the branch and push.
@@ -153,10 +153,10 @@ After current-head CI succeeds and the PR is ready:
 
    This verifies current-head CI passed and posts the SHA-pinned `@codex review` comment. Exactly one request per intended head commit.
 
-2. **Owner invokes the named `pr-lifecycle-watcher` with `phase: "review"`**:
+2. **Owner launches `subway watch` with `phase: "review"`**:
 
    ```bash
-   python3 scripts/workflow/pr-watch.py <PR> --phase review --expected-head <HEAD_SHA> --json
+   subway watch --pr <PR> --phase review --expected-head <HEAD_SHA>
    ```
 
 3. **Handling the review result**:
