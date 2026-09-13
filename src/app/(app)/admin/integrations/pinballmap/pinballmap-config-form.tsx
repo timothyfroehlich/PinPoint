@@ -59,6 +59,13 @@ function localityLabel(
   return city ?? state;
 }
 
+function locationIdFromInput(value: string): number | null {
+  const normalized = value.trim();
+  if (!/^\d+$/.test(normalized)) return null;
+  const locationId = Number(normalized);
+  return Number.isSafeInteger(locationId) && locationId > 0 ? locationId : null;
+}
+
 function currentLocationName(state: PinballMapAdminViewState): string {
   if (state.currentLocation) return state.currentLocation.name;
   if (state.configuredLocationId !== null) {
@@ -170,10 +177,13 @@ export function PinballMapConfigForm({
       applyAllowance(checkResult.allowance);
     }
     if (checkResult.ok) {
-      if (checkResult.candidate.locationId.toString() !== inputValue.trim()) {
+      if (
+        checkResult.candidate.locationId !== locationIdFromInput(inputValue)
+      ) {
         setCandidate(null);
         return;
       }
+      setInputValue(checkResult.candidate.locationId.toString());
       setCandidate(checkResult.candidate);
       setFeedback(null);
       return;
@@ -422,8 +432,9 @@ export function PinballMapConfigForm({
 
   const baselineValue = initialState.configuredLocationId?.toString() ?? "";
   const normalizedInput = inputValue.trim();
+  const inputLocationId = locationIdFromInput(inputValue);
   const isDirty = inputValue !== baselineValue;
-  const candidateMatches = candidate?.locationId.toString() === normalizedInput;
+  const candidateMatches = candidate?.locationId === inputLocationId;
   const canClear =
     initialState.configuredLocationId !== null && normalizedInput.length === 0;
   const canCommit =
@@ -456,7 +467,7 @@ export function PinballMapConfigForm({
     if (event.target !== event.currentTarget) return;
     event.preventDefault();
     if (normalizedInput.length === 0 || cooldownActive || anyPending) return;
-    if (!/^\d+$/.test(normalizedInput)) {
+    if (inputLocationId === null) {
       setCandidate(null);
       setFeedback({
         tone: "error",
@@ -469,7 +480,7 @@ export function PinballMapConfigForm({
     setFeedback(null);
     setAnnouncement(null);
     const formData = new FormData();
-    formData.set("locationId", normalizedInput);
+    formData.set("locationId", inputLocationId.toString());
     React.startTransition(() => dispatchCheck(formData));
   }
 

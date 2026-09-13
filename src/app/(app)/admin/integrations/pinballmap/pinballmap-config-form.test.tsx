@@ -292,6 +292,21 @@ describe("PinballMapConfigForm", () => {
     expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled();
   });
 
+  it("canonicalizes a zero-padded ID without discarding its successful Check", async () => {
+    const user = userEvent.setup();
+    renderForm();
+    const input = screen.getByLabelText("Location ID");
+    await user.clear(input);
+    await user.type(input, "033871");
+    await user.click(screen.getByRole("button", { name: "Check ID" }));
+
+    expect(
+      await screen.findByText("Pinball Wizard Arcade")
+    ).toBeInTheDocument();
+    expect(input).toHaveValue("33871");
+    expect(screen.getByRole("button", { name: "Save changes" })).toBeEnabled();
+  });
+
   it("uses controlled numeric validation instead of the browser validation bubble", async () => {
     const user = userEvent.setup();
     renderForm();
