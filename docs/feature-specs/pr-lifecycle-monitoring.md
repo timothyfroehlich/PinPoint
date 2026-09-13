@@ -13,15 +13,15 @@
 - **Watch** — an asynchronous background observation of a PR lifecycle phase anchored to a specific commit. Runs until a terminal verdict or timeout without blocking agent turns.
 - **Phase** — the lifecycle stage under observation: **CI** (aggregate check gate completion) or **review** (exact-head review evidence and thread resolution).
 - **Expected head** — the commit SHA the watch is anchored to. Detects PR branch updates so agents never act on stale commits.
-- **Terminal verdict** — an authoritative, machine-readable JSON object emitted upon completion that gives the agent everything needed to take its next step without follow-up queries.
-- **Failure artifact** — a targeted markdown summary of failed CI steps and errors written to disk, sparing agents from fetching or parsing raw workflow logs.
+- **Terminal verdict** — an authoritative, machine-readable JSON object emitted upon completion that gives the main agent everything needed to take its next step without follow-up queries.
+- **Failure artifact** — a targeted markdown summary of failed CI steps and errors written to disk, sparing the main agent from fetching or parsing raw workflow logs.
 
 ---
 
 ## 2. Launching a watch
 
-- **2.1** An agent launches a watch with five explicit parameters: worktree path, PR number, PR title, phase (`ci` | `review`), and expected head SHA.
-- **2.2** A watch executes as a non-blocking background process, consuming zero agent context tokens while running.
+- **2.1** A watch is defined by five parameters: the worktree path, the PR number, the PR title, the phase (`ci` | `review`), and the expected head SHA. The launching command defaults the worktree to the current working directory when invoked in place.
+- **2.2** A watch executes as a non-blocking background process, consuming zero main-agent context tokens while running.
 - **2.3** Invalid parameters, missing executables, or corrupt worktrees fail immediately at launch rather than hanging or polling.
 - **2.4** Invocation syntax and semantics are identical across all agent harnesses.
 
@@ -34,9 +34,9 @@
 - **3.3** Outcomes belong to a closed set:
   - CI phase: **passed**, **failed**, **stale**, **conflicting**, **timed_out**, **undetermined**.
   - Review phase: **passed**, **action_required**, **stale**, **conflicting**, **timed_out**, **undetermined**.
-- **3.4** An agent determines its next action directly from the terminal verdict without exploratory commands or additional GitHub API queries.
-- **3.5** A **stale** verdict indicates the PR head advanced; the agent re-evaluates the new head rather than retrying.
-- **3.6** A **conflicting** verdict indicates merge conflicts; the agent rebases or resolves rather than retrying.
+- **3.4** The main agent determines its next action directly from the terminal verdict without exploratory commands or additional GitHub API queries.
+- **3.5** A **stale** verdict indicates the PR head advanced; the main agent re-evaluates the new head rather than retrying.
+- **3.6** A **conflicting** verdict indicates merge conflicts; the main agent merges `origin/main` and resolves rather than retrying.
 - **3.7** An **undetermined** verdict indicates infrastructure or API failure; the agent may retry after a backoff.
 - **3.8** A **timed_out** verdict indicates the bounded duration ceiling was reached before completion.
 
@@ -90,4 +90,5 @@
 
 | Date | Amendment |
 | :-- | :-- |
+| 2026-09-12 | Clarify actor as the main agent across concepts and requirements; align §2.1 parameter contract with optional worktree defaulting; align §3.6 conflict resolution to merge origin/main per AGENTS.md branch policy. |
 | 2026-09-12 | Initial draft from first principles: background monitoring, structured verdicts, failure reporting, zero-token waiting, and unified CLI invocation via Subway. |
