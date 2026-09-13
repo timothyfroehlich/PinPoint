@@ -221,8 +221,24 @@ printf '%s\\n' "$@"
 """
     )
     fake_sem.chmod(0o755)
+    fake_pg_isready = fake_bin / "pg_isready"
+    fake_pg_isready.write_text("#!/bin/bash\nexit 0\n")
+    fake_pg_isready.chmod(0o755)
+    fake_curl = fake_bin / "curl"
+    fake_curl.write_text("#!/bin/bash\nexit 0\n")
+    fake_curl.chmod(0o755)
+    fake_psql = fake_bin / "psql"
+    fake_psql.write_text(
+        "#!/bin/bash\n"
+        "[[ \"$*\" == *\"WITH expected\"* ]] && printf 'ready\\n' || printf 't\\n'\n"
+    )
+    fake_psql.chmod(0o755)
     env = os.environ.copy()
     env["PATH"] = f"{fake_bin}{os.pathsep}{env['PATH']}"
+    env["POSTGRES_URL"] = "postgresql://postgres:postgres@localhost:61234/postgres"
+    env["POSTGRES_URL_NON_POOLING"] = env["POSTGRES_URL"]
+    env["NEXT_PUBLIC_SUPABASE_URL"] = "http://localhost:61233"
+    env["SUPABASE_SERVICE_ROLE_KEY"] = "test-service-role-key"
     script = REPO_ROOT / "scripts" / "workflow" / "preflight-locked.sh"
 
     compact = subprocess.run(

@@ -2,7 +2,7 @@
 # preflight-locked.sh — wrap `pnpm run preflight` in a host-wide concurrency cap.
 #
 # Caps concurrent preflights to 2 per host using GNU parallel's `sem` (a
-# persistent counting semaphore stored under ~/.parallel/semaphores/).
+# persistent counting semaphore stored under the shared PinPoint state root).
 #
 # Rationale: a single preflight peaks at ~1.5 GB of vitest RSS + ~2 GB during
 # `next build`. Two concurrent preflights = ~3 GB combined peak; three or more
@@ -28,6 +28,17 @@ if [[ $# -ne 0 ]]; then
   echo "Usage: bash scripts/workflow/preflight-locked.sh [--human]" >&2
   exit 64
 fi
+
+# Reject a missing or unmigrated worktree database before waiting for a host-wide
+# preflight slot. The canonical graph repeats this cheap read-only probe inside
+# the captured/streamed run so every uncapped entrypoint enforces the same gate.
+bash scripts/workflow/preflight-readiness.sh --quiet-success
+
+# GNU parallel defaults to ~/.parallel, which is not writable in every agent
+# sandbox. Keep every worktree on one host-wide semaphore while using the
+# existing agent-writable PinPoint state root.
+export PARALLEL_HOME="${XDG_STATE_HOME:-${HOME}/.local/state}/pinpoint/parallel"
+mkdir -p "$PARALLEL_HOME"
 
 if ! command -v sem >/dev/null 2>&1 \
    || ! sem --version 2>/dev/null | grep -q '^GNU parallel'; then

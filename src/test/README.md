@@ -25,7 +25,7 @@ src/test/
 
 Test pure functions, utilities, and validation logic without external dependencies.
 
-**Run**: `pnpm test` (included by default)
+**Run**: `pnpm test`
 
 **Examples**:
 
@@ -38,7 +38,15 @@ Test pure functions, utilities, and validation logic without external dependenci
 
 Test database queries and Server Actions using **PGlite** (worker-scoped).
 
-**Run**: `pnpm test` (included by default)
+**Run**: `pnpm run test:integration`
+
+For one or more files, use the supported targeted entrypoint. It always prepares the derived PGlite schema first and requires an explicit path:
+
+```bash
+pnpm run test:integration:target -- src/test/integration/database-queries.test.ts
+```
+
+Do not combine unit and integration paths in a bare Vitest command. Run the unit and integration verdicts through their separate package scripts.
 
 **Key Points**:
 
@@ -69,7 +77,7 @@ describe("My Feature", () => {
 
 Tests that require a **real Supabase instance** (authentication, SSR, etc.).
 
-**Run**: `pnpm run test:integration:supabase` (requires `supabase start`). Note that `pnpm run test:integration` **excludes** this directory — it is the PGlite-only project.
+**Run**: `pnpm run test:integration:supabase`. A fresh worktree needs the non-destructive local bootstrap `supabase start && pnpm run db:migrate` first. Note that `pnpm run test:integration` **excludes** this directory — it is the PGlite-only project.
 
 **Key Points**:
 
@@ -94,7 +102,10 @@ pnpm test
 # PGlite integration tests (excludes integration/supabase/)
 pnpm run test:integration
 
-# Supabase integration tests (requires supabase start)
+# One or more PGlite integration files (schema setup included)
+pnpm run test:integration:target -- src/test/integration/database-queries.test.ts
+
+# Supabase integration tests (fresh worktree bootstrap: supabase start && pnpm run db:migrate)
 pnpm run test:integration:supabase
 
 # All tests (unit + integration + supabase)
