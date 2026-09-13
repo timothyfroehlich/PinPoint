@@ -3,11 +3,7 @@ import { eq } from "drizzle-orm";
 import { type DbTransaction } from "~/server/db";
 import { machineSettingsSets } from "~/server/db/schema";
 import { type AccessLevel } from "~/lib/permissions/matrix";
-import {
-  canEditSet,
-  canSetOwnerDefault,
-  canViewSet,
-} from "~/lib/machines/settings-permissions";
+import { canEditSet, canSetOwnerDefault, canViewSet } from "~/lib/permissions";
 import type {
   SettingsSection,
   SettingsSetData,
