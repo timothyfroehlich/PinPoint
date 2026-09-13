@@ -456,6 +456,23 @@ def test_targeted_integration_rejects_options_without_a_test_path(
     assert "pnpm run test:integration:target -- <test-path>" in result.stderr
 
 
+def test_targeted_integration_rejects_path_like_option_operands(
+    tmp_path: Path,
+) -> None:
+    result, calls = _run_targeted_integration(
+        tmp_path,
+        args=[
+            "--require-target",
+            "--exclude",
+            "src/test/integration/example.test.ts",
+        ],
+    )
+
+    assert result.returncode == 64
+    assert not calls.exists()
+    assert "pnpm run test:integration:target -- <test-path>" in result.stderr
+
+
 def test_package_scripts_put_readiness_first_and_share_integration_setup() -> None:
     scripts = json.loads((REPO_ROOT / "package.json").read_text())["scripts"]
 

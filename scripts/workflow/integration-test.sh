@@ -5,14 +5,7 @@ set -euo pipefail
 
 if [[ ${1:-} == "--require-target" ]]; then
   shift
-  target_present=false
-  for argument in "$@"; do
-    if [[ "$argument" == src/test/integration/* ]]; then
-      target_present=true
-      break
-    fi
-  done
-  if [[ "$target_present" != true ]]; then
+  if [[ ${1:-} != src/test/integration/* ]]; then
     echo "Usage: pnpm run test:integration:target -- <test-path> [more-test-paths…]" >&2
     exit 64
   fi
