@@ -31,7 +31,7 @@
     "test:changed": "python3 scripts/quiet-run.py --label test:changed -- pnpm run test:changed:_run -- --silent --no-color --reporter=dot",
     "test:changed:human": "pnpm run test:changed:_run -- --reporter=verbose",
     "test:watch": "pnpm run test:ensure-schema && vitest watch --project unit",
-    "test:coverage": "pnpm run test:ensure-schema && vitest run --project unit --coverage --silent --no-color --reporter=dot",
+    "test:coverage": "pnpm run test:ensure-schema && bash scripts/workflow/heavy-run.sh vitest run --project unit --coverage --silent --no-color --reporter=dot",
     "test:_generate-schema": "drizzle-kit export --dialect=postgresql --schema=./src/server/db/schema.ts > src/test/setup/schema.sql",
     "smoke": "bash scripts/workflow/heavy-run.sh playwright test --config=playwright.config.smoke.ts --project=chromium --project='Mobile Chrome' --project=firefox --project='Mobile Safari' --quiet",
     "smoke:headed": "playwright test --config=playwright.config.smoke.ts --headed --project=chromium --project='Mobile Chrome' --project=firefox --project='Mobile Safari'",

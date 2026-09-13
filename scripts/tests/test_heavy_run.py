@@ -132,6 +132,7 @@ def test_complete_unit_and_check_graphs_join_admission_pool() -> None:
     scripts = json.loads((REPO_ROOT / "package.json").read_text())["scripts"]
 
     assert "heavy-run.sh vitest run --project unit" in scripts["test:_run"]
+    assert "heavy-run.sh vitest run --project unit" in scripts["test:coverage"]
     assert "heavy-run.sh npm-run-all" in scripts["check:_run"]
     assert scripts["test"].startswith("python3 scripts/quiet-run.py")
     assert scripts["test:human"].startswith("pnpm run test:_run")
