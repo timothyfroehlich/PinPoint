@@ -19,6 +19,7 @@ Each test drives the real bash against a real temporary git repository and a stu
 
 import json
 import os
+import shutil
 import stat
 import subprocess
 import tempfile
@@ -34,6 +35,7 @@ pytestmark = pytest.mark.integration
 SCRIPT = Path(__file__).parent.parent / "workflow" / "merge-handoff.sh"
 
 PR = 123
+OTHER_PR = 124
 BRANCH = "feat/thing-PP-abcd"
 
 GIT_ENV = {
@@ -96,6 +98,15 @@ class Scenario:
     title: str = "feat(thing): do the thing (PP-abcd)"
     branch: str = BRANCH
     body: str = ""
+
+
+@dataclass(frozen=True)
+class ConcurrentReports:
+    first: subprocess.CompletedProcess[str]
+    second: subprocess.CompletedProcess[str]
+    fetch_head_before: str
+    fetch_head_after: str
+    leftover_fetch_refs: str
 
 
 def codex_review(sha: str, state: str = "APPROVED") -> dict:
@@ -324,6 +335,231 @@ def repo_with_pr(
             timeout=120,
         )
         yield head_sha, run
+
+
+def run_concurrent_reports() -> ConcurrentReports:
+    """Run two reports whose fetches deterministically overlap in one checkout.
+
+    The git wrapper delegates every operation to the real binary. Its only job is to
+    hold the first report between fetch and revision lookup while the second report
+    fetches, reproducing the production interleaving without timing-dependent sleeps.
+    """
+    real_git = shutil.which("git")
+    assert real_git is not None
+
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_path = Path(tmp)
+        origin = tmp_path / "origin.git"
+        work = tmp_path / "work"
+        barriers = tmp_path / "barriers"
+        barriers.mkdir()
+
+        subprocess.run([real_git, "init", "-q", "--bare", str(origin)], check=True)
+        subprocess.run([real_git, "init", "-q", "-b", "main", str(work)], check=True)
+
+        write(work, "README.md", "# base\n")
+        git("add", "-A", cwd=work)
+        git("commit", "-qm", "base", cwd=work)
+        git("remote", "add", "origin", str(origin), cwd=work)
+        git("push", "-q", "origin", "main", cwd=work)
+
+        git("checkout", "-qb", "pr-one", cwd=work)
+        write(work, "src/lib/one.ts", "export const one = 1;\n")
+        git("add", "-A", cwd=work)
+        git("commit", "-qm", "first PR", cwd=work)
+        first_head = git("rev-parse", "HEAD", cwd=work)
+        git("push", "-q", "origin", f"HEAD:refs/pull/{PR}/head", cwd=work)
+
+        git("checkout", "-q", "main", cwd=work)
+        git("checkout", "-qb", "pr-two", cwd=work)
+        write(work, "docs/two.md", "# two\na\nb\nc\nd\ne\nf\n")
+        git("add", "-A", cwd=work)
+        git("commit", "-qm", "second PR", cwd=work)
+        second_head = git("rev-parse", "HEAD", cwd=work)
+        git("push", "-q", "origin", f"HEAD:refs/pull/{OTHER_PR}/head", cwd=work)
+
+        for number, title, branch, head in (
+            (PR, "fix: first (PP-first)", "pr-one", first_head),
+            (OTHER_PR, "fix: second (PP-second)", "pr-two", second_head),
+        ):
+            meta = {
+                "number": number,
+                "title": title,
+                "url": f"https://github.com/acme/widget/pull/{number}",
+                "headRefName": branch,
+                "headRefOid": head,
+                "baseRefName": "main",
+                "isDraft": False,
+                "state": "OPEN",
+                "body": "",
+            }
+            (tmp_path / f"meta-{number}.json").write_text(json.dumps(meta))
+
+        threads = {
+            "data": {
+                "repository": {
+                    "pullRequest": {
+                        "reviewThreads": {
+                            "pageInfo": {"hasNextPage": False, "endCursor": None},
+                            "nodes": [],
+                        }
+                    }
+                }
+            }
+        }
+        (tmp_path / "threads.json").write_text(json.dumps(threads))
+
+        gh_stub = tmp_path / "gh"
+        gh_stub.write_text(
+            "#!/usr/bin/env bash\n"
+            'args="$*"\n'
+            'case "$args" in\n'
+            '  *"nameWithOwner"*) printf "acme/widget\\n" ;;\n'
+            '  *"statusCheckRollup"*) printf "%s\\n" '
+            '\'{"name":"CI Gate","status":"COMPLETED",'
+            '"conclusion":"SUCCESS"}\' ;;\n'
+            '  *"--json mergeable"*) printf "MERGEABLE\\n" ;;\n'
+            f'  *"pr view {PR}"*"--jq .headRefOid"*) '
+            f'jq -r .headRefOid "$STUB_ROOT/meta-{PR}.json" ;;\n'
+            f'  *"pr view {OTHER_PR}"*"--jq .headRefOid"*) '
+            f'jq -r .headRefOid "$STUB_ROOT/meta-{OTHER_PR}.json" ;;\n'
+            f'  *"pr view {PR}"*) cat "$STUB_ROOT/meta-{PR}.json" ;;\n'
+            f'  *"pr view {OTHER_PR}"*) cat "$STUB_ROOT/meta-{OTHER_PR}.json" ;;\n'
+            '  *"api graphql"*) cat "$STUB_ROOT/threads.json" ;;\n'
+            '  *"/reviews"*) printf "[]\\n" ;;\n'
+            '  *"/comments"*) printf "[]\\n" ;;\n'
+            '  *) printf "UNEXPECTED gh call: %s\\n" "$args" >&2; exit 1 ;;\n'
+            "esac\n"
+        )
+        gh_stub.chmod(
+            gh_stub.stat().st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH
+        )
+
+        # Establish a value that the reports must leave untouched. The wrapper below
+        # controls only the report processes, so this setup fetch uses the real git.
+        git("fetch", "-q", "--refmap=", "origin", "main", cwd=work)
+        fetch_head_before = git("rev-parse", "FETCH_HEAD", cwd=work)
+
+        git_stub = tmp_path / "git"
+        git_stub.write_text(
+            """#!/usr/bin/env bash
+set -euo pipefail
+
+wait_for() {
+  local path=$1
+  local attempts=0
+  while [[ ! -e "$path" ]]; do
+    attempts=$((attempts + 1))
+    if [[ "$attempts" -ge 500 ]]; then
+      printf 'barrier timed out: %s\n' "$path" >&2
+      exit 90
+    fi
+    sleep 0.01
+  done
+}
+
+args="$*"
+if [[ "${RACE_ROLE:-}" == first && "$args" == *"pull/123/head"* ]]; then
+  if [[ ! -e "$RACE_BARRIERS/first-head-1" ]]; then
+    "$REAL_GIT" "$@"
+    : > "$RACE_BARRIERS/first-head-1"
+    wait_for "$RACE_BARRIERS/second-base"
+  else
+    "$REAL_GIT" "$@"
+    : > "$RACE_BARRIERS/first-head-2"
+    wait_for "$RACE_BARRIERS/second-head"
+  fi
+  exit 0
+fi
+
+if [[ "${RACE_ROLE:-}" == second && "${1:-}" == fetch ]]; then
+  if [[ ! -e "$RACE_BARRIERS/second-base" ]]; then
+    wait_for "$RACE_BARRIERS/first-head-1"
+    "$REAL_GIT" "$@"
+    : > "$RACE_BARRIERS/second-base"
+
+    # The vulnerable implementation retries after reading this fetch through the
+    # shared FETCH_HEAD. Give that retry a bounded chance to start. The isolated-ref
+    # implementation needs no retry, so the bound lets the second report continue.
+    for _ in {1..100}; do
+      [[ ! -e "$RACE_BARRIERS/first-head-2" ]] || break
+      sleep 0.01
+    done
+  else
+    "$REAL_GIT" "$@"
+    : > "$RACE_BARRIERS/second-head"
+  fi
+  exit 0
+fi
+
+exec "$REAL_GIT" "$@"
+"""
+        )
+        git_stub.chmod(
+            git_stub.stat().st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH
+        )
+
+        common_env = {
+            **os.environ,
+            **GIT_ENV,
+            "PATH": f"{tmp}{os.pathsep}{os.environ.get('PATH', '')}",
+            "REAL_GIT": real_git,
+            "RACE_BARRIERS": str(barriers),
+            "STUB_ROOT": str(tmp_path),
+        }
+        first_process = subprocess.Popen(
+            ["bash", str(SCRIPT), str(PR)],
+            cwd=work,
+            env={**common_env, "RACE_ROLE": "first"},
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        second_process = subprocess.Popen(
+            ["bash", str(SCRIPT), str(OTHER_PR)],
+            cwd=work,
+            env={**common_env, "RACE_ROLE": "second"},
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+
+        try:
+            first_stdout, first_stderr = first_process.communicate(timeout=30)
+            second_stdout, second_stderr = second_process.communicate(timeout=30)
+        finally:
+            for process in (first_process, second_process):
+                if process.poll() is None:
+                    process.kill()
+                    process.wait()
+
+        first_run = subprocess.CompletedProcess(
+            first_process.args,
+            first_process.returncode,
+            first_stdout,
+            first_stderr,
+        )
+        second_run = subprocess.CompletedProcess(
+            second_process.args,
+            second_process.returncode,
+            second_stdout,
+            second_stderr,
+        )
+        fetch_head_after = git("rev-parse", "FETCH_HEAD", cwd=work)
+        leftover_fetch_refs = git(
+            "for-each-ref",
+            "--format=%(refname)",
+            "refs/pinpoint/merge-handoff",
+            cwd=work,
+        )
+
+        return ConcurrentReports(
+            first=first_run,
+            second=second_run,
+            fetch_head_before=fetch_head_before,
+            fetch_head_after=fetch_head_after,
+            leftover_fetch_refs=leftover_fetch_refs,
+        )
 
 
 MERGE_CMD = f"! scripts/workflow/merge-pr.sh {PR} --human"
@@ -740,6 +976,22 @@ def test_a_pr_with_no_bead_says_so_rather_than_inventing_one() -> None:
 
 
 # --- The head-moved race ------------------------------------------------------------
+
+
+def test_concurrent_reports_cannot_cross_contaminate_fetched_heads() -> None:
+    """Each report owns its fetched commits even when another report fetches mid-read."""
+    reports = run_concurrent_reports()
+
+    assert reports.first.returncode == 0, reports.first.stderr
+    assert reports.second.returncode == 0, reports.second.stderr
+    assert "HEAD MOVED" not in reports.first.stdout, reports.first.stdout
+    assert "HEAD MOVED" not in reports.second.stdout, reports.second.stdout
+    assert "src +1 -0" in reports.first.stdout, reports.first.stdout
+    assert "docs +7 -0" not in reports.first.stdout, reports.first.stdout
+    assert "docs +7 -0" in reports.second.stdout, reports.second.stdout
+    assert "src +1 -0" not in reports.second.stdout, reports.second.stdout
+    assert reports.fetch_head_after == reports.fetch_head_before
+    assert reports.leftover_fetch_refs == ""
 
 
 def test_a_head_that_moved_mid_report_blocks_the_merge_command() -> None:
