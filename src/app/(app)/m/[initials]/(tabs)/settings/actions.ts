@@ -4,7 +4,7 @@
  * CRUD over a machine's settings sets. Two authorization layers:
  * - **Creating** rides on the matrix entry `machines.settings.manage`
  *   (member → owner-scoped; technician/admin → any), via `checkPermission`.
- * - **Editing an existing set** is per-set (`~/lib/machines/settings-permissions`):
+ * - **Editing an existing set** is per-set (`~/lib/permissions`):
  *   owner sets are owner+admin only (protected); community sets are co-edited
  *   by technicians+, the owner, and admin. Publish / tag Tournament need edit
  *   rights; setting the Owner's default needs owner/admin on an owner set.
@@ -35,7 +35,7 @@ import {
   canSetOwnerDefault,
   canViewSet,
   type SettingsSetAuth,
-} from "~/lib/machines/settings-permissions";
+} from "~/lib/permissions";
 import {
   NAME_MAX,
   type SettingsSection,
