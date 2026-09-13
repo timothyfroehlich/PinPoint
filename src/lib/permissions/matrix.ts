@@ -392,6 +392,18 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
         },
       },
       {
+        id: "machines.delete",
+        label: "Delete machines",
+        description: "Permanently delete machines from the system",
+        access: {
+          unauthenticated: false,
+          guest: false,
+          member: "owner",
+          technician: false,
+          admin: true,
+        },
+      },
+      {
         id: "machines.pinballmap.link",
         label: "Link machines to Pinball Map",
         description:
