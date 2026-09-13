@@ -42,10 +42,15 @@ export interface ProtectedActionOptions<
     | ((
         input: TInput,
         context: ActionContext
-      ) => {
-        permission: PermissionId;
-        ownershipContext?: OwnershipContext;
-      });
+      ) =>
+        | {
+            permission: PermissionId;
+            ownershipContext?: OwnershipContext;
+          }
+        | Promise<{
+            permission: PermissionId;
+            ownershipContext?: OwnershipContext;
+          }>);
   handler: (
     input: TInput,
     context: ActionContext
@@ -76,9 +81,6 @@ export function createProtectedAction<
         return err("UNAUTHORIZED", "Unauthorized. Please log in.");
       }
 
-      const accessLevel = await getUserAccessLevel(user.id);
-      const context: ActionContext = { user, accessLevel };
-
       let input = rawInput;
       if (options.schema) {
         const validation = options.schema.safeParse(rawInput);
@@ -88,10 +90,13 @@ export function createProtectedAction<
         input = validation.data;
       }
 
+      const accessLevel = await getUserAccessLevel(user.id);
+      const context: ActionContext = { user, accessLevel };
+
       if (options.permission) {
         const requirement =
           typeof options.permission === "function"
-            ? options.permission(input, context)
+            ? await options.permission(input, context)
             : { permission: options.permission };
 
         if (

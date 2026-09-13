@@ -76,8 +76,36 @@ describe("createProtectedAction", () => {
       expect(result.code).toBe("VALIDATION_ERROR");
       expect(result.message).toContain("count");
     }
+    expect(mocks.getUserAccessLevel).not.toHaveBeenCalled();
     expect(mocks.checkPermission).not.toHaveBeenCalled();
     expect(handler).not.toHaveBeenCalled();
+  });
+
+  it("supports asynchronous ownership resolution in permission callbacks", async () => {
+    const handler = vi.fn(() => Promise.resolve(ok("done")));
+    const action = createProtectedAction({
+      permission: async (input: { resourceId: string }, context) => {
+        await Promise.resolve();
+        return {
+          permission: "machines.edit",
+          ownershipContext: {
+            userId: context.user.id,
+            machineOwnerId: "owner-99",
+          },
+        };
+      },
+      handler,
+    });
+
+    const result = await action({ resourceId: "machine-1" });
+
+    expect(result).toEqual(ok("done"));
+    expect(mocks.checkPermission).toHaveBeenCalledWith(
+      "machines.edit",
+      "member",
+      { userId: "user-1", machineOwnerId: "owner-99" }
+    );
+    expect(handler).toHaveBeenCalled();
   });
 
   it("returns FORBIDDEN when an ownership-aware permission is denied", async () => {
