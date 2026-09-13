@@ -76,7 +76,7 @@ fi
 run_command=(pnpm run preflight:_run)
 if [[ $human == false ]]; then
   run_command=(
-    python3 scripts/quiet-run.py --label preflight -- "${run_command[@]}"
+    python3 scripts/quiet-run.py --label preflight --phase-set preflight -- "${run_command[@]}"
   )
 fi
 

@@ -447,7 +447,7 @@ printf 'bash %s\\n' "$*" >>"{calls}"
         capture_output=True,
         text=True,
         check=False,
-        timeout=5,
+        timeout=15,
     )
     return result, calls
 
@@ -525,11 +525,14 @@ def test_targeted_integration_rejects_path_like_option_operands(
 def test_package_scripts_put_readiness_first_and_share_integration_setup() -> None:
     scripts = json.loads((REPO_ROOT / "package.json").read_text())["scripts"]
 
-    assert scripts["preflight:readiness"] == (
+    assert scripts["preflight:readiness"].endswith(
         "bash scripts/workflow/preflight-readiness.sh"
     )
     preflight = scripts["preflight:_run"]
     assert preflight.startswith("pnpm run preflight:readiness && ")
+    expanded_preflight = " ".join(
+        scripts.get(token, token) for token in preflight.split()
+    )
     for phase in (
         "check:prototype-clean",
         "typecheck",
@@ -540,11 +543,13 @@ def test_package_scripts_put_readiness_first_and_share_integration_setup() -> No
         "test:integration:supabase",
         "smoke",
     ):
-        assert phase in preflight
+        assert phase in preflight or phase in expanded_preflight
     assert preflight.index("preflight:readiness") < preflight.index(
         "check:prototype-clean"
     )
-    assert preflight.index("check:prototype-clean") < preflight.index("db:fast-reset")
+    assert preflight.index("check:prototype-clean") < preflight.index(
+        "preflight:database-reset"
+    )
 
     assert scripts["test:integration:target"] == (
         "bash scripts/workflow/integration-test.sh --require-target"

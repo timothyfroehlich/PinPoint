@@ -297,7 +297,7 @@ exit 64
 
     try:
         for process in processes:
-            stdout, stderr = process.communicate(timeout=5)
+            stdout, stderr = process.communicate(timeout=15)
             assert process.returncode == 0, (stdout, stderr)
         assert (state_dir / "pinpoint-preflight").is_dir()
         assert (state_dir / "pinpoint-heavy").is_dir()

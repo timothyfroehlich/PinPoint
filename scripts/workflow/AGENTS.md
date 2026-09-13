@@ -132,6 +132,23 @@ Shared monitor state lives under `$XDG_STATE_HOME/pinpoint/pr-watch/` (falling b
 
 Watcher run telemetry is recorded under `tmp/gh-monitor/watcher-run-<pr>-<phase>-<timestamp>-<pid>-<nonce>.json` with harness, resolved model, expected/observed heads, elapsed wait, and terminal outcome.
 
+### Compact Validation Progress
+
+`quiet-run.py` keeps child stdout/stderr in the private validation log and writes
+only its bounded terminal verdict to the existing verdict stream. Compact
+preflight additionally declares a fixed allowlist of phase IDs. Each phase runs
+through `validation-phase.py`, which sends start/completion events over a private
+Unix datagram socket rather than through child output. Unknown IDs and malformed
+events are ignored, so a secret-shaped child line cannot be mistaken for progress.
+The maintained preflight allowlist is selected with `--phase-set preflight`.
+
+Progress transitions go to stderr. An active phase emits a heartbeat after 60
+seconds and every 60 seconds thereafter; `quiet-run.py --heartbeat-seconds N`
+changes that interval for focused validation or tests. Heartbeats contain only the
+validation label, declared phase ID, and elapsed time. Human variants do not create
+the progress socket, so the phase wrapper is silent and the command keeps streaming
+normally.
+
 ### UI Screenshots
 
 | Script                                                   | Purpose                                                                                                                                                                                                                                                                                                                                                                                                                        |
