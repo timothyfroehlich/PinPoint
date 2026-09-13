@@ -370,6 +370,35 @@ describe("literal shell payloads are re-parsed, not skipped", () => {
     ]);
   });
 
+  it("treats `bash -n <script>` (noexec) as the shell, not the script (PP-mslx)", () => {
+    // `-n` reads and parses the file but executes nothing, so the script is
+    // data: a syntax check on merge-pr.sh must not read as running merge-pr.sh.
+    // The unattended nightly hung twice (2026-09-11/12) on exactly this.
+    for (const cmd of [
+      "bash -n scripts/workflow/merge-pr.sh",
+      "sh -n scripts/workflow/merge-pr.sh",
+      "bash -nv scripts/workflow/merge-pr.sh",
+      "bash -xn scripts/workflow/merge-pr.sh",
+      "bash -n -- scripts/workflow/merge-pr.sh",
+      "bash -n -c 'gh pr merge 123'",
+    ]) {
+      expect(names(cmd), cmd).not.toContain("merge-pr.sh");
+      expect(names(cmd), cmd).not.toContain("gh");
+    }
+    expect(names("bash -n scripts/workflow/merge-pr.sh")).toEqual(["bash"]);
+  });
+
+  it("does not mistake a `-n`-shaped flag after the script for noexec", () => {
+    // Once the script is named, later words are its arguments.
+    expect(names("bash scripts/workflow/merge-pr.sh -n")).toEqual([
+      "merge-pr.sh",
+    ]);
+    // A long option is not a short-flag cluster; `--norc` is not noexec.
+    expect(names("bash --norc scripts/workflow/merge-pr.sh")).toEqual([
+      "merge-pr.sh",
+    ]);
+  });
+
   it("resolves commands inside $() and backtick substitutions", () => {
     expect(names("$(gh pr merge 5)")).toContain("gh");
     expect(names("`gh pr merge 5`")).toContain("gh");

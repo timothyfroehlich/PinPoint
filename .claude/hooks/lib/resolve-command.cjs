@@ -39,7 +39,10 @@
  *     to `chmod`.
  *   - Literal shell payloads are re-parsed, not skipped: `eval "…"`,
  *     `sh -c "…"`, `bash -c '…'`, `$(…)` and backtick substitutions all
- *     contribute their own segments.
+ *     contribute their own segments. `bash <script>` resolves to the script.
+ *   - A noexec shell (`bash -n …`, any `-n`-bearing short-flag cluster before
+ *     the script or `-c` payload) resolves to the shell itself: it parses and
+ *     runs nothing, so a syntax check on a guarded script is not an invocation.
  *   - Anything whose command slot cannot be known statically — `eval "$CMD"`,
  *     `sh -c "$X"`, `$(pick) pr merge`, an unbalanced quote — is reported in
  *     `unresolvable` instead of being silently dropped.
@@ -1009,6 +1012,21 @@ function resolveSegment(words, out, depth, options) {
   }
 
   if (SHELLS.has(name)) {
+    // `-n` (noexec) parses and executes nothing, so whatever follows — a
+    // script path or a `-c` payload — is data, not a command. Resolve to the
+    // shell itself; a guard keyed on the script's basename then stays quiet.
+    // Only short-flag clusters before the first non-flag word count: after
+    // the script is named, `-n` is the script's own argument, and `--norc`-
+    // style long options are not clusters. A `bash -n merge-pr.sh` syntax
+    // check hung the unattended nightly twice (PP-mslx) when this read as
+    // running merge-pr.sh.
+    const firstNonFlag = argWords.findIndex((w) => !w.value.startsWith("-"));
+    const leadingFlags =
+      firstNonFlag === -1 ? argWords : argWords.slice(0, firstNonFlag);
+    if (leadingFlags.some((w) => /^-[A-Za-z]*n[A-Za-z]*$/.test(w.value))) {
+      pushSegment(out, cmdWord.value, argWords, slot.appendsDynamicArgs);
+      return;
+    }
     // `-c`, and combined short-flag forms that end in it (`bash -lc "…"`).
     const dashCIdx = argWords.findIndex((w) => /^-[A-Za-z]*c$/.test(w.value));
     if (dashCIdx !== -1) {
