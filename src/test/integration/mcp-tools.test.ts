@@ -82,10 +82,7 @@ import {
   setMachinePinballmapSchema,
 } from "~/lib/mcp/tools/set-machine-pinballmap";
 import { updateMachineSchema } from "~/app/(app)/m/schemas";
-import {
-  carryStoredLinkTarget,
-  updateMachinePbmLink,
-} from "~/services/machines";
+import { updateMachinePbmLink } from "~/services/machines";
 import { runUpdateIssue } from "~/lib/mcp/tools/update-issue";
 import {
   McpToolError,
@@ -2243,20 +2240,32 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
       });
     });
 
-    it("preserves stored link when carryStoredLinkTarget receives false for exclusion", () => {
-      const stored = {
-        pinballmapMachineId: ELVIRA_PREMIUM_ID,
-        pinballmapExcluded: false,
-        pinballmapExcludedReason: null,
-        modelName: null,
-        manufacturer: "Stern",
-        year: 2019,
-      };
-      const carried = carryStoredLinkTarget(
-        { intent: "off", pinballmapExcluded: false },
-        stored
+    it("sets intent to on for an already linked machine even when catalog mirror is empty", async () => {
+      const admin = await makeUser("admin");
+      // Note: seedElviraCatalog() is deliberately NOT called here — the catalog mirror is empty.
+      const UNCATALOGED_ID = 99_999;
+      const machine = await seedMachine({
+        name: "Rush",
+        pbm: {
+          pinballmapMachineId: UNCATALOGED_ID,
+          manufacturer: "Stern",
+          pinballmapIntent: "off",
+        },
+      });
+
+      const outcome = await runSetMachinePinballmap(
+        { machine: machine.initials, intent: "on" },
+        ctx("admin", admin)
       );
-      expect(carried.pinballmapMachineId).toBe(ELVIRA_PREMIUM_ID);
+
+      expect(outcome.result).toMatchObject({
+        pinballmap: { status: "linked", intent: "on" },
+      });
+      expect(await pbmRow(machine.id)).toMatchObject({
+        pinballmapMachineId: UNCATALOGED_ID,
+        manufacturer: "Stern",
+        pinballmapIntent: "on",
+      });
     });
 
     it("refuses sync intent for an excluded machine", async () => {

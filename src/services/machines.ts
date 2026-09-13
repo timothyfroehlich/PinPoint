@@ -22,7 +22,10 @@ import {
   getChannels,
   type DeliveryPlan,
 } from "~/lib/notifications";
-import { type MachinePresenceStatus } from "~/lib/machines/presence";
+import {
+  type MachinePresenceStatus,
+  getMachinePresenceLabel,
+} from "~/lib/machines/presence";
 import { type ProseMirrorDoc } from "~/lib/tiptap/types";
 import { recordAbandonedListing } from "~/lib/pinballmap/abandoned-listings";
 import { createMachineTimelineEvent } from "~/lib/timeline/machine-events";
@@ -32,7 +35,10 @@ import {
   type PbmLinkSelection,
   type StoredPbmLinkState,
 } from "~/lib/pinballmap/link-columns";
-import type { PbmListingIntent } from "~/lib/pinballmap/listing-state";
+import {
+  INVALID_WHEN_ON,
+  type PbmListingIntent,
+} from "~/lib/pinballmap/listing-state";
 
 export type Machine = InferSelectModel<typeof machines>;
 
@@ -842,57 +848,6 @@ export function carryExcludedReason(
 }
 
 /**
- * Carry over stored Pinball Map catalog title or exclusion when the caller
- * specifies intent only (PP-enu4).
- *
- * If the caller provided `pinballmapMachineId` or `pinballmapExcluded`, that
- * explicit selection stands. If both were omitted (intent-only update), keep
- * the machine's existing catalog link or exclusion so updating intent does
- * not un-link the game.
- *
- * Returns a copy; never mutates `selection`.
- */
-export function carryStoredLinkTarget(
-  selection: PbmLinkSelection,
-  stored: Pick<
-    PbmLinkBasis,
-    | "pinballmapMachineId"
-    | "pinballmapExcluded"
-    | "pinballmapExcludedReason"
-    | "modelName"
-    | "manufacturer"
-    | "year"
-  >
-): PbmLinkSelection {
-  if (
-    selection.pinballmapMachineId !== undefined ||
-    selection.pinballmapExcluded === true
-  ) {
-    return selection;
-  }
-
-  if (stored.pinballmapMachineId !== null) {
-    return {
-      ...selection,
-      pinballmapMachineId: stored.pinballmapMachineId,
-    };
-  }
-
-  if (stored.pinballmapExcluded) {
-    return {
-      ...selection,
-      pinballmapExcluded: true,
-      pinballmapExcludedReason: stored.pinballmapExcludedReason ?? undefined,
-      modelName: stored.modelName ?? undefined,
-      manufacturer: stored.manufacturer ?? undefined,
-      year: stored.year ?? undefined,
-    };
-  }
-
-  return selection;
-}
-
-/**
  * Change a machine's PinballMap link and nothing else — the focused slice of
  * `updateMachineAction`'s PBM logic, for the MCP `set_machine_pinballmap` tool.
  *
@@ -931,6 +886,10 @@ export function carryStoredLinkTarget(
  * re-stated without them keeps the stored reason and hand-entered model
  * ({@link carryExcludedFields}).
  *
+ * Intent-only updates preserve the stored catalog metadata directly without
+ * re-resolving against the catalog mirror, so updating intent succeeds even when
+ * the catalog mirror is unpopulated (`mirror_unpopulated`).
+ *
  * Returns the planned columns, which are also the stored ones: the CAS above is
  * what makes those the same claim, since a write only lands when the basis it
  * was planned against is still the row. `previous` comes from the locked read,
@@ -951,22 +910,69 @@ export async function updateMachinePbmLink({
       return { ok: false, reason: "not_found", message: MACHINE_GONE_MESSAGE };
     }
 
-    const effectiveSelection = carryStoredLinkTarget(
-      carryExcludedFields(selection, basisRow),
-      basisRow
-    );
+    const isIntentOnly =
+      selection.pinballmapMachineId === undefined &&
+      selection.pinballmapExcluded !== true &&
+      selection.intent !== undefined;
 
-    const planned = await planMachinePbmLink({
-      machineId,
-      selection: effectiveSelection,
-      stored: {
-        pinballmapMachineId: basisRow.pinballmapMachineId,
-        pinballmapIntent: basisRow.pinballmapIntent,
-      },
-      presenceStatus: basisRow.presenceStatus,
-    });
-    if (!planned.ok) {
-      return { ok: false, reason: "invalid", message: planned.message };
+    let planned: MachinePbmLinkPlan;
+
+    if (isIntentOnly && selection.intent !== undefined) {
+      if (basisRow.pinballmapExcluded) {
+        return {
+          ok: false,
+          reason: "invalid",
+          message:
+            "Uncataloged (excluded) machines do not participate in Pinball Map sync and cannot have a sync intent.",
+        };
+      }
+      if (basisRow.pinballmapMachineId === null) {
+        return {
+          ok: false,
+          reason: "invalid",
+          message:
+            "A machine must be linked to a Pinball Map title to set lineup intent.",
+        };
+      }
+      if (
+        selection.intent === "on" &&
+        INVALID_WHEN_ON.includes(basisRow.presenceStatus)
+      ) {
+        return {
+          ok: false,
+          reason: "invalid",
+          message: `Blocked by Availability: ${getMachinePresenceLabel(basisRow.presenceStatus)}`,
+        };
+      }
+
+      planned = {
+        columns: {
+          pinballmapMachineId: basisRow.pinballmapMachineId,
+          pinballmapExcluded: false,
+          pinballmapExcludedReason: null,
+          pinballmapIntent: selection.intent,
+          modelName: basisRow.modelName,
+          manufacturer: basisRow.manufacturer,
+          year: basisRow.year,
+          opdbId: basisRow.opdbId,
+          ipdbId: basisRow.ipdbId,
+        },
+        abandoned: null,
+      };
+    } else {
+      const plannedResult = await planMachinePbmLink({
+        machineId,
+        selection: carryExcludedFields(selection, basisRow),
+        stored: {
+          pinballmapMachineId: basisRow.pinballmapMachineId,
+          pinballmapIntent: basisRow.pinballmapIntent,
+        },
+        presenceStatus: basisRow.presenceStatus,
+      });
+      if (!plannedResult.ok) {
+        return { ok: false, reason: "invalid", message: plannedResult.message };
+      }
+      planned = plannedResult.plan;
     }
 
     const outcome = await db.transaction(async (tx) => {
@@ -1000,7 +1006,7 @@ export async function updateMachinePbmLink({
       await applyMachinePbmLink(
         tx,
         machineId,
-        planned.plan,
+        planned,
         actorUserId,
         locked.pinballmapIntent
       );
@@ -1025,7 +1031,7 @@ export async function updateMachinePbmLink({
 
     return {
       ok: true,
-      columns: planned.plan.columns,
+      columns: planned.columns,
       previous: outcome.previous,
     };
   }
