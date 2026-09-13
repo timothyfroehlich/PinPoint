@@ -114,13 +114,36 @@ fi
 # shellcheck disable=SC1091
 source "$(dirname "$0")/_pr-gates.sh"
 
-# --- Authorship gate (no --force bypass) ---
-PR_INFO=$(gh pr view "$PR" --json author,title,url,labels,headRefOid,mergeable)
+# --- PR info (one read, shared by the merged short-circuit and the gates) ---
+PR_INFO=$(gh pr view "$PR" --json author,title,url,labels,headRefOid,mergeable,state,mergedAt,mergeCommit)
 PR_AUTHOR=$(jq -r .author.login <<< "$PR_INFO")
 PR_TITLE=$(jq -r .title <<< "$PR_INFO")
 PR_URL=$(jq -r .url <<< "$PR_INFO")
 PR_LABELS=$(jq -r '.labels | map(.name) | join(",")' <<< "$PR_INFO")
 PR_HEAD_SHA=$(jq -r .headRefOid <<< "$PR_INFO")
+
+# --- Already-merged short-circuit (PP-nii6) ---
+# A merged PR has nothing left to gate. GitHub reports mergeable=UNKNOWN for a
+# merged PR, which the no_conflict gate renders as "still computing" —
+# indistinguishable from a genuinely-pending mergeability check, so the natural
+# next action is to wait and retry a merge that already happened. Detect it up
+# front and exit cleanly, before the authorship gate and all four merge gates.
+# Applies in every mode (one-shot, --automerge, --dry-run).
+PR_STATE=$(jq -r '.state // ""' <<< "$PR_INFO")
+if [ "$PR_STATE" = "MERGED" ]; then
+  PR_MERGED_AT=$(jq -r '.mergedAt // ""' <<< "$PR_INFO")
+  PR_MERGE_COMMIT=$(jq -r '.mergeCommit.oid // ""' <<< "$PR_INFO")
+  # A merged PR always carries both mergedAt and mergeCommit; fall back to a bare
+  # message if either is somehow absent rather than print an empty "( )".
+  suffix=""
+  if [ -n "$PR_MERGED_AT" ] && [ -n "$PR_MERGE_COMMIT" ]; then
+    suffix=" ($PR_MERGED_AT, commit ${PR_MERGE_COMMIT:0:8})"
+  fi
+  echo "PR #$PR is already MERGED$suffix. Nothing to do."
+  exit 0
+fi
+
+# --- Authorship gate (no --force bypass) ---
 CURRENT_USER=$(gh api user --jq .login)
 
 is_trusted_author() {

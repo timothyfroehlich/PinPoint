@@ -1,9 +1,11 @@
-"""Unit tests for merge-pr.sh --automerge.
+"""Unit tests for merge-pr.sh.
 
---automerge polls the gates and merges unattended, so its three terminal states are
-worth pinning down precisely: it must merge when the gates go green, stop when one
-hard-fails, and give up without touching the PR when the budget runs out. A WAIT
-(CI still running, review pending) must never be mistaken for either terminus.
+Most of these pin down `--automerge`, which polls the gates and merges unattended, so
+its three terminal states are worth pinning down precisely: it must merge when the
+gates go green, stop when one hard-fails, and give up without touching the PR when the
+budget runs out. A WAIT (CI still running, review pending) must never be mistaken for
+either terminus. The file also covers behaviour shared by every mode — the authorship
+gate and the already-merged short-circuit — reusing the same `stub_repo` harness.
 
 The whole script runs against a stubbed `gh`, including the real `_pr-gates.sh` it
 sources, so the gate wiring is exercised end to end. `gh pr merge` and `gh pr edit`
@@ -61,6 +63,9 @@ def stub_repo(
     live_labels: list[str] | None = None,
     reap_exit: int = 0,
     compact_head_sha: str = HEAD_SHA,
+    state: str = "OPEN",
+    merged_at: str | None = None,
+    merge_commit: str | None = None,
 ) -> Iterator[dict]:
     """Yield paths + env for a run against a fully stubbed `gh`.
 
@@ -88,6 +93,9 @@ def stub_repo(
                 "labels": [{"name": n} for n in (labels or [])],
                 "headRefOid": HEAD_SHA,
                 "mergeable": "MERGEABLE",
+                "state": state,
+                "mergedAt": merged_at,
+                "mergeCommit": {"oid": merge_commit} if merge_commit else None,
             }
         )
         reviews = json.dumps(
@@ -509,3 +517,84 @@ def test_one_shot_path_is_unchanged_by_the_refactor() -> None:
     assert "AUTOMERGE" not in out.stdout
     assert not out.merged
     assert out.label_removed, "one-shot still drops the label on a blocked gate"
+
+
+# ---------------------------------------------------------------------------
+# PP-nii6: an already-merged PR must short-circuit before any gate runs, in every
+# mode. See merge-pr.sh for the why (mergeable=UNKNOWN reads as a pending conflict
+# check, making a merged PR look one retry away from a merge that already happened).
+# ---------------------------------------------------------------------------
+def test_already_merged_pr_short_circuits_before_any_gate() -> None:
+    """CI is stubbed RED to prove the gates never run: a reached RED gate would
+    exit 1 and strip the label. The run must instead exit 0 having touched
+    nothing."""
+    with stub_repo(
+        ci_rollup=CI_RED,
+        labels=["ready-for-review"],
+        state="MERGED",
+        merged_at="2026-07-26T02:08:04Z",
+        merge_commit="767862dc0000000000000000000000000000abcd",
+    ) as ctx:
+        out = run_and_snapshot(ctx, "--human")
+
+    assert out.returncode == 0, out.stdout + out.stderr
+    assert "is already MERGED" in out.stdout
+    assert "2026-07-26T02:08:04Z" in out.stdout
+    assert "767862dc" in out.stdout
+    assert "Nothing to do." in out.stdout
+    assert not out.merged, "must not attempt a merge on an already-merged PR"
+    assert not out.label_removed, "must not touch the PR"
+    # No gate ran: no CI rollup, no threads graphql, no reviews, no lone
+    # mergeability read — and the short-circuit precedes the authorship gate's
+    # `gh api user`.
+    assert not any("statusCheckRollup" in c for c in out.gh_calls), out.gh_calls
+    assert not any("graphql" in c for c in out.gh_calls), out.gh_calls
+    assert not any(c.rstrip().endswith("/reviews") for c in out.gh_calls), out.gh_calls
+    assert not any(c.startswith("api user") for c in out.gh_calls), out.gh_calls
+
+
+def test_already_merged_short_circuit_applies_to_dry_run() -> None:
+    """The short-circuit is mode-independent: --dry-run reports it too."""
+    with stub_repo(
+        ci_rollup=CI_RED,
+        state="MERGED",
+        merged_at="2026-07-26T02:08:04Z",
+        merge_commit="767862dc0000000000000000000000000000abcd",
+    ) as ctx:
+        out = run_and_snapshot(ctx, "--dry-run")
+
+    assert out.returncode == 0, out.stdout + out.stderr
+    assert "is already MERGED" in out.stdout
+    assert "Nothing to do." in out.stdout
+    assert "DRY RUN" not in out.stdout, "should exit before the dry-run gate report"
+    assert not out.merged
+
+
+def test_already_merged_short_circuit_applies_to_automerge() -> None:
+    """The short-circuit precedes the mode branch, so --automerge exits at once
+    rather than polling the gates of a PR that is already merged."""
+    with stub_repo(
+        ci_rollup=CI_RED,
+        labels=["ready-for-review"],
+        state="MERGED",
+        merged_at="2026-07-26T02:08:04Z",
+        merge_commit="767862dc0000000000000000000000000000abcd",
+    ) as ctx:
+        out = run_and_snapshot(ctx, "--human", "--automerge")
+
+    assert out.returncode == 0, out.stdout + out.stderr
+    assert "is already MERGED" in out.stdout
+    assert "AUTOMERGE" not in out.stdout, "must exit before the automerge loop"
+    assert not out.merged
+    assert not out.label_removed
+
+
+def test_already_merged_message_degrades_when_merge_metadata_is_missing() -> None:
+    """A MERGED state with no mergedAt/mergeCommit still exits 0 with a clear
+    message rather than an empty parenthetical or a pipefail crash."""
+    with stub_repo(ci_rollup=CI_RED, state="MERGED") as ctx:
+        out = run_and_snapshot(ctx, "--human")
+
+    assert out.returncode == 0, out.stdout + out.stderr
+    assert "PR #123 is already MERGED. Nothing to do." in out.stdout
+    assert not out.merged
