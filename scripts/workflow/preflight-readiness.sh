@@ -116,15 +116,30 @@ if [[ "$database_url" != postgres://* && "$database_url" != postgresql://* ]]; t
     "Run: python3 scripts/worktree_setup.py" >&2
   exit 1
 fi
-database_target="${database_url#*://}"
-database_target="${database_target#*@}"
-database_target="${database_target%%/*}"
+database_connection="${database_url#*://}"
+database_connection="${database_connection#*@}"
+database_target="${database_connection%%/*}"
 database_target="${database_target%%\?*}"
 
 if [[ ! "$database_target" =~ ^localhost:[0-9]+$ ]]; then
   printf '%s\n' \
     "FAIL: preflight readiness — POSTGRES_URL is not a localhost worktree database" \
     "Run: python3 scripts/worktree_setup.py" >&2
+  exit 1
+fi
+
+database_name_and_query="${database_connection#*/}"
+database_name="${database_name_and_query%%\?*}"
+if [[ "$database_connection" != */* || "$database_name" != "postgres" ]]; then
+  if [[ "$stack_overridden" == true ]]; then
+    printf '%s\n' \
+      "FAIL: preflight readiness — local stack overrides do not identify one worktree stack" \
+      "Run: unset POSTGRES_URL POSTGRES_URL_NON_POOLING NEXT_PUBLIC_SUPABASE_URL" >&2
+  else
+    printf '%s\n' \
+      "FAIL: preflight readiness — local stack configuration does not identify one worktree stack" \
+      "Run: python3 scripts/worktree_setup.py" >&2
+  fi
   exit 1
 fi
 
