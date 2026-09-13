@@ -21,6 +21,7 @@ def _run_readiness(
     *args: str,
     database_url_override: str | None = None,
     non_pooling_url_override: str | None = None,
+    supabase_url_override: str | None = None,
 ) -> subprocess.CompletedProcess[str]:
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
@@ -63,6 +64,8 @@ fi
         env["POSTGRES_URL"] = database_url_override
     if non_pooling_url_override is not None:
         env["POSTGRES_URL_NON_POOLING"] = non_pooling_url_override
+    if supabase_url_override is not None:
+        env["NEXT_PUBLIC_SUPABASE_URL"] = supabase_url_override
     return subprocess.run(
         ["/bin/bash", str(READINESS_SCRIPT), *args],
         cwd=tmp_path,
@@ -164,6 +167,7 @@ def test_explicit_database_url_overrides_dotenv_target(tmp_path: Path) -> None:
         non_pooling_url_override=(
             "postgresql://postgres:postgres@localhost:62345/postgres"
         ),
+        supabase_url_override="http://localhost:62344",
     )
 
     assert result.returncode == 0
@@ -186,7 +190,7 @@ def test_explicit_empty_database_url_is_not_replaced_from_dotenv(
     assert result.stdout == ""
     assert result.stderr.splitlines() == [
         "FAIL: preflight readiness — POSTGRES_URL is explicitly empty",
-        "Run: unset POSTGRES_URL POSTGRES_URL_NON_POOLING",
+        "Run: unset POSTGRES_URL POSTGRES_URL_NON_POOLING NEXT_PUBLIC_SUPABASE_URL",
     ]
 
 
@@ -207,8 +211,8 @@ def test_explicit_database_override_requires_matching_non_pooling_url(
     assert result.returncode == 1
     assert result.stdout == ""
     assert result.stderr.splitlines() == [
-        "FAIL: preflight readiness — database URL overrides must be defined together and match",
-        'Run: export POSTGRES_URL_NON_POOLING="$POSTGRES_URL"',
+        "FAIL: preflight readiness — local stack overrides must be defined together and match",
+        "Run: unset POSTGRES_URL POSTGRES_URL_NON_POOLING NEXT_PUBLIC_SUPABASE_URL",
     ]
 
 
@@ -226,8 +230,47 @@ def test_non_pooling_only_override_is_preserved_and_rejected(
     assert result.returncode == 1
     assert result.stdout == ""
     assert result.stderr.splitlines() == [
-        "FAIL: preflight readiness — database URL overrides must be defined together and match",
-        'Run: export POSTGRES_URL="$POSTGRES_URL_NON_POOLING"',
+        "FAIL: preflight readiness — local stack overrides must be defined together and match",
+        "Run: unset POSTGRES_URL POSTGRES_URL_NON_POOLING NEXT_PUBLIC_SUPABASE_URL",
+    ]
+
+
+def test_database_overrides_without_supabase_endpoint_are_rejected(
+    tmp_path: Path,
+) -> None:
+    database_url = "postgresql://postgres:postgres@localhost:62345/postgres"
+    result = _run_readiness(
+        tmp_path,
+        "ready",
+        database_url_override=database_url,
+        non_pooling_url_override=database_url,
+    )
+
+    assert result.returncode == 1
+    assert result.stdout == ""
+    assert result.stderr.splitlines() == [
+        "FAIL: preflight readiness — local stack overrides must be defined together and match",
+        "Run: unset POSTGRES_URL POSTGRES_URL_NON_POOLING NEXT_PUBLIC_SUPABASE_URL",
+    ]
+
+
+def test_stack_override_requires_adjacent_api_and_database_ports(
+    tmp_path: Path,
+) -> None:
+    database_url = "postgresql://postgres:postgres@localhost:62345/postgres"
+    result = _run_readiness(
+        tmp_path,
+        "ready",
+        database_url_override=database_url,
+        non_pooling_url_override=database_url,
+        supabase_url_override="http://localhost:61233",
+    )
+
+    assert result.returncode == 1
+    assert result.stdout == ""
+    assert result.stderr.splitlines() == [
+        "FAIL: preflight readiness — local stack overrides do not identify one worktree stack",
+        "Run: unset POSTGRES_URL POSTGRES_URL_NON_POOLING NEXT_PUBLIC_SUPABASE_URL",
     ]
 
 
@@ -376,6 +419,7 @@ printf '%s\n' "$PARALLEL_HOME"
     env["XDG_STATE_HOME"] = str(state_root)
     env["POSTGRES_URL"] = "postgresql://postgres:postgres@localhost:61234/postgres"
     env["POSTGRES_URL_NON_POOLING"] = env["POSTGRES_URL"]
+    env["NEXT_PUBLIC_SUPABASE_URL"] = "http://localhost:61233"
     script = REPO_ROOT / "scripts" / "workflow" / "preflight-locked.sh"
 
     result = subprocess.run(

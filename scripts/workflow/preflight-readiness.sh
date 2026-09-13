@@ -30,6 +30,11 @@ non_pooling_url_override="${POSTGRES_URL_NON_POOLING-}"
 if [[ ${POSTGRES_URL_NON_POOLING+x} == x ]]; then
   non_pooling_url_was_defined=true
 fi
+supabase_url_was_defined=false
+supabase_url_override="${NEXT_PUBLIC_SUPABASE_URL-}"
+if [[ ${NEXT_PUBLIC_SUPABASE_URL+x} == x ]]; then
+  supabase_url_was_defined=true
+fi
 
 # shellcheck source=/dev/null
 source .env.local 2>/dev/null || true
@@ -39,26 +44,30 @@ fi
 if [[ "$non_pooling_url_was_defined" == true ]]; then
   POSTGRES_URL_NON_POOLING="$non_pooling_url_override"
 fi
+if [[ "$supabase_url_was_defined" == true ]]; then
+  NEXT_PUBLIC_SUPABASE_URL="$supabase_url_override"
+fi
 
 database_url="${POSTGRES_URL:-}"
 remediation="supabase start && pnpm run db:migrate"
-database_url_overridden=false
+stack_overridden=false
 if [[ "$postgres_url_was_defined" == true \
-  || "$non_pooling_url_was_defined" == true ]]; then
-  database_url_overridden=true
+  || "$non_pooling_url_was_defined" == true \
+  || "$supabase_url_was_defined" == true ]]; then
+  stack_overridden=true
 fi
 
 if [[ -z "$database_url" ]]; then
   if [[ "$postgres_url_was_defined" == true ]]; then
     printf '%s\n' \
       "FAIL: preflight readiness — POSTGRES_URL is explicitly empty" \
-      "Run: unset POSTGRES_URL POSTGRES_URL_NON_POOLING" >&2
+      "Run: unset POSTGRES_URL POSTGRES_URL_NON_POOLING NEXT_PUBLIC_SUPABASE_URL" >&2
     exit 1
   fi
   if [[ "$non_pooling_url_was_defined" == true ]]; then
     printf '%s\n' \
-      "FAIL: preflight readiness — database URL overrides must be defined together and match" \
-      "Run: export POSTGRES_URL=\"\$POSTGRES_URL_NON_POOLING\"" >&2
+      "FAIL: preflight readiness — local stack overrides must be defined together and match" \
+      "Run: unset POSTGRES_URL POSTGRES_URL_NON_POOLING NEXT_PUBLIC_SUPABASE_URL" >&2
     exit 1
   fi
   printf '%s\n' \
@@ -67,17 +76,14 @@ if [[ -z "$database_url" ]]; then
   exit 1
 fi
 
-if [[ "$database_url_overridden" == true \
+if [[ "$stack_overridden" == true \
   && ( "$postgres_url_was_defined" != true \
     || "$non_pooling_url_was_defined" != true \
+    || "$supabase_url_was_defined" != true \
     || "${POSTGRES_URL_NON_POOLING:-}" != "$database_url" ) ]]; then
-  override_remediation="export POSTGRES_URL_NON_POOLING=\"\$POSTGRES_URL\""
-  if [[ "$postgres_url_was_defined" != true ]]; then
-    override_remediation="export POSTGRES_URL=\"\$POSTGRES_URL_NON_POOLING\""
-  fi
   printf '%s\n' \
-    "FAIL: preflight readiness — database URL overrides must be defined together and match" \
-    "Run: ${override_remediation}" >&2
+    "FAIL: preflight readiness — local stack overrides must be defined together and match" \
+    "Run: unset POSTGRES_URL POSTGRES_URL_NON_POOLING NEXT_PUBLIC_SUPABASE_URL" >&2
   exit 1
 fi
 
@@ -94,9 +100,26 @@ if [[ "$database_target" != localhost:* ]]; then
   exit 1
 fi
 
+if [[ "$stack_overridden" == true ]]; then
+  supabase_target="${NEXT_PUBLIC_SUPABASE_URL#*://}"
+  supabase_target="${supabase_target%%/*}"
+  supabase_target="${supabase_target%%\?*}"
+  database_port="${database_target##*:}"
+  supabase_port="${supabase_target##*:}"
+  if [[ "$supabase_target" != localhost:* \
+    || ! "$database_port" =~ ^[0-9]+$ \
+    || ! "$supabase_port" =~ ^[0-9]+$ ]] \
+    || (( 10#$database_port != 10#$supabase_port + 1 )); then
+    printf '%s\n' \
+      "FAIL: preflight readiness — local stack overrides do not identify one worktree stack" \
+      "Run: unset POSTGRES_URL POSTGRES_URL_NON_POOLING NEXT_PUBLIC_SUPABASE_URL" >&2
+    exit 1
+  fi
+fi
+
 availability_remediation="$remediation"
 divergence_remediation="pnpm run db:reset"
-if [[ "$database_url_overridden" == true ]]; then
+if [[ "$stack_overridden" == true ]]; then
   remediation="pnpm run db:migrate"
   availability_remediation="start the local Supabase stack that owns ${database_target}"
   divergence_remediation="reset ${database_target} from its owning worktree"
