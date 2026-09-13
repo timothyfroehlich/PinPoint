@@ -915,7 +915,7 @@ export async function updateMachinePbmLink({
       selection.pinballmapExcluded !== true &&
       selection.intent !== undefined;
 
-    let planned: MachinePbmLinkPlan;
+    let planned: MachinePbmLinkPlan | null = null;
 
     if (isIntentOnly && selection.intent !== undefined) {
       if (basisRow.pinballmapExcluded) {
@@ -944,21 +944,6 @@ export async function updateMachinePbmLink({
           message: `Blocked by Availability: ${getMachinePresenceLabel(basisRow.presenceStatus)}`,
         };
       }
-
-      planned = {
-        columns: {
-          pinballmapMachineId: basisRow.pinballmapMachineId,
-          pinballmapExcluded: false,
-          pinballmapExcludedReason: null,
-          pinballmapIntent: selection.intent,
-          modelName: basisRow.modelName,
-          manufacturer: basisRow.manufacturer,
-          year: basisRow.year,
-          opdbId: basisRow.opdbId,
-          ipdbId: basisRow.ipdbId,
-        },
-        abandoned: null,
-      };
     } else {
       const plannedResult = await planMachinePbmLink({
         machineId,
@@ -1003,15 +988,45 @@ export async function updateMachinePbmLink({
         return { state: "stale" } as const;
       }
 
-      await applyMachinePbmLink(
-        tx,
-        machineId,
-        planned,
-        actorUserId,
-        locked.pinballmapIntent
-      );
+      if (isIntentOnly && selection.intent !== undefined) {
+        await tx
+          .update(machines)
+          .set({ pinballmapIntent: selection.intent })
+          .where(eq(machines.id, machineId));
+
+        if (locked.pinballmapIntent !== selection.intent) {
+          await createMachineTimelineEvent(
+            machineId,
+            {
+              sourceType: "lifecycle",
+              tag: "lifecycle",
+              eventData: {
+                kind: "pinballmap_intent",
+                intent: selection.intent,
+              },
+              actorId: actorUserId,
+            },
+            tx
+          );
+        }
+      } else if (planned) {
+        await applyMachinePbmLink(
+          tx,
+          machineId,
+          planned,
+          actorUserId,
+          locked.pinballmapIntent
+        );
+      }
+
       const { presenceStatus: _presence, ...previous } = locked;
-      return { state: "applied", previous } as const;
+      const columns =
+        isIntentOnly && selection.intent !== undefined
+          ? { ...previous, pinballmapIntent: selection.intent }
+          : planned
+            ? planned.columns
+            : previous;
+      return { state: "applied", previous, columns } as const;
     });
 
     if (outcome.state === "gone") {
@@ -1031,7 +1046,7 @@ export async function updateMachinePbmLink({
 
     return {
       ok: true,
-      columns: planned.columns,
+      columns: outcome.columns,
       previous: outcome.previous,
     };
   }
