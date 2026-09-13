@@ -10,6 +10,7 @@
  * - Forgot Password: 3 requests per email per hour
  * - Public Issue (anonymous): 5 submissions per IP per 15 min
  * - Authenticated Issue: 20 submissions per user per 15 min
+ * - MCP: 120 authenticated requests/minute and 20 mutations/minute per user+client
  *
  * @see https://github.com/timothyfroehlich/PinPoint/issues/536
  * @see https://github.com/timothyfroehlich/PinPoint/issues/537
@@ -220,6 +221,30 @@ function createImageUploadLimiter(): Ratelimit | null {
   });
 }
 
+function createMcpRequestLimiter(): Ratelimit | null {
+  const redis = getRedis();
+  if (!redis) return null;
+
+  return new Ratelimit({
+    redis,
+    limiter: Ratelimit.slidingWindow(120, "1 m"),
+    prefix: "ratelimit:mcp:request",
+    analytics: true,
+  });
+}
+
+function createMcpWriteLimiter(): Ratelimit | null {
+  const redis = getRedis();
+  if (!redis) return null;
+
+  return new Ratelimit({
+    redis,
+    limiter: Ratelimit.slidingWindow(20, "1 m"),
+    prefix: "ratelimit:mcp:write",
+    analytics: true,
+  });
+}
+
 /**
  * Whether a limit bucket is keyed by client IP, account email, or user ID.
  * IP-keyed checks apply the "unknown IP" handling; email-keyed checks
@@ -408,6 +433,18 @@ export const checkImageUploadLimit = makeLimitChecker(
     keyType: "ip",
   }
 );
+
+/** Check the aggregate authenticated MCP transport budget for a user+client. */
+export const checkMcpRequestLimit = makeLimitChecker(createMcpRequestLimiter, {
+  label: "MCP request",
+  keyType: "user",
+});
+
+/** Check the narrower mutation budget for a user+OAuth-client key. */
+export const checkMcpWriteLimit = makeLimitChecker(createMcpWriteLimiter, {
+  label: "MCP write",
+  keyType: "user",
+});
 
 /**
  * Check signup rate limit (IP-based)

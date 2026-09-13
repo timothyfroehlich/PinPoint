@@ -15,7 +15,8 @@
  * - Editing always requires BOTH view and edit rights.
  */
 
-import { type AccessLevel } from "~/lib/permissions/matrix";
+import { checkPermission } from "./helpers";
+import { type AccessLevel } from "./matrix";
 
 /** The minimal per-set facts the authorization rules need. */
 export interface SettingsSetAuth {
@@ -25,8 +26,18 @@ export interface SettingsSetAuth {
   createdById: string | null;
 }
 
-const isTechPlus = (access: AccessLevel): boolean =>
-  access === "technician" || access === "admin"; // permissions-audit-allow: per-set authorization matrix logic
+const isAdmin = (access: AccessLevel): boolean =>
+  checkPermission("admin.access", access);
+
+const canManageMachineSettings = (
+  machineOwnerId: string | null,
+  viewerId: string | null,
+  access: AccessLevel
+): boolean =>
+  checkPermission("machines.settings.manage", access, {
+    userId: viewerId ?? undefined,
+    machineOwnerId,
+  });
 
 const isMachineOwner = (
   machineOwnerId: string | null,
@@ -42,7 +53,7 @@ export function canViewSet(
   viewerId: string | null,
   access: AccessLevel
 ): boolean {
-  if (set.isPublic || set.isPreferred || access === "admin") return true; // permissions-audit-allow: per-set authorization matrix logic
+  if (set.isPublic || set.isPreferred || isAdmin(access)) return true;
   return set.createdById !== null && set.createdById === viewerId;
 }
 
@@ -57,15 +68,20 @@ export function canEditSet(
   access: AccessLevel
 ): boolean {
   if (!canViewSet(set, viewerId, access)) return false;
-  if (access === "admin") return true; // permissions-audit-allow: per-set authorization matrix logic
+  if (isAdmin(access)) return true;
   if (isMachineOwner(machineOwnerId, viewerId)) return true;
   // An owner set on a machine with NO owner has nobody to protect it for — the
   // 0060 backfill turns every pre-existing preferred set into an owner set,
   // including those on unowned machines, which would otherwise leave them
   // admin-only. Fall back to community rules there so technicians keep them.
-  if (machineOwnerId === null) return isTechPlus(access);
+  if (machineOwnerId === null) {
+    return canManageMachineSettings(machineOwnerId, viewerId, access);
+  }
   // Community sets only: technicians+ co-edit. Owner sets stay protected.
-  return !set.isOwnerSet && isTechPlus(access);
+  return (
+    !set.isOwnerSet &&
+    canManageMachineSettings(machineOwnerId, viewerId, access)
+  );
 }
 
 /**
@@ -79,7 +95,7 @@ export function canSetOwnerDefault(
   access: AccessLevel
 ): boolean {
   if (!set.isOwnerSet) return false;
-  return access === "admin" || isMachineOwner(machineOwnerId, viewerId); // permissions-audit-allow: per-set authorization matrix logic
+  return isAdmin(access) || isMachineOwner(machineOwnerId, viewerId);
 }
 
 /** Publishing (public toggle) needs the same rights as editing. */

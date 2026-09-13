@@ -43,6 +43,27 @@ export const authUsers = authSchema.table("users", {
 });
 
 /**
+ * OAuth clients allowed to use PinPoint's write-capable MCP resource.
+ *
+ * Supabase owns OAuth client registration in auth.oauth_clients. This smaller
+ * application-owned allowlist binds an approved client id to the exact RFC 9728
+ * resource audience PinPoint accepts. The custom access-token hook consults it
+ * when issuing OAuth tokens; the MCP verifier checks it again on every request.
+ */
+export const mcpOauthClients = pgTable("mcp_oauth_clients", {
+  clientId: text("client_id").primaryKey(),
+  name: text("name").notNull(),
+  audience: text("audience").notNull(),
+  enabled: boolean("enabled").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+/**
  * User Profiles Table
  *
  * The id column references auth.users(id) from Supabase Auth (enforced by database FK).
@@ -821,7 +842,7 @@ export const machineSettingsSets = pgTable(
     // The machine owner's canonical set. Exactly one per machine (partial
     // unique index below). Always an owner set + public.
     isPreferred: boolean("is_preferred").notNull().default(false),
-    // Kind (drives who may EDIT — see ~/lib/machines/settings-permissions):
+    // Kind (drives who may EDIT — see ~/lib/permissions/settings):
     // true = owner set (created by the machine owner; only owner + admin edit,
     // protected from techs). false = community set (co-edited by technicians+
     // and the machine owner). Captured at creation; stored not derived, so it

@@ -16,6 +16,7 @@ import {
   resolveOwner,
   runTool,
   type ToolOutcome,
+  WRITE_TOOL_ANNOTATIONS,
 } from "./shared";
 import type { McpAuthContext } from "~/lib/mcp/verify-token";
 
@@ -99,10 +100,14 @@ export function registerSetMachineOwner(server: McpServer): void {
       description:
         "Set or clear a machine's owner. Identify the machine by initials or UUID; give the owner as a member's full name or UUID, or omit to clear ownership. Guests must be promoted to member first.",
       inputSchema: setOwnerSchema,
+      annotations: WRITE_TOOL_ANNOTATIONS,
     },
     (args, extra) =>
-      runTool("set_machine_owner", extra, (ctx) =>
-        runSetMachineOwner(args, ctx)
+      runTool(
+        "set_machine_owner",
+        extra,
+        (ctx) => runSetMachineOwner(args, ctx),
+        { mutates: true }
       )
   );
 }
