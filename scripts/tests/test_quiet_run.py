@@ -224,6 +224,9 @@ printf '%s\\n' "$@"
     fake_pg_isready = fake_bin / "pg_isready"
     fake_pg_isready.write_text("#!/bin/bash\nexit 0\n")
     fake_pg_isready.chmod(0o755)
+    fake_curl = fake_bin / "curl"
+    fake_curl.write_text("#!/bin/bash\nexit 0\n")
+    fake_curl.chmod(0o755)
     fake_psql = fake_bin / "psql"
     fake_psql.write_text(
         "#!/bin/bash\n"
