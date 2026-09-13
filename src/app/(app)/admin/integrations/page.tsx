@@ -38,7 +38,7 @@ export default async function AdminIntegrationsPage(): Promise<React.JSX.Element
         <PageHeader title="Integrations" />
 
         <div className="flex flex-col gap-6">
-          <Card>
+          <Card data-testid="discord-integration-card">
             <CardHeader>
               <CardTitle>Discord</CardTitle>
               <CardDescription>Bot notifications.</CardDescription>
@@ -61,7 +61,7 @@ export default async function AdminIntegrationsPage(): Promise<React.JSX.Element
             </CardContent>
           </Card>
 
-          <Card>
+          <Card data-testid="pinballmap-integration-card">
             <CardHeader>
               <CardTitle>Pinball Map</CardTitle>
               <CardDescription>
