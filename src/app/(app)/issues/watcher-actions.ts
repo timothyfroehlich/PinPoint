@@ -1,42 +1,27 @@
 "use server";
 
+import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
-import { createClient } from "~/lib/supabase/server";
-import { serverActionError } from "~/lib/observability/report-error";
-import { type Result, ok, err } from "~/lib/result";
+import { z } from "zod";
+
+import {
+  createProtectedAction,
+  type ProtectedActionResult,
+} from "~/lib/actions";
+import { ok } from "~/lib/result";
 import { toggleIssueWatcher } from "~/services/issues";
 import { db } from "~/server/db";
-import { issues, userProfiles } from "~/server/db/schema";
-import { eq } from "drizzle-orm";
-import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
+import { issues } from "~/server/db/schema";
 
-export type ToggleWatcherResult = Result<
-  { isWatching: boolean },
-  "UNAUTHORIZED" | "SERVER"
->;
+export type ToggleWatcherResult = ProtectedActionResult<{
+  isWatching: boolean;
+}>;
 
-export async function toggleWatcherAction(
-  issueId: string
-): Promise<ToggleWatcherResult> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return err("UNAUTHORIZED", "Unauthorized");
-  }
-
-  try {
-    const userProfile = await db.query.userProfiles.findFirst({
-      where: eq(userProfiles.id, user.id),
-      columns: { role: true },
-    });
-
-    if (!checkPermission("issues.watch", getAccessLevel(userProfile?.role))) {
-      return err("UNAUTHORIZED", "You do not have permission to watch issues");
-    }
-
+const toggleWatcher = createProtectedAction({
+  actionName: "toggleWatcherAction",
+  schema: z.string().uuid(),
+  permission: "issues.watch",
+  handler: async (issueId, { user }) => {
     const result = await toggleIssueWatcher({ issueId, userId: user.id });
 
     const issue = await db.query.issues.findFirst({
@@ -49,9 +34,11 @@ export async function toggleWatcherAction(
     }
 
     return ok(result);
-  } catch (error) {
-    return serverActionError(error, "SERVER", "Failed to toggle watcher", {
-      action: "toggleWatcher",
-    });
-  }
+  },
+});
+
+export async function toggleWatcherAction(
+  issueId: string
+): Promise<ToggleWatcherResult> {
+  return await toggleWatcher(issueId);
 }
