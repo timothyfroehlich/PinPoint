@@ -1024,6 +1024,21 @@ function resolveSegment(words, out, depth, options) {
     // nightly twice when this read as running merge-pr.sh.
     const opts = walkShellOptions(argWords);
     if (opts.noexec) {
+      // The literal flags say noexec, but a dynamic word anywhere up to and
+      // including the first operand can expand to `+n` (or be `+o` value
+      // `noexec`, or hide the real script) and turn execution back on. That
+      // is unresolvable, not "noexec, allow" (Codex review on PP-mslx).
+      const optionSpan =
+        opts.operandIdx === -1
+          ? argWords
+          : argWords.slice(0, opts.operandIdx + 1);
+      if (optionSpan.some((w) => w.dynamic)) {
+        out.unresolvable.push({
+          reason: "shell-option-dynamic",
+          text: `${name} ${optionSpan.map((w) => w.value).join(" ")}`.trim(),
+        });
+        return;
+      }
       pushSegment(out, cmdWord.value, argWords, slot.appendsDynamicArgs);
       return;
     }

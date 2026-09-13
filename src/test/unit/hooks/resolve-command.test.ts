@@ -671,6 +671,40 @@ describe("unresolvable", () => {
     ).toContain("shell-c-dynamic");
   });
 
+  it("reports a dynamic word in a noexec shell's option span (PP-mslx)", () => {
+    // `FLAGS=+n; bash -n $FLAGS script` runs the script — the expansion can
+    // switch noexec back off, so the literal `-n` proves nothing. Anything
+    // dynamic up to and including the first operand makes the shell state
+    // unresolvable rather than "noexec, allow".
+    for (const cmd of [
+      "bash -n $FLAGS scripts/workflow/merge-pr.sh 123 --human",
+      "bash -n +o $OPT scripts/workflow/merge-pr.sh 123",
+      "bash -n $SCRIPT",
+      "bash -n $(pick-flags) scripts/workflow/merge-pr.sh 123",
+    ]) {
+      const { segments, unresolvable } = resolveCommand(cmd);
+      // (a `$(…)` in the span still contributes its own inner segment)
+      expect(
+        segments.map((s) => s.name),
+        cmd
+      ).not.toContain("merge-pr.sh");
+      expect(
+        segments.map((s) => s.name),
+        cmd
+      ).not.toContain("bash");
+      expect(
+        unresolvable.map((u) => u.reason),
+        cmd
+      ).toContain("shell-option-dynamic");
+    }
+    // A dynamic word AFTER the script is the script's argument: still noexec.
+    expect(
+      resolveCommand("bash -n scripts/workflow/merge-pr.sh $ARG").segments.map(
+        (s) => s.name
+      )
+    ).toEqual(["bash"]);
+  });
+
   it("reports a substituted command slot", () => {
     expect(
       resolveCommand("$(pick-tool) pr merge 1").unresolvable.map(
