@@ -22,12 +22,17 @@ def _run_readiness(
     database_url_override: str | None = None,
     non_pooling_url_override: str | None = None,
     supabase_url_override: str | None = None,
+    dotenv_extra: str = "",
 ) -> subprocess.CompletedProcess[str]:
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     _write_executable(
         bin_dir / "pg_isready",
         '[[ "$STUB_MODE" == "unreachable" ]] && exit 1\nexit 0\n',
+    )
+    _write_executable(
+        bin_dir / "curl",
+        '[[ "$STUB_MODE" == "api_unreachable" ]] && exit 1\nexit 0\n',
     )
     _write_executable(
         bin_dir / "psql",
@@ -63,6 +68,9 @@ fi
     )
     (tmp_path / ".env.local").write_text(
         "POSTGRES_URL=postgresql://postgres:postgres@localhost:61234/postgres\n"
+        "POSTGRES_URL_NON_POOLING=postgresql://postgres:postgres@localhost:61234/postgres\n"
+        "NEXT_PUBLIC_SUPABASE_URL=http://localhost:61233\n"
+        f"{dotenv_extra}"
     )
     env = os.environ.copy()
     env["PATH"] = f"{bin_dir}{os.pathsep}{env['PATH']}"
@@ -108,6 +116,31 @@ def test_uninitialized_database_fails_fast_with_port_and_one_remediation(
         "FAIL: preflight readiness — Postgres at localhost:61234 is not migrated",
         "Run: supabase start && pnpm run db:migrate",
     ]
+
+
+def test_unavailable_supabase_api_fails_before_schema_inspection(
+    tmp_path: Path,
+) -> None:
+    result = _run_readiness(tmp_path, "api_unreachable")
+
+    assert result.returncode == 1
+    assert result.stdout == ""
+    assert result.stderr.splitlines() == [
+        "FAIL: preflight readiness — Supabase Auth is unavailable at localhost:61233",
+        "Run: supabase start && pnpm run db:migrate",
+    ]
+
+
+def test_dotenv_values_are_parsed_without_shell_execution(tmp_path: Path) -> None:
+    marker = tmp_path / "dotenv-command-ran"
+    result = _run_readiness(
+        tmp_path,
+        "ready",
+        dotenv_extra=f"CUSTOM=$(touch {marker})\n",
+    )
+
+    assert result.returncode == 0
+    assert not marker.exists()
 
 
 def test_database_missing_current_migration_hash_fails_fast(
@@ -437,6 +470,7 @@ def test_locked_preflight_uses_writable_shared_semaphore_state(
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     _write_executable(bin_dir / "pg_isready", "exit 0\n")
+    _write_executable(bin_dir / "curl", "exit 0\n")
     _write_executable(
         bin_dir / "psql",
         "[[ \"$*\" == *\"WITH expected\"* ]] && printf 'ready\\n' || printf 't\\n'\n",

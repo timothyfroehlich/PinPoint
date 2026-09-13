@@ -18,37 +18,59 @@ if [[ $# -ne 0 ]]; then
   exit 64
 fi
 
-# Match Node's --env-file behavior for both database selectors: load worktree
-# defaults, then restore every value the caller defined (including empty ones).
+# Match Node's --env-file behavior for the stack selectors without executing
+# arbitrary dotenv values as shell code. Existing environment values, including
+# empty ones, take precedence automatically.
 postgres_url_was_defined=false
-postgres_url_override="${POSTGRES_URL-}"
 if [[ ${POSTGRES_URL+x} == x ]]; then
   postgres_url_was_defined=true
 fi
 non_pooling_url_was_defined=false
-non_pooling_url_override="${POSTGRES_URL_NON_POOLING-}"
 if [[ ${POSTGRES_URL_NON_POOLING+x} == x ]]; then
   non_pooling_url_was_defined=true
 fi
 supabase_url_was_defined=false
-supabase_url_override="${NEXT_PUBLIC_SUPABASE_URL-}"
 if [[ ${NEXT_PUBLIC_SUPABASE_URL+x} == x ]]; then
   supabase_url_was_defined=true
 fi
 
-# shellcheck source=/dev/null
-source .env.local 2>/dev/null || true
-if [[ "$postgres_url_was_defined" == true ]]; then
-  POSTGRES_URL="$postgres_url_override"
-fi
-if [[ "$non_pooling_url_was_defined" == true ]]; then
-  POSTGRES_URL_NON_POOLING="$non_pooling_url_override"
-fi
-if [[ "$supabase_url_was_defined" == true ]]; then
-  NEXT_PUBLIC_SUPABASE_URL="$supabase_url_override"
+dotenv_postgres_url="${POSTGRES_URL-}"
+dotenv_non_pooling_url="${POSTGRES_URL_NON_POOLING-}"
+dotenv_supabase_url="${NEXT_PUBLIC_SUPABASE_URL-}"
+if [[ -f .env.local ]]; then
+  dotenv_load_status=""
+  {
+    IFS= read -r dotenv_postgres_url || true
+    IFS= read -r dotenv_non_pooling_url || true
+    IFS= read -r dotenv_supabase_url || true
+    IFS= read -r dotenv_load_status || true
+  } < <(
+    # JavaScript template literals expand in Node, not Bash.
+    # shellcheck disable=SC2016
+    node --env-file=.env.local -e '
+      for (const key of [
+        "POSTGRES_URL",
+        "POSTGRES_URL_NON_POOLING",
+        "NEXT_PUBLIC_SUPABASE_URL",
+      ]) {
+        process.stdout.write(`${process.env[key] ?? ""}\n`);
+      }
+      process.stdout.write("pinpoint-env-ready\n");
+    ' 2>/dev/null || true
+  )
+  if [[ "$dotenv_load_status" != "pinpoint-env-ready" ]]; then
+    printf '%s\n' \
+      "FAIL: preflight readiness — .env.local is unreadable" \
+      "Run: python3 scripts/worktree_setup.py" >&2
+    exit 1
+  fi
 fi
 
-database_url="${POSTGRES_URL:-}"
+POSTGRES_URL="$dotenv_postgres_url"
+POSTGRES_URL_NON_POOLING="$dotenv_non_pooling_url"
+NEXT_PUBLIC_SUPABASE_URL="$dotenv_supabase_url"
+
+database_url="$POSTGRES_URL"
 remediation="supabase start && pnpm run db:migrate"
 stack_overridden=false
 if [[ "$postgres_url_was_defined" == true \
@@ -106,21 +128,32 @@ if [[ ! "$database_target" =~ ^localhost:[0-9]+$ ]]; then
   exit 1
 fi
 
-if [[ "$stack_overridden" == true ]]; then
-  database_port="${database_target##*:}"
-  if [[ ! "${NEXT_PUBLIC_SUPABASE_URL:-}" =~ ^http://localhost:([0-9]+)$ ]]; then
+database_port="${database_target##*:}"
+if [[ ! "$NEXT_PUBLIC_SUPABASE_URL" =~ ^http://localhost:([0-9]+)$ ]]; then
+  if [[ "$stack_overridden" == true ]]; then
     printf '%s\n' \
       "FAIL: preflight readiness — local stack overrides do not identify one worktree stack" \
       "Run: unset POSTGRES_URL POSTGRES_URL_NON_POOLING NEXT_PUBLIC_SUPABASE_URL" >&2
-    exit 1
+  else
+    printf '%s\n' \
+      "FAIL: preflight readiness — local stack configuration does not identify one worktree stack" \
+      "Run: python3 scripts/worktree_setup.py" >&2
   fi
-  supabase_port="${BASH_REMATCH[1]}"
-  if (( 10#$database_port != 10#$supabase_port + 1 )); then
+  exit 1
+fi
+supabase_port="${BASH_REMATCH[1]}"
+supabase_target="localhost:${supabase_port}"
+if (( 10#$database_port != 10#$supabase_port + 1 )); then
+  if [[ "$stack_overridden" == true ]]; then
     printf '%s\n' \
       "FAIL: preflight readiness — local stack overrides do not identify one worktree stack" \
       "Run: unset POSTGRES_URL POSTGRES_URL_NON_POOLING NEXT_PUBLIC_SUPABASE_URL" >&2
-    exit 1
+  else
+    printf '%s\n' \
+      "FAIL: preflight readiness — local stack configuration does not identify one worktree stack" \
+      "Run: python3 scripts/worktree_setup.py" >&2
   fi
+  exit 1
 fi
 
 availability_remediation="$remediation"
@@ -135,6 +168,15 @@ if ! command -v pg_isready >/dev/null 2>&1 \
   || ! pg_isready -d "$database_url" -t 1 >/dev/null 2>&1; then
   printf '%s\n' \
     "FAIL: preflight readiness — Postgres is unavailable at ${database_target}" \
+    "Run: ${availability_remediation}" >&2
+  exit 1
+fi
+
+if ! command -v curl >/dev/null 2>&1 \
+  || ! curl -fsS --max-time 2 \
+    "${NEXT_PUBLIC_SUPABASE_URL}/auth/v1/health" >/dev/null 2>&1; then
+  printf '%s\n' \
+    "FAIL: preflight readiness — Supabase Auth is unavailable at ${supabase_target}" \
     "Run: ${availability_remediation}" >&2
   exit 1
 fi
