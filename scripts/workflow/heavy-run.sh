@@ -1,8 +1,14 @@
 #!/usr/bin/env bash
 # heavy-run.sh — wrap a command in the host-wide concurrency semaphore.
 #
-# Guards memory-intensive commands (test:integration, build, smoke) from
-# stacking up across parallel worktree sessions on a memory-constrained host.
+# Guards complete unit runs, static checks, and heavier commands
+# (test:integration, build, smoke) from stacking up across parallel worktree
+# sessions on a memory-constrained host. Focused unit-file commands intentionally
+# bypass this wrapper so they remain a fast local inner loop.
+#
+# This is the local fallback admission layer. PP-3vdr.16 separately owns a
+# supported Crabbox job for remote full-unit verdicts; it does not replace the
+# local cap when a caller chooses `pnpm run test` or `pnpm run test:human`.
 # Uses the same --jobs 2 slot count as preflight-locked.sh, but a SEPARATE id
 # (`pinpoint-heavy` vs `pinpoint-preflight`). The two pools are intentionally
 # distinct: preflight already holds an outer `pinpoint-preflight` slot and then
@@ -21,7 +27,7 @@
 #   bash scripts/workflow/heavy-run.sh <command> [args…]
 #
 # package.json wires this as:
-#   "test:integration": "pnpm run test:ensure-schema && bash scripts/workflow/heavy-run.sh vitest run …"
+#   "test:_run": "pnpm run test:ensure-schema && bash scripts/workflow/heavy-run.sh vitest run …"
 
 set -euo pipefail
 
@@ -51,6 +57,18 @@ if ! command -v sem >/dev/null 2>&1 \
   exec "$@"
 fi
 
+# GNU Parallel defaults to ~/.parallel, which is outside Codex's writable
+# boundary. Keep PinPoint's semaphore state in the existing cross-worktree
+# state root instead. Every checkout on the host resolves the same path, while
+# PINPOINT_PARALLEL_HOME gives tests and unusual installations an explicit
+# override without changing GNU Parallel's global configuration.
+pinpoint_state_home="${XDG_STATE_HOME:-${HOME}/.local/state}/pinpoint"
+pinpoint_parallel_home="${PINPOINT_PARALLEL_HOME:-$pinpoint_state_home/parallel}"
+if ! mkdir -p "$pinpoint_parallel_home"; then
+  echo "Error: cannot create PinPoint semaphore state: $pinpoint_parallel_home" >&2
+  exit 1
+fi
+
 # sem re-joins its command argv and re-parses it through a shell, so an argument
 # that legitimately contains a space (e.g. --project='Mobile Chrome' from the
 # `smoke` script) would be word-split into two tokens. Pre-quote each argument
@@ -58,8 +76,9 @@ fi
 # reconstructs the exact original argv. See PP-yso5.
 quoted_cmd="$(printf '%q ' "$@")"
 
-# --jobs 2:               up to 2 concurrent bare heavy jobs across all worktrees
+# --jobs 2:               up to 2 concurrent admitted jobs across all worktrees
 # --id pinpoint-heavy:    pool distinct from preflight's (see header — avoids
 #                         a self-deadlock when preflight nests these commands)
 # --fg:                   block synchronously and propagate exit code
-exec sem --jobs 2 --id pinpoint-heavy --fg "$quoted_cmd"
+PARALLEL_HOME="$pinpoint_parallel_home" \
+  exec sem --jobs 2 --id pinpoint-heavy --fg "$quoted_cmd"
