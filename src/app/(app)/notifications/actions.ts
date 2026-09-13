@@ -1,49 +1,24 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
-import { createClient } from "~/lib/supabase/server";
-import { db } from "~/server/db";
-import { notifications, userProfiles } from "~/server/db/schema";
 import { eq, and } from "drizzle-orm";
-import { type Result, ok, err } from "~/lib/result";
-import { serverActionError } from "~/lib/observability/report-error";
-import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
+import { revalidatePath } from "next/cache";
+import { z } from "zod";
 
-export type MarkAsReadResult = Result<
-  { success: boolean },
-  "UNAUTHORIZED" | "SERVER"
->;
+import {
+  createProtectedAction,
+  type ProtectedActionResult,
+} from "~/lib/actions";
+import { ok } from "~/lib/result";
+import { db } from "~/server/db";
+import { notifications } from "~/server/db/schema";
 
-export async function markAsReadAction(
-  notificationId: string
-): Promise<MarkAsReadResult> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+export type MarkAsReadResult = ProtectedActionResult<{ success: boolean }>;
 
-  if (!user) {
-    return err("UNAUTHORIZED", "Unauthorized");
-  }
-
-  try {
-    const userProfile = await db.query.userProfiles.findFirst({
-      where: eq(userProfiles.id, user.id),
-      columns: { role: true },
-    });
-
-    if (
-      !checkPermission(
-        "notifications.manage_own",
-        getAccessLevel(userProfile?.role)
-      )
-    ) {
-      return err(
-        "UNAUTHORIZED",
-        "You do not have permission to manage notifications"
-      );
-    }
-
+const markAsRead = createProtectedAction({
+  actionName: "markAsReadAction",
+  schema: z.string().uuid(),
+  permission: "notifications.manage_own",
+  handler: async (notificationId, { user }) => {
     await db
       .delete(notifications)
       .where(
@@ -55,56 +30,28 @@ export async function markAsReadAction(
 
     revalidatePath("/", "layout"); // Revalidate everywhere to update notification count
     return ok({ success: true });
-  } catch (error) {
-    return serverActionError(
-      error,
-      "SERVER",
-      "Failed to mark notification as read",
-      {
-        action: "markAsReadAction",
-        notificationId,
-      }
-    );
-  }
+  },
+});
+
+export async function markAsReadAction(
+  notificationId: string
+): Promise<MarkAsReadResult> {
+  return await markAsRead(notificationId);
 }
 
-export async function markAllAsReadAction(): Promise<MarkAsReadResult> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return err("UNAUTHORIZED", "Unauthorized");
-  }
-
-  try {
-    const userProfile = await db.query.userProfiles.findFirst({
-      where: eq(userProfiles.id, user.id),
-      columns: { role: true },
-    });
-
-    if (
-      !checkPermission(
-        "notifications.manage_own",
-        getAccessLevel(userProfile?.role)
-      )
-    ) {
-      return err(
-        "UNAUTHORIZED",
-        "You do not have permission to manage notifications"
-      );
-    }
-
+const markAllAsRead = createProtectedAction({
+  actionName: "markAllAsReadAction",
+  permission: "notifications.manage_own",
+  handler: async (_input: undefined, { user }) => {
     await db
       .delete(notifications)
       .where(and(eq(notifications.userId, user.id)));
 
     revalidatePath("/", "layout");
     return ok({ success: true });
-  } catch (error) {
-    return serverActionError(error, "SERVER", "Failed to mark all as read", {
-      action: "markAllAsReadAction",
-    });
-  }
+  },
+});
+
+export async function markAllAsReadAction(): Promise<MarkAsReadResult> {
+  return await markAllAsRead(undefined);
 }
