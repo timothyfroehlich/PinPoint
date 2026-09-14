@@ -10,8 +10,9 @@
 # shipped a real bug" — duplicated on purpose as a safety net in case the
 # reviewer does not open the referenced files.
 #
-# Tunables Tim may want to revisit after the trial: `reviews.profile`
-# (chill → assertive for more findings) and `auto_review.drafts`.
+# Tunables Tim may want to revisit once the plan's review budget is settled:
+# `reviews.profile` (chill → assertive for more findings) and
+# `auto_review.enabled` (currently manual-only).
 language: en-US
 
 tone_instructions: |
@@ -35,10 +36,13 @@ reviews:
   poem: false
 
   auto_review:
-    enabled: true
-    # PinPoint opens every agent PR as a draft and promotes it only after
-    # current-head CI succeeds (pinpoint-pr-workflow Phase 2/3). Reviewing on
-    # promotion rather than on open matches that flow.
+    # Manual-only (PP-w6u1). The plan's budget is one included review per hour, so
+    # auto-reviewing every draft promotion would spend it on small PRs. Tim asks
+    # the owning agent to request a review on large PRs:
+    #   gh pr comment <PR> --body "@coderabbitai review"
+    # The merge gate (scripts/workflow/_pr-gates.sh) accepts the resulting
+    # exact-head APPROVED review; Codex stays the default reviewer.
+    enabled: false
     drafts: false
 
   path_instructions:

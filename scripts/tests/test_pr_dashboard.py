@@ -168,6 +168,42 @@ def test_ten_native_reviewed_prs_use_one_graphql_request(run_dashboard):
 
 
 @pytest.mark.unit
+def test_coderabbit_exact_head_approval_reads_as_reviewed(run_dashboard):
+    node = pr_node(1, reviews=[review(login="coderabbitai")])
+    result, calls = run_dashboard(
+        [
+            {
+                "contains": ["pullRequests(first: 100"],
+                "stdout": json.dumps(open_pr_response([node])),
+            }
+        ]
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "reviewed" in result.stdout
+    # An exact-head approval needs no comment lookup, same as Codex's.
+    assert len(calls) == 1
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("state", ["COMMENTED", "CHANGES_REQUESTED"])
+def test_coderabbit_non_approval_does_not_read_as_reviewed(run_dashboard, state):
+    node = pr_node(1, reviews=[review(login="coderabbitai", state=state)])
+    result, _calls = run_dashboard(
+        [
+            {
+                "contains": ["pullRequests(first: 100"],
+                "stdout": json.dumps(open_pr_response([node])),
+            },
+            {"contains": ["issues/1/comments"], "stdout": "[]"},
+        ]
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "reviewed" not in result.stdout
+
+
+@pytest.mark.unit
 def test_no_open_prs_preserves_compact_cli_output(run_dashboard):
     result, calls = run_dashboard(
         [

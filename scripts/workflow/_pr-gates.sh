@@ -20,6 +20,12 @@ set -euo pipefail
 readonly CODEX_REVIEW_BOT="chatgpt-codex-connector[bot]"
 readonly CODEX_REVIEW_APP_SLUG="chatgpt-codex-connector"
 readonly CODEX_CLEAN_REVIEW_PREFIX="Codex Review: Didn't find any major issues."
+# CodeRabbit is a second trusted native reviewer, requested manually and only when Tim
+# asks for it on a large PR (PP-w6u1). Its exact-head APPROVED review is sufficient
+# coverage on its own. Nothing else it posts changes the Codex-derived state: a
+# CodeRabbit finding review is adjudicated through the thread gate like any other
+# thread, and its absence is never a failure.
+readonly CODERABBIT_REVIEW_BOT="coderabbitai[bot]"
 readonly GITHUB_ACTIONS_BOT="github-actions[bot]"
 readonly GITHUB_ACTIONS_APP_SLUG="github-actions"
 readonly CODEX_REACTION_WITNESS_PREFIX="<!-- pinpoint-codex-reaction-witness:"
@@ -37,19 +43,28 @@ _repo_slug() {
   printf '%s\n' "$_REPO_SLUG_CACHE"
 }
 
-# The full record of the Codex GitHub review that decides a head's state, as one TSV
-# line: <state> <sha> <reviewer> <detail> <submitted_at> <summary line>.
+# Human-readable name for a trusted native reviewer login, for gate and handoff output.
+_native_reviewer_label() {
+  case "$1" in
+    "$CODERABBIT_REVIEW_BOT") printf 'CodeRabbit\n' ;;
+    *) printf 'Codex\n' ;;
+  esac
+}
+
+# The full record of one trusted bot's GitHub review that decides a head's state, as
+# one TSV line: <state> <sha> <reviewer> <detail> <submitted_at> <summary line>.
 #
-# The latest review from the trusted Codex App is authoritative. An approval for an
-# older commit cannot cover a later push, and a later change-request review cannot
-# inherit an earlier approval. GitHub's commit_id is compared directly to the head SHA;
+# The latest review from the named bot is authoritative. An approval for an older
+# commit cannot cover a later push, and a later change-request review cannot inherit
+# an earlier approval. GitHub's commit_id is compared directly to the head SHA;
 # timestamps are only ordering metadata.
 #
 # The slurp is required because gh emits one JSON array per page under --paginate.
-_codex_review_record() {
-  local pr=$1 owner_repo=$2 head=$3
-  gh api --paginate "repos/${owner_repo}/pulls/${pr}/reviews" \
-    | jq -rs --arg bot "$CODEX_REVIEW_BOT" --arg head "$head" \
+# The reviews payload is fetched once per call; _review_record asks for two bots, so
+# the payload is passed in rather than re-fetched.
+_native_review_record() {
+  local head=$1 bot=$2 reviews_json=$3
+  jq -rs --arg bot "$bot" --arg head "$head" \
         '[ .[] | flatten | .[]
            | select(.user.login? == $bot)
            | { sha: (.commit_id // ""),
@@ -76,7 +91,7 @@ _codex_review_record() {
                  $latest + { state: "stale_approval" }
                end
            end
-         | [ .state, .sha, .reviewer, .detail, .at, .summary ] | @tsv'
+         | [ .state, .sha, .reviewer, .detail, .at, .summary ] | @tsv' <<< "$reviews_json"
 }
 
 # Issue comments carry four review records: the connector's clean result, the trusted
@@ -209,16 +224,24 @@ _comment_review_record() {
 # A manual marker is an independent valid record. Native reviews, clean connector
 # comments, and SHA-pinned reaction witnesses are representations of the automatic
 # Codex path. A later current-head finding cannot inherit an earlier clean result.
+# A CodeRabbit exact-head approval is a third independent valid record; no other
+# CodeRabbit state participates.
 _review_record() {
-  local head=$3 codex comment codex_state comment_state
-  local codex_sha codex_at comment_at
-  codex=$(_codex_review_record "$@")
+  local pr=$1 owner_repo=$2 head=$3 reviews_json codex coderabbit comment
+  local codex_state comment_state codex_sha codex_at comment_at
+  reviews_json=$(gh api --paginate "repos/${owner_repo}/pulls/${pr}/reviews")
+  codex=$(_native_review_record "$head" "$CODEX_REVIEW_BOT" "$reviews_json")
   codex_state=$(cut -f1 <<< "$codex")
   codex_sha=$(cut -f2 <<< "$codex")
   # A current native approval already passes the gate. Do not spend a second
   # paginated GitHub request looking up a marker that cannot change that result.
   if [[ "$codex_state" == "approval" ]]; then
     printf '%s\n' "$codex"
+    return
+  fi
+  coderabbit=$(_native_review_record "$head" "$CODERABBIT_REVIEW_BOT" "$reviews_json")
+  if [[ "$(cut -f1 <<< "$coderabbit")" == "approval" ]]; then
+    printf '%s\n' "$coderabbit"
     return
   fi
 
@@ -265,19 +288,32 @@ _review_record() {
   fi
 }
 
-# The review verdict on a given head, printed as "<state> <sha>" — the two
-# fields of _review_record the merge gate acts on.
+# The review verdict on a given head, printed as "<state> <sha> <reviewer>" — the
+# fields of _review_record the merge gate acts on. The reviewer login names which
+# trusted bot's approval is being reported.
 _review_verdict() {
   local record
   record=$(_review_record "$1" "$2" "$3")
-  printf '%s %s\n' "$(cut -f1 <<< "$record")" "$(cut -f2 <<< "$record")"
+  printf '%s %s %s\n' "$(cut -f1 <<< "$record")" "$(cut -f2 <<< "$record")" "$(cut -f3 <<< "$record")"
 }
 
 # Gate 1: CI Gate check has SUCCESS conclusion.
+#
+# One head can carry several `CI Gate` runs (draft promotion re-triggers the workflow on
+# the same SHA). Pick the authoritative one the way merge-pr.sh's poller and pr-watch.py
+# do — a live or finished run over a cancelled leftover, then the newest — so two
+# COMPLETED entries read as one result instead of a "COMPLETED\nCOMPLETED" status that
+# never equals COMPLETED and parks the gate in WAIT forever.
 check_ci() {
   local pr=$1
   local rollup
-  rollup=$(gh pr view "$pr" --json statusCheckRollup --jq '.statusCheckRollup[] | select(.name=="CI Gate")')
+  rollup=$(gh pr view "$pr" --json statusCheckRollup --jq '
+    [.statusCheckRollup[]? | select(.name=="CI Gate")]
+    | sort_by(
+        (if ((.conclusion // "") | ascii_upcase) == "CANCELLED" then 0 else 1 end),
+        (.completedAt // .startedAt // "")
+      )
+    | last // empty')
   if [ -z "$rollup" ]; then
     # Not a failure — GitHub has simply not registered the check run yet, which is
     # the normal state for the first seconds after `gh pr create`. Reporting it as a
@@ -317,7 +353,7 @@ check_ci() {
 # head, plus a durable record that the current head's one manual request was sent.
 # ---------------------------------------------------------------------------------
 #
-#   approval        Codex approved the current head SHA
+#   approval        Codex or CodeRabbit approved the current head SHA (RS_REVIEWER names which)
 #   clean_comment   Codex reported no major issues for the current head SHA
 #   clean_reaction  Trusted workflow witnessed Codex eyes-to-+1 on the current head
 #   reviewed        Codex reviewed the current head; the thread gate owns adjudication
@@ -330,10 +366,11 @@ check_ci() {
 #   review_requested  The one manual Codex review was requested for this head
 #   unreviewed      Neither review path has a record
 #
-# Sets globals: RS_STATE RS_HEAD_SHA RS_REVIEW_SHA
+# Sets globals: RS_STATE RS_HEAD_SHA RS_REVIEW_SHA RS_REVIEWER
 RS_STATE=""
 RS_HEAD_SHA=""
 RS_REVIEW_SHA=""
+RS_REVIEWER=""
 
 _compute_review_state() {
   local pr=$1
@@ -344,8 +381,7 @@ _compute_review_state() {
   verdict=$(_review_verdict "$pr" "$owner_repo" "$head_sha")
 
   RS_HEAD_SHA=$head_sha
-  RS_STATE=${verdict%% *}
-  RS_REVIEW_SHA=${verdict#* }
+  read -r RS_STATE RS_REVIEW_SHA RS_REVIEWER <<< "$verdict"
 }
 
 _review_remedy() {
@@ -413,9 +449,10 @@ check_unresolved_threads() {
   return 1
 }
 
-# Gate 3: a trusted clean Codex result or manual review marker must cover the exact head.
+# Gate 3: a trusted clean Codex result, a CodeRabbit approval, or a manual review marker
+# must cover the exact head.
 #
-#   approval        → PASS
+#   approval        → PASS (Codex or CodeRabbit; RS_REVIEWER says which)
 #   clean_comment   → PASS
 #   clean_reaction  → PASS
 #   reviewed        → PASS (the separate thread gate requires every finding adjudicated)
@@ -430,7 +467,7 @@ check_review_happened() {
 
   case "$RS_STATE" in
     approval)
-      echo "PASS: reviewed: Codex approved head SHA ${RS_HEAD_SHA:0:7}"
+      echo "PASS: reviewed: $(_native_reviewer_label "$RS_REVIEWER") approved head SHA ${RS_HEAD_SHA:0:7}"
       return 0
       ;;
     clean_comment)

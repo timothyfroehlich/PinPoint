@@ -156,7 +156,7 @@ ci_out=$(check_ci "$pr" 2>&1) || true
 threads_out=$(check_unresolved_threads "$pr" 2>&1) || true
 conflict_out=$(check_no_merge_conflict "$pr" 2>&1) || true
 # ---------------------------------------------------------------------------------
-# Review state: the Codex GitHub approval and what landed since
+# Review state: the Codex (or CodeRabbit) GitHub approval and what landed since
 # ---------------------------------------------------------------------------------
 
 record=$(_review_record "$pr" "$(_repo_slug)" "$head_sha")
@@ -194,7 +194,7 @@ since_review_from=""
 since_review_note=""
 case "$rv_state" in
   approval)
-    review_desc="Codex GitHub approval · ${rv_at} · covers head ${short_head}"
+    review_desc="$(_native_reviewer_label "$rv_reviewer") GitHub approval · ${rv_at} · covers head ${short_head}"
     ;;
   clean_comment)
     review_desc="Codex clean review comment · ${rv_at} · covers head ${short_head}"

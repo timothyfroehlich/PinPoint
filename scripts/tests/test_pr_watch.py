@@ -89,9 +89,14 @@ def _ago(seconds: float) -> str:
     return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() - seconds))
 
 
-def codex_review(sha=HEAD_SHA, state="APPROVED", submitted_at="2026-08-22T12:00:00Z"):
+def codex_review(
+    sha=HEAD_SHA,
+    state="APPROVED",
+    submitted_at="2026-08-22T12:00:00Z",
+    login=pr_watch.CODEX_REVIEW_BOT,
+):
     return {
-        "user": {"login": pr_watch.CODEX_REVIEW_BOT},
+        "user": {"login": login},
         "state": state,
         "commit_id": sha,
         "submitted_at": submitted_at,
@@ -924,6 +929,10 @@ def test_codex_login_is_identical_to_the_bash_gate():
     assert app_match, "CODEX_REVIEW_APP_SLUG not found in _pr-gates.sh"
     assert app_match.group(1) == pr_watch.CODEX_REVIEW_APP_SLUG
 
+    cr_match = re.search(r'^readonly CODERABBIT_REVIEW_BOT="(.+)"$', gates, re.M)
+    assert cr_match, "CODERABBIT_REVIEW_BOT not found in _pr-gates.sh"
+    assert cr_match.group(1) == pr_watch.CODERABBIT_REVIEW_BOT
+
 
 @pytest.mark.unit
 @pytest.mark.parametrize(
@@ -986,6 +995,45 @@ def test_review_state_approval_pins_head(monkeypatch):
     state, detail = pr_watch.review_state(PR)
     assert state == "approval"
     assert HEAD_SHA[:7] in detail
+
+
+@pytest.mark.unit
+def test_review_state_coderabbit_approval_pins_head(monkeypatch):
+    review = codex_review(login=pr_watch.CODERABBIT_REVIEW_BOT)
+    monkeypatch.setattr(pr_watch, "gh", make_gh(reviews=[review]))
+    state, detail = pr_watch.review_state(PR)
+    assert state == "approval"
+    assert detail == f"CodeRabbit approved head {HEAD_SHA[:7]}"
+
+
+@pytest.mark.unit
+def test_review_state_coderabbit_approval_beats_stale_codex_approval(monkeypatch):
+    reviews = [
+        codex_review(sha=OLD_SHA, submitted_at="2026-08-22T11:00:00Z"),
+        codex_review(login=pr_watch.CODERABBIT_REVIEW_BOT),
+    ]
+    monkeypatch.setattr(pr_watch, "gh", make_gh(reviews=reviews))
+    state, detail = pr_watch.review_state(PR)
+    assert state == "approval"
+    assert "CodeRabbit" in detail
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("state", ["COMMENTED", "CHANGES_REQUESTED", "DISMISSED"])
+def test_review_state_coderabbit_non_approval_is_not_evidence(monkeypatch, state):
+    reviews = [
+        codex_review(sha=OLD_SHA, submitted_at="2026-08-22T11:00:00Z"),
+        codex_review(login=pr_watch.CODERABBIT_REVIEW_BOT, state=state),
+    ]
+    monkeypatch.setattr(pr_watch, "gh", make_gh(reviews=reviews))
+    assert pr_watch.review_state(PR)[0] == "stale_approval"
+
+
+@pytest.mark.unit
+def test_review_state_stale_coderabbit_approval_is_unreviewed(monkeypatch):
+    review = codex_review(sha=OLD_SHA, login=pr_watch.CODERABBIT_REVIEW_BOT)
+    monkeypatch.setattr(pr_watch, "gh", make_gh(reviews=[review]))
+    assert pr_watch.review_state(PR)[0] == "unreviewed"
 
 
 @pytest.mark.unit

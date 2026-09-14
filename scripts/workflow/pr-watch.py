@@ -65,6 +65,9 @@ READY_LABEL = "ready-for-review"
 CI_GATE_NAME = "CI Gate"
 CODEX_REVIEW_BOT = "chatgpt-codex-connector[bot]"
 CODEX_REVIEW_APP_SLUG = "chatgpt-codex-connector"
+# Second trusted native reviewer (PP-w6u1). Only its exact-head APPROVED review is
+# evidence; every other CodeRabbit state leaves the Codex-derived verdict alone.
+CODERABBIT_REVIEW_BOT = "coderabbitai[bot]"
 CODEX_CLEAN_REVIEW_PREFIX = "Codex Review: Didn't find any major issues."
 GITHUB_ACTIONS_BOT = "github-actions[bot]"
 GITHUB_ACTIONS_APP_SLUG = "github-actions"
@@ -747,15 +750,33 @@ def _gh_api_list(path: str) -> list[dict]:
     return items
 
 
-def _codex_reviews(pr: int) -> list[dict]:
-    """Return trusted Codex reviews in submission order."""
+def _native_reviews(pr: int) -> dict[str, list[dict]]:
+    """Return trusted native reviews in submission order, keyed by bot login.
+
+    One fetch serves both bots; the gate script does the same.
+    """
     repo = f"repos/{REPO_OWNER}/{REPO_NAME}"
-    reviews = [
-        review
-        for review in _gh_api_list(f"{repo}/pulls/{pr}/reviews")
-        if review.get("user", {}).get("login") == CODEX_REVIEW_BOT
+    by_bot: dict[str, list[dict]] = {CODEX_REVIEW_BOT: [], CODERABBIT_REVIEW_BOT: []}
+    for review in _gh_api_list(f"{repo}/pulls/{pr}/reviews"):
+        login = review.get("user", {}).get("login")
+        if login in by_bot:
+            by_bot[login].append(review)
+    for reviews in by_bot.values():
+        reviews.sort(key=lambda review: review.get("submitted_at") or "")
+    return by_bot
+
+
+def _exact_head_approval(reviews: list[dict], head_sha: str) -> bool:
+    """True when the bot's authoritative review is an APPROVED of the exact head."""
+    if not reviews:
+        return False
+    head_reviews = [
+        review for review in reviews if (review.get("commit_id") or "") == head_sha
     ]
-    return sorted(reviews, key=lambda review: review.get("submitted_at") or "")
+    latest = head_reviews[-1] if head_reviews else reviews[-1]
+    return (latest.get("state") or "").upper() == "APPROVED" and (
+        latest.get("commit_id") or ""
+    ) == head_sha
 
 
 def _is_two_axis_review(body: str) -> bool:
@@ -876,7 +897,8 @@ def review_state(pr: int, *, head_sha: str | None = None) -> tuple[str, str]:
         head_sha = json.loads(gh("pr", "view", str(pr), "--json", "headRefOid"))[
             "headRefOid"
         ]
-    reviews = _codex_reviews(pr)
+    native = _native_reviews(pr)
+    reviews = native[CODEX_REVIEW_BOT]
     if reviews:
         head_reviews = [
             review for review in reviews if (review.get("commit_id") or "") == head_sha
@@ -886,6 +908,8 @@ def review_state(pr: int, *, head_sha: str | None = None) -> tuple[str, str]:
         state = (latest.get("state") or "UNKNOWN").upper()
         if state == "APPROVED" and review_sha == head_sha:
             return "approval", f"Codex approved head {head_sha[:7]}"
+    if _exact_head_approval(native[CODERABBIT_REVIEW_BOT], head_sha):
+        return "approval", f"CodeRabbit approved head {head_sha[:7]}"
 
     # A current native approval is sufficient. Defer the paginated comments request
     # unless it is needed to find another accepted record or request state.

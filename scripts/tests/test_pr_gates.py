@@ -1,7 +1,8 @@
-"""Regression tests for the merge gate's Codex and local-review records.
+"""Regression tests for the merge gate's Codex, CodeRabbit, and local-review records.
 
-A native approval, trusted clean connector comment or reaction-witness comment, or the
-existing SHA-pinned manual attestation, may cover the current head.
+A Codex native approval, trusted clean connector comment or reaction-witness comment,
+a CodeRabbit native approval, or the existing SHA-pinned manual attestation, may cover
+the current head.
 """
 
 import json
@@ -20,6 +21,7 @@ pytestmark = pytest.mark.integration
 GATES_PATH = Path(__file__).parent.parent / "workflow" / "_pr-gates.sh"
 CODEX_BOT = "chatgpt-codex-connector[bot]"
 CODEX_APP = "chatgpt-codex-connector"
+CODERABBIT_BOT = "coderabbitai[bot]"
 GITHUB_ACTIONS_BOT = "github-actions[bot]"
 GITHUB_ACTIONS_APP = "github-actions"
 HEAD_SHA = "d084c14a43af3ac021f0838f5c7bf4b77f72fb62"
@@ -164,10 +166,18 @@ def gate_env(
     threads: list[dict] | None = None,
     commits: list[dict] | None = None,
     head_sha: str = HEAD_SHA,
+    rollup: list[dict] | None = None,
 ) -> Iterator[dict]:
-    """Yield an environment whose gh executable serves paginated review records."""
+    """Yield an environment whose gh executable serves paginated review records.
+
+    `rollup` is the raw statusCheckRollup array; the stub runs the gate's real `--jq`
+    filter over it with jq, so the authoritative-run selection is what gets tested.
+    """
     with tempfile.TemporaryDirectory() as tmp:
         tmp_path = Path(tmp)
+        (tmp_path / "rollup.json").write_text(
+            json.dumps({"statusCheckRollup": rollup or []})
+        )
         (tmp_path / "reviews.json").write_text(
             "\n".join(json.dumps(page) for page in (review_pages or [[]]))
         )
@@ -204,6 +214,7 @@ def gate_env(
             'printf "%s\\n" "$args" >> "$STUB_CALLS"\n'
             'case "$args" in\n'
             '  *"--jq .headRefOid"*) printf "%s\\n" "$STUB_HEAD_SHA" ;;\n'
+            '  *"--json statusCheckRollup --jq"*) jq -r "${@: -1}" < "$STUB_ROLLUP" ;;\n'
             '  *"nameWithOwner"*) printf "acme/widget\\n" ;;\n'
             '  *"api graphql"*) cat "$STUB_THREADS" ;;\n'
             '  *"/pulls/"*"/reviews"*) cat "$STUB_REVIEWS" ;;\n'
@@ -223,6 +234,7 @@ def gate_env(
         env["STUB_COMMENTS"] = str(tmp_path / "comments.json")
         env["STUB_COMMITS"] = str(tmp_path / "commits.json")
         env["STUB_THREADS"] = str(tmp_path / "threads.json")
+        env["STUB_ROLLUP"] = str(tmp_path / "rollup.json")
         env["STUB_CALLS"] = str(calls_path)
         yield env
 
@@ -533,6 +545,74 @@ def test_delayed_old_head_review_does_not_override_current_native_approval() -> 
     assert f"Codex approved head SHA {HEAD_SHA[:7]}" in result.stdout
 
 
+def test_coderabbit_approval_of_head_passes() -> None:
+    with gate_env(review_pages=[[codex_review(login=CODERABBIT_BOT)]]) as env:
+        result = run_gate("check_review_happened", env)
+        state, sha, reviewer, *_ = review_record(env)
+    assert result.returncode == 0, result.stdout
+    assert f"CodeRabbit approved head SHA {HEAD_SHA[:7]}" in result.stdout
+    assert (state, sha, reviewer) == ("approval", HEAD_SHA, CODERABBIT_BOT)
+
+
+def test_coderabbit_approval_of_head_passes_despite_stale_codex_approval() -> None:
+    reviews = [
+        codex_review(sha=OTHER_SHA, submitted_at="2026-08-22T11:00:00Z"),
+        codex_review(login=CODERABBIT_BOT, submitted_at="2026-08-22T12:00:00Z"),
+    ]
+    with gate_env(review_pages=[reviews]) as env:
+        result = run_gate("check_review_happened", env)
+    assert result.returncode == 0, result.stdout
+    assert f"CodeRabbit approved head SHA {HEAD_SHA[:7]}" in result.stdout
+
+
+def test_stale_coderabbit_approval_does_not_cover_head() -> None:
+    with gate_env(
+        review_pages=[[codex_review(login=CODERABBIT_BOT, sha=OTHER_SHA)]]
+    ) as env:
+        result = run_gate("check_review_happened", env)
+    assert result.returncode == 1, result.stdout
+    assert "unreviewed" in result.stdout
+
+
+@pytest.mark.parametrize("state", ["COMMENTED", "CHANGES_REQUESTED", "DISMISSED"])
+def test_coderabbit_non_approval_leaves_codex_state_untouched(state: str) -> None:
+    # Codex approved an older commit; CodeRabbit's finding review on head is not
+    # coverage on its own — the Codex-derived stale_approval verdict stands.
+    reviews = [
+        codex_review(sha=OTHER_SHA, submitted_at="2026-08-22T11:00:00Z"),
+        codex_review(
+            login=CODERABBIT_BOT, state=state, submitted_at="2026-08-22T12:00:00Z"
+        ),
+    ]
+    with gate_env(review_pages=[reviews]) as env:
+        result = run_gate("check_review_happened", env)
+    assert result.returncode == 1, result.stdout
+    assert (
+        f"Codex approved {OTHER_SHA[:7]}, but head is {HEAD_SHA[:7]}" in result.stdout
+    )
+
+
+def test_coderabbit_non_approval_does_not_mask_codex_approval() -> None:
+    reviews = [
+        codex_review(submitted_at="2026-08-22T11:00:00Z"),
+        codex_review(
+            login=CODERABBIT_BOT,
+            state="CHANGES_REQUESTED",
+            submitted_at="2026-08-22T12:00:00Z",
+        ),
+    ]
+    with gate_env(review_pages=[reviews]) as env:
+        result = run_gate("check_review_happened", env)
+    assert result.returncode == 0, result.stdout
+    assert f"Codex approved head SHA {HEAD_SHA[:7]}" in result.stdout
+
+
+def test_coderabbit_approval_is_read_across_all_pages() -> None:
+    with gate_env(review_pages=[[], [codex_review(login=CODERABBIT_BOT)]]) as env:
+        result = run_gate("check_review_happened", env)
+    assert result.returncode == 0, result.stdout
+
+
 def test_reviews_are_read_across_all_pages() -> None:
     with gate_env(review_pages=[[], [codex_review()]]) as env:
         result = run_gate("check_review_happened", env)
@@ -604,7 +684,7 @@ def test_review_record_and_verdict_agree() -> None:
     )
     assert at == "2026-08-22T12:00:00Z"
     assert summary == "Codex review summary"
-    assert verdict.stdout.strip() == f"approval {HEAD_SHA}"
+    assert verdict.stdout.strip() == f"approval {HEAD_SHA} {CODEX_BOT}"
 
 
 def test_manual_marker_record_retains_reviewer_and_detail() -> None:
@@ -658,6 +738,78 @@ def test_marker_text_quoted_in_a_comment_is_not_a_marker() -> None:
     with gate_env(comment_pages=[[quoted]]) as env:
         result = run_gate("check_review_happened", env)
     assert result.returncode == 1, result.stdout
+
+
+def ci_gate(
+    *,
+    status: str = "COMPLETED",
+    conclusion: str | None = "SUCCESS",
+    started_at: str = "2026-08-22T12:00:00Z",
+    completed_at: str | None = "2026-08-22T12:10:00Z",
+) -> dict:
+    return {
+        "name": "CI Gate",
+        "status": status,
+        "conclusion": conclusion,
+        "startedAt": started_at,
+        "completedAt": completed_at,
+    }
+
+
+def test_ci_gate_passes_on_a_single_successful_run() -> None:
+    with gate_env(rollup=[ci_gate()]) as env:
+        result = run_gate("check_ci", env)
+    assert result.returncode == 0, result.stdout
+    assert "PASS: ci:" in result.stdout
+
+
+def test_ci_gate_absent_is_a_wait() -> None:
+    with gate_env(rollup=[{"name": "Other", "status": "COMPLETED"}]) as env:
+        result = run_gate("check_ci", env)
+    assert result.returncode == 2, result.stdout
+    assert "CI Gate check not reported yet" in result.stdout
+
+
+def test_two_completed_ci_gate_runs_on_one_head_read_as_one_result() -> None:
+    # Draft promotion re-runs the workflow on the same SHA; PR #2117 carried two
+    # COMPLETED/SUCCESS entries and the gate sat in WAIT with status=COMPLETED.
+    rollup = [
+        ci_gate(started_at="2026-08-22T12:00:00Z", completed_at="2026-08-22T12:10:00Z"),
+        ci_gate(started_at="2026-08-22T12:20:00Z", completed_at="2026-08-22T12:30:00Z"),
+    ]
+    with gate_env(rollup=rollup) as env:
+        result = run_gate("check_ci", env)
+    assert result.returncode == 0, result.stdout
+    assert "PASS: ci:" in result.stdout
+
+
+def test_newest_ci_gate_run_is_authoritative() -> None:
+    rollup = [
+        ci_gate(completed_at="2026-08-22T12:10:00Z"),
+        ci_gate(
+            conclusion="FAILURE",
+            started_at="2026-08-22T12:20:00Z",
+            completed_at="2026-08-22T12:30:00Z",
+        ),
+    ]
+    with gate_env(rollup=rollup) as env:
+        result = run_gate("check_ci", env)
+    assert result.returncode == 1, result.stdout
+    assert "FAIL: ci:" in result.stdout
+
+
+def test_cancelled_ci_gate_leftover_yields_to_the_live_run() -> None:
+    rollup = [
+        ci_gate(
+            conclusion="CANCELLED",
+            started_at="2026-08-22T12:20:00Z",
+            completed_at="2026-08-22T12:21:00Z",
+        ),
+        ci_gate(started_at="2026-08-22T12:00:00Z", completed_at="2026-08-22T12:10:00Z"),
+    ]
+    with gate_env(rollup=rollup) as env:
+        result = run_gate("check_ci", env)
+    assert result.returncode == 0, result.stdout
 
 
 def test_unresolved_threads_block_regardless_of_author() -> None:

@@ -203,6 +203,26 @@ trusted clean connector comment, or trusted SHA-pinned reaction witness; any of 
 completes exact-head coverage. If no evidence arrives, keep waiting or use Tim's local
 review route below. A new head requires replacement CI and exactly one new request.
 
+#### CodeRabbit: Tim-initiated extra review for large PRs
+
+CodeRabbit is installed with `auto_review.enabled: false` and a budget of one included
+review per hour, so it is **never requested on your own initiative**. When Tim tells you
+to request it on a PR, post its trigger after current-head CI succeeds and the PR is
+ready:
+
+```bash
+gh pr comment <PR> --body "@coderabbitai review"
+```
+
+CodeRabbit edits its acknowledgement comment in place a few seconds later — "Review
+triggered" can become "Review rate limited", so read the comment's current text, not the
+first one you saw. With `request_changes_workflow` on, it requests changes while it has
+open findings and submits a native `APPROVED` review once they are resolved and the
+latest commit is reviewed. The gate accepts that exact-head approval as coverage on its
+own (PP-w6u1); a CodeRabbit finding review is a normal review thread — fix or
+decline-and-resolve — and does not by itself cover head or fail the gate. A new head
+needs a new request, and only if Tim asks for one.
+
 #### Local review and manual-attestation route
 
 This older route remains valid when Tim explicitly chooses `/codex:review` or

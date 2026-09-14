@@ -12,6 +12,9 @@ from dataclasses import dataclass
 from typing import Any
 
 CODEX_REVIEW_GRAPHQL_LOGIN = "chatgpt-codex-connector"
+# GraphQL login of the second trusted native reviewer (PP-w6u1); REST shows it as
+# "coderabbitai[bot]". Only its exact-head approval counts.
+CODERABBIT_REVIEW_GRAPHQL_LOGIN = "coderabbitai"
 CODEX_COMMENT_BOT = "chatgpt-codex-connector[bot]"
 CODEX_REVIEW_APP_SLUG = "chatgpt-codex-connector"
 CODEX_CLEAN_REVIEW_PREFIX = "Codex Review: Didn't find any major issues."
@@ -270,15 +273,16 @@ def _issue_comments(owner: str, repo: str, pr: int) -> list[dict[str, Any]]:
     return _decode_paginated_lists(raw)
 
 
-def _native_review_record(reviews: list[dict[str, Any]], head: str) -> ReviewRecord:
+def _native_review_record(
+    reviews: list[dict[str, Any]],
+    head: str,
+    login: str = CODEX_REVIEW_GRAPHQL_LOGIN,
+) -> ReviewRecord:
     for review in reviews:
         author = review.get("author")
         if author is not None and not isinstance(author, dict):
             raise DashboardError("review author was malformed")
-        if (
-            isinstance(author, dict)
-            and author.get("login") == CODEX_REVIEW_GRAPHQL_LOGIN
-        ):
+        if isinstance(author, dict) and author.get("login") == login:
             commit = review.get("commit")
             if (
                 not isinstance(review.get("state"), str)
@@ -290,7 +294,7 @@ def _native_review_record(reviews: list[dict[str, Any]], head: str) -> ReviewRec
     trusted = [
         review
         for review in reviews
-        if (review.get("author") or {}).get("login") == CODEX_REVIEW_GRAPHQL_LOGIN
+        if (review.get("author") or {}).get("login") == login
     ]
     trusted.sort(key=lambda review: review.get("submittedAt") or "")
     if not trusted:
@@ -692,6 +696,12 @@ def _row_for_pr(owner: str, repo: str, pr_data: dict[str, Any]) -> dict[str, str
             else:
                 try:
                     native = _native_review_record(reviews, head)
+                    if native.state != "approval":
+                        coderabbit = _native_review_record(
+                            reviews, head, CODERABBIT_REVIEW_GRAPHQL_LOGIN
+                        )
+                        if coderabbit.state == "approval":
+                            native = coderabbit
                     if native.state in {"approval", "reviewed"}:
                         review = "reviewed"
                     else:
