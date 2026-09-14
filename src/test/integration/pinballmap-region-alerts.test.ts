@@ -1260,7 +1260,21 @@ describe("GET /api/cron/pinballmap-region-alerts", () => {
         },
       });
 
-    pbm.entries = [lmx({ lmxId: 1 })];
+    await testDb.insert(pinballmapRegionSeenMachines).values([
+      {
+        region: "austin",
+        lmxId: 1,
+        locationId: 26454,
+        pinballmapMachineId: 6412,
+        announcedAt: new Date(),
+        isPresent: true,
+      },
+    ]);
+
+    pbm.entries = [
+      lmx({ lmxId: 1, locationId: 26454, machineId: 6412 }),
+      lmx({ lmxId: 2, locationId: 26454, machineId: 18 }),
+    ];
     pbm.onEntriesFetch = async () => {
       await testDb
         .update(pinballmapState)

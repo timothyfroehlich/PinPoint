@@ -1229,80 +1229,89 @@ export async function bootstrapRegion(
 ): Promise<{ bootstrapped: boolean; discovered: number }> {
   assertNotInTransaction("bootstrapRegion");
   const region = normalizeRegion(rawRegion);
-  const client = await getPinballMapClient();
-  const observed = await client.fetchRegionLmxes(region);
-  if (observed.length === 0 || observed.length > MAX_REGION_ENTRIES) {
+  const leaseId = await claimRunLease(region);
+  if (!leaseId) {
     return { bootstrapped: false, discovered: 0 };
   }
 
-  const now = new Date();
-  let discovered = 0;
-
-  await db.transaction(async (tx) => {
-    await tx
-      .insert(pinballmapRegionAlertState)
-      .values({
-        region,
-        removalTrackingInitializedAt: now,
-      })
-      .onConflictDoUpdate({
-        target: pinballmapRegionAlertState.region,
-        set: { removalTrackingInitializedAt: now },
-      });
-
-    await tx
-      .update(pinballmapRegionAlertEvents)
-      .set({ announcedAt: now })
-      .where(
-        and(
-          eq(pinballmapRegionAlertEvents.region, region),
-          isNull(pinballmapRegionAlertEvents.announcedAt)
-        )
-      );
-
-    // Reconcile existing seen machines for this region:
-    // 1. Mark all existing rows as not present and reset missed runs so absent machines are not announced as removed
-    await tx
-      .update(pinballmapRegionSeenMachines)
-      .set({
-        isPresent: false,
-        missedRuns: 0,
-        announcedAt: sql`coalesce(${pinballmapRegionSeenMachines.announcedAt}, ${now})`,
-      })
-      .where(eq(pinballmapRegionSeenMachines.region, region));
-
-    // 2. Upsert observed machines: mark present, refresh locations and machines, and set announcedAt
-    for (let i = 0; i < observed.length; i += INSERT_CHUNK) {
-      const inserted = await tx
-        .insert(pinballmapRegionSeenMachines)
-        .values(
-          observed.slice(i, i + INSERT_CHUNK).map((entry) => ({
-            region,
-            lmxId: entry.lmxId,
-            locationId: entry.locationId,
-            pinballmapMachineId: entry.machineId,
-            announcedAt: now,
-            isPresent: true,
-            missedRuns: 0,
-          }))
-        )
-        .onConflictDoUpdate({
-          target: [
-            pinballmapRegionSeenMachines.region,
-            pinballmapRegionSeenMachines.lmxId,
-          ],
-          set: {
-            locationId: sql`excluded.location_id`,
-            pinballmapMachineId: sql`excluded.pinballmap_machine_id`,
-            isPresent: true,
-            missedRuns: 0,
-            announcedAt: sql`coalesce(${pinballmapRegionSeenMachines.announcedAt}, ${now})`,
-          },
-        })
-        .returning({ lmxId: pinballmapRegionSeenMachines.lmxId });
-      discovered += inserted.length;
+  try {
+    const client = await getPinballMapClient();
+    const observed = await client.fetchRegionLmxes(region);
+    if (observed.length === 0 || observed.length > MAX_REGION_ENTRIES) {
+      return { bootstrapped: false, discovered: 0 };
     }
-  });
 
-  return { bootstrapped: true, discovered };
+    const now = new Date();
+    let discovered = 0;
+
+    await db.transaction(async (tx) => {
+      await tx
+        .insert(pinballmapRegionAlertState)
+        .values({
+          region,
+          removalTrackingInitializedAt: now,
+        })
+        .onConflictDoUpdate({
+          target: pinballmapRegionAlertState.region,
+          set: { removalTrackingInitializedAt: now },
+        });
+
+      await tx
+        .update(pinballmapRegionAlertEvents)
+        .set({ announcedAt: now })
+        .where(
+          and(
+            eq(pinballmapRegionAlertEvents.region, region),
+            isNull(pinballmapRegionAlertEvents.announcedAt)
+          )
+        );
+
+      // Reconcile existing seen machines for this region:
+      // 1. Mark all existing rows as not present and reset missed runs so absent machines are not announced as removed
+      await tx
+        .update(pinballmapRegionSeenMachines)
+        .set({
+          isPresent: false,
+          missedRuns: 0,
+          announcedAt: sql`coalesce(${pinballmapRegionSeenMachines.announcedAt}, ${now})`,
+        })
+        .where(eq(pinballmapRegionSeenMachines.region, region));
+
+      // 2. Upsert observed machines: mark present, refresh locations and machines, and set announcedAt
+      for (let i = 0; i < observed.length; i += INSERT_CHUNK) {
+        const inserted = await tx
+          .insert(pinballmapRegionSeenMachines)
+          .values(
+            observed.slice(i, i + INSERT_CHUNK).map((entry) => ({
+              region,
+              lmxId: entry.lmxId,
+              locationId: entry.locationId,
+              pinballmapMachineId: entry.machineId,
+              announcedAt: now,
+              isPresent: true,
+              missedRuns: 0,
+            }))
+          )
+          .onConflictDoUpdate({
+            target: [
+              pinballmapRegionSeenMachines.region,
+              pinballmapRegionSeenMachines.lmxId,
+            ],
+            set: {
+              locationId: sql`excluded.location_id`,
+              pinballmapMachineId: sql`excluded.pinballmap_machine_id`,
+              isPresent: true,
+              missedRuns: 0,
+              announcedAt: sql`coalesce(${pinballmapRegionSeenMachines.announcedAt}, ${now})`,
+            },
+          })
+          .returning({ lmxId: pinballmapRegionSeenMachines.lmxId });
+        discovered += inserted.length;
+      }
+    });
+
+    return { bootstrapped: true, discovered };
+  } finally {
+    await releaseRunLease(region, leaseId);
+  }
 }

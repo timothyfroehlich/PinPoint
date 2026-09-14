@@ -108,10 +108,10 @@ describe("Pinball Map Region Alerts Admin Configuration", () => {
 
       const saveRes = await saveRegionAlertConfigAction({
         region: "austin",
-        alertChannelId: "123456789",
+        alertChannelId: "123456789012345678",
       });
       const testRes = await sendRegionAlertTestAction({
-        channelId: "123456789",
+        channelId: "123456789012345678",
       });
 
       expect(saveRes).toEqual({ ok: false, reason: "unauthorized" });
@@ -123,7 +123,30 @@ describe("Pinball Map Region Alerts Admin Configuration", () => {
     it("rejects empty region", async () => {
       const res = await saveRegionAlertConfigAction({
         region: "   ",
-        alertChannelId: "123456789",
+        alertChannelId: "123456789012345678",
+      });
+      expect(res).toEqual({ ok: false, reason: "invalid" });
+    });
+
+    it("rejects unknown region slug", async () => {
+      const res = await saveRegionAlertConfigAction({
+        region: "unknown-metro",
+        alertChannelId: null,
+      });
+      expect(res).toEqual({ ok: false, reason: "invalid" });
+    });
+
+    it("rejects non-snowflake channel ID for save", async () => {
+      const res = await saveRegionAlertConfigAction({
+        region: "austin",
+        alertChannelId: "not-a-snowflake",
+      });
+      expect(res).toEqual({ ok: false, reason: "invalid" });
+    });
+
+    it("rejects non-snowflake channel ID for test message", async () => {
+      const res = await sendRegionAlertTestAction({
+        channelId: "12345",
       });
       expect(res).toEqual({ ok: false, reason: "invalid" });
     });
@@ -142,7 +165,7 @@ describe("Pinball Map Region Alerts Admin Configuration", () => {
       await db
         .update(pinballmapState)
         .set({
-          regionAlertChannelId: "999",
+          regionAlertChannelId: "999999999999999999",
           regionAlertStatus: "posting",
         })
         .where(eq(pinballmapState.id, "singleton"));
@@ -170,7 +193,7 @@ describe("Pinball Map Region Alerts Admin Configuration", () => {
       const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
         new Response(
           JSON.stringify({
-            id: "123456789",
+            id: "123456789012345678",
             name: "new-machines",
             permissions: "2048", // SEND_MESSAGES
           }),
@@ -180,7 +203,7 @@ describe("Pinball Map Region Alerts Admin Configuration", () => {
 
       const res = await saveRegionAlertConfigAction({
         region: "austin",
-        alertChannelId: "123456789",
+        alertChannelId: "123456789012345678",
       });
 
       expect(res).toEqual({
@@ -194,7 +217,7 @@ describe("Pinball Map Region Alerts Admin Configuration", () => {
         .select()
         .from(pinballmapState)
         .where(eq(pinballmapState.id, "singleton"));
-      expect(updated?.regionAlertChannelId).toBe("123456789");
+      expect(updated?.regionAlertChannelId).toBe("123456789012345678");
       expect(updated?.regionAlertStatus).toBe("posting");
       expect(updated?.regionAlertLastStatusDetail).toBeNull();
 
@@ -205,7 +228,7 @@ describe("Pinball Map Region Alerts Admin Configuration", () => {
       const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
         new Response(
           JSON.stringify({
-            id: "123456789",
+            id: "123456789012345678",
             name: "announcements",
             permissions: "1024", // Does not have 2048
           }),
@@ -215,7 +238,7 @@ describe("Pinball Map Region Alerts Admin Configuration", () => {
 
       const res = await saveRegionAlertConfigAction({
         region: "austin",
-        alertChannelId: "123456789",
+        alertChannelId: "123456789012345678",
       });
 
       expect(res).toEqual({
@@ -230,7 +253,7 @@ describe("Pinball Map Region Alerts Admin Configuration", () => {
         .select()
         .from(pinballmapState)
         .where(eq(pinballmapState.id, "singleton"));
-      expect(updated?.regionAlertChannelId).toBe("123456789");
+      expect(updated?.regionAlertChannelId).toBe("123456789012345678");
       expect(updated?.regionAlertStatus).toBe("cant_post");
 
       fetchSpy.mockRestore();
@@ -243,7 +266,7 @@ describe("Pinball Map Region Alerts Admin Configuration", () => {
 
       const res = await saveRegionAlertConfigAction({
         region: "austin",
-        alertChannelId: "non-existent-channel",
+        alertChannelId: "999999999999999999",
       });
 
       expect(res).toEqual({
@@ -257,7 +280,7 @@ describe("Pinball Map Region Alerts Admin Configuration", () => {
         .select()
         .from(pinballmapState)
         .where(eq(pinballmapState.id, "singleton"));
-      expect(updated?.regionAlertChannelId).toBe("non-existent-channel");
+      expect(updated?.regionAlertChannelId).toBe("999999999999999999");
       expect(updated?.regionAlertStatus).toBe("cant_post");
 
       fetchSpy.mockRestore();
@@ -270,7 +293,7 @@ describe("Pinball Map Region Alerts Admin Configuration", () => {
 
       const res = await saveRegionAlertConfigAction({
         region: "austin",
-        alertChannelId: "123456789",
+        alertChannelId: "123456789012345678",
       });
 
       expect(res).toEqual({
@@ -287,7 +310,7 @@ describe("Pinball Map Region Alerts Admin Configuration", () => {
 
       const res = await saveRegionAlertConfigAction({
         region: "austin",
-        alertChannelId: "123456789",
+        alertChannelId: "123456789012345678",
       });
 
       expect(res).toEqual({
@@ -301,7 +324,7 @@ describe("Pinball Map Region Alerts Admin Configuration", () => {
       const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
         new Response(
           JSON.stringify({
-            id: "123456789",
+            id: "123456789012345678",
             permissions: "2048",
           }),
           { status: 200 }
@@ -309,18 +332,18 @@ describe("Pinball Map Region Alerts Admin Configuration", () => {
       );
 
       await saveRegionAlertConfigAction({
-        region: "dallas",
-        alertChannelId: "123456789",
+        region: "portland",
+        alertChannelId: "123456789012345678",
       });
 
-      expect(bootstrapRegionMock).toHaveBeenCalledWith("dallas");
+      expect(bootstrapRegionMock).toHaveBeenCalledWith("portland");
 
       const db = await getTestDb();
       const [updated] = await db
         .select()
         .from(pinballmapState)
         .where(eq(pinballmapState.id, "singleton"));
-      expect(updated?.regionAlertRegion).toBe("dallas");
+      expect(updated?.regionAlertRegion).toBe("portland");
 
       fetchSpy.mockRestore();
     });
@@ -335,7 +358,7 @@ describe("Pinball Map Region Alerts Admin Configuration", () => {
       const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
         new Response(
           JSON.stringify({
-            id: "123456789",
+            id: "123456789012345678",
             permissions: "2048",
           }),
           { status: 200 }
@@ -344,7 +367,7 @@ describe("Pinball Map Region Alerts Admin Configuration", () => {
 
       await saveRegionAlertConfigAction({
         region: "austin",
-        alertChannelId: "123456789",
+        alertChannelId: "123456789012345678",
       });
 
       expect(bootstrapRegionMock).toHaveBeenCalledWith("austin");
@@ -355,7 +378,7 @@ describe("Pinball Map Region Alerts Admin Configuration", () => {
       const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
         new Response(
           JSON.stringify({
-            id: "123456789",
+            id: "123456789012345678",
             name: "Text Channels",
             type: 4, // GUILD_CATEGORY
             permissions: "2048",
@@ -366,7 +389,7 @@ describe("Pinball Map Region Alerts Admin Configuration", () => {
 
       const res = await saveRegionAlertConfigAction({
         region: "austin",
-        alertChannelId: "123456789",
+        alertChannelId: "123456789012345678",
       });
 
       expect(res).toEqual({
@@ -385,7 +408,7 @@ describe("Pinball Map Region Alerts Admin Configuration", () => {
       const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
         new Response(
           JSON.stringify({
-            id: "123456789",
+            id: "123456789012345678",
             name: "new-machines",
             permissions: "2048",
           }),
@@ -395,7 +418,7 @@ describe("Pinball Map Region Alerts Admin Configuration", () => {
 
       const res = await saveRegionAlertConfigAction({
         region: "austin",
-        alertChannelId: "123456789",
+        alertChannelId: "123456789012345678",
       });
 
       expect(res.ok).toBe(true);
@@ -405,7 +428,7 @@ describe("Pinball Map Region Alerts Admin Configuration", () => {
         .from(pinballmapState)
         .where(eq(pinballmapState.id, "singleton"));
       expect(created).toBeDefined();
-      expect(created?.regionAlertChannelId).toBe("123456789");
+      expect(created?.regionAlertChannelId).toBe("123456789012345678");
       expect(created?.regionAlertStatus).toBe("posting");
 
       fetchSpy.mockRestore();
@@ -414,10 +437,16 @@ describe("Pinball Map Region Alerts Admin Configuration", () => {
 
   describe("sendRegionAlertTestAction", () => {
     it("returns needs_discord when bot token is missing", async () => {
+      const db = await getTestDb();
+      await db
+        .update(pinballmapState)
+        .set({ regionAlertChannelId: "123456789012345678" })
+        .where(eq(pinballmapState.id, "singleton"));
+
       getDiscordBotTokenMock.mockResolvedValueOnce(null);
 
       const res = await sendRegionAlertTestAction({
-        channelId: "123456789",
+        channelId: "123456789012345678",
       });
 
       expect(res).toEqual({
@@ -426,7 +455,6 @@ describe("Pinball Map Region Alerts Admin Configuration", () => {
         message: "Discord bot token not configured.",
       });
 
-      const db = await getTestDb();
       const [updated] = await db
         .select()
         .from(pinballmapState)
@@ -435,6 +463,12 @@ describe("Pinball Map Region Alerts Admin Configuration", () => {
     });
 
     it("delivers test message with CC BY-SA 4.0 attribution and marks status as posting", async () => {
+      const db = await getTestDb();
+      await db
+        .update(pinballmapState)
+        .set({ regionAlertChannelId: "123456789012345678" })
+        .where(eq(pinballmapState.id, "singleton"));
+
       const fetchSpy = vi
         .spyOn(globalThis, "fetch")
         .mockResolvedValueOnce(
@@ -442,7 +476,7 @@ describe("Pinball Map Region Alerts Admin Configuration", () => {
         );
 
       const res = await sendRegionAlertTestAction({
-        channelId: "123456789",
+        channelId: "123456789012345678",
       });
 
       expect(res).toEqual({
@@ -452,16 +486,15 @@ describe("Pinball Map Region Alerts Admin Configuration", () => {
 
       expect(postChannelMessageMock).toHaveBeenCalledWith({
         botToken: "mock-bot-token",
-        channelId: "123456789",
+        channelId: "123456789012345678",
         content: expect.stringContaining("CC BY-SA 4.0"),
       });
       expect(postChannelMessageMock).toHaveBeenCalledWith({
         botToken: "mock-bot-token",
-        channelId: "123456789",
+        channelId: "123456789012345678",
         content: expect.stringContaining("#alerts-feed"),
       });
 
-      const db = await getTestDb();
       const [updated] = await db
         .select()
         .from(pinballmapState)
@@ -476,13 +509,19 @@ describe("Pinball Map Region Alerts Admin Configuration", () => {
     });
 
     it("updates status to cant_post when postChannelMessage is blocked", async () => {
+      const db = await getTestDb();
+      await db
+        .update(pinballmapState)
+        .set({ regionAlertChannelId: "123456789012345678" })
+        .where(eq(pinballmapState.id, "singleton"));
+
       postChannelMessageMock.mockResolvedValueOnce({
         ok: false,
         reason: "blocked",
       });
 
       const res = await sendRegionAlertTestAction({
-        channelId: "123456789",
+        channelId: "123456789012345678",
       });
 
       expect(res).toEqual({
@@ -491,7 +530,6 @@ describe("Pinball Map Region Alerts Admin Configuration", () => {
         message: "Channel unreachable or bot missing permissions",
       });
 
-      const db = await getTestDb();
       const [updated] = await db
         .select()
         .from(pinballmapState)
@@ -499,12 +537,53 @@ describe("Pinball Map Region Alerts Admin Configuration", () => {
       expect(updated?.regionAlertStatus).toBe("cant_post");
     });
 
+    it("does not mutate persisted configuration or status when testing an unsaved channel ID", async () => {
+      const db = await getTestDb();
+      await db
+        .update(pinballmapState)
+        .set({
+          regionAlertChannelId: "123456789012345678",
+          regionAlertStatus: "not_configured",
+        })
+        .where(eq(pinballmapState.id, "singleton"));
+
+      const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+        new Response(JSON.stringify({ name: "unsaved-channel" }), {
+          status: 200,
+        })
+      );
+
+      const res = await sendRegionAlertTestAction({
+        channelId: "987654321098765432",
+      });
+
+      expect(res).toEqual({
+        ok: true,
+        channelName: "unsaved-channel",
+      });
+
+      expect(postChannelMessageMock).toHaveBeenCalledWith({
+        botToken: "mock-bot-token",
+        channelId: "987654321098765432",
+        content: expect.stringContaining("#unsaved-channel"),
+      });
+
+      const [persisted] = await db
+        .select()
+        .from(pinballmapState)
+        .where(eq(pinballmapState.id, "singleton"));
+      expect(persisted?.regionAlertChannelId).toBe("123456789012345678");
+      expect(persisted?.regionAlertStatus).toBe("not_configured");
+
+      fetchSpy.mockRestore();
+    });
+
     it("tests configured channel when channelId is omitted", async () => {
       const db = await getTestDb();
       await db
         .update(pinballmapState)
         .set({
-          regionAlertChannelId: "configured-channel-123",
+          regionAlertChannelId: "123456789012345678",
         })
         .where(eq(pinballmapState.id, "singleton"));
 
@@ -523,7 +602,7 @@ describe("Pinball Map Region Alerts Admin Configuration", () => {
 
       expect(postChannelMessageMock).toHaveBeenCalledWith({
         botToken: "mock-bot-token",
-        channelId: "configured-channel-123",
+        channelId: "123456789012345678",
         content: expect.stringContaining("#configured-feed"),
       });
 

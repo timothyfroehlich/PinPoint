@@ -240,7 +240,7 @@ function parseRegion(raw: unknown): PinballMapRegion | null {
   const id = asNumber(r["id"]);
   const name = asString(r["name"]);
   if (id === null || name === null || name.length === 0) return null;
-  const rawFormal = asString(r["formal_name"])?.trim();
+  const rawFormal = asString(r["full_name"])?.trim();
   const formalName =
     rawFormal && rawFormal.length > 0
       ? rawFormal
