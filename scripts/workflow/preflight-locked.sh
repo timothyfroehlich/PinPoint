@@ -74,10 +74,8 @@ fi
 # `preflight:_run` is the one canonical graph for capped, uncapped, compact,
 # and human runs. The presentation layer is the only difference.
 run_command=(pnpm run preflight:_run)
-if [[ $human == false ]]; then
-  run_command=(
-    python3 scripts/quiet-run.py --label preflight -- "${run_command[@]}"
-  )
+if [[ $human == true ]]; then
+  run_command+=(--human)
 fi
 
 # sem re-parses a command string through a shell. Quote each argument first so

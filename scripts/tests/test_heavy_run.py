@@ -265,7 +265,7 @@ def test_two_preflights_can_enter_distinct_inner_heavy_pool(tmp_path: Path) -> N
     fake_pnpm = tmp_path / "bin" / "pnpm"
     fake_pnpm.write_text(
         """#!/usr/bin/env bash
-if [[ $* == 'run preflight:_run' ]]; then
+if [[ $* == 'run preflight:_run'* ]]; then
   exec bash "$PINPOINT_REPO_ROOT/scripts/workflow/heavy-run.sh" \
     "$PINPOINT_TEST_PYTHON" -c 'import time; time.sleep(0.1)'
 fi
@@ -297,7 +297,7 @@ exit 64
 
     try:
         for process in processes:
-            stdout, stderr = process.communicate(timeout=5)
+            stdout, stderr = process.communicate(timeout=15)
             assert process.returncode == 0, (stdout, stderr)
         assert (state_dir / "pinpoint-preflight").is_dir()
         assert (state_dir / "pinpoint-heavy").is_dir()

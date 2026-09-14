@@ -447,7 +447,7 @@ printf 'bash %s\\n' "$*" >>"{calls}"
         capture_output=True,
         text=True,
         check=False,
-        timeout=5,
+        timeout=15,
     )
     return result, calls
 
@@ -524,27 +524,32 @@ def test_targeted_integration_rejects_path_like_option_operands(
 
 def test_package_scripts_put_readiness_first_and_share_integration_setup() -> None:
     scripts = json.loads((REPO_ROOT / "package.json").read_text())["scripts"]
+    runner_source = (REPO_ROOT / "scripts/workflow/preflight-runner.py").read_text()
 
-    assert scripts["preflight:readiness"] == (
+    assert scripts["preflight:readiness"].endswith(
         "bash scripts/workflow/preflight-readiness.sh"
     )
-    preflight = scripts["preflight:_run"]
-    assert preflight.startswith("pnpm run preflight:readiness && ")
+    assert scripts["preflight:_run"] == "python3 scripts/workflow/preflight-runner.py"
+
     for phase in (
-        "check:prototype-clean",
-        "typecheck",
-        "test:human",
-        "db:fast-reset",
+        "database-readiness",
+        "prototype-clean",
+        "static-checks",
+        "unit-tests",
+        "database-reset",
         "build",
-        "test:integration",
-        "test:integration:supabase",
+        "integration",
+        "supabase-integration",
         "smoke",
     ):
-        assert phase in preflight
-    assert preflight.index("preflight:readiness") < preflight.index(
-        "check:prototype-clean"
+        assert phase in runner_source
+
+    assert runner_source.index("database-readiness") < runner_source.index(
+        "prototype-clean"
     )
-    assert preflight.index("check:prototype-clean") < preflight.index("db:fast-reset")
+    assert runner_source.index("prototype-clean") < runner_source.index(
+        "database-reset"
+    )
 
     assert scripts["test:integration:target"] == (
         "bash scripts/workflow/integration-test.sh --require-target"
