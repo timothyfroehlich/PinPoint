@@ -1,0 +1,118 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+#
+# CodeRabbit review configuration for PinPoint.
+#
+# CANONICAL SOURCE: `REVIEW.md` at the repo root is the review rubric, and
+# `docs/NON_NEGOTIABLES.md` is the full `CORE-*` catalog. This file deliberately
+# POINTS AT them rather than restating them, because AGENTS.md §8 makes the
+# canonical docs authoritative and forbids parallel copies that drift. The only
+# rules inlined below are the three REVIEW.md flags as "each of these has
+# shipped a real bug" — duplicated on purpose as a safety net in case the
+# reviewer does not open the referenced files.
+#
+# Tunables Tim may want to revisit after the trial: `reviews.profile`
+# (chill → assertive for more findings) and `auto_review.drafts`.
+language: en-US
+
+tone_instructions: |
+  Be direct and technical. No preamble, no praise, no summary of what the code
+  does. State the problem, cite the rule ID, propose the fix.
+
+reviews:
+  # The point of this config: CodeRabbit requests changes while it has open
+  # findings and approves once they are resolved and the latest commit is
+  # reviewed. Approval means "automated review complete" — it does NOT
+  # authorize merging, which stays Tim's decision (PP-wi85).
+  request_changes_workflow: true
+
+  # "chill" keeps low-confidence nits out of the thread. PinPoint already runs a
+  # strict static gate (`pnpm run check`: oxlint type-aware, TS 7 strictest,
+  # ruff, shellcheck, actionlint), so style noise is pure cost here.
+  profile: chill
+
+  high_level_summary: true
+  review_status: true
+  poem: false
+
+  auto_review:
+    enabled: true
+    # PinPoint opens every agent PR as a draft and promotes it only after
+    # current-head CI succeeds (pinpoint-pr-workflow Phase 2/3). Reviewing on
+    # promotion rather than on open matches that flow.
+    drafts: false
+
+  path_instructions:
+    - path: "**"
+      instructions: |
+        Read `/REVIEW.md` (the canonical review rubric) and
+        `/docs/NON_NEGOTIABLES.md` (the full CORE-* catalog) before reviewing.
+        Cite the `CORE-*` rule ID in any comment reporting a violation, exactly
+        as a human reviewer would — e.g. "CORE-SEC-007".
+
+        PinPoint is a single-tenant pinball issue tracker in live production
+        with real user data. There is no multi-tenancy, no RLS, and no tRPC, by
+        design. Flag any newly introduced org scoping, multi-tenant context
+        wrapper, RLS policy, pgTAP test, or tRPC router.
+
+        Type safety (CORE-TS-007): flag `any` (explicit or implicit), non-null
+        assertions (`!`), and unsafe `as` casts; require narrowing instead.
+        Path aliases (CORE-TS-008): flag deep relative imports (`../../..`);
+        imports use the `~/` alias.
+
+    - path: "src/server/**"
+      instructions: |
+        CORE-ARCH-011 — no side effects inside DB transactions. Flag any HTTP
+        request, email/Discord send, blob upload, or Vault RPC inside a
+        `db.transaction(...)` callback. Inputs are fetched before the
+        transaction; effects are delivered after commit via `after()` +
+        `planNotification`/`dispatchNotification`.
+
+        Never reintroduce `prepare: true` on a client connecting to the
+        Supavisor transaction pooler (`:6543`) — it silently loses commits.
+
+    - path: "src/**/*.tsx"
+      instructions: |
+        CORE-SEC-007 — email privacy. A user's email must never render outside
+        `/admin/*` views and the user's own settings page. Flag any UI,
+        timeline event, notification body, or prop passed to a client component
+        that renders `reporterEmail` or a raw email elsewhere. The correct
+        display chain is `reportedByUser.name` → `invitedReporter.name` →
+        `reporterName` → `"Anonymous"`.
+
+        CORE-SEC-006 — minimal client payload. Flag a `"use client"` component
+        receiving a whole ORM row or domain object as a prop; pass only the
+        fields it uses. The RSC payload is visible in page source.
+
+        CORE-ARCH-001 — server-first. Flag `"use client"` on a component with no
+        interactivity (no event handlers, browser APIs, or client state).
+
+    - path: "src/lib/permissions/**"
+      instructions: |
+        CORE-ARCH-008 — every authorization check goes through
+        `checkPermission()` from `~/lib/permissions/helpers`, or a centralized
+        resource predicate here that delegates its role dimension to it. Flag
+        standalone permission checks defined outside this directory and
+        hardcoded role comparisons used as authorization gates. If a change
+        touches the matrix, verify the server action still enforces it.
+
+    - path: "drizzle/**"
+      instructions: |
+        CORE-ARCH-009 — schema changes go through `db:generate` + `db:migrate`.
+        Flag any `drizzle-kit push` or Supabase-migration usage. Every new
+        `.sql` migration needs a matching `_snapshot.json`. Never hand-edit
+        `drizzle/meta` — the snapshots are binary-like and manual edits corrupt
+        the prevId chain.
+
+    - path: "docs/feature-specs/**"
+      instructions: |
+        Source here is diff-oriented: every prose paragraph, concept bullet,
+        numbered requirement, divergence row, and changelog row stays on ONE
+        physical line, with soft wrapping left to the renderer. Flag
+        reflowed/hard-wrapped prose.
+
+        When a PR changes behavior covered by a spec, the same PR must update
+        the spec or add a divergence-table row — flag it if it has neither.
+
+knowledge_base:
+  learnings:
+    scope: auto
