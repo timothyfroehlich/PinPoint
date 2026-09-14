@@ -9,6 +9,8 @@ import sys
 import time
 from pathlib import Path
 
+import pytest
+
 PREFLIGHT_RUNNER = Path(__file__).parent.parent / "workflow" / "preflight-runner.py"
 REPO_ROOT = Path(__file__).parents[2]
 
@@ -105,7 +107,8 @@ def test_heartbeat_emits_on_long_running_phase(tmp_path: Path) -> None:
         and line.endswith("s elapsed)")
         for line in heartbeats
     )
-    assert len(progress) <= 6
+    # START + heartbeats + COMPLETE; only the two transitions are deterministic.
+    assert len(progress) == len(heartbeats) + 2
     assert list((tmp_path / "logs").glob("*.log")) == []
 
 
@@ -320,3 +323,124 @@ def test_default_phases_contain_canonical_order() -> None:
         "supabase-integration",
         "smoke",
     ]
+
+
+def test_reap_processes_terminates_and_waits_for_children() -> None:
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("preflight_runner", PREFLIGHT_RUNNER)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    p1 = subprocess.Popen(
+        [sys.executable, "-c", "import time; time.sleep(30)"],
+        start_new_session=True,
+    )
+    p2 = subprocess.Popen(
+        [sys.executable, "-c", "import time; time.sleep(30)"],
+        start_new_session=True,
+    )
+    active = [p1, p2]
+    procs = [p1, p2]
+
+    assert p1.poll() is None
+    assert p2.poll() is None
+
+    module._reap_processes(procs, active, signum=signal.SIGTERM)
+
+    assert p1.poll() is not None
+    assert p2.poll() is not None
+    assert active == []
+    with pytest.raises(OSError):
+        os.kill(p1.pid, 0)
+    with pytest.raises(OSError):
+        os.kill(p2.pid, 0)
+
+
+def test_parallel_start_failure_returns_127(tmp_path: Path) -> None:
+    phases = [
+        {
+            "parallel": [
+                {
+                    "name": "child-ok",
+                    "command": [sys.executable, "-c", "import time; time.sleep(5)"],
+                },
+                {
+                    "name": "child-bad",
+                    "command": ["/nonexistent/executable/for/test"],
+                },
+            ]
+        }
+    ]
+
+    result = _run_preflight_runner(tmp_path, phases)
+
+    assert result.returncode == 127
+    assert "failed to start child-bad" in result.stderr
+
+
+def test_parallel_interruption_reaps_all_children(tmp_path: Path) -> None:
+    ready1 = tmp_path / "child1.ready"
+    ready2 = tmp_path / "child2.ready"
+    pid1_file = tmp_path / "child1.pid"
+    pid2_file = tmp_path / "child2.pid"
+
+    phases = [
+        {
+            "parallel": [
+                {
+                    "name": "worker1",
+                    "command": [
+                        sys.executable,
+                        "-c",
+                        (
+                            "import os, time; from pathlib import Path; "
+                            f"Path({str(pid1_file)!r}).write_text(str(os.getpid())); "
+                            f"Path({str(ready1)!r}).write_text('ready'); time.sleep(30)"
+                        ),
+                    ],
+                },
+                {
+                    "name": "worker2",
+                    "command": [
+                        sys.executable,
+                        "-c",
+                        (
+                            "import os, time; from pathlib import Path; "
+                            f"Path({str(pid2_file)!r}).write_text(str(os.getpid())); "
+                            f"Path({str(ready2)!r}).write_text('ready'); time.sleep(30)"
+                        ),
+                    ],
+                },
+            ]
+        }
+    ]
+
+    env = os.environ.copy()
+    env["PINPOINT_QUIET_LOG_DIR"] = str(tmp_path / "logs")
+    env["PINPOINT_PREFLIGHT_PHASES_JSON"] = json.dumps(phases)
+
+    process = subprocess.Popen(
+        [sys.executable, str(PREFLIGHT_RUNNER)],
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+
+    deadline = time.monotonic() + 15
+    while not (ready1.exists() and ready2.exists()) and time.monotonic() < deadline:
+        time.sleep(0.01)
+    assert ready1.exists() and ready2.exists()
+
+    process.send_signal(signal.SIGINT)
+    stdout, stderr = process.communicate(timeout=15)
+
+    assert process.returncode == 128 + signal.SIGINT
+    child1_pid = int(pid1_file.read_text().strip())
+    child2_pid = int(pid2_file.read_text().strip())
+    with pytest.raises(OSError):
+        os.kill(child1_pid, 0)
+    with pytest.raises(OSError):
+        os.kill(child2_pid, 0)

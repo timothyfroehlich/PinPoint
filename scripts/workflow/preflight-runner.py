@@ -217,6 +217,44 @@ def _exit_for_returncode(returncode: int) -> int:
     return returncode if returncode >= 0 else 128 + abs(returncode)
 
 
+def _reap_processes(
+    procs: list[subprocess.Popen],
+    active_processes: list[subprocess.Popen],
+    signum: int | None = None,
+) -> None:
+    """Signal unfinished processes (if signum given) and wait for all started children to exit."""
+    if signum is not None:
+        for proc in procs:
+            if proc.poll() is None:
+                try:
+                    os.killpg(proc.pid, signum)
+                except OSError:
+                    try:
+                        proc.send_signal(signum)
+                    except OSError:
+                        pass
+    for proc in procs:
+        if proc.poll() is None:
+            try:
+                proc.wait(timeout=5.0)
+            except subprocess.TimeoutExpired:
+                try:
+                    os.killpg(proc.pid, signal.SIGKILL)
+                except OSError:
+                    try:
+                        proc.kill()
+                    except OSError:
+                        pass
+                try:
+                    proc.wait(timeout=2.0)
+                except (subprocess.TimeoutExpired, OSError):
+                    pass
+            except OSError:
+                pass
+        if proc in active_processes:
+            active_processes.remove(proc)
+
+
 def _run_human_mode(phases: list[dict], label: str = "preflight") -> int:
     active_processes: list[subprocess.Popen] = []
     received_signal: int | None = None
@@ -260,6 +298,11 @@ def _run_human_mode(phases: list[dict], label: str = "preflight") -> int:
                         print(
                             f"{label}: failed to start {name}: {error}", file=sys.stderr
                         )
+                        _reap_processes(
+                            [p["proc"] for p in procs],
+                            active_processes,
+                            signum=signal.SIGTERM,
+                        )
                         return 127
                     procs.append(
                         {
@@ -292,11 +335,26 @@ def _run_human_mode(phases: list[dict], label: str = "preflight") -> int:
                             if p["proc"] in active_processes:
                                 active_processes.remove(p["proc"])
 
+                if received_signal is not None:
+                    _reap_processes(
+                        [p["proc"] for p in procs],
+                        active_processes,
+                        signum=received_signal,
+                    )
+                    for p in procs:
+                        p["done"] = True
+                        p["exit"] = p["proc"].returncode
+
                 interrupted = next(
                     (p for p in procs if p["exit"] is not None and p["exit"] < 0),
                     None,
                 )
                 if interrupted is not None:
+                    _reap_processes(
+                        [p["proc"] for p in procs],
+                        active_processes,
+                        signum=signal.SIGTERM,
+                    )
                     return 128 + abs(interrupted["exit"])
 
                 failed = next((p for p in procs if p["exit"] not in (0, None)), None)
@@ -333,6 +391,7 @@ def _run_human_mode(phases: list[dict], label: str = "preflight") -> int:
                     return _exit_for_returncode(ret)
 
     finally:
+        _reap_processes(list(active_processes), active_processes, signum=signal.SIGTERM)
         for signum, handler in previous_handlers.items():
             signal.signal(signum, handler)
 
@@ -409,6 +468,11 @@ def main() -> int:
                             f"{args.label}: failed to start {name}: {error}",
                             file=sys.stderr,
                         )
+                        _reap_processes(
+                            [p["proc"] for p in procs],
+                            active_processes,
+                            signum=signal.SIGTERM,
+                        )
                         return 127
                     procs.append(
                         {
@@ -452,11 +516,26 @@ def main() -> int:
                                 )
                                 p["last_heartbeat"] = now
 
+                if received_signal is not None:
+                    _reap_processes(
+                        [p["proc"] for p in procs],
+                        active_processes,
+                        signum=received_signal,
+                    )
+                    for p in procs:
+                        p["done"] = True
+                        p["exit"] = p["proc"].returncode
+
                 interrupted = next(
                     (p for p in procs if p["exit"] is not None and p["exit"] < 0),
                     None,
                 )
                 if interrupted is not None:
+                    _reap_processes(
+                        [p["proc"] for p in procs],
+                        active_processes,
+                        signum=signal.SIGTERM,
+                    )
                     signum = abs(interrupted["exit"])
                     signame = signal.Signals(signum).name
                     total_elapsed = time.monotonic() - overall_start
@@ -562,6 +641,7 @@ def main() -> int:
                     return exit_code
 
     finally:
+        _reap_processes(list(active_processes), active_processes, signum=signal.SIGTERM)
         log_handle.close()
         for signum, handler in previous_handlers.items():
             signal.signal(signum, handler)
