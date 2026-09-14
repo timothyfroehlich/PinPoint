@@ -202,8 +202,8 @@ if (require.main === module) {
     // reflect where the command actually runs: a lead relocated via EnterWorktree
     // or a worktree-isolated subagent operates in a LINKED worktree whose root
     // differs from the project root — using CLAUDE_PROJECT_DIR would misclassify
-    // them as the MAIN worktree and wrongly block legit switches. Repo convention:
-    // see normalize-workspace-paths.cjs (`input.cwd || process.cwd()`).
+    // them as the MAIN worktree and wrongly block legit switches. Fall back to
+    // process.cwd() when payload.cwd is absent.
     const detectCwd = payload.cwd || process.cwd();
 
     // 2. Single-use bypass sentinel. In the main worktree the cwd and root
@@ -212,7 +212,9 @@ if (require.main === module) {
     if (fs.existsSync(sentinel)) {
       try {
         fs.unlinkSync(sentinel);
-      } catch {}
+      } catch {
+        // Best-effort cleanup
+      }
       process.exit(0);
     }
 

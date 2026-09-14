@@ -278,7 +278,7 @@ denied. On 2026-08-03 an auto-mode session was refused with `Blocked by classifi
 
 Two limits worth knowing:
 
-- Each rule matches the documented invocation — `bash scripts/workflow/<script> …` — and only that shape. **Use the relative path** — an absolute one does not match and falls through to the classifier. Don't count on `normalize-workspace-paths.cjs` to rescue it: its rewrite regex is hardcoded to `/home/froeht/Code/…`, so it never fires on this Mac (`/Users/froeht/Code/PinPoint`), and its `pinpoint-worktrees/` alternative predates the current `.claude/worktrees/<branch>/` layout. Chaining (`… && something-else`) does not inherit the allow either — each subcommand is matched on its own.
+- Each rule matches the documented invocation — `bash scripts/workflow/<script> …` — and only that shape. **Use the relative path** — an absolute one does not match and falls through to the classifier. Chaining (`… && something-else`) does not inherit the allow either — each subcommand is matched on its own.
 - A summary string containing an unbalanced quote makes the whole command unresolvable to `block-direct-merge.cjs`, which then scans the raw text and blocks on `merge-pr.sh` or `pr merge`. Rare, and it fails closed. Fix the quoting rather than working around it.
 
 #### Readiness is not review

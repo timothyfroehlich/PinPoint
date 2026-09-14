@@ -198,12 +198,12 @@ export async function logout(page: Page, _testInfo: TestInfo): Promise<void> {
  * wait in `support/fixtures.ts`.
  *
  * A caveat on how that was established, because it is easy to repeat the
- * mistake: the crabbox runner does **not** set `CI`, so on it these constants
- * evaluate to the local 5s/3s and `playwright.config.ts` uses `actionTimeout`
- * 5s and an `expect` timeout of 10s rather than CI's 30s. Any conclusion of the
- * form "widening the timeout did not help" drawn from a runner session is
- * therefore worthless — the widening never applied. Check `echo $CI` on the
- * host before reading anything into a timeout experiment. (PP-jxhy.)
+ * mistake: local and non-CI test environments do **not** set `CI`, so on them
+ * these constants evaluate to the local 5s/3s and `playwright.config.ts` uses
+ * `actionTimeout` 5s and an `expect` timeout of 10s rather than CI's 30s. Any
+ * conclusion of the form "widening the timeout did not help" drawn from a non-CI
+ * session is therefore worthless — the widening never applied. Check `echo $CI` on
+ * the host before reading anything into a timeout experiment. (PP-jxhy.)
  *
  * Local keeps the short budget: that dev server is usually warm, and a
  * genuinely missing selector should still fail fast.
