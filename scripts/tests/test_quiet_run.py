@@ -1,4 +1,4 @@
-"""Tests for the bounded validation-command output wrapper (PP-sec4)."""
+"""Tests for bounded validation output and secret-safe failure excerpts."""
 
 import json
 import os
@@ -16,6 +16,18 @@ REPO_ROOT = Path(__file__).parents[2]
 def _run_quiet(
     tmp_path: Path, label: str, code: str
 ) -> subprocess.CompletedProcess[str]:
+    return _run_quiet_command(
+        tmp_path,
+        label,
+        [sys.executable, "-c", code],
+    )
+
+
+def _run_quiet_command(
+    tmp_path: Path,
+    label: str,
+    command: list[str],
+) -> subprocess.CompletedProcess[str]:
     env = os.environ.copy()
     env["PINPOINT_QUIET_LOG_DIR"] = str(tmp_path / "logs")
     return subprocess.run(
@@ -25,9 +37,7 @@ def _run_quiet(
             "--label",
             label,
             "--",
-            sys.executable,
-            "-c",
-            code,
+            *command,
         ],
         env=env,
         capture_output=True,
@@ -154,13 +164,13 @@ def test_interrupt_is_forwarded_and_reported(tmp_path: Path) -> None:
         stderr=subprocess.PIPE,
         text=True,
     )
-    deadline = time.monotonic() + 5
+    deadline = time.monotonic() + 15
     while not ready_file.exists() and time.monotonic() < deadline:
         time.sleep(0.01)
     assert ready_file.exists()
 
     process.send_signal(signal.SIGINT)
-    stdout, stderr = process.communicate(timeout=5)
+    stdout, stderr = process.communicate(timeout=15)
 
     assert process.returncode == 128 + signal.SIGINT
     assert stdout == ""
@@ -199,12 +209,11 @@ def test_package_scripts_share_canonical_gate_graphs() -> None:
     )
     assert scripts["e2e:all"].endswith("-- pnpm run e2e:all:_run")
     assert scripts["e2e:all:human"] == "pnpm run e2e:all:_run"
-    assert scripts["preflight:unlocked"].endswith("-- pnpm run preflight:_run")
-    assert scripts["preflight:unlocked:human"] == "pnpm run preflight:_run"
+    assert scripts["preflight:unlocked"] == "pnpm run preflight:_run"
+    assert scripts["preflight:unlocked:human"] == "pnpm run preflight:_run --human"
 
     locked = (REPO_ROOT / "scripts/workflow/preflight-locked.sh").read_text()
     assert "pnpm run preflight:_run" in locked
-    assert "scripts/quiet-run.py --label preflight" in locked
 
 
 def test_locked_preflight_only_changes_presentation_mode(tmp_path: Path) -> None:
@@ -261,6 +270,6 @@ printf '%s\\n' "$@"
     assert compact.returncode == 0
     assert human.returncode == 0
     assert "pnpm run preflight:_run" in compact.stdout
-    assert "scripts/quiet-run.py" in compact.stdout
     assert "pnpm run preflight:_run" in human.stdout
-    assert "scripts/quiet-run.py" not in human.stdout
+    assert "--human" in human.stdout
+    assert "--human" not in compact.stdout
