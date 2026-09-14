@@ -160,8 +160,8 @@ After current-head CI succeeds and the PR is ready:
    ```
 
 3. **Handling the review result**:
-   - `outcome: "passed"` (exit 0): Exact-head review coverage present (native approval, clean reaction witness, clean comment, marker, or reviewed) AND 0 unresolved threads. Proceed to UI screenshots in 3.5, apply the `ready-for-review` label in 3.6, then enter the Phase 4 merge handoff.
-   - `outcome: "action_required"` (exit 1): Either exact-head review present but unresolved threads remain (>0), or review was `not_approved`. The owner adjudicates findings: fixes code or replies to/declines threads, then resolves them. If code changed, push and re-start at Phase 3.1. If all threads were resolved with no code change, exact-head coverage is complete.
+   - `outcome: "passed"` (exit 0): The gate label is `approved` (some checker — CodeRabbit approval, Codex evidence, or local attestation — covers the exact head) AND 0 unresolved threads. Proceed to UI screenshots in 3.5, apply the `ready-for-review` label in 3.6, then enter the Phase 4 merge handoff.
+   - `outcome: "action_required"` (exit 1): Either `approved` with unresolved threads remaining (>0), or the label is `changes requested`. The owner adjudicates findings: fixes code or replies to/declines threads, then resolves them. If code changed, push and re-start at Phase 3.1. If all threads were resolved with no code change, exact-head coverage is complete.
    - `outcome: "stale"` (exit 1): Branch head moved; re-orient to the new head.
    - `outcome: "conflicting"` (exit 1): Merge conflict; merge `main` and push.
    - `outcome: "timed_out"` / `"undetermined"` (exit 2): Re-run watch or inspect GitHub API.
@@ -255,7 +255,7 @@ hand-roll the node invocation to get around it.
 
 Address the findings. If the reviewed head remains current, attest it — **this step is
 yours on the local route.** A clean local review with no marker still reads as
-`unreviewed`:
+`not reviewed`:
 
 ```bash
 bash scripts/workflow/mark-review.sh <PR> codex-plugin-cc base-main "<one-line findings summary>"   # /codex:review
@@ -367,7 +367,7 @@ Never say "ready to push when you are" — you push. Never say a PR is "merged" 
 
 **On any FAIL the script removes the `ready-for-review` label if present** (and likewise on the `--automerge` RED path). The label's contract is "click-merge-without-thinking"; if a gate fails at merge time that contract is broken, so the label goes. Practical consequence: after Tim reports a FAIL, fix the underlying issue, push, and **re-apply the label** (3.6) before re-handing him the `--human` command — don't assume it survived.
 
-**A `reviewed` FAIL is almost never a `--force` case.** `unreviewed` means neither path covers head, `stale_approval` / `stale_clean_comment` / `stale_marker` mean you pushed past the review record, and `not_approved` means the current-head review is unusable — all describe an unfinished PR, not a broken gate. Take either honest path in 3.4 and cover head.
+**A `reviewed` FAIL is almost never a `--force` case.** `not reviewed` means no checker covers head, `stale review` means you pushed past the review record, and `changes requested` means a reviewer asked for changes on this head (or threads are open) — all describe an unfinished PR, not a broken gate. Take either honest path in 3.4 and cover head.
 
 `--bypass-merge-requirements` is for a required check failing for known-irrelevant reasons (infrastructure flake, unrelated job) where the change has been manually verified safe — log the flake first with `bash scripts/workflow/log-gha-flake.sh <pr> <run-id> <class> "<symptom>"` (see `docs/runbooks/gha-flake-log.md`) — or an emergency hotfix where waiting for CI is not acceptable. Do NOT suggest bypassing when a merge conflict exists, or when the underlying state hasn't been manually verified.
 

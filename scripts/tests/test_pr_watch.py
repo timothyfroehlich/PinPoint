@@ -6,13 +6,13 @@ is supersession rather than failure, while an API outage is undetermined rather
 than a fabricated red result. Detailed run logs are fetched only after the
 aggregate gate has conclusively failed. (PP-r63o, PP-qkl8)
 
-Review state: `--check-ready` reports which Codex-review state a PR is
-in without gating on it — "reviewed", "reviewed then pushed past", and "not yet
-reviewed" need different actions, and flattening a stale approval into "reviewed"
-is how a commit nobody read reaches the merge command.
+Review state: `--check-ready` and `--phase review` report the merge gate's label
+(approved / changes requested / stale review / not reviewed) without owning the
+logic — `review_summary` shells out to `_review_summary` in `_pr-gates.sh`, so a
+stale approval cannot be flattened into "approved" by a Python copy that drifted.
 
-Everything is mocked at the `gh` CLI seam (`pr_watch.gh`) — these tests never
-reach GitHub (CORE-TEST-006).
+Everything is mocked at the `gh` CLI seam (`pr_watch.gh`) and the gate seam
+(`pr_watch.review_summary`) — these tests never reach GitHub (CORE-TEST-006).
 """
 
 import importlib.util
@@ -89,92 +89,62 @@ def _ago(seconds: float) -> str:
     return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() - seconds))
 
 
-def codex_review(
-    sha=HEAD_SHA,
-    state="APPROVED",
-    submitted_at="2026-08-22T12:00:00Z",
-    login=pr_watch.CODEX_REVIEW_BOT,
-):
-    return {
-        "user": {"login": login},
-        "state": state,
-        "commit_id": sha,
-        "submitted_at": submitted_at,
-    }
-
-
-def manual_marker(sha=HEAD_SHA):
-    return {
-        "body": f"<!-- pinpoint-review: {sha} -->\nreviewed",
-        "updated_at": "2026-08-22T12:00:00Z",
-    }
-
-
-def claude_two_axis_review(
-    sha: str | None = HEAD_SHA[:8],
+def fake_summary(
+    label="not reviewed",
     *,
-    login: str = pr_watch.REPO_OWNER,
-    base: str = "origin/main",
-    updated_at: str = "2026-08-22T12:00:00Z",
+    head=HEAD_SHA,
+    checker="codex",
+    form="approval",
+    unresolved=0,
+    pending=False,
+    stale_sha=OLD_SHA,
 ):
-    if sha is not None:
-        preamble = f"Reviewed `{base}...{sha}` across **Standards** and **Spec**."
-    else:
-        preamble = f"Two-axis review against merge-base `{base}`. Docs-only."
-    body = (
-        f"## Code review — PR #{PR} (two-axis)\n\n"
-        f"{preamble}\n\n"
-        f"## Standards\n\nNo breaches.\n\n"
-        f"## Spec\n\nFaithful.\n\n"
-        f"---\n\n**Summary** — Clean.\n\n—Claude"
-    )
+    """A `_review_summary` document, as the bash gate emits it.
+
+    Only the fields the watcher reads are modelled: label, coverage (present exactly
+    when the label is "approved"), checkers, codex_request_pending, unresolved_threads.
+    """
+
+    def record(verdict, sha):
+        return {
+            "checker": checker,
+            "verdict": verdict,
+            "form": form if verdict == "covers" else "",
+            "sha": sha,
+            "reviewer": "",
+            "detail": "",
+            "at": "2026-08-22T12:00:00Z",
+            "summary": "",
+        }
+
+    none = {name: record("none", "") for name in ("coderabbit", "codex", "marker")}
+    checkers = dict(none)
+    if label == "approved":
+        checkers[checker] = record("covers", head)
+    elif label == "stale review":
+        checkers[checker] = record("stale", stale_sha)
+    elif label == "changes requested" and unresolved == 0:
+        checkers[checker] = record("changes_requested", head)
     return {
-        "user": {"login": login},
-        "body": body,
-        "updated_at": updated_at,
+        "head": head,
+        "label": label,
+        "coverage": checkers[checker] if label == "approved" else None,
+        "checkers": checkers,
+        "codex_request_pending": pending,
+        "unresolved_threads": unresolved,
     }
 
 
-def clean_codex_comment(
-    sha=HEAD_SHA[:10],
-    *,
-    login=pr_watch.CODEX_REVIEW_BOT,
-    app=pr_watch.CODEX_REVIEW_APP_SLUG,
-    updated_at="2026-08-22T12:00:00Z",
-):
-    return {
-        "user": {"login": login},
-        "performed_via_github_app": {"slug": app},
-        "body": (
-            "Codex Review: Didn't find any major issues. Keep it up!\n\n"
-            f"**Reviewed commit:** `{sha}`"
-        ),
-        "updated_at": updated_at,
-    }
+def use_summaries(monkeypatch, *summaries):
+    """Answer successive `review_summary` calls; the last one repeats."""
+    queue = list(summaries)
 
+    def fake_review_summary(_pr):
+        if len(queue) > 1:
+            return queue.pop(0)
+        return queue[0]
 
-def clean_codex_reaction_witness(
-    sha=HEAD_SHA,
-    *,
-    login=pr_watch.GITHUB_ACTIONS_BOT,
-    app=pr_watch.GITHUB_ACTIONS_APP_SLUG,
-    updated_at="2026-08-22T12:02:00Z",
-):
-    return {
-        "user": {"login": login},
-        "performed_via_github_app": {"slug": app},
-        "body": f"<!-- pinpoint-codex-reaction-witness: {sha} -->\nwitnessed",
-        "created_at": updated_at,
-        "updated_at": updated_at,
-    }
-
-
-def manual_review_request(sha=HEAD_SHA, login=pr_watch.REPO_OWNER):
-    return {
-        "user": {"login": login},
-        "body": f"@codex review\n<!-- pinpoint-codex-review-head: {sha} -->",
-        "created_at": "2026-08-22T12:03:00Z",
-    }
+    monkeypatch.setattr(pr_watch, "review_summary", fake_review_summary)
 
 
 def make_gh(
@@ -183,16 +153,13 @@ def make_gh(
     merge_state="CLEAN",
     threads=(),
     labels=(),
-    reviews=(),
-    comments=(),
 ):
     """Build a fake `gh` that answers every call pr-watch makes.
 
     Records each invocation on `.calls` so tests can assert what was queried.
 
-    `reviews` is what `review_state` reads. It defaults to empty — the
-    `unreviewed` state — which is deliberate: `unreviewed` is reported but does
-    NOT gate readiness, so tests that don't care about the review stay unaffected.
+    Review evidence is not modelled here: the watcher reads it from the bash gate
+    (`review_summary`), which tests replace with `use_summaries`.
     """
 
     def fake_gh(*args: str) -> str:
@@ -234,12 +201,6 @@ def make_gh(
                 return json.dumps({"headRefName": BRANCH, "headRefOid": HEAD_SHA})
             if fields == "headRefOid":
                 return json.dumps({"headRefOid": HEAD_SHA})
-        if args[:2] == ("api", "--paginate"):
-            path = args[2]
-            if "/reviews" in path:
-                return json.dumps(list(reviews))
-            if "/comments" in path:
-                return json.dumps(list(comments))
         if args[:2] == ("api", "graphql"):
             return json.dumps(
                 {
@@ -911,413 +872,99 @@ def test_run_audit_reports_cancelled_gate_as_superseded(monkeypatch, capsys):
 # review_state — native Codex review states, pinned to the reviewed SHA (PP-4ric)
 # ---------------------------------------------------------------------------
 #
+# review_summary / review_state — read from the bash gate, never mirrored
 # ---------------------------------------------------------------------------
-# review_state — trusted Codex GitHub reviews
-# ---------------------------------------------------------------------------
-
-GATES_PATH = Path(__file__).parent.parent / "workflow" / "_pr-gates.sh"
 
 
 @pytest.mark.unit
-def test_codex_login_is_identical_to_the_bash_gate():
-    gates = GATES_PATH.read_text()
-    match = re.search(r'^readonly CODEX_REVIEW_BOT="(.+)"$', gates, re.M)
-    assert match, "CODEX_REVIEW_BOT not found in _pr-gates.sh"
-    assert match.group(1) == pr_watch.CODEX_REVIEW_BOT
-
-    app_match = re.search(r'^readonly CODEX_REVIEW_APP_SLUG="(.+)"$', gates, re.M)
-    assert app_match, "CODEX_REVIEW_APP_SLUG not found in _pr-gates.sh"
-    assert app_match.group(1) == pr_watch.CODEX_REVIEW_APP_SLUG
-
-    cr_match = re.search(r'^readonly CODERABBIT_REVIEW_BOT="(.+)"$', gates, re.M)
-    assert cr_match, "CODERABBIT_REVIEW_BOT not found in _pr-gates.sh"
-    assert cr_match.group(1) == pr_watch.CODERABBIT_REVIEW_BOT
+def test_review_summary_shells_out_to_the_gate(monkeypatch, tmp_path):
+    gate = tmp_path / "_pr-gates.sh"
+    gate.write_text(
+        '_review_summary() { echo "{\\"label\\": \\"approved\\", \\"pr\\": $1}"; }\n'
+    )
+    monkeypatch.setattr(pr_watch, "GATES_SCRIPT", gate)
+    assert pr_watch.review_summary(PR) == {"label": "approved", "pr": PR}
 
 
 @pytest.mark.unit
-@pytest.mark.parametrize(
-    "state",
-    [
-        "approval",
-        "clean_comment",
-        "clean_reaction",
-        "reviewed",
-        "marker",
-        "stale_approval",
-        "stale_clean_comment",
-        "stale_clean_reaction",
-        "stale_marker",
-        "not_approved",
-        "review_requested",
-        "unreviewed",
-    ],
-)
-def test_state_vocabulary_is_shared_with_the_bash_gate(state):
-    arms = re.findall(r"^    (\w+)\)$", GATES_PATH.read_text(), re.M)
-    assert state in arms, arms
-
-
-@pytest.mark.unit
-def test_review_state_unreviewed(monkeypatch):
-    monkeypatch.setattr(pr_watch, "gh", make_gh(reviews=()))
-    state, detail = pr_watch.review_state(PR)
-    assert state == "unreviewed"
-    assert "request-codex-review.sh" in detail
-    assert "replacement CI and one new request" in detail
-
-
-@pytest.mark.unit
-def test_review_state_reports_current_head_request_as_pending(monkeypatch):
-    monkeypatch.setattr(pr_watch, "gh", make_gh(comments=[manual_review_request()]))
-    state, detail = pr_watch.review_state(PR)
-    assert state == "review_requested"
-    assert "already requested" in detail
-    assert "do not request the same head again" in detail
-
-
-@pytest.mark.unit
-@pytest.mark.parametrize(
-    "review_request_comment",
-    [manual_review_request(OLD_SHA), manual_review_request(login="someone-else")],
-)
-def test_review_state_ignores_old_or_untrusted_request(
-    monkeypatch, review_request_comment
+def test_review_summary_raises_when_the_gate_fails_or_returns_junk(
+    monkeypatch, tmp_path
 ):
-    monkeypatch.setattr(pr_watch, "gh", make_gh(comments=[review_request_comment]))
-    state, detail = pr_watch.review_state(PR)
-    assert state == "unreviewed"
-    assert "request-codex-review.sh" in detail
+    gate = tmp_path / "_pr-gates.sh"
+    gate.write_text("_review_summary() { echo boom >&2; return 1; }\n")
+    monkeypatch.setattr(pr_watch, "GATES_SCRIPT", gate)
+    with pytest.raises(RuntimeError, match="boom"):
+        pr_watch.review_summary(PR)
+
+    gate.write_text("_review_summary() { echo '[1, 2]'; }\n")
+    with pytest.raises(RuntimeError, match="malformed"):
+        pr_watch.review_summary(PR)
 
 
 @pytest.mark.unit
-def test_review_state_approval_pins_head(monkeypatch):
-    monkeypatch.setattr(pr_watch, "gh", make_gh(reviews=[codex_review()]))
-    state, detail = pr_watch.review_state(PR)
-    assert state == "approval"
-    assert HEAD_SHA[:7] in detail
-
-
-@pytest.mark.unit
-def test_review_state_coderabbit_approval_pins_head(monkeypatch):
-    review = codex_review(login=pr_watch.CODERABBIT_REVIEW_BOT)
-    monkeypatch.setattr(pr_watch, "gh", make_gh(reviews=[review]))
-    state, detail = pr_watch.review_state(PR)
-    assert state == "approval"
-    assert detail == f"CodeRabbit approved head {HEAD_SHA[:7]}"
-
-
-@pytest.mark.unit
-def test_review_state_coderabbit_approval_beats_stale_codex_approval(monkeypatch):
-    reviews = [
-        codex_review(sha=OLD_SHA, submitted_at="2026-08-22T11:00:00Z"),
-        codex_review(login=pr_watch.CODERABBIT_REVIEW_BOT),
-    ]
-    monkeypatch.setattr(pr_watch, "gh", make_gh(reviews=reviews))
-    state, detail = pr_watch.review_state(PR)
-    assert state == "approval"
-    assert "CodeRabbit" in detail
-
-
-@pytest.mark.unit
-@pytest.mark.parametrize("state", ["COMMENTED", "CHANGES_REQUESTED", "DISMISSED"])
-def test_review_state_coderabbit_non_approval_is_not_evidence(monkeypatch, state):
-    reviews = [
-        codex_review(sha=OLD_SHA, submitted_at="2026-08-22T11:00:00Z"),
-        codex_review(login=pr_watch.CODERABBIT_REVIEW_BOT, state=state),
-    ]
-    monkeypatch.setattr(pr_watch, "gh", make_gh(reviews=reviews))
-    assert pr_watch.review_state(PR)[0] == "stale_approval"
-
-
-@pytest.mark.unit
-def test_review_state_stale_coderabbit_approval_is_unreviewed(monkeypatch):
-    review = codex_review(sha=OLD_SHA, login=pr_watch.CODERABBIT_REVIEW_BOT)
-    monkeypatch.setattr(pr_watch, "gh", make_gh(reviews=[review]))
-    assert pr_watch.review_state(PR)[0] == "unreviewed"
-
-
-@pytest.mark.unit
-@pytest.mark.parametrize("state", ["COMMENTED", "CHANGES_REQUESTED", "DISMISSED"])
-def test_review_state_coderabbit_non_approval_alone_is_unreviewed(monkeypatch, state):
-    # No Codex record at all — CodeRabbit's finding review must not read as any
-    # Codex state, and the remedy must still point at the Codex request.
-    review = codex_review(login=pr_watch.CODERABBIT_REVIEW_BOT, state=state)
-    monkeypatch.setattr(pr_watch, "gh", make_gh(reviews=[review]))
-    result_state, detail = pr_watch.review_state(PR)
-    assert result_state == "unreviewed"
-    assert "request-codex-review.sh" in detail
-
-
-@pytest.mark.unit
-def test_review_state_clean_comment_pins_head(monkeypatch):
-    monkeypatch.setattr(pr_watch, "gh", make_gh(comments=[clean_codex_comment()]))
-    state, detail = pr_watch.review_state(PR)
-    assert state == "clean_comment"
-    assert HEAD_SHA[:10] in detail
-
-
-@pytest.mark.unit
-def test_review_state_clean_reaction_witness_pins_head(monkeypatch):
-    monkeypatch.setattr(
-        pr_watch,
-        "gh",
-        make_gh(
-            comments=[clean_codex_reaction_witness()],
-        ),
-    )
-    state, detail = pr_watch.review_state(PR)
-    assert state == "clean_reaction"
-    assert HEAD_SHA[:7] in detail
+@pytest.mark.parametrize("label", pr_watch.REVIEW_LABELS)
+def test_review_state_reports_the_gate_label_verbatim(monkeypatch, label):
+    use_summaries(monkeypatch, fake_summary(label))
+    state, _detail = pr_watch.review_state(PR)
+    assert state == label
 
 
 @pytest.mark.unit
 @pytest.mark.parametrize(
-    "witness",
+    "checker,who",
     [
-        clean_codex_reaction_witness(login="other[bot]"),
-        clean_codex_reaction_witness(app="other-app"),
-        clean_codex_reaction_witness(OLD_SHA),
+        ("coderabbit", "CodeRabbit approval"),
+        ("codex", "Codex evidence"),
+        ("marker", "local review attestation"),
     ],
 )
-def test_review_state_rejects_untrusted_or_stale_reaction_witness(monkeypatch, witness):
-    monkeypatch.setattr(
-        pr_watch,
-        "gh",
-        make_gh(
-            comments=[witness],
-        ),
-    )
-    assert pr_watch.review_state(PR)[0] != "clean_reaction"
-
-
-@pytest.mark.unit
-@pytest.mark.parametrize(
-    "comment",
-    [
-        clean_codex_comment(login="other[bot]"),
-        clean_codex_comment(app="other-app"),
-        clean_codex_comment(OLD_SHA[:10]),
-    ],
-)
-def test_review_state_rejects_untrusted_or_stale_clean_comment(monkeypatch, comment):
-    monkeypatch.setattr(pr_watch, "gh", make_gh(comments=[comment]))
-    assert pr_watch.review_state(PR)[0] != "clean_comment"
-
-
-@pytest.mark.unit
-def test_review_state_later_native_finding_overrides_clean_comment(monkeypatch):
-    monkeypatch.setattr(
-        pr_watch,
-        "gh",
-        make_gh(
-            reviews=[
-                codex_review(state="COMMENTED", submitted_at="2026-08-22T12:01:00Z")
-            ],
-            comments=[clean_codex_comment(updated_at="2026-08-22T12:00:00Z")],
-        ),
-    )
-    assert pr_watch.review_state(PR)[0] == "reviewed"
-
-
-@pytest.mark.unit
-def test_review_state_ignores_delayed_native_review_of_old_head(monkeypatch):
-    monkeypatch.setattr(
-        pr_watch,
-        "gh",
-        make_gh(
-            reviews=[
-                codex_review(
-                    OLD_SHA,
-                    state="COMMENTED",
-                    submitted_at="2026-08-22T12:01:00Z",
-                )
-            ],
-            comments=[clean_codex_comment(updated_at="2026-08-22T12:00:00Z")],
-        ),
-    )
-    assert pr_watch.review_state(PR)[0] == "clean_comment"
-
-
-@pytest.mark.unit
-def test_review_state_later_clean_comment_supersedes_native_finding(monkeypatch):
-    monkeypatch.setattr(
-        pr_watch,
-        "gh",
-        make_gh(
-            reviews=[
-                codex_review(state="COMMENTED", submitted_at="2026-08-22T12:00:00Z")
-            ],
-            comments=[clean_codex_comment(updated_at="2026-08-22T12:01:00Z")],
-        ),
-    )
-    assert pr_watch.review_state(PR)[0] == "clean_comment"
-
-
-@pytest.mark.unit
-def test_review_state_current_finding_outranks_delayed_stale_clean_comment(monkeypatch):
-    monkeypatch.setattr(
-        pr_watch,
-        "gh",
-        make_gh(
-            reviews=[
-                codex_review(state="COMMENTED", submitted_at="2026-08-22T12:00:00Z")
-            ],
-            comments=[
-                clean_codex_comment(OLD_SHA[:10], updated_at="2026-08-22T12:01:00Z")
-            ],
-        ),
-    )
-    assert pr_watch.review_state(PR)[0] == "reviewed"
-
-
-@pytest.mark.unit
-def test_review_state_manual_marker_pins_head(monkeypatch):
-    monkeypatch.setattr(pr_watch, "gh", make_gh(comments=[manual_marker()]))
-    assert pr_watch.review_state(PR)[0] == "marker"
-
-
-@pytest.mark.unit
-def test_review_state_claude_two_axis_review_pins_head(monkeypatch):
-    monkeypatch.setattr(
-        pr_watch, "gh", make_gh(comments=[claude_two_axis_review(HEAD_SHA[:8])])
-    )
+def test_review_state_names_the_covering_checker(monkeypatch, checker, who):
+    use_summaries(monkeypatch, fake_summary("approved", checker=checker))
     state, detail = pr_watch.review_state(PR)
-    assert state == "marker"
-    assert HEAD_SHA[:7] in detail
+    assert state == "approved"
+    assert detail == f"{who} covers head {HEAD_SHA[:7]}"
 
 
 @pytest.mark.unit
-def test_review_state_claude_two_axis_review_stale(monkeypatch):
-    monkeypatch.setattr(
-        pr_watch, "gh", make_gh(comments=[claude_two_axis_review(OLD_SHA[:8])])
-    )
+def test_review_state_not_reviewed_recommends_one_request(monkeypatch):
+    use_summaries(monkeypatch, fake_summary("not reviewed"))
     state, detail = pr_watch.review_state(PR)
-    assert state == "stale_marker"
-    assert OLD_SHA[:7] in detail
+    assert state == "not reviewed"
+    assert "CodeRabbit: none; Codex: none; local attestation: none" in detail
+    assert f"request-codex-review.sh #{PR} exactly once" in detail
+    assert "CodeRabbit request or a local review" in detail
 
 
 @pytest.mark.unit
-def test_review_state_manual_marker_survives_non_approval_codex_review(monkeypatch):
-    monkeypatch.setattr(
-        pr_watch,
-        "gh",
-        make_gh(
-            reviews=[codex_review(state="CHANGES_REQUESTED")],
-            comments=[manual_marker()],
-        ),
-    )
-    assert pr_watch.review_state(PR)[0] == "marker"
-
-
-def test_review_state_reports_a_newer_stale_marker_over_an_older_codex_non_approval(
-    monkeypatch,
-):
-    marker = manual_marker(OLD_SHA)
-    marker["updated_at"] = "2026-08-22T12:01:00Z"
-    monkeypatch.setattr(
-        pr_watch,
-        "gh",
-        make_gh(
-            reviews=[codex_review(OLD_SHA, state="CHANGES_REQUESTED")],
-            comments=[marker],
-        ),
-    )
-    assert pr_watch.review_state(PR)[0] == "stale_marker"
-
-
-@pytest.mark.unit
-def test_review_state_skips_marker_lookup_after_current_codex_approval(monkeypatch):
-    fake_gh = make_gh(reviews=[codex_review()])
-    monkeypatch.setattr(pr_watch, "gh", fake_gh)
-    assert pr_watch.review_state(PR)[0] == "approval"
-    assert not any("/comments" in args[-1] for args in fake_gh.calls)
-
-
-@pytest.mark.unit
-def test_review_state_stale_approval(monkeypatch):
-    monkeypatch.setattr(pr_watch, "gh", make_gh(reviews=[codex_review(OLD_SHA)]))
+def test_review_state_pending_request_is_not_recommended_again(monkeypatch):
+    use_summaries(monkeypatch, fake_summary("not reviewed", pending=True))
     state, detail = pr_watch.review_state(PR)
-    assert state == "stale_approval"
-    assert OLD_SHA[:7] in detail
-    assert HEAD_SHA[:7] in detail
-
-
-@pytest.mark.unit
-def test_review_state_old_head_finding_is_stale_not_actionable(monkeypatch):
-    monkeypatch.setattr(
-        pr_watch,
-        "gh",
-        make_gh(reviews=[codex_review(OLD_SHA, state="CHANGES_REQUESTED")]),
-    )
-    state, detail = pr_watch.review_state(PR)
-    assert state == "stale_approval"
-    assert OLD_SHA[:7] in detail
-    assert HEAD_SHA[:7] in detail
-
-
-@pytest.mark.unit
-def test_review_state_current_head_finding_completes_review_coverage(monkeypatch):
-    monkeypatch.setattr(
-        pr_watch, "gh", make_gh(reviews=[codex_review(state="COMMENTED")])
-    )
-    assert pr_watch.review_state(PR)[0] == "reviewed"
-
-
-@pytest.mark.unit
-@pytest.mark.parametrize("state", ["DISMISSED", "PENDING", "UNKNOWN"])
-def test_review_state_unusable_current_head_state_fails_closed(monkeypatch, state):
-    monkeypatch.setattr(
-        pr_watch,
-        "gh",
-        make_gh(
-            reviews=[codex_review(state=state)],
-            comments=[manual_review_request()],
-        ),
-    )
-    review_state, detail = pr_watch.review_state(PR)
-    assert review_state == "not_approved"
+    assert state == "not reviewed"
     assert "already requested" in detail
     assert "do not request the same head again" in detail
     assert "request-codex-review.sh" not in detail
 
 
 @pytest.mark.unit
-def test_review_state_uses_the_latest_codex_review(monkeypatch):
-    monkeypatch.setattr(
-        pr_watch,
-        "gh",
-        make_gh(
-            reviews=[
-                codex_review(submitted_at="2026-08-22T12:00:00Z"),
-                codex_review(
-                    state="CHANGES_REQUESTED",
-                    submitted_at="2026-08-22T12:01:00Z",
-                ),
-            ]
-        ),
+def test_review_state_stale_review_names_both_commits(monkeypatch):
+    use_summaries(monkeypatch, fake_summary("stale review", checker="coderabbit"))
+    state, detail = pr_watch.review_state(PR)
+    assert state == "stale review"
+    assert (
+        f"CodeRabbit: newest evidence names {OLD_SHA[:7]}, head is {HEAD_SHA[:7]}"
+        in detail
     )
-    assert pr_watch.review_state(PR)[0] == "reviewed"
 
 
 @pytest.mark.unit
-def test_review_state_ignores_delayed_old_head_native_review(monkeypatch):
-    monkeypatch.setattr(
-        pr_watch,
-        "gh",
-        make_gh(
-            reviews=[
-                codex_review(submitted_at="2026-08-22T12:00:00Z"),
-                codex_review(
-                    OLD_SHA,
-                    state="COMMENTED",
-                    submitted_at="2026-08-22T12:01:00Z",
-                ),
-            ]
-        ),
-    )
-    assert pr_watch.review_state(PR)[0] == "approval"
+def test_review_state_changes_requested_names_the_reviewer(monkeypatch):
+    use_summaries(monkeypatch, fake_summary("changes requested", checker="coderabbit"))
+    state, detail = pr_watch.review_state(PR)
+    assert state == "changes requested"
+    assert f"CodeRabbit: requested changes on head {HEAD_SHA[:7]}" in detail
 
 
+# ---------------------------------------------------------------------------
 # ---------------------------------------------------------------------------
 # run_audit — the review state is reported, but does not gate readiness
 # ---------------------------------------------------------------------------
@@ -1325,25 +972,35 @@ def test_review_state_ignores_delayed_old_head_native_review(monkeypatch):
 
 @pytest.mark.unit
 @pytest.mark.parametrize(
-    "state,reviews,comments",
+    "summary",
     [
-        ("unreviewed", (), ()),
-        ("stale_approval", (codex_review(OLD_SHA),), ()),
-        ("approval", (codex_review(),), ()),
-        ("clean_comment", (), (clean_codex_comment(),)),
-        ("marker", (), (manual_marker(),)),
+        fake_summary("not reviewed"),
+        fake_summary("stale review"),
+        fake_summary("approved"),
+        fake_summary("approved", checker="marker", form="marker"),
     ],
 )
 def test_run_audit_reports_the_review_state_without_gating_on_it(
-    monkeypatch, capsys, state, reviews, comments
+    monkeypatch, capsys, summary
 ):
-    monkeypatch.setattr(
-        pr_watch,
-        "gh",
-        make_gh(rollup=[_gate("SUCCESS")], reviews=reviews, comments=comments),
-    )
+    monkeypatch.setattr(pr_watch, "gh", make_gh(rollup=[_gate("SUCCESS")]))
+    use_summaries(monkeypatch, summary)
     assert pr_watch.run_audit(PR) is True
-    assert f"✓ review: {state}:" in capsys.readouterr().out
+    assert f"✓ review: {summary['label']}:" in capsys.readouterr().out
+
+
+@pytest.mark.unit
+def test_run_audit_survives_a_gate_failure(monkeypatch, capsys):
+    monkeypatch.setattr(pr_watch, "gh", make_gh(rollup=[_gate("SUCCESS")]))
+
+    def broken(_pr):
+        raise RuntimeError("gate exploded")
+
+    monkeypatch.setattr(pr_watch, "review_summary", broken)
+    assert pr_watch.run_audit(PR) is True
+    assert "✓ review: unknown: could not determine (gate exploded)" in (
+        capsys.readouterr().out
+    )
 
 
 @pytest.mark.unit
@@ -1619,11 +1276,8 @@ def test_watch_phase_ci_undetermined_when_merge_state_stays_unknown(monkeypatch)
 
 @pytest.mark.unit
 def test_watch_phase_review_passes_when_approved_and_zero_threads(monkeypatch):
-    fake = make_gh(
-        reviews=[codex_review(HEAD_SHA, state="APPROVED")],
-        threads=[{"isResolved": True}],
-    )
-    monkeypatch.setattr(pr_watch, "gh", fake)
+    monkeypatch.setattr(pr_watch, "gh", make_gh())
+    use_summaries(monkeypatch, fake_summary("approved"))
     states = []
 
     exit_code = pr_watch._watch_phase_review(
@@ -1638,17 +1292,14 @@ def test_watch_phase_review_passes_when_approved_and_zero_threads(monkeypatch):
     assert last_args[0] == HEAD_SHA
     assert last_args[1] == "passed"
     assert last_kwargs.get("outcome") == "passed"
-    assert last_kwargs.get("review_state") == "approval"
+    assert last_kwargs.get("review_state") == "approved"
     assert last_kwargs.get("unresolved_threads") == 0
 
 
 @pytest.mark.unit
 def test_watch_phase_review_action_required_when_threads_unresolved(monkeypatch):
-    fake = make_gh(
-        reviews=[codex_review(HEAD_SHA, state="APPROVED")],
-        threads=[{"isResolved": False}],
-    )
-    monkeypatch.setattr(pr_watch, "gh", fake)
+    monkeypatch.setattr(pr_watch, "gh", make_gh())
+    use_summaries(monkeypatch, fake_summary("approved", unresolved=1))
     states = []
 
     exit_code = pr_watch._watch_phase_review(
@@ -1666,19 +1317,14 @@ def test_watch_phase_review_action_required_when_threads_unresolved(monkeypatch)
 
 
 @pytest.mark.unit
-def test_watch_phase_review_revalidates_threads_before_passing(monkeypatch):
-    fake = make_gh(reviews=[codex_review(HEAD_SHA, state="APPROVED")])
-    monkeypatch.setattr(pr_watch, "gh", fake)
-    thread_snapshots = iter(
-        [
-            [{"isResolved": True}],
-            [{"isResolved": False}],
-        ]
-    )
-    monkeypatch.setattr(
-        pr_watch,
-        "get_review_threads",
-        lambda _pr: next(thread_snapshots),
+def test_watch_phase_review_revalidates_evidence_before_passing(monkeypatch):
+    # The first read says approved with zero threads; the terminal re-read sees a
+    # thread opened in between. The re-read wins.
+    monkeypatch.setattr(pr_watch, "gh", make_gh())
+    use_summaries(
+        monkeypatch,
+        fake_summary("approved"),
+        fake_summary("approved", unresolved=1),
     )
     states = []
 
@@ -1697,11 +1343,9 @@ def test_watch_phase_review_revalidates_threads_before_passing(monkeypatch):
 
 
 @pytest.mark.unit
-def test_watch_phase_review_action_required_when_not_approved(monkeypatch):
-    fake = make_gh(
-        reviews=[codex_review(HEAD_SHA, state="PENDING")],
-    )
-    monkeypatch.setattr(pr_watch, "gh", fake)
+def test_watch_phase_review_action_required_on_changes_requested(monkeypatch):
+    monkeypatch.setattr(pr_watch, "gh", make_gh())
+    use_summaries(monkeypatch, fake_summary("changes requested", checker="coderabbit"))
     states = []
 
     exit_code = pr_watch._watch_phase_review(
@@ -1715,7 +1359,30 @@ def test_watch_phase_review_action_required_when_not_approved(monkeypatch):
     last_args, last_kwargs = states[-1]
     assert last_args[1] == "action_required"
     assert last_kwargs.get("outcome") == "action_required"
-    assert last_kwargs.get("review_state") == "not_approved"
+    assert last_kwargs.get("review_state") == "changes requested"
+    assert "CodeRabbit: requested changes" in last_args[2]
+
+
+@pytest.mark.unit
+def test_watch_phase_review_undetermined_when_the_gate_fails(monkeypatch):
+    monkeypatch.setattr(pr_watch, "gh", make_gh())
+
+    def broken(_pr):
+        raise RuntimeError("_review_summary failed (exit 1): boom")
+
+    monkeypatch.setattr(pr_watch, "review_summary", broken)
+    states = []
+
+    exit_code = pr_watch._watch_phase_review(
+        PR,
+        HEAD_SHA,
+        timeout_sec=10,
+        poll_sec=0,
+        state_sink=lambda *args, **kwargs: states.append((args, kwargs)),
+    )
+    assert exit_code == pr_watch.EXIT_UNDETERMINED
+    assert states[-1][0][1] == "undetermined"
+    assert "boom" in states[-1][0][2]
 
 
 @pytest.mark.unit
@@ -1725,11 +1392,7 @@ def test_watch_phase_review_timeout_preserves_last_observed_state(monkeypatch):
         "_current_head_merge_snapshot",
         lambda _pr: (HEAD_SHA, "CLEAN"),
     )
-    monkeypatch.setattr(
-        pr_watch,
-        "review_state",
-        lambda _pr, *, head_sha: ("review_requested", "already requested"),
-    )
+    use_summaries(monkeypatch, fake_summary("stale review"))
     monotonic_values = iter([0.0, 0.0, 1.0])
     monkeypatch.setattr(pr_watch.time, "monotonic", lambda: next(monotonic_values))
     monkeypatch.setattr(pr_watch.time, "sleep", lambda _seconds: None)
@@ -1747,31 +1410,23 @@ def test_watch_phase_review_timeout_preserves_last_observed_state(monkeypatch):
     last_args, last_kwargs = states[-1]
     assert last_args[1] == "timed_out"
     assert last_kwargs.get("outcome") == "timed_out"
-    assert last_kwargs.get("review_state") == "review_requested"
+    assert last_kwargs.get("review_state") == "stale review"
     assert last_kwargs.get("merge_state") == "CLEAN"
 
 
 @pytest.mark.unit
-def test_watch_phase_review_keeps_old_head_finding_pending(monkeypatch):
-    fake = make_gh(
-        reviews=[codex_review(OLD_SHA, state="CHANGES_REQUESTED")],
-        threads=[{"isResolved": True}],
-    )
-    monkeypatch.setattr(pr_watch, "gh", fake)
-    states = []
-    reviews = iter(
-        [
-            ("stale_approval", "old-head finding"),
-            ("approval", "current-head approval"),
-            ("approval", "current-head approval revalidated"),
-        ]
-    )
-    monkeypatch.setattr(
-        pr_watch,
-        "review_state",
-        lambda _pr, *, head_sha: next(reviews),
+def test_watch_phase_review_keeps_stale_review_pending_until_head_is_covered(
+    monkeypatch,
+):
+    monkeypatch.setattr(pr_watch, "gh", make_gh())
+    use_summaries(
+        monkeypatch,
+        fake_summary("stale review"),
+        fake_summary("approved"),
+        fake_summary("approved"),
     )
     monkeypatch.setattr(pr_watch.time, "sleep", lambda _seconds: None)
+    states = []
 
     exit_code = pr_watch._watch_phase_review(
         PR,
@@ -1783,7 +1438,7 @@ def test_watch_phase_review_keeps_old_head_finding_pending(monkeypatch):
 
     assert exit_code == 0
     assert any(
-        args[1] == "pending" and kwargs.get("review_state") == "stale_approval"
+        args[1] == "pending" and kwargs.get("review_state") == "stale review"
         for args, kwargs in states
     )
     assert states[-1][0][1] == "passed"
@@ -1832,10 +1487,8 @@ def test_watch_phase_review_exits_conflicting_on_conflict(monkeypatch):
 
 @pytest.mark.unit
 def test_watch_phase_review_undetermined_when_merge_state_stays_unknown(monkeypatch):
-    fake = make_gh(
-        merge_state="UNKNOWN", reviews=[codex_review(HEAD_SHA, state="APPROVED")]
-    )
-    monkeypatch.setattr(pr_watch, "gh", fake)
+    monkeypatch.setattr(pr_watch, "gh", make_gh(merge_state="UNKNOWN"))
+    use_summaries(monkeypatch, fake_summary("approved"))
     monkeypatch.setattr(pr_watch.time, "sleep", lambda _seconds: None)
     states = []
 
@@ -1858,10 +1511,8 @@ def test_watch_phase_review_undetermined_when_merge_state_stays_unknown(monkeypa
 def test_watch_phase_review_exits_stale_if_head_moves_before_terminal_verdict(
     monkeypatch,
 ):
-    base = make_gh(
-        reviews=[codex_review(HEAD_SHA, state="APPROVED")],
-        threads=[{"isResolved": True}],
-    )
+    base = make_gh()
+    use_summaries(monkeypatch, fake_summary("approved"))
     observed_heads = [HEAD_SHA, OLD_SHA]
 
     def moving_head_gh(*args: str) -> str:

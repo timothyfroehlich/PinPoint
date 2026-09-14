@@ -156,15 +156,12 @@ ci_out=$(check_ci "$pr" 2>&1) || true
 threads_out=$(check_unresolved_threads "$pr" 2>&1) || true
 conflict_out=$(check_no_merge_conflict "$pr" 2>&1) || true
 # ---------------------------------------------------------------------------------
-# Review state: the Codex (or CodeRabbit) GitHub approval and what landed since
+# Review state: which reviewer's evidence covers head, and what landed since
 # ---------------------------------------------------------------------------------
 
-record=$(_review_record "$pr" "$(_repo_slug)" "$head_sha")
-rv_state=$(cut -f1 <<< "$record")
-rv_sha=$(cut -f2 <<< "$record")
-rv_reviewer=$(cut -f3 <<< "$record")
-rv_detail=$(cut -f4 <<< "$record")
-rv_at=$(cut -f5 <<< "$record")
+review_summary=$(_review_summary "$pr")
+rv_label=$(jq -r '.label' <<< "$review_summary")
+rv_covered=$(jq -r '.coverage != null' <<< "$review_summary")
 
 # Manual attestation metadata describes which review actually happened. Preserve it in
 # the handoff rather than flattening a `/code-review high` or the trivial exception into
@@ -189,79 +186,67 @@ review_phrase() {
   esac
 }
 
+# What one checker record is, in words: "CodeRabbit GitHub approval", "Codex clean
+# review comment", "/code-review high", … Keyed on `detail` (the review state or the
+# evidence kind) so a stale record reads the same as the covering one it used to be.
+record_phrase() {
+  local checker=$1 reviewer=$2 detail=$3
+  case "$checker:$detail" in
+    coderabbit:APPROVED) printf 'CodeRabbit GitHub approval\n' ;;
+    coderabbit:*) printf 'CodeRabbit GitHub review (%s)\n' "$detail" ;;
+    codex:APPROVED) printf 'Codex GitHub approval\n' ;;
+    codex:NO_FINDINGS) printf 'Codex clean review comment\n' ;;
+    codex:REACTION_WITNESS) printf 'Codex clean reaction witness\n' ;;
+    codex:*) printf 'Codex GitHub review (%s)\n' "$detail" ;;
+    marker:*) review_phrase "$reviewer" "$detail" ;;
+    *) printf '%s %s\n' "$checker" "$detail" ;;
+  esac
+}
+
 review_desc=""
 since_review_from=""
 since_review_note=""
-case "$rv_state" in
-  approval)
-    review_desc="$(_native_reviewer_label "$rv_reviewer") GitHub approval · ${rv_at} · covers head ${short_head}"
-    ;;
-  clean_comment)
-    review_desc="Codex clean review comment · ${rv_at} · covers head ${short_head}"
-    ;;
-  clean_reaction)
-    review_desc="Codex clean reaction witness · ${rv_at} · covers head ${short_head}"
-    ;;
-  reviewed)
-    review_desc="Codex GitHub review (${rv_detail}) · ${rv_at} · covers head ${short_head}; threads adjudicated separately"
-    ;;
-  marker)
-    review_desc="$(review_phrase "$rv_reviewer" "$rv_detail") · ${rv_at} · covers head ${short_head}"
-    ;;
-  review_requested)
-    review_desc="PENDING — manual Codex review requested for head ${short_head}; no exact-head evidence yet"
-    ;;
-  stale_approval)
-    if git cat-file -e "${rv_sha}^{commit}" 2>/dev/null \
-      && git merge-base --is-ancestor "$rv_sha" "$head_sha" 2>/dev/null; then
-      behind=$(git rev-list --count "${rv_sha}..${head_sha}")
-      review_desc="Codex GitHub approval · ${rv_at} · STALE: ${behind} commit(s) back, approved ${rv_sha:0:7}, head is ${short_head}"
-      since_review_from=$rv_sha
+if [[ "$rv_covered" == "true" ]]; then
+  cv_checker=$(jq -r '.coverage.checker' <<< "$review_summary")
+  cv_form=$(jq -r '.coverage.form' <<< "$review_summary")
+  cv_reviewer=$(jq -r '.coverage.reviewer' <<< "$review_summary")
+  cv_detail=$(jq -r '.coverage.detail' <<< "$review_summary")
+  cv_at=$(jq -r '.coverage.at' <<< "$review_summary")
+  review_desc="$(record_phrase "$cv_checker" "$cv_reviewer" "$cv_detail") · ${cv_at} · covers head ${short_head}"
+  if [[ "$cv_form" == "reviewed" ]]; then
+    review_desc+="; threads adjudicated separately"
+  fi
+else
+  # Nothing covers head. Describe the newest stale record (the one Tim would diff
+  # against), then let the label carry the verdict.
+  stale=$(jq -c '[.checkers[] | select(.verdict == "stale")] | sort_by(.at) | last // empty' <<< "$review_summary")
+  if [[ -n "$stale" ]]; then
+    st_checker=$(jq -r '.checker' <<< "$stale")
+    st_reviewer=$(jq -r '.reviewer' <<< "$stale")
+    st_detail=$(jq -r '.detail' <<< "$stale")
+    st_at=$(jq -r '.at' <<< "$stale")
+    st_sha=$(jq -r '.sha' <<< "$stale")
+    st_phrase=$(record_phrase "$st_checker" "$st_reviewer" "$st_detail")
+    if git cat-file -e "${st_sha}^{commit}" 2>/dev/null \
+      && git merge-base --is-ancestor "$st_sha" "$head_sha" 2>/dev/null; then
+      behind=$(git rev-list --count "${st_sha}..${head_sha}")
+      review_desc="${st_phrase} · ${st_at} · STALE: ${behind} commit(s) back, reviewed ${st_sha:0:7}, head is ${short_head}"
+      since_review_from=$st_sha
     else
-      review_desc="Codex GitHub approval · ${rv_at} · STALE: approved ${rv_sha:0:7}, not an ancestor of head (force-push?)"
-      since_review_note="unknowable — the approved commit is not an ancestor of head"
-    fi
-    ;;
-  stale_clean_comment)
-    if git cat-file -e "${rv_sha}^{commit}" 2>/dev/null \
-      && git merge-base --is-ancestor "$rv_sha" "$head_sha" 2>/dev/null; then
-      behind=$(git rev-list --count "${rv_sha}..${head_sha}")
-      review_desc="Codex clean review comment · ${rv_at} · STALE: ${behind} commit(s) back, reviewed ${rv_sha:0:7}, head is ${short_head}"
-      since_review_from=$rv_sha
-    else
-      review_desc="Codex clean review comment · ${rv_at} · STALE: reviewed ${rv_sha:0:7}, not an ancestor of head (force-push?)"
+      review_desc="${st_phrase} · ${st_at} · STALE: reviewed ${st_sha:0:7}, not an ancestor of head (force-push?)"
       since_review_note="unknowable — the reviewed commit is not an ancestor of head"
     fi
-    ;;
-  stale_clean_reaction)
-    if git cat-file -e "${rv_sha}^{commit}" 2>/dev/null \
-      && git merge-base --is-ancestor "$rv_sha" "$head_sha" 2>/dev/null; then
-      behind=$(git rev-list --count "${rv_sha}..${head_sha}")
-      review_desc="Codex clean reaction witness · ${rv_at} · STALE: ${behind} commit(s) back, reviewed ${rv_sha:0:7}, head is ${short_head}"
-      since_review_from=$rv_sha
-    else
-      review_desc="Codex clean reaction witness · ${rv_at} · STALE: reviewed ${rv_sha:0:7}, not an ancestor of head (force-push?)"
-      since_review_note="unknowable — the witnessed commit is not an ancestor of head"
-    fi
-    ;;
-  not_approved)
-    review_desc="Codex GitHub review (${rv_detail}) · ${rv_at} · did not approve ${rv_sha:0:7}"
-    ;;
-  stale_marker)
-    if git cat-file -e "${rv_sha}^{commit}" 2>/dev/null \
-      && git merge-base --is-ancestor "$rv_sha" "$head_sha" 2>/dev/null; then
-      behind=$(git rev-list --count "${rv_sha}..${head_sha}")
-      review_desc="$(review_phrase "$rv_reviewer" "$rv_detail") · ${rv_at} · STALE: ${behind} commit(s) back, reviewed ${rv_sha:0:7}, head is ${short_head}"
-      since_review_from=$rv_sha
-    else
-      review_desc="$(review_phrase "$rv_reviewer" "$rv_detail") · ${rv_at} · STALE: reviewed ${rv_sha:0:7}, not an ancestor of head (force-push?)"
-      since_review_note="unknowable — the manually attested commit is not an ancestor of head"
-    fi
-    ;;
-  *)
-    review_desc="NONE — no clean Codex result or manual review attestation on this PR"
-    ;;
-esac
+  elif [[ "$(jq -r '.codex_request_pending' <<< "$review_summary")" == "true" ]]; then
+    review_desc="PENDING — manual Codex review requested for head ${short_head}; no exact-head evidence yet"
+  else
+    review_desc="NONE — no reviewer's evidence on this PR"
+  fi
+  # The label outranks the stale description: a change request on head is the thing
+  # to act on, whatever older evidence exists. The since-review diff still uses it.
+  if [[ "$rv_label" == "changes requested" ]]; then
+    review_desc="CHANGES REQUESTED on head ${short_head} ($(jq -r '.unresolved_threads' <<< "$review_summary") unresolved thread(s)) — fix or decline-and-resolve, then get head re-reviewed"
+  fi
+fi
 # Diff shape
 # ---------------------------------------------------------------------------------
 
@@ -327,7 +312,7 @@ elif [[ -n "$since_review_note" ]]; then
   # compare against" here would contradict the review line two rows above, which names
   # the reviewed SHA.
   diff_since_review=$since_review_note
-elif [[ "$rv_state" == "approval" || "$rv_state" == "clean_comment" || "$rv_state" == "clean_reaction" || "$rv_state" == "reviewed" || "$rv_state" == "marker" ]]; then
+elif [[ "$rv_covered" == "true" ]]; then
   diff_since_review="none — the review covers head"
 else
   diff_since_review="n/a — nothing reviewed to compare against"
@@ -485,10 +470,12 @@ add_block() { blocking+=("$1"); }
 if [[ "$(gate_token "$ci_out")" != "PASS" ]]; then add_block "ci: $(gate_state "$ci_out")"; fi
 if [[ "$(gate_token "$threads_out")" != "PASS" ]]; then add_block "threads: $(gate_state "$threads_out")"; fi
 if [[ "$(gate_token "$conflict_out")" != "PASS" ]]; then add_block "no_conflict: $(gate_state "$conflict_out")"; fi
-if [[ "$rv_state" == "review_requested" ]]; then
-  add_block "reviewed: review_requested — the manual Codex review for this head was already requested; do not request it again; wait for exact-head evidence"
-elif [[ "$rv_state" != "approval" && "$rv_state" != "clean_comment" && "$rv_state" != "clean_reaction" && "$rv_state" != "reviewed" && "$rv_state" != "marker" ]]; then
-  add_block "reviewed: ${rv_state} — after current-head CI succeeds and the PR is ready, run request-codex-review.sh ${pr} exactly once for this head; a new head requires replacement CI and one new request"
+if [[ "$rv_covered" != "true" ]]; then
+  if [[ "$(jq -r '.codex_request_pending' <<< "$review_summary")" == "true" ]]; then
+    add_block "reviewed: ${rv_label} — the manual Codex review for this head was already requested; do not request it again; wait for exact-head evidence"
+  else
+    add_block "reviewed: ${rv_label} — after current-head CI succeeds and the PR is ready, run request-codex-review.sh ${pr} exactly once for this head, or ask Tim for a CodeRabbit request or a local review; a new head requires replacement CI and a new review"
+  fi
 fi
 if [[ "$is_draft" == "true" ]]; then add_block "draft: wait for current-head CI Gate success, then mark the PR ready"; fi
 if [[ "$pr_state" != "OPEN" ]]; then add_block "state: PR is ${pr_state}, not open"; fi

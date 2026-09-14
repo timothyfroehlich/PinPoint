@@ -7,8 +7,9 @@
 # authoritative (AGENTS.md §8); this file tells the reviewer to read them first.
 #
 # The `path_instructions` below DO restate a short list of rules — the ones
-# REVIEW.md itself lists as its high-signal flags, plus the CORE-* rules REVIEW.md
-# names as shipped bugs — because a CodeRabbit path instruction is the only text
+# REVIEW.md itself lists as its high-signal flags, the CORE-* rules REVIEW.md
+# names as shipped bugs, and the `prepare: true` pooler rule from AGENTS.md §7 —
+# because a CodeRabbit path instruction is the only text
 # guaranteed to reach the model for a given file, and the reviewer may not open
 # the referenced docs. Each restatement is a one-line summary that cites its
 # rule ID; the full statement, rationale, and do/don't live only in the catalog.
