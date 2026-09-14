@@ -38,8 +38,8 @@ set -euo pipefail
 LABEL="${1:?usage: evaluate-e2e-results.sh <label> <results-json-path>}"
 RESULTS="${2:?usage: evaluate-e2e-results.sh <label> <results-json-path>}"
 
-# The browser whose failures are reported but do not fail the job. WebKit does
-# not run on the crabbox runner (PP-jvow), so CI is its only home and its red is
+# The browser whose failures are reported but do not fail the job. WebKit
+# failures are non-gating (PP-jvow), so CI post-merge reports them as
 # informational rather than blocking.
 NON_GATING='Mobile Safari'
 
@@ -141,9 +141,9 @@ if [ "$STATS_UNEXPECTED" -gt 0 ] && [ "$WALK_FAILS" -eq 0 ]; then
 fi
 
 # Non-gating failures never change the verdict, but they still have to be
-# NAMED. This job is WebKit's only home — it does not run on the crabbox runner
-# (PP-jvow) and no PR job covers it — so a bare count would mean identifying a
-# Mobile Safari regression required downloading the HTML artifact.
+# NAMED. This post-merge job is WebKit's primary home — no PR job covers it —
+# so a bare count would mean identifying a Mobile Safari regression required
+# downloading the HTML artifact.
 if [ "$NON_GATING_FAILS" -gt 0 ]; then
   NON_GATING_TITLES=$(jq -r --arg ng "$NON_GATING" "${JQ_NON_GATING} | ${JQ_TITLES}" "$RESULTS")
 else

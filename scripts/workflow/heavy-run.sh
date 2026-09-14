@@ -6,9 +6,8 @@
 # sessions on a memory-constrained host. Focused unit-file commands intentionally
 # bypass this wrapper so they remain a fast local inner loop.
 #
-# This is the local fallback admission layer. PP-3vdr.16 separately owns a
-# supported Crabbox job for remote full-unit verdicts; it does not replace the
-# local cap when a caller chooses `pnpm run test` or `pnpm run test:human`.
+# This is the local admission layer; it caps local concurrency when a caller
+# runs `pnpm run test` or `pnpm run test:human`.
 # Uses the same --jobs 2 slot count as preflight-locked.sh, but a SEPARATE id
 # (`pinpoint-heavy` vs `pinpoint-preflight`). The two pools are intentionally
 # distinct: preflight already holds an outer `pinpoint-preflight` slot and then
