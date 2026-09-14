@@ -3,12 +3,16 @@
 # CodeRabbit review configuration for PinPoint.
 #
 # CANONICAL SOURCE: `REVIEW.md` at the repo root is the review rubric, and
-# `docs/NON_NEGOTIABLES.md` is the full `CORE-*` catalog. This file deliberately
-# POINTS AT them rather than restating them, because AGENTS.md §8 makes the
-# canonical docs authoritative and forbids parallel copies that drift. The only
-# rules inlined below are the three REVIEW.md flags as "each of these has
-# shipped a real bug" — duplicated on purpose as a safety net in case the
-# reviewer does not open the referenced files.
+# `docs/NON_NEGOTIABLES.md` is the full `CORE-*` catalog. Those stay
+# authoritative (AGENTS.md §8); this file tells the reviewer to read them first.
+#
+# The `path_instructions` below DO restate a short list of rules — the ones
+# REVIEW.md itself lists as its high-signal flags, plus the CORE-* rules REVIEW.md
+# names as shipped bugs — because a CodeRabbit path instruction is the only text
+# guaranteed to reach the model for a given file, and the reviewer may not open
+# the referenced docs. Each restatement is a one-line summary that cites its
+# rule ID; the full statement, rationale, and do/don't live only in the catalog.
+# When a rule below stops matching the catalog, the catalog wins — fix this file.
 #
 # Tunables Tim may want to revisit once the plan's review budget is settled:
 # `reviews.profile` (chill → assertive for more findings) and

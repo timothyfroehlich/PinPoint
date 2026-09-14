@@ -1037,6 +1037,18 @@ def test_review_state_stale_coderabbit_approval_is_unreviewed(monkeypatch):
 
 
 @pytest.mark.unit
+@pytest.mark.parametrize("state", ["COMMENTED", "CHANGES_REQUESTED", "DISMISSED"])
+def test_review_state_coderabbit_non_approval_alone_is_unreviewed(monkeypatch, state):
+    # No Codex record at all — CodeRabbit's finding review must not read as any
+    # Codex state, and the remedy must still point at the Codex request.
+    review = codex_review(login=pr_watch.CODERABBIT_REVIEW_BOT, state=state)
+    monkeypatch.setattr(pr_watch, "gh", make_gh(reviews=[review]))
+    result_state, detail = pr_watch.review_state(PR)
+    assert result_state == "unreviewed"
+    assert "request-codex-review.sh" in detail
+
+
+@pytest.mark.unit
 def test_review_state_clean_comment_pins_head(monkeypatch):
     monkeypatch.setattr(pr_watch, "gh", make_gh(comments=[clean_codex_comment()]))
     state, detail = pr_watch.review_state(PR)

@@ -288,32 +288,37 @@ _review_record() {
   fi
 }
 
-# The review verdict on a given head, printed as "<state> <sha> <reviewer>" — the
-# fields of _review_record the merge gate acts on. The reviewer login names which
-# trusted bot's approval is being reported.
+# The review verdict on a given head, printed as one TSV line "<state>\t<sha>\t<reviewer>"
+# — the fields of _review_record the merge gate acts on. The reviewer login names which
+# trusted bot's approval is being reported. Consumers must split with `cut -f`, not
+# `read`: `sha` is empty when GitHub returned a null commit_id, and `read` collapses
+# runs of any whitespace IFS (tab included), shifting the reviewer into the SHA slot.
 _review_verdict() {
-  local record
-  record=$(_review_record "$1" "$2" "$3")
-  printf '%s %s %s\n' "$(cut -f1 <<< "$record")" "$(cut -f2 <<< "$record")" "$(cut -f3 <<< "$record")"
+  _review_record "$1" "$2" "$3" | cut -f1-3
 }
 
-# Gate 1: CI Gate check has SUCCESS conclusion.
-#
 # One head can carry several `CI Gate` runs (draft promotion re-triggers the workflow on
-# the same SHA). Pick the authoritative one the way merge-pr.sh's poller and pr-watch.py
-# do — a live or finished run over a cancelled leftover, then the newest — so two
-# COMPLETED entries read as one result instead of a "COMPLETED\nCOMPLETED" status that
-# never equals COMPLETED and parks the gate in WAIT forever.
-check_ci() {
-  local pr=$1
-  local rollup
-  rollup=$(gh pr view "$pr" --json statusCheckRollup --jq '
-    [.statusCheckRollup[]? | select(.name=="CI Gate")]
+# the same SHA). This jq picks the authoritative one — a live or finished run over a
+# cancelled leftover, then the newest — from a `statusCheckRollup` payload. Shared with
+# merge-pr.sh's compact poller so the first evaluation and the re-polls cannot disagree.
+# (pr-watch.py's `_select_ci_gate` ranks by startedAt alone; it is the CI watcher, not
+# the merge gate, and was left as is.)
+readonly CI_GATE_SELECT_JQ='
+    [.statusCheckRollup[]? | select(.name == "CI Gate")]
     | sort_by(
         (if ((.conclusion // "") | ascii_upcase) == "CANCELLED" then 0 else 1 end),
         (.completedAt // .startedAt // "")
       )
-    | last // empty')
+    | last'
+
+# Gate 1: CI Gate check has SUCCESS conclusion.
+#
+# Two COMPLETED entries used to come back as two objects, so `status` read
+# "COMPLETED\nCOMPLETED", never equalled COMPLETED, and parked the gate in WAIT forever.
+check_ci() {
+  local pr=$1
+  local rollup
+  rollup=$(gh pr view "$pr" --json statusCheckRollup --jq "${CI_GATE_SELECT_JQ} // empty")
   if [ -z "$rollup" ]; then
     # Not a failure — GitHub has simply not registered the check run yet, which is
     # the normal state for the first seconds after `gh pr create`. Reporting it as a
@@ -381,7 +386,9 @@ _compute_review_state() {
   verdict=$(_review_verdict "$pr" "$owner_repo" "$head_sha")
 
   RS_HEAD_SHA=$head_sha
-  read -r RS_STATE RS_REVIEW_SHA RS_REVIEWER <<< "$verdict"
+  RS_STATE=$(cut -f1 <<< "$verdict")
+  RS_REVIEW_SHA=$(cut -f2 <<< "$verdict")
+  RS_REVIEWER=$(cut -f3 <<< "$verdict")
 }
 
 _review_remedy() {

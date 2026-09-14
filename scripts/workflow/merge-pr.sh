@@ -275,16 +275,10 @@ poll_waiting_gates() {
   for gate_name in "${GATE_WAITS[@]}"; do
     case "$gate_name" in
       ci)
-        # Prefer a live/non-cancelled gate over a superseded leftover, then the
-        # newest timestamp. This matches pr-watch.py's authoritative selection.
+        # Same authoritative-run selection as check_ci (CI_GATE_SELECT_JQ from
+        # _pr-gates.sh), so the re-poll cannot pick a different run than the audit.
         local ci_state
-        if ! ci_state=$(jq -r '
-          [.statusCheckRollup[]? | select(.name == "CI Gate")]
-          | sort_by(
-              (if ((.conclusion // "") | ascii_upcase) == "CANCELLED" then 0 else 1 end),
-              (.completedAt // .startedAt // "")
-            )
-          | last
+        if ! ci_state=$(jq -r "${CI_GATE_SELECT_JQ}"'
           | if . == null then "WAIT"
             elif .status != "COMPLETED" then "WAIT"
             else "TERMINAL"

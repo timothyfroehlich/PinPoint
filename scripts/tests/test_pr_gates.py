@@ -30,7 +30,7 @@ OTHER_SHA = "0000000000000000000000000000000000000000"
 
 def codex_review(
     *,
-    sha: str = HEAD_SHA,
+    sha: str | None = HEAD_SHA,
     state: str = "APPROVED",
     submitted_at: str = "2026-08-22T12:00:00Z",
     login: str = CODEX_BOT,
@@ -592,6 +592,29 @@ def test_coderabbit_non_approval_leaves_codex_state_untouched(state: str) -> Non
     )
 
 
+@pytest.mark.parametrize("state", ["COMMENTED", "CHANGES_REQUESTED", "DISMISSED"])
+def test_coderabbit_non_approval_alone_is_unreviewed(state: str) -> None:
+    # No Codex record at all: a CodeRabbit finding review on head must not read as
+    # coverage, and must not surface as a Codex state either.
+    review = codex_review(login=CODERABBIT_BOT, state=state)
+    with gate_env(review_pages=[[review]]) as env:
+        result = run_gate("check_review_happened", env)
+        record_state, _sha, reviewer, *_ = review_record(env)
+    assert result.returncode == 1, result.stdout
+    assert "is unreviewed" in result.stdout
+    assert (record_state, reviewer) == ("unreviewed", "")
+
+
+def test_null_commit_id_does_not_shift_reviewer_into_the_sha_slot() -> None:
+    # GitHub's commit_id is nullable. The verdict is TSV so an empty sha field stays
+    # empty instead of `read` collapsing the gap and reporting the login as the SHA.
+    with gate_env(review_pages=[[codex_review(sha=None)]]) as env:
+        result = run_gate("check_review_happened", env)
+    assert result.returncode == 1, result.stdout
+    assert "Codex approved chatgpt" not in result.stdout
+    assert f"Codex approved , but head is {HEAD_SHA[:7]}" in result.stdout
+
+
 def test_coderabbit_non_approval_does_not_mask_codex_approval() -> None:
     reviews = [
         codex_review(submitted_at="2026-08-22T11:00:00Z"),
@@ -684,7 +707,7 @@ def test_review_record_and_verdict_agree() -> None:
     )
     assert at == "2026-08-22T12:00:00Z"
     assert summary == "Codex review summary"
-    assert verdict.stdout.strip() == f"approval {HEAD_SHA} {CODEX_BOT}"
+    assert verdict.stdout.strip() == f"approval\t{HEAD_SHA}\t{CODEX_BOT}"
 
 
 def test_manual_marker_record_retains_reviewer_and_detail() -> None:
