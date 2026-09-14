@@ -243,7 +243,7 @@ def test_all_green_passes(tmp_path: Path) -> None:
 
 
 def test_mobile_safari_only_failure_passes(tmp_path: Path) -> None:
-    """WebKit has no crabbox home (PP-jvow), so CI reports its red without blocking."""
+    """WebKit is non-gating (PP-jvow), so CI reports its red without blocking."""
     payload = report(
         files=[
             described(

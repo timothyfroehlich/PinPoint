@@ -27,6 +27,7 @@ real Docker daemon, Supabase, git worktrees, or the slot manifest.
 
 import io
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -90,11 +91,13 @@ class RunStub:
         # exception instance to raise.
         self.responses = responses
         self.calls: list[list[str]] = []
+        self.call_kwargs: list[dict[str, object]] = []
 
     def __call__(
         self, args: list[str], **kwargs: object
     ) -> subprocess.CompletedProcess[str]:
         self.calls.append(list(args))
+        self.call_kwargs.append(dict(kwargs))
         default = (
             (0, "worktree /repo\n", "")
             if _kind(args) == "worktree_list"
@@ -110,6 +113,13 @@ class RunStub:
 
     def calls_of(self, kind: str) -> list[list[str]]:
         return [call for call in self.calls if _kind(call) == kind]
+
+    def kwargs_of(self, kind: str) -> list[dict[str, object]]:
+        return [
+            kwargs
+            for args, kwargs in zip(self.calls, self.call_kwargs, strict=True)
+            if _kind(args) == kind
+        ]
 
 
 def install(monkeypatch: pytest.MonkeyPatch, stub: RunStub) -> RunStub:
@@ -516,6 +526,31 @@ class TestMainTeardown:
         # must therefore run from the main worktree, which survives deletion.
         assert stub.calls_of("worktree_remove")[0][:3] == ["git", "-C", "/repo"]
         assert stub.calls_of("worktree_prune")[0][:3] == ["git", "-C", "/repo"]
+
+    def test_supabase_stop_forces_telemetry_off_and_preserves_inherited_env(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        fake_worktree: Path,
+        deallocated: list[str],
+    ) -> None:
+        monkeypatch.setenv("SUPABASE_TELEMETRY_DISABLED", "0")
+        monkeypatch.setenv("PINPOINT_CLEANUP_ENV_SENTINEL", "preserved")
+        stub = install(
+            monkeypatch,
+            RunStub(rev_parse=(0, f"{BRANCH}\n", ""), volume_ls=(0, "", "")),
+        )
+
+        assert _run_main(monkeypatch, fake_worktree) == cleanup.EXIT_OK
+
+        supabase_env = stub.kwargs_of("supabase")[0].get("env")
+        assert isinstance(supabase_env, dict)
+        assert supabase_env["SUPABASE_TELEMETRY_DISABLED"] == "1"
+        assert supabase_env["PINPOINT_CLEANUP_ENV_SENTINEL"] == "preserved"
+        assert supabase_env["PATH"] == os.environ["PATH"]
+
+        for args, kwargs in zip(stub.calls, stub.call_kwargs, strict=True):
+            if _kind(args) != "supabase":
+                assert "env" not in kwargs
 
     def test_unreadable_branch_refuses_cleanup_instead_of_reporting_success(
         self,

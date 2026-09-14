@@ -22,16 +22,23 @@ import {
   getChannels,
   type DeliveryPlan,
 } from "~/lib/notifications";
-import { type MachinePresenceStatus } from "~/lib/machines/presence";
+import {
+  type MachinePresenceStatus,
+  getMachinePresenceLabel,
+} from "~/lib/machines/presence";
 import { type ProseMirrorDoc } from "~/lib/tiptap/types";
 import { recordAbandonedListing } from "~/lib/pinballmap/abandoned-listings";
+import { createMachineTimelineEvent } from "~/lib/timeline/machine-events";
 import {
   resolvePbmLinkColumnsForUpdate,
   type AbandonedListing,
   type PbmLinkSelection,
   type StoredPbmLinkState,
 } from "~/lib/pinballmap/link-columns";
-import type { PbmListingIntent } from "~/lib/pinballmap/listing-state";
+import {
+  INVALID_WHEN_ON,
+  type PbmListingIntent,
+} from "~/lib/pinballmap/listing-state";
 
 export type Machine = InferSelectModel<typeof machines>;
 
@@ -616,8 +623,13 @@ export interface PlanMachinePbmLinkParams {
 export async function planMachinePbmLink({
   selection,
   stored,
+  presenceStatus,
 }: PlanMachinePbmLinkParams): Promise<PlanMachinePbmLinkResult> {
-  const resolved = await resolvePbmLinkColumnsForUpdate(selection, stored);
+  const resolved = await resolvePbmLinkColumnsForUpdate(
+    selection,
+    stored,
+    presenceStatus
+  );
   if (!resolved.ok) {
     return { ok: false, message: resolved.message };
   }
@@ -647,12 +659,32 @@ export async function applyMachinePbmLink(
   tx: DbTransaction,
   machineId: string,
   plan: MachinePbmLinkPlan,
-  actorUserId: string
+  actorUserId: string,
+  previousIntent?: PbmListingIntent
 ): Promise<void> {
   await tx.update(machines).set(plan.columns).where(eq(machines.id, machineId));
 
   if (plan.abandoned) {
     await recordAbandonedListing(tx, machineId, plan.abandoned, actorUserId);
+  }
+
+  if (
+    previousIntent !== undefined &&
+    plan.columns.pinballmapIntent !== previousIntent
+  ) {
+    await createMachineTimelineEvent(
+      machineId,
+      {
+        sourceType: "lifecycle",
+        tag: "lifecycle",
+        eventData: {
+          kind: "pinballmap_intent",
+          intent: plan.columns.pinballmapIntent,
+        },
+        actorId: actorUserId,
+      },
+      tx
+    );
   }
 }
 
@@ -833,10 +865,18 @@ export function carryExcludedReason(
  * one — could record no abandonment, leaving a live pinballmap.com entry nobody
  * tracks. That is the PP-l81u defect exactly. The fleet linking pass (PP-h059)
  * drives this tool across ~100 machines in one session, so the window is wide
- * open in practice, not theoretically.
+ * enough to hit. A lost CAS means someone else wrote between the plan and the
+ * lock; the loop retries up to {@link PBM_LINK_MAX_ATTEMPTS} times, re-reading
+ * the basis each time, before reporting `conflict`.
  *
- * The `FOR UPDATE` re-read inside the transaction closes it: whoever holds the
- * lock sees the other writer's committed state, and a basis that moved means the
+ * The CAS compares every column {@link planMachinePbmLink} derives its output
+ * from: `pinballmap_machine_id`, `pinballmap_intent`, and `presence_status`.
+ * The model metadata columns (manufacturer, year, OPDB/IPDB) are NOT in the
+ * basis: they are derived from the catalog mirror for whichever machine id
+ * lands here, so they cannot move independently. If the catalog row changed in
+ * between, that is the catalog changing, not the machine.
+ *
+ * If the locked row is missing entirely, the machine was deleted mid-flight; the
  * plan is void, so it is thrown away and re-planned rather than written. Same
  * read-modify-write serialization `editStoredSnapshot` uses in
  * `m/pinballmap-actions.ts`, for the same reason.
@@ -845,6 +885,10 @@ export function carryExcludedReason(
  * describing a link that was never stored (CORE-ARCH-012). An exclusion
  * re-stated without them keeps the stored reason and hand-entered model
  * ({@link carryExcludedFields}).
+ *
+ * Intent-only updates preserve the stored catalog metadata directly without
+ * re-resolving against the catalog mirror, so updating intent succeeds even when
+ * the catalog mirror is unpopulated (`mirror_unpopulated`).
  *
  * Returns the planned columns, which are also the stored ones: the CAS above is
  * what makes those the same claim, since a write only lands when the basis it
@@ -866,17 +910,54 @@ export async function updateMachinePbmLink({
       return { ok: false, reason: "not_found", message: MACHINE_GONE_MESSAGE };
     }
 
-    const planned = await planMachinePbmLink({
-      machineId,
-      selection: carryExcludedFields(selection, basisRow),
-      stored: {
-        pinballmapMachineId: basisRow.pinballmapMachineId,
-        pinballmapIntent: basisRow.pinballmapIntent,
-      },
-      presenceStatus: basisRow.presenceStatus,
-    });
-    if (!planned.ok) {
-      return { ok: false, reason: "invalid", message: planned.message };
+    const isIntentOnly =
+      selection.pinballmapMachineId === undefined &&
+      selection.pinballmapExcluded !== true &&
+      selection.intent !== undefined;
+
+    let planned: MachinePbmLinkPlan | null = null;
+
+    if (isIntentOnly && selection.intent !== undefined) {
+      if (basisRow.pinballmapExcluded) {
+        return {
+          ok: false,
+          reason: "invalid",
+          message:
+            "Uncataloged (excluded) machines do not participate in Pinball Map sync and cannot have a sync intent.",
+        };
+      }
+      if (basisRow.pinballmapMachineId === null) {
+        return {
+          ok: false,
+          reason: "invalid",
+          message:
+            "A machine must be linked to a Pinball Map title to set lineup intent.",
+        };
+      }
+      if (
+        selection.intent === "on" &&
+        INVALID_WHEN_ON.includes(basisRow.presenceStatus)
+      ) {
+        return {
+          ok: false,
+          reason: "invalid",
+          message: `Blocked by Availability: ${getMachinePresenceLabel(basisRow.presenceStatus)}`,
+        };
+      }
+    } else {
+      const plannedResult = await planMachinePbmLink({
+        machineId,
+        selection: carryExcludedFields(selection, basisRow),
+        stored: {
+          pinballmapMachineId: basisRow.pinballmapMachineId,
+          pinballmapIntent: basisRow.pinballmapIntent,
+        },
+        presenceStatus: basisRow.presenceStatus,
+      });
+      if (!plannedResult.ok) {
+        return { ok: false, reason: "invalid", message: plannedResult.message };
+      }
+      planned = plannedResult.plan;
     }
 
     const outcome = await db.transaction(async (tx) => {
@@ -907,9 +988,45 @@ export async function updateMachinePbmLink({
         return { state: "stale" } as const;
       }
 
-      await applyMachinePbmLink(tx, machineId, planned.plan, actorUserId);
+      if (isIntentOnly && selection.intent !== undefined) {
+        await tx
+          .update(machines)
+          .set({ pinballmapIntent: selection.intent })
+          .where(eq(machines.id, machineId));
+
+        if (locked.pinballmapIntent !== selection.intent) {
+          await createMachineTimelineEvent(
+            machineId,
+            {
+              sourceType: "lifecycle",
+              tag: "lifecycle",
+              eventData: {
+                kind: "pinballmap_intent",
+                intent: selection.intent,
+              },
+              actorId: actorUserId,
+            },
+            tx
+          );
+        }
+      } else if (planned) {
+        await applyMachinePbmLink(
+          tx,
+          machineId,
+          planned,
+          actorUserId,
+          locked.pinballmapIntent
+        );
+      }
+
       const { presenceStatus: _presence, ...previous } = locked;
-      return { state: "applied", previous } as const;
+      const columns =
+        isIntentOnly && selection.intent !== undefined
+          ? { ...previous, pinballmapIntent: selection.intent }
+          : planned
+            ? planned.columns
+            : previous;
+      return { state: "applied", previous, columns } as const;
     });
 
     if (outcome.state === "gone") {
@@ -929,7 +1046,7 @@ export async function updateMachinePbmLink({
 
     return {
       ok: true,
-      columns: planned.plan.columns,
+      columns: outcome.columns,
       previous: outcome.previous,
     };
   }

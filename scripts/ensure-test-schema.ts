@@ -153,9 +153,9 @@ function regenerateSchemaAtomic(hash: string): void {
  *
  * The symptom is `column "model_name" of relation "machines" does not exist`
  * from PGlite, hundreds of tests in, on a branch whose migration is obviously
- * present — and it survives a `git pull` on the runner, because the stale file
- * is not in git. Twice in one session on PP-o355.21 before the cause was found;
- * the crabbox skill's "reset the runner when you touch migrations" advice is a
+ * present — and it survives a `git pull` on an out-of-tree runner, because the
+ * stale file is not in git. Twice in one session on PP-o355.21 before the cause
+ * was found; advice to "reset the runner when you touch migrations" was a
  * workaround for exactly this.
  *
  * A hash of `schema.ts` written beside `schema.sql` cannot drift the same way:

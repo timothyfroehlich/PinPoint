@@ -19,11 +19,6 @@
  *
  * Fail-open: any error → let the command through unmodified. NEVER block or
  * fail a bd command because of this hook.
- *
- * Note: normalize-workspace-paths.cjs is the only other hook that returns
- * updatedInput. In practice bd commands don't carry absolute workspace paths,
- * so the two never rewrite the same command; both operate on the original
- * input.tool_input.command and don't depend on chaining between them.
  */
 
 const path = require("path");
@@ -114,11 +109,9 @@ async function main() {
   // updatedInput is only applied when it rides on a permission result, and a
   // hook produces a permission result ONLY when it emits a permissionDecision
   // (verified against bundled Claude Code v2.1.201) — so we MUST return "allow"
-  // for the command rewrite to take effect. This matches the
-  // normalize-workspace-paths.cjs precedent. Tradeoff: "allow" auto-approves
-  // the matched bd command; that is consistent with normalize-workspace-paths,
-  // and the block-* deny hooks still fire (deny > allow), so no safety
-  // regression.
+  // for the command rewrite to take effect. Tradeoff: "allow" auto-approves
+  // the matched bd command; the block-* deny hooks still fire (deny > allow),
+  // so no safety regression.
   const decision = {
     hookSpecificOutput: {
       hookEventName: "PreToolUse",
