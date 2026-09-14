@@ -6,8 +6,40 @@ import {
   docToPlainText,
   docIsEmpty,
   docsEqualByText,
+  isProseMirrorDoc,
   type ProseMirrorDoc,
 } from "./types";
+
+describe("isProseMirrorDoc", () => {
+  it("accepts a well-formed doc", () => {
+    expect(isProseMirrorDoc({ type: "doc", content: [] })).toBe(true);
+    expect(
+      isProseMirrorDoc({
+        type: "doc",
+        content: [{ type: "paragraph" }],
+      })
+    ).toBe(true);
+  });
+
+  it("rejects a bare { type: doc } with no content array", () => {
+    expect(isProseMirrorDoc({ type: "doc" })).toBe(false);
+    expect(isProseMirrorDoc({ type: "doc", content: undefined })).toBe(false);
+    expect(isProseMirrorDoc({ type: "doc", content: "nope" })).toBe(false);
+  });
+
+  it("rejects a non-doc node type", () => {
+    expect(isProseMirrorDoc({ type: "paragraph", content: [] })).toBe(false);
+  });
+
+  it("rejects nullish, primitive, and array values", () => {
+    expect(isProseMirrorDoc(null)).toBe(false);
+    expect(isProseMirrorDoc(undefined)).toBe(false);
+    expect(isProseMirrorDoc("doc")).toBe(false);
+    expect(isProseMirrorDoc(42)).toBe(false);
+    expect(isProseMirrorDoc([])).toBe(false);
+    expect(isProseMirrorDoc({})).toBe(false);
+  });
+});
 
 describe("plainTextToDoc", () => {
   it("converts single line to one paragraph", () => {
@@ -101,6 +133,12 @@ describe("extractMentions", () => {
     };
     expect(extractMentions(doc)).toEqual(["user-1"]);
   });
+
+  it("returns [] for null, undefined, or a malformed doc", () => {
+    expect(extractMentions(null)).toEqual([]);
+    expect(extractMentions(undefined)).toEqual([]);
+    expect(extractMentions({ type: "doc" } as never)).toEqual([]);
+  });
 });
 
 describe("docToPlainText", () => {
@@ -131,6 +169,16 @@ describe("docToPlainText", () => {
       ],
     };
     expect(docToPlainText(doc)).toBe("Hey @Tim");
+  });
+
+  it("passes legacy string values through unchanged", () => {
+    expect(docToPlainText("legacy plain text")).toBe("legacy plain text");
+  });
+
+  it("returns '' for null, undefined, or a malformed doc", () => {
+    expect(docToPlainText(null)).toBe("");
+    expect(docToPlainText(undefined)).toBe("");
+    expect(docToPlainText({ type: "doc" } as never)).toBe("");
   });
 });
 
