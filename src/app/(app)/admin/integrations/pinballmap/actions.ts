@@ -342,7 +342,16 @@ export async function saveRegionAlertConfigAction(
         },
       });
 
-    if (previousRegion !== normalizedRegion) {
+    const wasAlertConfigured = Boolean(
+      currentState?.regionAlertChannelId &&
+      currentState.regionAlertChannelId.trim().length > 0
+    );
+    const isAlertConfigured = alertChannelId !== null;
+    const regionChanged = previousRegion !== normalizedRegion;
+    const shouldBootstrap =
+      isAlertConfigured && (regionChanged || !wasAlertConfigured);
+
+    if (shouldBootstrap) {
       try {
         await bootstrapRegion(normalizedRegion);
       } catch (err) {
@@ -352,7 +361,7 @@ export async function saveRegionAlertConfigAction(
             region: normalizedRegion,
             action: "saveRegionAlertConfigAction.bootstrapRegion",
           },
-          "Failed to bootstrap new region"
+          "Failed to bootstrap region"
         );
       }
     }
@@ -462,10 +471,16 @@ export async function sendRegionAlertTestAction(
     });
 
     if (sent.ok) {
+      const wasAlertConfigured = Boolean(
+        currentState?.regionAlertChannelId &&
+        currentState.regionAlertChannelId.trim().length > 0
+      );
+
       await db
         .insert(pinballmapState)
         .values({
           id: "singleton",
+          regionAlertChannelId: channelId,
           regionAlertStatus: "posting",
           regionAlertLastPostAt: new Date(),
           regionAlertLastStatusDetail: "Test message delivered",
@@ -475,6 +490,7 @@ export async function sendRegionAlertTestAction(
         .onConflictDoUpdate({
           target: pinballmapState.id,
           set: {
+            regionAlertChannelId: channelId,
             regionAlertStatus: "posting",
             regionAlertLastPostAt: new Date(),
             regionAlertLastStatusDetail: "Test message delivered",
@@ -482,6 +498,22 @@ export async function sendRegionAlertTestAction(
             updatedBy: authorization.userId,
           },
         });
+
+      if (!wasAlertConfigured) {
+        try {
+          await bootstrapRegion(currentState?.regionAlertRegion ?? "austin");
+        } catch (err) {
+          log.error(
+            {
+              err,
+              region: currentState?.regionAlertRegion ?? "austin",
+              action: "sendRegionAlertTestAction.bootstrapRegion",
+            },
+            "Failed to bootstrap region on test message activation"
+          );
+        }
+      }
+
       revalidatePath(INTEGRATIONS_PATH);
       return channelName !== undefined
         ? { ok: true, channelName }
@@ -499,6 +531,7 @@ export async function sendRegionAlertTestAction(
       .insert(pinballmapState)
       .values({
         id: "singleton",
+        regionAlertChannelId: channelId,
         regionAlertStatus: newStatus,
         regionAlertLastStatusDetail: statusDetail,
         updatedAt: new Date(),
@@ -507,14 +540,15 @@ export async function sendRegionAlertTestAction(
       .onConflictDoUpdate({
         target: pinballmapState.id,
         set: {
+          regionAlertChannelId: channelId,
           regionAlertStatus: newStatus,
           regionAlertLastStatusDetail: statusDetail,
           updatedAt: new Date(),
           updatedBy: authorization.userId,
         },
       });
-
     revalidatePath(INTEGRATIONS_PATH);
+
     return { ok: false, reason: newStatus, message: statusDetail };
   } catch (error) {
     reportError(error, {

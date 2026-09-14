@@ -249,12 +249,12 @@ async function isRemovalTrackingInitialized(region: string): Promise<boolean> {
 export function getRegionAlertChannelId(
   state?: PinballmapRuntimeState | null
 ): string | null {
-  if (
-    state?.regionAlertChannelId !== undefined &&
-    state.regionAlertChannelId !== null
-  ) {
-    const trimmed = state.regionAlertChannelId.trim();
-    return trimmed.length > 0 ? trimmed : null;
+  if (state !== undefined && state !== null) {
+    if (state.regionAlertChannelId !== null) {
+      const trimmed = state.regionAlertChannelId.trim();
+      return trimmed.length > 0 ? trimmed : null;
+    }
+    return null;
   }
   const raw = process.env[ALERT_CHANNEL_ENV]?.trim();
   return raw !== undefined && raw.length > 0 ? raw : null;
@@ -1156,19 +1156,18 @@ export async function runRegionMachineAlerts(opts?: {
           ? "Channel unreachable or bot missing permissions"
           : "Discord was unreachable";
       await db
-        .insert(pinballmapState)
-        .values({
-          id: "singleton",
+        .update(pinballmapState)
+        .set({
           regionAlertStatus: newStatus,
           regionAlertLastStatusDetail: statusDetail,
         })
-        .onConflictDoUpdate({
-          target: pinballmapState.id,
-          set: {
-            regionAlertStatus: newStatus,
-            regionAlertLastStatusDetail: statusDetail,
-          },
-        });
+        .where(
+          and(
+            eq(pinballmapState.id, "singleton"),
+            eq(pinballmapState.regionAlertRegion, region),
+            eq(pinballmapState.regionAlertChannelId, channelId)
+          )
+        );
 
       if (sent.reason === "blocked") {
         // `blocked` is DiscordSendResult's "retrying will not fix this" — a 404 for
@@ -1194,21 +1193,19 @@ export async function runRegionMachineAlerts(opts?: {
 
     await markAnnounced(region, delivered);
     await db
-      .insert(pinballmapState)
-      .values({
-        id: "singleton",
+      .update(pinballmapState)
+      .set({
         regionAlertStatus: "posting",
         regionAlertLastPostAt: new Date(),
         regionAlertLastStatusDetail: null,
       })
-      .onConflictDoUpdate({
-        target: pinballmapState.id,
-        set: {
-          regionAlertStatus: "posting",
-          regionAlertLastPostAt: new Date(),
-          regionAlertLastStatusDetail: null,
-        },
-      });
+      .where(
+        and(
+          eq(pinballmapState.id, "singleton"),
+          eq(pinballmapState.regionAlertRegion, region),
+          eq(pinballmapState.regionAlertChannelId, channelId)
+        )
+      );
     // `readPending` caps at PENDING_READ_LIMIT, so "announced everything we read"
     // is not "announced everything queued" — a long Discord outage can leave more
     // rows behind than one run can drain. This log line is the monitoring signal
@@ -1263,6 +1260,18 @@ export async function bootstrapRegion(
         )
       );
 
+    // Reconcile existing seen machines for this region:
+    // 1. Mark all existing rows as not present and reset missed runs so absent machines are not announced as removed
+    await tx
+      .update(pinballmapRegionSeenMachines)
+      .set({
+        isPresent: false,
+        missedRuns: 0,
+        announcedAt: sql`coalesce(${pinballmapRegionSeenMachines.announcedAt}, ${now})`,
+      })
+      .where(eq(pinballmapRegionSeenMachines.region, region));
+
+    // 2. Upsert observed machines: mark present, refresh locations and machines, and set announcedAt
     for (let i = 0; i < observed.length; i += INSERT_CHUNK) {
       const inserted = await tx
         .insert(pinballmapRegionSeenMachines)
@@ -1273,9 +1282,23 @@ export async function bootstrapRegion(
             locationId: entry.locationId,
             pinballmapMachineId: entry.machineId,
             announcedAt: now,
+            isPresent: true,
+            missedRuns: 0,
           }))
         )
-        .onConflictDoNothing()
+        .onConflictDoUpdate({
+          target: [
+            pinballmapRegionSeenMachines.region,
+            pinballmapRegionSeenMachines.lmxId,
+          ],
+          set: {
+            locationId: sql`excluded.location_id`,
+            pinballmapMachineId: sql`excluded.pinballmap_machine_id`,
+            isPresent: true,
+            missedRuns: 0,
+            announcedAt: sql`coalesce(${pinballmapRegionSeenMachines.announcedAt}, ${now})`,
+          },
+        })
         .returning({ lmxId: pinballmapRegionSeenMachines.lmxId });
       discovered += inserted.length;
     }

@@ -325,6 +325,32 @@ describe("Pinball Map Region Alerts Admin Configuration", () => {
       fetchSpy.mockRestore();
     });
 
+    it("triggers bootstrapRegion when enabling alerts for the same region", async () => {
+      const db = await getTestDb();
+      await db
+        .update(pinballmapState)
+        .set({ regionAlertChannelId: null, regionAlertRegion: "austin" })
+        .where(eq(pinballmapState.id, "singleton"));
+
+      const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            id: "123456789",
+            permissions: "2048",
+          }),
+          { status: 200 }
+        )
+      );
+
+      await saveRegionAlertConfigAction({
+        region: "austin",
+        alertChannelId: "123456789",
+      });
+
+      expect(bootstrapRegionMock).toHaveBeenCalledWith("austin");
+      fetchSpy.mockRestore();
+    });
+
     it("marks status as cant_post when Discord channel is a category (type 4)", async () => {
       const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
         new Response(
