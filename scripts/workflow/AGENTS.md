@@ -135,19 +135,20 @@ Watcher run telemetry is recorded under `tmp/gh-monitor/watcher-run-<pr>-<phase>
 ### Compact Validation Progress
 
 `quiet-run.py` keeps child stdout/stderr in the private validation log and writes
-only its bounded terminal verdict to the existing verdict stream. Compact
-preflight additionally declares a fixed allowlist of phase IDs. Each phase runs
-through `validation-phase.py`, which sends start/completion events over a private
-Unix datagram socket rather than through child output. Unknown IDs and malformed
-events are ignored, so a secret-shaped child line cannot be mistaken for progress.
-The maintained preflight allowlist is selected with `--phase-set preflight`.
+only its bounded terminal verdict to the existing verdict stream (used for single-command
+tasks such as `check`, `test`, and `e2e:all`).
 
-Progress transitions go to stderr. An active phase emits a heartbeat after 60
-seconds and every 60 seconds thereafter; `quiet-run.py --heartbeat-seconds N`
-changes that interval for focused validation or tests. Heartbeats contain only the
-validation label, declared phase ID, and elapsed time. Human variants do not create
-the progress socket, so the phase wrapper is silent and the command keeps streaming
-normally.
+`preflight-runner.py` directly orchestrates the canonical preflight phases
+(`database-readiness`, `prototype-clean`, parallel `static-checks` and `unit-tests`,
+`database-reset`, `build`, `integration`, `supabase-integration`, `smoke`).
+In default compact mode, child stdout/stderr are captured in a private `0600` validation log
+under `tmp/validation-logs/`, while stderr receives bounded phase transitions
+(`preflight: PHASE <name> START / COMPLETE`) and periodic heartbeats
+(`preflight: HEARTBEAT <name> (<elapsed>s elapsed)`) after 60 seconds (configurable
+via `--heartbeat-seconds`). Child output never shares the progress channel, keeping
+progress secret-safe. On clean pass, the log file is deleted; on warning or failure,
+a bounded excerpt is shown and the log is retained. In `--human` mode, commands
+stream directly without log capture.
 
 ### UI Screenshots
 

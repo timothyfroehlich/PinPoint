@@ -3,10 +3,7 @@
 
 Successful logs are deleted. Warning and failure logs are retained for seven days
 under ``tmp/validation-logs`` with mode 0600 so an agent can inspect the complete
-evidence only when the bounded summary is insufficient. Callers may declare
-explicit validation phases; those emit one start/completion transition and, after
-60 seconds by default, a configurable heartbeat containing only the phase label and
-elapsed time. Child output never shares the progress channel.
+evidence only when the bounded summary is insufficient.
 """
 
 from __future__ import annotations
@@ -14,13 +11,9 @@ from __future__ import annotations
 import argparse
 import os
 import re
-import select
-import shutil
 import signal
-import socket
 import subprocess
 import sys
-import tempfile
 import time
 from datetime import UTC, datetime
 from pathlib import Path
@@ -34,21 +27,6 @@ WARNING_LIMIT = 8
 HEAD_LINES = 8
 TAIL_LINES = 16
 LINE_LIMIT = 240
-DEFAULT_HEARTBEAT_SECONDS = 60.0
-PROGRESS_SOCKET_ENV = "PINPOINT_QUIET_PROGRESS_SOCKET"
-PHASE_ID_RE = re.compile(r"[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?\Z")
-PHASE_SETS = {
-    "preflight": (
-        "database-readiness",
-        "static-checks",
-        "unit-tests",
-        "database-reset",
-        "build",
-        "integration",
-        "supabase-integration",
-        "smoke",
-    )
-}
 ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
 WARNING_RE = re.compile(r"\bwarn(?:ing)?\b", re.IGNORECASE)
 PASSED_RE = re.compile(r"\b(\d[\d,]*)\s+passed\b", re.IGNORECASE)
@@ -58,55 +36,15 @@ SENSITIVE_VALUE_RE = re.compile(
 )
 
 
-def _phase_id(value: str) -> str:
-    if PHASE_ID_RE.fullmatch(value) is None:
-        raise argparse.ArgumentTypeError(
-            "phase must be 1-64 lowercase letters, digits, or hyphens"
-        )
-    return value
-
-
-def _positive_seconds(value: str) -> float:
-    try:
-        seconds = float(value)
-    except ValueError as error:
-        raise argparse.ArgumentTypeError(
-            "heartbeat interval must be a number"
-        ) from error
-    if seconds <= 0:
-        raise argparse.ArgumentTypeError("heartbeat interval must be greater than zero")
-    return seconds
-
-
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--label", required=True, help="name shown in the verdict")
-    parser.add_argument(
-        "--phase",
-        action="append",
-        default=[],
-        type=_phase_id,
-        help="allowed progress phase ID; repeat for each phase",
-    )
-    parser.add_argument(
-        "--phase-set",
-        choices=sorted(PHASE_SETS),
-        help="declare a maintained phase allowlist",
-    )
-    parser.add_argument(
-        "--heartbeat-seconds",
-        default=DEFAULT_HEARTBEAT_SECONDS,
-        type=_positive_seconds,
-        help=f"heartbeat interval for active phases (default: {DEFAULT_HEARTBEAT_SECONDS:g})",
-    )
     parser.add_argument("command", nargs=argparse.REMAINDER)
     args = parser.parse_args()
     if args.command[:1] == ["--"]:
         args.command = args.command[1:]
     if not args.command:
         parser.error("a command is required after --")
-    if args.phase_set is not None:
-        args.phase = list(dict.fromkeys((*PHASE_SETS[args.phase_set], *args.phase)))
     return args
 
 
@@ -177,106 +115,6 @@ def _exit_for_returncode(returncode: int) -> int:
     return returncode if returncode >= 0 else 128 + abs(returncode)
 
 
-def _open_progress_socket() -> tuple[socket.socket, Path]:
-    progress_dir = Path(tempfile.mkdtemp(prefix="pinpoint-quiet-", dir="/tmp"))
-    socket_path = progress_dir / "events.sock"
-    progress_socket = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
-    try:
-        progress_socket.bind(str(socket_path))
-        os.chmod(socket_path, 0o600)
-        progress_socket.setblocking(False)
-    except OSError:
-        progress_socket.close()
-        shutil.rmtree(progress_dir, ignore_errors=True)
-        raise
-    return progress_socket, progress_dir
-
-
-def _drain_progress_events(
-    progress_socket: socket.socket,
-    *,
-    allowed_phases: set[str],
-    active_phases: dict[str, float],
-    completed_phases: set[str],
-    label: str,
-) -> None:
-    while True:
-        try:
-            payload = progress_socket.recv(256)
-        except BlockingIOError:
-            return
-
-        try:
-            version, event, phase = payload.decode("ascii").split("\t")
-        except (UnicodeDecodeError, ValueError):
-            continue
-        if version != "1" or phase not in allowed_phases:
-            continue
-
-        now = time.monotonic()
-        if (
-            event == "start"
-            and phase not in active_phases
-            and phase not in completed_phases
-        ):
-            active_phases[phase] = now
-            print(f"{label}: PHASE {phase} START", file=sys.stderr, flush=True)
-        elif event == "complete" and phase in active_phases:
-            elapsed = now - active_phases.pop(phase)
-            completed_phases.add(phase)
-            print(
-                f"{label}: PHASE {phase} COMPLETE ({elapsed:.1f}s)",
-                file=sys.stderr,
-                flush=True,
-            )
-
-
-def _wait_with_progress(
-    process: subprocess.Popen[bytes],
-    progress_socket: socket.socket,
-    *,
-    phases: list[str],
-    heartbeat_seconds: float,
-    label: str,
-) -> int:
-    allowed_phases = set(phases)
-    active_phases: dict[str, float] = {}
-    completed_phases: set[str] = set()
-    last_heartbeats: dict[str, float] = {}
-
-    while process.poll() is None:
-        readable, _, _ = select.select([progress_socket], [], [], 0.1)
-        if readable:
-            _drain_progress_events(
-                progress_socket,
-                allowed_phases=allowed_phases,
-                active_phases=active_phases,
-                completed_phases=completed_phases,
-                label=label,
-            )
-
-        now = time.monotonic()
-        for phase, phase_started in active_phases.items():
-            last_heartbeat = last_heartbeats.get(phase, phase_started)
-            if now - last_heartbeat < heartbeat_seconds:
-                continue
-            print(
-                f"{label}: HEARTBEAT {phase} ({now - phase_started:.1f}s elapsed)",
-                file=sys.stderr,
-                flush=True,
-            )
-            last_heartbeats[phase] = now
-
-    _drain_progress_events(
-        progress_socket,
-        allowed_phases=allowed_phases,
-        active_phases=active_phases,
-        completed_phases=completed_phases,
-        label=label,
-    )
-    return process.wait()
-
-
 def main() -> int:
     args = _parse_args()
     log_dir = _log_dir()
@@ -287,12 +125,6 @@ def main() -> int:
     started = time.monotonic()
     process: subprocess.Popen[bytes] | None = None
     received_signal: int | None = None
-    progress_socket: socket.socket | None = None
-    progress_dir: Path | None = None
-    child_env = os.environ.copy()
-    if args.phase:
-        progress_socket, progress_dir = _open_progress_socket()
-        child_env[PROGRESS_SOCKET_ENV] = str(progress_dir / "events.sock")
 
     def forward_signal(signum: int, _frame: FrameType | None) -> None:
         nonlocal received_signal
@@ -311,7 +143,6 @@ def main() -> int:
         try:
             process = subprocess.Popen(
                 args.command,
-                env=child_env,
                 stdout=log_handle,
                 stderr=subprocess.STDOUT,
                 start_new_session=True,
@@ -324,22 +155,9 @@ def main() -> int:
                 file=sys.stderr,
             )
             return 127
-        if progress_socket is None:
-            returncode = process.wait()
-        else:
-            returncode = _wait_with_progress(
-                process,
-                progress_socket,
-                phases=args.phase,
-                heartbeat_seconds=args.heartbeat_seconds,
-                label=args.label,
-            )
+        returncode = process.wait()
     finally:
         log_handle.close()
-        if progress_socket is not None:
-            progress_socket.close()
-        if progress_dir is not None:
-            shutil.rmtree(progress_dir, ignore_errors=True)
         for signum, handler in previous_handlers.items():
             signal.signal(signum, handler)
 

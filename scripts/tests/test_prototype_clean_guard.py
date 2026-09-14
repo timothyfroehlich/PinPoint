@@ -74,13 +74,12 @@ def test_disposable_file_next_to_layout_fails(tmp_path: Path) -> None:
 def test_both_preflight_paths_run_the_cleanup_guard() -> None:
     package = json.loads((REPO_ROOT / "package.json").read_text())
     locked_script = (REPO_ROOT / "scripts/workflow/preflight-locked.sh").read_text()
+    runner_source = (REPO_ROOT / "scripts/workflow/preflight-runner.py").read_text()
 
-    preflight = package["scripts"]["preflight:_run"]
-    assert preflight.startswith("pnpm run preflight:readiness && ")
-    assert preflight.index("preflight:readiness") < preflight.index(
-        "check:prototype-clean"
-    )
     assert "pnpm run preflight:_run" in locked_script
-    assert package["scripts"]["preflight:unlocked"].endswith(
-        "-- pnpm run preflight:_run"
+    assert package["scripts"]["preflight:unlocked"] == "pnpm run preflight:_run"
+    assert "database-readiness" in runner_source
+    assert "prototype-clean" in runner_source
+    assert runner_source.index("database-readiness") < runner_source.index(
+        "prototype-clean"
     )
