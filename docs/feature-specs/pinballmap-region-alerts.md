@@ -58,17 +58,13 @@ Related: `docs/feature-specs/pinballmap.md` (the location-sync integration), `do
 
 | Spec | Code today | Resolution |
 | :-- | :-- | :-- |
-| §2.1 region chosen from a list | Region is the hardcoded `PBM_AUSTIN_REGION` constant | Add a regions-list read from Pinball Map; make it a stored field |
-| §2.1 alert channel in config | Channel is the `DISCORD_PBM_ALERT_CHANNEL_ID` env var (`getRegionAlertChannelId`) | Move to DB; configure in the admin card |
-| §2.3 channel validated + status | Channel is used blind; no validation, no stored status | Validate on save; store channel status |
-| §2.4 Send test message | No test action; the channel is only exercised by the hourly cron | Add a Send test message button |
-| §3 stored status | No status surfaced anywhere in admin | Build the status readout |
 | §4.1 fixed hourly schedule | Hardcoded Vercel cron at `23 * * * *` | Keep; spec documents the fixed cadence |
 
 ---
 
 ## Changelog
 
-| Date       | Change   |
-| :--------- | :------- |
+| Date | Change |
+| :-- | :-- |
+| 2026-09-13 | Admin configuration card implemented (PP-o355.51.7): region select, alert channel configuration, Discord validation on save, send test message action, and stored channel status readout. |
 | 2026-08-22 | Created. |

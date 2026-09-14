@@ -3,7 +3,7 @@ import { getPinballMapApiToken } from "./api-token";
 import { createLiveClient } from "./client-live";
 import { getMockClient } from "./client-mock";
 import { getPinballMapMode } from "./config";
-import type { PinballMapClient } from "./types";
+import type { PinballMapClient, PinballMapRegion } from "./types";
 
 /**
  * Returns the active PinballMap client — live or mock, per `PINBALLMAP_MODE`
@@ -25,4 +25,29 @@ export function getPinballMapClient(): Promise<PinballMapClient> {
   return Promise.resolve(createLiveClient(getPinballMapApiToken()));
 }
 
-export type { PinballMapClient } from "./types";
+export type { PinballMapClient, PinballMapRegion } from "./types";
+
+let cachedRegions: { expiresAt: number; regions: PinballMapRegion[] } | null =
+  null;
+const REGIONS_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Fetch Pinball Map regions with a long cache TTL (24h).
+ * Regions change very rarely; sorting by formalName ensures consistent picker ordering.
+ */
+export async function getRegions(): Promise<PinballMapRegion[]> {
+  const now = Date.now();
+  if (cachedRegions && cachedRegions.expiresAt > now) {
+    return cachedRegions.regions;
+  }
+  const client = await getPinballMapClient();
+  const regions = await client.fetchRegions();
+  const sorted = [...regions].sort((a, b) =>
+    a.formalName.localeCompare(b.formalName)
+  );
+  cachedRegions = {
+    regions: sorted,
+    expiresAt: now + REGIONS_CACHE_TTL_MS,
+  };
+  return sorted;
+}

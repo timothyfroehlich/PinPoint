@@ -24,3 +24,12 @@ export const clearPinballMapLocationSchema = z.object({
     .transform(Number)
     .refine((value) => Number.isSafeInteger(value) && value >= 0),
 });
+
+export const saveRegionAlertConfigSchema = z.object({
+  region: z.string().trim().min(1),
+  alertChannelId: z.string().trim().nullable().optional(),
+});
+
+export const sendRegionAlertTestSchema = z.object({
+  channelId: z.string().trim().min(1).optional(),
+});

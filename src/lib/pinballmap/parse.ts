@@ -13,6 +13,7 @@ import type {
   PbmLmx,
   PbmRegionLmx,
   PbmRegionLocation,
+  PinballMapRegion,
 } from "./types";
 
 function asRecord(v: unknown): Record<string, unknown> | null {
@@ -231,4 +232,27 @@ export function parseMachineGroups(raw: unknown): MachineGroup[] {
   return list
     .map(parseMachineGroup)
     .filter((g): g is MachineGroup => g !== null);
+}
+
+function parseRegion(raw: unknown): PinballMapRegion | null {
+  const r = asRecord(raw);
+  if (!r) return null;
+  const id = asNumber(r["id"]);
+  const name = asString(r["name"]);
+  if (id === null || name === null || name.length === 0) return null;
+  const rawFormal = asString(r["formal_name"])?.trim();
+  const formalName =
+    rawFormal && rawFormal.length > 0
+      ? rawFormal
+      : name.charAt(0).toUpperCase() + name.slice(1);
+  return { id, name, formalName };
+}
+
+/** regions.json returns either a bare array or `{ regions: [...] }`. */
+export function parseRegions(raw: unknown): PinballMapRegion[] {
+  const r = asRecord(raw);
+  const list = r ? asArray(r["regions"]) : asArray(raw);
+  return list
+    .map(parseRegion)
+    .filter((reg): reg is PinballMapRegion => reg !== null);
 }

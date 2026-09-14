@@ -180,4 +180,30 @@ describe("getPinballMapAdminViewState", () => {
       },
     });
   });
+
+  it("populates region alert configuration and delivery status", async () => {
+    getPinballMapStateMock.mockResolvedValue({
+      locationId: 26454,
+      configurationGeneration: 1,
+      snapshotJson: SNAPSHOT,
+      lastSyncedAt: new Date("2026-09-12T10:00:00.000Z"),
+      lastSyncAttemptAt: new Date("2026-09-12T10:00:00.000Z"),
+      lastSyncStatus: "ok",
+      lastSyncError: null,
+      regionAlertRegion: "portland",
+      regionAlertChannelId: "1234567890",
+      regionAlertStatus: "posting",
+      regionAlertLastPostAt: new Date("2026-09-12T11:00:00.000Z"),
+      regionAlertLastStatusDetail: "Test message delivered",
+    });
+
+    const result = await getPinballMapAdminViewState();
+
+    expect(result.configuredRegion).toBe("portland");
+    expect(result.alertChannelId).toBe("1234567890");
+    expect(result.alertChannelStatus).toBe("posting");
+    expect(result.alertChannelStatusDetail).toBe("Test message delivered");
+    expect(result.alertLastPostAtIso).toBe("2026-09-12T11:00:00.000Z");
+    expect(result.availableRegions.length).toBeGreaterThan(0);
+  });
 });

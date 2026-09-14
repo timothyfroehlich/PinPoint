@@ -137,6 +137,16 @@ export interface MachineGroup {
   name: string;
 }
 
+/**
+ * A Pinball Map geographic region (e.g. "austin", "portland").
+ * Returned by `fetchRegions` / `GET /api/v1/regions.json`.
+ */
+export interface PinballMapRegion {
+  id: number;
+  name: string;
+  formalName: string;
+}
+
 /** Per-user PBM credentials appended to write requests as query params. */
 export interface PbmCredentials {
   email: string;
@@ -227,6 +237,8 @@ export interface PinballMapClient {
   fetchRegionLocations(region: string): Promise<PbmRegionLocation[]>;
   /** Anonymous bulk read: machine groups (family names) for the linking picker. */
   fetchMachineGroups(): Promise<MachineGroup[]>;
+  /** Anonymous bulk read: all regions listed in Pinball Map (`GET /api/v1/regions.json`). */
+  fetchRegions(): Promise<PinballMapRegion[]>;
   /** Exchange login+password for a long-lived API token. */
   authDetails(login: string, password: string): Promise<PbmAuthResult>;
   /** Add a machine to the location. */

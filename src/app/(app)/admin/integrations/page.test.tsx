@@ -64,6 +64,12 @@ describe("Admin Integrations routes", () => {
         nextRefillAtIso: null,
         observedAtIso: "2026-09-12T12:00:00.000Z",
       },
+      configuredRegion: "austin",
+      availableRegions: [{ id: 1, name: "austin", formalName: "Austin" }],
+      alertChannelId: null,
+      alertChannelStatus: "not_configured",
+      alertChannelStatusDetail: null,
+      alertLastPostAtIso: null,
     });
   });
 
