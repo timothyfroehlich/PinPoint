@@ -344,18 +344,28 @@ def test_reap_processes_terminates_and_waits_for_children() -> None:
     active = [p1, p2]
     procs = [p1, p2]
 
-    assert p1.poll() is None
-    assert p2.poll() is None
+    try:
+        assert p1.poll() is None
+        assert p2.poll() is None
 
-    module._reap_processes(procs, active, signum=signal.SIGTERM)
+        module._reap_processes(procs, active, signum=signal.SIGTERM)
 
-    assert p1.poll() is not None
-    assert p2.poll() is not None
-    assert active == []
-    with pytest.raises(OSError):
-        os.kill(p1.pid, 0)
-    with pytest.raises(OSError):
-        os.kill(p2.pid, 0)
+        assert p1.poll() is not None
+        assert p2.poll() is not None
+        assert active == []
+        with pytest.raises(OSError):
+            os.kill(p1.pid, 0)
+        with pytest.raises(OSError):
+            os.kill(p2.pid, 0)
+    finally:
+        for p in (p1, p2):
+            if p.poll() is None:
+                p.terminate()
+                try:
+                    p.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    p.kill()
+                    p.wait(timeout=5)
 
 
 def test_parallel_start_failure_returns_127(tmp_path: Path) -> None:
@@ -429,18 +439,34 @@ def test_parallel_interruption_reaps_all_children(tmp_path: Path) -> None:
         text=True,
     )
 
-    deadline = time.monotonic() + 15
-    while not (ready1.exists() and ready2.exists()) and time.monotonic() < deadline:
-        time.sleep(0.01)
-    assert ready1.exists() and ready2.exists()
+    try:
+        deadline = time.monotonic() + 15
+        while not (ready1.exists() and ready2.exists()) and time.monotonic() < deadline:
+            time.sleep(0.01)
+        assert ready1.exists() and ready2.exists()
 
-    process.send_signal(signal.SIGINT)
-    stdout, stderr = process.communicate(timeout=15)
+        process.send_signal(signal.SIGINT)
+        stdout, stderr = process.communicate(timeout=15)
 
-    assert process.returncode == 128 + signal.SIGINT
-    child1_pid = int(pid1_file.read_text().strip())
-    child2_pid = int(pid2_file.read_text().strip())
-    with pytest.raises(OSError):
-        os.kill(child1_pid, 0)
-    with pytest.raises(OSError):
-        os.kill(child2_pid, 0)
+        assert process.returncode == 128 + signal.SIGINT
+        child1_pid = int(pid1_file.read_text().strip())
+        child2_pid = int(pid2_file.read_text().strip())
+        with pytest.raises(OSError):
+            os.kill(child1_pid, 0)
+        with pytest.raises(OSError):
+            os.kill(child2_pid, 0)
+    finally:
+        if process.poll() is None:
+            process.terminate()
+            try:
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait(timeout=5)
+        for pid_file in (pid1_file, pid2_file):
+            if pid_file.exists():
+                try:
+                    pid = int(pid_file.read_text().strip())
+                    os.kill(pid, signal.SIGTERM)
+                except (ValueError, OSError):
+                    pass
