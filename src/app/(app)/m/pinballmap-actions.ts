@@ -43,14 +43,14 @@ import {
   type PinballMapMutationLease,
 } from "~/lib/pinballmap/state";
 import { PBM_REFRESH_REFILL_MS } from "~/lib/pinballmap/config";
-import {
-  getMachinePresenceLabel,
-  type MachinePresenceStatus,
-} from "~/lib/machines/presence";
+import { getMachinePresenceLabel } from "~/lib/machines/presence";
 import { findLmxForMachine } from "~/lib/pinballmap/resolve-lmx";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import { createMachineTimelineEvent } from "~/lib/timeline/machine-events";
-import type { PbmListingIntent } from "~/lib/pinballmap/listing-state";
+import {
+  INVALID_WHEN_ON,
+  type PbmListingIntent,
+} from "~/lib/pinballmap/listing-state";
 import { type Result, ok, err } from "~/lib/result";
 
 export type { CatalogEdition, CatalogFamily } from "~/lib/pinballmap/catalog";
@@ -220,11 +220,8 @@ export type SetPinballmapIntentResult = Result<
   "VALIDATION" | "UNAUTHORIZED" | "NOT_FOUND" | "BLOCKED"
 >;
 
-/** Availability that forbids intent On (spec 6.2). Mirrors `listing-state.ts`. */
-const INTENT_ON_BLOCKED_BY: readonly MachinePresenceStatus[] = [
-  "pending_arrival",
-  "removed",
-];
+/** Availability that forbids intent On (spec 6.2). Re-exports `INVALID_WHEN_ON`. */
+const INTENT_ON_BLOCKED_BY = INVALID_WHEN_ON;
 
 /**
  * Set a machine's listing intent — the tri-state toggle (spec 4.1, 8.1).

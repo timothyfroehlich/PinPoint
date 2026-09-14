@@ -831,7 +831,8 @@ export async function updateMachineAction(
                   selectionWithFreshReason.pinballmapExcludedReason ?? null,
               },
             },
-            user.id
+            user.id,
+            updatedMachine.pinballmapIntent
           );
         }
 
@@ -1058,7 +1059,8 @@ export async function updateMachineAction(
                 selectionWithFreshReason.pinballmapExcludedReason ?? null,
             },
           },
-          user.id
+          user.id,
+          updatedMachine.pinballmapIntent
         );
       }
 
