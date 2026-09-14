@@ -41,11 +41,6 @@ if [ -n "${CI:-}" ]; then
   exec "$@"
 fi
 
-# A memory-pressure gate used to run here, before the sem slot was acquired. It
-# was one developer's hardware problem — 4–5 parallel agent sessions on a 16 GB
-# laptop — living in a shared repo, so PP-p9cy moved it to that machine's own
-# Claude hooks. What is left is the concurrency cap, which is true of any host.
-#
 # Detect GNU parallel's sem. moreutils also ships a `sem` binary that doesn't
 # speak --jobs/--id/--fg, so probe the version banner too.
 if ! command -v sem >/dev/null 2>&1 \
@@ -56,8 +51,8 @@ if ! command -v sem >/dev/null 2>&1 \
   exec "$@"
 fi
 
-# GNU Parallel defaults to ~/.parallel, which is outside Codex's writable
-# boundary. Keep PinPoint's semaphore state in the existing cross-worktree
+# GNU Parallel defaults to ~/.parallel, which is not writable in every agent
+# sandbox. Keep PinPoint's semaphore state in the existing cross-worktree
 # state root instead. Every checkout on the host resolves the same path, while
 # PINPOINT_PARALLEL_HOME gives tests and unusual installations an explicit
 # override without changing GNU Parallel's global configuration.
