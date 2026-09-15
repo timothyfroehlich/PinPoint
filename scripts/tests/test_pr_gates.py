@@ -978,6 +978,27 @@ def test_newest_ci_gate_run_is_authoritative() -> None:
     assert "FAIL: ci:" in result.stdout
 
 
+def test_newest_started_run_wins_even_when_the_older_one_finished_later() -> None:
+    # Both completed, neither cancelled: the run that STARTED later is the verdict,
+    # so a slow older SUCCESS cannot hide a newer FAILURE.
+    rollup = [
+        ci_gate(
+            conclusion="SUCCESS",
+            started_at="2026-08-22T12:00:00Z",
+            completed_at="2026-08-22T12:40:00Z",
+        ),
+        ci_gate(
+            conclusion="FAILURE",
+            started_at="2026-08-22T12:20:00Z",
+            completed_at="2026-08-22T12:30:00Z",
+        ),
+    ]
+    with gate_env(rollup=rollup) as env:
+        result = run_gate("check_ci", env)
+    assert result.returncode == 1, result.stdout
+    assert "FAIL: ci:" in result.stdout
+
+
 def test_live_replacement_run_outranks_an_older_run_that_finished_later() -> None:
     # The replacement started at 12:20; the run it replaced finished at 12:25 with a
     # FAILURE. Its later completedAt must not make the failure authoritative.

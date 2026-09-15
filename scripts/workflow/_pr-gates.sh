@@ -327,16 +327,17 @@ _native_reviewer_label() {
 # One head can carry several `CI Gate` runs (draft promotion re-triggers the workflow on
 # the same SHA). This jq picks the authoritative one — a live or finished run over a
 # cancelled leftover, a live run over a finished one (never conclude while a
-# replacement is still running), then the newest — from a `statusCheckRollup` payload. Shared with
-# merge-pr.sh's compact poller so the first evaluation and the re-polls cannot disagree.
-# (pr-watch.py's `_select_ci_gate` ranks by startedAt alone; it is the CI watcher, not
-# the merge gate, and was left as is.)
+# replacement is still running), then the newest by startedAt — from a
+# `statusCheckRollup` payload. Recency is start time, not completion time: an older
+# run that finishes after a newer one must not hide the newer verdict. Shared with
+# merge-pr.sh's compact poller so the first evaluation and the re-polls cannot
+# disagree; pr-watch.py's `_select_ci_gate` ranks the same way.
 readonly CI_GATE_SELECT_JQ='
     [.statusCheckRollup[]? | select(.name == "CI Gate")]
     | sort_by(
         (if ((.conclusion // "") | ascii_upcase) == "CANCELLED" then 0 else 1 end),
         (if ((.status // "") | ascii_upcase) == "COMPLETED" then 0 else 1 end),
-        (.completedAt // .startedAt // "")
+        (.startedAt // .completedAt // "")
       )
     | last'
 
