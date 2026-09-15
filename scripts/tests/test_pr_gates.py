@@ -775,6 +775,29 @@ def test_failed_comment_fetch_fails_the_summary_rather_than_reading_as_empty() -
     assert result.stdout.strip() == ""
 
 
+def test_failed_commit_lookup_fails_the_summary_rather_than_dating_the_review_to_nothing() -> (
+    None
+):
+    # A two-axis comment with no explicit SHA is dated to a commit. If that lookup
+    # fails, the review must not silently become "no evidence".
+    comment = claude_two_axis_review(sha=None, updated_at="2026-08-22T12:05:00Z")
+    with gate_env(comment_pages=[[comment]]) as env:
+        env["STUB_COMMITS"] = str(Path(env["STUB_COMMITS"]).parent / "missing.json")
+        result = subprocess.run(
+            [
+                "bash",
+                "-c",
+                f'set -euo pipefail; source "{GATES_PATH}"; _review_summary 123',
+            ],
+            capture_output=True,
+            text=True,
+            env=env,
+            timeout=60,
+        )
+    assert result.returncode != 0
+    assert result.stdout.strip() == ""
+
+
 def test_review_summary_shape() -> None:
     with gate_env(review_pages=[[codex_review()]]) as env:
         summary = review_summary(env)

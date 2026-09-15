@@ -87,7 +87,7 @@ _review_evidence() {
          (($b | split("\n## Standards")[0] | [scan("(?:\\.{2,3}|(?:^|\\s)(?:head|commit)\\s+`?)([0-9a-f]{7,40})`?")] | flatten | length) == 0)
         )
       )' <<< "$comments_json" >/dev/null 2>&1; then
-    commits_json=$(gh pr view "$pr" --json commits --jq .commits 2>/dev/null || echo "[]")
+    commits_json=$(gh pr view "$pr" --json commits --jq .commits) || return 1
   fi
 
   jq -n --arg head "$head" \
