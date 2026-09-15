@@ -56,6 +56,11 @@ export async function getPinballMapState(): Promise<PinballmapRuntimeState | nul
       refreshTokensAt: pinballmapState.refreshTokensAt,
       outboundEmail: pinballmapState.outboundEmail,
       outboundTokenVaultId: pinballmapState.outboundTokenVaultId,
+      regionAlertRegion: pinballmapState.regionAlertRegion,
+      regionAlertChannelId: pinballmapState.regionAlertChannelId,
+      regionAlertStatus: pinballmapState.regionAlertStatus,
+      regionAlertLastPostAt: pinballmapState.regionAlertLastPostAt,
+      regionAlertLastStatusDetail: pinballmapState.regionAlertLastStatusDetail,
       updatedAt: pinballmapState.updatedAt,
       updatedBy: pinballmapState.updatedBy,
     })

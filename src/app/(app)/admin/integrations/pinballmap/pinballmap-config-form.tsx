@@ -16,6 +16,13 @@ import {
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "~/components/ui/select";
 import { Separator } from "~/components/ui/separator";
 import { RelativeTime } from "~/components/issues/RelativeTime";
 import { pinballmapLocationUrl } from "~/lib/pinballmap/public-url";
@@ -25,6 +32,8 @@ import {
   checkPinballMapLocationAction,
   clearPinballMapLocationAction,
   commitCheckedPinballMapLocationAction,
+  saveRegionAlertConfigAction,
+  sendRegionAlertTestAction,
   syncPinballMapNowAction,
 } from "./actions";
 import type {
@@ -35,6 +44,7 @@ import type {
   PinballMapAdminViewState,
   PinballMapAllowanceView,
   PinballMapLocationPreview,
+  RegionAlertChannelStatus,
   SyncPinballMapNowActionResult,
 } from "./types";
 
@@ -104,6 +114,20 @@ export function PinballMapConfigForm({
   const [allowance, setAllowance] = React.useState(initialState.allowance);
   const [clockMs, setClockMs] = React.useState<number | null>(null);
 
+  const [regionValue, setRegionValue] = React.useState(
+    initialState.configuredRegion || "austin"
+  );
+  const [channelValue, setChannelValue] = React.useState(
+    initialState.alertChannelId ?? ""
+  );
+  const [alertFeedback, setAlertFeedback] = React.useState<Feedback | null>(
+    null
+  );
+  const [isSavingAlert, startAlertSaveTransition] = React.useTransition();
+  const [isTestingAlert, startAlertTestTransition] = React.useTransition();
+  const regionBaselineRef = React.useRef(initialState.configuredRegion);
+  const channelBaselineRef = React.useRef(initialState.alertChannelId ?? "");
+
   const [checkResult, dispatchCheck, checkPending] = React.useActionState<
     CheckPinballMapLocationActionResult | undefined,
     FormData
@@ -126,7 +150,23 @@ export function PinballMapConfigForm({
   const previousClearResult = React.useRef(clearResult);
   const previousSyncResult = React.useRef(syncResult);
   const anyPending =
-    checkPending || commitPending || clearPending || syncPending;
+    checkPending ||
+    commitPending ||
+    clearPending ||
+    syncPending ||
+    isSavingAlert ||
+    isTestingAlert;
+
+  React.useEffect(() => {
+    if (regionBaselineRef.current !== initialState.configuredRegion) {
+      regionBaselineRef.current = initialState.configuredRegion;
+      setRegionValue(initialState.configuredRegion || "austin");
+    }
+    if (channelBaselineRef.current !== (initialState.alertChannelId ?? "")) {
+      channelBaselineRef.current = initialState.alertChannelId ?? "";
+      setChannelValue(initialState.alertChannelId ?? "");
+    }
+  }, [initialState.configuredRegion, initialState.alertChannelId]);
 
   const applyAllowance = React.useCallback(
     (next: PinballMapAllowanceView): void => {
@@ -431,15 +471,29 @@ export function PinballMapConfigForm({
   }, [allowance.nextRefillAtIso, allowance.observedAtIso, allowance.remaining]);
 
   const baselineValue = initialState.configuredLocationId?.toString() ?? "";
+  const baselineRegion = initialState.configuredRegion || "austin";
+  const baselineChannel = initialState.alertChannelId ?? "";
   const normalizedInput = inputValue.trim();
+  const normalizedChannelValue = channelValue.trim();
   const inputLocationId = locationIdFromInput(inputValue);
-  const isDirty = inputValue !== baselineValue;
+
+  const isLocationDirty = inputValue !== baselineValue;
+  const isRegionAlertDirty =
+    regionValue !== baselineRegion ||
+    normalizedChannelValue !== baselineChannel;
+  const isDirty = isLocationDirty || isRegionAlertDirty;
+
   const candidateMatches = candidate?.locationId === inputLocationId;
-  const canClear =
+  const locationCanClear =
     initialState.configuredLocationId !== null && normalizedInput.length === 0;
-  const canCommit =
-    candidateMatches && normalizedInput !== baselineValue && !canClear;
-  const canSave = canClear || canCommit;
+  const locationCanCommit =
+    candidateMatches && normalizedInput !== baselineValue && !locationCanClear;
+  const locationCanSave = locationCanClear || locationCanCommit;
+
+  const canSave =
+    (isLocationDirty && locationCanSave) ||
+    (!isLocationDirty && isRegionAlertDirty);
+
   const deadlineMs = allowance.nextRefillAtIso
     ? Date.parse(allowance.nextRefillAtIso)
     : null;
@@ -452,7 +506,11 @@ export function PinballMapConfigForm({
   const countdown = `${String(Math.floor(cooldownSeconds / 60))}:${String(
     cooldownSeconds % 60
   ).padStart(2, "0")}`;
-  const resetAvailable = isDirty || candidate !== null || feedback !== null;
+  const resetAvailable =
+    isDirty ||
+    candidate !== null ||
+    feedback !== null ||
+    alertFeedback !== null;
 
   useIntegrationDirtyState("pinballmap", isDirty);
 
@@ -484,13 +542,76 @@ export function PinballMapConfigForm({
     React.startTransition(() => dispatchCheck(formData));
   }
 
+  function saveAlertConfig(): void {
+    startAlertSaveTransition(async () => {
+      const res = await saveRegionAlertConfigAction({
+        region: regionValue,
+        alertChannelId:
+          normalizedChannelValue.length > 0 ? normalizedChannelValue : null,
+      });
+      if (res.ok) {
+        setAnnouncement({
+          tone: "success",
+          message: "Pinball Map settings saved.",
+        });
+        setAlertFeedback(null);
+        router.refresh();
+      } else {
+        setAnnouncement({
+          tone: "error",
+          message:
+            res.reason === "unauthorized"
+              ? "You no longer have permission to manage integrations."
+              : "PinPoint couldn't save region alert configuration. Try again.",
+        });
+      }
+    });
+  }
+
+  function handleSendTest(): void {
+    if (!normalizedChannelValue || isTestingAlert || anyPending) return;
+    setAlertFeedback(null);
+    startAlertTestTransition(async () => {
+      const res = await sendRegionAlertTestAction({
+        channelId: normalizedChannelValue,
+      });
+      if (res.ok) {
+        setAlertFeedback({
+          tone: "success",
+          message: res.channelName
+            ? `Test message sent to #${res.channelName}.`
+            : "Test message sent to Discord.",
+        });
+        router.refresh();
+      } else {
+        let msg = "Failed to send test message.";
+        if (res.reason === "needs_discord") {
+          msg = "Discord bot token is not configured.";
+        } else if (res.reason === "unauthorized") {
+          msg = "You no longer have permission to manage integrations.";
+        } else if (res.message) {
+          msg = res.message;
+        }
+        setAlertFeedback({
+          tone: "error",
+          message: msg,
+        });
+      }
+    });
+  }
+
   function commitCandidate(): void {
     if (!candidateMatches) return;
     setConfirmation(null);
     setAnnouncement(null);
     const formData = new FormData();
     formData.set("checkId", candidate.checkId);
-    React.startTransition(() => dispatchCommit(formData));
+    React.startTransition(() => {
+      dispatchCommit(formData);
+      if (isRegionAlertDirty) {
+        saveAlertConfig();
+      }
+    });
   }
 
   function clearLocation(): void {
@@ -506,23 +627,36 @@ export function PinballMapConfigForm({
       "expectedGeneration",
       initialState.configurationGeneration.toString()
     );
-    React.startTransition(() => dispatchClear(formData));
+    React.startTransition(() => {
+      dispatchClear(formData);
+      if (isRegionAlertDirty) {
+        saveAlertConfig();
+      }
+    });
   }
 
   function handleSave(): void {
-    if (canClear) {
-      setConfirmation("clear");
-      return;
+    if (isLocationDirty) {
+      if (locationCanClear) {
+        setConfirmation("clear");
+        return;
+      }
+      if (locationCanCommit) {
+        if (
+          initialState.configuredLocationId !== null &&
+          candidate.locationId !== initialState.configuredLocationId
+        ) {
+          setConfirmation("replace");
+          return;
+        }
+        commitCandidate();
+        return;
+      }
     }
-    if (!canCommit) return;
-    if (
-      initialState.configuredLocationId !== null &&
-      candidate.locationId !== initialState.configuredLocationId
-    ) {
-      setConfirmation("replace");
-      return;
+
+    if (isRegionAlertDirty) {
+      saveAlertConfig();
     }
-    commitCandidate();
   }
 
   function handleReset(): void {
@@ -530,6 +664,9 @@ export function PinballMapConfigForm({
     setCandidate(null);
     setFeedback(null);
     setAnnouncement(null);
+    setRegionValue(baselineRegion);
+    setChannelValue(baselineChannel);
+    setAlertFeedback(null);
   }
 
   function handleSync(): void {
@@ -543,7 +680,19 @@ export function PinballMapConfigForm({
     destination?.locationId === initialState.configuredLocationId ||
     (destination === null &&
       feedback === null &&
-      !(isDirty && normalizedInput.length > 0));
+      !(isLocationDirty && normalizedInput.length > 0));
+
+  const regionOptions = React.useMemo(() => {
+    const regions = [...initialState.availableRegions];
+    if (regionValue && !regions.some((r) => r.name === regionValue)) {
+      regions.unshift({
+        id: 0,
+        name: regionValue,
+        formalName: regionValue.charAt(0).toUpperCase() + regionValue.slice(1),
+      });
+    }
+    return regions;
+  }, [initialState.availableRegions, regionValue]);
 
   return (
     <>
@@ -619,7 +768,7 @@ export function PinballMapConfigForm({
               />
             ) : feedback ? (
               <FeedbackMessage feedback={feedback} />
-            ) : isDirty && normalizedInput.length > 0 ? (
+            ) : isLocationDirty && normalizedInput.length > 0 ? (
               <div className="space-y-0.5 text-xs">
                 <p className="text-warning font-medium">Not checked</p>
                 <p className="text-muted-foreground">
@@ -706,6 +855,127 @@ export function PinballMapConfigForm({
           />
         </section>
 
+        <Separator />
+
+        <section
+          className="space-y-4"
+          aria-labelledby="pinballmap-region-alerts"
+        >
+          <h3 id="pinballmap-region-alerts" className="font-medium">
+            Region alerts
+          </h3>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <div className="flex flex-wrap items-baseline gap-2">
+                <Label
+                  id="pinballmap-region-label"
+                  htmlFor="pinballmap-region-select"
+                >
+                  Region
+                </Label>
+                <span
+                  id="pinballmap-region-hint"
+                  className="text-muted-foreground text-xs text-pretty"
+                >
+                  · Which Pinball Map region to watch for new machines.
+                </span>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Select
+                  value={regionValue}
+                  onValueChange={(val) => {
+                    setRegionValue(val);
+                    setAlertFeedback(null);
+                  }}
+                  disabled={anyPending}
+                >
+                  <SelectTrigger
+                    id="pinballmap-region-select"
+                    aria-describedby="pinballmap-region-hint"
+                    className="w-full max-w-[360px]"
+                  >
+                    <SelectValue placeholder="Select region" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {regionOptions.map((region) => (
+                      <SelectItem key={region.name} value={region.name}>
+                        {region.formalName || region.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex flex-wrap items-baseline gap-2">
+                <Label
+                  id="pinballmap-alert-channel-label"
+                  htmlFor="pinballmap-alert-channel-id"
+                >
+                  Alert channel{" "}
+                  <span className="text-muted-foreground font-normal">
+                    (optional)
+                  </span>
+                </Label>
+                <span
+                  id="pinballmap-alert-channel-hint"
+                  className="text-muted-foreground text-xs text-pretty"
+                >
+                  · Pick a text channel the bot can post to. Clear it to turn
+                  region alerts off.
+                </span>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Input
+                  id="pinballmap-alert-channel-id"
+                  name="alertChannelId"
+                  type="text"
+                  autoComplete="off"
+                  placeholder="Channel ID (e.g. 123456789012345678)"
+                  value={channelValue}
+                  onChange={(e) => {
+                    setChannelValue(e.target.value);
+                    setAlertFeedback(null);
+                  }}
+                  disabled={anyPending}
+                  aria-describedby="pinballmap-alert-channel-hint pinballmap-region-alert-status"
+                  className="min-w-0 max-w-[360px] flex-1"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  loading={isTestingAlert}
+                  disabled={normalizedChannelValue.length === 0 || anyPending}
+                  onClick={handleSendTest}
+                >
+                  Send test message
+                </Button>
+              </div>
+
+              <div
+                id="pinballmap-region-alert-status"
+                role="status"
+                aria-live="polite"
+                aria-atomic="true"
+                className="min-h-5 space-y-1"
+              >
+                {alertFeedback ? (
+                  <FeedbackMessage feedback={alertFeedback} />
+                ) : (
+                  <RegionAlertStatusReadout
+                    status={initialState.alertChannelStatus}
+                    statusDetail={initialState.alertChannelStatusDetail}
+                    lastPostAtIso={initialState.alertLastPostAtIso}
+                  />
+                )}
+              </div>
+            </div>
+          </div>
+        </section>
+
         <div className="border-t border-outline-variant/50 pt-4">
           {announcement && (
             <div
@@ -721,7 +991,7 @@ export function PinballMapConfigForm({
             <Button
               ref={saveButtonRef}
               type="button"
-              loading={commitPending || clearPending}
+              loading={commitPending || clearPending || isSavingAlert}
               disabled={!canSave || anyPending}
               onClick={handleSave}
             >
@@ -735,11 +1005,13 @@ export function PinballMapConfigForm({
             >
               Reset
             </Button>
-            {isDirty && normalizedInput.length > 0 && !candidateMatches && (
-              <span className="text-muted-foreground text-xs">
-                Check the id first.
-              </span>
-            )}
+            {isLocationDirty &&
+              normalizedInput.length > 0 &&
+              !candidateMatches && (
+                <span className="text-muted-foreground text-xs">
+                  Check the id first.
+                </span>
+              )}
           </div>
         </div>
       </form>
@@ -1041,4 +1313,69 @@ function ReplacementConfirmation({
       </AlertDialogFooter>
     </>
   );
+}
+
+function RegionAlertStatusReadout({
+  status,
+  statusDetail,
+  lastPostAtIso,
+}: {
+  status: RegionAlertChannelStatus;
+  statusDetail: string | null;
+  lastPostAtIso: string | null;
+}): React.JSX.Element | null {
+  switch (status) {
+    case "posting": {
+      return (
+        <p className="text-success flex items-center gap-1.5 text-xs">
+          <CheckCircle2 className="size-3.5 shrink-0" aria-hidden />
+          <span>
+            {statusDetail === "Test message delivered" && lastPostAtIso ? (
+              <>
+                Test message delivered <RelativeTime value={lastPostAtIso} />.
+              </>
+            ) : lastPostAtIso ? (
+              <>
+                Posting · Last alert <RelativeTime value={lastPostAtIso} />
+                {statusDetail ? ` (${statusDetail})` : ""}.
+              </>
+            ) : (
+              "Posting · Channel connected."
+            )}
+          </span>
+        </p>
+      );
+    }
+    case "cant_post":
+      return (
+        <p className="text-destructive-text flex items-center gap-1.5 text-xs">
+          <AlertCircle className="size-3.5 shrink-0" aria-hidden />
+          <span>
+            Can&apos;t post:{" "}
+            {statusDetail ?? "Channel not found or bot lacks permissions."}
+          </span>
+        </p>
+      );
+    case "couldnt_check":
+      return (
+        <p className="text-warning flex items-center gap-1.5 text-xs">
+          <AlertCircle className="size-3.5 shrink-0" aria-hidden />
+          <span>
+            Couldn&apos;t check: {statusDetail ?? "Discord was unreachable."}
+          </span>
+        </p>
+      );
+    case "needs_discord":
+      return (
+        <p className="text-warning flex items-center gap-1.5 text-xs">
+          <AlertCircle className="size-3.5 shrink-0" aria-hidden />
+          <span>
+            Needs Discord:{" "}
+            {statusDetail ?? "Discord bot token not configured in Vault."}
+          </span>
+        </p>
+      );
+    case "not_configured":
+      return <p className="text-muted-foreground text-xs">Not configured</p>;
+  }
 }

@@ -121,6 +121,11 @@ export type PinballmapRuntimeState = Pick<
   | "refreshTokensAt"
   | "outboundEmail"
   | "outboundTokenVaultId"
+  | "regionAlertRegion"
+  | "regionAlertChannelId"
+  | "regionAlertStatus"
+  | "regionAlertLastPostAt"
+  | "regionAlertLastStatusDetail"
   | "updatedAt"
   | "updatedBy"
 >;

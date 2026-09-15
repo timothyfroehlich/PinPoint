@@ -13,16 +13,32 @@ import {
 import { reconcileAfterSync } from "~/lib/pinballmap/sync";
 import { reportError } from "~/lib/observability/report-error";
 import { createClient } from "~/lib/supabase/server";
+import { db } from "~/server/db";
+import { pinballmapState } from "~/server/db/schema";
+import { log } from "~/lib/logger";
+import { getDiscordBotToken } from "~/lib/discord/config";
+import { postChannelMessage } from "~/lib/discord/client";
+import { getPinballMapState } from "~/lib/pinballmap/state";
+import { normalizeRegion } from "~/lib/pinballmap/config";
+import { bootstrapRegion } from "~/lib/pinballmap/region-alerts";
+import { eq } from "drizzle-orm";
+import { getRegions } from "~/lib/pinballmap/client";
 import {
   checkPinballMapLocationSchema,
   clearPinballMapLocationSchema,
   commitCheckedPinballMapLocationSchema,
+  discordSnowflakeRegex,
+  saveRegionAlertConfigSchema,
+  sendRegionAlertTestSchema,
 } from "./schema";
 import type {
   CheckPinballMapLocationActionResult,
   ClearPinballMapLocationActionResult,
   CommitCheckedPinballMapLocationActionResult,
   PinballMapAllowanceView,
+  RegionAlertChannelStatus,
+  SaveRegionAlertConfigActionResult,
+  SendRegionAlertTestActionResult,
   SyncPinballMapNowActionResult,
 } from "./types";
 
@@ -193,6 +209,330 @@ export async function syncPinballMapNowAction(
   } catch (error) {
     reportError(error, {
       action: "syncPinballMapNowAction",
+      bestEffort: false,
+    });
+    revalidatePath(INTEGRATIONS_PATH);
+    return { ok: false, reason: "server_error" };
+  }
+}
+
+export async function saveRegionAlertConfigAction(
+  first: unknown,
+  second?: unknown
+): Promise<SaveRegionAlertConfigActionResult> {
+  try {
+    const authorization = await authorizeIntegrationsAdmin();
+    if (!authorization.ok) return { ok: false, reason: "unauthorized" };
+
+    const rawInput = second !== undefined ? second : first;
+    let rawRegion: unknown;
+    let rawAlertChannelId: unknown;
+
+    if (rawInput instanceof FormData) {
+      rawRegion = rawInput.get("region");
+      rawAlertChannelId = rawInput.get("alertChannelId");
+    } else if (typeof rawInput === "object" && rawInput !== null) {
+      const record = rawInput as Record<string, unknown>;
+      rawRegion = record["region"];
+      rawAlertChannelId = record["alertChannelId"];
+    }
+
+    const parsed = saveRegionAlertConfigSchema.safeParse({
+      region: rawRegion,
+      alertChannelId: rawAlertChannelId,
+    });
+    if (!parsed.success) return { ok: false, reason: "invalid" };
+
+    const normalizedRegion = normalizeRegion(parsed.data.region);
+    const knownRegions = await getRegions();
+    if (
+      knownRegions.length === 0 ||
+      !knownRegions.some((r) => normalizeRegion(r.name) === normalizedRegion)
+    ) {
+      return { ok: false, reason: "invalid" };
+    }
+
+    const rawAlertChannel = parsed.data.alertChannelId?.trim();
+    const alertChannelId =
+      rawAlertChannel !== undefined && rawAlertChannel.length > 0
+        ? rawAlertChannel
+        : null;
+
+    if (
+      alertChannelId !== null &&
+      !discordSnowflakeRegex.test(alertChannelId)
+    ) {
+      return { ok: false, reason: "invalid" };
+    }
+
+    let status: RegionAlertChannelStatus = "not_configured";
+    let statusDetail: string | null = null;
+
+    if (alertChannelId === null) {
+      status = "not_configured";
+      statusDetail = null;
+    } else {
+      const botToken = await getDiscordBotToken();
+      if (!botToken) {
+        status = "needs_discord";
+        statusDetail = "Discord bot token not configured";
+      } else {
+        try {
+          const res = await fetch(
+            `https://discord.com/api/v10/channels/${alertChannelId}`,
+            {
+              headers: { Authorization: `Bot ${botToken}` },
+            }
+          );
+          if (res.status === 401) {
+            status = "needs_discord";
+            statusDetail = "Discord bot token is invalid";
+          } else if (res.status === 403 || res.status === 404) {
+            status = "cant_post";
+            statusDetail = "Channel not found or bot lacks access";
+          } else if (res.status === 429 || res.status >= 500) {
+            status = "couldnt_check";
+            statusDetail = "Discord was unreachable";
+          } else if (res.ok) {
+            const body = (await res.json()) as {
+              permissions?: string;
+              type?: number;
+            };
+            if (body.type === 4 || body.type === 15) {
+              status = "cant_post";
+              statusDetail =
+                "Selected channel cannot receive direct text messages";
+            } else if (body.permissions !== undefined) {
+              const perms = BigInt(body.permissions);
+              // SEND_MESSAGES is bit 11 (2048)
+              const canSend = (perms & BigInt(2048)) !== 0n;
+              if (!canSend) {
+                status = "cant_post";
+                statusDetail =
+                  "Bot missing Send Messages permission in this channel";
+              } else {
+                status = "posting";
+                statusDetail = null;
+              }
+            } else {
+              status = "posting";
+              statusDetail = null;
+            }
+          } else {
+            status = "couldnt_check";
+            statusDetail = "Discord returned an unexpected response";
+          }
+        } catch (err) {
+          log.warn(
+            { err, action: "saveRegionAlertConfigAction.validateChannel" },
+            "Discord channel check failed"
+          );
+          status = "couldnt_check";
+          statusDetail = "Discord was unreachable";
+        }
+      }
+    }
+
+    const currentState = await getPinballMapState();
+    const previousRegion = currentState?.regionAlertRegion;
+
+    // CORE-ARCH-012: The save always persists the entered config, even when the check fails.
+    await db
+      .insert(pinballmapState)
+      .values({
+        id: "singleton",
+        regionAlertRegion: normalizedRegion,
+        regionAlertChannelId: alertChannelId,
+        regionAlertStatus: status,
+        regionAlertLastStatusDetail: statusDetail,
+        updatedAt: new Date(),
+        updatedBy: authorization.userId,
+      })
+      .onConflictDoUpdate({
+        target: pinballmapState.id,
+        set: {
+          regionAlertRegion: normalizedRegion,
+          regionAlertChannelId: alertChannelId,
+          regionAlertStatus: status,
+          regionAlertLastStatusDetail: statusDetail,
+          updatedAt: new Date(),
+          updatedBy: authorization.userId,
+        },
+      });
+
+    const wasAlertConfigured = Boolean(
+      currentState?.regionAlertChannelId &&
+      currentState.regionAlertChannelId.trim().length > 0
+    );
+    const isAlertConfigured = alertChannelId !== null;
+    const regionChanged = previousRegion !== normalizedRegion;
+    const shouldBootstrap =
+      isAlertConfigured && (regionChanged || !wasAlertConfigured);
+
+    if (shouldBootstrap) {
+      try {
+        await bootstrapRegion(normalizedRegion);
+      } catch (err) {
+        log.error(
+          {
+            err,
+            region: normalizedRegion,
+            action: "saveRegionAlertConfigAction.bootstrapRegion",
+          },
+          "Failed to bootstrap region"
+        );
+      }
+    }
+
+    revalidatePath(INTEGRATIONS_PATH);
+    return { ok: true, status, statusDetail };
+  } catch (error) {
+    reportError(error, {
+      action: "saveRegionAlertConfigAction",
+      bestEffort: false,
+    });
+    revalidatePath(INTEGRATIONS_PATH);
+    return { ok: false, reason: "server_error" };
+  }
+}
+
+export async function sendRegionAlertTestAction(
+  first: unknown,
+  second?: unknown
+): Promise<SendRegionAlertTestActionResult> {
+  try {
+    const authorization = await authorizeIntegrationsAdmin();
+    if (!authorization.ok) return { ok: false, reason: "unauthorized" };
+
+    const rawInput = second !== undefined ? second : first;
+    let rawChannelId: unknown;
+
+    if (rawInput instanceof FormData) {
+      rawChannelId = rawInput.get("channelId");
+    } else if (typeof rawInput === "object" && rawInput !== null) {
+      const record = rawInput as Record<string, unknown>;
+      rawChannelId = record["channelId"];
+    }
+
+    const parsed = sendRegionAlertTestSchema.safeParse({
+      channelId: rawChannelId,
+    });
+    if (!parsed.success) return { ok: false, reason: "invalid" };
+
+    const currentState = await getPinballMapState();
+    const channelId =
+      parsed.data.channelId ??
+      (currentState?.regionAlertChannelId?.trim().length
+        ? currentState.regionAlertChannelId.trim()
+        : undefined);
+
+    if (!channelId) {
+      return {
+        ok: false,
+        reason: "not_configured",
+        message: "No alert channel configured to test.",
+      };
+    }
+
+    if (!discordSnowflakeRegex.test(channelId)) {
+      return {
+        ok: false,
+        reason: "not_configured",
+        message: "No valid alert channel configured to test.",
+      };
+    }
+
+    const botToken = await getDiscordBotToken();
+    if (!botToken) {
+      if (currentState?.regionAlertChannelId === channelId) {
+        await db
+          .update(pinballmapState)
+          .set({
+            regionAlertStatus: "needs_discord",
+            regionAlertLastStatusDetail: "Discord bot token not configured",
+            updatedAt: new Date(),
+            updatedBy: authorization.userId,
+          })
+          .where(eq(pinballmapState.id, "singleton"));
+      }
+      revalidatePath(INTEGRATIONS_PATH);
+      return {
+        ok: false,
+        reason: "needs_discord",
+        message: "Discord bot token not configured.",
+      };
+    }
+
+    let channelName: string | undefined;
+    try {
+      const res = await fetch(
+        `https://discord.com/api/v10/channels/${channelId}`,
+        {
+          headers: { Authorization: `Bot ${botToken}` },
+        }
+      );
+      if (res.ok) {
+        const body = (await res.json()) as { name?: string };
+        if (body.name) channelName = body.name;
+      }
+    } catch {
+      // Best-effort channel name lookup
+    }
+
+    const content = channelName
+      ? `[PinPoint] Test alert: Region alerts are connected to #${channelName}.\nData from Pinball Map (CC BY-SA 4.0).`
+      : `[PinPoint] Test alert: Region alerts are connected to this channel.\nData from Pinball Map (CC BY-SA 4.0).`;
+
+    const sent = await postChannelMessage({
+      botToken,
+      channelId,
+      content,
+    });
+
+    if (sent.ok) {
+      if (currentState?.regionAlertChannelId === channelId) {
+        await db
+          .update(pinballmapState)
+          .set({
+            regionAlertStatus: "posting",
+            regionAlertLastPostAt: new Date(),
+            regionAlertLastStatusDetail: "Test message delivered",
+            updatedAt: new Date(),
+            updatedBy: authorization.userId,
+          })
+          .where(eq(pinballmapState.id, "singleton"));
+      }
+
+      revalidatePath(INTEGRATIONS_PATH);
+      return channelName !== undefined
+        ? { ok: true, channelName }
+        : { ok: true };
+    }
+
+    const newStatus: "cant_post" | "couldnt_check" =
+      sent.reason === "blocked" ? "cant_post" : "couldnt_check";
+    const statusDetail =
+      sent.reason === "blocked"
+        ? "Channel unreachable or bot missing permissions"
+        : "Discord was unreachable";
+
+    if (currentState?.regionAlertChannelId === channelId) {
+      await db
+        .update(pinballmapState)
+        .set({
+          regionAlertStatus: newStatus,
+          regionAlertLastStatusDetail: statusDetail,
+          updatedAt: new Date(),
+          updatedBy: authorization.userId,
+        })
+        .where(eq(pinballmapState.id, "singleton"));
+    }
+    revalidatePath(INTEGRATIONS_PATH);
+
+    return { ok: false, reason: newStatus, message: statusDetail };
+  } catch (error) {
+    reportError(error, {
+      action: "sendRegionAlertTestAction",
       bestEffort: false,
     });
     revalidatePath(INTEGRATIONS_PATH);

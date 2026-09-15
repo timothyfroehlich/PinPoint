@@ -1,9 +1,10 @@
 import "server-only";
+import * as nextCache from "next/cache";
 import { getPinballMapApiToken } from "./api-token";
 import { createLiveClient } from "./client-live";
 import { getMockClient } from "./client-mock";
 import { getPinballMapMode } from "./config";
-import type { PinballMapClient } from "./types";
+import type { PinballMapClient, PinballMapRegion } from "./types";
 
 /**
  * Returns the active PinballMap client — live or mock, per `PINBALLMAP_MODE`
@@ -25,4 +26,49 @@ export function getPinballMapClient(): Promise<PinballMapClient> {
   return Promise.resolve(createLiveClient(getPinballMapApiToken()));
 }
 
-export type { PinballMapClient } from "./types";
+export type { PinballMapClient, PinballMapRegion } from "./types";
+
+let memoryCachedRegions: {
+  expiresAt: number;
+  regions: PinballMapRegion[];
+} | null = null;
+const REGIONS_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+
+async function fetchRegionsUncached(): Promise<PinballMapRegion[]> {
+  const now = Date.now();
+  if (memoryCachedRegions && memoryCachedRegions.expiresAt > now) {
+    return memoryCachedRegions.regions;
+  }
+  const client = await getPinballMapClient();
+  const regions = await client.fetchRegions();
+  const sorted = [...regions].sort((a, b) =>
+    a.formalName.localeCompare(b.formalName)
+  );
+  memoryCachedRegions = {
+    regions: sorted,
+    expiresAt: now + REGIONS_CACHE_TTL_MS,
+  };
+  return sorted;
+}
+
+const unstableCache =
+  "unstable_cache" in nextCache &&
+  typeof nextCache.unstable_cache === "function"
+    ? nextCache.unstable_cache
+    : null;
+
+const getCachedRegions =
+  unstableCache !== null
+    ? unstableCache(fetchRegionsUncached, ["pinballmap-regions"], {
+        revalidate: 86400,
+        tags: ["pinballmap-regions"],
+      })
+    : fetchRegionsUncached;
+
+/**
+ * Fetch Pinball Map regions cached via Next data cache (24h TTL, CORE-PBM-001).
+ * Regions change very rarely; sorting by formalName ensures consistent picker ordering.
+ */
+export async function getRegions(): Promise<PinballMapRegion[]> {
+  return getCachedRegions();
+}

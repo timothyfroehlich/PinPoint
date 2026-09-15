@@ -1514,6 +1514,24 @@ export const pinballmapState = pgTable(
       .defaultNow(),
     outboundEmail: text("outbound_email"),
     outboundTokenVaultId: uuid("outbound_token_vault_id"),
+    // Region alert configuration and delivery health (PP-o355.51.7)
+    regionAlertRegion: text("region_alert_region").notNull().default("austin"),
+    regionAlertChannelId: text("region_alert_channel_id"),
+    regionAlertStatus: text("region_alert_status", {
+      enum: [
+        "not_configured",
+        "posting",
+        "cant_post",
+        "couldnt_check",
+        "needs_discord",
+      ],
+    })
+      .notNull()
+      .default("not_configured"),
+    regionAlertLastPostAt: timestamp("region_alert_last_post_at", {
+      withTimezone: true,
+    }),
+    regionAlertLastStatusDetail: text("region_alert_last_status_detail"),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -1528,6 +1546,10 @@ export const pinballmapState = pgTable(
     mutationLeasePairCheck: check(
       "pinballmap_state_mutation_lease_pair_check",
       sql`(mutation_lease_id IS NULL) = (mutation_lease_expires_at IS NULL)`
+    ),
+    regionAlertStatusCheck: check(
+      "pinballmap_state_region_alert_status_check",
+      sql`region_alert_status IN ('not_configured', 'posting', 'cant_post', 'couldnt_check', 'needs_discord')`
     ),
   })
 ).enableRLS();

@@ -10,13 +10,16 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { eq } from "drizzle-orm";
 import {
   pinballmapCatalog,
   pinballmapRegionAlertEvents,
   pinballmapRegionAlertState,
   pinballmapRegionLocationNames,
   pinballmapRegionSeenMachines,
+  pinballmapState,
 } from "~/server/db/schema";
+import { getRegionAlertChannelId } from "~/lib/pinballmap/region-alerts";
 import { getTestDb, setupTestDb } from "~/test/setup/pglite";
 import type { PbmRegionLmx, PbmRegionLocation } from "~/lib/pinballmap/types";
 import type { DiscordSendResult } from "~/lib/discord/client";
@@ -36,7 +39,7 @@ vi.mock("~/server/db", async () => {
 const pbm = {
   entries: [] as PbmRegionLmx[],
   entriesPromise: null as Promise<PbmRegionLmx[]> | null,
-  onEntriesFetch: null as (() => void) | null,
+  onEntriesFetch: null as (() => Promise<void> | void) | null,
   locations: [] as PbmRegionLocation[],
   /** When set, `fetchRegionLocations` rejects with it instead of returning. */
   locationsError: null as Error | null,
@@ -48,10 +51,10 @@ const pbm = {
 vi.mock("~/lib/pinballmap/client", () => ({
   getPinballMapClient: () =>
     Promise.resolve({
-      fetchRegionLmxes: (region: string) => {
+      fetchRegionLmxes: async (region: string) => {
         pbm.calls += 1;
         pbm.regions.push(region);
-        pbm.onEntriesFetch?.();
+        await pbm.onEntriesFetch?.();
         return pbm.entriesPromise ?? Promise.resolve(pbm.entries);
       },
       fetchRegionLocations: (region: string) => {
@@ -1153,5 +1156,144 @@ describe("GET /api/cron/pinballmap-region-alerts", () => {
       discovered: 1,
     });
     expect(pbm.calls).toBe(1);
+  });
+
+  it("honors an explicitly cleared database channel over legacy env var", () => {
+    process.env.DISCORD_PBM_ALERT_CHANNEL_ID = "env-channel-123";
+    try {
+      expect(
+        getRegionAlertChannelId({
+          id: "singleton",
+          regionAlertChannelId: null,
+          locationId: null,
+          configurationGeneration: 0,
+          mutationLeaseId: null,
+          mutationLeaseExpiresAt: null,
+          snapshotJson: null,
+          snapshotRevision: 0,
+          lastSyncedAt: null,
+          lastSyncStatus: "unknown",
+          lastSyncAttemptAt: null,
+          lastSyncError: null,
+          refreshTokens: 0,
+          refreshTokensAt: new Date(),
+          outboundEmail: null,
+          outboundTokenVaultId: null,
+          regionAlertRegion: "austin",
+          regionAlertStatus: "not_configured",
+          regionAlertLastPostAt: null,
+          regionAlertLastStatusDetail: null,
+          updatedAt: new Date(),
+          updatedBy: null,
+        })
+      ).toBeNull();
+
+      expect(getRegionAlertChannelId(null)).toBe("env-channel-123");
+    } finally {
+      delete process.env.DISCORD_PBM_ALERT_CHANNEL_ID;
+    }
+  });
+
+  it("reconciles existing membership rows when switching back to a region", async () => {
+    const { bootstrapRegion } = await import("~/lib/pinballmap/region-alerts");
+
+    const testDb = await getTestDb();
+    await testDb.insert(pinballmapRegionSeenMachines).values([
+      {
+        region: "austin",
+        lmxId: 1,
+        locationId: 10,
+        pinballmapMachineId: 100,
+        isPresent: true,
+        missedRuns: 0,
+        announcedAt: new Date(),
+      },
+      {
+        region: "austin",
+        lmxId: 2,
+        locationId: 10,
+        pinballmapMachineId: 101,
+        isPresent: true,
+        missedRuns: 0,
+        announcedAt: new Date(),
+      },
+    ]);
+
+    pbm.entries = [
+      lmx({ lmxId: 1, locationId: 10, machineId: 100 }),
+      lmx({ lmxId: 3, locationId: 10, machineId: 102 }),
+    ];
+
+    const result = await bootstrapRegion("austin");
+    expect(result.bootstrapped).toBe(true);
+
+    const rows = await testDb
+      .select()
+      .from(pinballmapRegionSeenMachines)
+      .where(eq(pinballmapRegionSeenMachines.region, "austin"));
+
+    const row1 = rows.find((r) => r.lmxId === 1);
+    const row2 = rows.find((r) => r.lmxId === 2);
+    const row3 = rows.find((r) => r.lmxId === 3);
+
+    expect(row1?.isPresent).toBe(true);
+    expect(row2?.isPresent).toBe(false);
+    expect(row3?.isPresent).toBe(true);
+  });
+
+  it("guards cron status updates against concurrent config changes", async () => {
+    const testDb = await getTestDb();
+    await testDb
+      .insert(pinballmapState)
+      .values({
+        id: "singleton",
+        regionAlertRegion: "austin",
+        regionAlertChannelId: "channel-a",
+        regionAlertStatus: "posting",
+      })
+      .onConflictDoUpdate({
+        target: pinballmapState.id,
+        set: {
+          regionAlertRegion: "austin",
+          regionAlertChannelId: "channel-a",
+          regionAlertStatus: "posting",
+        },
+      });
+
+    await testDb.insert(pinballmapRegionSeenMachines).values([
+      {
+        region: "austin",
+        lmxId: 1,
+        locationId: 26454,
+        pinballmapMachineId: 6412,
+        announcedAt: new Date(),
+        isPresent: true,
+      },
+    ]);
+
+    pbm.entries = [
+      lmx({ lmxId: 1, locationId: 26454, machineId: 6412 }),
+      lmx({ lmxId: 2, locationId: 26454, machineId: 18 }),
+    ];
+    pbm.onEntriesFetch = async () => {
+      await testDb
+        .update(pinballmapState)
+        .set({
+          regionAlertChannelId: "channel-b",
+          regionAlertStatus: "not_configured",
+        })
+        .where(eq(pinballmapState.id, "singleton"));
+    };
+
+    await runRegionMachineAlerts();
+
+    const [after] = await testDb
+      .select()
+      .from(pinballmapState)
+      .where(eq(pinballmapState.id, "singleton"));
+
+    expect(after?.regionAlertChannelId).toBe("channel-b");
+    expect(after?.regionAlertStatus).toBe("not_configured");
+    pbm.onEntriesFetch = null;
   });
 });

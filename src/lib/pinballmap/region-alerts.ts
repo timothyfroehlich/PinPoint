@@ -7,7 +7,9 @@ import {
   pinballmapRegionLocationNames,
   pinballmapRegionAlertState,
   pinballmapRegionSeenMachines,
+  pinballmapState,
 } from "~/server/db/schema";
+import { assertNotInTransaction } from "~/server/db/transaction-context";
 import { postChannelMessage } from "~/lib/discord/client";
 import { getDiscordBotToken } from "~/lib/discord/config";
 import { log } from "~/lib/logger";
@@ -19,9 +21,11 @@ import {
 } from "./catalog";
 import { getPinballMapClient } from "./client";
 import { PBM_AUSTIN_REGION, normalizeRegion } from "./config";
+import { getPinballMapState } from "./state";
 import { formatRegionAlertMessage } from "./region-alert-message";
 import type { RegionAlertEntry } from "./region-alert-message";
 import type { PbmRegionLmx, PbmRegionLocation } from "./types";
+import type { PinballmapRuntimeState } from "~/lib/types";
 
 /**
  * Pinball Map region membership changes → Discord (PP-o355.51.9).
@@ -242,9 +246,24 @@ async function isRemovalTrackingInitialized(region: string): Promise<boolean> {
 }
 
 /** The configured alert channel, or null when the feature is unconfigured. */
-export function getRegionAlertChannelId(): string | null {
+export function getRegionAlertChannelId(
+  state?: PinballmapRuntimeState | null
+): string | null {
+  if (state !== undefined && state !== null) {
+    if (state.regionAlertChannelId !== null) {
+      const trimmed = state.regionAlertChannelId.trim();
+      return trimmed.length > 0 ? trimmed : null;
+    }
+    return null;
+  }
   const raw = process.env[ALERT_CHANNEL_ENV]?.trim();
   return raw !== undefined && raw.length > 0 ? raw : null;
+}
+
+/** Resolves alert channel from DB state with env var fallback. */
+export async function resolveRegionAlertChannelId(): Promise<string | null> {
+  const state = await getPinballMapState();
+  return getRegionAlertChannelId(state);
 }
 
 /** "austin" → "Austin". PBM region slugs are lowercase single words. */
@@ -871,15 +890,52 @@ async function resolveMachineNames(
 export async function runRegionMachineAlerts(opts?: {
   region?: string;
 }): Promise<RegionAlertRun> {
-  const region = normalizeRegion(opts?.region ?? PBM_AUSTIN_REGION);
+  const state = await getPinballMapState();
+  const region = normalizeRegion(
+    opts?.region ?? state?.regionAlertRegion ?? PBM_AUSTIN_REGION
+  );
 
   // Checked before the fetch, not after: with no destination there is nothing to
   // do with the answer, and spending a PBM call to learn that would be rude.
-  const channelId = getRegionAlertChannelId();
-  if (channelId === null) return noop(region, "not_configured");
+  const channelId = getRegionAlertChannelId(state);
+  if (channelId === null) {
+    if (state?.regionAlertStatus !== "not_configured") {
+      await db
+        .insert(pinballmapState)
+        .values({
+          id: "singleton",
+          regionAlertStatus: "not_configured",
+          regionAlertLastStatusDetail: null,
+        })
+        .onConflictDoUpdate({
+          target: pinballmapState.id,
+          set: {
+            regionAlertStatus: "not_configured",
+            regionAlertLastStatusDetail: null,
+          },
+        });
+    }
+    return noop(region, "not_configured");
+  }
 
   const botToken = await getDiscordBotToken();
-  if (botToken === null) return noop(region, "not_configured");
+  if (botToken === null) {
+    await db
+      .insert(pinballmapState)
+      .values({
+        id: "singleton",
+        regionAlertStatus: "needs_discord",
+        regionAlertLastStatusDetail: "Discord bot token not configured",
+      })
+      .onConflictDoUpdate({
+        target: pinballmapState.id,
+        set: {
+          regionAlertStatus: "needs_discord",
+          regionAlertLastStatusDetail: "Discord bot token not configured",
+        },
+      });
+    return noop(region, "not_configured");
+  }
 
   const leaseId = await claimRunLease(region);
   if (leaseId === null) return noop(region, "already_running");
@@ -1093,6 +1149,26 @@ export async function runRegionMachineAlerts(opts?: {
         reason: sent.reason,
         action: "pinballmap.regionAlerts",
       };
+      const newStatus =
+        sent.reason === "blocked" ? "cant_post" : "couldnt_check";
+      const statusDetail =
+        sent.reason === "blocked"
+          ? "Channel unreachable or bot missing permissions"
+          : "Discord was unreachable";
+      await db
+        .update(pinballmapState)
+        .set({
+          regionAlertStatus: newStatus,
+          regionAlertLastStatusDetail: statusDetail,
+        })
+        .where(
+          and(
+            eq(pinballmapState.id, "singleton"),
+            eq(pinballmapState.regionAlertRegion, region),
+            eq(pinballmapState.regionAlertChannelId, channelId)
+          )
+        );
+
       if (sent.reason === "blocked") {
         // `blocked` is DiscordSendResult's "retrying will not fix this" — a 404 for
         // a channel that does not exist, or a bot that is not in the guild. Left at
@@ -1116,12 +1192,125 @@ export async function runRegionMachineAlerts(opts?: {
     }
 
     await markAnnounced(region, delivered);
+    await db
+      .update(pinballmapState)
+      .set({
+        regionAlertStatus: "posting",
+        regionAlertLastPostAt: new Date(),
+        regionAlertLastStatusDetail: null,
+      })
+      .where(
+        and(
+          eq(pinballmapState.id, "singleton"),
+          eq(pinballmapState.regionAlertRegion, region),
+          eq(pinballmapState.regionAlertChannelId, channelId)
+        )
+      );
     // `readPending` caps at PENDING_READ_LIMIT, so "announced everything we read"
     // is not "announced everything queued" — a long Discord outage can leave more
     // rows behind than one run can drain. This log line is the monitoring signal
     // for the job, so the remainder is measured rather than assumed to be zero.
     const remaining = await countPending(region);
     return { ...base, announced: delivered.length, pending: remaining };
+  } finally {
+    await releaseRunLease(region, leaseId);
+  }
+}
+
+/**
+ * Silent bootstrap for a new region (§2.5, §4.4).
+ *
+ * Marks all currently observed machines in the region as seen/announced so switching
+ * or enabling a region starts from a clean slate without announcing the whole
+ * metro's existing state as new arrivals.
+ */
+export async function bootstrapRegion(
+  rawRegion: string
+): Promise<{ bootstrapped: boolean; discovered: number }> {
+  assertNotInTransaction("bootstrapRegion");
+  const region = normalizeRegion(rawRegion);
+  const leaseId = await claimRunLease(region);
+  if (!leaseId) {
+    return { bootstrapped: false, discovered: 0 };
+  }
+
+  try {
+    const client = await getPinballMapClient();
+    const observed = await client.fetchRegionLmxes(region);
+    if (observed.length === 0 || observed.length > MAX_REGION_ENTRIES) {
+      return { bootstrapped: false, discovered: 0 };
+    }
+
+    const now = new Date();
+    let discovered = 0;
+
+    await db.transaction(async (tx) => {
+      await tx
+        .insert(pinballmapRegionAlertState)
+        .values({
+          region,
+          removalTrackingInitializedAt: now,
+        })
+        .onConflictDoUpdate({
+          target: pinballmapRegionAlertState.region,
+          set: { removalTrackingInitializedAt: now },
+        });
+
+      await tx
+        .update(pinballmapRegionAlertEvents)
+        .set({ announcedAt: now })
+        .where(
+          and(
+            eq(pinballmapRegionAlertEvents.region, region),
+            isNull(pinballmapRegionAlertEvents.announcedAt)
+          )
+        );
+
+      // Reconcile existing seen machines for this region:
+      // 1. Mark all existing rows as not present and reset missed runs so absent machines are not announced as removed
+      await tx
+        .update(pinballmapRegionSeenMachines)
+        .set({
+          isPresent: false,
+          missedRuns: 0,
+          announcedAt: sql`coalesce(${pinballmapRegionSeenMachines.announcedAt}, ${now})`,
+        })
+        .where(eq(pinballmapRegionSeenMachines.region, region));
+
+      // 2. Upsert observed machines: mark present, refresh locations and machines, and set announcedAt
+      for (let i = 0; i < observed.length; i += INSERT_CHUNK) {
+        const inserted = await tx
+          .insert(pinballmapRegionSeenMachines)
+          .values(
+            observed.slice(i, i + INSERT_CHUNK).map((entry) => ({
+              region,
+              lmxId: entry.lmxId,
+              locationId: entry.locationId,
+              pinballmapMachineId: entry.machineId,
+              announcedAt: now,
+              isPresent: true,
+              missedRuns: 0,
+            }))
+          )
+          .onConflictDoUpdate({
+            target: [
+              pinballmapRegionSeenMachines.region,
+              pinballmapRegionSeenMachines.lmxId,
+            ],
+            set: {
+              locationId: sql`excluded.location_id`,
+              pinballmapMachineId: sql`excluded.pinballmap_machine_id`,
+              isPresent: true,
+              missedRuns: 0,
+              announcedAt: sql`coalesce(${pinballmapRegionSeenMachines.announcedAt}, ${now})`,
+            },
+          })
+          .returning({ lmxId: pinballmapRegionSeenMachines.lmxId });
+        discovered += inserted.length;
+      }
+    });
+
+    return { bootstrapped: true, discovered };
   } finally {
     await releaseRunLease(region, leaseId);
   }

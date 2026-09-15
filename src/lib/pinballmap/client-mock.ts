@@ -17,6 +17,7 @@ import type {
   PbmToggleResult,
   PbmWriteResult,
   PinballMapClient,
+  PinballMapRegion,
 } from "./types";
 
 /**
@@ -90,6 +91,15 @@ export function createMockClient(): PinballMapClient {
 
     fetchMachineGroups(): Promise<MachineGroup[]> {
       return Promise.resolve(parseMachineGroups(machineGroupsFixture));
+    },
+
+    fetchRegions(): Promise<PinballMapRegion[]> {
+      return Promise.resolve([
+        { id: 1, name: "austin", formalName: "Austin" },
+        { id: 2, name: "portland", formalName: "Portland" },
+        { id: 3, name: "chicago", formalName: "Chicago" },
+        { id: 4, name: "seattle", formalName: "Seattle" },
+      ]);
     },
 
     /**

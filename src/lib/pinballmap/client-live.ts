@@ -8,6 +8,7 @@ import {
   parseMachineGroups,
   parseRegionLmxes,
   parseRegionLocations,
+  parseRegions,
 } from "./parse";
 import { PinballMapReadError } from "./types";
 import type {
@@ -24,6 +25,7 @@ import type {
   PbmWriteFailureReason,
   PbmWriteResult,
   PinballMapClient,
+  PinballMapRegion,
 } from "./types";
 
 /**
@@ -399,6 +401,12 @@ export function createLiveClient(apiToken: string | null): PinballMapClient {
         apiToken
       );
       return parseMachineGroups(raw);
+    },
+
+    async fetchRegions(): Promise<PinballMapRegion[]> {
+      assertNotInTransaction("pinballmap.fetchRegions");
+      const raw = await readJson("/regions.json", "fetchRegions", apiToken);
+      return parseRegions(raw);
     },
 
     async authDetails(login: string, password: string): Promise<PbmAuthResult> {

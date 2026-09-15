@@ -42,6 +42,15 @@ export type PinballMapHealthView =
       } | null;
     };
 
+import type { PinballMapRegion } from "~/lib/pinballmap/types";
+
+export type RegionAlertChannelStatus =
+  | "not_configured"
+  | "posting"
+  | "cant_post"
+  | "couldnt_check"
+  | "needs_discord";
+
 export interface PinballMapAdminViewState {
   configuredLocationId: number | null;
   configurationGeneration: number;
@@ -49,6 +58,12 @@ export interface PinballMapAdminViewState {
   retainedLocation: PinballMapRetainedLocation | null;
   health: PinballMapHealthView;
   allowance: PinballMapAllowanceView;
+  configuredRegion: string;
+  availableRegions: PinballMapRegion[];
+  alertChannelId: string | null;
+  alertChannelStatus: RegionAlertChannelStatus;
+  alertChannelStatusDetail: string | null;
+  alertLastPostAtIso: string | null;
 }
 
 export interface CheckedPinballMapLocation {
@@ -121,4 +136,34 @@ export type SyncPinballMapNowActionResult =
         | "unauthorized"
         | "server_error";
       allowance?: PinballMapAllowanceView;
+    };
+
+export type SaveRegionAlertConfigActionResult =
+  | {
+      ok: true;
+      status: RegionAlertChannelStatus;
+      statusDetail: string | null;
+    }
+  | {
+      ok: false;
+      reason: "invalid" | "unauthorized" | "server_error";
+      message?: string;
+    };
+
+export type SendRegionAlertTestActionResult =
+  | {
+      ok: true;
+      channelName?: string;
+    }
+  | {
+      ok: false;
+      reason:
+        | "not_configured"
+        | "needs_discord"
+        | "cant_post"
+        | "couldnt_check"
+        | "unauthorized"
+        | "invalid"
+        | "server_error";
+      message?: string;
     };

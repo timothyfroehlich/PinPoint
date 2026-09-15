@@ -14,12 +14,16 @@ const {
   clearActionMock,
   commitActionMock,
   refreshMock,
+  saveAlertActionMock,
+  sendTestActionMock,
   syncActionMock,
 } = vi.hoisted(() => ({
   checkActionMock: vi.fn(),
   clearActionMock: vi.fn(),
   commitActionMock: vi.fn(),
   refreshMock: vi.fn(),
+  saveAlertActionMock: vi.fn(),
+  sendTestActionMock: vi.fn(),
   syncActionMock: vi.fn(),
 }));
 
@@ -31,6 +35,8 @@ vi.mock("./actions", () => ({
   checkPinballMapLocationAction: checkActionMock,
   clearPinballMapLocationAction: clearActionMock,
   commitCheckedPinballMapLocationAction: commitActionMock,
+  saveRegionAlertConfigAction: saveAlertActionMock,
+  sendRegionAlertTestAction: sendTestActionMock,
   syncPinballMapNowAction: syncActionMock,
 }));
 
@@ -74,6 +80,15 @@ const CONFIGURED: PinballMapAdminViewState = {
     nextRefillAtIso: null,
     observedAtIso: "2026-09-12T12:00:00.000Z",
   },
+  configuredRegion: "austin",
+  availableRegions: [
+    { id: 1, name: "austin", formalName: "Austin" },
+    { id: 2, name: "dallas", formalName: "Dallas/Fort Worth" },
+  ],
+  alertChannelId: null,
+  alertChannelStatus: "not_configured",
+  alertChannelStatusDetail: null,
+  alertLastPostAtIso: null,
 };
 
 function renderForm(initialState: PinballMapAdminViewState = CONFIGURED) {
@@ -104,6 +119,15 @@ beforeEach(() => {
   syncActionMock.mockResolvedValue({
     ok: true,
     allowance: CONFIGURED.allowance,
+  });
+  saveAlertActionMock.mockResolvedValue({
+    ok: true,
+    status: "posting",
+    statusDetail: null,
+  });
+  sendTestActionMock.mockResolvedValue({
+    ok: true,
+    channelName: "new-machines",
   });
 });
 
@@ -710,5 +734,128 @@ describe("PinballMapConfigForm", () => {
     expect(
       screen.getByRole("button", { name: "Check ID" }).parentElement
     ).toHaveClass("flex-wrap");
+  });
+
+  describe("Region alerts section", () => {
+    it("renders region selector and alert channel input with hints", () => {
+      renderForm();
+
+      expect(screen.getByText("Region alerts")).toBeInTheDocument();
+      expect(screen.getByLabelText("Region")).toBeInTheDocument();
+      expect(
+        screen.getByText(/Which Pinball Map region to watch for new machines/)
+      ).toBeInTheDocument();
+      expect(screen.getByLabelText(/Alert channel/i)).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          /Pick a text channel the bot can post to. Clear it to turn region alerts off/
+        )
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: "Send test message" })
+      ).toBeDisabled();
+      expect(screen.getByText("Not configured")).toBeInTheDocument();
+    });
+
+    it("enables Save changes when alert channel is entered and saves it", async () => {
+      const user = userEvent.setup();
+      renderForm();
+
+      const channelInput = screen.getByLabelText(/Alert channel/i);
+      await user.type(channelInput, "1234567890");
+
+      const saveButton = screen.getByRole("button", { name: "Save changes" });
+      expect(saveButton).toBeEnabled();
+
+      await user.click(saveButton);
+
+      expect(saveAlertActionMock).toHaveBeenCalledWith({
+        region: "austin",
+        alertChannelId: "1234567890",
+      });
+      expect(
+        await screen.findByText("Pinball Map settings saved.")
+      ).toBeInTheDocument();
+    });
+
+    it("enables Send test message when channel is typed and posts test message", async () => {
+      const user = userEvent.setup();
+      renderForm();
+
+      const channelInput = screen.getByLabelText(/Alert channel/i);
+      await user.type(channelInput, "1234567890");
+
+      const testButton = screen.getByRole("button", {
+        name: "Send test message",
+      });
+      expect(testButton).toBeEnabled();
+
+      await user.click(testButton);
+
+      expect(sendTestActionMock).toHaveBeenCalledWith({
+        channelId: "1234567890",
+      });
+      expect(
+        await screen.findByText("Test message sent to #new-machines.")
+      ).toBeInTheDocument();
+    });
+
+    it("resets region alert edits when Reset is clicked", async () => {
+      const user = userEvent.setup();
+      renderForm();
+
+      const channelInput = screen.getByLabelText(/Alert channel/i);
+      await user.type(channelInput, "987654321");
+
+      const resetButton = screen.getByRole("button", { name: "Reset" });
+      expect(resetButton).toBeEnabled();
+
+      await user.click(resetButton);
+
+      expect(channelInput).toHaveValue("");
+      expect(
+        screen.getByRole("button", { name: "Save changes" })
+      ).toBeDisabled();
+    });
+
+    it.each([
+      {
+        status: "posting" as const,
+        detail: "Test message delivered",
+        lastPost: "2026-09-12T11:56:00.000Z",
+        expected: /Test message delivered 4 minutes ago\./,
+      },
+      {
+        status: "cant_post" as const,
+        detail: "Bot missing Send Messages permission",
+        lastPost: null,
+        expected: /Can't post: Bot missing Send Messages permission/,
+      },
+      {
+        status: "couldnt_check" as const,
+        detail: "Discord was unreachable",
+        lastPost: null,
+        expected: /Couldn't check: Discord was unreachable/,
+      },
+      {
+        status: "needs_discord" as const,
+        detail: "Discord bot token not configured in Vault",
+        lastPost: null,
+        expected: /Needs Discord: Discord bot token not configured in Vault/,
+      },
+    ])(
+      "renders $status status readout correctly",
+      ({ status, detail, lastPost, expected }) => {
+        renderForm({
+          ...CONFIGURED,
+          alertChannelId: "1234567890",
+          alertChannelStatus: status,
+          alertChannelStatusDetail: detail,
+          alertLastPostAtIso: lastPost,
+        });
+
+        expect(screen.getByText(expected)).toBeInTheDocument();
+      }
+    );
   });
 });

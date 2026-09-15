@@ -1,5 +1,7 @@
 import "server-only";
 
+import { log } from "~/lib/logger";
+import { getRegions } from "~/lib/pinballmap/client";
 import {
   getPinballMapState,
   getRefreshAllowance,
@@ -49,9 +51,19 @@ function allowanceView(
 
 export async function getPinballMapAdminViewState(): Promise<PinballMapAdminViewState> {
   const observedAt = new Date();
-  const [state, allowance] = await Promise.all([
+  const [state, allowance, availableRegions] = await Promise.all([
     getPinballMapState(),
     getRefreshAllowance(observedAt),
+    getRegions().catch((err: unknown) => {
+      log.warn(
+        {
+          err: err instanceof Error ? err.message : String(err),
+          action: "getPinballMapAdminViewState.getRegions",
+        },
+        "Failed to fetch regions from Pinball Map"
+      );
+      return [{ id: 1, name: "austin", formalName: "Austin" }];
+    }),
   ]);
   const configuredLocationId = state?.locationId ?? null;
   const generation = state?.configurationGeneration ?? 0;
@@ -68,6 +80,29 @@ export async function getPinballMapAdminViewState(): Promise<PinballMapAdminView
     ? { locationId: snapshot.locationId, name: snapshot.name }
     : null;
 
+  const configuredRegion = state?.regionAlertRegion ?? "austin";
+  const rawChannelId = state?.regionAlertChannelId?.trim();
+  const alertChannelId =
+    rawChannelId && rawChannelId.length > 0 ? rawChannelId : null;
+  const alertChannelStatus = !alertChannelId
+    ? "not_configured"
+    : (state?.regionAlertStatus ?? "not_configured");
+  const alertChannelStatusDetail = !alertChannelId
+    ? null
+    : (state?.regionAlertLastStatusDetail ?? null);
+  const alertLastPostAtIso = !alertChannelId
+    ? null
+    : (state?.regionAlertLastPostAt?.toISOString() ?? null);
+
+  const regionAlertFields = {
+    configuredRegion,
+    availableRegions,
+    alertChannelId,
+    alertChannelStatus,
+    alertChannelStatusDetail,
+    alertLastPostAtIso,
+  };
+
   if (configuredLocationId === null) {
     return {
       configuredLocationId,
@@ -76,6 +111,7 @@ export async function getPinballMapAdminViewState(): Promise<PinballMapAdminView
       retainedLocation,
       health: { kind: "not_configured" },
       allowance: allowanceView(allowance, observedAt),
+      ...regionAlertFields,
     };
   }
 
@@ -104,6 +140,7 @@ export async function getPinballMapAdminViewState(): Promise<PinballMapAdminView
             : null,
       },
       allowance: allowanceView(allowance, observedAt),
+      ...regionAlertFields,
     };
   }
 
@@ -124,6 +161,7 @@ export async function getPinballMapAdminViewState(): Promise<PinballMapAdminView
         machineCount: currentSnapshot.machineCount,
       },
       allowance: allowanceView(allowance, observedAt),
+      ...regionAlertFields,
     };
   }
 
@@ -138,5 +176,6 @@ export async function getPinballMapAdminViewState(): Promise<PinballMapAdminView
       error: state?.lastSyncError ?? null,
     },
     allowance: allowanceView(allowance, observedAt),
+    ...regionAlertFields,
   };
 }
