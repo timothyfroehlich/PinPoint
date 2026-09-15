@@ -30,7 +30,7 @@ function terminalJson(
     observed_head: INPUT.expected_head,
     outcome,
     ci_gate: outcome === "passed" ? "SUCCESS" : "FAILURE",
-    review_state: "unreviewed",
+    review_state: "not reviewed",
     unresolved_threads: 0,
     merge_state: "CLEAN",
     detail_url: "https://github.com/timothyfroehlich/PinPoint/pull/2053",

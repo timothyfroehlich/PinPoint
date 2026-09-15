@@ -53,18 +53,18 @@ case "$ci_conclusion" in
     ;;
 esac
 
-review_record=$(_review_record "$pr_number" "$owner_repo" "$head_sha")
-review_state=$(cut -f1 <<< "$review_record")
-case "$review_state" in
-  approval | clean_comment | clean_reaction | reviewed | marker)
-    echo "BLOCK: review request: head ${head_sha:0:7} already has exact-head review coverage (${review_state})" >&2
-    exit 1
-    ;;
-  review_requested)
-    echo "BLOCK: review request: head ${head_sha:0:7} was already requested; wait for its result" >&2
-    exit 1
-    ;;
-esac
+# Any reviewer's coverage of this head — Codex, CodeRabbit, or a local attestation —
+# makes a request redundant; a pending request for this head makes it a duplicate.
+summary=$(_review_summary "$pr_number")
+if [[ "$(jq -r '.label' <<< "$summary")" == "approved" ]]; then
+  covered_by=$(jq -r '.coverage.checker' <<< "$summary")
+  echo "BLOCK: review request: head ${head_sha:0:7} already has exact-head review coverage (${covered_by})" >&2
+  exit 1
+fi
+if [[ "$(jq -r '.codex_request_pending' <<< "$summary")" == "true" ]]; then
+  echo "BLOCK: review request: head ${head_sha:0:7} was already requested; wait for its result" >&2
+  exit 1
+fi
 
 latest_head=$(gh pr view "$pr_number" --json headRefOid --jq .headRefOid)
 if [[ "$latest_head" != "$head_sha" ]]; then

@@ -63,25 +63,17 @@ REPO_OWNER = "timothyfroehlich"
 REPO_NAME = "PinPoint"
 READY_LABEL = "ready-for-review"
 CI_GATE_NAME = "CI Gate"
-CODEX_REVIEW_BOT = "chatgpt-codex-connector[bot]"
-CODEX_REVIEW_APP_SLUG = "chatgpt-codex-connector"
-CODEX_CLEAN_REVIEW_PREFIX = "Codex Review: Didn't find any major issues."
-GITHUB_ACTIONS_BOT = "github-actions[bot]"
-GITHUB_ACTIONS_APP_SLUG = "github-actions"
-CODEX_REACTION_WITNESS_PREFIX = "<!-- pinpoint-codex-reaction-witness:"
-CODEX_REVIEW_REQUEST_RE = re.compile(
-    r"^@codex review\n<!-- pinpoint-codex-review-head: ([0-9a-f]{40}) -->$"
-)
-REVIEW_MARKER_PREFIX = "<!-- pinpoint-review:"
-LEGACY_CLAUDE_MARKER_PREFIX = "<!-- pinpoint-claude-review:"
 
 # --- Review state ---------------------------------------------------------------
-# Kept deliberately in sync with scripts/workflow/_pr-gates.sh. This watcher only
-# reports the state; merge-pr.sh is the enforcement point.
+# Read from scripts/workflow/_pr-gates.sh (`_review_summary`), never mirrored here.
+# This watcher only reports the label; merge-pr.sh is the enforcement point.
+GATES_SCRIPT = Path(__file__).resolve().parent / "_pr-gates.sh"
+REVIEW_LABELS = ("approved", "changes requested", "stale review", "not reviewed")
 REVIEW_HINT = (
     "after current-head CI succeeds and the PR is ready, run "
-    "request-codex-review.sh #{pr} exactly once for this head; a new head requires "
-    "replacement CI and one new request"
+    "request-codex-review.sh #{pr} exactly once for this head, or ask Tim for a "
+    "CodeRabbit request or a local review; a new head requires replacement CI and "
+    "a new review"
 )
 REVIEW_REQUESTED_HINT = (
     "the manual Codex review for this head was already requested; wait for exact-head "
@@ -336,7 +328,7 @@ def _emit_terminal_json(state: dict[str, object]) -> None:
         "observed_head": str(state.get("head_sha") or ""),
         "outcome": str(state.get("outcome") or state.get("status") or "failed"),
         "ci_gate": str(state.get("ci_gate") or "UNKNOWN"),
-        "review_state": str(state.get("review_state") or "unreviewed"),
+        "review_state": str(state.get("review_state") or "not reviewed"),
         "unresolved_threads": int(state.get("unresolved_threads") or 0),
         "merge_state": str(state.get("merge_state") or "UNKNOWN"),
         "detail_url": state.get("detail_url") or None,
@@ -636,7 +628,7 @@ def _run_coordinated_watch(
                         "outcome": "failed" if exit_code != 0 else "passed",
                         "status": "failed" if exit_code != 0 else "passed",
                         "ci_gate": "UNKNOWN",
-                        "review_state": "unreviewed",
+                        "review_state": "not reviewed",
                         "unresolved_threads": 0,
                         "merge_state": "UNKNOWN",
                     }
@@ -724,276 +716,91 @@ def get_review_threads(pr: int) -> list[dict]:
         cursor = rt["pageInfo"]["endCursor"]
 
 
-def _gh_api_list(path: str) -> list[dict]:
-    """GET a paginated GitHub list endpoint, returning every item.
+def review_summary(pr: int, *, timeout: float | None = None) -> dict:
+    """The review summary for a PR, computed by the bash gate.
 
-    `gh api --paginate` emits ONE JSON document per page, so json.loads on the
-    whole stream fails from page 2 onward. Decode documents until the buffer is
-    exhausted and flatten.
+    `_review_summary` in scripts/workflow/_pr-gates.sh is the single implementation
+    of review evidence — three checkers (CodeRabbit approval, Codex evidence, local
+    attestation) and a four-word label. This watcher and the dashboard read its JSON
+    instead of mirroring the logic, so no Python copy can drift from the merge gate.
+
+    `timeout` bounds the gate's `gh` calls; the review-phase watcher passes what is
+    left of its own deadline so a hung request cannot outlive the watch.
     """
-    raw = gh("api", "--paginate", f"{path}?per_page=100")
-    decoder = json.JSONDecoder()
-    items: list[dict] = []
-    idx = 0
-    while idx < len(raw):
-        while idx < len(raw) and raw[idx].isspace():
-            idx += 1
-        if idx >= len(raw):
-            break
-        doc, end = decoder.raw_decode(raw, idx)
-        if isinstance(doc, list):
-            items.extend(doc)
-        idx = end
-    return items
+    try:
+        result = subprocess.run(
+            [
+                "bash",
+                "-c",
+                'set -euo pipefail; source "$1"; _review_summary "$2"',
+                "_",
+                str(GATES_SCRIPT),
+                str(pr),
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError(f"_review_summary timed out after {timeout:.0f}s") from exc
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"_review_summary failed (exit {result.returncode}): {result.stderr.strip()}"
+        )
+    summary = json.loads(result.stdout)
+    if not isinstance(summary, dict) or "label" not in summary:
+        raise RuntimeError("_review_summary returned malformed JSON")
+    return summary
 
 
-def _codex_reviews(pr: int) -> list[dict]:
-    """Return trusted Codex reviews in submission order."""
-    repo = f"repos/{REPO_OWNER}/{REPO_NAME}"
-    reviews = [
-        review
-        for review in _gh_api_list(f"{repo}/pulls/{pr}/reviews")
-        if review.get("user", {}).get("login") == CODEX_REVIEW_BOT
-    ]
-    return sorted(reviews, key=lambda review: review.get("submitted_at") or "")
-
-
-def _is_two_axis_review(body: str) -> bool:
-    if not re.search(r"(?im)^##\s+(?:Two-axis\s+code\s+review|Code\s+review)\b", body):
-        return False
-    return bool(
-        re.search(r"(?m)^##\s+Standards\b", body)
-        and re.search(r"(?m)^##\s+Spec\b", body)
-    )
-
-
-def _extract_two_axis_sha(body: str) -> str | None:
-    preamble = body.split("\n## Standards")[0]
-    matches = re.findall(
-        r"(?:\.{2,3}|(?:^|\s)(?:head|commit)\s+`?)([0-9a-f]{7,40})`?",
-        preamble,
-        re.IGNORECASE,
-    )
-    if matches:
-        return matches[-1]
-    return None
-
-
-def _comment_review_records(
-    pr: int,
-) -> tuple[list[tuple[str, str, str]], list[tuple[str, str]], list[tuple[str, str]]]:
-    """Return Codex evidence, manual review requests, and local-review markers."""
-    repo = f"repos/{REPO_OWNER}/{REPO_NAME}"
-    codex_results: list[tuple[str, str, str]] = []
-    review_requests: list[tuple[str, str]] = []
-    markers: list[tuple[str, str]] = []
-    for comment in _gh_api_list(f"{repo}/issues/{pr}/comments"):
-        body = comment.get("body") or ""
-        app = comment.get("performed_via_github_app") or {}
-        first_line = body.splitlines()[0] if body else ""
-        if (
-            comment.get("user", {}).get("login") == CODEX_REVIEW_BOT
-            and app.get("slug") == CODEX_REVIEW_APP_SLUG
-            and first_line.startswith(CODEX_CLEAN_REVIEW_PREFIX)
-            and (
-                match := re.search(
-                    r"^\*\*Reviewed commit:\*\* `([0-9a-f]{10}|[0-9a-f]{40})`$",
-                    body,
-                    re.MULTILINE,
-                )
+def _checker_lines(summary: dict) -> str:
+    head = str(summary.get("head") or "")[:7]
+    names = {
+        "coderabbit": "CodeRabbit",
+        "codex": "Codex",
+        "marker": "local attestation",
+    }
+    parts: list[str] = []
+    for key, name in names.items():
+        record = (summary.get("checkers") or {}).get(key) or {}
+        verdict = record.get("verdict")
+        if verdict == "covers":
+            parts.append(f"{name}: covers head {head}")
+        elif verdict == "changes_requested":
+            parts.append(f"{name}: requested changes on head {head}")
+        elif verdict == "stale":
+            parts.append(
+                f"{name}: newest evidence names {str(record.get('sha') or '')[:7]}, head is {head}"
             )
-        ):
-            codex_results.append(
-                (
-                    "clean_comment",
-                    match.group(1),
-                    comment.get("updated_at") or comment.get("created_at") or "",
-                )
-            )
-        if comment.get("user", {}).get("login") == REPO_OWNER and (
-            match := CODEX_REVIEW_REQUEST_RE.fullmatch(body)
-        ):
-            review_requests.append((match.group(1), comment.get("created_at") or ""))
-        if (
-            comment.get("user", {}).get("login") == GITHUB_ACTIONS_BOT
-            and app.get("slug") == GITHUB_ACTIONS_APP_SLUG
-            and body.startswith(CODEX_REACTION_WITNESS_PREFIX)
-            and (
-                match := re.match(
-                    r"^<!-- pinpoint-codex-reaction-witness: ([0-9a-f]{40}) -->",
-                    body,
-                )
-            )
-        ):
-            codex_results.append(
-                (
-                    "clean_reaction",
-                    match.group(1),
-                    comment.get("updated_at") or comment.get("created_at") or "",
-                )
-            )
-        if body.startswith(REVIEW_MARKER_PREFIX):
-            markers.append(
-                (
-                    body[len(REVIEW_MARKER_PREFIX) :].split("-->", 1)[0].strip(),
-                    comment.get("updated_at") or "",
-                )
-            )
-        elif body.startswith(LEGACY_CLAUDE_MARKER_PREFIX):
-            markers.append(
-                (
-                    body[len(LEGACY_CLAUDE_MARKER_PREFIX) :].split("-->", 1)[0].strip(),
-                    comment.get("updated_at") or "",
-                )
-            )
-        elif (
-            comment.get("user", {}).get("login") == REPO_OWNER
-        ) and _is_two_axis_review(body):
-            sha = _extract_two_axis_sha(body)
-            at = comment.get("updated_at") or comment.get("created_at") or ""
-            if sha is None:
-                try:
-                    commits_json = gh("pr", "view", str(pr), "--json", "commits")
-                    commits_info = json.loads(commits_json)
-                    commits = commits_info.get("commits") or []
-                    matching = [
-                        c["oid"]
-                        for c in commits
-                        if (c.get("committedDate") or "") <= at
-                    ]
-                    if matching:
-                        sha = matching[-1]
-                except Exception:
-                    pass
-            if sha:
-                markers.append((sha, at))
-    return codex_results, review_requests, markers
+        else:
+            parts.append(f"{name}: none")
+    return "; ".join(parts)
 
 
 def review_state(pr: int, *, head_sha: str | None = None) -> tuple[str, str]:
-    """Return the current-head state across both valid review paths."""
-    if head_sha is None:
-        head_sha = json.loads(gh("pr", "view", str(pr), "--json", "headRefOid"))[
-            "headRefOid"
-        ]
-    reviews = _codex_reviews(pr)
-    if reviews:
-        head_reviews = [
-            review for review in reviews if (review.get("commit_id") or "") == head_sha
-        ]
-        latest = head_reviews[-1] if head_reviews else reviews[-1]
-        review_sha = latest.get("commit_id") or ""
-        state = (latest.get("state") or "UNKNOWN").upper()
-        if state == "APPROVED" and review_sha == head_sha:
-            return "approval", f"Codex approved head {head_sha[:7]}"
+    """Return (label, detail) for the current head.
 
-    # A current native approval is sufficient. Defer the paginated comments request
-    # unless it is needed to find another accepted record or request state.
-    codex_results, review_requests, markers = _comment_review_records(pr)
-    if any(
-        len(marker_sha) >= 7
-        and len(head_sha) >= 7
-        and (head_sha.startswith(marker_sha) or marker_sha.startswith(head_sha))
-        for marker_sha, _at in markers
-    ):
-        return "marker", f"manual review marker pins head {head_sha[:7]}"
-
-    current_clean = max(
-        (
-            record
-            for record in codex_results
-            if (record[0] == "clean_comment" and head_sha.startswith(record[1]))
-            or (record[0] == "clean_reaction" and record[1] == head_sha)
-        ),
-        key=lambda record: record[2],
-        default=("", "", ""),
-    )
-    if current_clean[1]:
-        clean_state, clean_sha, clean_at = current_clean
-        if (
-            not reviews
-            or review_sha != head_sha
-            or clean_at > (latest.get("submitted_at") or "")
-        ):
-            if clean_state == "clean_reaction":
-                return (
-                    clean_state,
-                    f"Codex clean reaction witnessed on head {head_sha[:7]}",
-                )
-            return clean_state, f"Codex found no major issues on head {clean_sha}"
-
-    if (
-        reviews
-        and review_sha == head_sha
-        and state in {"COMMENTED", "CHANGES_REQUESTED"}
-    ):
-        return (
-            "reviewed",
-            f"Codex reviewed head {head_sha[:7]} with {state}; thread gate owns findings",
-        )
-
-    review_requested = any(
-        request_sha == head_sha for request_sha, _at in review_requests
-    )
-    if reviews and review_sha == head_sha:
-        remediation = (
-            REVIEW_REQUESTED_HINT if review_requested else REVIEW_HINT.format(pr=pr)
-        )
-        return (
-            "not_approved",
-            f"Codex reviewed current head {review_sha[:7]} with unusable state "
-            f"{state}; {remediation}",
-        )
-
-    if review_requested:
-        return "review_requested", REVIEW_REQUESTED_HINT
-
-    latest_marker_sha, latest_marker_at = max(
-        markers, key=lambda marker: marker[1], default=("", "")
-    )
-    latest_clean_state, latest_clean_sha, latest_clean_at = max(
-        codex_results, key=lambda record: record[2], default=("", "", "")
-    )
-    latest_comment_sha, latest_comment_at, latest_comment_state = (
-        (latest_marker_sha, latest_marker_at, "stale_marker")
-        if latest_marker_at > latest_clean_at
-        else (
-            latest_clean_sha,
-            latest_clean_at,
-            "stale_clean_reaction"
-            if latest_clean_state == "clean_reaction"
-            else "stale_clean_comment",
-        )
-    )
-    if reviews:
-        if latest_comment_sha and latest_comment_at > (
-            latest.get("submitted_at") or ""
-        ):
-            return (
-                latest_comment_state,
-                f"review record pins {latest_comment_sha[:7]} but head is {head_sha[:7]}",
-            )
-        return (
-            "stale_approval",
-            f"Codex reviewed {review_sha[:7]} with {state}, but head is "
-            f"{head_sha[:7]} — "
-            f"{REVIEW_HINT.format(pr=pr)}",
-        )
-    if latest_marker_sha:
-        return (
-            "stale_marker",
-            f"manual review marker pins {latest_marker_sha[:7]} but head is {head_sha[:7]}",
-        )
-    if latest_clean_sha:
-        return (
-            "stale_clean_comment",
-            f"Codex clean result covers {latest_clean_sha[:7]} but head is {head_sha[:7]}",
-        )
-    return (
-        "unreviewed",
-        f"no Codex review or manual attestation — head {head_sha[:7]} is unreviewed; "
-        f"{REVIEW_HINT.format(pr=pr)}",
-    )
+    Labels are the gate's four words: approved, changes requested, stale review,
+    not reviewed. `head_sha` is accepted for call-site symmetry; the gate reads the
+    live head itself, and the review-phase loop re-checks head separately.
+    """
+    del head_sha
+    summary = review_summary(pr)
+    label = str(summary.get("label") or "not reviewed")
+    head = str(summary.get("head") or "")[:7]
+    if label == "approved":
+        coverage = summary.get("coverage") or {}
+        who = {
+            "coderabbit": "CodeRabbit approval",
+            "codex": "Codex evidence",
+            "marker": "local review attestation",
+        }.get(str(coverage.get("checker")), "review")
+        return label, f"{who} covers head {head}"
+    lines = _checker_lines(summary)
+    if summary.get("codex_request_pending"):
+        return label, f"{lines}; {REVIEW_REQUESTED_HINT}"
+    return label, f"{lines}; {REVIEW_HINT.format(pr=pr)}"
 
 
 def _unresolved_threads(threads: list[dict]) -> int:
@@ -1213,8 +1020,8 @@ def run_audit(pr: int) -> bool:
     # draft and become eligible for a manual review request?"; gating on review here
     # would make the check
     # circular and permanently red. merge-pr.sh's `reviewed` gate refuses to merge an
-    # unreviewed head. A stale Codex approval is worth seeing here anyway: it means the
-    # PR looks reviewed and is not.
+    # unreviewed head. A stale review is worth seeing here anyway: it means the PR
+    # looks reviewed and is not.
     try:
         state, review_detail = review_state(pr)
     except (RuntimeError, ValueError, KeyError) as exc:
@@ -1638,7 +1445,7 @@ def _watch_phase_review(
     Terminal states:
     - passed (exit 0): exact-head coverage present AND 0 unresolved threads.
     - action_required (exit 1): exact-head coverage present with >0 unresolved threads,
-      or review is not_approved.
+      or the label is "changes requested".
     - stale (exit 1): PR head moved away from expected_head.
     - conflicting (exit 1): merge state is DIRTY or CONFLICTING.
     - timed_out (exit 2): deadline reached without terminal verdict.
@@ -1646,22 +1453,21 @@ def _watch_phase_review(
     """
     deadline = time.monotonic() + timeout_sec
     last_signature: tuple[str, str, int] | None = None
-    last_review_state = "unreviewed"
+    last_review_state = "not reviewed"
     last_merge_state = "UNKNOWN"
 
     def read_review_evidence(head_sha: str) -> tuple[str, str, bool, int]:
-        state_kind, state_desc = review_state(pr, head_sha=head_sha)
-        accepted_review = state_kind in (
-            "approval",
-            "clean_comment",
-            "clean_reaction",
-            "marker",
-            "reviewed",
-        )
-        unresolved = 0
-        if accepted_review or state_kind == "not_approved":
-            unresolved = _unresolved_threads(get_review_threads(pr))
-        return state_kind, state_desc, accepted_review, unresolved
+        # One gate call answers coverage, label, and unresolved threads together,
+        # bounded by whatever is left of the watch deadline.
+        summary = review_summary(pr, timeout=max(1.0, deadline - time.monotonic()))
+        label = str(summary.get("label") or "not reviewed")
+        unresolved = int(summary.get("unresolved_threads") or 0)
+        if label == "approved":
+            coverage = summary.get("coverage") or {}
+            desc = f"{coverage.get('checker') or 'review'} covers head {head_sha[:7]}"
+        else:
+            desc = _checker_lines(summary)
+        return label, desc, label == "approved", unresolved
 
     while time.monotonic() < deadline:
         try:
@@ -1752,7 +1558,7 @@ def _watch_phase_review(
                 )
             return EXIT_UNDETERMINED
 
-        terminal_candidate = accepted_review or state_kind == "not_approved"
+        terminal_candidate = accepted_review or state_kind == "changes requested"
         for check_index in range(2 if terminal_candidate else 1):
             try:
                 terminal_head, terminal_merge_state = _current_head_merge_snapshot(pr)
@@ -1829,7 +1635,9 @@ def _watch_phase_review(
                             outcome="undetermined",
                         )
                     return EXIT_UNDETERMINED
-                terminal_candidate = accepted_review or state_kind == "not_approved"
+                terminal_candidate = (
+                    accepted_review or state_kind == "changes requested"
+                )
                 if not terminal_candidate:
                     break
 
@@ -1870,8 +1678,8 @@ def _watch_phase_review(
                     )
                 return 1
 
-        elif state_kind == "not_approved":
-            detail = f"Review on {head_sha[:7]} is not approved ({state_desc})"
+        elif state_kind == "changes requested":
+            detail = f"Changes requested on {head_sha[:7]} ({state_desc})"
             emit(detail)
             if state_sink is not None:
                 state_sink(
@@ -1887,7 +1695,7 @@ def _watch_phase_review(
             return 1
 
         else:
-            # In progress: review_requested, unreviewed, stale_approval, etc.
+            # In progress: not reviewed, or stale review.
             signature = (head_sha, state_kind, 0)
             if signature != last_signature:
                 detail = f"Review pending on {head_sha[:7]}: {state_kind}"
