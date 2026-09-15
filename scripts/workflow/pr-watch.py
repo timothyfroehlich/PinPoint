@@ -716,27 +716,34 @@ def get_review_threads(pr: int) -> list[dict]:
         cursor = rt["pageInfo"]["endCursor"]
 
 
-def review_summary(pr: int) -> dict:
+def review_summary(pr: int, *, timeout: float | None = None) -> dict:
     """The review summary for a PR, computed by the bash gate.
 
     `_review_summary` in scripts/workflow/_pr-gates.sh is the single implementation
     of review evidence — three checkers (CodeRabbit approval, Codex evidence, local
     attestation) and a four-word label. This watcher and the dashboard read its JSON
     instead of mirroring the logic, so no Python copy can drift from the merge gate.
+
+    `timeout` bounds the gate's `gh` calls; the review-phase watcher passes what is
+    left of its own deadline so a hung request cannot outlive the watch.
     """
-    result = subprocess.run(
-        [
-            "bash",
-            "-c",
-            'set -euo pipefail; source "$1"; _review_summary "$2"',
-            "_",
-            str(GATES_SCRIPT),
-            str(pr),
-        ],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    try:
+        result = subprocess.run(
+            [
+                "bash",
+                "-c",
+                'set -euo pipefail; source "$1"; _review_summary "$2"',
+                "_",
+                str(GATES_SCRIPT),
+                str(pr),
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError(f"_review_summary timed out after {timeout:.0f}s") from exc
     if result.returncode != 0:
         raise RuntimeError(
             f"_review_summary failed (exit {result.returncode}): {result.stderr.strip()}"
@@ -1450,8 +1457,9 @@ def _watch_phase_review(
     last_merge_state = "UNKNOWN"
 
     def read_review_evidence(head_sha: str) -> tuple[str, str, bool, int]:
-        # One gate call answers coverage, label, and unresolved threads together.
-        summary = review_summary(pr)
+        # One gate call answers coverage, label, and unresolved threads together,
+        # bounded by whatever is left of the watch deadline.
+        summary = review_summary(pr, timeout=max(1.0, deadline - time.monotonic()))
         label = str(summary.get("label") or "not reviewed")
         unresolved = int(summary.get("unresolved_threads") or 0)
         if label == "approved":

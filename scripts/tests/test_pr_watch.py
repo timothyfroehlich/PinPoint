@@ -139,7 +139,8 @@ def use_summaries(monkeypatch, *summaries):
     """Answer successive `review_summary` calls; the last one repeats."""
     queue = list(summaries)
 
-    def fake_review_summary(_pr):
+    def fake_review_summary(_pr, *, timeout=None):
+        del timeout
         if len(queue) > 1:
             return queue.pop(0)
         return queue[0]
@@ -902,6 +903,32 @@ def test_review_summary_raises_when_the_gate_fails_or_returns_junk(
 
 
 @pytest.mark.unit
+def test_review_summary_timeout_is_a_runtime_error(monkeypatch, tmp_path):
+    gate = tmp_path / "_pr-gates.sh"
+    gate.write_text("_review_summary() { sleep 5; echo '{}'; }\n")
+    monkeypatch.setattr(pr_watch, "GATES_SCRIPT", gate)
+    with pytest.raises(RuntimeError, match="timed out"):
+        pr_watch.review_summary(PR, timeout=0.2)
+
+
+@pytest.mark.unit
+def test_watch_phase_review_bounds_the_gate_call_by_the_remaining_deadline(
+    monkeypatch,
+):
+    monkeypatch.setattr(pr_watch, "gh", make_gh())
+    seen: list[float | None] = []
+
+    def fake_review_summary(_pr, *, timeout=None):
+        seen.append(timeout)
+        return fake_summary("approved")
+
+    monkeypatch.setattr(pr_watch, "review_summary", fake_review_summary)
+    exit_code = pr_watch._watch_phase_review(PR, HEAD_SHA, timeout_sec=30, poll_sec=0)
+    assert exit_code == 0
+    assert seen and all(t is not None and 0 < t <= 30 for t in seen)
+
+
+@pytest.mark.unit
 @pytest.mark.parametrize("label", pr_watch.REVIEW_LABELS)
 def test_review_state_reports_the_gate_label_verbatim(monkeypatch, label):
     use_summaries(monkeypatch, fake_summary(label))
@@ -1367,7 +1394,8 @@ def test_watch_phase_review_action_required_on_changes_requested(monkeypatch):
 def test_watch_phase_review_undetermined_when_the_gate_fails(monkeypatch):
     monkeypatch.setattr(pr_watch, "gh", make_gh())
 
-    def broken(_pr):
+    def broken(_pr, *, timeout=None):
+        del timeout
         raise RuntimeError("_review_summary failed (exit 1): boom")
 
     monkeypatch.setattr(pr_watch, "review_summary", broken)
@@ -1393,7 +1421,8 @@ def test_watch_phase_review_timeout_preserves_last_observed_state(monkeypatch):
         lambda _pr: (HEAD_SHA, "CLEAN"),
     )
     use_summaries(monkeypatch, fake_summary("stale review"))
-    monotonic_values = iter([0.0, 0.0, 1.0])
+    # deadline, loop check, the gate-call timeout budget, then the expiring loop check
+    monotonic_values = iter([0.0, 0.0, 0.0, 1.0])
     monkeypatch.setattr(pr_watch.time, "monotonic", lambda: next(monotonic_values))
     monkeypatch.setattr(pr_watch.time, "sleep", lambda _seconds: None)
     states = []
