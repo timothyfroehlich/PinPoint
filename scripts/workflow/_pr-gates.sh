@@ -431,7 +431,12 @@ _unresolved_thread_count() {
 check_unresolved_threads() {
   local pr=$1
   local unresolved
-  unresolved=$(_unresolved_thread_count "$pr")
+  # merge-pr.sh's run_gate captures output with `|| rc=$?`, which disables errexit
+  # inside; guard explicitly so a failed fetch is a FAIL, not an empty comparison.
+  if ! unresolved=$(_unresolved_thread_count "$pr"); then
+    echo "FAIL: threads: could not read review threads (GitHub fetch failed)"
+    return 1
+  fi
 
   if [ "$unresolved" -eq 0 ]; then
     echo "PASS: threads: 0 unresolved review threads"
@@ -454,7 +459,10 @@ RS_SUMMARY=""
 
 check_review_happened() {
   local pr=$1
-  RS_SUMMARY=$(_review_summary "$pr")
+  if ! RS_SUMMARY=$(_review_summary "$pr"); then
+    echo "FAIL: reviewed: could not read review evidence (GitHub fetch failed)"
+    return 1
+  fi
   RS_HEAD_SHA=$(jq -r '.head' <<< "$RS_SUMMARY")
   RS_LABEL=$(jq -r '.label' <<< "$RS_SUMMARY")
 

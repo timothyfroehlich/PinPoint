@@ -1070,6 +1070,19 @@ def test_unresolved_threads_block_regardless_of_author() -> None:
     assert "2 unresolved review threads" in result.stdout
 
 
+def test_gates_fail_with_a_named_reason_when_the_fetch_fails() -> None:
+    # merge-pr.sh runs each gate under `|| rc=$?`, which disables errexit inside the
+    # gate; a failed fetch must be a FAIL line, not an empty comparison or jq error.
+    with gate_env(review_pages=[[codex_review()]]) as env:
+        env["STUB_THREADS"] = str(Path(env["STUB_THREADS"]).parent / "missing.json")
+        threads = run_gate("check_unresolved_threads", env)
+        review = run_gate("check_review_happened", env)
+    assert threads.returncode == 1
+    assert "FAIL: threads: could not read review threads" in threads.stdout
+    assert review.returncode == 1
+    assert "FAIL: reviewed: could not read review evidence" in review.stdout
+
+
 def test_resolved_threads_do_not_block() -> None:
     with gate_env(threads=[thread(resolved=True, author="codex")]) as env:
         result = run_gate("check_unresolved_threads", env)
