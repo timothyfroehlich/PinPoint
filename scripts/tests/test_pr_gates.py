@@ -51,8 +51,10 @@ def manual_marker(
     reviewer: str = "claude-code",
     detail: str = "medium",
     updated_at: str = "2026-08-22T12:00:00Z",
+    login: str = "acme",
 ) -> dict:
     return {
+        "user": {"login": login},
         "body": (
             f"<!-- pinpoint-review: {sha} -->\n"
             f"<!-- pinpoint-reviewer: {reviewer} -->\n"
@@ -110,6 +112,7 @@ def manual_review_request(
 
 def legacy_claude_marker(sha: str = HEAD_SHA, detail: str = "high") -> dict:
     return {
+        "user": {"login": "acme"},
         "body": (
             f"<!-- pinpoint-claude-review: {sha} -->\n"
             f"<!-- pinpoint-review-depth: {detail} -->\n"
@@ -815,6 +818,7 @@ def test_manual_marker_record_retains_reviewer_and_detail() -> None:
 
 def test_canonical_marker_without_metadata_is_unrecorded() -> None:
     bare = {
+        "user": {"login": "acme"},
         "body": f"<!-- pinpoint-review: {HEAD_SHA} -->\nreviewed by hand",
         "updated_at": "2026-08-22T12:00:00Z",
     }
@@ -834,10 +838,22 @@ def test_legacy_marker_and_trivial_detail_remain_readable() -> None:
 
 
 def test_marker_text_quoted_in_a_comment_is_not_a_marker() -> None:
-    quoted = {"body": f"maybe post <!-- pinpoint-review: {HEAD_SHA} -->"}
+    quoted = {
+        "user": {"login": "acme"},
+        "body": f"maybe post <!-- pinpoint-review: {HEAD_SHA} -->",
+    }
     with gate_env(comment_pages=[[quoted]]) as env:
         result = run_gate("check_review_happened", env)
     assert result.returncode == 1, result.stdout
+
+
+def test_marker_from_anyone_but_the_owner_is_not_evidence() -> None:
+    # The repo is public; a marker-shaped comment from a stranger must not pass Gate 3.
+    with gate_env(comment_pages=[[manual_marker(login="stranger")]]) as env:
+        result = run_gate("check_review_happened", env)
+        summary = review_summary(env)
+    assert result.returncode == 1, result.stdout
+    assert verdicts(summary)["marker"] == "none"
 
 
 # ---------------------------------------------------------------------------------
@@ -960,6 +976,28 @@ def test_newest_ci_gate_run_is_authoritative() -> None:
         result = run_gate("check_ci", env)
     assert result.returncode == 1, result.stdout
     assert "FAIL: ci:" in result.stdout
+
+
+def test_live_replacement_run_outranks_an_older_run_that_finished_later() -> None:
+    # The replacement started at 12:20; the run it replaced finished at 12:25 with a
+    # FAILURE. Its later completedAt must not make the failure authoritative.
+    rollup = [
+        ci_gate(
+            conclusion="FAILURE",
+            started_at="2026-08-22T12:00:00Z",
+            completed_at="2026-08-22T12:25:00Z",
+        ),
+        ci_gate(
+            status="IN_PROGRESS",
+            conclusion=None,
+            started_at="2026-08-22T12:20:00Z",
+            completed_at=None,
+        ),
+    ]
+    with gate_env(rollup=rollup) as env:
+        result = run_gate("check_ci", env)
+    assert result.returncode == 2, result.stdout
+    assert "WAIT" in result.stdout
 
 
 def test_cancelled_ci_gate_leftover_yields_to_the_live_run() -> None:

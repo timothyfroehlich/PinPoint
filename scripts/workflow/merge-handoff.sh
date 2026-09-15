@@ -244,7 +244,13 @@ else
   # The label outranks the stale description: a change request on head is the thing
   # to act on, whatever older evidence exists. The since-review diff still uses it.
   if [[ "$rv_label" == "changes requested" ]]; then
-    review_desc="CHANGES REQUESTED on head ${short_head} ($(jq -r '.unresolved_threads' <<< "$review_summary") unresolved thread(s)) — fix or decline-and-resolve, then get head re-reviewed"
+    cr_threads=$(jq -r '.unresolved_threads' <<< "$review_summary")
+    if [[ "$cr_threads" -gt 0 ]]; then
+      review_desc="CHANGES REQUESTED on head ${short_head} (${cr_threads} unresolved thread(s)) — fix or decline-and-resolve, then get head re-reviewed"
+    else
+      cr_who=$(jq -r '[.checkers | to_entries[] | select(.value.verdict == "changes_requested") | .key | if . == "coderabbit" then "CodeRabbit" elif . == "codex" then "Codex" else . end] | join(", ")' <<< "$review_summary")
+      review_desc="CHANGES REQUESTED on head ${short_head} by ${cr_who} — address the review, then get head re-reviewed"
+    fi
   fi
 fi
 # Diff shape

@@ -221,6 +221,7 @@ def repo_with_pr(
         if scenario.manual_review:
             comments.append(
                 {
+                    "user": {"login": "acme"},
                     "body": (
                         f"<!-- pinpoint-review: {head_sha} -->\n"
                         f"<!-- pinpoint-reviewer: {scenario.manual_reviewer} -->\n"

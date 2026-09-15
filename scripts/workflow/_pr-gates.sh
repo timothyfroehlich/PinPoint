@@ -61,9 +61,11 @@ _repo_slug() {
 #   codex_witness   GitHub Actions witness of a fresh Codex eyes-to-+1 reaction,
 #                   SHA-pinned by the hidden marker
 #   codex_requests  the owner's manual `@codex review` request, SHA-pinned by its marker
-#   markers         local-review attestations: mark-review.sh markers, legacy Claude
-#                   markers, and the owner's two-axis review comments (whose SHA is
-#                   explicit in the preamble or else the newest commit at posting time)
+#   markers         local-review attestations posted by the repository owner (the
+#                   repo is public; anyone else's marker text is not evidence):
+#                   mark-review.sh markers, legacy Claude markers, and two-axis review
+#                   comments (whose SHA is explicit in the preamble or else the newest
+#                   commit at posting time)
 _review_evidence() {
   local pr=$1 owner_repo=$2 head=$3
   local raw reviews_json comments_json commits_json="[]"
@@ -146,7 +148,7 @@ _review_evidence() {
       markers: ([ $comments[]
         | (.body // "") as $body
         | (.updated_at // .created_at // "") as $at
-        | if ($body | startswith($prefix) or startswith($legacy)) then
+        | if (.user.login? == $owner and ($body | startswith($prefix) or startswith($legacy))) then
             { sha: (if $body | startswith($prefix) then ($body | ltrimstr($prefix)) else ($body | ltrimstr($legacy)) end | split("-->")[0] | gsub("^\\s+|\\s+$"; "")),
               reviewer: (if $body | startswith($prefix)
                          then ($body | [scan("<!-- pinpoint-reviewer:\\s*([a-z0-9-]+)\\s*-->")] | flatten | (.[0] // "unrecorded"))
@@ -324,7 +326,8 @@ _native_reviewer_label() {
 }
 # One head can carry several `CI Gate` runs (draft promotion re-triggers the workflow on
 # the same SHA). This jq picks the authoritative one — a live or finished run over a
-# cancelled leftover, then the newest — from a `statusCheckRollup` payload. Shared with
+# cancelled leftover, a live run over a finished one (never conclude while a
+# replacement is still running), then the newest — from a `statusCheckRollup` payload. Shared with
 # merge-pr.sh's compact poller so the first evaluation and the re-polls cannot disagree.
 # (pr-watch.py's `_select_ci_gate` ranks by startedAt alone; it is the CI watcher, not
 # the merge gate, and was left as is.)
@@ -332,6 +335,7 @@ readonly CI_GATE_SELECT_JQ='
     [.statusCheckRollup[]? | select(.name == "CI Gate")]
     | sort_by(
         (if ((.conclusion // "") | ascii_upcase) == "CANCELLED" then 0 else 1 end),
+        (if ((.status // "") | ascii_upcase) == "COMPLETED" then 0 else 1 end),
         (.completedAt // .startedAt // "")
       )
     | last'
