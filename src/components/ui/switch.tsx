@@ -51,7 +51,7 @@ const SwitchWithFormSupport = React.forwardRef<
   return (
     <>
       {/* The Radix Root is deliberately nameless: given a `name` inside a form
-          it renders its own bubble input (value "on") *in addition to* the
+          it submits its own bubble input (value "on") *in addition to* the
           custom hidden input below, so a checked switch submitted two entries
           under one name and formData.getAll(name) returned ["on", "on"]
           (PP-msjp). The custom hidden input is the single source of truth for
