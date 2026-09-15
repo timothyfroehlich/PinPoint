@@ -7,6 +7,10 @@ import { SENTRY_PRIVACY_OPTIONS } from "~/lib/observability/sentry-policy";
 
 export function SentryInitializer(): null {
   useEffect(() => {
+    if (Sentry.isInitialized()) {
+      return;
+    }
+
     // Manually initialize Sentry on the client to ensure the Feedback widget works
     // and to bypass potential bundler/auto-injection issues.
     Sentry.init({
