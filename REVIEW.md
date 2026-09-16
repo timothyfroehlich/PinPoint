@@ -72,7 +72,7 @@ Reviewers never merge PinPoint PRs. The PinPoint merge decision is Tim's, always
 
 This is enforced differently by harness. In **Claude Code**, `block-direct-merge.cjs` is a PreToolUse hook that **hard-blocks** the raw PinPoint channels and turns any PinPoint `merge-pr.sh` invocation into an **approval prompt Tim must accept** before it runs (PP-wi85, reversed for the script only, per Tim 2026-08-19). The hook does **not** fire inside Antigravity, Codex, or Gemini — in those harnesses there is no hook backstop and no approval prompt, so **do not run any PinPoint merge path yourself**; what binds you is this written instruction plus `merge-pr.sh`'s own refusal to execute without a `--human` flag that only Tim should ever pass.
 
-An agent's terminal state on a PR is: GitHub-ready, CI green, exact-head Codex review coverage (see "How review runs"), review threads resolved, `ready-for-review` applied, and screenshots posted if UI-touching. Then either hand Tim the command to run himself, `! scripts/workflow/merge-pr.sh <PR> --human`, or (Claude Code only) run it and let him approve the prompt.
+An agent's terminal state on a PR is: GitHub-ready, CI green, exact-head review coverage from any accepted checker — CodeRabbit approval, Codex evidence, or local attestation (see "How review runs") — review threads resolved, `ready-for-review` applied, and screenshots posted if UI-touching. Then either hand Tim the command to run himself, `! scripts/workflow/merge-pr.sh <PR> --human`, or (Claude Code only) run it and let him approve the prompt.
 
 ## Pointers, not copies
 
