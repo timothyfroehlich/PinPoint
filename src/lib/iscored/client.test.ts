@@ -146,6 +146,28 @@ describe("iscored client", () => {
       expect(scores[1]?.playerName).toBe("Anonymous");
       expect(scores[2]?.playerName).toBe("Anonymous");
     });
+
+    it("masks email-shaped player names with Anonymous (CORE-SEC-007)", async () => {
+      vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+        new Response(
+          JSON.stringify([
+            { id: 401, game: 888, name: "user@domain.com", score: 500 },
+            { id: 402, game: 888, name: "  player@test.org  ", score: 600 },
+            { id: 403, game: 888, name: "ValidPlayer", score: 700 },
+          ]),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }
+        )
+      );
+
+      const scores = await getAllScoresForMachine("888");
+      expect(scores).toHaveLength(3);
+      expect(scores[0]?.playerName).toBe("ValidPlayer");
+      expect(scores[1]?.playerName).toBe("Anonymous");
+      expect(scores[2]?.playerName).toBe("Anonymous");
+    });
   });
 
   describe("helper methods", () => {
@@ -331,6 +353,27 @@ describe("iscored client", () => {
       const scores = await getAllScoresForMachine("77956");
       expect(scores).toHaveLength(4);
       expect(fetchCount).toBe(1); // Cached
+    });
+
+    it("returns detached cloned records to prevent external cache mutation", async () => {
+      vi.spyOn(globalThis, "fetch").mockResolvedValue(
+        new Response(JSON.stringify(mockApiScores), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        })
+      );
+
+      const firstCall = await getAllScoresForMachine("77956");
+      expect(firstCall[0]?.playerName).toBe("Bob");
+
+      // Mutate the returned object
+      if (firstCall[0]) {
+        firstCall[0].playerName = "MutatedHacker";
+      }
+
+      // Second call should still have original cached data
+      const secondCall = await getAllScoresForMachine("77956");
+      expect(secondCall[0]?.playerName).toBe("Bob");
     });
   });
 

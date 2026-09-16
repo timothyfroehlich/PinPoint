@@ -8,7 +8,7 @@ import {
   getIscoredUser,
   getScoreEntryUrl,
 } from "./config";
-import type { IscoredScore, RawIscoredScore } from "./types";
+import type { IscoredScore } from "./types";
 
 export { getGameroomUrl, getScoreEntryUrl };
 export type { IscoredScore };
@@ -39,12 +39,31 @@ function parseScoreValue(val: unknown): number {
   return 0;
 }
 
+const EMAIL_SHAPE_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 function parsePlayerName(val: unknown): string {
   if (typeof val === "string") {
     const trimmed = val.trim();
-    return trimmed.length > 0 ? trimmed : "Anonymous";
+    if (trimmed.length > 0 && !EMAIL_SHAPE_REGEX.test(trimmed)) {
+      return trimmed;
+    }
   }
   return "Anonymous";
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function parseGameId(val: unknown): string | null {
+  if (typeof val === "number") {
+    return Number.isFinite(val) ? String(val) : null;
+  }
+  if (typeof val === "string") {
+    const trimmed = val.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  }
+  return null;
 }
 
 /**
@@ -59,27 +78,22 @@ function parseAndSanitizeScores(
   const sanitized: Omit<IscoredScore, "rank">[] = [];
 
   for (const item of items) {
-    if (!item || typeof item !== "object") {
+    if (!isRecord(item)) {
       continue;
     }
 
-    const raw = item as Partial<RawIscoredScore>;
-
-    if (raw.game === undefined || raw.game === null) {
-      continue;
-    }
-
-    const gameId = String(raw.game).trim();
+    const gameId = parseGameId(item["game"]);
     if (!gameId) {
       continue;
     }
 
-    const id = typeof raw.id === "number" ? raw.id : Number(raw.id) || 0;
+    const id =
+      typeof item["id"] === "number" ? item["id"] : Number(item["id"]) || 0;
     const gameName =
-      typeof raw.gameName === "string" ? raw.gameName.trim() : "";
-    const playerName = parsePlayerName(raw.name);
-    const scoreVal = parseScoreValue(raw.score);
-    const date = typeof raw.date === "string" ? raw.date.trim() : "";
+      typeof item["gameName"] === "string" ? item["gameName"].trim() : "";
+    const playerName = parsePlayerName(item["name"]);
+    const scoreVal = parseScoreValue(item["score"]);
+    const date = typeof item["date"] === "string" ? item["date"].trim() : "";
 
     sanitized.push({
       id,
@@ -244,7 +258,9 @@ export async function getAllScoresForMachine(
   }
 
   await ensureCacheReady(user);
-  return cache.scoresByGameId.get(trimmedId) ?? [];
+  return (
+    cache.scoresByGameId.get(trimmedId)?.map((score) => ({ ...score })) ?? []
+  );
 }
 
 /**

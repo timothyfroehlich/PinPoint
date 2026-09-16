@@ -74,6 +74,18 @@ describe("iscored config", () => {
       expect(getScoreEntryUrl("   ")).toBeNull();
     });
 
+    it("returns null if explicit user is whitespace-only", () => {
+      delete process.env.ISCORED_USER;
+      expect(getScoreEntryUrl("77956", "   ")).toBeNull();
+    });
+
+    it("trims explicitly passed user override", () => {
+      delete process.env.ISCORED_USER;
+      expect(getScoreEntryUrl("77956", "  CustomUser  ")).toBe(
+        "https://www.iscored.info/?mode=public&user=CustomUser&game=77956"
+      );
+    });
+
     it("returns null if no user is configured and none passed", () => {
       delete process.env.ISCORED_USER;
       expect(getScoreEntryUrl("77956")).toBeNull();
@@ -90,6 +102,18 @@ describe("iscored config", () => {
       delete process.env.ISCORED_USER;
       expect(getGameroomUrl("CustomGameroom")).toBe(
         "https://www.iscored.info/CustomGameroom"
+      );
+    });
+
+    it("returns null if explicit user is whitespace-only", () => {
+      delete process.env.ISCORED_USER;
+      expect(getGameroomUrl("   ")).toBeNull();
+    });
+
+    it("trims explicitly passed user override", () => {
+      delete process.env.ISCORED_USER;
+      expect(getGameroomUrl("  CustomUser  ")).toBe(
+        "https://www.iscored.info/CustomUser"
       );
     });
 

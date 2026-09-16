@@ -39,7 +39,7 @@ export function getScoreEntryUrl(
   iscoredGameId: string,
   user?: string | null
 ): string | null {
-  const resolvedUser = user ?? getIscoredUser();
+  const resolvedUser = (user ?? getIscoredUser())?.trim();
   const trimmedId = iscoredGameId.trim();
 
   if (!resolvedUser || !trimmedId) {
@@ -57,7 +57,7 @@ export function getScoreEntryUrl(
  * Returns null if no user is configured (or passed).
  */
 export function getGameroomUrl(user?: string | null): string | null {
-  const resolvedUser = user ?? getIscoredUser();
+  const resolvedUser = (user ?? getIscoredUser())?.trim();
 
   if (!resolvedUser) {
     return null;
