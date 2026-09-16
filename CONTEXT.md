@@ -55,3 +55,10 @@ A user-created grouping of machines, owned and managed by a user.
 **Integration**:
 A third-party service PinPoint connects to for a defined purpose, such as
 Discord notifications or Pinball Map synchronization.
+
+**iScored game**:
+A game record tracked in the location's iScored gameroom, identified by a numeric game ID.
+_Avoid_: iScored match, title
+
+**Score entry link**:
+The direct external URL to iScored's mobile score submission screen for a specific machine.
