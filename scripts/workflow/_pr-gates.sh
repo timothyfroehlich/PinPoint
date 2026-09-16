@@ -289,7 +289,8 @@ _review_summary() {
       --argjson coderabbit "$coderabbit" --argjson codex "$codex" --argjson marker "$marker" \
       --argjson evidence "$evidence" '
     [$coderabbit, $codex, $marker] as $checks
-    | ([ $checks[] | select(.verdict == "covers") ] | sort_by(.at) | last) as $coverage
+    | ([ $checks[] | select(.verdict == "covers") ]
+       | (map(select(.checker == "coderabbit"))[0] // (sort_by(.at) | last))) as $coverage
     | {
         head: $head,
         label: (if $coverage != null then "approved"
