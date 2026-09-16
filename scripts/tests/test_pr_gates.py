@@ -300,6 +300,16 @@ def test_coderabbit_approval_of_head_passes() -> None:
     assert summary["coverage"]["reviewer"] == CODERABBIT_BOT
 
 
+def test_coderabbit_precedence_over_codex_when_both_cover() -> None:
+    """When both CodeRabbit and Codex cover head, CodeRabbit takes precedence (§10.7)."""
+    cr = codex_review(login=CODERABBIT_BOT, submitted_at="2026-08-22T11:00:00Z")
+    cx = codex_review(login=CODEX_BOT, submitted_at="2026-08-22T12:00:00Z")
+    with gate_env(review_pages=[[cr, cx]]) as env:
+        summary = review_summary(env)
+    assert summary["coverage"]["checker"] == "coderabbit"
+    assert summary["coverage"]["reviewer"] == CODERABBIT_BOT
+
+
 def test_clean_codex_comment_of_head_passes() -> None:
     with gate_env(comment_pages=[[clean_codex_comment()]]) as env:
         result = run_gate("check_review_happened", env)
