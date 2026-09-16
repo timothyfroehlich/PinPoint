@@ -547,6 +547,13 @@
       "when": 1789351027181,
       "tag": "0077_pinballmap_region_alerts_config",
       "breakpoints": true
+    },
+    {
+      "idx": 78,
+      "version": "7",
+      "when": 1789532602642,
+      "tag": "0078_add-machine-iscored-game-id",
+      "breakpoints": true
     }
   ]
 }
