@@ -29,6 +29,8 @@ reviews:
   # reviewed. Approval means "automated review complete" — it does NOT
   # authorize merging, which stays Tim's decision (PP-wi85).
   request_changes_workflow: true
+  review_details: true
+  suggested_reviewers: false
 
   # "chill" keeps low-confidence nits out of the thread. PinPoint already runs a
   # strict static gate (`pnpm run check`: oxlint type-aware, TS 7 strictest,
@@ -36,6 +38,8 @@ reviews:
   profile: chill
 
   high_level_summary: true
+  high_level_summary_in_walkthrough: true
+  collapse_walkthrough: true
   review_status: true
   poem: false
 
@@ -50,6 +54,8 @@ reviews:
     # (@codex review).
     enabled: true
     drafts: false
+    auto_incremental_review: false
+    auto_pause_after_reviewed_commits: 1
 
   path_instructions:
     - path: "**"
