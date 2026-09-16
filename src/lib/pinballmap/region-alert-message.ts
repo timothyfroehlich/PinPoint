@@ -71,15 +71,75 @@ export interface FormattedRegionAlertMessage {
  * Both names are required at the type boundary because Discord posts are immutable;
  * unresolved events remain queued until the catalog and location cache can name them.
  */
-function formatEntry(entry: RegionAlertEntry): string {
-  const machine = sanitizeDiscordText(entry.machineName);
-  const venue = sanitizeDiscordText(entry.locationName);
-  const action = entry.eventType === "added" ? "Added" : "Removed";
-  return `• ${action}: ${machine} — [${venue}](${pinballmapLocationUrl(entry.locationId)})`;
+/**
+ * Render a candidate set of entries into the formatted Discord message.
+ *
+ * Preserves the order in which locations and machines appear in `renderedEntries`.
+ * Location header: masked link to location on Pinball Map.
+ * Machine lines: `• ❇️ <Machine>` for added, `• ❌ <Machine>` for removed.
+ */
+function renderMessage(
+  renderedEntries: RegionAlertEntry[],
+  totalCount: number,
+  regionLabel: string
+): string {
+  const region = sanitizeDiscordText(regionLabel);
+  const headline = `**Pinball Map changes in ${region}**`;
+  const attribution = "*Data from Pinball Map (CC BY-SA 4.0).*";
+
+  const groups = new Map<
+    number,
+    {
+      locationName: string;
+      machines: { eventType: "added" | "removed"; machineName: string }[];
+    }
+  >();
+
+  for (const entry of renderedEntries) {
+    let group = groups.get(entry.locationId);
+    if (!group) {
+      group = {
+        locationName: entry.locationName,
+        machines: [],
+      };
+      groups.set(entry.locationId, group);
+    }
+    group.machines.push({
+      eventType: entry.eventType,
+      machineName: entry.machineName,
+    });
+  }
+
+  const sections: string[] = [headline];
+
+  for (const [locationId, group] of groups) {
+    const venue = sanitizeDiscordText(group.locationName);
+    const header = `**[${venue}](${pinballmapLocationUrl(locationId)})**`;
+    const lines = group.machines.map((m) => {
+      const badge = m.eventType === "added" ? "❇️" : "❌";
+      const name = sanitizeDiscordText(m.machineName);
+      return `• ${badge} ${name}`;
+    });
+    sections.push([header, ...lines].join("\n"));
+  }
+
+  const omitted = totalCount - renderedEntries.length;
+  if (omitted > 0) {
+    sections.push(
+      `• …and ${String(omitted)} more changes (see the map for the full picture)`
+    );
+  }
+
+  sections.push(attribution);
+  return sections.join("\n\n");
 }
 
 /**
  * Build one announcement batch, or null when there is nothing to announce.
+ *
+ * Groups machine changes under their location header (with masked Pinball Map
+ * deep link) and lists each machine with a status badge (❇️ for added, ❌ for
+ * removed).
  *
  * A stable headline lets one digest carry both transition types in detection
  * order without implying that a mixed post contains additions only. The caller
@@ -92,80 +152,38 @@ export function formatRegionAlertMessage(
   const { entries, regionLabel } = input;
   if (entries.length === 0) return null;
 
-  const region = sanitizeDiscordText(regionLabel);
-  const headline = `**Pinball Map changes in ${region}**`;
+  const maxCandidates = Math.min(entries.length, REGION_ALERT_MAX_LINES);
 
-  const shown = entries.slice(0, REGION_ALERT_MAX_LINES);
-  const entryLines = shown.map(formatEntry);
-
-  // Attribution: the data is Pinball Map's, under CC BY-SA 4.0. It is a licence
-  // term, not a courtesy, so it is budgeted for rather than appended and hoped
-  // for — trimming an assembled string from the end would drop THIS line first,
-  // publishing PBM's data with the attribution cut off. Venue names are attacker-
-  // adjacent free text (anyone can name a location on Pinball Map) and each line
-  // already carries ~50 characters of URL scaffolding plus backslash escapes, so
-  // exceeding 2000 needs no unusual luck.
-  const attribution = "Data from Pinball Map (CC BY-SA 4.0).";
-
-  // Drop WHOLE LINES, never characters. A character-offset slice lands wherever
-  // it lands: mid-`[venue](https://…`, publishing an unterminated masked link;
-  // or straight after a lone backslash from sanitizeDiscordText, which then
-  // escapes the following newline and folds two lines into one. Dropping a line
-  // at a time cannot produce either, and it keeps the "…and N more" count — which
-  // a from-the-end trim would remove first, leaving a headline announcing N
-  // machines with no account of the missing ones. That count is the only trace
-  // they get in this digest. Omitted rows stay queued for a later run.
-  const overflowLine = (n: number): string =>
-    `• …and ${String(n)} more changes (see the map for the full picture)`;
-  // Reserved unconditionally, sized for the largest count it could ever carry.
-  // Adding it after the budget was spent is how a line-based trim reintroduces
-  // the overflow it exists to prevent.
-  const overflowReserve =
-    entries.length > shown.length || entryLines.length > 0
-      ? overflowLine(entries.length).length + 1
-      : 0;
-  const budget =
-    DISCORD_MAX_MESSAGE_LENGTH -
-    attribution.length -
-    headline.length -
-    2 -
-    overflowReserve;
-
-  const kept: string[] = [];
-  let used = 0;
-  for (let i = 0; i < entryLines.length; i += 1) {
-    const line = entryLines[i];
-    if (line === undefined) break;
-    if (used + line.length + 1 > budget) {
-      // A pathological third-party label must not strand the first queued event
-      // forever. Bound both names before sanitizing rather than falling back to
-      // ids; the immutable post must still identify the machine and venue.
-      if (kept.length === 0) {
-        const compactEntry = entries[i];
-        if (compactEntry !== undefined) {
-          kept.push(
-            formatEntry({
-              ...compactEntry,
-              locationName: truncateName(compactEntry.locationName),
-              machineName: truncateName(compactEntry.machineName),
-            })
-          );
-        }
-      }
-      break;
+  for (let k = maxCandidates; k >= 1; k -= 1) {
+    const candidateSlice = entries.slice(0, k);
+    const content = renderMessage(candidateSlice, entries.length, regionLabel);
+    if (content.length <= DISCORD_MAX_MESSAGE_LENGTH) {
+      return {
+        content,
+        renderedEntries: k,
+      };
     }
-    kept.push(line);
-    used += line.length + 1;
   }
 
-  const renderedEntries = kept.length;
-  const omitted = entries.length - renderedEntries;
-  if (omitted > 0) kept.push(overflowLine(omitted));
+  // If even a single entry exceeds the budget, it must be due to pathological names.
+  // Bound both names of the first entry so the queued event is not stranded forever.
+  const first = entries[0];
+  if (first !== undefined) {
+    const compacted: RegionAlertEntry = {
+      ...first,
+      locationName: truncateName(first.locationName),
+      machineName: truncateName(first.machineName),
+    };
+    const content = renderMessage([compacted], entries.length, regionLabel);
+    if (content.length <= DISCORD_MAX_MESSAGE_LENGTH) {
+      return {
+        content,
+        renderedEntries: 1,
+      };
+    }
+  }
 
-  return {
-    content: [headline, ...kept, attribution].join("\n"),
-    renderedEntries,
-  };
+  return null;
 }
 
 /** Bound untrusted labels without splitting a Unicode code point. */

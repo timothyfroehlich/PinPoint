@@ -36,11 +36,11 @@ describe("formatRegionAlertMessage", () => {
     });
 
     expect(message).toContain("**Pinball Map changes in Austin**");
-    expect(message).toContain("• Added: Godzilla (Premium)");
-    // The venue is the LINK TEXT of a masked link, not a trailing bare URL: a bare
+    expect(message).toContain("• ❇️ Godzilla (Premium)");
+    // The venue is the LINK TEXT of a masked link header, not a trailing bare URL: a bare
     // one makes Discord stack a preview card under every line.
     expect(message).toContain(
-      "[Austin Pinball Collective](https://pinballmap.com/map/?by_location_id=26454)"
+      "**[Austin Pinball Collective](https://pinballmap.com/map/?by_location_id=26454)**"
     );
     expect(message).toContain("CC BY-SA 4.0");
   });
@@ -99,8 +99,33 @@ describe("formatRegionAlertMessage", () => {
       regionLabel: "Austin",
     });
     expect(message).toContain("**Pinball Map changes in Austin**");
-    expect(message).toContain("• Added: Godzilla (Premium)");
-    expect(message).toContain("• Removed: Medieval Madness");
+    expect(message).toContain("• ❇️ Godzilla (Premium)");
+    expect(message).toContain("• ❌ Medieval Madness");
+  });
+
+  it("groups multiple machine changes under the same location header", () => {
+    const message = formatRegionAlertMessage({
+      entries: [
+        entry({ machineName: "Godzilla (Premium)", eventType: "added" }),
+        entry({ machineName: "Medieval Madness", eventType: "removed" }),
+        entry({
+          locationId: 1234,
+          locationName: "Pinballz Arcade",
+          machineName: "Attack from Mars",
+          eventType: "added",
+        }),
+      ],
+      regionLabel: "Austin",
+    });
+
+    expect(message).toBe(
+      [
+        "**Pinball Map changes in Austin**",
+        "**[Austin Pinball Collective](https://pinballmap.com/map/?by_location_id=26454)**\n• ❇️ Godzilla (Premium)\n• ❌ Medieval Madness",
+        "**[Pinballz Arcade](https://pinballmap.com/map/?by_location_id=1234)**\n• ❇️ Attack from Mars",
+        "*Data from Pinball Map (CC BY-SA 4.0).*",
+      ].join("\n\n")
+    );
   });
 
   it("lists at most the line cap and collapses the rest into a count", () => {
@@ -185,12 +210,15 @@ describe("formatRegionAlertMessage", () => {
     expect((message ?? "").length).toBeLessThanOrEqual(2000);
     expect(message).toContain("Data from Pinball Map (CC BY-SA 4.0).");
     // And it is still the final line, not something the trim landed mid-way through.
-    expect(message ?? "").toMatch(/Data from Pinball Map \(CC BY-SA 4\.0\)\.$/);
+    expect(message ?? "").toMatch(
+      /\*Data from Pinball Map \(CC BY-SA 4\.0\)\.\*$/
+    );
   });
 
-  it("drops whole lines when trimming, never cutting a masked link open", () => {
+  it("drops whole entries when trimming, never cutting a masked link open", () => {
     const entries = Array.from({ length: REGION_ALERT_MAX_LINES }, (_, i) =>
       entry({
+        locationId: 1000 + i,
         machineName: `Machine ${String(i)}`,
         locationName: "L".repeat(400),
       })
@@ -203,13 +231,17 @@ describe("formatRegionAlertMessage", () => {
       }) ?? "";
 
     expect(message.length).toBeLessThanOrEqual(2000);
-    // Every bullet that survived is a COMPLETE masked link: a character-offset
-    // slice could leave `[Venue](https://pinballmap…` unterminated, which Discord
-    // renders as raw text.
+    // Every location header that survived is a COMPLETE masked link.
+    for (const line of message.split("\n").filter((l) => l.startsWith("**["))) {
+      expect(line).toMatch(
+        /^\*\*\[.*\]\(https:\/\/pinballmap\.com\/[^)]*\)\*\*$/
+      );
+    }
+    // Every bullet that survived is a valid machine bullet or overflow line.
     for (const line of message
       .split("\n")
       .filter((l) => l.startsWith("• ") && !l.includes("…and"))) {
-      expect(line).toMatch(/\[.*\]\(https:\/\/pinballmap\.com\/[^)]*\)$/);
+      expect(line).toMatch(/^• (?:❇️|❌) .+/);
     }
     // No line ends on a dangling escape, which would escape the newline and fold
     // the next line into it.
@@ -221,6 +253,7 @@ describe("formatRegionAlertMessage", () => {
   it("keeps the overflow count when lines are dropped for length", () => {
     const entries = Array.from({ length: REGION_ALERT_MAX_LINES }, (_, i) =>
       entry({
+        locationId: 1000 + i,
         machineName: `Machine ${String(i)}`,
         locationName: "L".repeat(400),
       })
