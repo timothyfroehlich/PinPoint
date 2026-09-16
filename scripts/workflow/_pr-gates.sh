@@ -20,6 +20,12 @@ set -euo pipefail
 readonly CODEX_REVIEW_BOT="chatgpt-codex-connector[bot]"
 readonly CODEX_REVIEW_APP_SLUG="chatgpt-codex-connector"
 readonly CODEX_CLEAN_REVIEW_PREFIX="Codex Review: Didn't find any major issues."
+# CodeRabbit is a second trusted native reviewer, requested manually and only when Tim
+# asks for it on a large PR (PP-w6u1). Its exact-head APPROVED review is sufficient
+# coverage on its own. Nothing else it posts changes the Codex-derived state: a
+# CodeRabbit finding review is adjudicated through the thread gate like any other
+# thread, and its absence is never a failure.
+readonly CODERABBIT_REVIEW_BOT="coderabbitai[bot]"
 readonly GITHUB_ACTIONS_BOT="github-actions[bot]"
 readonly GITHUB_ACTIONS_APP_SLUG="github-actions"
 readonly CODEX_REACTION_WITNESS_PREFIX="<!-- pinpoint-codex-reaction-witness:"
@@ -32,66 +38,47 @@ readonly LEGACY_CLAUDE_MARKER_PREFIX="<!-- pinpoint-claude-review:"
 _REPO_SLUG_CACHE=""
 _repo_slug() {
   if [ -z "$_REPO_SLUG_CACHE" ]; then
-    _REPO_SLUG_CACHE=$(gh repo view --json nameWithOwner --jq .nameWithOwner)
+    _REPO_SLUG_CACHE=$(gh repo view --json nameWithOwner --jq .nameWithOwner) || return 1
   fi
   printf '%s\n' "$_REPO_SLUG_CACHE"
 }
 
-# The full record of the Codex GitHub review that decides a head's state, as one TSV
-# line: <state> <sha> <reviewer> <detail> <submitted_at> <summary line>.
-#
-# The latest review from the trusted Codex App is authoritative. An approval for an
-# older commit cannot cover a later push, and a later change-request review cannot
-# inherit an earlier approval. GitHub's commit_id is compared directly to the head SHA;
-# timestamps are only ordering metadata.
-#
-# The slurp is required because gh emits one JSON array per page under --paginate.
-_codex_review_record() {
-  local pr=$1 owner_repo=$2 head=$3
-  gh api --paginate "repos/${owner_repo}/pulls/${pr}/reviews" \
-    | jq -rs --arg bot "$CODEX_REVIEW_BOT" --arg head "$head" \
-        '[ .[] | flatten | .[]
-           | select(.user.login? == $bot)
-           | { sha: (.commit_id // ""),
-               reviewer: (.user.login // ""),
-               detail: (.state // "UNKNOWN"),
-               at: (.submitted_at // ""),
-               summary: (((.body? // "") | tostring | split("\n")[0] // "") | gsub("^\\s+|\\s+$"; "")) }
-         ] | sort_by(.at) as $reviews
-         | [ $reviews[] | select(.sha == $head) ] as $head_reviews
-         | if ($reviews | length) == 0 then
-             { state: "unreviewed", sha: "", reviewer: "", detail: "", at: "", summary: "" }
-           else
-             (if ($head_reviews | length) > 0 then $head_reviews[-1] else $reviews[-1] end) as $latest
-             | if $latest.detail == "APPROVED" and $latest.sha == $head then
-                 $latest + { state: "approval" }
-               elif $latest.detail == "APPROVED" then
-                 $latest + { state: "stale_approval" }
-               elif $latest.sha == $head then
-                 if $latest.detail == "COMMENTED" or $latest.detail == "CHANGES_REQUESTED"
-                 then $latest + { state: "reviewed" }
-                 else $latest + { state: "not_approved" }
-                 end
-               else
-                 $latest + { state: "stale_approval" }
-               end
-           end
-         | [ .state, .sha, .reviewer, .detail, .at, .summary ] | @tsv'
-}
 
-# Issue comments carry four review records: the connector's clean result, the trusted
-# workflow's SHA-pinned witness of a fresh eyes-to-+1 transition, the SHA-bound manual
-# review request, and the independent local-review attestation (including two-axis reviews).
-_comment_review_record() {
+# ---------------------------------------------------------------------------------
+# Review evidence — every record on the PR that could count as review coverage, as
+# one JSON document. Collecting is separate from deciding: the three checkers below
+# each read this document and answer for their own reviewer only.
+# ---------------------------------------------------------------------------------
+#
+# Fields per record: sha, reviewer, detail, at, summary. `sha` is "" when GitHub
+# returned a null commit_id, never absent, so every consumer can compare it.
+#
+# Lists (each sorted by `at`):
+#   coderabbit      native reviews from the exact CodeRabbit App account
+#   codex_native    native reviews from the exact Codex App account
+#   codex_clean     Codex's "no major issues" issue comment, SHA-pinned by its
+#                   "Reviewed commit" line (10- or 40-char)
+#   codex_witness   GitHub Actions witness of a fresh Codex eyes-to-+1 reaction,
+#                   SHA-pinned by the hidden marker
+#   codex_requests  the owner's manual `@codex review` request, SHA-pinned by its marker
+#   markers         local-review attestations posted by the repository owner (the
+#                   repo is public; anyone else's marker text is not evidence):
+#                   mark-review.sh markers, legacy Claude markers, and two-axis review
+#                   comments (whose SHA is explicit in the preamble or else the newest
+#                   commit at posting time)
+_review_evidence() {
   local pr=$1 owner_repo=$2 head=$3
-  local commits_json="${4:-}"
-  local comments_json
-  comments_json=$(gh api --paginate "repos/${owner_repo}/issues/${pr}/comments")
+  local raw reviews_json comments_json commits_json="[]"
+  # Fail closed: a failed fetch must not read as "no reviews" / "no comments".
+  raw=$(gh api --paginate "repos/${owner_repo}/pulls/${pr}/reviews") || return 1
+  reviews_json=$(jq -s '[ .[] | flatten | .[] ]' <<< "$raw")
+  raw=$(gh api --paginate "repos/${owner_repo}/issues/${pr}/comments") || return 1
+  comments_json=$(jq -s '[ .[] | flatten | .[] ]' <<< "$raw")
 
-  if [[ -z "$commits_json" ]]; then
-    if jq -ers --arg owner "${owner_repo%%/*}" '
-      [ .[] | flatten | .[] ] as $comments
-      | any($comments[];
+  # A two-axis review comment with no explicit SHA is dated to a commit. Only fetch
+  # the commit list when such a comment exists; it is one more paginated request.
+  if jq -e --arg owner "${owner_repo%%/*}" '
+      any(.[];
         (.user.login? == $owner) and
         ((.body // "") as $b |
          ($b | test("(^|\\n)##\\s+(?:Two-axis\\s+code\\s+review|Code\\s+review)\\b"; "i")) and
@@ -99,185 +86,269 @@ _comment_review_record() {
          ($b | test("(^|\\n)##\\s+Spec\\b")) and
          (($b | split("\n## Standards")[0] | [scan("(?:\\.{2,3}|(?:^|\\s)(?:head|commit)\\s+`?)([0-9a-f]{7,40})`?")] | flatten | length) == 0)
         )
-      )
-    ' <<< "$comments_json" >/dev/null 2>&1; then
-      commits_json=$(gh pr view "$pr" --json commits --jq .commits 2>/dev/null || echo "[]")
-    else
-      commits_json="[]"
-    fi
+      )' <<< "$comments_json" >/dev/null 2>&1; then
+    commits_json=$(gh pr view "$pr" --json commits --jq .commits) || return 1
   fi
 
-  jq -rs --arg bot "$CODEX_REVIEW_BOT" --arg app "$CODEX_REVIEW_APP_SLUG" \
+  jq -n --arg head "$head" \
+      --arg codex_bot "$CODEX_REVIEW_BOT" --arg codex_app "$CODEX_REVIEW_APP_SLUG" \
+      --arg coderabbit_bot "$CODERABBIT_REVIEW_BOT" \
       --arg actions_bot "$GITHUB_ACTIONS_BOT" --arg actions_app "$GITHUB_ACTIONS_APP_SLUG" \
       --arg witness_prefix "$CODEX_REACTION_WITNESS_PREFIX" \
       --arg clean_prefix "$CODEX_CLEAN_REVIEW_PREFIX" --arg prefix "$REVIEW_MARKER_PREFIX" \
-      --arg legacy "$LEGACY_CLAUDE_MARKER_PREFIX" --arg head "$head" \
-      --arg owner "${owner_repo%%/*}" \
-      --argjson commits "$commits_json" \
-      '[ .[] | flatten | .[] ] as $comments
-       | ([ $comments[]
-         | (.body // "") as $body
-         | select(.user.login? == $bot and .performed_via_github_app.slug? == $app)
-         | { sha: ($body | [scan("\\*\\*Reviewed commit:\\*\\* `([0-9a-f]{10}|[0-9a-f]{40})`")] | flatten | (.[0] // "")),
-             reviewer: (.user.login // ""),
-             detail: "NO_FINDINGS",
-             at: (.updated_at // .created_at // ""),
-             summary: (($body | split("\n")[0]) // ""),
-             state: "clean_comment" }
-         | select(.summary | startswith($clean_prefix))
-         | select((.sha | length) == 10 or (.sha | length) == 40)
-       ] | sort_by(.at)) as $clean
-       | ([ $comments[]
-         | (.body // "") as $body
-         | select(.user.login? == $actions_bot
-                  and .performed_via_github_app.slug? == $actions_app
-                  and ($body | startswith($witness_prefix)))
-         | { sha: ($body | [scan("^<!-- pinpoint-codex-reaction-witness: ([0-9a-f]{40}) -->")] | flatten | (.[0] // "")),
-             reviewer: (.user.login // ""),
-             detail: "REACTION_WITNESS",
-             at: (.updated_at // .created_at // ""),
-             summary: "Codex clean reaction witnessed by GitHub Actions",
-             state: "clean_reaction" }
-         | select((.sha | length) == 40)
-       ] | sort_by(.at)) as $witness
-       | ([ $comments[]
-         | (.body // "") as $body
-         | select(.user.login? == $owner)
-         | { sha: ($body | [scan("^@codex review\\n<!-- pinpoint-codex-review-head: ([0-9a-f]{40}) -->$")] | flatten | (.[0] // "")),
-             reviewer: (.user.login // ""),
-             detail: "MANUAL_REVIEW_REQUESTED",
-             at: (.created_at // ""),
-             summary: "Manual Codex review requested",
-             state: "review_requested" }
-         | select((.sha | length) == 40)
-       ] | sort_by(.at)) as $review_requests
-       | ([ $comments[]
-         | (.body // "") as $body
-         | (.updated_at // .created_at // "") as $at
-         | if ($body | startswith($prefix) or startswith($legacy)) then
-             { sha: (if $body | startswith($prefix) then ($body | ltrimstr($prefix)) else ($body | ltrimstr($legacy)) end | split("-->")[0] | gsub("^\\s+|\\s+$"; "")),
-               reviewer: (if $body | startswith($prefix)
-                          then ($body | [scan("<!-- pinpoint-reviewer:\\s*([a-z0-9-]+)\\s*-->")] | flatten | (.[0] // "unrecorded"))
-                          else "claude-code" end),
-               detail: (if $body | startswith($prefix)
-                        then ($body | [scan("<!-- pinpoint-review-detail:\\s*([a-z0-9-]+)\\s*-->")] | flatten | (.[0] // "unrecorded"))
-                        else ($body | [scan("<!-- pinpoint-review-depth:\\s*([a-z]+)\\s*-->")] | flatten | (.[0] // "unrecorded")) end),
-               at: $at,
-               summary: (($body | split("\n") | last) // "") }
-           elif (.user.login? == $owner
-                 and ($body | test("(^|\\n)##\\s+(?:Two-axis\\s+code\\s+review|Code\\s+review)\\b"; "i"))
-                 and ($body | test("(^|\\n)##\\s+Standards\\b"))
-                 and ($body | test("(^|\\n)##\\s+Spec\\b"))) then
-             ($body | split("\n## Standards")[0] | [scan("(?:\\.{2,3}|(?:^|\\s)(?:head|commit)\\s+`?)([0-9a-f]{7,40})`?")] | flatten | (.[-1] // "")) as $explicit_sha
-             | (if $explicit_sha != "" then
-                  ($commits | map(select(.oid | startswith($explicit_sha))) | (.[0].oid // $explicit_sha))
-                else
-                  ($commits | map(select((.committedDate // "") <= $at)) | (last.oid // ""))
-                end) as $resolved_sha
-             | { sha: $resolved_sha,
-                 reviewer: (if ($body | test("—\\s*Antigravity|antigravity-code"; "i")) then "antigravity" else "claude-code" end),
-                 detail: "two-axis",
-                 at: $at,
-                 summary: (($body | [scan("(?m)^\\*\\*Summary[^\n]*")] | flatten | (.[0] // ($body | split("\n")[0]))) // "") }
-           else empty end
-         | select((.sha | length) >= 7)
-       ] | sort_by(.at)) as $markers
-       | [ $markers[] | select((.sha | length) >= 7 and ($head | length) >= 7 and (.sha as $s | ($head | startswith($s)) or ($s | startswith($head)))) ] as $pinned
-       | (($clean + $witness) | sort_by(.at)) as $codex_results
-       | [ $codex_results[]
-           | select(if .state == "clean_comment"
-                    then (.sha as $sha | $head | startswith($sha))
-                    else .sha == $head
-                    end)
-       ] as $codex_pinned
-       | [ $review_requests[] | select(.sha == $head) ] as $request_sent
-       | if ($pinned | length) > 0 then ($pinned | last) + { state: "marker" }
-         elif ($codex_pinned | length) > 0 then ($codex_pinned | last)
-         elif ($request_sent | length) > 0 then ($request_sent | last)
-         elif ($markers | length) > 0 and ($codex_results | length) > 0 then
-           if $markers[-1].at > $codex_results[-1].at
-           then $markers[-1] + { state: "stale_marker" }
-           else $codex_results[-1] + { state: (if $codex_results[-1].state == "clean_reaction" then "stale_clean_reaction" else "stale_clean_comment" end) }
-           end
-         elif ($markers | length) > 0 then $markers[-1] + { state: "stale_marker" }
-         elif ($codex_results | length) > 0 then $codex_results[-1] + { state: (if $codex_results[-1].state == "clean_reaction" then "stale_clean_reaction" else "stale_clean_comment" end) }
-         else { state: "unreviewed", sha: "", reviewer: "", detail: "", at: "", summary: "" }
-         end
-       | [ .state, .sha, .reviewer, .detail, .at, .summary ] | @tsv' <<< "$comments_json"
+      --arg legacy "$LEGACY_CLAUDE_MARKER_PREFIX" --arg owner "${owner_repo%%/*}" \
+      --argjson reviews "$reviews_json" --argjson comments "$comments_json" \
+      --argjson commits "$commits_json" '
+    def native($bot):
+      [ $reviews[]
+        | select(.user.login? == $bot)
+        | { sha: (.commit_id // ""),
+            reviewer: (.user.login // ""),
+            detail: (.state // "UNKNOWN"),
+            at: (.submitted_at // ""),
+            summary: (((.body? // "") | tostring | split("\n")[0] // "") | gsub("^\\s+|\\s+$"; "")) }
+      ] | sort_by(.at);
+    {
+      head: $head,
+      coderabbit: native($coderabbit_bot),
+      codex_native: native($codex_bot),
+      codex_clean: ([ $comments[]
+        | (.body // "") as $body
+        | select(.user.login? == $codex_bot and .performed_via_github_app.slug? == $codex_app)
+        | { sha: ($body | [scan("\\*\\*Reviewed commit:\\*\\* `([0-9a-f]{10}|[0-9a-f]{40})`")] | flatten | (.[0] // "")),
+            reviewer: (.user.login // ""),
+            detail: "NO_FINDINGS",
+            at: (.updated_at // .created_at // ""),
+            summary: (($body | split("\n")[0]) // "") }
+        | select(.summary | startswith($clean_prefix))
+        | select((.sha | length) == 10 or (.sha | length) == 40)
+      ] | sort_by(.at)),
+      codex_witness: ([ $comments[]
+        | (.body // "") as $body
+        | select(.user.login? == $actions_bot
+                 and .performed_via_github_app.slug? == $actions_app
+                 and ($body | startswith($witness_prefix)))
+        | { sha: ($body | [scan("^<!-- pinpoint-codex-reaction-witness: ([0-9a-f]{40}) -->")] | flatten | (.[0] // "")),
+            reviewer: (.user.login // ""),
+            detail: "REACTION_WITNESS",
+            at: (.updated_at // .created_at // ""),
+            summary: "Codex clean reaction witnessed by GitHub Actions" }
+        | select((.sha | length) == 40)
+      ] | sort_by(.at)),
+      codex_requests: ([ $comments[]
+        | (.body // "") as $body
+        | select(.user.login? == $owner)
+        | { sha: ($body | [scan("^@codex review\\n<!-- pinpoint-codex-review-head: ([0-9a-f]{40}) -->$")] | flatten | (.[0] // "")),
+            reviewer: (.user.login // ""),
+            detail: "MANUAL_REVIEW_REQUESTED",
+            at: (.created_at // ""),
+            summary: "Manual Codex review requested" }
+        | select((.sha | length) == 40)
+      ] | sort_by(.at)),
+      markers: ([ $comments[]
+        | (.body // "") as $body
+        | (.updated_at // .created_at // "") as $at
+        | if (.user.login? == $owner and ($body | startswith($prefix) or startswith($legacy))) then
+            { sha: (if $body | startswith($prefix) then ($body | ltrimstr($prefix)) else ($body | ltrimstr($legacy)) end | split("-->")[0] | gsub("^\\s+|\\s+$"; "")),
+              reviewer: (if $body | startswith($prefix)
+                         then ($body | [scan("<!-- pinpoint-reviewer:\\s*([a-z0-9-]+)\\s*-->")] | flatten | (.[0] // "unrecorded"))
+                         else "claude-code" end),
+              detail: (if $body | startswith($prefix)
+                       then ($body | [scan("<!-- pinpoint-review-detail:\\s*([a-z0-9-]+)\\s*-->")] | flatten | (.[0] // "unrecorded"))
+                       else ($body | [scan("<!-- pinpoint-review-depth:\\s*([a-z]+)\\s*-->")] | flatten | (.[0] // "unrecorded")) end),
+              at: $at,
+              summary: (($body | split("\n") | last) // "") }
+          elif (.user.login? == $owner
+                and ($body | test("(^|\\n)##\\s+(?:Two-axis\\s+code\\s+review|Code\\s+review)\\b"; "i"))
+                and ($body | test("(^|\\n)##\\s+Standards\\b"))
+                and ($body | test("(^|\\n)##\\s+Spec\\b"))) then
+            ($body | split("\n## Standards")[0] | [scan("(?:\\.{2,3}|(?:^|\\s)(?:head|commit)\\s+`?)([0-9a-f]{7,40})`?")] | flatten | (.[-1] // "")) as $explicit_sha
+            | (if $explicit_sha != "" then
+                 ($commits | map(select(.oid | startswith($explicit_sha))) | (.[0].oid // $explicit_sha))
+               else
+                 ($commits | map(select((.committedDate // "") <= $at)) | (last.oid // ""))
+               end) as $resolved_sha
+            | { sha: $resolved_sha,
+                reviewer: (if ($body | test("—\\s*Antigravity|antigravity-code"; "i")) then "antigravity" else "claude-code" end),
+                detail: "two-axis",
+                at: $at,
+                summary: (($body | [scan("(?m)^\\*\\*Summary[^\n]*")] | flatten | (.[0] // ($body | split("\n")[0]))) // "") }
+          else empty end
+        | select((.sha | length) >= 7)
+      ] | sort_by(.at))
+    }'
 }
 
-# A manual marker is an independent valid record. Native reviews, clean connector
-# comments, and SHA-pinned reaction witnesses are representations of the automatic
-# Codex path. A later current-head finding cannot inherit an earlier clean result.
-_review_record() {
-  local head=$3 codex comment codex_state comment_state
-  local codex_sha codex_at comment_at
-  codex=$(_codex_review_record "$@")
-  codex_state=$(cut -f1 <<< "$codex")
-  codex_sha=$(cut -f2 <<< "$codex")
-  # A current native approval already passes the gate. Do not spend a second
-  # paginated GitHub request looking up a marker that cannot change that result.
-  if [[ "$codex_state" == "approval" ]]; then
-    printf '%s\n' "$codex"
-    return
-  fi
+# ---------------------------------------------------------------------------------
+# Three checkers. Each reads the evidence document and answers for one reviewer:
+#
+#   verdict   covers             this reviewer's evidence covers the exact head
+#             changes_requested  this reviewer's latest exact-head review asks for changes
+#             stale              this reviewer's newest evidence names an older commit
+#             none               nothing usable from this reviewer
+#   form      which evidence shape produced the verdict (approval, clean_comment,
+#             clean_reaction, reviewed, marker) — for the handoff description only
+#   sha, reviewer, detail, at, summary  the record that decided the verdict
+#
+# The gate passes if ANY checker covers head. Checkers never consult each other.
+# ---------------------------------------------------------------------------------
 
-  comment=$(_comment_review_record "$@")
-  comment_state=$(cut -f1 <<< "$comment")
-  if [[ "$comment_state" == "marker" ]]; then
-    printf '%s\n' "$comment"
-  elif [[ "$comment_state" == "clean_comment" || "$comment_state" == "clean_reaction" ]]; then
-    codex_at=$(cut -f5 <<< "$codex")
-    comment_at=$(cut -f5 <<< "$comment")
-    if [[ "$codex_state" == "unreviewed" || "$codex_sha" != "$head" || "$comment_at" > "$codex_at" ]]; then
-      printf '%s\n' "$comment"
-    else
-      printf '%s\n' "$codex"
-    fi
-  elif [[ "$codex_state" == "reviewed" ]]; then
-    # A current-head native finding review is coverage. A delayed comment for an
-    # older SHA cannot invalidate it; current clean comments were handled above.
-    printf '%s\n' "$codex"
-  elif [[ "$codex_state" == "not_approved" && "$codex_sha" == "$head" ]]; then
-    # A current-head unusable native review is actionable even when the durable
-    # request marker remains. Keep every workflow consumer fail-closed here.
-    printf '%s\n' "$codex"
-  elif [[ "$comment_state" == "review_requested" ]]; then
-    # A request pinned to the current head is durable workflow state, not review
-    # evidence. Report it regardless of older stale review records so no caller
-    # recommends spending the same head's one request twice.
-    printf '%s\n' "$comment"
-  else
-    codex_at=$(cut -f5 <<< "$codex")
-    if [[ "$comment_state" == "unreviewed" ]]; then
-      printf '%s\n' "$codex"
-      return
-    fi
+# Shared jq: pick the record that decides a native reviewer's verdict — the latest
+# exact-head review when there is one, otherwise the latest review at all. An
+# approval for an older commit cannot cover a later push; a later review cannot
+# inherit an earlier approval.
+# shellcheck disable=SC2016  # a jq program, not shell
+readonly _JQ_LATEST='
+  def latest($records; $head):
+    ([ $records[] | select(.sha == $head) ]) as $on_head
+    | if ($on_head | length) > 0 then $on_head[-1] elif ($records | length) > 0 then $records[-1] else null end;
+  def empty_verdict($checker):
+    { checker: $checker, verdict: "none", form: "", sha: "", reviewer: "", detail: "", at: "", summary: "" };'
 
-    # Neither path covers head. Report the newest record so merge-handoff can
-    # show the real diff since review instead of an older, unrelated failure.
-    comment_at=$(cut -f5 <<< "$comment")
-    if [[ "$comment_at" > "$codex_at" ]]; then
-      printf '%s\n' "$comment"
-    else
-      printf '%s\n' "$codex"
-    fi
-  fi
+# CodeRabbit: only a native APPROVED pinned to head covers. CHANGES_REQUESTED on head
+# is "changes requested" (it re-approves on its own once the threads resolve). Any
+# other exact-head state is nothing; anything off-head is stale.
+_coderabbit_check() {
+  jq -c "$_JQ_LATEST"'
+    .head as $head
+    | latest(.coderabbit; $head) as $r
+    | if $r == null then empty_verdict("coderabbit")
+      elif $r.sha == $head and $r.detail == "APPROVED" then $r + { checker: "coderabbit", verdict: "covers", form: "approval" }
+      elif $r.sha == $head and $r.detail == "CHANGES_REQUESTED" then $r + { checker: "coderabbit", verdict: "changes_requested", form: "" }
+      elif $r.sha == $head then $r + { checker: "coderabbit", verdict: "none", form: "" }
+      else $r + { checker: "coderabbit", verdict: "stale", form: "" }
+      end'
 }
 
-# The review verdict on a given head, printed as "<state> <sha>" — the two
-# fields of _review_record the merge gate acts on.
-_review_verdict() {
-  local record
-  record=$(_review_record "$1" "$2" "$3")
-  printf '%s %s\n' "$(cut -f1 <<< "$record")" "$(cut -f2 <<< "$record")"
+# Codex: four evidence shapes cover head — a native APPROVED, a native COMMENTED or
+# CHANGES_REQUESTED (the thread gate then owns every finding), the connector's clean
+# comment whose 10- or 40-char SHA is a prefix of head, or the trusted reaction
+# witness pinned to head. The newest of those on head is the record reported. With
+# nothing usable on head, the newest Codex record of any shape is reported: stale
+# when it names an older commit, none when it is an unusable state (DISMISSED,
+# PENDING) on head itself.
+_codex_check() {
+  jq -c "$_JQ_LATEST"'
+    .head as $head
+    | ([ .codex_native[] | select(.sha == $head)
+         | if .detail == "APPROVED" then . + { form: "approval" }
+           elif .detail == "COMMENTED" or .detail == "CHANGES_REQUESTED" then . + { form: "reviewed" }
+           else empty end ]
+       + [ .codex_clean[] | select(.sha as $s | $head | startswith($s)) | . + { form: "clean_comment" } ]
+       + [ .codex_witness[] | select(.sha == $head) | . + { form: "clean_reaction" } ]
+       | sort_by(.at)) as $on_head
+    | if ($on_head | length) > 0 then $on_head[-1] + { checker: "codex", verdict: "covers" }
+      else
+        ((.codex_native + .codex_clean + .codex_witness) | sort_by(.at)) as $all
+        | if ($all | length) == 0 then empty_verdict("codex")
+          elif $all[-1].sha == $head then $all[-1] + { checker: "codex", verdict: "none", form: "" }
+          else $all[-1] + { checker: "codex", verdict: "stale", form: "" }
+          end
+      end'
 }
+
+# Local attestation: a marker whose SHA is a prefix of head (or vice versa, for the
+# 7-char short form) covers. Otherwise the newest marker is stale.
+_marker_check() {
+  jq -c "$_JQ_LATEST"'
+    .head as $head
+    | ([ .markers[] | select(.sha as $s | (($head | startswith($s)) or ($s | startswith($head)))) ]) as $pinned
+    | if ($pinned | length) > 0 then $pinned[-1] + { checker: "marker", verdict: "covers", form: "marker" }
+      elif (.markers | length) > 0 then .markers[-1] + { checker: "marker", verdict: "stale", form: "" }
+      else empty_verdict("marker")
+      end'
+}
+
+# ---------------------------------------------------------------------------------
+# Review summary — the one JSON document every consumer reads (Gate 3, merge-handoff,
+# request-codex-review, pr-watch, pr-dashboard). Computed once per call.
+#
+#   head                    current head SHA
+#   label                   approved | changes requested | stale review | not reviewed
+#   coverage                the covering checker's record, or null
+#   checkers                { coderabbit, codex, marker } — each checker's verdict record
+#   codex_request_pending   the owner's manual Codex request is pinned to this head
+#   unresolved_threads      count from Gate 2's query
+#
+# Label rules, in order: any checker covers → approved; otherwise unresolved threads
+# or any checker's changes_requested → changes requested; otherwise any stale → stale
+# review; otherwise not reviewed.
+# ---------------------------------------------------------------------------------
+_review_summary() {
+  local pr=$1
+  local owner_repo head evidence coderabbit codex marker unresolved
+  owner_repo=$(_repo_slug) || return 1
+  head=$(gh pr view "$pr" --json headRefOid --jq .headRefOid) || return 1
+  evidence=$(_review_evidence "$pr" "$owner_repo" "$head") || return 1
+  coderabbit=$(_coderabbit_check <<< "$evidence")
+  codex=$(_codex_check <<< "$evidence")
+  marker=$(_marker_check <<< "$evidence")
+  unresolved=$(_unresolved_thread_count "$pr") || return 1
+
+  jq -n --arg head "$head" --argjson unresolved "$unresolved" \
+      --argjson coderabbit "$coderabbit" --argjson codex "$codex" --argjson marker "$marker" \
+      --argjson evidence "$evidence" '
+    [$coderabbit, $codex, $marker] as $checks
+    | ([ $checks[] | select(.verdict == "covers") ] | sort_by(.at) | last) as $coverage
+    | {
+        head: $head,
+        label: (if $coverage != null then "approved"
+                elif $unresolved > 0 or any($checks[]; .verdict == "changes_requested") then "changes requested"
+                elif any($checks[]; .verdict == "stale") then "stale review"
+                else "not reviewed" end),
+        coverage: $coverage,
+        checkers: { coderabbit: $coderabbit, codex: $codex, marker: $marker },
+        codex_request_pending: any($evidence.codex_requests[]; .sha == $head),
+        unresolved_threads: $unresolved
+      }'
+}
+
+# One line per checker, for the FAIL block and the handoff: what each reviewer's
+# evidence says about this head.
+_checker_lines() {
+  jq -r '
+    .head[0:7] as $h
+    | .checkers | to_entries[]
+    | .key as $k | .value as $v
+    | (if $k == "coderabbit" then "CodeRabbit" elif $k == "codex" then "Codex" else "local attestation" end) as $name
+    | if $v.verdict == "covers" then "  \($name): covers head \($h)"
+      elif $v.verdict == "changes_requested" then "  \($name): requested changes on head \($h)"
+      elif $v.verdict == "stale" then "  \($name): newest evidence names \($v.sha[0:7]), head is \($h)"
+      else "  \($name): none" end'
+}
+
+# Human-readable name for a trusted native reviewer login, for handoff output.
+_native_reviewer_label() {
+  case "$1" in
+    "$CODERABBIT_REVIEW_BOT") printf 'CodeRabbit\n' ;;
+    *) printf 'Codex\n' ;;
+  esac
+}
+# One head can carry several `CI Gate` runs (draft promotion re-triggers the workflow on
+# the same SHA). This jq picks the authoritative one — a live or finished run over a
+# cancelled leftover, a live run over a finished one (never conclude while a
+# replacement is still running), then the newest by startedAt — from a
+# `statusCheckRollup` payload. Recency is start time, not completion time: an older
+# run that finishes after a newer one must not hide the newer verdict. Shared with
+# merge-pr.sh's compact poller so the first evaluation and the re-polls cannot
+# disagree; pr-watch.py's `_select_ci_gate` ranks the same way.
+readonly CI_GATE_SELECT_JQ='
+    [.statusCheckRollup[]? | select(.name == "CI Gate")]
+    | sort_by(
+        (if ((.conclusion // "") | ascii_upcase) == "CANCELLED" then 0 else 1 end),
+        (if ((.status // "") | ascii_upcase) == "COMPLETED" then 0 else 1 end),
+        (.startedAt // .completedAt // "")
+      )
+    | last'
 
 # Gate 1: CI Gate check has SUCCESS conclusion.
+#
+# Two COMPLETED entries used to come back as two objects, so `status` read
+# "COMPLETED\nCOMPLETED", never equalled COMPLETED, and parked the gate in WAIT forever.
 check_ci() {
   local pr=$1
   local rollup
-  rollup=$(gh pr view "$pr" --json statusCheckRollup --jq '.statusCheckRollup[] | select(.name=="CI Gate")')
+  rollup=$(gh pr view "$pr" --json statusCheckRollup --jq "${CI_GATE_SELECT_JQ} // empty")
   if [ -z "$rollup" ]; then
     # Not a failure — GitHub has simply not registered the check run yet, which is
     # the normal state for the first seconds after `gh pr create`. Reporting it as a
@@ -312,66 +383,10 @@ check_ci() {
   esac
 }
 
-# ---------------------------------------------------------------------------------
-# Shared review state — a trusted Codex result or manual attestation pinned to the PR
-# head, plus a durable record that the current head's one manual request was sent.
-# ---------------------------------------------------------------------------------
-#
-#   approval        Codex approved the current head SHA
-#   clean_comment   Codex reported no major issues for the current head SHA
-#   clean_reaction  Trusted workflow witnessed Codex eyes-to-+1 on the current head
-#   reviewed        Codex reviewed the current head; the thread gate owns adjudication
-#   marker          A manual review marker pins the current head SHA
-#   stale_approval  Codex approved a different SHA — the current head was not reviewed
-#   stale_clean_comment  A clean Codex comment names a different SHA
-#   stale_clean_reaction  A reaction witness names a different SHA
-#   stale_marker    A manual marker names a different SHA
-#   not_approved    Codex's most-recent review covers a different SHA and is not an approval
-#   review_requested  The one manual Codex review was requested for this head
-#   unreviewed      Neither review path has a record
-#
-# Sets globals: RS_STATE RS_HEAD_SHA RS_REVIEW_SHA
-RS_STATE=""
-RS_HEAD_SHA=""
-RS_REVIEW_SHA=""
 
-_compute_review_state() {
-  local pr=$1
-  local owner_repo head_sha verdict
-  owner_repo=$(_repo_slug)
-
-  head_sha=$(gh pr view "$pr" --json headRefOid --jq .headRefOid)
-  verdict=$(_review_verdict "$pr" "$owner_repo" "$head_sha")
-
-  RS_HEAD_SHA=$head_sha
-  RS_STATE=${verdict%% *}
-  RS_REVIEW_SHA=${verdict#* }
-}
-
-_review_remedy() {
-  local pr=$1
-  echo "  remedy: after current-head CI succeeds and the PR is ready, run"
-  echo "          request-codex-review.sh ${pr} exactly once for this head. A new head"
-  echo "          requires replacement CI and one new request. Use review-preflight +"
-  echo "          mark-review only after Tim runs a local review."
-}
-
-_review_requested_remedy() {
-  local pr=$1
-  echo "  remedy: the manual Codex review for this head of PR #${pr} was already requested."
-  echo "          Wait for exact-head evidence; do not request the same head again. A new"
-  echo "          head requires replacement CI and one new request."
-}
-
-# Gate 2: Zero unresolved review threads. Uses GraphQL with cursor pagination.
-#
-# Counts threads from ANY author. It used to filter to Copilot-authored threads, which
-# after the retirement would have matched nothing and turned this gate into a permanent
-# PASS — a false green strictly worse than no gate. Every thread on a PinPoint PR now
-# comes from Tim or another agent, and AGENTS.md already requires each one to be fixed
-# or explicitly declined-and-resolved, so counting all of them is what the policy said
-# all along.
-check_unresolved_threads() {
+# Number of unresolved review threads, from ANY author, via GraphQL with cursor
+# pagination. Shared by Gate 2 and the review summary's label.
+_unresolved_thread_count() {
   local pr=$1
   local owner_repo cursor=""
   local unresolved=0
@@ -395,13 +410,33 @@ check_unresolved_threads() {
             }
           }
         }
-      }")
+      }") || return 1
     local page_unresolved
     page_unresolved=$(jq '[.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved == false)] | length' <<< "$resp")
     unresolved=$((unresolved + page_unresolved))
     has_next=$(jq -r '.data.repository.pullRequest.reviewThreads.pageInfo.hasNextPage' <<< "$resp")
     cursor=$(jq -r '.data.repository.pullRequest.reviewThreads.pageInfo.endCursor // empty' <<< "$resp")
   done
+  printf '%s\n' "$unresolved"
+}
+
+# Gate 2: Zero unresolved review threads.
+#
+# Counts threads from ANY author. It used to filter to Copilot-authored threads, which
+# after the retirement would have matched nothing and turned this gate into a permanent
+# PASS — a false green strictly worse than no gate. Every thread on a PinPoint PR now
+# comes from Tim or another agent, and AGENTS.md already requires each one to be fixed
+# or explicitly declined-and-resolved, so counting all of them is what the policy said
+# all along.
+check_unresolved_threads() {
+  local pr=$1
+  local unresolved
+  # merge-pr.sh's run_gate captures output with `|| rc=$?`, which disables errexit
+  # inside; guard explicitly so a failed fetch is a FAIL, not an empty comparison.
+  if ! unresolved=$(_unresolved_thread_count "$pr"); then
+    echo "FAIL: threads: could not read review threads (GitHub fetch failed)"
+    return 1
+  fi
 
   if [ "$unresolved" -eq 0 ]; then
     echo "PASS: threads: 0 unresolved review threads"
@@ -413,85 +448,56 @@ check_unresolved_threads() {
   return 1
 }
 
-# Gate 3: a trusted clean Codex result or manual review marker must cover the exact head.
+# Gate 3: some reviewer's evidence covers the exact head — a CodeRabbit approval, a
+# Codex result in any of its four shapes, or a local review attestation. Any one is
+# enough; the separate thread gate owns findings.
 #
-#   approval        → PASS
-#   clean_comment   → PASS
-#   clean_reaction  → PASS
-#   reviewed        → PASS (the separate thread gate requires every finding adjudicated)
-#   marker          → PASS
-#   stale_approval  → FAIL: Codex approved an earlier commit
-#   not_approved    → FAIL: Codex posted a non-approval review
-#   review_requested → FAIL: the manual review was requested but has not produced evidence
-#   unreviewed      → FAIL: Codex has not reviewed the PR
+# Sets globals for merge-handoff: RS_LABEL, RS_HEAD_SHA, RS_SUMMARY (the JSON).
+RS_LABEL=""
+RS_HEAD_SHA=""
+RS_SUMMARY=""
+
 check_review_happened() {
   local pr=$1
-  _compute_review_state "$pr"
+  if ! RS_SUMMARY=$(_review_summary "$pr"); then
+    echo "FAIL: reviewed: could not read review evidence (GitHub fetch failed)"
+    return 1
+  fi
+  RS_HEAD_SHA=$(jq -r '.head' <<< "$RS_SUMMARY")
+  RS_LABEL=$(jq -r '.label' <<< "$RS_SUMMARY")
 
-  case "$RS_STATE" in
-    approval)
-      echo "PASS: reviewed: Codex approved head SHA ${RS_HEAD_SHA:0:7}"
-      return 0
-      ;;
-    clean_comment)
-      echo "PASS: reviewed: Codex found no major issues on head SHA ${RS_HEAD_SHA:0:7}"
-      return 0
-      ;;
-    clean_reaction)
-      echo "PASS: reviewed: trusted workflow witnessed Codex clean reaction on head SHA ${RS_HEAD_SHA:0:7}"
-      return 0
-      ;;
-    reviewed)
-      echo "PASS: reviewed: Codex reviewed head SHA ${RS_HEAD_SHA:0:7}; thread gate owns findings"
-      return 0
-      ;;
-    marker)
-      echo "PASS: reviewed: review marker pins head SHA ${RS_HEAD_SHA:0:7}"
-      return 0
-      ;;
-    stale_approval)
-      echo "FAIL: reviewed: Codex approved ${RS_REVIEW_SHA:0:7}, but head is ${RS_HEAD_SHA:0:7}"
-      echo "  You pushed after that approval, so what is about to merge was never read."
-      _review_remedy "$pr"
-      return 1
-      ;;
-    stale_clean_comment)
-      echo "FAIL: reviewed: Codex clean result covers ${RS_REVIEW_SHA:0:7}, but head is ${RS_HEAD_SHA:0:7}"
-      _review_remedy "$pr"
-      return 1
-      ;;
-    stale_clean_reaction)
-      echo "FAIL: reviewed: Codex clean-reaction witness covers ${RS_REVIEW_SHA:0:7}, but head is ${RS_HEAD_SHA:0:7}"
-      _review_remedy "$pr"
-      return 1
-      ;;
-    not_approved)
-      echo "FAIL: reviewed: Codex last reviewed ${RS_REVIEW_SHA:0:7} without approval"
-      _review_remedy "$pr"
-      return 1
-      ;;
-    stale_marker)
-      echo "FAIL: reviewed: the review marker pins ${RS_REVIEW_SHA:0:7}, but head is ${RS_HEAD_SHA:0:7}"
-      _review_remedy "$pr"
-      return 1
-      ;;
-    review_requested)
-      echo "FAIL: reviewed: manual Codex review requested for head ${RS_HEAD_SHA:0:7}; result pending"
-      _review_requested_remedy "$pr"
-      return 1
-      ;;
-    unreviewed)
-      echo "FAIL: reviewed: no clean Codex result on PR #${pr} — head ${RS_HEAD_SHA:0:7} is unreviewed"
-      _review_remedy "$pr"
-      return 1
-      ;;
-    *)
-      echo "FAIL: reviewed: unrecognised review state '${RS_STATE}'"
-      return 1
-      ;;
-  esac
+  if [ "$RS_LABEL" = "approved" ]; then
+    local who
+    who=$(jq -r '.coverage.checker' <<< "$RS_SUMMARY")
+    case "$who" in
+      coderabbit) echo "PASS: reviewed: CodeRabbit approved head SHA ${RS_HEAD_SHA:0:7}" ;;
+      codex)
+        case "$(jq -r '.coverage.form' <<< "$RS_SUMMARY")" in
+          approval) echo "PASS: reviewed: Codex approved head SHA ${RS_HEAD_SHA:0:7}" ;;
+          clean_comment) echo "PASS: reviewed: Codex found no major issues on head SHA ${RS_HEAD_SHA:0:7}" ;;
+          clean_reaction) echo "PASS: reviewed: trusted workflow witnessed Codex clean reaction on head SHA ${RS_HEAD_SHA:0:7}" ;;
+          *) echo "PASS: reviewed: Codex reviewed head SHA ${RS_HEAD_SHA:0:7}; thread gate owns findings" ;;
+        esac
+        ;;
+      *) echo "PASS: reviewed: review marker pins head SHA ${RS_HEAD_SHA:0:7}" ;;
+    esac
+    return 0
+  fi
+
+  echo "FAIL: reviewed: ${RS_LABEL} — no reviewer's evidence covers head ${RS_HEAD_SHA:0:7}"
+  _checker_lines <<< "$RS_SUMMARY"
+  if [ "$(jq -r '.codex_request_pending' <<< "$RS_SUMMARY")" = "true" ]; then
+    echo "  remedy: the manual Codex review for this head was already requested; wait for"
+    echo "          exact-head evidence, do not request the same head again. A new head"
+    echo "          requires replacement CI and one new request."
+  else
+    echo "  remedy: after current-head CI succeeds and the PR is ready, run"
+    echo "          request-codex-review.sh ${pr} exactly once for this head, or ask Tim"
+    echo "          for a CodeRabbit request or a local review (review-preflight +"
+    echo "          mark-review). A new head requires replacement CI and a new review."
+  fi
+  return 1
 }
-
 # Gate 4: PR has no merge conflict. UNKNOWN returned once; caller may retry.
 check_no_merge_conflict() {
   local pr=$1
