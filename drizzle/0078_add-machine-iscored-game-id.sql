@@ -1,0 +1,1 @@
+ALTER TABLE "machines" ADD COLUMN "iscored_game_id" text;

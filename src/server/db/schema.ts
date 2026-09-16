@@ -252,6 +252,9 @@ export const machines = pgTable(
     year: integer("year"),
     opdbId: text("opdb_id"),
     ipdbId: integer("ipdb_id"),
+    // iScored game link (PP-h2bu.2). Nullable string identifier for the game
+    // record within the location's gameroom on iScored (e.g. "79212").
+    iscoredGameId: text("iscored_game_id"),
   },
   (t) => ({
     initialsCheck: check("initials_check", sql`initials ~ '^[A-Z0-9]{2,6}$'`),

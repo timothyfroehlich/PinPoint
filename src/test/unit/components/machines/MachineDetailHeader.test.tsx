@@ -32,6 +32,7 @@ function makeMachine(
     pinballmapIntent: "off" as const,
     opdbId: null,
     ipdbId: null,
+    iscoredGameId: null,
     issues: [],
     owner: null,
     invitedOwner: null,
