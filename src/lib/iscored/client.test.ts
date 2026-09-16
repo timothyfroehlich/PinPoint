@@ -154,6 +154,8 @@ describe("iscored client", () => {
             { id: 401, game: 888, name: "user@domain.com", score: 500 },
             { id: 402, game: 888, name: "  player@test.org  ", score: 600 },
             { id: 403, game: 888, name: "ValidPlayer", score: 700 },
+            { id: 404, game: 888, name: "Alice alice@example.com", score: 400 },
+            { id: 405, game: 888, name: "bob@domain.org (Guest)", score: 300 },
           ]),
           {
             status: 200,
@@ -163,10 +165,12 @@ describe("iscored client", () => {
       );
 
       const scores = await getAllScoresForMachine("888");
-      expect(scores).toHaveLength(3);
+      expect(scores).toHaveLength(5);
       expect(scores[0]?.playerName).toBe("ValidPlayer");
       expect(scores[1]?.playerName).toBe("Anonymous");
       expect(scores[2]?.playerName).toBe("Anonymous");
+      expect(scores[3]?.playerName).toBe("Anonymous");
+      expect(scores[4]?.playerName).toBe("Anonymous");
     });
   });
 
@@ -353,6 +357,35 @@ describe("iscored client", () => {
       const scores = await getAllScoresForMachine("77956");
       expect(scores).toHaveLength(4);
       expect(fetchCount).toBe(1); // Cached
+    });
+
+    it("throttles sequential refreshIscoredScores calls within 15 seconds", async () => {
+      vi.useFakeTimers();
+      const initialTime = 1000000;
+      vi.setSystemTime(initialTime);
+
+      let fetchCount = 0;
+      vi.spyOn(globalThis, "fetch").mockImplementation(() => {
+        fetchCount++;
+        return Promise.resolve(
+          new Response(JSON.stringify(mockApiScores), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          })
+        );
+      });
+
+      await refreshIscoredScores();
+      expect(fetchCount).toBe(1);
+
+      // Immediately call refresh again
+      await refreshIscoredScores();
+      expect(fetchCount).toBe(1); // Throttled
+
+      // Advance time past 15s TTL
+      vi.setSystemTime(initialTime + 16000);
+      await refreshIscoredScores();
+      expect(fetchCount).toBe(2); // Allowed after TTL
     });
 
     it("returns detached cloned records to prevent external cache mutation", async () => {

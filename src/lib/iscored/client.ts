@@ -39,12 +39,12 @@ function parseScoreValue(val: unknown): number {
   return 0;
 }
 
-const EMAIL_SHAPE_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const EMAIL_IN_TEXT_REGEX = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
 
 function parsePlayerName(val: unknown): string {
   if (typeof val === "string") {
     const trimmed = val.trim();
-    if (trimmed.length > 0 && !EMAIL_SHAPE_REGEX.test(trimmed)) {
+    if (trimmed.length > 0 && !EMAIL_IN_TEXT_REGEX.test(trimmed)) {
       return trimmed;
     }
   }
@@ -156,6 +156,7 @@ async function fetchAndCacheScores(user: string): Promise<void> {
 
   try {
     const res = await fetch(url, {
+      cache: "no-store",
       signal: AbortSignal.timeout(8000),
       headers: {
         Accept: "application/json",
@@ -279,6 +280,7 @@ export async function getTopScoresForMachine(
 
 /**
  * Explicitly triggers a cache refresh for the gameroom and awaits completion.
+ * Throttled to the 15-second minimum interval (Spec §3.3).
  */
 export async function refreshIscoredScores(): Promise<void> {
   const user = getIscoredUser();
@@ -286,6 +288,12 @@ export async function refreshIscoredScores(): Promise<void> {
     return;
   }
   syncUser(user);
+  if (
+    cache.lastFetchedAt !== null &&
+    Date.now() - cache.lastFetchedAt < ISCORED_CACHE_TTL_MS
+  ) {
+    return;
+  }
   await triggerRefresh(user);
 }
 
