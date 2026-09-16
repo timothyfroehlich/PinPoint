@@ -93,6 +93,11 @@ const nextConfig: NextConfig = {
     // It checks `typescript.tsconfigPath` (tsconfig.app.json) and reports raw
     // tsc diagnostics rather than Next code frames.
     useTypeScriptCli: true,
+    // PP-zg3q: Turbopack dev-server memory mitigations.
+    // Evict cached ASTs/snapshots aggressively after compilation to bound RSS in dev.
+    turbopackMemoryEviction: "full",
+    // Run loader transforms in worker threads rather than a child-process pool.
+    turbopackPluginRuntimeStrategy: "workerThreads",
   },
   typescript: {
     // App-source project. The root tsconfig.json is references-only after the
