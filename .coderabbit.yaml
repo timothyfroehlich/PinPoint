@@ -1,0 +1,127 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+#
+# CodeRabbit review configuration for PinPoint.
+#
+# CANONICAL SOURCE: `REVIEW.md` at the repo root is the review rubric, and
+# `docs/NON_NEGOTIABLES.md` is the full `CORE-*` catalog. Those stay
+# authoritative (AGENTS.md §8); this file tells the reviewer to read them first.
+#
+# The `path_instructions` below DO restate a short list of rules — the ones
+# REVIEW.md itself lists as its high-signal flags, the CORE-* rules REVIEW.md
+# names as shipped bugs, and the `prepare: true` pooler rule from AGENTS.md §7 —
+# because a CodeRabbit path instruction is the only text
+# guaranteed to reach the model for a given file, and the reviewer may not open
+# the referenced docs. Each restatement is a one-line summary that cites its
+# rule ID; the full statement, rationale, and do/don't live only in the catalog.
+# When a rule below stops matching the catalog, the catalog wins — fix this file.
+#
+# Tunables Tim may want to revisit once the plan's review budget is settled:
+# `reviews.profile` (chill → assertive for more findings) and
+# `auto_review.enabled` (currently manual-only).
+language: en-US
+
+tone_instructions: |
+  Be direct and technical. No preamble, no praise, no summary of what the code
+  does. State the problem, cite the rule ID, propose the fix.
+
+reviews:
+  # The point of this config: CodeRabbit requests changes while it has open
+  # findings and approves once they are resolved and the latest commit is
+  # reviewed. Approval means "automated review complete" — it does NOT
+  # authorize merging, which stays Tim's decision (PP-wi85).
+  request_changes_workflow: true
+
+  # "chill" keeps low-confidence nits out of the thread. PinPoint already runs a
+  # strict static gate (`pnpm run check`: oxlint type-aware, TS 7 strictest,
+  # ruff, shellcheck, actionlint), so style noise is pure cost here.
+  profile: chill
+
+  high_level_summary: true
+  review_status: true
+  poem: false
+
+  auto_review:
+    # Manual-only (PP-w6u1). The plan's budget is one included review per hour, so
+    # auto-reviewing every draft promotion would spend it on small PRs. Tim asks
+    # the owning agent to request a review on large PRs:
+    #   gh pr comment <PR> --body "@coderabbitai review"
+    # The merge gate (scripts/workflow/_pr-gates.sh) accepts the resulting
+    # exact-head APPROVED review; Codex stays the default reviewer.
+    enabled: false
+    drafts: false
+
+  path_instructions:
+    - path: "**"
+      instructions: |
+        Read `/REVIEW.md` (the canonical review rubric) and
+        `/docs/NON_NEGOTIABLES.md` (the full CORE-* catalog) before reviewing.
+        Cite the `CORE-*` rule ID in any comment reporting a violation, exactly
+        as a human reviewer would — e.g. "CORE-SEC-007".
+
+        PinPoint is a single-tenant pinball issue tracker in live production
+        with real user data. There is no multi-tenancy, no RLS, and no tRPC, by
+        design. Flag any newly introduced org scoping, multi-tenant context
+        wrapper, RLS policy, pgTAP test, or tRPC router.
+
+        Type safety (CORE-TS-007): flag `any` (explicit or implicit), non-null
+        assertions (`!`), and unsafe `as` casts; require narrowing instead.
+        Path aliases (CORE-TS-008): flag deep relative imports (`../../..`);
+        imports use the `~/` alias.
+
+    - path: "src/server/**"
+      instructions: |
+        CORE-ARCH-011 — no side effects inside DB transactions. Flag any HTTP
+        request, email/Discord send, blob upload, or Vault RPC inside a
+        `db.transaction(...)` callback. Inputs are fetched before the
+        transaction; effects are delivered after commit via `after()` +
+        `planNotification`/`dispatchNotification`.
+
+        Never reintroduce `prepare: true` on a client connecting to the
+        Supavisor transaction pooler (`:6543`) — it silently loses commits.
+
+    - path: "src/**/*.tsx"
+      instructions: |
+        CORE-SEC-007 — email privacy. A user's email must never render outside
+        `/admin/*` views and the user's own settings page. Flag any UI,
+        timeline event, notification body, or prop passed to a client component
+        that renders `reporterEmail` or a raw email elsewhere. The correct
+        display chain is `reportedByUser.name` → `invitedReporter.name` →
+        `reporterName` → `"Anonymous"`.
+
+        CORE-SEC-006 — minimal client payload. Flag a `"use client"` component
+        receiving a whole ORM row or domain object as a prop; pass only the
+        fields it uses. The RSC payload is visible in page source.
+
+        CORE-ARCH-001 — server-first. Flag `"use client"` on a component with no
+        interactivity (no event handlers, browser APIs, or client state).
+
+    - path: "src/lib/permissions/**"
+      instructions: |
+        CORE-ARCH-008 — every authorization check goes through
+        `checkPermission()` from `~/lib/permissions/helpers`, or a centralized
+        resource predicate here that delegates its role dimension to it. Flag
+        standalone permission checks defined outside this directory and
+        hardcoded role comparisons used as authorization gates. If a change
+        touches the matrix, verify the server action still enforces it.
+
+    - path: "drizzle/**"
+      instructions: |
+        CORE-ARCH-009 — schema changes go through `db:generate` + `db:migrate`.
+        Flag any `drizzle-kit push` or Supabase-migration usage. Every new
+        `.sql` migration needs a matching `_snapshot.json`. Never hand-edit
+        `drizzle/meta` — the snapshots are binary-like and manual edits corrupt
+        the prevId chain.
+
+    - path: "docs/feature-specs/**"
+      instructions: |
+        Source here is diff-oriented: every prose paragraph, concept bullet,
+        numbered requirement, divergence row, and changelog row stays on ONE
+        physical line, with soft wrapping left to the renderer. Flag
+        reflowed/hard-wrapped prose.
+
+        When a PR changes behavior covered by a spec, the same PR must update
+        the spec or add a divergence-table row — flag it if it has neither.
+
+knowledge_base:
+  learnings:
+    scope: auto
