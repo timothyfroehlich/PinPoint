@@ -140,7 +140,6 @@
 | § | Requirement | Code today | Resolution |
 | :-- | :-- | :-- | :-- |
 | 7.1 | Unified CLI command across all harnesses | Subway watch provides unified CLI; legacy harness agent definitions retained as dormant fallback | Resolved once subagents are deprecated |
-| 8.7 | CodeRabbit automatic review on draft promotion | `.coderabbit.yaml` currently sets `auto_review.enabled: false` | Update `.coderabbit.yaml` to enable auto-review on ready PRs |
 | 10.1–10.5 | Concurrent in-progress review detection and notification | `pr-watch.py` and `_review_summary` report individual checker records without in-progress status checks or concurrent notices | Add concurrent status tracking to `subway watch` and workflow gates |
 | 11.1–11.2 | Actionable prompt and comment count extraction | Reviewers' raw markdown bodies are not parsed into terminal payloads | Implement CodeRabbit prompt extraction in `subway watch` |
 

@@ -239,7 +239,7 @@ bash scripts/workflow/mark-review.sh <PR> codex-plugin-cc base-main "<one-line f
 bash scripts/workflow/mark-review.sh <PR> claude-code <depth> "<one-line findings summary>"         # /code-review <depth>
 ```
 
-That posts the sticky SHA-pinned marker `<!-- pinpoint-review: <head_sha> -->` that the `reviewed` gate detects.
+That posts the sticky SHA-pinned marker `<!-- pinpoint-review: {head_sha} -->` that the `reviewed` gate detects.
 
 **The pair has to match what Tim actually ran.** `codex-plugin-cc base-main` is the exact attestation for `/codex:review`; `claude-code <depth>` is the one for the built-in `/code-review`, where `<depth>` is the level he chose (`low`, `medium`, `high`, `xhigh`, `max`, `ultra`). Do not substitute a custom focus, a different base, a depth he didn't run, or a result from before the final push. The marker records the review method as well as the SHA, so the merge handoff can state what actually ran.
 
