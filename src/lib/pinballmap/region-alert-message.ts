@@ -46,31 +46,11 @@ export interface FormattedRegionAlertMessage {
   renderedEntries: number;
 }
 
-/**
- * One line per new machine: the title, then the venue as a MASKED LINK to its
- * PinballMap page.
- *
- * The link is a LOCATION deep link, built by `pinballmapLocationUrl()` — PBM's
- * attribution terms require pointing at the specific listing the data came from,
- * and a per-machine URL would be wrong anyway because the lmx id is ephemeral
- * (CORE-PBM-001).
- *
- * **Masked rather than bare**, for two reasons. Discord stacks a link-preview
- * card under every bare URL it finds, which at hourly cadence — where most posts
- * are a single line — made each post several times taller than its own text. And
- * the venue name is the natural link text anyway.
- *
- * **The label is attacker-controlled.** Both the venue name and the machine title
- * were typed by strangers on pinballmap.com, and `[label](url)` gives a `]` inside
- * the label the power to close the mask and publish an arbitrary link under our
- * bot's name. `sanitizeDiscordText` escapes `[`, `]`, `(` and `)` for exactly this
- * reason — see its docstring. Never interpolate a PBM string into this line
- * without it, and never "simplify" by dropping the sanitize call because the value
- * looks like a plain name.
- *
- * Both names are required at the type boundary because Discord posts are immutable;
- * unresolved events remain queued until the catalog and location cache can name them.
- */
+const STATUS_BADGES: Record<RegionAlertEntry["eventType"], string> = {
+  added: "❇️",
+  removed: "❌",
+};
+
 /**
  * Render a candidate set of entries into the formatted Discord message.
  *
@@ -91,7 +71,7 @@ function renderMessage(
     number,
     {
       locationName: string;
-      machines: { eventType: "added" | "removed"; machineName: string }[];
+      machines: Pick<RegionAlertEntry, "eventType" | "machineName">[];
     }
   >();
 
@@ -115,9 +95,9 @@ function renderMessage(
   for (const [locationId, group] of groups) {
     const venue = sanitizeDiscordText(group.locationName);
     const header = `**[${venue}](${pinballmapLocationUrl(locationId)})**`;
-    const lines = group.machines.map((m) => {
-      const badge = m.eventType === "added" ? "❇️" : "❌";
-      const name = sanitizeDiscordText(m.machineName);
+    const lines = group.machines.map((machine) => {
+      const badge = STATUS_BADGES[machine.eventType];
+      const name = sanitizeDiscordText(machine.machineName);
       return `• ${badge} ${name}`;
     });
     sections.push([header, ...lines].join("\n"));
