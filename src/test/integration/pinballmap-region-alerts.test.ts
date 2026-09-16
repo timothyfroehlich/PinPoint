@@ -633,9 +633,7 @@ describe("PinballMap region machine-change alerts (PGlite)", () => {
       announced: 1,
       pending: 0,
     });
-    expect(discord.posts.at(-1)?.content).toContain(
-      "• Removed: Medieval Madness"
-    );
+    expect(discord.posts.at(-1)?.content).toContain("• ❌ Medieval Madness");
     expect(await seenRows()).toContainEqual(
       expect.objectContaining({
         lmxId: 2,
@@ -654,9 +652,7 @@ describe("PinballMap region machine-change alerts (PGlite)", () => {
       announced: 1,
       pending: 0,
     });
-    expect(discord.posts.at(-1)?.content).toContain(
-      "• Added: Medieval Madness"
-    );
+    expect(discord.posts.at(-1)?.content).toContain("• ❇️ Medieval Madness");
     expect(await seenRows()).toContainEqual(
       expect.objectContaining({
         lmxId: 2,
@@ -695,9 +691,8 @@ describe("PinballMap region machine-change alerts (PGlite)", () => {
     const removed = await runRegionMachineAlerts();
 
     expect(removed).toMatchObject({ removed: 1, announced: 1, pending: 0 });
-    expect(discord.posts.at(-1)?.content).toContain(
-      "• Removed: Medieval Madness — [Pinballz Arcade]"
-    );
+    expect(discord.posts.at(-1)?.content).toContain("[Pinballz Arcade]");
+    expect(discord.posts.at(-1)?.content).toContain("• ❌ Medieval Madness");
     expect(discord.posts.at(-1)?.content).not.toContain("location #999");
   });
 
@@ -908,12 +903,8 @@ describe("PinballMap region machine-change alerts (PGlite)", () => {
     discord.result = { ok: true };
     const delivered = await runRegionMachineAlerts();
     expect(delivered).toMatchObject({ announced: 2, pending: 0 });
-    expect(discord.posts.at(-1)?.content).toContain(
-      "• Removed: Medieval Madness"
-    );
-    expect(discord.posts.at(-1)?.content).toContain(
-      "• Added: Medieval Madness"
-    );
+    expect(discord.posts.at(-1)?.content).toContain("• ❌ Medieval Madness");
+    expect(discord.posts.at(-1)?.content).toContain("• ❇️ Medieval Madness");
   });
 
   it("makes no Pinball Map call when the shared bot token is unavailable", async () => {
