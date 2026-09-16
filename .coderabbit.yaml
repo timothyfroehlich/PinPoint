@@ -15,9 +15,8 @@
 # rule ID; the full statement, rationale, and do/don't live only in the catalog.
 # When a rule below stops matching the catalog, the catalog wins — fix this file.
 #
-# Tunables Tim may want to revisit once the plan's review budget is settled:
-# `reviews.profile` (chill → assertive for more findings) and
-# `auto_review.enabled` (currently manual-only).
+# Tunables Tim may want to revisit:
+# `reviews.profile` (chill → assertive for more findings).
 language: en-US
 
 tone_instructions: |
@@ -30,6 +29,8 @@ reviews:
   # reviewed. Approval means "automated review complete" — it does NOT
   # authorize merging, which stays Tim's decision (PP-wi85).
   request_changes_workflow: true
+  review_details: true
+  suggested_reviewers: false
 
   # "chill" keeps low-confidence nits out of the thread. PinPoint already runs a
   # strict static gate (`pnpm run check`: oxlint type-aware, TS 7 strictest,
@@ -37,18 +38,24 @@ reviews:
   profile: chill
 
   high_level_summary: true
+  high_level_summary_in_walkthrough: true
+  collapse_walkthrough: true
   review_status: true
   poem: false
 
   auto_review:
-    # Manual-only (PP-w6u1). The plan's budget is one included review per hour, so
-    # auto-reviewing every draft promotion would spend it on small PRs. Tim asks
-    # the owning agent to request a review on large PRs:
+    # Automatic on draft promotion. CodeRabbit is the default reviewer (priority:
+    # CodeRabbit -> Codex -> manual/attested). New PRs start in draft; promoting
+    # out of draft (`gh pr ready`) triggers an automatic review. CodeRabbit does
+    # NOT automatically re-review on subsequent commit pushes; re-evaluating
+    # updated commits requires an explicit request:
     #   gh pr comment <PR> --body "@coderabbitai review"
-    # The merge gate (scripts/workflow/_pr-gates.sh) accepts the resulting
-    # exact-head APPROVED review; Codex stays the default reviewer.
-    enabled: false
+    # Quota ceiling is 5 reviews per hour. When rate-limited, fall back to Codex
+    # (@codex review).
+    enabled: true
     drafts: false
+    auto_incremental_review: false
+    auto_pause_after_reviewed_commits: 1
 
   path_instructions:
     - path: "**"

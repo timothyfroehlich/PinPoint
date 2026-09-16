@@ -480,7 +480,7 @@ if [[ "$rv_covered" != "true" ]]; then
   if [[ "$(jq -r '.codex_request_pending' <<< "$review_summary")" == "true" ]]; then
     add_block "reviewed: ${rv_label} — the manual Codex review for this head was already requested; do not request it again; wait for exact-head evidence"
   else
-    add_block "reviewed: ${rv_label} — after current-head CI succeeds and the PR is ready, run request-codex-review.sh ${pr} exactly once for this head, or ask Tim for a CodeRabbit request or a local review; a new head requires replacement CI and a new review"
+    add_block "reviewed: ${rv_label} — after current-head CI succeeds, mark the PR ready to trigger CodeRabbit review (or request re-review via @coderabbitai review), or run request-codex-review.sh ${pr} as fallback; a new head requires replacement CI and a new review"
   fi
 fi
 if [[ "$is_draft" == "true" ]]; then add_block "draft: wait for current-head CI Gate success, then mark the PR ready"; fi
