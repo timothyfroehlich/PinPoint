@@ -15,9 +15,8 @@
 # rule ID; the full statement, rationale, and do/don't live only in the catalog.
 # When a rule below stops matching the catalog, the catalog wins — fix this file.
 #
-# Tunables Tim may want to revisit once the plan's review budget is settled:
-# `reviews.profile` (chill → assertive for more findings) and
-# `auto_review.enabled` (currently manual-only).
+# Tunables Tim may want to revisit:
+# `reviews.profile` (chill → assertive for more findings).
 language: en-US
 
 tone_instructions: |
@@ -41,13 +40,15 @@ reviews:
   poem: false
 
   auto_review:
-    # Manual-only (PP-w6u1). The plan's budget is one included review per hour, so
-    # auto-reviewing every draft promotion would spend it on small PRs. Tim asks
-    # the owning agent to request a review on large PRs:
+    # Automatic on draft promotion. CodeRabbit is the default reviewer (priority:
+    # CodeRabbit -> Codex -> manual/attested). New PRs start in draft; promoting
+    # out of draft (`gh pr ready`) triggers an automatic review. CodeRabbit does
+    # NOT automatically re-review on subsequent commit pushes; re-evaluating
+    # updated commits requires an explicit request:
     #   gh pr comment <PR> --body "@coderabbitai review"
-    # The merge gate (scripts/workflow/_pr-gates.sh) accepts the resulting
-    # exact-head APPROVED review; Codex stays the default reviewer.
-    enabled: false
+    # Quota ceiling is 5 reviews per hour. When rate-limited, fall back to Codex
+    # (@codex review).
+    enabled: true
     drafts: false
 
   path_instructions:

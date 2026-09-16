@@ -1,6 +1,6 @@
 ---
 name: pinpoint-pr-workflow
-description: The PR-lifecycle decisions the scripts and gates do not state — draft-first creation, one manual Codex review request after current-head CI, exact-head review evidence, and why every push needs fresh CI and review. Also covers the merge handoff, screenshot gotchas, Dependabot lockfile trap, merge escape hatches, broken merge scripts, and GitHub MCP gotchas. Use when committing, opening or updating a PR, monitoring CI or review, addressing review comments, posting screenshots, handing a PR over to merge, landing the plane after Tim merges, or when a GitHub MCP call does something unexpected.
+description: The PR-lifecycle decisions the scripts and gates do not state — draft-first creation, CodeRabbit automated review on draft promotion, manual re-reviews, Codex fallback, exact-head review evidence, concurrent review adjudication, and why every push needs fresh CI and review. Also covers the merge handoff, screenshot gotchas, Dependabot lockfile trap, merge escape hatches, broken merge scripts, and GitHub MCP gotchas. Use when committing, opening or updating a PR, monitoring CI or review, addressing review comments, posting screenshots, handing a PR over to merge, landing the plane after Tim merges, or when a GitHub MCP call does something unexpected.
 ---
 
 # PinPoint PR Workflow
@@ -116,14 +116,14 @@ subway watch --pr <PR> --phase ci --expected-head <HEAD_SHA>
 ```
 
 For a new draft PR, keep it draft until `CI Gate` succeeds for the current head, then
-run `gh pr ready <PR>`, then request the review in 3.4. Promotion alone does not start a
-Codex review. A green run for an older SHA does not qualify.
+run `gh pr ready <PR>`. Promotion out of draft automatically triggers CodeRabbit review
+on the current head commit. A green run for an older SHA does not qualify.
 
 **Stream discipline**: Progressive logs go to `stderr`, and `stdout` receives strictly the terminal JSON object upon exit. Background tasks run silently without token-wasting intermediate wakeups.
 
 **Handling the CI result**:
 
-- `outcome: "passed"` (exit 0): CI Gate passed on `HEAD_SHA`. If the PR is draft, run `gh pr ready <PR>`, then proceed to request Codex review in 3.4.
+- `outcome: "passed"` (exit 0): CI Gate passed on `HEAD_SHA`. If the PR is draft, run `gh pr ready <PR>` (which auto-triggers CodeRabbit review), then proceed to monitor review in 3.4.
 - `outcome: "failed"` (exit 1): A run or CI Gate failed. Subway automatically extracts the failed steps log and provides `failure_summary` in the terminal JSON (and saves the full report to `failure_artifact` under `tmp/gh-monitor/`). Address the failure, commit, and push.
   - If judged to be a GitHub Actions **infra** flake (network timeout, runner loss, download 5xx, container start): log it with `bash scripts/workflow/log-gha-flake.sh <pr> <run-id> <class> "<symptom>"` before retrying.
 - `outcome: "stale"` (exit 1): The PR head moved away from `expected_head`. The owner re-checks branch state.
@@ -142,86 +142,63 @@ Every unresolved thread counts, whoever opened it — the `threads` gate is auth
 
 ### 3.4 Get the head commit reviewed
 
-**Codex review is manual-only.** Tim's personal automatic-review trigger stays off.
-After current-head CI succeeds and the PR is ready:
+**Review Priority Chain:**
+$$\text{CodeRabbit (Default)} \longrightarrow \text{Codex (Secondary / Fallback)} \longrightarrow \text{Local Attestation (Manual)}$$
 
-1. **Owner requests review**:
+#### 1. CodeRabbit: Default Automated Reviewer
 
-   ```bash
-   bash scripts/workflow/request-codex-review.sh <PR>
-   ```
+- **Draft promotion auto-trigger:** All agent-created PRs start as drafts (`gh pr create --draft`). When current-head CI succeeds, promote the PR out of draft:
+  ```bash
+  gh pr ready <PR>
+  ```
+  Draft promotion automatically triggers a CodeRabbit review on the current head commit.
+- **No auto re-reviews on commit push:** Pushing subsequent commits to an open PR does **not** automatically trigger a CodeRabbit re-review. Wait for replacement CI to succeed on the new head, then explicitly request a re-review:
+  ```bash
+  gh pr comment <PR> --body "@coderabbitai review"
+  ```
+  CodeRabbit edits its acknowledgement comment in place — "Review triggered" can become "Review rate limited", so check current status.
+- **Hourly Quota & Rate Limiting:** We have an allowance of 5 CodeRabbit reviews per rolling hour. When rate-limited, CodeRabbit posts an issue comment containing `Review rate limited.`
+- **Quota Fallback to Codex:** When CodeRabbit is rate-limited, immediately fall back to requesting a Codex review (see below). If Codex is also out of quota or unavailable, alert Tim and recommend either performing a local review attestation or waiting until the next CodeRabbit review slot becomes available.
 
-   This verifies current-head CI passed and posts the SHA-pinned `@codex review` comment. Exactly one request per intended head commit.
+#### 2. Codex: Secondary Reviewer & Rate-Limit Fallback
 
-2. **Owner launches `subway watch` with `phase: "review"`**:
+- **Manual request only:** Codex reviews are triggered strictly via explicit manual request and never run automatically on draft promotion or commit push.
+- To request Codex review on the current head (after current-head CI passes):
+  ```bash
+  bash scripts/workflow/request-codex-review.sh <PR>
+  ```
+  This helper verifies that the authenticated account is the repository owner, the PR is open and ready, current-head CI passed, and the head lacks review coverage. It posts the SHA-pinned `@codex review` trigger with a hidden marker binding the trusted reaction witness to that SHA. Never request the same head twice.
 
-   ```bash
-   subway watch --pr <PR> --phase review --expected-head <HEAD_SHA>
-   ```
+#### 3. Concurrent Review Execution & Adjudication
 
-3. **Handling the review result**:
-   - `outcome: "passed"` (exit 0): The gate label is `approved` (some checker — CodeRabbit approval, Codex evidence, or local attestation — covers the exact head) AND 0 unresolved threads. Proceed to UI screenshots in 3.5, apply the `ready-for-review` label in 3.6, then enter the Phase 4 merge handoff.
-   - `outcome: "action_required"` (exit 1): Either `approved` with unresolved threads remaining (>0), or the label is `changes requested`. The owner adjudicates findings: fixes code or replies to/declines threads, then resolves them. If code changed, push and re-start at Phase 3.1. If all threads were resolved with no code change, exact-head coverage is complete.
-   - `outcome: "stale"` (exit 1): Branch head moved; re-orient to the new head.
-   - `outcome: "conflicting"` (exit 1): Merge conflict; merge `main` and push.
-   - `outcome: "timed_out"` / `"undetermined"` (exit 2): Re-run watch or inspect GitHub API.
+Both CodeRabbit and Codex can be in progress on the same commit head simultaneously:
 
-The owning agent stays assigned through the whole loop: monitor current-head CI and
-review, address or explicitly decline every finding, resolve every thread, push fixes,
-and request a replacement review only after replacement CI succeeds. A slow or
-still-running review is a wait state; never request the same head twice, self-attest, or
-hand off an unreviewed PR. Use the harness's Monitor/wait mechanism rather than a
-hand-written polling loop.
+- **First-Success Resolution:** `subway watch --phase review` passes as soon as the first reviewer reports qualifying coverage on the exact head (`reviewer: "coderabbit"` or `"codex"`).
+- **Trailing Review Notification:** If a second reviewer is still in progress when the first succeeds, `subway watch` logs a notice and records `concurrent_review_in_progress` (and `pending_reviewers`). The owning agent must inspect the secondary reviewer's results once complete.
+- **Changes Requested:** If one reviewer requests changes while another is running, `subway watch` reports `outcome: "action_required"` while preserving the in-progress tracking of the second reviewer.
+- **Dual Completion:** If both complete successfully, CodeRabbit takes precedence as the primary covering reviewer.
 
-#### Later uploads: revalidate before re-requesting
-
-Leave an existing ready PR ready when pushing later commits, but do not request review
-until the replacement current-head `CI Gate` succeeds. If the PR is already draft,
-leave it draft through the push, wait for replacement CI, then run `gh pr ready <PR>`.
-After those checks, request one review for the new head.
-
-The upload's size does not change this sequence. Every push invalidates the previous
-head's coverage. Deterministic exact-head coverage comes from the SHA-bound manual
-request, not an automatic trigger.
-
-#### Request the GitHub review — exactly once per head
-
-After current-head CI succeeds and the PR is ready, run:
+#### 4. Monitor Review via `subway watch`
 
 ```bash
-bash scripts/workflow/request-codex-review.sh <PR>
+subway watch --pr <PR> --phase review --expected-head <HEAD_SHA>
 ```
 
-The helper verifies the authenticated account is the repository owner, the PR is open
-and ready, the latest `CI Gate` passed, the head lacks review coverage and a prior
-request, and the head did not move during validation. It then posts Codex's documented
-`@codex review` trigger with a hidden marker binding the trusted-main reaction witness
-to that SHA. The witness keeps checking that head throughout the reaction transition.
+**Handling the review result**:
 
-Never repeat the request for the same head. A result may arrive as a native review,
-trusted clean connector comment, or trusted SHA-pinned reaction witness; any of those
-completes exact-head coverage. If no evidence arrives, keep waiting or use Tim's local
-review route below. A new head requires replacement CI and exactly one new request.
+- `outcome: "passed"` (exit 0): The gate label is `approved` (exact head covered by CodeRabbit approval, Codex evidence, or local attestation) AND 0 unresolved threads remain.
+  - If `concurrent_review_in_progress` is non-null, note the trailing reviewer and check its output when finished.
+  - Proceed to UI screenshots in 3.5, apply the `ready-for-review` label in 3.6, then enter Phase 4 merge handoff.
+- `outcome: "action_required"` (exit 1): Either `approved` with unresolved threads (>0), or the review state is `changes requested`.
+  - For CodeRabbit, `subway watch` extracts the AI agent prompt directly into `review_summary` and actionable comment count into `actionable_comments`.
+  - Adjudicate findings: fix code or reply/decline threads.
+  - If code changed, push fixes, wait for replacement CI, and re-request review.
+  - If rate-limited (`coderabbit_rate_limited: true`), fall back to requesting Codex review. If Codex is also unavailable, alert Tim.
+- `outcome: "stale"` (exit 1): Branch head moved; re-orient to the new head.
+- `outcome: "conflicting"` (exit 1): Merge conflict; merge `origin/main` into the branch and push.
+- `outcome: "timed_out"` / `"undetermined"` (exit 2): Re-run watch or inspect GitHub API reachability.
 
-#### CodeRabbit: Tim-initiated extra review for large PRs
-
-CodeRabbit is installed with `auto_review.enabled: false` and a budget of one included
-review per hour, so it is **never requested on your own initiative**. When Tim tells you
-to request it on a PR, post its trigger after current-head CI succeeds and the PR is
-ready:
-
-```bash
-gh pr comment <PR> --body "@coderabbitai review"
-```
-
-CodeRabbit edits its acknowledgement comment in place a few seconds later — "Review
-triggered" can become "Review rate limited", so read the comment's current text, not the
-first one you saw. With `request_changes_workflow` on, it requests changes while it has
-open findings and submits a native `APPROVED` review once they are resolved and the
-latest commit is reviewed. The gate accepts that exact-head approval as coverage on its
-own (PP-w6u1); a CodeRabbit finding review is a normal review thread — fix or
-decline-and-resolve — and does not by itself cover head or fail the gate. A new head
-needs a new request, and only if Tim asks for one.
+The owning agent stays assigned through the whole loop: monitor current-head CI and review, address or explicitly decline every finding, resolve every thread, push fixes, and request a replacement review only after replacement CI succeeds. Never request the same head twice, self-attest without authorization, or hand off an unreviewed PR.
 
 #### Local review and manual-attestation route
 
