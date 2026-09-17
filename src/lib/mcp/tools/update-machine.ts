@@ -196,6 +196,18 @@ export async function runUpdateMachine(
       ? await resolveOwner(cleanArgs.owner)
       : undefined;
 
+  let fromOwnerName: string | null = null;
+  if (cleanArgs.owner !== undefined && newOwner !== undefined) {
+    const previousOwnerNames = await getOwnerNamesByMachine([
+      {
+        id: machine.id,
+        ownerId: machine.ownerId,
+        invitedOwnerId: machine.invitedOwnerId,
+      },
+    ]);
+    fromOwnerName = previousOwnerNames.get(machine.id) ?? null;
+  }
+
   const applied: MachineFieldChange[] = [];
   let currentName = machine.name;
   let currentPresenceStatus = machine.presenceStatus;
@@ -284,15 +296,6 @@ export async function runUpdateMachine(
 
   // 3. updateMachineOwner (if owner supplied)
   if (cleanArgs.owner !== undefined && newOwner !== undefined) {
-    const previousOwnerNames = await getOwnerNamesByMachine([
-      {
-        id: machine.id,
-        ownerId: currentOwnerId,
-        invitedOwnerId: currentInvitedOwnerId,
-      },
-    ]);
-    const fromOwnerName = previousOwnerNames.get(machine.id) ?? null;
-
     let deliveryPlan: Awaited<
       ReturnType<typeof updateMachineOwner>
     >["deliveryPlan"];
