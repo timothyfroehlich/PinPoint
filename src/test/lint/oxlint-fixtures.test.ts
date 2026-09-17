@@ -133,6 +133,7 @@ describe("oxlint jsPlugins fixtures", () => {
       new Set([
         "pinpoint/no-side-effects-in-transaction",
         "pinpoint/server-action-file-naming",
+        "pinpoint/no-unpaired-animate-motion",
         "pinpoint/no-restricted-disable-directives",
         "pinpoint/require-directive-description",
         "pinpoint/no-test-com-literals",
@@ -184,6 +185,23 @@ describe("oxlint jsPlugins fixtures", () => {
       { ruleId: "pinpoint/no-test-com-literals", line: 2 },
       { ruleId: "pinpoint/no-test-com-literals", line: 3 },
     ]);
+  });
+
+  it("fires pinpoint/no-unpaired-animate-motion on bare animate utilities missing motion-reduce:animate-none", async () => {
+    const found = forFile(await findingsPromise, "animate-motion.tsx");
+    expect(
+      found.map((f) => ({ ruleId: f.ruleId, line: f.line }))
+    ).toStrictEqual([
+      // className="… animate-spin" (direct string literal)
+      { ruleId: "pinpoint/no-unpaired-animate-motion", line: 10 },
+      // cn("animate-pulse", …) (string arg to a class-merge helper)
+      { ruleId: "pinpoint/no-unpaired-animate-motion", line: 11 },
+      // `… animate-bounce ${…}` (template literal)
+      { ruleId: "pinpoint/no-unpaired-animate-motion", line: 12 },
+      // className="md:animate-spin" (variant-prefixed, still needs the pairing)
+      { ruleId: "pinpoint/no-unpaired-animate-motion", line: 13 },
+    ]);
+    expect(found[0]?.message).toContain("CORE-A11Y-002");
   });
 
   it("fires better-tailwindcss/no-restricted-classes on raw palette and hex classes", async () => {
@@ -252,6 +270,7 @@ describe("oxlint jsPlugins fixtures", () => {
     expect(forFile(findings, "clean-tokens.tsx")).toStrictEqual([]);
     expect(forFile(findings, "tx-clean.ts")).toStrictEqual([]);
     expect(forFile(findings, "action-naming-clean.ts")).toStrictEqual([]);
+    expect(forFile(findings, "animate-motion-clean.tsx")).toStrictEqual([]);
   });
 });
 

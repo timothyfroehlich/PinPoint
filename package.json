@@ -206,7 +206,7 @@
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx,mjs,cjs}": [
-      "oxlint --fix --fix-suggestions",
+      "oxlint --ignore-pattern eslint-rules/__fixtures__/** --fix --fix-suggestions",
       "prettier --write"
     ],
     "*.{json,css,md}": [

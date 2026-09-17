@@ -1,5 +1,6 @@
 // Oxlint jsPlugins entry point. Oxlint requires a DEFAULT export shaped
 // `{ meta: { name }, rules }`.
+import { pinpointNoUnpairedAnimateMotionPlugin } from "./no-unpaired-animate-motion.mjs";
 import { pinpointRestrictedDisablePlugin } from "./no-restricted-disable-directives.mjs";
 import { pinpointNoTestComLiteralsPlugin } from "./no-test-com-literals.mjs";
 import { pinpointTransactionPlugin } from "./no-side-effects-in-transaction.mjs";
@@ -11,6 +12,7 @@ export default {
   rules: {
     ...pinpointTransactionPlugin.rules,
     ...pinpointServerActionNamingPlugin.rules,
+    ...pinpointNoUnpairedAnimateMotionPlugin.rules,
     // Directive governance. These two are the sole CORE-TS-007 disable gate.
     ...pinpointRestrictedDisablePlugin.rules,
     ...pinpointRequireDirectiveDescriptionPlugin.rules,
