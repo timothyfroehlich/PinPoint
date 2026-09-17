@@ -106,6 +106,14 @@ export const updateMachineSchema = z
       message:
         "A machine can't be both linked to a Pinball Map title and marked as not on Pinball Map. Pass one or the other.",
     }
+  )
+  .refine(
+    (args) =>
+      args.pinballmapExcludedReason === undefined ||
+      args.pinballmapExcluded === true,
+    {
+      message: "pinballmapExcludedReason requires pinballmapExcluded: true.",
+    }
   );
 
 export type UpdateMachineArgs = z.infer<typeof updateMachineSchema>;
@@ -117,6 +125,11 @@ export interface MachineFieldChange {
   changed: boolean;
 }
 
+export interface MachineFieldFailure {
+  field: string;
+  reason: string;
+}
+
 export interface UpdateMachineOutcome extends ToolOutcome {
   applied: MachineFieldChange[];
   result: {
@@ -125,6 +138,8 @@ export interface UpdateMachineOutcome extends ToolOutcome {
     presence: string;
     url: string;
     applied: MachineFieldChange[];
+    partial?: boolean;
+    failed?: MachineFieldFailure;
   };
 }
 
@@ -186,6 +201,35 @@ export async function runUpdateMachine(
   let currentOwnerId = machine.ownerId;
   let currentInvitedOwnerId = machine.invitedOwnerId;
 
+  function handleFailure(
+    field: string,
+    reason: string,
+    errorReason?:
+      "denied" | "not_found" | "invalid" | "conflict" | "rate_limited"
+  ): UpdateMachineOutcome {
+    if (applied.length > 0) {
+      return {
+        applied,
+        result: {
+          initials: machine.initials,
+          name: currentName,
+          presence: currentPresenceStatus,
+          url: machineUrl(machine.initials),
+          applied,
+          partial: true,
+          failed: { field, reason },
+        },
+        machineId: machine.id,
+        auditOutcome: "error",
+        auditReason: `partial:${field}`,
+      };
+    }
+    if (errorReason) {
+      throw new McpToolError(errorReason, reason);
+    }
+    throw new Error(reason);
+  }
+
   // 1. updateMachineName (if name supplied)
   if (cleanArgs.name !== undefined) {
     const { changed } = await updateMachineName({
@@ -210,87 +254,111 @@ export async function runUpdateMachine(
 
   // 2. updateMachinePresence (if presenceStatus supplied)
   if (cleanArgs.presenceStatus !== undefined) {
-    const { changed } = await updateMachinePresence({
-      machineId: machine.id,
-      presenceStatus: cleanArgs.presenceStatus,
-      actorUserId: ctx.userId,
-      current: {
-        name: currentName,
-        ownerId: currentOwnerId,
-        invitedOwnerId: currentInvitedOwnerId,
-        presenceStatus: currentPresenceStatus,
-      },
-    });
-    applied.push({
-      field: "presenceStatus",
-      from: currentPresenceStatus,
-      to: cleanArgs.presenceStatus,
-      changed,
-    });
-    currentPresenceStatus = cleanArgs.presenceStatus;
+    try {
+      const { changed } = await updateMachinePresence({
+        machineId: machine.id,
+        presenceStatus: cleanArgs.presenceStatus,
+        actorUserId: ctx.userId,
+        current: {
+          name: currentName,
+          ownerId: currentOwnerId,
+          invitedOwnerId: currentInvitedOwnerId,
+          presenceStatus: currentPresenceStatus,
+        },
+      });
+      applied.push({
+        field: "presenceStatus",
+        from: currentPresenceStatus,
+        to: cleanArgs.presenceStatus,
+        changed,
+      });
+      currentPresenceStatus = cleanArgs.presenceStatus;
+    } catch (error) {
+      return handleFailure(
+        "presenceStatus",
+        error instanceof Error ? error.message : "Updating presence failed."
+      );
+    }
   }
 
   // 3. updateMachineOwner (if owner supplied)
   if (cleanArgs.owner !== undefined && newOwner !== undefined) {
-    const previousOwnerNames = await getOwnerNamesByMachine([
-      {
-        id: machine.id,
-        ownerId: currentOwnerId,
-        invitedOwnerId: currentInvitedOwnerId,
-      },
-    ]);
-    const fromOwnerName = previousOwnerNames.get(machine.id) ?? null;
+    try {
+      const previousOwnerNames = await getOwnerNamesByMachine([
+        {
+          id: machine.id,
+          ownerId: currentOwnerId,
+          invitedOwnerId: currentInvitedOwnerId,
+        },
+      ]);
+      const fromOwnerName = previousOwnerNames.get(machine.id) ?? null;
 
-    const { deliveryPlan } = await updateMachineOwner({
-      machineId: machine.id,
-      actorUserId: ctx.userId,
-      current: {
-        name: currentName,
-        ownerId: currentOwnerId,
-        invitedOwnerId: currentInvitedOwnerId,
-        presenceStatus: currentPresenceStatus,
-      },
-      newOwner,
-    });
+      const { deliveryPlan } = await updateMachineOwner({
+        machineId: machine.id,
+        actorUserId: ctx.userId,
+        current: {
+          name: currentName,
+          ownerId: currentOwnerId,
+          invitedOwnerId: currentInvitedOwnerId,
+          presenceStatus: currentPresenceStatus,
+        },
+        newOwner,
+      });
 
-    after(() => dispatchNotification(deliveryPlan));
+      after(() => dispatchNotification(deliveryPlan));
 
-    const newOwnerNames = await getOwnerNamesByMachine([
-      {
-        id: machine.id,
-        ownerId: newOwner.ownerId,
-        invitedOwnerId: newOwner.invitedOwnerId,
-      },
-    ]);
-    const toOwnerName = newOwnerNames.get(machine.id) ?? null;
+      const newOwnerNames = await getOwnerNamesByMachine([
+        {
+          id: machine.id,
+          ownerId: newOwner.ownerId,
+          invitedOwnerId: newOwner.invitedOwnerId,
+        },
+      ]);
+      const toOwnerName = newOwnerNames.get(machine.id) ?? null;
 
-    const changed =
-      currentOwnerId !== newOwner.ownerId ||
-      currentInvitedOwnerId !== newOwner.invitedOwnerId;
+      const changed =
+        currentOwnerId !== newOwner.ownerId ||
+        currentInvitedOwnerId !== newOwner.invitedOwnerId;
 
-    applied.push({
-      field: "owner",
-      from: fromOwnerName,
-      to: toOwnerName,
-      changed,
-    });
+      applied.push({
+        field: "owner",
+        from: fromOwnerName,
+        to: toOwnerName,
+        changed,
+      });
+    } catch (error) {
+      return handleFailure(
+        "owner",
+        error instanceof Error ? error.message : "Updating owner failed."
+      );
+    }
   }
 
   // 4. updateMachinePbmLink (if pinballmap fields or intent supplied)
   if (wantsPbm) {
-    const updated = await updateMachinePbmLink({
-      machineId: machine.id,
-      actorUserId: ctx.userId,
-      selection: {
-        pinballmapMachineId: cleanArgs.pinballmapMachineId,
-        pinballmapExcluded: cleanArgs.pinballmapExcluded,
-        pinballmapExcludedReason: cleanArgs.pinballmapExcludedReason,
-        intent: cleanArgs.intent,
-      },
-    });
+    let updated: Awaited<ReturnType<typeof updateMachinePbmLink>>;
+    try {
+      updated = await updateMachinePbmLink({
+        machineId: machine.id,
+        actorUserId: ctx.userId,
+        selection: {
+          pinballmapMachineId: cleanArgs.pinballmapMachineId,
+          pinballmapExcluded: cleanArgs.pinballmapExcluded,
+          pinballmapExcludedReason: cleanArgs.pinballmapExcludedReason,
+          intent: cleanArgs.intent,
+        },
+      });
+    } catch (error) {
+      return handleFailure(
+        "pinballmap",
+        error instanceof Error
+          ? error.message
+          : "Updating Pinball Map link failed."
+      );
+    }
 
     if (!updated.ok) {
-      throw new McpToolError(updated.reason, updated.message);
+      return handleFailure("pinballmap", updated.message, updated.reason);
     }
 
     if (cleanArgs.pinballmapMachineId !== undefined) {
@@ -333,17 +401,24 @@ export async function runUpdateMachine(
 
   // 5. updateMachineIscoredLink (if iscoredGameId supplied)
   if (cleanArgs.iscoredGameId !== undefined) {
-    const { changed, iscoredGameId, previousIscoredGameId } =
-      await updateMachineIscoredLink({
-        machineId: machine.id,
-        iscoredGameId: cleanArgs.iscoredGameId,
+    try {
+      const { changed, iscoredGameId, previousIscoredGameId } =
+        await updateMachineIscoredLink({
+          machineId: machine.id,
+          iscoredGameId: cleanArgs.iscoredGameId,
+        });
+      applied.push({
+        field: "iscoredGameId",
+        from: previousIscoredGameId,
+        to: iscoredGameId,
+        changed,
       });
-    applied.push({
-      field: "iscoredGameId",
-      from: previousIscoredGameId,
-      to: iscoredGameId,
-      changed,
-    });
+    } catch (error) {
+      return handleFailure(
+        "iscoredGameId",
+        error instanceof Error ? error.message : "Updating iScored link failed."
+      );
+    }
   }
 
   return {
@@ -354,6 +429,7 @@ export async function runUpdateMachine(
       presence: currentPresenceStatus,
       url: machineUrl(machine.initials),
       applied,
+      partial: false,
     },
     machineId: machine.id,
   };

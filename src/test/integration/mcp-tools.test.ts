@@ -4013,6 +4013,53 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
         reason: "invalid",
         message: expect.stringMatching(/both/i),
       });
+
+      // pinballmapExcludedReason without pinballmapExcluded: true
+      await expect(
+        runUpdateMachine(
+          {
+            machine: machine.initials,
+            pinballmapExcludedReason: "Not in catalog",
+          },
+          ctx("admin", admin)
+        )
+      ).rejects.toMatchObject({
+        reason: "invalid",
+        message: expect.stringMatching(
+          /pinballmapExcludedReason requires pinballmapExcluded: true/i
+        ),
+      });
+    });
+
+    it("reports partial failure when earlier mutations commit before later failure", async () => {
+      const admin = await makeUser("admin", "Admin", "User");
+      const machine = await seedMachine();
+
+      // pinballmapMachineId pointing to non-existent catalog title will fail in updateMachinePbmLink
+      const outcome = await runUpdateMachine(
+        {
+          machine: machine.initials,
+          name: "Renamed Before PBM Error",
+          pinballmapMachineId: 999999999,
+        },
+        ctx("admin", admin)
+      );
+
+      expect(outcome.result.partial).toBe(true);
+      expect(outcome.result.failed).toEqual({
+        field: "pinballmap",
+        reason: expect.any(String),
+      });
+      expect(outcome.applied).toEqual([
+        {
+          field: "name",
+          from: "Seed Machine",
+          to: "Renamed Before PBM Error",
+          changed: true,
+        },
+      ]);
+      expect(outcome.auditOutcome).toBe("error");
+      expect(outcome.auditReason).toBe("partial:pinballmap");
     });
 
     it("enforces permission gates: member cannot update another member's machine but can update their own", async () => {

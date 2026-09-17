@@ -148,7 +148,7 @@ export function registerCreateIssue(server: McpServer): void {
     {
       title: "Create issue",
       description:
-        "File a new issue on a machine. Requires machine (initials or UUID), title, and severity; accepts optional description, priority, and frequency.",
+        "File a new issue on a machine. Requires machine (initials or UUID) and title; accepts optional description, severity, priority, and frequency.",
       inputSchema: createIssueSchema,
       annotations: WRITE_TOOL_ANNOTATIONS,
     },
