@@ -1106,3 +1106,60 @@ export async function updateMachineName({
 
   return { changed: true };
 }
+
+export interface UpdateMachineIscoredLinkParams {
+  machineId: string;
+  actorUserId: string;
+  iscoredGameId?: string | null;
+}
+
+export interface UpdateMachineIscoredLinkResult {
+  changed: boolean;
+  iscoredGameId: string | null;
+  previousIscoredGameId: string | null;
+}
+
+/**
+ * Set or clear a machine's linked iScored game ID (PP-h2bu.6, Spec §2).
+ *
+ * Normalizes empty strings and whitespace-only strings to null. Idempotent: returns
+ * changed: false if the trimmed id equals the stored id.
+ */
+export async function updateMachineIscoredLink({
+  machineId,
+  actorUserId: _actorUserId,
+  iscoredGameId,
+}: UpdateMachineIscoredLinkParams): Promise<UpdateMachineIscoredLinkResult> {
+  const normalized =
+    typeof iscoredGameId === "string" && iscoredGameId.trim().length > 0
+      ? iscoredGameId.trim()
+      : null;
+
+  const current = await db.query.machines.findFirst({
+    where: eq(machines.id, machineId),
+    columns: { iscoredGameId: true },
+  });
+
+  if (!current) {
+    throw new Error(`Machine ${machineId} not found`);
+  }
+
+  if (current.iscoredGameId === normalized) {
+    return {
+      changed: false,
+      iscoredGameId: current.iscoredGameId,
+      previousIscoredGameId: current.iscoredGameId,
+    };
+  }
+
+  await db
+    .update(machines)
+    .set({ iscoredGameId: normalized, updatedAt: new Date() })
+    .where(eq(machines.id, machineId));
+
+  return {
+    changed: true,
+    iscoredGameId: normalized,
+    previousIscoredGameId: current.iscoredGameId,
+  };
+}

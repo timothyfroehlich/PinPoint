@@ -11,6 +11,7 @@ import { registerListIssues } from "./list-issues";
 import { registerListMachines } from "./list-machines";
 import { registerSearchPinballmapCatalog } from "./search-pinballmap-catalog";
 import { registerSetMachineAvailability } from "./set-machine-availability";
+import { registerSetMachineIscored } from "./set-machine-iscored";
 import { registerSetMachineName } from "./set-machine-name";
 import { registerSetMachineOwner } from "./set-machine-owner";
 import { registerSetMachinePinballmap } from "./set-machine-pinballmap";
@@ -41,6 +42,7 @@ export function registerPinpointTools(server: McpServer): void {
   registerAddMachine(server);
   registerSetMachineOwner(server);
   registerSetMachinePinballmap(server);
+  registerSetMachineIscored(server);
   registerCreateIssue(server);
   registerAddIssueComment(server);
   registerUpdateIssue(server);
