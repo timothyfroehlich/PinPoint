@@ -167,4 +167,34 @@ describe("updateNotificationPreferencesAction (Integration)", () => {
     if (result.ok) return;
     expect(result.code).toBe("UNAUTHORIZED");
   });
+
+  it("rejects calls when the user has insufficient permissions", async () => {
+    const userId = randomUUID();
+    mockGetUser.mockResolvedValue({ data: { user: { id: userId } } });
+
+    const result = await updateNotificationPreferencesAction(
+      undefined,
+      buildFormData({ emailEnabled: "off" })
+    );
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.code).toBe("FORBIDDEN");
+    expect(result.message).toBe("Forbidden: Insufficient permissions.");
+  });
+
+  it("rejects invalid preference values", async () => {
+    const userId = await seedUser();
+    mockGetUser.mockResolvedValue({ data: { user: { id: userId } } });
+
+    const result = await updateNotificationPreferencesAction(
+      undefined,
+      buildFormData({ emailEnabled: "invalid" as unknown as "on" })
+    );
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.code).toBe("VALIDATION");
+    expect(result.message).toBe("Invalid input");
+  });
 });
