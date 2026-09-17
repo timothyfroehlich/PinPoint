@@ -176,6 +176,7 @@ export interface MachineRef extends MachinePbmColumns {
   ownerId: string | null;
   invitedOwnerId: string | null;
   presenceStatus: MachinePresenceStatus;
+  iscoredGameId: string | null;
 }
 
 /**
@@ -205,6 +206,7 @@ export async function resolveMachine(ref: string): Promise<MachineRef> {
       year: true,
       opdbId: true,
       ipdbId: true,
+      iscoredGameId: true,
     },
   });
   if (!machine) {

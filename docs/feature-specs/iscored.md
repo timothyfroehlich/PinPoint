@@ -40,7 +40,7 @@
 
 - **4.1** A Top Scores card renders on the machine's Info tab (`/m/[initials]`) in the reference rail, directly below the Details card. On mobile it folds inline with the rail, after Details.
 - **4.2** For a linked machine with scores, the card displays the top three scores as ranked rows (rank badge, player name, score date, formatted score), an "Add score" button linking to the score entry page in a new tab, and a "View all on iScored" link to the game's public iScored page in a new tab.
-- **4.3** The card header carries the "Top scores" label and the iScored logo; the logo links to the game's public iScored page in a new tab. The logo renders in every card state so the card stays recognisable when empty or unlinked.
+- **4.3** The card header carries the "Top scores" label and the iScored logo. For a linked machine the logo links to the game's public iScored page in a new tab; for an unlinked machine it renders as a plain image with no link. The logo renders in every card state so the card stays recognisable when empty or unlinked.
 - **4.4** For a linked machine with zero recorded scores, the card displays a quiet empty state ("No scores recorded yet"), an "Add score" button, and the "View all on iScored" link.
 - **4.5** For an unlinked machine, the card displays a quiet empty state indicating no iScored link is configured, with a link to the Manage tab for viewers who can open it. Guests see the sentence only.
 - **4.6** Mockup: `docs/feature-specs/iscored-top-scores-mockup.html` (desktop and mobile Info tab, plus the four card states). Logo asset: `docs/feature-specs/iscored-logo.svg` (supplied by iScored; white background removed, viewBox cropped to the artwork).
@@ -61,10 +61,9 @@ Removed 2026-09-16. The Info tab card's "View all on iScored" link replaces it: 
 
 ## Known divergences (code vs spec)
 
-| Spec                       | Code today                        | Resolution |
-| :------------------------- | :-------------------------------- | :--------- |
-| §2.3 MCP linking tool      | No `set_machine_iscored` MCP tool | PP-h2bu.6  |
-| §6.1 Fleet overview column | Not yet rendered                  | PP-h2bu.5  |
+| Spec                       | Code today       | Resolution |
+| :------------------------- | :--------------- | :--------- |
+| §6.1 Fleet overview column | Not yet rendered | PP-h2bu.5  |
 
 ---
 
@@ -72,5 +71,6 @@ Removed 2026-09-16. The Info tab card's "View all on iScored" link replaces it: 
 
 | Date | Change |
 | :-- | :-- |
+| 2026-09-17 | §4.3 clarified: the iScored logo is a link only when the machine is linked; unlinked it is a plain image (CodeRabbit finding on #2134). |
 | 2026-09-16 | Design lock: Top Scores card moves to the rail under Details as top-three ranked rows with the iScored logo and an external "View all on iScored" link; §5 machine iScored tab removed; mockup added. Canvas: https://claude.ai/artifact/Rb7AXgxUVFwW8bEWFhhUgv |
 | 2026-09-15 | Initial draft: machine linking, batch read with 15s non-blocking throttle & privacy contracts, Info tab top-3 card, machine iScored tab, MCP tooling, and fleet column. |

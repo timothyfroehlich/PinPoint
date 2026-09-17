@@ -75,6 +75,10 @@ import type {
 } from "~/lib/mcp/tools/search-pinballmap-catalog";
 import type { McpMachinePinballmap } from "~/lib/mcp/tools/pinballmap-block";
 import { runSetMachineAvailability } from "~/lib/mcp/tools/set-machine-availability";
+import {
+  runSetMachineIscored,
+  setMachineIscoredSchema,
+} from "~/lib/mcp/tools/set-machine-iscored";
 import { runSetMachineName } from "~/lib/mcp/tools/set-machine-name";
 import { runSetMachineOwner } from "~/lib/mcp/tools/set-machine-owner";
 import {
@@ -148,6 +152,7 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
     ownerId?: string | null;
     presenceStatus?: MachinePresenceStatus;
     pbm?: SeedPbm;
+    iscoredGameId?: string | null;
   }): Promise<{ id: string; initials: string }> {
     const db = await getTestDb();
     const [machine] = await db
@@ -157,6 +162,7 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
         initials: nextInitials(),
         ownerId: overrides?.ownerId ?? null,
         presenceStatus: overrides?.presenceStatus ?? "on_the_floor",
+        iscoredGameId: overrides?.iscoredGameId ?? null,
         ...(overrides?.pbm ?? {}),
       })
       .returning();
@@ -2381,6 +2387,173 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
     });
   });
 
+  describe("set_machine_iscored (PP-h2bu.6)", () => {
+    it("links a machine to an iScored game ID", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine({ name: "Ghostbusters" });
+
+      const outcome = await runSetMachineIscored(
+        { machine: machine.initials, gameId: "gb-pro-123" },
+        ctx("admin", admin)
+      );
+
+      expect(outcome.result).toMatchObject({
+        initials: machine.initials,
+        name: "Ghostbusters",
+        iscoredGameId: "gb-pro-123",
+        previousIscoredGameId: null,
+        changed: true,
+      });
+
+      const db = await getTestDb();
+      const row = await db.query.machines.findFirst({
+        where: eq(machines.id, machine.id),
+        columns: { iscoredGameId: true },
+      });
+      expect(row?.iscoredGameId).toBe("gb-pro-123");
+    });
+
+    it("accepts iscoredGameId as an alias for gameId", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine({ name: "Deadpool" });
+
+      const outcome = await runSetMachineIscored(
+        { machine: machine.initials, iscoredGameId: "dp-prem-456" },
+        ctx("admin", admin)
+      );
+
+      expect(outcome.result).toMatchObject({
+        initials: machine.initials,
+        name: "Deadpool",
+        iscoredGameId: "dp-prem-456",
+        previousIscoredGameId: null,
+        changed: true,
+      });
+    });
+
+    it("clears an iScored link when gameId is empty or null", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine({
+        name: "Godzilla",
+        iscoredGameId: "gz-789",
+      });
+
+      const outcome = await runSetMachineIscored(
+        { machine: machine.initials, gameId: null },
+        ctx("admin", admin)
+      );
+
+      expect(outcome.result).toMatchObject({
+        initials: machine.initials,
+        name: "Godzilla",
+        iscoredGameId: null,
+        previousIscoredGameId: "gz-789",
+        changed: true,
+      });
+
+      const db = await getTestDb();
+      const row = await db.query.machines.findFirst({
+        where: eq(machines.id, machine.id),
+        columns: { iscoredGameId: true },
+      });
+      expect(row?.iscoredGameId).toBeNull();
+    });
+
+    it("rejects unknown keys at schema validation via strictObject", () => {
+      const result = setMachineIscoredSchema.safeParse({
+        machine: "MM",
+        game_id: "12345",
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it("is idempotent when the game ID already matches, and reports changed: false", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine({
+        name: "Iron Maiden",
+        iscoredGameId: "im-101",
+      });
+
+      const outcome = await runSetMachineIscored(
+        { machine: machine.initials, gameId: "im-101" },
+        ctx("admin", admin)
+      );
+
+      expect((outcome.result as { changed: boolean }).changed).toBe(false);
+      expect(
+        (outcome.result as { iscoredGameId: string | null }).iscoredGameId
+      ).toBe("im-101");
+    });
+
+    it("denies a member who does not own the machine", async () => {
+      const member = await makeUser("member");
+      const machine = await seedMachine({
+        ownerId: null,
+        name: "Attack from Mars",
+      });
+
+      await expect(
+        runSetMachineIscored(
+          { machine: machine.initials, gameId: "afm-123" },
+          ctx("member", member)
+        )
+      ).rejects.toMatchObject({ reason: "denied" });
+
+      const db = await getTestDb();
+      const row = await db.query.machines.findFirst({
+        where: eq(machines.id, machine.id),
+        columns: { iscoredGameId: true },
+      });
+      expect(row?.iscoredGameId).toBeNull();
+    });
+
+    it("allows the machine owner or technician to update the link", async () => {
+      const owner = await makeUser("member", "Pat", "Owner");
+      const machine = await seedMachine({ ownerId: owner, name: "Getaway" });
+
+      const ownerOutcome = await runSetMachineIscored(
+        { machine: machine.initials, gameId: "gw-1" },
+        ctx("member", owner)
+      );
+      expect((ownerOutcome.result as { changed: boolean }).changed).toBe(true);
+
+      const tech = await makeUser("technician");
+      const techOutcome = await runSetMachineIscored(
+        { machine: machine.initials, gameId: "gw-2" },
+        ctx("technician", tech)
+      );
+      expect((techOutcome.result as { changed: boolean }).changed).toBe(true);
+      expect(
+        (techOutcome.result as { iscoredGameId: string | null }).iscoredGameId
+      ).toBe("gw-2");
+    });
+
+    it("throws not_found when the machine is unknown", async () => {
+      const admin = await makeUser("admin");
+      await expect(
+        runSetMachineIscored(
+          { machine: "NOPE", gameId: "123" },
+          ctx("admin", admin)
+        )
+      ).rejects.toMatchObject({ reason: "not_found" });
+    });
+
+    it("reflects iscoredGameId in get_machine", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine({
+        name: "Jurassic Park",
+        iscoredGameId: "jp-555",
+      });
+
+      const outcome = await runGetMachine(
+        { machine: machine.initials },
+        ctx("admin", admin)
+      );
+      const result = outcome.result as { iscoredGameId: string | null };
+      expect(result.iscoredGameId).toBe("jp-555");
+    });
+  });
+
   describe("resolveIssue / resolveAssignee (PP-u4ab.14)", () => {
     it("resolves an issue by machine initials and number", async () => {
       const admin = await makeUser("admin");
@@ -2640,6 +2813,7 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
       "list_machines",
       "search_pinballmap_catalog",
       "set_machine_availability",
+      "set_machine_iscored",
       "set_machine_name",
       "set_machine_owner",
       "set_machine_pinballmap",
