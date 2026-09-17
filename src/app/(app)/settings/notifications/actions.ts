@@ -45,6 +45,8 @@ const PREF_FIELDS = Object.keys(
   updatePreferencesSchema.shape
 ) as readonly PrefField[];
 
+const formPreferenceValueSchema = z.enum(["on", "off"]);
+
 export type UpdatePreferencesResult = ProtectedActionResult<
   { success: boolean },
   "VALIDATION"
@@ -61,8 +63,12 @@ const updatePreferencesProtected = createProtectedAction({
     const rawData: Partial<Record<PrefField, boolean>> = {};
     for (const name of PREF_FIELDS) {
       const value = formData.get(name);
-      if (value === "on") rawData[name] = true;
-      else if (value === "off") rawData[name] = false;
+      if (value === null) continue;
+      const parsedValue = formPreferenceValueSchema.safeParse(value);
+      if (!parsedValue.success) {
+        return err("VALIDATION", "Invalid input");
+      }
+      rawData[name] = parsedValue.data === "on";
     }
 
     const validation = updatePreferencesSchema.safeParse(rawData);
