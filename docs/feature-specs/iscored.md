@@ -65,7 +65,6 @@ Removed 2026-09-16. The Info tab card's "View all on iScored" link replaces it: 
 | :-- | :-- | :-- |
 | §2.1–§2.2 machine linking in Manage tab | No form field in Manage tab | PP-h2bu.4 |
 | §2.3 MCP linking tool | No `set_machine_iscored` MCP tool | PP-h2bu.6 |
-| §3.1–§3.5 iScored API client & cache | No client module | PP-h2bu.3 |
 | §4.1–§4.5 Info tab top scores card | Not yet rendered | PP-h2bu.4 |
 | §6.1 Fleet overview column | Not yet rendered | PP-h2bu.5 |
 
