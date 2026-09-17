@@ -110,6 +110,61 @@ describe("checkPermission", () => {
       ).toBe(true);
     });
 
+    it("should resolve machines.settings.setDefault by ownership for members and technicians, and grant to admins (PP-leli.8)", () => {
+      const asOwner: OwnershipContext = { userId, machineOwnerId: userId };
+      const asNonOwner: OwnershipContext = {
+        userId,
+        machineOwnerId: otherUserId,
+      };
+      expect(
+        checkPermission("machines.settings.setDefault", "member", asOwner)
+      ).toBe(true);
+      expect(
+        checkPermission("machines.settings.setDefault", "member", asNonOwner)
+      ).toBe(false);
+      expect(
+        checkPermission("machines.settings.setDefault", "technician", asOwner)
+      ).toBe(true);
+      expect(
+        checkPermission(
+          "machines.settings.setDefault",
+          "technician",
+          asNonOwner
+        )
+      ).toBe(false);
+      expect(
+        checkPermission("machines.settings.setDefault", "admin", asNonOwner)
+      ).toBe(true);
+      expect(
+        checkPermission("machines.settings.setDefault", "guest", asOwner)
+      ).toBe(false);
+      expect(
+        checkPermission(
+          "machines.settings.setDefault",
+          "unauthenticated",
+          asOwner
+        )
+      ).toBe(false);
+    });
+
+    it("should resolve machines.settings.view.private to admin only (PP-leli.8)", () => {
+      expect(checkPermission("machines.settings.view.private", "admin")).toBe(
+        true
+      );
+      expect(
+        checkPermission("machines.settings.view.private", "technician")
+      ).toBe(false);
+      expect(checkPermission("machines.settings.view.private", "member")).toBe(
+        false
+      );
+      expect(checkPermission("machines.settings.view.private", "guest")).toBe(
+        false
+      );
+      expect(
+        checkPermission("machines.settings.view.private", "unauthenticated")
+      ).toBe(false);
+    });
+
     it("should deny if userId not provided for conditional permission", () => {
       const context: OwnershipContext = {
         reporterId: userId,
