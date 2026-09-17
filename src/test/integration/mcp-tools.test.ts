@@ -88,6 +88,7 @@ import {
 import { updateMachineSchema } from "~/app/(app)/m/schemas";
 import { updateMachinePbmLink } from "~/services/machines";
 import { runUpdateIssue } from "~/lib/mcp/tools/update-issue";
+import { runUpdateMachine } from "~/lib/mcp/tools/update-machine";
 import {
   McpToolError,
   resolveAssignee,
@@ -2812,12 +2813,8 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
       "list_issues",
       "list_machines",
       "search_pinballmap_catalog",
-      "set_machine_availability",
-      "set_machine_iscored",
-      "set_machine_name",
-      "set_machine_owner",
-      "set_machine_pinballmap",
       "update_issue",
+      "update_machine",
     ]);
   });
 
@@ -3590,6 +3587,460 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
       } finally {
         spy.mockRestore();
       }
+    });
+  });
+
+  describe("update_machine", () => {
+    it("updates machine name individually and detects no-op", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine({ name: "Old Name" });
+
+      const outcome = await runUpdateMachine(
+        { machine: machine.initials, name: "New Name" },
+        ctx("admin", admin)
+      );
+
+      expect(outcome.applied).toEqual([
+        {
+          field: "name",
+          from: "Old Name",
+          to: "New Name",
+          changed: true,
+        },
+      ]);
+      expect(outcome.result.name).toBe("New Name");
+
+      const db = await getTestDb();
+      const updated = await db.query.machines.findFirst({
+        where: eq(machines.id, machine.id),
+      });
+      expect(updated?.name).toBe("New Name");
+
+      // No-op when unchanged
+      const noop = await runUpdateMachine(
+        { machine: machine.initials, name: "New Name" },
+        ctx("admin", admin)
+      );
+      expect(noop.applied).toEqual([
+        {
+          field: "name",
+          from: "New Name",
+          to: "New Name",
+          changed: false,
+        },
+      ]);
+    });
+
+    it("updates machine presenceStatus individually and detects no-op", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine({ presenceStatus: "on_the_floor" });
+
+      const outcome = await runUpdateMachine(
+        { machine: machine.initials, presenceStatus: "off_the_floor" },
+        ctx("admin", admin)
+      );
+
+      expect(outcome.applied).toEqual([
+        {
+          field: "presenceStatus",
+          from: "on_the_floor",
+          to: "off_the_floor",
+          changed: true,
+        },
+      ]);
+      expect(outcome.result.presence).toBe("off_the_floor");
+
+      const db = await getTestDb();
+      const updated = await db.query.machines.findFirst({
+        where: eq(machines.id, machine.id),
+      });
+      expect(updated?.presenceStatus).toBe("off_the_floor");
+
+      // No-op
+      const noop = await runUpdateMachine(
+        { machine: machine.initials, presenceStatus: "off_the_floor" },
+        ctx("admin", admin)
+      );
+      expect(noop.applied).toEqual([
+        {
+          field: "presenceStatus",
+          from: "off_the_floor",
+          to: "off_the_floor",
+          changed: false,
+        },
+      ]);
+    });
+
+    it("updates machine owner by name, UUID, and clears owner", async () => {
+      const admin = await makeUser("admin");
+      const member1 = await makeUser("member", "Ada", "Lovelace");
+      const member2 = await makeUser("member", "Grace", "Hopper");
+      const machine = await seedMachine();
+
+      // Set owner by member full name
+      const outcome1 = await runUpdateMachine(
+        { machine: machine.initials, owner: "Ada Lovelace" },
+        ctx("admin", admin)
+      );
+      expect(outcome1.applied).toEqual([
+        {
+          field: "owner",
+          from: null,
+          to: "Ada Lovelace",
+          changed: true,
+        },
+      ]);
+
+      const db = await getTestDb();
+      let row = await db.query.machines.findFirst({
+        where: eq(machines.id, machine.id),
+      });
+      expect(row?.ownerId).toBe(member1);
+
+      // Set owner by UUID
+      const outcome2 = await runUpdateMachine(
+        { machine: machine.initials, owner: member2 },
+        ctx("admin", admin)
+      );
+      expect(outcome2.applied).toEqual([
+        {
+          field: "owner",
+          from: "Ada Lovelace",
+          to: "Grace Hopper",
+          changed: true,
+        },
+      ]);
+      row = await db.query.machines.findFirst({
+        where: eq(machines.id, machine.id),
+      });
+      expect(row?.ownerId).toBe(member2);
+
+      // No-op when setting same owner
+      const noop = await runUpdateMachine(
+        { machine: machine.initials, owner: "Grace Hopper" },
+        ctx("admin", admin)
+      );
+      expect(noop.applied).toEqual([
+        {
+          field: "owner",
+          from: "Grace Hopper",
+          to: "Grace Hopper",
+          changed: false,
+        },
+      ]);
+
+      // Clear owner with null
+      const clearNull = await runUpdateMachine(
+        { machine: machine.initials, owner: null },
+        ctx("admin", admin)
+      );
+      expect(clearNull.applied).toEqual([
+        {
+          field: "owner",
+          from: "Grace Hopper",
+          to: null,
+          changed: true,
+        },
+      ]);
+      row = await db.query.machines.findFirst({
+        where: eq(machines.id, machine.id),
+      });
+      expect(row?.ownerId).toBeNull();
+    });
+
+    it("rejects invalid owner names and guest owners", async () => {
+      const admin = await makeUser("admin");
+      const guest = await makeUser("guest", "Guest", "User");
+      const machine = await seedMachine();
+
+      await expect(
+        runUpdateMachine(
+          { machine: machine.initials, owner: "Nonexistent Person" },
+          ctx("admin", admin)
+        )
+      ).rejects.toMatchObject({ reason: "not_found" });
+
+      await expect(
+        runUpdateMachine(
+          { machine: machine.initials, owner: guest },
+          ctx("admin", admin)
+        )
+      ).rejects.toMatchObject({ reason: "invalid" });
+    });
+
+    it("updates pinballmapMachineId individually and detects no-op", async () => {
+      await seedElviraCatalog();
+      const admin = await makeUser("admin");
+      const machine = await seedMachine();
+
+      const outcome = await runUpdateMachine(
+        { machine: machine.initials, pinballmapMachineId: ELVIRA_PREMIUM_ID },
+        ctx("admin", admin)
+      );
+      expect(outcome.applied).toEqual([
+        {
+          field: "pinballmapMachineId",
+          from: null,
+          to: String(ELVIRA_PREMIUM_ID),
+          changed: true,
+        },
+      ]);
+
+      const db = await getTestDb();
+      const row = await db.query.machines.findFirst({
+        where: eq(machines.id, machine.id),
+      });
+      expect(row?.pinballmapMachineId).toBe(ELVIRA_PREMIUM_ID);
+
+      // Re-link with same id is a no-op
+      const noop = await runUpdateMachine(
+        { machine: machine.initials, pinballmapMachineId: ELVIRA_PREMIUM_ID },
+        ctx("admin", admin)
+      );
+      expect(noop.applied).toEqual([
+        {
+          field: "pinballmapMachineId",
+          from: String(ELVIRA_PREMIUM_ID),
+          to: String(ELVIRA_PREMIUM_ID),
+          changed: false,
+        },
+      ]);
+    });
+
+    it("marks machine as excluded from Pinball Map with reason", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine();
+
+      const outcome = await runUpdateMachine(
+        {
+          machine: machine.initials,
+          pinballmapExcluded: true,
+          pinballmapExcludedReason: "Custom homebrew",
+        },
+        ctx("admin", admin)
+      );
+      expect(outcome.applied).toEqual([
+        {
+          field: "pinballmapExcluded",
+          from: "false",
+          to: "true",
+          changed: true,
+        },
+      ]);
+
+      const db = await getTestDb();
+      const row = await db.query.machines.findFirst({
+        where: eq(machines.id, machine.id),
+      });
+      expect(row?.pinballmapExcluded).toBe(true);
+      expect(row?.pinballmapExcludedReason).toBe("Custom homebrew");
+    });
+
+    it("updates lineup intent individually", async () => {
+      await seedElviraCatalog();
+      const admin = await makeUser("admin");
+      const machine = await seedMachine({
+        pbm: { pinballmapMachineId: ELVIRA_PREMIUM_ID, pinballmapIntent: "on" },
+      });
+
+      const outcome = await runUpdateMachine(
+        { machine: machine.initials, intent: "off" },
+        ctx("admin", admin)
+      );
+      expect(outcome.applied).toEqual([
+        {
+          field: "intent",
+          from: "on",
+          to: "off",
+          changed: true,
+        },
+      ]);
+
+      const db = await getTestDb();
+      const row = await db.query.machines.findFirst({
+        where: eq(machines.id, machine.id),
+      });
+      expect(row?.pinballmapIntent).toBe("off");
+    });
+
+    it("updates iscoredGameId individually and clears it", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine();
+
+      // Set iscoredGameId
+      const outcome = await runUpdateMachine(
+        { machine: machine.initials, iscoredGameId: "iscored-456" },
+        ctx("admin", admin)
+      );
+      expect(outcome.applied).toEqual([
+        {
+          field: "iscoredGameId",
+          from: null,
+          to: "iscored-456",
+          changed: true,
+        },
+      ]);
+
+      const db = await getTestDb();
+      let row = await db.query.machines.findFirst({
+        where: eq(machines.id, machine.id),
+      });
+      expect(row?.iscoredGameId).toBe("iscored-456");
+
+      // No-op when setting identical id
+      const noop = await runUpdateMachine(
+        { machine: machine.initials, iscoredGameId: "iscored-456" },
+        ctx("admin", admin)
+      );
+      expect(noop.applied).toEqual([
+        {
+          field: "iscoredGameId",
+          from: "iscored-456",
+          to: "iscored-456",
+          changed: false,
+        },
+      ]);
+
+      // Clear with null
+      const cleared = await runUpdateMachine(
+        { machine: machine.initials, iscoredGameId: null },
+        ctx("admin", admin)
+      );
+      expect(cleared.applied).toEqual([
+        {
+          field: "iscoredGameId",
+          from: "iscored-456",
+          to: null,
+          changed: true,
+        },
+      ]);
+      row = await db.query.machines.findFirst({
+        where: eq(machines.id, machine.id),
+      });
+      expect(row?.iscoredGameId).toBeNull();
+    });
+
+    it("updates multiple fields in combination", async () => {
+      await seedElviraCatalog();
+      const admin = await makeUser("admin");
+      const member = await makeUser("member", "Hedy", "Lamarr");
+      const machine = await seedMachine({
+        name: "Old Cabinet",
+        presenceStatus: "on_the_floor",
+      });
+
+      const outcome = await runUpdateMachine(
+        {
+          machine: machine.initials,
+          name: "New Cabinet Name",
+          presenceStatus: "off_the_floor",
+          owner: "Hedy Lamarr",
+          pinballmapMachineId: ELVIRA_PREMIUM_ID,
+          iscoredGameId: "iscored-combo-789",
+        },
+        ctx("admin", admin)
+      );
+
+      expect(outcome.applied).toEqual([
+        {
+          field: "name",
+          from: "Old Cabinet",
+          to: "New Cabinet Name",
+          changed: true,
+        },
+        {
+          field: "presenceStatus",
+          from: "on_the_floor",
+          to: "off_the_floor",
+          changed: true,
+        },
+        {
+          field: "owner",
+          from: null,
+          to: "Hedy Lamarr",
+          changed: true,
+        },
+        {
+          field: "pinballmapMachineId",
+          from: null,
+          to: String(ELVIRA_PREMIUM_ID),
+          changed: true,
+        },
+        {
+          field: "iscoredGameId",
+          from: null,
+          to: "iscored-combo-789",
+          changed: true,
+        },
+      ]);
+
+      const db = await getTestDb();
+      const row = await db.query.machines.findFirst({
+        where: eq(machines.id, machine.id),
+      });
+      expect(row).toMatchObject({
+        name: "New Cabinet Name",
+        presenceStatus: "off_the_floor",
+        ownerId: member,
+        pinballmapMachineId: ELVIRA_PREMIUM_ID,
+        iscoredGameId: "iscored-combo-789",
+      });
+    });
+
+    it("validates schema requirements: at least one field and mutual exclusion", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine();
+
+      // No fields supplied
+      await expect(
+        runUpdateMachine({ machine: machine.initials }, ctx("admin", admin))
+      ).rejects.toMatchObject({
+        reason: "invalid",
+        message: expect.stringMatching(/at least one field/i),
+      });
+
+      // Both pinballmapMachineId and pinballmapExcluded: true
+      await expect(
+        runUpdateMachine(
+          {
+            machine: machine.initials,
+            pinballmapMachineId: 12345,
+            pinballmapExcluded: true,
+          },
+          ctx("admin", admin)
+        )
+      ).rejects.toMatchObject({
+        reason: "invalid",
+        message: expect.stringMatching(/both/i),
+      });
+    });
+
+    it("enforces permission gates: member cannot update another member's machine but can update their own", async () => {
+      const member1 = await makeUser("member", "User", "One");
+      const member2 = await makeUser("member", "User", "Two");
+      const machine = await seedMachine({ ownerId: member1 });
+
+      // Member 2 trying to edit Member 1's machine
+      await expect(
+        runUpdateMachine(
+          { machine: machine.initials, name: "Unauthorized Rename" },
+          ctx("member", member2)
+        )
+      ).rejects.toMatchObject({ reason: "denied" });
+
+      // Member 1 editing their own machine succeeds
+      const outcome = await runUpdateMachine(
+        { machine: machine.initials, name: "Authorized Rename" },
+        ctx("member", member1)
+      );
+      expect(outcome.applied).toEqual([
+        {
+          field: "name",
+          from: "Seed Machine",
+          to: "Authorized Rename",
+          changed: true,
+        },
+      ]);
     });
   });
 });

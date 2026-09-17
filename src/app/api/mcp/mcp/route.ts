@@ -22,9 +22,7 @@ export const maxDuration = 60;
  * each tool additionally runs `checkPermission()` underneath (defense in depth).
  *
  * Tools: the PinPoint tool catalog ({@link registerPinpointTools}) plus a
- * `whoami` diagnostic used to validate the connection end-to-end. Deliberately
- * no count here — that number goes stale every time a tool lands (PP-x8jb);
- * `registerPinpointTools` is the list.
+ * `whoami` diagnostic used to validate the connection end-to-end.
  */
 const handler = createMcpHandler(
   (server) => {
