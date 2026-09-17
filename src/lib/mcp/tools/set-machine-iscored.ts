@@ -17,7 +17,7 @@ import {
 } from "./shared";
 import type { McpAuthContext } from "~/lib/mcp/verify-token";
 
-export const setMachineIscoredSchema = z.object({
+export const setMachineIscoredSchema = z.strictObject({
   machine: z
     .string()
     .trim()
@@ -26,11 +26,17 @@ export const setMachineIscoredSchema = z.object({
   gameId: z
     .string()
     .trim()
+    .nullable()
     .optional()
     .describe(
       "iScored game ID string to link to this machine. Omit, pass an empty string, or pass null to clear the link."
     ),
-  iscoredGameId: z.string().trim().optional().describe("Alias for gameId."),
+  iscoredGameId: z
+    .string()
+    .trim()
+    .nullable()
+    .optional()
+    .describe("Alias for gameId."),
 });
 
 export type SetMachineIscoredArgs = z.infer<typeof setMachineIscoredSchema>;
@@ -59,7 +65,6 @@ export async function runSetMachineIscored(
   const { changed, iscoredGameId, previousIscoredGameId } =
     await updateMachineIscoredLink({
       machineId: machine.id,
-      actorUserId: ctx.userId,
       iscoredGameId: rawId,
     });
 

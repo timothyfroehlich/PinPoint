@@ -1109,7 +1109,6 @@ export async function updateMachineName({
 
 export interface UpdateMachineIscoredLinkParams {
   machineId: string;
-  actorUserId: string;
   iscoredGameId?: string | null;
 }
 
@@ -1127,7 +1126,6 @@ export interface UpdateMachineIscoredLinkResult {
  */
 export async function updateMachineIscoredLink({
   machineId,
-  actorUserId: _actorUserId,
   iscoredGameId,
 }: UpdateMachineIscoredLinkParams): Promise<UpdateMachineIscoredLinkResult> {
   const normalized =

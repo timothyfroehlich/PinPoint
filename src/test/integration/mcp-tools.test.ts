@@ -75,7 +75,10 @@ import type {
 } from "~/lib/mcp/tools/search-pinballmap-catalog";
 import type { McpMachinePinballmap } from "~/lib/mcp/tools/pinballmap-block";
 import { runSetMachineAvailability } from "~/lib/mcp/tools/set-machine-availability";
-import { runSetMachineIscored } from "~/lib/mcp/tools/set-machine-iscored";
+import {
+  runSetMachineIscored,
+  setMachineIscoredSchema,
+} from "~/lib/mcp/tools/set-machine-iscored";
 import { runSetMachineName } from "~/lib/mcp/tools/set-machine-name";
 import { runSetMachineOwner } from "~/lib/mcp/tools/set-machine-owner";
 import {
@@ -2428,7 +2431,7 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
       });
     });
 
-    it("clears an iScored link when gameId is empty", async () => {
+    it("clears an iScored link when gameId is empty or null", async () => {
       const admin = await makeUser("admin");
       const machine = await seedMachine({
         name: "Godzilla",
@@ -2436,7 +2439,7 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
       });
 
       const outcome = await runSetMachineIscored(
-        { machine: machine.initials, gameId: "" },
+        { machine: machine.initials, gameId: null },
         ctx("admin", admin)
       );
 
@@ -2454,6 +2457,14 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
         columns: { iscoredGameId: true },
       });
       expect(row?.iscoredGameId).toBeNull();
+    });
+
+    it("rejects unknown keys at schema validation via strictObject", () => {
+      const result = setMachineIscoredSchema.safeParse({
+        machine: "MM",
+        game_id: "12345",
+      });
+      expect(result.success).toBe(false);
     });
 
     it("is idempotent when the game ID already matches, and reports changed: false", async () => {
