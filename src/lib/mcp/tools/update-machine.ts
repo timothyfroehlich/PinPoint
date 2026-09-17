@@ -5,6 +5,7 @@ import { after } from "next/server";
 import { z } from "zod";
 
 import { dispatchNotification } from "~/lib/notifications";
+import { reportError } from "~/lib/observability/report-error";
 import { checkPermission } from "~/lib/permissions/helpers";
 import { VALID_MACHINE_PRESENCE_STATUSES } from "~/lib/machines/presence";
 import {
@@ -283,17 +284,20 @@ export async function runUpdateMachine(
 
   // 3. updateMachineOwner (if owner supplied)
   if (cleanArgs.owner !== undefined && newOwner !== undefined) {
-    try {
-      const previousOwnerNames = await getOwnerNamesByMachine([
-        {
-          id: machine.id,
-          ownerId: currentOwnerId,
-          invitedOwnerId: currentInvitedOwnerId,
-        },
-      ]);
-      const fromOwnerName = previousOwnerNames.get(machine.id) ?? null;
+    const previousOwnerNames = await getOwnerNamesByMachine([
+      {
+        id: machine.id,
+        ownerId: currentOwnerId,
+        invitedOwnerId: currentInvitedOwnerId,
+      },
+    ]);
+    const fromOwnerName = previousOwnerNames.get(machine.id) ?? null;
 
-      const { deliveryPlan } = await updateMachineOwner({
+    let deliveryPlan: Awaited<
+      ReturnType<typeof updateMachineOwner>
+    >["deliveryPlan"];
+    try {
+      const outcome = await updateMachineOwner({
         machineId: machine.id,
         actorUserId: ctx.userId,
         current: {
@@ -304,9 +308,18 @@ export async function runUpdateMachine(
         },
         newOwner,
       });
+      deliveryPlan = outcome.deliveryPlan;
+    } catch (error) {
+      return handleFailure(
+        "owner",
+        error instanceof Error ? error.message : "Updating owner failed."
+      );
+    }
 
+    // Owner row is committed past this point: never report it as failed.
+    let toOwnerName: string | null = null;
+    try {
       after(() => dispatchNotification(deliveryPlan));
-
       const newOwnerNames = await getOwnerNamesByMachine([
         {
           id: machine.id,
@@ -314,24 +327,24 @@ export async function runUpdateMachine(
           invitedOwnerId: newOwner.invitedOwnerId,
         },
       ]);
-      const toOwnerName = newOwnerNames.get(machine.id) ?? null;
-
-      const changed =
-        currentOwnerId !== newOwner.ownerId ||
-        currentInvitedOwnerId !== newOwner.invitedOwnerId;
-
-      applied.push({
-        field: "owner",
-        from: fromOwnerName,
-        to: toOwnerName,
-        changed,
-      });
+      toOwnerName = newOwnerNames.get(machine.id) ?? null;
     } catch (error) {
-      return handleFailure(
-        "owner",
-        error instanceof Error ? error.message : "Updating owner failed."
-      );
+      reportError(error, {
+        action: "mcp.update_machine.ownerPostCommit",
+        machineId: machine.id,
+      });
     }
+
+    const changed =
+      currentOwnerId !== newOwner.ownerId ||
+      currentInvitedOwnerId !== newOwner.invitedOwnerId;
+
+    applied.push({
+      field: "owner",
+      from: fromOwnerName,
+      to: toOwnerName,
+      changed,
+    });
   }
 
   // 4. updateMachinePbmLink (if pinballmap fields or intent supplied)
