@@ -4,7 +4,7 @@
 
 **What this document is.** The requirements for PinPoint's printed apron cards: what the card shows, what data it draws on, and how that data is authored. No implementation detail — design records and code carry that. It describes the intended final state only; what the code does or used to do lives solely in the Known divergences table. Each requirement is numbered for citation. When code and spec disagree, either the code is wrong or this document gets amended — never silently neither.
 
-**Related records.** [apron-cards-mockup.html](apron-cards-mockup.html) (card face, both size variants). Card-editor design canvas: https://claude.ai/artifact/6eZticctcaWJPJRAwcqXXm (authoring surface — Service/Manage entry points, overflow handling, Export menu, mobile). Bead PP-esta (build tracking); PP-esta.1 (edition-name parsing survey, informs §7).
+**Related records.** [apron-cards-mockup.html](apron-cards-mockup.html) (card face, both size variants). [apron-cards-editor-mockup.html](apron-cards-editor-mockup.html) (authoring surface — Service/Manage entry points, overflow handling, Export menu, mobile). Bead PP-esta (build tracking); PP-esta.1 (edition-name parsing survey, informs §7).
 
 ---
 
