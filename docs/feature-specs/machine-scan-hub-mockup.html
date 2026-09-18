@@ -1,0 +1,1445 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Machine scan hub — mockup</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 32px 24px;
+        font-family:
+          system-ui,
+          -apple-system,
+          "Segoe UI",
+          Roboto,
+          sans-serif;
+        background: #09090b;
+        color: #f8fafc;
+      }
+      a {
+        color: #4ade80;
+      }
+      .row {
+        display: flex;
+        gap: 48px;
+        flex-wrap: wrap;
+        align-items: flex-start;
+      }
+      figure {
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      figcaption {
+        font-size: 13px;
+        color: #a1a1aa;
+      }
+      .frame {
+        border-radius: 28px;
+        overflow: hidden;
+        box-shadow: 0 0 0 1px #27272a;
+      }
+    </style>
+  </head>
+  <body>
+    <h1 style="font-size: 18px; margin: 0 0 4px">Machine scan hub</h1>
+    <p style="font-size: 13px; color: #a1a1aa; margin: 0 0 24px">
+      Visual reference for <code>docs/feature-specs/machine-scan-hub.md</code>.
+      Design locked 2026-09-18 (canvas board “A3-Tim · amber”). Sample data; the
+      PinPoint header and bottom tab bar are the real app shell.
+    </p>
+    <div class="row">
+      <figure>
+        <div class="frame">
+          <div
+            style="
+              width: 390px;
+              height: 844px;
+              box-sizing: border-box;
+              display: flex;
+              flex-direction: column;
+              background: #0f0f11;
+              color: #f8fafc;
+            "
+          >
+            <header
+              style="
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                height: 56px;
+                flex-shrink: 0;
+                padding: 0 16px;
+                background: rgba(24, 21, 27, 0.85);
+                border-bottom: 1px solid rgba(74, 222, 128, 0.5);
+                box-shadow: 0 0 15px rgba(74, 222, 128, 0.15);
+              "
+            >
+              <img
+                src="../../public/logo-pinpoint-transparent.png"
+                alt=""
+                style="width: 32px; height: 32px; object-fit: contain"
+              />
+              <span
+                style="
+                  font-size: 16px;
+                  font-weight: 700;
+                  letter-spacing: -0.01em;
+                  color: #f8fafc;
+                "
+                >PinPoint</span
+              >
+              <div style="flex-grow: 1"></div>
+              <a
+                href="#signin"
+                style="
+                  display: flex;
+                  align-items: center;
+                  height: 32px;
+                  padding: 0 12px;
+                  border-radius: 8px;
+                  border: 1px solid #52525b;
+                  color: #f8fafc;
+                  font-size: 12px;
+                  font-weight: 600;
+                  text-decoration: none;
+                "
+                >Sign In</a
+              >
+              <a
+                href="#signup"
+                style="
+                  display: flex;
+                  align-items: center;
+                  height: 32px;
+                  padding: 0 12px;
+                  border-radius: 8px;
+                  background: #4ade80;
+                  color: #022c22;
+                  font-size: 12px;
+                  font-weight: 600;
+                  text-decoration: none;
+                "
+                >Sign Up</a
+              >
+            </header>
+            <main
+              style="
+                flex-grow: 1;
+                min-height: 0;
+                display: flex;
+                flex-direction: column;
+                gap: 14px;
+                padding: 18px 20px 14px;
+              "
+            >
+              <a
+                href="#full"
+                style="
+                  display: flex;
+                  align-items: center;
+                  gap: 10px;
+                  color: inherit;
+                  text-decoration: none;
+                "
+              >
+                <div
+                  style="
+                    flex-grow: 1;
+                    min-width: 0;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 3px;
+                  "
+                >
+                  <h1
+                    style="
+                      margin: 0;
+                      font-size: 30px;
+                      line-height: 1.1;
+                      font-weight: 800;
+                      letter-spacing: -0.01em;
+                      color: #f8fafc;
+                    "
+                  >
+                    Attack from Mars
+                  </h1>
+                  <div style="font-size: 14px; color: #a1a1aa">
+                    Bally · 1995 · Owned by Tim F.
+                  </div>
+                </div>
+                <div
+                  style="
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    gap: 2px;
+                    color: #a1a1aa;
+                  "
+                >
+                  <svg
+                    width="22"
+                    height="22"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#a1a1aa"
+                    stroke-width="2.2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="m9 18 6-6-6-6"></path></svg
+                  ><span style="font-size: 10px; font-weight: 600"
+                    >Details</span
+                  >
+                </div>
+              </a>
+              <section
+                style="
+                  display: flex;
+                  flex-direction: column;
+                  gap: 6px;
+                  padding: 14px 16px;
+                  border-radius: 12px;
+                  background: #18151b;
+                  border: 1px solid #27272a;
+                "
+              >
+                <div
+                  style="
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                  "
+                >
+                  <div
+                    style="
+                      font-size: 11px;
+                      font-weight: 700;
+                      letter-spacing: 0.08em;
+                      text-transform: uppercase;
+                      color: #a1a1aa;
+                    "
+                  >
+                    Top scores
+                  </div>
+                  <a
+                    href="#x"
+                    style="
+                      font-size: 12px;
+                      font-weight: 600;
+                      color: #4ade80;
+                      text-decoration: none;
+                    "
+                    >View all on iScored</a
+                  >
+                </div>
+                <div
+                  style="
+                    display: flex;
+                    align-items: center;
+                    gap: 12px;
+                    height: 40px;
+                  "
+                >
+                  <div
+                    style="
+                      width: 24px;
+                      height: 24px;
+                      border-radius: 999px;
+                      background: #4ade80;
+                      color: #022c22;
+                      font-size: 12px;
+                      font-weight: 800;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                    "
+                  >
+                    1
+                  </div>
+                  <div
+                    style="
+                      flex-grow: 1;
+                      min-width: 0;
+                      display: flex;
+                      flex-direction: column;
+                    "
+                  >
+                    <div style="font-size: 14px; font-weight: 600">Kate M.</div>
+                    <div style="font-size: 11px; color: #a1a1aa">Sep 12</div>
+                  </div>
+                  <div
+                    style="
+                      font-size: 15px;
+                      font-weight: 700;
+                      font-variant-numeric: tabular-nums;
+                    "
+                  >
+                    6,482,330,120
+                  </div>
+                </div>
+                <div
+                  style="
+                    display: flex;
+                    align-items: center;
+                    gap: 12px;
+                    height: 40px;
+                  "
+                >
+                  <div
+                    style="
+                      width: 24px;
+                      height: 24px;
+                      border-radius: 999px;
+                      background: #27272a;
+                      color: #f8fafc;
+                      font-size: 12px;
+                      font-weight: 800;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                    "
+                  >
+                    2
+                  </div>
+                  <div
+                    style="
+                      flex-grow: 1;
+                      min-width: 0;
+                      display: flex;
+                      flex-direction: column;
+                    "
+                  >
+                    <div style="font-size: 14px; font-weight: 600">Tim F.</div>
+                    <div style="font-size: 11px; color: #a1a1aa">Aug 30</div>
+                  </div>
+                  <div
+                    style="
+                      font-size: 15px;
+                      font-weight: 700;
+                      font-variant-numeric: tabular-nums;
+                    "
+                  >
+                    4,213,450,000
+                  </div>
+                </div>
+                <div
+                  style="
+                    display: flex;
+                    align-items: center;
+                    gap: 12px;
+                    height: 40px;
+                  "
+                >
+                  <div
+                    style="
+                      width: 24px;
+                      height: 24px;
+                      border-radius: 999px;
+                      background: #27272a;
+                      color: #f8fafc;
+                      font-size: 12px;
+                      font-weight: 800;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                    "
+                  >
+                    3
+                  </div>
+                  <div
+                    style="
+                      flex-grow: 1;
+                      min-width: 0;
+                      display: flex;
+                      flex-direction: column;
+                    "
+                  >
+                    <div style="font-size: 14px; font-weight: 600">
+                      Jordan R.
+                    </div>
+                    <div style="font-size: 11px; color: #a1a1aa">Aug 2</div>
+                  </div>
+                  <div
+                    style="
+                      font-size: 15px;
+                      font-weight: 700;
+                      font-variant-numeric: tabular-nums;
+                    "
+                  >
+                    3,901,870,540
+                  </div>
+                </div>
+              </section>
+              <section
+                style="
+                  display: flex;
+                  flex-direction: column;
+                  gap: 6px;
+                  padding: 14px 16px;
+                  border-radius: 12px;
+                  background: #18151b;
+                  border: 1px solid #27272a;
+                "
+              >
+                <div
+                  style="
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                  "
+                >
+                  <div
+                    style="
+                      font-size: 11px;
+                      font-weight: 700;
+                      letter-spacing: 0.08em;
+                      text-transform: uppercase;
+                      color: #a1a1aa;
+                    "
+                  >
+                    Open issues · 3
+                  </div>
+                  <a
+                    href="#x"
+                    style="
+                      font-size: 12px;
+                      font-weight: 600;
+                      color: #4ade80;
+                      text-decoration: none;
+                    "
+                    >See all</a
+                  >
+                </div>
+                <div
+                  style="
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    height: 40px;
+                  "
+                >
+                  <span
+                    style="
+                      font-size: 11px;
+                      font-weight: 700;
+                      padding: 2px 8px;
+                      border-radius: 999px;
+                      background: #713f12;
+                      color: #fef9c3;
+                    "
+                    >Major</span
+                  >
+                  <div
+                    style="
+                      flex-grow: 1;
+                      min-width: 0;
+                      font-size: 14px;
+                      font-weight: 500;
+                      white-space: nowrap;
+                      overflow: hidden;
+                      text-overflow: ellipsis;
+                    "
+                  >
+                    Right flipper weak
+                  </div>
+                  <div style="font-size: 12px; color: #a1a1aa">3d</div>
+                </div>
+                <div
+                  style="
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    height: 40px;
+                  "
+                >
+                  <span
+                    style="
+                      font-size: 11px;
+                      font-weight: 700;
+                      padding: 2px 8px;
+                      border-radius: 999px;
+                      background: #27272a;
+                      color: #f8fafc;
+                    "
+                    >Minor</span
+                  >
+                  <div
+                    style="
+                      flex-grow: 1;
+                      min-width: 0;
+                      font-size: 14px;
+                      font-weight: 500;
+                      white-space: nowrap;
+                      overflow: hidden;
+                      text-overflow: ellipsis;
+                    "
+                  >
+                    Saucer kickout sticks
+                  </div>
+                  <div style="font-size: 12px; color: #a1a1aa">1w</div>
+                </div>
+                <div
+                  style="
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    height: 40px;
+                  "
+                >
+                  <span
+                    style="
+                      font-size: 11px;
+                      font-weight: 700;
+                      padding: 2px 8px;
+                      border-radius: 999px;
+                      background: #27272a;
+                      color: #a1a1aa;
+                    "
+                    >Cosmetic</span
+                  >
+                  <div
+                    style="
+                      flex-grow: 1;
+                      min-width: 0;
+                      font-size: 14px;
+                      font-weight: 500;
+                      white-space: nowrap;
+                      overflow: hidden;
+                      text-overflow: ellipsis;
+                    "
+                  >
+                    Stroke of Luck insert dim
+                  </div>
+                  <div style="font-size: 12px; color: #a1a1aa">2w</div>
+                </div>
+              </section>
+              <div style="flex-grow: 1"></div>
+
+              <div style="display: flex; gap: 10px">
+                <a
+                  href="#score"
+                  style="
+                    flex: 1 1 0;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 8px;
+                    height: 100px;
+                    border-radius: 14px;
+                    color: #042f2e;
+                    text-decoration: none;
+                    font-size: 16px;
+                    font-weight: 700;
+                    text-align: center;
+                    background-color: #4ade80;
+                  "
+                >
+                  <svg
+                    width="28"
+                    height="28"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2.2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"></path>
+                    <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"></path>
+                    <path d="M4 22h16"></path>
+                    <path
+                      d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"
+                    ></path>
+                    <path
+                      d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"
+                    ></path>
+                    <path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"></path></svg
+                  ><span>Post a score</span> </a
+                ><a
+                  href="#report"
+                  style="
+                    flex: 1 1 0;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 8px;
+                    height: 100px;
+                    border-radius: 14px;
+                    color: #422006;
+                    text-decoration: none;
+                    font-size: 16px;
+                    font-weight: 700;
+                    text-align: center;
+                    background-color: #eab308;
+                  "
+                >
+                  <svg
+                    width="28"
+                    height="28"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2.2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path
+                      d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"
+                    ></path>
+                    <path d="M12 9v4"></path>
+                    <path d="M12 17h.01"></path></svg
+                  ><span>Report a problem</span>
+                </a>
+              </div>
+            </main>
+            <nav
+              aria-label="mobile navigation"
+              style="
+                display: flex;
+                flex-shrink: 0;
+                padding-bottom: 14px;
+                background: rgba(24, 21, 27, 0.9);
+                border-top: 1px solid rgba(74, 222, 128, 0.5);
+                box-shadow: 0 -4px 15px rgba(74, 222, 128, 0.25);
+              "
+            >
+              <a
+                href="#dashboard"
+                style="
+                  flex: 1 1 0;
+                  display: flex;
+                  flex-direction: column;
+                  align-items: center;
+                  justify-content: center;
+                  gap: 4px;
+                  min-height: 56px;
+                  padding: 8px 0;
+                  font-size: 12px;
+                  font-weight: 500;
+                  color: #a1a1aa;
+                  text-decoration: none;
+                "
+                ><svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <rect width="7" height="9" x="3" y="3" rx="1"></rect>
+                  <rect width="7" height="5" x="14" y="3" rx="1"></rect>
+                  <rect width="7" height="9" x="14" y="12" rx="1"></rect>
+                  <rect width="7" height="5" x="3" y="16" rx="1"></rect></svg
+                ><span>Dashboard</span></a
+              ><a
+                href="#machines"
+                style="
+                  flex: 1 1 0;
+                  display: flex;
+                  flex-direction: column;
+                  align-items: center;
+                  justify-content: center;
+                  gap: 4px;
+                  min-height: 56px;
+                  padding: 8px 0;
+                  font-size: 12px;
+                  font-weight: 500;
+                  color: #4ade80;
+                  text-decoration: none;
+                "
+                ><svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <line x1="6" x2="10" y1="11" y2="11"></line>
+                  <line x1="8" x2="8" y1="9" y2="13"></line>
+                  <line x1="15" x2="15.01" y1="12" y2="12"></line>
+                  <line x1="18" x2="18.01" y1="10" y2="10"></line>
+                  <path
+                    d="M17.32 5H6.68a4 4 0 0 0-3.978 3.59c-.006.052-.01.101-.017.152C2.604 9.416 2 14.456 2 16a3 3 0 0 0 3 3c1 0 1.5-.5 2-1l1.414-1.414A2 2 0 0 1 9.828 16h4.344a2 2 0 0 1 1.414.586L17 18c.5.5 1 1 2 1a3 3 0 0 0 3-3c0-1.545-.604-6.584-.685-7.258-.007-.05-.011-.1-.017-.151A4 4 0 0 0 17.32 5z"
+                  ></path></svg
+                ><span>Machines</span></a
+              ><a
+                href="#issues"
+                style="
+                  flex: 1 1 0;
+                  display: flex;
+                  flex-direction: column;
+                  align-items: center;
+                  justify-content: center;
+                  gap: 4px;
+                  min-height: 56px;
+                  padding: 8px 0;
+                  font-size: 12px;
+                  font-weight: 500;
+                  color: #a1a1aa;
+                  text-decoration: none;
+                "
+                ><svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"
+                  ></path>
+                  <path d="M12 9v4"></path>
+                  <path d="M12 17h.01"></path></svg
+                ><span>Issues</span></a
+              ><a
+                href="#report"
+                style="
+                  flex: 1 1 0;
+                  display: flex;
+                  flex-direction: column;
+                  align-items: center;
+                  justify-content: center;
+                  gap: 4px;
+                  min-height: 56px;
+                  padding: 8px 0;
+                  font-size: 12px;
+                  font-weight: 500;
+                  color: #a1a1aa;
+                  text-decoration: none;
+                "
+                ><svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M5 12h14"></path>
+                  <path d="M12 5v14"></path></svg
+                ><span>Report</span></a
+              ><a
+                href="#more"
+                style="
+                  flex: 1 1 0;
+                  display: flex;
+                  flex-direction: column;
+                  align-items: center;
+                  justify-content: center;
+                  gap: 4px;
+                  min-height: 56px;
+                  padding: 8px 0;
+                  font-size: 12px;
+                  font-weight: 500;
+                  color: #a1a1aa;
+                  text-decoration: none;
+                "
+                ><svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <circle cx="12" cy="12" r="1"></circle>
+                  <circle cx="12" cy="5" r="1"></circle>
+                  <circle cx="12" cy="19" r="1"></circle></svg
+                ><span>More</span></a
+              >
+            </nav>
+          </div>
+        </div>
+        <figcaption>Reference phone, 390×844 — spec §5.1</figcaption>
+      </figure>
+      <figure>
+        <div class="frame">
+          <div
+            style="
+              width: 375px;
+              height: 667px;
+              box-sizing: border-box;
+              display: flex;
+              flex-direction: column;
+              background: #0f0f11;
+              color: #f8fafc;
+            "
+          >
+            <header
+              style="
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                height: 56px;
+                flex-shrink: 0;
+                padding: 0 16px;
+                background: rgba(24, 21, 27, 0.85);
+                border-bottom: 1px solid rgba(74, 222, 128, 0.5);
+                box-shadow: 0 0 15px rgba(74, 222, 128, 0.15);
+              "
+            >
+              <img
+                src="../../public/logo-pinpoint-transparent.png"
+                alt=""
+                style="width: 32px; height: 32px; object-fit: contain"
+              />
+              <span
+                style="
+                  font-size: 16px;
+                  font-weight: 700;
+                  letter-spacing: -0.01em;
+                  color: #f8fafc;
+                "
+                >PinPoint</span
+              >
+              <div style="flex-grow: 1"></div>
+              <a
+                href="#signin"
+                style="
+                  display: flex;
+                  align-items: center;
+                  height: 32px;
+                  padding: 0 12px;
+                  border-radius: 8px;
+                  border: 1px solid #52525b;
+                  color: #f8fafc;
+                  font-size: 12px;
+                  font-weight: 600;
+                  text-decoration: none;
+                "
+                >Sign In</a
+              >
+              <a
+                href="#signup"
+                style="
+                  display: flex;
+                  align-items: center;
+                  height: 32px;
+                  padding: 0 12px;
+                  border-radius: 8px;
+                  background: #4ade80;
+                  color: #022c22;
+                  font-size: 12px;
+                  font-weight: 600;
+                  text-decoration: none;
+                "
+                >Sign Up</a
+              >
+            </header>
+            <main
+              style="
+                flex-grow: 1;
+                min-height: 0;
+                display: flex;
+                flex-direction: column;
+                gap: 12px;
+                padding: 14px 16px 12px;
+              "
+            >
+              <a
+                href="#full"
+                style="
+                  display: flex;
+                  align-items: center;
+                  gap: 10px;
+                  color: inherit;
+                  text-decoration: none;
+                "
+              >
+                <div
+                  style="
+                    flex-grow: 1;
+                    min-width: 0;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 3px;
+                  "
+                >
+                  <h1
+                    style="
+                      margin: 0;
+                      font-size: 26px;
+                      line-height: 1.1;
+                      font-weight: 800;
+                      letter-spacing: -0.01em;
+                      color: #f8fafc;
+                    "
+                  >
+                    Attack from Mars
+                  </h1>
+                  <div style="font-size: 13px; color: #a1a1aa">
+                    Bally · 1995 · Owned by Tim F.
+                  </div>
+                </div>
+                <div
+                  style="
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    gap: 2px;
+                    color: #a1a1aa;
+                  "
+                >
+                  <svg
+                    width="22"
+                    height="22"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#a1a1aa"
+                    stroke-width="2.2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="m9 18 6-6-6-6"></path></svg
+                  ><span style="font-size: 10px; font-weight: 600"
+                    >Details</span
+                  >
+                </div>
+              </a>
+              <section
+                style="
+                  display: flex;
+                  flex-direction: column;
+                  gap: 6px;
+                  padding: 12px 14px;
+                  border-radius: 12px;
+                  background: #18151b;
+                  border: 1px solid #27272a;
+                "
+              >
+                <div
+                  style="
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                  "
+                >
+                  <div
+                    style="
+                      font-size: 11px;
+                      font-weight: 700;
+                      letter-spacing: 0.08em;
+                      text-transform: uppercase;
+                      color: #a1a1aa;
+                    "
+                  >
+                    Top scores
+                  </div>
+                  <a
+                    href="#x"
+                    style="
+                      font-size: 12px;
+                      font-weight: 600;
+                      color: #4ade80;
+                      text-decoration: none;
+                    "
+                    >View all on iScored</a
+                  >
+                </div>
+                <div
+                  style="
+                    display: flex;
+                    align-items: center;
+                    gap: 12px;
+                    height: 36px;
+                  "
+                >
+                  <div
+                    style="
+                      width: 24px;
+                      height: 24px;
+                      border-radius: 999px;
+                      background: #4ade80;
+                      color: #022c22;
+                      font-size: 12px;
+                      font-weight: 800;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                    "
+                  >
+                    1
+                  </div>
+                  <div
+                    style="
+                      flex-grow: 1;
+                      min-width: 0;
+                      display: flex;
+                      flex-direction: column;
+                    "
+                  >
+                    <div style="font-size: 14px; font-weight: 600">Kate M.</div>
+                    <div style="font-size: 11px; color: #a1a1aa">Sep 12</div>
+                  </div>
+                  <div
+                    style="
+                      font-size: 15px;
+                      font-weight: 700;
+                      font-variant-numeric: tabular-nums;
+                    "
+                  >
+                    6,482,330,120
+                  </div>
+                </div>
+                <div
+                  style="
+                    display: flex;
+                    align-items: center;
+                    gap: 12px;
+                    height: 36px;
+                  "
+                >
+                  <div
+                    style="
+                      width: 24px;
+                      height: 24px;
+                      border-radius: 999px;
+                      background: #27272a;
+                      color: #f8fafc;
+                      font-size: 12px;
+                      font-weight: 800;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                    "
+                  >
+                    2
+                  </div>
+                  <div
+                    style="
+                      flex-grow: 1;
+                      min-width: 0;
+                      display: flex;
+                      flex-direction: column;
+                    "
+                  >
+                    <div style="font-size: 14px; font-weight: 600">Tim F.</div>
+                    <div style="font-size: 11px; color: #a1a1aa">Aug 30</div>
+                  </div>
+                  <div
+                    style="
+                      font-size: 15px;
+                      font-weight: 700;
+                      font-variant-numeric: tabular-nums;
+                    "
+                  >
+                    4,213,450,000
+                  </div>
+                </div>
+                <div
+                  style="
+                    display: flex;
+                    align-items: center;
+                    gap: 12px;
+                    height: 36px;
+                  "
+                >
+                  <div
+                    style="
+                      width: 24px;
+                      height: 24px;
+                      border-radius: 999px;
+                      background: #27272a;
+                      color: #f8fafc;
+                      font-size: 12px;
+                      font-weight: 800;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                    "
+                  >
+                    3
+                  </div>
+                  <div
+                    style="
+                      flex-grow: 1;
+                      min-width: 0;
+                      display: flex;
+                      flex-direction: column;
+                    "
+                  >
+                    <div style="font-size: 14px; font-weight: 600">
+                      Jordan R.
+                    </div>
+                    <div style="font-size: 11px; color: #a1a1aa">Aug 2</div>
+                  </div>
+                  <div
+                    style="
+                      font-size: 15px;
+                      font-weight: 700;
+                      font-variant-numeric: tabular-nums;
+                    "
+                  >
+                    3,901,870,540
+                  </div>
+                </div>
+              </section>
+              <a
+                href="#issues"
+                style="
+                  display: flex;
+                  align-items: center;
+                  gap: 10px;
+                  padding: 12px 14px;
+                  border-radius: 12px;
+                  background: #18151b;
+                  border: 1px solid #27272a;
+                  color: #f8fafc;
+                  text-decoration: none;
+                "
+              >
+                <div
+                  style="
+                    flex-grow: 1;
+                    min-width: 0;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 3px;
+                  "
+                >
+                  <div
+                    style="
+                      font-size: 11px;
+                      font-weight: 700;
+                      letter-spacing: 0.08em;
+                      text-transform: uppercase;
+                      color: #a1a1aa;
+                    "
+                  >
+                    Open issues · 3
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 8px">
+                    <span
+                      style="
+                        font-size: 11px;
+                        font-weight: 700;
+                        padding: 2px 8px;
+                        border-radius: 999px;
+                        background: #713f12;
+                        color: #fef9c3;
+                      "
+                      >Major</span
+                    >
+                    <div
+                      style="
+                        flex-grow: 1;
+                        min-width: 0;
+                        font-size: 14px;
+                        font-weight: 500;
+                        white-space: nowrap;
+                        overflow: hidden;
+                        text-overflow: ellipsis;
+                      "
+                    >
+                      Right flipper weak
+                      <span style="color: #a1a1aa; font-weight: 400"
+                        >+2 more</span
+                      >
+                    </div>
+                  </div>
+                </div>
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#a1a1aa"
+                  stroke-width="2.2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="m9 18 6-6-6-6"></path>
+                </svg>
+              </a>
+              <div style="flex-grow: 1"></div>
+              <div style="display: flex; gap: 10px">
+                <a
+                  href="#score"
+                  style="
+                    flex: 1 1 0;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 8px;
+                    height: 88px;
+                    border-radius: 14px;
+                    background: #4ade80;
+                    color: #042f2e;
+                    text-decoration: none;
+                    font-size: 16px;
+                    font-weight: 700;
+                    text-align: center;
+                  "
+                >
+                  <svg
+                    width="28"
+                    height="28"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2.2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"></path>
+                    <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"></path>
+                    <path d="M4 22h16"></path>
+                    <path
+                      d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"
+                    ></path>
+                    <path
+                      d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"
+                    ></path>
+                    <path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"></path></svg
+                  ><span>Post a score</span> </a
+                ><a
+                  href="#report"
+                  style="
+                    flex: 1 1 0;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 8px;
+                    height: 88px;
+                    border-radius: 14px;
+                    background: #eab308;
+                    color: #422006;
+                    text-decoration: none;
+                    font-size: 16px;
+                    font-weight: 700;
+                    text-align: center;
+                  "
+                >
+                  <svg
+                    width="28"
+                    height="28"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2.2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path
+                      d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"
+                    ></path>
+                    <path d="M12 9v4"></path>
+                    <path d="M12 17h.01"></path></svg
+                  ><span>Report a problem</span>
+                </a>
+              </div>
+            </main>
+            <nav
+              aria-label="mobile navigation"
+              style="
+                display: flex;
+                flex-shrink: 0;
+                padding-bottom: 14px;
+                background: rgba(24, 21, 27, 0.9);
+                border-top: 1px solid rgba(74, 222, 128, 0.5);
+                box-shadow: 0 -4px 15px rgba(74, 222, 128, 0.25);
+              "
+            >
+              <a
+                href="#dashboard"
+                style="
+                  flex: 1 1 0;
+                  display: flex;
+                  flex-direction: column;
+                  align-items: center;
+                  justify-content: center;
+                  gap: 4px;
+                  min-height: 56px;
+                  padding: 8px 0;
+                  font-size: 12px;
+                  font-weight: 500;
+                  color: #a1a1aa;
+                  text-decoration: none;
+                "
+                ><svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <rect width="7" height="9" x="3" y="3" rx="1"></rect>
+                  <rect width="7" height="5" x="14" y="3" rx="1"></rect>
+                  <rect width="7" height="9" x="14" y="12" rx="1"></rect>
+                  <rect width="7" height="5" x="3" y="16" rx="1"></rect></svg
+                ><span>Dashboard</span></a
+              ><a
+                href="#machines"
+                style="
+                  flex: 1 1 0;
+                  display: flex;
+                  flex-direction: column;
+                  align-items: center;
+                  justify-content: center;
+                  gap: 4px;
+                  min-height: 56px;
+                  padding: 8px 0;
+                  font-size: 12px;
+                  font-weight: 500;
+                  color: #4ade80;
+                  text-decoration: none;
+                "
+                ><svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <line x1="6" x2="10" y1="11" y2="11"></line>
+                  <line x1="8" x2="8" y1="9" y2="13"></line>
+                  <line x1="15" x2="15.01" y1="12" y2="12"></line>
+                  <line x1="18" x2="18.01" y1="10" y2="10"></line>
+                  <path
+                    d="M17.32 5H6.68a4 4 0 0 0-3.978 3.59c-.006.052-.01.101-.017.152C2.604 9.416 2 14.456 2 16a3 3 0 0 0 3 3c1 0 1.5-.5 2-1l1.414-1.414A2 2 0 0 1 9.828 16h4.344a2 2 0 0 1 1.414.586L17 18c.5.5 1 1 2 1a3 3 0 0 0 3-3c0-1.545-.604-6.584-.685-7.258-.007-.05-.011-.1-.017-.151A4 4 0 0 0 17.32 5z"
+                  ></path></svg
+                ><span>Machines</span></a
+              ><a
+                href="#issues"
+                style="
+                  flex: 1 1 0;
+                  display: flex;
+                  flex-direction: column;
+                  align-items: center;
+                  justify-content: center;
+                  gap: 4px;
+                  min-height: 56px;
+                  padding: 8px 0;
+                  font-size: 12px;
+                  font-weight: 500;
+                  color: #a1a1aa;
+                  text-decoration: none;
+                "
+                ><svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"
+                  ></path>
+                  <path d="M12 9v4"></path>
+                  <path d="M12 17h.01"></path></svg
+                ><span>Issues</span></a
+              ><a
+                href="#report"
+                style="
+                  flex: 1 1 0;
+                  display: flex;
+                  flex-direction: column;
+                  align-items: center;
+                  justify-content: center;
+                  gap: 4px;
+                  min-height: 56px;
+                  padding: 8px 0;
+                  font-size: 12px;
+                  font-weight: 500;
+                  color: #a1a1aa;
+                  text-decoration: none;
+                "
+                ><svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M5 12h14"></path>
+                  <path d="M12 5v14"></path></svg
+                ><span>Report</span></a
+              ><a
+                href="#more"
+                style="
+                  flex: 1 1 0;
+                  display: flex;
+                  flex-direction: column;
+                  align-items: center;
+                  justify-content: center;
+                  gap: 4px;
+                  min-height: 56px;
+                  padding: 8px 0;
+                  font-size: 12px;
+                  font-weight: 500;
+                  color: #a1a1aa;
+                  text-decoration: none;
+                "
+                ><svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <circle cx="12" cy="12" r="1"></circle>
+                  <circle cx="12" cy="5" r="1"></circle>
+                  <circle cx="12" cy="19" r="1"></circle></svg
+                ><span>More</span></a
+              >
+            </nav>
+          </div>
+        </div>
+        <figcaption>
+          Smallest phone, 375×667 — Open issues collapses to one row, spec §5.2
+        </figcaption>
+      </figure>
+    </div>
+  </body>
+</html>

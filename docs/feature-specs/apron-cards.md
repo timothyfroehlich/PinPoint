@@ -15,7 +15,7 @@
 - **Card description** — an optional override of the card's description text, distinct from the machine's main description. A machine keeps at most one.
 - **Tip** — an optional second block of card text, shown under Description. Carries its own enabled/disabled toggle, independent of whether it has content.
 - **Edition** — the "<X> Edition" line shown under the title. Sourced only from Pinball Map's grouped-family data (PP-esta.1); PinPoint never derives an edition by parsing an ungrouped Pinball Map name.
-- **Scan target** — the URL the card's QR code encodes: the machine's PinPoint page, tagged with an `apron` source so that traffic is distinguishable from other QR sources.
+- **Scan target** — the URL the card's QR code encodes: the machine's scan hub, tagged with an `apron` source so that traffic is distinguishable from other QR sources.
 - **Title fit** — the rule that sizes and wraps a machine's name to the card's identity panel: shrink from a maximum size until the single longest word fits the panel on one line, keep shrinking until the full title wraps to three lines or fewer, down to a floor size below which the title may still exceed three lines rather than shrink further. Never breaks a word mid-word.
 
 ## 2. Data inputs
@@ -55,8 +55,8 @@
 
 ## 8. Scan target
 
-- **8.1** The QR code encodes the machine's PinPoint page, tagged with an `apron` source.
-- **8.2** The card is the machine's sole on-cabinet entry point once printed; it replaces the existing iScored sticker. The landing experience the QR opens is separate scope, tracked elsewhere.
+- **8.1** The QR code encodes the machine's scan hub (`/m/<initials>/hub`), tagged with an `apron` source.
+- **8.2** The card is the machine's sole on-cabinet entry point once printed; it replaces the existing iScored sticker. The landing experience is the scan hub, specified in `machine-scan-hub.md`.
 
 ## 9. Export
 
@@ -71,5 +71,6 @@ _None — nothing has been built against this spec yet._
 
 | Date | Change |
 | :-- | :-- |
+| 2026-09-18 | §1 Scan target, §8.1, §8.2: the QR encodes the machine's scan hub (`/m/<initials>/hub`) rather than the machine page; the landing experience is now specified in `machine-scan-hub.md`. |
 | 2026-09-15 | Initial draft: card content, apron size, description/tip authoring, title fit, edition sourcing, scan target. |
 | 2026-09-18 | Authoring surface is reached from Service and Manage (was Manage-only); description/tip overflow is a combined-region check that blocks save and export (§3.5, new); added §9 Export — exact-size format required, extensible. |
