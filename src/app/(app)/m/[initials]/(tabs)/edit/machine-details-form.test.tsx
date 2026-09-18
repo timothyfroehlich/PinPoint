@@ -1,4 +1,4 @@
-import type React from "react";
+import React, { useState } from "react";
 import { afterEach, describe, it, expect, vi, beforeEach } from "vitest";
 import {
   act,
@@ -8,7 +8,10 @@ import {
   waitFor,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MachineDetailsForm } from "./machine-details-form";
+import {
+  MachineDetailsForm,
+  type MachineDetailsFormProps,
+} from "./machine-details-form";
 import { DetailsDirtyProvider } from "./details-dirty";
 import { updateMachineAction } from "~/app/(app)/m/actions";
 import { err, ok } from "~/lib/result";
@@ -18,6 +21,42 @@ import { RouteTabStrip } from "~/components/layout/RouteTabStrip";
 vi.mock("~/app/(app)/m/actions", () => ({
   updateMachineAction: vi.fn(),
 }));
+
+vi.mock("~/components/machines/IscoredGamePicker", () => {
+  const MockPicker = ({
+    defaultGameId,
+    machineName,
+    onDirty,
+  }: {
+    defaultGameId?: string | null;
+    machineName?: string;
+    onDirty?: () => void;
+  }) => {
+    const [val, setVal] = useState(defaultGameId ?? "");
+    return (
+      <div data-testid="mock-iscored-game-picker">
+        <input
+          type="hidden"
+          name="iscoredGameId"
+          value={val}
+          data-testid="edit-machine-iscored-game-id"
+        />
+        <span data-testid="iscored-machine-name">{machineName}</span>
+        <button
+          type="button"
+          data-testid="iscored-game-picker-trigger"
+          onClick={() => {
+            setVal("99");
+            onDirty?.();
+          }}
+        >
+          select-99
+        </button>
+      </div>
+    );
+  };
+  return { IscoredGamePicker: MockPicker };
+});
 
 const pushMock = vi.hoisted(() => vi.fn());
 vi.mock("next/navigation", () => ({
@@ -86,7 +125,7 @@ vi.mock("~/components/machines/PinballMapLinkField", () => ({
   ),
 }));
 
-const baseProps = {
+const baseProps: MachineDetailsFormProps = {
   machineId: "11111111-1111-1111-1111-111111111111",
   name: "Godzilla (Premium)",
   presenceStatus: "on_the_floor" as const,
@@ -98,6 +137,7 @@ const baseProps = {
   modelName: null,
   manufacturer: null,
   year: null,
+  iscoredGameId: null,
 };
 
 /**
@@ -105,7 +145,7 @@ const baseProps = {
  * section can see it (PP-3bbr.3), and the hook throws outside the provider
  * rather than defaulting to clean — so every case renders inside one.
  */
-function renderForm(overrides: Partial<typeof baseProps> = {}): void {
+function renderForm(overrides: Partial<MachineDetailsFormProps> = {}): void {
   render(
     <DetailsDirtyProvider>
       <MachineDetailsForm {...baseProps} {...overrides} />
@@ -201,9 +241,11 @@ describe("MachineDetailsForm", () => {
     await user.type(nameInput, "!");
     expect(nameInput).toHaveValue("Godzilla (Premium)!");
 
-    await user.click(screen.getByRole("combobox"));
+    await user.click(screen.getByRole("combobox", { name: "Availability" }));
     await user.click(screen.getByRole("option", { name: "Off the Floor" }));
-    expect(screen.getByRole("combobox")).toHaveTextContent("Off the Floor");
+    expect(
+      screen.getByRole("combobox", { name: "Availability" })
+    ).toHaveTextContent("Off the Floor");
 
     await user.type(screen.getByLabelText("Machine description"), "draft");
     expect(hiddenDescription().value).not.toBe("");
@@ -213,7 +255,9 @@ describe("MachineDetailsForm", () => {
     expect(screen.getByLabelText(/Machine Name/)).toHaveValue(
       "Godzilla (Premium)"
     );
-    expect(screen.getByRole("combobox")).toHaveTextContent("On the Floor");
+    expect(
+      screen.getByRole("combobox", { name: "Availability" })
+    ).toHaveTextContent("On the Floor");
     expect(hiddenDescription().value).toBe("");
     expect(screen.getByTestId("details-dirty-note")).toHaveTextContent(
       "No unsaved changes"
@@ -269,7 +313,7 @@ describe("MachineDetailsForm", () => {
     renderForm();
 
     await user.type(screen.getByLabelText(/Machine Name/), "!");
-    await user.click(screen.getByRole("combobox"));
+    await user.click(screen.getByRole("combobox", { name: "Availability" }));
     await user.click(screen.getByRole("option", { name: "Off the Floor" }));
     await user.click(screen.getByRole("button", { name: "Save details" }));
 
@@ -301,7 +345,7 @@ describe("MachineDetailsForm", () => {
     renderForm();
 
     await user.type(screen.getByLabelText(/Machine Name/), "!");
-    await user.click(screen.getByRole("combobox"));
+    await user.click(screen.getByRole("combobox", { name: "Availability" }));
     await user.click(screen.getByRole("option", { name: "Off the Floor" }));
 
     await user.click(screen.getByRole("button", { name: "Save details" }));
@@ -322,16 +366,10 @@ describe("MachineDetailsForm", () => {
       .soft(screen.getByLabelText(/Machine Name/))
       .toHaveValue("Godzilla (Premium)!");
     expect
-      .soft(screen.getByRole("combobox"))
+      .soft(screen.getByRole("combobox", { name: "Availability" }))
       .toHaveTextContent("Off the Floor");
   });
 
-  // Name and Availability sit side by side at `@xl` (see the layout comment in
-  // machine-details-form.tsx). CSS grid placement does NOT reorder the DOM, so
-  // pairing them changed the keyboard path to Name → Availability → Model. That
-  // was accepted deliberately for the vertical space, but it is exactly the
-  // kind of decision that gets silently undone by a later layout tweak — so
-  // pin the order itself rather than the Tailwind classes that produce it.
   it("marks the section dirty when the PinballMap picker changes", async () => {
     // The picker used to leave the note reading "No unsaved changes" over a
     // real pending edit, so Cancel discarded it with no signal
@@ -375,7 +413,7 @@ describe("MachineDetailsForm", () => {
     renderForm();
 
     const name = screen.getByLabelText(/Machine Name/);
-    const availability = screen.getByRole("combobox");
+    const availability = screen.getByRole("combobox", { name: "Availability" });
     const pinballMapFields = screen.getByTestId("pbm-link-field");
 
     const follows = (a: Element, b: Element): boolean =>
@@ -582,6 +620,49 @@ describe("MachineDetailsForm", () => {
       expect(
         screen.queryByText("Discard unsaved changes?")
       ).not.toBeInTheDocument();
+    });
+  });
+
+  describe("iScored game ID field", () => {
+    it("renders with defaultValue from prop", () => {
+      renderForm({ iscoredGameId: "73" });
+      const input = screen.getByTestId("edit-machine-iscored-game-id");
+      expect(input).toHaveValue("73");
+    });
+
+    it("marks form dirty when edited via picker", async () => {
+      const user = userEvent.setup();
+      renderForm({ iscoredGameId: null });
+
+      expect(screen.getByTestId("details-dirty-note")).toHaveTextContent(
+        "No unsaved changes"
+      );
+
+      await user.click(screen.getByTestId("iscored-game-picker-trigger"));
+
+      expect(screen.getByTestId("details-dirty-note")).toHaveTextContent(
+        "Unsaved changes"
+      );
+      expect(screen.getByTestId("edit-machine-iscored-game-id")).toHaveValue(
+        "99"
+      );
+    });
+
+    it("wires liveName to IscoredGamePicker", async () => {
+      const user = userEvent.setup();
+      renderForm();
+
+      expect(screen.getByTestId("iscored-machine-name")).toHaveTextContent(
+        baseProps.name
+      );
+
+      const nameInput = screen.getByLabelText(/Machine Name/);
+      await user.clear(nameInput);
+      await user.type(nameInput, "New Live Name");
+
+      expect(screen.getByTestId("iscored-machine-name")).toHaveTextContent(
+        "New Live Name"
+      );
     });
   });
 });

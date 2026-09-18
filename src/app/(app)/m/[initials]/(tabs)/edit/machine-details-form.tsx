@@ -35,6 +35,7 @@ import {
   type UpdateMachineResult,
 } from "~/app/(app)/m/actions";
 import { PinballMapLinkField } from "~/components/machines/PinballMapLinkField";
+import { IscoredGamePicker } from "~/components/machines/IscoredGamePicker";
 import { RichTextEditor } from "~/components/editor/RichTextEditorDynamic";
 import type { ProseMirrorDoc } from "~/lib/tiptap/types";
 import {
@@ -57,6 +58,8 @@ export interface MachineDetailsFormProps {
   modelName: string | null;
   manufacturer: string | null;
   year: number | null;
+  /** Linked iScored game ID string, or null if unlinked. */
+  iscoredGameId: string | null;
 }
 
 /**
@@ -86,6 +89,7 @@ export function MachineDetailsForm({
   modelName,
   manufacturer,
   year,
+  iscoredGameId,
 }: MachineDetailsFormProps): React.JSX.Element {
   const [state, formAction, isPending] = useActionState<
     UpdateMachineResult | undefined,
@@ -407,6 +411,12 @@ export function MachineDetailsForm({
             onDirty={markDirty}
           />
         )}
+
+        <IscoredGamePicker
+          defaultGameId={iscoredGameId}
+          machineName={liveName}
+          onDirty={markDirty}
+        />
 
         <div className="space-y-1.5">
           {/* No htmlFor: RichTextEditor is a contenteditable widget with no

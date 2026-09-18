@@ -22,6 +22,8 @@ import {
   type PbmSiblingInput,
 } from "~/lib/pinballmap/listing-state";
 import { listSurfacingAbandonedForMachine } from "~/lib/pinballmap/abandoned-listings";
+import { getTopScoresForMachine } from "~/lib/iscored";
+import { TopScoresCard } from "~/components/machines/TopScoresCard";
 import { InfoHero } from "./info-hero";
 import { InfoRail } from "./info-rail";
 
@@ -169,6 +171,10 @@ export default async function MachineInfoTab({
   // tab layout and the route-level deep-link guard.
   const canOpenManage = canAccessMachineManage(accessLevel, ownershipContext);
 
+  const topScores = machine.iscoredGameId
+    ? await getTopScoresForMachine(machine.iscoredGameId, 3)
+    : [];
+
   const rail = (
     <InfoRail
       owner={machine.owner}
@@ -178,6 +184,13 @@ export default async function MachineInfoTab({
       modelName={modelName}
       manufacturer={machine.manufacturer}
       year={machine.year}
+      topScoresSlot={
+        <TopScoresCard
+          iscoredGameId={machine.iscoredGameId}
+          scores={topScores}
+          manageHref={canOpenManage ? `/m/${machine.initials}/edit` : null}
+        />
+      }
       pinballmap={{
         locationUrl:
           pbmState?.locationId != null
