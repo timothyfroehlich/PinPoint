@@ -185,13 +185,22 @@ async function fetchAndCacheScores(user: string): Promise<void> {
       return;
     }
 
-    if (!Array.isArray(rawData)) {
-      log.warn({ user }, "iScored API response was not an array");
+    const items = Array.isArray(rawData)
+      ? rawData
+      : isRecord(rawData) && Array.isArray(rawData["scores"])
+        ? rawData["scores"]
+        : null;
+
+    if (!items) {
+      log.warn(
+        { user },
+        "iScored API response was not an array or scores envelope"
+      );
       cache.lastFetchedAt = Date.now();
       return;
     }
 
-    const parsed = parseAndSanitizeScores(rawData);
+    const parsed = parseAndSanitizeScores(items);
     cache.scoresByGameId = groupAndRankScores(parsed);
     cache.lastFetchedAt = Date.now();
   } catch (err) {
