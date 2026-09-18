@@ -16,6 +16,7 @@ import {
 } from "~/lib/rate-limit";
 import { eq, count, and, isNull } from "drizzle-orm";
 import { log } from "~/lib/logger";
+import { errorMessage } from "~/lib/errors";
 import { reportError } from "~/lib/observability/report-error";
 import { checkPermission } from "~/lib/permissions/helpers";
 import { getUserAccessLevel } from "~/lib/permissions/access";
@@ -233,8 +234,7 @@ export async function uploadIssueImage(formData: FormData): Promise<
     } catch (caughtErr) {
       log.error(
         {
-          err:
-            caughtErr instanceof Error ? caughtErr.message : String(caughtErr),
+          err: errorMessage(caughtErr),
           blobPathname: uploadedBlobPathname,
         },
         "DB insert failed for image, cleaning up blob"
@@ -252,13 +252,10 @@ export async function uploadIssueImage(formData: FormData): Promise<
   } catch (caughtErr) {
     log.error(
       {
-        err: caughtErr instanceof Error ? caughtErr.message : String(caughtErr),
+        err: errorMessage(caughtErr),
       },
       "Upload action failed"
     );
-    return err(
-      "BLOB",
-      caughtErr instanceof Error ? caughtErr.message : "Upload failed"
-    );
+    return err("BLOB", errorMessage(caughtErr, "Upload failed"));
   }
 }
