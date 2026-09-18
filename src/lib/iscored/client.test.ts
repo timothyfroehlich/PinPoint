@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   clearIscoredCacheForTesting,
   getAllScoresForMachine,
+  getGameroomGames,
   getTopScoresForMachine,
   refreshIscoredScores,
 } from "./client";
@@ -460,6 +461,130 @@ describe("iscored client", () => {
 
       const scores = await getAllScoresForMachine("77956");
       expect(scores).toEqual([]);
+    });
+  });
+
+  describe("getGameroomGames", () => {
+    const mockGameroomGames = [
+      {
+        gameName: "Medieval Madness",
+        gameID: "77956",
+        CSSInitials: "...",
+        GameLogo: "/community/images/games/game1",
+      },
+      {
+        gameName: "Demolition Man",
+        gameID: 104656,
+        CSSInitials: "...",
+      },
+      {
+        gameName: "Game of Thrones (half-height)",
+        gameID: "79212",
+      },
+    ];
+
+    it("parses and returns games sorted alphabetically by gameName", async () => {
+      vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+        new Response(JSON.stringify(mockGameroomGames), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        })
+      );
+
+      const games = await getGameroomGames();
+      expect(games).toHaveLength(3);
+      expect(games[0]).toEqual({
+        gameId: "104656",
+        gameName: "Demolition Man",
+      });
+      expect(games[1]).toEqual({
+        gameId: "79212",
+        gameName: "Game of Thrones (half-height)",
+      });
+      expect(games[2]).toEqual({
+        gameId: "77956",
+        gameName: "Medieval Madness",
+      });
+    });
+
+    it("uses in-memory cache on subsequent calls within TTL", async () => {
+      const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+        new Response(JSON.stringify(mockGameroomGames), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        })
+      );
+
+      const first = await getGameroomGames();
+      const second = await getGameroomGames();
+
+      expect(first).toEqual(second);
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it("returns empty array when ISCORED_USER is unset", async () => {
+      delete process.env.ISCORED_USER;
+      const fetchSpy = vi.spyOn(globalThis, "fetch");
+
+      const games = await getGameroomGames();
+      expect(games).toEqual([]);
+      expect(fetchSpy).not.toHaveBeenCalled();
+    });
+
+    it("gracefully handles HTTP error", async () => {
+      vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+        new Response("Server Error", { status: 500 })
+      );
+
+      const games = await getGameroomGames();
+      expect(games).toEqual([]);
+    });
+
+    it("gracefully handles invalid JSON or non-array payload", async () => {
+      vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+        new Response("not json", { status: 200 })
+      );
+
+      const games = await getGameroomGames();
+      expect(games).toEqual([]);
+    });
+
+    it("preserves existing cached games when upstream response contains malformed records", async () => {
+      vi.useFakeTimers();
+      const initialTime = 1000000;
+      vi.setSystemTime(initialTime);
+
+      // 1. Initial successful fetch
+      vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+        new Response(JSON.stringify(mockGameroomGames), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        })
+      );
+      const initial = await getGameroomGames();
+      expect(initial).toHaveLength(3);
+
+      // Advance time past 1 hour (3600000 ms)
+      vi.setSystemTime(initialTime + 3600001);
+
+      // 2. Second fetch returns a malformed record (missing gameID)
+      const malformedGames = [
+        ...mockGameroomGames,
+        { gameName: "Broken Game", gameID: null },
+      ];
+      vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+        new Response(JSON.stringify(malformedGames), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        })
+      );
+
+      // Should preserve previous cached games and not return empty/broken list
+      const refreshed = await getGameroomGames();
+      expect(refreshed).toHaveLength(3);
+      expect(refreshed[0]?.gameName).toBe("Demolition Man");
+
+      vi.useRealTimers();
     });
   });
 });
