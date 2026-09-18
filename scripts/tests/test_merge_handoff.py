@@ -221,6 +221,7 @@ def repo_with_pr(
         if scenario.manual_review:
             comments.append(
                 {
+                    "user": {"login": "acme"},
                     "body": (
                         f"<!-- pinpoint-review: {head_sha} -->\n"
                         f"<!-- pinpoint-reviewer: {scenario.manual_reviewer} -->\n"
@@ -633,12 +634,12 @@ def test_an_unready_pr_gets_the_reason_instead_of_the_merge_command(
 
 
 def test_an_unreviewed_head_is_named_as_the_blocker() -> None:
-    """An unreviewed head names the one-per-head manual request route."""
+    """An unreviewed head names the automated review and manual fallback route."""
     with repo_with_pr(branch_changes={"src/lib/thing.ts": "x\n"}) as (_head, run):
         assert MERGE_CMD not in run.stdout, run.stdout
-        assert "reviewed: unreviewed" in run.stdout
-        assert "request-codex-review.sh 123 exactly once" in run.stdout
-        assert "replacement CI and one new request" in run.stdout
+        assert "reviewed: not reviewed" in run.stdout
+        assert "request-codex-review.sh 123 as fallback" in run.stdout
+        assert "a new head requires replacement CI and a new review" in run.stdout
 
 
 def test_a_pending_manual_request_is_not_recommended_again() -> None:
@@ -647,7 +648,10 @@ def test_a_pending_manual_request_is_not_recommended_again() -> None:
         scenario=Scenario(manual_request=True),
     ) as (_head, run):
         assert MERGE_CMD not in run.stdout, run.stdout
-        assert "reviewed: review_requested" in run.stdout
+        assert (
+            "reviewed: not reviewed — the manual Codex review for this head was already requested"
+            in run.stdout
+        )
         assert "do not request it again" in run.stdout
         assert "request-codex-review.sh" not in run.stdout
 

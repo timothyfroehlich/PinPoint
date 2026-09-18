@@ -472,12 +472,42 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
         id: "machines.settings.manage",
         label: "Manage machine settings",
         description:
-          "Create, edit, duplicate, delete, and set the preferred settings set. Owners manage their own machines; technicians and admins manage any. (Viewing settings is public, via machines.view.)",
+          "Create, edit, duplicate, and delete settings sets (owners manage " +
+          "sets on their own machines; technicians manage community sets and " +
+          "unowned machine sets; admins manage any). Setting the preferred " +
+          "owner default is governed separately by machines.settings.setDefault. " +
+          "(Viewing settings is public, via machines.view.)",
         access: {
           unauthenticated: false,
           guest: false,
           member: "owner",
           technician: true,
+          admin: true,
+        },
+      },
+      {
+        id: "machines.settings.setDefault",
+        label: "Set preferred machine settings set",
+        description:
+          "Set an owner settings set as the machine's preferred default. Restricted to machine owners and admins; technicians cannot set the default on machines they do not own.",
+        access: {
+          unauthenticated: false,
+          guest: false,
+          member: "owner",
+          technician: "owner",
+          admin: true,
+        },
+      },
+      {
+        id: "machines.settings.view.private",
+        label: "View private settings drafts",
+        description:
+          "View another user's unshared private settings draft. Creators always see their own drafts; public and preferred sets are visible to everyone.",
+        access: {
+          unauthenticated: false,
+          guest: false,
+          member: false,
+          technician: false,
           admin: true,
         },
       },

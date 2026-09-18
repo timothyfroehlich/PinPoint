@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>iScored Top Scores card — mockup</title>
+<!--
+  Static mockup for docs/feature-specs/iscored.md §4 (design locked 2026-09-16).
+  Generated from the design canvas at https://claude.ai/artifact/Rb7AXgxUVFwW8bEWFhhUgv
+  Values are lifted from the live Info tab: rounded-xl border-outline-variant bg-card p-4 cards,
+  the 10px uppercase section label, outline-sm buttons, semantic tokens from src/app/globals.css.
+  Sample scores are from the APC gameroom's Avengers: Infinity Quest board.
+-->
+<style>
+  body { margin: 0; padding: 32px; background: #0f0f11; color: #f8fafc; font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased; }
+  a { color: #4ade80; text-decoration: none; } a:hover { text-decoration: underline; }
+  h1 { font-size: 20px; margin: 0 0 8px; }
+  .intro { color: #a1a1aa; font-size: 14px; max-width: 72ch; line-height: 20px; margin: 0 0 32px; }
+  section { margin-bottom: 48px; }
+  h2 { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #a1a1aa; margin: 0 0 12px; }
+  .frame { display: inline-block; border: 1px dashed #3f3f46; border-radius: 4px; overflow: hidden; vertical-align: top; max-width: 100%; }
+</style>
+</head>
+<body>
+<h1>iScored Top Scores card — Info tab</h1>
+<p class="intro">Spec: <code>docs/feature-specs/iscored.md</code> §4. The card sits in the Info tab's reference rail directly under Details (folds inline after Details on mobile). Header: TOP SCORES label + iScored logo (links to the game's iScored page). Rows: rank badge (primary / secondary / outline), bold name with score date, mono score (#1 larger and tinted). Footer: outline "Add score" button (score entry page) + "View all on iScored" link (game page). Both external links open in a new tab. The former §5 iScored tab was cut.</p>
+<section><h2>Info tab — desktop (1200)</h2><div class="frame">
+<div style="width: 1200px; padding: 24px 24px 40px; box-sizing: border-box; background: #0f0f11; display: flex; flex-direction: column; gap: 16px;">
+<div style="display: flex; flex-direction: column; gap: 8px;">
+  <div style="display: flex; align-items: center; gap: 14px;">
+    <span style="display: grid; place-items: center; width: 44px; height: 44px; border-radius: 10px; border: 1px solid rgba(74,222,128,0.3); background: rgba(74,222,128,0.1); font-size: 14px; font-weight: 800; color: #4ade80;">DOM</span>
+    <div style="min-width: 0;">
+      <h1 style="margin: 0; font-size: 30px; font-weight: 700; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Domino</h1>
+      <p style="margin: 2px 0 0; font-size: 12px; color: #a1a1aa;">Gottlieb · 1968</p>
+    </div>
+  </div>
+  <div style="display: flex; min-height: 48px; border-bottom: 1px solid #52525b;"><a href="#" style="display: inline-flex; flex-shrink: 0; align-items: center; gap: 6px; white-space: nowrap; border-bottom: 2px solid #4ade80; padding: 12px 16px; font-size: 14px; font-weight: 500; color: #4ade80;">Info</a><a href="#" style="display: inline-flex; flex-shrink: 0; align-items: center; gap: 6px; white-space: nowrap; border-bottom: 2px solid transparent; padding: 12px 16px; font-size: 14px; font-weight: 500; color: #a1a1aa;">Settings</a><a href="#" style="display: inline-flex; flex-shrink: 0; align-items: center; gap: 6px; white-space: nowrap; border-bottom: 2px solid transparent; padding: 12px 16px; font-size: 14px; font-weight: 500; color: #a1a1aa;">Service</a><a href="#" style="display: inline-flex; flex-shrink: 0; align-items: center; gap: 6px; white-space: nowrap; border-bottom: 2px solid transparent; padding: 12px 16px; font-size: 14px; font-weight: 500; color: #a1a1aa;">Timeline</a><a href="#" style="display: inline-flex; flex-shrink: 0; align-items: center; gap: 6px; white-space: nowrap; border-bottom: 2px solid transparent; padding: 12px 16px; font-size: 14px; font-weight: 500; color: #a1a1aa;">Manage</a></div>
+</div>
+<div style="display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 24px;">
+  <div style="display: flex; flex-direction: column; gap: 24px; min-width: 0;">
+<section style="border-radius: 12px; border: 1px solid rgba(74,222,128,0.4); background: #18151b; padding: 20px;">
+  <div style="display: flex; flex-direction: row; align-items: center; gap: 16px;">
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <span style="display: inline-flex; align-items: center; gap: 8px; font-size: 18px; font-weight: 700; line-height: 28px;"><span style="width: 10px; height: 10px; border-radius: 9999px; background: #22c55e;"></span>Operational</span>
+      <span style="display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border-radius: 6px; border: 1px solid #52525b; font-size: 12px; font-weight: 500; color: #a1a1aa;">On the floor</span>
+    </div>
+    <a href="#" style="margin-left: auto; display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 40px; padding: 0 16px; border-radius: 6px; background: #4ade80; color: #022c22; font-size: 14px; font-weight: 700;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><line x1="12" x2="12" y1="8" y2="12"></line><line x1="12" x2="12.01" y1="16" y2="16"></line></svg>Report a problem <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg></a>
+  </div>
+  <div style="margin-top: 16px; border-top: 1px solid #52525b; padding-top: 16px;">
+    <p style="margin: 0; display: flex; align-items: center; gap: 8px; font-size: 14px; color: #a1a1aa; line-height: 20px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><path d="m9 12 2 2 4-4"></path></svg>No open issues — this machine is healthy.</p>
+  </div>
+</section><section>
+  <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px;">
+    <div style="display: flex; align-items: baseline; gap: 12px;">
+      <p style="margin: 0; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #a1a1aa; line-height: 15px;">Recent activity</p>
+      <a href="#" style="display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 500; color: #4ade80; line-height: 16px;">View all <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg></a>
+    </div>
+    <div style="display: flex; gap: 8px;">
+      <a href="#" style="display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 32px; padding: 0 10px; border-radius: 6px; border: 1px solid #27272a; background: rgba(39,39,42,0.3); box-shadow: 0 1px 2px rgba(0,0,0,0.05); font-size: 14px; font-weight: 500; color: #f8fafc; white-space: nowrap; flex-shrink: 0;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><line x1="12" x2="12" y1="8" y2="12"></line><line x1="12" x2="12.01" y1="16" y2="16"></line></svg>New Issue</a>
+      <a href="#" style="display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 32px; padding: 0 10px; border-radius: 6px; border: 1px solid #27272a; background: rgba(39,39,42,0.3); box-shadow: 0 1px 2px rgba(0,0,0,0.05); font-size: 14px; font-weight: 500; color: #f8fafc; white-space: nowrap; flex-shrink: 0;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg>New Note</a>
+    </div>
+  </div>
+  <div style="display: flex; flex-direction: column;">
+    <div style="display: flex; align-items: flex-start; gap: 12px; padding: 10px 0; border-bottom: 1px solid #27272a;">
+      <span style="flex-shrink: 0; width: 28px; height: 28px; border-radius: 9999px; background: #27272a; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: #a1a1aa;">TF</span>
+      <div style="min-width: 0; flex: 1;">
+        <p style="margin: 0; font-size: 14px; line-height: 20px; color: #f8fafc;"><span style="font-weight: 600;">Tim Froehlich</span> <span style="color: #a1a1aa;">· 2d ago</span></p>
+        <p style="margin: 2px 0 0; font-size: 14px; line-height: 20px; color: #a1a1aa;">Replaced the right flipper coil</p>
+      </div>
+    </div>
+    <div style="display: flex; align-items: flex-start; gap: 12px; padding: 10px 0; border-bottom: 1px solid #27272a;">
+      <span style="flex-shrink: 0; width: 28px; height: 28px; border-radius: 9999px; background: #27272a; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: #a1a1aa;">NW</span>
+      <div style="min-width: 0; flex: 1;">
+        <p style="margin: 0; font-size: 14px; line-height: 20px; color: #f8fafc;"><span style="font-weight: 600;">NAW</span> <span style="color: #a1a1aa;">· 5d ago</span></p>
+        <p style="margin: 2px 0 0; font-size: 14px; line-height: 20px; color: #a1a1aa;">Reported #DOM-14 · Left drop target stuck</p>
+      </div>
+    </div>
+    <div style="display: flex; align-items: flex-start; gap: 12px; padding: 10px 0; border-bottom: 1px solid #27272a;">
+      <span style="flex-shrink: 0; width: 28px; height: 28px; border-radius: 9999px; background: #27272a; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: #a1a1aa;">SY</span>
+      <div style="min-width: 0; flex: 1;">
+        <p style="margin: 0; font-size: 14px; line-height: 20px; color: #f8fafc;"><span style="font-weight: 600;">System</span> <span style="color: #a1a1aa;">· 2w ago</span></p>
+        <p style="margin: 2px 0 0; font-size: 14px; line-height: 20px; color: #a1a1aa;">Presence set to On the floor</p>
+      </div>
+    </div>
+  </div>
+</section>
+  </div>
+  <aside style="display: flex; flex-direction: column; gap: 24px;">
+<div style="border-radius: 12px; border: 1px solid #52525b; background: #18151b; padding: 16px;">
+  <p style="margin: 0; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #a1a1aa; line-height: 15px; margin-bottom: 12px;">Details</p>
+  <p style="margin: 0; font-size: 14px; line-height: 20px; color: #a1a1aa;">Single-player EM with a drop-target bank. Plays fast for its age.</p>
+  <div style="margin-top: 16px; border-top: 1px solid #52525b; padding-top: 16px;">
+    <p style="margin: 0; font-size: 14px; line-height: 20px;"><span style="font-weight: 600; color: #a1a1aa;">Model</span> <span style="color: #f8fafc;">Domino</span></p>
+    <p style="margin: 4px 0 0; font-size: 14px; line-height: 20px;"><span style="font-weight: 600; color: #a1a1aa;">Manufacturer</span> <span style="color: #f8fafc;">Gottlieb</span></p>
+    <p style="margin: 4px 0 0; font-size: 14px; line-height: 20px;"><span style="font-weight: 600; color: #a1a1aa;">Year</span> <span style="color: #f8fafc;">1968</span></p>
+    <p style="margin: 4px 0 0; font-size: 14px; line-height: 20px;"><a href="#" style="color: #4ade80;">View on Pinball Map</a></p>
+  </div>
+  <div style="margin-top: 16px; border-top: 1px solid #52525b; padding-top: 16px;">
+    <p style="margin: 0; font-size: 14px; line-height: 20px;"><span style="font-weight: 600; color: #a1a1aa;">Owner</span> <a href="#" style="font-weight: 600; color: #4ade80;">Tim Froehlich</a></p>
+    <p style="margin: 4px 0 0; font-size: 11px; color: #a1a1aa;">Added Mar 12, 2025</p>
+  </div>
+</div><section aria-label="Top scores" style="border-radius: 12px; border: 1px solid #52525b; background: #18151b; padding: 16px; overflow: hidden; ">
+  <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px;"><p style="margin: 0; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #a1a1aa; line-height: 15px;">Top scores</p><a href="#" title="View on iScored" style="display: inline-flex; flex-shrink: 0;"><img src="iscored-logo.svg" alt="iScored" style="height: 22px; width: auto; display: block;"></a></div>
+  <ol style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column;">
+    <li style="display: flex; align-items: center; gap: 12px; padding: 10px 16px; margin: 0 -16px; border-bottom: 1px solid #27272a; background: rgba(74,222,128,0.06);">
+      <span style="flex-shrink: 0; width: 28px; height: 28px; border-radius: 9999px; display: inline-flex; align-items: center; justify-content: center; background: #4ade80; color: #022c22; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-variant-numeric: tabular-nums; font-size: 12px; font-weight: 700;">1</span>
+      <div style="min-width: 0; flex: 1; display: flex; flex-direction: column;">
+        <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #f8fafc; font-size: 14px; font-weight: 600; line-height: 20px;">JSW</span>
+        <span style="font-size: 11px; color: #a1a1aa; line-height: 16px;">Jul 19, 2025</span>
+      </div>
+      <span style="flex-shrink: 0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-variant-numeric: tabular-nums; font-size: 18px; font-weight: 700; color: #4ade80;">609,799,780</span>
+    </li>
+    <li style="display: flex; align-items: center; gap: 12px; padding: 10px 16px; margin: 0 -16px; border-bottom: 1px solid #27272a; background: transparent;">
+      <span style="flex-shrink: 0; width: 28px; height: 28px; border-radius: 9999px; display: inline-flex; align-items: center; justify-content: center; background: #2dd4bf; color: #042f2e; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-variant-numeric: tabular-nums; font-size: 12px; font-weight: 700;">2</span>
+      <div style="min-width: 0; flex: 1; display: flex; flex-direction: column;">
+        <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #f8fafc; font-size: 14px; font-weight: 600; line-height: 20px;">VTX</span>
+        <span style="font-size: 11px; color: #a1a1aa; line-height: 16px;">Sep 11, 2025</span>
+      </div>
+      <span style="flex-shrink: 0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-variant-numeric: tabular-nums; font-size: 15px; font-weight: 700; color: #f8fafc;">578,421,330</span>
+    </li>
+    <li style="display: flex; align-items: center; gap: 12px; padding: 10px 16px; margin: 0 -16px; border-bottom: 1px solid #27272a; background: transparent;">
+      <span style="flex-shrink: 0; width: 28px; height: 28px; border-radius: 9999px; display: inline-flex; align-items: center; justify-content: center; background: #52525b; color: #f8fafc; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-variant-numeric: tabular-nums; font-size: 12px; font-weight: 700;">3</span>
+      <div style="min-width: 0; flex: 1; display: flex; flex-direction: column;">
+        <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #f8fafc; font-size: 14px; font-weight: 600; line-height: 20px;">RAB</span>
+        <span style="font-size: 11px; color: #a1a1aa; line-height: 16px;">Jun 28, 2025</span>
+      </div>
+      <span style="flex-shrink: 0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-variant-numeric: tabular-nums; font-size: 15px; font-weight: 700; color: #f8fafc;">478,481,630</span>
+    </li>
+  </ol>
+  <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 12px;">
+    <a href="#" style="display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 32px; padding: 0 10px; border-radius: 6px; border: 1px solid #27272a; background: rgba(39,39,42,0.3); box-shadow: 0 1px 2px rgba(0,0,0,0.05); font-size: 14px; font-weight: 500; color: #f8fafc; white-space: nowrap; flex-shrink: 0;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg>Add score<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"></path><path d="M10 14 21 3"></path><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path></svg></a>
+    <a href="#" style="display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 500; color: #4ade80; line-height: 16px;">View all on iScored <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"></path><path d="M10 14 21 3"></path><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path></svg></a>
+  </div>
+</section><div style="border-radius: 12px; border: 1px dashed rgba(45,212,191,0.5); background: #18151b; padding: 16px;">
+  <p style="margin: 0; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #a1a1aa; line-height: 15px; margin-bottom: 8px;">Tags</p>
+  <p style="margin: 0; font-size: 14px; color: #a1a1aa;">Coming soon!</p>
+</div>
+  </aside>
+</div>
+</div>
+</div></section>
+<section><h2>Info tab — mobile (390)</h2><div class="frame">
+<div style="width: 390px; padding: 16px 16px 40px; box-sizing: border-box; background: #0f0f11; display: flex; flex-direction: column; gap: 16px;">
+<div style="display: flex; flex-direction: column; gap: 8px;">
+  <div style="display: flex; align-items: center; gap: 14px;">
+    <span style="display: grid; place-items: center; width: 44px; height: 44px; border-radius: 10px; border: 1px solid rgba(74,222,128,0.3); background: rgba(74,222,128,0.1); font-size: 14px; font-weight: 800; color: #4ade80;">DOM</span>
+    <div style="min-width: 0;">
+      <h1 style="margin: 0; font-size: 24px; font-weight: 700; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Domino</h1>
+      <p style="margin: 2px 0 0; font-size: 12px; color: #a1a1aa;">Gottlieb · 1968</p>
+    </div>
+  </div>
+  <div style="display: flex; min-height: 48px; border-bottom: 1px solid #52525b;"><a href="#" style="display: inline-flex; flex-shrink: 0; align-items: center; gap: 6px; white-space: nowrap; border-bottom: 2px solid #4ade80; padding: 12px 16px; font-size: 14px; font-weight: 500; color: #4ade80;">Info</a><a href="#" style="display: inline-flex; flex-shrink: 0; align-items: center; gap: 6px; white-space: nowrap; border-bottom: 2px solid transparent; padding: 12px 16px; font-size: 14px; font-weight: 500; color: #a1a1aa;">Settings</a><a href="#" style="display: inline-flex; flex-shrink: 0; align-items: center; gap: 6px; white-space: nowrap; border-bottom: 2px solid transparent; padding: 12px 16px; font-size: 14px; font-weight: 500; color: #a1a1aa;">Service</a><a href="#" style="display: inline-flex; flex-shrink: 0; align-items: center; gap: 6px; white-space: nowrap; border-bottom: 2px solid transparent; padding: 12px 16px; font-size: 14px; font-weight: 500; color: #a1a1aa;">Timeline</a><span style="display: inline-flex; align-items: center; padding: 12px 16px; font-size: 18px; color: #a1a1aa; border-bottom: 2px solid transparent;">…</span></div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 24px;">
+<section style="border-radius: 12px; border: 1px solid rgba(74,222,128,0.4); background: #18151b; padding: 16px;">
+  <div style="display: flex; flex-direction: column; align-items: stretch; gap: 16px;">
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <span style="display: inline-flex; align-items: center; gap: 8px; font-size: 18px; font-weight: 700; line-height: 28px;"><span style="width: 10px; height: 10px; border-radius: 9999px; background: #22c55e;"></span>Operational</span>
+      <span style="display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border-radius: 6px; border: 1px solid #52525b; font-size: 12px; font-weight: 500; color: #a1a1aa;">On the floor</span>
+    </div>
+    <a href="#" style=" display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 40px; padding: 0 16px; border-radius: 6px; background: #4ade80; color: #022c22; font-size: 14px; font-weight: 700;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><line x1="12" x2="12" y1="8" y2="12"></line><line x1="12" x2="12.01" y1="16" y2="16"></line></svg>Report a problem <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg></a>
+  </div>
+  <div style="margin-top: 16px; border-top: 1px solid #52525b; padding-top: 16px;">
+    <p style="margin: 0; display: flex; align-items: center; gap: 8px; font-size: 14px; color: #a1a1aa; line-height: 20px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><path d="m9 12 2 2 4-4"></path></svg>No open issues — this machine is healthy.</p>
+  </div>
+</section><div style="border-radius: 12px; border: 1px solid #52525b; background: #18151b; padding: 16px;">
+  <p style="margin: 0; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #a1a1aa; line-height: 15px; margin-bottom: 12px;">Details</p>
+  <p style="margin: 0; font-size: 14px; line-height: 20px; color: #a1a1aa;">Single-player EM with a drop-target bank. Plays fast for its age.</p>
+  <div style="margin-top: 16px; border-top: 1px solid #52525b; padding-top: 16px;">
+    <p style="margin: 0; font-size: 14px; line-height: 20px;"><span style="font-weight: 600; color: #a1a1aa;">Model</span> <span style="color: #f8fafc;">Domino</span></p>
+    <p style="margin: 4px 0 0; font-size: 14px; line-height: 20px;"><span style="font-weight: 600; color: #a1a1aa;">Manufacturer</span> <span style="color: #f8fafc;">Gottlieb</span></p>
+    <p style="margin: 4px 0 0; font-size: 14px; line-height: 20px;"><span style="font-weight: 600; color: #a1a1aa;">Year</span> <span style="color: #f8fafc;">1968</span></p>
+    <p style="margin: 4px 0 0; font-size: 14px; line-height: 20px;"><a href="#" style="color: #4ade80;">View on Pinball Map</a></p>
+  </div>
+  <div style="margin-top: 16px; border-top: 1px solid #52525b; padding-top: 16px;">
+    <p style="margin: 0; font-size: 14px; line-height: 20px;"><span style="font-weight: 600; color: #a1a1aa;">Owner</span> <a href="#" style="font-weight: 600; color: #4ade80;">Tim Froehlich</a></p>
+    <p style="margin: 4px 0 0; font-size: 11px; color: #a1a1aa;">Added Mar 12, 2025</p>
+  </div>
+</div><section aria-label="Top scores" style="border-radius: 12px; border: 1px solid #52525b; background: #18151b; padding: 16px; overflow: hidden; ">
+  <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px;"><p style="margin: 0; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #a1a1aa; line-height: 15px;">Top scores</p><a href="#" title="View on iScored" style="display: inline-flex; flex-shrink: 0;"><img src="iscored-logo.svg" alt="iScored" style="height: 22px; width: auto; display: block;"></a></div>
+  <ol style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column;">
+    <li style="display: flex; align-items: center; gap: 12px; padding: 10px 16px; margin: 0 -16px; border-bottom: 1px solid #27272a; background: rgba(74,222,128,0.06);">
+      <span style="flex-shrink: 0; width: 28px; height: 28px; border-radius: 9999px; display: inline-flex; align-items: center; justify-content: center; background: #4ade80; color: #022c22; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-variant-numeric: tabular-nums; font-size: 12px; font-weight: 700;">1</span>
+      <div style="min-width: 0; flex: 1; display: flex; flex-direction: column;">
+        <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #f8fafc; font-size: 14px; font-weight: 600; line-height: 20px;">JSW</span>
+        <span style="font-size: 11px; color: #a1a1aa; line-height: 16px;">Jul 19, 2025</span>
+      </div>
+      <span style="flex-shrink: 0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-variant-numeric: tabular-nums; font-size: 18px; font-weight: 700; color: #4ade80;">609,799,780</span>
+    </li>
+    <li style="display: flex; align-items: center; gap: 12px; padding: 10px 16px; margin: 0 -16px; border-bottom: 1px solid #27272a; background: transparent;">
+      <span style="flex-shrink: 0; width: 28px; height: 28px; border-radius: 9999px; display: inline-flex; align-items: center; justify-content: center; background: #2dd4bf; color: #042f2e; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-variant-numeric: tabular-nums; font-size: 12px; font-weight: 700;">2</span>
+      <div style="min-width: 0; flex: 1; display: flex; flex-direction: column;">
+        <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #f8fafc; font-size: 14px; font-weight: 600; line-height: 20px;">VTX</span>
+        <span style="font-size: 11px; color: #a1a1aa; line-height: 16px;">Sep 11, 2025</span>
+      </div>
+      <span style="flex-shrink: 0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-variant-numeric: tabular-nums; font-size: 15px; font-weight: 700; color: #f8fafc;">578,421,330</span>
+    </li>
+    <li style="display: flex; align-items: center; gap: 12px; padding: 10px 16px; margin: 0 -16px; border-bottom: 1px solid #27272a; background: transparent;">
+      <span style="flex-shrink: 0; width: 28px; height: 28px; border-radius: 9999px; display: inline-flex; align-items: center; justify-content: center; background: #52525b; color: #f8fafc; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-variant-numeric: tabular-nums; font-size: 12px; font-weight: 700;">3</span>
+      <div style="min-width: 0; flex: 1; display: flex; flex-direction: column;">
+        <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #f8fafc; font-size: 14px; font-weight: 600; line-height: 20px;">RAB</span>
+        <span style="font-size: 11px; color: #a1a1aa; line-height: 16px;">Jun 28, 2025</span>
+      </div>
+      <span style="flex-shrink: 0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-variant-numeric: tabular-nums; font-size: 15px; font-weight: 700; color: #f8fafc;">478,481,630</span>
+    </li>
+  </ol>
+  <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 12px;">
+    <a href="#" style="display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 32px; padding: 0 10px; border-radius: 6px; border: 1px solid #27272a; background: rgba(39,39,42,0.3); box-shadow: 0 1px 2px rgba(0,0,0,0.05); font-size: 14px; font-weight: 500; color: #f8fafc; white-space: nowrap; flex-shrink: 0;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg>Add score<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"></path><path d="M10 14 21 3"></path><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path></svg></a>
+    <a href="#" style="display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 500; color: #4ade80; line-height: 16px;">View all on iScored <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"></path><path d="M10 14 21 3"></path><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path></svg></a>
+  </div>
+</section><div style="border-radius: 12px; border: 1px dashed rgba(45,212,191,0.5); background: #18151b; padding: 16px;">
+  <p style="margin: 0; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #a1a1aa; line-height: 15px; margin-bottom: 8px;">Tags</p>
+  <p style="margin: 0; font-size: 14px; color: #a1a1aa;">Coming soon!</p>
+</div><section>
+  <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px;">
+    <div style="display: flex; align-items: baseline; gap: 12px;">
+      <p style="margin: 0; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #a1a1aa; line-height: 15px;">Recent activity</p>
+      <a href="#" style="display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 500; color: #4ade80; line-height: 16px;">View all <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg></a>
+    </div>
+    <div style="display: flex; gap: 8px;">
+      <a href="#" style="display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 32px; padding: 0 10px; border-radius: 6px; border: 1px solid #27272a; background: rgba(39,39,42,0.3); box-shadow: 0 1px 2px rgba(0,0,0,0.05); font-size: 14px; font-weight: 500; color: #f8fafc; white-space: nowrap; flex-shrink: 0;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><line x1="12" x2="12" y1="8" y2="12"></line><line x1="12" x2="12.01" y1="16" y2="16"></line></svg>New Issue</a>
+      <a href="#" style="display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 32px; padding: 0 10px; border-radius: 6px; border: 1px solid #27272a; background: rgba(39,39,42,0.3); box-shadow: 0 1px 2px rgba(0,0,0,0.05); font-size: 14px; font-weight: 500; color: #f8fafc; white-space: nowrap; flex-shrink: 0;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg>New Note</a>
+    </div>
+  </div>
+  <div style="display: flex; flex-direction: column;">
+    <div style="display: flex; align-items: flex-start; gap: 12px; padding: 10px 0; border-bottom: 1px solid #27272a;">
+      <span style="flex-shrink: 0; width: 28px; height: 28px; border-radius: 9999px; background: #27272a; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: #a1a1aa;">TF</span>
+      <div style="min-width: 0; flex: 1;">
+        <p style="margin: 0; font-size: 14px; line-height: 20px; color: #f8fafc;"><span style="font-weight: 600;">Tim Froehlich</span> <span style="color: #a1a1aa;">· 2d ago</span></p>
+        <p style="margin: 2px 0 0; font-size: 14px; line-height: 20px; color: #a1a1aa;">Replaced the right flipper coil</p>
+      </div>
+    </div>
+    <div style="display: flex; align-items: flex-start; gap: 12px; padding: 10px 0; border-bottom: 1px solid #27272a;">
+      <span style="flex-shrink: 0; width: 28px; height: 28px; border-radius: 9999px; background: #27272a; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: #a1a1aa;">NW</span>
+      <div style="min-width: 0; flex: 1;">
+        <p style="margin: 0; font-size: 14px; line-height: 20px; color: #f8fafc;"><span style="font-weight: 600;">NAW</span> <span style="color: #a1a1aa;">· 5d ago</span></p>
+        <p style="margin: 2px 0 0; font-size: 14px; line-height: 20px; color: #a1a1aa;">Reported #DOM-14 · Left drop target stuck</p>
+      </div>
+    </div>
+    <div style="display: flex; align-items: flex-start; gap: 12px; padding: 10px 0; border-bottom: 1px solid #27272a;">
+      <span style="flex-shrink: 0; width: 28px; height: 28px; border-radius: 9999px; background: #27272a; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: #a1a1aa;">SY</span>
+      <div style="min-width: 0; flex: 1;">
+        <p style="margin: 0; font-size: 14px; line-height: 20px; color: #f8fafc;"><span style="font-weight: 600;">System</span> <span style="color: #a1a1aa;">· 2w ago</span></p>
+        <p style="margin: 2px 0 0; font-size: 14px; line-height: 20px; color: #a1a1aa;">Presence set to On the floor</p>
+      </div>
+    </div>
+  </div>
+</section>
+</div>
+</div>
+</div></section>
+<section><h2>Card — linked, scores</h2><div class="frame">
+<div style="width: 320px; padding: 0; box-sizing: border-box; background: #0f0f11;">
+<section aria-label="Top scores" style="border-radius: 12px; border: 1px solid #52525b; background: #18151b; padding: 16px; overflow: hidden; ">
+  <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px;"><p style="margin: 0; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #a1a1aa; line-height: 15px;">Top scores</p><a href="#" title="View on iScored" style="display: inline-flex; flex-shrink: 0;"><img src="iscored-logo.svg" alt="iScored" style="height: 22px; width: auto; display: block;"></a></div>
+  <ol style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column;">
+    <li style="display: flex; align-items: center; gap: 12px; padding: 10px 16px; margin: 0 -16px; border-bottom: 1px solid #27272a; background: rgba(74,222,128,0.06);">
+      <span style="flex-shrink: 0; width: 28px; height: 28px; border-radius: 9999px; display: inline-flex; align-items: center; justify-content: center; background: #4ade80; color: #022c22; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-variant-numeric: tabular-nums; font-size: 12px; font-weight: 700;">1</span>
+      <div style="min-width: 0; flex: 1; display: flex; flex-direction: column;">
+        <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #f8fafc; font-size: 14px; font-weight: 600; line-height: 20px;">JSW</span>
+        <span style="font-size: 11px; color: #a1a1aa; line-height: 16px;">Jul 19, 2025</span>
+      </div>
+      <span style="flex-shrink: 0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-variant-numeric: tabular-nums; font-size: 18px; font-weight: 700; color: #4ade80;">609,799,780</span>
+    </li>
+    <li style="display: flex; align-items: center; gap: 12px; padding: 10px 16px; margin: 0 -16px; border-bottom: 1px solid #27272a; background: transparent;">
+      <span style="flex-shrink: 0; width: 28px; height: 28px; border-radius: 9999px; display: inline-flex; align-items: center; justify-content: center; background: #2dd4bf; color: #042f2e; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-variant-numeric: tabular-nums; font-size: 12px; font-weight: 700;">2</span>
+      <div style="min-width: 0; flex: 1; display: flex; flex-direction: column;">
+        <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #f8fafc; font-size: 14px; font-weight: 600; line-height: 20px;">VTX</span>
+        <span style="font-size: 11px; color: #a1a1aa; line-height: 16px;">Sep 11, 2025</span>
+      </div>
+      <span style="flex-shrink: 0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-variant-numeric: tabular-nums; font-size: 15px; font-weight: 700; color: #f8fafc;">578,421,330</span>
+    </li>
+    <li style="display: flex; align-items: center; gap: 12px; padding: 10px 16px; margin: 0 -16px; border-bottom: 1px solid #27272a; background: transparent;">
+      <span style="flex-shrink: 0; width: 28px; height: 28px; border-radius: 9999px; display: inline-flex; align-items: center; justify-content: center; background: #52525b; color: #f8fafc; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-variant-numeric: tabular-nums; font-size: 12px; font-weight: 700;">3</span>
+      <div style="min-width: 0; flex: 1; display: flex; flex-direction: column;">
+        <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #f8fafc; font-size: 14px; font-weight: 600; line-height: 20px;">RAB</span>
+        <span style="font-size: 11px; color: #a1a1aa; line-height: 16px;">Jun 28, 2025</span>
+      </div>
+      <span style="flex-shrink: 0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-variant-numeric: tabular-nums; font-size: 15px; font-weight: 700; color: #f8fafc;">478,481,630</span>
+    </li>
+  </ol>
+  <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 12px;">
+    <a href="#" style="display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 32px; padding: 0 10px; border-radius: 6px; border: 1px solid #27272a; background: rgba(39,39,42,0.3); box-shadow: 0 1px 2px rgba(0,0,0,0.05); font-size: 14px; font-weight: 500; color: #f8fafc; white-space: nowrap; flex-shrink: 0;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg>Add score<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"></path><path d="M10 14 21 3"></path><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path></svg></a>
+    <a href="#" style="display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 500; color: #4ade80; line-height: 16px;">View all on iScored <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"></path><path d="M10 14 21 3"></path><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path></svg></a>
+  </div>
+</section></div>
+</div></section>
+<section><h2>Card — linked, no scores</h2><div class="frame">
+<div style="width: 320px; padding: 0; box-sizing: border-box; background: #0f0f11;">
+<section aria-label="Top scores" style="border-radius: 12px; border: 1px solid #52525b; background: #18151b; padding: 16px; overflow: hidden; ">
+  <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px;"><p style="margin: 0; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #a1a1aa; line-height: 15px;">Top scores</p><a href="#" title="View on iScored" style="display: inline-flex; flex-shrink: 0;"><img src="iscored-logo.svg" alt="iScored" style="height: 22px; width: auto; display: block;"></a></div>
+  <p style="margin: 8px 0 0; display: flex; align-items: center; gap: 8px; font-size: 14px; color: #a1a1aa; line-height: 20px;"><span style="color: #52525b; display: inline-flex;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"></path><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"></path><path d="M4 22h16"></path><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"></path><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"></path><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"></path></svg></span>No scores recorded yet</p>
+  <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 12px;">
+    <a href="#" style="display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 32px; padding: 0 10px; border-radius: 6px; border: 1px solid #27272a; background: rgba(39,39,42,0.3); box-shadow: 0 1px 2px rgba(0,0,0,0.05); font-size: 14px; font-weight: 500; color: #f8fafc; white-space: nowrap; flex-shrink: 0;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg>Add score<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"></path><path d="M10 14 21 3"></path><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path></svg></a>
+    <a href="#" style="display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 500; color: #4ade80; line-height: 16px;">View all on iScored <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"></path><path d="M10 14 21 3"></path><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path></svg></a>
+  </div>
+</section></div>
+</div></section>
+<section><h2>Card — unlinked, viewer can open Manage</h2><div class="frame">
+<div style="width: 320px; padding: 0; box-sizing: border-box; background: #0f0f11;">
+<section aria-label="Top scores" style="border-radius: 12px; border: 1px solid #52525b; background: #18151b; padding: 16px; overflow: hidden; border-style: dashed; border-color: rgba(45,212,191,0.5);">
+  <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px;"><p style="margin: 0; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #a1a1aa; line-height: 15px;">Top scores</p><a href="#" title="View on iScored" style="display: inline-flex; flex-shrink: 0;"><img src="iscored-logo.svg" alt="iScored" style="height: 22px; width: auto; display: block;"></a></div>
+  <p style="margin: 8px 0 0; font-size: 14px; color: #a1a1aa; line-height: 20px;">Not linked to iScored.</p>
+  <a href="#" style="display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 500; color: #4ade80; line-height: 16px; margin-top: 8px;">Link it on Manage <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg></a>
+</section></div>
+</div></section>
+<section><h2>Card — unlinked, guest</h2><div class="frame">
+<div style="width: 320px; padding: 0; box-sizing: border-box; background: #0f0f11;">
+<section aria-label="Top scores" style="border-radius: 12px; border: 1px solid #52525b; background: #18151b; padding: 16px; overflow: hidden; border-style: dashed; border-color: rgba(45,212,191,0.5);">
+  <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px;"><p style="margin: 0; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #a1a1aa; line-height: 15px;">Top scores</p><a href="#" title="View on iScored" style="display: inline-flex; flex-shrink: 0;"><img src="iscored-logo.svg" alt="iScored" style="height: 22px; width: auto; display: block;"></a></div>
+  <p style="margin: 8px 0 0; font-size: 14px; color: #a1a1aa; line-height: 20px;">Not linked to iScored.</p>
+</section></div>
+</div></section>
+</body>
+</html>

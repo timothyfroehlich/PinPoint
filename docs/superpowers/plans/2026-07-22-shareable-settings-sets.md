@@ -84,8 +84,8 @@
 
 **Files:**
 
-- Create: `src/lib/permissions/settings.ts`
-- Test: `src/lib/permissions/settings.test.ts`
+- Create: `src/lib/machines/settings-permissions.ts`
+- Test: `src/test/unit/lib/machines/settings-permissions.test.ts`
 
 **Interfaces — Produces:**
 

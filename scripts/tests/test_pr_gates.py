@@ -1,7 +1,9 @@
-"""Regression tests for the merge gate's Codex and local-review records.
+"""Regression tests for the merge gate's three review checkers.
 
-A native approval, trusted clean connector comment or reaction-witness comment, or the
-existing SHA-pinned manual attestation, may cover the current head.
+Gate 3 passes when ANY checker covers the exact head: CodeRabbit's native approval,
+Codex's evidence (native approval, exact-head finding review, trusted clean comment,
+or trusted reaction witness), or a local review attestation. `_review_summary` is the
+one JSON document every consumer reads; its label is one of four words.
 """
 
 import json
@@ -20,6 +22,7 @@ pytestmark = pytest.mark.integration
 GATES_PATH = Path(__file__).parent.parent / "workflow" / "_pr-gates.sh"
 CODEX_BOT = "chatgpt-codex-connector[bot]"
 CODEX_APP = "chatgpt-codex-connector"
+CODERABBIT_BOT = "coderabbitai[bot]"
 GITHUB_ACTIONS_BOT = "github-actions[bot]"
 GITHUB_ACTIONS_APP = "github-actions"
 HEAD_SHA = "d084c14a43af3ac021f0838f5c7bf4b77f72fb62"
@@ -28,7 +31,7 @@ OTHER_SHA = "0000000000000000000000000000000000000000"
 
 def codex_review(
     *,
-    sha: str = HEAD_SHA,
+    sha: str | None = HEAD_SHA,
     state: str = "APPROVED",
     submitted_at: str = "2026-08-22T12:00:00Z",
     login: str = CODEX_BOT,
@@ -48,8 +51,10 @@ def manual_marker(
     reviewer: str = "claude-code",
     detail: str = "medium",
     updated_at: str = "2026-08-22T12:00:00Z",
+    login: str = "acme",
 ) -> dict:
     return {
+        "user": {"login": login},
         "body": (
             f"<!-- pinpoint-review: {sha} -->\n"
             f"<!-- pinpoint-reviewer: {reviewer} -->\n"
@@ -107,6 +112,7 @@ def manual_review_request(
 
 def legacy_claude_marker(sha: str = HEAD_SHA, detail: str = "high") -> dict:
     return {
+        "user": {"login": "acme"},
         "body": (
             f"<!-- pinpoint-claude-review: {sha} -->\n"
             f"<!-- pinpoint-review-depth: {detail} -->\n"
@@ -164,10 +170,18 @@ def gate_env(
     threads: list[dict] | None = None,
     commits: list[dict] | None = None,
     head_sha: str = HEAD_SHA,
+    rollup: list[dict] | None = None,
 ) -> Iterator[dict]:
-    """Yield an environment whose gh executable serves paginated review records."""
+    """Yield an environment whose gh executable serves paginated review records.
+
+    `rollup` is the raw statusCheckRollup array; the stub runs the gate's real `--jq`
+    filter over it with jq, so the authoritative-run selection is what gets tested.
+    """
     with tempfile.TemporaryDirectory() as tmp:
         tmp_path = Path(tmp)
+        (tmp_path / "rollup.json").write_text(
+            json.dumps({"statusCheckRollup": rollup or []})
+        )
         (tmp_path / "reviews.json").write_text(
             "\n".join(json.dumps(page) for page in (review_pages or [[]]))
         )
@@ -204,6 +218,7 @@ def gate_env(
             'printf "%s\\n" "$args" >> "$STUB_CALLS"\n'
             'case "$args" in\n'
             '  *"--jq .headRefOid"*) printf "%s\\n" "$STUB_HEAD_SHA" ;;\n'
+            '  *"--json statusCheckRollup --jq"*) jq -r "${@: -1}" < "$STUB_ROLLUP" ;;\n'
             '  *"nameWithOwner"*) printf "acme/widget\\n" ;;\n'
             '  *"api graphql"*) cat "$STUB_THREADS" ;;\n'
             '  *"/pulls/"*"/reviews"*) cat "$STUB_REVIEWS" ;;\n'
@@ -223,6 +238,7 @@ def gate_env(
         env["STUB_COMMENTS"] = str(tmp_path / "comments.json")
         env["STUB_COMMITS"] = str(tmp_path / "commits.json")
         env["STUB_THREADS"] = str(tmp_path / "threads.json")
+        env["STUB_ROLLUP"] = str(tmp_path / "rollup.json")
         env["STUB_CALLS"] = str(calls_path)
         yield env
 
@@ -237,12 +253,13 @@ def run_gate(fn: str, env: dict) -> subprocess.CompletedProcess:
     )
 
 
-def review_record(env: dict) -> list[str]:
+def review_summary(env: dict) -> dict:
+    """`_review_summary 123` as a dict — the document every consumer reads."""
     result = subprocess.run(
         [
             "bash",
             "-c",
-            f'source "{GATES_PATH}"; _review_record 123 acme/widget {HEAD_SHA}',
+            f'set -euo pipefail; source "{GATES_PATH}"; _review_summary 123',
         ],
         capture_output=True,
         text=True,
@@ -250,60 +267,251 @@ def review_record(env: dict) -> list[str]:
         timeout=60,
     )
     assert result.returncode == 0, result.stderr
-    return result.stdout.rstrip("\n").split("\t")
+    return json.loads(result.stdout)
+
+
+def verdicts(summary: dict) -> dict[str, str]:
+    return {name: record["verdict"] for name, record in summary["checkers"].items()}
+
+
+# ---------------------------------------------------------------------------------
+# Gate 3 passes when any checker covers head
+# ---------------------------------------------------------------------------------
 
 
 def test_codex_approval_of_head_passes() -> None:
     with gate_env(review_pages=[[codex_review()]]) as env:
         result = run_gate("check_review_happened", env)
+        summary = review_summary(env)
     assert result.returncode == 0, result.stdout
-    assert f"Codex approved head SHA {HEAD_SHA[:7]}" in result.stdout
+    assert f"PASS: reviewed: Codex approved head SHA {HEAD_SHA[:7]}" in result.stdout
+    assert summary["label"] == "approved"
+    assert summary["coverage"]["checker"] == "codex"
+    assert summary["coverage"]["form"] == "approval"
+
+
+def test_coderabbit_approval_of_head_passes() -> None:
+    with gate_env(review_pages=[[codex_review(login=CODERABBIT_BOT)]]) as env:
+        result = run_gate("check_review_happened", env)
+        summary = review_summary(env)
+    assert result.returncode == 0, result.stdout
+    assert f"CodeRabbit approved head SHA {HEAD_SHA[:7]}" in result.stdout
+    assert summary["coverage"]["checker"] == "coderabbit"
+    assert summary["coverage"]["reviewer"] == CODERABBIT_BOT
+
+
+def test_coderabbit_precedence_over_codex_when_both_cover() -> None:
+    """When both CodeRabbit and Codex cover head, CodeRabbit takes precedence (§10.7)."""
+    cr = codex_review(login=CODERABBIT_BOT, submitted_at="2026-08-22T11:00:00Z")
+    cx = codex_review(login=CODEX_BOT, submitted_at="2026-08-22T12:00:00Z")
+    with gate_env(review_pages=[[cr, cx]]) as env:
+        summary = review_summary(env)
+    assert summary["coverage"]["checker"] == "coderabbit"
+    assert summary["coverage"]["reviewer"] == CODERABBIT_BOT
 
 
 def test_clean_codex_comment_of_head_passes() -> None:
     with gate_env(comment_pages=[[clean_codex_comment()]]) as env:
         result = run_gate("check_review_happened", env)
+        summary = review_summary(env)
     assert result.returncode == 0, result.stdout
     assert f"Codex found no major issues on head SHA {HEAD_SHA[:7]}" in result.stdout
+    assert summary["coverage"]["form"] == "clean_comment"
+    assert summary["coverage"]["detail"] == "NO_FINDINGS"
 
 
 def test_clean_codex_comment_accepts_full_head_sha() -> None:
     with gate_env(comment_pages=[[clean_codex_comment(HEAD_SHA)]]) as env:
-        state, sha, reviewer, detail, *_rest = review_record(env)
-    assert (state, sha, reviewer, detail) == (
-        "clean_comment",
-        HEAD_SHA,
-        CODEX_BOT,
-        "NO_FINDINGS",
-    )
+        summary = review_summary(env)
+    assert summary["label"] == "approved"
+    assert summary["coverage"]["sha"] == HEAD_SHA
 
 
 def test_clean_codex_reaction_witness_pins_current_head() -> None:
     with gate_env(comment_pages=[[clean_codex_reaction_witness()]]) as env:
-        state, sha, reviewer, detail, *_rest = review_record(env)
-    assert (state, sha, reviewer, detail) == (
-        "clean_reaction",
-        HEAD_SHA,
-        GITHUB_ACTIONS_BOT,
-        "REACTION_WITNESS",
+        result = run_gate("check_review_happened", env)
+        summary = review_summary(env)
+    assert result.returncode == 0, result.stdout
+    assert "trusted workflow witnessed Codex clean reaction" in result.stdout
+    assert summary["coverage"]["form"] == "clean_reaction"
+    assert summary["coverage"]["reviewer"] == GITHUB_ACTIONS_BOT
+
+
+def test_current_head_finding_review_passes_and_defers_to_the_thread_gate() -> None:
+    reviews = [
+        codex_review(submitted_at="2026-08-22T12:00:00Z"),
+        codex_review(state="CHANGES_REQUESTED", submitted_at="2026-08-22T12:01:00Z"),
+    ]
+    with gate_env(review_pages=[reviews]) as env:
+        result = run_gate("check_review_happened", env)
+        summary = review_summary(env)
+    assert result.returncode == 0, result.stdout
+    assert "thread gate owns findings" in result.stdout
+    assert summary["coverage"]["form"] == "reviewed"
+
+
+def test_manual_attestation_of_head_passes() -> None:
+    with gate_env(comment_pages=[[manual_marker()]]) as env:
+        result = run_gate("check_review_happened", env)
+        summary = review_summary(env)
+    assert result.returncode == 0, result.stdout
+    assert f"review marker pins head SHA {HEAD_SHA[:7]}" in result.stdout
+    assert summary["coverage"]["checker"] == "marker"
+    assert (summary["coverage"]["reviewer"], summary["coverage"]["detail"]) == (
+        "claude-code",
+        "medium",
     )
+
+
+@pytest.mark.parametrize("order", [[OTHER_SHA, HEAD_SHA], [HEAD_SHA, OTHER_SHA]])
+def test_any_manual_marker_pinning_head_passes(order: list[str]) -> None:
+    with gate_env(comment_pages=[[manual_marker(sha) for sha in order]]) as env:
+        result = run_gate("check_review_happened", env)
+    assert result.returncode == 0, result.stdout
+
+
+# ---------------------------------------------------------------------------------
+# Checkers are independent: one reviewer's verdict never masks another's
+# ---------------------------------------------------------------------------------
+
+
+def test_manual_attestation_covers_despite_codex_changes_requested() -> None:
+    with gate_env(
+        review_pages=[[codex_review(state="CHANGES_REQUESTED")]],
+        comment_pages=[[manual_marker()]],
+    ) as env:
+        result = run_gate("check_review_happened", env)
+    assert result.returncode == 0, result.stdout
+    assert "review marker pins head SHA" in result.stdout
+
+
+def test_coderabbit_approval_covers_despite_stale_codex_approval() -> None:
+    reviews = [
+        codex_review(sha=OTHER_SHA, submitted_at="2026-08-22T11:00:00Z"),
+        codex_review(login=CODERABBIT_BOT, submitted_at="2026-08-22T12:00:00Z"),
+    ]
+    with gate_env(review_pages=[reviews]) as env:
+        result = run_gate("check_review_happened", env)
+        summary = review_summary(env)
+    assert result.returncode == 0, result.stdout
+    assert f"CodeRabbit approved head SHA {HEAD_SHA[:7]}" in result.stdout
+    assert verdicts(summary) == {
+        "coderabbit": "covers",
+        "codex": "stale",
+        "marker": "none",
+    }
+
+
+def test_coderabbit_changes_requested_does_not_mask_codex_approval() -> None:
+    reviews = [
+        codex_review(submitted_at="2026-08-22T11:00:00Z"),
+        codex_review(
+            login=CODERABBIT_BOT,
+            state="CHANGES_REQUESTED",
+            submitted_at="2026-08-22T12:00:00Z",
+        ),
+    ]
+    with gate_env(review_pages=[reviews]) as env:
+        result = run_gate("check_review_happened", env)
+        summary = review_summary(env)
+    assert result.returncode == 0, result.stdout
+    assert f"Codex approved head SHA {HEAD_SHA[:7]}" in result.stdout
+    assert summary["label"] == "approved"
+    assert verdicts(summary)["coderabbit"] == "changes_requested"
+
+
+def test_newest_exact_head_codex_evidence_decides_its_form() -> None:
+    # A native finding review newer than a clean comment reports as "reviewed";
+    # a clean comment newer than a native finding reports as "clean_comment".
+    with gate_env(
+        review_pages=[
+            [codex_review(state="COMMENTED", submitted_at="2026-08-22T12:01:00Z")]
+        ],
+        comment_pages=[[clean_codex_comment(updated_at="2026-08-22T12:00:00Z")]],
+    ) as env:
+        assert review_summary(env)["coverage"]["form"] == "reviewed"
+    with gate_env(
+        review_pages=[
+            [codex_review(state="COMMENTED", submitted_at="2026-08-22T12:00:00Z")]
+        ],
+        comment_pages=[[clean_codex_comment(updated_at="2026-08-22T12:01:00Z")]],
+    ) as env:
+        assert review_summary(env)["coverage"]["form"] == "clean_comment"
+
+
+def test_off_head_codex_evidence_never_overrides_exact_head_evidence() -> None:
+    # A delayed native review of an OLD head cannot displace the clean comment on
+    # head; a delayed stale clean comment cannot displace the finding review on head.
+    with gate_env(
+        review_pages=[
+            [
+                codex_review(
+                    sha=OTHER_SHA,
+                    state="COMMENTED",
+                    submitted_at="2026-08-22T12:01:00Z",
+                )
+            ]
+        ],
+        comment_pages=[[clean_codex_comment(updated_at="2026-08-22T12:00:00Z")]],
+    ) as env:
+        assert review_summary(env)["coverage"]["form"] == "clean_comment"
+    with gate_env(
+        review_pages=[
+            [codex_review(state="COMMENTED", submitted_at="2026-08-22T12:00:00Z")]
+        ],
+        comment_pages=[
+            [clean_codex_comment(OTHER_SHA[:10], updated_at="2026-08-22T12:01:00Z")]
+        ],
+    ) as env:
+        assert review_summary(env)["coverage"]["form"] == "reviewed"
+
+
+def test_delayed_old_head_review_does_not_override_current_native_approval() -> None:
+    reviews = [
+        codex_review(submitted_at="2026-08-22T12:00:00Z"),
+        codex_review(
+            sha=OTHER_SHA, state="COMMENTED", submitted_at="2026-08-22T12:01:00Z"
+        ),
+    ]
+    with gate_env(review_pages=[reviews]) as env:
+        result = run_gate("check_review_happened", env)
+    assert result.returncode == 0, result.stdout
+    assert f"Codex approved head SHA {HEAD_SHA[:7]}" in result.stdout
+
+
+# ---------------------------------------------------------------------------------
+# Gate 3 fails closed: nothing off-head, untrusted, or unusable covers
+# ---------------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "reviews",
+    [
+        pytest.param([], id="no-review"),
+        pytest.param([codex_review(login="other-reviewer[bot]")], id="untrusted-bot"),
+        pytest.param([codex_review(sha=OTHER_SHA)], id="approval-of-old-head"),
+        pytest.param(
+            [codex_review(login=CODERABBIT_BOT, sha=OTHER_SHA)],
+            id="coderabbit-approval-of-old-head",
+        ),
+    ],
+)
+def test_no_qualifying_review_without_manual_attestation_fails(
+    reviews: list[dict],
+) -> None:
+    with gate_env(review_pages=[reviews]) as env:
+        result = run_gate("check_review_happened", env)
+    assert result.returncode == 1, result.stdout
+    assert "FAIL: reviewed:" in result.stdout
+    assert f"no reviewer's evidence covers head {HEAD_SHA[:7]}" in result.stdout
 
 
 @pytest.mark.parametrize(
     "witness",
     [
-        pytest.param(
-            clean_codex_reaction_witness(login="other[bot]"),
-            id="wrong-bot",
-        ),
-        pytest.param(
-            clean_codex_reaction_witness(app="other-app"),
-            id="wrong-app",
-        ),
-        pytest.param(
-            clean_codex_reaction_witness(OTHER_SHA),
-            id="stale-head",
-        ),
+        pytest.param(clean_codex_reaction_witness(login="other[bot]"), id="wrong-bot"),
+        pytest.param(clean_codex_reaction_witness(app="other-app"), id="wrong-app"),
+        pytest.param(clean_codex_reaction_witness(OTHER_SHA), id="stale-head"),
     ],
 )
 def test_untrusted_or_stale_reaction_witnesses_do_not_cover_head(
@@ -332,91 +540,120 @@ def test_untrusted_or_stale_clean_comments_do_not_cover_head(comment: dict) -> N
     assert result.returncode == 1, result.stdout
 
 
-def test_later_native_finding_overrides_earlier_clean_comment() -> None:
-    with gate_env(
-        review_pages=[
-            [codex_review(state="COMMENTED", submitted_at="2026-08-22T12:01:00Z")]
-        ],
-        comment_pages=[[clean_codex_comment(updated_at="2026-08-22T12:00:00Z")]],
-    ) as env:
-        state, *_rest = review_record(env)
-    assert state == "reviewed"
-
-
-def test_delayed_native_review_of_old_head_does_not_override_current_clean_comment() -> (
-    None
-):
-    with gate_env(
-        review_pages=[
-            [
-                codex_review(
-                    sha=OTHER_SHA,
-                    state="COMMENTED",
-                    submitted_at="2026-08-22T12:01:00Z",
-                )
-            ]
-        ],
-        comment_pages=[[clean_codex_comment(updated_at="2026-08-22T12:00:00Z")]],
-    ) as env:
-        state, *_rest = review_record(env)
-    assert state == "clean_comment"
-
-
-def test_delayed_stale_clean_comment_does_not_override_current_finding_review() -> None:
-    with gate_env(
-        review_pages=[
-            [codex_review(state="COMMENTED", submitted_at="2026-08-22T12:00:00Z")]
-        ],
-        comment_pages=[
-            [clean_codex_comment(OTHER_SHA[:10], updated_at="2026-08-22T12:01:00Z")]
-        ],
-    ) as env:
-        state, *_rest = review_record(env)
-    assert state == "reviewed"
-
-
-def test_later_clean_comment_supersedes_earlier_native_nonapproval() -> None:
-    with gate_env(
-        review_pages=[
-            [codex_review(state="COMMENTED", submitted_at="2026-08-22T12:00:00Z")]
-        ],
-        comment_pages=[[clean_codex_comment(updated_at="2026-08-22T12:01:00Z")]],
-    ) as env:
-        state, *_rest = review_record(env)
-    assert state == "clean_comment"
-
-
-def test_manual_attestation_of_head_still_passes() -> None:
-    with gate_env(comment_pages=[[manual_marker()]]) as env:
+@pytest.mark.parametrize("state", ["DISMISSED", "PENDING", "UNKNOWN"])
+def test_unusable_current_head_codex_review_state_fails_closed(state: str) -> None:
+    with gate_env(review_pages=[[codex_review(state=state)]]) as env:
         result = run_gate("check_review_happened", env)
-    assert result.returncode == 0, result.stdout
-    assert f"review marker pins head SHA {HEAD_SHA[:7]}" in result.stdout
+        summary = review_summary(env)
+    assert result.returncode == 1, result.stdout
+    assert summary["label"] == "not reviewed"
+    assert verdicts(summary)["codex"] == "none"
 
 
-def test_manual_attestation_remains_valid_after_non_approval_codex_review() -> None:
+@pytest.mark.parametrize("state", ["COMMENTED", "DISMISSED"])
+def test_coderabbit_non_approval_on_head_is_not_reviewed(state: str) -> None:
+    review = codex_review(login=CODERABBIT_BOT, state=state)
+    with gate_env(review_pages=[[review]]) as env:
+        result = run_gate("check_review_happened", env)
+        summary = review_summary(env)
+    assert result.returncode == 1, result.stdout
+    assert summary["label"] == "not reviewed"
+    assert verdicts(summary) == {
+        "coderabbit": "none",
+        "codex": "none",
+        "marker": "none",
+    }
+
+
+def test_coderabbit_changes_requested_on_head_is_changes_requested() -> None:
+    review = codex_review(login=CODERABBIT_BOT, state="CHANGES_REQUESTED")
+    with gate_env(review_pages=[[review]]) as env:
+        result = run_gate("check_review_happened", env)
+        summary = review_summary(env)
+    assert result.returncode == 1, result.stdout
+    assert "FAIL: reviewed: changes requested" in result.stdout
+    assert f"CodeRabbit: requested changes on head {HEAD_SHA[:7]}" in result.stdout
+    assert summary["label"] == "changes requested"
+
+
+def test_unresolved_threads_make_uncovered_head_changes_requested() -> None:
     with gate_env(
-        review_pages=[[codex_review(state="CHANGES_REQUESTED")]],
-        comment_pages=[[manual_marker()]],
+        threads=[thread(resolved=False, author="timothyfroehlich")],
+        review_pages=[[codex_review(sha=OTHER_SHA)]],
+    ) as env:
+        summary = review_summary(env)
+    assert summary["label"] == "changes requested"
+    assert summary["unresolved_threads"] == 1
+
+
+def test_unresolved_threads_do_not_change_an_approved_label() -> None:
+    # Coverage on head is Gate 3's whole question; Gate 2 owns the threads.
+    with gate_env(
+        threads=[thread(resolved=False, author="timothyfroehlich")],
+        review_pages=[[codex_review()]],
     ) as env:
         result = run_gate("check_review_happened", env)
+        summary = review_summary(env)
     assert result.returncode == 0, result.stdout
-    assert "review marker pins head SHA" in result.stdout
+    assert summary["label"] == "approved"
 
 
-def test_stale_manual_marker_does_not_override_current_finding_review() -> None:
+def test_null_commit_id_does_not_shift_reviewer_into_the_sha_slot() -> None:
+    # GitHub's commit_id is nullable; the record must carry "" rather than the login.
+    with gate_env(review_pages=[[codex_review(sha=None)]]) as env:
+        result = run_gate("check_review_happened", env)
+        summary = review_summary(env)
+    assert result.returncode == 1, result.stdout
+    codex = summary["checkers"]["codex"]
+    assert (codex["verdict"], codex["sha"], codex["reviewer"]) == (
+        "stale",
+        "",
+        CODEX_BOT,
+    )
+    assert "Codex approved chatgpt" not in result.stdout
+
+
+# ---------------------------------------------------------------------------------
+# Stale evidence: named in the FAIL block, never coverage
+# ---------------------------------------------------------------------------------
+
+
+def test_stale_codex_approval_reports_both_commits_and_the_request_remedy() -> None:
+    with gate_env(review_pages=[[codex_review(sha=OTHER_SHA)]]) as env:
+        result = run_gate("check_review_happened", env)
+        summary = review_summary(env)
+    assert result.returncode == 1, result.stdout
+    assert "FAIL: reviewed: stale review" in result.stdout
+    assert (
+        f"Codex: newest evidence names {OTHER_SHA[:7]}, head is {HEAD_SHA[:7]}"
+        in result.stdout
+    )
+    assert "request-codex-review.sh 123 exactly once" in result.stdout
+    assert "CodeRabbit request or a local review" in result.stdout
+    assert summary["label"] == "stale review"
+
+
+def test_stale_coderabbit_approval_is_stale_review() -> None:
     with gate_env(
-        review_pages=[[codex_review(state="CHANGES_REQUESTED")]],
-        comment_pages=[
-            [
-                manual_marker(
-                    OTHER_SHA,
-                    updated_at="2026-08-22T12:01:00Z",
-                )
-            ]
-        ],
+        review_pages=[[codex_review(login=CODERABBIT_BOT, sha=OTHER_SHA)]]
     ) as env:
-        state, sha, *_rest = review_record(env)
-    assert (state, sha) == ("reviewed", HEAD_SHA)
+        result = run_gate("check_review_happened", env)
+    assert result.returncode == 1, result.stdout
+    assert "FAIL: reviewed: stale review" in result.stdout
+    assert f"CodeRabbit: newest evidence names {OTHER_SHA[:7]}" in result.stdout
+
+
+@pytest.mark.parametrize("state", ["DISMISSED", "PENDING", "UNKNOWN"])
+def test_old_unusable_codex_review_is_stale(state: str) -> None:
+    with gate_env(review_pages=[[codex_review(sha=OTHER_SHA, state=state)]]) as env:
+        summary = review_summary(env)
+    assert summary["label"] == "stale review"
+    codex = summary["checkers"]["codex"]
+    assert (codex["verdict"], codex["sha"], codex["detail"]) == (
+        "stale",
+        OTHER_SHA,
+        state,
+    )
 
 
 def test_newest_stale_manual_marker_is_reported_when_no_marker_pins_head() -> None:
@@ -429,130 +666,35 @@ def test_newest_stale_manual_marker_is_reported_when_no_marker_pins_head() -> No
             ]
         ]
     ) as env:
-        state, sha, *_rest = review_record(env)
-    assert (state, sha) == ("stale_marker", OTHER_SHA)
+        summary = review_summary(env)
+    marker = summary["checkers"]["marker"]
+    assert (marker["verdict"], marker["sha"]) == ("stale", OTHER_SHA)
 
 
-def test_current_codex_approval_skips_manual_marker_lookup() -> None:
-    with gate_env(review_pages=[[codex_review()]]) as env:
-        result = run_gate("check_review_happened", env)
-        calls = Path(env["STUB_CALLS"]).read_text()
-    assert result.returncode == 0, result.stdout
-    assert "/pulls/123/reviews" in calls
-    assert "/issues/123/comments" not in calls
-
-
-def test_manual_markers_are_read_across_all_pages() -> None:
-    with gate_env(comment_pages=[[], [manual_marker()]]) as env:
-        result = run_gate("check_review_happened", env)
-    assert result.returncode == 0, result.stdout
-
-
-def test_clean_codex_comments_are_read_across_all_pages() -> None:
-    with gate_env(comment_pages=[[], [clean_codex_comment()]]) as env:
-        result = run_gate("check_review_happened", env)
-    assert result.returncode == 0, result.stdout
-
-
-def test_clean_codex_reaction_witnesses_are_read_across_all_pages() -> None:
-    with gate_env(comment_pages=[[], [clean_codex_reaction_witness()]]) as env:
-        result = run_gate("check_review_happened", env)
-    assert result.returncode == 0, result.stdout
-
-
-@pytest.mark.parametrize(
-    "reviews",
-    [
-        pytest.param([], id="no-codex-review"),
-        pytest.param([codex_review(login="other-reviewer[bot]")], id="untrusted-bot"),
-        pytest.param([codex_review(sha=OTHER_SHA)], id="approval-of-old-head"),
-    ],
-)
-def test_no_qualifying_codex_review_without_manual_attestation_fails(
-    reviews: list[dict],
-) -> None:
-    with gate_env(review_pages=[reviews]) as env:
-        result = run_gate("check_review_happened", env)
-    assert result.returncode == 1, result.stdout
-    assert "FAIL: reviewed:" in result.stdout
-
-
-def test_latest_current_head_finding_completes_review_coverage() -> None:
-    reviews = [
-        codex_review(submitted_at="2026-08-22T12:00:00Z"),
-        codex_review(
-            state="CHANGES_REQUESTED",
-            submitted_at="2026-08-22T12:01:00Z",
-        ),
-    ]
-    with gate_env(review_pages=[reviews]) as env:
-        result = run_gate("check_review_happened", env)
-    assert result.returncode == 0, result.stdout
-    assert "thread gate owns findings" in result.stdout
-
-
-@pytest.mark.parametrize("state", ["DISMISSED", "PENDING", "UNKNOWN"])
-def test_unusable_current_head_review_state_fails_closed(state: str) -> None:
-    with gate_env(review_pages=[[codex_review(state=state)]]) as env:
-        result = run_gate("check_review_happened", env)
-    assert result.returncode == 1, result.stdout
-    assert "without approval" in result.stdout
-
-
-@pytest.mark.parametrize("state", ["DISMISSED", "PENDING", "UNKNOWN"])
-def test_unusable_current_head_review_overrides_request_marker(state: str) -> None:
+def test_stale_manual_marker_does_not_hide_the_current_finding_review() -> None:
     with gate_env(
-        review_pages=[[codex_review(state=state)]],
-        comment_pages=[[manual_review_request()]],
+        review_pages=[[codex_review(state="CHANGES_REQUESTED")]],
+        comment_pages=[[manual_marker(OTHER_SHA, updated_at="2026-08-22T12:01:00Z")]],
     ) as env:
-        record = review_record(env)
-
-    assert record[:4] == ["not_approved", HEAD_SHA, CODEX_BOT, state]
-
-
-@pytest.mark.parametrize("state", ["DISMISSED", "PENDING", "UNKNOWN"])
-def test_old_unusable_review_is_stale(state: str) -> None:
-    with gate_env(review_pages=[[codex_review(sha=OTHER_SHA, state=state)]]) as env:
-        record = review_record(env)
-
-    assert record[:4] == ["stale_approval", OTHER_SHA, CODEX_BOT, state]
+        summary = review_summary(env)
+    assert summary["label"] == "approved"
+    assert summary["coverage"]["checker"] == "codex"
+    assert verdicts(summary)["marker"] == "stale"
 
 
-def test_delayed_old_head_review_does_not_override_current_native_approval() -> None:
-    reviews = [
-        codex_review(submitted_at="2026-08-22T12:00:00Z"),
-        codex_review(
-            sha=OTHER_SHA,
-            state="COMMENTED",
-            submitted_at="2026-08-22T12:01:00Z",
-        ),
-    ]
-    with gate_env(review_pages=[reviews]) as env:
-        result = run_gate("check_review_happened", env)
-    assert result.returncode == 0, result.stdout
-    assert f"Codex approved head SHA {HEAD_SHA[:7]}" in result.stdout
-
-
-def test_reviews_are_read_across_all_pages() -> None:
-    with gate_env(review_pages=[[], [codex_review()]]) as env:
-        result = run_gate("check_review_happened", env)
-    assert result.returncode == 0, result.stdout
-
-
-def test_stale_approval_reports_both_commits_and_the_manual_request_remedy() -> None:
-    with gate_env(review_pages=[[codex_review(sha=OTHER_SHA)]]) as env:
-        result = run_gate("check_review_happened", env)
-    assert OTHER_SHA[:7] in result.stdout
-    assert HEAD_SHA[:7] in result.stdout
-    assert "request-codex-review.sh 123 exactly once" in result.stdout
-    assert "replacement CI and one new request" in result.stdout
+# ---------------------------------------------------------------------------------
+# The manual Codex request marker: pending is a remedy hint, not evidence
+# ---------------------------------------------------------------------------------
 
 
 def test_current_head_review_request_is_pending_not_recommended_again() -> None:
     with gate_env(comment_pages=[[manual_review_request()]]) as env:
         result = run_gate("check_review_happened", env)
+        summary = review_summary(env)
     assert result.returncode == 1, result.stdout
-    assert "manual Codex review requested" in result.stdout
+    assert summary["label"] == "not reviewed"
+    assert summary["codex_request_pending"] is True
+    assert "already requested" in result.stdout
     assert "do not request the same head again" in result.stdout
     assert "request-codex-review.sh" not in result.stdout
 
@@ -569,9 +711,23 @@ def test_old_or_untrusted_review_request_does_not_mark_current_head_requested(
 ) -> None:
     with gate_env(comment_pages=[[review_request_comment]]) as env:
         result = run_gate("check_review_happened", env)
+        summary = review_summary(env)
     assert result.returncode == 1, result.stdout
-    assert "manual Codex review requested" not in result.stdout
+    assert summary["codex_request_pending"] is False
     assert "request-codex-review.sh 123 exactly once" in result.stdout
+
+
+@pytest.mark.parametrize("state", ["DISMISSED", "PENDING", "UNKNOWN"])
+def test_unusable_current_head_review_with_request_marker_stays_pending(
+    state: str,
+) -> None:
+    with gate_env(
+        review_pages=[[codex_review(state=state)]],
+        comment_pages=[[manual_review_request()]],
+    ) as env:
+        summary = review_summary(env)
+    assert summary["label"] == "not reviewed"
+    assert summary["codex_request_pending"] is True
 
 
 def test_review_gate_never_waits() -> None:
@@ -582,37 +738,110 @@ def test_review_gate_never_waits() -> None:
         assert "WAIT" not in result.stdout
 
 
-def test_review_record_and_verdict_agree() -> None:
+# ---------------------------------------------------------------------------------
+# Evidence collection: pagination, fail-closed fetches, record metadata
+# ---------------------------------------------------------------------------------
+
+
+def test_reviews_and_comments_are_read_across_all_pages() -> None:
+    with gate_env(review_pages=[[], [codex_review()]]) as env:
+        assert run_gate("check_review_happened", env).returncode == 0
+    with gate_env(review_pages=[[], [codex_review(login=CODERABBIT_BOT)]]) as env:
+        assert run_gate("check_review_happened", env).returncode == 0
+    for comment in (
+        manual_marker(),
+        clean_codex_comment(),
+        clean_codex_reaction_witness(),
+    ):
+        with gate_env(comment_pages=[[], [comment]]) as env:
+            assert run_gate("check_review_happened", env).returncode == 0
+
+
+def test_every_reviewer_is_consulted_even_when_codex_already_covers() -> None:
+    # One evidence fetch serves all three checkers; nothing is skipped on the way.
     with gate_env(review_pages=[[codex_review()]]) as env:
-        state, sha, reviewer, detail, at, summary = review_record(env)
-        verdict = subprocess.run(
+        result = run_gate("check_review_happened", env)
+        calls = Path(env["STUB_CALLS"]).read_text()
+    assert result.returncode == 0, result.stdout
+    assert "/pulls/123/reviews" in calls
+    assert "/issues/123/comments" in calls
+
+
+def test_failed_comment_fetch_fails_the_summary_rather_than_reading_as_empty() -> None:
+    with gate_env(review_pages=[[codex_review()]]) as env:
+        env["STUB_COMMENTS"] = str(Path(env["STUB_COMMENTS"]).parent / "missing.json")
+        result = subprocess.run(
             [
                 "bash",
                 "-c",
-                f'source "{GATES_PATH}"; _review_verdict 123 acme/widget {HEAD_SHA}',
+                f'set -euo pipefail; source "{GATES_PATH}"; _review_summary 123',
             ],
             capture_output=True,
             text=True,
             env=env,
             timeout=60,
         )
-    assert (state, sha, reviewer, detail) == (
-        "approval",
+    assert result.returncode != 0
+    assert result.stdout.strip() == ""
+
+
+def test_failed_commit_lookup_fails_the_summary_rather_than_dating_the_review_to_nothing() -> (
+    None
+):
+    # A two-axis comment with no explicit SHA is dated to a commit. If that lookup
+    # fails, the review must not silently become "no evidence".
+    comment = claude_two_axis_review(sha=None, updated_at="2026-08-22T12:05:00Z")
+    with gate_env(comment_pages=[[comment]]) as env:
+        env["STUB_COMMITS"] = str(Path(env["STUB_COMMITS"]).parent / "missing.json")
+        result = subprocess.run(
+            [
+                "bash",
+                "-c",
+                f'set -euo pipefail; source "{GATES_PATH}"; _review_summary 123',
+            ],
+            capture_output=True,
+            text=True,
+            env=env,
+            timeout=60,
+        )
+    assert result.returncode != 0
+    assert result.stdout.strip() == ""
+
+
+def test_review_summary_shape() -> None:
+    with gate_env(review_pages=[[codex_review()]]) as env:
+        summary = review_summary(env)
+    assert set(summary) == {
+        "head",
+        "label",
+        "coverage",
+        "checkers",
+        "codex_request_pending",
+        "unresolved_threads",
+    }
+    assert summary["head"] == HEAD_SHA
+    assert set(summary["checkers"]) == {"coderabbit", "codex", "marker"}
+    coverage = summary["coverage"]
+    assert (coverage["sha"], coverage["reviewer"], coverage["detail"]) == (
         HEAD_SHA,
         CODEX_BOT,
         "APPROVED",
     )
-    assert at == "2026-08-22T12:00:00Z"
-    assert summary == "Codex review summary"
-    assert verdict.stdout.strip() == f"approval {HEAD_SHA}"
+    assert coverage["at"] == "2026-08-22T12:00:00Z"
+    assert coverage["summary"] == "Codex review summary"
 
 
 def test_manual_marker_record_retains_reviewer_and_detail() -> None:
     with gate_env(
         comment_pages=[[manual_marker(reviewer="codex-plugin-cc", detail="base-main")]]
     ) as env:
-        state, sha, reviewer, detail, *_rest = review_record(env)
-    assert (state, sha, reviewer, detail) == (
+        coverage = review_summary(env)["coverage"]
+    assert (
+        coverage["checker"],
+        coverage["sha"],
+        coverage["reviewer"],
+        coverage["detail"],
+    ) == (
         "marker",
         HEAD_SHA,
         "codex-plugin-cc",
@@ -622,74 +851,60 @@ def test_manual_marker_record_retains_reviewer_and_detail() -> None:
 
 def test_canonical_marker_without_metadata_is_unrecorded() -> None:
     bare = {
+        "user": {"login": "acme"},
         "body": f"<!-- pinpoint-review: {HEAD_SHA} -->\nreviewed by hand",
         "updated_at": "2026-08-22T12:00:00Z",
     }
     with gate_env(comment_pages=[[bare]]) as env:
-        state, sha, reviewer, detail, *_rest = review_record(env)
-    assert (state, sha, reviewer, detail) == (
-        "marker",
-        HEAD_SHA,
-        "unrecorded",
-        "unrecorded",
-    )
+        coverage = review_summary(env)["coverage"]
+    assert (coverage["reviewer"], coverage["detail"]) == ("unrecorded", "unrecorded")
 
 
 def test_legacy_marker_and_trivial_detail_remain_readable() -> None:
     with gate_env(comment_pages=[[legacy_claude_marker(detail="trivial")]]) as env:
-        state, sha, reviewer, detail, *_rest = review_record(env)
-    assert (state, sha, reviewer, detail) == (
+        coverage = review_summary(env)["coverage"]
+    assert (coverage["checker"], coverage["reviewer"], coverage["detail"]) == (
         "marker",
-        HEAD_SHA,
         "claude-code",
         "trivial",
     )
 
 
-@pytest.mark.parametrize("order", [[OTHER_SHA, HEAD_SHA], [HEAD_SHA, OTHER_SHA]])
-def test_any_manual_marker_pinning_head_passes(order: list[str]) -> None:
-    with gate_env(comment_pages=[[manual_marker(sha) for sha in order]]) as env:
-        result = run_gate("check_review_happened", env)
-    assert result.returncode == 0, result.stdout
-
-
 def test_marker_text_quoted_in_a_comment_is_not_a_marker() -> None:
-    quoted = {"body": f"maybe post <!-- pinpoint-review: {HEAD_SHA} -->"}
+    quoted = {
+        "user": {"login": "acme"},
+        "body": f"maybe post <!-- pinpoint-review: {HEAD_SHA} -->",
+    }
     with gate_env(comment_pages=[[quoted]]) as env:
         result = run_gate("check_review_happened", env)
     assert result.returncode == 1, result.stdout
 
 
-def test_unresolved_threads_block_regardless_of_author() -> None:
-    with gate_env(
-        threads=[
-            thread(resolved=False, author="timothyfroehlich"),
-            thread(resolved=False, author="some-agent"),
-        ]
-    ) as env:
-        result = run_gate("check_unresolved_threads", env)
+def test_marker_from_anyone_but_the_owner_is_not_evidence() -> None:
+    # The repo is public; a marker-shaped comment from a stranger must not pass Gate 3.
+    with gate_env(comment_pages=[[manual_marker(login="stranger")]]) as env:
+        result = run_gate("check_review_happened", env)
+        summary = review_summary(env)
     assert result.returncode == 1, result.stdout
-    assert "2 unresolved review threads" in result.stdout
+    assert verdicts(summary)["marker"] == "none"
 
 
-def test_resolved_threads_do_not_block() -> None:
-    with gate_env(threads=[thread(resolved=True, author="codex")]) as env:
-        result = run_gate("check_unresolved_threads", env)
-    assert result.returncode == 0, result.stdout
+# ---------------------------------------------------------------------------------
+# Two-axis review comments are local attestations
+# ---------------------------------------------------------------------------------
 
 
 def test_claude_two_axis_review_with_explicit_short_sha_pins_head() -> None:
     comment = claude_two_axis_review(sha=HEAD_SHA[:8])
     with gate_env(comment_pages=[[comment]]) as env:
-        state, sha, reviewer, detail, at, summary = review_record(env)
-        assert state == "marker"
-        assert sha == HEAD_SHA[:8]
-        assert reviewer == "claude-code"
-        assert detail == "two-axis"
-        assert "Standards: 0 hard, Spec: 0 findings" in summary
+        coverage = review_summary(env)["coverage"]
         gate_res = run_gate("check_review_happened", env)
-        assert gate_res.returncode == 0, gate_res.stdout
-        assert f"review marker pins head SHA {HEAD_SHA[:7]}" in gate_res.stdout
+    assert coverage["checker"] == "marker"
+    assert coverage["sha"] == HEAD_SHA[:8]
+    assert (coverage["reviewer"], coverage["detail"]) == ("claude-code", "two-axis")
+    assert "Standards: 0 hard, Spec: 0 findings" in coverage["summary"]
+    assert gate_res.returncode == 0, gate_res.stdout
+    assert f"review marker pins head SHA {HEAD_SHA[:7]}" in gate_res.stdout
 
 
 def test_claude_two_axis_review_with_merge_base_only_correlates_commit_timestamp() -> (
@@ -704,34 +919,181 @@ def test_claude_two_axis_review_with_merge_base_only_correlates_commit_timestamp
         {"oid": HEAD_SHA, "committedDate": "2026-08-22T12:04:00Z"},
     ]
     with gate_env(comment_pages=[[comment]], commits=commits) as env:
-        state, sha, reviewer, detail, at, summary = review_record(env)
-        assert state == "marker"
-        assert sha == HEAD_SHA
-        assert reviewer == "claude-code"
-        assert detail == "two-axis"
+        coverage = review_summary(env)["coverage"]
         gate_res = run_gate("check_review_happened", env)
-        assert gate_res.returncode == 0, gate_res.stdout
-        assert f"review marker pins head SHA {HEAD_SHA[:7]}" in gate_res.stdout
+    assert coverage["checker"] == "marker"
+    assert coverage["sha"] == HEAD_SHA
+    assert gate_res.returncode == 0, gate_res.stdout
 
 
-def test_claude_two_axis_review_becomes_stale_marker_when_head_moves() -> None:
+def test_claude_two_axis_review_becomes_stale_when_head_moves() -> None:
     comment = claude_two_axis_review(sha=OTHER_SHA[:8])
     with gate_env(comment_pages=[[comment]]) as env:
-        state, sha, reviewer, detail, at, summary = review_record(env)
-        assert state == "stale_marker"
-        assert sha == OTHER_SHA[:8]
+        summary = review_summary(env)
         gate_res = run_gate("check_review_happened", env)
-        assert gate_res.returncode == 1, gate_res.stdout
-        assert (
-            f"the review marker pins {OTHER_SHA[:7]}, but head is {HEAD_SHA[:7]}"
-            in gate_res.stdout
-        )
+    marker = summary["checkers"]["marker"]
+    assert (marker["verdict"], marker["sha"]) == ("stale", OTHER_SHA[:8])
+    assert summary["label"] == "stale review"
+    assert gate_res.returncode == 1, gate_res.stdout
+    assert (
+        f"local attestation: newest evidence names {OTHER_SHA[:7]}, head is {HEAD_SHA[:7]}"
+        in gate_res.stdout
+    )
 
 
 def test_antigravity_two_axis_review_records_antigravity_reviewer() -> None:
     comment = claude_two_axis_review(sha=HEAD_SHA[:8], reviewer_sig="—Antigravity")
     with gate_env(comment_pages=[[comment]]) as env:
-        state, sha, reviewer, detail, at, summary = review_record(env)
-        assert state == "marker"
-        assert reviewer == "antigravity"
-        assert detail == "two-axis"
+        coverage = review_summary(env)["coverage"]
+    assert (coverage["reviewer"], coverage["detail"]) == ("antigravity", "two-axis")
+
+
+# ---------------------------------------------------------------------------------
+# Gate 1 (CI) and Gate 2 (threads)
+# ---------------------------------------------------------------------------------
+
+
+def ci_gate(
+    *,
+    status: str = "COMPLETED",
+    conclusion: str | None = "SUCCESS",
+    started_at: str = "2026-08-22T12:00:00Z",
+    completed_at: str | None = "2026-08-22T12:10:00Z",
+) -> dict:
+    return {
+        "name": "CI Gate",
+        "status": status,
+        "conclusion": conclusion,
+        "startedAt": started_at,
+        "completedAt": completed_at,
+    }
+
+
+def test_ci_gate_passes_on_a_single_successful_run() -> None:
+    with gate_env(rollup=[ci_gate()]) as env:
+        result = run_gate("check_ci", env)
+    assert result.returncode == 0, result.stdout
+    assert "PASS: ci:" in result.stdout
+
+
+def test_ci_gate_absent_is_a_wait() -> None:
+    with gate_env(rollup=[{"name": "Other", "status": "COMPLETED"}]) as env:
+        result = run_gate("check_ci", env)
+    assert result.returncode == 2, result.stdout
+    assert "CI Gate check not reported yet" in result.stdout
+
+
+def test_two_completed_ci_gate_runs_on_one_head_read_as_one_result() -> None:
+    # Draft promotion re-runs the workflow on the same SHA; PR #2117 carried two
+    # COMPLETED/SUCCESS entries and the gate sat in WAIT with status=COMPLETED.
+    rollup = [
+        ci_gate(started_at="2026-08-22T12:00:00Z", completed_at="2026-08-22T12:10:00Z"),
+        ci_gate(started_at="2026-08-22T12:20:00Z", completed_at="2026-08-22T12:30:00Z"),
+    ]
+    with gate_env(rollup=rollup) as env:
+        result = run_gate("check_ci", env)
+    assert result.returncode == 0, result.stdout
+    assert "PASS: ci:" in result.stdout
+
+
+def test_newest_ci_gate_run_is_authoritative() -> None:
+    rollup = [
+        ci_gate(completed_at="2026-08-22T12:10:00Z"),
+        ci_gate(
+            conclusion="FAILURE",
+            started_at="2026-08-22T12:20:00Z",
+            completed_at="2026-08-22T12:30:00Z",
+        ),
+    ]
+    with gate_env(rollup=rollup) as env:
+        result = run_gate("check_ci", env)
+    assert result.returncode == 1, result.stdout
+    assert "FAIL: ci:" in result.stdout
+
+
+def test_newest_started_run_wins_even_when_the_older_one_finished_later() -> None:
+    # Both completed, neither cancelled: the run that STARTED later is the verdict,
+    # so a slow older SUCCESS cannot hide a newer FAILURE.
+    rollup = [
+        ci_gate(
+            conclusion="SUCCESS",
+            started_at="2026-08-22T12:00:00Z",
+            completed_at="2026-08-22T12:40:00Z",
+        ),
+        ci_gate(
+            conclusion="FAILURE",
+            started_at="2026-08-22T12:20:00Z",
+            completed_at="2026-08-22T12:30:00Z",
+        ),
+    ]
+    with gate_env(rollup=rollup) as env:
+        result = run_gate("check_ci", env)
+    assert result.returncode == 1, result.stdout
+    assert "FAIL: ci:" in result.stdout
+
+
+def test_live_replacement_run_outranks_an_older_run_that_finished_later() -> None:
+    # The replacement started at 12:20; the run it replaced finished at 12:25 with a
+    # FAILURE. Its later completedAt must not make the failure authoritative.
+    rollup = [
+        ci_gate(
+            conclusion="FAILURE",
+            started_at="2026-08-22T12:00:00Z",
+            completed_at="2026-08-22T12:25:00Z",
+        ),
+        ci_gate(
+            status="IN_PROGRESS",
+            conclusion=None,
+            started_at="2026-08-22T12:20:00Z",
+            completed_at=None,
+        ),
+    ]
+    with gate_env(rollup=rollup) as env:
+        result = run_gate("check_ci", env)
+    assert result.returncode == 2, result.stdout
+    assert "WAIT" in result.stdout
+
+
+def test_cancelled_ci_gate_leftover_yields_to_the_live_run() -> None:
+    rollup = [
+        ci_gate(
+            conclusion="CANCELLED",
+            started_at="2026-08-22T12:20:00Z",
+            completed_at="2026-08-22T12:21:00Z",
+        ),
+        ci_gate(started_at="2026-08-22T12:00:00Z", completed_at="2026-08-22T12:10:00Z"),
+    ]
+    with gate_env(rollup=rollup) as env:
+        result = run_gate("check_ci", env)
+    assert result.returncode == 0, result.stdout
+
+
+def test_unresolved_threads_block_regardless_of_author() -> None:
+    with gate_env(
+        threads=[
+            thread(resolved=False, author="timothyfroehlich"),
+            thread(resolved=False, author="some-agent"),
+        ]
+    ) as env:
+        result = run_gate("check_unresolved_threads", env)
+    assert result.returncode == 1, result.stdout
+    assert "2 unresolved review threads" in result.stdout
+
+
+def test_gates_fail_with_a_named_reason_when_the_fetch_fails() -> None:
+    # merge-pr.sh runs each gate under `|| rc=$?`, which disables errexit inside the
+    # gate; a failed fetch must be a FAIL line, not an empty comparison or jq error.
+    with gate_env(review_pages=[[codex_review()]]) as env:
+        env["STUB_THREADS"] = str(Path(env["STUB_THREADS"]).parent / "missing.json")
+        threads = run_gate("check_unresolved_threads", env)
+        review = run_gate("check_review_happened", env)
+    assert threads.returncode == 1
+    assert "FAIL: threads: could not read review threads" in threads.stdout
+    assert review.returncode == 1
+    assert "FAIL: reviewed: could not read review evidence" in review.stdout
+
+
+def test_resolved_threads_do_not_block() -> None:
+    with gate_env(threads=[thread(resolved=True, author="codex")]) as env:
+        result = run_gate("check_unresolved_threads", env)
+    assert result.returncode == 0, result.stdout

@@ -90,6 +90,12 @@ describe("canEditSet", () => {
     expect(canEditSet(draft, OWNER, TECH, "technician")).toBe(true);
     expect(canEditSet(draft, OWNER, "tech-2", "technician")).toBe(false); // can't even see it
   });
+
+  it("an unauthenticated or guest user cannot edit even if ID matches owner (PP-leli.8)", () => {
+    const ownerSet = set({ isOwnerSet: true, createdById: OWNER });
+    expect(canEditSet(ownerSet, OWNER, OWNER, "unauthenticated")).toBe(false);
+    expect(canEditSet(ownerSet, OWNER, OWNER, "guest")).toBe(false);
+  });
 });
 
 describe("canSetOwnerDefault", () => {
@@ -114,5 +120,18 @@ describe("canSetOwnerDefault", () => {
         "technician"
       )
     ).toBe(false);
+  });
+
+  it("an unauthenticated or guest user cannot set default even if ID matches owner (PP-leli.8)", () => {
+    const ownerSet = set({ isOwnerSet: true, createdById: OWNER });
+    expect(canSetOwnerDefault(ownerSet, OWNER, OWNER, "unauthenticated")).toBe(
+      false
+    );
+    expect(canSetOwnerDefault(ownerSet, OWNER, OWNER, "guest")).toBe(false);
+  });
+
+  it("a technician who owns the machine can set default on their own machine (PP-leli.8)", () => {
+    const ownerSet = set({ isOwnerSet: true, createdById: TECH });
+    expect(canSetOwnerDefault(ownerSet, TECH, TECH, "technician")).toBe(true);
   });
 });

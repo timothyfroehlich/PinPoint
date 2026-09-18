@@ -1,5 +1,12 @@
 #!/usr/bin/env python3
-"""Render the PR dashboard from one repository-level GraphQL snapshot."""
+"""Render the PR dashboard from one repository-level GraphQL snapshot.
+
+CI and merge state come from the GraphQL snapshot. The Review column is the merge
+gate's own label — `_review_summary` in `_pr-gates.sh` runs three checkers
+(CodeRabbit approval, Codex evidence, local attestation) and names the result with
+one of four words: approved, changes requested, stale review, not reviewed. The
+dashboard shells out to it per PR rather than keeping a Python copy of that logic.
+"""
 
 from __future__ import annotations
 
@@ -8,30 +15,15 @@ import os
 import re
 import subprocess
 import sys
-from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
-CODEX_REVIEW_GRAPHQL_LOGIN = "chatgpt-codex-connector"
-CODEX_COMMENT_BOT = "chatgpt-codex-connector[bot]"
-CODEX_REVIEW_APP_SLUG = "chatgpt-codex-connector"
-CODEX_CLEAN_REVIEW_PREFIX = "Codex Review: Didn't find any major issues."
-GITHUB_ACTIONS_BOT = "github-actions[bot]"
-GITHUB_ACTIONS_APP_SLUG = "github-actions"
-CODEX_REACTION_WITNESS_PREFIX = "<!-- pinpoint-codex-reaction-witness:"
-CODEX_REVIEW_REQUEST_RE = re.compile(
-    r"^@codex review\n<!-- pinpoint-codex-review-head: ([0-9a-f]{40}) -->$"
-)
-REVIEW_MARKER_PREFIX = "<!-- pinpoint-review:"
-LEGACY_REVIEW_MARKER_PREFIX = "<!-- pinpoint-claude-review:"
 CONNECTION_PAGE_SIZE = 100
 CI_GATE_NAME = "CI Gate"
-
-
-@dataclass(frozen=True)
-class ReviewRecord:
-    state: str
-    sha: str = ""
-    at: str = ""
+GATES_SCRIPT = Path(__file__).resolve().parent / "_pr-gates.sh"
+REVIEW_LABELS = frozenset(
+    {"approved", "changes requested", "stale review", "not reviewed"}
+)
 
 
 class DashboardError(RuntimeError):
@@ -88,14 +80,6 @@ PR_FIELDS = f"""
         }}
       }}
     }}
-  }}
-  reviews(first: {CONNECTION_PAGE_SIZE}) {{
-    pageInfo {{ hasNextPage endCursor }}
-    nodes {{ state submittedAt commit {{ oid }} author {{ login }} }}
-  }}
-  reviewThreads(first: {CONNECTION_PAGE_SIZE}) {{
-    pageInfo {{ hasNextPage endCursor }}
-    nodes {{ isResolved }}
   }}
 """
 
@@ -154,23 +138,11 @@ def _connection(connection: Any) -> tuple[list[dict[str, Any]], bool, str]:
     return nodes, has_next, cursor
 
 
-def _nested_query(owner: str, repo: str, pr: int, kind: str, cursor: str) -> str:
+def _checks_query(owner: str, repo: str, pr: int, cursor: str) -> str:
     after = json.dumps(cursor)
-    if kind == "threads":
-        selection = f"""
-        reviewThreads(first: {CONNECTION_PAGE_SIZE}, after: {after}) {{
-          pageInfo {{ hasNextPage endCursor }} nodes {{ isResolved }}
-        }}
-        """
-    elif kind == "reviews":
-        selection = f"""
-        reviews(first: {CONNECTION_PAGE_SIZE}, after: {after}) {{
-          pageInfo {{ hasNextPage endCursor }}
-          nodes {{ state submittedAt commit {{ oid }} author {{ login }} }}
-        }}
-        """
-    elif kind == "checks":
-        selection = f"""
+    return f"""
+    query {{ repository(owner: {json.dumps(owner)}, name: {json.dumps(repo)}) {{
+      pullRequest(number: {pr}) {{
         commits(last: 1) {{ nodes {{ commit {{ statusCheckRollup {{
           contexts(first: {CONNECTION_PAGE_SIZE}, after: {after}) {{
             pageInfo {{ hasNextPage endCursor }}
@@ -181,21 +153,12 @@ def _nested_query(owner: str, repo: str, pr: int, kind: str, cursor: str) -> str
             }}
           }}
         }} }} }} }}
-        """
-    else:
-        raise ValueError(f"unknown connection kind: {kind}")
-    return f"""
-    query {{ repository(owner: {json.dumps(owner)}, name: {json.dumps(repo)}) {{
-      pullRequest(number: {pr}) {{ {selection} }}
+      }}
     }} }}
     """
 
 
-def _connection_from_pr(pr_data: dict[str, Any], kind: str) -> Any:
-    if kind == "threads":
-        return pr_data.get("reviewThreads")
-    if kind == "reviews":
-        return pr_data.get("reviews")
+def _checks_from_pr(pr_data: dict[str, Any]) -> Any:
     commits = pr_data.get("commits")
     if not isinstance(commits, dict) or not isinstance(commits.get("nodes"), list):
         raise DashboardError("commit connection was malformed")
@@ -212,274 +175,51 @@ def _connection_from_pr(pr_data: dict[str, Any], kind: str) -> Any:
     return rollup.get("contexts")
 
 
-def _complete_nested_connection(
-    owner: str,
-    repo: str,
-    pr: int,
-    kind: str,
-    initial: Any,
+def _complete_checks(
+    owner: str, repo: str, pr: int, initial: Any
 ) -> list[dict[str, Any]]:
     nodes, has_next, cursor = _connection(initial)
     seen_cursors: set[str] = set()
     while has_next:
         if cursor in seen_cursors:
-            raise DashboardError(f"{kind} pagination repeated its cursor")
+            raise DashboardError("checks pagination repeated its cursor")
         seen_cursors.add(cursor)
-        payload = _graphql(_nested_query(owner, repo, pr, kind, cursor))
+        payload = _graphql(_checks_query(owner, repo, pr, cursor))
         try:
             pr_data = payload["data"]["repository"]["pullRequest"]
             if not isinstance(pr_data, dict):
-                raise DashboardError(f"{kind} pagination PR was unavailable")
-            page = _connection_from_pr(pr_data, kind)
+                raise DashboardError("checks pagination PR was unavailable")
+            page = _checks_from_pr(pr_data)
         except (KeyError, TypeError, AttributeError) as exc:
-            raise DashboardError(f"{kind} pagination response was malformed") from exc
+            raise DashboardError("checks pagination response was malformed") from exc
         page_nodes, has_next, cursor = _connection(page)
         nodes.extend(page_nodes)
     return nodes
 
 
-def _decode_paginated_lists(raw: str) -> list[dict[str, Any]]:
-    if not raw.strip():
-        raise DashboardError("comments response was empty")
-    decoder = json.JSONDecoder()
-    items: list[dict[str, Any]] = []
-    index = 0
-    while index < len(raw):
-        while index < len(raw) and raw[index].isspace():
-            index += 1
-        if index >= len(raw):
-            break
-        try:
-            document, index = decoder.raw_decode(raw, index)
-        except json.JSONDecodeError as exc:
-            raise DashboardError(f"malformed comments response: {exc}") from exc
-        if not isinstance(document, list) or not all(
-            isinstance(item, dict) for item in document
-        ):
-            raise DashboardError("comments response was not a list")
-        items.extend(document)
-    return items
-
-
-def _issue_comments(owner: str, repo: str, pr: int) -> list[dict[str, Any]]:
-    raw = gh(
-        "api",
-        "--paginate",
-        f"repos/{owner}/{repo}/issues/{pr}/comments?per_page=100",
+def review_label(pr: int) -> str:
+    """The merge gate's review label for a PR, or "?" when the gate cannot say."""
+    result = subprocess.run(
+        [
+            "bash",
+            "-c",
+            'set -euo pipefail; source "$1"; _review_summary "$2"',
+            "_",
+            str(GATES_SCRIPT),
+            str(pr),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
     )
-    return _decode_paginated_lists(raw)
-
-
-def _native_review_record(reviews: list[dict[str, Any]], head: str) -> ReviewRecord:
-    for review in reviews:
-        author = review.get("author")
-        if author is not None and not isinstance(author, dict):
-            raise DashboardError("review author was malformed")
-        if (
-            isinstance(author, dict)
-            and author.get("login") == CODEX_REVIEW_GRAPHQL_LOGIN
-        ):
-            commit = review.get("commit")
-            if (
-                not isinstance(review.get("state"), str)
-                or not isinstance(review.get("submittedAt"), str)
-                or not isinstance(commit, dict)
-                or not isinstance(commit.get("oid"), str)
-            ):
-                raise DashboardError("trusted native review was malformed")
-    trusted = [
-        review
-        for review in reviews
-        if (review.get("author") or {}).get("login") == CODEX_REVIEW_GRAPHQL_LOGIN
-    ]
-    trusted.sort(key=lambda review: review.get("submittedAt") or "")
-    if not trusted:
-        return ReviewRecord("unreviewed")
-    head_reviews = [
-        review
-        for review in trusted
-        if ((review.get("commit") or {}).get("oid") or "") == head
-    ]
-    latest = (head_reviews or trusted)[-1]
-    sha = (latest.get("commit") or {}).get("oid") or ""
-    state = latest.get("state") or "UNKNOWN"
-    submitted_at = latest.get("submittedAt") or ""
-    if state == "APPROVED" and sha == head:
-        return ReviewRecord("approval", sha, submitted_at)
-    if state == "APPROVED":
-        return ReviewRecord("stale_approval", sha, submitted_at)
-    if sha == head:
-        if state in {"COMMENTED", "CHANGES_REQUESTED"}:
-            return ReviewRecord("reviewed", sha, submitted_at)
-        return ReviewRecord("not_approved", sha, submitted_at)
-    return ReviewRecord("stale_approval", sha, submitted_at)
-
-
-def _is_two_axis_review(body: str) -> bool:
-    if not re.search(r"(?im)^##\s+(?:Two-axis\s+code\s+review|Code\s+review)\b", body):
-        return False
-    return bool(
-        re.search(r"(?m)^##\s+Standards\b", body)
-        and re.search(r"(?m)^##\s+Spec\b", body)
-    )
-
-
-def _extract_two_axis_sha(body: str) -> str | None:
-    preamble = body.split("\n## Standards")[0]
-    matches = re.findall(
-        r"(?:\.{2,3}|(?:^|\s)(?:head|commit)\s+`?)([0-9a-f]{7,40})`?",
-        preamble,
-        re.IGNORECASE,
-    )
-    if matches:
-        return matches[-1]
-    return None
-
-
-def _comment_records(
-    comments: list[dict[str, Any]],
-    head: str,
-    owner: str,
-    head_committed_date: str | None = None,
-) -> tuple[list[ReviewRecord], list[ReviewRecord], list[ReviewRecord]]:
-    codex_results: list[ReviewRecord] = []
-    review_requests: list[ReviewRecord] = []
-    markers: list[ReviewRecord] = []
-    for comment in comments:
-        body = comment.get("body") or ""
-        if not isinstance(body, str):
-            continue
-        login = (comment.get("user") or {}).get("login")
-        app = (comment.get("performed_via_github_app") or {}).get("slug")
-        at = comment.get("updated_at") or comment.get("created_at") or ""
-        if (
-            login == CODEX_COMMENT_BOT
-            and app == CODEX_REVIEW_APP_SLUG
-            and body.startswith(CODEX_CLEAN_REVIEW_PREFIX)
-        ):
-            match = re.search(
-                r"\*\*Reviewed commit:\*\* `([0-9a-f]{10}|[0-9a-f]{40})`", body
-            )
-            if match is not None:
-                codex_results.append(ReviewRecord("clean_comment", match.group(1), at))
-        if (
-            login == GITHUB_ACTIONS_BOT
-            and app == GITHUB_ACTIONS_APP_SLUG
-            and body.startswith(CODEX_REACTION_WITNESS_PREFIX)
-        ):
-            match = re.match(
-                r"<!-- pinpoint-codex-reaction-witness: ([0-9a-f]{40}) -->", body
-            )
-            if match is not None:
-                codex_results.append(ReviewRecord("clean_reaction", match.group(1), at))
-        if login == owner and (match := CODEX_REVIEW_REQUEST_RE.fullmatch(body)):
-            review_requests.append(ReviewRecord("review_requested", match.group(1), at))
-        if body.startswith(REVIEW_MARKER_PREFIX) or body.startswith(
-            LEGACY_REVIEW_MARKER_PREFIX
-        ):
-            match = re.match(
-                r"<!-- (?:pinpoint-review|pinpoint-claude-review):\s*([^ ]+)\s*-->",
-                body,
-            )
-            if match is not None:
-                markers.append(ReviewRecord("marker", match.group(1), at))
-        elif login == owner and _is_two_axis_review(body):
-            sha = _extract_two_axis_sha(body)
-            if sha is None:
-                if head_committed_date and head_committed_date <= at:
-                    sha = head
-                elif head_committed_date:
-                    sha = "stale"
-                else:
-                    continue
-            markers.append(ReviewRecord("marker", sha, at))
-    codex_results.sort(key=lambda record: record.at)
-    review_requests.sort(key=lambda record: record.at)
-    markers.sort(key=lambda record: record.at)
-    return codex_results, review_requests, markers
-
-
-def _comment_review_record(
-    comments: list[dict[str, Any]],
-    head: str,
-    owner: str,
-    head_committed_date: str | None = None,
-) -> ReviewRecord:
-    codex_results, review_requests, markers = _comment_records(
-        comments, head, owner, head_committed_date
-    )
-    current_markers = [
-        record
-        for record in markers
-        if len(record.sha) >= 7
-        and len(head) >= 7
-        and (head.startswith(record.sha) or record.sha.startswith(head))
-    ]
-    if current_markers:
-        return current_markers[-1]
-    current_codex_results = [
-        record
-        for record in codex_results
-        if (
-            head.startswith(record.sha)
-            if record.state == "clean_comment"
-            else record.sha == head
-        )
-    ]
-    if current_codex_results:
-        return current_codex_results[-1]
-    current_requests = [record for record in review_requests if record.sha == head]
-    if current_requests:
-        return current_requests[-1]
-    stale = markers + codex_results
-    if not stale:
-        return ReviewRecord("unreviewed")
-    latest = max(stale, key=lambda record: record.at)
-    stale_state = {
-        "marker": "stale_marker",
-        "clean_comment": "stale_clean_comment",
-        "clean_reaction": "stale_clean_reaction",
-    }[latest.state]
-    return ReviewRecord(stale_state, latest.sha, latest.at)
-
-
-def _combined_review_state(native: ReviewRecord, comment: ReviewRecord) -> str:
-    if comment.state == "marker":
-        return "marker"
-    if comment.state in {"clean_comment", "clean_reaction"}:
-        comment_covers_native = native.sha == comment.sha or (
-            comment.state == "clean_comment" and native.sha.startswith(comment.sha)
-        )
-        if native.state == "unreviewed" or not comment_covers_native:
-            return comment.state
-        return comment.state if comment.at > native.at else native.state
-    if native.state == "reviewed":
-        return native.state
-    if (
-        native.state == "not_approved"
-        and comment.state == "review_requested"
-        and native.sha == comment.sha
-    ):
-        return native.state
-    if comment.state == "review_requested":
-        return comment.state
-    if comment.state == "unreviewed":
-        return native.state
-    return comment.state if comment.at > native.at else native.state
-
-
-def _review_label(state: str) -> str:
-    if state in {"approval", "clean_comment", "clean_reaction", "reviewed", "marker"}:
-        return "reviewed"
-    if state.startswith("stale_"):
-        return "RE-REVIEW"
-    if state == "not_approved":
-        return "NOT APPROVED"
-    if state == "unreviewed":
-        return "NOT REVIEWED"
-    if state == "review_requested":
-        return "REQUESTED"
-    return "?"
+    if result.returncode != 0:
+        return "?"
+    try:
+        summary = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        return "?"
+    label = summary.get("label") if isinstance(summary, dict) else None
+    return label if label in REVIEW_LABELS else "?"
 
 
 def _ci_label(checks: list[dict[str, Any]]) -> str:
@@ -612,18 +352,18 @@ def _unknown_row(number: int) -> dict[str, str]:
 def _render_row(row: dict[str, str]) -> None:
     print(
         f"#{row['number']:<5} {row['title'][:40]:<40} {row['ci']:<12} "
-        f"{row['review']:<12} {row['merge']:<10} {row['draft']:<8} {row['branch']}"
+        f"{row['review']:<18} {row['merge']:<10} {row['draft']:<8} {row['branch']}"
     )
 
 
 def _render_header() -> None:
     print(
-        f"{'PR':<6} {'Title':<40} {'CI':<12} {'Review':<12} "
+        f"{'PR':<6} {'Title':<40} {'CI':<12} {'Review':<18} "
         f"{'Merge':<10} {'Draft':<8} Branch"
     )
     print(
         f"{'------':<6} {'----------------------------------------':<40} "
-        f"{'------------':<12} {'------------':<12} {'----------':<10} "
+        f"{'------------':<12} {'------------------':<18} {'----------':<10} "
         f"{'--------':<8} -------------------"
     )
 
@@ -667,55 +407,11 @@ def _row_for_pr(owner: str, repo: str, pr_data: dict[str, Any]) -> dict[str, str
     if not isinstance(head, str) or not head:
         return _unknown_row(number)
 
-    connections: dict[str, list[dict[str, Any]] | None] = {}
-    for kind in ("checks", "threads", "reviews"):
-        try:
-            connections[kind] = _complete_nested_connection(
-                owner, repo, number, kind, _connection_from_pr(pr_data, kind)
-            )
-        except DashboardError:
-            connections[kind] = None
-
-    checks = connections["checks"]
-    ci = _ci_label(checks) if checks is not None else "?"
-    threads = connections["threads"]
-    reviews = connections["reviews"]
-    if threads is None or reviews is None:
-        review = "?"
-    else:
-        if any(not isinstance(thread.get("isResolved"), bool) for thread in threads):
-            review = "?"
-        else:
-            unresolved = sum(thread["isResolved"] is False for thread in threads)
-            if unresolved:
-                review = f"{unresolved} unres"
-            else:
-                try:
-                    native = _native_review_record(reviews, head)
-                    if native.state in {"approval", "reviewed"}:
-                        review = "reviewed"
-                    else:
-                        comments = _issue_comments(owner, repo, number)
-                        committed_date = None
-                        commits_data = pr_data.get("commits")
-                        if isinstance(commits_data, dict) and commits_data.get("nodes"):
-                            first_node = commits_data["nodes"][0]
-                            if isinstance(first_node, dict) and isinstance(
-                                first_node.get("commit"), dict
-                            ):
-                                raw_date = first_node["commit"].get("committedDate")
-                                if isinstance(raw_date, str):
-                                    committed_date = raw_date
-                        review = _review_label(
-                            _combined_review_state(
-                                native,
-                                _comment_review_record(
-                                    comments, head, owner, committed_date
-                                ),
-                            )
-                        )
-                except DashboardError:
-                    review = "?"
+    try:
+        checks = _complete_checks(owner, repo, number, _checks_from_pr(pr_data))
+        ci = _ci_label(checks)
+    except DashboardError:
+        ci = "?"
 
     title = pr_data.get("title")
     branch = pr_data.get("headRefName")
@@ -724,7 +420,7 @@ def _row_for_pr(owner: str, repo: str, pr_data: dict[str, Any]) -> dict[str, str
         "number": str(number),
         "title": title if isinstance(title, str) else "?",
         "ci": ci,
-        "review": review,
+        "review": review_label(number),
         "merge": _merge_label(pr_data.get("mergeStateStatus")),
         "draft": "draft" if is_draft is True else "" if is_draft is False else "?",
         "branch": branch if isinstance(branch, str) else "?",

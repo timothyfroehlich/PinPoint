@@ -138,6 +138,7 @@ def stub_repo(
             '  *graphql*) cat "$STUB_THREADS" ;;\n'
             '  *"/commits/"*) printf "%s\\n" "$STUB_HEAD_DATE" ;;\n'
             '  *"/pulls/"*"/reviews") cat "$STUB_REVIEWS" ;;\n'
+            '  *"/issues/"*"/comments") printf "[]\\n" ;;\n'
             '  *) printf "UNEXPECTED gh call: %s\\n" "$args" >&2; exit 1 ;;\n'
             "esac\n"
         )
@@ -192,7 +193,10 @@ def stub_repo(
             live_labels if live_labels is not None else (labels or [])
         )
         env["AUTOMERGE_POLL_INTERVAL"] = "0.05"
-        env["AUTOMERGE_TIMEOUT"] = "0.2"
+        # The initial full audit fetches reviews, comments, and threads before the
+        # first compact poll; under a parallel test load that alone can take longer
+        # than a 0.2s budget, which made the timeout tests flake on a busy host.
+        env["AUTOMERGE_TIMEOUT"] = "1.5"
 
         yield {
             "env": env,
