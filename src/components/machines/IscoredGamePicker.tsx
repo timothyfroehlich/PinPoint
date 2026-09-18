@@ -232,6 +232,7 @@ export function IscoredGamePicker({
             onDirty?.();
           }}
           placeholder="e.g., 73"
+          autoComplete="off"
           disabled={disabled}
           className="border-outline bg-surface text-foreground placeholder:text-muted-foreground"
           data-testid="edit-machine-iscored-game-id"
@@ -286,7 +287,10 @@ export function IscoredGamePicker({
             align="start"
           >
             <Command>
-              <CommandInput placeholder="Search iScored games…" />
+              <CommandInput
+                placeholder="Search iScored games…"
+                autoComplete="off"
+              />
               <CommandList>
                 <CommandEmpty>No games found.</CommandEmpty>
                 <CommandGroup>

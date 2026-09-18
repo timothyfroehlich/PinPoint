@@ -548,5 +548,43 @@ describe("iscored client", () => {
       const games = await getGameroomGames();
       expect(games).toEqual([]);
     });
+
+    it("preserves existing cached games when upstream response contains malformed records", async () => {
+      vi.useFakeTimers();
+      const initialTime = 1000000;
+      vi.setSystemTime(initialTime);
+
+      // 1. Initial successful fetch
+      vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+        new Response(JSON.stringify(mockGameroomGames), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        })
+      );
+      const initial = await getGameroomGames();
+      expect(initial).toHaveLength(3);
+
+      // Advance time past 1 hour (3600000 ms)
+      vi.setSystemTime(initialTime + 3600001);
+
+      // 2. Second fetch returns a malformed record (missing gameID)
+      const malformedGames = [
+        ...mockGameroomGames,
+        { gameName: "Broken Game", gameID: null },
+      ];
+      vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+        new Response(JSON.stringify(malformedGames), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        })
+      );
+
+      // Should preserve previous cached games and not return empty/broken list
+      const refreshed = await getGameroomGames();
+      expect(refreshed).toHaveLength(3);
+      expect(refreshed[0]?.gameName).toBe("Demolition Man");
+
+      vi.useRealTimers();
+    });
   });
 });

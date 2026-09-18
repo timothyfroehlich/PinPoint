@@ -316,22 +316,21 @@ const gamesCache: GamesCacheState = {
   user: null,
 };
 
-function parseAndSanitizeGames(items: unknown[]): IscoredGame[] {
+function parseAndSanitizeGames(items: unknown[]): IscoredGame[] | null {
   const games: IscoredGame[] = [];
   const seenIds = new Set<string>();
 
   for (const item of items) {
     if (!isRecord(item)) {
-      continue;
+      return null;
     }
 
     const gameId = parseGameId(
       item["gameID"] ?? item["gameId"] ?? item["game"]
     );
-    if (!gameId || seenIds.has(gameId)) {
-      continue;
+    if (!gameId) {
+      return null;
     }
-    seenIds.add(gameId);
 
     const rawName =
       typeof item["gameName"] === "string"
@@ -340,12 +339,17 @@ function parseAndSanitizeGames(items: unknown[]): IscoredGame[] {
           ? item["name"].trim()
           : "";
 
-    const gameName = rawName || `Game #${gameId}`;
+    if (!rawName) {
+      return null;
+    }
 
-    games.push({
-      gameId,
-      gameName,
-    });
+    if (!seenIds.has(gameId)) {
+      seenIds.add(gameId);
+      games.push({
+        gameId,
+        gameName: rawName,
+      });
+    }
   }
 
   games.sort((a, b) => a.gameName.localeCompare(b.gameName));
@@ -404,7 +408,17 @@ async function fetchAndCacheGames(user: string): Promise<void> {
       return;
     }
 
-    gamesCache.games = parseAndSanitizeGames(rawData);
+    const parsedGames = parseAndSanitizeGames(rawData);
+    if (parsedGames === null) {
+      log.warn(
+        { user },
+        "iScored gameroom games response contained malformed records; preserving cache"
+      );
+      markFetchFailure();
+      return;
+    }
+
+    gamesCache.games = parsedGames;
     gamesCache.lastFetchedAt = Date.now();
   } catch (err) {
     log.warn({ err, user }, "Failed to fetch iScored gameroom games");

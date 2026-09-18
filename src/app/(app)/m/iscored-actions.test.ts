@@ -1,11 +1,22 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getIscoredGamesAction } from "./iscored-actions";
 import { createClient } from "~/lib/supabase/server";
+import { db } from "~/server/db";
 import { getGameroomGames } from "~/lib/iscored/client";
 import { isIscoredConfigured } from "~/lib/iscored/config";
 
 vi.mock("~/lib/supabase/server", () => ({
   createClient: vi.fn(),
+}));
+
+vi.mock("~/server/db", () => ({
+  db: {
+    query: {
+      userProfiles: {
+        findFirst: vi.fn(),
+      },
+    },
+  },
 }));
 
 vi.mock("~/lib/iscored/client", () => ({
@@ -33,6 +44,40 @@ describe("getIscoredGamesAction", () => {
     expect(getGameroomGames).not.toHaveBeenCalled();
   });
 
+  it("returns error when user profile is not found", async () => {
+    vi.mocked(createClient).mockResolvedValue({
+      auth: {
+        getUser: vi
+          .fn()
+          .mockResolvedValue({ data: { user: { id: "user-123" } } }),
+      },
+    } as unknown as Awaited<ReturnType<typeof createClient>>);
+    vi.mocked(db.query.userProfiles.findFirst).mockResolvedValue(undefined);
+
+    const result = await getIscoredGamesAction();
+    expect(result).toEqual({ error: "User profile not found" });
+    expect(getGameroomGames).not.toHaveBeenCalled();
+  });
+
+  it("returns error when user has guest role (permission denied)", async () => {
+    vi.mocked(createClient).mockResolvedValue({
+      auth: {
+        getUser: vi
+          .fn()
+          .mockResolvedValue({ data: { user: { id: "user-123" } } }),
+      },
+    } as unknown as Awaited<ReturnType<typeof createClient>>);
+    vi.mocked(db.query.userProfiles.findFirst).mockResolvedValue({
+      role: "guest",
+    } as unknown as Awaited<
+      ReturnType<typeof db.query.userProfiles.findFirst>
+    >);
+
+    const result = await getIscoredGamesAction();
+    expect(result).toEqual({ error: "Permission denied" });
+    expect(getGameroomGames).not.toHaveBeenCalled();
+  });
+
   it("returns error when iScored is not configured", async () => {
     vi.mocked(createClient).mockResolvedValue({
       auth: {
@@ -41,6 +86,11 @@ describe("getIscoredGamesAction", () => {
           .mockResolvedValue({ data: { user: { id: "user-123" } } }),
       },
     } as unknown as Awaited<ReturnType<typeof createClient>>);
+    vi.mocked(db.query.userProfiles.findFirst).mockResolvedValue({
+      role: "member",
+    } as unknown as Awaited<
+      ReturnType<typeof db.query.userProfiles.findFirst>
+    >);
     vi.mocked(isIscoredConfigured).mockReturnValue(false);
 
     const result = await getIscoredGamesAction();
@@ -48,7 +98,7 @@ describe("getIscoredGamesAction", () => {
     expect(getGameroomGames).not.toHaveBeenCalled();
   });
 
-  it("returns games list when authenticated and configured", async () => {
+  it("returns games list when authorized and configured", async () => {
     const mockGames = [
       { gameId: "77956", gameName: "Medieval Madness" },
       { gameId: "104656", gameName: "Demolition Man" },
@@ -60,6 +110,11 @@ describe("getIscoredGamesAction", () => {
           .mockResolvedValue({ data: { user: { id: "user-123" } } }),
       },
     } as unknown as Awaited<ReturnType<typeof createClient>>);
+    vi.mocked(db.query.userProfiles.findFirst).mockResolvedValue({
+      role: "member",
+    } as unknown as Awaited<
+      ReturnType<typeof db.query.userProfiles.findFirst>
+    >);
     vi.mocked(isIscoredConfigured).mockReturnValue(true);
     vi.mocked(getGameroomGames).mockResolvedValue(mockGames);
 
@@ -76,6 +131,11 @@ describe("getIscoredGamesAction", () => {
           .mockResolvedValue({ data: { user: { id: "user-123" } } }),
       },
     } as unknown as Awaited<ReturnType<typeof createClient>>);
+    vi.mocked(db.query.userProfiles.findFirst).mockResolvedValue({
+      role: "admin",
+    } as unknown as Awaited<
+      ReturnType<typeof db.query.userProfiles.findFirst>
+    >);
     vi.mocked(isIscoredConfigured).mockReturnValue(true);
     vi.mocked(getGameroomGames).mockRejectedValue(new Error("Network failure"));
 

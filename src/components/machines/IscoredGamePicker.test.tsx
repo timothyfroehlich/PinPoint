@@ -200,6 +200,7 @@ describe("IscoredGamePicker component", () => {
     const input = await screen.findByRole("textbox");
     expect(input).toBeInTheDocument();
     expect(input).toHaveValue("55");
+    expect(input).toHaveAttribute("autocomplete", "off");
 
     const user = userEvent.setup();
     await user.clear(input);
@@ -219,5 +220,21 @@ describe("IscoredGamePicker component", () => {
     const input = await screen.findByRole("textbox");
     expect(input).toBeInTheDocument();
     expect(input).toHaveValue("42");
+    expect(input).toHaveAttribute("autocomplete", "off");
+  });
+
+  it("sets autocomplete off on the combobox search input", async () => {
+    vi.mocked(getIscoredGamesAction).mockResolvedValue({
+      games: mockGames,
+    });
+
+    render(<IscoredGamePicker />);
+
+    const trigger = await screen.findByTestId("iscored-game-picker-trigger");
+    const user = userEvent.setup();
+    await user.click(trigger);
+
+    const searchInput = screen.getByPlaceholderText("Search iScored games…");
+    expect(searchInput).toHaveAttribute("autocomplete", "off");
   });
 });
