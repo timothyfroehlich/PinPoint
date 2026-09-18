@@ -61,9 +61,10 @@ Removed 2026-09-16. The Info tab card's "View all on iScored" link replaces it: 
 
 ## Known divergences (code vs spec)
 
-| Spec                       | Code today       | Resolution |
-| :------------------------- | :--------------- | :--------- |
-| §6.1 Fleet overview column | Not yet rendered | PP-h2bu.5  |
+| Spec | Code today | Resolution |
+| :-- | :-- | :-- |
+| §2.3 MCP tool | Handled via consolidated `update_machine` tool | PP-u4ab.18 |
+| §6.1 Fleet overview column | Not yet rendered | PP-h2bu.5 |
 
 ---
 

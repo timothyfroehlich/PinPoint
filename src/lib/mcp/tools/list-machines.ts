@@ -123,13 +123,13 @@ export const listMachinesSchema = z.object({
   presence: presenceFilterSchema
     .optional()
     .describe(
-      "Which availability statuses to include: one status, or an array of them. The statuses are on_the_floor, off_the_floor, on_loan, pending_arrival, removed. A cabinet in any of the first three is still plausibly in the collection; removed is gone and pending_arrival has not arrived yet."
+      "Which availability statuses to include: a single status or an array of statuses (on_the_floor, off_the_floor, on_loan, pending_arrival, removed)."
     ),
   pinballmap: z
     .enum(PINBALLMAP_FILTERS)
     .optional()
     .describe(
-      "Only machines in this PinballMap link state. 'unlinked' = no catalog match yet and not marked as absent from PinballMap (the linking worklist); 'linked' = matched to a catalog title; 'excluded' = deliberately marked as not on PinballMap. Combines with 'search' and 'presence'."
+      "Filter by PinballMap link state: 'unlinked' (no catalog match and not excluded), 'linked' (matched to catalog), or 'excluded' (marked not on PinballMap)."
     ),
   limit: z
     .number()
@@ -145,9 +145,7 @@ export const listMachinesSchema = z.object({
     .int()
     .min(0)
     .optional()
-    .describe(
-      "How many matches to skip, for paging past the limit. Machines are ordered by name, then by initials to break ties between duplicate cabinets of the same title — a total order, so separate requests agree with each other about where a page boundary falls, for as long as the underlying rows don't change. Whether you should advance this offset at all depends on whether your own calls change what matches; the tool description has the rule."
-    ),
+    .describe("Number of matches to skip for pagination."),
 });
 
 type ListMachinesArgs = z.infer<typeof listMachinesSchema>;
@@ -242,26 +240,13 @@ export async function runListMachines(
 }
 
 /**
- * Why the description spends so many words on paging.
+ * Offset paging over a mutating result set.
  *
  * Offset paging is only coherent over a result set that holds still, and the MCP
  * surface can move it: `set_machine_availability` writes `presenceStatus` (the
  * `presence` filter), `set_machine_name` writes `name` (both the `search` target
  * and the primary sort key), and `add_machine` inserts rows that can land inside
- * any filter. So "page a filter, act on each row" — the natural reading of "put
- * every off-the-floor machine back on the floor" — silently skips about half of
- * them: each machine acted on leaves the filter, the rest shift up, and the next
- * `offset += limit` steps over exactly the ones that moved.
- *
- * That is why the description gives the drain procedure rather than just a
- * warning. It is stated once, there, for the model that has to follow it; this
- * comment is the rationale, not a second copy.
- *
- * `pinballmap` used to be the exception, by accident of what was not built yet.
- * `set_machine_pinballmap` (PP-u4ab.12) ships the link verb, so link state is
- * now mutable like the rest and the fleet linking pass moves rows out of the
- * `unlinked` bucket as it goes — exactly the shape the drain procedure exists
- * for. No edit to the description was needed: it was written to cover this.
+ * any filter.
  */
 export function registerListMachines(server: McpServer): void {
   server.registerTool(
@@ -269,7 +254,7 @@ export function registerListMachines(server: McpServer): void {
     {
       title: "List machines",
       description:
-        "List machines with their initials, name, availability, owner name, and open-issue count. Use this to find a machine's initials before acting on it (e.g. disambiguate 'the Medieval Madness by the door'). Supports a name/initials search, a presence filter (one status, or an array of them to accept several at once), and a PinballMap link-state filter (pinballmap: 'unlinked' | 'linked' | 'excluded') — use pinballmap: 'unlinked' to get the machines still needing a PinballMap catalog match. For that linking pass, ask for pinballmap: 'unlinked' TOGETHER WITH presence: ['on_the_floor', 'on_loan', 'off_the_floor'], which is the actionable worklist. 'unlinked' on its own also returns cabinets that are 'removed' (no longer in the collection) or 'pending_arrival' (not here yet) — nobody will ever link those, so they come back on every page of every sweep and you would have to recognise and skip them by hand each time. Narrowing presence drops them from 'total' as well as from the page, so 'total' is the size of the work actually left. Returns 'count' (this page), 'total' (every match), 'offset', and 'hasMore'. Answer counting questions from 'total', never from 'count' or the array length. To enumerate a collection larger than one page, keep requesting with offset += limit until hasMore is false — raising limit alone caps at 100 and will not reach the rest. That works only while the matching set holds still, and your own calls can move it: set_machine_availability changes presence, set_machine_name changes name (the search target and the sort key), add_machine adds rows. So if you are ACTING on the machines as you page them — 'put every off-the-floor machine back on the floor' — do NOT advance the offset. Each machine you fix leaves the filter and the rest shift up, so offset += limit steps over exactly as many machines as you just fixed, and the sweep ends on hasMore:false having never shown them. Re-request offset 0 and let the list drain instead. Raise offset only past machines you deliberately left unchanged, so they don't keep coming back. You are done when a request returns EMPTY (count 0), NOT when total reaches 0 — machines you left unchanged hold total above 0 forever. Narrowing the filter so it matches only rows you can actually act on, as the presence set above does, is what lets total fall to 0 at all.",
+        "List machines with initials, name, availability (presence), owner name, and open-issue count. Supports search by name/initials, presence filtering, and PinballMap link-state filtering ('unlinked' | 'linked' | 'excluded'). Returns paginated results with total count and hasMore.",
       inputSchema: listMachinesSchema,
       annotations: READ_ONLY_TOOL_ANNOTATIONS,
     },
