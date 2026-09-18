@@ -156,7 +156,7 @@ Returns an object with a `scores` array containing entries across the whole game
       "date": "2026-08-09 15:55:04",
       "wins": 0,
       "losses": 0,
-      "email": "evansstaggs@gmail.com",
+      "email": "player@example.com",
       "score": 1076
     }
   ]
