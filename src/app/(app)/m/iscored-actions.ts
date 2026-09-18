@@ -5,7 +5,6 @@ import { db } from "~/server/db";
 import { userProfiles } from "~/server/db/schema";
 import { eq } from "drizzle-orm";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
-import { getPermission } from "~/lib/permissions/matrix";
 import { getGameroomGames } from "~/lib/iscored/client";
 import { isIscoredConfigured } from "~/lib/iscored/config";
 import type { IscoredGame } from "~/lib/iscored/types";
@@ -41,7 +40,7 @@ export async function getIscoredGamesAction(): Promise<GetIscoredGamesResult> {
 
   const accessLevel = getAccessLevel(profile.role);
   const canCreate = checkPermission("machines.create", accessLevel);
-  const canEdit = getPermission("machines.edit", accessLevel) !== false;
+  const canEdit = checkPermission("machines.edit", accessLevel);
 
   if (!canCreate && !canEdit) {
     return { error: "Permission denied" };

@@ -1,19 +1,27 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getIscoredGamesAction } from "./iscored-actions";
-import { createClient } from "~/lib/supabase/server";
-import { db } from "~/server/db";
 import { getGameroomGames } from "~/lib/iscored/client";
 import { isIscoredConfigured } from "~/lib/iscored/config";
 
+const { mockGetUser, mockFindFirstProfile } = vi.hoisted(() => ({
+  mockGetUser: vi.fn(),
+  mockFindFirstProfile: vi.fn(),
+}));
+
 vi.mock("~/lib/supabase/server", () => ({
-  createClient: vi.fn(),
+  createClient: vi.fn(async () => {
+    await Promise.resolve();
+    return {
+      auth: { getUser: mockGetUser },
+    };
+  }),
 }));
 
 vi.mock("~/server/db", () => ({
   db: {
     query: {
       userProfiles: {
-        findFirst: vi.fn(),
+        findFirst: mockFindFirstProfile,
       },
     },
   },
@@ -33,11 +41,7 @@ describe("getIscoredGamesAction", () => {
   });
 
   it("returns error when user is not authenticated", async () => {
-    vi.mocked(createClient).mockResolvedValue({
-      auth: {
-        getUser: vi.fn().mockResolvedValue({ data: { user: null } }),
-      },
-    } as unknown as Awaited<ReturnType<typeof createClient>>);
+    mockGetUser.mockResolvedValue({ data: { user: null } });
 
     const result = await getIscoredGamesAction();
     expect(result).toEqual({ error: "Authentication required" });
@@ -45,14 +49,8 @@ describe("getIscoredGamesAction", () => {
   });
 
   it("returns error when user profile is not found", async () => {
-    vi.mocked(createClient).mockResolvedValue({
-      auth: {
-        getUser: vi
-          .fn()
-          .mockResolvedValue({ data: { user: { id: "user-123" } } }),
-      },
-    } as unknown as Awaited<ReturnType<typeof createClient>>);
-    vi.mocked(db.query.userProfiles.findFirst).mockResolvedValue(undefined);
+    mockGetUser.mockResolvedValue({ data: { user: { id: "user-123" } } });
+    mockFindFirstProfile.mockResolvedValue(undefined);
 
     const result = await getIscoredGamesAction();
     expect(result).toEqual({ error: "User profile not found" });
@@ -60,18 +58,17 @@ describe("getIscoredGamesAction", () => {
   });
 
   it("returns error when user has guest role (permission denied)", async () => {
-    vi.mocked(createClient).mockResolvedValue({
-      auth: {
-        getUser: vi
-          .fn()
-          .mockResolvedValue({ data: { user: { id: "user-123" } } }),
-      },
-    } as unknown as Awaited<ReturnType<typeof createClient>>);
-    vi.mocked(db.query.userProfiles.findFirst).mockResolvedValue({
-      role: "guest",
-    } as unknown as Awaited<
-      ReturnType<typeof db.query.userProfiles.findFirst>
-    >);
+    mockGetUser.mockResolvedValue({ data: { user: { id: "user-123" } } });
+    mockFindFirstProfile.mockResolvedValue({ role: "guest" });
+
+    const result = await getIscoredGamesAction();
+    expect(result).toEqual({ error: "Permission denied" });
+    expect(getGameroomGames).not.toHaveBeenCalled();
+  });
+
+  it("returns error when user has member role without machine context (permission denied)", async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: "user-123" } } });
+    mockFindFirstProfile.mockResolvedValue({ role: "member" });
 
     const result = await getIscoredGamesAction();
     expect(result).toEqual({ error: "Permission denied" });
@@ -79,18 +76,8 @@ describe("getIscoredGamesAction", () => {
   });
 
   it("returns error when iScored is not configured", async () => {
-    vi.mocked(createClient).mockResolvedValue({
-      auth: {
-        getUser: vi
-          .fn()
-          .mockResolvedValue({ data: { user: { id: "user-123" } } }),
-      },
-    } as unknown as Awaited<ReturnType<typeof createClient>>);
-    vi.mocked(db.query.userProfiles.findFirst).mockResolvedValue({
-      role: "member",
-    } as unknown as Awaited<
-      ReturnType<typeof db.query.userProfiles.findFirst>
-    >);
+    mockGetUser.mockResolvedValue({ data: { user: { id: "user-123" } } });
+    mockFindFirstProfile.mockResolvedValue({ role: "admin" });
     vi.mocked(isIscoredConfigured).mockReturnValue(false);
 
     const result = await getIscoredGamesAction();
@@ -103,18 +90,8 @@ describe("getIscoredGamesAction", () => {
       { gameId: "77956", gameName: "Medieval Madness" },
       { gameId: "104656", gameName: "Demolition Man" },
     ];
-    vi.mocked(createClient).mockResolvedValue({
-      auth: {
-        getUser: vi
-          .fn()
-          .mockResolvedValue({ data: { user: { id: "user-123" } } }),
-      },
-    } as unknown as Awaited<ReturnType<typeof createClient>>);
-    vi.mocked(db.query.userProfiles.findFirst).mockResolvedValue({
-      role: "member",
-    } as unknown as Awaited<
-      ReturnType<typeof db.query.userProfiles.findFirst>
-    >);
+    mockGetUser.mockResolvedValue({ data: { user: { id: "user-123" } } });
+    mockFindFirstProfile.mockResolvedValue({ role: "admin" });
     vi.mocked(isIscoredConfigured).mockReturnValue(true);
     vi.mocked(getGameroomGames).mockResolvedValue(mockGames);
 
@@ -124,18 +101,8 @@ describe("getIscoredGamesAction", () => {
   });
 
   it("returns error when getGameroomGames throws", async () => {
-    vi.mocked(createClient).mockResolvedValue({
-      auth: {
-        getUser: vi
-          .fn()
-          .mockResolvedValue({ data: { user: { id: "user-123" } } }),
-      },
-    } as unknown as Awaited<ReturnType<typeof createClient>>);
-    vi.mocked(db.query.userProfiles.findFirst).mockResolvedValue({
-      role: "admin",
-    } as unknown as Awaited<
-      ReturnType<typeof db.query.userProfiles.findFirst>
-    >);
+    mockGetUser.mockResolvedValue({ data: { user: { id: "user-123" } } });
+    mockFindFirstProfile.mockResolvedValue({ role: "admin" });
     vi.mocked(isIscoredConfigured).mockReturnValue(true);
     vi.mocked(getGameroomGames).mockRejectedValue(new Error("Network failure"));
 
