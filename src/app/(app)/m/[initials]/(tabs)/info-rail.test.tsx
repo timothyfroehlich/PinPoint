@@ -218,4 +218,14 @@ describe("InfoRail", () => {
       expect(chip).toHaveClass("shrink-0");
     });
   });
+
+  it("renders topScoresSlot when provided", () => {
+    renderRail({
+      topScoresSlot: (
+        <div data-testid="test-top-scores">Top Scores Content</div>
+      ),
+    });
+    expect(screen.getByTestId("test-top-scores")).toBeInTheDocument();
+    expect(screen.getByText("Top Scores Content")).toBeInTheDocument();
+  });
 });

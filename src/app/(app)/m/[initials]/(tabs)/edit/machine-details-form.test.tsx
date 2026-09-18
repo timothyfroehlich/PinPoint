@@ -8,7 +8,10 @@ import {
   waitFor,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MachineDetailsForm } from "./machine-details-form";
+import {
+  MachineDetailsForm,
+  type MachineDetailsFormProps,
+} from "./machine-details-form";
 import { DetailsDirtyProvider } from "./details-dirty";
 import { updateMachineAction } from "~/app/(app)/m/actions";
 import { err, ok } from "~/lib/result";
@@ -86,7 +89,7 @@ vi.mock("~/components/machines/PinballMapLinkField", () => ({
   ),
 }));
 
-const baseProps = {
+const baseProps: MachineDetailsFormProps = {
   machineId: "11111111-1111-1111-1111-111111111111",
   name: "Godzilla (Premium)",
   presenceStatus: "on_the_floor" as const,
@@ -98,6 +101,7 @@ const baseProps = {
   modelName: null,
   manufacturer: null,
   year: null,
+  iscoredGameId: null,
 };
 
 /**
@@ -105,7 +109,7 @@ const baseProps = {
  * section can see it (PP-3bbr.3), and the hook throws outside the provider
  * rather than defaulting to clean — so every case renders inside one.
  */
-function renderForm(overrides: Partial<typeof baseProps> = {}): void {
+function renderForm(overrides: Partial<MachineDetailsFormProps> = {}): void {
   render(
     <DetailsDirtyProvider>
       <MachineDetailsForm {...baseProps} {...overrides} />
@@ -582,6 +586,30 @@ describe("MachineDetailsForm", () => {
       expect(
         screen.queryByText("Discard unsaved changes?")
       ).not.toBeInTheDocument();
+    });
+  });
+
+  describe("iScored game ID field", () => {
+    it("renders with defaultValue from prop", () => {
+      renderForm({ iscoredGameId: "73" });
+      const input = screen.getByTestId("edit-machine-iscored-game-id");
+      expect(input).toHaveValue("73");
+    });
+
+    it("marks form dirty when edited", async () => {
+      const user = userEvent.setup();
+      renderForm({ iscoredGameId: null });
+      const input = screen.getByTestId("edit-machine-iscored-game-id");
+
+      expect(screen.getByTestId("details-dirty-note")).toHaveTextContent(
+        "No unsaved changes"
+      );
+
+      await user.type(input, "99");
+
+      expect(screen.getByTestId("details-dirty-note")).toHaveTextContent(
+        "Unsaved changes"
+      );
     });
   });
 });

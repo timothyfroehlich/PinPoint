@@ -1,5 +1,6 @@
 import "server-only";
 
+import { cache as reactCache } from "react";
 import { log } from "~/lib/logger";
 import {
   ISCORED_BASE_URL,
@@ -245,24 +246,24 @@ async function ensureCacheReady(user: string): Promise<void> {
  * Returns empty array if `ISCORED_USER` is unset, game ID is unlinked/blank,
  * or if upstream is unreachable.
  */
-export async function getAllScoresForMachine(
-  iscoredGameId: string
-): Promise<IscoredScore[]> {
-  const trimmedId = iscoredGameId.trim();
-  if (!trimmedId) {
-    return [];
-  }
+export const getAllScoresForMachine = reactCache(
+  async (iscoredGameId: string): Promise<IscoredScore[]> => {
+    const trimmedId = iscoredGameId.trim();
+    if (!trimmedId) {
+      return [];
+    }
 
-  const user = getIscoredUser();
-  if (!user) {
-    return [];
-  }
+    const user = getIscoredUser();
+    if (!user) {
+      return [];
+    }
 
-  await ensureCacheReady(user);
-  return (
-    cache.scoresByGameId.get(trimmedId)?.map((score) => ({ ...score })) ?? []
-  );
-}
+    await ensureCacheReady(user);
+    return (
+      cache.scoresByGameId.get(trimmedId)?.map((score) => ({ ...score })) ?? []
+    );
+  }
+);
 
 /**
  * Retrieves the top scores for a specific machine's iScored game ID.

@@ -86,6 +86,12 @@ export const createMachineSchema = z.object({
   ownerId: z.string().uuid().optional(),
   presenceStatus: z.enum(VALID_MACHINE_PRESENCE_STATUSES).optional(),
   forcePromoteUserId: z.string().uuid().optional(),
+  iscoredGameId: z
+    .string()
+    .trim()
+    .max(100, "iScored Game ID must be less than 100 characters")
+    .optional()
+    .nullable(),
   ...pinballmapLinkFields,
 });
 
@@ -114,6 +120,12 @@ export const updateMachineSchema = z.object({
   ownerId: z.string().uuid().optional(),
   presenceStatus: z.enum(VALID_MACHINE_PRESENCE_STATUSES).optional(),
   forcePromoteUserId: z.string().uuid().optional(),
+  iscoredGameId: z
+    .string()
+    .trim()
+    .max(100, "iScored Game ID must be less than 100 characters")
+    .optional()
+    .nullable(),
   ...pinballmapLinkFields,
 });
 
