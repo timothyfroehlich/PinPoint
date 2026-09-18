@@ -12,6 +12,7 @@ import { Forbidden } from "~/components/errors/Forbidden";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 
 import { getUnifiedUsers } from "~/lib/users/queries";
+import { isIscoredConfigured } from "~/lib/iscored/config";
 
 /**
  * Create Machine Page (Protected Route)
@@ -56,6 +57,8 @@ export default async function NewMachinePage(): Promise<React.JSX.Element> {
     role: u.role,
   }));
 
+  const iscoredConfigured = isIscoredConfigured();
+
   return (
     <PageContainer size="standard" className="pt-4 pb-8">
       <Card className="max-w-2xl gap-3 border-outline-variant">
@@ -66,6 +69,7 @@ export default async function NewMachinePage(): Promise<React.JSX.Element> {
           <CreateMachineForm
             allUsers={allUsers}
             canSelectOwner={canCreateMachine}
+            iscoredConfigured={iscoredConfigured}
           />
         </CardContent>
       </Card>

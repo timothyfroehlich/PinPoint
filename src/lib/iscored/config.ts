@@ -12,6 +12,12 @@ export const ISCORED_BASE_URL = "https://www.iscored.info";
 export const ISCORED_CACHE_TTL_MS = 15_000;
 
 /**
+ * Cache TTL for the full gameroom games list.
+ * Games in a gameroom change rarely, so a 1-hour TTL avoids frequent upstream hits.
+ */
+export const ISCORED_GAMES_CACHE_TTL_MS = 60 * 60 * 1000;
+
+/**
  * Returns the configured iScored gameroom username from environment variables,
  * or null if unconfigured.
  */
