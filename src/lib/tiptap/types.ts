@@ -26,6 +26,29 @@ export interface ProseMirrorDoc {
 }
 
 /**
+ * Runtime type guard for {@link ProseMirrorDoc}. A value persisted in a JSONB
+ * column is typed `ProseMirrorDoc` at rest but is never validated by the type
+ * system, so readers must narrow the real shape before walking `content`
+ * (CORE-TS-007) — a stored value can be a legacy string, `null`, or a bare
+ * `{ type: "doc" }` with no `content`. Checks only the top-level shape; node
+ * validation is Tiptap's job, matching the guarantee the previous
+ * `as ProseMirrorDoc` casts made. Intentionally stricter than
+ * {@link proseMirrorDocSchema}, whose `content` is optional: a bare
+ * `{ type: "doc" }` passes that schema but fails this guard, so the two are not
+ * interchangeable.
+ */
+export function isProseMirrorDoc(value: unknown): value is ProseMirrorDoc {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "type" in value &&
+    value.type === "doc" &&
+    "content" in value &&
+    Array.isArray(value.content)
+  );
+}
+
+/**
  * Minimal Zod schema for validating ProseMirror document payloads.
  * Validates the top-level shape — content validation is handled by Tiptap.
  */
@@ -98,17 +121,8 @@ export function plainTextToDoc(text: string): ProseMirrorDoc {
 export function extractMentions(
   doc: ProseMirrorDoc | null | undefined
 ): string[] {
-  const d = doc as unknown;
-  if (
-    !d ||
-    typeof d !== "object" ||
-    (d as Record<string, unknown>)["type"] !== "doc" ||
-    !Array.isArray((d as Record<string, unknown>)["content"])
-  ) {
-    return [];
-  }
+  if (!isProseMirrorDoc(doc)) return [];
 
-  const validDoc = d as ProseMirrorDoc;
   const ids = new Set<string>();
 
   function walk(nodes: ProseMirrorNode[] | undefined): void {
@@ -123,7 +137,7 @@ export function extractMentions(
     }
   }
 
-  walk(validDoc.content);
+  walk(doc.content);
   return Array.from(ids);
 }
 
@@ -136,18 +150,8 @@ export function docToPlainText(
 ): string {
   if (!doc) return "";
   if (typeof doc === "string") return doc;
+  if (!isProseMirrorDoc(doc)) return "";
 
-  const d = doc as unknown;
-  if (
-    !d ||
-    typeof d !== "object" ||
-    (d as Record<string, unknown>)["type"] !== "doc" ||
-    !Array.isArray((d as Record<string, unknown>)["content"])
-  ) {
-    return "";
-  }
-
-  const validDoc = d as ProseMirrorDoc;
   const parts: string[] = [];
 
   function walk(nodes: ProseMirrorNode[] | undefined): void {
@@ -179,7 +183,7 @@ export function docToPlainText(
     }
   }
 
-  walk(validDoc.content);
+  walk(doc.content);
 
   return parts.join("").trim();
 }

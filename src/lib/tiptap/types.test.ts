@@ -6,6 +6,7 @@ import {
   docToPlainText,
   docIsEmpty,
   docsEqualByText,
+  isProseMirrorDoc,
   type ProseMirrorDoc,
 } from "./types";
 
@@ -44,6 +45,51 @@ describe("plainTextToDoc", () => {
     const doc = plainTextToDoc("");
     expect(doc.content).toHaveLength(1);
     expect(doc.content[0].type).toBe("paragraph");
+  });
+});
+
+describe("isProseMirrorDoc", () => {
+  it("accepts a well-formed doc", () => {
+    const doc: ProseMirrorDoc = {
+      type: "doc",
+      content: [{ type: "paragraph" }],
+    };
+    expect(isProseMirrorDoc(doc)).toBe(true);
+  });
+
+  it("accepts a doc with an empty content array", () => {
+    expect(isProseMirrorDoc({ type: "doc", content: [] })).toBe(true);
+  });
+
+  it("rejects null and undefined", () => {
+    expect(isProseMirrorDoc(null)).toBe(false);
+    expect(isProseMirrorDoc(undefined)).toBe(false);
+  });
+
+  it("rejects strings and other primitives", () => {
+    expect(isProseMirrorDoc("legacy plain text")).toBe(false);
+    expect(isProseMirrorDoc(42)).toBe(false);
+  });
+
+  it("rejects an array (typeof [] === 'object')", () => {
+    expect(isProseMirrorDoc([])).toBe(false);
+    expect(isProseMirrorDoc([{ type: "doc", content: [] }])).toBe(false);
+  });
+
+  it("rejects a plain object with no type key", () => {
+    expect(isProseMirrorDoc({})).toBe(false);
+  });
+
+  it("rejects a bare { type: doc } with no content array", () => {
+    expect(isProseMirrorDoc({ type: "doc" })).toBe(false);
+  });
+
+  it("rejects an object whose type is not doc", () => {
+    expect(isProseMirrorDoc({ type: "paragraph", content: [] })).toBe(false);
+  });
+
+  it("rejects a doc whose content is not an array", () => {
+    expect(isProseMirrorDoc({ type: "doc", content: "nope" })).toBe(false);
   });
 });
 
