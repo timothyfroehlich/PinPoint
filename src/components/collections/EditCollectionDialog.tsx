@@ -147,6 +147,14 @@ export function EditCollectionDialog({
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
+                {error && (
+                  <div
+                    role="alert"
+                    className="rounded-md border border-destructive/20 bg-destructive/10 p-4 mb-4 text-destructive-text"
+                  >
+                    <p className="text-sm font-medium">{error}</p>
+                  </div>
+                )}
                 <AlertDialogHeader>
                   <AlertDialogTitle>Delete this collection?</AlertDialogTitle>
                   <AlertDialogDescription>

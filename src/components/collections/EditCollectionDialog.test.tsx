@@ -98,6 +98,24 @@ describe("EditCollectionDialog", () => {
     await waitFor(() => expect(push).toHaveBeenCalledWith("/c/collections"));
   });
 
+  it("shows the error message inside the alert dialog when delete fails", async () => {
+    deleteAction.mockResolvedValue({
+      success: false,
+      error: "Cannot delete this collection",
+    });
+    renderDialog();
+
+    await userEvent.click(screen.getByTestId("collection-edit-trigger"));
+    await userEvent.click(screen.getByTestId("collection-delete-trigger"));
+    await userEvent.click(screen.getByTestId("collection-delete-confirm"));
+
+    // We expect the error to show up. Since it's duplicated in two places now,
+    // we use getAllByText or findByText with multiple results.
+    const errors = await screen.findAllByText("Cannot delete this collection");
+    expect(errors.length).toBeGreaterThan(0);
+    expect(push).not.toHaveBeenCalled();
+  });
+
   it("hides the delete control for an editor (canDelete=false)", async () => {
     renderDialog(false);
     await userEvent.click(screen.getByTestId("collection-edit-trigger"));
