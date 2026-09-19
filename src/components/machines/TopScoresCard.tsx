@@ -4,7 +4,7 @@ import Link from "next/link";
 import { ArrowRight, ExternalLink, Plus, Trophy } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { formatDate } from "~/lib/dates";
-import { getGameroomUrl, getScoreEntryUrl } from "~/lib/iscored";
+import { getGameroomUrl, getGameUrl, getScoreEntryUrl } from "~/lib/iscored";
 import type { IscoredScore } from "~/lib/iscored/types";
 
 export interface TopScoresCardProps {
@@ -54,12 +54,13 @@ export function TopScoresCard({
 }: TopScoresCardProps): React.JSX.Element {
   const isLinked = Boolean(iscoredGameId && iscoredGameId.trim().length > 0);
   const scoreEntryUrl = iscoredGameId ? getScoreEntryUrl(iscoredGameId) : null;
-  const externalIscoredUrl = scoreEntryUrl ?? getGameroomUrl();
+  const gameUrl = iscoredGameId ? getGameUrl(iscoredGameId) : null;
+  const externalIscoredUrl = gameUrl ?? getGameroomUrl();
 
   const headerLogo =
-    isLinked && scoreEntryUrl ? (
+    isLinked && externalIscoredUrl ? (
       <a
-        href={scoreEntryUrl}
+        href={externalIscoredUrl}
         target="_blank"
         rel="noopener noreferrer"
         title="View on iScored"
