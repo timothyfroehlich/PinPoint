@@ -56,6 +56,28 @@ export function getScoreEntryUrl(
 }
 
 /**
+ * Builds the direct external URL to view a specific game in the location's
+ * public iScored gameroom (Spec §1, §4.2, §4.3).
+ *
+ * Pattern: `https://www.iscored.info/{user}?scrollTo={gameID}`
+ *
+ * Returns null if no user is configured (or passed) or if the game ID is blank.
+ */
+export function getGameUrl(
+  iscoredGameId: string,
+  user?: string | null
+): string | null {
+  const resolvedUser = (user ?? getIscoredUser())?.trim();
+  const trimmedId = iscoredGameId.trim();
+
+  if (!resolvedUser || !trimmedId) {
+    return null;
+  }
+
+  return `${ISCORED_BASE_URL}/${encodeURIComponent(resolvedUser)}?scrollTo=${encodeURIComponent(trimmedId)}`;
+}
+
+/**
  * Builds the location's public iScored gameroom URL (Spec §5.4).
  *
  * Pattern: `https://www.iscored.info/{user}`
