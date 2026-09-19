@@ -267,7 +267,8 @@ describe("postChannelMessage", () => {
     if (typeof rawBody !== "string") {
       throw new Error("expected body to be a string");
     }
-    expect(JSON.parse(rawBody)).toEqual({
+    const parsedBody: unknown = JSON.parse(rawBody);
+    expect(parsedBody).toEqual({
       content: "test message",
       allowed_mentions: { parse: [] },
       flags: 4,
