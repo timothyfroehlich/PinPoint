@@ -230,6 +230,17 @@ const FILLED_DOC: ProseMirrorDoc = {
   content: [{ type: "paragraph", content: [{ type: "text", text: "old" }] }],
 };
 
+const STERN_PRESET: SettingsInstructionsPreset = {
+  key: "stern",
+  label: "Stern",
+  doc: {
+    type: "doc",
+    content: [
+      { type: "paragraph", content: [{ type: "text", text: "Stern path" }] },
+    ],
+  },
+};
+
 describe("InlineEditableField — optimistic clear (B3)", () => {
   it("clearing a filled field renders empty immediately (optimistic clear) — old text gone after Save", async () => {
     const user = userEvent.setup();
@@ -268,17 +279,6 @@ describe("InlineEditableField — optimistic clear (B3)", () => {
 });
 
 describe("InlineEditableField — preset overwrite confirm (B2 / Task 11)", () => {
-  const sternPreset: SettingsInstructionsPreset = {
-    key: "stern",
-    label: "Stern",
-    doc: {
-      type: "doc",
-      content: [
-        { type: "paragraph", content: [{ type: "text", text: "Stern path" }] },
-      ],
-    },
-  };
-
   it("confirms before a preset overwrites existing editor content", async () => {
     const user = userEvent.setup();
     const onSave = vi.fn().mockResolvedValue({ ok: true });
@@ -299,7 +299,7 @@ describe("InlineEditableField — preset overwrite confirm (B2 / Task 11)", () =
         canEdit
         testId={TID}
         onSave={onSave}
-        presets={[sternPreset]}
+        presets={[STERN_PRESET]}
         openWhenEmpty
         headingProminent
       />
@@ -351,7 +351,7 @@ describe("InlineEditableField — preset overwrite confirm (B2 / Task 11)", () =
         canEdit
         testId={TID}
         onSave={vi.fn().mockResolvedValue({ ok: true })}
-        presets={[sternPreset]}
+        presets={[STERN_PRESET]}
         openWhenEmpty
         headingProminent
       />
@@ -385,7 +385,7 @@ describe("InlineEditableField — preset overwrite confirm (B2 / Task 11)", () =
         canEdit
         testId={TID}
         onSave={vi.fn().mockResolvedValue({ ok: true })}
-        presets={[sternPreset]}
+        presets={[STERN_PRESET]}
         openWhenEmpty
         headingProminent
       />
@@ -402,5 +402,208 @@ describe("InlineEditableField — preset overwrite confirm (B2 / Task 11)", () =
     expect(screen.getByTestId("mock-editor-content")).toHaveTextContent(
       "Stern path"
     );
+  });
+});
+
+const NEW_DOC: ProseMirrorDoc = {
+  type: "doc",
+  content: [
+    { type: "paragraph", content: [{ type: "text", text: "brand new" }] },
+  ],
+};
+
+describe("InlineEditableField — external value re-sync while clean (PP-od8m)", () => {
+  it("external clear of a clean always-open field: no phantom Save, nav guard not armed", () => {
+    // A concurrent edit / revalidation empties an always-open field the user has
+    // NOT touched. The clean draft must follow the new value: the reopened box
+    // is empty, no Save appears, and onDirtyChange never reports dirty.
+    const onDirtyChange = vi.fn();
+    const { rerender } = render(
+      <InlineEditableField
+        label="How to change settings"
+        value={FILLED_DOC}
+        machineId="m1"
+        canEdit
+        testId={TID}
+        openWhenEmpty
+        headingProminent
+        onDirtyChange={onDirtyChange}
+        onSave={vi.fn().mockResolvedValue({ ok: true })}
+      />
+    );
+
+    // Filled + untouched → read-only display, no Save.
+    expect(screen.getByTestId("mock-display")).toHaveTextContent("old");
+    expect(screen.queryByTestId(`${TID}-save`)).not.toBeInTheDocument();
+    onDirtyChange.mockClear();
+
+    // Server value cleared underneath the clean field.
+    rerender(
+      <InlineEditableField
+        label="How to change settings"
+        value={null}
+        machineId="m1"
+        canEdit
+        testId={TID}
+        openWhenEmpty
+        headingProminent
+        onDirtyChange={onDirtyChange}
+        onSave={vi.fn().mockResolvedValue({ ok: true })}
+      />
+    );
+
+    // Box reopens EMPTY (draft re-synced to null), so no phantom Save button and
+    // the parent's nav guard is never armed for a change the user did not make.
+    // Exact empty check — toHaveTextContent("") is a substring match that any
+    // content satisfies, so it would pass even on a stale "old" draft.
+    expect(screen.getByTestId("mock-editor")).toBeInTheDocument();
+    expect(screen.getByTestId("mock-editor-content").textContent).toBe("");
+    expect(screen.queryByTestId(`${TID}-save`)).not.toBeInTheDocument();
+    expect(onDirtyChange).not.toHaveBeenCalledWith(true);
+  });
+
+  it("external add to a clean always-open empty field: draft follows it, guard stays clean", () => {
+    // The mirror case: an always-open EMPTY field gains a value from elsewhere.
+    // isEmpty flips false so the box shows the new value as read-only display,
+    // and — crucially — the nav guard is not armed (isDirty stays false).
+    const onDirtyChange = vi.fn();
+    const { rerender } = render(
+      <InlineEditableField
+        label="How to change settings"
+        value={null}
+        machineId="m1"
+        canEdit
+        testId={TID}
+        openWhenEmpty
+        headingProminent
+        onDirtyChange={onDirtyChange}
+        onSave={vi.fn().mockResolvedValue({ ok: true })}
+      />
+    );
+    expect(screen.getByTestId("mock-editor")).toBeInTheDocument();
+    onDirtyChange.mockClear();
+
+    rerender(
+      <InlineEditableField
+        label="How to change settings"
+        value={NEW_DOC}
+        machineId="m1"
+        canEdit
+        testId={TID}
+        openWhenEmpty
+        headingProminent
+        onDirtyChange={onDirtyChange}
+        onSave={vi.fn().mockResolvedValue({ ok: true })}
+      />
+    );
+
+    // Shows the new value read-only, no phantom Save, guard never armed.
+    expect(screen.getByTestId("mock-display")).toHaveTextContent("brand new");
+    expect(screen.queryByTestId(`${TID}-save`)).not.toBeInTheDocument();
+    expect(onDirtyChange).not.toHaveBeenCalledWith(true);
+  });
+
+  it("does NOT clobber an in-progress dirty edit when the value changes underneath", async () => {
+    // A click-to-edit consumer (openWhenEmpty=false, like machine-text-fields):
+    // the user opens the editor and diverges the draft, then a concurrent edit
+    // changes the server value. The in-progress draft must survive untouched and
+    // its (honest) Save must remain.
+    const user = userEvent.setup();
+    const { rerender } = render(
+      <InlineEditableField
+        label="How to change settings"
+        value={null}
+        machineId="m1"
+        canEdit
+        testId={TID}
+        presets={[STERN_PRESET]}
+        onSave={vi.fn().mockResolvedValue({ ok: true })}
+      />
+    );
+
+    // Open the editor (empty click-to-edit field) and make the draft dirty via a
+    // preset — an empty editor inserts the preset directly (no overwrite confirm).
+    await user.click(screen.getByTestId(`${TID}-edit`));
+    await user.click(screen.getByTestId(`${TID}-preset-trigger`));
+    await user.click(screen.getByTestId(`${TID}-preset-stern`));
+    expect(screen.getByTestId("mock-editor-content")).toHaveTextContent(
+      "Stern path"
+    );
+    expect(screen.getByTestId(`${TID}-save`)).toBeInTheDocument();
+
+    // Server value changes underneath the in-progress edit.
+    rerender(
+      <InlineEditableField
+        label="How to change settings"
+        value={NEW_DOC}
+        machineId="m1"
+        canEdit
+        testId={TID}
+        presets={[STERN_PRESET]}
+        onSave={vi.fn().mockResolvedValue({ ok: true })}
+      />
+    );
+
+    // The dirty draft is preserved (not overwritten by "brand new") and Save
+    // stays — the edit is not silently discarded.
+    expect(screen.getByTestId("mock-editor-content")).toHaveTextContent(
+      "Stern path"
+    );
+    expect(screen.getByTestId(`${TID}-save`)).toBeInTheDocument();
+  });
+
+  it("always-open field: a dirty draft is not clobbered when the value changes underneath", async () => {
+    // The exact scenario the bead is about — an ALWAYS-OPEN (openWhenEmpty) field
+    // with a dirty draft, whose server value changes from a concurrent edit. Here
+    // isEditing stays false (always-open never sets it), so the not-clobber
+    // guarantee rests entirely on docsEqualByText(editValue, lastSyncedValue).
+    // A regression that simplified the clean-check to `!isEditing` would silently
+    // discard the draft; this test locks that branch in.
+    const user = userEvent.setup();
+    const onDirtyChange = vi.fn();
+    const { rerender } = render(
+      <InlineEditableField
+        label="How to change settings"
+        value={null}
+        machineId="m1"
+        canEdit
+        testId={TID}
+        openWhenEmpty
+        headingProminent
+        presets={[STERN_PRESET]}
+        onDirtyChange={onDirtyChange}
+        onSave={vi.fn().mockResolvedValue({ ok: true })}
+      />
+    );
+
+    // Diverge the always-open draft via a preset (no explicit Pencil edit).
+    await user.click(screen.getByTestId(`${TID}-preset-trigger`));
+    await user.click(screen.getByTestId(`${TID}-preset-stern`));
+    expect(screen.getByTestId("mock-editor-content")).toHaveTextContent(
+      "Stern path"
+    );
+    expect(onDirtyChange).toHaveBeenCalledWith(true);
+    onDirtyChange.mockClear();
+
+    // Concurrent edit changes the server value underneath the dirty draft.
+    rerender(
+      <InlineEditableField
+        label="How to change settings"
+        value={NEW_DOC}
+        machineId="m1"
+        canEdit
+        testId={TID}
+        openWhenEmpty
+        headingProminent
+        presets={[STERN_PRESET]}
+        onDirtyChange={onDirtyChange}
+        onSave={vi.fn().mockResolvedValue({ ok: true })}
+      />
+    );
+
+    // The draft ("Stern path") is NOT overwritten by "brand new", so it stays
+    // dirty against the new value — the guard never reports clean. If the draft
+    // had been clobbered, isDirty would flip false and onDirtyChange(false) fire.
+    expect(onDirtyChange).not.toHaveBeenCalledWith(false);
   });
 });
