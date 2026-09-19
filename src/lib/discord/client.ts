@@ -16,7 +16,12 @@ export type DiscordSendResult =
   | { ok: true }
   | {
       ok: false;
-      reason: "blocked" | "rate_limited" | "transient" | "not_configured";
+      reason:
+        | "blocked"
+        | "rate_limited"
+        | "transient"
+        | "not_configured"
+        | "no_shared_server";
     };
 
 /** Historical alias — `sendDm`'s return type. */
@@ -158,6 +163,7 @@ async function postMessage(
 const DISCORD_ERROR_CANNOT_DM_USER = 50007;
 const DISCORD_ERROR_MISSING_ACCESS = 50001;
 const DISCORD_ERROR_MISSING_PERMISSIONS = 50013;
+const DISCORD_ERROR_NO_SHARED_SERVER = 50278;
 const PERMANENT_403_CODES: readonly number[] = [
   DISCORD_ERROR_CANNOT_DM_USER,
   DISCORD_ERROR_MISSING_ACCESS,
@@ -168,6 +174,9 @@ async function classify(res: Response): Promise<SendDmResult> {
   if (res.status === 404) return { ok: false, reason: "blocked" };
   if (res.status === 403) {
     const code = await readDiscordErrorCode(res);
+    if (code === DISCORD_ERROR_NO_SHARED_SERVER) {
+      return { ok: false, reason: "no_shared_server" };
+    }
     return code !== null && PERMANENT_403_CODES.includes(code)
       ? { ok: false, reason: "blocked" }
       : { ok: false, reason: "transient" };

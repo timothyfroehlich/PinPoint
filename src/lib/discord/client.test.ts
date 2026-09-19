@@ -125,6 +125,26 @@ describe("sendDm", () => {
     expect(result).toEqual({ ok: false, reason: "blocked" });
   });
 
+  it("returns reason='no_shared_server' on 403 with Discord code 50278", async () => {
+    installFetchMock((call) =>
+      call.url.endsWith("/users/@me/channels")
+        ? new Response(
+            JSON.stringify({
+              code: 50278,
+              message: "Must share a server with the user",
+            }),
+            { status: 403 }
+          )
+        : new Response("{}", { status: 200 })
+    );
+    const result = await sendDm({
+      botToken: "t",
+      discordUserId: "u",
+      content: "hi",
+    });
+    expect(result).toEqual({ ok: false, reason: "no_shared_server" });
+  });
+
   it.each([
     [50001, "Missing Access"],
     [50013, "Missing Permissions"],

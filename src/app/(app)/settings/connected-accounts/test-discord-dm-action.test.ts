@@ -108,6 +108,28 @@ describe("testDiscordDmAction", () => {
     });
   });
 
+  it("propagates no_shared_server and includes inviteUrl from sendDm", async () => {
+    mockUser("u1");
+    findFirst.mockResolvedValue({ id: "u1", discordUserId: "d1" });
+    vi.mocked(getDiscordConfig).mockResolvedValue({
+      botToken: "t",
+      guildId: "g",
+      inviteLink: "https://discord.gg/invite",
+      botHealthStatus: "healthy",
+      lastBotCheckAt: null,
+      updatedAt: new Date(),
+    });
+    vi.mocked(sendDm).mockResolvedValue({
+      ok: false,
+      reason: "no_shared_server",
+    });
+    expect(await testDiscordDmAction()).toEqual({
+      ok: false,
+      reason: "no_shared_server",
+      inviteUrl: "https://discord.gg/invite",
+    });
+  });
+
   it.each([["rate_limited"], ["transient"]] as const)(
     "propagates %s from sendDm",
     async (reason) => {

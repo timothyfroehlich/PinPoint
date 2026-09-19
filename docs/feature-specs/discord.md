@@ -62,7 +62,6 @@ The card uses the credential-entry pattern: fields, a Save that validates and re
 | §3 stored status | `bot_health_status` / `last_bot_check_at` are only reset to their default values; production never records a successful or failed check | Wire the write path; widen the enum (rejected vs unreachable) (PP-o355.51.5) |
 | §3.3 traffic updates status | `sendDm` 401s classified for the send result but never persisted to config health | On a 401, write Not working (PP-eps) |
 | §2.5 invite-link inline check | Validated on save (`schema.ts`: URL regex, max 512); no as-you-type check | Add the inline/as-you-type check (PP-o355.51.5) |
-| §4.2 invite link on Test DM | Test DM collapses Discord's no-mutual-guilds response into `blocked`, and its response never includes the invite link | Preserve the specific outcome and show the configured link only for it (PP-o355.51.10) |
 
 ---
 

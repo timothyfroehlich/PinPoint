@@ -9,7 +9,10 @@ import {
 } from "./test-discord-dm-action";
 
 const REASON_COPY: Record<
-  Exclude<TestDmResult, { ok: true }>["reason"],
+  Exclude<
+    TestDmResult,
+    { ok: true } | { reason: "no_shared_server" }
+  >["reason"],
   string
 > = {
   not_authenticated: "You need to sign in again.",
@@ -28,7 +31,7 @@ export function DiscordTestDmButton(): React.JSX.Element {
   return (
     <div className="flex items-center justify-end gap-2">
       {result && (
-        <p
+        <div
           className={
             result.ok
               ? "text-xs text-success max-w-[20rem] text-right"
@@ -36,8 +39,26 @@ export function DiscordTestDmButton(): React.JSX.Element {
           }
           role="status"
         >
-          {result.ok ? "Test DM sent" : REASON_COPY[result.reason]}
-        </p>
+          {result.ok ? (
+            <p>Test DM sent</p>
+          ) : result.reason === "no_shared_server" ? (
+            <p>
+              You don't share a server with the bot.{" "}
+              {result.inviteUrl ? (
+                <a
+                  href={result.inviteUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="underline underline-offset-4 hover:text-foreground"
+                >
+                  Join the server
+                </a>
+              ) : null}
+            </p>
+          ) : (
+            <p>{REASON_COPY[result.reason]}</p>
+          )}
+        </div>
       )}
       <Button
         type="button"
