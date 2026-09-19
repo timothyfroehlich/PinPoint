@@ -262,7 +262,12 @@ describe("postChannelMessage", () => {
     expect(calls[0]?.init?.headers).toMatchObject({
       Authorization: "Bot bot-tok",
     });
-    expect(JSON.parse(calls[0]?.init?.body as string)).toEqual({
+    const rawBody = calls[0]?.init?.body;
+    expect(typeof rawBody).toBe("string");
+    if (typeof rawBody !== "string") {
+      throw new Error("expected body to be a string");
+    }
+    expect(JSON.parse(rawBody)).toEqual({
       content: "test message",
       allowed_mentions: { parse: [] },
       flags: 4,

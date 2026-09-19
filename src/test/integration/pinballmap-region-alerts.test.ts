@@ -92,10 +92,16 @@ vi.mock("~/lib/pinballmap/catalog", async () => {
   };
 });
 
-const discord = {
+interface DiscordMockState {
+  hasToken: boolean;
+  result: DiscordSendResult;
+  posts: { channelId: string; content: string; flags?: number }[];
+}
+
+const discord: DiscordMockState = {
   hasToken: true,
-  result: { ok: true } as DiscordSendResult,
-  posts: [] as { channelId: string; content: string; flags?: number }[],
+  result: { ok: true },
+  posts: [],
 };
 
 vi.mock("~/lib/discord/config", () => ({
