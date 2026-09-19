@@ -1,7 +1,13 @@
 "use client";
 
 import type React from "react";
-import { useState, useActionState, useEffect, startTransition } from "react";
+import {
+  useState,
+  useActionState,
+  useEffect,
+  startTransition,
+  useId,
+} from "react";
 import {
   updateIssueStatusAction,
   type UpdateIssueStatusResult,
@@ -17,11 +23,6 @@ import {
   type OwnershipContext,
 } from "~/lib/permissions/helpers";
 import { type AccessLevel } from "~/lib/permissions/matrix";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "~/components/ui/tooltip";
 import { cn } from "~/lib/utils";
 import { toast } from "sonner";
 
@@ -71,6 +72,7 @@ export function UpdateIssueStatusForm({
         accessLevel,
         ownershipContext
       );
+  const descriptionId = useId();
 
   useEffect(() => {
     if (state && !state.ok) {
@@ -120,6 +122,9 @@ export function UpdateIssueStatusForm({
           type="button"
           className="w-full disabled:cursor-not-allowed"
           disabled={isPending || !permissionState.allowed}
+          aria-describedby={
+            !permissionState.allowed && deniedReason ? descriptionId : undefined
+          }
           data-testid="issue-status-trigger"
         >
           <IssueBadge
@@ -138,6 +143,9 @@ export function UpdateIssueStatusForm({
       value={selectedStatus}
       onValueChange={handleValueChange}
       disabled={isPending || !permissionState.allowed}
+      ariaDescribedby={
+        !permissionState.allowed && deniedReason ? descriptionId : undefined
+      }
     />
   );
 
@@ -161,18 +169,17 @@ export function UpdateIssueStatusForm({
           "relative",
           isPending && "opacity-50 pointer-events-none"
         )}
-        title={deniedReason ?? undefined}
       >
-        {permissionState.allowed ? (
-          control
-        ) : (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              {compact ? <span className="block">{control}</span> : control}
-            </TooltipTrigger>
-            <TooltipContent>{deniedReason}</TooltipContent>
-          </Tooltip>
-        )}
+        {control}
+        {!permissionState.allowed && deniedReason ? (
+          <p
+            id={descriptionId}
+            className="text-sm text-muted-foreground mt-2"
+            data-testid="status-denied-reason"
+          >
+            {deniedReason}
+          </p>
+        ) : null}
       </div>
     </form>
   );

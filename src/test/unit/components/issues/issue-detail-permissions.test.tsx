@@ -112,8 +112,8 @@ describe("Issue detail permission-aware UI", () => {
     );
 
     const statusControl = screen.getByTestId("issue-status-select");
-    expect(statusControl.closest("div[title]")).toHaveAttribute(
-      "title",
+    expect(statusControl).toBeDisabled();
+    expect(screen.getByTestId("status-denied-reason")).toHaveTextContent(
       "Only the owner can perform this action"
     );
   });

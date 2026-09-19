@@ -19,6 +19,7 @@ interface FrequencySelectProps {
   name?: string;
   placeholder?: string;
   testId?: string;
+  ariaDescribedby?: string | undefined;
 }
 
 const frequencyOptions: IssueFrequency[] = [
@@ -35,6 +36,7 @@ export function FrequencySelect({
   name = "frequency",
   placeholder = "Select frequency...",
   testId = "issue-frequency-select",
+  ariaDescribedby,
 }: FrequencySelectProps): React.JSX.Element {
   return (
     <Select
@@ -51,6 +53,7 @@ export function FrequencySelect({
             ? `Frequency: ${FREQUENCY_CONFIG[value].label}`
             : "Select Frequency"
         }
+        aria-describedby={ariaDescribedby}
         data-testid={testId}
       >
         <SelectValue placeholder={placeholder}>

@@ -19,6 +19,7 @@ interface PrioritySelectProps {
   name?: string;
   placeholder?: string;
   testId?: string;
+  ariaDescribedby?: string | undefined;
 }
 
 const priorityOptions: IssuePriority[] = ["low", "medium", "high"];
@@ -31,6 +32,7 @@ export function PrioritySelect({
   name = "priority",
   placeholder = "Select priority...",
   testId = "issue-priority-select",
+  ariaDescribedby,
 }: PrioritySelectProps): React.JSX.Element {
   return (
     <Select
@@ -47,6 +49,7 @@ export function PrioritySelect({
             ? `Priority: ${PRIORITY_CONFIG[value].label}`
             : "Select Priority"
         }
+        aria-describedby={ariaDescribedby}
         data-testid={testId}
       >
         <SelectValue placeholder={placeholder}>

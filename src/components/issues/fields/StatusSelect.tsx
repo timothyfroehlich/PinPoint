@@ -50,6 +50,7 @@ interface StatusSelectProps {
   disabled?: boolean;
   id?: string;
   name?: string;
+  ariaDescribedby?: string | undefined;
 }
 
 export function StatusSelect({
@@ -58,6 +59,7 @@ export function StatusSelect({
   disabled = false,
   id,
   name = "status",
+  ariaDescribedby,
 }: StatusSelectProps): React.JSX.Element {
   return (
     <Select
@@ -70,6 +72,7 @@ export function StatusSelect({
         id={id}
         className="w-full border-outline-variant bg-surface text-foreground"
         aria-label={`Status: ${STATUS_CONFIG[value].label}`}
+        aria-describedby={ariaDescribedby}
         data-testid="issue-status-select"
       >
         <SelectValue>

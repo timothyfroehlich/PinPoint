@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useActionState, startTransition } from "react";
+import { useActionState, startTransition, useId } from "react";
 import {
   assignIssueAction,
   type AssignIssueResult,
@@ -13,11 +13,6 @@ import {
   type OwnershipContext,
 } from "~/lib/permissions/helpers";
 import { type AccessLevel } from "~/lib/permissions/matrix";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "~/components/ui/tooltip";
 
 interface AssignIssueFormProps {
   issueId: string;
@@ -52,6 +47,7 @@ export function AssignIssueForm({
         accessLevel,
         ownershipContext
       );
+  const descriptionId = useId();
   const assignedUserName =
     users.find((user) => user.id === assignedToId)?.name ?? "Unassigned";
 
@@ -69,35 +65,35 @@ export function AssignIssueForm({
     );
   }
 
-  const picker = (
-    <AssigneePicker
-      assignedToId={assignedToId}
-      users={users}
-      currentUserId={currentUserId}
-      isPending={isPending}
-      disabled={!permissionState.allowed}
-      disabledReason={deniedReason}
-      onAssign={(userId) => {
-        const formData = new FormData();
-        formData.append("issueId", issueId);
-        formData.append("assignedTo", userId ?? "");
-        startTransition(() => {
-          formAction(formData);
-        });
-      }}
-    />
-  );
-
   return (
     <div>
-      {permissionState.allowed ? (
-        picker
-      ) : (
-        <Tooltip>
-          <TooltipTrigger asChild>{picker}</TooltipTrigger>
-          <TooltipContent>{deniedReason}</TooltipContent>
-        </Tooltip>
-      )}
+      <AssigneePicker
+        assignedToId={assignedToId}
+        users={users}
+        currentUserId={currentUserId}
+        isPending={isPending}
+        disabled={!permissionState.allowed}
+        ariaDescribedby={
+          !permissionState.allowed && deniedReason ? descriptionId : undefined
+        }
+        onAssign={(userId) => {
+          const formData = new FormData();
+          formData.append("issueId", issueId);
+          formData.append("assignedTo", userId ?? "");
+          startTransition(() => {
+            formAction(formData);
+          });
+        }}
+      />
+      {!permissionState.allowed && deniedReason ? (
+        <p
+          id={descriptionId}
+          className="text-sm text-muted-foreground mt-2"
+          data-testid="assign-denied-reason"
+        >
+          {deniedReason}
+        </p>
+      ) : null}
       {state && !state.ok && (
         <p className="text-sm text-destructive-text">{state.message}</p>
       )}

@@ -1,7 +1,13 @@
 "use client";
 
 import type React from "react";
-import { useState, useActionState, useEffect, startTransition } from "react";
+import {
+  useState,
+  useActionState,
+  useEffect,
+  startTransition,
+  useId,
+} from "react";
 import {
   updateIssueSeverityAction,
   type UpdateIssueSeverityResult,
@@ -17,11 +23,6 @@ import {
   type OwnershipContext,
 } from "~/lib/permissions/helpers";
 import { type AccessLevel } from "~/lib/permissions/matrix";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "~/components/ui/tooltip";
 import { cn } from "~/lib/utils";
 import { toast } from "sonner";
 
@@ -73,6 +74,7 @@ export function UpdateIssueSeverityForm({
         accessLevel,
         ownershipContext
       );
+  const descriptionId = useId();
 
   // Dispatch the action directly instead of routing through a native
   // `<form>` submission. `@radix-ui/react-select` >=2.3.3 attaches a
@@ -121,6 +123,9 @@ export function UpdateIssueSeverityForm({
           type="button"
           className="w-full disabled:cursor-not-allowed"
           disabled={isPending || !permissionState.allowed}
+          aria-describedby={
+            !permissionState.allowed && deniedReason ? descriptionId : undefined
+          }
           data-testid="issue-severity-trigger"
         >
           <IssueBadge
@@ -139,6 +144,9 @@ export function UpdateIssueSeverityForm({
       value={selectedSeverity}
       onValueChange={handleValueChange}
       disabled={isPending || !permissionState.allowed}
+      ariaDescribedby={
+        !permissionState.allowed && deniedReason ? descriptionId : undefined
+      }
     />
   );
 
@@ -162,18 +170,17 @@ export function UpdateIssueSeverityForm({
           "relative",
           isPending && "opacity-50 pointer-events-none"
         )}
-        title={deniedReason ?? undefined}
       >
-        {permissionState.allowed ? (
-          control
-        ) : (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              {compact ? <span className="block">{control}</span> : control}
-            </TooltipTrigger>
-            <TooltipContent>{deniedReason}</TooltipContent>
-          </Tooltip>
-        )}
+        {control}
+        {!permissionState.allowed && deniedReason ? (
+          <p
+            id={descriptionId}
+            className="text-sm text-muted-foreground mt-2"
+            data-testid="severity-denied-reason"
+          >
+            {deniedReason}
+          </p>
+        ) : null}
       </div>
     </form>
   );

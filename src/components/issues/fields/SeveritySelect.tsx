@@ -19,6 +19,7 @@ interface SeveritySelectProps {
   name?: string;
   placeholder?: string;
   testId?: string;
+  ariaDescribedby?: string | undefined;
 }
 
 const severityOptions: IssueSeverity[] = [
@@ -36,6 +37,7 @@ export function SeveritySelect({
   name = "severity",
   placeholder = "Select severity...",
   testId = "issue-severity-select",
+  ariaDescribedby,
 }: SeveritySelectProps): React.JSX.Element {
   return (
     <Select
@@ -52,6 +54,7 @@ export function SeveritySelect({
             ? `Severity: ${SEVERITY_CONFIG[value].label}`
             : "Select Severity"
         }
+        aria-describedby={ariaDescribedby}
         data-testid={testId}
       >
         <SelectValue placeholder={placeholder}>
