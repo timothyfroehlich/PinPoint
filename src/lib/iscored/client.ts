@@ -7,12 +7,13 @@ import {
   ISCORED_CACHE_TTL_MS,
   ISCORED_GAMES_CACHE_TTL_MS,
   getGameroomUrl,
+  getGameUrl,
   getIscoredUser,
   getScoreEntryUrl,
 } from "./config";
 import type { IscoredGame, IscoredScore } from "./types";
 
-export { getGameroomUrl, getScoreEntryUrl };
+export { getGameroomUrl, getGameUrl, getScoreEntryUrl };
 export type { IscoredGame, IscoredScore };
 
 interface CacheState {

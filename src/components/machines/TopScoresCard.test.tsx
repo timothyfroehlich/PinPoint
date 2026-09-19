@@ -71,10 +71,10 @@ describe("TopScoresCard", () => {
       const card = screen.getByTestId("machine-top-scores-card");
       expect(card).toBeInTheDocument();
 
-      // Header logo is a link
+      // Header logo is a link to the game in the gameroom
       const logoLink = screen.getByTestId("iscored-logo-link");
       expect(logoLink).toHaveAttribute("target", "_blank");
-      expect(logoLink.getAttribute("href")).toContain("game=73");
+      expect(logoLink.getAttribute("href")).toContain("scrollTo=73");
 
       // Scores list has only top 3 items
       const rows = screen.getAllByRole("listitem");
@@ -101,14 +101,14 @@ describe("TopScoresCard", () => {
       // 4th score is omitted
       expect(screen.queryByText("Dave")).not.toBeInTheDocument();
 
-      // Footer actions
+      // Footer actions: Add score links to score entry; View all links to game in gameroom
       const addBtn = screen.getByTestId("iscored-add-score-btn");
       expect(addBtn).toHaveAttribute("target", "_blank");
       expect(addBtn.getAttribute("href")).toContain("game=73");
 
       const viewAllLink = screen.getByTestId("iscored-view-all-link");
       expect(viewAllLink).toHaveAttribute("target", "_blank");
-      expect(viewAllLink.getAttribute("href")).toContain("game=73");
+      expect(viewAllLink.getAttribute("href")).toContain("scrollTo=73");
     });
   });
 
@@ -128,6 +128,7 @@ describe("TopScoresCard", () => {
 
       const logoLink = screen.getByTestId("iscored-logo-link");
       expect(logoLink).toBeInTheDocument();
+      expect(logoLink.getAttribute("href")).toContain("scrollTo=73");
 
       const addBtn = screen.getByTestId("iscored-add-score-btn");
       expect(addBtn).toBeInTheDocument();
@@ -135,7 +136,7 @@ describe("TopScoresCard", () => {
 
       const viewAllLink = screen.getByTestId("iscored-view-all-link");
       expect(viewAllLink).toBeInTheDocument();
-      expect(viewAllLink.getAttribute("href")).toContain("game=73");
+      expect(viewAllLink.getAttribute("href")).toContain("scrollTo=73");
     });
   });
 
