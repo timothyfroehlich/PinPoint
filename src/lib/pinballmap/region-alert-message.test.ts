@@ -37,10 +37,9 @@ describe("formatRegionAlertMessage", () => {
 
     expect(message).toContain("**Pinball Map changes in Austin**");
     expect(message).toContain("• ❇️ Godzilla (Premium)");
-    // The venue is the LINK TEXT of a masked link header, not a trailing bare URL: a bare
-    // one makes Discord stack a preview card under every line.
+    // The venue is the LINK TEXT of a masked link header, with <url> to suppress Discord embed cards.
     expect(message).toContain(
-      "**[Austin Pinball Collective](https://pinballmap.com/map/?by_location_id=26454)**"
+      "**[Austin Pinball Collective](<https://pinballmap.com/map/?by_location_id=26454>)**"
     );
     expect(message).toContain("CC BY-SA 4.0");
   });
@@ -65,7 +64,7 @@ describe("formatRegionAlertMessage", () => {
     // "neutralized" with "absent".
     expect(body.match(/(?<!\\)\]\(/g)).toHaveLength(1);
     expect(body).toContain(
-      "](https://pinballmap.com/map/?by_location_id=26454)"
+      "](<https://pinballmap.com/map/?by_location_id=26454>)"
     );
     // The hostile text survives as literal, escaped characters.
     expect(body).toContain("Foo\\]");
@@ -82,7 +81,7 @@ describe("formatRegionAlertMessage", () => {
     const body = message ?? "";
     expect(body.match(/(?<!\\)\]\(/g)).toHaveLength(1);
     expect(body).toContain(
-      "](https://pinballmap.com/map/?by_location_id=26454)"
+      "](<https://pinballmap.com/map/?by_location_id=26454>)"
     );
   });
 
@@ -121,8 +120,8 @@ describe("formatRegionAlertMessage", () => {
     expect(message).toBe(
       [
         "**Pinball Map changes in Austin**",
-        "**[Austin Pinball Collective](https://pinballmap.com/map/?by_location_id=26454)**\n• ❇️ Godzilla (Premium)\n• ❌ Medieval Madness",
-        "**[Pinballz Arcade](https://pinballmap.com/map/?by_location_id=1234)**\n• ❇️ Attack from Mars",
+        "**[Austin Pinball Collective](<https://pinballmap.com/map/?by_location_id=26454>)**\n• ❇️ Godzilla (Premium)\n• ❌ Medieval Madness",
+        "**[Pinballz Arcade](<https://pinballmap.com/map/?by_location_id=1234>)**\n• ❇️ Attack from Mars",
         "*Data from Pinball Map (CC BY-SA 4.0).*",
       ].join("\n\n")
     );
@@ -234,7 +233,7 @@ describe("formatRegionAlertMessage", () => {
     // Every location header that survived is a COMPLETE masked link.
     for (const line of message.split("\n").filter((l) => l.startsWith("**["))) {
       expect(line).toMatch(
-        /^\*\*\[.*\]\(https:\/\/pinballmap\.com\/[^)]*\)\*\*$/
+        /^\*\*\[.*\]\(<https:\/\/pinballmap\.com\/[^>]*>\)\*\*$/
       );
     }
     // Every bullet that survived is a valid machine bullet or overflow line.
