@@ -59,6 +59,7 @@ export function EditCollectionDialog({
   const [name, setName] = useState(currentName);
   const [selected, setSelected] = useState<string[]>(currentIds);
   const [error, setError] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [savePending, startSave] = useTransition();
   const [deletePending, startDelete] = useTransition();
 
@@ -69,6 +70,7 @@ export function EditCollectionDialog({
       setName(currentName);
       setSelected(currentIds);
       setError(null);
+      setDeleteError(null);
     }
   }, [open, currentName, currentIds]);
 
@@ -89,10 +91,10 @@ export function EditCollectionDialog({
   }
 
   function remove(): void {
-    setError(null);
+    setDeleteError(null);
     startDelete(async () => {
       const result = await deleteCollectionAction({ collectionId });
-      if (!result.success) setError(result.error);
+      if (!result.success) setDeleteError(result.error);
       else router.push("/c/collections");
     });
   }
@@ -134,7 +136,11 @@ export function EditCollectionDialog({
 
         <div className="@container flex flex-row items-center justify-between gap-2">
           {canDelete && (
-            <AlertDialog>
+            <AlertDialog
+              onOpenChange={(deleteOpen) => {
+                if (deleteOpen) setDeleteError(null);
+              }}
+            >
               <AlertDialogTrigger asChild>
                 <Button
                   type="button"
@@ -147,12 +153,12 @@ export function EditCollectionDialog({
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
-                {error && (
+                {deleteError && (
                   <div
                     role="alert"
-                    className="rounded-md border border-destructive/20 bg-destructive/10 p-4 mb-4 text-destructive-text"
+                    className="mb-4 rounded-md border border-destructive/20 bg-destructive/10 p-4 text-destructive-text"
                   >
-                    <p className="text-sm font-medium">{error}</p>
+                    <p className="text-sm font-medium">{deleteError}</p>
                   </div>
                 )}
                 <AlertDialogHeader>

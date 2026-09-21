@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -109,11 +109,28 @@ describe("EditCollectionDialog", () => {
     await userEvent.click(screen.getByTestId("collection-delete-trigger"));
     await userEvent.click(screen.getByTestId("collection-delete-confirm"));
 
-    // We expect the error to show up. Since it's duplicated in two places now,
-    // we use getAllByText or findByText with multiple results.
-    const errors = await screen.findAllByText("Cannot delete this collection");
-    expect(errors.length).toBeGreaterThan(0);
+    const alertDialog = screen.getByRole("alertdialog");
+    expect(await within(alertDialog).findByRole("alert")).toHaveTextContent(
+      "Cannot delete this collection"
+    );
     expect(push).not.toHaveBeenCalled();
+  });
+
+  it("does not show a stale save error in the delete confirmation", async () => {
+    updateAction.mockResolvedValue({
+      success: false,
+      error: "Unknown machine",
+    });
+    renderDialog();
+
+    await userEvent.click(screen.getByTestId("collection-edit-trigger"));
+    await userEvent.click(screen.getByTestId("collection-save"));
+    expect(await screen.findByText("Unknown machine")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByTestId("collection-delete-trigger"));
+    expect(
+      within(screen.getByRole("alertdialog")).queryByRole("alert")
+    ).not.toBeInTheDocument();
   });
 
   it("hides the delete control for an editor (canDelete=false)", async () => {
