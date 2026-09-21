@@ -13,6 +13,13 @@
  *
  * These tests read the real constructed FormData set for a `<form>`, so they
  * exercise both the custom hidden input and Radix's own bubble input.
+ *
+ * They also guard PP-msjp: the Radix Root used to carry `name` too, so a
+ * checked switch submitted the bubble's "on" *and* the hidden input's "on"
+ * under one name — getAll(name) returned ["on", "on"]. The action reads
+ * .get() (the first value), so it was latent, but a switch to .getAll() would
+ * have been surprised. The Root is now nameless; the hidden input is the sole
+ * carrier, so exactly one entry is submitted.
  */
 import React from "react";
 import { render } from "@testing-library/react";
@@ -38,6 +45,16 @@ describe("SwitchWithFormSupport form submission", () => {
     // would submit nothing, but the action must distinguish "off" from absent.
     const data = formDataFor(<Switch name="notify" />);
     expect(data.get("notify")).toBe("off");
+  });
+
+  it("submits exactly one entry when enabled and checked (PP-msjp)", () => {
+    // The Radix bubble input used to share the name, so a checked switch
+    // emitted ["on", "on"] and getAll() saw both; .get() read only the first,
+    // which is why the duplicate stayed latent. This is the one shape that
+    // regresses: an *unchecked* Radix bubble submits nothing, so only the
+    // checked case ever doubled up.
+    const data = formDataFor(<Switch name="notify" defaultChecked />);
+    expect(data.getAll("notify")).toEqual(["on"]);
   });
 
   it("contributes nothing to FormData when disabled", () => {
