@@ -59,6 +59,7 @@ Related: `docs/feature-specs/pinballmap.md` (the location-sync integration), `do
 | Spec | Code today | Resolution |
 | :-- | :-- | :-- |
 | §4.1 fixed hourly schedule | Hardcoded Vercel cron at `23 * * * *` | Keep; spec documents the fixed cadence |
+| §4.3 in-place LMX machine updates | Updates machine ID in-place silently without events; user edition fixes via remove-and-re-add emit paired events | Keep; in-place LMX mutation is rare admin reconciliation |
 
 ---
 
