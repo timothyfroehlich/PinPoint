@@ -1,71 +1,191 @@
-import type { NotificationType } from "~/lib/notifications/dispatch";
+import {
+  getIssueFrequencyLabel,
+  getIssueSeverityLabel,
+  getIssueStatusLabel,
+} from "~/lib/issues/status";
+import type { IssueStatus } from "~/lib/issues/status";
+import type { IssueFrequency, IssueSeverity } from "~/lib/types";
+import type { RecipientReason } from "~/lib/notifications/events";
 import { buildResourceUrl } from "~/lib/notifications/resource-url";
+
+export {
+  formatDiscordImprovementNotice,
+  formatDiscordWelcomeMessage,
+} from "~/lib/discord/system-messages";
 
 const DISCORD_MAX_MESSAGE_LENGTH = 2000;
 
-export interface DiscordMessageInput {
-  type: NotificationType;
+interface DiscordIssueMessageBase {
   siteUrl: string;
-  resourceType: "issue" | "machine";
+  resourceType: "issue";
   issueTitle: string | undefined;
   formattedIssueId: string | undefined;
   machineName: string | undefined;
-  machineInitials: string | undefined;
-  newStatus: string | undefined;
-  /**
-   * Comment text passed through from the dispatcher but intentionally NOT
-   * rendered in the DM body. Carrying it here keeps the channel signature
-   * uniform with the email/in-app channels (which DO show snippets in
-   * their own templates) without committing to a Discord layout decision —
-   * if a future PR wants to inline a preview, the data is already wired.
-   * Privacy: don't add it to the body without an explicit decision.
-   */
-  commentContent: string | undefined;
+  actorName: string | undefined;
+  recipientReason: RecipientReason;
 }
+
+export type DiscordMessageInput =
+  | (DiscordIssueMessageBase & {
+      type: "new_issue";
+      severity: IssueSeverity | undefined;
+      frequency: IssueFrequency | undefined;
+    })
+  | (DiscordIssueMessageBase & {
+      type: "issue_assigned";
+      severity: IssueSeverity | undefined;
+    })
+  | (DiscordIssueMessageBase & {
+      type: "issue_status_changed";
+      oldStatus: IssueStatus;
+      newStatus: IssueStatus;
+    })
+  | (DiscordIssueMessageBase & {
+      type: "new_comment" | "mentioned";
+      commentContent: string | undefined;
+      commentId: string | undefined;
+      attachmentCount: number;
+    })
+  | {
+      type: "machine_ownership_changed";
+      siteUrl: string;
+      resourceType: "machine";
+      machineName: string | undefined;
+      machineInitials: string | undefined;
+      ownershipChange: "added" | "removed";
+    };
 
 export function formatDiscordMessage(input: DiscordMessageInput): string {
-  const link = buildResourceUrl(input);
-  const body = buildBody(input);
-  const footer = `Manage notifications: ${input.siteUrl}/settings/notifications`;
-  const suffix = `\n${link}\n\n${footer}`;
+  if (input.type === "machine_ownership_changed") {
+    const machine = sanitizeDiscordText(input.machineName ?? "a machine");
+    const url = buildResourceUrl(input);
+    return input.ownershipChange === "added"
+      ? `**You now own [${machine}](${url})**\nYou’ll receive issue activity for this machine.`
+      : `**You no longer own [${machine}](${url})**\nYou won’t receive owner notifications for this machine.`;
+  }
 
-  // Truncate body if the assembled message would exceed Discord's 2000-char
-  // hard limit. The link and footer are auxiliary metadata users rely on, so
-  // we preserve them and trim the body instead.
-  const bodyBudget = DISCORD_MAX_MESSAGE_LENGTH - suffix.length;
-  const safeBody =
-    bodyBudget <= 0 || body.length > bodyBudget
-      ? body.slice(0, Math.max(0, bodyBudget - 1)) + "…"
-      : body;
-
-  const assembled = `${safeBody}${suffix}`;
-  // Belt-and-suspenders: if the suffix alone exceeds the limit (pathological
-  // siteUrl), hard-cap the final output. Discord rejects oversized messages
-  // with 400, which classifies as transient and would silently retry forever.
-  return assembled.length > DISCORD_MAX_MESSAGE_LENGTH
-    ? assembled.slice(0, DISCORD_MAX_MESSAGE_LENGTH - 1) + "…"
-    : assembled;
-}
-
-function buildBody(input: DiscordMessageInput): string {
-  const id = sanitizeDiscordText(input.formattedIssueId ?? "");
-  const title = sanitizeDiscordText(input.issueTitle ?? "");
-  const machine = sanitizeDiscordText(input.machineName ?? "a machine");
-  const status = sanitizeDiscordText(input.newStatus ?? "updated");
+  const url = buildResourceUrl(input);
+  const commentUrl =
+    (input.type === "new_comment" || input.type === "mentioned") &&
+    input.commentId
+      ? `${url}#comment-${encodeURIComponent(input.commentId)}`
+      : url;
+  const id = sanitizeDiscordText(input.formattedIssueId ?? "Issue");
+  const title = sanitizeDiscordText(input.issueTitle ?? "Untitled issue");
+  const machine = sanitizeDiscordText(input.machineName ?? "Unknown machine");
+  const actorName = input.actorName
+    ? sanitizeDiscordText(input.actorName)
+    : undefined;
+  const actor = actorName ?? "A member";
 
   switch (input.type) {
-    case "issue_assigned":
-      return `You were assigned ${id} — ${title}`;
-    case "issue_status_changed":
-      return `${id} — ${title} is now ${status}`;
-    case "new_comment":
-      return `New comment on ${id} — ${title}`;
     case "new_issue":
-      return `New issue on ${machine}: ${id} — ${title}`;
+      return [
+        `**[${id}](${url}) — ${title}**`,
+        [
+          machine,
+          input.severity ? getIssueSeverityLabel(input.severity) : undefined,
+          input.frequency ? getIssueFrequencyLabel(input.frequency) : undefined,
+        ]
+          .filter((value): value is string => value !== undefined)
+          .join(" · "),
+        `${actorName ? `Reported by ${actorName}` : "Reported anonymously"} · ${formatRecipientReason(input.recipientReason)}`,
+      ].join("\n");
+    case "issue_assigned":
+      return [
+        `**[${id}](${url}) assigned to you**`,
+        [
+          title,
+          machine,
+          input.severity ? getIssueSeverityLabel(input.severity) : undefined,
+        ]
+          .filter((value): value is string => value !== undefined)
+          .join(" · "),
+        `Assigned by ${actor}`,
+      ].join("\n");
+    case "issue_status_changed":
+      return [
+        `**[${id}](${url}) moved to ${getIssueStatusLabel(input.newStatus)}**`,
+        `${title} · ${machine} · previously ${getIssueStatusLabel(input.oldStatus)}`,
+        `Changed by ${actor} · ${formatRecipientReason(input.recipientReason)}`,
+      ].join("\n");
+    case "new_comment":
+      return formatCommentMessage(
+        `**[${id}](${commentUrl}) — ${actor} commented**`,
+        [`${title} · ${machine}`, formatRecipientReason(input.recipientReason)],
+        input.commentContent,
+        input.attachmentCount
+      );
     case "mentioned":
-      return `You were mentioned on ${id} — ${title}`;
-    case "machine_ownership_changed":
-      return `Ownership changed for ${machine}`;
+      return formatCommentMessage(
+        `**[${id}](${commentUrl}) — ${actor} mentioned you**`,
+        [`${title} · ${machine}`],
+        input.commentContent,
+        input.attachmentCount
+      );
+  }
+}
+
+function formatCommentMessage(
+  heading: string,
+  contextLines: readonly string[],
+  content: string | undefined,
+  attachmentCount: number
+): string {
+  const fixedLines = [heading, ...contextLines];
+  if (content?.trim()) {
+    const fixed = `${fixedLines.join("\n")}\n\n`;
+    const attachmentLine =
+      attachmentCount > 0
+        ? `\n\nAdded ${attachmentCount} ${attachmentCount === 1 ? "photo" : "photos"}.`
+        : "";
+    const quoteBudget =
+      DISCORD_MAX_MESSAGE_LENGTH - fixed.length - attachmentLine.length;
+    const sanitized = sanitizeDiscordText(content.trim());
+    const quote = (value: string): string => value.replace(/^/gm, "> ");
+    if (quote(sanitized).length <= quoteBudget) {
+      return `${fixed}${quote(sanitized)}${attachmentLine}`;
+    }
+
+    let low = 0;
+    let high = sanitized.length;
+    while (low < high) {
+      const midpoint = Math.ceil((low + high) / 2);
+      if (quote(sanitized.slice(0, midpoint)).length + 1 <= quoteBudget) {
+        low = midpoint;
+      } else {
+        high = midpoint - 1;
+      }
+    }
+    return `${fixed}${quote(sanitized.slice(0, low))}…${attachmentLine}`;
+  }
+  if (attachmentCount > 0) {
+    fixedLines.push(
+      `Added ${attachmentCount} ${attachmentCount === 1 ? "photo" : "photos"} — open the issue to view.`
+    );
+  }
+  return fixedLines.join("\n");
+}
+
+function formatRecipientReason(reason: RecipientReason): string {
+  switch (reason) {
+    case "machine_owner":
+      return "You own this machine";
+    case "machine_watcher":
+      return "You’re watching this machine";
+    case "issue_watcher":
+      return "You’re watching this issue";
+    case "global_watcher":
+      return "You follow all machines";
+    case "actor":
+      return "You made this change";
+    case "assignee":
+      return "Assigned to you";
+    case "mentioned":
+      return "Mentioned you";
+    case "ownership_added":
+    case "ownership_removed":
+      return "Ownership changed";
   }
 }
 

@@ -12,6 +12,11 @@ import {
 import type { IssueWatcher } from "~/lib/types/database";
 import { log } from "~/lib/logger";
 import { reportError } from "~/lib/observability/report-error";
+import type {
+  NotificationEvent,
+  NotificationType,
+  RecipientReason,
+} from "~/lib/notifications/events";
 import { getChannels } from "./channels/registry";
 import type {
   ChannelContext,
@@ -22,18 +27,9 @@ import type {
 
 export type { NotificationChannel };
 export { getChannels };
+export type { NotificationEvent, NotificationType, RecipientReason };
 
 type NotificationPreferences = typeof notificationPreferences.$inferSelect;
-
-export type NotificationType =
-  | "issue_assigned"
-  | "issue_status_changed"
-  | "new_comment"
-  | "new_issue"
-  | "machine_ownership_changed"
-  | "mentioned";
-
-type ResourceType = "issue" | "machine";
 
 /**
  * Narrow a channel to one that performs external delivery. Narrowing the whole
@@ -57,64 +53,84 @@ export interface DeliveryPlan {
   deliveries: (() => Promise<DeliveryResult>)[];
 }
 
-export interface CreateNotificationProps {
+/** @deprecated Prefer the explicit NotificationEvent name. */
+export type CreateNotificationProps = NotificationEvent;
+
+interface DiscordCandidate {
+  userId: string;
   type: NotificationType;
-  resourceId: string;
-  resourceType: ResourceType;
-  actorId?: string | undefined;
-  /**
-   * Whether to include the actor in the recipient set (default: true).
-   *
-   * Two separate layers control actor self-notification:
-   * - `includeActor: false` — Business rule override. The actor is structurally
-   *   excluded from the recipient set regardless of user preferences. Use for
-   *   notifications where the actor is not a valid recipient (e.g., assigner
-   *   in issue_assigned, admin performing machine ownership changes).
-   * - `suppressOwnActions` (user pref) — The actor can globally opt out of
-   *   receiving notifications for their own actions. Only evaluated when
-   *   includeActor is true (default).
-   */
-  includeActor?: boolean | undefined;
-  issueTitle?: string | undefined;
-  machineName?: string | undefined;
-  /**
-   * Machine initials, used to build the `/m/<INITIALS>` link in machine-resource
-   * notifications. Optional: `planNotification` resolves it from the machine row
-   * when a caller doesn't pass it. (PP-gzq2)
-   */
-  machineInitials?: string | undefined;
-  formattedIssueId?: string | undefined;
-  commentContent?: string | undefined;
-  newStatus?: string | undefined;
-  issueDescription?: string | undefined;
-  additionalRecipientIds?: string[] | undefined;
-  /**
-   * Stable per-event identifier forwarded into ChannelContext.eventId.
-   * See ChannelContext for full rationale (PP-pfyf).
-   */
-  eventId?: string | undefined;
+  order: number;
+  deliver: () => Promise<DeliveryResult>;
 }
 
-export async function planNotification(
-  {
-    type,
-    resourceId,
-    resourceType,
-    actorId,
-    includeActor = true,
-    issueTitle,
-    machineName,
-    machineInitials,
-    formattedIssueId,
-    commentContent,
-    newStatus,
-    issueDescription,
-    additionalRecipientIds,
-    eventId,
-  }: CreateNotificationProps,
+const DISCORD_EVENT_PRIORITY: Record<NotificationType, number> = {
+  issue_assigned: 3,
+  mentioned: 2,
+  issue_status_changed: 1,
+  new_comment: 1,
+  new_issue: 1,
+  machine_ownership_changed: 1,
+};
+
+const RECIPIENT_REASON_PRIORITY: Record<RecipientReason, number> = {
+  assignee: 9,
+  mentioned: 8,
+  machine_owner: 7,
+  ownership_added: 7,
+  ownership_removed: 7,
+  machine_watcher: 6,
+  issue_watcher: 5,
+  global_watcher: 4,
+  actor: 1,
+};
+
+function directRecipientReason(event: NotificationEvent): RecipientReason {
+  switch (event.type) {
+    case "issue_assigned":
+      return "assignee";
+    case "mentioned":
+      return "mentioned";
+    case "machine_ownership_changed":
+      return event.ownershipChange === "added"
+        ? "ownership_added"
+        : "ownership_removed";
+    case "new_issue":
+    case "new_comment":
+    case "issue_status_changed":
+      return "issue_watcher";
+  }
+}
+
+function sortReasons(reasons: Set<RecipientReason>): RecipientReason[] {
+  return [...reasons].sort(
+    (left, right) =>
+      RECIPIENT_REASON_PRIORITY[right] - RECIPIENT_REASON_PRIORITY[left]
+  );
+}
+
+async function planNotificationCandidate(
+  event: NotificationEvent,
   tx: DbTransaction = db,
-  preResolvedChannels?: readonly NotificationChannel[]
+  preResolvedChannels?: readonly NotificationChannel[],
+  discordCandidates?: DiscordCandidate[]
 ): Promise<DeliveryPlan> {
+  const { type, resourceId, resourceType, actorId, eventId } = event;
+  const includeActor = event.includeActor ?? true;
+  const issueTitle =
+    event.resourceType === "issue" ? event.issueTitle : undefined;
+  const machineName = event.machineName;
+  const machineInitials =
+    event.resourceType === "machine" ? event.machineInitials : undefined;
+  const formattedIssueId =
+    event.resourceType === "issue" ? event.formattedIssueId : undefined;
+  const commentContent =
+    event.type === "new_comment" || event.type === "mentioned"
+      ? event.commentContent
+      : undefined;
+  const issueDescription =
+    event.type === "new_issue" || event.type === "issue_assigned"
+      ? event.issueDescription
+      : undefined;
   log.debug(
     { type, resourceId, actorId, action: "planNotification" },
     "Planning notification"
@@ -122,14 +138,25 @@ export async function planNotification(
 
   // 1. Determine recipients
   const recipientIds = new Set<string>();
+  const recipientReasons = new Map<string, Set<RecipientReason>>();
 
-  const addRecipients = (...ids: (string | null | undefined)[]): void => {
+  const addRecipients = (
+    reason: RecipientReason,
+    ...ids: (string | null | undefined)[]
+  ): void => {
     ids.forEach((id) => {
-      if (id) recipientIds.add(id);
+      if (!id) return;
+      recipientIds.add(id);
+      const reasons = recipientReasons.get(id);
+      if (reasons) reasons.add(reason);
+      else recipientReasons.set(id, new Set([reason]));
     });
   };
 
-  addRecipients(...(additionalRecipientIds ?? []));
+  addRecipients(
+    directRecipientReason(event),
+    ...(event.additionalRecipientIds ?? [])
+  );
 
   let resolvedIssueTitle = issueTitle;
   let resolvedMachineName = machineName;
@@ -137,34 +164,20 @@ export async function planNotification(
   let resolvedFormattedIssueId = formattedIssueId;
 
   if (type === "new_issue") {
-    let machineId: string | null;
-    let machineOwnerId: string | null;
-
-    if (resourceType === "issue") {
-      const issue = await tx.query.issues.findFirst({
-        where: eq(issues.id, resourceId),
-        with: { machine: true },
-      });
-      machineId = issue?.machine.id ?? null;
-      machineOwnerId = issue?.machine.ownerId ?? null;
-      resolvedIssueTitle = resolvedIssueTitle ?? issue?.title;
-      resolvedMachineName = resolvedMachineName ?? issue?.machine.name;
-      // Derive the formatted id from the SAME row we just fetched — the query
-      // above selects all issue columns, so a second findFirst for
-      // issueNumber/machineInitials is redundant round-trip inside the
-      // transaction window. (PP-2053.2 review)
-      if (!resolvedFormattedIssueId && issue) {
-        resolvedFormattedIssueId = `${issue.machineInitials}-${String(issue.issueNumber).padStart(2, "0")}`;
-      }
-    } else {
-      const machine = await tx.query.machines.findFirst({
-        where: eq(machines.id, resourceId),
-        columns: { id: true, name: true, ownerId: true, initials: true },
-      });
-      machineId = machine?.id ?? null;
-      machineOwnerId = machine?.ownerId ?? null;
-      resolvedMachineName = resolvedMachineName ?? machine?.name;
-      resolvedMachineInitials = resolvedMachineInitials ?? machine?.initials;
+    const issue = await tx.query.issues.findFirst({
+      where: eq(issues.id, resourceId),
+      with: { machine: true },
+    });
+    const machineId = issue?.machine.id ?? null;
+    const machineOwnerId = issue?.machine.ownerId ?? null;
+    resolvedIssueTitle = resolvedIssueTitle ?? issue?.title;
+    resolvedMachineName = resolvedMachineName ?? issue?.machine.name;
+    // Derive the formatted id from the SAME row we just fetched — the query
+    // above selects all issue columns, so a second findFirst for
+    // issueNumber/machineInitials is redundant round-trip inside the
+    // transaction window. (PP-2053.2 review)
+    if (!resolvedFormattedIssueId && issue) {
+      resolvedFormattedIssueId = `${issue.machineInitials}-${String(issue.issueNumber).padStart(2, "0")}`;
     }
 
     const globalSubscribers = await tx.query.notificationPreferences.findMany({
@@ -176,35 +189,33 @@ export async function planNotification(
         ),
     });
 
-    addRecipients(...globalSubscribers.map((p) => p.userId));
+    addRecipients("global_watcher", ...globalSubscribers.map((p) => p.userId));
 
     // Owners always get new_issue (per-user prefs still gate delivery);
     // toggleMachineWatcher can remove them from machine_watchers.
-    addRecipients(machineOwnerId);
+    addRecipients("machine_owner", machineOwnerId);
 
     if (machineId) {
       const watchersList = await tx.query.machineWatchers.findMany({
         where: eq(machineWatchers.machineId, machineId),
       });
 
-      addRecipients(...watchersList.map((w) => w.userId));
+      addRecipients("machine_watcher", ...watchersList.map((w) => w.userId));
 
-      if (resourceType === "issue") {
-        const fullSubscribers = watchersList.filter(
-          (w) => w.watchMode === "subscribe"
-        );
+      const fullSubscribers = watchersList.filter(
+        (w) => w.watchMode === "subscribe"
+      );
 
-        if (fullSubscribers.length > 0) {
-          await tx
-            .insert(issueWatchers)
-            .values(
-              fullSubscribers.map((w) => ({
-                issueId: resourceId,
-                userId: w.userId,
-              }))
-            )
-            .onConflictDoNothing();
-        }
+      if (fullSubscribers.length > 0) {
+        await tx
+          .insert(issueWatchers)
+          .values(
+            fullSubscribers.map((w) => ({
+              issueId: resourceId,
+              userId: w.userId,
+            }))
+          )
+          .onConflictDoNothing();
       }
     }
   } else if (
@@ -216,14 +227,18 @@ export async function planNotification(
       where: eq(issueWatchers.issueId, resourceId),
     });
 
-    addRecipients(...watchers.map((w: IssueWatcher) => w.userId));
+    addRecipients(
+      "issue_watcher",
+      ...watchers.map((w: IssueWatcher) => w.userId)
+    );
   }
 
   if (includeActor && actorId) {
-    recipientIds.add(actorId);
+    addRecipients("actor", actorId);
   }
   if (actorId && !includeActor) {
     recipientIds.delete(actorId);
+    recipientReasons.delete(actorId);
   }
 
   if (recipientIds.size === 0) return { deliveries: [] };
@@ -257,16 +272,20 @@ export async function planNotification(
   });
   const prefsMap = new Map(preferences.map((p) => [p.userId, p]));
 
-  // 3. Fetch emails (avoid N+1)
+  // 3. Fetch recipient and actor profiles (avoid N+1).
+  const profileIds = new Set(recipientIds);
+  if (actorId) profileIds.add(actorId);
   const users = await tx
     .select({
       id: userProfiles.id,
       email: userProfiles.email,
+      name: userProfiles.name,
       discordUserId: userProfiles.discordUserId,
     })
     .from(userProfiles)
-    .where(inArray(userProfiles.id, [...recipientIds]));
+    .where(inArray(userProfiles.id, [...profileIds]));
   const emailMap = new Map(users.map((u) => [u.id, u.email]));
+  const nameMap = new Map(users.map((u) => [u.id, u.name]));
   const discordUserIdMap = new Map(users.map((u) => [u.id, u.discordUserId]));
 
   // 4. Fan-out per recipient using the channel registry.
@@ -282,7 +301,7 @@ export async function planNotification(
     userId: string;
     type: NotificationType;
     resourceId: string;
-    resourceType: ResourceType;
+    resourceType: "issue" | "machine";
   }[] = [];
 
   // Email dispatch is concurrent via Promise.allSettled so one slow/failed
@@ -300,25 +319,49 @@ export async function planNotification(
       continue;
     }
 
-    const ctx: ChannelContext = {
-      userId,
-      type,
-      resourceId,
-      resourceType,
-      email: emailMap.get(userId) ?? null,
-      discordUserId: discordUserIdMap.get(userId) ?? null,
-      issueTitle: resolvedIssueTitle,
-      machineName: resolvedMachineName,
-      machineInitials: resolvedMachineInitials,
-      formattedIssueId: resolvedFormattedIssueId,
-      commentContent,
-      newStatus,
-      issueDescription,
-      eventId,
-    };
-
     for (const channel of channels) {
-      if (!channel.shouldDeliver(prefs, type)) continue;
+      if (event.channelKeys && !event.channelKeys.includes(channel.key)) {
+        continue;
+      }
+      const recipientReason = sortReasons(
+        recipientReasons.get(userId) ?? new Set<RecipientReason>()
+      ).find((reason) => channel.shouldDeliver(prefs, type, reason));
+      if (!recipientReason) continue;
+
+      const ctx: ChannelContext = {
+        userId,
+        type,
+        resourceId,
+        resourceType,
+        email: emailMap.get(userId) ?? null,
+        discordUserId: discordUserIdMap.get(userId) ?? null,
+        issueTitle: resolvedIssueTitle,
+        machineName: resolvedMachineName,
+        machineInitials: resolvedMachineInitials,
+        formattedIssueId: resolvedFormattedIssueId,
+        commentContent,
+        ...(event.type === "new_comment" || event.type === "mentioned"
+          ? {
+              commentId: event.commentId,
+              attachmentCount: event.attachmentCount,
+            }
+          : {}),
+        ...(event.type === "issue_status_changed"
+          ? { oldStatus: event.oldStatus, newStatus: event.newStatus }
+          : {}),
+        ...(event.type === "new_issue" || event.type === "issue_assigned"
+          ? { severity: event.severity }
+          : {}),
+        ...(event.type === "new_issue" ? { frequency: event.frequency } : {}),
+        ...(event.type === "machine_ownership_changed"
+          ? { ownershipChange: event.ownershipChange }
+          : {}),
+        actorName:
+          event.actorName ?? (actorId ? nameMap.get(actorId) : undefined),
+        recipientReason,
+        issueDescription,
+        eventId,
+      };
 
       if (channel.key === "in_app") {
         // Batched insert — collect, don't deliver individually.
@@ -332,7 +375,17 @@ export async function planNotification(
         // External channel (email/Discord): captured as a thunk and run only
         // in dispatchNotification, AFTER the transaction commits — never
         // holding the connection open across an HTTP call. (PP-2053.2)
-        deferredDeliveries.push(() => channel.deliver(ctx));
+        const deliver = (): Promise<DeliveryResult> => channel.deliver(ctx);
+        if (channel.key === "discord" && discordCandidates) {
+          discordCandidates.push({
+            userId,
+            type,
+            order: discordCandidates.length,
+            deliver,
+          });
+        } else {
+          deferredDeliveries.push(deliver);
+        }
       } else {
         // A channel that wants delivery (shouldDeliver true) but is neither the
         // transactional in_app channel nor an external DeliveryChannel can't be
@@ -360,6 +413,58 @@ export async function planNotification(
   // email ran inside the transaction and was sent even though it rolled back.
   // (PP-2053.2)
   return { deliveries: deferredDeliveries };
+}
+
+export async function planNotification(
+  event: NotificationEvent,
+  tx: DbTransaction = db,
+  preResolvedChannels?: readonly NotificationChannel[]
+): Promise<DeliveryPlan> {
+  return planNotificationCandidate(event, tx, preResolvedChannels);
+}
+
+/**
+ * Plan all candidates caused by one product action. The candidates are planned
+ * independently for email and in-app delivery, preserving their existing
+ * behavior. Eligible Discord candidates are collected and reduced to one per
+ * recipient only after preferences have been evaluated, so disabling a mention
+ * correctly falls back to a watched-comment DM.
+ */
+export async function planNotifications(
+  events: readonly NotificationEvent[],
+  tx: DbTransaction = db,
+  preResolvedChannels?: readonly NotificationChannel[]
+): Promise<DeliveryPlan> {
+  const deliveries: DeliveryPlan["deliveries"] = [];
+  const discordCandidates: DiscordCandidate[] = [];
+
+  for (const event of events) {
+    const plan = await planNotificationCandidate(
+      event,
+      tx,
+      preResolvedChannels,
+      discordCandidates
+    );
+    deliveries.push(...plan.deliveries);
+  }
+
+  const selected = new Map<string, DiscordCandidate>();
+  for (const candidate of discordCandidates) {
+    const current = selected.get(candidate.userId);
+    if (
+      !current ||
+      DISCORD_EVENT_PRIORITY[candidate.type] >
+        DISCORD_EVENT_PRIORITY[current.type]
+    ) {
+      selected.set(candidate.userId, candidate);
+    }
+  }
+  deliveries.push(
+    ...[...selected.values()]
+      .sort((left, right) => left.order - right.order)
+      .map((candidate) => candidate.deliver)
+  );
+  return { deliveries };
 }
 
 /**
@@ -443,5 +548,7 @@ function buildDefaultPrefs(userId: string): NotificationPreferences {
     discordNotifyOnNewIssue: true,
     discordWatchNewIssuesGlobal: false,
     discordDmBlockedAt: null,
+    discordOnboardedAt: null,
+    discordNoticeVersion: 0,
   };
 }

@@ -32,7 +32,7 @@ import {
   reassignIssueMachine,
   updateIssueTitle,
 } from "~/services/issues";
-import { planNotification } from "~/lib/notifications";
+import { planNotification, planNotifications } from "~/lib/notifications";
 import { plainTextToDoc, type ProseMirrorDoc } from "~/lib/tiptap/types";
 import { resolveIssueReporter } from "~/lib/issues/utils";
 
@@ -46,9 +46,10 @@ import { resolveIssueReporter } from "~/lib/issues/utils";
 vi.mock("~/lib/notifications", () => ({
   // Services now plan inside the tx and return the plan; the action dispatches
   // post-commit. These tests call the services directly, so they assert the
-  // planning payload. planNotification must resolve a DeliveryPlan so the
+  // planning payload. Both planners must resolve a DeliveryPlan so the
   // service's `deliveries.push(...plan.deliveries)` works. (PP-2053.3)
   planNotification: vi.fn().mockResolvedValue({ deliveries: [] }),
+  planNotifications: vi.fn().mockResolvedValue({ deliveries: [] }),
   getChannels: vi.fn().mockResolvedValue([]),
 }));
 
@@ -374,7 +375,8 @@ describe("Issue Service Functions (Integration)", () => {
       expect(first.idempotencyKey).toBe(idempotencyKey);
       // Fresh insert: deduped must be false.
       expect(firstDeduped).toBe(false);
-      const planCallsAfterFirst = vi.mocked(planNotification).mock.calls.length;
+      const planCallsAfterFirst =
+        vi.mocked(planNotifications).mock.calls.length;
       expect(planCallsAfterFirst).toBeGreaterThan(0);
 
       // Capture the machine counter after the first insert — a retry must NOT
@@ -405,8 +407,8 @@ describe("Issue Service Functions (Integration)", () => {
         machineAfterFirst?.nextIssueNumber
       );
 
-      // No second notification: planNotification not called again, empty plan.
-      expect(vi.mocked(planNotification).mock.calls.length).toBe(
+      // No second notification: the batch planner is not called again.
+      expect(vi.mocked(planNotifications).mock.calls.length).toBe(
         planCallsAfterFirst
       );
       expect(deliveryPlan.deliveries).toHaveLength(0);
@@ -903,16 +905,17 @@ describe("Issue Service Functions (Integration)", () => {
         reportedBy: testUser.id,
       });
 
-      const mockFn = planNotification as ReturnType<typeof vi.fn>;
-      expect(mockFn).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: "new_issue",
-          resourceId: issue.id,
-          resourceType: "issue",
-          actorId: testUser.id,
-          issueTitle: "New Notification Issue",
-          machineName: testMachine.name,
-        }),
+      expect(vi.mocked(planNotifications)).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({
+            type: "new_issue",
+            resourceId: issue.id,
+            resourceType: "issue",
+            actorId: testUser.id,
+            issueTitle: "New Notification Issue",
+            machineName: testMachine.name,
+          }),
+        ]),
         expect.anything(),
         expect.anything()
       );
@@ -943,12 +946,12 @@ describe("Issue Service Functions (Integration)", () => {
         reportedBy: testUser.id,
       });
 
-      const mockFn = vi.mocked(planNotification);
-      const mentionCalls = mockFn.mock.calls.filter(
-        ([payload]) => payload.type === "mentioned"
-      );
-      expect(mentionCalls).toHaveLength(1);
-      expect(mentionCalls[0]?.[0]).toEqual(
+      const mentionEvents = vi
+        .mocked(planNotifications)
+        .mock.calls.flatMap(([events]) => events)
+        .filter((event) => event.type === "mentioned");
+      expect(mentionEvents).toHaveLength(1);
+      expect(mentionEvents[0]).toEqual(
         expect.objectContaining({
           type: "mentioned",
           resourceId: issue.id,
@@ -979,11 +982,11 @@ describe("Issue Service Functions (Integration)", () => {
         reportedBy: testUser.id,
       });
 
-      const mockFn = vi.mocked(planNotification);
-      const mentionCalls = mockFn.mock.calls.filter(
-        ([payload]) => payload.type === "mentioned"
-      );
-      expect(mentionCalls).toHaveLength(0);
+      const mentionEvents = vi
+        .mocked(planNotifications)
+        .mock.calls.flatMap(([events]) => events)
+        .filter((event) => event.type === "mentioned");
+      expect(mentionEvents).toHaveLength(0);
     });
   });
 
@@ -1020,17 +1023,18 @@ describe("Issue Service Functions (Integration)", () => {
       expect(watchers.some((w) => w.userId === testUser.id)).toBe(true);
 
       // Verify notification dispatch
-      const mockFn = planNotification as ReturnType<typeof vi.fn>;
-      expect(mockFn).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: "new_comment",
-          resourceId: testIssue.id,
-          resourceType: "issue",
-          actorId: testUser.id,
-          issueTitle: testIssue.title,
-          machineName: testMachine.name,
-          commentContent: "My comment",
-        }),
+      expect(vi.mocked(planNotifications)).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({
+            type: "new_comment",
+            resourceId: testIssue.id,
+            resourceType: "issue",
+            actorId: testUser.id,
+            issueTitle: testIssue.title,
+            machineName: testMachine.name,
+            commentContent: "My comment",
+          }),
+        ]),
         expect.anything(),
         expect.anything()
       );
@@ -1051,7 +1055,8 @@ describe("Issue Service Functions (Integration)", () => {
       // First submission inserts the row and plans a notification.
       const { comment: first } = await addIssueComment(params);
       expect(first.idempotencyKey).toBe(idempotencyKey);
-      const planCallsAfterFirst = vi.mocked(planNotification).mock.calls.length;
+      const planCallsAfterFirst =
+        vi.mocked(planNotifications).mock.calls.length;
       expect(planCallsAfterFirst).toBeGreaterThan(0);
 
       // Retry with the SAME key returns the existing comment, empty plan.
@@ -1060,7 +1065,7 @@ describe("Issue Service Functions (Integration)", () => {
       expect(deliveryPlan.deliveries).toHaveLength(0);
 
       // No second notification planned.
-      expect(vi.mocked(planNotification).mock.calls.length).toBe(
+      expect(vi.mocked(planNotifications).mock.calls.length).toBe(
         planCallsAfterFirst
       );
 

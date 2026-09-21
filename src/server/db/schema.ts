@@ -16,7 +16,10 @@ import {
   unique,
 } from "drizzle-orm/pg-core";
 import { citext } from "~/server/db/citext";
-import { ISSUE_STATUS_VALUES, type IssueStatus } from "~/lib/issues/status";
+import {
+  ISSUE_STATUS_VALUES,
+  type IssueStatus,
+} from "~/lib/issues/status-values";
 import type { ProseMirrorDoc } from "~/lib/tiptap/types";
 import { type TimelineEventData } from "~/lib/timeline/types";
 import { type MachineTimelineEventData } from "~/lib/timeline/machine-event-types";
@@ -1164,6 +1167,18 @@ export const notificationPreferences = pgTable(
     discordWatchNewIssuesGlobal: boolean("discord_watch_new_issues_global")
       .notNull()
       .default(false),
+
+    // Set the first time an account gains a Discord identity. This separates
+    // first-link defaults/welcome from a later re-link, which must preserve the
+    // member's choices and stay quiet.
+    discordOnboardedAt: timestamp("discord_onboarded_at", {
+      withTimezone: true,
+    }),
+    // Versioned acknowledgement for one-time product notices. Future notices
+    // can advance the version without accumulating single-use boolean columns.
+    discordNoticeVersion: integer("discord_notice_version")
+      .notNull()
+      .default(0),
 
     // Deprecated 2026-05-21: column retained to avoid drop migration; never read.
     discordDmBlockedAt: timestamp("discord_dm_blocked_at", {
