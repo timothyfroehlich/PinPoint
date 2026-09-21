@@ -5,16 +5,14 @@ import { log } from "~/lib/logger";
 import {
   ISCORED_BASE_URL,
   ISCORED_CACHE_TTL_MS,
-  ISCORED_GAMES_CACHE_TTL_MS,
   getGameroomUrl,
-  getGameUrl,
   getIscoredUser,
   getScoreEntryUrl,
 } from "./config";
-import type { IscoredGame, IscoredScore } from "./types";
+import type { IscoredScore } from "./types";
 
-export { getGameroomUrl, getGameUrl, getScoreEntryUrl };
-export type { IscoredGame, IscoredScore };
+export { getGameroomUrl, getScoreEntryUrl };
+export type { IscoredScore };
 
 interface CacheState {
   scoresByGameId: Map<string, IscoredScore[]>;
@@ -186,22 +184,13 @@ async function fetchAndCacheScores(user: string): Promise<void> {
       return;
     }
 
-    const items = Array.isArray(rawData)
-      ? rawData
-      : isRecord(rawData) && Array.isArray(rawData["scores"])
-        ? rawData["scores"]
-        : null;
-
-    if (!items) {
-      log.warn(
-        { user },
-        "iScored API response was not an array or scores envelope"
-      );
+    if (!Array.isArray(rawData)) {
+      log.warn({ user }, "iScored API response was not an array");
       cache.lastFetchedAt = Date.now();
       return;
     }
 
-    const parsed = parseAndSanitizeScores(items);
+    const parsed = parseAndSanitizeScores(rawData);
     cache.scoresByGameId = groupAndRankScores(parsed);
     cache.lastFetchedAt = Date.now();
   } catch (err) {
@@ -310,192 +299,11 @@ export async function refreshIscoredScores(): Promise<void> {
 }
 
 /**
- * Games list cache state.
- */
-interface GamesCacheState {
-  games: IscoredGame[];
-  lastFetchedAt: number | null;
-  refreshPromise: Promise<void> | null;
-  user: string | null;
-}
-
-const gamesCache: GamesCacheState = {
-  games: [],
-  lastFetchedAt: null,
-  refreshPromise: null,
-  user: null,
-};
-
-function parseAndSanitizeGames(items: unknown[]): IscoredGame[] | null {
-  const games: IscoredGame[] = [];
-  const seenIds = new Set<string>();
-
-  for (const item of items) {
-    if (!isRecord(item)) {
-      return null;
-    }
-
-    const gameId = parseGameId(
-      item["gameID"] ?? item["gameId"] ?? item["game"]
-    );
-    if (!gameId) {
-      return null;
-    }
-
-    const rawName =
-      typeof item["gameName"] === "string"
-        ? item["gameName"].trim()
-        : typeof item["name"] === "string"
-          ? item["name"].trim()
-          : "";
-
-    if (!rawName) {
-      return null;
-    }
-
-    if (!seenIds.has(gameId)) {
-      seenIds.add(gameId);
-      games.push({
-        gameId,
-        gameName: rawName,
-      });
-    }
-  }
-
-  games.sort((a, b) => a.gameName.localeCompare(b.gameName));
-  return games;
-}
-
-const FAILURE_RETRY_INTERVAL_MS = 15_000;
-
-function markFetchFailure(): void {
-  // Rather than caching an empty failure for the full 1-hour TTL,
-  // set lastFetchedAt to expire after a short retry interval (15s).
-  gamesCache.lastFetchedAt =
-    Date.now() - ISCORED_GAMES_CACHE_TTL_MS + FAILURE_RETRY_INTERVAL_MS;
-}
-
-async function fetchAndCacheGames(user: string): Promise<void> {
-  const url = `${ISCORED_BASE_URL}/api/${encodeURIComponent(user)}`;
-
-  try {
-    const res = await fetch(url, {
-      cache: "no-store",
-      signal: AbortSignal.timeout(8000),
-      headers: {
-        Accept: "application/json",
-      },
-    });
-
-    if (!res.ok) {
-      log.warn(
-        { status: res.status, user },
-        "iScored API returned non-OK status for gameroom games"
-      );
-      markFetchFailure();
-      return;
-    }
-
-    const text = await res.text();
-    let rawData: unknown;
-    try {
-      rawData = JSON.parse(text);
-    } catch {
-      log.warn(
-        { user },
-        "iScored gameroom games API response was not valid JSON"
-      );
-      markFetchFailure();
-      return;
-    }
-
-    if (!Array.isArray(rawData)) {
-      log.warn(
-        { user },
-        "iScored gameroom games API response was not an array"
-      );
-      markFetchFailure();
-      return;
-    }
-
-    const parsedGames = parseAndSanitizeGames(rawData);
-    if (parsedGames === null) {
-      log.warn(
-        { user },
-        "iScored gameroom games response contained malformed records; preserving cache"
-      );
-      markFetchFailure();
-      return;
-    }
-
-    gamesCache.games = parsedGames;
-    gamesCache.lastFetchedAt = Date.now();
-  } catch (err) {
-    log.warn({ err, user }, "Failed to fetch iScored gameroom games");
-    markFetchFailure();
-  }
-}
-
-function triggerGamesRefresh(user: string): Promise<void> {
-  if (gamesCache.refreshPromise) {
-    return gamesCache.refreshPromise;
-  }
-  gamesCache.refreshPromise = fetchAndCacheGames(user).finally(() => {
-    gamesCache.refreshPromise = null;
-  });
-  return gamesCache.refreshPromise;
-}
-
-function syncGamesUser(user: string): void {
-  if (gamesCache.user !== user) {
-    gamesCache.games = [];
-    gamesCache.lastFetchedAt = null;
-    gamesCache.refreshPromise = null;
-    gamesCache.user = user;
-  }
-}
-
-async function ensureGamesCacheReady(user: string): Promise<void> {
-  syncGamesUser(user);
-
-  const now = Date.now();
-  if (gamesCache.lastFetchedAt === null) {
-    await triggerGamesRefresh(user);
-    return;
-  }
-
-  if (now - gamesCache.lastFetchedAt > ISCORED_GAMES_CACHE_TTL_MS) {
-    void triggerGamesRefresh(user);
-  }
-}
-
-/**
- * Retrieves the full list of games configured in the iScored gameroom.
- *
- * Server-side cached for 1 hour. Returns an empty array if `ISCORED_USER`
- * is not configured or upstream is unreachable.
- */
-export const getGameroomGames = reactCache(async (): Promise<IscoredGame[]> => {
-  const user = getIscoredUser();
-  if (!user) {
-    return [];
-  }
-
-  await ensureGamesCacheReady(user);
-  return gamesCache.games.map((g) => ({ ...g }));
-});
-
-/**
- * Resets the in-memory caches. Exported for test isolation.
+ * Resets the in-memory score cache. Exported for test isolation.
  */
 export function clearIscoredCacheForTesting(): void {
   cache.scoresByGameId = new Map();
   cache.lastFetchedAt = null;
   cache.refreshPromise = null;
   cache.user = null;
-
-  gamesCache.games = [];
-  gamesCache.lastFetchedAt = null;
-  gamesCache.refreshPromise = null;
-  gamesCache.user = null;
 }

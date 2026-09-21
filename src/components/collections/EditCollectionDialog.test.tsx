@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -109,28 +109,50 @@ describe("EditCollectionDialog", () => {
     await userEvent.click(screen.getByTestId("collection-delete-trigger"));
     await userEvent.click(screen.getByTestId("collection-delete-confirm"));
 
-    const alertDialog = screen.getByRole("alertdialog");
-    expect(await within(alertDialog).findByRole("alert")).toHaveTextContent(
-      "Cannot delete this collection"
-    );
+    // Only the delete error appears in the UI
+    expect(
+      await screen.findByText("Cannot delete this collection")
+    ).toBeInTheDocument();
     expect(push).not.toHaveBeenCalled();
   });
 
-  it("does not show a stale save error in the delete confirmation", async () => {
+  it("opening delete confirmation clears old delete errors, keeps save error", async () => {
+    // Stage 1: simulate a save error
     updateAction.mockResolvedValue({
       success: false,
-      error: "Unknown machine",
+      error: "Bad save error",
     });
+    // Stage 2: simulate a delete error
+    deleteAction.mockResolvedValue({
+      success: false,
+      error: "Bad delete error",
+    });
+
     renderDialog();
 
     await userEvent.click(screen.getByTestId("collection-edit-trigger"));
-    await userEvent.click(screen.getByTestId("collection-save"));
-    expect(await screen.findByText("Unknown machine")).toBeInTheDocument();
 
+    // Save fails, showing error
+    await userEvent.click(screen.getByTestId("collection-save"));
+    expect(await screen.findByText("Bad save error")).toBeInTheDocument();
+
+    // Delete fails, showing error
     await userEvent.click(screen.getByTestId("collection-delete-trigger"));
-    expect(
-      within(screen.getByRole("alertdialog")).queryByRole("alert")
-    ).not.toBeInTheDocument();
+    await userEvent.click(screen.getByTestId("collection-delete-confirm"));
+    expect(await screen.findByText("Bad delete error")).toBeInTheDocument();
+
+    // Closing the delete confirmation clears the delete error
+    await userEvent.click(screen.getByText("Keep collection"));
+    await waitFor(() => {
+      expect(screen.queryByText("Bad delete error")).not.toBeInTheDocument();
+    });
+
+    // Opening it again doesn't show old error
+    await userEvent.click(screen.getByTestId("collection-delete-trigger"));
+    expect(screen.queryByText("Bad delete error")).not.toBeInTheDocument();
+
+    // Save error is STILL there because we haven't resaved or reopened the whole modal
+    expect(screen.getByText("Bad save error")).toBeInTheDocument();
   });
 
   it("hides the delete control for an editor (canDelete=false)", async () => {

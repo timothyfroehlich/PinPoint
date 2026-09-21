@@ -13,7 +13,6 @@
 - **iScored game** — a game record hosted on iScored within the location's gameroom, identified by a game ID string and game title. Created in iScored's administrative console.
 - **Machine link** — the association between a physical PinPoint machine and an iScored game ID. A machine is either linked or unlinked.
 - **Score entry link** — the direct external URL (`https://www.iscored.info/?mode=public&user={user}&game={gameID}`) taking a player to iScored's mobile score submission screen for that game.
-- **Game link** — the direct external URL (`https://www.iscored.info/{user}?scrollTo={gameID}`) taking a player to the game's leaderboard within the location's public gameroom.
 - **Gameroom** — the location's iScored account identity (e.g. `Apcscore`), configured through the server environment variable `ISCORED_USER`.
 
 ---
@@ -73,7 +72,6 @@ Removed 2026-09-16. The Info tab card's "View all on iScored" link replaces it: 
 
 | Date | Change |
 | :-- | :-- |
-| 2026-09-19 | Define Game link concept: public gameroom deep-link pattern (scrollTo={gameID}) used for "View all on iScored" and the card logo, distinct from the mobile score entry link. |
 | 2026-09-17 | §4.3 clarified: the iScored logo is a link only when the machine is linked; unlinked it is a plain image (CodeRabbit finding on #2134). |
 | 2026-09-16 | Design lock: Top Scores card moves to the rail under Details as top-three ranked rows with the iScored logo and an external "View all on iScored" link; §5 machine iScored tab removed; mockup added. Canvas: https://claude.ai/artifact/Rb7AXgxUVFwW8bEWFhhUgv |
 | 2026-09-15 | Initial draft: machine linking, batch read with 15s non-blocking throttle & privacy contracts, Info tab top-3 card, machine iScored tab, MCP tooling, and fleet column. |

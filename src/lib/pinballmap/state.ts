@@ -2,7 +2,6 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { and, eq, isNull, lt, lte, or, sql } from "drizzle-orm";
 import { db } from "~/server/db";
-import { errorMessage } from "~/lib/errors";
 import { pinballmapLocationChecks, pinballmapState } from "~/server/db/schema";
 import { getPinballMapClient } from "./client";
 import { clearResolvedAbandonments } from "./abandoned-listings";
@@ -554,7 +553,7 @@ export async function syncLocationSnapshot(
     if (!stored) return { ok: false, reason: "superseded" };
     return { ok: true, machineCount: snapshot.machineCount, syncedAt };
   } catch (err) {
-    const message = errorMessage(err, "Unknown sync error");
+    const message = err instanceof Error ? err.message : "Unknown sync error";
     // Note: no `lastSyncedAt` here — a failed attempt must not advance the
     // last-successful-sync clock. `updatedAt` still records that we wrote.
     const stored = await recordSyncFailure(
@@ -694,7 +693,7 @@ export async function checkTrackedLocation(
     return {
       ok: false,
       reason: "fetch_failed",
-      error: errorMessage(error, "Unknown check error"),
+      error: error instanceof Error ? error.message : "Unknown check error",
     };
   }
 

@@ -128,44 +128,44 @@ url_api = "https://api.github.com/repos/astral-sh/ruff/releases/assets/532582890
 provenance = "github-attestations"
 
 [[tools.supabase]]
-version = "2.117.0"
+version = "2.116.0"
 backend = "aqua:supabase/cli"
-specifiers = ["2.117.0"]
+specifiers = ["2.116.0"]
 
 [tools.supabase."platforms.linux-arm64"]
-checksum = "sha256:598c56a936fdf179ea486717901e6e49bc5d777b3ad317eab02f41faf21a95cb"
-url = "https://github.com/supabase/cli/releases/download/v2.117.0/supabase_linux_arm64.tar.gz"
-url_api = "https://api.github.com/repos/supabase/cli/releases/assets/549094082"
+checksum = "sha256:015a45756bb8459716a4b44b020605adc11956cd7d0bd5824aec2ed1c8287933"
+url = "https://github.com/supabase/cli/releases/download/v2.116.0/supabase_linux_arm64.tar.gz"
+url_api = "https://api.github.com/repos/supabase/cli/releases/assets/531262313"
 
 [tools.supabase."platforms.linux-arm64-musl"]
-checksum = "sha256:598c56a936fdf179ea486717901e6e49bc5d777b3ad317eab02f41faf21a95cb"
-url = "https://github.com/supabase/cli/releases/download/v2.117.0/supabase_linux_arm64.tar.gz"
-url_api = "https://api.github.com/repos/supabase/cli/releases/assets/549094082"
+checksum = "sha256:015a45756bb8459716a4b44b020605adc11956cd7d0bd5824aec2ed1c8287933"
+url = "https://github.com/supabase/cli/releases/download/v2.116.0/supabase_linux_arm64.tar.gz"
+url_api = "https://api.github.com/repos/supabase/cli/releases/assets/531262313"
 
 [tools.supabase."platforms.linux-x64"]
-checksum = "sha256:69c05f85b9e47ee706d30f1a6ca8a526b4e337bfd12c7ef1ef522d24e7280d24"
-url = "https://github.com/supabase/cli/releases/download/v2.117.0/supabase_linux_amd64.tar.gz"
-url_api = "https://api.github.com/repos/supabase/cli/releases/assets/549094091"
+checksum = "sha256:5b3031cb297d51b25be4c284e4c852254460ec722ec221d3b81b07d55acfd158"
+url = "https://github.com/supabase/cli/releases/download/v2.116.0/supabase_linux_amd64.tar.gz"
+url_api = "https://api.github.com/repos/supabase/cli/releases/assets/531262322"
 
 [tools.supabase."platforms.linux-x64-musl"]
-checksum = "sha256:69c05f85b9e47ee706d30f1a6ca8a526b4e337bfd12c7ef1ef522d24e7280d24"
-url = "https://github.com/supabase/cli/releases/download/v2.117.0/supabase_linux_amd64.tar.gz"
-url_api = "https://api.github.com/repos/supabase/cli/releases/assets/549094091"
+checksum = "sha256:5b3031cb297d51b25be4c284e4c852254460ec722ec221d3b81b07d55acfd158"
+url = "https://github.com/supabase/cli/releases/download/v2.116.0/supabase_linux_amd64.tar.gz"
+url_api = "https://api.github.com/repos/supabase/cli/releases/assets/531262322"
 
 [tools.supabase."platforms.macos-arm64"]
-checksum = "sha256:c8a298065b374836a42945f5d78ab9348d328bcfd099c14d3e5b0b537791209b"
-url = "https://github.com/supabase/cli/releases/download/v2.117.0/supabase_darwin_arm64.tar.gz"
-url_api = "https://api.github.com/repos/supabase/cli/releases/assets/549094081"
+checksum = "sha256:8b750455d7b02c989cec0c6c26599d28b0aefcbeedf20a315bb1d5215a185a83"
+url = "https://github.com/supabase/cli/releases/download/v2.116.0/supabase_darwin_arm64.tar.gz"
+url_api = "https://api.github.com/repos/supabase/cli/releases/assets/531262323"
 
 [tools.supabase."platforms.macos-x64"]
-checksum = "sha256:6bf14bf758f8514ea4ba3a0020c15eabec6f6edc7525614345fda6c0082ae63d"
-url = "https://github.com/supabase/cli/releases/download/v2.117.0/supabase_darwin_amd64.tar.gz"
-url_api = "https://api.github.com/repos/supabase/cli/releases/assets/549094088"
+checksum = "sha256:1e1dce66222fba539211624617960887e445fd7f27830d6f54bdb4eaf1d7c498"
+url = "https://github.com/supabase/cli/releases/download/v2.116.0/supabase_darwin_amd64.tar.gz"
+url_api = "https://api.github.com/repos/supabase/cli/releases/assets/531262321"
 
 [tools.supabase."platforms.windows-x64"]
-checksum = "sha256:84dbb4b75466065d4458eeda1cd6a95fff31ff33202ffcd8edac41819d0ce496"
-url = "https://github.com/supabase/cli/releases/download/v2.117.0/supabase_windows_amd64.tar.gz"
-url_api = "https://api.github.com/repos/supabase/cli/releases/assets/549094084"
+checksum = "sha256:4a83f0ebcec759785749a266bb788ec0787ef05252ef1b4a9ff07798c70535c4"
+url = "https://github.com/supabase/cli/releases/download/v2.116.0/supabase_windows_amd64.tar.gz"
+url_api = "https://api.github.com/repos/supabase/cli/releases/assets/531262328"
 
 [[tools.zizmor]]
 version = "1.29.0"

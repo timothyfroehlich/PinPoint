@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { DISCORD_MESSAGE_FLAGS, postChannelMessage, sendDm } from "./client";
+import { sendDm } from "./client";
 
 const ORIGINAL_FETCH = globalThis.fetch;
 
@@ -237,59 +237,5 @@ describe("sendDm", () => {
       content: "hi",
     });
     expect(result).toEqual({ ok: false, reason: "not_configured" });
-  });
-});
-
-describe("postChannelMessage", () => {
-  it("posts a message directly to a channel with flags", async () => {
-    const calls = installFetchMock((call) => {
-      if (call.url.endsWith("/channels/chan-123/messages")) {
-        return new Response(JSON.stringify({ id: "msg-1" }), { status: 200 });
-      }
-      throw new Error(`unexpected url ${call.url}`);
-    });
-
-    const result = await postChannelMessage({
-      botToken: "bot-tok",
-      channelId: "chan-123",
-      content: "test message",
-      flags: DISCORD_MESSAGE_FLAGS.SUPPRESS_EMBEDS,
-    });
-
-    expect(result).toEqual({ ok: true });
-    expect(calls).toHaveLength(1);
-    expect(calls[0]?.url).toContain("/channels/chan-123/messages");
-    expect(calls[0]?.init?.headers).toMatchObject({
-      Authorization: "Bot bot-tok",
-    });
-    const rawBody = calls[0]?.init?.body;
-    expect(typeof rawBody).toBe("string");
-    if (typeof rawBody !== "string") {
-      throw new Error("expected body to be a string");
-    }
-    const parsedBody: unknown = JSON.parse(rawBody);
-    expect(parsedBody).toEqual({
-      content: "test message",
-      allowed_mentions: { parse: [] },
-      flags: 4,
-    });
-  });
-
-  it("returns reason='not_configured' when channelId or botToken is empty", async () => {
-    expect(
-      await postChannelMessage({
-        botToken: "",
-        channelId: "chan-123",
-        content: "hi",
-      })
-    ).toEqual({ ok: false, reason: "not_configured" });
-
-    expect(
-      await postChannelMessage({
-        botToken: "tok",
-        channelId: "",
-        content: "hi",
-      })
-    ).toEqual({ ok: false, reason: "not_configured" });
   });
 });

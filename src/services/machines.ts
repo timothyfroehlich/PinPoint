@@ -229,8 +229,6 @@ export interface CreateMachineParams {
    * the insert. Callers gate this on `admin.users.promote.guestToMember`.
    */
   promoteGuest?: PromoteGuest | null | undefined;
-  /** Linked iScored game ID string, or null/undefined for none. */
-  iscoredGameId?: string | null | undefined;
 }
 
 /**
@@ -251,7 +249,6 @@ export async function createMachine({
   description,
   pbmColumns,
   promoteGuest,
-  iscoredGameId,
 }: CreateMachineParams): Promise<{
   machine: Machine;
   deliveryPlan: DeliveryPlan;
@@ -287,7 +284,6 @@ export async function createMachine({
         ...(presenceStatus !== undefined && { presenceStatus }),
         ...(description !== undefined &&
           description !== null && { description }),
-        ...(iscoredGameId !== undefined && { iscoredGameId }),
         ...(pbmColumns ?? {}),
       })
       .returning();

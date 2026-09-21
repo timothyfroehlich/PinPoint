@@ -4,7 +4,7 @@
 
 **What this document is.** The requirements for PinPoint's printed apron cards: what the card shows, what data it draws on, and how that data is authored. No implementation detail — design records and code carry that. It describes the intended final state only; what the code does or used to do lives solely in the Known divergences table. Each requirement is numbered for citation. When code and spec disagree, either the code is wrong or this document gets amended — never silently neither.
 
-**Related records.** [apron-cards-mockup.html](apron-cards-mockup.html) (card face, both size variants). [apron-cards-editor-mockup.html](apron-cards-editor-mockup.html) (authoring surface — Service/Manage entry points, overflow handling, Export menu, mobile). Bead PP-esta (build tracking); PP-esta.1 (edition-name parsing survey, informs §7).
+**Related records.** [apron-cards-mockup.html](apron-cards-mockup.html) (visual reference, both size variants). Bead PP-esta (build tracking); PP-esta.1 (edition-name parsing survey, informs §7).
 
 ---
 
@@ -26,12 +26,10 @@
 
 ## 3. Authoring card content
 
-- **3.1** Card description and tip are authored in one editing surface reached two ways: an "Apron card" entry point on the Service tab (the primary path — where the machine's on-cabinet QR workflow lives today) and a matching row on the Manage tab. Both open the same surface; there are not two independent editors.
-- **3.2** The editor offers an explicit choice for description: use the machine's main description (read-only there — edited on the Info tab), or write a custom one just for the card. Switching back to the main description discards nothing — the custom text is kept, only unused.
-- **3.3** Tip has an enabled/disabled toggle, independent of its saved text. When disabled, the card shows a single Description block and no Tip heading, regardless of saved tip content.
-- **3.4** The editor renders a live preview of the card face as description and tip are typed. Description and tip share one flowing region on the card rather than two independently sized boxes: growing one narrows the room available to the other in the preview, matching what the printed card will do.
-- **3.5** Description and tip are checked as one combined region, not measured line by line: PinPoint knows only whether the combined content still fits the card, not how many lines over it runs. While it does not fit, the card can be neither saved nor exported (§9), and the state renders as one card-level notice rather than a per-field message.
-- **3.6** Changing apron size, card description, or tip requires the machine-management capability: machine owner, technician, or administrator.
+- **3.1** Card description and tip are authored on the machine's Manage tab, alongside the machine's other settings.
+- **3.2** The Manage tab offers an explicit choice for description: use the machine's main description, or write a card-specific one. Switching back to "use main description" discards nothing — the card-specific text is kept, only unused.
+- **3.3** Tip has an enabled/disabled checkbox, independent of its saved text. When disabled, the card shows a single Description block and no Tip heading, regardless of saved tip content.
+- **3.4** The Manage editor renders a live preview of the card face as description and tip are typed. Description and tip share one flowing region on the card rather than two independently sized boxes: growing one narrows the room available to the other in the preview, matching what the printed card will do.
 
 ## 4. Apron size
 
@@ -59,12 +57,6 @@
 - **8.1** The QR code encodes the machine's PinPoint page, tagged with an `apron` source.
 - **8.2** The card is the machine's sole on-cabinet entry point once printed; it replaces the existing iScored sticker. The landing experience the QR opens is separate scope, tracked elsewhere.
 
-## 9. Export
-
-- **9.1** A card can be exported once it is saved and has an apron size; export is unavailable while either is missing, rather than offered against unsaved or unsized content.
-- **9.2** At least one export format renders the card at its exact physical dimensions (§1's apron size), suitable for printing at 100% with no fit-to-page scaling. Export may offer more than one format; adding a format does not change the authoring flow in §3.
-- **9.3** Exporting a saved card requires signed-in membership. A member who cannot edit the machine can export its card but cannot change its size or content.
-
 ## Known divergences
 
 _None — nothing has been built against this spec yet._
@@ -73,6 +65,4 @@ _None — nothing has been built against this spec yet._
 
 | Date | Change |
 | :-- | :-- |
-| 2026-09-20 | Added §3.6 and §9.3: card edits use the machine-management capability; exporting is member+ and does not grant editing. |
 | 2026-09-15 | Initial draft: card content, apron size, description/tip authoring, title fit, edition sourcing, scan target. |
-| 2026-09-18 | Authoring surface is reached from Service and Manage (was Manage-only); description/tip overflow is a combined-region check that blocks save and export (§3.5, new); added §9 Export — exact-size format required, extensible. |
