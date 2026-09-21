@@ -3,6 +3,7 @@
 import type * as React from "react";
 import { useTransition } from "react";
 import { Button } from "~/components/ui/button";
+import { errorMessage } from "~/lib/errors";
 import { MailCheck } from "lucide-react";
 import { resendInvite } from "./actions";
 import { toast } from "sonner";
@@ -24,9 +25,7 @@ export function ResendInviteButton({
         await resendInvite(userId);
         toast.success("Invitation resent successfully");
       } catch (error) {
-        toast.error(
-          error instanceof Error ? error.message : "Failed to resend invitation"
-        );
+        toast.error(errorMessage(error, "Failed to resend invitation"));
       }
     });
   }

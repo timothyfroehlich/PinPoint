@@ -15,6 +15,7 @@ import {
   AlertDialogTrigger,
 } from "~/components/ui/alert-dialog";
 import { UserX } from "lucide-react";
+import { errorMessage } from "~/lib/errors";
 import { removeInvitedUser } from "./actions";
 import { toast } from "sonner";
 
@@ -35,9 +36,7 @@ export function RemoveInvitedUserButton({
         await removeInvitedUser(userId);
         toast.success("Invitation removed successfully");
       } catch (error) {
-        toast.error(
-          error instanceof Error ? error.message : "Failed to remove invitation"
-        );
+        toast.error(errorMessage(error, "Failed to remove invitation"));
       }
     });
   }

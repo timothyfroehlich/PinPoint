@@ -280,6 +280,14 @@ export async function createMachineAction(
       (formData.get("forcePromoteUserId") as string).length > 0
         ? (formData.get("forcePromoteUserId") as string)
         : undefined,
+    iscoredGameId: (() => {
+      if (!formData.has("iscoredGameId")) return undefined;
+      const raw = formData.get("iscoredGameId");
+      if (typeof raw === "string" && raw.trim().length > 0) {
+        return raw.trim();
+      }
+      return null;
+    })(),
     ...readPbmLinkFormFields(formData),
   };
 
@@ -298,8 +306,14 @@ export async function createMachineAction(
     return err("VALIDATION", firstError?.message ?? "Invalid input");
   }
 
-  const { name, initials, ownerId, presenceStatus, forcePromoteUserId } =
-    validation.data;
+  const {
+    name,
+    initials,
+    ownerId,
+    presenceStatus,
+    forcePromoteUserId,
+    iscoredGameId,
+  } = validation.data;
 
   // Resolve PinballMap link columns (mutual-exclusion + catalog-derived metadata).
   // Creators are tech/admin (machines.create), who always hold the link
@@ -362,6 +376,7 @@ export async function createMachineAction(
         presenceStatus,
         description: descriptionColumn,
         pbmColumns,
+        iscoredGameId,
         promoteGuest: {
           userId: forcePromoteUserId,
           type: targetActive ? "active" : "invited",
@@ -463,6 +478,7 @@ export async function createMachineAction(
       presenceStatus,
       description: descriptionColumn,
       pbmColumns,
+      iscoredGameId,
     });
 
     revalidatePath("/m");
