@@ -591,6 +591,19 @@ def test_a_clean_codex_reaction_gets_the_merge_command() -> None:
         assert MERGE_CMD in run.stdout, run.stdout
 
 
+def test_pure_merge_from_main_over_approved_commit_gets_merge_command() -> None:
+    with repo_with_pr(
+        branch_changes={"src/lib/thing.ts": "export const x = 1;\n"},
+        scenario=Scenario(review="previous"),
+        merge_main_in=True,
+    ) as (_head, run):
+        assert run.returncode == 0, run.stderr
+        assert MERGE_CMD in run.stdout, run.stdout
+        assert "covers head" in run.stdout
+        assert "pure merge from main" in run.stdout
+        assert "since review  none — the review covers head" in run.stdout
+
+
 @pytest.mark.parametrize(
     "scenario,reason",
     [
