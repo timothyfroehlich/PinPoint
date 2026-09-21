@@ -94,7 +94,7 @@ function renderMessage(
 
   for (const [locationId, group] of groups) {
     const venue = sanitizeDiscordText(group.locationName);
-    const header = `**[${venue}](${pinballmapLocationUrl(locationId)})**`;
+    const header = `**[${venue}](<${pinballmapLocationUrl(locationId)}>)**`;
     const lines = group.machines.map((machine) => {
       const badge = STATUS_BADGES[machine.eventType];
       const name = sanitizeDiscordText(machine.machineName);
