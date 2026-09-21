@@ -4,7 +4,6 @@ import { assertNotInTransaction } from "~/server/db/transaction-context";
 
 const DISCORD_API = "https://discord.com/api/v10";
 const MAX_RETRY_AFTER_SECONDS = 5;
-const SUPPRESS_EMBEDS_FLAG = 1 << 2;
 
 /**
  * Outcome of any Discord message send.
@@ -29,11 +28,19 @@ export interface SendDmInput {
   content: string;
 }
 
+/** Discord Message Flags (https://discord.com/developers/docs/resources/channel#message-object-message-flags) */
+export const DISCORD_MESSAGE_FLAGS = {
+  /** Do not include any embeds when serializing this message. */
+  SUPPRESS_EMBEDS: 1 << 2, // 4
+} as const;
+
 export interface PostChannelMessageInput {
   botToken: string;
   /** Discord channel snowflake to post into. */
   channelId: string;
   content: string;
+  /** Optional message flags (e.g. `DISCORD_MESSAGE_FLAGS.SUPPRESS_EMBEDS`). */
+  flags?: number;
 }
 
 /**
@@ -60,7 +67,12 @@ export async function postChannelMessage(
     return { ok: false, reason: "not_configured" };
   }
 
-  return postMessage(input.botToken, input.channelId, input.content);
+  return postMessage(
+    input.botToken,
+    input.channelId,
+    input.content,
+    input.flags
+  );
 }
 
 export async function sendDm(input: SendDmInput): Promise<SendDmResult> {
@@ -73,9 +85,12 @@ export async function sendDm(input: SendDmInput): Promise<SendDmResult> {
   const channel = await openDmChannel(input.botToken, input.discordUserId);
   if (!channel.ok) return channel.result;
 
-  return postMessage(input.botToken, channel.channelId, input.content, {
-    suppressEmbeds: true,
-  });
+  return postMessage(
+    input.botToken,
+    channel.channelId,
+    input.content,
+    DISCORD_MESSAGE_FLAGS.SUPPRESS_EMBEDS
+  );
 }
 
 async function openDmChannel(
@@ -101,8 +116,16 @@ async function postMessage(
   botToken: string,
   channelId: string,
   content: string,
-  options: { suppressEmbeds?: boolean | undefined } = {}
+  flags?: number
 ): Promise<SendDmResult> {
+  const payload: Record<string, unknown> = {
+    content,
+    allowed_mentions: { parse: [] },
+  };
+  if (flags !== undefined) {
+    payload["flags"] = flags;
+  }
+
   const send = (): Promise<Response> =>
     safeFetch(`${DISCORD_API}/channels/${channelId}/messages`, {
       method: "POST",
@@ -111,11 +134,7 @@ async function postMessage(
       // sanitize() escape ever regresses, Discord refuses to resolve any
       // user/role/everyone mention. Costs nothing and prevents accidental
       // @everyone fan-outs from user-supplied issue titles/comments.
-      body: JSON.stringify({
-        content,
-        allowed_mentions: { parse: [] },
-        ...(options.suppressEmbeds ? { flags: SUPPRESS_EMBEDS_FLAG } : {}),
-      }),
+      body: JSON.stringify(payload),
     });
 
   let res = await send();
