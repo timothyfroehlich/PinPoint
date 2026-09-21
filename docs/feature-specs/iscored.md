@@ -13,6 +13,7 @@
 - **iScored game** — a game record hosted on iScored within the location's gameroom, identified by a game ID string and game title. Created in iScored's administrative console.
 - **Machine link** — the association between a physical PinPoint machine and an iScored game ID. A machine is either linked or unlinked.
 - **Score entry link** — the direct external URL (`https://www.iscored.info/?mode=public&user={user}&game={gameID}`) taking a player to iScored's mobile score submission screen for that game.
+- **Game link** — the direct external URL (`https://www.iscored.info/{user}?scrollTo={gameID}`) taking a player to the game's leaderboard within the location's public gameroom.
 - **Gameroom** — the location's iScored account identity (e.g. `Apcscore`), configured through the server environment variable `ISCORED_USER`.
 
 ---
@@ -38,19 +39,18 @@
 
 ## 4. Machine Info tab ("Top Scores" card)
 
-- **4.1** A Top Scores card renders on the machine's Info tab (`/m/[initials]`) in the main column below the hero.
-- **4.2** For a linked machine with scores, the card displays the top three scores (rank, player name/initials, formatted score), an "Add score" button linking to the score entry page in a new tab, and a link to the machine's iScored tab.
-- **4.3** For a linked machine with zero recorded scores, the card displays a quiet empty state ("No scores recorded yet") and an "Add score" button.
-- **4.4** For an unlinked machine, the card displays a quiet empty state indicating no iScored link is configured.
+- **4.1** A Top Scores card renders on the machine's Info tab (`/m/[initials]`) in the reference rail, directly below the Details card. On mobile it folds inline with the rail, after Details.
+- **4.2** For a linked machine with scores, the card displays the top three scores as ranked rows (rank badge, player name, score date, formatted score), an "Add score" button linking to the score entry page in a new tab, and a "View all on iScored" link to the game's public iScored page in a new tab.
+- **4.3** The card header carries the "Top scores" label and the iScored logo. For a linked machine the logo links to the game's public iScored page in a new tab; for an unlinked machine it renders as a plain image with no link. The logo renders in every card state so the card stays recognisable when empty or unlinked.
+- **4.4** For a linked machine with zero recorded scores, the card displays a quiet empty state ("No scores recorded yet"), an "Add score" button, and the "View all on iScored" link.
+- **4.5** For an unlinked machine, the card displays a quiet empty state indicating no iScored link is configured, with a link to the Manage tab for viewers who can open it. Guests see the sentence only.
+- **4.6** Mockup: `docs/feature-specs/iscored-top-scores-mockup.html` (desktop and mobile Info tab, plus the four card states). Logo asset: `docs/feature-specs/iscored-logo.svg` (supplied by iScored; white background removed, viewBox cropped to the artwork).
 
 ---
 
 ## 5. Machine iScored tab
 
-- **5.1** A dedicated "iScored" tab on the machine page (`/m/[initials]/iscored`) renders the machine's leaderboard, styled to echo iScored's presentation within PinPoint's native theme. In the machine tab strip, it is positioned immediately after the "Info" tab (between Info and Settings).
-- **5.2** The tab strip renders the tab using the iScored brand label and logo.
-- **5.3** For a linked machine, the tab lists all available high scores and includes an "Add score" button linking to the score entry page in a new tab.
-- **5.4** For an unlinked machine, the tab displays a helpful empty state with a link to the location's public iScored gameroom URL (`https://www.iscored.info/{user}`) and instructions for linking the game in the Manage tab.
+Removed 2026-09-16. The Info tab card's "View all on iScored" link replaces it: iScored's own game page already renders the full leaderboard with game art, and a PinPoint tab showing more rows of the same list added nothing members could not get one tap away. Revisit only if a tab would show something iScored's page does not (a signed-in member's own scores, score history, a per-machine reset). Section number retained so later citations stay stable.
 
 ---
 
@@ -64,11 +64,7 @@
 
 | Spec | Code today | Resolution |
 | :-- | :-- | :-- |
-| §2.1–§2.2 machine linking in Manage tab | No form field in Manage tab | PP-h2bu.4 |
-| §2.3 MCP linking tool | No `set_machine_iscored` MCP tool | PP-h2bu.6 |
-| §3.1–§3.5 iScored API client & cache | No client module | PP-h2bu.3 |
-| §4.1–§4.4 Info tab top scores card | Not yet rendered | PP-h2bu.4 |
-| §5.1–§5.4 Machine iScored tab | Not yet rendered | PP-h2bu.4 |
+| §2.3 MCP tool | Handled via consolidated `update_machine` tool | PP-u4ab.18 |
 | §6.1 Fleet overview column | Not yet rendered | PP-h2bu.5 |
 
 ---
@@ -77,4 +73,7 @@
 
 | Date | Change |
 | :-- | :-- |
+| 2026-09-19 | Define Game link concept: public gameroom deep-link pattern (scrollTo={gameID}) used for "View all on iScored" and the card logo, distinct from the mobile score entry link. |
+| 2026-09-17 | §4.3 clarified: the iScored logo is a link only when the machine is linked; unlinked it is a plain image (CodeRabbit finding on #2134). |
+| 2026-09-16 | Design lock: Top Scores card moves to the rail under Details as top-three ranked rows with the iScored logo and an external "View all on iScored" link; §5 machine iScored tab removed; mockup added. Canvas: https://claude.ai/artifact/Rb7AXgxUVFwW8bEWFhhUgv |
 | 2026-09-15 | Initial draft: machine linking, batch read with 15s non-blocking throttle & privacy contracts, Info tab top-3 card, machine iScored tab, MCP tooling, and fleet column. |

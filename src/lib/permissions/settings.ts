@@ -26,24 +26,6 @@ export interface SettingsSetAuth {
   createdById: string | null;
 }
 
-const isAdmin = (access: AccessLevel): boolean =>
-  checkPermission("admin.access", access);
-
-const canManageMachineSettings = (
-  machineOwnerId: string | null,
-  viewerId: string | null,
-  access: AccessLevel
-): boolean =>
-  checkPermission("machines.settings.manage", access, {
-    userId: viewerId ?? undefined,
-    machineOwnerId,
-  });
-
-const isMachineOwner = (
-  machineOwnerId: string | null,
-  viewerId: string | null
-): boolean => viewerId !== null && viewerId === machineOwnerId;
-
 /**
  * Who may SEE a set: public sets and the owner's default are visible to
  * everyone; a private draft only to its creator (and admin).
@@ -53,8 +35,9 @@ export function canViewSet(
   viewerId: string | null,
   access: AccessLevel
 ): boolean {
-  if (set.isPublic || set.isPreferred || isAdmin(access)) return true;
-  return set.createdById !== null && set.createdById === viewerId;
+  if (set.isPublic || set.isPreferred) return true;
+  if (set.createdById !== null && set.createdById === viewerId) return true;
+  return checkPermission("machines.settings.view.private", access);
 }
 
 /**
@@ -68,20 +51,20 @@ export function canEditSet(
   access: AccessLevel
 ): boolean {
   if (!canViewSet(set, viewerId, access)) return false;
-  if (isAdmin(access)) return true;
-  if (isMachineOwner(machineOwnerId, viewerId)) return true;
+
   // An owner set on a machine with NO owner has nobody to protect it for — the
   // 0060 backfill turns every pre-existing preferred set into an owner set,
   // including those on unowned machines, which would otherwise leave them
   // admin-only. Fall back to community rules there so technicians keep them.
-  if (machineOwnerId === null) {
-    return canManageMachineSettings(machineOwnerId, viewerId, access);
+  if (!set.isOwnerSet || machineOwnerId === null) {
+    return checkPermission("machines.settings.manage", access, {
+      userId: viewerId ?? undefined,
+      machineOwnerId,
+    });
   }
-  // Community sets only: technicians+ co-edit. Owner sets stay protected.
-  return (
-    !set.isOwnerSet &&
-    canManageMachineSettings(machineOwnerId, viewerId, access)
-  );
+
+  // Owner sets on owned machines: owner + admin only (technicians excluded).
+  return canSetOwnerDefault(set, machineOwnerId, viewerId, access);
 }
 
 /**
@@ -95,7 +78,10 @@ export function canSetOwnerDefault(
   access: AccessLevel
 ): boolean {
   if (!set.isOwnerSet) return false;
-  return isAdmin(access) || isMachineOwner(machineOwnerId, viewerId);
+  return checkPermission("machines.settings.setDefault", access, {
+    userId: viewerId ?? undefined,
+    machineOwnerId,
+  });
 }
 
 /** Publishing (public toggle) needs the same rights as editing. */

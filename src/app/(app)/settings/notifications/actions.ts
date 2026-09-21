@@ -1,12 +1,15 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient } from "~/lib/supabase/server";
+import { z } from "zod";
+
+import {
+  createProtectedAction,
+  type ProtectedActionResult,
+} from "~/lib/actions";
+import { ok, err } from "~/lib/result";
 import { db } from "~/server/db";
 import { notificationPreferences } from "~/server/db/schema";
-import { type Result, ok, err } from "~/lib/result";
-import { serverActionError } from "~/lib/observability/report-error";
-import { z } from "zod";
 
 const updatePreferencesSchema = z.object({
   emailEnabled: z.boolean().optional(),
@@ -42,46 +45,42 @@ const PREF_FIELDS = Object.keys(
   updatePreferencesSchema.shape
 ) as readonly PrefField[];
 
-export type UpdatePreferencesResult = Result<
+const formPreferenceValueSchema = z.enum(["on", "off"]);
+
+export type UpdatePreferencesResult = ProtectedActionResult<
   { success: boolean },
-  "UNAUTHORIZED" | "VALIDATION" | "SERVER"
+  "VALIDATION"
 >;
 
-export async function updateNotificationPreferencesAction(
-  _prevState: UpdatePreferencesResult | undefined,
-  formData: FormData
-): Promise<UpdatePreferencesResult> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+const updatePreferencesProtected = createProtectedAction({
+  actionName: "updateNotificationPreferencesAction",
+  permission: "notifications.manage_own",
+  handler: async (formData: FormData, { user }) => {
+    // Absent fields are preserved, not coerced to false: only "on"/"off" write.
+    // A disabled toggle submits nothing (like a native checkbox; PP-bhd7.7), as
+    // do a direct API call or a partial submit — each leaves its column
+    // untouched, so a disabled Discord switch never overwrites the saved value.
+    const rawData: Partial<Record<PrefField, boolean>> = {};
+    for (const name of PREF_FIELDS) {
+      const value = formData.get(name);
+      if (value === null) continue;
+      const parsedValue = formPreferenceValueSchema.safeParse(value);
+      if (!parsedValue.success) {
+        return err("VALIDATION", "Invalid input");
+      }
+      rawData[name] = parsedValue.data === "on";
+    }
 
-  if (!user) {
-    return err("UNAUTHORIZED", "Unauthorized");
-  }
+    const validation = updatePreferencesSchema.safeParse(rawData);
+    if (!validation.success) {
+      return err("VALIDATION", "Invalid input");
+    }
 
-  // Absent fields are preserved, not coerced to false: only "on"/"off" write.
-  // A disabled toggle submits nothing (like a native checkbox; PP-bhd7.7), as
-  // do a direct API call or a partial submit — each leaves its column
-  // untouched, so a disabled Discord switch never overwrites the saved value.
-  const rawData: Partial<Record<PrefField, boolean>> = {};
-  for (const name of PREF_FIELDS) {
-    const value = formData.get(name);
-    if (value === "on") rawData[name] = true;
-    else if (value === "off") rawData[name] = false;
-  }
+    if (Object.keys(validation.data).length === 0) {
+      revalidatePath("/settings");
+      return ok({ success: true });
+    }
 
-  const validation = updatePreferencesSchema.safeParse(rawData);
-  if (!validation.success) {
-    return err("VALIDATION", "Invalid input");
-  }
-
-  if (Object.keys(validation.data).length === 0) {
-    revalidatePath("/settings");
-    return ok({ success: true });
-  }
-
-  try {
     await db
       .insert(notificationPreferences)
       .values({
@@ -95,9 +94,12 @@ export async function updateNotificationPreferencesAction(
 
     revalidatePath("/settings");
     return ok({ success: true });
-  } catch (error) {
-    return serverActionError(error, "SERVER", "Failed to update preferences", {
-      action: "updateNotificationPreferencesAction",
-    });
-  }
+  },
+});
+
+export async function updateNotificationPreferencesAction(
+  _prevState: UpdatePreferencesResult | undefined,
+  formData: FormData
+): Promise<UpdatePreferencesResult> {
+  return await updatePreferencesProtected(formData);
 }

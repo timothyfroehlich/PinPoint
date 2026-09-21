@@ -34,3 +34,10 @@ Preserve the live client's serialized writes and bounded `429` handling. Reuse s
 When showing data for a specific PinballMap location, use `pinballmapLocationUrl` for the required location-listing attribution; do not construct the URL or link only to the homepage.
 
 Unit and E2E tests must use the mock client at the seam and committed captured fixtures. The fixture-refresh script is a deliberate manual GET-only operation, never test setup or a routine live call.
+
+## MCP Catalog Linking & Lineup Intent
+
+When managing PinballMap links via the PinPoint MCP server:
+
+- Use `search_pinballmap_catalog` (2-step family → edition lookup) and `update_machine(machine, pinballmapMachineId: ..., intent: "on" | "off" | "no_sync")`.
+- For the full 2-step procedure and mutual exclusion rules (`pinballmapExcluded`), see the `pinpoint-mcp` skill (`.agents/skills/pinpoint-mcp/SKILL.md`).

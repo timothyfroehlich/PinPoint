@@ -278,6 +278,7 @@ export default async function MachineEditPage({
               modelName={machine.modelName}
               manufacturer={machine.manufacturer}
               year={machine.year}
+              iscoredGameId={machine.iscoredGameId}
             />
           </section>
         ) : null}

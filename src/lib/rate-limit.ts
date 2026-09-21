@@ -22,6 +22,7 @@ import { Redis } from "@upstash/redis";
 import { headers } from "next/headers";
 import { createHash } from "node:crypto";
 import { log } from "~/lib/logger";
+import { errorMessage } from "~/lib/errors";
 import { maskEmail } from "~/lib/logging/mask";
 import { BLOB_CONFIG } from "~/lib/blob/config";
 
@@ -327,7 +328,7 @@ function makeLimitChecker(
         reset: result.reset,
       };
     } catch (error) {
-      const err = error instanceof Error ? error.message : "Unknown";
+      const err = errorMessage(error, "Unknown");
       log.error(
         keyType === "email"
           ? { err, email: maskEmail(limitKey) }

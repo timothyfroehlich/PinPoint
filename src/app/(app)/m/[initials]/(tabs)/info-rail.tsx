@@ -16,6 +16,8 @@ interface InfoRailProps {
   descriptionSlot?: React.ReactNode;
   /** Edit-machine control (dialog trigger or denied tooltip), shown in the owner card footer. */
   editSlot?: React.ReactNode;
+  /** Top scores card slot, rendered below Details and above Tags placeholder. */
+  topScoresSlot?: React.ReactNode;
   /**
    * The game's model identity — normally the Pinball Map catalog title (e.g.
    * "Godzilla (Premium)"), or a hand-entered name for a machine their catalog
@@ -119,6 +121,7 @@ export function InfoRail({
   addedAt,
   descriptionSlot,
   editSlot,
+  topScoresSlot,
   modelName,
   manufacturer,
   year,
@@ -302,6 +305,8 @@ export function InfoRail({
 
         {editSlot ? <div className="mt-4">{editSlot}</div> : null}
       </div>
+
+      {topScoresSlot}
 
       {/* Tags — reserved slot for the future Collections feature. */}
       <div className={PLACEHOLDER_CARD} data-testid="machine-tags-placeholder">
