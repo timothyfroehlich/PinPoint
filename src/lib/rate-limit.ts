@@ -314,9 +314,9 @@ function makeLimitChecker(
 
     const normalizedKey =
       keyType === "email"
-        ? limitKey.toLowerCase()
+        ? hashIdentifier(limitKey.trim().toLowerCase())
         : keyType === "user"
-          ? hashUserId(limitKey)
+          ? hashIdentifier(limitKey)
           : limitKey;
 
     try {
@@ -402,11 +402,11 @@ export const checkPublicIssueLimit = makeLimitChecker(
 );
 
 /**
- * Hashes a user ID to a pseudonymous string so raw user identifiers
+ * Hashes an identifier to a pseudonymous string so raw user identifiers
  * are never stored in external rate-limit caches (CORE-SEC-007).
  */
-function hashUserId(userId: string): string {
-  return createHash("sha256").update(userId, "utf8").digest("hex");
+function hashIdentifier(identifier: string): string {
+  return createHash("sha256").update(identifier, "utf8").digest("hex");
 }
 
 /**
