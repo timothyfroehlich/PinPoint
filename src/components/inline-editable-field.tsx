@@ -149,6 +149,12 @@ export function InlineEditableField({
   // the only viable injection path (bug #6).
   const [editorSeed, setEditorSeed] = useState(0);
   const [isPending, startTransition] = useTransition();
+  // The last server `value` the draft was synced from — the baseline that tells
+  // an untouched draft from a diverged one when a fresh `value` arrives (see the
+  // render-time re-sync below).
+  const [lastSyncedValue, setLastSyncedValue] = useState<ProseMirrorDoc | null>(
+    value ?? null
+  );
 
   const displayValue = optimistic ? optimistic.value : (value ?? null);
   const isEmpty = docIsEmpty(displayValue);
@@ -159,6 +165,34 @@ export function InlineEditableField({
   useEffect(() => {
     setOptimistic(null);
   }, [value]);
+
+  // Adopt a freshly-arrived server `value` into the draft when the draft is
+  // CLEAN and the field is not in an explicit (Pencil) edit — so an always-open
+  // box (openWhenEmpty) follows a concurrent edit/revalidation instead of
+  // stranding a stale `editValue`. Without this, a clean always-open field whose
+  // value changes underneath keeps its old draft: `isDirty` flips true against
+  // the new `displayValue`, showing a phantom Save and arming the parent's nav
+  // guard (onDirtyChange) with no actual user edit (PP-od8m).
+  //
+  // Done DURING render (the React "adjust state from a prop change" pattern),
+  // not in an effect, so the corrected draft is in place BEFORE `isDirty` /
+  // `onDirtyChange` are computed for the committed render; an effect would first
+  // commit the phantom-dirty render, momentarily arming the guard. No editor
+  // `key` bump is needed: the same server change flips `isEmpty`, which toggles
+  // `editorOpen` and remounts the box fresh from the re-synced `editValue`.
+  //
+  // A DIRTY draft (draft ≠ last server value) is never clobbered — the
+  // clean-check compares `editValue` to `lastSyncedValue`, not to the incoming
+  // value, so an in-progress edit is preserved and its (honest) Save stays.
+  // Explicit edits keep their own baseline via handleEdit/handleCancel.
+  if (!docsEqualByText(lastSyncedValue, value ?? null)) {
+    const draftWasClean =
+      !isEditing && docsEqualByText(editValue, lastSyncedValue);
+    setLastSyncedValue(value ?? null);
+    if (draftWasClean) {
+      setEditValue(value ?? null);
+    }
+  }
 
   function handleEdit(): void {
     setEditValue(displayValue ?? null);
