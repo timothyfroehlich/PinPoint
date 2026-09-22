@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -74,6 +74,14 @@ describe("Discord integration config RLS", () => {
     await adminClient.auth.admin.deleteUser(memberUser.id);
   });
 
+  afterEach(async () => {
+    const { error } = await adminClient
+      .from("discord_integration_config")
+      .update({ guild_id: initialGuildId })
+      .eq("id", "singleton");
+    expect(error).toBeNull();
+  });
+
   it("anonymous client cannot read the config", async () => {
     const { data, error } = await anonClient
       .from("discord_integration_config")
@@ -129,11 +137,6 @@ describe("Discord integration config RLS", () => {
       .eq("id", "singleton")
       .single();
     expect(data?.guild_id).toBe("test-guild-123");
-    // Restore the value established by this environment's seed.
-    await adminClient
-      .from("discord_integration_config")
-      .update({ guild_id: initialGuildId })
-      .eq("id", "singleton");
   });
 
   it("authenticated role cannot EXECUTE get_discord_config()", async () => {

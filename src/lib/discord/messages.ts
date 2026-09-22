@@ -56,6 +56,16 @@ export type DiscordMessageInput =
     };
 
 export function formatDiscordMessage(input: DiscordMessageInput): string {
+  return clampDiscordMessage(formatDiscordMessageBody(input));
+}
+
+function clampDiscordMessage(message: string): string {
+  return message.length <= DISCORD_MAX_MESSAGE_LENGTH
+    ? message
+    : `${message.slice(0, DISCORD_MAX_MESSAGE_LENGTH - 1)}…`;
+}
+
+function formatDiscordMessageBody(input: DiscordMessageInput): string {
   if (input.type === "machine_ownership_changed") {
     const machine = sanitizeDiscordText(input.machineName ?? "a machine");
     const url = buildResourceUrl(input);

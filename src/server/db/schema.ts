@@ -1179,6 +1179,13 @@ export const notificationPreferences = pgTable(
     discordNoticeVersion: integer("discord_notice_version")
       .notNull()
       .default(0),
+    // Short-lived claim around one-time notice delivery. The claim is acquired
+    // atomically before Discord I/O so overlapping rollout commands cannot DM
+    // the same member; expiry recovers an interrupted process.
+    discordNoticeLeaseId: uuid("discord_notice_lease_id"),
+    discordNoticeLeaseExpiresAt: timestamp("discord_notice_lease_expires_at", {
+      withTimezone: true,
+    }),
 
     // Deprecated 2026-05-21: column retained to avoid drop migration; never read.
     discordDmBlockedAt: timestamp("discord_dm_blocked_at", {

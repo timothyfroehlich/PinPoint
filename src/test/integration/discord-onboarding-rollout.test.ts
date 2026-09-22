@@ -14,6 +14,16 @@ const { DISCORD_NOTICE_VERSION, syncDiscordIdentityAndClaimOnboarding } =
 const { runDiscordImprovementNoticeRollout } =
   await import("~/lib/discord/improvement-rollout");
 
+function createDeferred(): { promise: Promise<void>; resolve: () => void } {
+  let resolvePromise = (): void => {
+    throw new Error("deferred promise was not initialized");
+  };
+  const promise = new Promise<void>((resolve) => {
+    resolvePromise = resolve;
+  });
+  return { promise, resolve: resolvePromise };
+}
+
 describe("Discord first-link onboarding and rollout", () => {
   setupTestDb();
 
@@ -141,6 +151,56 @@ describe("Discord first-link onboarding and rollout", () => {
     ).resolves.toMatchObject({ eligible: 1, sent: 0, failed: 1 });
     await expect(runDiscordImprovementNoticeRollout()).resolves.toMatchObject({
       eligible: 1,
+    });
+  });
+
+  it("atomically claims a recipient across overlapping send runs", async () => {
+    const db = await getTestDb();
+    const [user] = await db
+      .insert(userProfiles)
+      .values(createTestUser({ discordUserId: "discord-overlap" }))
+      .returning();
+    await db.insert(notificationPreferences).values({ userId: user.id });
+
+    const sendStarted = createDeferred();
+    const finishSend = createDeferred();
+    const firstSender = vi.fn(async () => {
+      sendStarted.resolve();
+      await finishSend.promise;
+      return true;
+    });
+    const secondSender = vi.fn(() => Promise.resolve(true));
+
+    const firstRun = runDiscordImprovementNoticeRollout({
+      send: true,
+      sendNotice: firstSender,
+    });
+    await sendStarted.promise;
+
+    await expect(
+      runDiscordImprovementNoticeRollout({
+        send: true,
+        sendNotice: secondSender,
+      })
+    ).resolves.toEqual({
+      eligible: 0,
+      sent: 0,
+      skippedDisabled: 0,
+      failed: 0,
+    });
+    expect(secondSender).not.toHaveBeenCalled();
+
+    finishSend.resolve();
+    await expect(firstRun).resolves.toMatchObject({ sent: 1, failed: 0 });
+    expect(firstSender).toHaveBeenCalledOnce();
+
+    const preferences = await db.query.notificationPreferences.findFirst({
+      where: eq(notificationPreferences.userId, user.id),
+    });
+    expect(preferences).toMatchObject({
+      discordNoticeVersion: DISCORD_NOTICE_VERSION,
+      discordNoticeLeaseId: null,
+      discordNoticeLeaseExpiresAt: null,
     });
   });
 });

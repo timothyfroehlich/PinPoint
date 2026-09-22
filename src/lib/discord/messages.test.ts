@@ -204,6 +204,25 @@ describe("formatDiscordMessage", () => {
     expect(out).toContain("…");
   });
 
+  it("clamps non-comment messages to Discord's 2000-character limit", () => {
+    const out = formatDiscordMessage({
+      type: "new_issue",
+      siteUrl: "https://app.example.com",
+      issueTitle: "x".repeat(5000),
+      formattedIssueId: "XX-13",
+      resourceType: "issue",
+      machineName: "A very long machine name",
+      actorName: "Paul",
+      recipientReason: "machine_owner",
+      severity: "minor",
+      frequency: "intermittent",
+    });
+
+    expect(out).toHaveLength(2000);
+    expect(out).toContain("https://app.example.com/m/XX/i/13");
+    expect(out.endsWith("…")).toBe(true);
+  });
+
   it("includes comment text and targets the specific comment", () => {
     const out = formatDiscordMessage({
       type: "new_comment",

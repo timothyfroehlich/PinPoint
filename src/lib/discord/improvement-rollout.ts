@@ -1,5 +1,6 @@
 import "server-only";
-import { and, eq, isNotNull, lt } from "drizzle-orm";
+import { randomUUID } from "node:crypto";
+import { and, eq, isNotNull, isNull, lt, or } from "drizzle-orm";
 import { db } from "~/server/db";
 import { notificationPreferences, userProfiles } from "~/server/db/schema";
 import { getDiscordConfig } from "~/lib/discord/config";
@@ -7,6 +8,8 @@ import { sendDm } from "~/lib/discord/client";
 import { formatDiscordImprovementNotice } from "~/lib/discord/system-messages";
 import { getSiteUrl } from "~/lib/url";
 import { DISCORD_NOTICE_VERSION } from "~/lib/discord/onboarding";
+
+const NOTICE_LEASE_MS = 5 * 60 * 1000;
 
 export interface DiscordRolloutResult {
   eligible: number;
@@ -43,6 +46,7 @@ export async function runDiscordImprovementNoticeRollout({
   send?: boolean | undefined;
   sendNotice?: SendNotice | undefined;
 } = {}): Promise<DiscordRolloutResult> {
+  const now = new Date();
   const candidates = await db
     .select({
       userId: notificationPreferences.userId,
@@ -57,7 +61,14 @@ export async function runDiscordImprovementNoticeRollout({
     .where(
       and(
         isNotNull(userProfiles.discordUserId),
-        lt(notificationPreferences.discordNoticeVersion, DISCORD_NOTICE_VERSION)
+        lt(
+          notificationPreferences.discordNoticeVersion,
+          DISCORD_NOTICE_VERSION
+        ),
+        or(
+          isNull(notificationPreferences.discordNoticeLeaseId),
+          lt(notificationPreferences.discordNoticeLeaseExpiresAt, now)
+        )
       )
     );
 
@@ -71,20 +82,34 @@ export async function runDiscordImprovementNoticeRollout({
     send && !sendNotice ? await createImprovementNoticeSender() : sendNotice;
 
   for (const candidate of candidates) {
-    if (!candidate.discordEnabled) {
-      result.skippedDisabled += 1;
-      if (send) await markNoticeCurrent(candidate.userId);
+    if (!send) {
+      if (!candidate.discordEnabled) result.skippedDisabled += 1;
       continue;
     }
-    if (!send) continue;
-    const delivered =
-      candidate.discordUserId && effectiveSendNotice
-        ? await effectiveSendNotice(candidate.discordUserId)
-        : false;
+
+    const leaseId = await claimNotice(candidate.userId);
+    if (leaseId === null) continue;
+
+    if (!candidate.discordEnabled) {
+      result.skippedDisabled += 1;
+      await markNoticeCurrent(candidate.userId, leaseId);
+      continue;
+    }
+    let delivered: boolean;
+    try {
+      delivered =
+        candidate.discordUserId && effectiveSendNotice
+          ? await effectiveSendNotice(candidate.discordUserId)
+          : false;
+    } catch (error) {
+      await releaseNoticeClaim(candidate.userId, leaseId);
+      throw error;
+    }
     if (delivered) {
-      await markNoticeCurrent(candidate.userId);
+      await markNoticeCurrent(candidate.userId, leaseId);
       result.sent += 1;
     } else {
+      await releaseNoticeClaim(candidate.userId, leaseId);
       result.failed += 1;
     }
   }
@@ -92,14 +117,65 @@ export async function runDiscordImprovementNoticeRollout({
   return result;
 }
 
-async function markNoticeCurrent(userId: string): Promise<void> {
-  await db
+async function claimNotice(userId: string): Promise<string | null> {
+  const now = new Date();
+  const leaseId = randomUUID();
+  const [claimed] = await db
     .update(notificationPreferences)
-    .set({ discordNoticeVersion: DISCORD_NOTICE_VERSION })
+    .set({
+      discordNoticeLeaseId: leaseId,
+      discordNoticeLeaseExpiresAt: new Date(now.getTime() + NOTICE_LEASE_MS),
+    })
     .where(
       and(
         eq(notificationPreferences.userId, userId),
-        lt(notificationPreferences.discordNoticeVersion, DISCORD_NOTICE_VERSION)
+        lt(
+          notificationPreferences.discordNoticeVersion,
+          DISCORD_NOTICE_VERSION
+        ),
+        or(
+          isNull(notificationPreferences.discordNoticeLeaseId),
+          lt(notificationPreferences.discordNoticeLeaseExpiresAt, now)
+        )
+      )
+    )
+    .returning({ userId: notificationPreferences.userId });
+  return claimed === undefined ? null : leaseId;
+}
+
+async function markNoticeCurrent(
+  userId: string,
+  leaseId: string
+): Promise<void> {
+  await db
+    .update(notificationPreferences)
+    .set({
+      discordNoticeVersion: DISCORD_NOTICE_VERSION,
+      discordNoticeLeaseId: null,
+      discordNoticeLeaseExpiresAt: null,
+    })
+    .where(
+      and(
+        eq(notificationPreferences.userId, userId),
+        eq(notificationPreferences.discordNoticeLeaseId, leaseId)
+      )
+    );
+}
+
+async function releaseNoticeClaim(
+  userId: string,
+  leaseId: string
+): Promise<void> {
+  await db
+    .update(notificationPreferences)
+    .set({
+      discordNoticeLeaseId: null,
+      discordNoticeLeaseExpiresAt: null,
+    })
+    .where(
+      and(
+        eq(notificationPreferences.userId, userId),
+        eq(notificationPreferences.discordNoticeLeaseId, leaseId)
       )
     );
 }

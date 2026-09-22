@@ -53,6 +53,8 @@ function prefs(
     discordDmBlockedAt: null,
     discordOnboardedAt: null,
     discordNoticeVersion: 0,
+    discordNoticeLeaseId: null,
+    discordNoticeLeaseExpiresAt: null,
     ...overrides,
   };
 }
