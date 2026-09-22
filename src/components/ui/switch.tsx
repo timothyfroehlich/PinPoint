@@ -5,6 +5,10 @@ import * as SwitchPrimitives from "@radix-ui/react-switch";
 
 import { cn } from "~/lib/utils";
 
+// Base (unexported) Switch. It spreads `name` straight into the Radix Root,
+// which submits its own bubble input inside a form — do not give this one a
+// `name` in form context; use SwitchWithFormSupport (exported below), which
+// withholds `name` from the Root on purpose (PP-msjp).
 const Switch = React.forwardRef<
   React.ElementRef<typeof SwitchPrimitives.Root>,
   React.ComponentPropsWithoutRef<typeof SwitchPrimitives.Root>
@@ -46,8 +50,16 @@ const SwitchWithFormSupport = React.forwardRef<
 
   return (
     <>
+      {/* The Radix Root is deliberately nameless: given a `name` inside a form
+          it submits its own bubble input (value "on") *in addition to* the
+          custom hidden input below, so a checked switch submitted two entries
+          under one name and formData.getAll(name) returned ["on", "on"]
+          (PP-msjp). The custom hidden input is the single source of truth for
+          this control's submission — it also emits the explicit "off" that
+          Radix's bubble cannot. `name` is destructured out of props above, so
+          it never reaches the Root — neither this element nor the `{...props}`
+          spread may reintroduce it, or the double-submit returns. */}
       <Switch
-        name={name}
         {...(!isControlled ? { defaultChecked } : {})}
         checked={resolvedChecked}
         onCheckedChange={handleCheckedChange}

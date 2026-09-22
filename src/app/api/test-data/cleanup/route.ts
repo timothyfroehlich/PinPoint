@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { ilike, inArray, or, type SQL } from "drizzle-orm";
 import { log } from "~/lib/logger";
+import { errorMessage } from "~/lib/errors";
 import {
   issues,
   machines,
@@ -197,12 +198,9 @@ export async function POST(request: Request): Promise<Response> {
       removedUsers,
     });
   } catch (err) {
-    log.error(
-      { err: err instanceof Error ? err.message : String(err) },
-      "Test data cleanup failed"
-    );
+    log.error({ err: errorMessage(err) }, "Test data cleanup failed");
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Cleanup failed" },
+      { error: errorMessage(err, "Cleanup failed") },
       { status: 500 }
     );
   }

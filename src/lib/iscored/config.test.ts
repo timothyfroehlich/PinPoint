@@ -3,6 +3,7 @@ import {
   ISCORED_BASE_URL,
   ISCORED_CACHE_TTL_MS,
   getGameroomUrl,
+  getGameUrl,
   getIscoredUser,
   getScoreEntryUrl,
   isIscoredConfigured,
@@ -120,6 +121,51 @@ describe("iscored config", () => {
     it("returns null if no user is configured and none passed", () => {
       delete process.env.ISCORED_USER;
       expect(getGameroomUrl()).toBeNull();
+    });
+  });
+
+  describe("getGameUrl", () => {
+    it("builds the correct public gameroom scrollTo game link from env", () => {
+      process.env.ISCORED_USER = "Apcscore";
+      expect(getGameUrl("77956")).toBe(
+        "https://www.iscored.info/Apcscore?scrollTo=77956"
+      );
+    });
+
+    it("uses explicitly passed user override", () => {
+      delete process.env.ISCORED_USER;
+      expect(getGameUrl("104656", "OtherUser")).toBe(
+        "https://www.iscored.info/OtherUser?scrollTo=104656"
+      );
+    });
+
+    it("URL-encodes user and game ID components", () => {
+      expect(getGameUrl("game#1 / special", "User & Co")).toBe(
+        "https://www.iscored.info/User%20%26%20Co?scrollTo=game%231%20%2F%20special"
+      );
+    });
+
+    it("returns null if gameId is empty or whitespace", () => {
+      process.env.ISCORED_USER = "Apcscore";
+      expect(getGameUrl("")).toBeNull();
+      expect(getGameUrl("   ")).toBeNull();
+    });
+
+    it("returns null if explicit user is whitespace-only", () => {
+      delete process.env.ISCORED_USER;
+      expect(getGameUrl("77956", "   ")).toBeNull();
+    });
+
+    it("trims explicitly passed user override", () => {
+      delete process.env.ISCORED_USER;
+      expect(getGameUrl("77956", "  CustomUser  ")).toBe(
+        "https://www.iscored.info/CustomUser?scrollTo=77956"
+      );
+    });
+
+    it("returns null if no user is configured and none passed", () => {
+      delete process.env.ISCORED_USER;
+      expect(getGameUrl("77956")).toBeNull();
     });
   });
 });

@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+import { errorMessage } from "~/lib/errors";
+
 export const dynamic = "force-dynamic";
 
 export async function GET(): Promise<Response> {
@@ -18,7 +20,7 @@ export async function GET(): Promise<Response> {
     return NextResponse.json(
       {
         ok: false,
-        error: error instanceof Error ? error.message : "Unknown error",
+        error: errorMessage(error, "Unknown error"),
       },
       { status: 500 }
     );
