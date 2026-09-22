@@ -693,7 +693,7 @@ describe("notification delivery (planNotification + dispatchNotification)", () =
           resourceType: "machine",
           actorId: actor.id,
           machineName: machine.name,
-          newStatus: "added",
+          ownershipChange: "added",
           additionalRecipientIds: [recipient.id],
         },
         asDbOrTx(db)
@@ -751,7 +751,7 @@ describe("notification delivery (planNotification + dispatchNotification)", () =
           actorId: admin.id,
           includeActor: false,
           machineName: machine.name,
-          newStatus: "added",
+          ownershipChange: "added",
           additionalRecipientIds: [newOwner.id],
         },
         asDbOrTx(db)

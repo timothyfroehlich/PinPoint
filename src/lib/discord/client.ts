@@ -85,7 +85,12 @@ export async function sendDm(input: SendDmInput): Promise<SendDmResult> {
   const channel = await openDmChannel(input.botToken, input.discordUserId);
   if (!channel.ok) return channel.result;
 
-  return postMessage(input.botToken, channel.channelId, input.content);
+  return postMessage(
+    input.botToken,
+    channel.channelId,
+    input.content,
+    DISCORD_MESSAGE_FLAGS.SUPPRESS_EMBEDS
+  );
 }
 
 async function openDmChannel(
