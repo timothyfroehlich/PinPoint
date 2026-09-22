@@ -1,8 +1,4 @@
-import {
-  isProseMirrorDoc,
-  type ProseMirrorDoc,
-  type ProseMirrorNode,
-} from "./types";
+import type { ProseMirrorDoc, ProseMirrorNode } from "./types";
 
 /**
  * Extract the first paragraph's plain text from a ProseMirrorDoc.
@@ -14,10 +10,23 @@ export function extractFirstParagraph(
 ): string {
   if (!doc) return "";
   if (typeof doc === "string") return doc;
-  if (!isProseMirrorDoc(doc)) return "";
+
+  const d = doc as unknown;
+  if (
+    !d ||
+    typeof d !== "object" ||
+    (d as Record<string, unknown>)["type"] !== "doc" ||
+    !Array.isArray((d as Record<string, unknown>)["content"])
+  ) {
+    return "";
+  }
+
+  const validDoc = d as ProseMirrorDoc;
 
   // Find the first paragraph node
-  const firstParagraph = doc.content.find((node) => node.type === "paragraph");
+  const firstParagraph = validDoc.content.find(
+    (node) => node.type === "paragraph"
+  );
   if (!firstParagraph?.content) return "";
 
   return extractTextFromNodes(firstParagraph.content).trim();

@@ -112,12 +112,10 @@ describe("Issue detail permission-aware UI", () => {
     );
 
     const statusControl = screen.getByTestId("issue-status-select");
-    const denialReason = screen.getByTestId("status-denied-reason");
     expect(statusControl).toBeDisabled();
-    expect(denialReason).toHaveTextContent(
+    expect(screen.getByTestId("status-denied-reason")).toHaveTextContent(
       "Only the owner can perform this action"
     );
-    expect(statusControl).toHaveAttribute("aria-describedby", denialReason.id);
   });
 
   it("shows a login prompt instead of the add-comment form when unauthenticated", () => {

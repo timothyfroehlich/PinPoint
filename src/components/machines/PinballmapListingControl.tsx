@@ -470,7 +470,7 @@ function IntentToggle({
     <>
       <div
         role="radiogroup"
-        aria-label="Pinball Map lineup intent"
+        aria-label="Pinball Map listing intent"
         className="inline-flex overflow-hidden rounded-lg border border-outline-variant"
         data-testid="pbm-listing-intent"
       >

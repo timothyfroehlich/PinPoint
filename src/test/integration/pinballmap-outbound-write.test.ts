@@ -765,12 +765,7 @@ describe("PinballMap outbound writes (PGlite)", () => {
     );
 
     expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.code).toBe("PBM_REJECTED");
-      expect(result.message).toBe(
-        "Pinball Map still shows this entry but rejected the removal. Nothing was changed — an admin should check the lineup on pinballmap.com."
-      );
-    }
+    if (!result.ok) expect(result.code).toBe("PBM_REJECTED");
     // The stored lineup is left alone, so the out-of-sync state stays visible
     // rather than being quietly resolved by a removal that did not happen.
     const state = await db.query.pinballmapState.findFirst();

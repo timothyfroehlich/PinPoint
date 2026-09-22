@@ -260,78 +260,6 @@ _marker_check() {
 }
 
 # ---------------------------------------------------------------------------------
-# Pure merge check: returns 0 if head is a clean merge of origin/main (or base_ref)
-# over reviewed_sha without any unreviewed feature commits.
-# ---------------------------------------------------------------------------------
-_is_pure_merge_from_main() {
-  local pr=$1 reviewed_sha=$2 head=$3 base_ref=${4:-main}
-  [[ -z "$reviewed_sha" || -z "$head" || "$reviewed_sha" == "$head" ]] && return 1
-
-  # Object presence check: both reviewed_sha and head must be valid commits
-  if ! git cat-file -e "${reviewed_sha}^{commit}" 2>/dev/null || ! git cat-file -e "${head}^{commit}" 2>/dev/null; then
-    # In a git repo, attempt to fetch if missing
-    git fetch -q --no-write-fetch-head origin "+refs/pull/${pr}/head" "+refs/heads/${base_ref}" 2>/dev/null || true
-  fi
-
-  git cat-file -e "${reviewed_sha}^{commit}" 2>/dev/null || return 1
-  git cat-file -e "${head}^{commit}" 2>/dev/null || return 1
-
-  # Step 1: reviewed_sha must be an ancestor of head
-  git merge-base --is-ancestor "$reviewed_sha" "$head" 2>/dev/null || return 1
-
-  # Step 2: resolve base branch ref (e.g. origin/main, main)
-  local main_ref=""
-  if git rev-parse --verify "origin/${base_ref}^{commit}" >/dev/null 2>&1; then
-    main_ref="origin/${base_ref}"
-  elif git rev-parse --verify "${base_ref}^{commit}" >/dev/null 2>&1; then
-    main_ref="${base_ref}"
-  else
-    return 1
-  fi
-
-  # Step 3: all non-merge commits in reviewed_sha..head must already be on main
-  local extra_commits
-  extra_commits=$(git rev-list --no-merges "${reviewed_sha}..${head}" --not "$main_ref" 2>/dev/null) || return 1
-  [[ -z "$extra_commits" ]] || return 1
-
-  # Step 4: there must be at least one merge commit in reviewed_sha..head
-  local merge_commits
-  merge_commits=$(git rev-list --merges "${reviewed_sha}..${head}" 2>/dev/null) || return 1
-  [[ -n "$merge_commits" ]] || return 1
-
-  # Step 5: for every merge commit in reviewed_sha..head:
-  # - It must be a 2-parent merge
-  # - One parent must be a descendant of reviewed_sha (the feature branch side)
-  # - One parent must be on main_ref (the main side)
-  # - The merge must be a clean merge: its tree matches git merge-tree --write-tree
-  local m parents p1 p2 clean_tree actual_tree parent_array
-  for m in $merge_commits; do
-    parents=$(git rev-list --parents -n 1 "$m" 2>/dev/null | cut -d' ' -f2-)
-    read -r -a parent_array <<< "$parents"
-    [[ ${#parent_array[@]} -eq 2 ]] || return 1
-
-    p1="${parent_array[0]}"
-    p2="${parent_array[1]}"
-
-    if git merge-base --is-ancestor "$reviewed_sha" "$p1" 2>/dev/null && \
-       git merge-base --is-ancestor "$p2" "$main_ref" 2>/dev/null; then
-      : # valid order: branch merged main
-    elif git merge-base --is-ancestor "$reviewed_sha" "$p2" 2>/dev/null && \
-         git merge-base --is-ancestor "$p1" "$main_ref" 2>/dev/null; then
-      : # reverse order
-    else
-      return 1
-    fi
-
-    clean_tree=$(git merge-tree --write-tree "$p1" "$p2" 2>/dev/null) || return 1
-    actual_tree=$(git rev-parse "${m}^{tree}" 2>/dev/null) || return 1
-    [[ "$clean_tree" == "$actual_tree" ]] || return 1
-  done
-
-  return 0
-}
-
-# ---------------------------------------------------------------------------------
 # Review summary — the one JSON document every consumer reads (Gate 3, merge-handoff,
 # request-codex-review, pr-watch, pr-dashboard). Computed once per call.
 #
@@ -348,56 +276,14 @@ _is_pure_merge_from_main() {
 # ---------------------------------------------------------------------------------
 _review_summary() {
   local pr=$1
-  local owner_repo head base_ref evidence coderabbit codex marker unresolved pr_view
+  local owner_repo head evidence coderabbit codex marker unresolved
   owner_repo=$(_repo_slug) || return 1
   head=$(gh pr view "$pr" --json headRefOid --jq .headRefOid) || return 1
-  pr_view=$(gh pr view "$pr" --json baseRefName 2>/dev/null || true)
-  if jq -e '.baseRefName' <<< "$pr_view" >/dev/null 2>&1; then
-    base_ref=$(jq -r '.baseRefName' <<< "$pr_view")
-  elif [[ "$pr_view" =~ ^[a-zA-Z0-9._/-]+$ ]]; then
-    base_ref="$pr_view"
-  else
-    base_ref="main"
-  fi
-  base_ref=${base_ref:-main}
   evidence=$(_review_evidence "$pr" "$owner_repo" "$head") || return 1
   coderabbit=$(_coderabbit_check <<< "$evidence")
   codex=$(_codex_check <<< "$evidence")
   marker=$(_marker_check <<< "$evidence")
   unresolved=$(_unresolved_thread_count "$pr") || return 1
-
-  # Check for inherited review approval across pure merges from main
-  if [[ $(jq -r '.verdict' <<< "$coderabbit") == "stale" ]]; then
-    local cr_sha cr_detail
-    cr_sha=$(jq -r '.sha' <<< "$coderabbit")
-    cr_detail=$(jq -r '.detail' <<< "$coderabbit")
-    if [[ "$cr_detail" == "APPROVED" ]] && _is_pure_merge_from_main "$pr" "$cr_sha" "$head" "$base_ref"; then
-      coderabbit=$(jq -c '. + { verdict: "covers", form: "approval", inherited: true, inherited_from: .sha }' <<< "$coderabbit")
-    fi
-  fi
-
-  if [[ $(jq -r '.verdict' <<< "$codex") == "stale" ]]; then
-    local cx_sha cx_detail cx_form=""
-    cx_sha=$(jq -r '.sha' <<< "$codex")
-    cx_detail=$(jq -r '.detail' <<< "$codex")
-    case "$cx_detail" in
-      APPROVED) cx_form="approval" ;;
-      NO_FINDINGS) cx_form="clean_comment" ;;
-      REACTION_WITNESS) cx_form="clean_reaction" ;;
-      COMMENTED|CHANGES_REQUESTED) cx_form="reviewed" ;;
-    esac
-    if [[ -n "$cx_form" ]] && _is_pure_merge_from_main "$pr" "$cx_sha" "$head" "$base_ref"; then
-      codex=$(jq -c --arg form "$cx_form" '. + { verdict: "covers", form: $form, inherited: true, inherited_from: .sha }' <<< "$codex")
-    fi
-  fi
-
-  if [[ $(jq -r '.verdict' <<< "$marker") == "stale" ]]; then
-    local mk_sha
-    mk_sha=$(jq -r '.sha' <<< "$marker")
-    if [[ -n "$mk_sha" ]] && _is_pure_merge_from_main "$pr" "$mk_sha" "$head" "$base_ref"; then
-      marker=$(jq -c '. + { verdict: "covers", form: "marker", inherited: true, inherited_from: .sha }' <<< "$marker")
-    fi
-  fi
 
   jq -n --arg head "$head" --argjson unresolved "$unresolved" \
       --argjson coderabbit "$coderabbit" --argjson codex "$codex" --argjson marker "$marker" \
@@ -426,9 +312,7 @@ _checker_lines() {
     | .checkers | to_entries[]
     | .key as $k | .value as $v
     | (if $k == "coderabbit" then "CodeRabbit" elif $k == "codex" then "Codex" else "local attestation" end) as $name
-    | if $v.verdict == "covers" then
-        (if ($v.inherited // false) then "  \($name): covers head \($h) (inherited from \($v.inherited_from[0:7]); pure merge from main)"
-         else "  \($name): covers head \($h)" end)
+    | if $v.verdict == "covers" then "  \($name): covers head \($h)"
       elif $v.verdict == "changes_requested" then "  \($name): requested changes on head \($h)"
       elif $v.verdict == "stale" then "  \($name): newest evidence names \($v.sha[0:7]), head is \($h)"
       else "  \($name): none" end'
@@ -586,23 +470,17 @@ check_review_happened() {
   if [ "$RS_LABEL" = "approved" ]; then
     local who
     who=$(jq -r '.coverage.checker' <<< "$RS_SUMMARY")
-    local inherited from_sha suffix=""
-    inherited=$(jq -r '.coverage.inherited // false' <<< "$RS_SUMMARY")
-    if [ "$inherited" = "true" ]; then
-      from_sha=$(jq -r '.coverage.inherited_from // .coverage.sha' <<< "$RS_SUMMARY")
-      suffix=" (inherited from ${from_sha:0:7}; pure merge from main)"
-    fi
     case "$who" in
-      coderabbit) echo "PASS: reviewed: CodeRabbit approved head SHA ${RS_HEAD_SHA:0:7}${suffix}" ;;
+      coderabbit) echo "PASS: reviewed: CodeRabbit approved head SHA ${RS_HEAD_SHA:0:7}" ;;
       codex)
         case "$(jq -r '.coverage.form' <<< "$RS_SUMMARY")" in
-          approval) echo "PASS: reviewed: Codex approved head SHA ${RS_HEAD_SHA:0:7}${suffix}" ;;
-          clean_comment) echo "PASS: reviewed: Codex found no major issues on head SHA ${RS_HEAD_SHA:0:7}${suffix}" ;;
-          clean_reaction) echo "PASS: reviewed: trusted workflow witnessed Codex clean reaction on head SHA ${RS_HEAD_SHA:0:7}${suffix}" ;;
-          *) echo "PASS: reviewed: Codex reviewed head SHA ${RS_HEAD_SHA:0:7}; thread gate owns findings${suffix}" ;;
+          approval) echo "PASS: reviewed: Codex approved head SHA ${RS_HEAD_SHA:0:7}" ;;
+          clean_comment) echo "PASS: reviewed: Codex found no major issues on head SHA ${RS_HEAD_SHA:0:7}" ;;
+          clean_reaction) echo "PASS: reviewed: trusted workflow witnessed Codex clean reaction on head SHA ${RS_HEAD_SHA:0:7}" ;;
+          *) echo "PASS: reviewed: Codex reviewed head SHA ${RS_HEAD_SHA:0:7}; thread gate owns findings" ;;
         esac
         ;;
-      *) echo "PASS: reviewed: review marker pins head SHA ${RS_HEAD_SHA:0:7}${suffix}" ;;
+      *) echo "PASS: reviewed: review marker pins head SHA ${RS_HEAD_SHA:0:7}" ;;
     esac
     return 0
   fi

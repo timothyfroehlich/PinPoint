@@ -35,7 +35,6 @@ import {
   type UpdateMachineResult,
 } from "~/app/(app)/m/actions";
 import { PinballMapLinkField } from "~/components/machines/PinballMapLinkField";
-import { IscoredGamePicker } from "~/components/machines/IscoredGamePicker";
 import { RichTextEditor } from "~/components/editor/RichTextEditorDynamic";
 import type { ProseMirrorDoc } from "~/lib/tiptap/types";
 import {
@@ -412,11 +411,24 @@ export function MachineDetailsForm({
           />
         )}
 
-        <IscoredGamePicker
-          defaultGameId={iscoredGameId}
-          machineName={liveName}
-          onDirty={markDirty}
-        />
+        <div className="space-y-1.5">
+          <Label htmlFor="edit-iscored-game-id" className="text-foreground">
+            iScored Game ID
+          </Label>
+          <Input
+            id="edit-iscored-game-id"
+            name="iscoredGameId"
+            type="text"
+            defaultValue={iscoredGameId ?? ""}
+            placeholder="e.g., 73"
+            enterKeyHint="next"
+            className="border-outline bg-surface text-foreground placeholder:text-muted-foreground"
+            data-testid="edit-machine-iscored-game-id"
+          />
+          <p className="text-xs text-muted-foreground">
+            Game identifier on iScored.info. Leave blank to unlink.
+          </p>
+        </div>
 
         <div className="space-y-1.5">
           {/* No htmlFor: RichTextEditor is a contenteditable widget with no
