@@ -74,10 +74,12 @@ describe("iscored client", () => {
     },
   ];
 
+  const mockScoresPayload = (scores: unknown[] = mockApiScores) => ({ scores });
+
   describe("parsing, ranking, and PII email stripping (CORE-SEC-007)", () => {
     it("parses scores, normalizes numeric game to string, and strips emails at client boundary", async () => {
       vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
-        new Response(JSON.stringify(mockApiScores), {
+        new Response(JSON.stringify(mockScoresPayload()), {
           status: 200,
           headers: { "Content-Type": "application/json" },
         })
@@ -111,9 +113,22 @@ describe("iscored client", () => {
       }
     });
 
-    it("parses string scores with commas", async () => {
+    it("parses scores when upstream returns a legacy bare array", async () => {
       vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
         new Response(JSON.stringify(mockApiScores), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        })
+      );
+
+      const scores = await getAllScoresForMachine("77956");
+      expect(scores).toHaveLength(4);
+      expect(scores[0]?.playerName).toBe("Bob");
+    });
+
+    it("parses string scores with commas", async () => {
+      vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+        new Response(JSON.stringify(mockScoresPayload()), {
           status: 200,
           headers: { "Content-Type": "application/json" },
         })
@@ -129,11 +144,13 @@ describe("iscored client", () => {
     it("falls back to Anonymous when player name is empty or missing", async () => {
       vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
         new Response(
-          JSON.stringify([
-            { id: 301, game: 999, name: "", score: 100 },
-            { id: 302, game: 999, name: "   ", score: 200 },
-            { id: 303, game: 999, score: 300 },
-          ]),
+          JSON.stringify(
+            mockScoresPayload([
+              { id: 301, game: 999, name: "", score: 100 },
+              { id: 302, game: 999, name: "   ", score: 200 },
+              { id: 303, game: 999, score: 300 },
+            ])
+          ),
           {
             status: 200,
             headers: { "Content-Type": "application/json" },
@@ -151,13 +168,25 @@ describe("iscored client", () => {
     it("masks email-shaped player names with Anonymous (CORE-SEC-007)", async () => {
       vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
         new Response(
-          JSON.stringify([
-            { id: 401, game: 888, name: "user@domain.com", score: 500 },
-            { id: 402, game: 888, name: "  player@test.org  ", score: 600 },
-            { id: 403, game: 888, name: "ValidPlayer", score: 700 },
-            { id: 404, game: 888, name: "Alice alice@example.com", score: 400 },
-            { id: 405, game: 888, name: "bob@domain.org (Guest)", score: 300 },
-          ]),
+          JSON.stringify(
+            mockScoresPayload([
+              { id: 401, game: 888, name: "user@domain.com", score: 500 },
+              { id: 402, game: 888, name: "  player@test.org  ", score: 600 },
+              { id: 403, game: 888, name: "ValidPlayer", score: 700 },
+              {
+                id: 404,
+                game: 888,
+                name: "Alice alice@example.com",
+                score: 400,
+              },
+              {
+                id: 405,
+                game: 888,
+                name: "bob@domain.org (Guest)",
+                score: 300,
+              },
+            ])
+          ),
           {
             status: 200,
             headers: { "Content-Type": "application/json" },
@@ -178,7 +207,7 @@ describe("iscored client", () => {
   describe("helper methods", () => {
     it("getTopScoresForMachine defaults to 3 scores", async () => {
       vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
-        new Response(JSON.stringify(mockApiScores), {
+        new Response(JSON.stringify(mockScoresPayload()), {
           status: 200,
           headers: { "Content-Type": "application/json" },
         })
@@ -191,7 +220,7 @@ describe("iscored client", () => {
 
     it("getTopScoresForMachine respects custom limit", async () => {
       vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
-        new Response(JSON.stringify(mockApiScores), {
+        new Response(JSON.stringify(mockScoresPayload()), {
           status: 200,
           headers: { "Content-Type": "application/json" },
         })
@@ -214,7 +243,7 @@ describe("iscored client", () => {
 
     it("returns empty array when machine has no scores in gameroom", async () => {
       vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
-        new Response(JSON.stringify(mockApiScores), {
+        new Response(JSON.stringify(mockScoresPayload()), {
           status: 200,
           headers: { "Content-Type": "application/json" },
         })
@@ -228,7 +257,7 @@ describe("iscored client", () => {
   describe("batch caching & 15-second throttle with SWR", () => {
     it("serves from cache on subsequent calls within 15 seconds", async () => {
       const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
-        new Response(JSON.stringify(mockApiScores), {
+        new Response(JSON.stringify(mockScoresPayload()), {
           status: 200,
           headers: { "Content-Type": "application/json" },
         })
@@ -253,7 +282,7 @@ describe("iscored client", () => {
         fetchCount++;
         if (fetchCount === 1) {
           return Promise.resolve(
-            new Response(JSON.stringify(mockApiScores), {
+            new Response(JSON.stringify(mockScoresPayload()), {
               status: 200,
               headers: { "Content-Type": "application/json" },
             })
@@ -299,7 +328,7 @@ describe("iscored client", () => {
         },
       ];
       resolveSecondFetch(
-        new Response(JSON.stringify(updatedScores), {
+        new Response(JSON.stringify(mockScoresPayload(updatedScores)), {
           status: 200,
           headers: { "Content-Type": "application/json" },
         })
@@ -322,7 +351,7 @@ describe("iscored client", () => {
       vi.spyOn(globalThis, "fetch").mockImplementation(async () => {
         fetchCount++;
         await new Promise((resolve) => setTimeout(resolve, 10));
-        return new Response(JSON.stringify(mockApiScores), {
+        return new Response(JSON.stringify(mockScoresPayload()), {
           status: 200,
           headers: { "Content-Type": "application/json" },
         });
@@ -345,7 +374,7 @@ describe("iscored client", () => {
       vi.spyOn(globalThis, "fetch").mockImplementation(() => {
         fetchCount++;
         return Promise.resolve(
-          new Response(JSON.stringify(mockApiScores), {
+          new Response(JSON.stringify(mockScoresPayload()), {
             status: 200,
             headers: { "Content-Type": "application/json" },
           })
@@ -369,7 +398,7 @@ describe("iscored client", () => {
       vi.spyOn(globalThis, "fetch").mockImplementation(() => {
         fetchCount++;
         return Promise.resolve(
-          new Response(JSON.stringify(mockApiScores), {
+          new Response(JSON.stringify(mockScoresPayload()), {
             status: 200,
             headers: { "Content-Type": "application/json" },
           })
@@ -391,7 +420,7 @@ describe("iscored client", () => {
 
     it("returns detached cloned records to prevent external cache mutation", async () => {
       vi.spyOn(globalThis, "fetch").mockResolvedValue(
-        new Response(JSON.stringify(mockApiScores), {
+        new Response(JSON.stringify(mockScoresPayload()), {
           status: 200,
           headers: { "Content-Type": "application/json" },
         })

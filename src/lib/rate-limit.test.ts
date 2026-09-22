@@ -93,9 +93,12 @@ describe("rate-limit checker factory", () => {
     });
 
     const { checkLoginAccountLimit } = await import("./rate-limit");
-    const result = await checkLoginAccountLimit("USER@Example.COM");
+    const result = await checkLoginAccountLimit(" USER@Example.COM ");
 
-    expect(limitMock).toHaveBeenCalledWith("user@example.com");
+    const expectedHash = createHash("sha256")
+      .update("user@example.com", "utf8")
+      .digest("hex");
+    expect(limitMock).toHaveBeenCalledWith(expectedHash);
     expect(result).toEqual({
       success: true,
       limit: 5,
@@ -118,7 +121,10 @@ describe("rate-limit checker factory", () => {
     await checkLoginAccountLimit("unknown");
 
     // Email path treats "unknown" as an ordinary key, not the IP fallback.
-    expect(limitMock).toHaveBeenCalledWith("unknown");
+    const expectedHash = createHash("sha256")
+      .update("unknown", "utf8")
+      .digest("hex");
+    expect(limitMock).toHaveBeenCalledWith(expectedHash);
   });
 
   it("uses the shared fallback key for an unknown IP in production", async () => {

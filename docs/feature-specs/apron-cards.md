@@ -31,6 +31,7 @@
 - **3.3** Tip has an enabled/disabled toggle, independent of its saved text. When disabled, the card shows a single Description block and no Tip heading, regardless of saved tip content.
 - **3.4** The editor renders a live preview of the card face as description and tip are typed. Description and tip share one flowing region on the card rather than two independently sized boxes: growing one narrows the room available to the other in the preview, matching what the printed card will do.
 - **3.5** Description and tip are checked as one combined region, not measured line by line: PinPoint knows only whether the combined content still fits the card, not how many lines over it runs. While it does not fit, the card can be neither saved nor exported (§9), and the state renders as one card-level notice rather than a per-field message.
+- **3.6** Changing apron size, card description, or tip requires the machine-management capability: machine owner, technician, or administrator.
 
 ## 4. Apron size
 
@@ -62,6 +63,7 @@
 
 - **9.1** A card can be exported once it is saved and has an apron size; export is unavailable while either is missing, rather than offered against unsaved or unsized content.
 - **9.2** At least one export format renders the card at its exact physical dimensions (§1's apron size), suitable for printing at 100% with no fit-to-page scaling. Export may offer more than one format; adding a format does not change the authoring flow in §3.
+- **9.3** Exporting a saved card requires signed-in membership. A member who cannot edit the machine can export its card but cannot change its size or content.
 
 ## Known divergences
 
@@ -71,6 +73,7 @@ _None — nothing has been built against this spec yet._
 
 | Date | Change |
 | :-- | :-- |
+| 2026-09-20 | Added §3.6 and §9.3: card edits use the machine-management capability; exporting is member+ and does not grant editing. |
 | 2026-09-18 | §1 Scan target, §8.1, §8.2: the QR encodes the machine's scan hub (`/m/<initials>/hub`) rather than the machine page; the landing experience is now specified in `machine-scan-hub.md`. |
 | 2026-09-15 | Initial draft: card content, apron size, description/tip authoring, title fit, edition sourcing, scan target. |
 | 2026-09-18 | Authoring surface is reached from Service and Manage (was Manage-only); description/tip overflow is a combined-region check that blocks save and export (§3.5, new); added §9 Export — exact-size format required, extensible. |

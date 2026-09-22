@@ -10,7 +10,10 @@ import {
   pinballmapState,
 } from "~/server/db/schema";
 import { assertNotInTransaction } from "~/server/db/transaction-context";
-import { postChannelMessage } from "~/lib/discord/client";
+import {
+  DISCORD_MESSAGE_FLAGS,
+  postChannelMessage,
+} from "~/lib/discord/client";
 import { getDiscordBotToken } from "~/lib/discord/config";
 import { log } from "~/lib/logger";
 import { reportError } from "~/lib/observability/report-error";
@@ -33,8 +36,9 @@ import type { PinballmapRuntimeState } from "~/lib/types";
  * Blessed by PBM's maintainer ryantg (2026-07-19: "Lots of people make bots like
  * that").
  *
- * One full bulk region read is diffed against durable membership. An absence must
- * appear in two consecutive successful reads before it becomes a removal. Each
+ * One full bulk region read is diffed against durable membership. Machine additions
+ * and removals are confirmed and announced on the first run where they appear or
+ * disappear, so game swaps and edition updates announce together. Each
  * confirmed transition is copied into a separate event queue, so a failed removal
  * post and a later re-add remain two deliverable facts.
  *
@@ -615,88 +619,54 @@ async function applySnapshot(
       }
     }
 
-    // A legacy row missing from the first post-migration snapshot stays active
-    // with one miss. Only a second consecutive absence may baseline it as gone;
-    // a transient return resets the miss without creating a false Added event.
-    const initializationNeedsAnotherSnapshot =
-      initializeRemovals &&
-      !rebootstrapped &&
-      missing.some((row) => row.missedRuns === 0);
-
-    if (
-      (initializeRemovals || rebootstrapped) &&
-      missing.length > 0 &&
-      !initializationNeedsAnotherSnapshot
-    ) {
-      await tx
-        .update(pinballmapRegionSeenMachines)
-        .set({ isPresent: false, missedRuns: 2 })
-        .where(
-          and(
-            eq(pinballmapRegionSeenMachines.region, region),
-            inArray(
-              pinballmapRegionSeenMachines.lmxId,
-              missing.map((row) => row.lmxId)
-            ),
-            eq(pinballmapRegionSeenMachines.isPresent, true)
-          )
-        );
-    }
-
-    const firstMiss = rebootstrapped
-      ? []
-      : missing.filter((row) => row.missedRuns === 0);
-    if (firstMiss.length > 0) {
-      await tx
-        .update(pinballmapRegionSeenMachines)
-        .set({ missedRuns: 1 })
-        .where(
-          and(
-            eq(pinballmapRegionSeenMachines.region, region),
-            inArray(
-              pinballmapRegionSeenMachines.lmxId,
-              firstMiss.map((row) => row.lmxId)
-            ),
-            eq(pinballmapRegionSeenMachines.isPresent, true)
-          )
-        );
-    }
-
-    const confirmedMissing =
-      initializeRemovals || rebootstrapped
-        ? []
-        : missing.filter((row) => row.missedRuns > 0);
-    const removals =
-      confirmedMissing.length === 0
-        ? []
-        : await tx
-            .update(pinballmapRegionSeenMachines)
-            .set({ isPresent: false, missedRuns: 2 })
-            .where(
-              and(
-                eq(pinballmapRegionSeenMachines.region, region),
-                inArray(
-                  pinballmapRegionSeenMachines.lmxId,
-                  confirmedMissing.map((row) => row.lmxId)
-                ),
-                eq(pinballmapRegionSeenMachines.isPresent, true)
-              )
+    // Confirm removals on the first run where a machine is absent from the snapshot.
+    // If removal tracking is being initialized or if the run rebootstrapped, missing
+    // entries are marked not present without generating announcement events.
+    let removals: RegionAlertTransition[] = [];
+    if (missing.length > 0) {
+      if (initializeRemovals || rebootstrapped) {
+        await tx
+          .update(pinballmapRegionSeenMachines)
+          .set({ isPresent: false, missedRuns: 1 })
+          .where(
+            and(
+              eq(pinballmapRegionSeenMachines.region, region),
+              inArray(
+                pinballmapRegionSeenMachines.lmxId,
+                missing.map((row) => row.lmxId)
+              ),
+              eq(pinballmapRegionSeenMachines.isPresent, true)
             )
-            .returning({
-              lmxId: pinballmapRegionSeenMachines.lmxId,
-              generation: pinballmapRegionSeenMachines.generation,
-              locationId: pinballmapRegionSeenMachines.locationId,
-              pinballmapMachineId:
-                pinballmapRegionSeenMachines.pinballmapMachineId,
-            });
+          );
+      } else {
+        const updated = await tx
+          .update(pinballmapRegionSeenMachines)
+          .set({ isPresent: false, missedRuns: 1 })
+          .where(
+            and(
+              eq(pinballmapRegionSeenMachines.region, region),
+              inArray(
+                pinballmapRegionSeenMachines.lmxId,
+                missing.map((row) => row.lmxId)
+              ),
+              eq(pinballmapRegionSeenMachines.isPresent, true)
+            )
+          )
+          .returning({
+            lmxId: pinballmapRegionSeenMachines.lmxId,
+            generation: pinballmapRegionSeenMachines.generation,
+            locationId: pinballmapRegionSeenMachines.locationId,
+            pinballmapMachineId:
+              pinballmapRegionSeenMachines.pinballmapMachineId,
+          });
+        removals = updated.map((row) => ({
+          ...row,
+          eventType: "removed" as const,
+        }));
+      }
+    }
 
-    const events = [
-      ...(rebootstrapped ? [] : additions),
-      ...removals.map((row) => ({
-        ...row,
-        eventType: "removed" as const,
-      })),
-    ];
+    const events = [...(rebootstrapped ? [] : additions), ...removals];
     for (let i = 0; i < events.length; i += INSERT_CHUNK) {
       await tx
         .insert(pinballmapRegionAlertEvents)
@@ -714,7 +684,7 @@ async function applySnapshot(
         .onConflictDoNothing();
     }
 
-    if (initializeRemovals && !initializationNeedsAnotherSnapshot) {
+    if (initializeRemovals) {
       await tx
         .update(pinballmapRegionAlertState)
         .set({ removalTrackingInitializedAt: detectedAt })
@@ -1141,6 +1111,7 @@ export async function runRegionMachineAlerts(opts?: {
       botToken,
       channelId,
       content: message.content,
+      flags: DISCORD_MESSAGE_FLAGS.SUPPRESS_EMBEDS,
     });
     if (!sent.ok) {
       const detail = {
