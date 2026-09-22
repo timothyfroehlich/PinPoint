@@ -58,7 +58,7 @@ export function EditCollectionDialog({
   const [open, setOpen] = useState(false);
   const [name, setName] = useState(currentName);
   const [selected, setSelected] = useState<string[]>(currentIds);
-  const [saveError, setSaveError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [savePending, startSave] = useTransition();
   const [deletePending, startDelete] = useTransition();
@@ -69,20 +69,20 @@ export function EditCollectionDialog({
     if (open) {
       setName(currentName);
       setSelected(currentIds);
-      setSaveError(null);
+      setError(null);
       setDeleteError(null);
     }
   }, [open, currentName, currentIds]);
 
   function save(): void {
-    setSaveError(null);
+    setError(null);
     startSave(async () => {
       const result = await updateCollectionAction({
         collectionId,
         name,
         machineIds: selected,
       });
-      if (!result.success) setSaveError(result.error);
+      if (!result.success) setError(result.error);
       else {
         setOpen(false);
         router.refresh();
@@ -128,15 +128,19 @@ export function EditCollectionDialog({
           idPrefix="edit-collection"
         />
 
-        {saveError && (
+        {error && (
           <p className="mt-4 text-sm text-destructive-text" role="alert">
-            {saveError}
+            {error}
           </p>
         )}
 
         <div className="@container flex flex-row items-center justify-between gap-2">
           {canDelete && (
-            <AlertDialog onOpenChange={() => setDeleteError(null)}>
+            <AlertDialog
+              onOpenChange={(deleteOpen) => {
+                if (deleteOpen) setDeleteError(null);
+              }}
+            >
               <AlertDialogTrigger asChild>
                 <Button
                   type="button"
@@ -152,7 +156,7 @@ export function EditCollectionDialog({
                 {deleteError && (
                   <div
                     role="alert"
-                    className="rounded-md border border-destructive/20 bg-destructive/10 p-4 mb-4 text-destructive-text"
+                    className="mb-4 rounded-md border border-destructive/20 bg-destructive/10 p-4 text-destructive-text"
                   >
                     <p className="text-sm font-medium">{deleteError}</p>
                   </div>

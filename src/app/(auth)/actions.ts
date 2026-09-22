@@ -11,6 +11,7 @@ import {
   resetPasswordSchema,
 } from "./schemas";
 import { log } from "~/lib/logger";
+import { errorMessage } from "~/lib/errors";
 import { maskEmail } from "~/lib/logging/mask";
 import {
   serverActionError,
@@ -354,7 +355,7 @@ export async function signupAction(
         {
           userId: data.user.id,
           action: "signup",
-          err: termsError instanceof Error ? termsError.message : "Unknown",
+          err: errorMessage(termsError, "Unknown"),
         },
         "Failed to record terms acceptance timestamp"
       );
