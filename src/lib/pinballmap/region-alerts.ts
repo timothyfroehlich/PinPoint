@@ -793,10 +793,9 @@ async function markAnnounced(
  * an empty upstream payload, leaves it untouched — so on its own it would let a
  * failing endpoint be retried every hour. The second clock,
  * `pinballmap_region_alert_state.catalog_refresh_attempted_at`, is claimed at
- * the START of
- * every on-demand attempt by {@link claimCatalogRefreshAttempt}, so success,
- * empty, and failure all back off for the full cooldown (PP-o355.44). It lives in
- * the database because serverless invocations share no memory.
+ * the START of every on-demand attempt by {@link claimCatalogRefreshAttempt}, so
+ * success, empty, and failure all back off for the full cooldown (PP-o355.44).
+ * It lives in the database because serverless invocations share no memory.
  *
  * **A refresh failure leaves the event pending.** Every failure path here returns
  * the names we already had; the caller withholds only events whose titles remain
