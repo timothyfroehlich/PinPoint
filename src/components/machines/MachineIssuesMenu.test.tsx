@@ -1,8 +1,10 @@
 // @vitest-environment jsdom
 import React from "react";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { toast } from "sonner";
+import type { ExportIssuesResult } from "~/app/(app)/issues/export-action";
 import { MachineIssuesMenu } from "./MachineIssuesMenu";
 
 // next/link → plain anchor so hrefs are assertable.
@@ -100,8 +102,8 @@ describe("MachineIssuesMenu", () => {
   });
 
   it("prevents multiple concurrent exports", async () => {
-    let resolveExport: (value: any) => void;
-    const exportPromise = new Promise((resolve) => {
+    let resolveExport: ((value: ExportIssuesResult) => void) | undefined;
+    const exportPromise = new Promise<ExportIssuesResult>((resolve) => {
       resolveExport = resolve;
     });
     mockExport.mockReturnValue(exportPromise);
@@ -110,34 +112,69 @@ describe("MachineIssuesMenu", () => {
     render(<MachineIssuesMenu machineInitials="GZ" view="open" />);
 
     await user.click(screen.getByRole("button", { name: /issue options/i }));
-    const exportBtn = screen.getByRole("menuitem", {
+    const exportItem = screen.getByRole("menuitem", {
       name: /export all issues/i,
     });
-
-    // The userEvent.click awaits internal promises which allows the state update in our async event handler
-    // to potentially process between clicks. We want to simulate rapid successive clicks *before* the first
-    // promise resolves, which is effectively what happens if isExporting locks the function immediately.
-    // However, since handleExport is an async function called synchronously inside onSelect, the state update
-    // from setIsExporting(true) happens on the next tick, not synchronously.
-    // This is a common issue with async handlers and rapid user events in React.
-    // Let's test the state protection logic by firing events without awaiting the layout effects.
-
-    // Actually, in React, setIsExporting is asynchronous anyway.
-    // Let's just do a simple check. If `isExporting` is true, the button is disabled.
-    // A disabled button cannot be clicked via userEvent.
-    await user.click(exportBtn);
+    await user.click(exportItem);
 
     // Radix dropdown items don't natively use the `disabled` DOM attribute for a variety of reasons,
     // they use aria-disabled or pointer-events-none.
-    expect(exportBtn).toHaveAttribute("aria-disabled", "true");
+    await user.click(screen.getByRole("button", { name: /issue options/i }));
+    const pendingExportItem = screen.getByRole("menuitem", {
+      name: "Exporting issues…",
+    });
+    expect(pendingExportItem).toHaveAttribute("aria-disabled", "true");
 
-    resolveExport!({
+    // Exercise the disabled item directly to guard against a future regression
+    // that visually disables the item but still lets its selection handler run.
+    fireEvent.click(pendingExportItem);
+    expect(mockExport).toHaveBeenCalledTimes(1);
+
+    if (resolveExport === undefined) {
+      throw new Error("Expected the export action promise to have a resolver");
+    }
+    resolveExport({
       ok: true,
       value: { csv: "a,b\n1,2", fileName: "GZ-issues.csv" },
     });
 
-    // Wait for the final state to settle so we can see the button re-enabled (if the dropdown didn't close).
-    // The dropdown actually closes on select, but we can verify it was only called once.
-    expect(mockExport).toHaveBeenCalledTimes(1);
+    await waitFor(() => {
+      expect(
+        screen.getByRole("menuitem", { name: /export all issues/i })
+      ).not.toHaveAttribute("aria-disabled");
+    });
+  });
+
+  it("reports when the browser cannot create a CSV download", async () => {
+    const originalCreateObjectURL = URL.createObjectURL;
+    Object.defineProperty(URL, "createObjectURL", {
+      configurable: true,
+      value: undefined,
+    });
+    mockExport.mockResolvedValue({
+      ok: true,
+      value: { csv: "a,b\n1,2", fileName: "GZ-issues.csv" },
+    });
+
+    try {
+      const user = userEvent.setup();
+      render(<MachineIssuesMenu machineInitials="GZ" view="open" />);
+
+      await user.click(screen.getByRole("button", { name: /issue options/i }));
+      await user.click(
+        screen.getByRole("menuitem", { name: /export all issues/i })
+      );
+
+      await waitFor(() => {
+        expect(toast.error).toHaveBeenCalledWith(
+          "Download failed. Your browser may not support file downloads."
+        );
+      });
+    } finally {
+      Object.defineProperty(URL, "createObjectURL", {
+        configurable: true,
+        value: originalCreateObjectURL,
+      });
+    }
   });
 });

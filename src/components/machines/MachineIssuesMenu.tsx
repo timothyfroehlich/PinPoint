@@ -106,7 +106,7 @@ export function MachineIssuesMenu({
           disabled={isExporting}
         >
           <Download className="size-4" aria-hidden="true" />
-          Export all issues (CSV)
+          {isExporting ? "Exporting issues…" : "Export all issues (CSV)"}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
@@ -138,7 +138,9 @@ function ViewToggleItem({
 /** Blob → download of a generated CSV. No-op when the browser lacks the API. */
 function triggerCsvDownload(csv: string, fileName: string): void {
   if (typeof URL.createObjectURL !== "function") {
-    toast.error("Download failed. Your browser may not support file downloads.");
+    toast.error(
+      "Download failed. Your browser may not support file downloads."
+    );
     return;
   }
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
