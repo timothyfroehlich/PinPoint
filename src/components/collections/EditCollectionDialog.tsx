@@ -58,7 +58,7 @@ export function EditCollectionDialog({
   const [open, setOpen] = useState(false);
   const [name, setName] = useState(currentName);
   const [selected, setSelected] = useState<string[]>(currentIds);
-  const [error, setError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [savePending, startSave] = useTransition();
   const [deletePending, startDelete] = useTransition();
@@ -69,20 +69,20 @@ export function EditCollectionDialog({
     if (open) {
       setName(currentName);
       setSelected(currentIds);
-      setError(null);
+      setSaveError(null);
       setDeleteError(null);
     }
   }, [open, currentName, currentIds]);
 
   function save(): void {
-    setError(null);
+    setSaveError(null);
     startSave(async () => {
       const result = await updateCollectionAction({
         collectionId,
         name,
         machineIds: selected,
       });
-      if (!result.success) setError(result.error);
+      if (!result.success) setSaveError(result.error);
       else {
         setOpen(false);
         router.refresh();
@@ -128,9 +128,9 @@ export function EditCollectionDialog({
           idPrefix="edit-collection"
         />
 
-        {error && (
+        {saveError && (
           <p className="mt-4 text-sm text-destructive-text" role="alert">
-            {error}
+            {saveError}
           </p>
         )}
 
