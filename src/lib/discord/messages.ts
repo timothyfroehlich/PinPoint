@@ -69,9 +69,21 @@ function formatDiscordMessageBody(input: DiscordMessageInput): string {
   if (input.type === "machine_ownership_changed") {
     const machine = sanitizeDiscordText(input.machineName ?? "a machine");
     const url = buildResourceUrl(input);
-    return input.ownershipChange === "added"
-      ? `**You now own [${machine}](${url})**\nYou’ll receive issue activity for this machine.`
-      : `**You no longer own [${machine}](${url})**\nYou won’t receive owner notifications for this machine.`;
+    const prefix =
+      input.ownershipChange === "added"
+        ? "**You now own ["
+        : "**You no longer own [";
+    const suffix =
+      input.ownershipChange === "added"
+        ? `](${url})**\nYou’ll receive issue activity for this machine.`
+        : `](${url})**\nYou won’t receive owner notifications for this machine.`;
+    const machineBudget =
+      DISCORD_MAX_MESSAGE_LENGTH - prefix.length - suffix.length;
+    const linkedMachine =
+      machine.length <= machineBudget
+        ? machine
+        : `${machine.slice(0, Math.max(0, machineBudget - 1))}…`;
+    return `${prefix}${linkedMachine}${suffix}`;
   }
 
   const url = buildResourceUrl(input);
@@ -86,7 +98,7 @@ function formatDiscordMessageBody(input: DiscordMessageInput): string {
   const actorName = input.actorName
     ? sanitizeDiscordText(input.actorName)
     : undefined;
-  const actor = actorName ?? "A member";
+  const actor = actorName ?? "Anonymous";
 
   switch (input.type) {
     case "new_issue":

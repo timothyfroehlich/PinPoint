@@ -91,8 +91,12 @@ export async function runDiscordImprovementNoticeRollout({
     if (leaseId === null) continue;
 
     if (!candidate.discordEnabled) {
-      result.skippedDisabled += 1;
-      await markNoticeCurrent(candidate.userId, leaseId);
+      const finalized = await markNoticeCurrent(candidate.userId, leaseId);
+      if (finalized) {
+        result.skippedDisabled += 1;
+      } else {
+        result.failed += 1;
+      }
       continue;
     }
     let delivered: boolean;
@@ -106,8 +110,12 @@ export async function runDiscordImprovementNoticeRollout({
       throw error;
     }
     if (delivered) {
-      await markNoticeCurrent(candidate.userId, leaseId);
-      result.sent += 1;
+      const finalized = await markNoticeCurrent(candidate.userId, leaseId);
+      if (finalized) {
+        result.sent += 1;
+      } else {
+        result.failed += 1;
+      }
     } else {
       await releaseNoticeClaim(candidate.userId, leaseId);
       result.failed += 1;
@@ -146,8 +154,8 @@ async function claimNotice(userId: string): Promise<string | null> {
 async function markNoticeCurrent(
   userId: string,
   leaseId: string
-): Promise<void> {
-  await db
+): Promise<boolean> {
+  const [updated] = await db
     .update(notificationPreferences)
     .set({
       discordNoticeVersion: DISCORD_NOTICE_VERSION,
@@ -159,7 +167,9 @@ async function markNoticeCurrent(
         eq(notificationPreferences.userId, userId),
         eq(notificationPreferences.discordNoticeLeaseId, leaseId)
       )
-    );
+    )
+    .returning({ userId: notificationPreferences.userId });
+  return updated !== undefined;
 }
 
 async function releaseNoticeClaim(

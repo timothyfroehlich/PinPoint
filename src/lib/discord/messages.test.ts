@@ -55,6 +55,21 @@ describe("formatDiscordMessage", () => {
     expect(out).toContain("[Medieval Madness](https://app.example.com/m)");
   });
 
+  it("preserves the machine link when a long ownership label is truncated", () => {
+    const out = formatDiscordMessage({
+      type: "machine_ownership_changed",
+      siteUrl: "https://app.example.com",
+      resourceType: "machine",
+      machineName: "x".repeat(5000),
+      machineInitials: "MM",
+      ownershipChange: "removed",
+    });
+
+    expect(out).toHaveLength(2000);
+    expect(out).toContain("…](https://app.example.com/m/MM)**");
+    expect(out).toContain("You won’t receive owner notifications");
+  });
+
   it("falls back to the issue list when the formatted id is unparseable", () => {
     const out = formatDiscordMessage({
       type: "new_comment",
@@ -91,6 +106,22 @@ describe("formatDiscordMessage", () => {
     expect(out).toBe(
       "**[TWD-03](https://app.example.com/m/TWD/i/3) moved to In Progress**\nFlippers weak · Walking Dead · previously Confirmed\nChanged by Paul · You’re watching this issue"
     );
+  });
+
+  it("uses Anonymous when an actor name is unavailable", () => {
+    const out = formatDiscordMessage({
+      type: "issue_assigned",
+      siteUrl: "https://app.example.com",
+      issueTitle: "Flippers weak",
+      formattedIssueId: "TWD-03",
+      resourceType: "issue",
+      machineName: "Walking Dead",
+      actorName: undefined,
+      recipientReason: "assignee",
+      severity: "minor",
+    });
+
+    expect(out).toContain("Assigned by Anonymous");
   });
 
   it("breaks @everyone / @here so they don't ping", () => {

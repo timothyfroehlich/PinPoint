@@ -203,4 +203,35 @@ describe("Discord first-link onboarding and rollout", () => {
       discordNoticeLeaseExpiresAt: null,
     });
   });
+
+  it("reports a delivered notice as failed when its lease was reclaimed", async () => {
+    const db = await getTestDb();
+    const [user] = await db
+      .insert(userProfiles)
+      .values(createTestUser({ discordUserId: "discord-reclaimed" }))
+      .returning();
+    await db.insert(notificationPreferences).values({ userId: user.id });
+
+    await expect(
+      runDiscordImprovementNoticeRollout({
+        send: true,
+        sendNotice: async () => {
+          await db
+            .update(notificationPreferences)
+            .set({
+              discordNoticeLeaseId: "00000000-0000-4000-8000-000000000001",
+            })
+            .where(eq(notificationPreferences.userId, user.id));
+          return true;
+        },
+      })
+    ).resolves.toMatchObject({ eligible: 1, sent: 0, failed: 1 });
+
+    const preferences = await db.query.notificationPreferences.findFirst({
+      where: eq(notificationPreferences.userId, user.id),
+    });
+    expect(preferences?.discordNoticeVersion).toBeLessThan(
+      DISCORD_NOTICE_VERSION
+    );
+  });
 });
