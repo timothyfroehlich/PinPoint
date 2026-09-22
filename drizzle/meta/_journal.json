@@ -568,6 +568,13 @@
       "when": 1790044346046,
       "tag": "0080_add-discord-notice-lease",
       "breakpoints": true
+    },
+    {
+      "idx": 81,
+      "version": "7",
+      "when": 1790120608413,
+      "tag": "0081_pinballmap-catalog-refresh-attempt",
+      "breakpoints": true
     }
   ]
 }
