@@ -154,6 +154,44 @@ describe("Discord first-link onboarding and rollout", () => {
     });
   });
 
+  it("counts a rejected delivery and continues with later recipients", async () => {
+    const db = await getTestDb();
+    const [rejected, delivered] = await db
+      .insert(userProfiles)
+      .values([
+        createTestUser({ discordUserId: "discord-rejected" }),
+        createTestUser({
+          email: "delivered@example.com",
+          discordUserId: "discord-delivered",
+        }),
+      ])
+      .returning();
+    await db
+      .insert(notificationPreferences)
+      .values([{ userId: rejected.id }, { userId: delivered.id }]);
+    const sendNotice = vi.fn((discordUserId: string) => {
+      if (discordUserId === "discord-rejected") {
+        return Promise.reject(new Error("invalid Discord response"));
+      }
+      return Promise.resolve(true);
+    });
+
+    await expect(
+      runDiscordImprovementNoticeRollout({ send: true, sendNotice })
+    ).resolves.toMatchObject({ eligible: 2, sent: 1, failed: 1 });
+    expect(sendNotice).toHaveBeenCalledTimes(2);
+
+    const rejectedPreferences =
+      await db.query.notificationPreferences.findFirst({
+        where: eq(notificationPreferences.userId, rejected.id),
+      });
+    expect(rejectedPreferences).toMatchObject({
+      discordNoticeVersion: 0,
+      discordNoticeLeaseId: null,
+      discordNoticeLeaseExpiresAt: null,
+    });
+  });
+
   it("atomically claims a recipient across overlapping send runs", async () => {
     const db = await getTestDb();
     const [user] = await db

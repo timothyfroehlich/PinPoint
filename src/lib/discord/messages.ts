@@ -14,6 +14,7 @@ export {
 } from "~/lib/discord/system-messages";
 
 const DISCORD_MAX_MESSAGE_LENGTH = 2000;
+const DISCORD_MAX_ACTOR_LABEL_LENGTH = 256;
 
 interface DiscordIssueMessageBase {
   siteUrl: string;
@@ -99,6 +100,7 @@ function formatDiscordMessageBody(input: DiscordMessageInput): string {
     ? sanitizeDiscordText(input.actorName)
     : undefined;
   const actor = actorName ?? "Anonymous";
+  const commentActor = clampDiscordText(actor, DISCORD_MAX_ACTOR_LABEL_LENGTH);
 
   switch (input.type) {
     case "new_issue":
@@ -133,14 +135,14 @@ function formatDiscordMessageBody(input: DiscordMessageInput): string {
       ].join("\n");
     case "new_comment":
       return formatCommentMessage(
-        `**[${id}](${commentUrl}) — ${actor} commented**`,
+        `**[${id}](${commentUrl}) — ${commentActor} commented**`,
         [`${title} · ${machine}`, formatRecipientReason(input.recipientReason)],
         input.commentContent,
         input.attachmentCount
       );
     case "mentioned":
       return formatCommentMessage(
-        `**[${id}](${commentUrl}) — ${actor} mentioned you**`,
+        `**[${id}](${commentUrl}) — ${commentActor} mentioned you**`,
         [`${title} · ${machine}`],
         input.commentContent,
         input.attachmentCount
@@ -154,13 +156,30 @@ function formatCommentMessage(
   content: string | undefined,
   attachmentCount: number
 ): string {
-  const fixedLines = [heading, ...contextLines];
   if (content?.trim()) {
-    const fixed = `${fixedLines.join("\n")}\n\n`;
     const attachmentLine =
       attachmentCount > 0
         ? `\n\nAdded ${attachmentCount} ${attachmentCount === 1 ? "photo" : "photos"}.`
         : "";
+    const trailingContext = contextLines.slice(1);
+    const fixedOverhead = [heading, ...trailingContext].join("\n").length;
+    const contextSeparators = contextLines.length;
+    const minimumQuotedContentLength = "> …".length;
+    const primaryContextBudget = Math.max(
+      0,
+      DISCORD_MAX_MESSAGE_LENGTH -
+        fixedOverhead -
+        contextSeparators -
+        "\n\n".length -
+        attachmentLine.length -
+        minimumQuotedContentLength
+    );
+    const boundedPrimaryContext = clampDiscordText(
+      contextLines[0] ?? "",
+      primaryContextBudget
+    );
+    const fixedLines = [heading, boundedPrimaryContext, ...trailingContext];
+    const fixed = `${fixedLines.join("\n")}\n\n`;
     const quoteBudget =
       DISCORD_MAX_MESSAGE_LENGTH - fixed.length - attachmentLine.length;
     const sanitized = sanitizeDiscordText(content.trim());
@@ -181,12 +200,20 @@ function formatCommentMessage(
     }
     return `${fixed}${quote(sanitized.slice(0, low))}…${attachmentLine}`;
   }
+  const fixedLines = [heading, ...contextLines];
   if (attachmentCount > 0) {
     fixedLines.push(
       `Added ${attachmentCount} ${attachmentCount === 1 ? "photo" : "photos"} — open the issue to view.`
     );
   }
   return fixedLines.join("\n");
+}
+
+function clampDiscordText(value: string, maxLength: number): string {
+  if (value.length <= maxLength) return value;
+  if (maxLength <= 0) return "";
+  if (maxLength === 1) return "…";
+  return `${value.slice(0, maxLength - 1)}…`;
 }
 
 function formatRecipientReason(reason: RecipientReason): string {

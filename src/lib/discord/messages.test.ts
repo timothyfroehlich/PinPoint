@@ -235,6 +235,29 @@ describe("formatDiscordMessage", () => {
     expect(out).toContain("…");
   });
 
+  it("preserves the attachment notice when comment context is oversized", () => {
+    const out = formatDiscordMessage({
+      type: "new_comment",
+      siteUrl: "https://app.example.com",
+      issueTitle: "t".repeat(5000),
+      formattedIssueId: "XX-14",
+      resourceType: "issue",
+      machineName: "m".repeat(5000),
+      actorName: "a".repeat(5000),
+      recipientReason: "issue_watcher",
+      commentContent: "A useful comment that must be budgeted.",
+      commentId: "comment-14",
+      attachmentCount: 2,
+    });
+
+    expect(out.length).toBeLessThanOrEqual(2000);
+    expect(out).toContain(
+      "https://app.example.com/m/XX/i/14#comment-comment-14"
+    );
+    expect(out).toContain("Added 2 photos.");
+    expect(out.endsWith("Added 2 photos.")).toBe(true);
+  });
+
   it("clamps non-comment messages to Discord's 2000-character limit", () => {
     const out = formatDiscordMessage({
       type: "new_issue",

@@ -105,9 +105,10 @@ export async function runDiscordImprovementNoticeRollout({
         candidate.discordUserId && effectiveSendNotice
           ? await effectiveSendNotice(candidate.discordUserId)
           : false;
-    } catch (error) {
+    } catch {
       await releaseNoticeClaim(candidate.userId, leaseId);
-      throw error;
+      result.failed += 1;
+      continue;
     }
     if (delivered) {
       const finalized = await markNoticeCurrent(candidate.userId, leaseId);
