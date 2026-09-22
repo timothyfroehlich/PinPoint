@@ -1,13 +1,15 @@
 """Tests for CI change detection rules in .github/workflows/ci.yml.
 
-Verifies that PRs touching only developer tooling, Python tests, agent configs,
-linters, package scripts, or non-PR workflows bypass expensive E2E, Supabase
-integration, and build suites, while real website changes, CI changes, and
-TypeScript unit tests continue to run the required CI suites.
+Verifies that PRs touching only developer tooling — Python/shell scripts, Python
+tests, agent configs, linters, data files (.sql/.json/.txt) under scripts/, or
+non-PR workflows — bypass expensive E2E, Supabase integration, and build suites,
+while real website changes, CI changes, TypeScript unit tests, TS/JS scripts, and
+package.json continue to run the required CI suites (PP-9jar).
 """
 
-import fnmatch
+import re
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 
 import pytest
@@ -15,6 +17,43 @@ import yaml
 
 REPO_ROOT = Path(__file__).parent.parent.parent
 CI_YML_PATH = REPO_ROOT / ".github" / "workflows" / "ci.yml"
+
+
+@lru_cache(maxsize=None)
+def _glob_to_regex(glob: str) -> re.Pattern[str]:
+    """Translate a dorny/paths-filter (picomatch) glob to an anchored regex.
+
+    Mirrors the picomatch semantics dorny/paths-filter@v4 runs with `dot: true`,
+    which Python's ``fnmatch`` does NOT model: ``*`` matches within a single path
+    segment (it does not cross ``/``), while ``**`` is a globstar that spans zero
+    or more whole segments. Getting this right matters for the ``scripts/**/*.ext``
+    patterns — ``fnmatch`` treats ``*`` as crossing ``/`` and has no globstar, so
+    it silently mis-classifies top-level ``scripts/foo.py`` / ``scripts/foo.sh``.
+    """
+    out: list[str] = []
+    i, n = 0, len(glob)
+    while i < n:
+        c = glob[i]
+        if c == "*":
+            if i + 1 < n and glob[i + 1] == "*":
+                # Globstar. `**/` -> zero or more leading segments; a trailing
+                # `**` (or any other `**`) -> the rest of the path.
+                if i + 2 < n and glob[i + 2] == "/":
+                    out.append("(?:.*/)?")
+                    i += 3
+                else:
+                    out.append(".*")
+                    i += 2
+            else:
+                out.append("[^/]*")
+                i += 1
+        elif c == "?":
+            out.append("[^/]")
+            i += 1
+        else:
+            out.append(re.escape(c))
+            i += 1
+    return re.compile("^" + "".join(out) + "$")
 
 
 @dataclass(frozen=True)
@@ -41,12 +80,11 @@ class PathsFilterSimulator:
             matches_every = True
             for pat in self.has_code_patterns:
                 if pat.startswith("!"):
-                    neg_pat = pat[1:]
-                    if fnmatch.fnmatch(f, neg_pat):
+                    if _glob_to_regex(pat[1:]).match(f):
                         matches_every = False
                         break
                 else:
-                    if not fnmatch.fnmatch(f, pat):
+                    if not _glob_to_regex(pat).match(f):
                         matches_every = False
                         break
             if matches_every:
@@ -56,7 +94,7 @@ class PathsFilterSimulator:
         has_deps = False
         for f in changed_files:
             for pat in self.deps_patterns:
-                if fnmatch.fnmatch(f, pat):
+                if _glob_to_regex(pat).match(f):
                     has_deps = True
                     break
             if has_deps:
@@ -122,48 +160,6 @@ def test_recent_non_website_prs_bypass_tests(
             "scripts/tests/test_node_hook_paths.py",
             "scripts/tests/test_pr_watcher_agents.py",
         ],
-        "PR #2068 (feat: separate check:python)": [
-            "AGENTS.md",
-            "package.json",
-            "scripts/README.md",
-            "scripts/tests/test_beads_compatibility.py",
-            "scripts/tests/test_chores_nag_hook.py",
-            "scripts/tests/test_memory_review_apply_remote.py",
-            "scripts/tests/test_merge_handoff.py",
-            "scripts/tests/test_merge_pr_automerge.py",
-            "scripts/tests/test_mise_project_contract.py",
-            "scripts/tests/test_post_checkout_hook.py",
-            "scripts/tests/test_pr_gates.py",
-            "scripts/tests/test_request_codex_review.py",
-            "scripts/tests/test_review_preflight.py",
-            "scripts/tests/test_vercel_cli.py",
-            "scripts/tests/test_worktree_create_hook.py",
-            "scripts/tests/test_worktree_reap.py",
-        ],
-        "PR #2067 (feat: compact E2E output)": [
-            "package.json",
-            "scripts/tests/test_e2e_all_isolated.py",
-            "scripts/tests/test_quiet_run.py",
-            "scripts/workflow/e2e-all-isolated.sh",
-        ],
-        "PR #2063 (feat: quiet status output)": [
-            "package.json",
-            "scripts/dev-status.sh",
-            "scripts/tests/test_dev_status.py",
-            "scripts/tests/test_orchestration_status.py",
-            "scripts/workflow/orchestration-status.sh",
-        ],
-        "PR #2060 (feat: quiet validation)": [
-            "AGENTS.md",
-            "package.json",
-            "pytest.ini",
-            "scripts/README.md",
-            "scripts/quiet-run.py",
-            "scripts/tests/test_prototype_clean_guard.py",
-            "scripts/tests/test_pytest_output_policy.py",
-            "scripts/tests/test_quiet_run.py",
-            "scripts/workflow/preflight-locked.sh",
-        ],
         "PR #2058 (chore: scope permissions)": [
             ".codex/rules/pinpoint.rules",
             "scripts/tests/test_codex_gh.py",
@@ -214,6 +210,93 @@ def test_recent_non_website_prs_bypass_tests(
         has_code, has_deps = paths_filter.evaluate(files)
         assert not has_code, f"{pr_name} incorrectly flagged as has_code=True: {files}"
         assert not has_deps, f"{pr_name} incorrectly flagged as has_deps=True: {files}"
+
+
+def test_package_json_prs_trigger_tests(
+    paths_filter: PathsFilterSimulator,
+) -> None:
+    """package.json edits must trigger full CI (PP-9jar).
+
+    Before PP-9jar, `!package.json` in the has_code filter let a package.json-only
+    PR skip typecheck/lint/test/build/E2E entirely while ci-gate still went green.
+    These are real file lists from PRs that used to bypass and now must not.
+    """
+    package_json_prs: dict[str, list[str]] = {
+        "PR #2068 (feat: separate check:python)": [
+            "AGENTS.md",
+            "package.json",
+            "scripts/README.md",
+            "scripts/tests/test_beads_compatibility.py",
+            "scripts/tests/test_worktree_reap.py",
+        ],
+        "PR #2067 (feat: compact E2E output)": [
+            "package.json",
+            "scripts/tests/test_e2e_all_isolated.py",
+            "scripts/workflow/e2e-all-isolated.sh",
+        ],
+        "PR #2063 (feat: quiet status output)": [
+            "package.json",
+            "scripts/dev-status.sh",
+            "scripts/workflow/orchestration-status.sh",
+        ],
+        "PR #2060 (feat: quiet validation)": [
+            "AGENTS.md",
+            "package.json",
+            "pytest.ini",
+            "scripts/quiet-run.py",
+            "scripts/workflow/preflight-locked.sh",
+        ],
+    }
+    for pr_name, files in package_json_prs.items():
+        has_code, _ = paths_filter.evaluate(files)
+        assert has_code, f"{pr_name} must trigger CI (has_code=True): {files}"
+
+
+def test_scripts_ts_js_trigger_tests(
+    paths_filter: PathsFilterSimulator,
+) -> None:
+    """TS/JS under scripts/ is real code and must trigger full CI (PP-9jar).
+
+    scripts/migrate-production.ts runs on every Vercel prod build and
+    scripts/lib/pg-client.mjs is the PP-d8l8 prod commit-loss file; both are in
+    tsconfig.app.json. They must get typecheck/lint/test/build, unlike the
+    Python/shell/data files under scripts/ which stay excluded.
+    """
+    code_files = [
+        "scripts/migrate-production.ts",
+        "scripts/lib/pg-client.mjs",
+        "scripts/lib/drizzle-push-guard.ts",
+        "scripts/workflow/pr-watcher-mcp.ts",
+        "scripts/workflow/pr-watcher-mcp.test.ts",
+    ]
+    for f in code_files:
+        has_code, _ = paths_filter.evaluate([f])
+        assert has_code, f"scripts code file must trigger CI (has_code=True): {f}"
+
+
+def test_scripts_non_code_files_bypass_tests(
+    paths_filter: PathsFilterSimulator,
+) -> None:
+    """Python/shell/data files under scripts/ stay excluded (PP-9jar).
+
+    Guards the intentional divergence between picomatch (dorny) and fnmatch:
+    top-level scripts/*.py and scripts/*.sh are excluded by scripts/**/*.{py,sh}
+    (globstar spans zero segments), which fnmatch would get wrong.
+    """
+    non_code_files = [
+        "scripts/quiet-run.py",  # top-level .py
+        "scripts/worktree_setup.py",  # top-level .py
+        "scripts/dev-status.sh",  # top-level .sh
+        "scripts/check-pytest.sh",  # top-level .sh
+        "scripts/workflow/orchestration-status.sh",  # nested .sh
+        "scripts/requirements.txt",  # data
+        "scripts/beads-compatibility.json",  # data
+        "scripts/sql/readonly-role.sql",  # data
+        "scripts/tests/test_dev_status.py",  # python test tree
+    ]
+    for f in non_code_files:
+        has_code, _ = paths_filter.evaluate([f])
+        assert not has_code, f"scripts non-code file must bypass (has_code=False): {f}"
 
 
 def test_ts_unit_tests_trigger_ci_tests(
