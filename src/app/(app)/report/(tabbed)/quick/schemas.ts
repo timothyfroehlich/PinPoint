@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { ISSUE_STATUS_VALUES } from "~/lib/issues/status";
+import { ISSUE_FREQUENCY_VALUES } from "~/lib/types";
 import { proseMirrorDocValueSchema } from "~/lib/tiptap/types";
 
 /** Maximum rows a single quick submit may create (accident guard, not abuse). */
@@ -20,7 +21,7 @@ export const quickRowSchema = z.object({
     message: "Select a severity",
   }),
   priority: z.enum(["low", "medium", "high"], { message: "Select a priority" }),
-  frequency: z.enum(["intermittent", "frequent", "constant"], {
+  frequency: z.enum(ISSUE_FREQUENCY_VALUES, {
     message: "Select a frequency",
   }),
   status: z.enum(ISSUE_STATUS_VALUES),

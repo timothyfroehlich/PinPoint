@@ -57,6 +57,7 @@ export const ISSUE_PRIORITY_VALUES = ["low", "medium", "high"] as const;
 export type IssuePriority = (typeof ISSUE_PRIORITY_VALUES)[number];
 
 export const ISSUE_FREQUENCY_VALUES = [
+  "not_specified",
   "intermittent",
   "frequent",
   "constant",

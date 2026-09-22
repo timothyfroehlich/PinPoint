@@ -554,7 +554,7 @@ export const issues = pgTable(
       .notNull()
       .default("medium"),
     frequency: text("frequency", {
-      enum: ["intermittent", "frequent", "constant"],
+      enum: ["not_specified", "intermittent", "frequent", "constant"],
     })
       .notNull()
       .default("intermittent"),
