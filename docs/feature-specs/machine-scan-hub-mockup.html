@@ -46,8 +46,9 @@
     <h1 style="font-size: 18px; margin: 0 0 4px">Machine scan hub</h1>
     <p style="font-size: 13px; color: #a1a1aa; margin: 0 0 24px">
       Visual reference for <code>docs/feature-specs/machine-scan-hub.md</code>.
-      Design locked 2026-09-18 (canvas board “A3-Tim · amber”). Sample data; the
-      PinPoint header and bottom tab bar are the real app shell.
+      Design locked 2026-09-18, Top scores header amended 2026-09-21 (canvas
+      board “A3-Tim · View all on [iScored logo]”). Sample data; the PinPoint
+      header and bottom tab bar are the real app shell.
     </p>
     <div class="row">
       <figure>
@@ -226,14 +227,22 @@
                   </div>
                   <a
                     href="#x"
+                    title="View all on iScored"
                     style="
+                      display: flex;
+                      align-items: center;
+                      gap: 6px;
                       font-size: 12px;
                       font-weight: 600;
                       color: #4ade80;
                       text-decoration: none;
                     "
-                    >View all on iScored</a
-                  >
+                    ><span>View all on</span
+                    ><img
+                      src="iscored-logo.svg"
+                      alt="iScored"
+                      style="height: 18px; width: auto; display: block"
+                  /></a>
                 </div>
                 <div
                   style="
@@ -953,21 +962,29 @@
                   </div>
                   <a
                     href="#x"
+                    title="View all on iScored"
                     style="
+                      display: flex;
+                      align-items: center;
+                      gap: 6px;
                       font-size: 12px;
                       font-weight: 600;
                       color: #4ade80;
                       text-decoration: none;
                     "
-                    >View all on iScored</a
-                  >
+                    ><span>View all on</span
+                    ><img
+                      src="iscored-logo.svg"
+                      alt="iScored"
+                      style="height: 18px; width: auto; display: block"
+                  /></a>
                 </div>
                 <div
                   style="
                     display: flex;
                     align-items: center;
                     gap: 12px;
-                    height: 36px;
+                    height: 40px;
                   "
                 >
                   <div
@@ -1012,7 +1029,7 @@
                     display: flex;
                     align-items: center;
                     gap: 12px;
-                    height: 36px;
+                    height: 40px;
                   "
                 >
                   <div
@@ -1057,7 +1074,7 @@
                     display: flex;
                     align-items: center;
                     gap: 12px;
-                    height: 36px;
+                    height: 40px;
                   "
                 >
                   <div
@@ -1189,7 +1206,7 @@
                     align-items: center;
                     justify-content: center;
                     gap: 8px;
-                    height: 88px;
+                    height: 100px;
                     border-radius: 14px;
                     background: #4ade80;
                     color: #042f2e;
@@ -1230,7 +1247,7 @@
                     align-items: center;
                     justify-content: center;
                     gap: 8px;
-                    height: 88px;
+                    height: 100px;
                     border-radius: 14px;
                     background: #eab308;
                     color: #422006;
@@ -1437,7 +1454,8 @@
           </div>
         </div>
         <figcaption>
-          Smallest phone, 375×667 — Open issues collapses to one row, spec §5.2
+          Smallest phone, 375×667 — Open issues collapses to one row; scores and
+          buttons keep their size, spec §5.2
         </figcaption>
       </figure>
     </div>
