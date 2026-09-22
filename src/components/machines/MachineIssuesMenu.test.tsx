@@ -1,8 +1,10 @@
 // @vitest-environment jsdom
 import React from "react";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { toast } from "sonner";
+import type { ExportIssuesResult } from "~/app/(app)/issues/export-action";
 import { MachineIssuesMenu } from "./MachineIssuesMenu";
 
 // next/link → plain anchor so hrefs are assertable.
@@ -97,5 +99,82 @@ describe("MachineIssuesMenu", () => {
     await waitFor(() => {
       expect(mockExport).toHaveBeenCalledWith({ machineInitials: "GZ" });
     });
+  });
+
+  it("prevents multiple concurrent exports", async () => {
+    let resolveExport: ((value: ExportIssuesResult) => void) | undefined;
+    const exportPromise = new Promise<ExportIssuesResult>((resolve) => {
+      resolveExport = resolve;
+    });
+    mockExport.mockReturnValue(exportPromise);
+
+    const user = userEvent.setup();
+    render(<MachineIssuesMenu machineInitials="GZ" view="open" />);
+
+    await user.click(screen.getByRole("button", { name: /issue options/i }));
+    const exportItem = screen.getByRole("menuitem", {
+      name: /export all issues/i,
+    });
+    await user.click(exportItem);
+
+    // Radix dropdown items don't natively use the `disabled` DOM attribute for a variety of reasons,
+    // they use aria-disabled or pointer-events-none.
+    await user.click(screen.getByRole("button", { name: /issue options/i }));
+    const pendingExportItem = screen.getByRole("menuitem", {
+      name: "Exporting issues…",
+    });
+    expect(pendingExportItem).toHaveAttribute("aria-disabled", "true");
+
+    // Exercise the disabled item directly to guard against a future regression
+    // that visually disables the item but still lets its selection handler run.
+    fireEvent.click(pendingExportItem);
+    expect(mockExport).toHaveBeenCalledTimes(1);
+
+    if (resolveExport === undefined) {
+      throw new Error("Expected the export action promise to have a resolver");
+    }
+    resolveExport({
+      ok: true,
+      value: { csv: "a,b\n1,2", fileName: "GZ-issues.csv" },
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("menuitem", { name: /export all issues/i })
+      ).not.toHaveAttribute("aria-disabled");
+    });
+  });
+
+  it("reports when the browser cannot create a CSV download", async () => {
+    const originalCreateObjectURL = URL.createObjectURL;
+    Object.defineProperty(URL, "createObjectURL", {
+      configurable: true,
+      value: undefined,
+    });
+    mockExport.mockResolvedValue({
+      ok: true,
+      value: { csv: "a,b\n1,2", fileName: "GZ-issues.csv" },
+    });
+
+    try {
+      const user = userEvent.setup();
+      render(<MachineIssuesMenu machineInitials="GZ" view="open" />);
+
+      await user.click(screen.getByRole("button", { name: /issue options/i }));
+      await user.click(
+        screen.getByRole("menuitem", { name: /export all issues/i })
+      );
+
+      await waitFor(() => {
+        expect(toast.error).toHaveBeenCalledWith(
+          "Download failed. Your browser may not support file downloads."
+        );
+      });
+    } finally {
+      Object.defineProperty(URL, "createObjectURL", {
+        configurable: true,
+        value: originalCreateObjectURL,
+      });
+    }
   });
 });
