@@ -161,24 +161,13 @@ function formatCommentMessage(
       attachmentCount > 0
         ? `\n\nAdded ${attachmentCount} ${attachmentCount === 1 ? "photo" : "photos"}.`
         : "";
-    const trailingContext = contextLines.slice(1);
-    const fixedOverhead = [heading, ...trailingContext].join("\n").length;
-    const contextSeparators = contextLines.length;
     const minimumQuotedContentLength = "> …".length;
-    const primaryContextBudget = Math.max(
-      0,
-      DISCORD_MAX_MESSAGE_LENGTH -
-        fixedOverhead -
-        contextSeparators -
-        "\n\n".length -
-        attachmentLine.length -
-        minimumQuotedContentLength
+    const boundedContextLines = boundCommentContext(
+      heading,
+      contextLines,
+      "\n\n".length + attachmentLine.length + minimumQuotedContentLength
     );
-    const boundedPrimaryContext = clampDiscordText(
-      contextLines[0] ?? "",
-      primaryContextBudget
-    );
-    const fixedLines = [heading, boundedPrimaryContext, ...trailingContext];
+    const fixedLines = [heading, ...boundedContextLines];
     const fixed = `${fixedLines.join("\n")}\n\n`;
     const quoteBudget =
       DISCORD_MAX_MESSAGE_LENGTH - fixed.length - attachmentLine.length;
@@ -200,13 +189,39 @@ function formatCommentMessage(
     }
     return `${fixed}${quote(sanitized.slice(0, low))}…${attachmentLine}`;
   }
-  const fixedLines = [heading, ...contextLines];
   if (attachmentCount > 0) {
-    fixedLines.push(
-      `Added ${attachmentCount} ${attachmentCount === 1 ? "photo" : "photos"} — open the issue to view.`
+    const attachmentNotice = `Added ${attachmentCount} ${attachmentCount === 1 ? "photo" : "photos"} — open the issue to view.`;
+    const boundedContextLines = boundCommentContext(
+      heading,
+      contextLines,
+      "\n".length + attachmentNotice.length
     );
+    return [heading, ...boundedContextLines, attachmentNotice].join("\n");
   }
-  return fixedLines.join("\n");
+  return [heading, ...contextLines].join("\n");
+}
+
+function boundCommentContext(
+  heading: string,
+  contextLines: readonly string[],
+  reservedAfterContext: number
+): readonly string[] {
+  const primaryContext = contextLines[0] ?? "";
+  const trailingContext = contextLines.slice(1);
+  const fixedContentLength =
+    heading.length +
+    trailingContext.reduce((total, line) => total + line.length, 0);
+  const primaryContextBudget = Math.max(
+    0,
+    DISCORD_MAX_MESSAGE_LENGTH -
+      fixedContentLength -
+      contextLines.length -
+      reservedAfterContext
+  );
+  return [
+    clampDiscordText(primaryContext, primaryContextBudget),
+    ...trailingContext,
+  ];
 }
 
 function clampDiscordText(value: string, maxLength: number): string {

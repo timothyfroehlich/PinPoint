@@ -322,6 +322,28 @@ describe("formatDiscordMessage", () => {
     expect(out).toContain("Added 2 photos — open the issue to view.");
   });
 
+  it("preserves an attachment-only notice when context is oversized", () => {
+    const out = formatDiscordMessage({
+      type: "new_comment",
+      siteUrl: "https://app.example.com",
+      issueTitle: "t".repeat(5000),
+      formattedIssueId: "XX-15",
+      resourceType: "issue",
+      machineName: "m".repeat(5000),
+      actorName: "a".repeat(5000),
+      recipientReason: "issue_watcher",
+      commentContent: "",
+      commentId: "comment-15",
+      attachmentCount: 3,
+    });
+
+    expect(out.length).toBeLessThanOrEqual(2000);
+    expect(out).toContain(
+      "https://app.example.com/m/XX/i/15#comment-comment-15"
+    );
+    expect(out.endsWith("Added 3 photos — open the issue to view.")).toBe(true);
+  });
+
   it("formats onboarding and rollout settings links", () => {
     expect(formatDiscordWelcomeMessage("https://app.example.com")).toContain(
       "[Review notification settings](https://app.example.com/settings/notifications)"
