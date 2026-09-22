@@ -4,7 +4,7 @@
 
 **What this document is.** The requirements for the machine scan hub: the player-facing page a machine's apron-card QR opens. No implementation detail — design records and code carry that. It describes the intended final state only; what the code does or used to do lives solely in the Known divergences table. Each requirement is numbered for citation. When code and spec disagree, either the code is wrong or this document gets amended — never silently neither.
 
-**Related records.** [machine-scan-hub-mockup.html](machine-scan-hub-mockup.html) (visual reference, locked 2026-09-18; canvas https://claude.ai/artifact/Fc7Qm1iMQ6o9MKkwvaUCg2, board "A3-Tim · View all on [iScored logo]"). `docs/feature-specs/apron-cards.md` (the card whose QR opens the hub), `docs/feature-specs/iscored.md` (Top Scores card, score entry link), `docs/feature-specs/reporting.md` (Quick report). Bead PP-cov9 (build tracking); PP-a0be (pinTips on the hub, deferred).
+**Related records.** [machine-scan-hub-mockup.html](machine-scan-hub-mockup.html) (visual reference, locked 2026-09-18; canvas https://claude.ai/artifact/Fc7Qm1iMQ6o9MKkwvaUCg2, board "A3-Tim · View all on [iScored logo]"; unlinked state: canvas https://claude.ai/artifact/UhqRBvz9vM1yphnSXtgYZd, board "Unlinked · sentence only"). `docs/feature-specs/apron-cards.md` (the card whose QR opens the hub), `docs/feature-specs/iscored.md` (Top Scores card, score entry link), `docs/feature-specs/reporting.md` (Quick report). Bead PP-cov9 (build tracking); PP-a0be (pinTips on the hub, deferred).
 
 ---
 
@@ -24,7 +24,7 @@
 ## 3. Content, top to bottom
 
 - **3.1** **Identity block** — the machine's name, then manufacturer · year · owner display name on one line. The block links to the machine's Info page and carries a "Details" affordance. The owner is shown by display name only (CORE-SEC-007).
-- **3.2** **Top scores card** — a reduced form of the iScored Top Scores card (iScored spec §4): the "Top scores" label, three ranked rows, a "View all on" link carrying the iScored logo, and the card's empty and unlinked states (§4.4–§4.5). It carries no Add score control — that action is the hub's Post a score button (§3.4). The hub never shows more than three scores.
+- **3.2** **Top scores card** — a reduced form of the iScored Top Scores card (iScored spec §4): the "Top scores" label, three ranked rows, a "View all on" link carrying the iScored logo, and the card's empty and unlinked states (§4.4–§4.5). In the unlinked state the card keeps its label and the iScored logo (as a plain image) and shows one sentence — no iScored game is linked to this machine — to every viewer; it never renders the Manage link. It carries no Add score control — that action is the hub's Post a score button (§3.4). The hub never shows more than three scores.
 - **3.3** **Open issues card** — the count of open issues in its label and the three newest open issues as rows (severity label, title, age), with a "See all" link to the machine's issues. With zero open issues it shows a quiet "No open issues" state.
 - **3.4** **Action buttons** — two equal-size buttons side by side in the thumb zone, icon above label: **Post a score** (left) and **Report a problem** (right).
 - **3.5** The hub shows no machine status indicator (Playable / Needs attention / Out of order) and no maintainer or owner tools.
@@ -56,5 +56,6 @@
 
 | Date | Change |
 | :-- | :-- |
+| 2026-09-22 | §3.2: the unlinked state shows the sentence only, to everyone — the hub never renders the Manage link (resolves the conflict with §3.5). Unlinked-state mockup added. |
 | 2026-09-21 | §3.2 narrowed: the hub's Top scores card is a reduced iScored card — no Add score control (Post a score is the thumb-zone button), "View all on" link carries the iScored logo. Mockup board reference updated. |
 | 2026-09-18 | Initial draft: route and shell, content order, actions, fit on the reference and smallest phones, color. Design locked on canvas board "A3-Tim · amber". |
