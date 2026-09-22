@@ -1,5 +1,10 @@
 import type { notificationPreferences } from "~/server/db/schema";
-import type { NotificationType } from "~/lib/notifications/dispatch";
+import type { IssueStatus } from "~/lib/issues/status";
+import type { IssueFrequency, IssueSeverity } from "~/lib/types";
+import type {
+  NotificationType,
+  RecipientReason,
+} from "~/lib/notifications/events";
 
 /**
  * Preferences row shape — matches Drizzle's inferred select type for
@@ -37,7 +42,15 @@ export interface ChannelContext {
   machineInitials?: string | undefined;
   formattedIssueId?: string | undefined;
   commentContent?: string | undefined;
-  newStatus?: string | undefined;
+  commentId?: string | undefined;
+  attachmentCount?: number | undefined;
+  oldStatus?: IssueStatus | undefined;
+  newStatus?: IssueStatus | undefined;
+  severity?: IssueSeverity | undefined;
+  frequency?: IssueFrequency | undefined;
+  ownershipChange?: "added" | "removed" | undefined;
+  actorName?: string | undefined;
+  recipientReason: RecipientReason;
   issueDescription?: string | undefined;
   /**
    * Stable per-event identifier that discriminates distinct occurrences of the
@@ -78,7 +91,8 @@ export interface NotificationChannel {
    */
   shouldDeliver(
     prefs: NotificationPreferencesRow,
-    type: NotificationType
+    type: NotificationType,
+    recipientReason?: RecipientReason
   ): boolean;
   /**
    * Perform the actual external delivery (email/Discord HTTP). Run AFTER the

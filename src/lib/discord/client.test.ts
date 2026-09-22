@@ -24,6 +24,12 @@ function installFetchMock(handler: (call: FetchCall) => Response): FetchCall[] {
   return calls;
 }
 
+function requestBody(call: FetchCall | undefined): string {
+  const body = call?.init?.body;
+  if (typeof body !== "string") throw new Error("expected a JSON request body");
+  return body;
+}
+
 beforeEach(() => {
   vi.useFakeTimers();
 });
@@ -56,6 +62,30 @@ describe("sendDm", () => {
     expect(calls).toHaveLength(2);
     expect(calls[0]?.init?.headers).toMatchObject({
       Authorization: "Bot bot-tok",
+    });
+    expect(JSON.parse(requestBody(calls[1]))).toMatchObject({
+      content: "hi",
+      allowed_mentions: { parse: [] },
+      flags: 4,
+    });
+  });
+
+  it("does not suppress link embeds on shared channel messages", async () => {
+    const calls = installFetchMock(
+      () => new Response(JSON.stringify({ id: "msg-1" }), { status: 200 })
+    );
+
+    await expect(
+      postChannelMessage({
+        botToken: "bot-tok",
+        channelId: "channel-1",
+        content: "https://example.com",
+      })
+    ).resolves.toEqual({ ok: true });
+
+    expect(JSON.parse(requestBody(calls[0]))).toEqual({
+      content: "https://example.com",
+      allowed_mentions: { parse: [] },
     });
   });
 
