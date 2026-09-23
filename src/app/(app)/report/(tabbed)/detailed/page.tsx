@@ -66,11 +66,7 @@ export default async function DetailedReportPage({
       userAuthenticated={Boolean(user)}
       accessLevel={accessLevel}
       assignees={assignees}
-      initialError={
-        typeof params.error === "string"
-          ? decodeURIComponent(params.error)
-          : undefined
-      }
+      initialError={typeof params.error === "string" ? params.error : undefined}
       initialIssues={initialIssues}
       initialMachineInitials={selectedMachine?.initials ?? ""}
       canMultiple={

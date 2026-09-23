@@ -1,8 +1,10 @@
 import React from "react";
 import { renderToString } from "react-dom/server";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ReportDraftProvider } from "./report-draft-store";
+import { submitPublicIssueAction } from "./actions";
+import { ReportDraftProvider, useReportDraft } from "./report-draft-store";
+import { defaultEntry } from "./report-draft-schema";
 import { QuickReportForm } from "./quick-report-form";
 
 vi.mock("next/navigation", () => ({
@@ -38,9 +40,38 @@ function renderForm(canMultiple: boolean): void {
   );
 }
 
+function DraftState(): React.JSX.Element {
+  const draft = useReportDraft();
+  return (
+    <div>
+      <button
+        onClick={() => {
+          draft.setEntries(() => [
+            {
+              ...defaultEntry("22222222-2222-4222-8222-222222222222"),
+              machineId: MACHINE.id,
+              title: "First issue",
+            },
+            {
+              ...defaultEntry("33333333-3333-4333-8333-333333333333"),
+              title: "Other issue",
+            },
+          ]);
+          draft.patchSingle({ firstName: "Stale reporter" });
+        }}
+      >
+        Seed draft
+      </button>
+      <output data-testid="single-name">{draft.single.firstName}</output>
+      <output data-testid="second-title">{draft.entries[1]?.title}</output>
+    </div>
+  );
+}
+
 describe("QuickReportForm", () => {
   beforeEach(() => {
     localStorage.clear();
+    vi.mocked(submitPublicIssueAction).mockReset();
   });
 
   it("renders URL machine and Quick frequency on the first server paint", () => {
@@ -107,5 +138,33 @@ describe("QuickReportForm", () => {
     expect(
       screen.getByRole("link", { name: "Report multiple issues" })
     ).toHaveAttribute("href", "/report/multiple");
+  });
+
+  it("clears Detailed-only data after a Quick submit while preserving extra Multiple rows", async () => {
+    vi.mocked(submitPublicIssueAction).mockResolvedValue({ success: true });
+    render(
+      <ReportDraftProvider machines={[MACHINE]} assignees={[]}>
+        <DraftState />
+        <QuickReportForm
+          machinesList={[MACHINE]}
+          canMultiple
+          initialIssues={[]}
+          initialMachineInitials=""
+        />
+      </ReportDraftProvider>
+    );
+
+    act(() => screen.getByRole("button", { name: "Seed draft" }).click());
+    expect(screen.getByTestId("single-name")).toHaveTextContent(
+      "Stale reporter"
+    );
+    act(() => screen.getByRole("button", { name: "Report issue" }).click());
+
+    await waitFor(() => {
+      expect(screen.getByTestId("single-name")).toBeEmptyDOMElement();
+      expect(screen.getByTestId("second-title")).toHaveTextContent(
+        "Other issue"
+      );
+    });
   });
 });

@@ -18,7 +18,7 @@ import {
   type RecentIssueData,
 } from "./actions";
 import { useReportDraft, type SharedEntry } from "./report-draft-store";
-import { defaultEntry } from "./report-draft-schema";
+import { defaultEntry, emptySingle } from "./report-draft-schema";
 
 interface Machine {
   id: string;
@@ -111,8 +111,14 @@ export function QuickReportForm({
   const searchParams = useSearchParams();
   const formRef = React.useRef<HTMLFormElement>(null);
   const quickDefaultsApplied = React.useRef(false);
-  const { entries, hydrated, patchEntry, clearAll, resetEntryZero } =
-    useReportDraft();
+  const {
+    entries,
+    hydrated,
+    patchEntry,
+    patchSingle,
+    clearAll,
+    resetEntryZero,
+  } = useReportDraft();
   const storedEntry = entries[0] ?? FALLBACK_ENTRY;
   // The shared provider starts with Detailed's blank defaults so it can hydrate
   // a saved draft safely. Render Quick's URL machine and defaults immediately,
@@ -182,11 +188,15 @@ export function QuickReportForm({
     if (!state.success) return;
     formRef.current?.reset();
     if (entries.length <= 1) clearAll();
-    else resetEntryZero();
+    else {
+      resetEntryZero();
+      patchSingle(emptySingle());
+    }
     if (state.redirectTo) window.location.assign(state.redirectTo);
   }, [
     clearAll,
     entries.length,
+    patchSingle,
     resetEntryZero,
     state.redirectTo,
     state.success,

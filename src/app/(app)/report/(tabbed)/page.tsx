@@ -57,9 +57,7 @@ export default async function PublicReportPage({
 
   const params = await searchParams;
   const errorMessage =
-    typeof params.error === "string"
-      ? decodeURIComponent(params.error)
-      : undefined;
+    typeof params.error === "string" ? params.error : undefined;
 
   const machineIdFromQuery = params.machineId;
   const machineInitialsFromQuery = params.machine;
