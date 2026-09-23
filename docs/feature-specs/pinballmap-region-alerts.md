@@ -41,10 +41,10 @@ Related: `docs/feature-specs/pinballmap.md` (the location-sync integration), `do
 
 - **4.1** Alerts run on a fixed hourly schedule (a server cron). The cadence is not admin-configurable, and there is no on-demand run — the test message (§2.4) is the only manual post.
 - **4.2** Only two kinds of change are announced: a machine **added** to a location in the region, and a machine **removed** from one. No other Pinball Map activity is announced — not condition comments, high scores, new locations, or photos.
-- **4.3** Each change is announced once: recorded when first seen and marked announced only after the post succeeds; a failed post is retried on the next run, not lost.
+- **4.3** Each change is announced once: recorded on the first run where it appears or disappears (removals are confirmed on the first absent run without a multi-run debounce, allowing additions and removals from game swaps or edition changes to announce together), and marked announced only after the post succeeds; a failed post is retried on the next run, not lost.
 - **4.4** The first run for a region records current state as already-seen without announcing, so enabling alerts (or switching region, §2.5) does not dump the region's existing activity into the channel.
 - **4.5** A quiet period with no add/remove events is a normal no-op, not a failure. Only a failed, malformed, or implausibly large/incomplete response is treated as a bad read and discarded without announcing.
-- **4.6** Each alert names the added or removed machine and its venue, links to the venue's Pinball Map page (the location-specific link-back, CORE-PBM-001), and carries the required Pinball Map attribution (CC BY-SA 4.0, CORE-PBM-001).
+- **4.6** Each alert names the added or removed machine and its venue, links to the venue's Pinball Map page with link previews suppressed (the location-specific link-back, CORE-PBM-001), and carries the required Pinball Map attribution (CC BY-SA 4.0, CORE-PBM-001).
 - **4.7** No outbound Discord call runs inside a database transaction (CORE-ARCH-011).
 
 ## 5. Permissions
@@ -59,6 +59,7 @@ Related: `docs/feature-specs/pinballmap.md` (the location-sync integration), `do
 | Spec | Code today | Resolution |
 | :-- | :-- | :-- |
 | §4.1 fixed hourly schedule | Hardcoded Vercel cron at `23 * * * *` | Keep; spec documents the fixed cadence |
+| §4.3 in-place LMX machine updates | Updates machine ID in-place silently without events; user edition fixes via remove-and-re-add emit paired events | Keep; in-place LMX mutation is rare admin reconciliation |
 
 ---
 
@@ -66,5 +67,6 @@ Related: `docs/feature-specs/pinballmap.md` (the location-sync integration), `do
 
 | Date | Change |
 | :-- | :-- |
+| 2026-09-19 | Confirmed removals on the first absent run so game swaps and edition changes announce together (§4.3); suppressed Discord link preview embeds on venue links (§4.6). |
 | 2026-09-13 | Admin configuration card implemented (PP-o355.51.7): region select, alert channel configuration, Discord validation on save, send test message action, and stored channel status readout. |
 | 2026-08-22 | Created. |

@@ -51,6 +51,10 @@ function prefs(
     discordNotifyOnNewIssue: false,
     discordWatchNewIssuesGlobal: false,
     discordDmBlockedAt: null,
+    discordOnboardedAt: null,
+    discordNoticeVersion: 0,
+    discordNoticeLeaseId: null,
+    discordNoticeLeaseExpiresAt: null,
     ...overrides,
   };
 }
@@ -60,6 +64,7 @@ function ctx(overrides: Partial<ChannelContext> = {}): ChannelContext {
     userId: "u1",
     type: "issue_assigned",
     resourceId: "issue-1",
+    eventId: "event-1",
     resourceType: "issue",
     email: "u@example.com",
     discordUserId: "discord-1",
@@ -68,6 +73,7 @@ function ctx(overrides: Partial<ChannelContext> = {}): ChannelContext {
     formattedIssueId: "AFM-01",
     commentContent: undefined,
     newStatus: undefined,
+    recipientReason: "assignee",
     issueDescription: undefined,
     ...overrides,
   };

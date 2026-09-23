@@ -8,6 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "~/components/ui/select";
+import { errorMessage } from "~/lib/errors";
 import { updateUserRole } from "./actions";
 import { toast } from "sonner";
 
@@ -45,9 +46,7 @@ export function UserRoleSelect({
         await updateUserRole(userId, newRole, userType);
         toast.success("Role updated successfully");
       } catch (error) {
-        toast.error(
-          error instanceof Error ? error.message : "Failed to update role"
-        );
+        toast.error(errorMessage(error, "Failed to update role"));
       }
     });
   };

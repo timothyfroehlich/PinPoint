@@ -239,6 +239,7 @@ function TimelineItem({
 
   return (
     <div
+      id={event.type === "comment" ? `comment-${event.id}` : undefined}
       className="group relative flex gap-3 @xl:gap-4"
       data-testid={`timeline-item-${event.id}`}
     >

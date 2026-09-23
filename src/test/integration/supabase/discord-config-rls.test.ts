@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -17,6 +17,7 @@ describe("Discord integration config RLS", () => {
   let memberUser: { id: string; email: string };
   let adminAuthedClient: SupabaseClient;
   let memberAuthedClient: SupabaseClient;
+  let initialGuildId: string | null;
 
   beforeAll(async () => {
     const adminEmail = `discord-rls-admin-${Date.now()}@test.com`;
@@ -58,11 +59,27 @@ describe("Discord integration config RLS", () => {
       email: memberEmail,
       password: "TestPassword123",
     });
+
+    const { data: initialConfig, error: initialConfigError } = await adminClient
+      .from("discord_integration_config")
+      .select("guild_id")
+      .eq("id", "singleton")
+      .single();
+    if (initialConfigError) throw initialConfigError;
+    initialGuildId = initialConfig.guild_id;
   });
 
   afterAll(async () => {
     await adminClient.auth.admin.deleteUser(adminUser.id);
     await adminClient.auth.admin.deleteUser(memberUser.id);
+  });
+
+  afterEach(async () => {
+    const { error } = await adminClient
+      .from("discord_integration_config")
+      .update({ guild_id: initialGuildId })
+      .eq("id", "singleton");
+    expect(error).toBeNull();
   });
 
   it("anonymous client cannot read the config", async () => {
@@ -105,7 +122,7 @@ describe("Discord integration config RLS", () => {
       .select("guild_id")
       .eq("id", "singleton")
       .single();
-    expect(data?.guild_id).toBeNull();
+    expect(data?.guild_id).toBe(initialGuildId);
   });
 
   it("admin client can UPDATE the config", async () => {
@@ -120,11 +137,6 @@ describe("Discord integration config RLS", () => {
       .eq("id", "singleton")
       .single();
     expect(data?.guild_id).toBe("test-guild-123");
-    // cleanup
-    await adminClient
-      .from("discord_integration_config")
-      .update({ guild_id: null })
-      .eq("id", "singleton");
   });
 
   it("authenticated role cannot EXECUTE get_discord_config()", async () => {

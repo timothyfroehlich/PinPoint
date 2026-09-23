@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { ISSUE_STATUS_VALUES } from "~/lib/issues/status";
+import { ISSUE_FREQUENCY_VALUES } from "~/lib/types";
 
 export const publicIssueSchema = z.object({
   machineId: z.string().uuid({ message: "Please select a machine" }),
@@ -21,7 +22,7 @@ export const publicIssueSchema = z.object({
       message: "Select a priority",
     })
     .optional(),
-  frequency: z.enum(["intermittent", "frequent", "constant"], {
+  frequency: z.enum(ISSUE_FREQUENCY_VALUES, {
     message: "Select frequency",
   }),
   status: z.enum(ISSUE_STATUS_VALUES).optional(),

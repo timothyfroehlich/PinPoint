@@ -4,7 +4,7 @@
 
 Requirements for PinPoint's Discord bot, which DMs members about issue and machine activity, and its admin configuration surface. Describes the intended final state; current code lives in the Known divergences table.
 
-Discord _login_ is a separate system (Supabase OAuth) and is not covered here. Disabling notifications never affects login.
+Discord authentication remains a separate Supabase OAuth system. This spec covers only the notification onboarding triggered when an account first gains a Discord identity. Disabling notifications never affects login.
 
 Related: `docs/feature-specs/admin-integrations.md` (the page this card lives on), the Pinball Map region-alerts spec (a separate feature that uses this bot token — §1.2).
 
@@ -15,6 +15,8 @@ Related: `docs/feature-specs/admin-integrations.md` (the page this card lives on
 - **1.1** One Discord bot, PinPoint-wide, delivers notifications as direct messages to members.
 - **1.2** The bot token is the Discord credential, owned by this spec. Other features may use it — the Pinball Map region-alerts posts do (separate spec). This spec does not define their behavior; each is gated by its own spec.
 - **1.3** A member can only be DM'd if they have linked their Discord account, which the login side records.
+- **1.4** The first time an account gains a Discord identity, Discord DMs are enabled and PinPoint sends a welcome DM linking to notification settings. Re-linking Discord preserves the member's existing choices and does not send another welcome.
+- **1.5** First-link defaults enable assignments, direct mentions, new issues on owned or watched machines, and comments and status changes on watched issues. All-machine notifications remain off. Notifications caused by the member's own actions are suppressed by default.
 
 ## 2. Configuration (the admin card)
 
@@ -44,8 +46,12 @@ The card uses the credential-entry pattern: fields, a Save that validates and re
 
 - **4.1** A notification is DM'd to the member's linked Discord account. A member with no linked account is skipped, not errored.
 - **4.2** If a Test DM fails because the member and bot share no Discord server, the response shows the configured invite link so the member can join and retry; no other Test DM failure shows the invite link.
-- **4.3** Comment content is not rendered in the DM body — a notification links to the resource, it does not quote it. The text is available to the channel but deliberately withheld from the message (privacy).
-- **4.4** No outbound Discord call runs inside a database transaction (CORE-ARCH-011).
+- **4.3** Comment and mention DMs include the comment's plain-text content. If the content would exceed Discord's message limit, PinPoint truncates the comment while preserving the notification heading, context, and link. A comment with attachments but no text states the attachment count and links to the comment.
+- **4.4** An issue notification links the issue ID to the issue. Comment and mention links target the specific comment. A machine-only notification links the machine name. Routine notifications do not append a separate raw resource URL or notification-settings footer.
+- **4.5** A routine DM identifies what happened and includes the context needed to judge it without opening PinPoint: the issue title and machine, applicable severity or status, the acting member when known, and why the recipient received it when that is not already obvious.
+- **4.6** One product action sends at most one Discord DM to each recipient. When a recipient qualifies for multiple notification types, PinPoint prefers assignment, then direct mention, then the general activity notification. If the preferred type is disabled but another qualifying type is enabled, PinPoint sends the enabled fallback.
+- **4.7** Discord honors the account-wide preference to suppress notifications caused by the member's own actions.
+- **4.8** No outbound Discord call runs inside a database transaction (CORE-ARCH-011).
 
 ## 5. Permissions
 
@@ -70,5 +76,6 @@ The card uses the credential-entry pattern: fields, a Save that validates and re
 
 | Date | Change |
 | :-- | :-- |
+| 2026-09-12 | Made DMs issue-first and actionable; added comment text, per-action deduplication, and first-link onboarding. |
 | 2026-09-08 | Limited the Test DM invite link to the no-shared-server failure. |
 | 2026-08-22 | Created. |

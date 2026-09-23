@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   clearIscoredCacheForTesting,
   getAllScoresForMachine,
+  getGameroomGames,
   getTopScoresForMachine,
   refreshIscoredScores,
 } from "./client";
@@ -73,10 +74,12 @@ describe("iscored client", () => {
     },
   ];
 
+  const mockScoresPayload = (scores: unknown[] = mockApiScores) => ({ scores });
+
   describe("parsing, ranking, and PII email stripping (CORE-SEC-007)", () => {
     it("parses scores, normalizes numeric game to string, and strips emails at client boundary", async () => {
       vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
-        new Response(JSON.stringify(mockApiScores), {
+        new Response(JSON.stringify(mockScoresPayload()), {
           status: 200,
           headers: { "Content-Type": "application/json" },
         })
@@ -110,9 +113,22 @@ describe("iscored client", () => {
       }
     });
 
-    it("parses string scores with commas", async () => {
+    it("parses scores when upstream returns a legacy bare array", async () => {
       vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
         new Response(JSON.stringify(mockApiScores), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        })
+      );
+
+      const scores = await getAllScoresForMachine("77956");
+      expect(scores).toHaveLength(4);
+      expect(scores[0]?.playerName).toBe("Bob");
+    });
+
+    it("parses string scores with commas", async () => {
+      vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+        new Response(JSON.stringify(mockScoresPayload()), {
           status: 200,
           headers: { "Content-Type": "application/json" },
         })
@@ -128,11 +144,13 @@ describe("iscored client", () => {
     it("falls back to Anonymous when player name is empty or missing", async () => {
       vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
         new Response(
-          JSON.stringify([
-            { id: 301, game: 999, name: "", score: 100 },
-            { id: 302, game: 999, name: "   ", score: 200 },
-            { id: 303, game: 999, score: 300 },
-          ]),
+          JSON.stringify(
+            mockScoresPayload([
+              { id: 301, game: 999, name: "", score: 100 },
+              { id: 302, game: 999, name: "   ", score: 200 },
+              { id: 303, game: 999, score: 300 },
+            ])
+          ),
           {
             status: 200,
             headers: { "Content-Type": "application/json" },
@@ -150,13 +168,25 @@ describe("iscored client", () => {
     it("masks email-shaped player names with Anonymous (CORE-SEC-007)", async () => {
       vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
         new Response(
-          JSON.stringify([
-            { id: 401, game: 888, name: "user@domain.com", score: 500 },
-            { id: 402, game: 888, name: "  player@test.org  ", score: 600 },
-            { id: 403, game: 888, name: "ValidPlayer", score: 700 },
-            { id: 404, game: 888, name: "Alice alice@example.com", score: 400 },
-            { id: 405, game: 888, name: "bob@domain.org (Guest)", score: 300 },
-          ]),
+          JSON.stringify(
+            mockScoresPayload([
+              { id: 401, game: 888, name: "user@domain.com", score: 500 },
+              { id: 402, game: 888, name: "  player@test.org  ", score: 600 },
+              { id: 403, game: 888, name: "ValidPlayer", score: 700 },
+              {
+                id: 404,
+                game: 888,
+                name: "Alice alice@example.com",
+                score: 400,
+              },
+              {
+                id: 405,
+                game: 888,
+                name: "bob@domain.org (Guest)",
+                score: 300,
+              },
+            ])
+          ),
           {
             status: 200,
             headers: { "Content-Type": "application/json" },
@@ -177,7 +207,7 @@ describe("iscored client", () => {
   describe("helper methods", () => {
     it("getTopScoresForMachine defaults to 3 scores", async () => {
       vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
-        new Response(JSON.stringify(mockApiScores), {
+        new Response(JSON.stringify(mockScoresPayload()), {
           status: 200,
           headers: { "Content-Type": "application/json" },
         })
@@ -190,7 +220,7 @@ describe("iscored client", () => {
 
     it("getTopScoresForMachine respects custom limit", async () => {
       vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
-        new Response(JSON.stringify(mockApiScores), {
+        new Response(JSON.stringify(mockScoresPayload()), {
           status: 200,
           headers: { "Content-Type": "application/json" },
         })
@@ -213,7 +243,7 @@ describe("iscored client", () => {
 
     it("returns empty array when machine has no scores in gameroom", async () => {
       vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
-        new Response(JSON.stringify(mockApiScores), {
+        new Response(JSON.stringify(mockScoresPayload()), {
           status: 200,
           headers: { "Content-Type": "application/json" },
         })
@@ -227,7 +257,7 @@ describe("iscored client", () => {
   describe("batch caching & 15-second throttle with SWR", () => {
     it("serves from cache on subsequent calls within 15 seconds", async () => {
       const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
-        new Response(JSON.stringify(mockApiScores), {
+        new Response(JSON.stringify(mockScoresPayload()), {
           status: 200,
           headers: { "Content-Type": "application/json" },
         })
@@ -252,7 +282,7 @@ describe("iscored client", () => {
         fetchCount++;
         if (fetchCount === 1) {
           return Promise.resolve(
-            new Response(JSON.stringify(mockApiScores), {
+            new Response(JSON.stringify(mockScoresPayload()), {
               status: 200,
               headers: { "Content-Type": "application/json" },
             })
@@ -298,7 +328,7 @@ describe("iscored client", () => {
         },
       ];
       resolveSecondFetch(
-        new Response(JSON.stringify(updatedScores), {
+        new Response(JSON.stringify(mockScoresPayload(updatedScores)), {
           status: 200,
           headers: { "Content-Type": "application/json" },
         })
@@ -321,7 +351,7 @@ describe("iscored client", () => {
       vi.spyOn(globalThis, "fetch").mockImplementation(async () => {
         fetchCount++;
         await new Promise((resolve) => setTimeout(resolve, 10));
-        return new Response(JSON.stringify(mockApiScores), {
+        return new Response(JSON.stringify(mockScoresPayload()), {
           status: 200,
           headers: { "Content-Type": "application/json" },
         });
@@ -344,7 +374,7 @@ describe("iscored client", () => {
       vi.spyOn(globalThis, "fetch").mockImplementation(() => {
         fetchCount++;
         return Promise.resolve(
-          new Response(JSON.stringify(mockApiScores), {
+          new Response(JSON.stringify(mockScoresPayload()), {
             status: 200,
             headers: { "Content-Type": "application/json" },
           })
@@ -368,7 +398,7 @@ describe("iscored client", () => {
       vi.spyOn(globalThis, "fetch").mockImplementation(() => {
         fetchCount++;
         return Promise.resolve(
-          new Response(JSON.stringify(mockApiScores), {
+          new Response(JSON.stringify(mockScoresPayload()), {
             status: 200,
             headers: { "Content-Type": "application/json" },
           })
@@ -390,7 +420,7 @@ describe("iscored client", () => {
 
     it("returns detached cloned records to prevent external cache mutation", async () => {
       vi.spyOn(globalThis, "fetch").mockResolvedValue(
-        new Response(JSON.stringify(mockApiScores), {
+        new Response(JSON.stringify(mockScoresPayload()), {
           status: 200,
           headers: { "Content-Type": "application/json" },
         })
@@ -460,6 +490,130 @@ describe("iscored client", () => {
 
       const scores = await getAllScoresForMachine("77956");
       expect(scores).toEqual([]);
+    });
+  });
+
+  describe("getGameroomGames", () => {
+    const mockGameroomGames = [
+      {
+        gameName: "Medieval Madness",
+        gameID: "77956",
+        CSSInitials: "...",
+        GameLogo: "/community/images/games/game1",
+      },
+      {
+        gameName: "Demolition Man",
+        gameID: 104656,
+        CSSInitials: "...",
+      },
+      {
+        gameName: "Game of Thrones (half-height)",
+        gameID: "79212",
+      },
+    ];
+
+    it("parses and returns games sorted alphabetically by gameName", async () => {
+      vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+        new Response(JSON.stringify(mockGameroomGames), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        })
+      );
+
+      const games = await getGameroomGames();
+      expect(games).toHaveLength(3);
+      expect(games[0]).toEqual({
+        gameId: "104656",
+        gameName: "Demolition Man",
+      });
+      expect(games[1]).toEqual({
+        gameId: "79212",
+        gameName: "Game of Thrones (half-height)",
+      });
+      expect(games[2]).toEqual({
+        gameId: "77956",
+        gameName: "Medieval Madness",
+      });
+    });
+
+    it("uses in-memory cache on subsequent calls within TTL", async () => {
+      const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+        new Response(JSON.stringify(mockGameroomGames), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        })
+      );
+
+      const first = await getGameroomGames();
+      const second = await getGameroomGames();
+
+      expect(first).toEqual(second);
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it("returns empty array when ISCORED_USER is unset", async () => {
+      delete process.env.ISCORED_USER;
+      const fetchSpy = vi.spyOn(globalThis, "fetch");
+
+      const games = await getGameroomGames();
+      expect(games).toEqual([]);
+      expect(fetchSpy).not.toHaveBeenCalled();
+    });
+
+    it("gracefully handles HTTP error", async () => {
+      vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+        new Response("Server Error", { status: 500 })
+      );
+
+      const games = await getGameroomGames();
+      expect(games).toEqual([]);
+    });
+
+    it("gracefully handles invalid JSON or non-array payload", async () => {
+      vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+        new Response("not json", { status: 200 })
+      );
+
+      const games = await getGameroomGames();
+      expect(games).toEqual([]);
+    });
+
+    it("preserves existing cached games when upstream response contains malformed records", async () => {
+      vi.useFakeTimers();
+      const initialTime = 1000000;
+      vi.setSystemTime(initialTime);
+
+      // 1. Initial successful fetch
+      vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+        new Response(JSON.stringify(mockGameroomGames), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        })
+      );
+      const initial = await getGameroomGames();
+      expect(initial).toHaveLength(3);
+
+      // Advance time past 1 hour (3600000 ms)
+      vi.setSystemTime(initialTime + 3600001);
+
+      // 2. Second fetch returns a malformed record (missing gameID)
+      const malformedGames = [
+        ...mockGameroomGames,
+        { gameName: "Broken Game", gameID: null },
+      ];
+      vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+        new Response(JSON.stringify(malformedGames), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        })
+      );
+
+      // Should preserve previous cached games and not return empty/broken list
+      const refreshed = await getGameroomGames();
+      expect(refreshed).toHaveLength(3);
+      expect(refreshed[0]?.gameName).toBe("Demolition Man");
+
+      vi.useRealTimers();
     });
   });
 });

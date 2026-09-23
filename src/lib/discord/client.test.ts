@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { sendDm } from "./client";
+import { DISCORD_MESSAGE_FLAGS, postChannelMessage, sendDm } from "./client";
 
 const ORIGINAL_FETCH = globalThis.fetch;
 
@@ -22,6 +22,12 @@ function installFetchMock(handler: (call: FetchCall) => Response): FetchCall[] {
     return Promise.resolve(handler(call));
   });
   return calls;
+}
+
+function requestBody(call: FetchCall | undefined): string {
+  const body = call?.init?.body;
+  if (typeof body !== "string") throw new Error("expected a JSON request body");
+  return body;
 }
 
 beforeEach(() => {
@@ -56,6 +62,30 @@ describe("sendDm", () => {
     expect(calls).toHaveLength(2);
     expect(calls[0]?.init?.headers).toMatchObject({
       Authorization: "Bot bot-tok",
+    });
+    expect(JSON.parse(requestBody(calls[1]))).toMatchObject({
+      content: "hi",
+      allowed_mentions: { parse: [] },
+      flags: 4,
+    });
+  });
+
+  it("does not suppress link embeds on shared channel messages", async () => {
+    const calls = installFetchMock(
+      () => new Response(JSON.stringify({ id: "msg-1" }), { status: 200 })
+    );
+
+    await expect(
+      postChannelMessage({
+        botToken: "bot-tok",
+        channelId: "channel-1",
+        content: "https://example.com",
+      })
+    ).resolves.toEqual({ ok: true });
+
+    expect(JSON.parse(requestBody(calls[0]))).toEqual({
+      content: "https://example.com",
+      allowed_mentions: { parse: [] },
     });
   });
 
@@ -237,5 +267,59 @@ describe("sendDm", () => {
       content: "hi",
     });
     expect(result).toEqual({ ok: false, reason: "not_configured" });
+  });
+});
+
+describe("postChannelMessage", () => {
+  it("posts a message directly to a channel with flags", async () => {
+    const calls = installFetchMock((call) => {
+      if (call.url.endsWith("/channels/chan-123/messages")) {
+        return new Response(JSON.stringify({ id: "msg-1" }), { status: 200 });
+      }
+      throw new Error(`unexpected url ${call.url}`);
+    });
+
+    const result = await postChannelMessage({
+      botToken: "bot-tok",
+      channelId: "chan-123",
+      content: "test message",
+      flags: DISCORD_MESSAGE_FLAGS.SUPPRESS_EMBEDS,
+    });
+
+    expect(result).toEqual({ ok: true });
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.url).toContain("/channels/chan-123/messages");
+    expect(calls[0]?.init?.headers).toMatchObject({
+      Authorization: "Bot bot-tok",
+    });
+    const rawBody = calls[0]?.init?.body;
+    expect(typeof rawBody).toBe("string");
+    if (typeof rawBody !== "string") {
+      throw new Error("expected body to be a string");
+    }
+    const parsedBody: unknown = JSON.parse(rawBody);
+    expect(parsedBody).toEqual({
+      content: "test message",
+      allowed_mentions: { parse: [] },
+      flags: 4,
+    });
+  });
+
+  it("returns reason='not_configured' when channelId or botToken is empty", async () => {
+    expect(
+      await postChannelMessage({
+        botToken: "",
+        channelId: "chan-123",
+        content: "hi",
+      })
+    ).toEqual({ ok: false, reason: "not_configured" });
+
+    expect(
+      await postChannelMessage({
+        botToken: "tok",
+        channelId: "",
+        content: "hi",
+      })
+    ).toEqual({ ok: false, reason: "not_configured" });
   });
 });

@@ -280,6 +280,14 @@ export async function createMachineAction(
       (formData.get("forcePromoteUserId") as string).length > 0
         ? (formData.get("forcePromoteUserId") as string)
         : undefined,
+    iscoredGameId: (() => {
+      if (!formData.has("iscoredGameId")) return undefined;
+      const raw = formData.get("iscoredGameId");
+      if (typeof raw === "string" && raw.trim().length > 0) {
+        return raw.trim();
+      }
+      return null;
+    })(),
     ...readPbmLinkFormFields(formData),
   };
 
@@ -298,8 +306,14 @@ export async function createMachineAction(
     return err("VALIDATION", firstError?.message ?? "Invalid input");
   }
 
-  const { name, initials, ownerId, presenceStatus, forcePromoteUserId } =
-    validation.data;
+  const {
+    name,
+    initials,
+    ownerId,
+    presenceStatus,
+    forcePromoteUserId,
+    iscoredGameId,
+  } = validation.data;
 
   // Resolve PinballMap link columns (mutual-exclusion + catalog-derived metadata).
   // Creators are tech/admin (machines.create), who always hold the link
@@ -362,6 +376,7 @@ export async function createMachineAction(
         presenceStatus,
         description: descriptionColumn,
         pbmColumns,
+        iscoredGameId,
         promoteGuest: {
           userId: forcePromoteUserId,
           type: targetActive ? "active" : "invited",
@@ -463,6 +478,7 @@ export async function createMachineAction(
       presenceStatus,
       description: descriptionColumn,
       pbmColumns,
+      iscoredGameId,
     });
 
     revalidatePath("/m");
@@ -793,7 +809,7 @@ export async function updateMachineAction(
       const oldOwnerId = currentMachine.ownerId;
 
       // Atomic: promote + update machine + update watcher
-      const [machine] = await db.transaction(async (tx) => {
+      const { machine, ownerEventId } = await db.transaction(async (tx) => {
         // Promote guest to member
         if (targetActive) {
           await tx
@@ -868,7 +884,7 @@ export async function updateMachineAction(
 
         // Lifecycle: emit one event per tracked field that changed.
         // Atomic with the update — if an emit fails, the update rolls back.
-        await emitMachineUpdated(
+        const ownerEventId = await emitMachineUpdated(
           tx,
           {
             id: currentMachine.id,
@@ -888,7 +904,11 @@ export async function updateMachineAction(
           user.id
         );
 
-        return [updatedMachine];
+        if (oldOwnerId !== (machineOwnerId ?? null) && !ownerEventId) {
+          throw new Error("Owner changed without a timeline event");
+        }
+
+        return { machine: updatedMachine, ownerEventId };
       });
 
       // Post-commit side effects — best-effort: do not fail the action on notification errors
@@ -897,7 +917,7 @@ export async function updateMachineAction(
         const channels = await getChannels();
 
         // Remove old owner watcher and notify them
-        if (oldOwnerId && oldOwnerId !== machineOwnerId) {
+        if (ownerEventId && oldOwnerId && oldOwnerId !== machineOwnerId) {
           await db
             .delete(machineWatchers)
             .where(
@@ -912,10 +932,11 @@ export async function updateMachineAction(
                 type: "machine_ownership_changed",
                 resourceId: machine.id,
                 resourceType: "machine",
+                eventId: ownerEventId,
                 actorId: user.id,
                 includeActor: false,
                 machineName: machine.name,
-                newStatus: "removed",
+                ownershipChange: "removed",
                 additionalRecipientIds: [oldOwnerId],
               },
               undefined,
@@ -925,17 +946,18 @@ export async function updateMachineAction(
         }
 
         // Notify new owner
-        if (machineOwnerId && machineOwnerId !== oldOwnerId) {
+        if (ownerEventId && machineOwnerId && machineOwnerId !== oldOwnerId) {
           await dispatchNotification(
             await planNotification(
               {
                 type: "machine_ownership_changed",
                 resourceId: machine.id,
                 resourceType: "machine",
+                eventId: ownerEventId,
                 actorId: user.id,
                 includeActor: false,
                 machineName: machine.name,
-                newStatus: "added",
+                ownershipChange: "added",
                 additionalRecipientIds: [machineOwnerId],
               },
               undefined,
@@ -1038,7 +1060,7 @@ export async function updateMachineAction(
 
     // Atomic: update machine + reconcile watcher rows + emit lifecycle events.
     // Notifications stay outside the tx as best-effort side effects.
-    const [machine] = await db.transaction(async (tx) => {
+    const { machine, ownerEventId } = await db.transaction(async (tx) => {
       const [updatedMachine] =
         Object.keys(detailValues).length > 0
           ? await tx
@@ -1114,7 +1136,7 @@ export async function updateMachineAction(
 
       // Lifecycle: emit one event per tracked field that changed.
       // Atomic with the update — if an emit fails, the update rolls back.
-      await emitMachineUpdated(
+      const ownerEventId = await emitMachineUpdated(
         tx,
         {
           id: currentMachine.id,
@@ -1134,7 +1156,15 @@ export async function updateMachineAction(
         user.id
       );
 
-      return [updatedMachine];
+      if (
+        shouldUpdateOwner &&
+        oldOwnerId !== (finalOwnerId ?? null) &&
+        !ownerEventId
+      ) {
+        throw new Error("Owner changed without a timeline event");
+      }
+
+      return { machine: updatedMachine, ownerEventId };
     });
 
     // Post-commit side effects — best-effort: do not fail the action on notification errors
@@ -1143,17 +1173,18 @@ export async function updateMachineAction(
         // Resolve channels once for all notifications in this block (PP-rfc).
         const channels = await getChannels();
 
-        if (oldOwnerId && oldOwnerId !== finalOwnerId) {
+        if (ownerEventId && oldOwnerId && oldOwnerId !== finalOwnerId) {
           await dispatchNotification(
             await planNotification(
               {
                 type: "machine_ownership_changed",
                 resourceId: machine.id,
                 resourceType: "machine",
+                eventId: ownerEventId,
                 actorId: user.id,
                 includeActor: false,
                 machineName: machine.name,
-                newStatus: "removed",
+                ownershipChange: "removed",
                 additionalRecipientIds: [oldOwnerId],
               },
               undefined,
@@ -1161,17 +1192,18 @@ export async function updateMachineAction(
             )
           );
         }
-        if (finalOwnerId && finalOwnerId !== oldOwnerId) {
+        if (ownerEventId && finalOwnerId && finalOwnerId !== oldOwnerId) {
           await dispatchNotification(
             await planNotification(
               {
                 type: "machine_ownership_changed",
                 resourceId: machine.id,
                 resourceType: "machine",
+                eventId: ownerEventId,
                 actorId: user.id,
                 includeActor: false,
                 machineName: machine.name,
-                newStatus: "added",
+                ownershipChange: "added",
                 additionalRecipientIds: [finalOwnerId],
               },
               undefined,

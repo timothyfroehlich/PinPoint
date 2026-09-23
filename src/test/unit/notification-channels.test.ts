@@ -31,6 +31,10 @@ function prefs(
     discordNotifyOnNewIssue: true,
     discordWatchNewIssuesGlobal: false,
     discordDmBlockedAt: null,
+    discordOnboardedAt: null,
+    discordNoticeVersion: 0,
+    discordNoticeLeaseId: null,
+    discordNoticeLeaseExpiresAt: null,
     ...overrides,
   };
 }

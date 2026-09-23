@@ -23,6 +23,11 @@ vi.mock("~/lib/logger", () => ({
 // Mock drizzle-orm operators (used by the action internally)
 vi.mock("drizzle-orm", () => ({
   eq: vi.fn((_col: unknown, val: unknown) => ({ type: "eq", val })),
+  and: vi.fn((...conditions: unknown[]) => ({ type: "and", conditions })),
+  inArray: vi.fn((_col: unknown, values: unknown[]) => ({
+    type: "inArray",
+    values,
+  })),
   desc: vi.fn((col: unknown) => ({ type: "desc", col })),
 }));
 
@@ -31,7 +36,11 @@ vi.mock("~/server/db/schema", () => ({
   machines: {},
   userProfiles: {},
   issueImages: {},
-  issues: { machineInitials: "machineInitials", createdAt: "createdAt" },
+  issues: {
+    machineInitials: "machineInitials",
+    status: "status",
+    createdAt: "createdAt",
+  },
 }));
 
 // Stub out other imports the module pulls in but that are irrelevant to this test
