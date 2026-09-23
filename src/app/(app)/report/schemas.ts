@@ -38,6 +38,7 @@ export const publicIssueSchema = z.object({
     .or(z.literal("")),
   assignedTo: z.string().uuid("Invalid assignee").optional().or(z.literal("")),
   watchIssue: z.boolean().default(true),
+  reportSource: z.literal("apron").optional(),
   // Client-generated UUID, stable across submission retries. Lets the service
   // dedup a retried submission. Optional + tolerant of a missing/blank value so
   // a JS-disabled or legacy client (no hidden field) still submits. (PP-2053.7)

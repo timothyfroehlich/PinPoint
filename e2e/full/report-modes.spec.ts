@@ -43,7 +43,9 @@ test.describe("report mode handoffs", () => {
     await expect(page.getByRole("radio", { name: "Frequent" })).toBeChecked();
 
     await page.getByRole("link", { name: "Add details" }).click();
-    await expect(page).toHaveURL(/\/report\/detailed$/);
+    await expect(page).toHaveURL(
+      new RegExp(`/report/detailed\\?machine=${afm.initials}$`)
+    );
     await expect(
       page.getByRole("combobox", { name: "Select Machine" })
     ).toContainText(afm.initials);

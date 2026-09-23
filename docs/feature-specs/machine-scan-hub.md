@@ -1,6 +1,6 @@
 # Machine Scan Hub — Feature Spec
 
-**Status: draft.**
+**Status: approved.**
 
 **What this document is.** The requirements for the machine scan hub: the player-facing page a machine's apron-card QR opens. No implementation detail — design records and code carry that. It describes the intended final state only; what the code does or used to do lives solely in the Known divergences table. Each requirement is numbered for citation. When code and spec disagree, either the code is wrong or this document gets amended — never silently neither.
 
@@ -45,12 +45,6 @@
 ## 6. Color
 
 - **6.1** Post a score uses the primary token. Report a problem uses the existing `warning` token (amber) with dark text — the color family the Major severity label already uses. No new token is introduced.
-
-## Known divergences
-
-| Spec | Code today | Resolution |
-| :-- | :-- | :-- |
-| §2–§6 | Nothing built; the current sticker QR opens `/report?machine=<initials>&source=qr` directly | PP-cov9 |
 
 ## Changelog
 
