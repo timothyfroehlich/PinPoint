@@ -612,9 +612,9 @@ if (require.main === module) {
     // command a human types (which never generates a PreToolUse event).
     console.error(
       `Direct merge blocked: ${detail}. This channel skips merge-pr.sh's gate checks, so it ` +
-        "stays human-only. Either run the gate-enforced script yourself — " +
-        "`bash scripts/workflow/merge-pr.sh <PR> --human` (Tim approves the prompt) — or hand Tim " +
-        "the command to run himself: ! scripts/workflow/merge-pr.sh <PR> --human"
+        "stays human-only. Only after Tim directly requests the unambiguous merge in the active task, run " +
+        "`bash scripts/workflow/merge-pr.sh <PR> --human`; Claude Code will also prompt. Otherwise hand Tim " +
+        "the guarded command to run himself: ! scripts/workflow/merge-pr.sh <PR> --human"
     );
     process.exit(2);
   });
