@@ -51,9 +51,14 @@ describe("QuickSearch", () => {
     const user = userEvent.setup();
     renderQuickSearch();
     const input = screen.getByTestId("quick-search-desktop-input");
+    const suggestions = document.getElementById(
+      input.getAttribute("aria-controls") ?? ""
+    );
+    expect(suggestions).toHaveAttribute("hidden");
 
     fireEvent.keyDown(document, { key: "k", metaKey: true });
     await waitFor(() => expect(input).toHaveFocus());
+    expect(suggestions).not.toHaveAttribute("hidden");
     expect(
       within(screen.getByRole("listbox", { name: "Suggestions" })).getByText(
         "Search machines and issues"
@@ -67,6 +72,7 @@ describe("QuickSearch", () => {
 
     await user.keyboard("{Escape}");
     expect(input).toHaveFocus();
+    expect(suggestions).toHaveAttribute("hidden");
     expect(
       screen.queryByText(
         "Try a machine name or initials, an issue title, or an issue ID."

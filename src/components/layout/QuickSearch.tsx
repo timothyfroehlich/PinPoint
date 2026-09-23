@@ -470,8 +470,11 @@ export function DesktopQuickSearchTrigger(): React.JSX.Element {
           data-testid="quick-search-desktop-input"
           className="h-9 py-0"
         />
-        {desktopOpen && (
-          <CommandList className="absolute top-[calc(100%+0.5rem)] left-1/2 z-50 max-h-[min(65dvh,28rem)] w-[min(26rem,calc(100vw-2rem))] -translate-x-1/2 rounded-lg border bg-popover shadow-lg">
+        <CommandList
+          hidden={!desktopOpen}
+          className="absolute top-[calc(100%+0.5rem)] left-1/2 z-50 max-h-[min(65dvh,28rem)] w-[min(26rem,calc(100vw-2rem))] -translate-x-1/2 rounded-lg border bg-popover shadow-lg"
+        >
+          {desktopOpen && (
             <QuickSearchContent
               query={query}
               searchState={searchState}
@@ -479,8 +482,8 @@ export function DesktopQuickSearchTrigger(): React.JSX.Element {
               onNavigate={navigateTo}
               onRetry={retry}
             />
-          </CommandList>
-        )}
+          )}
+        </CommandList>
       </Command>
       <p className="sr-only" aria-live="polite" aria-atomic="true">
         {searchState.status === "loaded" && !isRefreshing
