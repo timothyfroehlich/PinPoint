@@ -48,6 +48,12 @@ describe("iscored config", () => {
     });
   });
 
+  it("never builds outbound links for the local AFM demo game", () => {
+    process.env.ISCORED_USER = "Apcscore";
+    expect(getScoreEntryUrl("local-afm-demo")).toBeNull();
+    expect(getGameUrl("local-afm-demo")).toBeNull();
+  });
+
   describe("getScoreEntryUrl", () => {
     it("builds the correct public score entry link from env", () => {
       process.env.ISCORED_USER = "Apcscore";
