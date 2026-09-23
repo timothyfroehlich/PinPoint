@@ -28,6 +28,7 @@ import { X } from "lucide-react";
 import { openFeedbackForm } from "~/components/feedback/FeedbackWidget";
 import { isNavItemActive } from "~/components/layout/nav-utils";
 import { NAV_ITEMS, type NavItem } from "~/components/layout/nav-config";
+import { MobileQuickSearchTrigger } from "~/components/layout/QuickSearch";
 import type { UserRole } from "~/lib/types";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 
@@ -41,7 +42,7 @@ interface BottomTabBarProps {
 // instead — the bottom bar keeps just the core destinations plus Report.
 const bottomTabs = [
   ...(NAV_ITEMS as readonly NavItem[]).filter(
-    (item) => !item.hideFromBottomBar
+    (item) => !item.hideFromBottomBar && item.href !== "/dashboard"
   ),
   { title: "Report", href: "/report", icon: Plus },
 ];
@@ -68,6 +69,8 @@ export function BottomTabBar({
         className="md:hidden fixed bottom-0 left-0 right-0 z-50 flex border-t border-primary/50 bg-card/90 backdrop-blur-sm shadow-[0_-4px_15px_color-mix(in_srgb,var(--color-primary)_25%,transparent)]"
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
+        <MobileQuickSearchTrigger className={tabBaseClass} />
+
         {bottomTabs.map((tab) => {
           const href = tab.href === "/issues" ? resolvedIssuesPath : tab.href;
           const active = isNavItemActive(

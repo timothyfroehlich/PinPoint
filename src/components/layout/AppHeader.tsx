@@ -17,6 +17,7 @@ import { HeaderSignInButton } from "~/components/layout/header-sign-in-button";
 import { HelpMenu } from "~/components/layout/HelpMenu";
 import { isNavItemActive } from "~/components/layout/nav-utils";
 import { NAV_ITEMS } from "~/components/layout/nav-config";
+import { DesktopQuickSearchTrigger } from "~/components/layout/QuickSearch";
 import type { UserRole } from "~/lib/types/user";
 
 interface AppHeaderProps {
@@ -33,8 +34,8 @@ interface AppHeaderProps {
 /**
  * Unified application header that replaces Sidebar + MobileHeader.
  *
- * Desktop (>= lg): Logo, APC logo, nav links (icon+text), Report Issue button (icon+"Report Issue"), HelpMenu, auth.
- * Tablet (md–lg): Logo, nav links (icon-only), Report button (icon+"Report"), HelpMenu, auth.
+ * Desktop (>= lg): Logo, APC logo, nav links, centered quick search, Report Issue, HelpMenu, auth.
+ * Tablet (md–lg): Logo, icon-only nav links, centered quick search, Report, HelpMenu, auth.
  * Mobile (< md): Logo, auth. Nav handled by BottomTabBar.
  */
 export function AppHeader({
@@ -114,16 +115,17 @@ export function AppHeader({
             data-testid={`nav-${item.title.toLowerCase()}`}
           >
             <item.icon className="size-4 shrink-0" aria-hidden="true" />
-            {/* Labels appear at xl (not lg): at the 1024px lg breakpoint the
-                nav (now 4 items incl. Collections) plus the Report action
-                overflow the header — icon-only keeps it within the viewport
-                until there's room for text. */}
-            <span className="hidden xl:inline" aria-hidden="true">
+            {/* Keep labels visually hidden until the centered search field and
+                right-side actions can coexist without overlap. The links retain
+                their aria-label at narrower desktop widths. */}
+            <span className="hidden min-[1700px]:inline" aria-hidden="true">
               {item.title}
             </span>
           </Link>
         ))}
       </nav>
+
+      <DesktopQuickSearchTrigger />
 
       <div className="flex-1" />
 
