@@ -60,14 +60,13 @@ export function UserMenu({
     <DropdownMenu>
       <DropdownMenuTrigger
         aria-label="User menu"
-        className="flex items-center gap-1.5 rounded-lg px-1.5 py-1 hover:bg-primary hover:text-on-primary transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+        className="flex items-center gap-1.5 rounded-lg px-1.5 py-1 hover:bg-primary hover:text-on-primary transition-colors duration-150 motion-reduce:transition-none focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
         data-testid={testId}
       >
         <div className="flex items-center gap-1.5">
-          {/* sm-structural-allow: top navigation bar is always full-viewport-width, viewport breakpoint is correct */}
-          <div className="hidden sm:block text-right">
+          <div className="hidden xl:block text-right">
             <p
-              className="text-sm font-medium text-on-primary-container leading-tight"
+              className="max-w-24 truncate text-sm font-medium text-on-primary-container leading-tight"
               data-testid="user-menu-name"
             >
               {userName.split(" ")[0]}
