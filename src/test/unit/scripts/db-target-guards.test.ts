@@ -9,9 +9,9 @@
 //      never actually invoked is the exact failure mode these catch, and only a
 //      real run proves the call site exists AND fires before any connection.
 //
-// The "passes the guard" cases point at localhost:1, where the socket is
-// refused instantly — so the assertion is "it got far enough to try to
-// connect", with no waiting on a timeout and no live database required.
+// Local-only scripts require both a loopback URL and a Docker container owned
+// by this worktree. A localhost:1 URL alone must never pass that guard because
+// it could be an SSH forward to a persistent remote database.
 
 import { spawnSync } from "node:child_process";
 import path from "node:path";
@@ -187,12 +187,12 @@ describe("seed scripts — local-only demo seeds refuse remote targets", () => {
       expect(status).toBe(2);
     });
 
-    it(`${script} lets a localhost URL through to the connection attempt`, () => {
+    it(`${script} refuses localhost without an owned local stack`, () => {
       const { status, stderr } = runScript(script, { POSTGRES_URL: LOCAL_URL });
-      expect(stderr).not.toContain("Refusing to run destructive DB script");
-      // Got past the guard and failed on the socket instead.
-      expect(stderr).toContain("ECONNREFUSED");
-      expect(status).not.toBe(2);
+      expect(status).toBe(2);
+      expect(stderr).toContain(
+        "not proved to be this worktree's local Supabase"
+      );
     });
   }
 });
