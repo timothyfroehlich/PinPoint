@@ -48,7 +48,7 @@
 - **5.1** Opening quick search immediately presents and focuses the search input without waiting for search data.
 - **5.2** Search begins after the query contains at least two non-whitespace characters.
 - **5.3** A person can move through results with arrow keys, open the selected result with Enter, and close quick search with Escape.
-- **5.4** Closing mobile quick search returns focus to the Search tab; closing desktop results leaves focus in the inline search field.
+- **5.4** Closing mobile quick search restores focus to the element that opened it (the Search tab when tapped, or the previously focused element when opened by shortcut). On desktop, Escape closes results and leaves focus in the inline search field; moving focus away, including with Tab, closes results without returning focus to the field.
 - **5.5** Quick search presents distinct initial, loading, empty, and failure states.
 - **5.6** A failure leaves the search field and current query available for another attempt.
 - **5.7** A response for an older query never replaces results for a newer query.
