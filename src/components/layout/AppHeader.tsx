@@ -61,113 +61,119 @@ export function AppHeader({
 
   return (
     <header
-      className="sticky top-0 z-20 flex h-14 items-center gap-4 border-b border-primary/50 bg-card/85 px-4 backdrop-blur-sm shadow-[0_0_15px_rgba(74,222,128,0.15)]"
+      className="sticky top-0 z-20 flex h-14 items-center gap-4 border-b border-primary/50 bg-card/85 px-4 backdrop-blur-sm shadow-[0_0_15px_rgba(74,222,128,0.15)] md:grid md:grid-cols-[minmax(0,1fr)_clamp(6rem,calc(50vw-16rem),20rem)_minmax(0,1fr)]"
       data-testid="app-header"
     >
-      <Link
-        href="/dashboard"
-        className="flex items-center gap-2"
-        aria-label="PinPoint"
-      >
-        <Image
-          src="/logo-pinpoint-transparent.png"
-          alt=""
-          aria-hidden="true"
-          width={32}
-          height={32}
-          className="size-8 object-contain"
-        />
-        <span className="text-base font-bold tracking-tight text-foreground">
-          PinPoint
-        </span>
-      </Link>
+      <div className="flex min-w-0 items-center gap-4">
+        <Link
+          href="/dashboard"
+          className="flex items-center gap-2"
+          aria-label="PinPoint"
+        >
+          <Image
+            src="/logo-pinpoint-transparent.png"
+            alt=""
+            aria-hidden="true"
+            width={32}
+            height={32}
+            className="size-8 object-contain"
+          />
+          <span className="text-base font-bold tracking-tight text-foreground">
+            PinPoint
+          </span>
+        </Link>
 
-      <a
-        href="https://austinpinballcollective.org"
-        target="_blank"
-        rel="noopener noreferrer"
-        aria-label="Austin Pinball Collective"
-        className="hidden lg:block"
-        data-testid="apc-logo-link"
-      >
-        <Image
-          src="/apc-logo.png"
-          alt="Austin Pinball Collective"
-          width={64}
-          height={38}
-          className="h-7 w-auto object-contain shrink-0"
-        />
-      </a>
+        <a
+          href="https://austinpinballcollective.org"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Austin Pinball Collective"
+          className="hidden lg:block"
+          data-testid="apc-logo-link"
+        >
+          <Image
+            src="/apc-logo.png"
+            alt="Austin Pinball Collective"
+            width={64}
+            height={38}
+            className="h-7 w-auto object-contain shrink-0"
+          />
+        </a>
 
-      <nav className="hidden md:flex items-center gap-1" aria-label="main">
-        {navLinks.map((item) => (
-          <Link
-            key={item.href}
-            href={item.href}
-            className={cn(
-              "flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm font-medium transition-colors duration-150 lg:px-3",
-              item.active
-                ? "bg-primary/10 text-primary"
-                : "text-muted-foreground hover:bg-primary/10 hover:text-primary"
-            )}
-            aria-current={item.active ? "page" : undefined}
-            aria-label={item.title}
-            data-testid={`nav-${item.title.toLowerCase()}`}
-          >
-            <item.icon className="size-4 shrink-0" aria-hidden="true" />
-            {/* Keep labels visually hidden until the centered search field and
+        <nav className="hidden md:flex items-center gap-1" aria-label="main">
+          {navLinks.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={cn(
+                "flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm font-medium transition-colors duration-150 lg:px-3",
+                item.active
+                  ? "bg-primary/10 text-primary"
+                  : "text-muted-foreground hover:bg-primary/10 hover:text-primary"
+              )}
+              aria-current={item.active ? "page" : undefined}
+              aria-label={item.title}
+              data-testid={`nav-${item.title.toLowerCase()}`}
+            >
+              <item.icon className="size-4 shrink-0" aria-hidden="true" />
+              {/* Keep labels visually hidden until the centered search field and
                 right-side actions can coexist without overlap. The links retain
                 their aria-label at narrower desktop widths. */}
-            <span className="hidden min-[1700px]:inline" aria-hidden="true">
-              {item.title}
-            </span>
-          </Link>
-        ))}
-      </nav>
+              <span className="hidden min-[1700px]:inline" aria-hidden="true">
+                {item.title}
+              </span>
+            </Link>
+          ))}
+        </nav>
+      </div>
 
       <DesktopQuickSearchTrigger />
 
-      <div className="flex-1" />
-
-      <div className="hidden md:flex items-center gap-2">
-        <Button
-          asChild
-          size="sm"
-          variant="secondary"
-          className="gap-2"
-          data-testid="nav-report-issue"
-        >
-          <Link href="/report" aria-label="Report Issue">
-            <AlertCircle className="size-4 shrink-0" aria-hidden="true" />
-            <span className="lg:hidden" aria-hidden="true">
-              Report
-            </span>
-            <span className="hidden lg:inline" aria-hidden="true">
-              Report Issue
-            </span>
-          </Link>
-        </Button>
-        <HelpMenu newChangelogCount={newChangelogCount} />
-      </div>
-
-      {isAuthenticated ? (
-        <div className="flex items-center gap-2">
-          <NotificationList notifications={notifications} />
-          <UserMenu userName={userName ?? "User"} role={role} userId={userId} />
-        </div>
-      ) : (
-        <div className="flex items-center gap-2">
-          <HeaderSignInButton />
+      <div className="ml-auto flex items-center gap-4 md:ml-0 md:justify-self-end">
+        <div className="hidden md:flex items-center gap-2">
           <Button
             asChild
             size="sm"
-            className="text-xs px-3 h-8"
-            data-testid="nav-signup"
+            variant="secondary"
+            className="gap-2"
+            data-testid="nav-report-issue"
           >
-            <Link href="/signup">Sign Up</Link>
+            <Link href="/report" aria-label="Report Issue">
+              <AlertCircle className="size-4 shrink-0" aria-hidden="true" />
+              <span className="lg:hidden" aria-hidden="true">
+                Report
+              </span>
+              <span className="hidden lg:inline" aria-hidden="true">
+                Report Issue
+              </span>
+            </Link>
           </Button>
+          <HelpMenu newChangelogCount={newChangelogCount} />
         </div>
-      )}
+
+        {isAuthenticated ? (
+          <div className="flex items-center gap-2">
+            <NotificationList notifications={notifications} />
+            <UserMenu
+              userName={userName ?? "User"}
+              role={role}
+              userId={userId}
+            />
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            <HeaderSignInButton />
+            <Button
+              asChild
+              size="sm"
+              className="text-xs px-3 h-8"
+              data-testid="nav-signup"
+            >
+              <Link href="/signup">Sign Up</Link>
+            </Button>
+          </div>
+        )}
+      </div>
     </header>
   );
 }

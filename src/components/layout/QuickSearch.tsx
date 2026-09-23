@@ -456,7 +456,7 @@ export function DesktopQuickSearchTrigger(): React.JSX.Element {
           closeDesktopSearch();
         }
       }}
-      className="absolute left-1/2 hidden -translate-x-1/2 md:block md:w-[clamp(8rem,calc(50vw-16rem),20rem)]"
+      className="relative hidden w-full md:block"
       data-testid="quick-search-desktop"
     >
       <Command
