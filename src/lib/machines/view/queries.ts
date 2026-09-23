@@ -232,7 +232,6 @@ function publicRow(candidate: MachineViewCandidate): MachineViewRow {
     title: candidate.title,
     manufacturer: candidate.manufacturer,
     year: candidate.year,
-    ownerId: candidate.ownerId,
     ownerName: candidate.ownerName,
     presence: candidate.presence,
     createdAt: candidate.createdAt,

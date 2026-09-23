@@ -13,7 +13,6 @@ function machine(overrides: Partial<MachineViewRow> = {}): MachineViewRow {
     title: "Attack from Mars",
     manufacturer: "Bally",
     year: 1995,
-    ownerId: "owner-1",
     ownerName: "Alex",
     presence: "on_the_floor",
     createdAt: "2026-01-01T00:00:00.000Z",
@@ -46,11 +45,11 @@ describe("MachineViewTable", () => {
       screen.getByRole("link", { name: "Attack from Mars" })
     ).toHaveAttribute("href", "/m/AFM");
     expect(screen.getByText("Bally · 1995 · Alex")).toBeInTheDocument();
-    expect(
-      screen.getByRole("link", {
-        name: "View 2 open issues for Attack from Mars",
-      })
-    ).toHaveAttribute("href", "/issues?machine=AFM");
+    const issueLink = screen.getByRole("link", {
+      name: "View 2 open issues for Attack from Mars",
+    });
+    expect(issueLink).toHaveAttribute("href", "/issues?machine=AFM");
+    expect(issueLink).toHaveClass("text-amber-500");
     expect(
       screen.getByRole("link", {
         name: "View service history for Attack from Mars",

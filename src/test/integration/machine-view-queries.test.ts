@@ -181,6 +181,7 @@ describe("machine view database pipeline", () => {
     expect(all.rows.every((row) => row.lastServicedAt === undefined)).toBe(
       true
     );
+    expect(all.rows.every((row) => !Object.hasOwn(row, "ownerId"))).toBe(true);
   });
 
   it("ignores owner IDs that are not available in the active scope", async () => {

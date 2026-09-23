@@ -13,6 +13,7 @@ import {
 } from "~/lib/machines/status";
 
 export interface MachineViewCandidate extends MachineViewRow {
+  ownerId: string | null;
   canonicalModelName: string;
   legacyModelName: string;
 }

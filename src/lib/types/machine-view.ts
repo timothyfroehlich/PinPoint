@@ -59,7 +59,6 @@ export interface MachineViewRow {
   title: string;
   manufacturer: string;
   year: number | null;
-  ownerId: string | null;
   ownerName: string;
   presence: MachinePresenceStatus;
   createdAt: string;

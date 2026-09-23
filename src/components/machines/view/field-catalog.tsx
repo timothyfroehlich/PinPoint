@@ -103,7 +103,10 @@ function IssueCount({ row }: { row: MachineViewRow }): React.JSX.Element {
     <Link
       href={`/issues?machine=${encodeURIComponent(row.initials)}`}
       aria-label={`View ${label} for ${row.title}`}
-      className="inline-flex items-center gap-1.5 rounded-sm text-xs font-medium text-foreground underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-sm text-xs font-medium underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        severity?.iconColor ?? "text-foreground"
+      )}
     >
       {Icon ? (
         <Icon aria-hidden="true" className={cn("size-4", severity.iconColor)} />

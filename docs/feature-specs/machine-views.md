@@ -93,13 +93,7 @@
 
 ## Known divergences (code vs spec)
 
-| Spec | Code today | Resolution |
-| :-- | :-- | :-- |
-| §2.1 Shared implementation | `/m` uses a machine-card grid; Collections use `CollectionOverviewTable` | Shared Machine View refactor |
-| §3.4–§3.9 Conditional server pipeline | `/m` and Collection resolvers hydrate issue children and build separate client/server projections | Conditional Machine View loader and compact aggregates |
-| §4.1–§4.9 Canonical bookmarkable state | Machines and Collections use different or local-only sorting, filtering, and column state | Preset-relative URL codec |
-| §5.2–§5.4 Shared responsive presentation | `/m` uses cards; Collection columns are automatically hidden at narrower widths | Shared table and Compact/Table phone presentations |
-| §5.6–§5.7 Issue and service navigation | Current surfaces do not consistently provide both links | Shared field renderers |
+_None currently recorded._
 
 ---
 

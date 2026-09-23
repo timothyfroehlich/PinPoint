@@ -47,7 +47,6 @@ function result(overrides: Partial<MachineViewResult> = {}): MachineViewResult {
         title: "Attack from Mars",
         manufacturer: "Bally",
         year: 1995,
-        ownerId: "owner-1",
         ownerName: "Alex",
         presence: "on_the_floor",
         createdAt: "2026-01-01T00:00:00.000Z",
@@ -125,6 +124,71 @@ describe("MachineView", () => {
     expect(navigation.replace).toHaveBeenLastCalledWith("/m?q=mars", {
       scroll: false,
     });
+  });
+
+  it("preserves new typing when an earlier search result arrives", () => {
+    vi.useFakeTimers();
+    const { rerender } = render(
+      <MachineView result={result()} preset="machines" />
+    );
+    const search = screen.getByRole("searchbox", { name: /search machines/i });
+
+    fireEvent.change(search, { target: { value: "mars" } });
+    act(() => vi.advanceTimersByTime(250));
+    fireEvent.change(search, { target: { value: "mars rover" } });
+
+    navigation.searchParams = new URLSearchParams({ q: "mars" });
+    rerender(
+      <MachineView
+        result={result({
+          state: {
+            ...getMachineViewPreset("machines").defaultState,
+            q: "mars",
+          },
+        })}
+        preset="machines"
+      />
+    );
+    expect(search).toHaveValue("mars rover");
+
+    act(() => vi.advanceTimersByTime(250));
+    expect(navigation.replace).toHaveBeenLastCalledWith("/m?q=mars+rover", {
+      scroll: false,
+    });
+
+    navigation.searchParams = new URLSearchParams({ q: "attack" });
+    rerender(
+      <MachineView
+        result={result({
+          state: {
+            ...getMachineViewPreset("machines").defaultState,
+            q: "attack",
+          },
+        })}
+        preset="machines"
+      />
+    );
+    expect(search).toHaveValue("attack");
+  });
+
+  it("does not navigate again for trailing whitespace", () => {
+    vi.useFakeTimers();
+    const state = {
+      ...getMachineViewPreset("machines").defaultState,
+      q: "mars",
+    };
+    navigation.searchParams = new URLSearchParams({ q: "mars" });
+    render(<MachineView result={result({ state })} preset="machines" />);
+
+    fireEvent.change(
+      screen.getByRole("searchbox", { name: /search machines/i }),
+      {
+        target: { value: "mars " },
+      }
+    );
+    act(() => vi.advanceTimersByTime(250));
+
+    expect(navigation.replace).not.toHaveBeenCalled();
   });
 
   it("shows a useful empty result and clears back to preset filters", async () => {

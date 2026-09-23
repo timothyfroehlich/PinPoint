@@ -40,13 +40,16 @@ export function MachineView({
   const [isPending, startTransition] = React.useTransition();
   const [state, setState] = React.useState(result.state);
   const [searchValue, setSearchValue] = React.useState(result.state.q);
+  const requestedQuery = React.useRef(result.state.q);
   const [mobileMode, setMobileMode] = React.useState<"compact" | "table">(
     "compact"
   );
 
   React.useEffect(() => {
+    const isRequestedResult = result.state.q === requestedQuery.current;
     setState(result.state);
-    setSearchValue(result.state.q);
+    if (!isRequestedResult) setSearchValue(result.state.q);
+    requestedQuery.current = result.state.q;
   }, [result.state]);
 
   React.useEffect(() => {
@@ -56,6 +59,7 @@ export function MachineView({
 
   const navigate = React.useCallback(
     (next: MachineViewState): void => {
+      requestedQuery.current = next.q;
       setState(next);
       const query = serializeMachineViewState(next, preset).toString();
       startTransition(() => {
@@ -68,7 +72,7 @@ export function MachineView({
   );
 
   React.useEffect(() => {
-    if (searchValue === state.q) return;
+    if (searchValue.trim() === state.q) return;
     const timeout = window.setTimeout(() => {
       navigate({ ...state, q: searchValue.trim(), page: 1 });
     }, 250);
