@@ -214,6 +214,28 @@ describe("QuickSearch", () => {
     consoleError.mockRestore();
   });
 
+  it("rejects an unexpected search response and offers a retry", async () => {
+    const user = userEvent.setup();
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(jsonResponse({ machines: "invalid" }))
+    );
+    renderQuickSearch();
+
+    const input = screen.getByTestId("quick-search-desktop-input");
+    await user.click(input);
+    await user.type(input, "attack");
+
+    expect(
+      await screen.findByText("Search is unavailable.")
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Try again" })).toBeVisible();
+    consoleError.mockRestore();
+  });
+
   it("keeps the mobile result panel stable while a new query loads", async () => {
     const user = userEvent.setup();
     let resolveSecond: ((response: Response) => void) | undefined;

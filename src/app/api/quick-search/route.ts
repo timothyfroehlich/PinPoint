@@ -4,7 +4,7 @@ import { log } from "~/lib/logger";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import { createClient } from "~/lib/supabase/server";
 import {
-  normalizeQuickSearchQuery,
+  quickSearchQuerySchema,
   searchQuickNavigation,
 } from "~/app/api/quick-search/queries";
 
@@ -24,12 +24,18 @@ export async function GET(request: Request): Promise<NextResponse> {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const query = normalizeQuickSearchQuery(
+  const parsedQuery = quickSearchQuerySchema.safeParse(
     new URL(request.url).searchParams.get("q") ?? ""
   );
+  if (!parsedQuery.success) {
+    return NextResponse.json(
+      { error: "Invalid search query" },
+      { status: 400 }
+    );
+  }
 
   try {
-    return NextResponse.json(await searchQuickNavigation(query));
+    return NextResponse.json(await searchQuickNavigation(parsedQuery.data));
   } catch (error) {
     log.error({ err: error }, "Quick search failed");
     return NextResponse.json({ error: "Search failed" }, { status: 500 });

@@ -4,9 +4,11 @@ import { getTestDb, setupTestDb } from "~/test/setup/pglite";
 import { issues, machines, pinballmapCatalog } from "~/server/db/schema";
 import {
   QUICK_SEARCH_RESULT_LIMIT,
+  quickSearchQuerySchema,
   searchQuickNavigation,
 } from "~/app/api/quick-search/queries";
 import { plainTextToDoc } from "~/lib/tiptap/types";
+import { quickSearchResultsSchema } from "~/lib/quick-search/types";
 
 vi.mock("~/server/db", async () => {
   const { getTestDb } = await import("~/test/setup/pglite");
@@ -15,6 +17,15 @@ vi.mock("~/server/db", async () => {
 
 describe("quick search queries", () => {
   setupTestDb();
+
+  it("validates and normalizes bounded URL queries", () => {
+    expect(quickSearchQuerySchema.parse("  Godzilla   Premium  ")).toBe(
+      "Godzilla Premium"
+    );
+    expect(quickSearchQuerySchema.safeParse("x".repeat(321)).success).toBe(
+      false
+    );
+  });
 
   it("matches and ranks public machine and issue identity fields", async () => {
     const db = await getTestDb();
@@ -51,6 +62,9 @@ describe("quick search queries", () => {
     ]);
 
     const initialsResults = await searchQuickNavigation("AFM");
+    expect(quickSearchResultsSchema.safeParse(initialsResults).success).toBe(
+      true
+    );
     expect(initialsResults.machines.map((machine) => machine.initials)).toEqual(
       ["AFM", "AF2"]
     );

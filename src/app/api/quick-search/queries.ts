@@ -1,4 +1,5 @@
 import { asc, eq, or, sql } from "drizzle-orm";
+import { z } from "zod";
 import { CLOSED_STATUSES } from "~/lib/issues/status";
 import type { QuickSearchResults } from "~/lib/quick-search/types";
 import { db } from "~/server/db";
@@ -16,6 +17,11 @@ export function normalizeQuickSearchQuery(query: string): string {
     .replace(/\s+/g, " ")
     .slice(0, QUICK_SEARCH_MAX_QUERY_LENGTH);
 }
+
+export const quickSearchQuerySchema = z
+  .string()
+  .max(QUICK_SEARCH_MAX_QUERY_LENGTH * 4)
+  .transform(normalizeQuickSearchQuery);
 
 function escapeLikePattern(value: string): string {
   return value.replace(/[\\%_]/g, "\\$&");

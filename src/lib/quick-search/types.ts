@@ -1,22 +1,31 @@
-import type { IssueStatus } from "~/lib/issues/status";
+import { z } from "zod";
+import { ISSUE_STATUS_VALUES } from "~/lib/issues/status-values";
 
-export interface QuickSearchMachineResult {
-  id: string;
-  initials: string;
-  name: string;
-  modelName: string | null;
-}
+const quickSearchMachineResultSchema = z.object({
+  id: z.string().min(1),
+  initials: z.string(),
+  name: z.string(),
+  modelName: z.string().nullable(),
+});
 
-export interface QuickSearchIssueResult {
-  id: string;
-  issueNumber: number;
-  machineInitials: string;
-  machineName: string;
-  status: IssueStatus;
-  title: string;
-}
+const quickSearchIssueResultSchema = z.object({
+  id: z.string().min(1),
+  issueNumber: z.number().int(),
+  machineInitials: z.string(),
+  machineName: z.string(),
+  status: z.enum(ISSUE_STATUS_VALUES),
+  title: z.string(),
+});
 
-export interface QuickSearchResults {
-  machines: QuickSearchMachineResult[];
-  issues: QuickSearchIssueResult[];
-}
+export const quickSearchResultsSchema = z.object({
+  machines: z.array(quickSearchMachineResultSchema),
+  issues: z.array(quickSearchIssueResultSchema),
+});
+
+export type QuickSearchMachineResult = z.infer<
+  typeof quickSearchMachineResultSchema
+>;
+export type QuickSearchIssueResult = z.infer<
+  typeof quickSearchIssueResultSchema
+>;
+export type QuickSearchResults = z.infer<typeof quickSearchResultsSchema>;

@@ -29,7 +29,10 @@ import {
 } from "~/components/ui/dialog";
 import { Skeleton } from "~/components/ui/skeleton";
 import { getIssueStatusLabel } from "~/lib/issues/status";
-import type { QuickSearchResults } from "~/lib/quick-search/types";
+import {
+  quickSearchResultsSchema,
+  type QuickSearchResults,
+} from "~/lib/quick-search/types";
 import { cn } from "~/lib/utils";
 
 const SEARCH_DEBOUNCE_MS = 150;
@@ -145,7 +148,7 @@ export function QuickSearchProvider({
       })
         .then(async (response) => {
           if (!response.ok) throw new Error("Search request failed");
-          return (await response.json()) as QuickSearchResults;
+          return quickSearchResultsSchema.parse(await response.json());
         })
         .then((results) => {
           if (requestSequence === requestSequenceRef.current) {
