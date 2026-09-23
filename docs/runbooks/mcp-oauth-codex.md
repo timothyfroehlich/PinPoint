@@ -28,22 +28,28 @@ hook until the DCR-created client is present in `mcp_oauth_clients`.
    admits only the UUID in `MCP_ADMIN_USER_ID`, with a live `admin` role and a
    Supabase-verified ES256 token; it temporarily permits the default
    `authenticated` audience and an unregistered client id.
-4. Restart Codex so it loads the project `.codex/config.toml`, then run
-   `codex mcp login pinpoint`. Complete login as Tim, approve the consent page,
-   and call `whoami`. Record its `clientId`; `authMode` must be `oauth`.
+4. Run `codex mcp login pinpoint --oauth-client-registration dcr` to register
+   the public client. Record its client id and exact loopback redirect URI from
+   Supabase Authentication > OAuth Apps. The first consent window may expire
+   while completing the remaining setup; an initial login is not required to
+   pin the registration.
 5. Insert that exact client id into `public.mcp_oauth_clients`, with name
    `Codex Desktop`, audience
    `https://pinpoint.austinpinballcollective.org/api/mcp/mcp`, and `enabled =
-true`. Verify the redirect URI registered by DCR is the exact callback Codex
-   used. Keep that client registration and disable Dynamic Client Registration.
+true`. Preserve the exact callback URL and port registered by DCR. Do not
+   disable Dynamic Client Registration globally without checking other OAuth
+   apps that rely on it; the MCP allowlist is the narrower control.
 6. In Supabase Authentication > Hooks, enable the Postgres custom access-token
    hook `public.mcp_custom_access_token_hook`.
-7. Remove `MCP_OAUTH_DCR_CANARY` and redeploy. Add the recorded client id under
-   `[mcp_servers.pinpoint.oauth]` as `client_id = "..."` in project config so a
-   fresh Codex install does not depend on DCR.
-8. Run `codex mcp logout pinpoint`, then `codex mcp login pinpoint` and call
-   `whoami` again. Confirm the access token has the exact MCP audience, reads do
-   not prompt, and each mutation prompts before execution.
+7. Remove `MCP_OAUTH_DCR_CANARY` and redeploy. Pin `client_id`, the exact
+   `callback_url`, and matching `callback_port` under
+   `[mcp_servers.pinpoint.oauth]` in project config. Pinning only the client id
+   can fail because Codex may otherwise choose a different loopback port.
+8. Restart Codex so it loads the updated project config. Run
+   `codex mcp login pinpoint`, approve the consent page as Tim, and call
+   `whoami`. Confirm `authMode` is `oauth`, `clientId` matches the pinned client,
+   the access token has the exact MCP audience, reads do not prompt, and each
+   mutation prompts before execution.
 
 ## Refresh and revocation proof
 

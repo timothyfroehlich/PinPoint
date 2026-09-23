@@ -24,6 +24,14 @@ default_tools_approval_mode = "prompt"
 startup_timeout_sec = 30
 tool_timeout_sec = 60
 
+# Supabase registered this public client with an exact loopback callback.
+# Keep the client, callback URL, and listener port together: a random Codex
+# callback port would not match the registered redirect URI.
+[mcp_servers.pinpoint.oauth]
+client_id = "842d41cc-8bbc-4ff8-8b02-866e462e1b90"
+callback_url = "http://127.0.0.1:60427/callback/lMn9xOYNzr5s"
+callback_port = 60427
+
 # Read-only tools are safe to call without interrupting the task. Every other
 # tool inherits the server-level prompt requirement.
 [mcp_servers.pinpoint.tools.whoami]
