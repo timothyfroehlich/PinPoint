@@ -92,6 +92,7 @@ export default async function PublicReportPage({
       initialError={errorMessage}
       initialIssues={initialIssues}
       initialMachineInitials={selectedMachine?.initials ?? ""}
+      source={params.source === "apron" ? "apron" : undefined}
     />
   );
 }

@@ -73,6 +73,7 @@ interface UnifiedReportFormProps {
   initialError?: string | undefined;
   initialIssues: RecentIssueData[] | null;
   initialMachineInitials: string;
+  source?: string | undefined;
 }
 
 // Type-only fallback so `entries[0]` reads are non-optional. The provider always
@@ -95,6 +96,7 @@ export function UnifiedReportForm({
   initialError,
   initialIssues,
   initialMachineInitials,
+  source,
 }: UnifiedReportFormProps): React.JSX.Element {
   const searchParams = useSearchParams();
   const formRef = useRef<HTMLFormElement>(null);
@@ -367,6 +369,9 @@ export function UnifiedReportForm({
             ref={formRef}
             className="space-y-3 md:space-y-4"
           >
+            {source ? (
+              <input type="hidden" name="source" value={source} />
+            ) : null}
             {/* Honeypot field for bot detection */}
             <input
               type="text"

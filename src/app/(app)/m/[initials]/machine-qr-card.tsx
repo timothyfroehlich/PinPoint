@@ -12,8 +12,8 @@ interface MachineQrCardProps {
   machineInitials: string;
   /** Pre-rendered PNG data URL (from `generateQrPngDataUrl`). */
   qrDataUrl: string;
-  /** The absolute report URL the QR encodes (also the "open"/"copy" target). */
-  reportUrl: string;
+  /** The absolute hub URL the QR encodes (also the copy target). */
+  hubUrl: string;
 }
 
 /**
@@ -26,7 +26,7 @@ export function MachineQrCard({
   machineName,
   machineInitials,
   qrDataUrl,
-  reportUrl,
+  hubUrl,
 }: MachineQrCardProps): React.JSX.Element {
   return (
     <section
@@ -46,15 +46,14 @@ export function MachineQrCard({
         <div className="shrink-0 rounded-lg border border-outline-variant/60 bg-white p-2 shadow-sm">
           <img
             src={qrDataUrl}
-            alt={`QR code linking to the report page for ${machineName}`}
+            alt={`QR code linking to the machine hub for ${machineName}`}
             className="size-24"
           />
         </div>
 
         <div className="min-w-0 flex-1 space-y-2">
           <p className="text-xs text-muted-foreground">
-            Print and stick it on the machine — players scan to report a
-            problem.
+            Scan to post a score or report a problem for this machine.
           </p>
           <div className="flex flex-wrap items-center gap-2">
             <Button asChild size="sm" variant="outline">
@@ -64,10 +63,10 @@ export function MachineQrCard({
               </a>
             </Button>
             <CopyButton
-              value={reportUrl}
+              value={hubUrl}
               variant="ghost"
               size="sm"
-              aria-label="Copy report link"
+              aria-label="Copy machine hub link"
             />
           </div>
         </div>
