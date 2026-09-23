@@ -40,7 +40,7 @@ test.describe("Issue List Features - Extended", () => {
     createdIssueTitlePrefix = issueTitle;
     const machineInitials = seededMachines.addamsFamily.initials;
 
-    await page.goto(`/report?machine=${machineInitials}`);
+    await page.goto(`/report/detailed?machine=${machineInitials}`);
     await fillReportForm(page, { title: issueTitle, priority: "low" });
     await page.getByRole("button", { name: "Submit Issue Report" }).click();
     await expect(page).toHaveURL(/\/m\/[A-Z0-9]{2,6}\/i\/[0-9]+/);

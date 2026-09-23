@@ -70,7 +70,7 @@ test.describe("UnifiedReportForm — stale localStorage machineId (PP-lql)", () 
     }, STALE_UUID);
 
     // The machine select must NOT silently land on machinesList[0].
-    await page.goto("/report");
+    await page.goto("/report/detailed");
 
     const machineSelect = page.getByTestId("machine-select");
     await expect(machineSelect).toBeVisible();

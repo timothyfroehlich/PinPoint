@@ -26,11 +26,11 @@ test.describe("Report Form Clears After Submission", () => {
     });
   });
 
-  test("should clear form fields when authenticated user navigates back to /report after submission", async ({
+  test("should clear form fields when authenticated user returns to Detailed after submission", async ({
     page,
   }) => {
     // 1. Go to report page and fill the form
-    await page.goto("/report");
+    await page.goto("/report/detailed");
     await expect(
       page.getByRole("heading", { name: "Report an Issue" })
     ).toBeVisible();
@@ -50,14 +50,14 @@ test.describe("Report Form Clears After Submission", () => {
     await submitFormAndWaitForRedirect(
       page,
       page.getByRole("button", { name: "Submit Issue Report" }),
-      { awayFrom: "/report", expectedIssueTitle: issueTitle }
+      { awayFrom: "/report/detailed", expectedIssueTitle: issueTitle }
     );
 
     // Verify we landed on the issue detail page
     await expect(page).toHaveURL(/\/m\/.*\/i\/\d+/);
 
     // 3. Navigate back to the report page
-    await page.goto("/report");
+    await page.goto("/report/detailed");
     await expect(
       page.getByRole("heading", { name: "Report an Issue" })
     ).toBeVisible();
