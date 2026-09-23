@@ -333,10 +333,11 @@ export async function createMachine({
             type: "machine_ownership_changed",
             resourceId: machine.id,
             resourceType: "machine",
+            eventId: machine.id,
             actorId: actorUserId,
             includeActor: false,
             machineName: machine.name,
-            newStatus: "added",
+            ownershipChange: "added",
             additionalRecipientIds: [promoteGuest.userId],
           },
           tx,
@@ -449,7 +450,7 @@ export async function updateMachineOwner({
 
     // Lifecycle: emit only `owner_changed`. Name is passed unchanged and
     // presence is left `undefined` so no spurious name/presence events fire.
-    await emitMachineUpdated(
+    const ownerEventId = await emitMachineUpdated(
       tx,
       {
         id: machineId,
@@ -466,21 +467,26 @@ export async function updateMachineOwner({
       actorUserId
     );
 
+    if (willNotify && ownerEventId === null) {
+      throw new Error("Owner changed without a timeline event");
+    }
+
     // Notifications planned in-tx (transactional in-app rows), delivered by the
     // caller post-commit. Best-effort: a planning failure never rolls back the
     // committed owner change.
     const deliveries: DeliveryPlan["deliveries"] = [];
     try {
-      if (oldOwnerId && oldOwnerId !== newOwnerId) {
+      if (ownerEventId && oldOwnerId && oldOwnerId !== newOwnerId) {
         const removed = await planNotification(
           {
             type: "machine_ownership_changed",
             resourceId: machine.id,
             resourceType: "machine",
+            eventId: ownerEventId,
             actorId: actorUserId,
             includeActor: false,
             machineName: machine.name,
-            newStatus: "removed",
+            ownershipChange: "removed",
             additionalRecipientIds: [oldOwnerId],
           },
           tx,
@@ -488,16 +494,17 @@ export async function updateMachineOwner({
         );
         deliveries.push(...removed.deliveries);
       }
-      if (newOwnerId && newOwnerId !== oldOwnerId) {
+      if (ownerEventId && newOwnerId && newOwnerId !== oldOwnerId) {
         const added = await planNotification(
           {
             type: "machine_ownership_changed",
             resourceId: machine.id,
             resourceType: "machine",
+            eventId: ownerEventId,
             actorId: actorUserId,
             includeActor: false,
             machineName: machine.name,
-            newStatus: "added",
+            ownershipChange: "added",
             additionalRecipientIds: [newOwnerId],
           },
           tx,

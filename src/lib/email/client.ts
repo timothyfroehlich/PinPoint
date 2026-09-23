@@ -83,7 +83,11 @@ export async function sendEmail({
       { to: maskEmail(to), subject },
       "[Email] No transport configured. Email not sent."
     );
-    return { success: false, error: "No transport configured" };
+    return {
+      success: false,
+      error: "No transport configured",
+      reason: "skipped",
+    };
   }
 
   const result = await transport.send({

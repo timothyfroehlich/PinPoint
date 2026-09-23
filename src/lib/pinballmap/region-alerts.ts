@@ -787,17 +787,15 @@ async function markAnnounced(
  * that id would trigger a full catalog fetch on every tick for as long as it stays
  * pending (which happens whenever Discord is failing and rows are not clearing).
  *
- * **What the cooldown does NOT cover, stated precisely.** Its clock is
- * `max(refreshed_at)` over the mirror, and that only advances when a refresh
- * SUCCEEDS and writes rows. So a refresh that throws, or that returns an empty
- * upstream payload, leaves the clock where it was and the next tick tries again —
- * hourly, with no backoff, for as long as the failure lasts. The expensive case is
- * still covered (a large successful fetch stamps every row it upserts, so an id
- * PBM has simply not catalogued is suppressed after one attempt), and a 429 is
- * absorbed at the client seam, which honors Retry-After and reports `rate_limited`
- * rather than retrying here. The residue is one cheap failed request per hour
- * against an endpoint that is already failing. Closing it properly needs an
- * attempt clock that persists across invocations — PP-o355.44.
+ * **Two clocks, either one suppresses.** The mirror's `max(refreshed_at)` covers
+ * a recent successful refresh from any path, the weekly cron included, but it
+ * only advances when a refresh writes rows. A refresh that throws, or that gets
+ * an empty upstream payload, leaves it untouched — so on its own it would let a
+ * failing endpoint be retried every hour. The second clock,
+ * `pinballmap_region_alert_state.catalog_refresh_attempted_at`, is claimed at
+ * the START of every on-demand attempt by {@link claimCatalogRefreshAttempt}, so
+ * success, empty, and failure all back off for the full cooldown (PP-o355.44).
+ * It lives in the database because serverless invocations share no memory.
  *
  * **A refresh failure leaves the event pending.** Every failure path here returns
  * the names we already had; the caller withholds only events whose titles remain
@@ -808,6 +806,7 @@ async function markAnnounced(
  * any transaction (CORE-ARCH-011).
  */
 async function resolveMachineNames(
+  region: string,
   machineIds: number[]
 ): Promise<Map<number, string>> {
   const names = await getCatalogNames(machineIds);
@@ -825,6 +824,14 @@ async function resolveMachineNames(
         action: "pinballmap.regionAlerts",
       },
       "Unknown machine ids but catalog was refreshed recently; keeping alerts pending"
+    );
+    return names;
+  }
+
+  if (!(await claimCatalogRefreshAttempt(region))) {
+    log.warn(
+      { missing, action: "pinballmap.regionAlerts" },
+      "Unknown machine ids but a catalog refresh was attempted recently; keeping alerts pending"
     );
     return names;
   }
@@ -851,6 +858,34 @@ async function resolveMachineNames(
     );
   }
   return refreshed;
+}
+
+/**
+ * Claim the on-demand catalog refresh attempt for a region's run, or return
+ * false when one was already attempted inside {@link CATALOG_REFRESH_COOLDOWN_MS}.
+ *
+ * Stamped before the fetch, like `lastSyncAttemptAt` for location syncs (PP-hbi0):
+ * a clock that only moved on success would let a failing or empty refresh retry
+ * on every run. One conditional update is both the check and the stamp. The row
+ * always exists here, because {@link claimRunLease} inserts it before any run.
+ */
+async function claimCatalogRefreshAttempt(region: string): Promise<boolean> {
+  const now = new Date();
+  const cutoff = new Date(now.getTime() - CATALOG_REFRESH_COOLDOWN_MS);
+  const claimed = await db
+    .update(pinballmapRegionAlertState)
+    .set({ catalogRefreshAttemptedAt: now })
+    .where(
+      and(
+        eq(pinballmapRegionAlertState.region, region),
+        or(
+          isNull(pinballmapRegionAlertState.catalogRefreshAttemptedAt),
+          lt(pinballmapRegionAlertState.catalogRefreshAttemptedAt, cutoff)
+        )
+      )
+    )
+    .returning({ region: pinballmapRegionAlertState.region });
+  return claimed.length > 0;
 }
 
 /**
@@ -1052,6 +1087,7 @@ export async function runRegionMachineAlerts(opts?: {
       return true;
     });
     const machineNames = await resolveMachineNames(
+      region,
       venueNamed.map((event) => event.pinballmapMachineId)
     );
     const announceable: PendingRegionAlertEvent[] = [];

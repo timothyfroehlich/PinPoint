@@ -46,6 +46,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "~/components/ui/alert-dialog";
+import { ListPlus } from "lucide-react";
 
 interface Machine {
   id: string;
@@ -73,6 +74,7 @@ interface UnifiedReportFormProps {
   initialError?: string | undefined;
   initialIssues: RecentIssueData[] | null;
   initialMachineInitials: string;
+  canMultiple?: boolean;
 }
 
 // Type-only fallback so `entries[0]` reads are non-optional. The provider always
@@ -95,6 +97,7 @@ export function UnifiedReportForm({
   initialError,
   initialIssues,
   initialMachineInitials,
+  canMultiple = false,
 }: UnifiedReportFormProps): React.JSX.Element {
   const searchParams = useSearchParams();
   const formRef = useRef<HTMLFormElement>(null);
@@ -321,10 +324,22 @@ export function UnifiedReportForm({
 
   return (
     <div className="w-full">
-      <p className="text-sm text-muted-foreground mb-6">
-        Tell us what&apos;s going on and the maintenance crew will take it from
-        here.
-      </p>
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold">Detailed report</h2>
+          <p className="text-sm text-muted-foreground">
+            Add context, photos, and maintenance details.
+          </p>
+        </div>
+        {canMultiple ? (
+          <Button asChild variant="outline">
+            <Link href="/report/multiple">
+              <ListPlus aria-hidden="true" />
+              Report multiple issues
+            </Link>
+          </Button>
+        ) : null}
+      </div>
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         {/* Main Form Column */}
         <div className="lg:col-span-7 space-y-3 md:space-y-4">
@@ -662,8 +677,8 @@ export function UnifiedReportForm({
                   <Link
                     href={getLoginUrl(
                       selectedMachine
-                        ? `/report?machine=${selectedMachine.initials}`
-                        : "/report"
+                        ? `/report/detailed?machine=${selectedMachine.initials}`
+                        : "/report/detailed"
                     )}
                     className="text-link"
                   >

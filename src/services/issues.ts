@@ -23,8 +23,10 @@ import {
 } from "~/lib/timeline/issue-timeline-helpers";
 import {
   planNotification,
+  planNotifications,
   getChannels,
   type DeliveryPlan,
+  type NotificationEvent,
 } from "~/lib/notifications";
 import { reportError } from "~/lib/observability/report-error";
 import { log } from "~/lib/logger";
@@ -385,48 +387,66 @@ export async function createIssue({
       const plainDescription = description
         ? docToPlainText(description)
         : undefined;
-      // Trigger Notification (actorId optional for public reports)
-      const newIssuePlan = await planNotification(
+      const notificationEvents: NotificationEvent[] = [
         {
           type: "new_issue",
           resourceId: issue.id,
           resourceType: "issue",
+          eventId: issue.id,
           ...(reportedBy ? { actorId: reportedBy } : {}),
+          ...(!reportedBy && reporterName ? { actorName: reporterName } : {}),
           issueTitle: title,
           machineName: updatedMachine.name,
           formattedIssueId: formattedId,
           issueDescription: plainDescription,
+          severity: issue.severity,
+          frequency: issue.frequency,
         },
-        tx,
-        channels
-      );
-      deliveries.push(...newIssuePlan.deliveries);
+      ];
 
-      // Extract and notify mentions — batch all mentioned users into one call
-      // to avoid O(N) round-trips inside the transaction.
+      // Initial assignment previously had no Discord notification. Keep the
+      // new candidate Discord-only so email and in-app behavior are unchanged;
+      // the action batch will prefer it over the general new-issue DM.
+      if (assignedTo) {
+        notificationEvents.push({
+          type: "issue_assigned",
+          resourceId: issue.id,
+          resourceType: "issue",
+          eventId: issue.id,
+          ...(reportedBy ? { actorId: reportedBy } : {}),
+          includeActor: false,
+          additionalRecipientIds: [assignedTo],
+          channelKeys: ["discord"],
+          issueTitle: title,
+          machineName: updatedMachine.name,
+          formattedIssueId: formattedId,
+          issueDescription: plainDescription,
+          severity: issue.severity,
+        });
+      }
+
       if (description) {
         const mentions = extractMentions(description);
         if (mentions.length > 0) {
-          const commentContent = plainDescription;
-          const mentionPlan = await planNotification(
-            {
-              type: "mentioned",
-              resourceId: issue.id,
-              resourceType: "issue",
-              actorId: reportedBy ?? undefined,
-              includeActor: false,
-              additionalRecipientIds: mentions,
-              issueTitle: title,
-              machineName: updatedMachine.name,
-              formattedIssueId: formattedId,
-              commentContent,
-            },
-            tx,
-            channels
-          );
-          deliveries.push(...mentionPlan.deliveries);
+          notificationEvents.push({
+            type: "mentioned",
+            resourceId: issue.id,
+            resourceType: "issue",
+            eventId: issue.id,
+            actorId: reportedBy ?? undefined,
+            includeActor: false,
+            additionalRecipientIds: mentions,
+            issueTitle: title,
+            machineName: updatedMachine.name,
+            formattedIssueId: formattedId,
+            commentContent: plainDescription,
+            attachmentCount: 0,
+          });
         }
       }
+
+      const plan = await planNotifications(notificationEvents, tx, channels);
+      deliveries.push(...plan.deliveries);
     } catch (error) {
       reportError(error, {
         action: "createIssueNotifications",
@@ -601,7 +621,7 @@ export async function updateIssueStatus({
       .where(eq(issues.id, issueId));
 
     // 2. Create Timeline Event
-    await createTimelineEvent(
+    const statusEventId = await createTimelineEvent(
       issueId,
       { type: "status_changed", from: oldStatus, to: status },
       tx,
@@ -654,6 +674,7 @@ export async function updateIssueStatus({
           type: "issue_status_changed",
           resourceId: issueId,
           resourceType: "issue",
+          eventId: statusEventId,
           actorId: userId,
           issueTitle: currentIssue.title,
           machineName: currentIssue.machine.name,
@@ -661,6 +682,7 @@ export async function updateIssueStatus({
             currentIssue.machineInitials,
             currentIssue.issueNumber
           ),
+          oldStatus,
           newStatus: status,
         },
         tx,
@@ -828,7 +850,7 @@ export async function addIssueComment({
         : undefined;
       const plainTextContent = docToPlainText(content);
 
-      const commentPlan = await planNotification(
+      const notificationEvents: NotificationEvent[] = [
         {
           type: "new_comment",
           resourceId: issueId,
@@ -838,36 +860,34 @@ export async function addIssueComment({
           machineName: issue?.machine.name ?? undefined,
           formattedIssueId: formattedId,
           commentContent: plainTextContent,
+          commentId: comment.id,
+          attachmentCount: imagesMetadata.length,
           eventId: comment.id,
         },
-        tx,
-        channels
-      );
-      deliveries.push(...commentPlan.deliveries);
+      ];
 
       // Extract and notify mentions — batch all mentioned users into one call
       // to avoid O(N) round-trips inside the transaction.
       const mentions = extractMentions(content);
       if (mentions.length > 0) {
-        const mentionPlan = await planNotification(
-          {
-            type: "mentioned",
-            resourceId: issueId,
-            resourceType: "issue",
-            actorId: userId,
-            includeActor: false,
-            additionalRecipientIds: mentions,
-            issueTitle: issue?.title ?? undefined,
-            machineName: issue?.machine.name ?? undefined,
-            formattedIssueId: formattedId,
-            commentContent: plainTextContent,
-            eventId: comment.id,
-          },
-          tx,
-          channels
-        );
-        deliveries.push(...mentionPlan.deliveries);
+        notificationEvents.push({
+          type: "mentioned",
+          resourceId: issueId,
+          resourceType: "issue",
+          actorId: userId,
+          includeActor: false,
+          additionalRecipientIds: mentions,
+          issueTitle: issue?.title ?? undefined,
+          machineName: issue?.machine.name ?? undefined,
+          formattedIssueId: formattedId,
+          commentContent: plainTextContent,
+          commentId: comment.id,
+          attachmentCount: imagesMetadata.length,
+          eventId: comment.id,
+        });
       }
+      const plan = await planNotifications(notificationEvents, tx, channels);
+      deliveries.push(...plan.deliveries);
     } catch (error) {
       reportError(error, {
         action: "addIssueCommentNotifications",
@@ -1035,7 +1055,12 @@ export async function assignIssue({
     const event: TimelineEventData = assignedTo
       ? { type: "assigned", assigneeName }
       : { type: "unassigned" };
-    await createTimelineEvent(issueId, event, tx, actorId);
+    const assignmentEventId = await createTimelineEvent(
+      issueId,
+      event,
+      tx,
+      actorId
+    );
 
     // Duplicate-write to machine timeline (atomic with assignment update,
     // PP-0x98, PP-tv9l). The assignee is stored as an `assignee` person-
@@ -1073,6 +1098,7 @@ export async function assignIssue({
             type: "issue_assigned",
             resourceId: issueId,
             resourceType: "issue",
+            eventId: assignmentEventId,
             actorId,
             includeActor: false,
             additionalRecipientIds: [assignedTo],

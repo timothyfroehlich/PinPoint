@@ -6,7 +6,7 @@
  * → explicit setState for controlled state → redirect last.
  *
  * Forms covered:
- * - /report (UnifiedReportForm)
+ * - /report/detailed (UnifiedReportForm)
  * - /m/new (CreateMachineForm)
  * - Issue detail comment box (AddCommentForm)
  * - Admin user invite dialog (InviteUserDialog)
@@ -67,7 +67,7 @@ test.describe("CREATE form resets", () => {
 
     const machineInitials = seededMachines.medievalMadness.initials;
 
-    await page.goto("/report");
+    await page.goto("/report/detailed");
     await selectMachine(page);
 
     await fillReportForm(page, {
@@ -82,10 +82,10 @@ test.describe("CREATE form resets", () => {
       timeout: 30000,
     });
 
-    // Navigate back to /report (no machine param). All fields must be empty.
+    // Navigate back to Detailed (no machine param). All fields must be empty.
     // This proves localStorage was cleared and the reset effect ran before
     // navigation. URL machine param would mask the test, so we use the bare URL.
-    await page.goto("/report");
+    await page.goto("/report/detailed");
 
     // Machine select shows placeholder option, not a previously chosen machine.
     await expect(machineSelectValue(page)).toHaveValue("");
@@ -116,12 +116,12 @@ test.describe("CREATE form resets", () => {
       password: TEST_USERS.admin.password,
     });
 
-    await page.goto("/report");
+    await page.goto("/report/detailed");
     await selectMachine(page);
 
     // Picking a machine via the dropdown writes ?machine=… into the URL.
     // Verify before clicking Clear so the strip-on-clear assertion is meaningful.
-    await expect(page).toHaveURL(/\/report\?.*machine=/);
+    await expect(page).toHaveURL(/\/report\/detailed\?.*machine=/);
 
     await page
       .getByLabel("Issue Title *")
@@ -202,7 +202,7 @@ test.describe("CREATE form resets", () => {
     // Create a throwaway issue so the comment is not left on a shared seeded
     // issue. afterEach cleans up all issues whose title starts with RESET_PREFIX
     // (which cascades their comments), so no timeline noise accumulates.
-    await page.goto("/report");
+    await page.goto("/report/detailed");
     await selectMachine(page);
     await fillReportForm(page, {
       title: `${RESET_PREFIX} Comment Form Reset Issue`,
@@ -211,7 +211,7 @@ test.describe("CREATE form resets", () => {
     await submitFormAndWaitForRedirect(
       page,
       page.getByRole("button", { name: "Submit Issue Report" }),
-      { awayFrom: "/report" }
+      { awayFrom: "/report/detailed" }
     );
     // After redirect, we are on the new issue's detail page — stay here.
     await expect(page).toHaveURL(/\/m\/[A-Z0-9]+\/i\/[0-9]+/, {

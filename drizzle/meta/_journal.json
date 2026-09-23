@@ -554,6 +554,27 @@
       "when": 1789532602642,
       "tag": "0078_add-machine-iscored-game-id",
       "breakpoints": true
+    },
+    {
+      "idx": 79,
+      "version": "7",
+      "when": 1789958988184,
+      "tag": "0079_discord-notification-onboarding",
+      "breakpoints": true
+    },
+    {
+      "idx": 80,
+      "version": "7",
+      "when": 1790044346046,
+      "tag": "0080_add-discord-notice-lease",
+      "breakpoints": true
+    },
+    {
+      "idx": 81,
+      "version": "7",
+      "when": 1790120608413,
+      "tag": "0081_pinballmap-catalog-refresh-attempt",
+      "breakpoints": true
     }
   ]
 }

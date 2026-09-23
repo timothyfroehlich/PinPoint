@@ -27,7 +27,7 @@ test.describe("Public Issue Reporting", () => {
   test("should submit anonymous issue and show confirmation", async ({
     page,
   }) => {
-    await page.goto("/report");
+    await page.goto("/report/detailed");
     await expect(
       page.getByRole("heading", {
         name: "Report an Issue",
@@ -74,7 +74,7 @@ test.describe("Public Issue Reporting", () => {
   test("should preserve draft when logging in from inline report-form link", async ({
     page,
   }) => {
-    await page.goto("/report");
+    await page.goto("/report/detailed");
     await selectMachine(page);
     await expect(page).toHaveURL(/machine=/);
 
@@ -96,14 +96,14 @@ test.describe("Public Issue Reporting", () => {
     await expect(page).toHaveURL(/\/login\?/);
 
     const next = new URL(page.url()).searchParams.get("next");
-    expect(next).toBe(`/report?machine=${machineInitials}`);
+    expect(next).toBe(`/report/detailed?machine=${machineInitials}`);
 
     await page.getByLabel("Email").fill(TEST_USERS.member.email);
     await page.getByLabel(/^Password\s*\*?$/).fill(TEST_USERS.member.password);
     await page.getByRole("button", { name: "Sign In" }).click();
 
     await expect(page).toHaveURL(
-      new RegExp(`/report\\?machine=${machineInitials}`)
+      new RegExp(`/report/detailed\\?machine=${machineInitials}`)
     );
     await expect(page.getByLabel("Issue Title")).toHaveValue(issueTitle);
     await expect(page.getByLabel("Description")).toHaveText(issueDescription);
@@ -113,7 +113,7 @@ test.describe("Public Issue Reporting", () => {
   test("should preserve draft when logging in from header sign-in link", async ({
     page,
   }) => {
-    await page.goto("/report");
+    await page.goto("/report/detailed");
     await selectMachine(page);
     await expect(page).toHaveURL(/machine=/);
 
@@ -136,14 +136,14 @@ test.describe("Public Issue Reporting", () => {
     await expect(page).toHaveURL(/\/login\?/);
 
     const next = new URL(page.url()).searchParams.get("next");
-    expect(next).toBe(`/report?machine=${machineInitials}`);
+    expect(next).toBe(`/report/detailed?machine=${machineInitials}`);
 
     await page.getByLabel("Email").fill(TEST_USERS.member.email);
     await page.getByLabel(/^Password\s*\*?$/).fill(TEST_USERS.member.password);
     await page.getByRole("button", { name: "Sign In" }).click();
 
     await expect(page).toHaveURL(
-      new RegExp(`/report\\?machine=${machineInitials}`)
+      new RegExp(`/report/detailed\\?machine=${machineInitials}`)
     );
     await expect(page.getByLabel("Issue Title")).toHaveValue(issueTitle);
     await expect(page.getByLabel("Description")).toHaveText(issueDescription);
@@ -154,7 +154,7 @@ test.describe("Public Issue Reporting", () => {
     page,
   }) => {
     // Submit an issue first - select a machine (dropdown starts unselected)
-    await page.goto("/report");
+    await page.goto("/report/detailed");
     const machineValue = machineSelectValue(page);
 
     // Verify machine picker starts with no selection (empty value)
@@ -196,6 +196,9 @@ test.describe("Public Issue Reporting", () => {
     await expect(
       page.getByRole("heading", { name: "Report an Issue" })
     ).toBeVisible();
+
+    // The success link returns to Quick; inspect the shared blank draft in Detailed.
+    await page.getByRole("link", { name: "Add details" }).click();
 
     // Verify text fields are empty (draft cleared, not restored)
     await expect(page.getByLabel("Issue Title")).toHaveValue("");

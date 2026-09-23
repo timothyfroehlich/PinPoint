@@ -42,6 +42,7 @@ The control's states (§4) are comparisons across these: _in sync_ means intent 
 - **3.3** PinPoint never writes to Pinball Map on its own. Every outbound write is an explicit human action.
 - **3.4** The UI renders from stored data. Opening a page never triggers a call to Pinball Map, and no control requires a click to discover its own state.
 - **3.5** While configured but before a valid snapshot exists, the control is in the **Waiting** state and renders disabled — no interactive element acts against unknown data. Successfully setting the location supplies a valid snapshot; otherwise the hourly refresh and the header's manual Refresh are the paths out. Waiting may persist while attempts fail, and the header stays live with an error marker and Refresh as the escape hatch.
+- **3.6** Full support also lets an authorized person explicitly post a condition comment to an existing lineup entry, confirm the tracked location's lineup, and change an eligible entry's Insider Connected setting on Pinball Map. None of these actions runs automatically or changes PinPoint's listing intent. Their interaction, permission, and stale-state details are specified separately before delivery.
 
 ## 4. The listing control
 
@@ -168,6 +169,7 @@ Replacing the tracked location is a rare, near-never operation — PinPoint trac
 | 7.1 comment fan-out | No comment import exists | PP-o355.4 (reshape to fan-out); PP-o355.36 depends on it |
 | 7.3 comment marking on removal | Not implemented | PP-o355.36 |
 | 10.9 comment re-marking on location change | No comment import exists | PP-o355.4 (import); permanent mark-on-location-change after |
+| 3.6 additional outbound actions | Client methods exist, but no app actions expose condition-comment posting, venue-lineup confirmation, or Insider Connected changes | PP-o355.5; workflow decisions PP-o355.54.13, PP-o355.54.10, PP-o355.54.11 |
 
 ---
 
@@ -177,6 +179,7 @@ Changes to this document. Divergence-table rows are working state and are not lo
 
 | Date | Change |
 | :-- | :-- |
+| 2026-09-22 | Added §3.6: full support includes explicit condition-comment posting, tracked-location lineup confirmation, and eligible Insider Connected changes. Detailed workflows remain separate decisions (PP-o355.54.13, PP-o355.54.10, PP-o355.54.11). |
 | 2026-09-06 | Restricted the read-only control and manual Refresh in §§4.9 and 8.3 to signed-in members; anonymous visitors and guests remain excluded. |
 | 2026-09-05 | Surfaced §10.9's validating fetch as an explicit admin-triggered **Check ID** step: look up first — the resolved venue previews the candidate in the field, not the live configuration — then Save, disabled until the lookup succeeds. Editing the id after a successful lookup re-disables Save (§10.9). Aligned §10.3/§10.13 terminology (Check ID lookup, not "validation") and §10.15 (the confirmation names both venues, not ids). Config-card design, PP-o355.51.6.2. |
 | 2026-09-05 | Defined the Edition Near-Miss concept (§1) and catalog matching rule (§2.6) for machines sharing a title family (`machineGroupId`) with differing editions. Defined dense diagnostic status badges (§4.10) and reconciled fleet-wide views to the `/fleet` dashboard (§10). |

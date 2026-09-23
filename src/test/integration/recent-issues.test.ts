@@ -240,6 +240,39 @@ describe("getRecentIssuesAction — serialization and ordering (integration)", (
     }
   });
 
+  it("shows the newest open issues rather than newer closed issues", async () => {
+    const db = await getTestDb();
+    const olderDate = new Date("2025-06-14T12:00:00.000Z");
+    const newerDate = new Date("2025-06-15T12:00:00.000Z");
+
+    await db.insert(issues).values([
+      createTestIssue(MACHINE_INITIALS, {
+        issueNumber: 11,
+        title: "Still open",
+        status: "new",
+        reportedBy: OWNER_ID,
+        reporterEmail: null,
+        createdAt: olderDate,
+        updatedAt: olderDate,
+      }),
+      createTestIssue(MACHINE_INITIALS, {
+        issueNumber: 12,
+        title: "Already fixed",
+        status: "fixed",
+        reportedBy: OWNER_ID,
+        reporterEmail: null,
+        createdAt: newerDate,
+        updatedAt: newerDate,
+      }),
+    ]);
+
+    const result = await getRecentIssuesAction(MACHINE_INITIALS, 3);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.map((issue) => issue.title)).toEqual(["Still open"]);
+    }
+  });
+
   // CORE-SEC-007: the action selects a minimal column set that must not include
   // reporterEmail, even when the row has one stored in the DB.
   it("does not expose reporterEmail on returned rows (CORE-SEC-007)", async () => {

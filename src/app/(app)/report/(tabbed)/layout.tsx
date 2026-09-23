@@ -3,11 +3,10 @@ import { eq } from "drizzle-orm";
 import { db } from "~/server/db";
 import { userProfiles } from "~/server/db/schema";
 import { createClient } from "~/lib/supabase/server";
-import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
+import { getAccessLevel } from "~/lib/permissions/helpers";
 import { PageContainer } from "~/components/layout/PageContainer";
 import { PageHeader } from "~/components/layout/PageHeader";
 import { ReportDraftProvider } from "../report-draft-store";
-import { ReportTabs } from "../report-tabs";
 import { getReportMachines, getReportAssignees } from "../report-data";
 
 // Avoid SSG hitting Supabase during builds that run parallel to db resets, and
@@ -16,12 +15,9 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 /**
- * Shared layout for the tabbed report page (PP-idrb). Fetches machines +
- * assignees once (both child routes used to fetch their own) and hosts the
- * client `ReportDraftProvider` so the shared draft survives `/report ↔
- * /report/quick` navigation without a remount, plus the boxed tab bar. The two
- * children — `/report` (Single) and `/report/quick` (Multiple) — render inside
- * the provider.
+ * Shared layout for the progressive report flow. The draft provider stays
+ * mounted while Quick, Detailed, and Multiple navigate between sibling routes,
+ * so the first report carries forward without tab-like mode chrome.
  */
 export default async function ReportLayout({
   children,
@@ -44,8 +40,6 @@ export default async function ReportLayout({
   }
 
   const accessLevel = getAccessLevel(userProfile?.role);
-  const canQuick = checkPermission("issues.report.quick", accessLevel);
-
   // Assignees for whoever can assign (matrix-gated — includes technicians, who
   // the old hand-rolled admin/member check dropped). Deduped with page.tsx's
   // call via React cache(); anonymous reporters get [] and no assignee control.
@@ -61,8 +55,13 @@ export default async function ReportLayout({
   return (
     <ReportDraftProvider machines={machineOptions} assignees={assignees}>
       <PageContainer size="wide">
-        <PageHeader title="Report an Issue" />
-        <ReportTabs canQuick={canQuick} />
+        <PageHeader
+          title={
+            <h1 className="text-balance text-2xl font-bold tracking-tight md:text-3xl">
+              Report an Issue
+            </h1>
+          }
+        />
         {children}
       </PageContainer>
     </ReportDraftProvider>

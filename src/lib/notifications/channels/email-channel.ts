@@ -16,6 +16,7 @@ import type {
   DeliveryResult,
 } from "./types";
 import type { NotificationType } from "~/lib/notifications/dispatch";
+import type { RecipientReason } from "~/lib/notifications/events";
 
 /**
  * Strict sanitization policy for email notifications.
@@ -297,7 +298,8 @@ export const emailChannel: DeliveryChannel = {
   key: "email",
   shouldDeliver(
     prefs: NotificationPreferencesRow,
-    type: NotificationType
+    type: NotificationType,
+    recipientReason?: RecipientReason
   ): boolean {
     if (!prefs.emailEnabled) return false;
     switch (type) {
@@ -308,6 +310,10 @@ export const emailChannel: DeliveryChannel = {
       case "new_comment":
         return prefs.emailNotifyOnNewComment;
       case "new_issue":
+        if (recipientReason === "global_watcher") {
+          return prefs.emailWatchNewIssuesGlobal;
+        }
+        if (recipientReason) return prefs.emailNotifyOnNewIssue;
         return prefs.emailNotifyOnNewIssue || prefs.emailWatchNewIssuesGlobal;
       case "machine_ownership_changed":
         // Critical event — preferences cannot opt out (only main switch can).
@@ -343,18 +349,18 @@ export const emailChannel: DeliveryChannel = {
       // resource (e.g. two separate comments → two distinct keys). Without it,
       // Resend treats both as the same email and silently drops the second.
       // (PP-pfyf)
-      const emailIdempotencyKey = ctx.eventId
-        ? `notif:${ctx.resourceType}:${ctx.resourceId}:${ctx.type}:${ctx.userId}:${ctx.eventId}`
-        : `notif:${ctx.resourceType}:${ctx.resourceId}:${ctx.type}:${ctx.userId}`;
+      const emailIdempotencyKey = `notif:${ctx.resourceType}:${ctx.resourceId}:${ctx.type}:${ctx.userId}:${ctx.eventId}`;
 
-      await sendEmail({
+      const result = await sendEmail({
         to: ctx.email,
         subject: getEmailSubject(
           ctx.type,
           ctx.issueTitle,
           ctx.machineName,
           ctx.formattedIssueId,
-          ctx.newStatus
+          ctx.type === "machine_ownership_changed"
+            ? ctx.ownershipChange
+            : ctx.newStatus
         ),
         html: getEmailHtml({
           type: ctx.type,
@@ -363,14 +369,19 @@ export const emailChannel: DeliveryChannel = {
           machineInitials: ctx.machineInitials,
           formattedIssueId: ctx.formattedIssueId,
           commentContent: ctx.commentContent,
-          newStatus: ctx.newStatus,
+          newStatus:
+            ctx.type === "machine_ownership_changed"
+              ? ctx.ownershipChange
+              : ctx.newStatus,
           userId: ctx.userId,
           issueDescription: ctx.issueDescription,
         }),
         idempotencyKey: emailIdempotencyKey,
         ...threadingHeaders,
       });
-      return { ok: true };
+      return result.success
+        ? { ok: true }
+        : { ok: false, reason: result.reason };
     } catch (err) {
       reportError(err, {
         action: "email-channel.deliver",
