@@ -197,6 +197,43 @@ describe("seed scripts — local-only demo seeds refuse remote targets", () => {
   }
 });
 
+describe("local-only guards — PINPOINT_DEV_DB_HOSTS dev-stack allowlist", () => {
+  // A Supabase stack on another machine (docs/runbooks/remote-supabase.md).
+  // `.invalid` never resolves, so passing the guard fails fast on DNS.
+  const DEV_STACK_URL = "postgres://postgres:pw@devbox.invalid:1/postgres";
+
+  for (const script of [
+    "supabase/seed-collections.mjs",
+    "supabase/seed-timeline-backfill.mjs",
+  ]) {
+    it(`${script} refuses an unlisted dev-stack host`, () => {
+      const { status, stderr } = runScript(script, {
+        POSTGRES_URL: DEV_STACK_URL,
+      });
+      expect(status).not.toBe(0);
+      expect(stderr).toMatch(/Refusing|refuses non-local/);
+    });
+
+    it(`${script} lets a listed dev-stack host through to the connection attempt`, () => {
+      const { stderr } = runScript(script, {
+        POSTGRES_URL: DEV_STACK_URL,
+        PINPOINT_DEV_DB_HOSTS: "other, DEVBOX.invalid",
+      });
+      expect(stderr).not.toMatch(/Refusing|refuses non-local/);
+      expect(stderr).toContain("ENOTFOUND");
+    });
+  }
+
+  it("still refuses a managed cloud host even when it is listed", () => {
+    const { status, stderr } = runScript("supabase/seed-collections.mjs", {
+      POSTGRES_URL: PREVIEW_POOLER_URL,
+      PINPOINT_DEV_DB_HOSTS: "aws-0-us-east-2.pooler.supabase.com",
+    });
+    expect(status).toBe(2);
+    expect(stderr).toContain("Refusing to run destructive DB script");
+  });
+});
+
 describe("seed scripts — remote-capable seeds refuse production only", () => {
   for (const script of [
     "supabase/seed-discord.mjs",

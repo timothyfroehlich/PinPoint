@@ -77,7 +77,7 @@ NEXT_PUBLIC_SUPABASE_URL="$dotenv_supabase_url"
 supabase_service_role_key="$dotenv_service_role_key"
 
 database_url="$POSTGRES_URL"
-remediation="supabase start && pnpm run db:migrate"
+remediation="pnpm supabase:start && pnpm run db:migrate"
 stack_overridden=false
 if [[ "$postgres_url_was_defined" == true \
   || "$non_pooling_url_was_defined" == true \

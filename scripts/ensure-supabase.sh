@@ -15,7 +15,7 @@ SUPABASE_URL="${NEXT_PUBLIC_SUPABASE_URL:-http://localhost:54321}"
 
 if ! curl -fsS --max-time 2 "${SUPABASE_URL}/auth/v1/health" >/dev/null 2>&1; then
   echo "Error: Supabase is not running at ${SUPABASE_URL}." >&2
-  echo "  Start it with: supabase start" >&2
+  echo "  Start it with: pnpm supabase:start" >&2
   exit 1
 fi
 

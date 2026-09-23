@@ -549,8 +549,59 @@ class TestMainTeardown:
         assert supabase_env["PATH"] == os.environ["PATH"]
 
         for args, kwargs in zip(stub.calls, stub.call_kwargs, strict=True):
-            if _kind(args) != "supabase":
+            if _kind(args) in {"supabase", "volume_ls", "volume_rm"}:
+                assert kwargs.get("env") == supabase_env
+            else:
                 assert "env" not in kwargs
+
+    def test_remote_backend_worktree_tears_down_on_the_remote_daemon(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        fake_worktree: Path,
+        deallocated: list[str],
+    ) -> None:
+        (fake_worktree / ".env.local").write_text("PINPOINT_SUPABASE_BACKEND=remote\n")
+        monkeypatch.setenv("PINPOINT_REMOTE_DOCKER_HOST", "ssh://bazzite")
+        monkeypatch.setenv("PINPOINT_REMOTE_SUPABASE_HOST", "bazzite")
+        monkeypatch.setenv("DOCKER_CONTEXT", "orbstack")
+        stub = install(
+            monkeypatch,
+            RunStub(
+                rev_parse=(0, f"{BRANCH}\n", ""),
+                volume_ls=(0, f"supabase_db_{PROJECT_ID}\n", ""),
+            ),
+        )
+
+        assert _run_main(monkeypatch, fake_worktree) == cleanup.EXIT_OK
+
+        for kind in ("supabase", "volume_ls", "volume_rm"):
+            env = stub.kwargs_of(kind)[0]["env"]
+            assert isinstance(env, dict)
+            assert env["DOCKER_HOST"] == "ssh://bazzite"
+            assert env["SUPABASE_SERVICES_HOSTNAME"] == "bazzite"
+            assert "DOCKER_CONTEXT" not in env
+        assert deallocated == [str(fake_worktree)]
+
+    def test_remote_backend_without_remote_settings_keeps_the_worktree(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        fake_worktree: Path,
+        deallocated: list[str],
+    ) -> None:
+        """Local-daemon teardown would report zero and strand remote volumes."""
+        (fake_worktree / ".env.local").write_text("PINPOINT_SUPABASE_BACKEND=remote\n")
+        monkeypatch.delenv("PINPOINT_REMOTE_DOCKER_HOST", raising=False)
+        stub = install(monkeypatch, RunStub(rev_parse=(0, f"{BRANCH}\n", "")))
+
+        exit_code = _run_main(monkeypatch, fake_worktree)
+
+        assert exit_code == cleanup.EXIT_FAILED
+        assert "PINPOINT_REMOTE_DOCKER_HOST is unset" in capsys.readouterr().err
+        assert stub.calls_of("supabase") == []
+        assert stub.calls_of("volume_ls") == []
+        assert stub.calls_of("worktree_remove") == []
+        assert deallocated == []
 
     def test_unreadable_branch_refuses_cleanup_instead_of_reporting_success(
         self,

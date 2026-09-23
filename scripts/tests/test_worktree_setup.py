@@ -47,7 +47,21 @@ from worktree_setup import (
     resolve_install_timeout,
     resolve_preinstalled_toolchain,
     resolve_project_id,
+    resolve_supabase_backend,
 )
+
+
+@pytest.fixture(autouse=True)
+def _no_ambient_backend_settings(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Tim's Mac exports remote-backend defaults; tests must not inherit them."""
+    for name in (
+        "PINPOINT_SUPABASE_BACKEND",
+        "PINPOINT_SET_SUPABASE_BACKEND",
+        "PINPOINT_REMOTE_SUPABASE_HOST",
+        "PINPOINT_RESERVED_SLOTS",
+    ):
+        monkeypatch.delenv(name, raising=False)
+
 
 # Testing philosophy for worktree setup
 # ────────────────────────────────────────────────────────────────────────────
@@ -224,17 +238,102 @@ class TestMergeEnvLocal:
         assert "MAILPIT_SMTP_PORT=58325" in result
 
 
+class TestSupabaseBackend:
+    """Backend choice: stored per worktree, defaulted from the environment."""
+
+    @pytest.fixture
+    def port_config(self) -> PortConfig:
+        return PortConfig(slot=40, project_id="pinpoint-test", name="test-worktree")
+
+    def test_defaults_to_local_on_localhost(
+        self, tmp_path: Path, port_config: PortConfig
+    ) -> None:
+        result = merge_env_local(tmp_path, port_config)
+
+        assert "PINPOINT_SUPABASE_BACKEND=local" in result
+        assert "NEXT_PUBLIC_SUPABASE_URL=http://localhost:58321" in result
+        assert "MAILPIT_HOST=localhost" in result
+
+    def test_environment_default_selects_remote_host_for_a_new_worktree(
+        self, tmp_path: Path, port_config: PortConfig, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("PINPOINT_SUPABASE_BACKEND", "remote")
+        monkeypatch.setenv("PINPOINT_REMOTE_SUPABASE_HOST", "bazzite")
+
+        result = merge_env_local(tmp_path, port_config)
+
+        assert "PINPOINT_SUPABASE_BACKEND=remote" in result
+        assert "NEXT_PUBLIC_SUPABASE_URL=http://bazzite:58321" in result
+        assert (
+            "POSTGRES_URL=postgresql://postgres:postgres@bazzite:58322/postgres"
+            in result
+        )
+        assert "MAILPIT_HOST=bazzite" in result
+        # The browser and Next.js stay on this machine.
+        assert "NEXT_PUBLIC_SITE_URL=http://localhost:3400" in result
+
+    def test_stored_choice_survives_a_different_environment_default(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        (tmp_path / ".env.local").write_text("PINPOINT_SUPABASE_BACKEND=local\n")
+        monkeypatch.setenv("PINPOINT_SUPABASE_BACKEND", "remote")
+        monkeypatch.setenv("PINPOINT_REMOTE_SUPABASE_HOST", "bazzite")
+
+        assert resolve_supabase_backend(tmp_path / ".env.local") == (
+            "local",
+            "localhost",
+        )
+
+    def test_explicit_switch_replaces_the_stored_choice(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        (tmp_path / ".env.local").write_text("PINPOINT_SUPABASE_BACKEND=local\n")
+        monkeypatch.setenv("PINPOINT_SET_SUPABASE_BACKEND", "remote")
+        monkeypatch.setenv("PINPOINT_REMOTE_SUPABASE_HOST", "bazzite")
+
+        assert resolve_supabase_backend(tmp_path / ".env.local") == (
+            "remote",
+            "bazzite",
+        )
+
+    def test_remote_without_a_host_falls_back_to_local(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        monkeypatch.setenv("PINPOINT_SUPABASE_BACKEND", "remote")
+
+        assert resolve_supabase_backend(tmp_path / ".env.local") == (
+            "local",
+            "localhost",
+        )
+        assert "PINPOINT_REMOTE_SUPABASE_HOST is unset" in capsys.readouterr().err
+
+    def test_unknown_backend_falls_back_to_local(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("PINPOINT_SUPABASE_BACKEND", "cloud")
+
+        assert resolve_supabase_backend(tmp_path / ".env.local") == (
+            "local",
+            "localhost",
+        )
+
+
 class TestManagedKeys:
     """Test the managed key set."""
 
     def test_managed_keys_complete(self) -> None:
         expected_managed = {
+            "PINPOINT_SUPABASE_BACKEND",
             "NEXT_PUBLIC_SUPABASE_URL",
             "POSTGRES_URL",
             "POSTGRES_URL_NON_POOLING",
             "PORT",
             "NEXT_PUBLIC_SITE_URL",
             "EMAIL_TRANSPORT",
+            "MAILPIT_HOST",
             "MAILPIT_PORT",
             "MAILPIT_SMTP_PORT",
             "INBUCKET_PORT",
@@ -527,6 +626,18 @@ class TestManifest:
         wt3.mkdir()
         slot3 = allocate_slot(str(wt3))
         assert slot3 == 1  # Reuses the freed slot
+
+    def test_allocate_skips_reserved_slots(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("PINPOINT_RESERVED_SLOTS", "1, 3,junk")
+        slots = []
+        for name in ("wt1", "wt2", "wt3"):
+            wt = tmp_path / name
+            wt.mkdir()
+            slots.append(allocate_slot(str(wt)))
+
+        assert slots == [2, 4, 5]
 
     def test_allocate_returns_existing_slot(self, tmp_path: Path) -> None:
         wt = tmp_path / "wt"

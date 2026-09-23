@@ -60,14 +60,29 @@ LOCAL_SUPABASE_SERVICE_ROLE_KEY = (
     "EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU"
 )
 
+# Where the worktree's Supabase stack runs. "local" is this machine's Docker;
+# "remote" is another host's Docker reached over the network, with the same
+# ports published on PINPOINT_REMOTE_SUPABASE_HOST
+# (docs/runbooks/remote-supabase.md). The choice is stored in .env.local and
+# survives branch switches. PINPOINT_SUPABASE_BACKEND in the environment is
+# only the default for a worktree that has no stored choice yet;
+# PINPOINT_SET_SUPABASE_BACKEND replaces the stored choice
+# (scripts/supabase-stack.sh use).
+SUPABASE_BACKENDS = ("local", "remote")
+BACKEND_ENV_KEY = "PINPOINT_SUPABASE_BACKEND"
+BACKEND_SWITCH_ENV_KEY = "PINPOINT_SET_SUPABASE_BACKEND"
+REMOTE_HOST_ENV_KEY = "PINPOINT_REMOTE_SUPABASE_HOST"
+
 # Keys that this script manages (port-dependent and local dev defaults)
 MANAGED_ENV_KEYS = {
+    BACKEND_ENV_KEY,
     "NEXT_PUBLIC_SUPABASE_URL",
     "POSTGRES_URL",
     "POSTGRES_URL_NON_POOLING",
     "PORT",
     "NEXT_PUBLIC_SITE_URL",
     "EMAIL_TRANSPORT",
+    "MAILPIT_HOST",
     "MAILPIT_PORT",
     "MAILPIT_SMTP_PORT",
     "INBUCKET_PORT",
@@ -198,6 +213,18 @@ def _write_manifest_locked(f: object, slots: dict[str, int]) -> None:
     f.write(json.dumps({"version": 1, "slots": slots}, indent=2) + "\n")  # type: ignore[union-attr]
 
 
+def reserved_slots() -> set[int]:
+    """Slots new worktrees must not take, from PINPOINT_RESERVED_SLOTS.
+
+    A remote Supabase host can also run stacks this machine's manifest does
+    not know about (Crabbox's runner stacks on Bazzite). Its Docker refuses a
+    port number already published there, even on a different address, so
+    those slots' ports are off limits here. Comma-separated; junk is ignored.
+    """
+    raw = os.environ.get("PINPOINT_RESERVED_SLOTS", "")
+    return {int(part) for part in raw.split(",") if part.strip().isdigit()}
+
+
 def allocate_slot(worktree_path: str) -> int:
     """Allocate the lowest free slot for a worktree, with file locking."""
     MANIFEST_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -219,7 +246,7 @@ def allocate_slot(worktree_path: str) -> int:
                     _write_manifest_locked(f, slots)
                 return slots[worktree_path]
 
-            used = set(slots.values())
+            used = set(slots.values()) | reserved_slots()
             for candidate in range(1, MAX_SLOT + 1):
                 if candidate not in used:
                     slots[worktree_path] = candidate
@@ -411,6 +438,8 @@ def format_env_file(
         f"# Ports: Next.js={port_config.nextjs_port}, Supabase API={port_config.api_port}, DB={port_config.db_port}",
         "",
         "# === Managed by worktree_setup.py (do not edit) ===",
+        "# Supabase backend: local or remote. Switch with `pnpm supabase:use <backend>`.",
+        f"{BACKEND_ENV_KEY}={managed_values[BACKEND_ENV_KEY]}",
         f"NEXT_PUBLIC_SUPABASE_URL={managed_values['NEXT_PUBLIC_SUPABASE_URL']}",
         f"POSTGRES_URL={managed_values['POSTGRES_URL']}",
         f"POSTGRES_URL_NON_POOLING={managed_values['POSTGRES_URL_NON_POOLING']}",
@@ -419,6 +448,7 @@ def format_env_file(
         "",
         "# Email Configuration (Mailpit)",
         f"EMAIL_TRANSPORT={managed_values['EMAIL_TRANSPORT']}",
+        f"MAILPIT_HOST={managed_values['MAILPIT_HOST']}",
         f"MAILPIT_PORT={managed_values['MAILPIT_PORT']}",
         f"MAILPIT_SMTP_PORT={managed_values['MAILPIT_SMTP_PORT']}",
         f"INBUCKET_PORT={managed_values['INBUCKET_PORT']}",
@@ -503,6 +533,39 @@ def _resolve_unsubscribe_secret(worktree_path: Path, main_path: Path | None) -> 
     return UNSUBSCRIBE_SIGNING_SECRET_PLACEHOLDER
 
 
+def resolve_supabase_backend(env_file: Path) -> tuple[str, str]:
+    """Return (backend, service_host) for this worktree.
+
+    Precedence: an explicit switch, then the stored choice, then the
+    environment default, then "local". A remote choice without a configured
+    host falls back to local with a warning rather than failing the checkout.
+    """
+    candidates = (
+        os.environ.get(BACKEND_SWITCH_ENV_KEY),
+        _read_managed_value(env_file, BACKEND_ENV_KEY),
+        os.environ.get(BACKEND_ENV_KEY),
+    )
+    backend = next((c.strip() for c in candidates if c and c.strip()), "local")
+    if backend not in SUPABASE_BACKENDS:
+        print(
+            f"worktree_setup: warning: unknown Supabase backend {backend!r}; using local",
+            file=sys.stderr,
+        )
+        backend = "local"
+
+    if backend == "local":
+        return backend, "localhost"
+
+    host = os.environ.get(REMOTE_HOST_ENV_KEY, "").strip()
+    if not host:
+        print(
+            f"worktree_setup: warning: {REMOTE_HOST_ENV_KEY} is unset; using the local backend",
+            file=sys.stderr,
+        )
+        return "local", "localhost"
+    return backend, host
+
+
 def merge_env_local(worktree_path: Path, port_config: PortConfig) -> str:
     """Generate .env.local content, preserving user-provided custom keys.
 
@@ -529,14 +592,17 @@ def merge_env_local(worktree_path: Path, port_config: PortConfig) -> str:
     user_values = {**main_keys, **target_keys}
 
     unsubscribe_secret = _resolve_unsubscribe_secret(worktree_path, main_path)
+    backend, host = resolve_supabase_backend(worktree_path / ".env.local")
 
     managed_values = {
-        "NEXT_PUBLIC_SUPABASE_URL": f"http://localhost:{port_config.api_port}",
-        "POSTGRES_URL": f"postgresql://postgres:postgres@localhost:{port_config.db_port}/postgres",
-        "POSTGRES_URL_NON_POOLING": f"postgresql://postgres:postgres@localhost:{port_config.db_port}/postgres",
+        BACKEND_ENV_KEY: backend,
+        "NEXT_PUBLIC_SUPABASE_URL": f"http://{host}:{port_config.api_port}",
+        "POSTGRES_URL": f"postgresql://postgres:postgres@{host}:{port_config.db_port}/postgres",
+        "POSTGRES_URL_NON_POOLING": f"postgresql://postgres:postgres@{host}:{port_config.db_port}/postgres",
         "PORT": str(port_config.nextjs_port),
         "NEXT_PUBLIC_SITE_URL": port_config.site_url,
         "EMAIL_TRANSPORT": "smtp",
+        "MAILPIT_HOST": host,
         "MAILPIT_PORT": str(port_config.inbucket_port),
         "MAILPIT_SMTP_PORT": str(port_config.smtp_port),
         "INBUCKET_PORT": str(port_config.inbucket_port),
@@ -1230,6 +1296,7 @@ def main() -> int:
         print(
             f"worktree_setup: status=ready "
             f"slot={slot} "
+            f"supabase={parse_env_file(env_path).get(BACKEND_ENV_KEY)} "
             f"project_id={port_config.project_id} "
             f"nextjs={port_config.nextjs_port} "
             f"api={port_config.api_port} "

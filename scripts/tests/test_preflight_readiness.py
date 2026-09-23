@@ -116,7 +116,7 @@ def test_unreachable_database_fails_fast_with_port_and_one_remediation(
     assert result.stdout == ""
     assert result.stderr.splitlines() == [
         "FAIL: preflight readiness — Postgres is unavailable at localhost:61234",
-        "Run: supabase start && pnpm run db:migrate",
+        "Run: pnpm supabase:start && pnpm run db:migrate",
     ]
 
 
@@ -129,7 +129,7 @@ def test_uninitialized_database_fails_fast_with_port_and_one_remediation(
     assert result.stdout == ""
     assert result.stderr.splitlines() == [
         "FAIL: preflight readiness — Postgres at localhost:61234 is not migrated",
-        "Run: supabase start && pnpm run db:migrate",
+        "Run: pnpm supabase:start && pnpm run db:migrate",
     ]
 
 
@@ -142,7 +142,7 @@ def test_unavailable_supabase_api_fails_before_schema_inspection(
     assert result.stdout == ""
     assert result.stderr.splitlines() == [
         "FAIL: preflight readiness — Supabase Auth is unavailable at localhost:61233",
-        "Run: supabase start && pnpm run db:migrate",
+        "Run: pnpm supabase:start && pnpm run db:migrate",
     ]
 
 
@@ -184,7 +184,7 @@ def test_database_missing_current_migration_hash_fails_fast(
     assert result.stdout == ""
     assert result.stderr.splitlines() == [
         "FAIL: preflight readiness — Postgres at localhost:61234 is not migrated",
-        "Run: supabase start && pnpm run db:migrate",
+        "Run: pnpm supabase:start && pnpm run db:migrate",
     ]
 
 
@@ -628,6 +628,6 @@ def test_agent_docs_name_bootstrap_and_targeted_entrypoints() -> None:
     testing = (REPO_ROOT / "src" / "test" / "README.md").read_text()
 
     for content in (agents, testing):
-        assert "supabase start && pnpm run db:migrate" in content
+        assert "pnpm supabase:start && pnpm run db:migrate" in content
         assert "pnpm run test:integration:target --" in content
         assert "bare Vitest command" in content
