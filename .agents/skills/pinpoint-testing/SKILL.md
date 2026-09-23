@@ -98,6 +98,10 @@ Mocking `~/server/db` with canned return values, or mocking `drizzle-orm` at all
 
 The house pattern instead forwards the `db` singleton to worker-scoped PGlite, so the real SQL executes against real Postgres — `vi.mock("~/server/db", …)` returning `{ db: await getTestDb() }`. This is how you integration-test a service function that imports the singleton directly instead of accepting it as a parameter. `src/test/integration/transaction-tripwire.test.ts` is a representative example. It composes with CORE-TEST-001 rather than violating it: `getTestDb()` hands back the **worker-scoped** instance, so no per-test database is created.
 
+## Host / environment gotchas
+
+- **`localStorage is undefined` in unit tests** (`TypeError: Cannot read properties of undefined (reading 'clear')`, green in CI but red on some Fedora/Bazzite hosts) is a jsdom-per-host quirk, not your change. `src/test/setup.ts` installs an in-memory `localStorage` (via `src/test/memory-storage.ts`) only when jsdom fails to supply one, so this should no longer bite — but if it resurfaces, that's the seam to widen (e.g. `sessionStorage`), not the suite to distrust. (PP-2s37.)
+
 ## Elsewhere
 
 - `pinpoint-e2e` — Playwright technique, selector strategy, worker isolation, environment defaults.
