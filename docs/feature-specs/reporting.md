@@ -13,14 +13,14 @@
 - **Report draft** — an unsaved description of an operational problem associated with a machine. It becomes an issue only when submitted.
 - **Report template** — a reusable, player-facing description of an observable machine problem. It seeds a report draft and may provide guidance before submission.
 - **Report mode** — one of three ways to prepare issue reports: **Quick report**, **Detailed report**, or **Multiple issues**.
-- **Quick report** — the default, minimum-input path for reporting one observable problem.
+- **Quick report** — the minimum-input path for reporting one observable problem and the fallback when no available saved default applies.
 - **Detailed report** — the complete single-issue form for reporters who need to add context or control additional issue fields.
 - **Multiple issues** — the batch-authoring mode for preparing and submitting reports about more than one problem.
 - **Deflection guidance** — advice that may resolve an immediate problem without creating an issue while preserving a path to report a recurring or unresolved problem.
 
 ## 2. Reporting surface and modes
 
-- **2.1** Opening `/report` starts in Quick report.
+- **2.1** Opening `/report` starts in the signed-in reporter's saved default report mode when that mode is available; otherwise it starts in Quick report.
 - **2.2** Quick report is the primary path rather than one of several equally weighted top-level tabs.
 - **2.3** The Quick report surface places its report templates before the actions for entering Detailed report or Multiple issues.
 - **2.4** A reporter can expand a Quick report draft into Detailed report.
@@ -30,6 +30,9 @@
 - **2.8** A draft moved into Multiple issues becomes its first issue row.
 - **2.9** Quick report and Detailed report are available to anyone permitted to report an issue.
 - **2.10** Multiple issues is shown only to people with the batch-reporting capability.
+- **2.11** A signed-in user can choose Quick report, Detailed report, or Multiple issues as the default report mode in account settings.
+- **2.12** Account settings offers Multiple issues as a default only when the user has the batch-reporting capability.
+- **2.13** If a saved default is no longer available to the reporter, opening `/report` starts in Quick report without exposing the unavailable mode.
 
 ## 3. Quick report
 
@@ -136,20 +139,20 @@
 - **9.3** Each displayed issue links to its issue page and shows its current status.
 - **9.4** The panel links to the selected machine's complete issue list when open issues are present.
 - **9.5** The panel has explicit loading, failure, no-machine, and no-open- issues states.
-- **9.6** The panel remains collapsible but is open and visually prominent by default.
+- **9.6** The recent-open-issues section is always visible and visually prominent whenever it is shown; it is not collapsible.
 
 ## Known divergences
 
 | Requirement | Code today | Resolution |
 | :-- | :-- | :-- |
-| §2.1–§2.2, §2.4–§2.9, §3.1–§3.4, §3.8, §3.12–§3.13, §4.1, §4.5–§4.6, §7.1, §7.4–§7.5, §8.9–§8.10 | `/report` opens the complete single form; Quick and its draft handoffs do not exist; the existing single-issue mode is named Single issue rather than Detailed report. | `PP-ek0e.2` |
+| §2.1, §2.11–§2.13 | Account settings has no default-report-mode preference, and `/report` does not resolve a saved preference or unavailable-mode fallback. | `PP-ek0e.4` |
 | §2.3, §3.5–§3.11, §4.1, §4.3–§4.4, §5–§6 | Quick report templates, progressive problem selection, template values and confirmation, and deflection guidance do not exist. | `PP-ek0e.3` |
-| §4.2 | Issue frequency requires Intermittent, Frequent, or Constant; Not specified is unavailable. | `PP-ek0e.2` |
-| §9.1, §9.6 | Recent issues are not filtered to open status, and they show three rows on mobile and five on desktop with different visual prominence. | `PP-ek0e.2` |
+| §9.1, §9.6 | Detailed report still shows five recent issues on desktop and lets its panel collapse; Quick report shows three and is always visible. | `PP-ek0e` follow-up decision; preserve Detailed behavior in `PP-ek0e.2` |
 
 ## Changelog
 
 | Date | Change |
 | :-- | :-- |
+| 2026-09-12 | Added a per-user default report mode with a capability-safe fallback, and made recent open issues always visible. |
 | 2026-09-06 | Aligned batch-row behavior and divergence coverage with the existing report flow after conformance review. |
 | 2026-09-05 | Initial draft: three report modes, draft continuity, Quick report templates and defaults, deflection, and recent-open-issue behavior. |

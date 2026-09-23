@@ -1,5 +1,6 @@
 import {
   Circle,
+  CircleHelp,
   CircleDot,
   Disc,
   AlertTriangle,
@@ -248,6 +249,12 @@ export const FREQUENCY_CONFIG: Record<
   IssueFrequency,
   { label: string; styles: string; iconColor: string; icon: LucideIcon }
 > = {
+  not_specified: {
+    label: "Not specified",
+    styles: "bg-muted text-muted-foreground border-outline-variant",
+    iconColor: "text-muted-foreground",
+    icon: CircleHelp,
+  },
   intermittent: {
     label: "Intermittent",
     styles: "bg-cyan-950/50 text-cyan-400 border-cyan-500",
@@ -338,6 +345,7 @@ export const PRIORITY_STYLES: Record<IssuePriority, string> = {
 };
 
 export const FREQUENCY_STYLES: Record<IssueFrequency, string> = {
+  not_specified: FREQUENCY_CONFIG.not_specified.styles,
   intermittent: FREQUENCY_CONFIG.intermittent.styles,
   frequent: FREQUENCY_CONFIG.frequent.styles,
   constant: FREQUENCY_CONFIG.constant.styles,

@@ -30,6 +30,12 @@
     "authRole": "member",
     "seedNeeds": "seeded machine TAF (addamsFamily) from src/test/data/machines.json"
   },
+  "machine-scan-hub": {
+    "label": "Machine Scan Hub (Attack from Mars)",
+    "route": "/m/AFM/hub?source=apron",
+    "authRole": "member",
+    "seedNeeds": "seeded AFM machine, open issues, and iScored scores"
+  },
   "collections": {
     "label": "Collections",
     "route": "/c/collections",

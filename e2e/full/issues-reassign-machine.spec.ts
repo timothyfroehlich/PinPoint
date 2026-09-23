@@ -44,13 +44,13 @@ async function createIssueOnMachine(
   machineInitials: string,
   title: string
 ): Promise<string> {
-  await page.goto(`/report?machine=${machineInitials}`);
+  await page.goto(`/report/detailed?machine=${machineInitials}`);
   await fillReportForm(page, { title, priority: "medium" });
   await submitFormAndWaitForRedirect(
     page,
     page.getByRole("button", { name: "Submit Issue Report" }),
     {
-      awayFrom: "/report",
+      awayFrom: "/report/detailed",
       expectedIssueTitle: title,
     }
   );

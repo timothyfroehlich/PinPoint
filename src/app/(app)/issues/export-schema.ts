@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { ISSUE_STATUS_VALUES } from "~/lib/issues/status";
+import { ISSUE_FREQUENCY_VALUES } from "~/lib/types";
 
 /**
  * Schema for CSV export action input.
@@ -31,9 +32,7 @@ export const exportFiltersSchema = z.object({
     .array(z.enum(["cosmetic", "minor", "major", "unplayable"]))
     .optional(),
   priority: z.array(z.enum(["low", "medium", "high"])).optional(),
-  frequency: z
-    .array(z.enum(["intermittent", "frequent", "constant"]))
-    .optional(),
+  frequency: z.array(z.enum(ISSUE_FREQUENCY_VALUES)).optional(),
   assignee: z.array(z.string()).optional(),
   owner: z.array(z.string()).optional(),
   reporter: z.array(z.string()).optional(),

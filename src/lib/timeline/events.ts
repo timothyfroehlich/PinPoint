@@ -39,11 +39,16 @@ export async function createTimelineEvent(
   event: TimelineEventData,
   tx: DbTransaction = db,
   actorId?: string | null
-): Promise<void> {
-  await tx.insert(issueComments).values({
-    issueId,
-    eventData: event,
-    isSystem: true,
-    authorId: actorId ?? null,
-  });
+): Promise<string> {
+  const [row] = await tx
+    .insert(issueComments)
+    .values({
+      issueId,
+      eventData: event,
+      isSystem: true,
+      authorId: actorId ?? null,
+    })
+    .returning({ id: issueComments.id });
+  if (!row) throw new Error("Failed to insert issue timeline event");
+  return row.id;
 }

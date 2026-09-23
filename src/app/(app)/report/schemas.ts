@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { ISSUE_STATUS_VALUES } from "~/lib/issues/status";
+import { ISSUE_FREQUENCY_VALUES } from "~/lib/types";
 
 export const publicIssueSchema = z.object({
   machineId: z.string().uuid({ message: "Please select a machine" }),
@@ -21,7 +22,7 @@ export const publicIssueSchema = z.object({
       message: "Select a priority",
     })
     .optional(),
-  frequency: z.enum(["intermittent", "frequent", "constant"], {
+  frequency: z.enum(ISSUE_FREQUENCY_VALUES, {
     message: "Select frequency",
   }),
   status: z.enum(ISSUE_STATUS_VALUES).optional(),
@@ -37,6 +38,7 @@ export const publicIssueSchema = z.object({
     .or(z.literal("")),
   assignedTo: z.string().uuid("Invalid assignee").optional().or(z.literal("")),
   watchIssue: z.boolean().default(true),
+  reportSource: z.literal("apron").optional(),
   // Client-generated UUID, stable across submission retries. Lets the service
   // dedup a retried submission. Optional + tolerant of a missing/blank value so
   // a JS-disabled or legacy client (no hidden field) still submits. (PP-2053.7)
