@@ -149,6 +149,14 @@ export function UnifiedReportForm({
     () => machinesList.find((m) => m.id === entry.machineId),
     [machinesList, entry.machineId]
   );
+  const loginReturnParams = new URLSearchParams();
+  if (selectedMachine)
+    loginReturnParams.set("machine", selectedMachine.initials);
+  if (source) loginReturnParams.set("source", source);
+  const loginReturnQuery = loginReturnParams.toString();
+  const loginReturnUrl = loginReturnQuery
+    ? `/report/detailed?${loginReturnQuery}`
+    : "/report/detailed";
 
   // The report form submits the machine's id (as `machineId`), so each option's
   // combobox `value` is the machine id.
@@ -685,11 +693,7 @@ export function UnifiedReportForm({
                 <p className="text-sm text-muted-foreground pb-1">
                   Already have an account?{" "}
                   <Link
-                    href={getLoginUrl(
-                      selectedMachine
-                        ? `/report/detailed?machine=${selectedMachine.initials}`
-                        : "/report/detailed"
-                    )}
+                    href={getLoginUrl(loginReturnUrl)}
                     className="text-link"
                   >
                     Log in

@@ -25,4 +25,13 @@ test("apron scan opens Quick report with AFM and source preserved", async ({
     page.getByRole("combobox", { name: "Select Machine" })
   ).toContainText("Attack from Mars");
   await expect(page.getByTestId("report-source")).toHaveValue("apron");
+  const loginHref = await page
+    .getByRole("link", { name: "Log in" })
+    .getAttribute("href");
+  expect(loginHref).toBeTruthy();
+  if (!loginHref) throw new Error("Expected a login link on Detailed report.");
+  const loginUrl = new URL(loginHref, page.url());
+  expect(loginUrl.searchParams.get("next")).toBe(
+    "/report/detailed?machine=AFM&source=apron"
+  );
 });
