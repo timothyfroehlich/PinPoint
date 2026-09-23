@@ -3,6 +3,7 @@ import type { PutBlobResult } from "@vercel/blob";
 import path from "path";
 import fs from "fs/promises";
 import { log } from "~/lib/logger";
+import { errorMessage } from "~/lib/errors";
 import { assertNotInTransaction } from "~/server/db/transaction-context";
 
 function shouldUseMockBlobStorage(): boolean {
@@ -75,7 +76,7 @@ export async function uploadToBlob(
     });
   } catch (err) {
     const errorDetails = {
-      err: err instanceof Error ? err.message : String(err),
+      err: errorMessage(err),
       pathname,
     };
     log.error(errorDetails, "Blob upload failed");
@@ -134,7 +135,7 @@ export async function deleteFromBlob(pathname: string): Promise<void> {
     await del(pathname);
   } catch (err) {
     const errorDetails = {
-      err: err instanceof Error ? err.message : String(err),
+      err: errorMessage(err),
       pathname,
     };
     log.error(errorDetails, "Blob deletion failed");

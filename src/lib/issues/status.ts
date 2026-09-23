@@ -1,5 +1,6 @@
 import {
   Circle,
+  CircleHelp,
   CircleDot,
   Disc,
   AlertTriangle,
@@ -8,6 +9,12 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { IssueSeverity, IssuePriority, IssueFrequency } from "~/lib/types";
+import type { IssueStatus } from "~/lib/issues/status-values";
+
+export {
+  ISSUE_STATUS_VALUES,
+  type IssueStatus,
+} from "~/lib/issues/status-values";
 
 /**
  * Single Source of Truth for Issue Status Values
@@ -39,24 +46,6 @@ export const ISSUE_STATUSES = {
 
 // Array of all valid statuses (for runtime validation)
 export const ALL_ISSUE_STATUSES = Object.values(ISSUE_STATUSES);
-
-// Type-safe array with specific literal types (for TypeScript and Drizzle)
-export const ISSUE_STATUS_VALUES = [
-  "new",
-  "confirmed",
-  "in_progress",
-  "need_parts",
-  "need_help",
-  "wait_owner",
-  "fixed",
-  "wont_fix",
-  "wai",
-  "no_repro",
-  "duplicate",
-] as const;
-
-// Derive the type from the array (this is the canonical IssueStatus type)
-export type IssueStatus = (typeof ISSUE_STATUS_VALUES)[number];
 
 // Shared styling constants
 export const ISSUE_BADGE_WIDTH = "w-[120px]";
@@ -260,6 +249,12 @@ export const FREQUENCY_CONFIG: Record<
   IssueFrequency,
   { label: string; styles: string; iconColor: string; icon: LucideIcon }
 > = {
+  not_specified: {
+    label: "Not specified",
+    styles: "bg-muted text-muted-foreground border-outline-variant",
+    iconColor: "text-muted-foreground",
+    icon: CircleHelp,
+  },
   intermittent: {
     label: "Intermittent",
     styles: "bg-cyan-950/50 text-cyan-400 border-cyan-500",
@@ -350,6 +345,7 @@ export const PRIORITY_STYLES: Record<IssuePriority, string> = {
 };
 
 export const FREQUENCY_STYLES: Record<IssueFrequency, string> = {
+  not_specified: FREQUENCY_CONFIG.not_specified.styles,
   intermittent: FREQUENCY_CONFIG.intermittent.styles,
   frequent: FREQUENCY_CONFIG.frequent.styles,
   constant: FREQUENCY_CONFIG.constant.styles,

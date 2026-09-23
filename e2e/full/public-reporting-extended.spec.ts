@@ -26,7 +26,7 @@ test.describe("Public Issue Reporting - Extended", () => {
     const timestamp = Date.now();
     const email = `newuser-${timestamp}@example.com`;
 
-    await page.goto("/report");
+    await page.goto("/report/detailed");
     await selectMachine(page);
     // Wait for URL refresh (router.push) to prevent race conditions on Mobile Safari
     await expect(page).toHaveURL(/machine=/);
@@ -52,7 +52,7 @@ test.describe("Public Issue Reporting - Extended", () => {
   test("should pre-fill name on signup when provided without email", async ({
     page,
   }) => {
-    await page.goto("/report");
+    await page.goto("/report/detailed");
     await selectMachine(page);
     // Wait for URL refresh (router.push) to prevent race conditions on Mobile Safari
     await expect(page).toHaveURL(/machine=/);
@@ -87,7 +87,7 @@ test.describe("Public Issue Reporting - Extended", () => {
     const timestamp = Date.now();
     const email = `reporter-${timestamp}@example.com`;
 
-    await page.goto("/report");
+    await page.goto("/report/detailed");
     await selectMachine(page);
     // Wait for URL refresh (router.push) to prevent race conditions on Mobile Safari
     await expect(page).toHaveURL(/machine=/);
@@ -127,7 +127,7 @@ test.describe("Public Issue Reporting - Extended", () => {
     const issueTitle = `${PUBLIC_PREFIX} Security Test ${Date.now()}`;
 
     // 1. Submit anonymous issue
-    await page.goto("/report");
+    await page.goto("/report/detailed");
     await selectMachine(page);
     await expect(page).toHaveURL(/machine=/);
 

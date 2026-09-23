@@ -25,6 +25,7 @@ import {
   type OwnerSelectUser,
 } from "~/components/machines/OwnerSelect";
 import { PinballMapLinkField } from "~/components/machines/PinballMapLinkField";
+import { IscoredGamePicker } from "~/components/machines/IscoredGamePicker";
 import { RichTextEditor } from "~/components/editor/RichTextEditorDynamic";
 import type { ProseMirrorDoc } from "~/lib/tiptap/types";
 import {
@@ -45,11 +46,13 @@ import { Alert, AlertDescription } from "~/components/ui/alert";
 interface CreateMachineFormProps {
   allUsers: OwnerSelectUser[];
   canSelectOwner: boolean;
+  iscoredConfigured?: boolean;
 }
 
 export function CreateMachineForm({
   allUsers,
   canSelectOwner,
+  iscoredConfigured = false,
 }: CreateMachineFormProps): React.JSX.Element {
   const formRef = useRef<HTMLFormElement>(null);
   const [state, formAction, isPending] = useActionState<
@@ -311,6 +314,8 @@ export function CreateMachineForm({
         {/* Model — links the machine to its PinballMap catalog model/edition
             (bead B / PP-o355.2). */}
         <PinballMapLinkField machineName={nameValue} />
+
+        {iscoredConfigured && <IscoredGamePicker machineName={nameValue} />}
 
         {/* Description */}
         <div className="space-y-1.5">

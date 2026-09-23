@@ -343,6 +343,13 @@ describe("push actions", () => {
 });
 
 describe("the intent toggle", () => {
+  it("uses lineup vocabulary in its accessible name (spec 4.8)", () => {
+    renderControl({ view: VIEWS.syncOff });
+    expect(
+      screen.getByRole("radiogroup", { name: "Pinball Map lineup intent" })
+    ).toBeInTheDocument();
+  });
+
   it("marks exactly the current position as checked", () => {
     renderControl({ view: VIEWS.syncOff });
     expect(screen.getByTestId("pbm-listing-intent-no_sync")).toBeChecked();

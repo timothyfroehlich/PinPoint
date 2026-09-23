@@ -49,7 +49,7 @@ test.describe("Rich Text and Mentions", () => {
     const machine = await createTestMachine(reporter.id, initials);
 
     // 4. Go to report page
-    await page.goto(`/report?machine=${machine.initials}`);
+    await page.goto(`/report/detailed?machine=${machine.initials}`);
 
     // 5. Fill title
     await page.fill('input[name="title"]', "Test Rich Text Issue");
@@ -116,7 +116,7 @@ test.describe("Rich Text and Mentions", () => {
     const machine = await createTestMachine(user.id, initials);
 
     await loginAs(page, testInfo, { email: userEmail });
-    await page.goto(`/report?machine=${machine.initials}`);
+    await page.goto(`/report/detailed?machine=${machine.initials}`);
     await page.fill('input[name="title"]', "Issue for comment");
     await page.click('button[type="submit"]');
 

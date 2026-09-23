@@ -180,7 +180,7 @@ test.describe("Machine Timeline (PP-0x98)", () => {
       reassignTitle = `${REASSIGN_PREFIX} ${testInfo.project.name}-${testInfo.workerIndex.toString()}-${Date.now().toString()}`;
 
       // 1. File a throwaway issue on machine A and land on its detail page.
-      await page.goto(`/report?machine=${machineA}`);
+      await page.goto(`/report/detailed?machine=${machineA}`);
       await fillReportForm(page, {
         title: reassignTitle,
         priority: "medium",
@@ -188,7 +188,7 @@ test.describe("Machine Timeline (PP-0x98)", () => {
       await submitFormAndWaitForRedirect(
         page,
         page.getByRole("button", { name: "Submit Issue Report" }),
-        { awayFrom: "/report" }
+        { awayFrom: "/report/detailed" }
       );
       await expect(page).toHaveURL(new RegExp(`/m/${machineA}/i/[0-9]+$`));
 

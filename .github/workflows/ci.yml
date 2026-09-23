@@ -41,19 +41,27 @@ concurrency:
 jobs:
   # Detect which files changed to skip expensive jobs for non-website PRs.
   # "Non-website" covers: docs (docs/**, **/*.md), beads (.beads/**), agent
-  # configs (.agent[s]/**, .claude/**, .codex/**), developer / test / maintenance
-  # scripts (scripts/**), package.json (script/metadata edits; dependency changes
-  # update pnpm-lock.yaml / pnpm-workspace.yaml), editor / IDE / git configs
+  # configs (.agent[s]/**, .claude/**, .codex/**), the non-TS/JS files under
+  # scripts/ (scripts/**/*.{py,sh,sql,json,txt} and the whole scripts/tests/**
+  # tree), editor / IDE / git configs
   # (.husky/**, .vscode/**, pinpoint.code-workspace, .gitattributes, .gitignore),
   # test/linter configs (pytest.ini, ruff.toml, .yamllint.yml, .gitleaks.toml),
-  # agent hook / script unit tests (src/test/unit/hooks/**, src/test/unit/scripts/**),
   # and non-PR GitHub Action configs/workflows (dependabot.yml, renovate.json,
   # CODEOWNERS, ownerless-renovate-issues.yaml, preview-*.yaml, audit-override.yaml,
   # codex-reaction-witness.yaml).
   #
-  # Note: scripts/**, python tests, and shell scripts are already tested on every
-  # PR by the always-running `linters` job (Fast Linters: pytest scripts/tests/,
-  # ruff, shellcheck).
+  # Note: under scripts/, only TS/JS (.ts/.mjs) counts as code. Python and shell
+  # are excluded (the always-running `linters` job covers them: pytest
+  # scripts/tests/, ruff, shellcheck), and .sql/.json/.txt plus the whole
+  # scripts/tests/** tree are excluded as data/config the site build can't
+  # depend on. TS/JS is NOT excluded because it is real code
+  # (scripts/migrate-production.ts runs on every Vercel prod build,
+  # scripts/lib/pg-client.mjs is the PP-d8l8 prod commit-loss file,
+  # tsconfig.app.json includes some, scripts/workflow/pr-watcher-mcp.ts has a
+  # vitest spec) that the linters job never touches, so it must get typecheck,
+  # lint, test, and build. package.json is likewise NOT excluded — a
+  # package.json-only edit (packageManager pin, a script, an engines bump) with no
+  # lockfile change must still re-run setup and the full suite. (PP-9jar)
   #
   # .github/workflows/ci.yml and .github/actions/** are intentionally NOT excluded —
   # any change to the CI workflow or its composite actions directly affects what
@@ -80,7 +88,7 @@ jobs:
       deps: ${{ steps.deps-filter.outputs.deps }}
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c  # ratchet:step-security/harden-runner@v2.21.0
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # ratchet:step-security/harden-runner@v2.21.1
         with:
           egress-policy: audit
 
@@ -112,8 +120,12 @@ jobs:
               - '!ruff.toml'
               - '!.yamllint.yml'
               - '!.gitleaks.toml'
-              - '!scripts/**'
-              - '!package.json'
+              - '!scripts/**/*.py'
+              - '!scripts/**/*.sh'
+              - '!scripts/**/*.sql'
+              - '!scripts/**/*.json'
+              - '!scripts/**/*.txt'
+              - '!scripts/tests/**'
               - '!.github/dependabot.yml'
               - '!.github/renovate.json'
               - '!.github/CODEOWNERS'
@@ -151,7 +163,7 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c  # ratchet:step-security/harden-runner@v2.21.0
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # ratchet:step-security/harden-runner@v2.21.1
         with:
           egress-policy: audit
 
@@ -238,7 +250,7 @@ jobs:
     if: needs.changes.outputs.code == 'true' || needs.changes.outputs.deps == 'true'
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c  # ratchet:step-security/harden-runner@v2.21.0
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # ratchet:step-security/harden-runner@v2.21.1
         with:
           egress-policy: audit
 
@@ -266,7 +278,7 @@ jobs:
     needs: setup
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c  # ratchet:step-security/harden-runner@v2.21.0
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # ratchet:step-security/harden-runner@v2.21.1
         with:
           egress-policy: audit
 
@@ -302,7 +314,7 @@ jobs:
     needs: setup
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c  # ratchet:step-security/harden-runner@v2.21.0
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # ratchet:step-security/harden-runner@v2.21.1
         with:
           egress-policy: audit
 
@@ -335,7 +347,7 @@ jobs:
     needs: setup
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c  # ratchet:step-security/harden-runner@v2.21.0
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # ratchet:step-security/harden-runner@v2.21.1
         with:
           egress-policy: audit
 
@@ -368,7 +380,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c  # ratchet:step-security/harden-runner@v2.21.0
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # ratchet:step-security/harden-runner@v2.21.1
         with:
           egress-policy: audit
 
@@ -442,7 +454,7 @@ jobs:
     needs: [setup, typecheck, lint, format, linters, test-unit, test-integration]
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c  # ratchet:step-security/harden-runner@v2.21.0
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # ratchet:step-security/harden-runner@v2.21.1
         with:
           egress-policy: audit
 
@@ -480,7 +492,7 @@ jobs:
     needs: setup
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c  # ratchet:step-security/harden-runner@v2.21.0
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # ratchet:step-security/harden-runner@v2.21.1
         with:
           egress-policy: audit
 
@@ -518,7 +530,7 @@ jobs:
     needs: setup
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c  # ratchet:step-security/harden-runner@v2.21.0
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # ratchet:step-security/harden-runner@v2.21.1
         with:
           egress-policy: audit
 
@@ -562,7 +574,7 @@ jobs:
     needs: setup
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c  # ratchet:step-security/harden-runner@v2.21.0
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # ratchet:step-security/harden-runner@v2.21.1
         with:
           egress-policy: audit
 
@@ -616,7 +628,7 @@ jobs:
     needs: [changes, setup, typecheck, lint, format, linters, test-unit, test-integration, test-migrations]
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c  # ratchet:step-security/harden-runner@v2.21.0
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # ratchet:step-security/harden-runner@v2.21.1
         with:
           egress-policy: audit
 
@@ -664,7 +676,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c  # ratchet:step-security/harden-runner@v2.21.0
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # ratchet:step-security/harden-runner@v2.21.1
         with:
           egress-policy: audit
 
@@ -738,7 +750,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c  # ratchet:step-security/harden-runner@v2.21.0
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # ratchet:step-security/harden-runner@v2.21.1
         with:
           egress-policy: audit
 
@@ -812,7 +824,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c  # ratchet:step-security/harden-runner@v2.21.0
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # ratchet:step-security/harden-runner@v2.21.1
         with:
           egress-policy: audit
 
@@ -900,7 +912,7 @@ jobs:
     timeout-minutes: 90
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c  # ratchet:step-security/harden-runner@v2.21.0
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # ratchet:step-security/harden-runner@v2.21.1
         with:
           egress-policy: audit
 
@@ -1047,7 +1059,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c  # ratchet:step-security/harden-runner@v2.21.0
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # ratchet:step-security/harden-runner@v2.21.1
         with:
           egress-policy: audit
 
@@ -1068,7 +1080,7 @@ jobs:
     needs: setup
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c  # ratchet:step-security/harden-runner@v2.21.0
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # ratchet:step-security/harden-runner@v2.21.1
         with:
           egress-policy: audit
 
@@ -1186,7 +1198,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c  # ratchet:step-security/harden-runner@v2.21.0
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # ratchet:step-security/harden-runner@v2.21.1
         with:
           egress-policy: audit
 

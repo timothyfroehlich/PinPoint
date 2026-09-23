@@ -85,6 +85,26 @@ describe("ResendTransport.send", () => {
     expect(mockReportError).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ["invalid_idempotent_request", 409, "permanent"],
+    ["concurrent_idempotent_requests", 409, "transient"],
+    ["rate_limit_exceeded", 429, "transient"],
+    ["internal_server_error", 500, "transient"],
+    ["validation_error", 400, "permanent"],
+  ])(
+    "classifies %s (%i) delivery failure",
+    async (name, statusCode, reason) => {
+      mockSend.mockResolvedValue({
+        data: null,
+        error: { name, statusCode, message: "send failed" },
+      });
+
+      const result = await new ResendTransport("key").send(params);
+      expect(result).toMatchObject({ success: false, reason });
+      expect(mockReportError).not.toHaveBeenCalled();
+    }
+  );
+
   it("forwards threading and idempotency options to the SDK", async () => {
     mockSend.mockResolvedValue({ data: { id: "email_456" }, error: null });
 
