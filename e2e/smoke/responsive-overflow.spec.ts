@@ -64,7 +64,13 @@ const authenticatedRoutes = [
   "/settings",
 ];
 
-const publicRoutes = ["/report", "/help", "/about", "/whats-new"];
+const publicRoutes = [
+  "/report",
+  `/m/${machineInitials}/hub?source=apron`,
+  "/help",
+  "/about",
+  "/whats-new",
+];
 
 test.describe("Responsive: no horizontal overflow", () => {
   test.describe("authenticated pages", () => {
