@@ -1,9 +1,26 @@
 #!/bin/bash
 set -euo pipefail
 
-# Guard: verify Supabase is running before the dev server starts.
-# Does NOT auto-start — in multi-worktree setups, auto-starting from the
-# wrong directory would use the wrong ports/config. Start explicitly.
+# Tim's Mac dotfiles select remote mode for normal development. Other hosts
+# retain local behavior, and CI always uses its own local stack. Local mode on
+# Tim's Mac is an explicit opt-in, never an outage fallback.
+
+backend="${PINPOINT_SUPABASE_BACKEND:-local}"
+if [[ "${CI:-}" == "1" || "${CI:-}" == "true" ]]; then
+  backend=local
+fi
+if [[ "$backend" != remote && "$backend" != local ]]; then
+  echo "Error: PINPOINT_SUPABASE_BACKEND must be remote or local." >&2
+  exit 2
+fi
+
+if [[ "$backend" == remote ]]; then
+  python3 scripts/remote-supabase.py start
+  exit $?
+fi
+
+# Local mode only checks readiness. Start a local stack explicitly from the
+# correct worktree; this guard never starts one for CI or interactive opt-in.
 
 if ! command -v supabase &>/dev/null; then
   echo "Error: supabase CLI is not installed." >&2

@@ -114,10 +114,18 @@ mise exec -- python3 -m pip install -r scripts/requirements.txt
 mise exec -- pnpm install       # plain `pnpm` also works after mise shell activation
 cp .env.example .env.local      # then fill in Supabase + DB vars
 
-mise exec -- pnpm run dev       # automatically ensures Supabase is running
+supabase start                 # local setup for hosts without Tim's Mac dotfiles
+mise exec -- pnpm run db:migrate
+mise exec -- pnpm run dev       # verifies the selected stack, then starts Next.js
 ```
 
 Open `http://localhost:<PORT>` (see `.env.local`) to use the app.
+
+In Tim's Mac worktrees, dotfiles select Bazzite-hosted Supabase instead:
+`pnpm run dev` starts or reuses that worktree's remote stack and tunnel before
+Next.js. See [the remote development runbook](docs/runbooks/remote-supabase.md)
+for status, stop, recovery, and explicit local opt-in. Other hosts and CI keep
+their local-stack behavior.
 
 ### Database Workflow (Migrations)
 
@@ -130,10 +138,10 @@ pnpm run db:migrate                            # apply migrations locally
 pnpm run test:_generate-schema                 # refresh PGlite schema
 ```
 
-For a full local reset (destructive – wipes app data):
+For a full **local-only** reset (destructive – wipes app data):
 
 ```bash
-pnpm run db:reset
+PINPOINT_SUPABASE_BACKEND=local pnpm run db:reset
 ```
 
 This restarts Supabase, drops app tables, reapplies all migrations, regenerates the test schema, and seeds users/data.
@@ -147,7 +155,7 @@ pnpm run dev          # start dev server
 pnpm run check        # static gate: typecheck + lint + format (no tests, no Python)
 pnpm run test         # unit tests (PGlite)
 pnpm run test:integration           # PGlite integration tests
-pnpm run test:integration:supabase  # Supabase-backed integration tests (needs supabase start)
+pnpm run test:integration:supabase  # Supabase-backed tests (use Crabbox for heavy verdicts)
 pnpm run check:python # ruff + pytest over scripts/ and the hooks
 pnpm run smoke        # Playwright smoke E2E tests
 pnpm run preflight    # full local CI gate before pushing

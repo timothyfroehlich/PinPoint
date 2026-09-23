@@ -221,3 +221,32 @@ For this branch, `/m` first response was **3.76 s** and warmed responses **0.89/
 One `status` run initially reported `TUNNEL BROKEN: timed out` while the tunnel was still present and the API/Postgres immediately passed independent probes. Its former 2-second local check was too aggressive for intermittent remote latency. The pilot-only helper now probes IPv4 loopback with a 5-second budget; `status` returned READY on the unchanged tunnel PID. The focused lifecycle tests and the full Python gate passed again (633 tests). This adjustment does not provide automatic reconnect: a real SSH timeout still requires `start` to re-establish the owned tunnel.
 
 Genuine Docker Engine uses its native archive endpoint, so it should avoid Podman 5's Buildah `docker cp -` broken-pipe bug; Supabase's remote stream-copy design is expressly built for Docker ([v2.115.0 change](https://github.com/supabase/cli/releases/tag/v2.115.0)). **Still unverified:** startup and a repeated archive-upload stress test against an actual rootless Docker daemon on Bazzite. Installing Fedora's rootful Docker packages instead would require privileged [RPM installation and a system daemon](https://docs.docker.com/engine/install/fedora/), hence rpm-ostree layering/reboot on Bazzite, and would widen the host/networking footprint. For this isolated pilot, rootless Docker is the viable Docker alternative; rootful layered Docker is disproportionate.
+
+## Default-workflow adoption (2026-09-22)
+
+The measured sections above record the pilot as it ran; the pilot-named script
+path remains as a compatibility entry point. The maintained lifecycle is now
+[`scripts/remote-supabase.py`](../../scripts/remote-supabase.py), and the
+current start/status/stop, local opt-in, E2E safety, and teardown instructions
+are in [the operational runbook](../runbooks/remote-supabase.md). Normal Mac
+`pnpm run dev` uses remote mode only when Tim's Mac dotfiles export the backend
+selector; remote failure never starts a local stack. Existing Mac-local
+volumes are deliberately not migrated or deleted by this change.
+
+An adoption-worktree proof on the newer `origin/main` used independent Bazzite
+slot **17**, project `pinpoint-codex-remote-supabase-default`, and Mac browser
+`http://localhost:3200`. A first, empty-volume CLI start hit
+`LegacyDbConnectError` while Postgres finished initializing; the CLI removed
+that attempt's containers. A second start against the same scoped volume
+succeeded, then applied **82** Drizzle migrations and the full once-only seed
+sequence. The journal contained 82 entries, and the database contained
+**12 machines and 20 issues**. A subsequent ordinary `pnpm run dev` reused the tunnel and
+volumes, reapplied migrations without reseeding, and started Next.js on the
+Mac. `dev:status` passed for Next.js, API, and Postgres after allowing a larger
+remote probe budget; the one-second local-only probe had intermittently
+misclassified healthy services over the hotspot. The new helper retries only
+that exact fresh-Postgres handshake failure once and never selects local
+Docker. All four published service ports on Bazzite remained bound to
+`127.0.0.1`; the older slot-13 and slot-15 pilot containers and Crabbox
+runners remained up with distinct ports. The full Discord login/callback and
+same-LAN reachability are still unproved, as above.

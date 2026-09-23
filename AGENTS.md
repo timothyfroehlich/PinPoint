@@ -71,26 +71,40 @@ One-time install for tools the workflow scripts depend on:
 Each git worktree gets isolated Supabase ports automatically. The Husky `post-checkout` hook runs `scripts/worktree_setup.py`, which allocates a slot from `~/.config/pinpoint/worktree-slots.json` and generates read-only `supabase/config.toml`, `.env.local`, `.claude/launch.json`.
 
 - **Create**: `git worktree add /path -b branch origin/main` — the hook handles the rest.
-- **Cleanup**: `python3 scripts/worktree_cleanup.py <worktree-path>` is the complete teardown command: it stops the pinned Supabase project, removes its volumes, unlocks/removes/prunes the Git worktree, then releases its slot. Claude's `WorktreeRemove` hook calls the same module via `--claude-hook`; configure Codex cleanup as `python3 scripts/worktree_cleanup.py .`. Plain `git worktree remove` or `rm -rf` bypasses it and leaks resources; `scripts/worktree_orphan_sweep.py --apply` reconciles those.
+- **Cleanup**: `python3 scripts/worktree_cleanup.py <worktree-path>` is the complete teardown command: for a remote-backed worktree it first verifies and removes only that project's Bazzite containers, volumes, network, and lease, then cleans any Mac-local resources, removes the Git worktree, and releases its Mac slot. It refuses to remove a remote-backed worktree when Bazzite's state is unknown. Claude's `WorktreeRemove` hook calls the same module via `--claude-hook`; configure Codex cleanup as `python3 scripts/worktree_cleanup.py .`. Plain `git worktree remove` or `rm -rf` bypasses this; `worktree_orphan_sweep.py --apply` currently handles Mac-local orphans only.
 - **Reaping finished worktrees**: `scripts/worktree_reap.py` identifies worktrees whose work already landed and delegates teardown to `worktree_cleanup.py`. It consumes Git's complete worktree inventory, regardless of whether Claude, Codex, Antigravity, or a human chose the path. The sweep can't reap an existing worktree because it is still "active". Reap requires positive proof: a merged PR whose `headRefOid` **is** local `HEAD` with a clean tree, or zero commits ahead of `origin/main` with no PR. Dirty tree, post-merge commits, an open PR, or unreachable `gh` means "leave it alone". Dry-run by default; `--apply` to reclaim. `merge-pr.sh` reaps the merged branch's worktree automatically. (PP-49x5.)
 - **SessionStart audit**: one hook runs both the sweep and the reap in dry-run mode every 6h and prints a one-line nudge when either finds something to reclaim.
 - **Ports**: main worktree uses defaults (3000 / 54321 / 54322). Slot N: `3000+N*10`, `54321+N*100`, `54322+N*100`.
 - **Supabase `project_id`**: derived from the branch name the **first** time a worktree is set up, then **pinned** — later checkouts reuse the id already in `supabase/config.toml`. It names the Docker containers and labels the volumes, so letting it follow a `git checkout -b` would rename the stack out from under itself (`supabase stop` matches nothing, the old containers keep the ports bound, cleanup misses them). `config.toml` is the authoritative record of the running stack's id. (PP-4936.)
 - **Config**: edit `supabase/config.toml.template`, not the generated file (which is chmod 444).
 
-### Starting the local stack (self-service)
+### Supabase development stack (self-service)
 
-Start what you need yourself rather than pausing the user.
+With Tim's Mac dotfiles, each worktree defaults to Supabase on Bazzite rootless Docker. The
+source, CLI, migrations, seeds, Next.js, and browser stay on the Mac; an owned
+SSH tunnel preserves the generated `localhost` URLs. Start it with
+`pnpm run dev:remote:start`, inspect it with `pnpm run dev:remote:status`, and
+stop only that worktree's remote containers and tunnel with
+`pnpm run dev:remote:stop` (volumes and lease remain). `pnpm run dev` starts or
+reuses the verified remote stack before Next.js; it never falls back to local
+Docker when Bazzite is unavailable. See `docs/runbooks/remote-supabase.md` for
+recovery and the exact ownership checks. The full Discord OAuth callback/session
+remains unproved and need not be part of routine pilot checks. Do not run bare
+`supabase start` for the default Mac path.
 
-- **OrbStack down?** `open -a OrbStack`, then `docker info` to confirm.
-- **Supabase down?** From the current worktree: `supabase start`. Ports are isolated, so this won't affect anyone else.
-- **Fresh worktree database?** `supabase start && pnpm run db:migrate` is the non-destructive bootstrap. `preflight` checks this state before costly work and prints the isolated Postgres port when it is missing; it never starts or migrates services implicitly.
+Use a Mac-local stack only when Tim requests the faster interactive response:
+stop the remote stack for this worktree, start the local one explicitly with
+`supabase start`, then run `pnpm run dev:local`. Existing Mac-local volumes are
+not migrated or deleted by remote startup. CI and Bazzite's Crabbox jobs retain
+their local-to-the-runner stacks; this default is for Mac development sessions.
+If remote startup fails, report the helper's specific failure instead of
+starting a local stack silently.
 
 Leave the stack running afterward — the user can stop it. Hand off what's running. If you can't start it (port collisions, stuck containers), ask the user — don't fall back to "let CI tell us."
 
 ### Process safety
 
-Only stop services you started in this session, by specific PID or via worktree-local commands (e.g. `supabase stop` inside the worktree). Forbidden without explicit permission: `supabase stop --all`, `pkill`/`killall` against process names, `docker stop` on containers you didn't start. The system runs many environments in parallel; broad kills wipe out other agents' work.
+Only stop services you started in this session, by specific PID or via a worktree-scoped lifecycle command (for example `pnpm run dev:remote:stop` for its verified tunnel and project). Forbidden without explicit permission: `supabase stop --all`, `pkill`/`killall` against process names, `docker stop` on containers you didn't start. The system runs many environments in parallel; broad kills wipe out other agents' work.
 
 ## 5. Workflow
 
@@ -145,6 +159,11 @@ When the user explicitly asks for "prototype mode" / "rapid iteration" / "just e
 6. Auth / permissions / middleware → `pnpm run smoke` + targeted specs
 7. DB schema / migrations → `pnpm run preflight`
 8. Final pre-review → push and let **CI** run the full suite; don't sweep locally.
+
+On Tim's Mac, remote Supabase is persistent. E2E global setup and PR screenshot
+auth setup reset their database and therefore refuse remote mode; route heavy
+verdicts to `crabbox-slot`, or deliberately switch this worktree to a Mac-local
+stack with `PINPOINT_SUPABASE_BACKEND=local` for interactive debugging.
 
 ### Early UI review gate (pre-E2E) (PP-4c4b)
 

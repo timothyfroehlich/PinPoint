@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-SCRIPT_PATH = Path(__file__).parent.parent / "remote-supabase-pilot.py"
+SCRIPT_PATH = Path(__file__).parent.parent / "remote-supabase.py"
 SPEC = importlib.util.spec_from_file_location("remote_supabase_pilot", SCRIPT_PATH)
 assert SPEC is not None
 assert SPEC.loader is not None
@@ -304,6 +304,68 @@ def test_remote_lease_script_reserves_persists_and_marks_bootstrap(
     registry = json.loads(manifest.read_text())["slots"]
     assert registry[str(first["lease_path"])] == 96
 
+    wrong_release = subprocess.run(
+        [
+            sys.executable,
+            "-",
+            "pinpoint-remote-pilot",
+            "95",
+            str(manifest),
+            str(lease_root),
+        ],
+        input=pilot.REMOTE_RELEASE_SCRIPT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert wrong_release.returncode != 0
+    assert lease_file.exists()
+
+    subprocess.run(
+        [
+            sys.executable,
+            "-",
+            "pinpoint-remote-pilot",
+            "96",
+            str(manifest),
+            str(lease_root),
+        ],
+        input=pilot.REMOTE_RELEASE_SCRIPT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert not lease_file.exists()
+    assert str(first["lease_path"]) not in json.loads(manifest.read_text())["slots"]
+
+
+def test_corrupt_remote_lease_cannot_be_replaced(tmp_path: Path) -> None:
+    manifest = tmp_path / "worktree-slots.json"
+    manifest.write_text('{"version": 1, "slots": {}}')
+    lease_dir = tmp_path / "leases" / "pinpoint-remote-pilot"
+    lease_dir.mkdir(parents=True)
+    (lease_dir / "lease.json").write_text("invalid json")
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-",
+            "reserve",
+            "pinpoint-remote-pilot",
+            str(manifest),
+            str(tmp_path / "leases"),
+            "-",
+        ],
+        input=pilot.REMOTE_LEASE_SCRIPT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode != 0
+    assert "lease is unreadable" in result.stderr
+    assert (lease_dir / "lease.json").read_text() == "invalid json"
+
 
 def test_validate_state_rejects_changed_lease(tmp_path: Path) -> None:
     expected = state(tmp_path)
@@ -521,16 +583,18 @@ def test_status_reports_ready(
 
 
 @pytest.mark.parametrize(
-    ("bootstrap_complete", "expected_scripts"),
+    ("bootstrap_complete", "transient_first_start", "expected_scripts"),
     [
-        (False, ["db:migrate", "db:fast-reset"]),
-        (True, ["db:migrate"]),
+        (False, False, ["db:migrate", "db:fast-reset"]),
+        (False, True, ["db:migrate", "db:fast-reset"]),
+        (True, False, ["db:migrate"]),
     ],
 )
 def test_start_migrates_every_time_and_seeds_only_before_bootstrap(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     bootstrap_complete: bool,
+    transient_first_start: bool,
     expected_scripts: list[str],
 ) -> None:
     expected = state(tmp_path)
@@ -543,6 +607,7 @@ def test_start_migrates_every_time_and_seeds_only_before_bootstrap(
     marked = replace(lease, bootstrap_complete=True)
     lease_calls: list[str] = []
     scripts: list[str] = []
+    start_calls: list[object] = []
     monkeypatch.setattr(
         pilot,
         "read_local_identity",
@@ -569,14 +634,28 @@ def test_start_migrates_every_time_and_seeds_only_before_bootstrap(
     monkeypatch.setattr(
         pilot, "project_volumes", lambda *_args: ("db",) if bootstrap_complete else ()
     )
-    monkeypatch.setattr(pilot.subprocess, "run", lambda *_args, **_kwargs: completed())
+
+    def start_result(*_args: object, **_kwargs: object) -> object:
+        start_calls.append(object())
+        if transient_first_start and len(start_calls) == 1:
+            return completed(
+                1,
+                stderr="LegacyDbConnectError: Connection terminated unexpectedly",
+            )
+        return completed()
+
+    monkeypatch.setattr(pilot.subprocess, "run", start_result)
+    monkeypatch.setattr(pilot.time, "sleep", lambda _seconds: None)
     monkeypatch.setattr(pilot, "wait_for_local_services", lambda *_args: None)
     monkeypatch.setattr(
-        pilot, "run_project_command", lambda _root, _env, script: scripts.append(script)
+        pilot,
+        "run_project_command",
+        lambda _root, _env, script, **_kwargs: scripts.append(script),
     )
 
     assert pilot.start(tmp_path) == 0
     assert scripts == expected_scripts
+    assert len(start_calls) == (2 if transient_first_start else 1)
     assert ("mark-bootstrapped" in lease_calls) is (not bootstrap_complete)
 
 
@@ -592,3 +671,135 @@ def test_stop_tunnel_never_kills_unowned_process(
 
     assert killed == []
     assert pilot.read_state(tmp_path).tunnel_pid == 0
+
+
+def test_start_never_reserves_over_a_failed_lease_lookup(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    expected = state(tmp_path)
+    calls: list[str] = []
+    monkeypatch.setattr(
+        pilot,
+        "read_local_identity",
+        lambda _root: (expected.project_id, expected.local, {}, "abc"),
+    )
+    monkeypatch.setattr(pilot, "verify_locked_cli", lambda _root: "2.117.0")
+    monkeypatch.setattr(pilot, "read_state", lambda _root: None)
+    monkeypatch.setattr(pilot, "remote_uid", lambda: 1000)
+
+    def failed_lookup(action: str, *_args: object, **_kwargs: object) -> object:
+        calls.append(action)
+        raise subprocess.CalledProcessError(1, ["ssh"], stderr="identity mismatch")
+
+    monkeypatch.setattr(pilot, "remote_lease", failed_lookup)
+
+    with pytest.raises(pilot.PilotError, match="without proving the lease is absent"):
+        pilot.start(tmp_path)
+    assert calls == ["get"]
+
+
+def test_destroy_removes_only_owned_remote_resources(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    expected = state(tmp_path)
+    pilot.write_state(tmp_path, expected)
+    lease = pilot.RemoteLease(expected.project_id, expected.remote_slot, True, "/lease")
+    events: list[str] = []
+    monkeypatch.setattr(
+        pilot,
+        "read_local_identity",
+        lambda _root: (expected.project_id, expected.local, {}, "abc"),
+    )
+    monkeypatch.setattr(pilot, "remote_lease", lambda *_args: lease)
+    monkeypatch.setattr(
+        pilot,
+        "render_runtime_config",
+        lambda *_args: (tmp_path, expected.config_digest),
+    )
+    monkeypatch.setattr(pilot, "remote_uid", lambda: 1000)
+    monkeypatch.setattr(pilot, "is_owned_tunnel", lambda _state: True)
+    monkeypatch.setattr(pilot, "child_environment", lambda *_args: {})
+    monkeypatch.setattr(pilot, "verify_remote_docker", lambda *_args: "Docker")
+    monkeypatch.setattr(pilot, "project_volumes", lambda *_args: ("owned-db",))
+
+    def docker_call(
+        _state: object, _env: object, args: list[str], **_kwargs: object
+    ) -> object:
+        events.append("docker " + " ".join(args))
+        if args[:2] == ["network", "inspect"]:
+            return completed(
+                stdout=json.dumps(
+                    [
+                        {
+                            "Labels": {
+                                "pinpoint.remote-supabase-pilot": expected.project_id
+                            }
+                        }
+                    ]
+                )
+            )
+        return completed()
+
+    monkeypatch.setattr(pilot, "docker_run", docker_call)
+    monkeypatch.setattr(
+        pilot.subprocess,
+        "run",
+        lambda args, **_kwargs: (
+            events.append("supabase " + " ".join(args)) or completed()
+        ),
+    )
+    monkeypatch.setattr(
+        pilot, "stop_tunnel", lambda _root, _state: events.append("stop tunnel")
+    )
+    monkeypatch.setattr(
+        pilot,
+        "release_remote_lease",
+        lambda project, slot: events.append(f"release {project} {slot}"),
+    )
+
+    assert pilot.destroy(tmp_path) == 0
+    assert events[0].startswith("docker network inspect")
+    assert any("stop --workdir" in event for event in events)
+    assert "docker volume rm owned-db" in events
+    assert f"docker network rm {expected.network_name}" in events
+    assert events[-1] == f"release {expected.project_id} {expected.remote_slot}"
+    assert not pilot.state_path(tmp_path).exists()
+
+
+def test_destroy_refuses_foreign_network_before_stopping_containers(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    expected = state(tmp_path)
+    pilot.write_state(tmp_path, expected)
+    lease = pilot.RemoteLease(expected.project_id, expected.remote_slot, True, "/lease")
+    monkeypatch.setattr(
+        pilot,
+        "read_local_identity",
+        lambda _root: (expected.project_id, expected.local, {}, "abc"),
+    )
+    monkeypatch.setattr(pilot, "remote_lease", lambda *_args: lease)
+    monkeypatch.setattr(
+        pilot,
+        "render_runtime_config",
+        lambda *_args: (tmp_path, expected.config_digest),
+    )
+    monkeypatch.setattr(pilot, "remote_uid", lambda: 1000)
+    monkeypatch.setattr(pilot, "is_owned_tunnel", lambda _state: True)
+    monkeypatch.setattr(pilot, "child_environment", lambda *_args: {})
+    monkeypatch.setattr(pilot, "verify_remote_docker", lambda *_args: "Docker")
+    monkeypatch.setattr(
+        pilot,
+        "docker_run",
+        lambda *_args, **_kwargs: completed(
+            stdout=json.dumps([{"Labels": {"pinpoint.remote-supabase-pilot": "other"}}])
+        ),
+    )
+    stopped: list[object] = []
+    monkeypatch.setattr(
+        pilot.subprocess, "run", lambda *_args, **_kwargs: stopped.append(1)
+    )
+
+    with pytest.raises(pilot.PilotError, match="owner label"):
+        pilot.destroy(tmp_path)
+    assert stopped == []
+    assert pilot.state_path(tmp_path).exists()

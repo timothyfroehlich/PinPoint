@@ -29,6 +29,10 @@ worktree's pinned `supabase/config.toml`, not from its current branch name
 (PP-rbbp). Since PP-4936 the pinned id no longer follows the branch, so a
 branch-derived id goes stale the moment the branch is renamed — and a volume
 query filtered on a label nothing carries returns a clean, wrong zero.
+
+Remote-backed worktrees are torn down through `remote-supabase.py destroy`
+before local cleanup. An unreachable or unverifiable remote store keeps the
+worktree in place rather than claiming a complete teardown.
 """
 
 import fcntl
@@ -48,6 +52,7 @@ from worktree_setup import branch_to_project_id, read_pinned_project_id  # noqa:
 MANIFEST_PATH = Path.home() / ".config" / "pinpoint" / "worktree-slots.json"
 
 SUPABASE_PROJECT_LABEL = "com.supabase.cli.project"
+REMOTE_STATE_RELATIVE_PATH = Path(".agent/tmp/remote-supabase-docker-pilot/state.json")
 
 SWEEP_HINT = "python3 scripts/worktree_orphan_sweep.py --apply"
 
@@ -382,6 +387,58 @@ def cleanup_worktree(worktree_path: Path) -> int:
     # EXIT_OK for a teardown that never touched Docker.
     git_marker_present = git_marker.is_file()
 
+    remote_state = worktree_path / REMOTE_STATE_RELATIVE_PATH
+    remote_local_query: VolumeQuery | None = None
+    remote_project_id: str | None = None
+    if remote_state.exists():
+        if not git_marker_present:
+            print(
+                f"Remote state exists at {remote_state}, but the worktree has no "
+                ".git marker. Keeping it for manual recovery.",
+                file=sys.stderr,
+            )
+            return EXIT_DOCKER_UNKNOWN
+        remote_project_id = read_pinned_project_id(worktree_path)
+        if remote_project_id is None:
+            print(
+                "Remote state exists, but the pinned local project ID is missing. "
+                "Keeping the worktree for identity recovery.",
+                file=sys.stderr,
+            )
+            return EXIT_DOCKER_UNKNOWN
+        remote_local_query = list_project_volumes(remote_project_id)
+        if remote_local_query.is_unknown:
+            print(
+                f"Mac-local Docker volumes for {remote_project_id} are unknown: "
+                f"{remote_local_query.unknown_reason}. Keeping the remote stack "
+                "and worktree intact until local resources can be checked.",
+                file=sys.stderr,
+            )
+            return EXIT_DOCKER_UNKNOWN
+        remote_helper = Path(__file__).with_name("remote-supabase.py")
+        result = subprocess.run(
+            [sys.executable, str(remote_helper), "destroy"],
+            cwd=worktree_path,
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            print(
+                f"Remote Supabase cleanup failed for {worktree_path}: "
+                f"{result.stderr.strip() or result.stdout.strip()}. "
+                "The worktree and its local port lease remain intact.",
+                file=sys.stderr,
+            )
+            return EXIT_DOCKER_UNKNOWN
+        if remote_state.exists():
+            print(
+                "Remote helper reported success but left its state marker; "
+                "keeping the worktree and local slot for investigation.",
+                file=sys.stderr,
+            )
+            return EXIT_DOCKER_UNKNOWN
+        print(result.stdout.strip(), file=sys.stderr)
+
     volumes_unknown_reason: str | None = None
     if not git_marker_present:
         volumes_unknown_reason = (
@@ -420,6 +477,12 @@ def cleanup_worktree(worktree_path: Path) -> int:
 
     if branch:
         project_id = resolve_project_id(worktree_path, branch)
+        if remote_project_id is not None and project_id != remote_project_id:
+            print(
+                "Pinned project ID changed during remote cleanup; keeping the worktree.",
+                file=sys.stderr,
+            )
+            return EXIT_DOCKER_UNKNOWN
 
         # Stop Supabase. Failures here are non-fatal: a missing project_ref or
         # a stack that was never started both look like errors but don't block
@@ -450,7 +513,7 @@ def cleanup_worktree(worktree_path: Path) -> int:
         # Remove Docker volumes. A query that failed is unknown, NOT zero
         # (PP-3w4g): reporting "removed 0 volume(s)" for a query that never ran
         # is how volumes leak permanently past a teardown that claimed success.
-        query = list_project_volumes(project_id)
+        query = remote_local_query or list_project_volumes(project_id)
         if query.is_unknown:
             volumes_unknown_reason = query.unknown_reason
             print(

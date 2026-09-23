@@ -12,8 +12,27 @@ const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
  * Parse the URL and exit the process if the host is not a local loopback.
  * Accepts the same env vars the reset scripts already read.
  * @param {string} databaseUrl
+ * @param {boolean} allowRemoteBootstrap Only the fresh-db seed path may opt in.
  */
-export function assertLocalDatabase(databaseUrl) {
+export function assertLocalDatabase(databaseUrl, allowRemoteBootstrap = false) {
+  if (
+    process.env.PINPOINT_SUPABASE_BACKEND === "remote" &&
+    process.env.CI !== "1" &&
+    process.env.CI !== "true" &&
+    !(
+      allowRemoteBootstrap &&
+      process.env.PINPOINT_REMOTE_SUPABASE_BOOTSTRAP === "1"
+    )
+  ) {
+    console.error(
+      "❌ Destructive database commands are local-only while remote Supabase is selected."
+    );
+    console.error(
+      "   Use PINPOINT_SUPABASE_BACKEND=local with a deliberate local stack."
+    );
+    process.exit(2);
+  }
+
   let host;
   try {
     host = new URL(databaseUrl).hostname;

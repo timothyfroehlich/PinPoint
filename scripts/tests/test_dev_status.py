@@ -18,6 +18,8 @@ def _run_status(
     mode: str = "healthy",
     postgres_url: bool = True,
     timeout: int = 15,
+    backend: str = "local",
+    remote_ready: bool = True,
 ) -> subprocess.CompletedProcess[str]:
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
@@ -25,6 +27,7 @@ def _run_status(
     _write_executable(
         bin_dir / "curl",
         f"""
+printf '%s\n' "$*" >> "{tmp_path}/curl-args"
 if [[ "$STUB_MODE" == down ]]; then
   exit 1
 fi
@@ -45,6 +48,7 @@ printf '%s\n' "$count" >"$count_file"
     _write_executable(
         bin_dir / "pg_isready",
         f"""
+printf '%s\n' "$*" >> "{tmp_path}/postgres-args"
 [[ "$STUB_MODE" == down ]] && exit 1
 count_file="{tmp_path}/postgres-count"
 count=0
@@ -55,6 +59,11 @@ printf '%s\n' "$count" >"$count_file"
 """,
     )
     _write_executable(bin_dir / "sleep", "exit 0\n")
+    _write_executable(
+        bin_dir / "python3",
+        "echo 'READY: remote project verified'\n"
+        + ("exit 0\n" if remote_ready else "exit 6\n"),
+    )
 
     env_lines = [
         "PORT=3210",
@@ -70,6 +79,8 @@ printf '%s\n' "$count" >"$count_file"
     env = os.environ.copy()
     env["PATH"] = f"{bin_dir}{os.pathsep}{env['PATH']}"
     env["STUB_MODE"] = mode
+    env["PINPOINT_SUPABASE_BACKEND"] = backend
+    env.pop("CI", None)
     return subprocess.run(
         ["bash", str(SCRIPT_PATH), *args],
         cwd=tmp_path,
@@ -149,3 +160,23 @@ def test_unknown_option_is_a_usage_error(tmp_path: Path) -> None:
 
     assert result.returncode == 2
     assert "Usage:" in result.stderr
+
+
+def test_remote_status_checks_owned_stack_before_local_health(tmp_path: Path) -> None:
+    result = _run_status(tmp_path, backend="remote")
+
+    assert result.returncode == 0
+    assert result.stdout.startswith("READY: remote project verified\n")
+    assert "PASS: dev status" in result.stdout
+    curl_args = (tmp_path / "curl-args").read_text().splitlines()
+    assert "--max-time 10" in curl_args[0]
+    assert "--max-time 5" in curl_args[1]
+    assert "-t 5" in (tmp_path / "postgres-args").read_text()
+
+
+def test_remote_status_fails_closed_when_tunnel_is_down(tmp_path: Path) -> None:
+    result = _run_status(tmp_path, backend="remote", remote_ready=False)
+
+    assert result.returncode == 1
+    assert "Run: pnpm run dev:remote:start" in result.stderr
+    assert "PASS: dev status" not in result.stdout

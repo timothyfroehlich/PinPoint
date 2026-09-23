@@ -30,6 +30,31 @@ for arg in "$@"; do
   esac
 done
 
+backend="${PINPOINT_SUPABASE_BACKEND:-local}"
+if [[ "${CI:-}" == "1" || "${CI:-}" == "true" ]]; then
+  backend=local
+fi
+if [[ "$backend" != remote && "$backend" != local ]]; then
+  echo "PINPOINT_SUPABASE_BACKEND must be remote or local" >&2
+  exit 2
+fi
+if [[ "$backend" == remote ]]; then
+  if ! python3 scripts/remote-supabase.py status; then
+    echo "Remote Supabase is not ready. Run: pnpm run dev:remote:start" >&2
+    exit 1
+  fi
+fi
+
+# A healthy SSH tunnel still adds tailnet latency to every database probe.
+# Keep the fast local checks, but do not call a remote stack unhealthy because
+# a one-second probe raced with a cold page compilation or hotspot jitter.
+NEXT_PROBE_TIMEOUT=1
+SERVICE_PROBE_TIMEOUT=1
+if [[ "$backend" == remote ]]; then
+  NEXT_PROBE_TIMEOUT=10
+  SERVICE_PROBE_TIMEOUT=5
+fi
+
 # shellcheck source=/dev/null
 source .env.local 2>/dev/null || true
 
@@ -62,15 +87,15 @@ emit_postgres_skip() {
 }
 
 probe_nextjs() {
-  curl -sS --max-time 1 -o /dev/null "http://localhost:${PORT}" 2>/dev/null
+  curl -sS --max-time "$NEXT_PROBE_TIMEOUT" -o /dev/null "http://localhost:${PORT}" 2>/dev/null
 }
 
 probe_supabase() {
-  curl -fsS --max-time 1 "${SUPABASE_URL}/auth/v1/health" >/dev/null 2>&1
+  curl -fsS --max-time "$SERVICE_PROBE_TIMEOUT" "${SUPABASE_URL}/auth/v1/health" >/dev/null 2>&1
 }
 
 probe_postgres() {
-  pg_isready -d "$POSTGRES_URL" -t 1 >/dev/null 2>&1
+  pg_isready -d "$POSTGRES_URL" -t "$SERVICE_PROBE_TIMEOUT" >/dev/null 2>&1
 }
 
 compact_status() {
@@ -86,7 +111,11 @@ compact_status() {
   if [ "$supabase_up" = true ]; then
     parts+=("Supabase API=up")
   else
-    parts+=("Supabase API=down (start: supabase start)")
+    if [[ "$backend" == remote ]]; then
+      parts+=("Supabase API=down (start: pnpm run dev:remote:start)")
+    else
+      parts+=("Supabase API=down (start: supabase start)")
+    fi
   fi
   if [ -n "$postgres_skip_reason" ]; then
     parts+=("Postgres=skipped ($postgres_skip_reason)")

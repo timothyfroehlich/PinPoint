@@ -302,6 +302,20 @@ function checkDocker(): void {
  *   4. Full reset fallback if fast-reset fails
  */
 export default async function globalSetup(config: FullConfig): Promise<void> {
+  // This setup truncates and reseeds data. A remote development database is
+  // persistent across Mac sessions, so E2E must use Crabbox/CI or a deliberate
+  // local-stack opt-in instead of resetting it over the tunnel.
+  if (
+    process.env["PINPOINT_SUPABASE_BACKEND"] === "remote" &&
+    process.env["CI"] !== "1" &&
+    process.env["CI"] !== "true"
+  ) {
+    throw new Error(
+      "E2E refuses to reset a Bazzite-backed development database. " +
+        "Use crabbox-slot for the suite, or select a local stack with PINPOINT_SUPABASE_BACKEND=local."
+    );
+  }
+
   // Browser + Docker checks run regardless of SKIP_SUPABASE_RESET. SKIP only
   // skips the DB reset/migration/seed; browsers and the docker daemon still
   // need to be there for tests to launch.

@@ -3,6 +3,12 @@
 
 set -euo pipefail
 
+if [[ "${PINPOINT_SUPABASE_BACKEND:-local}" == remote && "${CI:-}" != 1 && "${CI:-}" != true ]]; then
+  echo "FAIL: preflight resets its database and is local-only while remote Supabase is selected." >&2
+  echo "Use Crabbox for heavy verdicts, or select a deliberate local stack with PINPOINT_SUPABASE_BACKEND=local." >&2
+  exit 1
+fi
+
 script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
 readonly script_dir
 repository_root=$(cd "${script_dir}/../.." && pwd -P)

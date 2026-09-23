@@ -25,7 +25,8 @@ Main worktree uses default ports (slot 0). All others get dynamically allocated 
 ## Scripts
 
 - **`worktree_setup.py`** — Called by post-checkout hook. Allocates ports, generates configs.
-- **`worktree_cleanup.py`** — The complete teardown entry point for Claude, Codex, reap, and manual callers: `python3 scripts/worktree_cleanup.py <worktree-path>`. Claude uses `--claude-hook`; configure Codex cleanup as `python3 scripts/worktree_cleanup.py .`. It stops Supabase, removes volumes, removes/prunes the Git worktree, then releases the slot. Exit `0` means complete; `1` failed, `2` refused the main worktree, `3` found a missing target with residue, and `4` removed the worktree while Docker state was unknown. Preserve non-zero codes as the leak diagnostic.
+- **`remote-supabase.py`** — Mac worktree lifecycle against Bazzite rootless Docker: `start`, `status`, `stop` (data preserved), and cleanup-only `destroy` (data removed). It owns a private SSH tunnel, dedicated network, and remote port lease; see `docs/runbooks/remote-supabase.md`.
+- **`worktree_cleanup.py`** — The complete teardown entry point for Claude, Codex, reap, and manual callers: `python3 scripts/worktree_cleanup.py <worktree-path>`. Claude uses `--claude-hook`; configure Codex cleanup as `python3 scripts/worktree_cleanup.py .`. Remote-backed worktrees are destroyed only after identity checks; an unreachable remote leaves the worktree in place with exit `4`. Local Supabase/volumes, Git worktree, and local slot are then cleaned. Exit `0` means complete; `1` failed, `2` refused the main worktree, `3` found a missing target with residue, and `4` means resource state was unknown. Preserve non-zero codes as the leak diagnostic.
 
 ## Python Toolchain & Testing
 

@@ -95,6 +95,7 @@ describe("e2e/global-setup", () => {
       ...envBackup,
       NEXT_PUBLIC_SUPABASE_URL: "http://localhost:54321",
       POSTGRES_URL: "postgresql://postgres:postgres@localhost:54322/postgres",
+      PINPOINT_SUPABASE_BACKEND: "local",
       // Keep the Docker readiness retry loop fast and deterministic in tests:
       // a few attempts, no real sleep between them.
       E2E_DOCKER_READY_ATTEMPTS: "3",
@@ -135,6 +136,18 @@ describe("e2e/global-setup", () => {
       stdio: "inherit",
       env: process.env,
     });
+  });
+
+  it("refuses remote development data before any reset or browser preflight", async () => {
+    process.env.PINPOINT_SUPABASE_BACKEND = "remote";
+    const setup = await loadSetup();
+
+    await expect(setup(EMPTY_CONFIG)).rejects.toThrow(
+      "E2E refuses to reset a Bazzite-backed development database"
+    );
+    expect(launchMock).not.toHaveBeenCalled();
+    expect(execSyncMock).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("falls back to full reset when fast reset fails", async () => {

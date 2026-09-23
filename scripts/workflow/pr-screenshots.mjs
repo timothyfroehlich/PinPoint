@@ -32,10 +32,12 @@
 //   (PP-rsy3.)
 //
 // Preconditions (best-effort, not auto-provisioned by this script):
-//   - Local dev server running at http://localhost:<PORT> (`pnpm run dev`).
+//   - Local dev server running at http://localhost:<PORT> (`pnpm run dev:local`
+//     on Tim's Mac, where remote Supabase is otherwise the default).
 //     PORT is read from .env.local the same way playwright.config.ts does —
 //     worktree-aware, always localhost (CORE-SEC-008).
-//   - Local Supabase running (`supabase start`).
+//   - Explicit Mac-local Supabase running (`supabase start`) because auth setup
+//     resets and reseeds its database.
 //   - `gh` CLI authenticated.
 //
 // First run (or any run with missing/stale storage state) invokes
@@ -206,8 +208,8 @@ function ensureAuthStorageState(rolesNeeded, forceAuth) {
   );
   if (result.status !== 0) {
     throw new Error(
-      "auth-setup failed — see output above. Ensure the dev server + Supabase " +
-        "can start locally (pnpm run dev / supabase start)."
+      "auth-setup failed — see output above. Use an explicitly local stack " +
+        "(supabase start; pnpm run dev:local; PINPOINT_SUPABASE_BACKEND=local for screenshots)."
     );
   }
 }

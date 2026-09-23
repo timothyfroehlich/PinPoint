@@ -248,6 +248,7 @@ printf '%s\\n' "$@"
     env["POSTGRES_URL_NON_POOLING"] = env["POSTGRES_URL"]
     env["NEXT_PUBLIC_SUPABASE_URL"] = "http://localhost:61233"
     env["SUPABASE_SERVICE_ROLE_KEY"] = "test-service-role-key"
+    env["PINPOINT_SUPABASE_BACKEND"] = "local"
     script = REPO_ROOT / "scripts" / "workflow" / "preflight-locked.sh"
 
     compact = subprocess.run(

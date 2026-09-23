@@ -10,6 +10,23 @@ READINESS_SCRIPT = REPO_ROOT / "scripts" / "workflow" / "preflight-readiness.sh"
 INTEGRATION_SCRIPT = REPO_ROOT / "scripts" / "workflow" / "integration-test.sh"
 
 
+def test_preflight_refuses_remote_database_reset(tmp_path: Path) -> None:
+    env = os.environ.copy()
+    env["PINPOINT_SUPABASE_BACKEND"] = "remote"
+    env.pop("CI", None)
+    result = subprocess.run(
+        ["bash", str(READINESS_SCRIPT)],
+        cwd=tmp_path,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 1
+    assert "local-only" in result.stderr
+
+
 def _write_executable(path: Path, body: str) -> None:
     path.write_text(f"#!/bin/bash\nset -euo pipefail\n{body}")
     path.chmod(0o755)
@@ -88,6 +105,7 @@ fi
     env = os.environ.copy()
     env["PATH"] = f"{bin_dir}{os.pathsep}{env['PATH']}"
     env["STUB_MODE"] = mode
+    env["PINPOINT_SUPABASE_BACKEND"] = "local"
     if database_url_override is not None:
         env["POSTGRES_URL"] = database_url_override
     if non_pooling_url_override is not None:
@@ -601,6 +619,7 @@ printf '%s\n' "$PARALLEL_HOME"
     env = os.environ.copy()
     env["PATH"] = f"{bin_dir}{os.pathsep}{env['PATH']}"
     env["XDG_STATE_HOME"] = str(state_root)
+    env["PINPOINT_SUPABASE_BACKEND"] = "local"
     env["POSTGRES_URL"] = "postgresql://postgres:postgres@localhost:61234/postgres"
     env["POSTGRES_URL_NON_POOLING"] = env["POSTGRES_URL"]
     env["NEXT_PUBLIC_SUPABASE_URL"] = "http://localhost:61233"
@@ -627,7 +646,8 @@ def test_agent_docs_name_bootstrap_and_targeted_entrypoints() -> None:
     agents = (REPO_ROOT / "AGENTS.md").read_text()
     testing = (REPO_ROOT / "src" / "test" / "README.md").read_text()
 
+    assert "pnpm run dev:remote:start" in agents
+    assert "supabase start && pnpm run db:migrate" in testing
     for content in (agents, testing):
-        assert "supabase start && pnpm run db:migrate" in content
         assert "pnpm run test:integration:target --" in content
         assert "bare Vitest command" in content

@@ -6,7 +6,7 @@ import {
 import { assertLocalDatabase } from "./assert-local-db.mjs";
 
 const databaseUrl = resolveScriptDatabaseUrl();
-assertLocalDatabase(databaseUrl);
+assertLocalDatabase(databaseUrl, true);
 
 async function fastReset() {
   console.log("🚀 Starting Fast DB Reset...");

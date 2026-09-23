@@ -29,6 +29,10 @@ If all five say "E2E is the right layer", write it. Otherwise, the cheapest laye
 
 ## Quick Start
 
+- **Mac remote-stack boundary:** `e2e/global-setup.ts` truncates and reseeds.
+  It refuses `PINPOINT_SUPABASE_BACKEND=remote` even with
+  `SKIP_SUPABASE_RESET=true`; run heavy verdicts through `crabbox-slot`, or
+  deliberately select and start a Mac-local stack for interactive E2E debugging.
 - **Run Smoke Tests**: `pnpm run smoke` (Fast, critical paths)
 - **Run Full Suite**: `pnpm run e2e:full` / `e2e:all` (Comprehensive — CI's job by default; three parallel Chromium workers plus a Supabase stack and a Next server, peaking at several GB)
 - **Debug Mode**: `pnpm exec playwright test e2e/path/to/test.spec.ts --debug`

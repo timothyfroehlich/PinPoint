@@ -60,6 +60,8 @@ def pin_project_id(worktree: Path, project_id: str) -> None:
 
 def _kind(args: list[str]) -> str:
     """Classify an argv so the stub can answer per-command."""
+    if len(args) >= 3 and args[1].endswith("remote-supabase.py"):
+        return "remote_destroy"
     head = tuple(args[:3])
     if head[:3] == ("docker", "volume", "ls"):
         return "volume_ls"
@@ -497,6 +499,90 @@ def deallocated(monkeypatch: pytest.MonkeyPatch) -> list[str]:
 
 
 class TestMainTeardown:
+    def test_remote_failure_keeps_worktree_and_local_slot(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        fake_worktree: Path,
+        deallocated: list[str],
+    ) -> None:
+        state = fake_worktree / cleanup.REMOTE_STATE_RELATIVE_PATH
+        state.parent.mkdir(parents=True)
+        state.write_text("{}")
+        pin_project_id(fake_worktree, PROJECT_ID)
+        stub = install(
+            monkeypatch, RunStub(remote_destroy=(1, "", "Bazzite unreachable"))
+        )
+
+        exit_code = _run_main(monkeypatch, fake_worktree)
+
+        assert exit_code == cleanup.EXIT_DOCKER_UNKNOWN
+        assert state.exists()
+        assert fake_worktree.exists()
+        assert stub.calls_of("remote_destroy")
+        assert stub.calls_of("supabase") == []
+        assert stub.calls_of("worktree_remove") == []
+        assert deallocated == []
+
+    def test_remote_success_precedes_local_and_git_cleanup(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        fake_worktree: Path,
+        deallocated: list[str],
+    ) -> None:
+        state = fake_worktree / cleanup.REMOTE_STATE_RELATIVE_PATH
+        state.parent.mkdir(parents=True)
+        state.write_text("{}")
+        pin_project_id(fake_worktree, PROJECT_ID)
+        stub = install(
+            monkeypatch,
+            RunStub(
+                remote_destroy=(0, "Removed owned remote project", ""),
+                rev_parse=(0, f"{BRANCH}\n", ""),
+                volume_ls=(0, "", ""),
+            ),
+        )
+        original_run = cleanup.subprocess.run
+
+        def remote_then_local(
+            args: list[str], **kwargs: object
+        ) -> subprocess.CompletedProcess[str]:
+            result = original_run(args, **kwargs)
+            if _kind(args) == "remote_destroy":
+                state.unlink()
+            return result
+
+        monkeypatch.setattr(cleanup.subprocess, "run", remote_then_local)
+
+        exit_code = _run_main(monkeypatch, fake_worktree)
+
+        assert exit_code == cleanup.EXIT_OK
+        kinds = [_kind(call) for call in stub.calls]
+        assert kinds.index("remote_destroy") < kinds.index("supabase")
+        assert kinds.index("remote_destroy") < kinds.index("worktree_remove")
+        assert deallocated == [str(fake_worktree)]
+
+    def test_remote_cleanup_waits_for_local_volume_identity(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        fake_worktree: Path,
+        deallocated: list[str],
+    ) -> None:
+        state = fake_worktree / cleanup.REMOTE_STATE_RELATIVE_PATH
+        state.parent.mkdir(parents=True)
+        state.write_text("{}")
+        pin_project_id(fake_worktree, PROJECT_ID)
+        stub = install(
+            monkeypatch,
+            RunStub(volume_ls=(1, "", "Mac Docker daemon unavailable")),
+        )
+
+        assert _run_main(monkeypatch, fake_worktree) == cleanup.EXIT_DOCKER_UNKNOWN
+        assert state.exists()
+        assert stub.calls_of("volume_ls")
+        assert stub.calls_of("remote_destroy") == []
+        assert stub.calls_of("worktree_remove") == []
+        assert deallocated == []
+
     def test_healthy_teardown_removes_volumes_and_succeeds(
         self,
         monkeypatch: pytest.MonkeyPatch,
