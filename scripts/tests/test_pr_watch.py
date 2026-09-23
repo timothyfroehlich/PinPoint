@@ -958,8 +958,8 @@ def test_review_state_not_reviewed_recommends_one_request(monkeypatch):
     state, detail = pr_watch.review_state(PR)
     assert state == "not reviewed"
     assert "CodeRabbit: none; Codex: none; local attestation: none" in detail
-    assert f"request-codex-review.sh #{PR} exactly once" in detail
-    assert "CodeRabbit request or a local review" in detail
+    assert "@coderabbitai review on a later head" in detail
+    assert f"request-codex-review.sh #{PR} <reply-ID>" in detail
 
 
 @pytest.mark.unit

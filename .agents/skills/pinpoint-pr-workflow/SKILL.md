@@ -158,20 +158,20 @@ $$\text{CodeRabbit (Default)} \longrightarrow \text{Codex (Secondary / Fallback)
   ```
   CodeRabbit edits its acknowledgement comment in place — "Review triggered" can become "Review rate limited", so check current status.
 - **Hourly Quota & Rate Limiting:** We have an allowance of 5 CodeRabbit reviews per rolling hour. When rate-limited, CodeRabbit posts an issue comment containing `Review rate limited.`
-- **Quota Fallback to Codex:** When CodeRabbit is rate-limited, immediately fall back to requesting a Codex review (see below). If Codex is also out of quota or unavailable, alert Tim and recommend either performing a local review attestation or waiting until the next CodeRabbit review slot becomes available.
+- **Quota Fallback to Codex:** Read the trusted CodeRabbit reply to the latest manual `@coderabbitai review` request on the current head. When it says `Review rate limited`, pass that reply's issue-comment ID to the Codex request helper below. If draft promotion was rate-limited, make one manual CodeRabbit request on the same head so the fallback has a head-timed reply. A pending review or a `Review finished` reply without a native approval is a CodeRabbit follow-up, not quota exhaustion. If Codex is also out of quota or unavailable, alert Tim and recommend either performing a local review attestation or waiting until the next CodeRabbit review slot becomes available.
 
 #### 2. Codex: Secondary Reviewer & Rate-Limit Fallback
 
 - **Manual request only:** Codex reviews are triggered strictly via explicit manual request and never run automatically on draft promotion or commit push.
 - To request Codex review on the current head (after current-head CI passes):
   ```bash
-  bash scripts/workflow/request-codex-review.sh <PR>
+  bash scripts/workflow/request-codex-review.sh <PR> <CodeRabbit-reply-comment-ID>
   ```
-  This helper verifies that the authenticated account is the repository owner, the PR is open and ready, current-head CI passed, and the head lacks review coverage. It posts the SHA-pinned `@codex review` trigger with a hidden marker binding the trusted reaction witness to that SHA. Never request the same head twice.
+  This helper verifies the owner, open and ready state, current-head CI, missing coverage, and a trusted CodeRabbit rate-limit reply after a manual request on this head. It posts the SHA-pinned `@codex review` trigger with a hidden marker binding the trusted reaction witness to that SHA. Never request the same head twice.
 
 #### 3. Concurrent Review Execution & Adjudication
 
-Both CodeRabbit and Codex can be in progress on the same commit head simultaneously:
+When CodeRabbit completes after a quota fallback, both reviewers can have results on the same head:
 
 - **First-Success Resolution:** `subway watch --phase review` passes as soon as the first reviewer reports qualifying coverage on the exact head (`reviewer: "coderabbit"` or `"codex"`).
 - **Trailing Review Notification:** If a second reviewer is still in progress when the first succeeds, `subway watch` logs a notice and records `concurrent_review_in_progress` (and `pending_reviewers`). The owning agent must inspect the secondary reviewer's results once complete.
@@ -193,7 +193,7 @@ subway watch --pr <PR> --phase review --expected-head <HEAD_SHA>
   - For CodeRabbit, `subway watch` extracts the AI agent prompt directly into `review_summary` and actionable comment count into `actionable_comments`.
   - Adjudicate findings: fix code or reply/decline threads.
   - If code changed, push fixes, wait for replacement CI, and re-request review.
-  - If rate-limited (`coderabbit_rate_limited: true`), fall back to requesting Codex review. If Codex is also unavailable, alert Tim.
+  - If CodeRabbit's trusted reply says `Review rate limited`, use its issue-comment ID for the Codex fallback. If Codex is also unavailable, alert Tim.
 - `outcome: "stale"` (exit 1): Branch head moved; re-orient to the new head.
 - `outcome: "conflicting"` (exit 1): Merge conflict; merge `origin/main` into the branch and push.
 - `outcome: "timed_out"` / `"undetermined"` (exit 2): Re-run watch or inspect GitHub API reachability.

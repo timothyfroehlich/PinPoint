@@ -20,11 +20,8 @@ set -euo pipefail
 readonly CODEX_REVIEW_BOT="chatgpt-codex-connector[bot]"
 readonly CODEX_REVIEW_APP_SLUG="chatgpt-codex-connector"
 readonly CODEX_CLEAN_REVIEW_PREFIX="Codex Review: Didn't find any major issues."
-# CodeRabbit is a second trusted native reviewer, requested manually and only when Tim
-# asks for it on a large PR (PP-w6u1). Its exact-head APPROVED review is sufficient
-# coverage on its own. Nothing else it posts changes the Codex-derived state: a
-# CodeRabbit finding review is adjudicated through the thread gate like any other
-# thread, and its absence is never a failure.
+# CodeRabbit is the default reviewer. Its exact-head APPROVED review covers the
+# head; finding threads are adjudicated through the separate thread gate.
 readonly CODERABBIT_REVIEW_BOT="coderabbitai[bot]"
 readonly GITHUB_ACTIONS_BOT="github-actions[bot]"
 readonly GITHUB_ACTIONS_APP_SLUG="github-actions"
@@ -205,13 +202,13 @@ readonly _JQ_LATEST='
   def empty_verdict($checker):
     { checker: $checker, verdict: "none", form: "", sha: "", reviewer: "", detail: "", at: "", summary: "" };'
 
-# CodeRabbit: only a native APPROVED pinned to head covers. CHANGES_REQUESTED on head
-# is "changes requested" (it re-approves on its own once the threads resolve). Any
-# other exact-head state is nothing; anything off-head is stale.
+# CodeRabbit: COMMENTED reviews are non-decisive. CodeRabbit may post an empty
+# COMMENTED review after an APPROVED review on the same head; it does not revoke
+# that approval. CHANGES_REQUESTED and DISMISSED remain decisive.
 _coderabbit_check() {
   jq -c "$_JQ_LATEST"'
     .head as $head
-    | latest(.coderabbit; $head) as $r
+    | latest([.coderabbit[] | select(.detail != "COMMENTED")]; $head) as $r
     | if $r == null then empty_verdict("coderabbit")
       elif $r.sha == $head and $r.detail == "APPROVED" then $r + { checker: "coderabbit", verdict: "covers", form: "approval" }
       elif $r.sha == $head and $r.detail == "CHANGES_REQUESTED" then $r + { checker: "coderabbit", verdict: "changes_requested", form: "" }
@@ -614,10 +611,11 @@ check_review_happened() {
     echo "          exact-head evidence, do not request the same head again. A new head"
     echo "          requires replacement CI and one new request."
   else
-    echo "  remedy: after current-head CI succeeds and the PR is ready, run"
-    echo "          request-codex-review.sh ${pr} exactly once for this head, or ask Tim"
-    echo "          for a CodeRabbit request or a local review (review-preflight +"
-    echo "          mark-review). A new head requires replacement CI and a new review."
+    echo "  remedy: after current-head CI succeeds, mark the draft ready to trigger"
+    echo "          CodeRabbit, or request @coderabbitai review for a later head."
+    echo "          Only a trusted current-head Review rate limited reply permits"
+    echo "          request-codex-review.sh ${pr} <reply-ID>. A new head requires"
+    echo "          replacement CI and a new review."
   fi
   return 1
 }

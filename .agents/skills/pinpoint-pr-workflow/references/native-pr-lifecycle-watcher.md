@@ -39,7 +39,7 @@ Each agent calls `watch_pr_lifecycle` exactly once and returns its terminal JSON
 ## Owner lifecycle
 
 1. Push the intended head and invoke the named agent with `phase: "ci"`.
-2. On `outcome: "passed"`, promote a draft PR, then run `bash scripts/workflow/request-codex-review.sh <PR>` exactly once for that head.
+2. On `outcome: "passed"`, promote a draft PR to trigger CodeRabbit; for a later head, request `@coderabbitai review`. Use `request-codex-review.sh <PR> <reply-ID>` only after a trusted current-head CodeRabbit usage-limit reply.
 3. Invoke the named agent with the same envelope except `phase: "review"`.
 4. The capable owner handles every terminal outcome, mutation, finding, label, screenshot, and merge handoff. A changed head restarts at step 1.
 

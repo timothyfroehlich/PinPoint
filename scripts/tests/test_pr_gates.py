@@ -307,6 +307,38 @@ def test_coderabbit_approval_of_head_passes() -> None:
     assert summary["coverage"]["reviewer"] == CODERABBIT_BOT
 
 
+def test_empty_coderabbit_comment_does_not_erase_approval() -> None:
+    reviews = [
+        codex_review(login=CODERABBIT_BOT, submitted_at="2026-08-22T12:00:00Z"),
+        codex_review(
+            login=CODERABBIT_BOT,
+            state="COMMENTED",
+            submitted_at="2026-08-22T12:01:00Z",
+        ),
+    ]
+    reviews[1]["body"] = ""
+    with gate_env(review_pages=[reviews]) as env:
+        summary = review_summary(env)
+    assert summary["label"] == "approved"
+    assert summary["coverage"]["checker"] == "coderabbit"
+    assert summary["coverage"]["detail"] == "APPROVED"
+
+
+def test_later_coderabbit_changes_request_supersedes_approval() -> None:
+    reviews = [
+        codex_review(login=CODERABBIT_BOT, submitted_at="2026-08-22T12:00:00Z"),
+        codex_review(
+            login=CODERABBIT_BOT,
+            state="CHANGES_REQUESTED",
+            submitted_at="2026-08-22T12:01:00Z",
+        ),
+    ]
+    with gate_env(review_pages=[reviews]) as env:
+        summary = review_summary(env)
+    assert summary["label"] == "changes requested"
+    assert summary["checkers"]["coderabbit"]["verdict"] == "changes_requested"
+
+
 def test_coderabbit_precedence_over_codex_when_both_cover() -> None:
     """When both CodeRabbit and Codex cover head, CodeRabbit takes precedence (§10.7)."""
     cr = codex_review(login=CODERABBIT_BOT, submitted_at="2026-08-22T11:00:00Z")
@@ -635,8 +667,8 @@ def test_stale_codex_approval_reports_both_commits_and_the_request_remedy() -> N
         f"Codex: newest evidence names {OTHER_SHA[:7]}, head is {HEAD_SHA[:7]}"
         in result.stdout
     )
-    assert "request-codex-review.sh 123 exactly once" in result.stdout
-    assert "CodeRabbit request or a local review" in result.stdout
+    assert "@coderabbitai review for a later head" in result.stdout
+    assert "request-codex-review.sh 123 <reply-ID>" in result.stdout
     assert summary["label"] == "stale review"
 
 
@@ -721,7 +753,7 @@ def test_old_or_untrusted_review_request_does_not_mark_current_head_requested(
         summary = review_summary(env)
     assert result.returncode == 1, result.stdout
     assert summary["codex_request_pending"] is False
-    assert "request-codex-review.sh 123 exactly once" in result.stdout
+    assert "request-codex-review.sh 123 <reply-ID>" in result.stdout
 
 
 @pytest.mark.parametrize("state", ["DISMISSED", "PENDING", "UNKNOWN"])

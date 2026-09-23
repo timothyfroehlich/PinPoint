@@ -70,10 +70,10 @@ CI_GATE_NAME = "CI Gate"
 GATES_SCRIPT = Path(__file__).resolve().parent / "_pr-gates.sh"
 REVIEW_LABELS = ("approved", "changes requested", "stale review", "not reviewed")
 REVIEW_HINT = (
-    "after current-head CI succeeds and the PR is ready, run "
-    "request-codex-review.sh #{pr} exactly once for this head, or ask Tim for a "
-    "CodeRabbit request or a local review; a new head requires replacement CI and "
-    "a new review"
+    "after current-head CI succeeds, mark the draft ready for CodeRabbit or request "
+    "@coderabbitai review on a later head; only a trusted current-head rate-limit "
+    "reply permits request-codex-review.sh #{pr} <reply-ID>; a new head requires "
+    "replacement CI and review"
 )
 REVIEW_REQUESTED_HINT = (
     "the manual Codex review for this head was already requested; wait for exact-head "

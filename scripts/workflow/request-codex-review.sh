@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [[ $# -ne 1 || ! $1 =~ ^[0-9]+$ ]]; then
-  echo "Usage: $0 <PR-number>" >&2
+if [[ $# -ne 2 || ! $1 =~ ^[0-9]+$ || ! $2 =~ ^[0-9]+$ ]]; then
+  echo "Usage: $0 <PR-number> <CodeRabbit-rate-limit-comment-ID>" >&2
   exit 2
 fi
 
 readonly pr_number=$1
+readonly rate_limit_comment_id=$2
 script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 readonly script_dir
 # shellcheck source=scripts/workflow/_pr-gates.sh
@@ -63,6 +64,38 @@ if [[ "$(jq -r '.label' <<< "$summary")" == "approved" ]]; then
 fi
 if [[ "$(jq -r '.codex_request_pending' <<< "$summary")" == "true" ]]; then
   echo "BLOCK: review request: head ${head_sha:0:7} was already requested; wait for its result" >&2
+  exit 1
+fi
+
+# A missing review, a pending CodeRabbit request, and a completed review without
+# a native approval are not quota exhaustion. Bind the fallback to the latest
+# owner request on this head and CodeRabbit's own rate-limit acknowledgement.
+head_committed_at=$(gh api "repos/${owner_repo}/commits/${head_sha}" --jq .commit.committer.date)
+comments_raw=$(gh api --paginate "repos/${owner_repo}/issues/${pr_number}/comments")
+latest_coderabbit_request_at=$(jq -sr --arg actor "$actor" '
+  [ .[] | flatten | .[]
+    | select(.user.login? == $actor and ((.body // "") | split("\n")[0] == "@coderabbitai review"))
+    | .created_at // "" ] | max // ""
+' <<< "$comments_raw")
+if [[ -z "$head_committed_at" || -z "$latest_coderabbit_request_at" ||
+      "$latest_coderabbit_request_at" < "$head_committed_at" ]]; then
+  echo "BLOCK: review request: no current-head CodeRabbit request with verifiable timing" >&2
+  exit 1
+fi
+
+rate_limit_comment=$(gh api "repos/${owner_repo}/issues/comments/${rate_limit_comment_id}")
+if ! jq -e --arg actor "$actor" --arg repo "$owner_repo" \
+    --arg pr "$pr_number" --arg requested "$latest_coderabbit_request_at" \
+    --arg committed "$head_committed_at" '
+  .user.login? == "coderabbitai[bot]" and
+  .performed_via_github_app.slug? == "coderabbitai" and
+  .issue_url? == ("https://api.github.com/repos/" + $repo + "/issues/" + $pr) and
+  ((.body // "") | test("Review rate limited"; "i")) and
+  (.created_at // "") >= $requested and
+  (.updated_at // "") >= $requested and
+  (.updated_at // "") >= $committed
+' <<< "$rate_limit_comment" >/dev/null; then
+  echo "BLOCK: review request: comment ${rate_limit_comment_id} does not prove CodeRabbit usage exhaustion for this head" >&2
   exit 1
 fi
 
