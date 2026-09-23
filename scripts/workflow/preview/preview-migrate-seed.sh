@@ -83,17 +83,12 @@ SUPABASE_SERVICE_ROLE_KEY="$SUPABASE_SERVICE_ROLE_KEY" \
   node supabase/seed-users.mjs --preview
 echo "::endgroup::"
 
-# PR-specific demo seeds go below this line (run only if their script exists, so
-# this stays a no-op on branches that don't carry them). A seed added here must
-# be REMOTE-CAPABLE: the demo seeds that call `assertLocalDatabase`
-# (seed-collections, seed-machine-settings) exit 2 against a branch DB. Swap
-# their guard for `assertNotPinPointProduction` (scripts/lib/db-target.mjs)
-# before wiring one in. Example for PR #1388:
-#   [[ -f supabase/seed-machine-settings.mjs ]] && {
-#     echo "::group::Seed machine settings demo"
-#     node supabase/seed-machine-settings.mjs
-#     echo "::endgroup::"
-#   }
+# Keep the AFM showcase data in this shared path so both /preview creation and
+# push-triggered resync restore it after resetting the branch database. The
+# script refuses PinPoint production before opening a connection.
+echo "::group::Seed machine settings demo"
+node supabase/seed-machine-settings.mjs
+echo "::endgroup::"
 
 # PinballMap catalog mirror (PP-o355.2): the refresh cron is prod-only, so
 # preview branches need the mirror seeded from offline fixtures for the linking
