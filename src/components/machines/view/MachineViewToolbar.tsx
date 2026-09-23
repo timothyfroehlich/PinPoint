@@ -1,11 +1,22 @@
 "use client";
 
 import type React from "react";
-import { Search, SlidersHorizontal, X } from "lucide-react";
+import { ChevronDown, Search, SlidersHorizontal, X } from "lucide-react";
 import { MultiSelect, type Option } from "~/components/ui/multi-select";
 import { Input } from "~/components/ui/input";
 import { Button } from "~/components/ui/button";
 import { Badge } from "~/components/ui/badge";
+import { Checkbox } from "~/components/ui/checkbox";
+import {
+  Drawer,
+  DrawerClose,
+  DrawerContent,
+  DrawerDescription,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerTrigger,
+} from "~/components/ui/drawer";
 import { PaginationControls } from "~/components/issues/PaginationControls";
 import {
   DropdownMenu,
@@ -37,6 +48,7 @@ import type {
   MachineViewPresetId,
   MachineViewState,
 } from "~/lib/types";
+import { cn } from "~/lib/utils";
 
 const PAGE_SIZES: MachineViewPageSize[] = [25, 50, 100];
 const STATUS_VALUES: MachineStatus[] = [
@@ -172,25 +184,71 @@ export function MachineViewToolbar({
 
   return (
     <div className="space-y-3">
-      <div className="@container space-y-2">
-        <div className="relative">
-          <label htmlFor="machine-view-search" className="sr-only">
-            Search machines
-          </label>
-          <Search
-            aria-hidden="true"
-            className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
-          />
-          <Input
-            id="machine-view-search"
-            type="search"
-            value={searchValue}
-            onChange={(event) => onSearchChange(event.target.value)}
-            placeholder="Search machines…"
-            className="pl-9"
-          />
+      <div className="@container overflow-hidden rounded-lg border border-outline-variant bg-card shadow-sm">
+        <div className="space-y-2 p-3">
+          <div className="relative">
+            <label htmlFor="machine-view-search" className="sr-only">
+              Search machines
+            </label>
+            <Search
+              aria-hidden="true"
+              className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+            />
+            <Input
+              id="machine-view-search"
+              type="search"
+              value={searchValue}
+              onChange={(event) => onSearchChange(event.target.value)}
+              placeholder="Search machines…"
+              className="h-11 bg-background pl-9"
+            />
+          </div>
+          {hasFilters ? (
+            <div
+              role="region"
+              aria-label="Active filters"
+              className="flex flex-wrap items-center gap-2"
+            >
+              {searchValue ? (
+                <Badge variant="secondary" className="gap-1 pl-2.5">
+                  Search: {searchValue}
+                  <button
+                    type="button"
+                    onClick={() => onSearchChange("")}
+                    aria-label="Remove search filter"
+                  >
+                    <X className="size-3" />
+                  </button>
+                </Badge>
+              ) : null}
+              {chips.map((chip) => (
+                <Badge
+                  key={`${chip.key}-${chip.value}`}
+                  variant="secondary"
+                  className="gap-1 pl-2.5"
+                >
+                  {chip.label}
+                  <button
+                    type="button"
+                    onClick={() => removeChip(chip.key, chip.value)}
+                    aria-label={`Remove ${chip.label} filter`}
+                  >
+                    <X className="size-3" />
+                  </button>
+                </Badge>
+              ))}
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={clearFilters}
+              >
+                Clear all
+              </Button>
+            </div>
+          ) : null}
         </div>
-        <div className="grid min-w-0 grid-cols-1 gap-2 @sm:grid-cols-2 @md:grid-cols-3">
+        <div className="grid min-w-0 grid-cols-1 gap-2 border-t border-outline-variant p-3 @sm:grid-cols-2 @md:grid-cols-3">
           <MultiSelect
             options={presenceOptions}
             value={state.presence === "all" ? [] : state.presence}
@@ -230,51 +288,6 @@ export function MachineViewToolbar({
         </div>
       </div>
 
-      {hasFilters ? (
-        <div
-          role="region"
-          aria-label="Active filters"
-          className="flex flex-wrap items-center gap-2"
-        >
-          {searchValue ? (
-            <Badge variant="secondary" className="gap-1 pl-2.5">
-              Search: {searchValue}
-              <button
-                type="button"
-                onClick={() => onSearchChange("")}
-                aria-label="Remove search filter"
-              >
-                <X className="size-3" />
-              </button>
-            </Badge>
-          ) : null}
-          {chips.map((chip) => (
-            <Badge
-              key={`${chip.key}-${chip.value}`}
-              variant="secondary"
-              className="gap-1 pl-2.5"
-            >
-              {chip.label}
-              <button
-                type="button"
-                onClick={() => removeChip(chip.key, chip.value)}
-                aria-label={`Remove ${chip.label} filter`}
-              >
-                <X className="size-3" />
-              </button>
-            </Badge>
-          ))}
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={clearFilters}
-          >
-            Clear all
-          </Button>
-        </div>
-      ) : null}
-
       <div className="flex flex-wrap items-center justify-between gap-3 px-1">
         <div className="flex items-center gap-2">
           <span className="text-sm font-bold uppercase tracking-tight text-foreground/90">
@@ -284,20 +297,135 @@ export function MachineViewToolbar({
             {totalCount}
           </span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-4">
           <PaginationControls
             page={state.page}
             totalCount={totalCount}
             pageSize={state.pageSize}
             onNavigate={(page) => update({ page }, false)}
           />
+          <Drawer direction="bottom">
+            <DrawerTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-8 gap-2 px-2.5 font-medium shadow-sm md:hidden"
+                data-testid="machine-view-mobile-options-trigger"
+              >
+                <SlidersHorizontal className="size-3.5" aria-hidden="true" />
+                View Options
+              </Button>
+            </DrawerTrigger>
+            <DrawerContent className="max-h-[85dvh] rounded-t-2xl">
+              <DrawerHeader className="shrink-0 pb-1 text-left">
+                <DrawerTitle className="text-lg">View Options</DrawerTitle>
+                <DrawerDescription className="sr-only">
+                  Choose visible fields, layout, and rows per page.
+                </DrawerDescription>
+              </DrawerHeader>
+              <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-2">
+                <details className="group rounded-lg border border-outline-variant bg-card">
+                  <summary className="flex min-h-12 cursor-pointer list-none items-center gap-2 px-3 py-2 text-sm font-semibold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+                    Fields
+                    <span className="ml-auto text-xs font-medium text-muted-foreground">
+                      {state.columns.length - 1} selected
+                    </span>
+                    <ChevronDown
+                      aria-hidden="true"
+                      className="size-4 text-muted-foreground transition-transform group-open:rotate-180 motion-reduce:transition-none"
+                    />
+                  </summary>
+                  <div className="grid grid-cols-2 gap-2 border-t border-outline-variant p-3">
+                    {permittedFields
+                      .filter((field) => field !== "machine")
+                      .map((field) => (
+                        <label
+                          key={field}
+                          className="flex min-h-11 items-center gap-2 rounded-md border border-outline-variant bg-card px-3 py-2 text-sm text-foreground"
+                        >
+                          <Checkbox
+                            checked={state.columns.includes(field)}
+                            onCheckedChange={(checked) =>
+                              toggleColumn(field, checked === true)
+                            }
+                            aria-label={MACHINE_VIEW_FIELDS[field].label}
+                          />
+                          <span>{MACHINE_VIEW_FIELDS[field].label}</span>
+                        </label>
+                      ))}
+                  </div>
+                </details>
+                <section aria-labelledby="machine-view-mobile-page-size">
+                  <h3
+                    id="machine-view-mobile-page-size"
+                    className="mb-2 text-sm font-semibold text-foreground"
+                  >
+                    Rows per page
+                  </h3>
+                  <div className="grid grid-cols-3 gap-2">
+                    {PAGE_SIZES.map((pageSize) => (
+                      <Button
+                        key={pageSize}
+                        type="button"
+                        variant="outline"
+                        aria-pressed={state.pageSize === pageSize}
+                        onClick={() => update({ pageSize })}
+                        className={cn(
+                          "min-h-11",
+                          state.pageSize === pageSize &&
+                            "border-primary bg-primary/10 text-primary"
+                        )}
+                      >
+                        {pageSize}
+                      </Button>
+                    ))}
+                  </div>
+                </section>
+                <section aria-labelledby="machine-view-mobile-layout">
+                  <h3
+                    id="machine-view-mobile-layout"
+                    className="mb-2 text-sm font-semibold text-foreground"
+                  >
+                    Layout
+                  </h3>
+                  <div className="grid grid-cols-2 gap-2">
+                    {(["compact", "table"] as const).map((mode) => (
+                      <Button
+                        key={mode}
+                        type="button"
+                        variant="outline"
+                        aria-pressed={mobileMode === mode}
+                        onClick={() => onMobileModeChange(mode)}
+                        className={cn(
+                          "min-h-11",
+                          mobileMode === mode &&
+                            "border-primary bg-primary/10 text-primary"
+                        )}
+                      >
+                        {mode === "compact" ? "Compact list" : "Table"}
+                      </Button>
+                    ))}
+                  </div>
+                </section>
+              </div>
+              <DrawerFooter className="shrink-0 border-t border-outline-variant pb-[calc(1rem+env(safe-area-inset-bottom))]">
+                <DrawerClose asChild>
+                  <Button type="button" className="min-h-11 w-full">
+                    Done
+                  </Button>
+                </DrawerClose>
+              </DrawerFooter>
+            </DrawerContent>
+          </Drawer>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
-                className="gap-2"
+                className="hidden h-8 gap-2 px-2.5 font-medium shadow-sm md:inline-flex"
+                data-testid="machine-view-desktop-options-trigger"
               >
                 <SlidersHorizontal className="size-3.5" />
                 View Options
@@ -336,26 +464,6 @@ export function MachineViewToolbar({
                     {pageSize}
                   </DropdownMenuRadioItem>
                 ))}
-              </DropdownMenuRadioGroup>
-              <DropdownMenuSeparator />
-              <DropdownMenuLabel className="md:hidden">
-                Phone display
-              </DropdownMenuLabel>
-              <DropdownMenuRadioGroup
-                value={mobileMode}
-                onValueChange={(value) => {
-                  if (value === "compact" || value === "table") {
-                    onMobileModeChange(value);
-                  }
-                }}
-                className="md:hidden"
-              >
-                <DropdownMenuRadioItem value="compact">
-                  Compact list
-                </DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="table">
-                  Table
-                </DropdownMenuRadioItem>
               </DropdownMenuRadioGroup>
             </DropdownMenuContent>
           </DropdownMenu>

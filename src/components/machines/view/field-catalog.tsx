@@ -2,18 +2,32 @@
 
 import type React from "react";
 import Link from "next/link";
+import { CircleCheck, TriangleAlert, Wrench } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { Badge } from "~/components/ui/badge";
 import { MachinePresenceBadge } from "~/components/machines/MachinePresenceBadge";
-import { MachineStatusBadge } from "~/components/machines/MachineStatusBadge";
 import { useRelativeNow } from "~/components/issues/RelativeTimeProvider";
 import { formatDate } from "~/lib/dates";
-import { getIssueSeverityStyles } from "~/lib/issues/status";
+import { SEVERITY_CONFIG } from "~/lib/issues/status";
+import {
+  getMachineStatusLabel,
+  type MachineStatus,
+} from "~/lib/machines/status";
 import { MACHINE_VIEW_FIELDS } from "~/lib/machines/view/config";
 import { formatCompactAgeAgo } from "~/lib/machines/view/model";
 import type { MachineViewFieldId, MachineViewRow } from "~/lib/types";
 import { cn } from "~/lib/utils";
 
 export type MachineSelectionHandler = (machineId: string) => void;
+
+const STATUS_INDICATORS: Record<
+  MachineStatus,
+  { icon: LucideIcon; color: string }
+> = {
+  operational: { icon: CircleCheck, color: "text-success" },
+  needs_service: { icon: Wrench, color: "text-warning" },
+  unplayable: { icon: TriangleAlert, color: "text-destructive-text" },
+};
 
 interface MachineIdentityProps {
   row: MachineViewRow;
@@ -37,15 +51,18 @@ export function MachineIdentity({
                   onMachineSelect(row.id);
                 },
               })}
-          className="truncate rounded-sm font-semibold text-foreground underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="truncate rounded-sm text-sm font-bold text-foreground underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           {row.title}
         </Link>
-        <Badge variant="outline" className="shrink-0 uppercase">
+        <Badge
+          variant="outline"
+          className="shrink-0 border-outline-variant px-1.5 py-0 text-xs font-medium uppercase text-muted-foreground"
+        >
           {row.initials}
         </Badge>
       </div>
-      <div className="mt-0.5 truncate text-xs font-normal text-muted-foreground">
+      <div className="mt-0.5 truncate text-sm font-normal text-muted-foreground">
         {row.manufacturer} · {row.year ?? "Unknown"} · {row.ownerName}
       </div>
     </div>
@@ -61,38 +78,52 @@ function RelativeAge({ value }: { value: string }): React.JSX.Element {
   );
 }
 
+function Playability({ status }: { status: MachineStatus }): React.JSX.Element {
+  const indicator = STATUS_INDICATORS[status];
+  const Icon = indicator.icon;
+  return (
+    <span className="inline-flex items-center gap-1.5 text-xs font-medium text-foreground">
+      <Icon aria-hidden="true" className={cn("size-4", indicator.color)} />
+      {getMachineStatusLabel(status)}
+    </span>
+  );
+}
+
 function IssueCount({ row }: { row: MachineViewRow }): React.JSX.Element {
   const count = row.health?.openIssues ?? 0;
-  if (count === 0) return <span className="text-muted-foreground">0</span>;
+  if (count === 0)
+    return <span className="text-xs font-medium text-muted-foreground">0</span>;
   const worst = row.health?.worstSeverity;
   const label = `${count} open ${count === 1 ? "issue" : "issues"}`;
+  const severity =
+    worst === null || worst === undefined ? null : SEVERITY_CONFIG[worst];
+  const Icon = severity?.icon;
 
   return (
     <Link
       href={`/issues?machine=${encodeURIComponent(row.initials)}`}
       aria-label={`View ${label} for ${row.title}`}
-      className="inline-flex rounded-full underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      className="inline-flex items-center gap-1.5 rounded-sm text-xs font-medium text-foreground underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
-      {worst === null || worst === undefined ? (
-        count
-      ) : (
-        <Badge className={cn("border", getIssueSeverityStyles(worst))}>
-          {count}
-        </Badge>
-      )}
+      {Icon ? (
+        <Icon aria-hidden="true" className={cn("size-4", severity.iconColor)} />
+      ) : null}
+      {count}
     </Link>
   );
 }
 
 function LastServiced({ row }: { row: MachineViewRow }): React.JSX.Element {
   if (!row.lastServicedAt) {
-    return <span className="text-muted-foreground">Never</span>;
+    return (
+      <span className="text-xs font-medium text-muted-foreground">Never</span>
+    );
   }
   return (
     <Link
       href={`/m/${row.initials}/maintenance`}
       aria-label={`View service history for ${row.title}`}
-      className="inline-flex rounded-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      className="inline-flex rounded-sm text-xs font-medium text-foreground underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
       <RelativeAge value={row.lastServicedAt} />
     </Link>
@@ -114,11 +145,7 @@ export const MACHINE_VIEW_FIELD_RENDERERS: Record<
     label: MACHINE_VIEW_FIELDS.playability.label,
     align: "left",
     render: (row) =>
-      row.health ? (
-        <MachineStatusBadge status={row.health.playability} size="sm" />
-      ) : (
-        "—"
-      ),
+      row.health ? <Playability status={row.health.playability} /> : "—",
   },
   openIssues: {
     label: MACHINE_VIEW_FIELDS.openIssues.label,

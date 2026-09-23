@@ -49,23 +49,28 @@ function SortHeader({
         active ? (state.dir === "asc" ? "ascending" : "descending") : "none"
       }
       className={cn(
-        "sticky top-0 z-20 whitespace-nowrap border-b border-outline-variant bg-muted px-4 py-3 text-sm font-semibold text-muted-foreground",
+        "sticky top-0 z-20 whitespace-nowrap border-b border-outline-variant bg-muted/30 px-4 py-3 text-left text-sm font-semibold text-muted-foreground",
         align === "center" && "text-center",
         align === "right" && "text-right",
-        sticky && "left-0 z-30 min-w-72 border-r"
+        sticky && "left-0 z-30 min-w-72 border-r border-outline-variant"
       )}
     >
       <button
         type="button"
         onClick={() => onSort(field)}
         className={cn(
-          "inline-flex min-h-8 items-center gap-1 rounded-sm hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          "group inline-flex items-center rounded-sm hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
           align === "center" && "justify-center",
           align === "right" && "justify-end"
         )}
       >
         {MACHINE_VIEW_FIELDS[field].label}
-        <Icon className={cn("size-3.5", !active && "opacity-40")} />
+        <Icon
+          className={cn(
+            "ml-2 size-4",
+            active ? "text-primary" : "opacity-30 group-hover:opacity-100"
+          )}
+        />
       </button>
     </th>
   );
@@ -94,7 +99,7 @@ export function MachineViewTable({
         aria-label="Machine table"
         className="max-h-[65vh] overflow-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
       >
-        <table className="w-full min-w-max border-collapse text-sm">
+        <table className="w-full min-w-max border-collapse text-left text-sm">
           <caption className="sr-only">
             Machines with selected status and activity fields
           </caption>
@@ -117,15 +122,12 @@ export function MachineViewTable({
               ))}
             </tr>
           </thead>
-          <tbody>
+          <tbody className="divide-y divide-border">
             {rows.map((row) => (
-              <tr
-                key={row.id}
-                className="group border-b border-outline-variant last:border-b-0 hover:bg-muted/40"
-              >
+              <tr key={row.id} className="group hover:bg-muted/50">
                 <th
                   scope="row"
-                  className="sticky left-0 z-10 min-w-72 border-r border-outline-variant bg-card px-4 py-2 text-left group-hover:bg-muted"
+                  className="sticky left-0 z-10 min-w-72 border-r border-outline-variant bg-card px-4 py-4 text-left group-hover:bg-muted/50"
                 >
                   <MachineIdentity
                     row={row}
@@ -138,7 +140,7 @@ export function MachineViewTable({
                     <td
                       key={field}
                       className={cn(
-                        "whitespace-nowrap px-4 py-2",
+                        "whitespace-nowrap px-4 py-4",
                         renderer.align === "center" && "text-center",
                         renderer.align === "right" && "text-right",
                         renderer.tableClassName

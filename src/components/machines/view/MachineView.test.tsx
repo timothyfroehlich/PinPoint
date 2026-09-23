@@ -5,6 +5,17 @@ import { getMachineViewPreset } from "~/lib/machines/view/config";
 import type { MachineViewResult } from "~/lib/types";
 import { MachineView } from "./MachineView";
 
+window.matchMedia = vi.fn().mockImplementation(() => ({
+  matches: false,
+  media: "",
+  onchange: null,
+  addListener: vi.fn(),
+  removeListener: vi.fn(),
+  addEventListener: vi.fn(),
+  removeEventListener: vi.fn(),
+  dispatchEvent: vi.fn(),
+}));
+
 const navigation = vi.hoisted(() => ({
   replace: vi.fn(),
   searchParams: new URLSearchParams(),
@@ -143,10 +154,8 @@ describe("MachineView", () => {
     render(<MachineView result={result()} preset="machines" />);
 
     expect(await screen.findByText(/scroll for more/i)).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "View Options" }));
-    await user.click(
-      screen.getByRole("menuitemradio", { name: "Compact list" })
-    );
+    await user.click(screen.getByTestId("machine-view-mobile-options-trigger"));
+    await user.click(screen.getByRole("button", { name: "Compact list" }));
     expect(storage.get("pinpoint:machine-view:mobile-mode")).toBe("compact");
   });
 });

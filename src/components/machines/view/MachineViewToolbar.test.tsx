@@ -5,6 +5,17 @@ import { getMachineViewPreset } from "~/lib/machines/view/config";
 import type { MachineViewState } from "~/lib/types";
 import { MachineViewToolbar } from "./MachineViewToolbar";
 
+window.matchMedia = vi.fn().mockImplementation(() => ({
+  matches: false,
+  media: "",
+  onchange: null,
+  addListener: vi.fn(),
+  removeListener: vi.fn(),
+  addEventListener: vi.fn(),
+  removeEventListener: vi.fn(),
+  dispatchEvent: vi.fn(),
+}));
+
 const onSearchChange = vi.fn();
 const onStateChange = vi.fn();
 const onMobileModeChange = vi.fn();
@@ -110,7 +121,9 @@ describe("MachineViewToolbar", () => {
     };
     renderToolbar(state);
 
-    await user.click(screen.getByRole("button", { name: "View Options" }));
+    await user.click(
+      screen.getByTestId("machine-view-desktop-options-trigger")
+    );
     await user.click(
       screen.getByRole("menuitemcheckbox", { name: "Last Serviced" })
     );
@@ -128,7 +141,7 @@ describe("MachineViewToolbar", () => {
     });
   });
 
-  it("paginates and offers the phone display preference", async () => {
+  it("paginates and offers the layout preference", async () => {
     const user = userEvent.setup();
     const state: MachineViewState = {
       ...getMachineViewPreset("machines").defaultState,
@@ -139,8 +152,41 @@ describe("MachineViewToolbar", () => {
     await user.click(screen.getByRole("button", { name: "Next page" }));
     expect(onStateChange).toHaveBeenCalledWith({ ...state, page: 3 });
 
-    await user.click(screen.getByRole("button", { name: "View Options" }));
-    await user.click(screen.getByRole("menuitemradio", { name: "Table" }));
+    await user.click(screen.getByTestId("machine-view-mobile-options-trigger"));
+    expect(screen.getByText("Layout")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Table" }));
     expect(onMobileModeChange).toHaveBeenCalledWith("table");
+  });
+
+  it("changes fields and page size from the phone drawer", async () => {
+    const user = userEvent.setup();
+    const state: MachineViewState = {
+      ...getMachineViewPreset("machines").defaultState,
+      page: 3,
+    };
+    renderToolbar(state);
+
+    await user.click(screen.getByTestId("machine-view-mobile-options-trigger"));
+    expect(screen.getByText("3 selected")).toBeInTheDocument();
+    await user.click(screen.getByText("Fields"));
+    await user.click(screen.getByRole("checkbox", { name: "Last Activity" }));
+    expect(onStateChange).toHaveBeenCalledWith({
+      ...state,
+      columns: [
+        "machine",
+        "playability",
+        "openIssues",
+        "lastServiced",
+        "lastActivity",
+      ],
+      page: 3,
+    });
+
+    await user.click(screen.getByRole("button", { name: "50" }));
+    expect(onStateChange).toHaveBeenLastCalledWith({
+      ...state,
+      pageSize: 50,
+      page: 1,
+    });
   });
 });
