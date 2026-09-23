@@ -250,3 +250,20 @@ Docker. All four published service ports on Bazzite remained bound to
 `127.0.0.1`; the older slot-13 and slot-15 pilot containers and Crabbox
 runners remained up with distinct ports. The full Discord login/callback and
 same-LAN reachability are still unproved, as above.
+
+Code review found that an idle Mac worktree already held slot 17, so a stopped
+stack could later collide with the adoption pilot's same-number CLI health
+forwards. The helper now serializes Bazzite lease selection with the Mac
+worktree registry and persists a Mac-side remote reservation; new worktrees
+also account for pre-registry pilot state files. On 2026-09-23 only the adoption
+pilot was stopped and relocated **17 → 20**, then restarted against the same
+`supabase_db_pinpoint-codex-remote-supabase-default` volume. Before and after,
+the database contained **20 issues, 12 machines, and 82 migration entries**.
+The final adoption-pilot tunnel PID at that check was **56365**, with service
+bindings on Bazzite `127.0.0.1:56321/56322/56324/56325`; the Mac browser and
+generated localhost URLs stayed at `3200/56321/56322/56324`. The older pilots
+remain on their own slots, untouched. Local opt-in and destructive DB commands
+now require Docker container labels, worktree path, and port bindings to prove
+that localhost points to this worktree's local stack, never an active remote
+tunnel. SSH control commands are bounded to 60 seconds, and `dev:status --wait`
+retries remote ownership checks within its wait budget.

@@ -11,6 +11,7 @@ fallback exists.
 from __future__ import annotations
 
 import argparse
+import fcntl
 import hashlib
 import json
 import os
@@ -44,6 +45,7 @@ SUPABASE_HOME_RELATIVE_PATH = Path(
     ".agent/tmp/remote-supabase-docker-pilot/supabase-home"
 )
 MAX_SLOT = 96
+MAC_MANIFEST = Path.home() / ".config/pinpoint/worktree-slots.json"
 
 BASE_PORT_APP = 3000
 BASE_PORT_API = 54321
@@ -242,6 +244,26 @@ with manifest.open("r+") as handle:
         if action == "mark-bootstrapped":
             lease["bootstrap_complete"] = True
             write_lease(lease)
+        elif action == "relocate":
+            used = {
+                value for path, value in slots.items() if path != str(lease_dir)
+            }
+            replacement = next(
+                (
+                    candidate
+                    for candidate in range(1, MAX_SLOT + 1)
+                    if candidate != slot
+                    and candidate not in used
+                    and candidate not in forbidden
+                    and ports_available(candidate)
+                ),
+                None,
+            )
+            if replacement is None:
+                raise SystemExit("no free replacement remote port slot")
+            lease["slot"] = replacement
+            write_lease(lease)
+            slots[str(lease_dir)] = replacement
         elif action not in {"reserve", "get"}:
             raise SystemExit(f"unsupported action: {action}")
 
@@ -457,14 +479,19 @@ def run_remote(
     *,
     check: bool = True,
     input_text: str | None = None,
+    timeout: float = 60,
 ) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        ["ssh", *SSH_OPTIONS, REMOTE_HOST, *args],
-        check=check,
-        capture_output=True,
-        text=True,
-        input=input_text,
-    )
+    try:
+        return subprocess.run(
+            ["ssh", *SSH_OPTIONS, REMOTE_HOST, *args],
+            check=check,
+            capture_output=True,
+            text=True,
+            input=input_text,
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired as error:
+        raise PilotError(f"Bazzite SSH command timed out after {timeout}s") from error
 
 
 def remote_uid() -> int:
@@ -553,8 +580,16 @@ def port_is_available(port: int) -> bool:
             sock.close()
 
 
-def forbidden_remote_slots() -> set[int]:
-    forbidden: set[int] = set()
+def forbidden_remote_slots(
+    root: Path, local_slots: dict[str, int], reservations: dict[str, Any]
+) -> set[int]:
+    own = str(root.resolve())
+    forbidden = {
+        int(slot)
+        for path, slot in local_slots.items()
+        if str(Path(path).resolve()) != own
+    }
+    forbidden.update(int(entry["slot"]) for entry in reservations.values())
     for slot in range(1, MAX_SLOT + 1):
         ports = Ports.for_slot(slot)
         if not all(
@@ -563,6 +598,143 @@ def forbidden_remote_slots() -> set[int]:
         ):
             forbidden.add(slot)
     return forbidden
+
+
+def mac_manifest_data(file: Any) -> dict[str, Any]:
+    file.seek(0)
+    try:
+        data = json.load(file)
+        slots = data["slots"]
+        reservations = data.get("remote_slots", {})
+        if not isinstance(slots, dict) or not isinstance(reservations, dict):
+            raise ValueError("invalid registry shape")
+        for path, slot in slots.items():
+            if (
+                not isinstance(path, str)
+                or not isinstance(slot, int)
+                or not 1 <= slot <= MAX_SLOT
+            ):
+                raise ValueError("invalid local slot")
+        for project, entry in reservations.items():
+            if (
+                not isinstance(project, str)
+                or not isinstance(entry, dict)
+                or not isinstance(entry.get("worktree"), str)
+                or not isinstance(entry.get("slot"), int)
+                or not 1 <= entry["slot"] <= MAX_SLOT
+            ):
+                raise ValueError("invalid remote slot reservation")
+        return data
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        raise PilotError(f"Mac slot registry is unreadable: {error}") from error
+
+
+def write_mac_manifest(file: Any, data: dict[str, Any]) -> None:
+    file.seek(0)
+    file.truncate()
+    json.dump(data, file, indent=2)
+    file.write("\n")
+    file.flush()
+    os.fsync(file.fileno())
+
+
+def acquire_remote_lease(root: Path, project_id: str) -> RemoteLease:
+    """Serialize remote selection with Mac worktree slot allocation."""
+    try:
+        with MAC_MANIFEST.open("r+") as file:
+            fcntl.flock(file, fcntl.LOCK_EX)
+            try:
+                data = mac_manifest_data(file)
+                slots = data["slots"]
+                reservations = data.setdefault("remote_slots", {})
+                own = str(root.resolve())
+                if own not in slots:
+                    raise PilotError("this worktree has no Mac slot registry entry")
+                existing = reservations.get(project_id)
+                if existing is not None and existing["worktree"] != own:
+                    raise PilotError("Mac remote slot reservation owner mismatch")
+
+                try:
+                    lease = remote_lease("get", project_id)
+                except subprocess.CalledProcessError as error:
+                    if "pilot lease does not exist" not in (error.stderr or ""):
+                        raise PilotError(
+                            "Bazzite lease lookup failed without proving the lease is absent"
+                        ) from error
+                    if existing is not None:
+                        raise PilotError(
+                            "Mac reservation exists but the Bazzite lease is missing"
+                        ) from error
+                    lease = remote_lease(
+                        "reserve",
+                        project_id,
+                        forbidden_remote_slots(root, slots, reservations),
+                    )
+
+                occupied = {
+                    int(slot)
+                    for path, slot in slots.items()
+                    if str(Path(path).resolve()) != own
+                }
+                occupied.update(
+                    int(entry["slot"])
+                    for owner, entry in reservations.items()
+                    if owner != project_id
+                )
+                if lease.slot in occupied:
+                    raise PilotError(
+                        f"remote slot {lease.slot} conflicts with a Mac worktree or lease"
+                    )
+                if existing is not None and existing["slot"] != lease.slot:
+                    raise PilotError("Mac and Bazzite remote slot leases differ")
+                reservations[project_id] = {"worktree": own, "slot": lease.slot}
+                write_mac_manifest(file, data)
+                return lease
+            finally:
+                fcntl.flock(file, fcntl.LOCK_UN)
+    except OSError as error:
+        raise PilotError(f"Mac slot registry is unavailable: {error}") from error
+
+
+def release_mac_reservation(root: Path, project_id: str, slot: int) -> None:
+    with MAC_MANIFEST.open("r+") as file:
+        fcntl.flock(file, fcntl.LOCK_EX)
+        try:
+            data = mac_manifest_data(file)
+            reservations = data.setdefault("remote_slots", {})
+            existing = reservations.get(project_id)
+            if existing is not None:
+                if existing != {"worktree": str(root.resolve()), "slot": slot}:
+                    raise PilotError("Mac remote slot reservation owner mismatch")
+                del reservations[project_id]
+                write_mac_manifest(file, data)
+        finally:
+            fcntl.flock(file, fcntl.LOCK_UN)
+
+
+def relocate_remote_lease(root: Path, project_id: str, old_slot: int) -> RemoteLease:
+    """Move only this stopped pilot's port lease, preserving its project volume."""
+    with MAC_MANIFEST.open("r+") as file:
+        fcntl.flock(file, fcntl.LOCK_EX)
+        try:
+            data = mac_manifest_data(file)
+            slots = data["slots"]
+            reservations = data.setdefault("remote_slots", {})
+            own = str(root.resolve())
+            if own not in slots:
+                raise PilotError("this worktree has no Mac slot registry entry")
+            existing = reservations.get(project_id)
+            if existing is not None and existing != {"worktree": own, "slot": old_slot}:
+                raise PilotError("Mac remote slot reservation owner mismatch")
+            forbidden = forbidden_remote_slots(root, slots, reservations)
+            lease = remote_lease("relocate", project_id, forbidden)
+            if lease.slot == old_slot or lease.slot in forbidden:
+                raise PilotError("Bazzite returned a conflicting replacement slot")
+            reservations[project_id] = {"worktree": own, "slot": lease.slot}
+            write_mac_manifest(file, data)
+            return lease
+        finally:
+            fcntl.flock(file, fcntl.LOCK_UN)
 
 
 def build_forwards(local: Ports, remote: Ports) -> tuple[tuple[int, int], ...]:
@@ -760,6 +932,7 @@ def child_environment(
     env.update(env_values)
     env.pop("DOCKER_CONTEXT", None)
     env.pop("PINPOINT_REMOTE_SUPABASE_BOOTSTRAP", None)
+    env.pop("PINPOINT_REMOTE_SUPABASE_SEED_CHILD", None)
     supabase_home = root / SUPABASE_HOME_RELATIVE_PATH
     ensure_private_directory(supabase_home)
     env.update(
@@ -769,6 +942,7 @@ def child_environment(
             "SUPABASE_SERVICES_HOSTNAME": "localhost",
             "SUPABASE_TELEMETRY_DISABLED": "1",
             "SUPABASE_HOME": str(supabase_home),
+            "PINPOINT_SUPABASE_BACKEND": "remote",
         }
     )
     return env
@@ -930,6 +1104,10 @@ def run_project_command(
     root: Path, env: dict[str, str], script: str, *, bootstrap: bool = False
 ) -> None:
     child_env = env.copy()
+    # pnpm 11 may try to reconcile node_modules in a non-TTY agent invocation.
+    # CI=true makes that operation non-interactive; destructive guards never use
+    # CI as permission to target a remote database.
+    child_env["CI"] = "true"
     if bootstrap:
         if script != "db:fast-reset":
             raise PilotError("remote bootstrap authorization is only for db:fast-reset")
@@ -1063,14 +1241,7 @@ def start(root: Path) -> int:
     existing_state = read_state(root)
 
     uid = remote_uid()
-    try:
-        lease = remote_lease("get", project_id)
-    except subprocess.CalledProcessError as error:
-        if "pilot lease does not exist" not in (error.stderr or ""):
-            raise PilotError(
-                "Bazzite lease lookup failed without proving the lease is absent"
-            ) from error
-        lease = remote_lease("reserve", project_id, forbidden_remote_slots())
+    lease = acquire_remote_lease(root, project_id)
     remote = Ports.for_slot(lease.slot)
     runtime_root, digest = render_runtime_config(root, project_id, local, remote)
     provisional = make_provisional_state(
@@ -1142,7 +1313,11 @@ def start(root: Path) -> int:
 
 
 def status(root: Path) -> int:
-    reachable = run_remote(["true"], check=False)
+    try:
+        reachable = run_remote(["true"], check=False)
+    except PilotError:
+        print("UNREACHABLE: Bazzite SSH connection timed out")
+        return STATUS_UNREACHABLE
     if reachable.returncode != 0:
         print("UNREACHABLE: Bazzite SSH connection failed")
         return STATUS_UNREACHABLE
@@ -1242,6 +1417,38 @@ def stop(root: Path) -> int:
     return 0
 
 
+def relocate(root: Path) -> int:
+    """Explicitly repair a legacy Mac-slot collision without deleting data."""
+    project_id, local, _env_values, local_commit = read_local_identity(root)
+    old_lease = remote_lease("get", project_id)
+    old_state = read_state(root)
+    if old_state is None:
+        raise PilotError(
+            "remote state is missing; refusing to relocate unknown resources"
+        )
+    uid = remote_uid()
+    _runtime, old_digest = render_runtime_config(
+        root, project_id, local, Ports.for_slot(old_lease.slot)
+    )
+    validate_state_identity(old_state, project_id, old_lease, old_digest, uid)
+    stop(root)
+    replacement = relocate_remote_lease(root, project_id, old_lease.slot)
+    _runtime, digest = render_runtime_config(
+        root, project_id, local, Ports.for_slot(replacement.slot)
+    )
+    write_state(
+        root,
+        make_provisional_state(
+            project_id, local, replacement, local_commit, digest, uid
+        ),
+    )
+    print(
+        f"Moved pilot port lease {old_lease.slot} → {replacement.slot}; "
+        "database volumes were not changed."
+    )
+    return start(root)
+
+
 def destroy(root: Path) -> int:
     """Remove one worktree's remote resources for the worktree cleanup path."""
     project_id, local, env_values, local_commit = read_local_identity(root)
@@ -1302,6 +1509,7 @@ def destroy(root: Path) -> int:
 
     stop_tunnel(root, state)
     release_remote_lease(project_id, lease.slot)
+    release_mac_reservation(root, project_id, lease.slot)
     state_path(root).unlink()
     print(
         f"Removed project {project_id}: {len(volumes)} remote volume(s), "
@@ -1312,7 +1520,9 @@ def destroy(root: Path) -> int:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("operation", choices=("start", "status", "stop", "destroy"))
+    parser.add_argument(
+        "operation", choices=("start", "status", "stop", "destroy", "relocate")
+    )
     args = parser.parse_args()
     root = repo_root()
     try:
@@ -1322,6 +1532,8 @@ def main() -> int:
             return status(root)
         if args.operation == "stop":
             return stop(root)
+        if args.operation == "relocate":
+            return relocate(root)
         return destroy(root)
     except (PilotError, subprocess.CalledProcessError, OSError, ValueError) as error:
         if isinstance(error, subprocess.CalledProcessError):

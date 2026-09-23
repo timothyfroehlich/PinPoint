@@ -76,7 +76,15 @@ async function fastReset() {
       "pnpm run db:_seed-pinballmap-state",
     ];
     for (const cmd of seedCommands) {
-      execSync(cmd, { stdio: "inherit" });
+      execSync(cmd, {
+        stdio: "inherit",
+        env: {
+          ...process.env,
+          ...(process.env.PINPOINT_REMOTE_SUPABASE_BOOTSTRAP === "1"
+            ? { PINPOINT_REMOTE_SUPABASE_SEED_CHILD: "1" }
+            : {}),
+        },
+      });
     }
     console.log("✅ Database reseeded.");
   } catch (error) {

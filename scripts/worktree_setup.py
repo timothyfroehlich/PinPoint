@@ -194,8 +194,34 @@ def _read_manifest_locked(f: object) -> dict[str, int]:
 def _write_manifest_locked(f: object, slots: dict[str, int]) -> None:
     """Rewrite the manifest file from a locked file handle."""
     f.seek(0)  # type: ignore[union-attr]
+    try:
+        data = json.loads(f.read())  # type: ignore[union-attr]
+    except json.JSONDecodeError:
+        data = {"version": 1}
+    data["slots"] = slots
+    f.seek(0)  # type: ignore[union-attr]
     f.truncate()  # type: ignore[union-attr]
-    f.write(json.dumps({"version": 1, "slots": slots}, indent=2) + "\n")  # type: ignore[union-attr]
+    f.write(json.dumps(data, indent=2) + "\n")  # type: ignore[union-attr]
+
+
+def _reserved_remote_slots_locked(f: object, slots: dict[str, int]) -> set[int]:
+    """Include new Mac reservations and pre-registry pilot state files."""
+    f.seek(0)  # type: ignore[union-attr]
+    try:
+        data = json.loads(f.read())  # type: ignore[union-attr]
+        reservations = data.get("remote_slots", {})
+        if not isinstance(reservations, dict):
+            raise ValueError("remote_slots is not an object")
+        used = {int(entry["slot"]) for entry in reservations.values()}
+        for path in slots:
+            state = Path(path) / ".agent/tmp/remote-supabase-docker-pilot/state.json"
+            if state.exists():
+                used.add(int(json.loads(state.read_text())["remote_slot"]))
+        return used
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        raise RuntimeError(
+            "Remote slot registry is unreadable; refusing a new slot"
+        ) from error
 
 
 def allocate_slot(worktree_path: str) -> int:
@@ -219,7 +245,7 @@ def allocate_slot(worktree_path: str) -> int:
                     _write_manifest_locked(f, slots)
                 return slots[worktree_path]
 
-            used = set(slots.values())
+            used = set(slots.values()) | _reserved_remote_slots_locked(f, slots)
             for candidate in range(1, MAX_SLOT + 1):
                 if candidate not in used:
                     slots[worktree_path] = candidate

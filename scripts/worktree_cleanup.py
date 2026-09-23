@@ -76,6 +76,9 @@ EXIT_STALE_TARGET = 3
 #: — the same name with a different value, deliberately. In that script 1 is free;
 #: here it already means "failed", and callers distinguish these codes per script.
 EXIT_DOCKER_UNKNOWN = 4
+#: Remote teardown could not be verified, so the worktree, local slot, and
+#: remote lease remain intact. Unlike EXIT_DOCKER_UNKNOWN, nothing was removed.
+EXIT_REMOTE_KEPT = 8
 
 
 def resolve_project_id(worktree_path: Path, branch: str) -> str:
@@ -128,13 +131,15 @@ def deallocate_slot(worktree_path: str) -> None:
                 data = json.loads(f.read())
                 slots = data.get("slots", {})
             except (json.JSONDecodeError, KeyError):
+                data = {"version": 1}
                 slots = {}
 
             if worktree_path in slots:
                 del slots[worktree_path]
                 f.seek(0)
                 f.truncate()
-                f.write(json.dumps({"version": 1, "slots": slots}, indent=2) + "\n")
+                data["slots"] = slots
+                f.write(json.dumps(data, indent=2) + "\n")
         finally:
             fcntl.flock(f, fcntl.LOCK_UN)
 
@@ -397,7 +402,7 @@ def cleanup_worktree(worktree_path: Path) -> int:
                 ".git marker. Keeping it for manual recovery.",
                 file=sys.stderr,
             )
-            return EXIT_DOCKER_UNKNOWN
+            return EXIT_REMOTE_KEPT
         remote_project_id = read_pinned_project_id(worktree_path)
         if remote_project_id is None:
             print(
@@ -405,7 +410,7 @@ def cleanup_worktree(worktree_path: Path) -> int:
                 "Keeping the worktree for identity recovery.",
                 file=sys.stderr,
             )
-            return EXIT_DOCKER_UNKNOWN
+            return EXIT_REMOTE_KEPT
         remote_local_query = list_project_volumes(remote_project_id)
         if remote_local_query.is_unknown:
             print(
@@ -414,14 +419,23 @@ def cleanup_worktree(worktree_path: Path) -> int:
                 "and worktree intact until local resources can be checked.",
                 file=sys.stderr,
             )
-            return EXIT_DOCKER_UNKNOWN
+            return EXIT_REMOTE_KEPT
         remote_helper = Path(__file__).with_name("remote-supabase.py")
-        result = subprocess.run(
-            [sys.executable, str(remote_helper), "destroy"],
-            cwd=worktree_path,
-            capture_output=True,
-            text=True,
-        )
+        try:
+            result = subprocess.run(
+                [sys.executable, str(remote_helper), "destroy"],
+                cwd=worktree_path,
+                capture_output=True,
+                text=True,
+                timeout=300,
+            )
+        except subprocess.TimeoutExpired:
+            print(
+                "Remote Supabase cleanup timed out; keeping the worktree, "
+                "local slot, and remote state for inspection.",
+                file=sys.stderr,
+            )
+            return EXIT_REMOTE_KEPT
         if result.returncode != 0:
             print(
                 f"Remote Supabase cleanup failed for {worktree_path}: "
@@ -429,14 +443,14 @@ def cleanup_worktree(worktree_path: Path) -> int:
                 "The worktree and its local port lease remain intact.",
                 file=sys.stderr,
             )
-            return EXIT_DOCKER_UNKNOWN
+            return EXIT_REMOTE_KEPT
         if remote_state.exists():
             print(
                 "Remote helper reported success but left its state marker; "
                 "keeping the worktree and local slot for investigation.",
                 file=sys.stderr,
             )
-            return EXIT_DOCKER_UNKNOWN
+            return EXIT_REMOTE_KEPT
         print(result.stdout.strip(), file=sys.stderr)
 
     volumes_unknown_reason: str | None = None

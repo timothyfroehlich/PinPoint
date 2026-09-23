@@ -20,7 +20,7 @@ pnpm run dev:remote:stop    # stops only this project and its tunnel; keeps data
 ```
 
 `start` verifies the generated project ID and ports, the locked CLI, Bazzite's
-rootless Docker identity, its private slot lease, the dedicated network with
+rootless Docker identity, its private slot lease and Mac-side reservation, the dedicated network with
 loopback host publishing, and the owned SSH process. It applies Drizzle migrations on every
 successful start. It runs the complete development seed sequence only for a
 new database; a bootstrap marker prevents later starts from wiping records.
@@ -28,6 +28,13 @@ new database; a bootstrap marker prevents later starts from wiping records.
 unhealthy remote services, a missing tunnel, and a broken tunnel. A stopped or
 failed tunnel does **not** select a Mac-local daemon. Re-run `start` to repair a
 lost tunnel; it reconnects to the same remote volumes.
+The Mac slot registry reserves remote service ports even while a tunnel is
+stopped. New local worktrees skip those reservations, and a new remote lease
+skips every other Mac worktree's slot. If an older pilot lease predates this
+rule and collides with another Mac worktree, `pnpm run dev:remote:relocate`
+explicitly stops only that pilot, moves its port lease, and restarts against
+the same named database volume. Confirm its records afterward; do not use the
+relocation command as a routine start path.
 
 The helper's private state, runtime config, and tunnel log stay under
 `.agent/tmp/remote-supabase-docker-pilot/` in the worktree. The `pilot` path
@@ -47,6 +54,10 @@ start`, then use `pnpm run dev:local`. Set
 a deliberate local E2E run. Stop that local stack before returning to remote
 mode because both use the same Mac localhost ports. Never stop another
 session's stack merely to free ports; coordinate with its owner.
+Local mode and local-only reset/seed commands prove that the running Docker
+database belongs to this exact worktree and owns the requested localhost port.
+`dev:local` also checks the API container. An active remote pilot tunnel is
+rejected even if its localhost health endpoint responds.
 
 Existing Mac-local volumes are neither copied nor deleted when a remote stack
 starts. Each worktree's first remote start creates a fresh database and seeds
@@ -59,6 +70,8 @@ bootstrap allowance for a new database. `preflight` and local E2E global setup
 refuse remote mode because they reset data; use Crabbox for heavy verdicts.
 Setting `CI=true` in a Mac shell does not bypass those destructive-data guards;
 select `PINPOINT_SUPABASE_BACKEND=local` and a real local stack deliberately.
+The helper's fresh-bootstrap marker reaches only `db:fast-reset` and its
+allowlisted seed children; ordinary reset commands never accept it.
 
 ## Worktree teardown and recovery
 
@@ -67,7 +80,7 @@ worktree teardown. When the worktree has remote state, it first verifies the
 Mac-local volume inventory as well as the remote project, rootless Docker store,
 network owner label, and lease, then stops only
 that project, removes its labeled volumes and dedicated network, closes its
-owned tunnel, and releases its remote slot. If Bazzite cannot be checked, the
+owned tunnel, and releases its Bazzite lease and Mac reservation. If Bazzite cannot be checked, the
 worktree and Mac slot remain in place with a non-zero result. An unavailable
 Mac Docker daemon also blocks remote teardown until it can account for older
 local volumes belonging to the same worktree. `dev:remote:stop` is non-destructive;
@@ -83,6 +96,13 @@ recovery rather than running broad Docker cleanup.
 
 The original worktree used remote slot 13; the Machine View worktree used slot 15. Both reached the Mac browser through localhost tunnels, and the original
 database retained its sentinel record after both tunnel and stack restarts.
+Those two pre-registry leases may still overlap older Mac slots; their state
+files keep new allocations from using the same slots, but their owners should
+coordinate a scoped relocation before running an already-assigned conflicting
+local stack concurrently. The adoption worktree's initial slot 17 did overlap
+another Mac lease, so it was explicitly relocated to its own slot 20. Its
+named database volume was unchanged, and the post-restart journal/row counts
+remained 82 migrations, 12 machines, and 20 issues.
 The effective Docker publish bindings were `127.0.0.1` on Bazzite. The Mac's
 tailnet connection to a loopback-published probe was refused; same-LAN access
 was not conclusively measured while Tim was travelling. Across the hotspot,

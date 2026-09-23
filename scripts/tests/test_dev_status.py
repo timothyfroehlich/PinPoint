@@ -20,6 +20,7 @@ def _run_status(
     timeout: int = 15,
     backend: str = "local",
     remote_ready: bool = True,
+    remote_ready_after: int = 1,
 ) -> subprocess.CompletedProcess[str]:
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
@@ -61,8 +62,15 @@ printf '%s\n' "$count" >"$count_file"
     _write_executable(bin_dir / "sleep", "exit 0\n")
     _write_executable(
         bin_dir / "python3",
-        "echo 'READY: remote project verified'\n"
-        + ("exit 0\n" if remote_ready else "exit 6\n"),
+        f"""
+count_file="{tmp_path}/remote-count"
+count=0
+[[ -f "$count_file" ]] && read -r count <"$count_file"
+count=$((count + 1))
+printf '%s\\n' "$count" >"$count_file"
+echo 'READY: remote project verified'
+[[ {str(remote_ready).lower()} == true && "$count" -ge {remote_ready_after} ]]
+""",
     )
 
     env_lines = [
@@ -180,3 +188,17 @@ def test_remote_status_fails_closed_when_tunnel_is_down(tmp_path: Path) -> None:
     assert result.returncode == 1
     assert "Run: pnpm run dev:remote:start" in result.stderr
     assert "PASS: dev status" not in result.stdout
+
+
+def test_remote_wait_retries_ownership_until_tunnel_is_ready(tmp_path: Path) -> None:
+    result = _run_status(
+        tmp_path,
+        "--wait",
+        "--timeout=15",
+        backend="remote",
+        remote_ready_after=3,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert int((tmp_path / "remote-count").read_text()) >= 3
+    assert "PASS: all configured dev services ready" in result.stdout

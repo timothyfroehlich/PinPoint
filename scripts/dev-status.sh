@@ -38,7 +38,7 @@ if [[ "$backend" != remote && "$backend" != local ]]; then
   echo "PINPOINT_SUPABASE_BACKEND must be remote or local" >&2
   exit 2
 fi
-if [[ "$backend" == remote ]]; then
+if [[ "$backend" == remote && "$WAIT_MODE" == false ]]; then
   if ! python3 scripts/remote-supabase.py status; then
     echo "Remote Supabase is not ready. Run: pnpm run dev:remote:start" >&2
     exit 1
@@ -176,6 +176,20 @@ last_summary=0
 
 while true; do
   elapsed=$((SECONDS - start_time))
+
+  if [[ "$backend" == remote ]]; then
+    # A healthy API port alone cannot establish which stack owns it. A stack
+    # still starting may become ready within this command's wait budget.
+    if ! python3 scripts/remote-supabase.py status >/dev/null 2>&1; then
+      if [ "$elapsed" -ge "$TIMEOUT" ]; then
+        echo "Remote Supabase is not ready. Run: pnpm run dev:remote:start" >&2
+        compact_status "FAIL" "dev status timeout after ${TIMEOUT}s"
+        exit 1
+      fi
+      sleep "$POLL_INTERVAL"
+      continue
+    fi
+  fi
 
   if [ "$nextjs_up" = false ] && probe_nextjs; then
     nextjs_up=true

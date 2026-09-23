@@ -92,6 +92,12 @@ recovery and the exact ownership checks. The full Discord OAuth callback/session
 remains unproved and need not be part of routine pilot checks. Do not run bare
 `supabase start` for the default Mac path.
 
+Mac worktree slots and remote service-port leases share the registry, including
+stopped stacks. If `start` reports a legacy slot collision, coordinate with the
+worktree owner and use `pnpm run dev:remote:relocate` only for that worktree;
+it preserves the named database volume. Local opt-in and reset/seed commands
+verify Docker container ownership, not just a responsive localhost URL.
+
 Use a Mac-local stack only when Tim requests the faster interactive response:
 stop the remote stack for this worktree, start the local one explicitly with
 `supabase start`, then run `pnpm run dev:local`. Existing Mac-local volumes are

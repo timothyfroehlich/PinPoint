@@ -792,6 +792,21 @@ class TestApply:
         assert reap.CLEANUP_EXIT_MEANINGS[1] in err
         assert reap.CLEANUP_EXIT_MEANINGS[4] in err
 
+    def test_remote_kept_status_never_reports_worktree_reaped(
+        self,
+        world: World,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        world.add_worktree("remote-kept")
+        fake_cleanup(world, monkeypatch, exit_code=8)
+
+        code, out, err = run_reap(world, monkeypatch, capsys, "--apply")
+
+        assert code == 8
+        assert "REAPED:" not in out
+        assert reap.CLEANUP_EXIT_MEANINGS[8] in err
+
 
 class TestBranchFilter:
     def test_branch_filter_scopes_the_run_to_one_worktree(

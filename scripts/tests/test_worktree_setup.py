@@ -537,6 +537,45 @@ class TestManifest:
 
         assert slot1 == slot2  # Same worktree gets same slot
 
+    def test_allocate_skips_persistent_remote_reservations(
+        self, tmp_path: Path
+    ) -> None:
+        wt = tmp_path / "wt"
+        wt.mkdir()
+        self.manifest_path.write_text(
+            json.dumps(
+                {
+                    "version": 1,
+                    "slots": {},
+                    "remote_slots": {
+                        "pinpoint-pilot": {"worktree": "/old/wt", "slot": 1}
+                    },
+                }
+            )
+        )
+
+        assert allocate_slot(str(wt)) == 2
+        assert (
+            json.loads(self.manifest_path.read_text())["remote_slots"][
+                "pinpoint-pilot"
+            ]["slot"]
+            == 1
+        )
+
+    def test_allocate_skips_legacy_pilot_state(self, tmp_path: Path) -> None:
+        pilot = tmp_path / "pilot"
+        pilot.mkdir()
+        state = pilot / ".agent/tmp/remote-supabase-docker-pilot/state.json"
+        state.parent.mkdir(parents=True)
+        state.write_text(json.dumps({"remote_slot": 2}))
+        self.manifest_path.write_text(
+            json.dumps({"version": 1, "slots": {str(pilot): 1}})
+        )
+        new = tmp_path / "new"
+        new.mkdir()
+
+        assert allocate_slot(str(new)) == 3
+
 
 class TestBranchToProjectId:
     """Test branch name to project ID conversion."""

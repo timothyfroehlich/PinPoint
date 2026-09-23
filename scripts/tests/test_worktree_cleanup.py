@@ -297,6 +297,28 @@ def manifest(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     return _write
 
 
+def test_deallocate_preserves_other_remote_slot_reservations(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    path = tmp_path / "worktree-slots.json"
+    path.write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "slots": {"/target": 1, "/other": 2},
+                "remote_slots": {"pinpoint-other": {"worktree": "/other", "slot": 3}},
+            }
+        )
+    )
+    monkeypatch.setattr(cleanup, "MANIFEST_PATH", path)
+
+    cleanup.deallocate_slot("/target")
+
+    result = json.loads(path.read_text())
+    assert result["slots"] == {"/other": 2}
+    assert result["remote_slots"]["pinpoint-other"]["slot"] == 3
+
+
 def _run_main(monkeypatch: pytest.MonkeyPatch, target: Path | str) -> int:
     monkeypatch.setattr(sys, "argv", ["worktree_cleanup.py", str(target)])
     return cleanup.main()
@@ -515,7 +537,7 @@ class TestMainTeardown:
 
         exit_code = _run_main(monkeypatch, fake_worktree)
 
-        assert exit_code == cleanup.EXIT_DOCKER_UNKNOWN
+        assert exit_code == cleanup.EXIT_REMOTE_KEPT
         assert state.exists()
         assert fake_worktree.exists()
         assert stub.calls_of("remote_destroy")
@@ -576,10 +598,37 @@ class TestMainTeardown:
             RunStub(volume_ls=(1, "", "Mac Docker daemon unavailable")),
         )
 
-        assert _run_main(monkeypatch, fake_worktree) == cleanup.EXIT_DOCKER_UNKNOWN
+        assert _run_main(monkeypatch, fake_worktree) == cleanup.EXIT_REMOTE_KEPT
         assert state.exists()
         assert stub.calls_of("volume_ls")
         assert stub.calls_of("remote_destroy") == []
+        assert stub.calls_of("worktree_remove") == []
+        assert deallocated == []
+
+    def test_remote_cleanup_timeout_keeps_worktree_and_slot(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        fake_worktree: Path,
+        deallocated: list[str],
+    ) -> None:
+        state = fake_worktree / cleanup.REMOTE_STATE_RELATIVE_PATH
+        state.parent.mkdir(parents=True)
+        state.write_text("{}")
+        pin_project_id(fake_worktree, PROJECT_ID)
+        stub = install(monkeypatch, RunStub())
+        original_run = cleanup.subprocess.run
+
+        def timed_destroy(
+            args: list[str], **kwargs: object
+        ) -> subprocess.CompletedProcess[str]:
+            if _kind(args) == "remote_destroy":
+                raise subprocess.TimeoutExpired(args, 300)
+            return original_run(args, **kwargs)
+
+        monkeypatch.setattr(cleanup.subprocess, "run", timed_destroy)
+
+        assert _run_main(monkeypatch, fake_worktree) == cleanup.EXIT_REMOTE_KEPT
+        assert state.exists()
         assert stub.calls_of("worktree_remove") == []
         assert deallocated == []
 

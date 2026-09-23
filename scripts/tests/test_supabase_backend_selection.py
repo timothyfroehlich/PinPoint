@@ -14,12 +14,18 @@ def executable(path: Path, body: str) -> None:
     path.chmod(0o755)
 
 
-def run_guard(tmp_path: Path, backend: str, remote_exit: int = 0) -> tuple[int, str]:
+def run_guard(
+    tmp_path: Path, backend: str, remote_exit: int = 0, owner_exit: int = 0
+) -> tuple[int, str]:
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     calls = tmp_path / "calls"
     executable(
         bin_dir / "python3",
+        'if [[ "$*" == *assert-local-stack.py* ]]; then\n'
+        f"  printf 'owner:%s\\n' \"$*\" >> {calls}\n"
+        f"  exit {owner_exit}\n"
+        "fi\n"
         f"printf 'remote:%s\\n' \"$*\" >> {calls}\nexit {remote_exit}",
     )
     executable(bin_dir / "supabase", "exit 0")
@@ -57,8 +63,17 @@ def test_local_opt_in_only_probes_local_health(tmp_path: Path) -> None:
     code, calls = run_guard(tmp_path, "local")
 
     assert code == 0
-    assert calls.startswith("local:")
+    assert calls.startswith("owner:scripts/assert-local-stack.py --require-api\nlocal:")
     assert "remote:" not in calls
+
+
+def test_local_opt_in_rejects_unowned_endpoint_before_health_probe(
+    tmp_path: Path,
+) -> None:
+    code, calls = run_guard(tmp_path, "local", owner_exit=2)
+
+    assert code == 1
+    assert calls == "owner:scripts/assert-local-stack.py --require-api\n"
 
 
 @pytest.mark.parametrize("ci_flag", [None, "true"])
@@ -143,7 +158,57 @@ def test_bootstrap_marker_does_not_authorize_other_reset_scripts() -> None:
     assert result.returncode == 2
 
 
+def test_fresh_bootstrap_child_authorizes_only_seed_scripts() -> None:
+    env = os.environ.copy()
+    env["PINPOINT_SUPABASE_BACKEND"] = "remote"
+    env["PINPOINT_REMOTE_SUPABASE_BOOTSTRAP"] = "1"
+    env["PINPOINT_REMOTE_SUPABASE_SEED_CHILD"] = "1"
+
+    def run(script_name: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            [
+                "node",
+                "--input-type=module",
+                "-e",
+                "const { assertLocalDatabase } = await import('./scripts/assert-local-db.mjs'); "
+                "assertLocalDatabase('postgres://postgres@localhost:54322/postgres')",
+                script_name,
+            ],
+            cwd=SCRIPTS.parent,
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+    assert run("seed-collections.mjs").returncode == 0
+    assert run("reset-to-empty.mjs").returncode == 2
+
+
 def test_ci_flag_does_not_waive_remote_database_guard() -> None:
     result = run_database_guard(ci_flag="true")
 
     assert result.returncode == 2
+
+
+def test_local_selector_without_owned_container_cannot_reset() -> None:
+    env = os.environ.copy()
+    env["PINPOINT_SUPABASE_BACKEND"] = "local"
+    env.pop("PINPOINT_REMOTE_SUPABASE_BOOTSTRAP", None)
+    result = subprocess.run(
+        [
+            "node",
+            "--input-type=module",
+            "-e",
+            "import { assertLocalDatabase } from './scripts/assert-local-db.mjs'; "
+            "assertLocalDatabase('postgres://postgres@localhost:54322/postgres')",
+        ],
+        cwd=SCRIPTS.parent,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 2
+    assert "not proved to be this worktree's local Supabase" in result.stderr

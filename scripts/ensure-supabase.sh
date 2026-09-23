@@ -27,6 +27,13 @@ if ! command -v supabase &>/dev/null; then
   exit 1
 fi
 
+# A healthy localhost URL can still be an owned remote SSH forward. Confirm
+# both service ports belong to this worktree's running local Docker stack.
+if ! python3 scripts/assert-local-stack.py --require-api; then
+  echo "  Start this worktree's local stack with: supabase start" >&2
+  exit 1
+fi
+
 # Use worktree-specific URL (set in .env.local by post-checkout hook)
 SUPABASE_URL="${NEXT_PUBLIC_SUPABASE_URL:-http://localhost:54321}"
 

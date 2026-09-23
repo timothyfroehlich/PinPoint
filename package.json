@@ -13,6 +13,7 @@
     "dev:remote:start": "python3 scripts/remote-supabase.py start",
     "dev:remote:status": "python3 scripts/remote-supabase.py status",
     "dev:remote:stop": "python3 scripts/remote-supabase.py stop",
+    "dev:remote:relocate": "python3 scripts/remote-supabase.py relocate",
     "dev:status": "bash scripts/dev-status.sh",
     "dev:status:human": "bash scripts/dev-status.sh --verbose",
     "build": "bash scripts/workflow/heavy-run.sh next build",

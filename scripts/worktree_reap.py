@@ -60,8 +60,8 @@ EXIT_OK = 0
 #: reused. A caller that collapses these into "failed" throws away the only
 #: signal that says whether anything leaked (PP-r7tv), so every one of them is
 #: surfaced verbatim, which only works if this script's *own* statuses live
-#: outside the range. Hence CLEANUP_EXIT_MEANINGS below occupies 0-4 and every
-#: code this script mints for itself starts at 5.
+#: outside its set. CLEANUP_EXIT_MEANINGS includes 0-4 and 8; this script's
+#: own statuses occupy 5-7.
 #:
 #: Wordings are deliberately no more specific than `worktree_cleanup.py`'s own
 #: docstrings: 1 there is "usage error, or the git worktree removal itself
@@ -74,6 +74,7 @@ CLEANUP_EXIT_MEANINGS = {
     2: "REFUSED — target is the main worktree",
     3: "STALE TARGET — path gone but slot/git residue remains",
     4: "removed, but Supabase volume state was UNKNOWN — volumes may have leaked",
+    8: "REMOTE KEPT — remote teardown was unverifiable; worktree and slot remain",
 }
 
 #: `--apply` hit more than one distinct `worktree_cleanup.py` failure code, so

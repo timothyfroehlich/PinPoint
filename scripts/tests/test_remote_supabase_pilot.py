@@ -339,6 +339,134 @@ def test_remote_lease_script_reserves_persists_and_marks_bootstrap(
     assert str(first["lease_path"]) not in json.loads(manifest.read_text())["slots"]
 
 
+def test_remote_lease_relocates_port_without_losing_bootstrap(tmp_path: Path) -> None:
+    manifest = tmp_path / "worktree-slots.json"
+    lease_root = tmp_path / "leases"
+
+    def invoke(action: str, forbidden: str) -> dict[str, object]:
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-",
+                action,
+                "pinpoint-remote-pilot",
+                str(manifest),
+                str(lease_root),
+                forbidden,
+            ],
+            input=pilot.REMOTE_LEASE_SCRIPT,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        return json.loads(result.stdout)
+
+    original = invoke("reserve", "-")
+    marked = invoke("mark-bootstrapped", "-")
+    moved = invoke("relocate", str(original["slot"]))
+
+    assert marked["bootstrap_complete"] is True
+    assert moved["bootstrap_complete"] is True
+    assert moved["slot"] != original["slot"]
+    assert (
+        json.loads(manifest.read_text())["slots"][str(moved["lease_path"])]
+        == moved["slot"]
+    )
+
+
+def test_remote_ssh_timeout_is_bounded_and_actionable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def timed_out(*_args: object, **_kwargs: object) -> object:
+        raise subprocess.TimeoutExpired(["ssh"], 3)
+
+    monkeypatch.setattr(pilot.subprocess, "run", timed_out)
+    with pytest.raises(pilot.PilotError, match="timed out after 3s"):
+        pilot.run_remote(["true"], timeout=3)
+
+
+def test_project_commands_use_noninteractive_pnpm_without_waiving_bootstrap_guard(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    captured: list[dict[str, str]] = []
+
+    def record(*_args: object, **kwargs: object) -> object:
+        captured.append(kwargs["env"])
+        return completed()
+
+    monkeypatch.setattr(pilot.subprocess, "run", record)
+    pilot.run_project_command(tmp_path, {"CI": "false"}, "db:migrate")
+    pilot.run_project_command(tmp_path, {}, "db:fast-reset", bootstrap=True)
+
+    assert captured[0]["CI"] == "true"
+    assert "PINPOINT_REMOTE_SUPABASE_BOOTSTRAP" not in captured[0]
+    assert captured[1]["PINPOINT_REMOTE_SUPABASE_BOOTSTRAP"] == "1"
+
+
+def test_mac_reservation_forbids_other_worktree_slots(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    own = tmp_path / "own"
+    own.mkdir()
+    other = tmp_path / "other"
+    other.mkdir()
+    manifest = tmp_path / "worktree-slots.json"
+    manifest.write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "slots": {str(own): 3, str(other): 1},
+                "remote_slots": {},
+            }
+        )
+    )
+    monkeypatch.setattr(pilot, "MAC_MANIFEST", manifest)
+    monkeypatch.setattr(pilot, "port_is_available", lambda _port: True)
+    lease = pilot.RemoteLease("pinpoint-own", 2, False, "/lease")
+    actions: list[tuple[str, set[int] | None]] = []
+
+    def remote_lease(
+        action: str, _project: str, forbidden: set[int] | None = None
+    ) -> object:
+        actions.append((action, forbidden))
+        if action == "get":
+            raise subprocess.CalledProcessError(
+                1, ["ssh"], stderr="pilot lease does not exist"
+            )
+        return lease
+
+    monkeypatch.setattr(pilot, "remote_lease", remote_lease)
+
+    assert pilot.acquire_remote_lease(own, "pinpoint-own") == lease
+    assert actions == [("get", None), ("reserve", {1})]
+    assert json.loads(manifest.read_text())["remote_slots"]["pinpoint-own"] == {
+        "worktree": str(own),
+        "slot": 2,
+    }
+
+
+def test_existing_remote_lease_conflicting_with_mac_slot_fails_closed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    own = tmp_path / "own"
+    own.mkdir()
+    other = tmp_path / "other"
+    other.mkdir()
+    manifest = tmp_path / "worktree-slots.json"
+    manifest.write_text(
+        json.dumps({"version": 1, "slots": {str(own): 3, str(other): 2}})
+    )
+    monkeypatch.setattr(pilot, "MAC_MANIFEST", manifest)
+    monkeypatch.setattr(
+        pilot,
+        "remote_lease",
+        lambda *_args: pilot.RemoteLease("pinpoint-own", 2, True, "/lease"),
+    )
+
+    with pytest.raises(pilot.PilotError, match="conflicts with a Mac worktree"):
+        pilot.acquire_remote_lease(own, "pinpoint-own")
+
+
 def test_corrupt_remote_lease_cannot_be_replaced(tmp_path: Path) -> None:
     manifest = tmp_path / "worktree-slots.json"
     manifest.write_text('{"version": 1, "slots": {}}')
@@ -512,6 +640,18 @@ def test_status_distinguishes_unreachable_host(
     assert "UNREACHABLE" in capsys.readouterr().out
 
 
+def test_status_distinguishes_ssh_timeout(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    def timeout(*_args: object, **_kwargs: object) -> object:
+        raise pilot.PilotError("Bazzite SSH command timed out after 60s")
+
+    monkeypatch.setattr(pilot, "run_remote", timeout)
+
+    assert pilot.status(tmp_path) == pilot.STATUS_UNREACHABLE
+    assert "timed out" in capsys.readouterr().out
+
+
 def test_status_distinguishes_unreachable_docker(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -622,6 +762,7 @@ def test_start_migrates_every_time_and_seeds_only_before_bootstrap(
         return marked if action == "mark-bootstrapped" else lease
 
     monkeypatch.setattr(pilot, "remote_lease", lease_result)
+    monkeypatch.setattr(pilot, "acquire_remote_lease", lambda *_args: lease)
     monkeypatch.setattr(
         pilot,
         "render_runtime_config",
@@ -686,6 +827,9 @@ def test_start_never_reserves_over_a_failed_lease_lookup(
     monkeypatch.setattr(pilot, "verify_locked_cli", lambda _root: "2.117.0")
     monkeypatch.setattr(pilot, "read_state", lambda _root: None)
     monkeypatch.setattr(pilot, "remote_uid", lambda: 1000)
+    manifest = tmp_path / "worktree-slots.json"
+    manifest.write_text(json.dumps({"version": 1, "slots": {str(tmp_path): 3}}))
+    monkeypatch.setattr(pilot, "MAC_MANIFEST", manifest)
 
     def failed_lookup(action: str, *_args: object, **_kwargs: object) -> object:
         calls.append(action)
@@ -756,6 +900,7 @@ def test_destroy_removes_only_owned_remote_resources(
         "release_remote_lease",
         lambda project, slot: events.append(f"release {project} {slot}"),
     )
+    monkeypatch.setattr(pilot, "release_mac_reservation", lambda *_args: None)
 
     assert pilot.destroy(tmp_path) == 0
     assert events[0].startswith("docker network inspect")
