@@ -222,7 +222,7 @@ export function QuickSearchProvider({
               Search machines and issues, then open a result.
             </DialogDescription>
           </DialogHeader>
-          <Command shouldFilter={false} label="Search machines and issues">
+          <Command shouldFilter={false} label="Quick search">
             <CommandInput
               autoComplete="off"
               enterKeyHint="search"
@@ -230,7 +230,7 @@ export function QuickSearchProvider({
               spellCheck={false}
               value={query}
               onValueChange={setQuery}
-              aria-label="Search machines and issues"
+              aria-label="Quick search"
             />
             <CommandList className="max-h-[min(65dvh,28rem)]">
               <QuickSearchContent
@@ -448,7 +448,7 @@ export function DesktopQuickSearchTrigger(): React.JSX.Element {
     >
       <Command
         shouldFilter={false}
-        label="Search machines and issues"
+        label="Quick search"
         className="h-auto overflow-visible rounded-md border bg-background focus-within:ring-2 focus-within:ring-ring"
       >
         <CommandInput
@@ -466,7 +466,7 @@ export function DesktopQuickSearchTrigger(): React.JSX.Element {
               desktopInputRef.current?.focus();
             }
           }}
-          aria-label="Search machines and issues"
+          aria-label="Quick search"
           data-testid="quick-search-desktop-input"
           className="h-9 py-0"
         />

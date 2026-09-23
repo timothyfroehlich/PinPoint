@@ -113,7 +113,7 @@ describe("QuickSearch", () => {
     const dialog = screen.getByRole("dialog");
     await user.type(
       within(dialog).getByRole("combobox", {
-        name: "Search machines and issues",
+        name: "Quick search",
       }),
       "attack"
     );
@@ -242,7 +242,7 @@ describe("QuickSearch", () => {
     await user.click(screen.getByTestId("quick-search-mobile-trigger"));
     const dialog = screen.getByRole("dialog");
     const input = within(dialog).getByRole("combobox", {
-      name: "Search machines and issues",
+      name: "Quick search",
     });
     await user.type(input, "go");
     expect(await within(dialog).findByText("Godzilla")).toBeInTheDocument();
