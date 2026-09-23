@@ -99,8 +99,8 @@ fi
 # block-direct-merge.cjs hook. --human is a same-tool guard against accidental
 # or scripted calls, not an independent authorization check.
 if [ "$DRY_RUN" != "true" ] && [ "$HUMAN" != "true" ]; then
-  echo "REFUSE: merges are human-authorized only. Canonical command: scripts/workflow/merge-pr.sh $PR --human" >&2
-  echo "        (forgot --human? add it to merge. --dry-run previews gate status without merging.)" >&2
+  echo "REFUSE: merges require Tim's direct request in the active task and --human." >&2
+  echo "        If requested, run scripts/workflow/merge-pr.sh $PR --human; otherwise use merge-handoff.sh $PR. --dry-run previews without merging." >&2
   exit 1
 fi
 

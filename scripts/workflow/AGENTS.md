@@ -48,7 +48,7 @@ approval-gated route instead:
 bash scripts/workflow/codex-gh.sh merge-external <owner/repo> <PR-number> <merge|squash|rebase>
 ```
 
-It rejects PinPoint targets case-insensitively; PinPoint still uses `merge-pr.sh --human`.
+It rejects PinPoint targets case-insensitively; after Tim's explicit request, PinPoint uses `merge-pr.sh --human`, and otherwise uses `merge-handoff.sh`.
 
 ## Scripts
 
