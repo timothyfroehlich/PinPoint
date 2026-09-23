@@ -16,10 +16,13 @@ test("apron scan opens Quick report with AFM and source preserved", async ({
   await expect(page.getByTestId("report-source")).toHaveValue("apron");
   await expect(page.getByRole("link", { name: "Add details" })).toHaveAttribute(
     "href",
-    "/report/detailed?source=apron"
+    "/report/detailed?machine=AFM&source=apron"
   );
 
   await page.getByRole("link", { name: "Add details" }).click();
-  await expect(page).toHaveURL("/report/detailed?source=apron");
+  await expect(page).toHaveURL("/report/detailed?machine=AFM&source=apron");
+  await expect(
+    page.getByRole("combobox", { name: "Select Machine" })
+  ).toContainText("Attack from Mars");
   await expect(page.getByTestId("report-source")).toHaveValue("apron");
 });

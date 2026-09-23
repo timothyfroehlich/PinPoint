@@ -135,7 +135,7 @@ describe("QuickReportForm", () => {
     expect(document.querySelector('input[name="source"]')).toHaveValue("apron");
     expect(screen.getByRole("link", { name: "Add details" })).toHaveAttribute(
       "href",
-      "/report/detailed?source=apron"
+      "/report/detailed?machine=AFM&source=apron"
     );
   });
 

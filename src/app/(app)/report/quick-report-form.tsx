@@ -160,6 +160,13 @@ export function QuickReportForm({
     () => machinesList.find((machine) => machine.id === entry.machineId),
     [entry.machineId, machinesList]
   );
+  const detailsParams = new URLSearchParams();
+  if (selectedMachine) detailsParams.set("machine", selectedMachine.initials);
+  if (source) detailsParams.set("source", source);
+  const detailsQuery = detailsParams.toString();
+  const detailsHref = detailsQuery
+    ? `/report/detailed?${detailsQuery}`
+    : "/report/detailed";
   const currentInitials = selectedMachine?.initials ?? "";
 
   React.useEffect(() => {
@@ -392,13 +399,7 @@ export function QuickReportForm({
               </Button>
               <div className="space-y-2 border-t border-outline-variant pt-4">
                 <Button asChild variant="outline" className="h-11 w-full">
-                  <Link
-                    href={
-                      source === "apron"
-                        ? "/report/detailed?source=apron"
-                        : "/report/detailed"
-                    }
-                  >
+                  <Link href={detailsHref}>
                     <FilePenLine aria-hidden="true" />
                     Add details
                   </Link>
