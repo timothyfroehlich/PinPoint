@@ -84,6 +84,21 @@ describe("Public Issue Form Validation", () => {
     }
   });
 
+  it("retains the apron scan source and leaves ordinary reports untagged", () => {
+    const formData = new FormData();
+    formData.set("machineId", "00000000-0000-0000-0000-000000000000");
+    formData.set("title", "Valid Title");
+    formData.set("severity", "minor");
+    formData.set("frequency", "intermittent");
+
+    const ordinary = parsePublicIssueForm(formData);
+    expect(ordinary.success && ordinary.data.reportSource).toBeUndefined();
+
+    formData.set("source", "apron");
+    const fromApron = parsePublicIssueForm(formData);
+    expect(fromApron.success && fromApron.data.reportSource).toBe("apron");
+  });
+
   // assignedTo field tests
   it("should pass validation with valid assignedTo UUID", () => {
     const validUuid = "00000000-0000-0000-0000-000000000000";
