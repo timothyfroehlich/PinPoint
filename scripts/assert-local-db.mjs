@@ -25,6 +25,7 @@ const BOOTSTRAP_SEEDS = new Set([
  */
 export function assertLocalDatabase(databaseUrl, allowRemoteBootstrap = false) {
   const remoteBootstrap =
+    process.env.PINPOINT_SUPABASE_BACKEND === "remote" &&
     process.env.PINPOINT_REMOTE_SUPABASE_BOOTSTRAP === "1" &&
     (allowRemoteBootstrap ||
       (process.env.PINPOINT_REMOTE_SUPABASE_SEED_CHILD === "1" &&

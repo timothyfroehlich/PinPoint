@@ -712,6 +712,26 @@ def release_mac_reservation(root: Path, project_id: str, slot: int) -> None:
             fcntl.flock(file, fcntl.LOCK_UN)
 
 
+def check_mac_reservation(root: Path, project_id: str, slot: int) -> None:
+    """Check the local lease before any irreversible remote teardown."""
+    try:
+        with MAC_MANIFEST.open("r") as file:
+            fcntl.flock(file, fcntl.LOCK_SH)
+            try:
+                existing = (
+                    mac_manifest_data(file).get("remote_slots", {}).get(project_id)
+                )
+            finally:
+                fcntl.flock(file, fcntl.LOCK_UN)
+    except OSError as error:
+        raise PilotError(f"Mac slot registry is unavailable: {error}") from error
+    if existing is not None and existing != {
+        "worktree": str(root.resolve()),
+        "slot": slot,
+    }:
+        raise PilotError("Mac remote slot reservation owner mismatch")
+
+
 def relocate_remote_lease(root: Path, project_id: str, old_slot: int) -> RemoteLease:
     """Move only this stopped pilot's port lease, preserving its project volume."""
     with MAC_MANIFEST.open("r+") as file:
@@ -1462,6 +1482,7 @@ def destroy(root: Path) -> int:
         )
     uid = remote_uid()
     validate_state_identity(state, project_id, lease, digest, uid)
+    check_mac_reservation(root, project_id, lease.slot)
     if not is_owned_tunnel(state):
         state = start_tunnel(root, replace(state, tunnel_pid=0, tunnel_argv=()))
     env = child_environment(root, env_values, state)

@@ -862,6 +862,7 @@ def test_destroy_removes_only_owned_remote_resources(
     )
     monkeypatch.setattr(pilot, "remote_uid", lambda: 1000)
     monkeypatch.setattr(pilot, "is_owned_tunnel", lambda _state: True)
+    monkeypatch.setattr(pilot, "check_mac_reservation", lambda *_args: None)
     monkeypatch.setattr(pilot, "child_environment", lambda *_args: {})
     monkeypatch.setattr(pilot, "verify_remote_docker", lambda *_args: "Docker")
     monkeypatch.setattr(pilot, "project_volumes", lambda *_args: ("owned-db",))
@@ -930,6 +931,7 @@ def test_destroy_refuses_foreign_network_before_stopping_containers(
     )
     monkeypatch.setattr(pilot, "remote_uid", lambda: 1000)
     monkeypatch.setattr(pilot, "is_owned_tunnel", lambda _state: True)
+    monkeypatch.setattr(pilot, "check_mac_reservation", lambda *_args: None)
     monkeypatch.setattr(pilot, "child_environment", lambda *_args: {})
     monkeypatch.setattr(pilot, "verify_remote_docker", lambda *_args: "Docker")
     monkeypatch.setattr(
@@ -947,4 +949,46 @@ def test_destroy_refuses_foreign_network_before_stopping_containers(
     with pytest.raises(pilot.PilotError, match="owner label"):
         pilot.destroy(tmp_path)
     assert stopped == []
+    assert pilot.state_path(tmp_path).exists()
+
+
+def test_destroy_checks_mac_reservation_before_remote_teardown(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    expected = state(tmp_path)
+    pilot.write_state(tmp_path, expected)
+    lease = pilot.RemoteLease(expected.project_id, expected.remote_slot, True, "/lease")
+    manifest = tmp_path / "worktree-slots.json"
+    manifest.write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "slots": {str(tmp_path): 3},
+                "remote_slots": {
+                    expected.project_id: {"worktree": "/other", "slot": 12}
+                },
+            }
+        )
+    )
+    monkeypatch.setattr(pilot, "MAC_MANIFEST", manifest)
+    monkeypatch.setattr(
+        pilot,
+        "read_local_identity",
+        lambda _root: (expected.project_id, expected.local, {}, "abc"),
+    )
+    monkeypatch.setattr(pilot, "remote_lease", lambda *_args: lease)
+    monkeypatch.setattr(
+        pilot,
+        "render_runtime_config",
+        lambda *_args: (tmp_path, expected.config_digest),
+    )
+    monkeypatch.setattr(pilot, "remote_uid", lambda: 1000)
+    monkeypatch.setattr(
+        pilot,
+        "is_owned_tunnel",
+        lambda _state: pytest.fail("destroy touched tunnel before Mac lease check"),
+    )
+
+    with pytest.raises(pilot.PilotError, match="reservation owner mismatch"):
+        pilot.destroy(tmp_path)
     assert pilot.state_path(tmp_path).exists()

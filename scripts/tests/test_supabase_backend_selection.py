@@ -108,12 +108,16 @@ def test_remote_mode_cannot_run_destructive_local_restart(
 
 def run_database_guard(
     *,
+    backend: str | None = "remote",
     bootstrap_marker: bool = False,
     allow_bootstrap: bool = False,
     ci_flag: str | None = None,
 ) -> subprocess.CompletedProcess[str]:
     env = os.environ.copy()
-    env["PINPOINT_SUPABASE_BACKEND"] = "remote"
+    if backend is None:
+        env.pop("PINPOINT_SUPABASE_BACKEND", None)
+    else:
+        env["PINPOINT_SUPABASE_BACKEND"] = backend
     if bootstrap_marker:
         env["PINPOINT_REMOTE_SUPABASE_BOOTSTRAP"] = "1"
     else:
@@ -189,6 +193,18 @@ def test_ci_flag_does_not_waive_remote_database_guard() -> None:
     result = run_database_guard(ci_flag="true")
 
     assert result.returncode == 2
+
+
+@pytest.mark.parametrize("backend", ["local", None])
+def test_bootstrap_marker_does_not_waive_local_stack_ownership(
+    backend: str | None,
+) -> None:
+    result = run_database_guard(
+        backend=backend, bootstrap_marker=True, allow_bootstrap=True
+    )
+
+    assert result.returncode == 2
+    assert "not proved to be this worktree's local Supabase" in result.stderr
 
 
 def test_local_selector_without_owned_container_cannot_reset() -> None:
