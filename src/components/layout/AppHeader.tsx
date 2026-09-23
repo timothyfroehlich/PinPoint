@@ -28,6 +28,7 @@ interface AppHeaderProps {
   notifications: EnrichedNotification[];
   issuesPath: string;
   newChangelogCount: number;
+  reportHref?: string;
 }
 
 /**
@@ -45,6 +46,7 @@ export function AppHeader({
   notifications,
   issuesPath,
   newChangelogCount,
+  reportHref = "/report/detailed",
 }: AppHeaderProps): React.JSX.Element {
   const pathname = usePathname();
 
@@ -135,7 +137,7 @@ export function AppHeader({
           className="gap-2"
           data-testid="nav-report-issue"
         >
-          <Link href="/report" aria-label="Report Issue">
+          <Link href={reportHref} aria-label="Report Issue">
             <AlertCircle className="size-4 shrink-0" aria-hidden="true" />
             <span className="lg:hidden" aria-hidden="true">
               Report

@@ -35,6 +35,7 @@ interface BottomTabBarProps {
   role?: UserRole | undefined;
   /** The issues link path, read from cookie on the server */
   issuesPath?: string | undefined;
+  reportHref?: string | undefined;
 }
 
 // Items flagged hideFromBottomBar (e.g. Collections) live in the "More" sheet
@@ -54,6 +55,7 @@ const sheetItemClass =
 export function BottomTabBar({
   role,
   issuesPath,
+  reportHref = "/report",
 }: BottomTabBarProps): React.JSX.Element {
   const [moreOpen, setMoreOpen] = useState(false);
   const pathname = usePathname();
@@ -69,7 +71,12 @@ export function BottomTabBar({
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
         {bottomTabs.map((tab) => {
-          const href = tab.href === "/issues" ? resolvedIssuesPath : tab.href;
+          const href =
+            tab.href === "/issues"
+              ? resolvedIssuesPath
+              : tab.href === "/report"
+                ? reportHref
+                : tab.href;
           const active = isNavItemActive(
             tab.href,
             pathname,
@@ -145,13 +152,13 @@ export function BottomTabBar({
 
             {checkPermission("issues.report.quick", getAccessLevel(role)) && (
               <Link
-                href="/report/quick"
+                href="/report/multiple"
                 onClick={() => setMoreOpen(false)}
                 className={sheetItemClass}
-                data-testid="more-sheet-quick-report"
+                data-testid="more-sheet-multiple-issues"
               >
                 <ListPlus className="size-5 shrink-0" aria-hidden="true" />
-                <span>Quick report</span>
+                <span>Multiple issues</span>
               </Link>
             )}
 

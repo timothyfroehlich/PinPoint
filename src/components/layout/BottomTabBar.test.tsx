@@ -60,6 +60,14 @@ describe("BottomTabBar", () => {
     );
   });
 
+  it("uses the saved mobile report destination", () => {
+    render(<BottomTabBar reportHref="/report/multiple" />);
+    expect(screen.getByRole("link", { name: /report/i })).toHaveAttribute(
+      "href",
+      "/report/multiple"
+    );
+  });
+
   it("renders the More button", () => {
     render(<BottomTabBar />);
     expect(
@@ -99,6 +107,19 @@ describe("BottomTabBar", () => {
     expect(screen.getByTestId("more-sheet-help")).toBeInTheDocument();
     expect(screen.getByTestId("more-sheet-whats-new")).toBeInTheDocument();
     expect(screen.getByTestId("more-sheet-about")).toBeInTheDocument();
+  });
+
+  it("offers Multiple issues in More only with batch access", async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(<BottomTabBar role="guest" />);
+    await user.click(screen.getByRole("button", { name: /more options/i }));
+    expect(screen.queryByTestId("more-sheet-multiple-issues")).toBeNull();
+
+    rerender(<BottomTabBar role="member" />);
+    expect(screen.getByTestId("more-sheet-multiple-issues")).toHaveAttribute(
+      "href",
+      "/report/multiple"
+    );
   });
 
   it("calls openFeedbackForm and closes the sheet when Feedback is clicked", async () => {
