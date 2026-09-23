@@ -46,12 +46,6 @@
 
 - **6.1** Post a score uses the primary token. Report a problem uses the existing `warning` token (amber) with dark text — the color family the Major severity label already uses. No new token is introduced.
 
-## Known divergences
-
-| Spec | Code today | Resolution |
-| :-- | :-- | :-- |
-| §4.3 | `/report` still opens the existing report form rather than Quick report. The hub preselects the machine and passes `source=apron` to that form. | PP-ek0e.2 |
-
 ## Changelog
 
 | Date | Change |

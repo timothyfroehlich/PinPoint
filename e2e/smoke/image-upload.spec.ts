@@ -35,7 +35,7 @@ test.describe("Image Upload Reporting", () => {
     });
 
     // 2. Go to Report
-    await page.goto("/report");
+    await page.goto("/report/detailed");
     // Just pick the first machine in the list
     await selectMachine(page);
     await expect(page).toHaveURL(/machine=/);
@@ -72,7 +72,7 @@ test.describe("Image Upload Reporting", () => {
     await submitFormAndWaitForRedirect(
       page,
       page.getByRole("button", { name: "Submit Issue Report" }),
-      { awayFrom: "/report" }
+      { awayFrom: "/report/detailed" }
     );
 
     // 6. Verify Redirection to Issue Detail

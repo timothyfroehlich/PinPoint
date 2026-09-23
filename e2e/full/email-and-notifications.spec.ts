@@ -77,7 +77,7 @@ test.describe("Notifications", () => {
     const publicContext = await browser.newContext();
     const publicPage = attachHydrationWait(await publicContext.newPage());
 
-    await publicPage.goto("/report");
+    await publicPage.goto("/report/detailed");
     await selectMachine(publicPage, machine.id);
 
     // Verify selection stuck (mobile chrome stability)
@@ -156,7 +156,7 @@ test.describe("Notifications", () => {
     await expect(page.getByRole("button", { name: "Saved!" })).toBeVisible();
 
     // Report issue as this same user; with suppression on, no notification should appear
-    await page.goto(`/report?machine=${machine.initials}`);
+    await page.goto(`/report/detailed?machine=${machine.initials}`);
     const issueTitle = getTestIssueTitle("Own Action Suppressed");
     await fillReportForm(page, {
       title: issueTitle,
@@ -205,7 +205,7 @@ test.describe("Notifications", () => {
       password: "TestPassword123",
     });
 
-    await page.goto(`/report?machine=${machine.initials}`);
+    await page.goto(`/report/detailed?machine=${machine.initials}`);
     await expect(
       page.getByRole("heading", { name: "Report an Issue" })
     ).toBeVisible();
@@ -299,7 +299,7 @@ test.describe("Notifications", () => {
     // 2. Action: Anonymous user reports issue on ANY machine
     const publicContext = await browser.newContext();
     const publicPage = attachHydrationWait(await publicContext.newPage());
-    await publicPage.goto("/report");
+    await publicPage.goto("/report/detailed");
 
     // Use a seeded machine for convenience, or create one.
     // Since we are watching globally, any machine works.
@@ -364,7 +364,7 @@ test.describe("Notifications", () => {
     // We need a separate context to avoid "actor == recipient" filter
     const publicContext = await browser.newContext();
     const publicPage = attachHydrationWait(await publicContext.newPage());
-    await publicPage.goto("/report");
+    await publicPage.goto("/report/detailed");
     // Select machine and verify state (Mobile Chrome hardening)
     await selectMachine(publicPage, machine.id);
     await expect(machineSelectValue(publicPage)).toHaveValue(machine.id);
@@ -427,7 +427,7 @@ test.describe("Notifications", () => {
       password: "TestPassword123",
     });
 
-    await memberPage.goto("/report");
+    await memberPage.goto("/report/detailed");
     await selectMachine(memberPage, machine.id);
 
     const issueTitle = getTestIssueTitle("Email Test Issue");
@@ -523,7 +523,7 @@ test.describe.serial("Email Notifications", () => {
     });
 
     // Create an issue for the unique machine
-    await page.goto(`/report?machine=${testMachineInitials}`);
+    await page.goto(`/report/detailed?machine=${testMachineInitials}`);
     await fillReportForm(page, {
       title: issueTitle,
       description: "Testing email notifications",
@@ -533,7 +533,7 @@ test.describe.serial("Email Notifications", () => {
     await submitFormAndWaitForRedirect(
       page,
       page.getByRole("button", { name: "Submit Issue Report" }),
-      { awayFrom: "/report" }
+      { awayFrom: "/report/detailed" }
     );
 
     // Verify we're on the issue page (or success page + navigation)
@@ -590,14 +590,14 @@ test.describe.serial("Email Notifications", () => {
     });
 
     // Create issue for the unique machine
-    await page.goto(`/report?machine=${testMachineInitials}`);
+    await page.goto(`/report/detailed?machine=${testMachineInitials}`);
     await fillReportForm(page, { title: issueTitle });
 
     // Submit form and wait for Server Action redirect (Safari-defensive)
     await submitFormAndWaitForRedirect(
       page,
       page.getByRole("button", { name: "Submit Issue Report" }),
-      { awayFrom: "/report" }
+      { awayFrom: "/report/detailed" }
     );
 
     // Accept either direct issue page OR success page

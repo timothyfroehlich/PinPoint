@@ -31,8 +31,8 @@ interface NotificationEventBase {
   additionalRecipientIds?: readonly string[] | undefined;
   /** Restrict an event candidate to specific channels. Defaults to all channels. */
   channelKeys?: readonly NotificationChannelKey[] | undefined;
-  /** Stable occurrence identifier used by external-channel idempotency. */
-  eventId?: string | undefined;
+  /** Persisted occurrence identifier used by external-channel idempotency. */
+  eventId: string;
 }
 
 interface IssueEventBase extends NotificationEventBase {

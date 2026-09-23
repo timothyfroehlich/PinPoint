@@ -26,7 +26,7 @@ test.describe("Status Overhaul E2E", () => {
     const machine = seededMachines.addamsFamily;
 
     // 1. Create Issue
-    await page.goto(`/report?machine=${machine.initials}`);
+    await page.goto(`/report/detailed?machine=${machine.initials}`);
 
     // Verify the page rendered with authenticated state before filling the form.
     // The priority select is only visible for members/admins, so its presence
