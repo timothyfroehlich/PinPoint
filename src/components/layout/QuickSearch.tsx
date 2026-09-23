@@ -112,11 +112,13 @@ export function QuickSearchProvider({
     const handleKeyDown = (event: KeyboardEvent): void => {
       if (event.key.toLowerCase() === "k" && (event.metaKey || event.ctrlKey)) {
         event.preventDefault();
-        if (
-          typeof window.matchMedia !== "function" ||
-          window.matchMedia("(min-width: 768px)").matches
-        ) {
-          desktopInputRef.current?.focus();
+        const desktopInput = desktopInputRef.current;
+        const desktopInputVisible =
+          desktopInput !== null && desktopInput.getClientRects().length > 0;
+        if (desktopInputVisible) {
+          desktopInput.focus();
+        }
+        if (desktopInputVisible && document.activeElement === desktopInput) {
           setDesktopOpen(true);
         } else {
           openQuickSearch();

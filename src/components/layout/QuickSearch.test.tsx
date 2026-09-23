@@ -51,6 +51,12 @@ describe("QuickSearch", () => {
     const user = userEvent.setup();
     renderQuickSearch();
     const input = screen.getByTestId("quick-search-desktop-input");
+    vi.spyOn(input, "getClientRects").mockReturnValue({
+      0: new DOMRect(),
+      length: 1,
+      item: () => new DOMRect(),
+      [Symbol.iterator]: () => [new DOMRect()].values(),
+    });
     const suggestions = document.getElementById(
       input.getAttribute("aria-controls") ?? ""
     );
@@ -88,6 +94,23 @@ describe("QuickSearch", () => {
     expect(suggestions).not.toHaveAttribute("hidden");
     await user.tab();
     expect(suggestions).toHaveAttribute("hidden");
+  });
+
+  it("opens the mobile search when CSS hides the desktop field", () => {
+    renderQuickSearch();
+    const input = screen.getByTestId("quick-search-desktop-input");
+    vi.spyOn(input, "getClientRects").mockReturnValue({
+      length: 0,
+      item: () => null,
+      [Symbol.iterator]: () => [].values(),
+    });
+
+    fireEvent.keyDown(document, { key: "k", ctrlKey: true });
+
+    expect(
+      screen.getByRole("dialog", { name: "Quick search" })
+    ).toBeInTheDocument();
+    expect(input).not.toHaveFocus();
   });
 
   it("shows grouped results and navigates with the keyboard", async () => {
