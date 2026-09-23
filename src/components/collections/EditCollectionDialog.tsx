@@ -60,6 +60,7 @@ export function EditCollectionDialog({
   const [selected, setSelected] = useState<string[]>(currentIds);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [savePending, startSave] = useTransition();
   const [deletePending, startDelete] = useTransition();
 
@@ -137,7 +138,10 @@ export function EditCollectionDialog({
         <div className="@container flex flex-row items-center justify-between gap-2">
           {canDelete && (
             <AlertDialog
+              open={deleteOpen}
               onOpenChange={(deleteOpen) => {
+                if (!deleteOpen && deletePending) return;
+                setDeleteOpen(deleteOpen);
                 if (deleteOpen) setDeleteError(null);
               }}
             >
@@ -152,7 +156,11 @@ export function EditCollectionDialog({
                   <span className="hidden @sm:inline">Delete collection</span>
                 </Button>
               </AlertDialogTrigger>
-              <AlertDialogContent>
+              <AlertDialogContent
+                onEscapeKeyDown={(event) => {
+                  if (deletePending) event.preventDefault();
+                }}
+              >
                 {deleteError && (
                   <div
                     role="alert"
@@ -170,7 +178,9 @@ export function EditCollectionDialog({
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter className="gap-2 sm:gap-0">
-                  <AlertDialogCancel>Keep collection</AlertDialogCancel>
+                  <AlertDialogCancel disabled={deletePending}>
+                    Keep collection
+                  </AlertDialogCancel>
                   <Button
                     type="button"
                     variant="destructive"

@@ -116,6 +116,38 @@ describe("EditCollectionDialog", () => {
     expect(push).not.toHaveBeenCalled();
   });
 
+  it("keeps the confirmation open while deletion is pending so a failure stays visible", async () => {
+    let settleDelete: (result: {
+      success: false;
+      error: string;
+    }) => void = () => {
+      throw new Error("Delete request was not started");
+    };
+    deleteAction.mockReturnValue(
+      new Promise<{ success: false; error: string }>((resolve) => {
+        settleDelete = resolve;
+      })
+    );
+    renderDialog();
+
+    await userEvent.click(screen.getByTestId("collection-edit-trigger"));
+    await userEvent.click(screen.getByTestId("collection-delete-trigger"));
+    await userEvent.click(screen.getByTestId("collection-delete-confirm"));
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "Keep collection" })
+      ).toBeDisabled()
+    );
+
+    await userEvent.keyboard("{Escape}");
+    expect(screen.getByRole("alertdialog")).toBeInTheDocument();
+
+    settleDelete({ success: false, error: "Cannot delete this collection" });
+    expect(
+      await within(screen.getByRole("alertdialog")).findByRole("alert")
+    ).toHaveTextContent("Cannot delete this collection");
+  });
+
   it("does not show a stale save error in the delete confirmation", async () => {
     updateAction.mockResolvedValue({
       success: false,
