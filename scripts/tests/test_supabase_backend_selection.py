@@ -67,6 +67,7 @@ def test_remote_mode_cannot_run_destructive_local_restart(tmp_path: Path) -> Non
     env = os.environ.copy()
     env["PATH"] = f"{bin_dir}{os.pathsep}{env['PATH']}"
     env["PINPOINT_SUPABASE_BACKEND"] = "remote"
+    env.pop("CI", None)
 
     result = subprocess.run(
         ["bash", str(SCRIPTS / "restart-local-supabase.sh")],
