@@ -1,0 +1,1 @@
+ALTER TABLE "pinballmap_region_alert_state" ADD COLUMN "catalog_refresh_attempted_at" timestamp with time zone;
