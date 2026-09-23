@@ -149,7 +149,8 @@ export async function emitMachineUpdated(
   before: MachineBeforeSnapshot,
   next: MachineUpdateNext,
   actorId: string
-): Promise<void> {
+): Promise<string | null> {
+  let ownerEventId: string | null = null;
   if (next.name !== before.name) {
     await createMachineTimelineEvent(
       before.id,
@@ -169,7 +170,7 @@ export async function emitMachineUpdated(
     const people: TimelinePersonRef[] = [];
     if (before.owner) people.push(ownerPersonRef("from_owner", before.owner));
     if (next.owner) people.push(ownerPersonRef("to_owner", next.owner));
-    await createMachineTimelineEvent(
+    ownerEventId = await createMachineTimelineEvent(
       before.id,
       {
         sourceType: "lifecycle",
@@ -201,4 +202,5 @@ export async function emitMachineUpdated(
       tx
     );
   }
+  return ownerEventId;
 }

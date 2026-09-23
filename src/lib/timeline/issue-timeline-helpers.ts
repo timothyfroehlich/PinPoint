@@ -50,6 +50,7 @@ export async function emitIssueOpened(
     title: string;
     severity: IssueSeverity;
     frequency: IssueFrequency;
+    reportSource?: "apron" | undefined;
     /**
      * Reporter as a stable id reference (real or invited) when one exists —
      * resolved live at render. Omit for a freeform guest or anonymous open.
@@ -70,6 +71,7 @@ export async function emitIssueOpened(
     title: args.title,
     severity: args.severity,
     frequency: args.frequency,
+    ...(args.reportSource ? { reportSource: args.reportSource } : {}),
     ...(args.guestReporterName
       ? { guestReporterName: args.guestReporterName }
       : {}),

@@ -349,11 +349,9 @@ export const emailChannel: DeliveryChannel = {
       // resource (e.g. two separate comments → two distinct keys). Without it,
       // Resend treats both as the same email and silently drops the second.
       // (PP-pfyf)
-      const emailIdempotencyKey = ctx.eventId
-        ? `notif:${ctx.resourceType}:${ctx.resourceId}:${ctx.type}:${ctx.userId}:${ctx.eventId}`
-        : `notif:${ctx.resourceType}:${ctx.resourceId}:${ctx.type}:${ctx.userId}`;
+      const emailIdempotencyKey = `notif:${ctx.resourceType}:${ctx.resourceId}:${ctx.type}:${ctx.userId}:${ctx.eventId}`;
 
-      await sendEmail({
+      const result = await sendEmail({
         to: ctx.email,
         subject: getEmailSubject(
           ctx.type,
@@ -381,7 +379,9 @@ export const emailChannel: DeliveryChannel = {
         idempotencyKey: emailIdempotencyKey,
         ...threadingHeaders,
       });
-      return { ok: true };
+      return result.success
+        ? { ok: true }
+        : { ok: false, reason: result.reason };
     } catch (err) {
       reportError(err, {
         action: "email-channel.deliver",

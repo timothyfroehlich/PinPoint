@@ -53,7 +53,7 @@ test.describe("Issues System", () => {
       const machineInitials = seededMachines.addamsFamily.initials;
 
       // Navigate to report page for The Addams Family
-      await page.goto(`/report?machine=${machineInitials}`);
+      await page.goto(`/report/detailed?machine=${machineInitials}`);
 
       await assertNoA11yViolations(page);
 
@@ -70,7 +70,7 @@ test.describe("Issues System", () => {
         page,
         page.getByRole("button", { name: "Submit Issue Report" }),
         {
-          awayFrom: "/report",
+          awayFrom: "/report/detailed",
           expectedIssueTitle: "Test flipper not working",
         }
       );
@@ -136,9 +136,9 @@ test.describe("Issues System", () => {
       // layout redesign. Navigate to the report form directly with the
       // machine pre-filled (URL contract this spec already asserted on).
       await page.goto(
-        `/report?machine=${seededMachines.addamsFamily.initials}`
+        `/report/detailed?machine=${seededMachines.addamsFamily.initials}`
       );
-      await page.waitForURL(/\/report\?machine=TAF/);
+      await page.waitForURL(/\/report\/detailed\?machine=TAF/);
 
       // Fill out remaining fields
       await fillReportForm(page, { title: "Display flickering" });
@@ -148,7 +148,7 @@ test.describe("Issues System", () => {
         page,
         page.getByRole("button", { name: "Submit Issue Report" }),
         {
-          awayFrom: "/report",
+          awayFrom: "/report/detailed",
           expectedIssueTitle: "Display flickering",
         }
       );
@@ -176,13 +176,13 @@ test.describe("Issues System", () => {
       // Create an issue first to navigate to via UI interaction
       machineInitials = seededMachines.addamsFamily.initials;
       issueTitle = `Details ${Date.now()}`;
-      await page.goto(`/report?machine=${machineInitials}`);
+      await page.goto(`/report/detailed?machine=${machineInitials}`);
       await fillReportForm(page, { title: issueTitle, priority: "medium" });
       await submitFormAndWaitForRedirect(
         page,
         page.getByRole("button", { name: "Submit Issue Report" }),
         {
-          awayFrom: "/report",
+          awayFrom: "/report/detailed",
           expectedIssueTitle: issueTitle,
         }
       );
@@ -261,13 +261,13 @@ test.describe("Issues System", () => {
       // Create a fresh issue for this worker to avoid parallel test conflicts
       const machineInitials = seededMachines.humptyDumpty.initials;
       issueTitle = `Assignee ${Date.now()}`;
-      await page.goto(`/report?machine=${machineInitials}`);
+      await page.goto(`/report/detailed?machine=${machineInitials}`);
       await fillReportForm(page, { title: issueTitle, priority: "medium" });
       await submitFormAndWaitForRedirect(
         page,
         page.getByRole("button", { name: "Submit Issue Report" }),
         {
-          awayFrom: "/report",
+          awayFrom: "/report/detailed",
           expectedIssueTitle: issueTitle,
         }
       );

@@ -886,6 +886,38 @@ describe("Issue Service Functions (Integration)", () => {
         expect.anything()
       );
     });
+
+    it("uses a new persisted event ID when an assignee returns", async () => {
+      const db = await getTestDb();
+      await assignIssue({
+        issueId: testIssue.id,
+        assignedTo: testUser2.id,
+        actorId: testUser.id,
+      });
+      await assignIssue({
+        issueId: testIssue.id,
+        assignedTo: null,
+        actorId: testUser.id,
+      });
+      await assignIssue({
+        issueId: testIssue.id,
+        assignedTo: testUser2.id,
+        actorId: testUser.id,
+      });
+
+      const eventIds = vi
+        .mocked(planNotification)
+        .mock.calls.map(([event]) => event.eventId);
+      const timelineRows = await db
+        .select({ id: issueComments.id })
+        .from(issueComments)
+        .where(eq(issueComments.issueId, testIssue.id));
+      expect(eventIds).toHaveLength(2);
+      expect(eventIds[0]).not.toBe(eventIds[1]);
+      expect(timelineRows.map((row) => row.id)).toEqual(
+        expect.arrayContaining(eventIds)
+      );
+    });
   });
 
   // -----------------------------------------------------------------------
@@ -1252,6 +1284,33 @@ describe("Issue Service Functions (Integration)", () => {
       // Verify no notification dispatched
       const mockFn = planNotification as ReturnType<typeof vi.fn>;
       expect(mockFn).not.toHaveBeenCalled();
+    });
+
+    it("uses a new persisted event ID when status cycles back", async () => {
+      const db = await getTestDb();
+      await updateIssueStatus({
+        issueId: testIssue.id,
+        status: "in_progress",
+        userId: testUser.id,
+      });
+      await updateIssueStatus({
+        issueId: testIssue.id,
+        status: "new",
+        userId: testUser.id,
+      });
+
+      const eventIds = vi
+        .mocked(planNotification)
+        .mock.calls.map(([event]) => event.eventId);
+      const timelineRows = await db
+        .select({ id: issueComments.id })
+        .from(issueComments)
+        .where(eq(issueComments.issueId, testIssue.id));
+      expect(eventIds).toHaveLength(2);
+      expect(eventIds[0]).not.toBe(eventIds[1]);
+      expect(timelineRows.map((row) => row.id)).toEqual(
+        expect.arrayContaining(eventIds)
+      );
     });
   });
 

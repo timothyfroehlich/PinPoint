@@ -59,7 +59,7 @@ vi.mock("~/server/db", async () => {
 
 // Mock Resend at its boundary — assert dispatch without real HTTP.
 vi.mock("~/lib/email/client", () => ({
-  sendEmail: vi.fn().mockResolvedValue(undefined),
+  sendEmail: vi.fn().mockResolvedValue({ success: true }),
 }));
 
 vi.mock("~/lib/logger", () => ({
@@ -184,6 +184,7 @@ describe("Doodle Bug regression — notifications deliver strictly post-commit (
           {
             type: "new_issue",
             resourceId: issue.id,
+            eventId: issue.id,
             resourceType: "issue",
             issueTitle: issue.title,
             machineName: machine.name,

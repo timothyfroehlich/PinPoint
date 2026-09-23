@@ -14,7 +14,7 @@ import {
 } from "~/lib/permissions/index";
 import { deriveMachineStatus } from "~/lib/machines/status";
 import { resolveRequestUrl } from "~/lib/url";
-import { buildMachineReportUrl } from "~/lib/machines/report-url";
+import { buildMachineHubUrl } from "~/lib/machines/hub-url";
 import { generateQrPngDataUrl } from "~/lib/machines/qr";
 import { MachineIssuesCard } from "~/app/(app)/m/[initials]/machine-issues-card";
 import { MachineOpsBox } from "~/app/(app)/m/[initials]/machine-ops-box";
@@ -99,18 +99,17 @@ export default async function MachineMaintenanceTab({
 
   const machineStatus = deriveMachineStatus(machine.issues);
 
-  // QR sticker → the machine's report page (relocated off the Info tab).
+  // The existing service QR opens the same player hub as the apron card.
   const headersList = await headers();
-  const reportUrl = buildMachineReportUrl({
-    siteUrl: resolveRequestUrl(headersList),
-    machineInitials: machine.initials,
-    source: "qr",
-  });
+  const hubUrl = buildMachineHubUrl(
+    resolveRequestUrl(headersList),
+    machine.initials
+  );
 
   // Open is the default; the All view is loaded lazily only when requested.
   // Resolve the QR PNG concurrently with the (optional) all-issues read.
   const [qrDataUrl, issuesToShow] = await Promise.all([
-    generateQrPngDataUrl(reportUrl),
+    generateQrPngDataUrl(hubUrl),
     view === "all"
       ? getMachineAllIssues(initials)
       : Promise.resolve(machine.issues),
@@ -160,7 +159,7 @@ export default async function MachineMaintenanceTab({
           machineName={machine.name}
           machineInitials={machine.initials}
           qrDataUrl={qrDataUrl}
-          reportUrl={reportUrl}
+          hubUrl={hubUrl}
         />
       </div>
     </div>

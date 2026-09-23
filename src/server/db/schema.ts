@@ -477,6 +477,18 @@ export const pinballmapRegionAlertState = pgTable(
     runLeaseExpiresAt: timestamp("run_lease_expires_at", {
       withTimezone: true,
     }),
+    // Start of the last on-demand catalog refresh this region's alert run
+    // attempted for an unknown machine id (success, empty, OR failure). The
+    // refresh-on-miss cooldown reads it alongside the mirror's own
+    // `refreshed_at`, which only advances when a refresh writes rows, so a
+    // failing or empty refresh still backs off instead of retrying every hourly
+    // run (PP-o355.44, CORE-PBM-001). Per region although the catalog is global:
+    // alerts run for one configured region, and the run lease guarantees this
+    // row exists, whereas creating the `pinballmap_state` singleton would change
+    // how the alert channel resolves.
+    catalogRefreshAttemptedAt: timestamp("catalog_refresh_attempted_at", {
+      withTimezone: true,
+    }),
   },
   (_t) => ({
     runLeasePairCheck: check(
@@ -554,7 +566,7 @@ export const issues = pgTable(
       .notNull()
       .default("medium"),
     frequency: text("frequency", {
-      enum: ["intermittent", "frequent", "constant"],
+      enum: ["not_specified", "intermittent", "frequent", "constant"],
     })
       .notNull()
       .default("intermittent"),

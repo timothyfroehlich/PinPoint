@@ -22,7 +22,7 @@ test.describe("quick report — authoring", () => {
       email: TEST_USERS.member.email,
       password: TEST_USERS.member.password,
     });
-    await page.goto("/report/quick");
+    await page.goto("/report/multiple");
     await expect(page.getByTestId("quick-report-grid")).toBeVisible();
   });
 

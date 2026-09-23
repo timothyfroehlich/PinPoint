@@ -87,6 +87,8 @@ export interface CreateIssueParams {
   reporterEmail?: string | null;
   assignedTo?: string | null;
   autoWatchReporter?: boolean | undefined;
+  /** Where the public report was launched, when it came from a tracked entry point. */
+  reportSource?: "apron" | undefined;
   /**
    * Client-generated UUID, stable across submission retries. When present and a
    * row already carries this key, createIssue returns the existing issue
@@ -194,6 +196,7 @@ export async function createIssue({
   reporterEmail,
   assignedTo,
   autoWatchReporter = true,
+  reportSource,
   idempotencyKey,
 }: CreateIssueParams): Promise<{
   issue: Issue;
@@ -375,6 +378,7 @@ export async function createIssue({
           ? { guestReporterName: reporterName }
           : {}),
       ...(reportedBy ? { actorId: reportedBy } : {}),
+      ...(reportSource ? { reportSource } : {}),
     });
 
     // 6. Notifications — planned inside the transaction (transactional in-app
@@ -392,6 +396,7 @@ export async function createIssue({
           type: "new_issue",
           resourceId: issue.id,
           resourceType: "issue",
+          eventId: issue.id,
           ...(reportedBy ? { actorId: reportedBy } : {}),
           ...(!reportedBy && reporterName ? { actorName: reporterName } : {}),
           issueTitle: title,
@@ -411,6 +416,7 @@ export async function createIssue({
           type: "issue_assigned",
           resourceId: issue.id,
           resourceType: "issue",
+          eventId: issue.id,
           ...(reportedBy ? { actorId: reportedBy } : {}),
           includeActor: false,
           additionalRecipientIds: [assignedTo],
@@ -430,6 +436,7 @@ export async function createIssue({
             type: "mentioned",
             resourceId: issue.id,
             resourceType: "issue",
+            eventId: issue.id,
             actorId: reportedBy ?? undefined,
             includeActor: false,
             additionalRecipientIds: mentions,
@@ -618,7 +625,7 @@ export async function updateIssueStatus({
       .where(eq(issues.id, issueId));
 
     // 2. Create Timeline Event
-    await createTimelineEvent(
+    const statusEventId = await createTimelineEvent(
       issueId,
       { type: "status_changed", from: oldStatus, to: status },
       tx,
@@ -671,6 +678,7 @@ export async function updateIssueStatus({
           type: "issue_status_changed",
           resourceId: issueId,
           resourceType: "issue",
+          eventId: statusEventId,
           actorId: userId,
           issueTitle: currentIssue.title,
           machineName: currentIssue.machine.name,
@@ -1051,7 +1059,12 @@ export async function assignIssue({
     const event: TimelineEventData = assignedTo
       ? { type: "assigned", assigneeName }
       : { type: "unassigned" };
-    await createTimelineEvent(issueId, event, tx, actorId);
+    const assignmentEventId = await createTimelineEvent(
+      issueId,
+      event,
+      tx,
+      actorId
+    );
 
     // Duplicate-write to machine timeline (atomic with assignment update,
     // PP-0x98, PP-tv9l). The assignee is stored as an `assignee` person-
@@ -1089,6 +1102,7 @@ export async function assignIssue({
             type: "issue_assigned",
             resourceId: issueId,
             resourceType: "issue",
+            eventId: assignmentEventId,
             actorId,
             includeActor: false,
             additionalRecipientIds: [assignedTo],

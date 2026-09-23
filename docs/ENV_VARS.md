@@ -219,6 +219,7 @@ the degradation is a known, documented choice — not an oversight.
 | `MAILPIT_PORT` / `MAILPIT_SMTP_PORT` (`INBUCKET_PORT` / `INBUCKET_SMTP_PORT`)   | 🟢            | Dev/CI   | `src/lib/email/client.ts`                  | per-worktree test mail ports                                                                                   |
 | `DEV_AUTOLOGIN_ENABLED` / `_EMAIL` / `_PASSWORD`                                | 🔴(dev creds) | Dev      | `src/lib/supabase/middleware.ts`           | 🚫 must be absent/`false` in prod                                                                              |
 | `DEV_ALLOWED_ORIGINS`                                                           | 🟢            | Dev      | `next.config.ts`                           | comma-sep origins for cross-machine `next dev`; ignored by `next build`/Vercel                                 |
+| `ISCORED_DEMO_AFMSCORES`                                                        | 🟢            | Dev      | `src/lib/iscored/local-demo.ts`            | Opt-in AFM screenshot scores; see below.                                                                       |
 | `PINBALLMAP_MODE`                                                               | 🟢            | All      | `src/lib/pinballmap/config.ts`             | default keys off `VERCEL_ENV`: `live` only on a production deployment                                          |
 | `MOCK_BLOB_STORAGE`                                                             | 🟢            | Dev/test | `src/lib/blob/client.ts`                   | feature flag                                                                                                   |
 | `DRIZZLE_FORCE_PRODUCTION`                                                      | 🟢            | Ops      | `drizzle.config.ts`                        | explicit opt-in guard for prod DDL — see the `*_FORCE_PRODUCTION` note below                                   |
@@ -226,6 +227,14 @@ the degradation is a known, documented choice — not an oversight.
 | `POSTGRES_URL_READONLY`                                                         | 🔴            | Ops      | `scripts/query-readonly.mjs`               | `pinpoint_readonly` role; **never** in Vercel — the app never reads it                                         |
 | `SKIP_SUPABASE_RESET`, `E2E_DOCKER_READY_ATTEMPTS`, `E2E_DOCKER_READY_DELAY_MS` | 🟢            | CI/test  | `e2e/global-setup.ts`                      | E2E harness tuning                                                                                             |
 | `SUPABASE_TELEMETRY_DISABLED`                                                   | 🟢            | Internal | `scripts/worktree_cleanup.py`              | Forced to `1` only for cleanup-owned `supabase stop`; process-local, not user-configurable or deployment-gated |
+
+`ISCORED_DEMO_AFMSCORES=1` enables synthetic AFM scores only under
+`NODE_ENV=development`. `pnpm run db:_seed-iscored-demo` links local AFM to the
+reserved demo game ID without resetting the database. The same seed runs during
+`db:reset`, so an opt-in survives a local reset. Leave `ISCORED_USER` unset for
+this fixture: scores render, while outbound score actions stay hidden because
+the reserved game ID is not a real iScored game. URL helpers also reject the
+reserved ID if `ISCORED_USER` happens to be set. Never set this flag in Vercel.
 
 > **`*_FORCE_PRODUCTION` accepts `1` or `true`, and nothing else.**
 > `DRIZZLE_FORCE_PRODUCTION`, `MARK_MIGRATION_FORCE_PRODUCTION` and

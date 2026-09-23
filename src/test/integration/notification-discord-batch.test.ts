@@ -227,11 +227,13 @@ describe("Discord product-action batching", () => {
         {
           type: "new_issue",
           resourceId: issue.id,
+          eventId: issue.id,
           resourceType: "issue",
         },
         {
           type: "issue_assigned",
           resourceId: issue.id,
+          eventId: issue.id,
           resourceType: "issue",
           includeActor: false,
           additionalRecipientIds: [recipient.id],
@@ -281,11 +283,13 @@ describe("Discord product-action batching", () => {
         {
           type: "new_issue",
           resourceId: issue.id,
+          eventId: issue.id,
           resourceType: "issue",
         },
         {
           type: "issue_assigned",
           resourceId: issue.id,
+          eventId: issue.id,
           resourceType: "issue",
           includeActor: false,
           additionalRecipientIds: [recipient.id],
@@ -352,7 +356,14 @@ describe("Discord product-action batching", () => {
     ]);
 
     const plan = await planNotifications(
-      [{ type: "new_issue", resourceId: issue.id, resourceType: "issue" }],
+      [
+        {
+          type: "new_issue",
+          resourceId: issue.id,
+          resourceType: "issue",
+          eventId: issue.id,
+        },
+      ],
       asDbOrTx(db),
       [discordChannel]
     );
@@ -404,6 +415,7 @@ describe("Discord product-action batching", () => {
 
     const shared = {
       resourceId: issue.id,
+      eventId: issue.id,
       resourceType: "issue" as const,
       actorId: actor.id,
       commentContent: "I mentioned myself",

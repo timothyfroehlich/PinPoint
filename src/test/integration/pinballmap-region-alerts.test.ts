@@ -226,6 +226,25 @@ async function markAllPending(): Promise<void> {
 /** A mirror last written long enough ago that the cooldown has expired. */
 const STALE_MIRROR = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
+/** The on-demand refresh attempt clock (PP-o355.44), or null when never set. */
+async function catalogRefreshAttemptedAt(): Promise<Date | null> {
+  const db = await getTestDb();
+  const [row] = await db
+    .select({ at: pinballmapRegionAlertState.catalogRefreshAttemptedAt })
+    .from(pinballmapRegionAlertState)
+    .where(eq(pinballmapRegionAlertState.region, "austin"));
+  return row?.at ?? null;
+}
+
+/** Age the attempt clock past the cooldown, as if six hours had gone by. */
+async function expireCatalogRefreshAttempt(): Promise<void> {
+  const db = await getTestDb();
+  await db
+    .update(pinballmapRegionAlertState)
+    .set({ catalogRefreshAttemptedAt: STALE_MIRROR })
+    .where(eq(pinballmapRegionAlertState.region, "austin"));
+}
+
 describe("PinballMap region machine-change alerts (PGlite)", () => {
   setupTestDb();
 
@@ -537,9 +556,13 @@ describe("PinballMap region machine-change alerts (PGlite)", () => {
       expect.objectContaining({ lmxId: 2, announcedAt: null })
     );
 
+    // The empty refresh still spent the cooldown (PP-o355.44); a later refresh
+    // after it expires is what names the machine.
+    await expireCatalogRefreshAttempt();
     catalog.seeds = [{ machineId: 9999, name: "Bon Jovi (Premium)" }];
     const retried = await runRegionMachineAlerts();
 
+    expect(catalog.refreshCalls).toBe(2);
     expect(retried).toMatchObject({ discovered: 0, announced: 1, pending: 0 });
     expect(discord.posts[0]?.content).toContain("Bon Jovi (Premium)");
   });
@@ -557,6 +580,7 @@ describe("PinballMap region machine-change alerts (PGlite)", () => {
     pbm.entries = [lmx({ lmxId: 1 }), lmx({ lmxId: 2, machineId: 9999 })];
     await runRegionMachineAlerts();
     expect(catalog.refreshCalls).toBe(1);
+    expect(await catalogRefreshAttemptedAt()).not.toBeNull();
 
     // Second unknown id, same run window: the mirror is now fresh, so no refresh.
     catalog.seeds = [];
@@ -584,6 +608,55 @@ describe("PinballMap region machine-change alerts (PGlite)", () => {
 
     expect(catalog.refreshCalls).toBe(1);
     expect(run).toMatchObject({ announced: 0, pending: 1 });
+    expect(discord.posts).toEqual([]);
+  });
+
+  it("backs off after a refresh that throws, then retries once the cooldown expires", async () => {
+    // PP-o355.44: a thrown refresh writes no catalog rows, so the mirror's clock
+    // cannot back it off. The attempt clock must, or a failing endpoint is hit
+    // on every hourly run.
+    await seedCatalog([{ machineId: 6412, name: "Godzilla" }], STALE_MIRROR);
+    pbm.entries = [lmx({ lmxId: 1 })];
+    await runRegionMachineAlerts();
+    catalog.refreshCalls = 0;
+
+    catalog.error = new Error("PinballMap fetchCatalog failed");
+    pbm.entries = [lmx({ lmxId: 1 }), lmx({ lmxId: 2, machineId: 9999 })];
+    await runRegionMachineAlerts();
+    expect(catalog.refreshCalls).toBe(1);
+
+    const nextHour = await runRegionMachineAlerts();
+    expect(catalog.refreshCalls).toBe(1);
+    expect(nextHour).toMatchObject({ announced: 0, pending: 1 });
+    expect(discord.posts).toEqual([]);
+
+    await expireCatalogRefreshAttempt();
+    catalog.error = null;
+    catalog.seeds = [{ machineId: 9999, name: "Bon Jovi (Premium)" }];
+    const recovered = await runRegionMachineAlerts();
+
+    expect(catalog.refreshCalls).toBe(2);
+    expect(recovered).toMatchObject({ announced: 1, pending: 0 });
+    expect(discord.posts[0]?.content).toContain("Bon Jovi (Premium)");
+  });
+
+  it("backs off after a refresh that returns an empty catalog", async () => {
+    // An empty upstream payload is a no-op for the mirror (it never wipes rows),
+    // so like a throw it leaves `refreshed_at` untouched (PP-o355.44).
+    await seedCatalog([{ machineId: 6412, name: "Godzilla" }], STALE_MIRROR);
+    pbm.entries = [lmx({ lmxId: 1 })];
+    await runRegionMachineAlerts();
+    catalog.refreshCalls = 0;
+
+    catalog.seeds = [];
+    pbm.entries = [lmx({ lmxId: 1 }), lmx({ lmxId: 2, machineId: 9999 })];
+    await runRegionMachineAlerts();
+    expect(catalog.refreshCalls).toBe(1);
+
+    const nextHour = await runRegionMachineAlerts();
+
+    expect(catalog.refreshCalls).toBe(1);
+    expect(nextHour).toMatchObject({ announced: 0, pending: 1 });
     expect(discord.posts).toEqual([]);
   });
 

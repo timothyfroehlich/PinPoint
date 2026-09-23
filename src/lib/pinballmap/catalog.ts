@@ -260,16 +260,15 @@ export async function getCatalogNames(
  * When the mirror was last written, or null when it has never been populated.
  *
  * `refreshedAt` is stamped on every row a refresh upserts, so the maximum is the
- * completion time of the last successful `refreshCatalog()`. This exists so a
- * caller can rate-limit its own on-demand refreshes without a new column or a
- * process-local timer — the region alert (PP-o355.18) uses it as the cooldown
- * behind refresh-on-miss, and serverless invocations share no memory, so the
- * clock has to live in the database to mean anything.
+ * completion time of the last successful `refreshCatalog()`. The region alert
+ * (PP-o355.18) uses it as one of the cooldown clocks behind refresh-on-miss, so
+ * a recent successful refresh from any path, the weekly cron included,
+ * suppresses an on-demand one.
  *
- * Note it advances on SUCCESS only. A refresh that threw leaves it where it was,
- * so a caller guarding on it will retry on its next tick rather than being locked
- * out by a failure — which is the behavior you want from a cooldown whose job is
- * to prevent redundant work, not to punish an outage.
+ * Note it advances on SUCCESS only: a refresh that threw or read an empty
+ * payload leaves it where it was. A caller that must also back off from failed
+ * attempts needs its own attempt clock — the region alert pairs this with
+ * `pinballmap_region_alert_state.catalog_refresh_attempted_at` (PP-o355.44).
  */
 export async function getCatalogLastRefreshedAt(): Promise<Date | null> {
   // Top-1 by descending timestamp rather than `max()` in raw SQL: the column
