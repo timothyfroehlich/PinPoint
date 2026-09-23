@@ -94,6 +94,47 @@ describe("quick search queries", () => {
     expect(excludedFieldResults.issues).toHaveLength(0);
   });
 
+  it("searches catalog and manual manufacturer and year with prefix ranking", async () => {
+    const db = await getTestDb();
+    await db.insert(pinballmapCatalog).values({
+      pinballmapMachineId: 991,
+      name: "Meteor",
+      manufacturer: "Bally",
+      year: 1995,
+    });
+    await db.insert(machines).values([
+      createTestMachine({
+        initials: "PBM",
+        name: "Z Cabinet",
+        pinballmapMachineId: 991,
+      }),
+      createTestMachine({
+        initials: "MAN",
+        name: "A Cabinet",
+        pinballmapExcluded: true,
+        modelName: "Prototype",
+        manufacturer: "The Bally Company",
+        year: 1987,
+      }),
+    ]);
+
+    expect(
+      (await searchQuickNavigation("Bally")).machines.map(
+        (machine) => machine.initials
+      )
+    ).toEqual(["PBM", "MAN"]);
+    expect(
+      (await searchQuickNavigation("1995")).machines.map(
+        (machine) => machine.initials
+      )
+    ).toEqual(["PBM"]);
+    expect(
+      (await searchQuickNavigation("1987")).machines.map(
+        (machine) => machine.initials
+      )
+    ).toEqual(["MAN"]);
+  });
+
   it("enforces the minimum query length and per-group result limit", async () => {
     const db = await getTestDb();
     await db.insert(machines).values(

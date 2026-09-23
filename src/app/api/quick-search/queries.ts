@@ -39,11 +39,19 @@ export async function searchQuickNavigation(
   const modelIdentity = sql<
     string | null
   >`coalesce(${pinballmapCatalog.name}, ${machines.modelName})`;
+  const modelManufacturer = sql<
+    string | null
+  >`coalesce(${pinballmapCatalog.manufacturer}, ${machines.manufacturer})`;
+  const modelYear = sql<
+    string | null
+  >`coalesce(${pinballmapCatalog.year}, ${machines.year})::text`;
   const machineRank = sql<number>`case
     when lower(${machines.initials}) = lower(${query}) then 0
     when ${machines.initials} ilike ${prefix} then 1
     when ${machines.name} ilike ${prefix} then 2
-    when ${modelIdentity} ilike ${prefix} then 3
+    when ${modelIdentity} ilike ${prefix}
+      or ${modelManufacturer} ilike ${prefix}
+      or ${modelYear} ilike ${prefix} then 3
     else 4
   end`;
 
@@ -79,7 +87,9 @@ export async function searchQuickNavigation(
         or(
           sql`${machines.initials} ilike ${contains}`,
           sql`${machines.name} ilike ${contains}`,
-          sql`${modelIdentity} ilike ${contains}`
+          sql`${modelIdentity} ilike ${contains}`,
+          sql`${modelManufacturer} ilike ${contains}`,
+          sql`${modelYear} ilike ${contains}`
         )
       )
       .orderBy(machineRank, asc(machines.name))
