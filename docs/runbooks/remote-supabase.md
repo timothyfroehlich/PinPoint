@@ -57,6 +57,8 @@ stores. Destructive database commands (`db:reset`, `db:fast-reset`,
 remote mode is selected. The remote helper has a one-time, narrowly scoped
 bootstrap allowance for a new database. `preflight` and local E2E global setup
 refuse remote mode because they reset data; use Crabbox for heavy verdicts.
+Setting `CI=true` in a Mac shell does not bypass those destructive-data guards;
+select `PINPOINT_SUPABASE_BACKEND=local` and a real local stack deliberately.
 
 ## Worktree teardown and recovery
 

@@ -3,7 +3,7 @@
 
 set -euo pipefail
 
-if [[ "${PINPOINT_SUPABASE_BACKEND:-local}" == remote && "${CI:-}" != 1 && "${CI:-}" != true ]]; then
+if [[ "${PINPOINT_SUPABASE_BACKEND:-local}" == remote ]]; then
   echo "FAIL: preflight resets its database and is local-only while remote Supabase is selected." >&2
   echo "Use Crabbox for heavy verdicts, or select a deliberate local stack with PINPOINT_SUPABASE_BACKEND=local." >&2
   exit 1

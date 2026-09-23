@@ -17,8 +17,6 @@ const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
 export function assertLocalDatabase(databaseUrl, allowRemoteBootstrap = false) {
   if (
     process.env.PINPOINT_SUPABASE_BACKEND === "remote" &&
-    process.env.CI !== "1" &&
-    process.env.CI !== "true" &&
     !(
       allowRemoteBootstrap &&
       process.env.PINPOINT_REMOTE_SUPABASE_BOOTSTRAP === "1"

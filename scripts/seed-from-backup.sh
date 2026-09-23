@@ -102,7 +102,7 @@ fi
 
 # Extract POSTGRES_URL line and strip key + optional surrounding quotes
 POSTGRES_URL_LINE=$(grep -m1 "^POSTGRES_URL=" "$ENV_FILE" || echo "")
-if [[ "${PINPOINT_SUPABASE_BACKEND:-local}" == remote && "${CI:-}" != 1 && "${CI:-}" != true ]]; then
+if [[ "${PINPOINT_SUPABASE_BACKEND:-local}" == remote ]]; then
     echo "❌ Seeding from a production dump is local-only while remote Supabase is selected." >&2
     exit 1
 fi

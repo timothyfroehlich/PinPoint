@@ -4,6 +4,8 @@ import os
 import subprocess
 from pathlib import Path
 
+import pytest
+
 SCRIPTS = Path(__file__).parent.parent
 
 
@@ -59,7 +61,10 @@ def test_local_opt_in_only_probes_local_health(tmp_path: Path) -> None:
     assert "remote:" not in calls
 
 
-def test_remote_mode_cannot_run_destructive_local_restart(tmp_path: Path) -> None:
+@pytest.mark.parametrize("ci_flag", [None, "true"])
+def test_remote_mode_cannot_run_destructive_local_restart(
+    tmp_path: Path, ci_flag: str | None
+) -> None:
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     calls = tmp_path / "calls"
@@ -67,7 +72,10 @@ def test_remote_mode_cannot_run_destructive_local_restart(tmp_path: Path) -> Non
     env = os.environ.copy()
     env["PATH"] = f"{bin_dir}{os.pathsep}{env['PATH']}"
     env["PINPOINT_SUPABASE_BACKEND"] = "remote"
-    env.pop("CI", None)
+    if ci_flag is None:
+        env.pop("CI", None)
+    else:
+        env["CI"] = ci_flag
 
     result = subprocess.run(
         ["bash", str(SCRIPTS / "restart-local-supabase.sh")],
@@ -84,7 +92,10 @@ def test_remote_mode_cannot_run_destructive_local_restart(tmp_path: Path) -> Non
 
 
 def run_database_guard(
-    *, bootstrap_marker: bool = False, allow_bootstrap: bool = False
+    *,
+    bootstrap_marker: bool = False,
+    allow_bootstrap: bool = False,
+    ci_flag: str | None = None,
 ) -> subprocess.CompletedProcess[str]:
     env = os.environ.copy()
     env["PINPOINT_SUPABASE_BACKEND"] = "remote"
@@ -92,7 +103,10 @@ def run_database_guard(
         env["PINPOINT_REMOTE_SUPABASE_BOOTSTRAP"] = "1"
     else:
         env.pop("PINPOINT_REMOTE_SUPABASE_BOOTSTRAP", None)
-    env.pop("CI", None)
+    if ci_flag is None:
+        env.pop("CI", None)
+    else:
+        env["CI"] = ci_flag
     option = ", true" if allow_bootstrap else ""
     return subprocess.run(
         [
@@ -125,5 +139,11 @@ def test_remote_fresh_bootstrap_can_use_destructive_seed() -> None:
 
 def test_bootstrap_marker_does_not_authorize_other_reset_scripts() -> None:
     result = run_database_guard(bootstrap_marker=True)
+
+    assert result.returncode == 2
+
+
+def test_ci_flag_does_not_waive_remote_database_guard() -> None:
+    result = run_database_guard(ci_flag="true")
 
     assert result.returncode == 2

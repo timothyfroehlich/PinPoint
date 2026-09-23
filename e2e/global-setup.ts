@@ -305,11 +305,7 @@ export default async function globalSetup(config: FullConfig): Promise<void> {
   // This setup truncates and reseeds data. A remote development database is
   // persistent across Mac sessions, so E2E must use Crabbox/CI or a deliberate
   // local-stack opt-in instead of resetting it over the tunnel.
-  if (
-    process.env["PINPOINT_SUPABASE_BACKEND"] === "remote" &&
-    process.env["CI"] !== "1" &&
-    process.env["CI"] !== "true"
-  ) {
+  if (process.env["PINPOINT_SUPABASE_BACKEND"] === "remote") {
     throw new Error(
       "E2E refuses to reset a Bazzite-backed development database. " +
         "Use crabbox-slot for the suite, or select a local stack with PINPOINT_SUPABASE_BACKEND=local."

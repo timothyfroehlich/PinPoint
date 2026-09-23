@@ -140,6 +140,8 @@ describe("e2e/global-setup", () => {
 
   it("refuses remote development data before any reset or browser preflight", async () => {
     process.env.PINPOINT_SUPABASE_BACKEND = "remote";
+    // A local command may set CI=true for pnpm; that must not waive the DB guard.
+    process.env.CI = "true";
     const setup = await loadSetup();
 
     await expect(setup(EMPTY_CONFIG)).rejects.toThrow(
