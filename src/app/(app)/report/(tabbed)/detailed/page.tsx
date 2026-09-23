@@ -25,6 +25,7 @@ export default async function DetailedReportPage({
     error?: string | string[];
     machine?: string | string[];
     machineId?: string | string[];
+    source?: string | string[];
   }>;
 }): Promise<React.JSX.Element> {
   const machinesListPromise = getReportMachines();
@@ -69,6 +70,7 @@ export default async function DetailedReportPage({
       initialError={typeof params.error === "string" ? params.error : undefined}
       initialIssues={initialIssues}
       initialMachineInitials={selectedMachine?.initials ?? ""}
+      source={params.source === "apron" ? "apron" : undefined}
       canMultiple={
         Boolean(user) && checkPermission("issues.report.quick", accessLevel)
       }

@@ -58,6 +58,7 @@ export function parsePublicIssueForm(
     status: toOptionalString(formData.get("status")),
     assignedTo: toOptionalString(formData.get("assignedTo")),
     watchIssue: toBooleanFromForm(formData.get("watchIssue")),
+    reportSource: toOptionalString(formData.get("source")),
     idempotencyKey: toOptionalString(formData.get("idempotencyKey")),
   };
 
