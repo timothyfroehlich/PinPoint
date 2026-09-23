@@ -1,13 +1,7 @@
-import { asc, eq, inArray, notInArray } from "drizzle-orm";
+import { asc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { db, type DbTransaction } from "~/server/db";
-import {
-  collections,
-  collectionMachines,
-  issues,
-  machines,
-} from "~/server/db/schema";
-import { CLOSED_STATUSES } from "~/lib/issues/status";
+import { collections, collectionMachines, machines } from "~/server/db/schema";
 import type { ProseMirrorDoc } from "~/lib/tiptap/types";
 import type { CollectionMachine } from "./owner";
 
@@ -43,11 +37,9 @@ const baseColumns = {
 } as const;
 
 /**
- * Hydrate a resolved collection row with its machines (open-issues-only, same
- * `CollectionMachine[]` shape as getOwnerCollection so the /c/ tabs, summary,
- * and timeline reuse it unchanged). Shared by both resolvers — the machine
- * query is large and load-bearing, so it lives here once (Rule-of-Three
- * caveat: DRY the second instance when the duplicated thing is substantial).
+ * Hydrate a resolved collection row with only the machine identities required
+ * to scope tabs and edit controls. Overview enrichments are loaded by Machine
+ * View only when the active view requires them.
  */
 async function hydrateCollection(
   tx: DbTransaction,
@@ -69,12 +61,6 @@ async function hydrateCollection(
             initials: true,
             name: true,
             presenceStatus: true,
-          },
-          with: {
-            issues: {
-              where: notInArray(issues.status, [...CLOSED_STATUSES]),
-              columns: { status: true, severity: true, createdAt: true },
-            },
           },
           orderBy: [asc(machines.name)],
         });
