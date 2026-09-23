@@ -65,6 +65,25 @@ describe("QuickReportGrid", () => {
     expect(within(row).getByText(/description/i)).toBeInTheDocument();
   });
 
+  it("keeps the staged Watch checkbox value when a row collapses and expands", async () => {
+    renderGrid();
+    const row = screen.getByTestId("quick-row");
+    await userEvent.click(within(row).getByRole("button", { name: /more/i }));
+
+    const watch = within(row).getByRole("checkbox", { name: "Watch" });
+    expect(watch).toBeChecked();
+    await userEvent.click(within(row).getByText("Watch"));
+    expect(watch).not.toBeChecked();
+
+    await userEvent.click(
+      within(row).getAllByRole("button", { name: /less/i })[0]
+    );
+    await userEvent.click(within(row).getByRole("button", { name: /more/i }));
+    expect(
+      within(row).getByRole("checkbox", { name: "Watch" })
+    ).not.toBeChecked();
+  });
+
   it("quick-submits a row and shows the confirmation receipt", async () => {
     submitRow.mockResolvedValue({
       index: 0,
