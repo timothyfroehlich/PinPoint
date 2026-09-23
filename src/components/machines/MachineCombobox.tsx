@@ -147,6 +147,9 @@ interface MachineComboboxProps {
   emptyText?: string;
   disabled?: boolean;
   ariaLabel?: string;
+  ariaInvalid?: boolean;
+  ariaRequired?: boolean;
+  ariaDescribedBy?: string | undefined;
   triggerTestId?: string;
   valueInputTestId?: string;
   triggerClassName?: string;
@@ -172,6 +175,9 @@ export function MachineCombobox({
   emptyText = "No machines found.",
   disabled = false,
   ariaLabel,
+  ariaInvalid = false,
+  ariaRequired = false,
+  ariaDescribedBy,
   triggerTestId = "machine-select",
   valueInputTestId = "machine-select-input",
   triggerClassName,
@@ -206,6 +212,9 @@ export function MachineCombobox({
             aria-expanded={open}
             aria-controls={open ? listboxId : undefined}
             {...(ariaLabel ? { "aria-label": ariaLabel } : {})}
+            aria-invalid={ariaInvalid}
+            aria-required={ariaRequired}
+            aria-describedby={ariaDescribedBy}
             disabled={disabled}
             data-testid={triggerTestId}
             className={cn(
