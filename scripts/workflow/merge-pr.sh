@@ -94,11 +94,11 @@ if [ "$AUTOMERGE" = "true" ] && [ "$DRY_RUN" = "true" ]; then
   exit 1
 fi
 
-# --human is required to actually merge (PP-wi85, reversed for this script per Tim
-# 2026-08-19). --dry-run is exempt — it takes no action. An agent MAY invoke this
-# script with --human: inside Claude Code the block-direct-merge.cjs PreToolUse hook
-# turns the invocation into an approval prompt, so Tim signs off before the merge
-# runs. --human stays as a same-tool guard against scripted/non-interactive calls.
+# --human is required to actually merge (PP-wi85). --dry-run is exempt.
+# An agent may invoke this script after Tim directly requests the unambiguous
+# merge in the active task. Claude Code additionally prompts through its
+# block-direct-merge.cjs hook. --human is a same-tool guard against accidental
+# or scripted calls, not an independent authorization check.
 if [ "$DRY_RUN" != "true" ] && [ "$HUMAN" != "true" ]; then
   echo "REFUSE: merges are human-authorized only. Canonical command: scripts/workflow/merge-pr.sh $PR --human" >&2
   echo "        (forgot --human? add it to merge. --dry-run previews gate status without merging.)" >&2
@@ -457,11 +457,11 @@ if [ "$DRY_RUN" = "true" ]; then
 fi
 
 # --- Execute merge ---
-# Reaching this line already required passing the --human gate above. When an
-# agent invoked this script inside Claude Code, the block-direct-merge PreToolUse
-# hook already prompted Tim for approval before the script ran — see the header
-# comment. This `gh pr merge` runs as a subprocess of the script, so the hook does
-# not see it directly; --human is the guard for that layer.
+# Reaching this line already required --human and all merge gates above. Tim's
+# direct request in the active task authorizes the owning agent in any harness;
+# Claude Code additionally prompts through block-direct-merge.cjs. This
+# `gh pr merge` runs as a subprocess of the script, so the hook does not see
+# it directly; --human is the same-tool guard for that layer.
 gh pr merge "$PR" "${MERGE_ARGS[@]}"
 echo "MERGED: PR #$PR"
 
