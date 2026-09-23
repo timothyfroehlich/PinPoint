@@ -9,8 +9,8 @@
 #                                 An agent MAY invoke this script only after Tim directly
 #                                 requests the unambiguous merge in the active task. That
 #                                 request authorizes the owning agent in any harness to use
-#                                 this gate-checked path. Claude Code additionally turns the
-#                                 invocation into a PreToolUse approval prompt. --human is
+#                                 this gate-checked path. Claude Code and Codex may also
+#                                 show a PreToolUse approval prompt. --human is
 #                                 a same-tool guard against accidental/scripted invocation;
 #                                 it does not independently verify authorization.
 #   -a, --automerge               Poll the gates instead of evaluating them once, and merge
@@ -48,10 +48,9 @@
 # Defense-in-depth note (PP-wi85): Tim's direct, unambiguous merge request in
 # the active task is the authorization boundary in every harness. The --human
 # flag is a same-tool guard against accidental/scripted invocation; it does not
-# independently verify that request. Claude Code additionally uses
-# block-direct-merge.cjs to prompt for approval before running this script.
-# Other harnesses must honor the active-task request without assuming that
-# Claude's hook is present. Raw merge channels (gh pr merge, gh api PUT
+# independently verify that request. Claude Code and Codex may also use
+# block-direct-merge.cjs to prompt before running this script. Every harness
+# must honor the active-task request whether or not the hook is present. Raw merge channels (gh pr merge, gh api PUT
 # .../merge, MCP merge) remain prohibited for agents because they skip gates.
 
 set -euo pipefail
@@ -96,7 +95,7 @@ fi
 
 # --human is required to actually merge (PP-wi85). --dry-run is exempt.
 # An agent may invoke this script after Tim directly requests the unambiguous
-# merge in the active task. Claude Code additionally prompts through its
+# merge in the active task. Claude Code and Codex may also prompt through the
 # block-direct-merge.cjs hook. --human is a same-tool guard against accidental
 # or scripted calls, not an independent authorization check.
 if [ "$DRY_RUN" != "true" ] && [ "$HUMAN" != "true" ]; then
@@ -459,7 +458,7 @@ fi
 # --- Execute merge ---
 # Reaching this line already required --human and all merge gates above. Tim's
 # direct request in the active task authorizes the owning agent in any harness;
-# Claude Code additionally prompts through block-direct-merge.cjs. This
+# Claude Code and Codex may also prompt through block-direct-merge.cjs. This
 # `gh pr merge` runs as a subprocess of the script, so the hook does not see
 # it directly; --human is the same-tool guard for that layer.
 gh pr merge "$PR" "${MERGE_ARGS[@]}"

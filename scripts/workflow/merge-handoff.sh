@@ -14,8 +14,8 @@ set -euo pipefail
 # first re-runs this report, the second merges. Both are `!`-prefixed for Tim's
 # Claude Code prompt, where `!` runs outside the agent tool-call path. When Tim
 # directly requests the unambiguous PR's merge in the active task, its owning
-# agent in any harness may run `merge-pr.sh <PR> --human`; Claude Code also adds
-# an approval prompt through block-direct-merge.cjs. Without that request, hand
+# agent in any harness may run `merge-pr.sh <PR> --human`; Claude Code and Codex
+# may also prompt through block-direct-merge.cjs. Without that request, hand
 # off only. Raw merge channels stay prohibited for agents.
 #
 # The merge command is only printed when all four merge gates actually pass. Handing over a

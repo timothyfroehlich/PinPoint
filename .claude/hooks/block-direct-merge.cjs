@@ -10,8 +10,8 @@
 // ASK (prompts Tim; exits 0 with a PreToolUse "ask" decision):
 //   3. `scripts/workflow/merge-pr.sh` — the gate-enforced merge script. An
 //      owning agent may invoke it only after Tim directly requests the
-//      unambiguous merge in the active task. This Claude Code hook adds a
-//      confirmation prompt; it does not replace that prerequisite. The "ask"
+//      unambiguous merge in the active task. This hook, loaded by Claude Code
+//      and Codex, adds a confirmation prompt; it does not replace the request. The "ask"
 //      decision prompts in every permission mode, including bypassPermissions.
 //      The script re-checks all four merge gates (CI, exact-head review,
 //      resolved threads, no conflict) at merge time.
@@ -586,7 +586,7 @@ if (require.main === module) {
 
     // merge-pr.sh: ask, don't deny. The owning agent may invoke it only after
     // Tim directly requests the unambiguous merge in the active task. This
-    // Claude Code prompt is an additional confirmation, not a substitute for
+    // hook prompt is an additional confirmation, not a substitute for
     // that request. "ask" prompts in every permission mode, including
     // bypassPermissions. The script re-checks all four merge gates.
     if (kind === "merge-script") {
@@ -613,7 +613,7 @@ if (require.main === module) {
     console.error(
       `Direct merge blocked: ${detail}. This channel skips merge-pr.sh's gate checks, so it ` +
         "stays human-only. Only after Tim directly requests the unambiguous merge in the active task, run " +
-        "`bash scripts/workflow/merge-pr.sh <PR> --human`; Claude Code will also prompt. Otherwise hand Tim " +
+        "`bash scripts/workflow/merge-pr.sh <PR> --human`; the hook may also prompt. Otherwise hand Tim " +
         "the guarded command to run himself: ! scripts/workflow/merge-pr.sh <PR> --human"
     );
     process.exit(2);
