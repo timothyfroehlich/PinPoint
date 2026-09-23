@@ -160,4 +160,13 @@ describe("discordChannel.deliver", () => {
     const result = await channel.deliver(ctx());
     expect(result).toEqual({ ok: false, reason: "permanent" });
   });
+
+  it("maps no shared server → permanent (joining a server requires member action)", async () => {
+    vi.mocked(sendDm).mockResolvedValueOnce({
+      ok: false,
+      reason: "no_shared_server",
+    });
+    const result = await channel.deliver(ctx());
+    expect(result).toEqual({ ok: false, reason: "permanent" });
+  });
 });
