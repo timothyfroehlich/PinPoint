@@ -113,4 +113,28 @@ describe("quick search queries", () => {
       QUICK_SEARCH_RESULT_LIMIT
     );
   });
+
+  it("preserves three-digit issue numbers in identifier matches", async () => {
+    const db = await getTestDb();
+    await db
+      .insert(machines)
+      .values(createTestMachine({ initials: "AFM", name: "Attack from Mars" }));
+    await db
+      .insert(issues)
+      .values([
+        createTestIssue("AFM", { issueNumber: 12, title: "Issue twelve" }),
+        createTestIssue("AFM", { issueNumber: 123, title: "Issue 123" }),
+      ]);
+
+    expect(
+      (await searchQuickNavigation("AFM-123")).issues.map(
+        (issue) => issue.issueNumber
+      )
+    ).toEqual([123]);
+    expect(
+      (await searchQuickNavigation("AFM-12")).issues.map(
+        (issue) => issue.issueNumber
+      )
+    ).toEqual([12, 123]);
+  });
 });

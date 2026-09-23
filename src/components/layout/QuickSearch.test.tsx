@@ -78,6 +78,16 @@ describe("QuickSearch", () => {
         "Try a machine name or initials, an issue title, or an issue ID."
       )
     ).not.toBeInTheDocument();
+
+    await user.keyboard("g");
+    expect(suggestions).not.toHaveAttribute("hidden");
+    await user.keyboard("{Escape}");
+    expect(suggestions).toHaveAttribute("hidden");
+
+    await user.click(input);
+    expect(suggestions).not.toHaveAttribute("hidden");
+    await user.tab();
+    expect(suggestions).toHaveAttribute("hidden");
   });
 
   it("shows grouped results and navigates with the keyboard", async () => {
@@ -131,6 +141,33 @@ describe("QuickSearch", () => {
 
     await user.keyboard("{ArrowDown}{Enter}");
     expect(routerPush).toHaveBeenCalledWith("/m/AFM/i/3");
+  });
+
+  it("opens a desktop result when clicked", async () => {
+    const user = userEvent.setup();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        jsonResponse({
+          machines: [
+            {
+              id: "machine-1",
+              initials: "AFM",
+              name: "Attack from Mars",
+              modelName: null,
+            },
+          ],
+          issues: [],
+        })
+      )
+    );
+    renderQuickSearch();
+
+    const input = screen.getByTestId("quick-search-desktop-input");
+    await user.type(input, "attack");
+    await user.click(await screen.findByText("Attack from Mars"));
+
+    expect(routerPush).toHaveBeenCalledWith("/m/AFM");
   });
 
   it("does not let an older response replace a newer query", async () => {

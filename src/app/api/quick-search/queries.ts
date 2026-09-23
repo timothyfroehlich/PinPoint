@@ -47,7 +47,7 @@ export async function searchQuickNavigation(
     else 4
   end`;
 
-  const issueIdentifier = sql<string>`upper(${issues.machineInitials}) || '-' || lpad(${issues.issueNumber}::text, 2, '0')`;
+  const issueIdentifier = sql<string>`upper(${issues.machineInitials}) || '-' || lpad(${issues.issueNumber}::text, greatest(2, length(${issues.issueNumber}::text)), '0')`;
   const issueRank = sql<number>`case
     when lower(${issueIdentifier}) = lower(${query}) then 0
     when ${issueIdentifier} ilike ${prefix} then 1

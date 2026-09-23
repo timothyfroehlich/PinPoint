@@ -446,6 +446,14 @@ export function DesktopQuickSearchTrigger(): React.JSX.Element {
   return (
     <div
       ref={containerRef}
+      onBlur={(event) => {
+        if (
+          !(event.relatedTarget instanceof Node) ||
+          !event.currentTarget.contains(event.relatedTarget)
+        ) {
+          closeDesktopSearch();
+        }
+      }}
       className="absolute left-1/2 hidden -translate-x-1/2 md:block md:w-[clamp(8rem,calc(50vw-16rem),20rem)]"
       data-testid="quick-search-desktop"
     >
@@ -460,8 +468,12 @@ export function DesktopQuickSearchTrigger(): React.JSX.Element {
           placeholder="Search…"
           spellCheck={false}
           value={query}
-          onValueChange={setQuery}
+          onValueChange={(value) => {
+            setQuery(value);
+            setDesktopOpen(true);
+          }}
           onFocus={() => setDesktopOpen(true)}
+          onClick={() => setDesktopOpen(true)}
           onKeyDown={(event) => {
             if (event.key === "Escape") {
               event.preventDefault();
