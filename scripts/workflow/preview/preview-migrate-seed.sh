@@ -80,7 +80,7 @@ echo "::endgroup::"
 echo "::group::Seed users and data"
 NEXT_PUBLIC_SUPABASE_URL="$SUPABASE_URL" \
 SUPABASE_SERVICE_ROLE_KEY="$SUPABASE_SERVICE_ROLE_KEY" \
-  node supabase/seed-users.mjs
+  node supabase/seed-users.mjs --preview
 echo "::endgroup::"
 
 # PR-specific demo seeds go below this line (run only if their script exists, so
