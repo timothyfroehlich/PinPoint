@@ -71,7 +71,7 @@ GATES_SCRIPT = Path(__file__).resolve().parent / "_pr-gates.sh"
 REVIEW_LABELS = ("approved", "changes requested", "stale review", "not reviewed")
 REVIEW_HINT = (
     "after current-head CI succeeds, mark the draft ready for CodeRabbit or request "
-    "@coderabbitai review on a later head; only a trusted current-head rate-limit "
+    "request-coderabbit-review.sh #{pr} on a later head; only a trusted current-head rate-limit "
     "reply permits request-codex-review.sh #{pr} <reply-ID>; a new head requires "
     "replacement CI and review"
 )

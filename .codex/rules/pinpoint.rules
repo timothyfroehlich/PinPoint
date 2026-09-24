@@ -79,6 +79,7 @@ prefix_rule(pattern=["git", "stash", "drop"], decision="prompt", justification="
 prefix_rule(pattern=["git", "stash", "clear"], decision="prompt", justification="Clearing stashes deletes all preserved changes")
 
 # Fixed-subcommand GitHub reads used throughout the PR lifecycle.
+prefix_rule(pattern=["bash", "scripts/workflow/request-coderabbit-review.sh"], decision="allow", justification="Request one SHA-tagged CodeRabbit review for the current PR head")
 prefix_rule(
     pattern=["bash", "scripts/workflow/codex-gh.sh"],
     decision="allow",

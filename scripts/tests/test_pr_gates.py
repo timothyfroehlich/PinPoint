@@ -667,7 +667,7 @@ def test_stale_codex_approval_reports_both_commits_and_the_request_remedy() -> N
         f"Codex: newest evidence names {OTHER_SHA[:7]}, head is {HEAD_SHA[:7]}"
         in result.stdout
     )
-    assert "@coderabbitai review for a later head" in result.stdout
+    assert "request-coderabbit-review.sh 123 for a later head" in result.stdout
     assert "request-codex-review.sh 123 <reply-ID>" in result.stdout
     assert summary["label"] == "stale review"
 

@@ -11,15 +11,19 @@ import pytest
 pytestmark = pytest.mark.integration
 
 SCRIPT = Path(__file__).parent.parent / "workflow" / "request-codex-review.sh"
+CODERABBIT_SCRIPT = (
+    Path(__file__).parent.parent / "workflow" / "request-coderabbit-review.sh"
+)
 HEAD = "a" * 40
 OTHER_HEAD = "b" * 40
-HEAD_COMMITTED_AT = "2026-09-05T12:00:00Z"
 
 
-def coderabbit_request(created_at: str = "2026-09-05T12:01:00Z") -> dict:
+def coderabbit_request(
+    created_at: str = "2026-09-05T12:01:00Z", sha: str = HEAD
+) -> dict:
     return {
         "user": {"login": "acme"},
-        "body": "@coderabbitai review",
+        "body": f"@coderabbitai review\n<!-- pinpoint-coderabbit-review-head: {sha} -->",
         "created_at": created_at,
     }
 
@@ -56,8 +60,8 @@ def run_request(
     comments: list[dict] | None = None,
     rate_limit_comment: dict | None = None,
     rate_limit_comment_id: str | None = "456",
-    head_committed_at: str = HEAD_COMMITTED_AT,
     latest_head: str = HEAD,
+    script: Path = SCRIPT,
 ) -> tuple[subprocess.CompletedProcess[str], list[str]]:
     posts = tmp_path / "posts.jsonl"
     gh = tmp_path / "gh"
@@ -76,8 +80,6 @@ def run_request(
         "elif args[:2] == ['api', 'graphql']:\n"
         "    print(json.dumps({'data': {'repository': {'pullRequest': {'reviewThreads': "
         "{'pageInfo': {'hasNextPage': False, 'endCursor': None}, 'nodes': []}}}}}))\n"
-        "elif any('/commits/' in arg for arg in args):\n"
-        "    print(os.environ['STUB_HEAD_COMMITTED_AT'])\n"
         "elif any('/issues/comments/' in arg for arg in args):\n"
         "    print(os.environ['STUB_RATE_LIMIT_COMMENT'])\n"
         "elif any('/pulls/' in arg and '/reviews' in arg for arg in args):\n"
@@ -114,7 +116,6 @@ def run_request(
         "STUB_ACTOR": actor,
         "STUB_METADATA": json.dumps(metadata),
         "STUB_LATEST_HEAD": latest_head,
-        "STUB_HEAD_COMMITTED_AT": head_committed_at,
         "STUB_RATE_LIMIT_COMMENT": json.dumps(
             rate_limit_comment
             if rate_limit_comment is not None
@@ -129,7 +130,7 @@ def run_request(
     result = subprocess.run(
         [
             "bash",
-            str(SCRIPT),
+            str(script),
             "123",
             *([rate_limit_comment_id] if rate_limit_comment_id else []),
         ],
@@ -173,14 +174,54 @@ def test_requests_sha_bound_review_after_green_ci(tmp_path: Path) -> None:
     assert f"head {HEAD[:7]}" in result.stdout
 
 
+def test_accepts_coderabbit_ack_edited_after_request(tmp_path: Path) -> None:
+    result, posts = run_request(
+        tmp_path,
+        rate_limit_comment=rate_limit_response(created_at="2026-09-05T11:59:00Z"),
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert len(posts) == 1
+
+
+def test_coderabbit_helper_posts_head_bound_request(tmp_path: Path) -> None:
+    result, posts = run_request(
+        tmp_path,
+        script=CODERABBIT_SCRIPT,
+        rate_limit_comment_id=None,
+        comments=[],
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert posts == [
+        f"@coderabbitai review\n<!-- pinpoint-coderabbit-review-head: {HEAD} -->"
+    ]
+
+
+def test_coderabbit_helper_refuses_same_head_duplicate(tmp_path: Path) -> None:
+    result, posts = run_request(
+        tmp_path,
+        script=CODERABBIT_SCRIPT,
+        rate_limit_comment_id=None,
+    )
+
+    assert result.returncode == 1
+    assert "already requested" in result.stderr
+    assert posts == []
+
+
 @pytest.mark.parametrize(
     ("kwargs", "message"),
     [
         ({"rate_limit_comment_id": None}, "Usage:"),
-        ({"comments": []}, "no current-head CodeRabbit request"),
+        ({"comments": []}, "no SHA-tagged CodeRabbit request"),
         (
-            {"comments": [coderabbit_request("2026-09-05T11:59:00Z")]},
-            "no current-head CodeRabbit request",
+            {"comments": [coderabbit_request(sha=OTHER_HEAD)]},
+            "no SHA-tagged CodeRabbit request",
+        ),
+        (
+            {"comments": [{**coderabbit_request(), "body": "@coderabbitai review"}]},
+            "no SHA-tagged CodeRabbit request",
         ),
         (
             {"comments": [coderabbit_request("2026-09-05T12:02:00Z")]},
@@ -210,14 +251,6 @@ def test_requests_sha_bound_review_after_green_ci(tmp_path: Path) -> None:
             {
                 "rate_limit_comment": rate_limit_response(
                     updated_at="2026-09-05T11:59:00Z"
-                )
-            },
-            "does not prove CodeRabbit usage exhaustion",
-        ),
-        (
-            {
-                "rate_limit_comment": rate_limit_response(
-                    created_at="2026-09-05T11:59:00Z"
                 )
             },
             "does not prove CodeRabbit usage exhaustion",

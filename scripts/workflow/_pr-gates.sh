@@ -612,7 +612,7 @@ check_review_happened() {
     echo "          requires replacement CI and one new request."
   else
     echo "  remedy: after current-head CI succeeds, mark the draft ready to trigger"
-    echo "          CodeRabbit, or request @coderabbitai review for a later head."
+    echo "          CodeRabbit, or run request-coderabbit-review.sh ${pr} for a later head."
     echo "          Only a trusted current-head Review rate limited reply permits"
     echo "          request-codex-review.sh ${pr} <reply-ID>. A new head requires"
     echo "          replacement CI and a new review."

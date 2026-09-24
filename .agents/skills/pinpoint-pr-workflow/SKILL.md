@@ -154,11 +154,11 @@ $$\text{CodeRabbit (Default)} \longrightarrow \text{Codex (Secondary / Fallback)
   Draft promotion automatically triggers a CodeRabbit review on the current head commit.
 - **No auto re-reviews on commit push:** Pushing subsequent commits to an open PR does **not** automatically trigger a CodeRabbit re-review. Wait for replacement CI to succeed on the new head, then explicitly request a re-review:
   ```bash
-  gh pr comment <PR> --body "@coderabbitai review"
+  bash scripts/workflow/request-coderabbit-review.sh <PR>
   ```
   CodeRabbit edits its acknowledgement comment in place — "Review triggered" can become "Review rate limited", so check current status.
 - **Hourly Quota & Rate Limiting:** We have an allowance of 5 CodeRabbit reviews per rolling hour. When rate-limited, CodeRabbit posts an issue comment containing `Review rate limited.`
-- **Quota Fallback to Codex:** Read the trusted CodeRabbit reply to the latest manual `@coderabbitai review` request on the current head. When it says `Review rate limited`, pass that reply's issue-comment ID to the Codex request helper below. If draft promotion was rate-limited, make one manual CodeRabbit request on the same head so the fallback has a head-timed reply. A pending review or a `Review finished` reply without a native approval is a CodeRabbit follow-up, not quota exhaustion. If Codex is also out of quota or unavailable, alert Tim and recommend either performing a local review attestation or waiting until the next CodeRabbit review slot becomes available.
+- **Quota Fallback to Codex:** Read the trusted CodeRabbit reply to the latest SHA-tagged manual request on the current head. When it says `Review rate limited`, pass that reply's issue-comment ID to the Codex request helper below. If draft promotion was rate-limited, use the helper to make one SHA-tagged manual CodeRabbit request on the same head, then wait for its rate-limit reply. The auto-trigger reply alone does not authorize Codex. A pending review or a `Review finished` reply without a native approval is a CodeRabbit follow-up, not quota exhaustion. If Codex is also out of quota or unavailable, alert Tim and recommend either performing a local review attestation or waiting until the next CodeRabbit review slot becomes available.
 
 #### 2. Codex: Secondary Reviewer & Rate-Limit Fallback
 
