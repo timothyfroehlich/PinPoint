@@ -81,6 +81,7 @@ export default async function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        <link rel="preconnect" href="https://img.opdb.org" />
         {blobHostname !== null && (
           <link rel="preconnect" href={`https://${blobHostname}`} />
         )}

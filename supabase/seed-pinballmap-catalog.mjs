@@ -53,6 +53,9 @@ const rows = catalog.map((m) => ({
   year: m.year ?? null,
   opdb_id: m.opdb_id ?? null,
   ipdb_id: m.ipdb_id ?? null,
+  opdb_image_url: m.opdb_img ?? null,
+  opdb_image_width: m.opdb_img_width ?? null,
+  opdb_image_height: m.opdb_img_height ?? null,
   machine_group_id: m.machine_group_id ?? null,
   group_name:
     m.machine_group_id != null
@@ -67,6 +70,9 @@ const cols = [
   "year",
   "opdb_id",
   "ipdb_id",
+  "opdb_image_url",
+  "opdb_image_width",
+  "opdb_image_height",
   "machine_group_id",
   "group_name",
 ];
@@ -82,6 +88,9 @@ try {
       year = excluded.year,
       opdb_id = excluded.opdb_id,
       ipdb_id = excluded.ipdb_id,
+      opdb_image_url = excluded.opdb_image_url,
+      opdb_image_width = excluded.opdb_image_width,
+      opdb_image_height = excluded.opdb_image_height,
       machine_group_id = excluded.machine_group_id,
       group_name = excluded.group_name,
       refreshed_at = now()

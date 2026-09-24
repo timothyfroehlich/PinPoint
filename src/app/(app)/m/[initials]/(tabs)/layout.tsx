@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
-import { userProfiles } from "~/server/db/schema";
+import { pinballmapState, userProfiles } from "~/server/db/schema";
 import {
   getAccessLevel,
   canAccessMachineManage,
@@ -14,6 +14,10 @@ import { MachineDetailHeader } from "~/components/machines/MachineDetailHeader";
 import { MachineTabStrip } from "~/components/machines/MachineTabStrip";
 import { MachineBackboxTranslite } from "~/components/machines/MachineBackboxTranslite";
 import { deriveMachineStatus } from "~/lib/machines/status";
+import {
+  pinballmapCatalogUrl,
+  pinballmapLocationUrl,
+} from "~/lib/pinballmap/public-url";
 import { getMachineForLayout } from "../_data";
 
 export default async function MachineDetailLayout({
@@ -58,6 +62,13 @@ export default async function MachineDetailLayout({
   const accessLevel = getAccessLevel(currentUserProfile?.role);
   const canManage =
     user !== null && canAccessMachineManage(accessLevel, ownershipContext);
+  const [attributionState] = machine.backboxImageUrl
+    ? await db
+        .select({ locationId: pinballmapState.locationId })
+        .from(pinballmapState)
+        .where(eq(pinballmapState.id, "singleton"))
+        .limit(1)
+    : [];
 
   return (
     <PageContainer size="standard">
@@ -79,6 +90,11 @@ export default async function MachineDetailLayout({
           <MachineBackboxTranslite
             imageUrl={machine.backboxImageUrl}
             name={machine.name}
+            pinballmapUrl={
+              attributionState?.locationId != null
+                ? pinballmapLocationUrl(attributionState.locationId)
+                : pinballmapCatalogUrl()
+            }
           />
         </div>
         <div className="pt-2">{children}</div>

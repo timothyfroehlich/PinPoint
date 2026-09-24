@@ -315,6 +315,9 @@ export const pinballmapCatalog = pgTable(
     year: integer("year"),
     opdbId: text("opdb_id"),
     ipdbId: integer("ipdb_id"),
+    opdbImageUrl: text("opdb_image_url"),
+    opdbImageWidth: integer("opdb_image_width"),
+    opdbImageHeight: integer("opdb_image_height"),
     // PBM groups editions of one title (e.g. Godzilla Pro/Premium/LE) under a
     // machine_group_id; the group's display name lives in a separate endpoint,
     // so we denormalize it here to power the family→edition picker without a

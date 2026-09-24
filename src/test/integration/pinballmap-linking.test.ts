@@ -134,6 +134,12 @@ describe("PinballMap catalog mirror (PGlite)", () => {
     const rows = await db.select().from(pinballmapCatalog);
     expect(rows.length).toBe(count);
     expect(rows.every((r) => r.name.length > 0)).toBe(true);
+    expect(rows.find((r) => r.pinballmapMachineId === 642)).toMatchObject({
+      opdbImageUrl:
+        "https://img.opdb.org/0fd1477a-cf84-49d6-8495-d58d26c34529-medium.jpg",
+      opdbImageWidth: 640,
+      opdbImageHeight: 444,
+    });
 
     // Grouped editions get the family name denormalized onto each row from the
     // machine_groups endpoint; standalone titles stay null.

@@ -34,6 +34,33 @@ function asNumber(v: unknown): number | null {
   return typeof v === "number" && Number.isFinite(v) ? v : null;
 }
 
+function asPositiveInteger(v: unknown): number | null {
+  return typeof v === "number" &&
+    Number.isSafeInteger(v) &&
+    v > 0 &&
+    v <= 2_147_483_647
+    ? v
+    : null;
+}
+
+function asOpdbImageUrl(v: unknown): string | null {
+  if (typeof v !== "string") return null;
+  try {
+    const url = new URL(v);
+    // Pinball Map currently supplies OPDB's image CDN URL. Keep this aligned
+    // with next.config.ts instead of letting a catalog value select a new host.
+    return url.protocol === "https:" &&
+      url.hostname === "img.opdb.org" &&
+      url.username === "" &&
+      url.password === "" &&
+      url.port === ""
+      ? url.toString()
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 function asBoolOrNull(v: unknown): boolean | null {
   return typeof v === "boolean" ? v : null;
 }
@@ -203,6 +230,9 @@ function parseCatalogMachine(raw: unknown): CatalogMachine | null {
     year: asNumber(r["year"]),
     opdbId: asString(r["opdb_id"]),
     ipdbId: asNumber(r["ipdb_id"]),
+    opdbImageUrl: asOpdbImageUrl(r["opdb_img"]),
+    opdbImageWidth: asPositiveInteger(r["opdb_img_width"]),
+    opdbImageHeight: asPositiveInteger(r["opdb_img_height"]),
     machineGroupId: asNumber(r["machine_group_id"]),
   };
 }

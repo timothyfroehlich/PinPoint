@@ -18,33 +18,6 @@ import { CLOSED_STATUSES } from "~/lib/issues/status";
  *     (bead PP-0kta) will be the access point for closed-issue history; until
  *     then, "All / Closed" views are deliberately not exposed in the UI.
  */
-/**
- * The one piece of display metadata that still has no source anywhere.
- *
- * This started as a four-field frame for the enriched machine header
- * (PP-5sgt.1, June 2026), written when none of `manufacturer`, `year`,
- * `edition` or `backboxImageUrl` existed as columns — the nulls let the header
- * be built ahead of its data and render its empty fallback. Two of the four
- * became real columns underneath it and the spread kept overwriting them with
- * null, so the header's sub-line was blank on every machine that had the data
- * (found by review on PR #1875; fixed in PP-3bbr.1). `edition` was deleted
- * outright — it was never stored, and Pinball Map bakes it into the catalog
- * title, which the Info tab's Model row already shows in full.
- *
- * `backboxImageUrl` is genuinely absent: `MachineBackboxTranslite` is complete
- * and tested but has returned `null` on every page load since it shipped,
- * because nothing fetches translite art. **PP-o355.43 either gives it a source
- * or deletes it** — and has to answer OPDB's image licensing first, since
- * hotlinking their CDN is out and re-hosting is a separate rights question
- * from CORE-PBM-001. Until then the field exists so the component's prop has
- * something to read.
- */
-const PBM_METADATA_PLACEHOLDER: {
-  backboxImageUrl: string | null;
-} = {
-  backboxImageUrl: null,
-};
-
 export const getMachineForLayout = cache(async (initials: string) => {
   const [machine, totalIssuesCountResult] = await Promise.all([
     db.query.machines.findFirst({
@@ -82,7 +55,10 @@ export const getMachineForLayout = cache(async (initials: string) => {
         // out. Null here for an unmatched machine, and also for a matched one
         // whose title has left the mirror; `resolveModelTitle` separates those.
         pinballmapTitle: {
-          columns: { name: true },
+          columns: {
+            name: true,
+            opdbImageUrl: true,
+          },
         },
       },
     }),
@@ -96,7 +72,7 @@ export const getMachineForLayout = cache(async (initials: string) => {
     machine: machine
       ? {
           ...machine,
-          ...PBM_METADATA_PLACEHOLDER,
+          backboxImageUrl: machine.pinballmapTitle?.opdbImageUrl ?? null,
           modelTitle: resolveModelTitle(machine),
         }
       : undefined,

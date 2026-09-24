@@ -2,10 +2,12 @@ import type React from "react";
 import Image from "next/image";
 
 interface MachineBackboxTransliteProps {
-  /** OPDB backbox image URL (via PinballMap). Null until PP-o355.2 lands. */
+  /** OPDB image URL mirrored from Pinball Map's machine catalog. */
   imageUrl: string | null;
   /** Machine name, for the image's accessible name. */
   name: string;
+  /** Link to Pinball Map's configured location, or its home for catalog-only use. */
+  pinballmapUrl: string;
 }
 
 /**
@@ -18,20 +20,16 @@ interface MachineBackboxTransliteProps {
  * (`height:100%; width:auto`) had no hard width cap and fell back to the
  * image's natural ~1099px width, blowing out the page. A fixed box can't.
  *
- * Frame-first: when `imageUrl` is null (no OPDB match, or PBM not yet
- * ingested) this renders nothing — the header degrades to chip + identity
- * only. Not rendered on mobile: a translite is a large, busy ~2-foot-wide
- * image that is illegible at thumbnail size.
- *
- * NOTE: when PP-o355.2 supplies real OPDB URLs, add the OPDB image host to
- * `next.config` `images.remotePatterns` — until then `imageUrl` is always
- * null so `next/image` never renders and no host config is required.
+ * When the catalog has no image, the header keeps its compact identity layout.
+ * Pinball Map's image is usually a backglass but can be another primary game
+ * image when no primary backglass is available.
  */
 export function MachineBackboxTranslite({
   imageUrl,
   name,
+  pinballmapUrl,
 }: MachineBackboxTransliteProps): React.JSX.Element | null {
-  if (imageUrl == null || imageUrl === "") return null;
+  if (imageUrl == null) return null;
 
   return (
     <figure
@@ -40,13 +38,15 @@ export function MachineBackboxTranslite({
     >
       <Image
         src={imageUrl}
-        alt={`${name} backbox`}
+        alt={`${name} game artwork`}
         fill
         sizes="300px"
+        unoptimized
         className="object-cover object-center"
       />
-      <figcaption className="absolute right-2 bottom-2 rounded bg-background/75 px-1.5 py-0.5 text-[8.5px] tracking-wide text-muted-foreground">
-        OPDB · Pinball Map
+      <figcaption className="absolute right-2 bottom-2 rounded bg-background/90 px-1.5 py-0.5 text-[10px] tracking-wide text-foreground">
+        Image: <a href={imageUrl}>OPDB</a> · via{" "}
+        <a href={pinballmapUrl}>Pinball Map</a>
       </figcaption>
     </figure>
   );

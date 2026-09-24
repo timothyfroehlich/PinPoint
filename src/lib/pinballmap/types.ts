@@ -123,6 +123,9 @@ export interface CatalogMachine {
   year: number | null;
   opdbId: string | null;
   ipdbId: number | null;
+  opdbImageUrl: string | null;
+  opdbImageWidth: number | null;
+  opdbImageHeight: number | null;
   /**
    * PBM groups editions of one title (Pro/Premium/LE) under a machine_group_id;
    * null for standalone titles. The group's display name comes from a separate
