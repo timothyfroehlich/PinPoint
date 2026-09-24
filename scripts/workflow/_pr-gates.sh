@@ -231,8 +231,11 @@ _coderabbit_check() {
     | if $r != null and $r.sha == $head and $r.detail == "APPROVED" then $r + { checker: "coderabbit", verdict: "covers", form: "approval" }
       elif $r.sha == $head and $r.detail == "CHANGES_REQUESTED" then $r + { checker: "coderabbit", verdict: "changes_requested", form: "" }
       elif $r != null and $r.sha == $head then $r + { checker: "coderabbit", verdict: "none", form: "" }
-      elif $r != null and $r.detail == "APPROVED" and $summary != null and $summary.at >= $r.at then
-        $summary + { checker: "coderabbit", verdict: "covers", form: "summary_review", inherited_from: $r.sha }
+      elif $r != null and ($r.detail == "APPROVED" or $r.detail == "CHANGES_REQUESTED")
+           and $summary != null and $summary.at >= $r.at then
+        $summary + { checker: "coderabbit",
+                     verdict: (if $r.detail == "APPROVED" then "covers" else "changes_requested" end),
+                     form: "summary_review", inherited_from: $r.sha }
       elif $r == null then empty_verdict("coderabbit")
       else $r + { checker: "coderabbit", verdict: "stale", form: "" }
       end'
@@ -383,6 +386,15 @@ _review_summary() {
   codex=$(_codex_check <<< "$evidence")
   marker=$(_marker_check <<< "$evidence")
   unresolved=$(_unresolved_thread_count "$pr") || return 1
+
+  # A finding-bearing CodeRabbit review covers the exact head after every
+  # thread is explicitly adjudicated and resolved. The thread gate remains a
+  # separate requirement and blocks while any thread is unresolved.
+  if [[ "$unresolved" == "0" && $(jq -r '.verdict' <<< "$coderabbit") == "changes_requested" ]]; then
+    coderabbit=$(jq -c '
+      . + { verdict: "covers", form: (if .form == "summary_review" then .form else "reviewed" end) }
+    ' <<< "$coderabbit")
+  fi
 
   # Check for inherited review approval across pure merges from main
   if [[ $(jq -r '.verdict' <<< "$coderabbit") == "stale" ]]; then
@@ -612,11 +624,11 @@ check_review_happened() {
     fi
     case "$who" in
       coderabbit)
-        if [[ $(jq -r '.coverage.form' <<< "$RS_SUMMARY") == "summary_review" ]]; then
-          echo "PASS: reviewed: CodeRabbit incremental review covers head SHA ${RS_HEAD_SHA:0:7}; prior approval on $(jq -r '.coverage.inherited_from[0:7]' <<< "$RS_SUMMARY")"
-        else
-          echo "PASS: reviewed: CodeRabbit approved head SHA ${RS_HEAD_SHA:0:7}${suffix}"
-        fi
+        case "$(jq -r '.coverage.form' <<< "$RS_SUMMARY")" in
+          summary_review) echo "PASS: reviewed: CodeRabbit incremental review covers head SHA ${RS_HEAD_SHA:0:7}; prior review on $(jq -r '.coverage.inherited_from[0:7]' <<< "$RS_SUMMARY")" ;;
+          reviewed) echo "PASS: reviewed: CodeRabbit finding review covers head SHA ${RS_HEAD_SHA:0:7}; threads adjudicated" ;;
+          *) echo "PASS: reviewed: CodeRabbit approved head SHA ${RS_HEAD_SHA:0:7}${suffix}" ;;
+        esac
         ;;
       codex)
         case "$(jq -r '.coverage.form' <<< "$RS_SUMMARY")" in

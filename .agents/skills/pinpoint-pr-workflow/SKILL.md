@@ -195,7 +195,7 @@ subway watch --pr <PR> --phase review --expected-head <HEAD_SHA>
   - If code changed, push fixes, wait for replacement CI, and re-request review.
   - If CodeRabbit's trusted reply says `Review rate limited`, use its issue-comment ID for the Codex fallback. If Codex is also unavailable, alert Tim.
 
-CodeRabbit may finish an incremental review of a merge commit without posting a new native review. The gate accepts its exact-head `final_review_risk_coverage` summary from the CodeRabbit App only when its latest decisive native review was an earlier approval, both summary commit fields match the current head, and no current-head review requests changes. This is CodeRabbit coverage, not a quota signal; do not request Codex or repeat the CodeRabbit request.
+CodeRabbit may finish an incremental review of a merge commit without posting a new native review. The gate accepts its exact-head `final_review_risk_coverage` summary from the CodeRabbit App only when its latest decisive native review was an earlier approval or an adjudicated finding review, both summary commit fields match the current head, and every finding thread is resolved. A current-head `CHANGES_REQUESTED` review also covers head once every thread is adjudicated and resolved. This is CodeRabbit coverage, not a quota signal; do not request Codex or repeat the CodeRabbit request.
 
 - `outcome: "stale"` (exit 1): Branch head moved; re-orient to the new head.
 - `outcome: "conflicting"` (exit 1): Merge conflict; merge `origin/main` into the branch and push.

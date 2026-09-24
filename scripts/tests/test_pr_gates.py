@@ -357,7 +357,9 @@ def test_later_coderabbit_changes_request_supersedes_approval() -> None:
             submitted_at="2026-08-22T12:01:00Z",
         ),
     ]
-    with gate_env(review_pages=[reviews]) as env:
+    with gate_env(
+        review_pages=[reviews], threads=[thread(resolved=False, author=CODERABBIT_BOT)]
+    ) as env:
         summary = review_summary(env)
     assert summary["label"] == "changes requested"
     assert summary["checkers"]["coderabbit"]["verdict"] == "changes_requested"
@@ -404,6 +406,33 @@ def test_coderabbit_summary_without_prior_native_approval_does_not_cover() -> No
     assert summary["label"] == "not reviewed"
 
 
+def test_coderabbit_incremental_summary_covers_adjudicated_prior_finding() -> None:
+    finding = codex_review(
+        sha=OTHER_SHA, login=CODERABBIT_BOT, state="CHANGES_REQUESTED"
+    )
+    with gate_env(
+        review_pages=[[finding]],
+        comment_pages=[[coderabbit_summary()]],
+        threads=[thread(resolved=True, author=CODERABBIT_BOT)],
+    ) as env:
+        summary = review_summary(env)
+    assert summary["label"] == "approved"
+    assert summary["coverage"]["form"] == "summary_review"
+
+
+def test_coderabbit_incremental_summary_waits_for_unresolved_prior_finding() -> None:
+    finding = codex_review(
+        sha=OTHER_SHA, login=CODERABBIT_BOT, state="CHANGES_REQUESTED"
+    )
+    with gate_env(
+        review_pages=[[finding]],
+        comment_pages=[[coderabbit_summary()]],
+        threads=[thread(resolved=False, author=CODERABBIT_BOT)],
+    ) as env:
+        summary = review_summary(env)
+    assert summary["label"] == "changes requested"
+
+
 def test_coderabbit_current_head_changes_request_beats_summary() -> None:
     reviews = [
         codex_review(sha=OTHER_SHA, login=CODERABBIT_BOT),
@@ -415,7 +444,9 @@ def test_coderabbit_current_head_changes_request_beats_summary() -> None:
         ),
     ]
     with gate_env(
-        review_pages=[reviews], comment_pages=[[coderabbit_summary()]]
+        review_pages=[reviews],
+        comment_pages=[[coderabbit_summary()]],
+        threads=[thread(resolved=False, author=CODERABBIT_BOT)],
     ) as env:
         summary = review_summary(env)
     assert summary["label"] == "changes requested"
@@ -533,7 +564,9 @@ def test_coderabbit_changes_requested_does_not_mask_codex_approval() -> None:
             submitted_at="2026-08-22T12:00:00Z",
         ),
     ]
-    with gate_env(review_pages=[reviews]) as env:
+    with gate_env(
+        review_pages=[reviews], threads=[thread(resolved=False, author=CODERABBIT_BOT)]
+    ) as env:
         result = run_gate("check_review_happened", env)
         summary = review_summary(env)
     assert result.returncode == 0, result.stdout
@@ -689,13 +722,27 @@ def test_coderabbit_non_approval_on_head_is_not_reviewed(state: str) -> None:
 
 def test_coderabbit_changes_requested_on_head_is_changes_requested() -> None:
     review = codex_review(login=CODERABBIT_BOT, state="CHANGES_REQUESTED")
-    with gate_env(review_pages=[[review]]) as env:
+    with gate_env(
+        review_pages=[[review]], threads=[thread(resolved=False, author=CODERABBIT_BOT)]
+    ) as env:
         result = run_gate("check_review_happened", env)
         summary = review_summary(env)
     assert result.returncode == 1, result.stdout
     assert "FAIL: reviewed: changes requested" in result.stdout
     assert f"CodeRabbit: requested changes on head {HEAD_SHA[:7]}" in result.stdout
     assert summary["label"] == "changes requested"
+
+
+def test_resolved_coderabbit_finding_covers_head_without_second_review() -> None:
+    review = codex_review(login=CODERABBIT_BOT, state="CHANGES_REQUESTED")
+    with gate_env(
+        review_pages=[[review]], threads=[thread(resolved=True, author=CODERABBIT_BOT)]
+    ) as env:
+        result = run_gate("check_review_happened", env)
+        summary = review_summary(env)
+    assert result.returncode == 0, result.stdout
+    assert "CodeRabbit finding review covers head SHA" in result.stdout
+    assert summary["coverage"]["form"] == "reviewed"
 
 
 def test_unresolved_threads_make_uncovered_head_changes_requested() -> None:

@@ -258,12 +258,29 @@ def test_coderabbit_changes_requested_on_head_is_changes_requested(run_dashboard
             *gate_rules(
                 1,
                 reviews=[review(login=CODERABBIT_BOT, state="CHANGES_REQUESTED")],
+                unresolved=1,
             ),
         ]
     )
 
     assert result.returncode == 0, result.stderr
     assert review_column(result) == "changes requested"
+
+
+@pytest.mark.unit
+def test_resolved_coderabbit_finding_is_approved(run_dashboard):
+    result, _calls = run_dashboard(
+        [
+            list_rule([pr_node(1)]),
+            *gate_rules(
+                1,
+                reviews=[review(login=CODERABBIT_BOT, state="CHANGES_REQUESTED")],
+            ),
+        ]
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert review_column(result) == "approved"
 
 
 @pytest.mark.unit
