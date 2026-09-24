@@ -184,6 +184,16 @@ export const machines = pgTable(
       .notNull()
       .defaultNow(),
     description: jsonb("description").$type<ProseMirrorDoc>(),
+    // The card's layout is selected explicitly per cabinet. Description and
+    // tip are independent of size; a disabled tip keeps its saved text.
+    apronSize: text("apron_size", { enum: ["stern", "wpc"] }),
+    apronUseCustomDescription: boolean("apron_use_custom_description")
+      .notNull()
+      .default(false),
+    apronDescription: text("apron_description"),
+    apronTip: text("apron_tip"),
+    apronTipEnabled: boolean("apron_tip_enabled").notNull().default(false),
+    apronSavedAt: timestamp("apron_saved_at", { withTimezone: true }),
     ownerRequirements: jsonb("owner_requirements").$type<ProseMirrorDoc>(),
     // Machine-level "Before you change anything": the owner's honor-system
     // requests for how people should handle THIS machine's settings ("ask me

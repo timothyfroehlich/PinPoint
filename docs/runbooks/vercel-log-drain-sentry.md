@@ -75,8 +75,9 @@ The forwarder function:
 ### 1. Create the forwarder function
 
 Add `src/app/api/log-drain/route.ts` (or a standalone serverless function).
-It must be excluded from middleware auth — add its path to the public-routes
-list in `middleware.ts`.
+No additional Proxy auth exception is needed: `src/lib/supabase/middleware.ts`
+already lets `/api` routes perform their own authentication. Keep this route in
+the `src/proxy.ts` matcher so it receives security headers.
 
 Key implementation points:
 

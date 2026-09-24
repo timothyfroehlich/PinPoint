@@ -2,7 +2,7 @@
 
 The security headers themselves are not documented here. `next.config.ts` sets
 the static headers (HSTS, `X-Frame-Options`, `X-Content-Type-Options`,
-`Referrer-Policy`, `Permissions-Policy`); the root `middleware.ts` builds the
+`Referrer-Policy`, `Permissions-Policy`); `src/proxy.ts` builds the
 Content-Security-Policy and the per-request nonce. Read those files for the
 current values — a table here would only drift from them. How to author a CSP
 change (production-branch-first, what is already allowlisted, the `x-nonce`

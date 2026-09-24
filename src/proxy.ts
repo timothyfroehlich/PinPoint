@@ -3,7 +3,7 @@ import { updateSession } from "~/lib/supabase/middleware";
 import { canonicalMachinePath } from "~/lib/machines/canonical-path";
 
 /**
- * Next.js middleware for Supabase SSR authentication and security headers
+ * Next.js Proxy for Supabase SSR authentication and security headers
  *
  * Responsibilities:
  * - Refreshes expired auth tokens automatically
@@ -19,8 +19,8 @@ import { canonicalMachinePath } from "~/lib/machines/canonical-path";
  * Required for CORE-SSR-003 compliance
  * See docs/SECURITY.md for the threat-model decisions and known gaps
  */
-export async function middleware(request: NextRequest): Promise<NextResponse> {
-  // 0. Canonicalize machine URLs: /m/afm -> /m/AFM. Initials are stored
+export async function proxy(request: NextRequest): Promise<NextResponse> {
+  // Canonicalize machine URLs: /m/afm -> /m/AFM. Initials are stored
   //    uppercase, so a lowercased link would otherwise 404. Runs before the
   //    session refresh because the redirected request will refresh anyway.
   const canonicalPath = canonicalMachinePath(request.nextUrl.pathname);
@@ -34,26 +34,31 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
     return NextResponse.redirect(url, 308);
   }
 
-  // 1. Run Supabase middleware first to handle session
-  const response = await updateSession(request);
-  // 2. Generate nonce for CSP using Web Crypto API (Edge Runtime compatible)
+  // Generate a nonce before session handling so Next can apply it to scripts.
   const nonce = crypto.randomUUID();
 
-  // 3. Get Supabase URL from environment
+  // Get Supabase URL from environment.
   const supabaseUrl = process.env["NEXT_PUBLIC_SUPABASE_URL"];
   const supabaseWsUrl = supabaseUrl?.replace(/^https?:\/\//, (match) =>
     match === "https://" ? "wss://" : "ws://"
   );
 
-  // 4. Allow Vercel preview toolbar in non-production environments
+  // Allow Vercel preview toolbar in non-production environments.
   // Per https://vercel.com/docs/vercel-toolbar/managing-toolbar#using-a-content-security-policy
-  const isProduction = process.env["VERCEL_ENV"] === "production";
+  const vercelEnv = process.env["VERCEL_ENV"];
+  const isProduction =
+    vercelEnv === "production" ||
+    (process.env.NODE_ENV === "production" && vercelEnv !== "preview");
+  const isLocalDevelopment =
+    process.env.NODE_ENV === "development" &&
+    vercelEnv !== "production" &&
+    vercelEnv !== "preview";
 
   // Production: strict-dynamic (nonce-only, blocks host allowlists)
   // Preview: explicit allowlist (allows vercel.live scripts)
   const scriptSrc = isProduction
     ? `'self' 'nonce-${nonce}' 'strict-dynamic'`
-    : `'self' 'nonce-${nonce}' https://vercel.live`;
+    : `'self' 'nonce-${nonce}' https://vercel.live${isLocalDevelopment ? " 'unsafe-eval'" : ""}`;
 
   const styleSrc = isProduction
     ? "'self' 'unsafe-inline'"
@@ -74,7 +79,7 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
   const frameSrc = isProduction ? "'none'" : "'self' https://vercel.live";
   const frameAncestors = isProduction ? "'none'" : "'self' https://vercel.live";
 
-  // 5. Construct CSP header with nonce-based script execution
+  // Construct CSP header with nonce-based script execution.
   const cspHeader = `
     default-src 'self';
     script-src ${scriptSrc};
@@ -93,7 +98,14 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
     .replace(/\s{2,}/g, " ")
     .trim();
 
-  // 6. Set headers
+  // Replace client-supplied values and forward CSP to the renderer. Next
+  //    reads the request CSP to attach this nonce to its generated scripts.
+  request.headers.set("Content-Security-Policy", cspHeader);
+  request.headers.set("x-nonce", nonce);
+
+  // Refresh the session using the same request so cookie updates and these
+  //    headers are forwarded together to Server Components.
+  const response = await updateSession(request);
   response.headers.set("Content-Security-Policy", cspHeader);
   response.headers.set("x-nonce", nonce);
 
