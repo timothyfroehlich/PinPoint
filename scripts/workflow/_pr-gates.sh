@@ -357,22 +357,27 @@ _is_pure_merge_from_main() {
 
 # A CHANGES_REQUESTED review is adjudicated only when CodeRabbit named inline
 # findings and every comment from that specific review belongs to a resolved
-# thread. A review with body-only findings has no such evidence and stays blocked.
+# thread with either an owner reply or a later change to the commented file.
+# A review with body-only findings has no such evidence and stays blocked.
 _coderabbit_finding_adjudicated() {
   local pr=$1 record=$2
-  local review_id expected owner_repo raw ids count owner repo cursor="" has_next=true matched=0
+  local review_id expected owner_repo raw findings count owner repo cursor="" has_next=true threads='[]'
+  local head reviewed_sha replies comment id path changed
   review_id=$(jq -r '.review_id // .id // empty' <<< "$record")
   expected=$(jq -r '.actionable_count // 0' <<< "$record")
   [[ "$review_id" =~ ^[0-9]+$ && "$expected" =~ ^[0-9]+$ && "$expected" -gt 0 ]] || return 1
+  head=$(gh pr view "$pr" --json headRefOid --jq .headRefOid) || return 1
+  reviewed_sha=$(jq -r '.inherited_from // .sha // empty' <<< "$record")
+  [[ "$reviewed_sha" =~ ^[0-9a-f]{40}$ ]] || return 1
   owner_repo=$(_repo_slug) || return 1
   raw=$(gh api --paginate "repos/${owner_repo}/pulls/${pr}/reviews/${review_id}/comments") || return 1
-  ids=$(jq -s '[.[] | flatten | .[] | select(.in_reply_to_id == null) | .id] | unique' <<< "$raw") || return 1
-  count=$(jq 'length' <<< "$ids")
+  findings=$(jq -s '[.[] | flatten | .[] | select(.in_reply_to_id == null) | {id, path}] | unique_by(.id)' <<< "$raw") || return 1
+  count=$(jq 'length' <<< "$findings")
   [[ "$count" -eq "$expected" ]] || return 1
   owner=${owner_repo%%/*}
   repo=${owner_repo#*/}
   while [[ "$has_next" == "true" ]]; do
-    local after_arg="" resp page_matched
+    local after_arg="" resp page_threads
     [[ -n "$cursor" ]] && after_arg=", after: \"$cursor\""
     resp=$(gh api graphql -f query="
       query {
@@ -385,15 +390,30 @@ _coderabbit_finding_adjudicated() {
           }
         }
       }") || return 1
-    page_matched=$(jq --argjson ids "$ids" '
-      [.data.repository.pullRequest.reviewThreads.nodes[]
-       | select(.isResolved == true and (.comments.nodes[0].databaseId as $id | $ids | index($id) != null))] | length
-    ' <<< "$resp") || return 1
-    matched=$((matched + page_matched))
+    page_threads=$(jq -c '[.data.repository.pullRequest.reviewThreads.nodes[]
+      | {root: .comments.nodes[0].databaseId, isResolved}]' <<< "$resp") || return 1
+    threads=$(jq -cn --argjson a "$threads" --argjson b "$page_threads" '$a + $b') || return 1
     has_next=$(jq -r '.data.repository.pullRequest.reviewThreads.pageInfo.hasNextPage' <<< "$resp")
     cursor=$(jq -r '.data.repository.pullRequest.reviewThreads.pageInfo.endCursor // empty' <<< "$resp")
   done
-  [[ "$matched" -eq "$expected" ]]
+  raw=$(gh api --paginate "repos/${owner_repo}/pulls/${pr}/comments") || return 1
+  replies=$(jq -s '[.[] | flatten | .[] | select(.in_reply_to_id != null)]' <<< "$raw") || return 1
+  while IFS= read -r comment; do
+    id=$(jq -r '.id // empty' <<< "$comment")
+    path=$(jq -r '.path // empty' <<< "$comment")
+    [[ "$id" =~ ^[0-9]+$ && -n "$path" ]] || return 1
+    jq -e --argjson id "$id" 'any(.[]; .root == $id and .isResolved == true)' <<< "$threads" >/dev/null || return 1
+    if jq -e --argjson id "$id" --arg owner "$owner" '
+      any(.[]; .in_reply_to_id == $id and .user.login == $owner and (.body // "") != "")
+    ' <<< "$replies" >/dev/null; then
+      continue
+    fi
+    [[ "$reviewed_sha" != "$head" ]] || return 1
+    changed=0
+    git diff --quiet "$reviewed_sha" "$head" -- "$path" || changed=$?
+    [[ "$changed" -eq 1 ]] || return 1
+  done < <(jq -c '.[]' <<< "$findings")
+  return 0
 }
 
 # ---------------------------------------------------------------------------------

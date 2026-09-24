@@ -202,6 +202,8 @@ def gate_env(
     threads: list[dict] | None = None,
     commits: list[dict] | None = None,
     review_comments: list[dict] | None = None,
+    pull_comments: list[dict] | None = None,
+    changed_paths: list[str] | None = None,
     head_sha: str = HEAD_SHA,
     base_ref: str = "main",
     rollup: list[dict] | None = None,
@@ -225,6 +227,8 @@ def gate_env(
         (tmp_path / "review-comments.json").write_text(
             json.dumps(review_comments or [])
         )
+        (tmp_path / "pull-comments.json").write_text(json.dumps(pull_comments or []))
+        (tmp_path / "changed-paths.json").write_text(json.dumps(changed_paths or []))
         (tmp_path / "commits.json").write_text(json.dumps(commits or []))
         (tmp_path / "threads.json").write_text(
             json.dumps(
@@ -261,6 +265,7 @@ def gate_env(
             '  *"api graphql"*) cat "$STUB_THREADS" ;;\n'
             '  *"/reviews/"*"/comments"*) cat "$STUB_REVIEW_COMMENTS" ;;\n'
             '  *"/pulls/"*"/reviews"*) cat "$STUB_REVIEWS" ;;\n'
+            '  *"/pulls/"*"/comments"*) cat "$STUB_PULL_COMMENTS" ;;\n'
             '  *"/issues/"*"/comments"*) cat "$STUB_COMMENTS" ;;\n'
             '  *"commits"*) cat "$STUB_COMMITS" ;;\n'
             '  *) printf "UNEXPECTED gh call: %s\\n" "$args" >&2; exit 1 ;;\n'
@@ -270,6 +275,21 @@ def gate_env(
             gh_stub.stat().st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH
         )
 
+        if changed_paths is not None:
+            git_stub = tmp_path / "git"
+            git_stub.write_text(
+                "#!/usr/bin/env bash\n"
+                'if [[ "$1" == "diff" && "$2" == "--quiet" ]]; then\n'
+                '  jq -e --arg path "$6" "index(\\$path) != null" "$STUB_CHANGED_PATHS" >/dev/null\n'
+                "  if [[ $? -eq 0 ]]; then exit 1; fi\n"
+                "  exit 0\n"
+                "fi\n"
+                'printf "UNEXPECTED git call: %s\\n" "$*" >&2; exit 2\n'
+            )
+            git_stub.chmod(
+                git_stub.stat().st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH
+            )
+
         env = dict(os.environ)
         env["PATH"] = f"{tmp}{os.pathsep}{env.get('PATH', '')}"
         env["STUB_HEAD_SHA"] = head_sha
@@ -277,6 +297,8 @@ def gate_env(
         env["STUB_REVIEWS"] = str(tmp_path / "reviews.json")
         env["STUB_COMMENTS"] = str(tmp_path / "comments.json")
         env["STUB_REVIEW_COMMENTS"] = str(tmp_path / "review-comments.json")
+        env["STUB_PULL_COMMENTS"] = str(tmp_path / "pull-comments.json")
+        env["STUB_CHANGED_PATHS"] = str(tmp_path / "changed-paths.json")
         env["STUB_COMMITS"] = str(tmp_path / "commits.json")
         env["STUB_THREADS"] = str(tmp_path / "threads.json")
         env["STUB_ROLLUP"] = str(tmp_path / "rollup.json")
@@ -431,7 +453,10 @@ def test_coderabbit_incremental_summary_covers_adjudicated_prior_finding() -> No
         review_pages=[[finding]],
         comment_pages=[[coderabbit_summary()]],
         threads=[thread(resolved=True, author=CODERABBIT_BOT)],
-        review_comments=[{"id": 42, "in_reply_to_id": None}],
+        review_comments=[{"id": 42, "path": "src/example.ts", "in_reply_to_id": None}],
+        pull_comments=[
+            {"id": 43, "in_reply_to_id": 42, "user": {"login": "acme"}, "body": "Fixed"}
+        ],
     ) as env:
         summary = review_summary(env)
     assert summary["label"] == "approved"
@@ -761,13 +786,54 @@ def test_resolved_coderabbit_finding_covers_head_without_second_review() -> None
     with gate_env(
         review_pages=[[review]],
         threads=[thread(resolved=True, author=CODERABBIT_BOT)],
-        review_comments=[{"id": 42, "in_reply_to_id": None}],
+        review_comments=[{"id": 42, "path": "src/example.ts", "in_reply_to_id": None}],
+        pull_comments=[
+            {
+                "id": 43,
+                "in_reply_to_id": 42,
+                "user": {"login": "acme"},
+                "body": "Declined: expected behavior",
+            }
+        ],
     ) as env:
         result = run_gate("check_review_happened", env)
         summary = review_summary(env)
     assert result.returncode == 0, result.stdout
     assert "CodeRabbit finding review covers head SHA" in result.stdout
     assert summary["coverage"]["form"] == "reviewed"
+
+
+def test_silently_resolved_coderabbit_finding_stays_blocked() -> None:
+    review = codex_review(
+        login=CODERABBIT_BOT, state="CHANGES_REQUESTED", actionable_count=1
+    )
+    with gate_env(
+        review_pages=[[review]],
+        threads=[thread(resolved=True, author=CODERABBIT_BOT)],
+        review_comments=[{"id": 42, "path": "src/example.ts", "in_reply_to_id": None}],
+    ) as env:
+        summary = review_summary(env)
+    assert summary["label"] == "changes requested"
+    assert summary["coverage"] is None
+
+
+def test_later_file_change_adjudicates_coderabbit_finding() -> None:
+    review = codex_review(
+        sha=OTHER_SHA,
+        login=CODERABBIT_BOT,
+        state="CHANGES_REQUESTED",
+        actionable_count=1,
+    )
+    with gate_env(
+        review_pages=[[review]],
+        comment_pages=[[coderabbit_summary()]],
+        threads=[thread(resolved=True, author=CODERABBIT_BOT)],
+        review_comments=[{"id": 42, "path": "src/example.ts", "in_reply_to_id": None}],
+        changed_paths=["src/example.ts"],
+    ) as env:
+        summary = review_summary(env)
+    assert summary["label"] == "approved"
+    assert summary["coverage"]["form"] == "summary_review"
 
 
 def test_body_only_coderabbit_finding_stays_blocked_without_inline_evidence() -> None:
