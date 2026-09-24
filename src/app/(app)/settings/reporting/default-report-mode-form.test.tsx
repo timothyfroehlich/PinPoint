@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -27,16 +27,67 @@ describe("DefaultReportModeForm", () => {
     );
 
     expect(
-      screen.getByRole("heading", { name: "Preferred Issue Reporting Form" })
+      screen.getByRole("heading", { name: "Report button opens" })
     ).toBeInTheDocument();
-    const desktop = screen.getByRole("group", { name: "Desktop / Tablet" });
-    const mobile = screen.getByRole("group", { name: "Mobile" });
+    const desktop = screen.getByRole("group", {
+      name: "Desktop / Tablet report form",
+    });
+    const mobile = screen.getByRole("group", { name: "Mobile report form" });
     expect(within(mobile).getByRole("radio", { name: "Quick" })).toBeChecked();
     expect(
       within(desktop).getByRole("radio", { name: "Detailed" })
     ).toBeChecked();
     expect(screen.queryByRole("radio", { name: "Multiple" })).toBeNull();
     expect(screen.queryByRole("button", { name: /Save/ })).toBeNull();
+  });
+
+  it("lists the mobile row before the desktop row", () => {
+    render(
+      <DefaultReportModeForm
+        initialMobileMode="quick"
+        initialDesktopMode="detailed"
+        canMultiple={false}
+      />
+    );
+    const groupNames = screen
+      .getAllByRole("group")
+      .map((group) => group.querySelector("legend")?.textContent);
+    expect(groupNames).toEqual([
+      "Mobile report form",
+      "Desktop / Tablet report form",
+    ]);
+  });
+
+  it("clears the saved confirmation after a few seconds", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      vi.mocked(updateDefaultReportModeAction).mockResolvedValue({
+        ok: true,
+        value: { mobileMode: "detailed", desktopMode: "detailed" },
+      });
+      const user = userEvent.setup({
+        advanceTimers: (ms) => vi.advanceTimersByTime(ms),
+      });
+      render(
+        <DefaultReportModeForm
+          initialMobileMode="quick"
+          initialDesktopMode="detailed"
+          canMultiple={false}
+        />
+      );
+
+      const mobile = screen.getByRole("group", { name: "Mobile report form" });
+      await user.click(within(mobile).getByRole("radio", { name: "Detailed" }));
+      await waitFor(() => {
+        expect(screen.getByRole("status")).toHaveTextContent("Saved");
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(3000);
+      });
+      expect(screen.getByRole("status")).toBeEmptyDOMElement();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("offers Multiple in both settings only with batch access", () => {
@@ -69,8 +120,10 @@ describe("DefaultReportModeForm", () => {
       />
     );
 
-    const mobile = screen.getByRole("group", { name: "Mobile" });
-    const desktop = screen.getByRole("group", { name: "Desktop / Tablet" });
+    const mobile = screen.getByRole("group", { name: "Mobile report form" });
+    const desktop = screen.getByRole("group", {
+      name: "Desktop / Tablet report form",
+    });
     await user.click(within(desktop).getByRole("radio", { name: "Quick" }));
     await waitFor(() => {
       expect(screen.getByRole("status")).toHaveTextContent("Saved");
@@ -119,8 +172,10 @@ describe("DefaultReportModeForm", () => {
       />
     );
 
-    const mobile = screen.getByRole("group", { name: "Mobile" });
-    const desktop = screen.getByRole("group", { name: "Desktop / Tablet" });
+    const mobile = screen.getByRole("group", { name: "Mobile report form" });
+    const desktop = screen.getByRole("group", {
+      name: "Desktop / Tablet report form",
+    });
     await user.click(within(desktop).getByRole("radio", { name: "Quick" }));
     await user.click(within(mobile).getByRole("radio", { name: "Detailed" }));
     expect(screen.getByRole("status")).toHaveTextContent("Saving…");
@@ -155,7 +210,9 @@ describe("DefaultReportModeForm", () => {
       />
     );
 
-    const desktop = screen.getByRole("group", { name: "Desktop / Tablet" });
+    const desktop = screen.getByRole("group", {
+      name: "Desktop / Tablet report form",
+    });
     await user.click(within(desktop).getByRole("radio", { name: "Quick" }));
     await waitFor(() => {
       expect(screen.getByRole("alert")).toHaveTextContent(
@@ -181,7 +238,7 @@ describe("DefaultReportModeForm", () => {
       ok: true,
       value: { mobileMode: "detailed", desktopMode: "detailed" },
     });
-    const mobile = screen.getByRole("group", { name: "Mobile" });
+    const mobile = screen.getByRole("group", { name: "Mobile report form" });
     const quick = within(mobile).getByRole("radio", { name: "Quick" });
     const detailed = within(mobile).getByRole("radio", {
       name: "Detailed",

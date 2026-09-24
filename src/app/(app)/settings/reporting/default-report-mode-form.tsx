@@ -6,6 +6,8 @@ import { REPORT_MODE_VALUES, type ReportMode } from "~/lib/types";
 import { cn } from "~/lib/utils";
 import { updateDefaultReportModeAction } from "./actions";
 
+const SAVED_STATUS_MS = 3000;
+
 const MODE_LABELS: Record<ReportMode, string> = {
   quick: "Quick",
   detailed: "Detailed",
@@ -58,6 +60,14 @@ export function DefaultReportModeForm({
     savedModes.current = modes;
     setSelectedModes(modes);
   }, [availableMobileMode, availableDesktopMode]);
+
+  React.useEffect(() => {
+    if (saveStatus !== "saved") return;
+    const timeout = window.setTimeout(() => {
+      setSaveStatus("idle");
+    }, SAVED_STATUS_MS);
+    return () => window.clearTimeout(timeout);
+  }, [saveStatus]);
 
   async function flushSelections(): Promise<void> {
     if (saveInFlight.current) return;
@@ -112,19 +122,19 @@ export function DefaultReportModeForm({
   return (
     <div className="@container flex flex-col gap-1">
       <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
-        Preferred Issue Reporting Form
+        Report button opens
       </h3>
       {(
         [
           {
-            key: "desktop",
-            label: "Desktop / Tablet",
-            selectedMode: selectedModes.desktopMode,
-          },
-          {
             key: "mobile",
             label: "Mobile",
             selectedMode: selectedModes.mobileMode,
+          },
+          {
+            key: "desktop",
+            label: "Desktop / Tablet",
+            selectedMode: selectedModes.desktopMode,
           },
         ] as const
       ).map((surface) => (
@@ -132,7 +142,7 @@ export function DefaultReportModeForm({
           key={surface.key}
           className="grid grid-cols-[7rem_minmax(0,1fr)] items-center gap-x-1 @sm:gap-x-2"
         >
-          <legend className="sr-only">{surface.label}</legend>
+          <legend className="sr-only">{surface.label} report form</legend>
           <span aria-hidden="true" className="text-xs font-medium @sm:text-sm">
             {surface.label}:
           </span>
@@ -172,16 +182,27 @@ export function DefaultReportModeForm({
         </fieldset>
       ))}
 
+      {/* The status line always reserves one line of height, so the sections
+          below do not shift when feedback appears. It stays mounted so screen
+          readers announce its changes; an error takes its place. */}
       {errorMessage ? (
         <p role="alert" className="text-sm text-destructive-text">
           {errorMessage}
         </p>
       ) : null}
-      {saveStatus !== "idle" ? (
-        <p role="status" className="text-sm text-muted-foreground">
-          {saveStatus === "saving" ? "Saving…" : "Saved"}
-        </p>
-      ) : null}
+      <p
+        role="status"
+        className={cn(
+          "min-h-lh text-sm text-muted-foreground",
+          errorMessage && "hidden"
+        )}
+      >
+        {saveStatus === "saving"
+          ? "Saving…"
+          : saveStatus === "saved"
+            ? "Saved"
+            : null}
+      </p>
     </div>
   );
 }

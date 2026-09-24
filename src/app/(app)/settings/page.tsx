@@ -131,7 +131,7 @@ export default async function SettingsPage(): Promise<React.JSX.Element> {
 
         <div>
           <h2 className="mb-4 text-balance text-xl font-semibold">
-            App preferences
+            App Preferences
           </h2>
           <DefaultReportModeForm
             initialMobileMode={profile.mobileReportMode}
