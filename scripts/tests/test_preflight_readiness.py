@@ -18,8 +18,20 @@ def _write_executable(path: Path, body: str) -> None:
     path.chmod(0o755)
 
 
+ENV_LOCAL = (
+    "POSTGRES_URL=postgresql://postgres:postgres@localhost:61234/postgres\n"
+    'NEXT_PUBLIC_SUPABASE_URL="http://localhost:61233"\n'
+    # Valid dotenv, invalid bash: readiness must not source the file.
+    "EMAIL_FROM=PinPoint <noreply@example.com>\n"
+)
+
+
 def _run_readiness(
-    tmp_path: Path, mode: str, *, with_env_file: bool = True
+    tmp_path: Path,
+    mode: str,
+    *,
+    env_local: str | None = ENV_LOCAL,
+    exported: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
@@ -38,12 +50,12 @@ esac
     journal = tmp_path / "drizzle" / "meta" / "_journal.json"
     journal.parent.mkdir(parents=True)
     journal.write_text(json.dumps({"entries": [{"tag": "0000_a"}, {"tag": "0001_b"}]}))
-    if with_env_file:
-        (tmp_path / ".env.local").write_text(
-            "POSTGRES_URL=postgresql://postgres:postgres@localhost:61234/postgres\n"
-            "NEXT_PUBLIC_SUPABASE_URL=http://localhost:61233\n"
-        )
+    if env_local is not None:
+        (tmp_path / ".env.local").write_text(env_local)
     env = os.environ.copy()
+    env.pop("POSTGRES_URL", None)
+    env.pop("NEXT_PUBLIC_SUPABASE_URL", None)
+    env.update(exported or {})
     env["PATH"] = f"{bin_dir}{os.pathsep}{env['PATH']}"
     env["STUB_MODE"] = mode
     return subprocess.run(
@@ -90,13 +102,39 @@ def test_unready_stack_fails_with_one_actionable_line(
 
 
 def test_missing_env_file_points_at_worktree_setup(tmp_path: Path) -> None:
-    result = _run_readiness(tmp_path, "ready", with_env_file=False)
+    result = _run_readiness(tmp_path, "ready", env_local=None)
 
     assert result.returncode == 1
     assert result.stderr.splitlines() == [
         "FAIL: preflight readiness — .env.local is missing. "
         "Run: python3 scripts/worktree_setup.py"
     ]
+
+
+def test_missing_key_points_at_worktree_setup(tmp_path: Path) -> None:
+    result = _run_readiness(
+        tmp_path, "ready", env_local="NEXT_PUBLIC_SUPABASE_URL=http://x\n"
+    )
+
+    assert result.returncode == 1
+    assert result.stderr.splitlines() == [
+        "FAIL: preflight readiness — .env.local lacks POSTGRES_URL or "
+        "NEXT_PUBLIC_SUPABASE_URL. Run: python3 scripts/worktree_setup.py"
+    ]
+
+
+def test_exported_value_wins_over_env_local(tmp_path: Path) -> None:
+    result = _run_readiness(
+        tmp_path,
+        "ready",
+        exported={"POSTGRES_URL": "postgresql://u:p@db.example:5433/postgres"},
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert (
+        result.stdout
+        == "PASS: preflight readiness — Postgres ready at db.example:5433\n"
+    )
 
 
 def _run_targeted_integration(
