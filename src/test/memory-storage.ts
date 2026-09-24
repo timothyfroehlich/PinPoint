@@ -40,3 +40,22 @@ export function createMemoryStorage(): Storage {
     },
   };
 }
+
+/** Install a fallback only when jsdom does not expose localStorage. */
+export function installMemoryStorageIfMissing(): void {
+  const hasLocalStorage = ((): boolean => {
+    try {
+      return globalThis.localStorage != null;
+    } catch {
+      return false;
+    }
+  })();
+
+  if (!hasLocalStorage) {
+    Object.defineProperty(globalThis, "localStorage", {
+      configurable: true,
+      writable: true,
+      value: createMemoryStorage(),
+    });
+  }
+}

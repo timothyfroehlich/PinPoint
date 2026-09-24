@@ -1,6 +1,9 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { createMemoryStorage } from "~/test/memory-storage";
+import {
+  createMemoryStorage,
+  installMemoryStorageIfMissing,
+} from "~/test/memory-storage";
 
 describe("createMemoryStorage", () => {
   let storage: Storage;
@@ -52,5 +55,62 @@ describe("createMemoryStorage", () => {
     expect(storage.key(0)).toBe("first");
     expect(storage.key(1)).toBe("second");
     expect(storage.key(2)).toBeNull();
+  });
+});
+
+describe("installMemoryStorageIfMissing", () => {
+  const originalDescriptor = Object.getOwnPropertyDescriptor(
+    globalThis,
+    "localStorage"
+  );
+
+  afterEach(() => {
+    if (originalDescriptor === undefined) {
+      Reflect.deleteProperty(globalThis, "localStorage");
+    } else {
+      Object.defineProperty(globalThis, "localStorage", originalDescriptor);
+    }
+  });
+
+  it("installs usable storage when localStorage is missing", () => {
+    Object.defineProperty(globalThis, "localStorage", {
+      configurable: true,
+      value: undefined,
+    });
+
+    installMemoryStorageIfMissing();
+
+    expect(globalThis.localStorage).toBeDefined();
+    globalThis.localStorage.setItem("draft", "saved");
+    expect(globalThis.localStorage.getItem("draft")).toBe("saved");
+    globalThis.localStorage.clear();
+    expect(globalThis.localStorage.length).toBe(0);
+  });
+
+  it("installs usable storage when the localStorage getter throws", () => {
+    Object.defineProperty(globalThis, "localStorage", {
+      configurable: true,
+      get(): never {
+        throw new DOMException("Storage is disabled", "SecurityError");
+      },
+    });
+
+    expect(installMemoryStorageIfMissing).not.toThrow();
+    globalThis.localStorage.setItem("draft", "saved");
+    expect(globalThis.localStorage.getItem("draft")).toBe("saved");
+  });
+
+  it("preserves storage already supplied by the environment", () => {
+    const suppliedStorage = createMemoryStorage();
+    suppliedStorage.setItem("existing", "kept");
+    Object.defineProperty(globalThis, "localStorage", {
+      configurable: true,
+      value: suppliedStorage,
+    });
+
+    installMemoryStorageIfMissing();
+
+    expect(globalThis.localStorage).toBe(suppliedStorage);
+    expect(globalThis.localStorage.getItem("existing")).toBe("kept");
   });
 });

@@ -7,7 +7,7 @@
 import "@testing-library/jest-dom/vitest";
 import { EventEmitter } from "node:events";
 
-import { createMemoryStorage } from "~/test/memory-storage";
+import { installMemoryStorageIfMissing } from "~/test/memory-storage";
 
 // Ensure POSTGRES_URL is set for tests to avoid db/index.ts throwing error
 if (process.env.POSTGRES_URL === undefined || process.env.POSTGRES_URL === "") {
@@ -82,20 +82,7 @@ if (typeof window !== "undefined") {
   // no-op polyfills above: a no-op where jsdom already supplies real storage,
   // so it can never mask a working implementation. Accessing the property can
   // itself throw under an opaque origin, hence the try/catch.
-  const hasLocalStorage = ((): boolean => {
-    try {
-      return globalThis.localStorage != null;
-    } catch {
-      return false;
-    }
-  })();
-  if (!hasLocalStorage) {
-    Object.defineProperty(globalThis, "localStorage", {
-      configurable: true,
-      writable: true,
-      value: createMemoryStorage(),
-    });
-  }
+  installMemoryStorageIfMissing();
 
   // jsdom cannot navigate between Documents, so anchor clicks and
   // window.location assignments exercised in component tests (e.g. the
