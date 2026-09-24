@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Machine Settings Sets Demo Seed (PP-43q3, PP-tn6t) — LOCAL ONLY
+ * Machine Settings Sets Demo Seed (PP-43q3, PP-tn6t) — local and preview
  *
  * Populates the `machine_settings_sets` table for ONE showcase machine, Attack
  * from Mars (AFM), so the Machine Settings tab always has something meaningful
@@ -38,18 +38,14 @@
  * Deterministic: every run wipes AFM's existing sets and re-inserts these six,
  * so re-seeding never duplicates or leaves stale demo rows.
  *
- * Demo data, and local-only: `assertLocalDatabase` refuses any non-loopback
- * POSTGRES_URL. Nothing currently wires this into the preview pipeline
- * (scripts/workflow/preview/preview-migrate-seed.sh keeps it only as a
- * commented-out example), so a hard loopback allowlist costs nothing and closes
- * the "prod env loaded in this shell" path. If it is ever added to the preview
- * pipeline, swap this for the `assertNotPinPointProduction` guard the
- * remote-capable seeds use — do not just delete it.
+ * Demo data for local and ephemeral preview databases. Never run it against
+ * PinPoint production: the guard checks the target before any connection or
+ * write, including when the preview controller invokes this script.
  */
 
 import postgres from "postgres";
 
-import { assertLocalDatabase } from "../scripts/assert-local-db.mjs";
+import { assertNotPinPointProduction } from "../scripts/lib/db-target.mjs";
 
 // Use the pooled POSTGRES_URL (port :6543, IPv4) like seed-users.mjs — NOT
 // POSTGRES_URL_NON_POOLING (:5432), which resolves to IPv6 and is unreachable
@@ -63,8 +59,8 @@ if (!databaseUrl) {
   process.exit(1);
 }
 
-// Before the client is constructed and before any network call: loopback only.
-assertLocalDatabase(databaseUrl);
+// Before the client is constructed and before any network call: never prod.
+assertNotPinPointProduction(databaseUrl, "POSTGRES_URL");
 
 /** Wrap a single sentence of plain text in a minimal ProseMirror doc. */
 function doc(text) {
@@ -398,7 +394,7 @@ function buildSets(afmId, ownerId, techId) {
 }
 
 async function run() {
-  const sql = postgres(databaseUrl);
+  const sql = postgres(databaseUrl, { prepare: false });
 
   try {
     const [afm] = await sql`
