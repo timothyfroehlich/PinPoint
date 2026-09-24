@@ -5,7 +5,9 @@ import { PageContainer } from "~/components/layout/PageContainer";
 import { CollectionHeader } from "~/components/collections/CollectionHeader";
 import { CollectionTabStrip } from "~/components/collections/CollectionTabStrip";
 import { summarizeCollection } from "~/lib/collections/summary";
+import { getMachineViewHealth } from "~/lib/machines/view/queries";
 import { getOwnerCollectionForLayout } from "../_data";
+import { db } from "~/server/db";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -34,7 +36,11 @@ export default async function CollectionLayout({
   const collection = await getOwnerCollectionForLayout(userId);
   if (!collection) notFound();
 
-  const summary = summarizeCollection(collection.machines);
+  const health = await getMachineViewHealth(
+    db,
+    collection.machines.map((machine) => machine.initials)
+  );
+  const summary = summarizeCollection(collection.machines, health);
   const worstStatus =
     summary.unplayable > 0
       ? "unplayable"

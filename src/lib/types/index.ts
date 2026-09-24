@@ -34,3 +34,17 @@ export type {
 } from "./issue";
 
 export type { UnifiedUser, UserStatus, MachineOwner } from "./user";
+
+export {
+  MACHINE_VIEW_FIELD_IDS,
+  type MachineViewFieldId,
+  type MachineViewHealth,
+  type MachineViewOwnerOption,
+  type MachineViewPageSize,
+  type MachineViewPresetId,
+  type MachineViewResult,
+  type MachineViewRow,
+  type MachineViewScope,
+  type MachineViewSortDirection,
+  type MachineViewState,
+} from "./machine-view";

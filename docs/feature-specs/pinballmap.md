@@ -112,6 +112,10 @@ The control's states (§4) are comparisons across these: _in sync_ means intent 
 - **7.3** Previously imported comments are marked as belonging to a previous listing only when the old entry is gone for good. A restoration within Pinball Map's window is the same listing resumed — its comments are not marked, or are unmarked if the entry comes back.
 - **7.4** Historical Pinball Map comments imported during the initial backfill do not notify watchers. Comments newly observed after that baseline notify watchers of covering machines.
 - **7.5** A person can explicitly convert an imported Pinball Map comment to an issue from a covering machine's timeline. PinPoint never creates an issue from a Pinball Map comment automatically.
+- **7.6** Each imported copy notes that the same Pinball Map comment may appear on other cabinets covering the shared entry.
+- **7.7** A person watching multiple covering cabinets receives a separate notification for each watched cabinet when that comment is first observed.
+- **7.8** A Pinball Map comment can be converted to at most one PinPoint issue across all its timeline copies; after conversion, each copy links to that issue.
+- **7.9** A person can move the converted issue to another machine if the original machine selection was wrong.
 
 ## 8. Permissions
 
@@ -173,7 +177,7 @@ Replacing the tracked location is a rare, near-never operation — PinPoint trac
 | 7.4 watcher notifications after baseline | No comment import or notification exists | PP-o355.4; shared-comment identity PP-o355.54.14 |
 | 7.5 explicit Convert to issue | No comment import or conversion action exists | PP-o355.4; shared-comment identity PP-o355.54.14 |
 | 10.9 comment re-marking on location change | No comment import exists | PP-o355.4 (import); permanent mark-on-location-change after |
-| 3.6 additional outbound actions | Client methods exist, but no app actions expose condition-comment posting, venue-lineup confirmation, or Insider Connected changes | PP-o355.5; workflow decisions PP-o355.54.13, PP-o355.54.10, PP-o355.54.11 |
+| 3.6 additional outbound actions | Client methods exist, but no app actions expose condition-comment posting, venue-lineup confirmation, or Insider Connected changes | PP-o355.57 (condition comment, decision PP-o355.54.13), PP-o355.58 (confirm lineup, decision PP-o355.54.10), PP-o355.59 (Insider Connected, decision PP-o355.54.11) |
 
 ---
 
@@ -183,6 +187,7 @@ Changes to this document. Divergence-table rows are working state and are not lo
 
 | Date | Change |
 | :-- | :-- |
+| 2026-09-23 | Clarified shared-comment copies and per-cabinet notifications (§§7.6–7.7), and tied conversion to one movable issue per Pinball Map comment (§§7.8–7.9). |
 | 2026-09-22 | Added §§7.4–7.5: historical comment backfill is silent, later new comments notify watchers, and Convert to issue is explicit rather than automatic. |
 | 2026-09-22 | Added §3.6: full support includes explicit condition-comment posting, tracked-location lineup confirmation, and eligible Insider Connected changes. Detailed workflows remain separate decisions (PP-o355.54.13, PP-o355.54.10, PP-o355.54.11). |
 | 2026-09-06 | Restricted the read-only control and manual Refresh in §§4.9 and 8.3 to signed-in members; anonymous visitors and guests remain excluded. |

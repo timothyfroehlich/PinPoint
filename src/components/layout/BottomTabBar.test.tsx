@@ -34,18 +34,28 @@ vi.mock("~/components/feedback/FeedbackWidget", () => ({
   openFeedbackForm: vi.fn(),
 }));
 
+vi.mock("~/components/layout/QuickSearch", () => ({
+  MobileQuickSearchTrigger: ({ className }: { className?: string }) => (
+    <button className={className} data-testid="quick-search-mobile-trigger">
+      Search
+    </button>
+  ),
+}));
+
 describe("BottomTabBar", () => {
   beforeEach(() => {
     vi.mocked(usePathname).mockReturnValue("/dashboard");
   });
 
-  it("renders the four main tabs with correct links", () => {
+  it("replaces Dashboard with Search and preserves the remaining destinations", () => {
     render(<BottomTabBar />);
 
-    expect(screen.getByRole("link", { name: /dashboard/i })).toHaveAttribute(
-      "href",
-      "/dashboard"
-    );
+    expect(
+      screen.queryByRole("link", { name: /dashboard/i })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByTestId("quick-search-mobile-trigger")
+    ).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /issues/i })).toHaveAttribute(
       "href",
       "/issues"
@@ -76,14 +86,11 @@ describe("BottomTabBar", () => {
   });
 
   it("highlights the active tab based on pathname", () => {
+    vi.mocked(usePathname).mockReturnValue("/issues");
     render(<BottomTabBar />);
 
-    // usePathname is mocked to return "/dashboard"
-    const dashboardLink = screen.getByRole("link", { name: /dashboard/i });
-    expect(dashboardLink).toHaveAttribute("aria-current", "page");
-
     const issuesLink = screen.getByRole("link", { name: /issues/i });
-    expect(issuesLink).not.toHaveAttribute("aria-current", "page");
+    expect(issuesLink).toHaveAttribute("aria-current", "page");
   });
 
   it("uses issuesPath prop for the Issues tab link", () => {

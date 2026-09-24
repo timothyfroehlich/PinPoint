@@ -87,6 +87,12 @@ vi.mock("./HelpMenu", () => ({
   ),
 }));
 
+vi.mock("~/components/layout/QuickSearch", () => ({
+  DesktopQuickSearchTrigger: () => (
+    <button data-testid="quick-search-desktop-trigger">Search</button>
+  ),
+}));
+
 // FeedbackWidget uses Sentry -- mock it to keep tests simple
 vi.mock("~/components/feedback/FeedbackWidget", () => ({
   openFeedbackForm: vi.fn(),
@@ -224,6 +230,13 @@ describe("AppHeader", () => {
   });
 
   describe("desktop actions", () => {
+    it("renders the quick search trigger", () => {
+      render(<AppHeader {...defaultAuthProps} />);
+      expect(
+        screen.getByTestId("quick-search-desktop-trigger")
+      ).toBeInTheDocument();
+    });
+
     it("opens Detailed report by default from the header", () => {
       render(<AppHeader {...defaultAuthProps} />);
       expect(screen.getByTestId("nav-report-issue")).toBeInTheDocument();

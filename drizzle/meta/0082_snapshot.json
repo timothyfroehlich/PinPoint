@@ -1,5 +1,5 @@
 {
-  "id": "974f4242-8ba2-461a-b3a9-0284d20b08ab",
+  "id": "48c96d9a-9d05-4e0c-9105-4bb0782fdf0a",
   "prevId": "1529e845-825a-49f6-8436-bfd9f8c09732",
   "version": "7",
   "dialect": "postgresql",
@@ -1505,6 +1505,44 @@
         "description": {
           "name": "description",
           "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "apron_size": {
+          "name": "apron_size",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "apron_use_custom_description": {
+          "name": "apron_use_custom_description",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "apron_description": {
+          "name": "apron_description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "apron_tip": {
+          "name": "apron_tip",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "apron_tip_enabled": {
+          "name": "apron_tip_enabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "apron_saved_at": {
+          "name": "apron_saved_at",
+          "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
         },
@@ -3238,20 +3276,6 @@
           "notNull": true,
           "default": "'guest'"
         },
-        "mobile_report_mode": {
-          "name": "mobile_report_mode",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'quick'"
-        },
-        "desktop_report_mode": {
-          "name": "desktop_report_mode",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'detailed'"
-        },
         "terms_accepted_at": {
           "name": "terms_accepted_at",
           "type": "timestamp with time zone",
@@ -3293,14 +3317,6 @@
         "user_profiles_role_check": {
           "name": "user_profiles_role_check",
           "value": "role IN ('guest', 'member', 'technician', 'admin')"
-        },
-        "user_profiles_mobile_report_mode_check": {
-          "name": "user_profiles_mobile_report_mode_check",
-          "value": "mobile_report_mode IN ('quick', 'detailed', 'multiple')"
-        },
-        "user_profiles_desktop_report_mode_check": {
-          "name": "user_profiles_desktop_report_mode_check",
-          "value": "desktop_report_mode IN ('quick', 'detailed', 'multiple')"
         },
         "user_profiles_first_name_not_blank": {
           "name": "user_profiles_first_name_not_blank",

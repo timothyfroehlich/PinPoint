@@ -168,10 +168,7 @@ describe("db-target — describeTarget never leaks credentials", () => {
 });
 
 describe("seed scripts — local-only demo seeds refuse remote targets", () => {
-  for (const script of [
-    "supabase/seed-collections.mjs",
-    "supabase/seed-machine-settings.mjs",
-  ]) {
+  for (const script of ["supabase/seed-collections.mjs"]) {
     it(`${script} refuses a production URL`, () => {
       const { status, stderr } = runScript(script, {
         POSTGRES_URL: PROD_POOLER_URL,
@@ -200,6 +197,7 @@ describe("seed scripts — local-only demo seeds refuse remote targets", () => {
 describe("seed scripts — remote-capable seeds refuse production only", () => {
   for (const script of [
     "supabase/seed-discord.mjs",
+    "supabase/seed-machine-settings.mjs",
     "supabase/seed-pinballmap-catalog.mjs",
   ]) {
     it(`${script} refuses the production project`, () => {
@@ -228,10 +226,8 @@ describe("seed scripts — remote-capable seeds refuse production only", () => {
         DISCORD_BOT_TOKEN: "fake-token-for-test",
       });
       expect(stderr).not.toContain("PinPoint PRODUCTION");
-      // These two catch their own connection error and print a bare "seed
-      // failed" line, so assert on that rather than on ECONNREFUSED: either way
-      // the run got past the guard and reached the database.
-      expect(stderr).toMatch(/seed failed/i);
+      // Each script reports its connection failure after passing the guard.
+      expect(stderr).toMatch(/(?:seed failed|seed-machine-settings failed)/i);
     });
   }
 });

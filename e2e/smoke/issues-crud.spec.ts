@@ -92,7 +92,7 @@ test.describe("Issues System", () => {
       page,
     }) => {
       // Navigate to machines list page with filters reset
-      await page.goto("/m?availability=all");
+      await page.goto("/m?presence=all");
       await expect(
         page.getByRole("heading", { name: "Machines" })
       ).toBeVisible();
@@ -105,9 +105,9 @@ test.describe("Issues System", () => {
         .waitForLoadState("networkidle", { timeout: 5000 })
         .catch(() => undefined);
 
-      const machineSearchInput = page.getByPlaceholder(
-        "Search machines by name or initials..."
-      );
+      const machineSearchInput = page.getByRole("searchbox", {
+        name: "Search machines",
+      });
       await machineSearchInput.fill(seededMachines.addamsFamily.initials);
       await expect(machineSearchInput).toHaveValue(
         seededMachines.addamsFamily.initials
@@ -122,11 +122,12 @@ test.describe("Issues System", () => {
         })
         .toBe(seededMachines.addamsFamily.initials);
 
-      // Click the stable machine detail link by initials. The display name can
-      // change earlier in the serial suite, but the route remains /m/TAF.
-      const addamsFamilyLink = page.locator(
-        `a[href="/m/${seededMachines.addamsFamily.initials}"]`
-      );
+      // The shared view renders both compact and table markup. The accessible
+      // link query selects the mode currently shown instead of matching both.
+      const addamsFamilyLink = page.getByRole("link", {
+        name: "The Addams Family",
+        exact: true,
+      });
       await expect(addamsFamilyLink).toBeVisible();
       await addamsFamilyLink.click();
       await expect(page).toHaveURL(/\/m\/TAF/); // Expect TAF machine detail page
