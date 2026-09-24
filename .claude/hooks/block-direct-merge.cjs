@@ -8,14 +8,13 @@
 // Tim 2026-08-19).
 //
 // ASK (prompts Tim; exits 0 with a PreToolUse "ask" decision):
-//   3. `scripts/workflow/merge-pr.sh` — the gate-enforced merge script. An agent
-//      MAY invoke it; the hook turns the invocation into an approval prompt, so
-//      the merge decision is still Tim's (he approves the prompt). A hook "ask"
-//      prompts in EVERY permission mode, including bypassPermissions, so a
-//      bypassPermissions subagent cannot merge silently. The script re-checks all
-//      four merge gates (CI green, review marker pins head, threads resolved, no
-//      conflict) at merge time, so approving the prompt is not approving an
-//      un-gated merge.
+//   3. `scripts/workflow/merge-pr.sh` — the gate-enforced merge script. An
+//      owning agent may invoke it only after Tim directly requests the
+//      unambiguous merge in the active task. This hook, loaded by Claude Code
+//      and Codex, adds a confirmation prompt; it does not replace the request. The "ask"
+//      decision prompts in every permission mode, including bypassPermissions.
+//      The script re-checks all four merge gates (CI, exact-head review,
+//      resolved threads, no conflict) at merge time.
 //
 // DENY (hard-blocks; exits 2 with a stderr message):
 //   1. `gh pr merge` (direct CLI merge)
@@ -24,8 +23,7 @@
 //   For PinPoint targets, these three stay human-only-via-`!` because they
 //   bypass merge-pr.sh's gate checks entirely — a raw merge runs no
 //   CI/review/threads/conflict re-evaluation, so there is no safe agent path
-//   through them. The only way an agent reaches a PinPoint merge is the
-//   ask-gated script above.
+//   through them. In Claude Code, an authorized agent uses the ask-gated script.
 //
 // HOW IT MATCHES (PP-6t3c, PP-ar8a). This used to regex a quote-stripped copy of
 // the command, which had the boundary wide open: `eval "gh pr merge 123"`,
@@ -586,18 +584,16 @@ if (require.main === module) {
       process.exit(0);
     }
 
-    // merge-pr.sh: ask, don't deny. An agent may invoke the gate-enforced merge
-    // script, but the invocation is turned into an approval prompt so Tim signs
-    // off (PP-wi85 reversed for this channel only, per Tim 2026-08-19). A
-    // PreToolUse "ask" decision prompts in every permission mode — including
-    // bypassPermissions — so a bypassPermissions subagent cannot merge silently.
-    // The script re-checks all four merge gates at merge time, so approving the
-    // prompt is not approving an un-gated merge.
+    // merge-pr.sh: ask, don't deny. The owning agent may invoke it only after
+    // Tim directly requests the unambiguous merge in the active task. This
+    // hook prompt is an additional confirmation, not a substitute for
+    // that request. "ask" prompts in every permission mode, including
+    // bypassPermissions. The script re-checks all four merge gates.
     if (kind === "merge-script") {
       const reason =
         "merge-pr.sh runs the gate-enforced merge (CI green, review marker pins " +
         "head, threads resolved, no conflict — all re-checked at merge time). " +
-        `Approve to let Tim sign off on the merge. [matched: ${detail}]`;
+        `Confirm Tim requested this merge in the active task. [matched: ${detail}]`;
       process.stdout.write(
         JSON.stringify({
           hookSpecificOutput: {
@@ -616,9 +612,9 @@ if (require.main === module) {
     // command a human types (which never generates a PreToolUse event).
     console.error(
       `Direct merge blocked: ${detail}. This channel skips merge-pr.sh's gate checks, so it ` +
-        "stays human-only. Either run the gate-enforced script yourself — " +
-        "`bash scripts/workflow/merge-pr.sh <PR> --human` (Tim approves the prompt) — or hand Tim " +
-        "the command to run himself: ! scripts/workflow/merge-pr.sh <PR> --human"
+        "stays human-only. Only after Tim directly requests the unambiguous merge in the active task, run " +
+        "`bash scripts/workflow/merge-pr.sh <PR> --human`; the hook may also prompt. Otherwise hand Tim " +
+        "the guarded command to run himself: ! scripts/workflow/merge-pr.sh <PR> --human"
     );
     process.exit(2);
   });

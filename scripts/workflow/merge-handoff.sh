@@ -11,12 +11,12 @@ set -euo pipefail
 #
 # The report is a SNAPSHOT and says so: it is stale the moment CI re-runs, someone pushes,
 # or main moves. That is why the last two lines are commands rather than conclusions — the
-# first re-runs this report, the second merges. Both are `!`-prefixed because Tim types
-# them into the Claude Code prompt, where `!` runs a command outside the agent tool-call
-# path. An agent MAY also run `merge-pr.sh --human` itself, but the block-direct-merge hook
-# turns that into an approval prompt Tim must accept (PP-wi85, reversed for the script per
-# Tim 2026-08-19) — so the merge decision stays his either way. The raw channels (gh pr
-# merge, gh api, MCP merge) stay hard-blocked for agents.
+# first re-runs this report, the second merges. Both are `!`-prefixed for Tim's
+# Claude Code prompt, where `!` runs outside the agent tool-call path. When Tim
+# directly requests the unambiguous PR's merge in the active task, its owning
+# agent in any harness may run `merge-pr.sh <PR> --human`; Claude Code and Codex
+# may also prompt through block-direct-merge.cjs. Without that request, hand
+# off only. Raw merge channels stay prohibited for agents.
 #
 # The merge command is only printed when all four merge gates actually pass. Handing over a
 # merge command while CI is still yellow invites a merge on a guess, and the gates would
