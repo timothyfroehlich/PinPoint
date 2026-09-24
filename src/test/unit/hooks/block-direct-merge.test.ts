@@ -241,9 +241,10 @@ describe("block-direct-merge.cjs — MCP merge", () => {
 });
 
 describe("block-direct-merge.cjs — merge-pr.sh (PP-wi85 ask-gated)", () => {
-  // merge-pr.sh is the gate-enforced script; an agent MAY invoke it, and the
-  // hook turns each invocation into an approval prompt (exit 0 + "ask" JSON) so
-  // Tim signs off. Every shape below still has to be RECOGNIZED as merge-pr.sh —
+  // merge-pr.sh is the gate-enforced script; an owning agent may invoke it only
+  // after Tim directly requests the unambiguous merge in the active task.
+  // The hook adds an approval prompt (exit 0 + "ask" JSON). Every shape below
+  // still has to be RECOGNIZED as merge-pr.sh —
   // a wrapper/path form that slips past recognition would reach the merge
   // un-prompted, so these are the same evasion cases the old hard gate covered,
   // now asserting ask instead of deny.

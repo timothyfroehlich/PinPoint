@@ -99,6 +99,8 @@ def test_refuses_pinpoint_targets(tmp_path: Path, repository: str) -> None:
 
     assert result.returncode == 1
     assert "merge-pr.sh 2058 --human" in result.stderr
+    assert "Tim's direct request" in result.stderr
+    assert "merge-handoff.sh 2058" in result.stderr
     assert calls == ["git", "rev-parse", "--show-toplevel"]
 
 
