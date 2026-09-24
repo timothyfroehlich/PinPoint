@@ -9,11 +9,12 @@ interface MachineBackboxTransliteProps {
 }
 
 /**
- * MachineBackboxTranslite — desktop-only backbox art block for the machine
- * detail header zone. It sits flush to the right edge and stretches to the
- * full height of the identity + tab-strip column beside it.
+ * MachineBackboxTranslite — game artwork for the machine detail header zone,
+ * placed in the layout grid's `art` area. Below md it sits beside the identity,
+ * above the tab strip; from md it sits flush to the right edge and stretches
+ * to the full height of the identity + tab strip.
  *
- * Fixed-width box with the image absolutely positioned via `fill` +
+ * Fixed-width box (per breakpoint) with the image absolutely positioned via `fill` +
  * `object-cover`. This is load-bearing: a height-driven version
  * (`height:100%; width:auto`) had no hard width cap and fell back to the
  * image's natural ~1099px width, blowing out the page. A fixed box can't.
@@ -31,13 +32,13 @@ export function MachineBackboxTranslite({
   return (
     <figure
       data-testid="machine-translite"
-      className="relative m-0 hidden w-[300px] shrink-0 self-stretch overflow-hidden border-b border-l border-outline-variant md:block"
+      className="relative m-0 ml-3 w-28 overflow-hidden rounded-md [grid-area:art] sm:w-44 md:ml-0 md:w-[300px] md:rounded-none md:border-b md:border-l md:border-outline-variant"
     >
       <Image
         src={imageUrl}
         alt={`${name} game artwork`}
         fill
-        sizes="300px"
+        sizes="(min-width: 768px) 300px, (min-width: 640px) 176px, 112px"
         unoptimized
         className="object-cover object-center"
       />

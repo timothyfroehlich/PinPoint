@@ -46,17 +46,4 @@ describe("MachineBackboxTranslite", () => {
     expect(screen.queryByTestId("machine-translite")).not.toBeInTheDocument();
     expect(container).toBeEmptyDOMElement();
   });
-
-  it("is desktop-only (hidden on mobile, shown at md)", () => {
-    render(
-      <MachineBackboxTranslite
-        imageUrl="https://img.opdb.org/godzilla.jpg"
-        name="Godzilla"
-      />
-    );
-    expect(screen.getByTestId("machine-translite")).toHaveClass(
-      "hidden",
-      "md:block"
-    );
-  });
 });
