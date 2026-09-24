@@ -26,6 +26,7 @@ import { PinballmapListingControl } from "~/components/machines/PinballmapListin
 import { PinballmapAbandonedEntries } from "~/components/machines/PinballmapAbandonedEntries";
 import { getUnifiedUsers } from "~/lib/users/queries";
 import { getMachineForLayout } from "~/app/(app)/m/[initials]/_data";
+import { ApronCardPanel } from "~/app/(app)/m/[initials]/apron/ApronCardPanel";
 import { MachineDetailsForm } from "./machine-details-form";
 import { DetailsDirtyProvider } from "./details-dirty";
 import { PinballmapDirtyGate } from "./pinballmap-dirty-gate";
@@ -350,6 +351,15 @@ export default async function MachineEditPage({
           ) : null}
         </section>
       </DetailsDirtyProvider>
+
+      {/* Apron card — edited in its own dialog, the same one the Service tab
+          opens (apron-cards spec §3.1). */}
+      <ApronCardPanel
+        machine={machine}
+        variant="row"
+        canEdit={canEdit}
+        canExport={checkPermission("machines.apron.export", accessLevel)}
+      />
 
       {/* Danger zone — applies immediately. Machine deletion joins this
           section in PP-o355.25. */}
