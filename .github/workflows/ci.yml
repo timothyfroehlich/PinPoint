@@ -39,41 +39,21 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Detect which files changed to skip expensive jobs for non-website PRs.
-  # "Non-website" covers: docs (docs/**, **/*.md), beads (.beads/**), agent
-  # configs (.agent[s]/**, .claude/**, .codex/**), the non-TS/JS files under
-  # scripts/ (scripts/**/*.{py,sh,sql,json,txt} and the whole scripts/tests/**
-  # tree), editor / IDE / git configs
-  # (.husky/**, .vscode/**, pinpoint.code-workspace, .gitattributes, .gitignore),
-  # test/linter configs (pytest.ini, ruff.toml, .yamllint.yml, .gitleaks.toml),
-  # and non-PR GitHub Action configs/workflows (dependabot.yml, renovate.json,
-  # CODEOWNERS, ownerless-renovate-issues.yaml, preview-*.yaml,
-  # codex-reaction-witness.yaml).
+  # Detect which files changed so non-website PRs skip the expensive jobs
+  # (integration, migrations, Supabase, E2E). `static` and `linters` always
+  # run, so a hole in this filter can skip E2E but never type-check, lint,
+  # unit tests or the build.
   #
-  # Note: under scripts/, only TS/JS (.ts/.mjs) counts as code. Python and shell
-  # are excluded (the always-running `linters` job covers them: pytest
-  # scripts/tests/, ruff, shellcheck), and .sql/.json/.txt plus the whole
-  # scripts/tests/** tree are excluded as data/config the site build can't
-  # depend on. TS/JS is NOT excluded because it is real code
-  # (scripts/migrate-production.ts runs on every Vercel prod build,
-  # scripts/lib/pg-client.mjs is the PP-d8l8 prod commit-loss file,
-  # tsconfig.app.json includes some, scripts/workflow/pr-watcher-mcp.ts has a
-  # vitest spec) that the linters job never touches, so it must get typecheck,
-  # lint, test, and build. package.json is likewise NOT excluded — a
-  # package.json-only edit (packageManager pin, a script, an engines bump) with no
-  # lockfile change must still re-run setup and the full suite. (PP-9jar)
+  # "Non-website": docs and *.md, .beads, agent configs (.agent[s], .claude,
+  # .codex), non-TS/JS files under scripts/ (py/sh/sql/json/txt and
+  # scripts/tests/**), editor/git configs, test/linter configs, and the
+  # GitHub configs/workflows that don't affect this workflow. TS/JS under
+  # scripts/ and package.json count as code (scripts/migrate-production.ts runs
+  # on every prod build; PP-9jar). ci.yml and .github/actions/** always count.
   #
-  # .github/workflows/ci.yml and .github/actions/** are intentionally NOT excluded —
-  # any change to the CI workflow or its composite actions directly affects what
-  # CI runs, so we keep triggering full CI to validate it.
-  #
-  # Uses predicate-quantifier: 'every' with a positive '**' plus negative
-  # exclusions. A changed file counts as "code" only when it matches every
-  # pattern — i.e. it matches '**' (always) AND is NOT under any excluded
-  # path. `has_code` is true if at least one changed file is "code". A
-  # PR touching only excluded paths produces has_code=false and downstream
-  # expensive jobs cascade-skip via `setup`'s `if:` gate. New / unknown
-  # directories default to running full CI — the safe failure mode.
+  # predicate-quantifier 'every' with a positive '**' plus negative exclusions:
+  # a file is "code" only if it is excluded by none of them. New or unknown
+  # paths default to running full CI.
   #
   # Why 'every' and not 'some': under 'some', the positive '**' matches every
   # file by itself, short-circuiting the negative exclusions and forcing
@@ -153,10 +133,11 @@ jobs:
             echo "code=false" >> "$GITHUB_OUTPUT"
           fi
 
-  # Required parallel canary for the locked mise toolchain. Keep the existing
-  # job graph intact until the later cutover so it remains the rollback path.
-  mise-canary:
-    name: mise Toolchain Canary
+  # Static checks, unit tests and build. Always runs (no path filter), so a
+  # change that only touches files the filter treats as non-code still gets
+  # type-checked, linted and unit-tested.
+  static:
+    name: Static checks, unit tests, build
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -176,38 +157,6 @@ jobs:
         with:
           install-args: "--locked"
 
-      - name: Verify locked toolchain versions
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          assert_version() {
-            local tool="$1"
-            local expected="$2"
-            local actual="$3"
-            if [[ "$actual" != "$expected" ]]; then
-              echo "::error::${tool} version mismatch: expected ${expected}, got ${actual}"
-              exit 1
-            fi
-            echo "${tool} ${actual}"
-          }
-
-          node_version="$(node --version)"
-          node_version="${node_version#v}"
-          pnpm_version="$(pnpm --version)"
-          python_version="$(python3 -c 'import platform; print(platform.python_version())')"
-          supabase_version="$(supabase --version)"
-
-          expected_node="$(python3 -c 'import tomllib; print(tomllib.load(open("mise.toml", "rb"))["tools"]["node"])')"
-          expected_pnpm="$(python3 -c 'import json; value=json.load(open("package.json"))["packageManager"]; print(value.split("@", 1)[1].split("+", 1)[0])')"
-          expected_python="$(python3 -c 'import tomllib; print(tomllib.load(open("mise.toml", "rb"))["tools"]["python"])')"
-          expected_supabase="$(python3 -c 'import tomllib; print(tomllib.load(open("mise.toml", "rb"))["tools"]["supabase"])')"
-
-          assert_version node "$expected_node" "$node_version"
-          assert_version pnpm "$expected_pnpm" "$pnpm_version"
-          assert_version python "$expected_python" "$python_version"
-          assert_version supabase "$expected_supabase" "$supabase_version"
-
       - name: Cache node_modules
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # ratchet:actions/cache@v6.1.0
         with:
@@ -217,21 +166,24 @@ jobs:
       - name: Install dependencies from lockfile
         run: pnpm install --frozen-lockfile
 
-      - name: Run representative static checks
+      - name: Type check
         run: |
           pnpm run typecheck
           pnpm run typecheck:tests
-          pnpm run lint
-          pnpm run format
-          ruff check scripts/
-          ruff format --check scripts/
+          pnpm run typecheck:e2e
 
-      - name: Run representative unit tests
+      - name: Lint
+        run: pnpm run lint
+
+      - name: Format check
+        run: pnpm run format
+
+      - name: Unit tests
         run: |
           set -a
           source .env.ci
           set +a
-          pnpm run test
+          pnpm run test:_run
 
       - name: Build application
         run: |
@@ -269,108 +221,6 @@ jobs:
         with:
           path: node_modules
           key: ${{ steps.toolchain.outputs.node-modules-key }}
-
-  typecheck:
-    name: TypeScript Type Check
-    runs-on: ubuntu-latest
-    needs: setup
-    steps:
-      - name: Harden Runner
-        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # ratchet:step-security/harden-runner@v2.21.1
-        with:
-          egress-policy: audit
-
-      - name: Checkout code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # ratchet:actions/checkout@v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Setup locked mise toolchain
-        id: toolchain
-        uses: ./.github/actions/setup-mise
-
-      - name: Restore node_modules
-        id: cache-restore
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # ratchet:actions/cache/restore@v6.1.0
-        with:
-          path: node_modules
-          key: ${{ steps.toolchain.outputs.node-modules-key }}
-
-      - name: Install dependencies (if cache miss)
-        if: steps.cache-restore.outputs.cache-hit != 'true'
-        run: pnpm install --frozen-lockfile
-
-      - name: Run type checking
-        run: pnpm run typecheck
-
-      - name: Run test type checking (native tsc)
-        run: pnpm run typecheck:tests
-
-  lint:
-    name: Oxlint
-    runs-on: ubuntu-latest
-    needs: setup
-    steps:
-      - name: Harden Runner
-        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # ratchet:step-security/harden-runner@v2.21.1
-        with:
-          egress-policy: audit
-
-      - name: Checkout code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # ratchet:actions/checkout@v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Setup locked mise toolchain
-        id: toolchain
-        uses: ./.github/actions/setup-mise
-
-      - name: Restore node_modules
-        id: cache-restore
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # ratchet:actions/cache/restore@v6.1.0
-        with:
-          path: node_modules
-          key: ${{ steps.toolchain.outputs.node-modules-key }}
-
-      - name: Install dependencies (if cache miss)
-        if: steps.cache-restore.outputs.cache-hit != 'true'
-        run: pnpm install --frozen-lockfile
-
-      - name: Run linting
-        run: pnpm run lint
-
-  format:
-    name: Prettier Format Check
-    runs-on: ubuntu-latest
-    needs: setup
-    steps:
-      - name: Harden Runner
-        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # ratchet:step-security/harden-runner@v2.21.1
-        with:
-          egress-policy: audit
-
-      - name: Checkout code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # ratchet:actions/checkout@v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Setup locked mise toolchain
-        id: toolchain
-        uses: ./.github/actions/setup-mise
-
-      - name: Restore node_modules
-        id: cache-restore
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # ratchet:actions/cache/restore@v6.1.0
-        with:
-          path: node_modules
-          key: ${{ steps.toolchain.outputs.node-modules-key }}
-
-      - name: Install dependencies (if cache miss)
-        if: steps.cache-restore.outputs.cache-hit != 'true'
-        run: pnpm install --frozen-lockfile
-
-      - name: Check formatting
-        run: pnpm run format
 
   # Fast linters that always run — cheap enough to never skip.
   linters:
@@ -444,82 +294,6 @@ jobs:
             .github/workflows/ci.yml
             .github/workflows/preview-control.yaml
             .github/workflows/preview-reaper.yaml
-
-  build:
-    name: Build
-    runs-on: ubuntu-latest
-    needs: [setup, typecheck, lint, format, linters, test-unit, test-integration]
-    steps:
-      - name: Harden Runner
-        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # ratchet:step-security/harden-runner@v2.21.1
-        with:
-          egress-policy: audit
-
-      - name: Checkout code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # ratchet:actions/checkout@v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Setup locked mise toolchain
-        id: toolchain
-        uses: ./.github/actions/setup-mise
-
-      - name: Restore node_modules
-        id: cache-restore
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # ratchet:actions/cache/restore@v6.1.0
-        with:
-          path: node_modules
-          key: ${{ steps.toolchain.outputs.node-modules-key }}
-
-      - name: Install dependencies (if cache miss)
-        if: steps.cache-restore.outputs.cache-hit != 'true'
-        run: pnpm install --frozen-lockfile
-
-      - name: Build application
-        run: |
-          # Load CI environment variables for build-time evaluation
-          set -a
-          source .env.ci
-          set +a
-          pnpm run build
-
-  test-unit:
-    name: Unit Tests
-    runs-on: ubuntu-latest
-    needs: setup
-    steps:
-      - name: Harden Runner
-        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # ratchet:step-security/harden-runner@v2.21.1
-        with:
-          egress-policy: audit
-
-      - name: Checkout code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # ratchet:actions/checkout@v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Setup locked mise toolchain
-        id: toolchain
-        uses: ./.github/actions/setup-mise
-
-      - name: Restore node_modules
-        id: cache-restore
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # ratchet:actions/cache/restore@v6.1.0
-        with:
-          path: node_modules
-          key: ${{ steps.toolchain.outputs.node-modules-key }}
-
-      - name: Install dependencies (if cache miss)
-        if: steps.cache-restore.outputs.cache-hit != 'true'
-        run: pnpm install --frozen-lockfile
-
-      - name: Run unit tests with coverage
-        run: |
-          set -a
-          source .env.ci
-          set +a
-          pnpm run test:coverage
-
 
   test-integration:
     name: Integration Tests
@@ -622,7 +396,7 @@ jobs:
     name: Supabase Integration Tests
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'pull_request' && (needs.changes.outputs.code == 'true' || needs.changes.outputs.deps == 'true') }}
-    needs: [changes, setup, typecheck, lint, format, linters, test-unit, test-integration, test-migrations]
+    needs: [changes, setup, static, linters, test-integration, test-migrations]
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # ratchet:step-security/harden-runner@v2.21.1
@@ -669,7 +443,7 @@ jobs:
     name: E2E Smoke Tests (Chromium)
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'pull_request' && (needs.changes.outputs.code == 'true' || needs.changes.outputs.deps == 'true') }}
-    needs: [changes, setup, typecheck, lint, format, linters, test-unit, test-integration, test-migrations]
+    needs: [changes, setup, static, linters, test-integration, test-migrations]
     timeout-minutes: 15
     steps:
       - name: Harden Runner
@@ -743,7 +517,7 @@ jobs:
     name: E2E Smoke Tests (Mobile Chrome)
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'pull_request' && (needs.changes.outputs.code == 'true' || needs.changes.outputs.deps == 'true') }}
-    needs: [changes, setup, typecheck, lint, format, linters, test-unit, test-integration, test-migrations]
+    needs: [changes, setup, static, linters, test-integration, test-migrations]
     timeout-minutes: 15
     steps:
       - name: Harden Runner
@@ -817,7 +591,7 @@ jobs:
     name: E2E Full Tests (Chromium)
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'pull_request' && (needs.changes.outputs.code == 'true' || needs.changes.outputs.deps == 'true') }}
-    needs: [changes, setup, typecheck, lint, format, linters, test-unit, test-integration, test-migrations]
+    needs: [changes, setup, static, linters, test-integration, test-migrations]
     timeout-minutes: 15
     steps:
       - name: Harden Runner
@@ -895,7 +669,7 @@ jobs:
     # leaning on the `setup`-skip cascade to keep it off docs-only main pushes —
     # an implicit guard a future refactor could break. (PP-x0ke.)
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && (needs.changes.outputs.code == 'true' || needs.changes.outputs.deps == 'true') }}
-    needs: [changes, setup, typecheck, lint, format, linters, test-unit, test-integration, test-migrations]
+    needs: [changes, setup, static, linters, test-integration, test-migrations]
     # Backstop only — the real limits are per-step (see the comment above the
     # Playwright steps). Must stay above setup + both step timeouts, or a job
     # cancellation silently swallows the verdict again. (PP-jxhy.)
@@ -1130,14 +904,9 @@ jobs:
     needs:
       - changes
       - setup
-      - mise-canary
+      - static
       - linters
       - gitleaks
-      - build
-      - lint
-      - format
-      - typecheck
-      - test-unit
       - test-integration
       - test-migrations
       - test-integration-supabase

@@ -302,7 +302,7 @@ def test_scripts_non_code_files_bypass_tests(
 def test_ts_unit_tests_trigger_ci_tests(
     paths_filter: PathsFilterSimulator,
 ) -> None:
-    """TypeScript/Vitest unit tests under src/test/unit/** must trigger CI test-unit job."""
+    """TypeScript/Vitest unit tests under src/test/unit/** must trigger the path-filtered CI jobs."""
     pr_2070_ts_tests = [
         "src/test/unit/hooks/block-direct-pr-watch.test.ts",
         "src/test/unit/hooks/verify-guard-stack.test.ts",

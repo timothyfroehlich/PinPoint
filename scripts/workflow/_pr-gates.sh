@@ -58,7 +58,7 @@ _repo_slug() {
 #   codex_native    native reviews from the exact Codex App account
 #   codex_clean     Codex's "no major issues" issue comment, SHA-pinned by its
 #                   "Reviewed commit" line (10- or 40-char)
-#   codex_witness   GitHub Actions witness of a fresh Codex eyes-to-+1 reaction,
+#   codex_witness   GitHub Actions witness of Codex's +1 on the SHA-tagged request,
 #                   SHA-pinned by the hidden marker
 #   codex_requests  the owner's manual `@codex review` request, SHA-pinned by its marker
 #   markers         local-review attestations posted by the repository owner (the

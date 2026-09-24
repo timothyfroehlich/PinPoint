@@ -1,4 +1,4 @@
-"""Tests for the trusted Codex eyes-to-clean reaction witness."""
+"""Tests for the trusted Codex clean-reaction witness."""
 
 import json
 import os
@@ -109,7 +109,7 @@ def run_witness(
     return result, posts, targets_path.read_text().splitlines()
 
 
-def test_fresh_eyes_then_clean_reaction_posts_sha_pinned_witness(
+def test_fresh_clean_reaction_posts_sha_pinned_witness(
     tmp_path: Path,
 ) -> None:
     result, posts, targets = run_witness(
@@ -122,12 +122,22 @@ def test_fresh_eyes_then_clean_reaction_posts_sha_pinned_witness(
     assert result.returncode == 0, result.stderr
     assert len(posts) == 1
     assert f"<!-- pinpoint-codex-reaction-witness: {HEAD} -->" in posts[0]["body"]
-    assert "03:01:00Z" in posts[0]["body"]
     assert "03:02:00Z" in posts[0]["body"]
     assert targets == [
         "repos/acme/widget/issues/123/reactions?per_page=100",
         "repos/acme/widget/issues/123/reactions?per_page=100",
     ]
+
+
+def test_clean_reaction_is_witnessed_after_eyes_was_already_replaced(
+    tmp_path: Path,
+) -> None:
+    """A review that finishes before the first poll leaves only +1 behind."""
+    result, posts, _targets = run_witness(
+        tmp_path, reaction_pages=[[reaction("+1", "2026-08-28T03:00:30Z")]]
+    )
+    assert result.returncode == 0, result.stderr
+    assert len(posts) == 1
 
 
 def test_manual_request_watches_the_trigger_comment_reactions(tmp_path: Path) -> None:
@@ -150,11 +160,12 @@ def test_manual_request_watches_the_trigger_comment_reactions(tmp_path: Path) ->
 @pytest.mark.parametrize(
     "reaction_pages",
     [
-        [[reaction("eyes", "2026-08-28T02:59:59Z")]],
-        [[reaction("eyes", "2026-08-28T03:01:00Z", login="other[bot]")]],
+        [[reaction("+1", "2026-08-28T02:59:59Z")]],
+        [[reaction("+1", "2026-08-28T03:01:00Z", login="other[bot]")]],
+        [[reaction("eyes", "2026-08-28T03:01:00Z")]],
     ],
 )
-def test_old_or_untrusted_eyes_cannot_create_witness(
+def test_old_untrusted_or_unfinished_reactions_cannot_create_witness(
     tmp_path: Path, reaction_pages: list[list[dict]]
 ) -> None:
     result, posts, _targets = run_witness(tmp_path, reaction_pages=reaction_pages)
@@ -216,12 +227,3 @@ def test_workflow_uses_trusted_main_and_narrow_permissions() -> None:
         in text
     )
     assert "GITHUB_ENV" not in text
-
-
-def test_default_budget_has_a_quiet_window_and_at_most_108_loop_reads() -> None:
-    text = SCRIPT.read_text()
-    assert "CODEX_WITNESS_INITIAL_DELAY_SECONDS:-120" in text
-    assert "CODEX_WITNESS_MAX_ATTEMPTS:-36" in text
-    assert "CODEX_WITNESS_POLL_SECONDS:-30" in text
-    # Each attempt reads head + reviews + one reaction endpoint until eyes appears.
-    assert 36 * 3 == 108

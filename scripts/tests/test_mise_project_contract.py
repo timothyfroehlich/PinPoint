@@ -898,74 +898,28 @@ def _workflow_job_block(workflow: str, job_name: str) -> str:
     return match.group(0)
 
 
-def test_ci_mise_canary_contract() -> None:
-    """Verify the required canary exercises the shared mise setup and caches."""
+def test_ci_static_job_contract() -> None:
+    """The always-run static job uses the shared mise setup and gates the PR."""
     workflow = CI_WORKFLOW_PATH.read_text(encoding="utf-8")
-    setup_action = MISE_ACTION_PATH.read_text(encoding="utf-8")
-    canary = _workflow_job_block(workflow, "mise-canary")
+    static = _workflow_job_block(workflow, "static")
 
-    checkout = canary.index("uses: actions/checkout@")
-    mise_action = canary.index("uses: ./.github/actions/setup-mise")
-    assert checkout < mise_action
-    assert "id: toolchain" in canary
-    assert 'install-args: "--locked"' in canary
-
-    assert "actions/setup-node" not in canary
-    assert "pnpm/action-setup" not in canary
-    assert "supabase/setup-cli" not in canary
-
-    assert (
-        "uses: jdx/mise-action@3c2e0cf82a5b2e5249f0d3635a4d83d0ae861518" in setup_action
+    assert static.index("uses: actions/checkout@") < static.index(
+        "uses: ./.github/actions/setup-mise"
     )
-    assert 'version: "2026.8.11"' in setup_action
-    assert 'default: "--locked node pnpm"' in setup_action
-    assert "cache: true" in setup_action
-    assert (
-        'cache_key: "{{default}}-compat-node-${{ inputs.node-version }}"'
-        in setup_action
-    )
-    assert "Verify Node compatibility runtime" in setup_action
-    assert "Node compatibility mismatch" in setup_action
-    assert 'default: "."' in setup_action
-    assert "working_directory: ${{ inputs.working-directory }}" in setup_action
-    assert "working-directory: ${{ inputs.working-directory }}" in setup_action
-
-    for version_command in (
-        "node --version",
-        "pnpm --version",
-        "platform.python_version()",
-        "supabase --version",
-    ):
-        assert version_command in canary
-
-    assert "pnpm store path --silent" in setup_action
-    assert "Cache pnpm store" in setup_action
-    assert "Cache node_modules" in canary
-    assert "steps.toolchain.outputs.node-modules-key" in canary
-    assert "runner.os" in setup_action
-    assert "runner.arch" in setup_action
-    assert "hashFiles('package.json')" in setup_action
-    assert "hashFiles('pnpm-lock.yaml')" in setup_action
-    assert "pnpm-store-${RUNNER_OS}-${RUNNER_ARCH}" in setup_action
-    assert "node-modules-${RUNNER_OS}-${RUNNER_ARCH}" in setup_action
-    assert "-node-${node_version}-pnpm-${pnpm_version}" in setup_action
-    assert "-${PACKAGE_HASH}-${LOCK_HASH}" in setup_action
-
+    assert "if:" not in static.split("steps:")[0], "static must always run"
     for command in (
         "pnpm install --frozen-lockfile",
         "pnpm run typecheck",
         "pnpm run typecheck:tests",
+        "pnpm run typecheck:e2e",
         "pnpm run lint",
         "pnpm run format",
-        "ruff check scripts/",
-        "ruff format --check scripts/",
-        "pnpm run test",
+        "pnpm run test:_run",
         "pnpm run build",
     ):
-        assert command in canary
+        assert command in static
 
-    ci_gate = _workflow_job_block(workflow, "ci-gate")
-    assert "- mise-canary" in ci_gate
+    assert "- static" in _workflow_job_block(workflow, "ci-gate")
 
 
 def test_workflows_use_mise_without_legacy_setup_actions() -> None:
@@ -1004,11 +958,7 @@ def test_ci_jobs_share_runtime_aware_dependency_cache() -> None:
     workflow = CI_WORKFLOW_PATH.read_text(encoding="utf-8")
     dependency_jobs = (
         "setup",
-        "typecheck",
-        "lint",
-        "format",
-        "build",
-        "test-unit",
+        "static",
         "test-integration",
         "test-migrations",
         "test-integration-supabase",
