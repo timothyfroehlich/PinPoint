@@ -57,7 +57,8 @@ esac
 normalized_repository=$(printf '%s' "$target_repository" | tr '[:upper:]' '[:lower:]')
 readonly normalized_repository
 if [[ "$normalized_repository" == "timothyfroehlich/pinpoint" ]]; then
-  echo "BLOCK: use bash scripts/workflow/merge-pr.sh ${pr_number} --human for PinPoint" >&2
+  echo "BLOCK: PinPoint merges require Tim's direct request in the active task." >&2
+  echo "  If requested, run bash scripts/workflow/merge-pr.sh ${pr_number} --human; otherwise use bash scripts/workflow/merge-handoff.sh ${pr_number}." >&2
   exit 1
 fi
 
