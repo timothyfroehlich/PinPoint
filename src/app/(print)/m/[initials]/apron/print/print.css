@@ -1,6 +1,6 @@
 /* Apron card print route (PP-esta). On screen: a toolbar above the card. On
- * paper: only the card at its physical size, inside the page margin most
- * printers need, with crop marks at each corner to cut along. The root
+ * paper: only the card sheet (ApronCardSheet — card at physical size, panel
+ * bleed, crop marks), inside the page margin most printers need. The root
  * layout's full-height, overflow-hidden body is undone so nothing clips. */
 @page {
   margin: 12mm;
@@ -26,84 +26,8 @@
   max-width: 640px;
 }
 
-/* The sheet pads the card so the crop marks sit in white space around it. */
 .apron-print__sheet {
-  --crop-gap: 2mm;
-  --crop-len: 5mm;
-
-  position: relative;
   flex-shrink: 0;
-  padding: calc(var(--crop-gap) + var(--crop-len));
-  background: #ffffff;
-}
-
-.apron-print__crop {
-  position: absolute;
-  inset: calc(var(--crop-gap) + var(--crop-len));
-  pointer-events: none;
-}
-
-.apron-print__mark {
-  position: absolute;
-  background: #000000;
-}
-
-/* Horizontal marks extend the top/bottom trim lines outward. */
-.apron-print__mark.is-top-left-h,
-.apron-print__mark.is-top-right-h,
-.apron-print__mark.is-bottom-left-h,
-.apron-print__mark.is-bottom-right-h {
-  width: var(--crop-len);
-  height: 0.25pt;
-}
-
-/* Vertical marks extend the left/right trim lines outward. */
-.apron-print__mark.is-top-left-v,
-.apron-print__mark.is-top-right-v,
-.apron-print__mark.is-bottom-left-v,
-.apron-print__mark.is-bottom-right-v {
-  width: 0.25pt;
-  height: var(--crop-len);
-}
-
-.apron-print__mark.is-top-left-h,
-.apron-print__mark.is-bottom-left-h {
-  right: calc(100% + var(--crop-gap));
-}
-
-.apron-print__mark.is-top-right-h,
-.apron-print__mark.is-bottom-right-h {
-  left: calc(100% + var(--crop-gap));
-}
-
-.apron-print__mark.is-top-left-h,
-.apron-print__mark.is-top-right-h {
-  top: 0;
-}
-
-.apron-print__mark.is-bottom-left-h,
-.apron-print__mark.is-bottom-right-h {
-  bottom: 0;
-}
-
-.apron-print__mark.is-top-left-v,
-.apron-print__mark.is-top-right-v {
-  bottom: calc(100% + var(--crop-gap));
-}
-
-.apron-print__mark.is-bottom-left-v,
-.apron-print__mark.is-bottom-right-v {
-  top: calc(100% + var(--crop-gap));
-}
-
-.apron-print__mark.is-top-left-v,
-.apron-print__mark.is-bottom-left-v {
-  left: 0;
-}
-
-.apron-print__mark.is-top-right-v,
-.apron-print__mark.is-bottom-right-v {
-  right: 0;
 }
 
 @media print {

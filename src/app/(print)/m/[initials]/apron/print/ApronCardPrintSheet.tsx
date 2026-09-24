@@ -6,7 +6,7 @@ import Link from "next/link";
 import { Printer } from "lucide-react";
 
 import { Button } from "~/components/ui/button";
-import { ApronCardFace } from "~/components/machines/apron/ApronCardFace";
+import { ApronCardSheet } from "~/components/machines/apron/ApronCardSheet";
 import {
   APRON_CARD_SIZES,
   type ApronCardContent,
@@ -21,18 +21,6 @@ interface ApronCardPrintSheetProps {
   size: ApronCardSize;
   scanUrl: string;
 }
-
-// Two marks per corner, each on the trim line's extension, clear of the card.
-const CROP_MARKS = [
-  "is-top-left-h",
-  "is-top-left-v",
-  "is-top-right-h",
-  "is-top-right-v",
-  "is-bottom-left-h",
-  "is-bottom-left-v",
-  "is-bottom-right-h",
-  "is-bottom-right-v",
-] as const;
 
 /** Shows the card and opens the print dialog once fonts and title are set. */
 export function ApronCardPrintSheet({
@@ -75,12 +63,7 @@ export function ApronCardPrintSheet({
         </div>
       </div>
       <div className="apron-print__sheet">
-        <div className="apron-print__crop" aria-hidden="true">
-          {CROP_MARKS.map((mark) => (
-            <span key={mark} className={`apron-print__mark ${mark}`} />
-          ))}
-        </div>
-        <ApronCardFace
+        <ApronCardSheet
           content={content}
           size={size}
           scanUrl={scanUrl}

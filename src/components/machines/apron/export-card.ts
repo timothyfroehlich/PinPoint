@@ -1,5 +1,6 @@
 import {
   APRON_CARD_SIZES,
+  APRON_SHEET_MARGIN_MM,
   type ApronCardSize,
 } from "~/lib/machines/apron-card";
 
@@ -31,7 +32,10 @@ export async function exportApronCardPng(
   download(await rasterize(node), filename);
 }
 
-/** One-page PDF whose page is exactly the card (spec §9.2). */
+/**
+ * One-page PDF of the print sheet: the card at exact size (spec §9.2) with
+ * panel bleed and crop marks, on a page just large enough to hold them.
+ */
 export async function exportApronCardPdf(
   node: HTMLElement,
   size: ApronCardSize,
@@ -42,13 +46,15 @@ export async function exportApronCardPdf(
     import("jspdf"),
   ]);
   const { widthMm, heightMm } = APRON_CARD_SIZES[size];
+  const pageW = widthMm + 2 * APRON_SHEET_MARGIN_MM;
+  const pageH = heightMm + 2 * APRON_SHEET_MARGIN_MM;
   const pdf = new jsPDF({
     orientation: "landscape",
     unit: "mm",
-    format: [widthMm, heightMm],
+    format: [pageW, pageH],
     compress: true,
   });
-  pdf.addImage(png, "PNG", 0, 0, widthMm, heightMm, undefined, "FAST");
+  pdf.addImage(png, "PNG", 0, 0, pageW, pageH, undefined, "FAST");
   const url = URL.createObjectURL(pdf.output("blob"));
   download(url, filename);
   setTimeout(() => {

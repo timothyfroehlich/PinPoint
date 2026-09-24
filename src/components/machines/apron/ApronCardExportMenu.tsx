@@ -24,6 +24,7 @@ import type {
   ApronCardSize,
 } from "~/lib/machines/apron-card";
 import { ApronCardFace } from "./ApronCardFace";
+import { ApronCardSheet } from "./ApronCardSheet";
 import { exportApronCardPdf, exportApronCardPng } from "./export-card";
 
 type Format = "pdf" | "png";
@@ -40,7 +41,7 @@ interface ApronCardExportMenuProps {
 }
 
 /**
- * Export ▾ — exact-size PDF, 600 DPI PNG, or the browser print route
+ * Export ▾ — PDF print sheet, 600 DPI PNG, or the browser print route
  * (spec §9.2). PDF and PNG render an off-screen copy of the card at print
  * size and rasterize it, so on-screen scaling never affects the file.
  */
@@ -127,13 +128,22 @@ export function ApronCardExportMenu({
               aria-hidden="true"
               className="pointer-events-none fixed top-0 -left-[10000px]"
             >
-              <div ref={nodeRef}>
-                <ApronCardFace
-                  content={content}
-                  size={size}
-                  scanUrl={scanUrl}
-                  onReady={handleReady}
-                />
+              <div ref={nodeRef} className="inline-block">
+                {pending === "pdf" ? (
+                  <ApronCardSheet
+                    content={content}
+                    size={size}
+                    scanUrl={scanUrl}
+                    onReady={handleReady}
+                  />
+                ) : (
+                  <ApronCardFace
+                    content={content}
+                    size={size}
+                    scanUrl={scanUrl}
+                    onReady={handleReady}
+                  />
+                )}
               </div>
             </div>,
             document.body

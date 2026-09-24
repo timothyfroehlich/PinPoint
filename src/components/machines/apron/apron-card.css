@@ -205,3 +205,96 @@
   letter-spacing: 0.14em;
   color: var(--apron-label);
 }
+
+/* Print sheet (print route and PDF export): white margin around the card,
+ * 2mm of panel bleed past the left, top, and bottom trim edges, and corner
+ * crop marks set 3mm out from the trim so they clear the bleed. */
+.apron-sheet {
+  --apron-bleed: 2mm;
+  --apron-crop-gap: 3mm;
+  --apron-crop-len: 5mm;
+
+  display: inline-block;
+  padding: var(--apron-sheet-margin);
+  background: #ffffff;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.apron-sheet__trim {
+  position: relative;
+}
+
+.apron-sheet__trim > .apron-card {
+  position: relative;
+}
+
+.apron-sheet__bleed {
+  position: absolute;
+  top: calc(-1 * var(--apron-bleed));
+  bottom: calc(-1 * var(--apron-bleed));
+  left: calc(-1 * var(--apron-bleed));
+  width: calc(var(--apron-bleed-panel-width) + var(--apron-bleed));
+  background: #0f0f11;
+}
+
+.apron-sheet__mark {
+  position: absolute;
+  background: #000000;
+}
+
+.apron-sheet__mark.is-top-left-h,
+.apron-sheet__mark.is-top-right-h,
+.apron-sheet__mark.is-bottom-left-h,
+.apron-sheet__mark.is-bottom-right-h {
+  width: var(--apron-crop-len);
+  height: 0.25pt;
+}
+
+.apron-sheet__mark.is-top-left-v,
+.apron-sheet__mark.is-top-right-v,
+.apron-sheet__mark.is-bottom-left-v,
+.apron-sheet__mark.is-bottom-right-v {
+  width: 0.25pt;
+  height: var(--apron-crop-len);
+}
+
+.apron-sheet__mark.is-top-left-h,
+.apron-sheet__mark.is-bottom-left-h {
+  right: calc(100% + var(--apron-crop-gap));
+}
+
+.apron-sheet__mark.is-top-right-h,
+.apron-sheet__mark.is-bottom-right-h {
+  left: calc(100% + var(--apron-crop-gap));
+}
+
+.apron-sheet__mark.is-top-left-h,
+.apron-sheet__mark.is-top-right-h {
+  top: 0;
+}
+
+.apron-sheet__mark.is-bottom-left-h,
+.apron-sheet__mark.is-bottom-right-h {
+  bottom: 0;
+}
+
+.apron-sheet__mark.is-top-left-v,
+.apron-sheet__mark.is-top-right-v {
+  bottom: calc(100% + var(--apron-crop-gap));
+}
+
+.apron-sheet__mark.is-bottom-left-v,
+.apron-sheet__mark.is-bottom-right-v {
+  top: calc(100% + var(--apron-crop-gap));
+}
+
+.apron-sheet__mark.is-top-left-v,
+.apron-sheet__mark.is-bottom-left-v {
+  left: 0;
+}
+
+.apron-sheet__mark.is-top-right-v,
+.apron-sheet__mark.is-bottom-right-v {
+  right: 0;
+}

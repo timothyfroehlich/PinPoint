@@ -139,6 +139,12 @@ export const APRON_CARD_LAYOUTS: Record<ApronCardSize, ApronCardLayout> = {
 
 export const APRON_TITLE_MAX_LINES = 3;
 
+/**
+ * White space the print sheet adds around the card on each side, in mm: a 3mm
+ * gap past the 2mm panel bleed, then 5mm crop marks.
+ */
+export const APRON_SHEET_MARGIN_MM = 8;
+
 /** Width of `text` rendered in the title face at `fontPx`. */
 export type MeasureText = (text: string, fontPx: number) => number;
 
