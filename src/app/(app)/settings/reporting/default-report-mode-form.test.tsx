@@ -2,7 +2,10 @@ import React from "react";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { updateDefaultReportModeAction } from "./actions";
+import {
+  updateDefaultReportModeAction,
+  type UpdateDefaultReportModeResult,
+} from "./actions";
 import { DefaultReportModeForm } from "./default-report-mode-form";
 
 vi.mock("./actions", () => ({
@@ -14,7 +17,7 @@ describe("DefaultReportModeForm", () => {
     vi.mocked(updateDefaultReportModeAction).mockReset();
   });
 
-  it("shows separate mobile and header choices with their defaults", () => {
+  it("shows compact desktop and mobile rows with their defaults", () => {
     render(
       <DefaultReportModeForm
         initialMobileMode="quick"
@@ -23,17 +26,17 @@ describe("DefaultReportModeForm", () => {
       />
     );
 
-    const mobile = screen.getByRole("group", { name: "Mobile bottom bar" });
-    const header = screen.getByRole("group", {
-      name: "Tablet and desktop header",
-    });
     expect(
-      within(mobile).getByRole("radio", { name: /Quick report/ })
-    ).toHaveAttribute("aria-checked", "true");
+      screen.getByRole("heading", { name: "Preferred Issue Reporting Form" })
+    ).toBeInTheDocument();
+    const desktop = screen.getByRole("group", { name: "Desktop / Tablet" });
+    const mobile = screen.getByRole("group", { name: "Mobile" });
+    expect(within(mobile).getByRole("radio", { name: "Quick" })).toBeChecked();
     expect(
-      within(header).getByRole("radio", { name: /Detailed report/ })
-    ).toHaveAttribute("aria-checked", "true");
-    expect(screen.queryByRole("radio", { name: /Multiple issues/ })).toBeNull();
+      within(desktop).getByRole("radio", { name: "Detailed" })
+    ).toBeChecked();
+    expect(screen.queryByRole("radio", { name: "Multiple" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Save/ })).toBeNull();
   });
 
   it("offers Multiple in both settings only with batch access", () => {
@@ -44,12 +47,19 @@ describe("DefaultReportModeForm", () => {
         canMultiple
       />
     );
-    expect(
-      screen.getAllByRole("radio", { name: /Multiple issues/ })
-    ).toHaveLength(2);
+    expect(screen.getAllByRole("radio", { name: "Multiple" })).toHaveLength(2);
   });
 
-  it("lets the two choices change independently", async () => {
+  it("saves each selection immediately and preserves the other preference", async () => {
+    vi.mocked(updateDefaultReportModeAction)
+      .mockResolvedValueOnce({
+        ok: true,
+        value: { mobileMode: "quick", desktopMode: "quick" },
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        value: { mobileMode: "detailed", desktopMode: "quick" },
+      });
     const user = userEvent.setup();
     render(
       <DefaultReportModeForm
@@ -59,63 +69,102 @@ describe("DefaultReportModeForm", () => {
       />
     );
 
-    const mobile = screen.getByRole("group", { name: "Mobile bottom bar" });
-    const header = screen.getByRole("group", {
-      name: "Tablet and desktop header",
-    });
-    const detailedOnMobile = within(mobile).getByRole("radio", {
-      name: /Detailed report/,
-    });
-    await user.click(detailedOnMobile);
-
-    expect(detailedOnMobile).toHaveAttribute("aria-checked", "true");
-    expect(
-      within(header).getByRole("radio", { name: /Detailed report/ })
-    ).toHaveAttribute("aria-checked", "true");
-    expect(
-      screen.getByRole("button", { name: "Save report screens" })
-    ).toBeEnabled();
-  });
-
-  it("keeps the saved choices selected after submitting", async () => {
-    vi.mocked(updateDefaultReportModeAction).mockResolvedValue({
-      ok: true,
-      value: { mobileMode: "detailed", desktopMode: "quick" },
-    });
-    const user = userEvent.setup();
-    render(
-      <DefaultReportModeForm
-        initialMobileMode="quick"
-        initialDesktopMode="detailed"
-        canMultiple={false}
-      />
-    );
-
-    const mobile = screen.getByRole("group", { name: "Mobile bottom bar" });
-    const header = screen.getByRole("group", {
-      name: "Tablet and desktop header",
-    });
-    const mobileDetailed = within(mobile).getByRole("radio", {
-      name: /Detailed report/,
-    });
-    const headerQuick = within(header).getByRole("radio", {
-      name: /Quick report/,
-    });
-
-    await user.click(mobileDetailed);
-    await user.click(headerQuick);
-    await user.click(
-      screen.getByRole("button", { name: "Save report screens" })
-    );
-
+    const mobile = screen.getByRole("group", { name: "Mobile" });
+    const desktop = screen.getByRole("group", { name: "Desktop / Tablet" });
+    await user.click(within(desktop).getByRole("radio", { name: "Quick" }));
     await waitFor(() => {
-      expect(screen.getByRole("status")).toHaveTextContent(
-        "Report screens saved."
+      expect(screen.getByRole("status")).toHaveTextContent("Saved");
+    });
+    const firstForm = vi.mocked(updateDefaultReportModeAction).mock
+      .calls[0]?.[1];
+    expect(firstForm?.get("mobileReportMode")).toBe("quick");
+    expect(firstForm?.get("desktopReportMode")).toBe("quick");
+
+    await user.click(within(mobile).getByRole("radio", { name: "Detailed" }));
+    await waitFor(() => {
+      expect(updateDefaultReportModeAction).toHaveBeenCalledTimes(2);
+      expect(screen.getByRole("status")).toHaveTextContent("Saved");
+    });
+    const secondForm = vi.mocked(updateDefaultReportModeAction).mock
+      .calls[1]?.[1];
+    expect(secondForm?.get("mobileReportMode")).toBe("detailed");
+    expect(secondForm?.get("desktopReportMode")).toBe("quick");
+    expect(within(desktop).getByRole("radio", { name: "Quick" })).toBeChecked();
+    expect(
+      within(mobile).getByRole("radio", { name: "Detailed" })
+    ).toBeChecked();
+  });
+
+  it("queues the latest selection while a save is in flight", async () => {
+    let completeFirst: (result: UpdateDefaultReportModeResult) => void = () => {
+      throw new Error("First save did not start");
+    };
+    vi.mocked(updateDefaultReportModeAction)
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            completeFirst = resolve;
+          })
+      )
+      .mockResolvedValueOnce({
+        ok: true,
+        value: { mobileMode: "detailed", desktopMode: "quick" },
+      });
+    const user = userEvent.setup();
+    render(
+      <DefaultReportModeForm
+        initialMobileMode="quick"
+        initialDesktopMode="detailed"
+        canMultiple={false}
+      />
+    );
+
+    const mobile = screen.getByRole("group", { name: "Mobile" });
+    const desktop = screen.getByRole("group", { name: "Desktop / Tablet" });
+    await user.click(within(desktop).getByRole("radio", { name: "Quick" }));
+    await user.click(within(mobile).getByRole("radio", { name: "Detailed" }));
+    expect(screen.getByRole("status")).toHaveTextContent("Saving…");
+    expect(updateDefaultReportModeAction).toHaveBeenCalledTimes(1);
+
+    completeFirst({
+      ok: true,
+      value: { mobileMode: "quick", desktopMode: "quick" },
+    });
+    await waitFor(() => {
+      expect(updateDefaultReportModeAction).toHaveBeenCalledTimes(2);
+      expect(screen.getByRole("status")).toHaveTextContent("Saved");
+    });
+    expect(
+      within(mobile).getByRole("radio", { name: "Detailed" })
+    ).toBeChecked();
+    expect(within(desktop).getByRole("radio", { name: "Quick" })).toBeChecked();
+  });
+
+  it("restores the confirmed choice and reports a failed save", async () => {
+    vi.mocked(updateDefaultReportModeAction).mockResolvedValue({
+      ok: false,
+      code: "SERVER",
+      message: "Your profile could not be updated. Try again.",
+    });
+    const user = userEvent.setup();
+    render(
+      <DefaultReportModeForm
+        initialMobileMode="quick"
+        initialDesktopMode="detailed"
+        canMultiple={false}
+      />
+    );
+
+    const desktop = screen.getByRole("group", { name: "Desktop / Tablet" });
+    await user.click(within(desktop).getByRole("radio", { name: "Quick" }));
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "could not be updated"
       );
     });
-    expect(mobileDetailed).toHaveAttribute("aria-checked", "true");
-    expect(headerQuick).toHaveAttribute("aria-checked", "true");
-    expect(updateDefaultReportModeAction).toHaveBeenCalledTimes(1);
+    expect(
+      within(desktop).getByRole("radio", { name: "Detailed" })
+    ).toBeChecked();
   });
 
   it("supports arrow keys within each report-screen group", async () => {
@@ -128,15 +177,19 @@ describe("DefaultReportModeForm", () => {
       />
     );
 
-    const mobile = screen.getByRole("group", { name: "Mobile bottom bar" });
-    const quick = within(mobile).getByRole("radio", { name: /Quick report/ });
+    vi.mocked(updateDefaultReportModeAction).mockResolvedValue({
+      ok: true,
+      value: { mobileMode: "detailed", desktopMode: "detailed" },
+    });
+    const mobile = screen.getByRole("group", { name: "Mobile" });
+    const quick = within(mobile).getByRole("radio", { name: "Quick" });
     const detailed = within(mobile).getByRole("radio", {
-      name: /Detailed report/,
+      name: "Detailed",
     });
     quick.focus();
     await user.keyboard("{ArrowRight}");
     expect(detailed).toHaveFocus();
-    expect(detailed).toHaveAttribute("aria-checked", "true");
-    expect(quick).toHaveAttribute("aria-checked", "false");
+    expect(detailed).toBeChecked();
+    expect(quick).not.toBeChecked();
   });
 });

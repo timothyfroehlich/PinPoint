@@ -1,30 +1,16 @@
 "use client";
 
 import * as React from "react";
-import { Button } from "~/components/ui/button";
 import { resolveDefaultReportMode } from "~/lib/report/default-mode";
 import { REPORT_MODE_VALUES, type ReportMode } from "~/lib/types";
 import { cn } from "~/lib/utils";
-import {
-  updateDefaultReportModeAction,
-  type UpdateDefaultReportModeResult,
-} from "./actions";
+import { updateDefaultReportModeAction } from "./actions";
 
-const MODE_DETAILS: Record<ReportMode, { label: string; description: string }> =
-  {
-    quick: {
-      label: "Quick report",
-      description: "A few details for one issue.",
-    },
-    detailed: {
-      label: "Detailed report",
-      description: "The full form for one issue.",
-    },
-    multiple: {
-      label: "Multiple issues",
-      description: "Prepare several issues together.",
-    },
-  };
+const MODE_LABELS: Record<ReportMode, string> = {
+  quick: "Quick",
+  detailed: "Detailed",
+  multiple: "Multiple",
+};
 
 export function DefaultReportModeForm({
   initialMobileMode,
@@ -45,136 +31,131 @@ export function DefaultReportModeForm({
     canMultiple,
     "detailed"
   );
-  const [selectedMobileMode, setSelectedMobileMode] =
-    React.useState(availableMobileMode);
-  const [selectedDesktopMode, setSelectedDesktopMode] =
-    React.useState(availableDesktopMode);
-  const [state, setState] = React.useState<UpdateDefaultReportModeResult>();
-  const [isPending, setIsPending] = React.useState(false);
-  const savedMobileMode = state?.ok
-    ? state.value.mobileMode
-    : availableMobileMode;
-  const savedDesktopMode = state?.ok
-    ? state.value.desktopMode
-    : availableDesktopMode;
+  const initialModes = {
+    mobileMode: availableMobileMode,
+    desktopMode: availableDesktopMode,
+  };
+  const [selectedModes, setSelectedModes] = React.useState(initialModes);
+  const [saveStatus, setSaveStatus] = React.useState<
+    "idle" | "saving" | "saved"
+  >("idle");
+  const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
+  const saveInFlight = React.useRef(false);
+  const hasInteracted = React.useRef(false);
+  const desiredModes = React.useRef(initialModes);
+  const savedModes = React.useRef(initialModes);
   const availableModes = REPORT_MODE_VALUES.filter(
     (mode) => mode !== "multiple" || canMultiple
   );
 
   React.useEffect(() => {
-    setSelectedMobileMode(availableMobileMode);
-    setSelectedDesktopMode(availableDesktopMode);
+    if (hasInteracted.current) return;
+    const modes = {
+      mobileMode: availableMobileMode,
+      desktopMode: availableDesktopMode,
+    };
+    desiredModes.current = modes;
+    savedModes.current = modes;
+    setSelectedModes(modes);
   }, [availableMobileMode, availableDesktopMode]);
 
-  React.useEffect(() => {
-    if (!state?.ok) return;
-    setSelectedMobileMode(state.value.mobileMode);
-    setSelectedDesktopMode(state.value.desktopMode);
-  }, [state]);
-
-  async function saveReportModes(): Promise<void> {
-    const formData = new FormData();
-    formData.set("mobileReportMode", selectedMobileMode);
-    formData.set("desktopReportMode", selectedDesktopMode);
-    setIsPending(true);
+  async function flushSelections(): Promise<void> {
+    if (saveInFlight.current) return;
+    saveInFlight.current = true;
     try {
-      setState(await updateDefaultReportModeAction(undefined, formData));
+      while (
+        desiredModes.current.mobileMode !== savedModes.current.mobileMode ||
+        desiredModes.current.desktopMode !== savedModes.current.desktopMode
+      ) {
+        const submittingModes = desiredModes.current;
+        const formData = new FormData();
+        formData.set("mobileReportMode", submittingModes.mobileMode);
+        formData.set("desktopReportMode", submittingModes.desktopMode);
+        const result = await updateDefaultReportModeAction(undefined, formData);
+        if (!result.ok) {
+          desiredModes.current = savedModes.current;
+          setSelectedModes(savedModes.current);
+          setSaveStatus("idle");
+          setErrorMessage(result.message);
+          return;
+        }
+        savedModes.current = result.value;
+        if (desiredModes.current === submittingModes) {
+          desiredModes.current = result.value;
+          setSelectedModes(result.value);
+        }
+      }
+      setSaveStatus("saved");
+    } catch {
+      desiredModes.current = savedModes.current;
+      setSelectedModes(savedModes.current);
+      setSaveStatus("idle");
+      setErrorMessage("Could not save your preference. Try again.");
     } finally {
-      setIsPending(false);
+      saveInFlight.current = false;
     }
   }
 
+  function selectMode(surface: "mobile" | "desktop", mode: ReportMode): void {
+    const nextModes = {
+      ...desiredModes.current,
+      [surface === "mobile" ? "mobileMode" : "desktopMode"]: mode,
+    };
+    desiredModes.current = nextModes;
+    hasInteracted.current = true;
+    setSelectedModes(nextModes);
+    setSaveStatus("saving");
+    setErrorMessage(null);
+    void flushSelections();
+  }
+
   return (
-    <div className="@container space-y-5">
+    <div className="@container flex flex-col gap-1">
+      <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+        Preferred Issue Reporting Form
+      </h3>
       {(
         [
           {
-            key: "mobile",
-            label: "Mobile bottom bar",
-            help: "Opens when you tap Report in the bottom bar.",
-            selectedMode: selectedMobileMode,
-            setSelectedMode: setSelectedMobileMode,
+            key: "desktop",
+            label: "Desktop / Tablet",
+            selectedMode: selectedModes.desktopMode,
           },
           {
-            key: "desktop",
-            label: "Tablet and desktop header",
-            help: "Opens when you select Report in the header.",
-            selectedMode: selectedDesktopMode,
-            setSelectedMode: setSelectedDesktopMode,
+            key: "mobile",
+            label: "Mobile",
+            selectedMode: selectedModes.mobileMode,
           },
         ] as const
       ).map((surface) => (
         <fieldset
           key={surface.key}
-          aria-describedby={`report-mode-${surface.key}-help`}
-          disabled={isPending}
-          className="space-y-2"
+          className="grid grid-cols-[7rem_minmax(0,1fr)] items-center gap-x-1 @sm:gap-x-2"
         >
-          <legend
-            id={`report-mode-${surface.key}-label`}
-            className="text-base font-medium"
-          >
-            {surface.label}
-          </legend>
-          <p
-            id={`report-mode-${surface.key}-help`}
-            className="text-sm text-muted-foreground"
-          >
-            {surface.help}
-          </p>
-          <div
-            role="radiogroup"
-            aria-labelledby={`report-mode-${surface.key}-label`}
-            aria-describedby={`report-mode-${surface.key}-help`}
-            className="grid gap-2 @sm:grid-cols-2 @2xl:grid-cols-3"
-          >
-            {availableModes.map((mode, index) => (
-              <button
+          <legend className="sr-only">{surface.label}</legend>
+          <span aria-hidden="true" className="text-xs font-medium @sm:text-sm">
+            {surface.label}:
+          </span>
+          <div className="flex flex-wrap items-center gap-x-1 @sm:gap-x-2">
+            {availableModes.map((mode) => (
+              <label
                 key={mode}
-                type="button"
-                role="radio"
-                aria-checked={surface.selectedMode === mode}
-                tabIndex={surface.selectedMode === mode ? 0 : -1}
-                data-report-mode={mode}
-                onClick={() => surface.setSelectedMode(mode)}
-                onKeyDown={(event) => {
-                  const direction =
-                    event.key === "ArrowRight" || event.key === "ArrowDown"
-                      ? 1
-                      : event.key === "ArrowLeft" || event.key === "ArrowUp"
-                        ? -1
-                        : 0;
-                  const nextIndex =
-                    event.key === "Home"
-                      ? 0
-                      : event.key === "End"
-                        ? availableModes.length - 1
-                        : direction === 0
-                          ? -1
-                          : (index + direction + availableModes.length) %
-                            availableModes.length;
-                  if (nextIndex < 0) return;
-                  event.preventDefault();
-                  const nextMode = availableModes[nextIndex];
-                  if (!nextMode) return;
-                  surface.setSelectedMode(nextMode);
-                  event.currentTarget.parentElement
-                    ?.querySelector<HTMLButtonElement>(
-                      `[data-report-mode="${nextMode}"]`
-                    )
-                    ?.focus();
-                }}
-                className={cn(
-                  "flex min-h-12 cursor-pointer items-center gap-3 rounded-lg border px-3 py-2 text-left",
-                  surface.selectedMode === mode
-                    ? "border-primary bg-primary/10"
-                    : "border-outline-variant hover:border-primary/60"
-                )}
+                htmlFor={`report-mode-${surface.key}-${mode}`}
+                className="flex min-h-11 cursor-pointer items-center gap-1 rounded-md px-0.5 text-sm hover:bg-muted/50 @sm:gap-1.5 @sm:px-1"
               >
+                <input
+                  id={`report-mode-${surface.key}-${mode}`}
+                  type="radio"
+                  name={`${surface.key}ReportMode`}
+                  value={mode}
+                  checked={surface.selectedMode === mode}
+                  onChange={() => selectMode(surface.key, mode)}
+                  className="peer sr-only"
+                />
                 <span
                   aria-hidden="true"
                   className={cn(
-                    "flex size-4 shrink-0 items-center justify-center rounded-full border",
+                    "flex size-4 shrink-0 items-center justify-center rounded-full border peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-ring",
                     surface.selectedMode === mode
                       ? "border-primary"
                       : "border-muted-foreground"
@@ -184,45 +165,23 @@ export function DefaultReportModeForm({
                     <span className="size-2 rounded-full bg-primary" />
                   ) : null}
                 </span>
-                <span className="grid gap-0.5">
-                  <span className="font-medium">
-                    {MODE_DETAILS[mode].label}
-                  </span>
-                  <span className="text-sm text-muted-foreground">
-                    {MODE_DETAILS[mode].description}
-                  </span>
-                </span>
-              </button>
+                <span>{MODE_LABELS[mode]}</span>
+              </label>
             ))}
           </div>
         </fieldset>
       ))}
 
-      {state && !state.ok ? (
+      {errorMessage ? (
         <p role="alert" className="text-sm text-destructive-text">
-          {state.message}
+          {errorMessage}
         </p>
       ) : null}
-      {state?.ok &&
-      selectedMobileMode === savedMobileMode &&
-      selectedDesktopMode === savedDesktopMode ? (
+      {saveStatus !== "idle" ? (
         <p role="status" className="text-sm text-muted-foreground">
-          Report screens saved.
+          {saveStatus === "saving" ? "Saving…" : "Saved"}
         </p>
       ) : null}
-
-      <Button
-        type="button"
-        onClick={saveReportModes}
-        disabled={
-          isPending ||
-          (selectedMobileMode === savedMobileMode &&
-            selectedDesktopMode === savedDesktopMode)
-        }
-        loading={isPending}
-      >
-        Save report screens
-      </Button>
     </div>
   );
 }
