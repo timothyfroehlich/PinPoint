@@ -103,21 +103,16 @@ Terminal JSON schema (`stdout`):
 
 ### Compact Validation Progress
 
-`quiet-run.py` keeps child stdout/stderr in the private validation log and writes
-only its bounded terminal verdict to the existing verdict stream (used for single-command
-tasks such as `check`, `test`, and `e2e:all`).
+`quiet-run.py` keeps child stdout/stderr in a private `0600` log under
+`tmp/validation-logs/` and prints only a bounded verdict (used for `check`, `test`,
+`e2e:all` and `preflight`). On a clean pass the log is deleted; on a warning or
+failure a bounded excerpt is shown and the log is kept.
 
-`preflight-runner.py` directly orchestrates the canonical preflight phases
-(`database-readiness`, `prototype-clean`, parallel `static-checks` and `unit-tests`,
-`database-reset`, `build`, `integration`, `supabase-integration`, `smoke`).
-In default compact mode, child stdout/stderr are captured in a private `0600` validation log
-under `tmp/validation-logs/`, while stderr receives bounded phase transitions
-(`preflight: PHASE <name> START / COMPLETE`) and periodic heartbeats
-(`preflight: HEARTBEAT <name> (<elapsed>s elapsed)`) after 60 seconds (configurable
-via `--heartbeat-seconds`). Child output never shares the progress channel, keeping
-progress secret-safe. On clean pass, the log file is deleted; on warning or failure,
-a bounded excerpt is shown and the log is retained. In `--human` mode, commands
-stream directly without log capture.
+`preflight.sh` runs the canonical preflight phases in order, printing `== <phase>`
+before each and stopping at the first failure: readiness, `check:human`, `test:human`,
+`db:fast-reset`, `build`, `test:integration`, `test:integration:supabase`,
+chromium-only smoke. `pnpm run preflight` wraps it in `quiet-run.py`;
+`pnpm run preflight:human` streams it.
 
 ### UI Screenshots
 
