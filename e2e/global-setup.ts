@@ -333,11 +333,15 @@ export default async function globalSetup(config: FullConfig): Promise<void> {
   const postgresUrl =
     process.env["POSTGRES_URL_NON_POOLING"] ?? process.env["POSTGRES_URL"];
 
+  // A stopped local stack refuses at once, so these probe timeouts only bound
+  // a slow answer: a remote backend over a high-latency link needs seconds.
+  const probeTimeoutSeconds = 10;
+
   // 1. Supabase API health
   console.log("🔍 Checking Supabase...");
   try {
     const res = await fetch(`${supabaseUrl}/auth/v1/health`, {
-      signal: AbortSignal.timeout(3000),
+      signal: AbortSignal.timeout(probeTimeoutSeconds * 1000),
     });
     if (!res.ok) {
       throw new Error(`HTTP ${res.status}`);
@@ -360,7 +364,9 @@ export default async function globalSetup(config: FullConfig): Promise<void> {
     );
   }
   console.log("🔍 Checking Postgres...");
-  const client = postgres(postgresUrl, { connect_timeout: 3 });
+  const client = postgres(postgresUrl, {
+    connect_timeout: probeTimeoutSeconds,
+  });
   try {
     await client`SELECT 1`;
   } catch (error) {
