@@ -57,6 +57,8 @@ export const getMachineForLayout = cache(async (initials: string) => {
         pinballmapTitle: {
           columns: {
             name: true,
+            machineGroupId: true,
+            groupName: true,
             opdbImageUrl: true,
           },
         },

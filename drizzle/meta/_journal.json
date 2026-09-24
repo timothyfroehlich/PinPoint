@@ -579,8 +579,15 @@
     {
       "idx": 82,
       "version": "7",
-      "when": 1790228569347,
-      "tag": "0082_add-opdb-catalog-images",
+      "when": 1790135626663,
+      "tag": "0082_add-machine-apron-card",
+      "breakpoints": true
+    },
+    {
+      "idx": 83,
+      "version": "7",
+      "when": 1790293036614,
+      "tag": "0083_add-opdb-catalog-images",
       "breakpoints": true
     }
   ]

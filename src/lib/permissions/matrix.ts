@@ -392,6 +392,18 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
         },
       },
       {
+        id: "machines.apron.export",
+        label: "Export apron cards",
+        description: "Export a saved, print-ready card for a machine",
+        access: {
+          unauthenticated: false,
+          guest: false,
+          member: true,
+          technician: true,
+          admin: true,
+        },
+      },
+      {
         id: "machines.delete",
         label: "Delete machines",
         description: "Permanently delete machines from the system",

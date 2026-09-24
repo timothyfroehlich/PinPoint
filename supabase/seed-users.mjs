@@ -8,7 +8,8 @@
  *
  * Usage: pnpm run db:_seed-users
  *
- * Password for all test users: "TestPassword123"
+ * Local password for all test users: "TestPassword123". Hosted previews pass
+ * --preview to use random passwords that are never printed.
  * DO NOT use these in production!
  *
  * Remote-capable ON PURPOSE: preview-migrate-seed.sh runs this against an
@@ -20,6 +21,7 @@
  * DIFFERENT variable from POSTGRES_URL and could be pointed at prod on its own.
  */
 
+import { randomBytes } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 import { assertNotPinPointProduction } from "../scripts/lib/db-target.mjs";
 import { createScriptClient } from "../scripts/lib/pg-client.mjs";
@@ -72,6 +74,7 @@ function wrapTextInProseMirror(text) {
 }
 
 const TEST_USERS = Object.entries(usersData);
+const previewSeed = process.argv.includes("--preview");
 
 async function seedUsersAndData() {
   console.log("🌱 Seeding test users and data...\n");
@@ -84,7 +87,11 @@ async function seedUsersAndData() {
       // Create user using Supabase Admin API
       const { data, error } = await supabase.auth.admin.createUser({
         email: user.email,
-        password: user.password,
+        // Hosted previews enforce leaked-password checks. Use a unique secret
+        // for each ephemeral account rather than the published local fixture.
+        password: previewSeed
+          ? randomBytes(32).toString("base64url")
+          : user.password,
         email_confirm: true, // Auto-confirm email for test users
         user_metadata: {
           name: user.name,
@@ -152,6 +159,13 @@ async function seedUsersAndData() {
     } catch (err) {
       console.error(`❌ Error processing ${user.email}:`, err);
     }
+  }
+
+  const missingUsers = TEST_USERS.filter(([key]) => !userIds[key]);
+  if (missingUsers.length > 0) {
+    throw new Error(
+      `Could not seed required test users: ${missingUsers.map(([, user]) => user.email).join(", ")}`
+    );
   }
 
   // 2. Seed Invited Users (for testing invited reporter display)
@@ -929,7 +943,11 @@ async function seedUsersAndData() {
   console.log("  guest@test.com (Guest role)");
   console.log("  testuser@pinpoint.internal (Username account, Member role)");
   console.log("    └─ Login with username: testuser");
-  console.log(`  Password: ${usersData.admin.password}`);
+  if (previewSeed) {
+    console.log("  Preview passwords are random and are not logged.");
+  } else {
+    console.log(`  Password: ${usersData.admin.password}`);
+  }
 
   await sql.end();
   process.exit(0);

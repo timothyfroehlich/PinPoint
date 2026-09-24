@@ -1,5 +1,5 @@
 {
-  "id": "691bb321-436e-41dd-beaa-cfe4e5daf505",
+  "id": "48c96d9a-9d05-4e0c-9105-4bb0782fdf0a",
   "prevId": "1529e845-825a-49f6-8436-bfd9f8c09732",
   "version": "7",
   "dialect": "postgresql",
@@ -1508,6 +1508,44 @@
           "primaryKey": false,
           "notNull": false
         },
+        "apron_size": {
+          "name": "apron_size",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "apron_use_custom_description": {
+          "name": "apron_use_custom_description",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "apron_description": {
+          "name": "apron_description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "apron_tip": {
+          "name": "apron_tip",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "apron_tip_enabled": {
+          "name": "apron_tip_enabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "apron_saved_at": {
+          "name": "apron_saved_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
         "owner_requirements": {
           "name": "owner_requirements",
           "type": "jsonb",
@@ -2190,24 +2228,6 @@
         },
         "ipdb_id": {
           "name": "ipdb_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "opdb_image_url": {
-          "name": "opdb_image_url",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "opdb_image_width": {
-          "name": "opdb_image_width",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "opdb_image_height": {
-          "name": "opdb_image_height",
           "type": "integer",
           "primaryKey": false,
           "notNull": false
