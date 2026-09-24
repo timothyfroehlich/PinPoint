@@ -45,6 +45,19 @@ Data does not move between backends. After `use`, start the new backend's
 stack, run `pnpm run db:reset` if it is new, and restart `pnpm dev` so it reads
 the rewritten `.env.local`.
 
+### Moving an existing worktree to the remote backend
+
+Delete the worktree's local stack as part of the switch; freeing Mac memory is
+the point. From that worktree, in order:
+
+1. `pnpm supabase:stop --no-backup` while `.env.local` still says `local`. This
+   removes the local containers and volumes. Local dev data is not migrated.
+2. `pnpm supabase:use remote`
+3. `pnpm supabase:start`, then `pnpm run db:reset` for the new remote stack.
+
+`pnpm supabase:use remote` on its own only stops the local stack and keeps its
+volumes.
+
 Call `supabase` directly only with the same environment the script sets; a
 bare `supabase start` or `supabase db reset` targets this machine's Docker.
 
