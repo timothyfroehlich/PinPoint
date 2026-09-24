@@ -419,6 +419,16 @@ describe("Specific permission rules from design", () => {
       expect(getPermission("machines.edit", "admin")).toBe(true);
     });
 
+    it("allows members to export saved apron cards without edit permission", () => {
+      expect(getPermission("machines.apron.export", "unauthenticated")).toBe(
+        false
+      );
+      expect(getPermission("machines.apron.export", "guest")).toBe(false);
+      expect(getPermission("machines.apron.export", "member")).toBe(true);
+      expect(getPermission("machines.apron.export", "technician")).toBe(true);
+      expect(getPermission("machines.apron.export", "admin")).toBe(true);
+    });
+
     it("should allow only machine owners and admins to delete machines", () => {
       expect(getPermission("machines.delete", "unauthenticated")).toBe(false);
       expect(getPermission("machines.delete", "guest")).toBe(false);
