@@ -141,12 +141,14 @@ describe("EditCollectionDialog", () => {
     expect(
       within(alertDialog).queryByText("Delete this collection?")
     ).not.toBeInTheDocument();
-    expect(
-      within(alertDialog).getByRole("link", { name: "Back to collections" })
-    ).toHaveAttribute("href", "/c/collections");
+    const backLink = within(alertDialog).getByRole("link", {
+      name: "Back to collections",
+    });
+    expect(backLink).toHaveAttribute("href", "/c/collections");
     expect(
       within(alertDialog).queryByTestId("collection-delete-confirm")
     ).not.toBeInTheDocument();
+    await userEvent.click(backLink);
   });
 
   it("keeps the confirmation open while deletion is pending so a failure stays visible", async () => {
