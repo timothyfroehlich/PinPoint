@@ -19,7 +19,6 @@ import {
   derivePbmListingView,
   type PbmSiblingInput,
 } from "~/lib/pinballmap/listing-state";
-import { findLmxForMachine } from "~/lib/pinballmap/resolve-lmx";
 import { listSurfacingAbandonedForMachine } from "~/lib/pinballmap/abandoned-listings";
 import { getCatalogEntry } from "~/lib/pinballmap/catalog";
 import { PinballmapListingControl } from "~/components/machines/PinballmapListingControl";
@@ -179,15 +178,6 @@ export default async function MachineEditPage({
     siblings: sameTitle,
   });
 
-  // The remove confirm's comment count (spec 4.6). Null when there is no entry
-  // to count comments on, which the confirm says outright rather than showing a
-  // zero it cannot stand behind.
-  const commentCount =
-    snapshot !== null && machine.pinballmapMachineId !== null
-      ? (findLmxForMachine(snapshot, machine.pinballmapMachineId)?.conditions
-          .length ?? null)
-      : null;
-
   // Whether an operator credential exists at all — read off the two columns the
   // state row already carries, never by decrypting the token. Without one the
   // outbound writes cannot run, so Add / Remove are absent rather than present
@@ -221,9 +211,12 @@ export default async function MachineEditPage({
       lmxId: row.lmxId,
       locationUrl: pinballmapLocationUrl(row.locationId),
       title: (await getCatalogEntry(row.pinballmapMachineId))?.name ?? null,
+      currentLocation: row.locationId === pbmState?.locationId,
       commentCount:
-        snapshot?.lmxes.find((l) => l.id === row.lmxId)?.conditions.length ??
-        null,
+        row.locationId === pbmState?.locationId
+          ? (snapshot?.lmxes.find((l) => l.id === row.lmxId)?.conditions
+              .length ?? null)
+          : null,
     }))
   );
 
@@ -329,7 +322,6 @@ export default async function MachineEditPage({
                 canRefresh={canRefresh}
                 writeEnabled={writeEnabled}
                 modelName={pinballmapTitleName}
-                commentCount={commentCount}
               />
             </PinballmapDirtyGate>
           )}

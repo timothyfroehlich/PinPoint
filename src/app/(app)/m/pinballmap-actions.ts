@@ -1009,6 +1009,127 @@ export async function removeMachineFromPinballMapAction(
   }
 }
 
+export type RemovalCommentCheckResult = Result<
+  {
+    count: number;
+    checkedAt: Date;
+    freshness: "current" | "last_known";
+    failure: "throttled" | "failed" | null;
+  },
+  "VALIDATION" | "UNAUTHORIZED" | "NOT_FOUND" | "SERVER"
+>;
+
+/**
+ * Check the comment count when an operator opens a remove confirmation.
+ * Page rendering stays on the stored snapshot; only this deliberate click may
+ * spend from the shared manual-refresh allowance (spec 3.4, 4.6).
+ */
+export async function checkRemovalCommentsAction(
+  formData: FormData
+): Promise<RemovalCommentCheckResult> {
+  const explicitLmxRaw = formData.get("lmxId");
+  const explicitLmxId =
+    typeof explicitLmxRaw === "string" && /^\d+$/.test(explicitLmxRaw)
+      ? Number(explicitLmxRaw)
+      : null;
+  const authed = await authorizeListingAction(
+    formData,
+    "machines.pinballmap.push",
+    explicitLmxId !== null ? { requireLink: false } : undefined
+  );
+  if (!authed.ok) return authed.result;
+  const { machine, userId } = authed;
+
+  const state = await getPinballMapState();
+  if (state?.locationId == null)
+    return err("SERVER", "Pinball Map isn't configured yet.");
+
+  const abandoned =
+    explicitLmxId === null
+      ? null
+      : (
+          await listSurfacingAbandonedForMachine(machine.id, state.locationId)
+        ).find((row) => row.lmxId === explicitLmxId);
+  if (explicitLmxId !== null && !abandoned)
+    return err("NOT_FOUND", "This entry is no longer available to remove.");
+  if (abandoned && abandoned.locationId !== state.locationId)
+    return err("SERVER", "This entry belongs to a different location.");
+
+  const entryId =
+    explicitLmxId ??
+    (machine.pinballmapMachineId === null
+      ? null
+      : ((state.snapshotJson
+          ? findLmxForMachine(state.snapshotJson, machine.pinballmapMachineId)
+              ?.id
+          : null) ?? null));
+  if (entryId === null)
+    return err("NOT_FOUND", "This entry is no longer on the lineup.");
+
+  const initialEntry = state.snapshotJson?.lmxes.find(
+    (entry) => entry.id === entryId
+  );
+  const initialCheckedAt = state.lastSyncedAt;
+  const now = Date.now();
+  const isFresh =
+    initialEntry !== undefined &&
+    initialCheckedAt !== null &&
+    now - initialCheckedAt.getTime() <= 5 * 60 * 1000;
+  if (isFresh)
+    return ok({
+      count: initialEntry.conditions.length,
+      checkedAt: initialCheckedAt,
+      freshness: "current",
+      failure: null,
+    });
+
+  const refreshed = await syncLocationSnapshot({
+    updatedBy: userId,
+    trigger: "manual",
+  });
+  if (refreshed.ok) await reconcileAfterSync();
+  // A refresh changes the shared lineup; even a failed attempt can spend the
+  // header's allowance. Keep other machine pages and the header in step.
+  revalidatePath("/m", "layout");
+  // Another human or the hourly sync may have refreshed while our attempt was
+  // busy or throttled. Prefer that new observation over a stale fallback.
+  const latest = await getPinballMapState();
+  if (latest?.locationId !== state.locationId)
+    return err(
+      "SERVER",
+      "The tracked location changed. Reload before removing."
+    );
+  const titleId = abandoned?.pinballmapMachineId ?? machine.pinballmapMachineId;
+  const latestEntry =
+    latest.snapshotJson && titleId !== null
+      ? findLmxForMachine(latest.snapshotJson, titleId)
+      : undefined;
+  if (
+    latest.lastSyncedAt !== null &&
+    latest.lastSyncedAt.getTime() > (initialCheckedAt?.getTime() ?? 0) &&
+    now - latest.lastSyncedAt.getTime() <= 5 * 60 * 1000
+  ) {
+    if (!latestEntry)
+      return err("NOT_FOUND", "This entry is no longer on the lineup.");
+    return ok({
+      count: latestEntry.conditions.length,
+      checkedAt: latest.lastSyncedAt,
+      freshness: "current",
+      failure: null,
+    });
+  }
+  if (refreshed.ok)
+    return err("SERVER", "The refreshed lineup is unavailable. Try again.");
+  if (!initialEntry || !initialCheckedAt)
+    return err("SERVER", "No last-known comment count is available.");
+  return ok({
+    count: initialEntry.conditions.length,
+    checkedAt: initialCheckedAt,
+    freshness: "last_known",
+    failure: refreshed.reason === "throttled" ? "throttled" : "failed",
+  });
+}
+
 export type RefreshPinballmapResult = Result<
   { machineCount: number; abandonmentsCleared: number },
   "UNAUTHORIZED" | "SERVER" | "THROTTLED"

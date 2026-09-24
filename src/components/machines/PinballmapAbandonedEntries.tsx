@@ -1,10 +1,15 @@
 "use client";
 
 import type React from "react";
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { TriangleAlert } from "lucide-react";
 
-import { removeMachineFromPinballMapAction } from "~/app/(app)/m/pinballmap-actions";
+import {
+  checkRemovalCommentsAction,
+  removeMachineFromPinballMapAction,
+  type RemovalCommentCheckResult,
+} from "~/app/(app)/m/pinballmap-actions";
+import { formatRelative } from "~/lib/dates";
 import { Alert, AlertDescription } from "~/components/ui/alert";
 import { Button } from "~/components/ui/button";
 import {
@@ -26,7 +31,9 @@ export interface AbandonedEntry {
   locationUrl: string;
   /** Catalog title at the time, or null if the mirror no longer carries it. */
   title: string | null;
-  /** Comments on the entry, for the remove confirm (spec 4.6). */
+  /** Older locations cannot be refreshed through the tracked-location seam. */
+  currentLocation: boolean;
+  /** Existing confirmation data for older-location entries, when available. */
   commentCount: number | null;
 }
 
@@ -96,6 +103,7 @@ export function PinballmapAbandonedEntries({
             </span>
             {canPush && writeEnabled ? (
               <RemoveEntryButton
+                machineId={machineId}
                 entry={entry}
                 pending={pending}
                 onConfirm={() => {
@@ -143,26 +151,67 @@ export function PinballmapAbandonedEntries({
   );
 }
 
-/** Same confirm as the control's Remove, including the comment count (4.6). */
+/** Refreshes tracked-location counts; older-location cleanup remains PP-o355.49. */
 function RemoveEntryButton({
+  machineId,
   entry,
   pending,
   onConfirm,
 }: {
+  machineId: string;
   entry: AbandonedEntry;
   pending: boolean;
   onConfirm: () => void;
 }): React.JSX.Element {
+  const [open, setOpen] = useState(false);
+  const [checking, startCheck] = useTransition();
+  const checkAttempt = useRef(0);
+  const [check, setCheck] = useState<RemovalCommentCheckResult | null>(null);
   const game = entry.title ?? `Pinball Map entry #${String(entry.lmxId)}`;
-  const consequence =
-    entry.commentCount === null
+
+  function handleOpenChange(nextOpen: boolean): void {
+    const attempt = ++checkAttempt.current;
+    setOpen(nextOpen);
+    if (!nextOpen || !entry.currentLocation) return;
+    setCheck(null);
+    startCheck(async () => {
+      try {
+        const formData = new FormData();
+        formData.set("machineId", machineId);
+        formData.set("lmxId", String(entry.lmxId));
+        const result = await checkRemovalCommentsAction(formData);
+        if (checkAttempt.current === attempt) setCheck(result);
+      } catch {
+        if (checkAttempt.current === attempt)
+          setCheck({
+            ok: false,
+            code: "SERVER",
+            message: "The comment check failed. Close and try again.",
+          });
+      }
+    });
+  }
+
+  const countMessage = !entry.currentLocation
+    ? entry.commentCount === null
       ? "PinPoint could not read this entry's comments just now, so it can't say how many would be lost. Refresh first if that matters."
       : entry.commentCount === 0
         ? null
-        : `The entry has ${String(entry.commentCount)} ${entry.commentCount === 1 ? "comment" : "comments"}. They are recoverable only if the game is re-added within 7 days; after that the history is permanently lost.`;
+        : `The entry has ${String(entry.commentCount)} ${entry.commentCount === 1 ? "comment" : "comments"}. They are recoverable only if the game is re-added within 7 days; after that the history is permanently lost.`
+    : check?.ok === true
+      ? check.value.count === 0
+        ? "The entry has 0 comments. It can be restored by re-adding the game within 7 days."
+        : `The entry has ${String(check.value.count)} ${check.value.count === 1 ? "comment" : "comments"}. They are recoverable only if the game is re-added within 7 days; after that the history is permanently lost.`
+      : null;
+  const consequence =
+    countMessage !== null &&
+    check?.ok === true &&
+    check.value.freshness === "last_known"
+      ? `${check.value.failure === "throttled" ? "Refresh is temporarily unavailable" : "Refresh failed"}. The last-known count was checked ${formatRelative(check.value.checkedAt)}. ${countMessage} Choose whether to proceed with that older count or cancel.`
+      : countMessage;
 
   return (
-    <AlertDialog>
+    <AlertDialog open={open} onOpenChange={handleOpenChange}>
       <AlertDialogTrigger asChild>
         <Button
           variant="outline"
@@ -181,8 +230,19 @@ function RemoveEntryButton({
             will no longer be publicly visible.
           </AlertDialogDescription>
         </AlertDialogHeader>
+        {entry.currentLocation && (checking || check === null) ? (
+          <p role="status">Checking the entry&apos;s current comments…</p>
+        ) : null}
+        {entry.currentLocation && check?.ok === false ? (
+          <p role="alert" className="text-sm text-destructive-text">
+            {check.message}
+          </p>
+        ) : null}
         {consequence !== null ? (
-          <p className="rounded-r-md border-l-[3px] border-warning bg-warning-container/40 px-3 py-2 text-sm text-on-warning-container">
+          <p
+            className="rounded-r-md border-l-[3px] border-warning bg-warning-container/40 px-3 py-2 text-sm text-on-warning-container"
+            data-testid="pbm-abandoned-remove-consequence"
+          >
             {consequence}
           </p>
         ) : null}
@@ -191,10 +251,15 @@ function RemoveEntryButton({
           <AlertDialogAction
             type="button"
             variant="destructive"
-            disabled={pending}
+            disabled={
+              pending ||
+              (entry.currentLocation && (checking || check?.ok !== true))
+            }
             onClick={onConfirm}
           >
-            Remove machine
+            {check?.ok === true && check.value.freshness === "last_known"
+              ? "Proceed with removal"
+              : "Remove machine"}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

@@ -15,6 +15,7 @@ import "@testing-library/jest-dom/vitest";
 
 import {
   addMachineToPinballMapAction,
+  checkRemovalCommentsAction,
   refreshPinballmapLineupAction,
   removeMachineFromPinballMapAction,
   setPinballmapIntentAction,
@@ -28,6 +29,7 @@ import { PinballmapListingControl } from "./PinballmapListingControl";
 
 vi.mock("~/app/(app)/m/pinballmap-actions", () => ({
   addMachineToPinballMapAction: vi.fn(),
+  checkRemovalCommentsAction: vi.fn(),
   refreshPinballmapLineupAction: vi.fn(),
   removeMachineFromPinballMapAction: vi.fn(),
   setPinballmapIntentAction: vi.fn(),
@@ -140,7 +142,6 @@ function renderControl(overrides: Partial<Props> = {}): {
         canRefresh={true}
         writeEnabled={true}
         modelName="Medieval Madness"
-        commentCount={12}
         {...overrides}
       />
     </RelativeTimeProvider>
@@ -159,6 +160,15 @@ beforeEach(() => {
   vi.mocked(removeMachineFromPinballMapAction).mockResolvedValue({
     ok: true,
     value: {},
+  });
+  vi.mocked(checkRemovalCommentsAction).mockResolvedValue({
+    ok: true,
+    value: {
+      count: 12,
+      checkedAt: new Date(),
+      freshness: "current",
+      failure: null,
+    },
   });
   vi.mocked(setPinballmapIntentAction).mockResolvedValue({
     ok: true,
@@ -208,7 +218,6 @@ describe("the status sentence", () => {
           canRefresh
           writeEnabled
           modelName="Medieval Madness"
-          commentCount={0}
         />
       );
       expect(
@@ -286,19 +295,68 @@ describe("push actions", () => {
     );
     expect(consequence).toHaveTextContent("12 comments");
     expect(consequence).toHaveTextContent("within 7 days");
+    expect(checkRemovalCommentsAction).toHaveBeenCalledOnce();
     expect(removeMachineFromPinballMapAction).not.toHaveBeenCalled();
   });
 
-  it("says it cannot count the comments rather than showing a zero it invented", async () => {
+  it("blocks removal until the comment check completes", async () => {
     const user = userEvent.setup();
-    renderControl({
-      view: VIEWS.lingering,
-      commentCount: null,
+    let finish:
+      | ((
+          value: Awaited<ReturnType<typeof checkRemovalCommentsAction>>
+        ) => void)
+      | undefined;
+    vi.mocked(checkRemovalCommentsAction).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        })
+    );
+    renderControl({ view: VIEWS.lingering });
+    await user.click(screen.getByTestId("pbm-listing-remove"));
+    expect(
+      screen.getByRole("button", { name: "Remove machine" })
+    ).toBeDisabled();
+    await act(async () => {
+      await Promise.resolve();
+      finish?.({
+        ok: true,
+        value: {
+          count: 0,
+          checkedAt: new Date(),
+          freshness: "current",
+          failure: null,
+        },
+      });
     });
+    expect(
+      await screen.findByTestId("pbm-listing-remove-consequence")
+    ).toHaveTextContent("0 comments");
+    expect(
+      screen.getByRole("button", { name: "Remove machine" })
+    ).toBeEnabled();
+  });
+
+  it("marks a failed refresh count as old and offers an explicit proceed choice", async () => {
+    const user = userEvent.setup();
+    vi.mocked(checkRemovalCommentsAction).mockResolvedValue({
+      ok: true,
+      value: {
+        count: 3,
+        checkedAt: new Date(Date.now() - 12 * 60_000),
+        freshness: "last_known",
+        failure: "failed",
+      },
+    });
+    renderControl({ view: VIEWS.lingering });
     await user.click(screen.getByTestId("pbm-listing-remove"));
     expect(
       await screen.findByTestId("pbm-listing-remove-consequence")
-    ).toHaveTextContent("could not read this entry's comments");
+    ).toHaveTextContent("last-known count was checked");
+    expect(
+      screen.getByRole("button", { name: "Proceed with removal" })
+    ).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeEnabled();
   });
 
   it("renders no Add button on a Missing machine whose availability blocks it", () => {

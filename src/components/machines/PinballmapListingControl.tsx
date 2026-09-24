@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import {
   CheckCircle2,
@@ -14,6 +14,7 @@ import {
 
 import {
   addMachineToPinballMapAction,
+  checkRemovalCommentsAction,
   refreshPinballmapLineupAction,
   removeMachineFromPinballMapAction,
   setPinballmapIntentAction,
@@ -39,6 +40,8 @@ import type {
 } from "~/lib/pinballmap/listing-state";
 import type { Result } from "~/lib/result";
 import { cn } from "~/lib/utils";
+import { formatRelative } from "~/lib/dates";
+import type { RemovalCommentCheckResult } from "~/app/(app)/m/pinballmap-actions";
 
 /**
  * The Manage tab's Pinball Map control (PP-o355.21) — spec §4.
@@ -98,8 +101,6 @@ export interface PinballmapListingControlProps {
   writeEnabled: boolean;
   /** Catalog title, so a confirm names the game rather than "this machine". */
   modelName: string | null;
-  /** Comments on the entry, for the remove confirm's consequence line (4.6). */
-  commentCount: number | null;
 }
 
 const INTENT_OPTIONS: readonly { value: PbmListingIntent; label: string }[] = [
@@ -121,7 +122,6 @@ export function PinballmapListingControl({
   canRefresh,
   writeEnabled,
   modelName,
-  commentCount,
 }: PinballmapListingControlProps): React.JSX.Element {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -242,6 +242,7 @@ export function PinballmapListingControl({
                   testId="pbm-listing-remove"
                   pending={pending}
                   destructive
+                  removalMachineId={machineId}
                   onConfirm={() => {
                     run(removeMachineFromPinballMapAction);
                   }}
@@ -249,7 +250,6 @@ export function PinballmapListingControl({
                     title: "Remove from Pinball Map?",
                     body: `Removes ${game} from the location's lineup on pinballmap.com. It will no longer be publicly visible.`,
                     action: "Remove machine",
-                    consequence: removeConsequence(commentCount),
                   }}
                   label="Remove machine from Pinball Map"
                 />
@@ -696,14 +696,11 @@ function nameSiblings(siblings: readonly PbmSibling[]): React.ReactNode {
  * The remove confirmation's consequence line (4.6): the entry's comment count
  * and what happens to it, stated accurately.
  *
- * A null count means the lineup has not been read recently enough to know. It
- * says so rather than showing a number it cannot stand behind (CORE-ARCH-012).
+ * Only a count returned by the confirmation-time check reaches this copy.
  */
-function removeConsequence(commentCount: number | null): string | null {
-  if (commentCount === null) {
-    return "PinPoint could not read this entry's comments just now, so it can't say how many would be lost. Refresh first if that matters.";
-  }
-  if (commentCount === 0) return null;
+function removeConsequence(commentCount: number): string {
+  if (commentCount === 0)
+    return "The entry has 0 comments. It can be restored by re-adding the game within 7 days.";
   const plural = commentCount === 1 ? "comment" : "comments";
   return `The entry has ${String(commentCount)} ${plural}. They are recoverable only if the game is re-added within 7 days; after that the history is permanently lost.`;
 }
@@ -712,7 +709,6 @@ interface ConfirmCopy {
   title: string;
   body: string;
   action: string;
-  consequence?: string | null;
 }
 
 /** Pushes confirm before acting, naming the game and the public effect (4.5). */
@@ -723,6 +719,7 @@ function ConfirmButton({
   testId,
   label,
   destructive = false,
+  removalMachineId,
 }: {
   copy: ConfirmCopy;
   onConfirm: () => void;
@@ -730,9 +727,44 @@ function ConfirmButton({
   testId: string;
   label: string;
   destructive?: boolean;
+  removalMachineId?: string;
 }): React.JSX.Element {
+  const [open, setOpen] = useState(false);
+  const [checking, startCheck] = useTransition();
+  const checkAttempt = useRef(0);
+  const [check, setCheck] = useState<RemovalCommentCheckResult | null>(null);
+
+  function handleOpenChange(nextOpen: boolean): void {
+    const attempt = ++checkAttempt.current;
+    setOpen(nextOpen);
+    if (!nextOpen || removalMachineId === undefined) return;
+    setCheck(null);
+    startCheck(async () => {
+      try {
+        const formData = new FormData();
+        formData.set("machineId", removalMachineId);
+        const result = await checkRemovalCommentsAction(formData);
+        if (checkAttempt.current === attempt) setCheck(result);
+      } catch {
+        if (checkAttempt.current === attempt)
+          setCheck({
+            ok: false,
+            code: "SERVER",
+            message: "The comment check failed. Close and try again.",
+          });
+      }
+    });
+  }
+
+  const removalReady = removalMachineId === undefined || check?.ok === true;
+  const consequence =
+    check?.ok === true
+      ? check.value.freshness === "last_known"
+        ? `${check.value.failure === "throttled" ? "Refresh is temporarily unavailable" : "Refresh failed"}. The last-known count was checked ${formatRelative(check.value.checkedAt)}. ${removeConsequence(check.value.count)} Choose whether to proceed with that older count or cancel.`
+        : removeConsequence(check.value.count)
+      : null;
   return (
-    <AlertDialog>
+    <AlertDialog open={open} onOpenChange={handleOpenChange}>
       <AlertDialogTrigger asChild>
         <Button
           variant="outline"
@@ -748,12 +780,20 @@ function ConfirmButton({
           <AlertDialogTitle>{copy.title}</AlertDialogTitle>
           <AlertDialogDescription>{copy.body}</AlertDialogDescription>
         </AlertDialogHeader>
-        {copy.consequence != null ? (
+        {removalMachineId !== undefined && (checking || check === null) ? (
+          <p role="status">Checking the entry&apos;s current comments…</p>
+        ) : null}
+        {check?.ok === false ? (
+          <p role="alert" className="text-sm text-destructive-text">
+            {check.message}
+          </p>
+        ) : null}
+        {consequence !== null ? (
           <p
             className="rounded-r-md border-l-[3px] border-warning bg-warning-container/40 px-3 py-2 text-sm text-on-warning-container"
             data-testid={`${testId}-consequence`}
           >
-            {copy.consequence}
+            {consequence}
           </p>
         ) : null}
         <AlertDialogFooter>
@@ -761,10 +801,12 @@ function ConfirmButton({
           <AlertDialogAction
             type="button"
             variant={destructive ? "destructive" : "default"}
-            disabled={pending}
+            disabled={pending || checking || !removalReady}
             onClick={onConfirm}
           >
-            {copy.action}
+            {check?.ok === true && check.value.freshness === "last_known"
+              ? "Proceed with removal"
+              : copy.action}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
