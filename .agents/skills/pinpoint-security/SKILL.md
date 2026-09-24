@@ -36,10 +36,10 @@ in JS rather than querying the table.
 
 ## CSP authoring (CORE-SEC-003/004)
 
-The root `middleware.ts` sets the Content-Security-Policy. Things to know before modifying it:
+`src/proxy.ts` sets the Content-Security-Policy. Things to know before modifying it:
 
-- **`script-src` posture**: production is nonce-only — `'self' 'nonce-<uuid>' 'strict-dynamic'`, no host allowlist. Preview adds `https://vercel.live` for the Vercel toolbar. Never add `'unsafe-inline'` or `'unsafe-eval'`.
-- **Per-request nonce**: `middleware.ts` calls `crypto.randomUUID()` and sets the nonce on `Content-Security-Policy` (`'nonce-<uuid>'`) plus an `x-nonce` response header. The `x-nonce` header is set for any inline-script use case; there is no consumer in `src/` today, so if you add an inline `<script>` you must read `x-nonce` yourself and set the `nonce` attribute.
+- **`script-src` posture**: production is nonce-only — `'self' 'nonce-<uuid>' 'strict-dynamic'`, no host allowlist. Preview adds `https://vercel.live` for the Vercel toolbar. Local development alone permits `'unsafe-eval'` for Next.js debugging. Never add script `'unsafe-inline'` or allow `'unsafe-eval'` in a deployed build.
+- **Per-request nonce**: `src/proxy.ts` calls `crypto.randomUUID()` and forwards the CSP and `x-nonce` in request headers so Next.js can nonce its generated scripts. It sets the same values on the response. Overwrite client-supplied values; keep session cookie updates when composing the response.
 - **Already allowlisted**: Supabase URL + WS URL in `connect-src`. Note `connect-src` allows both `localhost:*` and `127.0.0.1:*` in **both** branches (production included), so don't describe that as dev-only.
 - **Adding a new external host**: add to the appropriate directive in the production branch first, mirror to the preview branch only if needed. Default to deny.
 
