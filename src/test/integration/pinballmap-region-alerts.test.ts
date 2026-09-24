@@ -20,6 +20,10 @@ import {
   pinballmapState,
 } from "~/server/db/schema";
 import { getRegionAlertChannelId } from "~/lib/pinballmap/region-alerts";
+import {
+  MAX_REGION_ENTRIES,
+  RegionPayloadTooLargeError,
+} from "~/lib/pinballmap/types";
 import { getTestDb, setupTestDb } from "~/test/setup/pglite";
 import type { PbmRegionLmx, PbmRegionLocation } from "~/lib/pinballmap/types";
 import type { DiscordSendResult } from "~/lib/discord/client";
@@ -1185,6 +1189,23 @@ describe("PinballMap region machine-change alerts (PGlite)", () => {
     expect(await seenRows()).toEqual([]);
     expect(discord.posts).toEqual([]);
   });
+
+  it("treats a streaming ceiling abort as an implausible payload without writing", async () => {
+    pbm.entriesPromise = Promise.reject(
+      new RegionPayloadTooLargeError(MAX_REGION_ENTRIES + 1)
+    );
+
+    const run = await runRegionMachineAlerts();
+
+    expect(run).toMatchObject({
+      skipped: "implausible_payload",
+      observed: MAX_REGION_ENTRIES + 1,
+      discovered: 0,
+      announced: 0,
+    });
+    expect(await seenRows()).toEqual([]);
+    expect(discord.posts).toEqual([]);
+  });
 });
 
 describe("GET /api/cron/pinballmap-region-alerts", () => {
@@ -1194,6 +1215,7 @@ describe("GET /api/cron/pinballmap-region-alerts", () => {
   const url = "http://localhost/api/cron/pinballmap-region-alerts";
 
   beforeEach(() => {
+    pbm.entriesPromise = null;
     vi.stubEnv("CRON_SECRET", CRON_SECRET);
     vi.stubEnv("DISCORD_PBM_ALERT_CHANNEL_ID", "channel-1");
     pbm.entries = [lmx({ lmxId: 1 })];

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createLiveClient } from "./client-live";
-import { PinballMapReadError } from "./types";
+import { MAX_REGION_ENTRIES, PinballMapReadError } from "./types";
 
 const ORIGINAL_FETCH = globalThis.fetch;
 const CREDS = { email: "tim@example.com", token: "secret-tok" };
@@ -205,6 +205,64 @@ describe("live client — reads", () => {
     expect(calls[0]?.init?.headers).toMatchObject({ "X-Api-Token": "tok-123" });
   });
 
+  it("stops reading and cancels an oversized region stream before buffering the full response", async () => {
+    let nextId = 1;
+    let chunksSent = 0;
+    let cancelled = false;
+    const encoder = new TextEncoder();
+    const response = new Response(
+      new ReadableStream<Uint8Array>(
+        {
+          pull(controller) {
+            chunksSent += 1;
+            if (chunksSent === 1) {
+              controller.enqueue(encoder.encode('{"location_machine_xrefs":['));
+              return;
+            }
+            if (nextId > MAX_REGION_ENTRIES + 500) {
+              controller.enqueue(encoder.encode("]}"));
+              controller.close();
+              return;
+            }
+            const rows: string[] = [];
+            for (let i = 0; i < 100; i += 1) {
+              const id = nextId++;
+              rows.push(
+                `${id === 1 ? "" : ","}{"id":${id},"location_id":2,"machine_id":3}`
+              );
+            }
+            controller.enqueue(encoder.encode(rows.join("")));
+          },
+          cancel() {
+            cancelled = true;
+          },
+        },
+        { highWaterMark: 0 }
+      )
+    );
+    const jsonSpy = vi.spyOn(response, "json");
+    installFetchMock(() => response);
+
+    await expect(
+      createLiveClient(null).fetchRegionLmxes("austin")
+    ).rejects.toMatchObject({ observedAtLeast: MAX_REGION_ENTRIES + 1 });
+    expect(cancelled).toBe(true);
+    expect(chunksSent).toBeLessThan(206);
+    expect(jsonSpy).not.toHaveBeenCalled();
+  });
+
+  it("accepts an empty wrapped region array and rejects a missing one", async () => {
+    installFetchMock(() => json({ location_machine_xrefs: [] }));
+    await expect(
+      createLiveClient(null).fetchRegionLmxes("austin")
+    ).resolves.toEqual([]);
+
+    installFetchMock(() => json({ unrelated: [] }));
+    await expect(
+      createLiveClient(null).fetchRegionLmxes("austin")
+    ).rejects.toThrow(/missing location_machine_xrefs array/);
+  });
+
   it("fetchRegionLocations asks for no_details and returns id → name", async () => {
     const calls = installFetchMock(() =>
       json({
@@ -248,6 +306,15 @@ describe("live client — a 200 carrying an error body is a FAILED read", () => 
   // broken read. Every shape must throw so the caller can tell the difference.
   it("throws when `errors` is a STRING", async () => {
     installFetchMock(() => json({ errors: "Region not found" }));
+    await expect(
+      createLiveClient(null).fetchRegionLmxes("austin")
+    ).rejects.toThrow(/Region not found/);
+  });
+
+  it("reports a PBM error before a malformed array field in the same body", async () => {
+    installFetchMock(() =>
+      json({ location_machine_xrefs: null, errors: "Region not found" })
+    );
     await expect(
       createLiveClient(null).fetchRegionLmxes("austin")
     ).rejects.toThrow(/Region not found/);

@@ -77,6 +77,20 @@ export class PinballMapReadError extends Error {
 }
 
 /**
+ * An unknown region can make PBM return every LMX worldwide. This cap is far
+ * above a real region (Austin had 487 entries in August 2026) and below a
+ * global dump. The live client stops reading at the first row beyond it.
+ */
+export const MAX_REGION_ENTRIES = 20_000;
+
+export class RegionPayloadTooLargeError extends Error {
+  constructor(readonly observedAtLeast: number) {
+    super("PinballMap region payload is implausibly large");
+    this.name = "RegionPayloadTooLargeError";
+  }
+}
+
+/**
  * One entry of the region-wide LMX bulk read (`fetchRegionLmxes`, PP-o355.18).
  *
  * **The region index carries no names.** Verified against PBM's source

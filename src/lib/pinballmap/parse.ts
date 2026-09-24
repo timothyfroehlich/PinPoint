@@ -115,7 +115,7 @@ export function parseLocation(
  * outright on top of the model's default scope, so there is not even a field to
  * test. Deleted entries simply stop appearing.
  */
-function parseRegionLmx(raw: unknown): PbmRegionLmx | null {
+export function parseRegionLmx(raw: unknown): PbmRegionLmx | null {
   const r = asRecord(raw);
   if (!r) return null;
   const lmxId = asNumber(r["id"]);

@@ -1,4 +1,10 @@
 import "server-only";
+import {
+  JSONParser,
+  TokenParserError,
+  TokenizerError,
+  TokenType,
+} from "@streamparser/json";
 import { log } from "~/lib/logger";
 import { assertNotInTransaction } from "~/server/db/transaction-context";
 import { PBM_API_BASE, PBM_USER_AGENT } from "./config";
@@ -6,11 +12,15 @@ import {
   parseCatalog,
   parseLocation,
   parseMachineGroups,
-  parseRegionLmxes,
+  parseRegionLmx,
   parseRegionLocations,
   parseRegions,
 } from "./parse";
-import { PinballMapReadError } from "./types";
+import {
+  MAX_REGION_ENTRIES,
+  PinballMapReadError,
+  RegionPayloadTooLargeError,
+} from "./types";
 import type {
   CatalogMachine,
   LocationSnapshot,
@@ -280,12 +290,12 @@ function toWriteResult(outcome: WriteOutcome): PbmWriteResult {
   return outcome.ok ? { ok: true } : outcome;
 }
 
-async function readJson(
+async function readResponse(
   path: string,
   label: string,
   apiToken: string | null,
   query?: Record<string, string>
-): Promise<unknown> {
+): Promise<Response> {
   const res = await safeFetch(
     buildUrl(path, query),
     { method: "GET" },
@@ -306,6 +316,35 @@ async function readJson(
       `PinballMap ${label} failed: HTTP ${res.status}`
     );
   }
+  return res;
+}
+
+function throwReadBodyError(
+  label: string,
+  body: Record<string, unknown>
+): void {
+  const message = pbmErrorMessage(body);
+  if (!message) return;
+  const lower = message.toLowerCase();
+  const reason =
+    lower.includes("failed to find location") || lower.includes("not found")
+      ? "not_found"
+      : lower.includes("authentication") || lower.includes("api token")
+        ? "unauthorized"
+        : "transient";
+  throw new PinballMapReadError(
+    reason,
+    `PinballMap ${label} failed: ${message}`
+  );
+}
+
+async function readJson(
+  path: string,
+  label: string,
+  apiToken: string | null,
+  query?: Record<string, string>
+): Promise<unknown> {
+  const res = await readResponse(path, label, apiToken, query);
   // A 200 with a non-JSON body (e.g. an HTML maintenance/edge page during an
   // outage) is a read failure, not a crash — surface it as a structured error.
   let data: unknown;
@@ -317,21 +356,139 @@ async function readJson(
       `PinballMap ${label} failed: response was not valid JSON`
     );
   }
-  const message = pbmErrorMessage(asRecord(data));
-  if (message) {
-    const lower = message.toLowerCase();
-    const reason =
-      lower.includes("failed to find location") || lower.includes("not found")
-        ? "not_found"
-        : lower.includes("authentication") || lower.includes("api token")
-          ? "unauthorized"
-          : "transient";
+  const record = asRecord(data);
+  if (record) throwReadBodyError(label, record);
+  return data;
+}
+
+/** Parse only completed LMX rows; never retain the wire array or its body. */
+async function readRegionLmxes(
+  region: string,
+  apiToken: string | null
+): Promise<PbmRegionLmx[]> {
+  const label = "fetchRegionLmxes";
+  const res = await readResponse(
+    `/region/${regionSegment(region)}/location_machine_xrefs.json`,
+    label,
+    apiToken
+  );
+  const reader = res.body?.getReader();
+  if (!reader) {
     throw new PinballMapReadError(
-      reason,
-      `PinballMap ${label} failed: ${message}`
+      "invalid_response",
+      `PinballMap ${label} failed: response had no body`
     );
   }
-  return data;
+
+  const entries: PbmRegionLmx[] = [];
+  const seen = new Set<number>();
+  const errors: Record<string, unknown> = {};
+  let parser: JSONParser | null = null;
+  let wrapped = false;
+  let hasArray = false;
+  let depth = 0;
+  let expectingRootKey = false;
+  let rootKey: string | null = null;
+  let expectingArray = false;
+
+  try {
+    let responseDone = false;
+    while (!responseDone) {
+      const { value, done } = await reader.read();
+      responseDone = done;
+      if (done) break;
+      if (!parser) {
+        const first = value.find(
+          (byte) => byte !== 9 && byte !== 10 && byte !== 13 && byte !== 32
+        );
+        if (first === undefined) continue;
+        wrapped = first !== 91; // `[` is the tolerated bare-array shape.
+        hasArray = !wrapped;
+        parser = new JSONParser({
+          paths: wrapped
+            ? ["$.location_machine_xrefs.*", "$.errors", "$.error"]
+            : ["$.*"],
+          keepStack: false,
+        });
+        parser.onToken = ({ token, value: tokenValue }) => {
+          if (wrapped && depth === 1) {
+            if (expectingArray) {
+              hasArray = token === TokenType.LEFT_BRACKET;
+              expectingArray = false;
+            } else if (token === TokenType.STRING && expectingRootKey) {
+              rootKey = typeof tokenValue === "string" ? tokenValue : null;
+              expectingRootKey = false;
+            } else if (token === TokenType.COLON) {
+              expectingArray = rootKey === "location_machine_xrefs";
+            } else if (token === TokenType.COMMA) {
+              expectingRootKey = true;
+            }
+          }
+          if (
+            token === TokenType.LEFT_BRACE ||
+            token === TokenType.LEFT_BRACKET
+          ) {
+            depth += 1;
+            if (wrapped && depth === 1) expectingRootKey = true;
+          } else if (
+            token === TokenType.RIGHT_BRACE ||
+            token === TokenType.RIGHT_BRACKET
+          ) {
+            depth -= 1;
+          }
+        };
+        parser.onValue = ({ value: row, key }) => {
+          if (typeof key === "string") {
+            if (key === "errors" || key === "error") errors[key] = row;
+            return;
+          }
+          if (typeof key !== "number") return;
+          const entry = parseRegionLmx(row);
+          if (!entry) {
+            throw new Error(
+              `PinballMap region machine payload has malformed entry at index ${String(key)}`
+            );
+          }
+          if (seen.has(entry.lmxId)) {
+            throw new Error(
+              `PinballMap region machine payload repeats LMX id ${String(entry.lmxId)}`
+            );
+          }
+          seen.add(entry.lmxId);
+          entries.push(entry);
+          if (entries.length > MAX_REGION_ENTRIES) {
+            throw new RegionPayloadTooLargeError(entries.length);
+          }
+        };
+      }
+      parser.write(value);
+    }
+    if (!parser) {
+      throw new PinballMapReadError(
+        "invalid_response",
+        `PinballMap ${label} failed: response was not valid JSON`
+      );
+    }
+    if (!parser.isEnded) parser.end();
+    throwReadBodyError(label, errors);
+    if (!hasArray) {
+      throw new Error(
+        "PinballMap region machine payload missing location_machine_xrefs array"
+      );
+    }
+    return entries;
+  } catch (error) {
+    await reader.cancel();
+    if (error instanceof TokenizerError || error instanceof TokenParserError) {
+      throw new PinballMapReadError(
+        "invalid_response",
+        `PinballMap ${label} failed: response was not valid JSON`
+      );
+    }
+    throw error;
+  } finally {
+    reader.releaseLock();
+  }
 }
 
 /**
@@ -368,12 +525,7 @@ export function createLiveClient(apiToken: string | null): PinballMapClient {
       // region. PBM also accepts `?limit=N`, which combined with their `id desc`
       // ordering yields the N most recent — deliberately NOT used, because a cap
       // would silently drop entries out of a diff that must see all of them.
-      const raw = await readJson(
-        `/region/${regionSegment(region)}/location_machine_xrefs.json`,
-        "fetchRegionLmxes",
-        apiToken
-      );
-      return parseRegionLmxes(raw);
+      return readRegionLmxes(region, apiToken);
     },
 
     async fetchRegionLocations(region: string): Promise<PbmRegionLocation[]> {
