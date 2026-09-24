@@ -15,11 +15,25 @@
       "Bash(gh repo delete *)",
       "Bash(shutdown:*)",
       "Bash(reboot:*)",
-      "Bash(mkfs:*)"
+      "Bash(mkfs:*)",
+      "Bash(gh pr merge*)",
+      "Bash(gh pr -* merge)",
+      "Bash(gh pr -* merge *)",
+      "Bash(gh api *pulls/*/merge*)",
+      "Bash(gh api *mergePullRequest*)",
+      "Bash(gh api *enablePullRequestAutoMerge*)",
+      "Bash(gh pr checkout*)",
+      "Bash(gh pr co *)",
+      "Bash(gh co *)",
+      "mcp__github__merge_pull_request",
+      "mcp__github__enable_pr_auto_merge",
+      "mcp__claude_ai_GitHub__merge_pull_request",
+      "mcp__claude_ai_GitHub__enable_pr_auto_merge",
+      "mcp__plugin_github_github__merge_pull_request",
+      "mcp__plugin_github_github__enable_pr_auto_merge"
     ],
     "ask": [
-      "Bash(*merge-pr.sh*--force*)",
-      "Bash(*merge-pr.sh*--bypass-merge-requirements*)",
+      "Bash(*merge-pr.sh *)",
       "Bash(supabase db reset:*)",
       "Bash(supabase db remote commit:*)",
       "Bash(supabase migration repair:*)",
@@ -97,31 +111,11 @@
         ]
       },
       {
-        "matcher": "Bash|mcp__github__merge_pull_request",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/block-direct-merge.cjs",
-            "timeout": 5
-          }
-        ]
-      },
-      {
         "matcher": "Bash",
         "hooks": [
           {
             "type": "command",
             "command": "node \"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/block-main-worktree-branch-switch.cjs",
-            "timeout": 5
-          }
-        ]
-      },
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/block-gh-pr-checkout.cjs",
             "timeout": 5
           }
         ]

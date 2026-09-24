@@ -1,16 +1,5 @@
 {
   "hooks": {
-    "PreToolUse": [
-      {
-        "hooks": [
-          {
-            "command": "node .claude/hooks/block-direct-merge.cjs",
-            "statusMessage": "Enforcing guarded PinPoint merges",
-            "type": "command"
-          }
-        ]
-      }
-    ],
     "PostCompact": [
       {
         "hooks": [

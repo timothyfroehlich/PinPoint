@@ -7,8 +7,7 @@ ${CLAUDE_PROJECT_DIR:-.}. When the session cwd moved off a directory that
 happens to contain .claude/hooks -- a worktree removed, cwd changed mid-
 session -- Node exited with MODULE_NOT_FOUND and Claude Code reported a
 "Failed with non-blocking status code" -- so the tool call PROCEEDED and the
-guard hooks (block-direct-merge, block-main-worktree-branch-switch) went
-silently inert.
+guard hooks (e.g. block-main-worktree-branch-switch) went silently inert.
 
 These tests read the real settings.json rather than a fixture copy, so a
 future edit that re-introduces a bare relative path is caught here instead of
@@ -82,7 +81,6 @@ NODE_HOOK_COMMANDS = _node_hook_commands()
 # parametrized tests just running over a shorter list.
 EXPECTED_NODE_HOOK_BASENAMES = [
     "inject-beads-actor.cjs",
-    "block-direct-merge.cjs",
     "block-main-worktree-branch-switch.cjs",
     "ui-screenshot-reminder.cjs",
     "verify-guard-stack.cjs",
@@ -107,18 +105,9 @@ def test_project_hooks_do_not_register_global_huddle_runtime() -> None:
     assert "huddle-service" not in registered
 
 
-def test_codex_wires_the_direct_merge_guard_without_blanket_blocking_gh() -> None:
-    codex_hooks = json.loads(CODEX_HOOKS_PATH.read_text(encoding="utf-8"))
-    codex_commands: list[str] = []
-    for event_entries in codex_hooks.get("hooks", {}).values():
-        codex_commands.extend(_collect_commands(event_entries))
-
-    merge_guards = [
-        command for command in codex_commands if "block-direct-merge.cjs" in command
-    ]
-    assert len(merge_guards) == 1, f"Codex merge guard wiring: {merge_guards}"
-
+def test_codex_forbids_raw_pr_merge_without_blanket_blocking_gh() -> None:
     compact_rules = re.sub(r"\s+", "", CODEX_RULES_PATH.read_text(encoding="utf-8"))
+    assert 'pattern=["gh","pr","merge"],decision="forbidden"' in compact_rules
     assert 'pattern=["gh"],decision="forbidden"' not in compact_rules
 
 

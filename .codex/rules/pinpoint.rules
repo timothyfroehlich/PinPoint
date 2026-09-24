@@ -78,28 +78,43 @@ prefix_rule(pattern=["git", "worktree", "prune"], decision="prompt", justificati
 prefix_rule(pattern=["git", "stash", "drop"], decision="prompt", justification="Dropping a stash deletes preserved changes")
 prefix_rule(pattern=["git", "stash", "clear"], decision="prompt", justification="Clearing stashes deletes all preserved changes")
 
-# Fixed-subcommand GitHub reads used throughout the PR lifecycle.
+# GitHub CLI. Read-only PR and run subcommands are approval-free. Raw merges skip
+# the merge gates and PR checkouts strand a worktree on a throwaway branch, so
+# both are forbidden; PinPoint merges go through merge-pr.sh, which prompts.
+# Every other gh command falls through to the default approval policy.
 prefix_rule(
-    pattern=["bash", "scripts/workflow/codex-gh.sh"],
+    pattern=["gh", "pr", ["list", "view", "checks", "diff"]],
     decision="allow",
-    justification="Run a fixed read-only GitHub command through the PinPoint wrapper",
-    match=[
-        "bash scripts/workflow/codex-gh.sh pr-list --limit 20",
-        "bash scripts/workflow/codex-gh.sh pr-view 2058 --json headRefOid",
-        "bash scripts/workflow/codex-gh.sh pr-checks 2058",
-        "bash scripts/workflow/codex-gh.sh pr-diff 2058",
-        "bash scripts/workflow/codex-gh.sh run-list --limit 20",
-        "bash scripts/workflow/codex-gh.sh run-view 12345",
-    ],
+    justification="Read PinPoint pull request state",
+    match=["gh pr list --limit 20", "gh pr view 2058 --json headRefOid", "gh pr checks 2058", "gh pr diff 2058"],
 )
 prefix_rule(
-    pattern=["bash", "scripts/workflow/codex-gh.sh", "merge-external"],
-    decision="prompt",
-    justification="An explicit non-PinPoint repository merge requires user approval",
-    match=[
-        "bash scripts/workflow/codex-gh.sh merge-external owner/other 17 squash",
-    ],
+    pattern=["gh", "run", ["list", "view"]],
+    decision="allow",
+    justification="Read PinPoint CI runs",
+    match=["gh run list --limit 20", "gh run view 12345"],
 )
+prefix_rule(
+    pattern=["gh", "pr", "merge"],
+    decision="forbidden",
+    justification="Raw merges skip the gates; after Tim's explicit request run bash scripts/workflow/merge-pr.sh <PR> --human, otherwise bash scripts/workflow/merge-handoff.sh <PR>",
+    match=["gh pr merge 2058 --squash", "gh pr merge 17 --repo owner/other --squash"],
+)
+prefix_rule(
+    pattern=["gh", "pr", ["checkout", "co"]],
+    decision="forbidden",
+    justification="gh pr checkout switches this worktree onto a throwaway branch; use gh pr diff/view, or git worktree add",
+    match=["gh pr checkout 2058", "gh pr co 2058"],
+)
+prefix_rule(pattern=["gh", "co"], decision="forbidden", justification="gh co is gh pr checkout; use gh pr diff/view, or git worktree add")
+prefix_rule(
+    pattern=["bash", "scripts/workflow/merge-pr.sh"],
+    decision="prompt",
+    justification="Merging requires Tim's explicit request in the active task (PP-wi85)",
+    match=["bash scripts/workflow/merge-pr.sh 2058 --human"],
+)
+prefix_rule(pattern=["scripts/workflow/merge-pr.sh"], decision="prompt", justification="Merging requires Tim's explicit request in the active task (PP-wi85)")
+prefix_rule(pattern=["./scripts/workflow/merge-pr.sh"], decision="prompt", justification="Merging requires Tim's explicit request in the active task (PP-wi85)")
 # Trusted PinPoint workflow entry points and routine local validation.
 prefix_rule(pattern=["./scripts/workflow/pr-watch.py"], decision="allow", justification="Monitor a PinPoint pull request through the repository workflow")
 prefix_rule(pattern=["python3", "scripts/workflow/pr-watch.py"], decision="allow", justification="Monitor a PinPoint pull request through the repository workflow")
