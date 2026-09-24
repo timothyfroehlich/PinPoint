@@ -78,19 +78,37 @@ def _kind(args: list[str]) -> str:
 
 
 class DockerStub:
-    """Stands in for subprocess.run, answering docker calls from a script."""
+    """Stands in for subprocess.run, answering docker calls from a script.
 
-    def __init__(self, **responses: object) -> None:
+    Calls made with `DOCKER_HOST` in their env are answered from `remote`, so
+    one stub can play both the local and the remote daemon.
+    """
+
+    def __init__(
+        self, remote: dict[str, object] | None = None, **responses: object
+    ) -> None:
         # Each response is either a CompletedProcess-ish tuple
         # (returncode, stdout, stderr) or an exception instance to raise.
         self.responses = responses
+        self.remote = remote or {}
         self.calls: list[list[str]] = []
+        self.remote_calls: list[list[str]] = []
+        self.docker_hosts: list[str | None] = []
+        self.remote_timeouts: list[object] = []
 
     def __call__(
         self, args: list[str], **_kwargs: object
     ) -> subprocess.CompletedProcess[str]:
-        self.calls.append(list(args))
-        response = self.responses.get(_kind(args), (0, "", ""))
+        env = _kwargs.get("env")
+        docker_host = env.get("DOCKER_HOST") if isinstance(env, dict) else None
+        self.docker_hosts.append(docker_host)
+        if docker_host:
+            self.remote_calls.append(list(args))
+            self.remote_timeouts.append(_kwargs.get("timeout"))
+            response = self.remote.get(_kind(args), (0, "", ""))
+        else:
+            self.calls.append(list(args))
+            response = self.responses.get(_kind(args), (0, "", ""))
         if isinstance(response, BaseException):
             raise response
         returncode, stdout, stderr = response  # type: ignore[misc]
@@ -101,6 +119,23 @@ class DockerStub:
 
     def calls_of(self, kind: str) -> list[list[str]]:
         return [c for c in self.calls if _kind(c) == kind]
+
+    def remote_calls_of(self, kind: str) -> list[list[str]]:
+        return [c for c in self.remote_calls if _kind(c) == kind]
+
+
+REMOTE_ENV_VARS = (
+    "PINPOINT_REMOTE_DOCKER_HOST",
+    "PINPOINT_REMOTE_SUPABASE_HOST",
+    "PINPOINT_SUPABASE_BACKEND",
+)
+
+
+@pytest.fixture(autouse=True)
+def _no_remote_backend_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The developer's shell may select the remote backend; tests opt in explicitly."""
+    for name in REMOTE_ENV_VARS:
+        monkeypatch.delenv(name, raising=False)
 
 
 def install(monkeypatch: pytest.MonkeyPatch, stub: DockerStub) -> DockerStub:
@@ -439,3 +474,460 @@ class TestMainOrphanClassification:
         assert exit_code == 0
         assert "pinpoint-dead: 0 container(s), 1 volume(s)" in err
         assert stub.calls_of("volume_rm") == []
+
+
+# --- Remote backend --------------------------------------------------------
+#
+# The gap these lock down: a remote worktree deleted with `rm -rf` left its
+# stack running on the remote daemon, the sweep only looked at the local
+# daemon, and `--apply` freed the slot. The next worktree given that slot then
+# failed `supabase start` with "port is already allocated", and the remote
+# volumes leaked forever.
+
+REMOTE_HOST = "ssh://bazzite"
+WORKDIR_LABEL = "com.supabase.cli.workdir"
+
+
+def _remote_daemon(
+    containers: list[tuple[str, str, str]],
+    volumes: list[tuple[str, str, str]] | None = None,
+) -> dict[str, object]:
+    """Remote responses for `(name, project, workdir)` rows.
+
+    Volumes default to one db volume per project with an EMPTY workdir, which
+    is what the real Supabase CLI writes: only containers carry the workdir.
+    """
+    if volumes is None:
+        projects = sorted({project for _name, project, _wd in containers})
+        volumes = [(f"supabase_db_{p}", p, "") for p in projects]
+    return {
+        "volume_ls": (0, "".join(f"{n}\n" for n, _p, _w in volumes), ""),
+        "volume_inspect": (
+            0,
+            "".join(f"{n}|{p}|{w}\n" for n, p, w in volumes),
+            "",
+        ),
+        "ps": (0, "".join(f"{n}|{p}|{w}\n" for n, p, w in containers), ""),
+    }
+
+
+@pytest.fixture
+def remote_home(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
+    """Make tmp_path this machine's home, so its paths count as local workdirs."""
+    monkeypatch.setenv("HOME", str(tmp_path))
+    return tmp_path
+
+
+def _gone(home: Path, name: str) -> str:
+    return str(home / "Code/PinPoint/.claude/worktrees" / name)
+
+
+class TestRemoteOrphans:
+    def test_apply_removes_remote_orphan_with_docker_host_and_frees_its_slot(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        isolated_main,
+        remote_home: Path,
+    ) -> None:
+        gone = _gone(remote_home, "dead")
+        deallocated = isolated_main(active=set(), orphan_slots=[gone])
+        monkeypatch.setenv("PINPOINT_REMOTE_DOCKER_HOST", REMOTE_HOST)
+        stub = install(
+            monkeypatch,
+            DockerStub(
+                remote=_remote_daemon(
+                    [
+                        ("supabase_db_pinpoint-dead", "pinpoint-dead", gone),
+                        ("supabase_kong_pinpoint-dead", "pinpoint-dead", gone),
+                    ]
+                )
+            ),
+        )
+
+        exit_code = _run_main(monkeypatch, "--apply")
+
+        err = capsys.readouterr().err
+        assert exit_code == 0
+        assert stub.remote_calls_of("container_rm") == [
+            [
+                "docker",
+                "rm",
+                "-f",
+                "supabase_db_pinpoint-dead",
+                "supabase_kong_pinpoint-dead",
+            ]
+        ]
+        assert stub.remote_calls_of("volume_rm") == [
+            ["docker", "volume", "rm", "supabase_db_pinpoint-dead"]
+        ]
+        # Every remote call went to the remote daemon, never the local one.
+        assert stub.calls_of("container_rm") == []
+        assert stub.calls_of("volume_rm") == []
+        assert REMOTE_HOST in stub.docker_hosts
+        # The stack holding the slot's ports is gone, so the slot is released.
+        assert deallocated == [gone]
+        assert f"on {REMOTE_HOST}" in err
+
+    def test_dry_run_reports_remote_orphan_without_removing(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        isolated_main,
+        remote_home: Path,
+    ) -> None:
+        gone = _gone(remote_home, "dead")
+        deallocated = isolated_main(active=set(), orphan_slots=[])
+        monkeypatch.setenv("PINPOINT_REMOTE_DOCKER_HOST", REMOTE_HOST)
+        stub = install(
+            monkeypatch,
+            DockerStub(
+                remote=_remote_daemon(
+                    [("supabase_db_pinpoint-dead", "pinpoint-dead", gone)]
+                )
+            ),
+        )
+
+        exit_code = _run_main(monkeypatch)
+
+        err = capsys.readouterr().err
+        assert exit_code == 0
+        assert "pinpoint-dead: 1 container(s), 1 volume(s)" in err
+        assert stub.remote_calls_of("container_rm") == []
+        assert stub.remote_calls_of("volume_rm") == []
+        assert deallocated == []
+
+    def test_quiet_nudge_counts_remote_orphans(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        isolated_main,
+        remote_home: Path,
+    ) -> None:
+        gone = _gone(remote_home, "dead")
+        isolated_main(active=set(), orphan_slots=[])
+        monkeypatch.setenv("PINPOINT_REMOTE_DOCKER_HOST", REMOTE_HOST)
+        install(
+            monkeypatch,
+            DockerStub(
+                remote=_remote_daemon(
+                    [("supabase_db_pinpoint-dead", "pinpoint-dead", gone)]
+                )
+            ),
+        )
+
+        _run_main(monkeypatch, "--quiet")
+
+        assert "1 remote Supabase project orphan(s)" in capsys.readouterr().err
+
+    def test_crabbox_and_remote_host_paths_are_never_touched(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        isolated_main,
+        remote_home: Path,
+    ) -> None:
+        """The remote host's own stacks: not orphans, not reported, not removed."""
+        isolated_main(active=set(), orphan_slots=[])
+        monkeypatch.setenv("PINPOINT_REMOTE_DOCKER_HOST", REMOTE_HOST)
+        # Crabbox runner under this machine's home too, to prove the project
+        # prefix alone excludes it.
+        stub = install(
+            monkeypatch,
+            DockerStub(
+                remote=_remote_daemon(
+                    [
+                        (
+                            "supabase_db_pinpoint-runner-crabbox",
+                            "pinpoint-runner-crabbox",
+                            "/var/home/froeht/Code/PinPoint/.claude/worktrees/crabbox-runner",
+                        ),
+                        (
+                            "supabase_db_pinpoint-runner-crabbox-2",
+                            "pinpoint-runner-crabbox-2",
+                            _gone(remote_home, "crabbox-runner-2"),
+                        ),
+                        (
+                            "supabase_db_pinpoint-bazzite-checkout",
+                            "pinpoint-bazzite-checkout",
+                            "/var/home/froeht/Code/PinPoint",
+                        ),
+                    ]
+                )
+            ),
+        )
+
+        exit_code = _run_main(monkeypatch, "--apply")
+
+        err = capsys.readouterr().err
+        assert exit_code == 0
+        assert stub.remote_calls_of("container_rm") == []
+        assert stub.remote_calls_of("volume_rm") == []
+        assert "crabbox" not in err
+        assert "bazzite-checkout" not in err
+        assert "No orphans found." in err
+
+    def test_remote_project_of_a_live_worktree_is_not_an_orphan(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        isolated_main,
+        remote_home: Path,
+    ) -> None:
+        """A moved worktree's labels point at the old path; its project is still active."""
+        isolated_main(active={"pinpoint-moved"}, orphan_slots=[])
+        monkeypatch.setenv("PINPOINT_REMOTE_DOCKER_HOST", REMOTE_HOST)
+        stub = install(
+            monkeypatch,
+            DockerStub(
+                remote=_remote_daemon(
+                    [
+                        (
+                            "supabase_db_pinpoint-moved",
+                            "pinpoint-moved",
+                            _gone(remote_home, "old-path"),
+                        )
+                    ]
+                )
+            ),
+        )
+
+        assert _run_main(monkeypatch, "--apply") == 0
+        assert stub.remote_calls_of("volume_rm") == []
+
+    def test_volume_only_remote_project_is_reported_but_never_removed(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        isolated_main,
+        remote_home: Path,
+    ) -> None:
+        """Volumes carry no workdir label, so a stopped stack can't be attributed."""
+        gone = _gone(remote_home, "stopped")
+        deallocated = isolated_main(active=set(), orphan_slots=[gone])
+        monkeypatch.setenv("PINPOINT_REMOTE_DOCKER_HOST", REMOTE_HOST)
+        stub = install(
+            monkeypatch,
+            DockerStub(
+                remote=_remote_daemon(
+                    [],
+                    volumes=[("supabase_db_pinpoint-stopped", "pinpoint-stopped", "")],
+                )
+            ),
+        )
+
+        exit_code = _run_main(monkeypatch, "--apply")
+
+        err = capsys.readouterr().err
+        assert exit_code == 0
+        assert stub.remote_calls_of("volume_rm") == []
+        assert "pinpoint-stopped: 1 volume(s)" in err
+        # No container, so nothing holds the slot's ports: it is freed.
+        assert deallocated == [gone]
+
+
+class TestRemoteSlotSafety:
+    def test_slot_kept_when_remote_project_still_references_it(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        isolated_main,
+        remote_home: Path,
+    ) -> None:
+        """Workdir *inside* the worktree still counts (older pilot stacks did this)."""
+        gone = _gone(remote_home, "dead")
+        deallocated = isolated_main(active=set(), orphan_slots=[gone])
+        monkeypatch.setenv("PINPOINT_REMOTE_DOCKER_HOST", REMOTE_HOST)
+        install(
+            monkeypatch,
+            DockerStub(
+                remote=_remote_daemon(
+                    [
+                        (
+                            "supabase_db_pinpoint-dead",
+                            "pinpoint-dead",
+                            gone + "/.agent/tmp/runtime",
+                        )
+                    ]
+                )
+            ),
+        )
+
+        exit_code = _run_main(monkeypatch)
+
+        err = capsys.readouterr().err
+        assert exit_code == 0
+        assert deallocated == []
+        assert f"keeping slot for {gone}: remote project(s) pinpoint-dead" in err
+
+    def test_slot_kept_when_remote_removal_fails(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        isolated_main,
+        remote_home: Path,
+    ) -> None:
+        gone = _gone(remote_home, "dead")
+        deallocated = isolated_main(active=set(), orphan_slots=[gone])
+        monkeypatch.setenv("PINPOINT_REMOTE_DOCKER_HOST", REMOTE_HOST)
+        daemon = _remote_daemon([("supabase_db_pinpoint-dead", "pinpoint-dead", gone)])
+        daemon["container_rm"] = (1, "", "permission denied")
+        install(monkeypatch, DockerStub(remote=daemon))
+
+        _run_main(monkeypatch, "--apply")
+
+        err = capsys.readouterr().err
+        assert deallocated == []
+        assert f"kept slot for {gone}" in err
+
+    def test_unrelated_orphan_slot_is_still_freed(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        isolated_main,
+        remote_home: Path,
+    ) -> None:
+        """A healthy remote query that finds nothing for a path proves it's free."""
+        gone = _gone(remote_home, "was-local")
+        deallocated = isolated_main(active=set(), orphan_slots=[gone])
+        monkeypatch.setenv("PINPOINT_REMOTE_DOCKER_HOST", REMOTE_HOST)
+        install(monkeypatch, DockerStub(remote=_remote_daemon([])))
+
+        assert _run_main(monkeypatch, "--apply") == 0
+        assert deallocated == [gone]
+
+    @pytest.mark.parametrize(
+        "failure",
+        [
+            (255, "", "ssh: connect to host bazzite port 22: Operation timed out"),
+            subprocess.TimeoutExpired(["docker"], 60),
+        ],
+    )
+    def test_unreachable_remote_is_unknown_and_keeps_slots(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        isolated_main,
+        remote_home: Path,
+        failure: object,
+    ) -> None:
+        gone = _gone(remote_home, "dead")
+        deallocated = isolated_main(active=set(), orphan_slots=[gone])
+        monkeypatch.setenv("PINPOINT_REMOTE_DOCKER_HOST", REMOTE_HOST)
+        stub = install(monkeypatch, DockerStub(remote={"volume_ls": failure}))
+
+        exit_code = _run_main(monkeypatch, "--apply")
+
+        err = capsys.readouterr().err
+        assert exit_code == sweep.EXIT_DOCKER_UNKNOWN
+        assert "UNKNOWN" in err
+        assert deallocated == []
+        assert stub.remote_calls_of("container_rm") == []
+        assert stub.remote_calls_of("volume_rm") == []
+
+    def test_quiet_remote_query_fits_the_session_start_budget(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        isolated_main,
+        remote_home: Path,
+    ) -> None:
+        """The hook kills the sweep at 10 s; the remote half must give up first."""
+        isolated_main(active=set(), orphan_slots=[])
+        monkeypatch.setenv("PINPOINT_REMOTE_DOCKER_HOST", REMOTE_HOST)
+        stub = install(
+            monkeypatch,
+            DockerStub(
+                remote=_remote_daemon(
+                    [
+                        (
+                            "supabase_db_pinpoint-x",
+                            "pinpoint-x",
+                            _gone(remote_home, "x"),
+                        )
+                    ]
+                )
+            ),
+        )
+
+        _run_main(monkeypatch, "--quiet")
+
+        assert stub.remote_timeouts
+        assert all(
+            isinstance(t, float) and t <= sweep.QUIET_REMOTE_QUERY_BUDGET_SECONDS
+            for t in stub.remote_timeouts
+        )
+
+    def test_remote_worktree_present_but_docker_host_unset_is_unknown(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        isolated_main,
+        tmp_path: Path,
+    ) -> None:
+        """A live remote worktree proves the backend is in use even without env."""
+        live = tmp_path / "live"
+        live.mkdir()
+        (live / ".env.local").write_text("PINPOINT_SUPABASE_BACKEND=remote\n")
+        deallocated = isolated_main(active=set(), orphan_slots=["/gone/worktree"])
+        monkeypatch.setattr(
+            sweep, "get_active_worktree_branches", lambda _repo: {str(live): "x"}
+        )
+        install(monkeypatch, DockerStub())
+
+        exit_code = _run_main(monkeypatch, "--apply", "--quiet")
+
+        err = capsys.readouterr().err
+        assert exit_code == sweep.EXIT_DOCKER_UNKNOWN
+        assert "PINPOINT_REMOTE_DOCKER_HOST is unset" in err
+        assert deallocated == []
+
+    def test_quiet_dry_run_names_remote_unknown(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        isolated_main,
+    ) -> None:
+        isolated_main(active=set(), orphan_slots=["/gone/worktree"])
+        monkeypatch.setenv("PINPOINT_SUPABASE_BACKEND", "remote")
+        install(monkeypatch, DockerStub())
+
+        exit_code = _run_main(monkeypatch, "--quiet")
+
+        err = capsys.readouterr().err
+        assert exit_code == sweep.EXIT_DOCKER_UNKNOWN
+        assert "remote Supabase project orphans UNKNOWN" in err
+
+
+class TestNoRemoteBackendIsUnchanged:
+    def test_env_unset_never_queries_a_remote_and_frees_slots(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        isolated_main,
+    ) -> None:
+        deallocated = isolated_main(active=set(), orphan_slots=["/gone/worktree"])
+        stub = install(monkeypatch, DockerStub())
+
+        exit_code = _run_main(monkeypatch, "--apply")
+
+        err = capsys.readouterr().err
+        assert exit_code == 0
+        assert stub.remote_calls == []
+        assert set(stub.docker_hosts) == {None}
+        assert deallocated == ["/gone/worktree"]
+        assert "remote" not in err.lower()
+
+    def test_quiet_nudge_text_is_unchanged(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        isolated_main,
+    ) -> None:
+        isolated_main(active=set(), orphan_slots=["/gone/worktree"])
+        install(monkeypatch, DockerStub())
+
+        _run_main(monkeypatch, "--quiet")
+
+        assert capsys.readouterr().err == (
+            "worktree-orphan-sweep: found 1 slot orphan(s), "
+            "0 Supabase Docker project orphan(s) (dry-run). "
+            "Run: python3 scripts/worktree_orphan_sweep.py --apply\n"
+        )
