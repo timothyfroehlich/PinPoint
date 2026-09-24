@@ -53,7 +53,8 @@ SWEEP_HINT = "python3 scripts/worktree_orphan_sweep.py --apply"
 
 #: Everything cleaned up (or verifiably nothing to clean up).
 EXIT_OK = 0
-#: Usage error, or the git worktree removal itself failed.
+#: Usage error, the git worktree removal itself failed, or a remote-backend
+#: worktree was refused because PINPOINT_REMOTE_DOCKER_HOST is unset.
 EXIT_FAILED = 1
 #: Refused to operate: the target is the main worktree.
 EXIT_MAIN_WORKTREE = 2

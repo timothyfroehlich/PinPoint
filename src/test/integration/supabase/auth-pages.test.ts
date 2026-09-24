@@ -14,7 +14,7 @@ import {
  * Note: We test the auth state logic, not the Server Component rendering.
  * The actual redirect behavior is tested in E2E tests.
  *
- * Requires Supabase to be running (supabase start).
+ * Requires Supabase to be running (pnpm supabase:start).
  */
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;

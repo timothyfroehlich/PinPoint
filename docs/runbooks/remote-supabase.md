@@ -48,6 +48,21 @@ the rewritten `.env.local`.
 Call `supabase` directly only with the same environment the script sets; a
 bare `supabase start` or `supabase db reset` targets this machine's Docker.
 
+## Latency and when to switch to local
+
+Every query crosses the network. On the home LAN a remote stack feels local.
+Over slower links, measured 2026-09-23 against Bazzite:
+
+| Link          | Round trip         | Postgres connect | Page load (cold / warm) |
+| ------------- | ------------------ | ---------------- | ----------------------- |
+| Phone hotspot | ~170 ms            | —                | ~1.8 s warm             |
+| Plane Wi-Fi   | ~850 ms, ~30% loss | 3–8 s            | 9.6 s / 2 s (dashboard) |
+
+Readiness probes (`ensure-supabase.sh`, `dev-status.sh`, preflight readiness)
+allow for links like the plane's. When a session needs tight interactive
+latency, `pnpm supabase:use local` and work against a Mac-local stack; switch
+back afterwards.
+
 ## Teardown
 
 `python3 scripts/worktree_cleanup.py <worktree>` stops a remote worktree's

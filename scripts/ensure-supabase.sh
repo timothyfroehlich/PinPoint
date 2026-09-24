@@ -13,7 +13,7 @@ fi
 # Use worktree-specific URL (set in .env.local by post-checkout hook)
 SUPABASE_URL="${NEXT_PUBLIC_SUPABASE_URL:-http://localhost:54321}"
 
-if ! curl -fsS --max-time 2 "${SUPABASE_URL}/auth/v1/health" >/dev/null 2>&1; then
+if ! curl -fsS --max-time 10 "${SUPABASE_URL}/auth/v1/health" >/dev/null 2>&1; then
   echo "Error: Supabase is not running at ${SUPABASE_URL}." >&2
   echo "  Start it with: pnpm supabase:start" >&2
   exit 1

@@ -368,7 +368,7 @@ export default async function globalSetup(config: FullConfig): Promise<void> {
     throw new Error(
       `Cannot connect to Postgres (${msg}).\n` +
         `  URL: ${redactUrl(postgresUrl)}\n` +
-        `  Is Supabase running? Try: supabase status`,
+        `  Is Supabase running? Try: pnpm supabase:status`,
       { cause: error }
     );
   } finally {

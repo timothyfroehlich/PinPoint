@@ -27,6 +27,7 @@ def _run_readiness(
         "postgresql://postgres:postgres@localhost:61234/postgres"
     ),
     dotenv_extra: str = "",
+    dev_db_hosts: str | None = None,
 ) -> subprocess.CompletedProcess[str]:
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
@@ -88,6 +89,9 @@ fi
     env = os.environ.copy()
     env["PATH"] = f"{bin_dir}{os.pathsep}{env['PATH']}"
     env["STUB_MODE"] = mode
+    env.pop("PINPOINT_DEV_DB_HOSTS", None)
+    if dev_db_hosts is not None:
+        env["PINPOINT_DEV_DB_HOSTS"] = dev_db_hosts
     if database_url_override is not None:
         env["POSTGRES_URL"] = database_url_override
     if non_pooling_url_override is not None:
@@ -259,6 +263,53 @@ def test_explicit_database_url_overrides_dotenv_target(tmp_path: Path) -> None:
     assert result.stderr == ""
     assert result.stdout == (
         "PASS: preflight readiness — Postgres ready at localhost:62345\n"
+    )
+
+
+def _remote_stack_overrides(host: str = "bazzite") -> dict[str, str]:
+    database_url = f"postgresql://postgres:postgres@{host}:62345/postgres"
+    return {
+        "database_url_override": database_url,
+        "non_pooling_url_override": database_url,
+        "supabase_url_override": f"http://{host}:62344",
+    }
+
+
+def test_listed_dev_stack_host_is_a_worktree_database(tmp_path: Path) -> None:
+    """A remote-backend worktree (docs/runbooks/remote-supabase.md)."""
+    result = _run_readiness(
+        tmp_path,
+        "ready",
+        dev_db_hosts="other, bazzite",
+        **_remote_stack_overrides(),
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout == (
+        "PASS: preflight readiness — Postgres ready at bazzite:62345\n"
+    )
+
+
+def test_unlisted_remote_host_is_refused(tmp_path: Path) -> None:
+    result = _run_readiness(tmp_path, "ready", **_remote_stack_overrides())
+
+    assert result.returncode == 1
+    assert result.stderr.splitlines()[0] == (
+        "FAIL: preflight readiness — POSTGRES_URL is not a localhost or "
+        "dev-stack worktree database"
+    )
+
+
+def test_dev_stack_database_requires_api_on_the_same_host(tmp_path: Path) -> None:
+    overrides = _remote_stack_overrides()
+    overrides["supabase_url_override"] = "http://localhost:62344"
+
+    result = _run_readiness(tmp_path, "ready", dev_db_hosts="bazzite", **overrides)
+
+    assert result.returncode == 1
+    assert result.stderr.splitlines()[0] == (
+        "FAIL: preflight readiness — local stack overrides do not identify one "
+        "worktree stack"
     )
 
 

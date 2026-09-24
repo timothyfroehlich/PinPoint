@@ -114,24 +114,21 @@ if [ -z "$POSTGRES_URL" ]; then
     exit 1
 fi
 
-# Safety check: parse the host out of POSTGRES_URL and require a local loopback.
-# Substring matching (e.g. =~ localhost) would wrongly pass a remote host or a
-# password that merely contains "localhost".
+# Safety check: the shared guard parses the host out of POSTGRES_URL and allows
+# loopback or a dev-stack host listed in PINPOINT_DEV_DB_HOSTS, never a cloud
+# host (scripts/assert-local-db.mjs). It prints its own refusal.
+guard_module="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/assert-local-db.mjs"
+if ! GUARD_MODULE="$guard_module" node --input-type=module -e \
+    'const { assertLocalDatabase } = await import(process.env.GUARD_MODULE); assertLocalDatabase(process.env.POSTGRES_URL);'; then
+    echo -e "${RED}   Refusing to reset a non-local database.${NC}"
+    exit 1
+fi
 db_hostport=${POSTGRES_URL#*://} # strip scheme
 db_hostport=${db_hostport##*@}   # strip userinfo@ (greedy: host follows the last @)
 db_hostport=${db_hostport%%/*}   # strip /path
 db_host=${db_hostport%%:*}       # strip :port
-case "$db_host" in
-    localhost | 127.0.0.1) ;;
-    *)
-        echo -e "${RED}❌ POSTGRES_URL host is not local: ${db_host}${NC}"
-        echo -e "${RED}   Refusing to reset non-local database.${NC}"
-        echo -e "${YELLOW}⚠️  This script should ONLY be used with local development databases.${NC}"
-        exit 1
-        ;;
-esac
 
-echo -e "${GREEN}✓ Verified POSTGRES_URL points to a local database (${db_host})${NC}"
+echo -e "${GREEN}✓ Verified POSTGRES_URL points to a local dev database (${db_host})${NC}"
 
 echo -e "${BLUE}🧹 Resetting local database schema...${NC}"
 # Use the project's existing reset logic (minus seeding)

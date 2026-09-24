@@ -9,7 +9,7 @@ import { describe, it, expect, beforeAll } from "vitest";
  * This would have caught the issue in commit 8656b06 where Mailpit
  * was not enabled in CI for password reset E2E tests.
  *
- * Requires Mailpit to be running (supabase start includes Mailpit).
+ * Requires Mailpit to be running (pnpm supabase:start includes Mailpit).
  */
 
 describe("Mailpit Integration", () => {

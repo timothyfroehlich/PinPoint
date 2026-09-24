@@ -115,7 +115,7 @@ stack_status() {
   echo "backend:  $backend${DOCKER_HOST:+ (DOCKER_HOST=$DOCKER_HOST)}"
   echo "project:  $project_id"
   echo "api:      $api_url"
-  if curl -fsS --max-time 3 "$api_url/auth/v1/health" >/dev/null 2>&1; then
+  if curl -fsS --max-time 10 "$api_url/auth/v1/health" >/dev/null 2>&1; then
     echo "health:   ok"
   else
     echo "health:   not responding"

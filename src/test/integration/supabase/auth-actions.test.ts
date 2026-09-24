@@ -9,7 +9,7 @@ import {
  * Integration tests for authentication actions
  *
  * These tests validate auth actions against a real Supabase instance.
- * Requires Supabase to be running (supabase start).
+ * Requires Supabase to be running (pnpm supabase:start).
  *
  * Note: Validation schemas are covered by unit tests; this file focuses on
  * Supabase behavior (auth flows) against a real instance.

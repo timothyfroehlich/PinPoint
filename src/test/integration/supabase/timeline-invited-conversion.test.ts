@@ -9,7 +9,7 @@
  * cannot succeed while any reference remains).
  *
  * This MUST run against real Postgres: PGlite does not execute triggers, so
- * this lives in the supabase suite (requires `supabase start`). Setup/asserts
+ * this lives in the supabase suite (requires `pnpm supabase:start`). Setup/asserts
  * use a raw `postgres` connection; signup goes through the admin auth API,
  * which inserts into `auth.users` and fires the trigger synchronously.
  */

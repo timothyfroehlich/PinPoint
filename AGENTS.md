@@ -91,7 +91,7 @@ Leave the stack running afterward — the user can stop it. Hand off what's runn
 
 ### Process safety
 
-Only stop services you started in this session, by specific PID or via worktree-local commands (e.g. `supabase stop` inside the worktree). Forbidden without explicit permission: `supabase stop --all`, `pkill`/`killall` against process names, `docker stop` on containers you didn't start. The system runs many environments in parallel; broad kills wipe out other agents' work.
+Only stop services you started in this session, by specific PID or via worktree-local commands (e.g. `pnpm supabase:stop` inside the worktree). Forbidden without explicit permission: `supabase stop --all`, `pkill`/`killall` against process names, `docker stop` on containers you didn't start. The system runs many environments in parallel; broad kills wipe out other agents' work.
 
 ## 5. Workflow
 
