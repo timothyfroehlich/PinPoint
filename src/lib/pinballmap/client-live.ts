@@ -394,7 +394,16 @@ async function readRegionLmxes(
   try {
     let responseDone = false;
     while (!responseDone) {
-      const { value, done } = await reader.read();
+      let chunk: ReadableStreamReadResult<Uint8Array>;
+      try {
+        chunk = await reader.read();
+      } catch {
+        throw new PinballMapReadError(
+          "invalid_response",
+          `PinballMap ${label} failed: response body could not be read`
+        );
+      }
+      const { value, done } = chunk;
       responseDone = done;
       if (done) break;
       if (!parser) {
@@ -478,7 +487,7 @@ async function readRegionLmxes(
     }
     return entries;
   } catch (error) {
-    await reader.cancel();
+    await reader.cancel().catch(() => undefined);
     if (error instanceof TokenizerError || error instanceof TokenParserError) {
       throw new PinballMapReadError(
         "invalid_response",

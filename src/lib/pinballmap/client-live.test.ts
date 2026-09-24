@@ -235,6 +235,7 @@ describe("live client — reads", () => {
           },
           cancel() {
             cancelled = true;
+            return Promise.reject(new Error("cancel failed"));
           },
         },
         { highWaterMark: 0 }
@@ -249,6 +250,24 @@ describe("live client — reads", () => {
     expect(cancelled).toBe(true);
     expect(chunksSent).toBeLessThan(206);
     expect(jsonSpy).not.toHaveBeenCalled();
+  });
+
+  it("classifies a failed response-body read as an invalid PBM response", async () => {
+    const response = new Response(
+      new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(
+            new TextEncoder().encode('{"location_machine_xrefs":[')
+          );
+          controller.error(new Error("connection terminated"));
+        },
+      })
+    );
+    installFetchMock(() => response);
+
+    await expect(
+      createLiveClient(null).fetchRegionLmxes("austin")
+    ).rejects.toMatchObject({ reason: "invalid_response" });
   });
 
   it("accepts an empty wrapped region array and rejects a missing one", async () => {
