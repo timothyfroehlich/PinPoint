@@ -23,7 +23,6 @@ describe("MachineBackboxTranslite", () => {
       <MachineBackboxTranslite
         imageUrl="https://img.opdb.org/godzilla.jpg"
         name="Godzilla"
-        pinballmapUrl="https://pinballmap.com/map/?by_location_id=26454"
       />
     );
     const img = screen.getByRole("img");
@@ -34,19 +33,14 @@ describe("MachineBackboxTranslite", () => {
       "href",
       "https://img.opdb.org/godzilla.jpg"
     );
-    expect(screen.getByRole("link", { name: "Pinball Map" })).toHaveAttribute(
-      "href",
-      "https://pinballmap.com/map/?by_location_id=26454"
-    );
+    expect(
+      screen.queryByRole("link", { name: /pinball map/i })
+    ).not.toBeInTheDocument();
   });
 
   it("renders nothing when no image URL exists (chip-only fallback)", () => {
     const { container } = render(
-      <MachineBackboxTranslite
-        imageUrl={null}
-        name="Godzilla"
-        pinballmapUrl="https://pinballmap.com/"
-      />
+      <MachineBackboxTranslite imageUrl={null} name="Godzilla" />
     );
     expect(screen.queryByRole("img")).not.toBeInTheDocument();
     expect(screen.queryByTestId("machine-translite")).not.toBeInTheDocument();
@@ -58,7 +52,6 @@ describe("MachineBackboxTranslite", () => {
       <MachineBackboxTranslite
         imageUrl="https://img.opdb.org/godzilla.jpg"
         name="Godzilla"
-        pinballmapUrl="https://pinballmap.com/"
       />
     );
     expect(screen.getByTestId("machine-translite")).toHaveClass(

@@ -6,8 +6,6 @@ interface MachineBackboxTransliteProps {
   imageUrl: string | null;
   /** Machine name, for the image's accessible name. */
   name: string;
-  /** Link to Pinball Map's configured location, or its home for catalog-only use. */
-  pinballmapUrl: string;
 }
 
 /**
@@ -27,7 +25,6 @@ interface MachineBackboxTransliteProps {
 export function MachineBackboxTranslite({
   imageUrl,
   name,
-  pinballmapUrl,
 }: MachineBackboxTransliteProps): React.JSX.Element | null {
   if (imageUrl == null) return null;
 
@@ -44,9 +41,8 @@ export function MachineBackboxTranslite({
         unoptimized
         className="object-cover object-center"
       />
-      <figcaption className="absolute right-2 bottom-2 rounded bg-background/90 px-1.5 py-0.5 text-[10px] tracking-wide text-foreground">
-        Image: <a href={imageUrl}>OPDB</a> · via{" "}
-        <a href={pinballmapUrl}>Pinball Map</a>
+      <figcaption className="absolute right-0 bottom-0 rounded-tl bg-background/90 px-1.5 py-0.5 text-[10px] tracking-wide text-foreground">
+        Image: <a href={imageUrl}>OPDB</a>
       </figcaption>
     </figure>
   );
