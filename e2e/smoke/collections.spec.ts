@@ -58,8 +58,10 @@ test.describe("Personal collections (PP-wqit.1)", () => {
     await page.keyboard.press("Escape"); // close the multi-select popover
     await page.getByTestId("collection-add-machines").click();
 
-    // Overview now renders the machine table.
-    await expect(page.getByTestId("collection-overview-body")).toBeVisible();
+    // Overview now renders the shared Machine View in either responsive mode.
+    await expect(
+      page.getByRole("link", { name: "Slick Chick", exact: true })
+    ).toBeVisible();
     await expect(page.getByTestId("collection-summary")).toBeVisible();
 
     // Issues and Timeline tabs render without 500.
@@ -95,7 +97,9 @@ test.describe("Personal collections (PP-wqit.1)", () => {
     await page.getByRole("option", { name: /Slick Chick/ }).click();
     await page.keyboard.press("Escape");
     await page.getByTestId("collection-add-machines").click();
-    await expect(page.getByTestId("collection-overview-body")).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "Slick Chick", exact: true })
+    ).toBeVisible();
 
     // Enable view sharing and grab the generated link.
     await page.getByTestId("collection-share-trigger").click();
@@ -116,7 +120,7 @@ test.describe("Personal collections (PP-wqit.1)", () => {
       const anonPage = attachHydrationWait(await anon.newPage());
       await anonPage.goto(shareUrl);
       await expect(
-        anonPage.getByTestId("collection-overview-body")
+        anonPage.getByRole("link", { name: "Slick Chick", exact: true })
       ).toBeVisible();
       await expect(anonPage).toHaveURL(/\/c\/[^/]+$/);
       await expect(

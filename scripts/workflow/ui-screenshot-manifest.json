@@ -24,6 +24,12 @@
     "authRole": "member",
     "seedNeeds": "default seed"
   },
+  "machines-directory": {
+    "label": "Machines Directory",
+    "route": "/m",
+    "authRole": "member",
+    "seedNeeds": "default seed (on-floor machines and open issues)"
+  },
   "machine-detail": {
     "label": "Machine Detail (Addams Family)",
     "route": "/m/TAF",
