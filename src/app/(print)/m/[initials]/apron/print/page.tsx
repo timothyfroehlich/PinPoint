@@ -8,7 +8,8 @@ import { db } from "~/server/db";
 import { machines, userProfiles } from "~/server/db/schema";
 import { createClient } from "~/lib/supabase/server";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
-import { apronCardContent, buildApronScanUrl } from "~/lib/machines/apron-card";
+import { apronCardContent } from "~/lib/machines/apron-card";
+import { buildMachineHubUrl } from "~/lib/machines/hub-url";
 import { resolveRequestUrl } from "~/lib/url";
 import { ApronCardPrintSheet } from "./ApronCardPrintSheet";
 
@@ -60,7 +61,7 @@ export default async function ApronCardPrintPage({
       machineInitials={machine.initials}
       content={apronCardContent(machine)}
       size={machine.apronSize}
-      scanUrl={buildApronScanUrl(
+      scanUrl={buildMachineHubUrl(
         resolveRequestUrl(await headers()),
         machine.initials
       )}

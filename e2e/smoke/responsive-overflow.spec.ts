@@ -64,7 +64,13 @@ const authenticatedRoutes = [
   "/settings",
 ];
 
-const publicRoutes = ["/report", "/help", "/about", "/whats-new"];
+const publicRoutes = [
+  "/report",
+  `/m/${seededMachines.attackFromMars.initials}/hub?source=apron`,
+  "/help",
+  "/about",
+  "/whats-new",
+];
 
 test.describe("Responsive: no horizontal overflow", () => {
   test.describe("authenticated pages", () => {
@@ -96,6 +102,31 @@ test.describe("Responsive: no horizontal overflow", () => {
         "edit",
       ]) {
         await expect(page.getByTestId(`machine-tab-${tab}`)).toBeVisible();
+      }
+    });
+
+    test("desktop quick search stays clear of header controls", async ({
+      page,
+    }) => {
+      await page.goto("/dashboard");
+      await page.getByTestId("user-menu-name").evaluate((name) => {
+        name.textContent = "Longfirstnameexample";
+      });
+
+      for (const width of [768, 1008, 1024, 1280]) {
+        await page.setViewportSize({ width, height: 900 });
+        const [nav, search, report] = await Promise.all([
+          page.getByRole("navigation", { name: "main" }).boundingBox(),
+          page.getByTestId("quick-search-desktop").boundingBox(),
+          page.getByTestId("nav-report-issue").boundingBox(),
+        ]);
+        if (!nav || !search || !report) {
+          throw new Error(`Header controls missing at ${String(width)}px`);
+        }
+
+        expect(nav.x + nav.width).toBeLessThanOrEqual(search.x + 1);
+        expect(search.x + search.width).toBeLessThanOrEqual(report.x + 1);
+        await assertNoHorizontalOverflow(page);
       }
     });
 

@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   apronCardContent,
   apronCardPixelSize,
-  buildApronScanUrl,
   cardParagraphs,
   fitTitleSize,
   groupedEdition,
@@ -119,12 +118,6 @@ describe("fitTitleSize", () => {
 });
 
 describe("card helpers", () => {
-  it("tags the scan hub URL with the apron source", () => {
-    expect(buildApronScanUrl("https://example.org", "GDZ")).toBe(
-      "https://example.org/m/GDZ/hub?source=apron"
-    );
-  });
-
   it("splits card text into trimmed paragraphs", () => {
     expect(cardParagraphs("One.\n\n  Two.  \n")).toEqual(["One.", "Two."]);
   });

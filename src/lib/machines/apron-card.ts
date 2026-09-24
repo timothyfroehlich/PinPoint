@@ -209,13 +209,6 @@ export function cardParagraphs(text: string): string[] {
     .filter(Boolean);
 }
 
-/** The URL the card's QR encodes (spec §8.1): the scan hub, tagged `apron`. */
-export function buildApronScanUrl(siteUrl: string, initials: string): string {
-  const url = new URL(`/m/${encodeURIComponent(initials)}/hub`, siteUrl);
-  url.searchParams.set("source", "apron");
-  return url.toString();
-}
-
 /** A size's physical dimensions in CSS px (96 per inch). */
 export function apronCardPixelSize(size: ApronCardSize): {
   width: number;

@@ -7,6 +7,7 @@ import { CollectionTabStrip } from "~/components/collections/CollectionTabStrip"
 import { EditCollectionDialog } from "~/components/collections/EditCollectionDialog";
 import { CollectionShareDialog } from "~/components/collections/CollectionShareDialog";
 import { summarizeCollection } from "~/lib/collections/summary";
+import { getMachineViewHealth } from "~/lib/machines/view/queries";
 import {
   getEditorCollaborators,
   getGrantableMembers,
@@ -44,7 +45,11 @@ export default async function CollectionLayout({
   const data = await getCollectionForLayout(id);
   if (!data) notFound();
 
-  const summary = summarizeCollection(data.collection.machines);
+  const health = await getMachineViewHealth(
+    db,
+    data.collection.machines.map((machine) => machine.initials)
+  );
+  const summary = summarizeCollection(data.collection.machines, health);
   const worstStatus =
     summary.unplayable > 0
       ? "unplayable"

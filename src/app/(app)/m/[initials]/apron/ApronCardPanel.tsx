@@ -2,7 +2,8 @@ import type React from "react";
 import { headers } from "next/headers";
 
 import { ApronCardEntry } from "~/components/machines/apron/ApronCardEntry";
-import { apronCardContent, buildApronScanUrl } from "~/lib/machines/apron-card";
+import { apronCardContent } from "~/lib/machines/apron-card";
+import { buildMachineHubUrl } from "~/lib/machines/hub-url";
 import { docToPlainText } from "~/lib/tiptap/types";
 import { resolveRequestUrl } from "~/lib/url";
 import type { MachineForLayout } from "~/app/(app)/m/[initials]/_data";
@@ -21,7 +22,7 @@ export async function ApronCardPanel({
 }): Promise<React.JSX.Element | null> {
   if (!canEdit && !canExport) return null;
 
-  const scanUrl = buildApronScanUrl(
+  const scanUrl = buildMachineHubUrl(
     resolveRequestUrl(await headers()),
     machine.initials
   );
