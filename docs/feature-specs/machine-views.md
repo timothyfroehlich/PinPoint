@@ -4,7 +4,7 @@
 
 **What this document is.** The requirements for PinPoint's shared machine-list experience on `/m`, standard Collections, and owner Collections. It describes the intended final state only; what the code does or used to do lives solely in the Known divergences table. Each requirement is numbered for citation. When code and spec disagree, either the code is wrong or this document gets amended — never silently neither.
 
-**Related records.** `docs/feature-specs/fleet.md` (the existing Fleet and Pinball Map dashboard requirements; unchanged by this spec).
+**Related records.** `docs/feature-specs/fleet.md` (the existing Fleet and Pinball Map dashboard requirements; unchanged by this spec), `docs/feature-specs/collections-and-tags.md` (Collection, Owner Collection, and Tag membership and access).
 
 ---
 
@@ -21,8 +21,8 @@
 
 ## 2. Shared Module and Scoping
 
-- **2.1** `/m`, standard Collection overviews, and owner Collection overviews use one domain-specific Machine View implementation rather than separate card, table, or query pipelines.
-- **2.2** Machine View supports all-machines, standard-collection, and owner scopes. Standard Collections use exact membership rows; owner Collections use exact owner identity. No scope may leak machines from outside its authoritative set.
+- **2.1** `/m`, standard Collection overviews, owner Collection overviews, and tag page overviews use one domain-specific Machine View implementation rather than separate card, table, or query pipelines.
+- **2.2** Machine View supports all-machines, standard-collection, owner, and tag scopes. Standard Collections use exact membership rows; owner Collections use exact owner identity; tags use their tag type's membership rule. No scope may leak machines from outside its authoritative set.
 - **2.3** Machines and Collections define separate Page Presets. A preset owns default filters, displayed fields, sorting, and permitted fields; route callers supply only scope, preset, and URL search parameters.
 - **2.4** The module remains machine-specific rather than becoming a generic grid. Future tags and locations may add Machine View scopes or presets without changing the machine row model.
 - **2.5** Unmatched external integration entries are not Machine rows. Their representation remains deferred until the Integrations design and must not be introduced as a premature generic row union.
@@ -101,4 +101,5 @@ _None currently recorded._
 
 | Date | Change |
 | :-- | :-- |
+| 2026-09-24 | Added tag scope for tag page overviews. |
 | 2026-09-21 | Created. Establishes one machine-specific view for `/m` and Collections, conditional enrichment, bookmarkable URL state, shared responsive presentation, route-preservation requirements, and explicit deferred integrations/saved-view work. |
