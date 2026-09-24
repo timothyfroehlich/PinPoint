@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Read-only readiness gate: is this worktree's Supabase stack up and migrated?
 # Runs first in preflight so a missing stack fails in seconds, not after the
-# build. Reads the worktree's ports from .env.local the same way `pnpm dev` does.
+# build. Reads the worktree's ports through @next/env, the loader `pnpm dev`
+# uses: dotenv parsing, and exported variables win over .env.local.
 
 set -euo pipefail
 
@@ -11,10 +12,14 @@ fail() {
 }
 
 [[ -f .env.local ]] || fail ".env.local is missing" "python3 scripts/worktree_setup.py"
-set -a
-# shellcheck source=/dev/null
-source .env.local
-set +a
+env_value() {
+  node -e "require('@next/env').loadEnvConfig('.', true, { info() {}, error() {} });
+    process.stdout.write(process.env[process.argv[1]] ?? '')" "$1"
+}
+POSTGRES_URL=$(env_value POSTGRES_URL)
+NEXT_PUBLIC_SUPABASE_URL=$(env_value NEXT_PUBLIC_SUPABASE_URL)
+[[ -n "$POSTGRES_URL" && -n "$NEXT_PUBLIC_SUPABASE_URL" ]] \
+  || fail ".env.local lacks POSTGRES_URL or NEXT_PUBLIC_SUPABASE_URL" "python3 scripts/worktree_setup.py"
 
 # Report host:port only; never print the URL's credentials.
 db_target="${POSTGRES_URL#*@}"

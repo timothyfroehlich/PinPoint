@@ -148,7 +148,7 @@ Vercel preview migrations: preview deployments skip `migrate:production` (branch
 
 ## pnpm audit gate
 
-CI runs `pnpm audit --audit-level=high` only when a PR changes `pnpm-lock.yaml` or `pnpm-workspace.yaml` — the only change that can bring a new advisory in. Advisories already on `main` are Dependabot's job (its security-updates group), not a reason to block unrelated PRs, so there is no per-PR override.
+CI runs `pnpm audit` only when a PR changes `pnpm-lock.yaml` or `pnpm-workspace.yaml`, audits both the head and the base lockfile, and fails only on high/critical advisory IDs the head adds. An advisory published against a version already locked on `main` is Dependabot's job (its security-updates group), not a reason to block unrelated dependency PRs, so there is no per-PR override. The job log lists the advisories already on the base.
 
 ### Resolving advisories via overrides
 

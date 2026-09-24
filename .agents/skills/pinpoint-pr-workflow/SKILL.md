@@ -122,7 +122,7 @@ on the current head commit. A green run for an older SHA does not qualify.
 **Handling the CI result**:
 
 - `outcome: "passed"` (exit 0): CI Gate passed on `HEAD_SHA`. If the PR is draft, run `gh pr ready <PR>` (which auto-triggers CodeRabbit review), then proceed to monitor review in 3.4.
-- `outcome: "failed"` (exit 1): A run or CI Gate failed. The watcher saves the failed-step log and returns its path as `failure_artifact` (under `tmp/gh-monitor/`). Address the failure, commit, and push.
+- `outcome: "failed"` (exit 1): A run or CI Gate failed. When it can fetch the failed-step log, the watcher saves it and returns its path as `failure_artifact` (under `tmp/gh-monitor/`); if `failure_artifact` is null, open `detail_url` for the run log. Address the failure, commit, and push.
   - If judged to be a GitHub Actions **infra** flake (network timeout, runner loss, download 5xx, container start): log it with `bash scripts/workflow/log-gha-flake.sh <pr> <run-id> <class> "<symptom>"` before retrying.
 - `outcome: "stale"` (exit 1): The PR head moved away from `expected_head`. The owner re-checks branch state.
 - `outcome: "conflicting"` (exit 1): Merge conflict developed (`DIRTY` or `CONFLICTING`). Merge `origin/main` into the branch and push.

@@ -677,6 +677,15 @@ def _watch_phase_review(
                 # between the first read and the verdict.
                 summary = read_evidence()
                 problem = pinned_problem()
+            if problem is None and summary and summary.get("head") != expected_head:
+                # The gate read its own head; evidence for another commit
+                # (a push and revert between reads, replica lag) is not ours.
+                problem = _head_problem(
+                    str(summary.get("head") or ""),
+                    seen.get("merge_state", "UNKNOWN"),
+                    expected_head,
+                    "review",
+                )
         except (RuntimeError, json.JSONDecodeError) as exc:
             return _verdict(
                 "undetermined", f"⚠  Could not determine review state — {exc}", **seen

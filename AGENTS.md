@@ -177,7 +177,7 @@ Never resolve `drizzle/meta` conflicts manually — the folder holds binary-like
 
 The owning agent monitors CI, draft promotion, review execution, findings, and corrective pushes until one accepted checker — CodeRabbit approval, Codex evidence, or a local attestation — covers the exact current head and every review thread is resolved. An exact-head finding-bearing review is also terminal once every thread is explicitly adjudicated and resolved; declining a finding without a push does not require another review. Never request the same head twice. A corrective push invalidates prior coverage: wait for replacement current-head CI, then request or trigger a new review for the new head. A pure merge of `main` into the branch does not — the gate carries review coverage across it (PP-ojoj).
 
-The gate accepts CodeRabbit's native exact-head approval, Codex's native GitHub approval, its exact-bot/exact-app clean comment pinned to head, a trusted GitHub Actions witness that pins Codex's `+1` on the SHA-tagged request to head, an exact-head `COMMENTED`/`CHANGES_REQUESTED` review after every finding thread is adjudicated and resolved, or the existing SHA-pinned manual attestation after Tim runs `/codex:review` or `/code-review` — three independent checkers following the priority hierarchy **CodeRabbit $\longrightarrow$ Codex $\longrightarrow$ Local Attestation**, any one of which passes the gate; the label is one of `approved` / `changes requested` / `stale review` / `not reviewed`. When concurrent reviews run, the gate resolves on first success while alerting if a secondary review is still in progress. Request and state-transition rules: `pinpoint-pr-workflow` skill Phase 3.
+The gate accepts CodeRabbit's native exact-head approval, Codex's native GitHub approval, its exact-bot/exact-app clean comment pinned to head, a trusted GitHub Actions witness that pins Codex's `+1` on the SHA-tagged request to head, an exact-head `COMMENTED`/`CHANGES_REQUESTED` review after every finding thread is adjudicated and resolved, or the existing SHA-pinned manual attestation after Tim runs `/codex:review` or `/code-review` — three independent checkers following the priority hierarchy **CodeRabbit $\longrightarrow$ Codex $\longrightarrow$ Local Attestation**, any one of which passes the gate; the label is one of `approved` / `changes requested` / `stale review` / `not reviewed`. When concurrent reviews run, the gate resolves on the first qualifying review; check the other reviewer's findings when it lands. Request and state-transition rules: `pinpoint-pr-workflow` skill Phase 3.
 
 ### The `ownerless` label
 
@@ -245,7 +245,7 @@ Native Supabase auto-branching is **disabled** — no PR gets a preview by defau
 
 ### pnpm audit gate
 
-CI runs `pnpm audit --audit-level=high` only on PRs that change `pnpm-lock.yaml` or `pnpm-workspace.yaml`; advisories already on `main` are Dependabot's job. See `pinpoint-deployment`.
+CI runs `pnpm audit` only on PRs that change `pnpm-lock.yaml` or `pnpm-workspace.yaml`, and fails only on high/critical advisories the PR adds over its base; advisories already on `main` are Dependabot's job. See `pinpoint-deployment`.
 
 ## 8. Documentation
 

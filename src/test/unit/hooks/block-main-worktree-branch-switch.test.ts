@@ -70,6 +70,8 @@ const BLOCKED = [
   "git checkout origin/main",
   "git status && git checkout feature/x",
   "echo $(git switch feature/x)",
+  "cd . && git checkout feature/x",
+  "git checkout feature/x && cd ..",
 ];
 
 const ALLOWED = [
@@ -85,6 +87,7 @@ const ALLOWED = [
   "git -C ../other checkout feature/x",
   "echo git checkout feature/x",
   "rg 'git checkout feature/x' docs",
+  "grep -n 'git status && git checkout feature/x' notes.md",
   "git status",
 ];
 

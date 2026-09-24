@@ -560,6 +560,16 @@ def test_watch_phase_review_passes_when_approved_and_zero_threads(monkeypatch):
 
 
 @pytest.mark.unit
+def test_watch_phase_review_rejects_evidence_for_another_head(monkeypatch):
+    """An approval the gate computed for a different commit must not pass."""
+    monkeypatch.setattr(pr_watch, "gh", make_gh())
+    use_summaries(monkeypatch, fake_summary("approved", head=OLD_SHA))
+
+    verdict = pr_watch._watch_phase_review(PR, HEAD_SHA, timeout_sec=10, poll_sec=0)
+    assert verdict.outcome == "stale"
+
+
+@pytest.mark.unit
 def test_watch_phase_review_action_required_when_threads_unresolved(monkeypatch):
     monkeypatch.setattr(pr_watch, "gh", make_gh())
     use_summaries(monkeypatch, fake_summary("approved", unresolved=1))

@@ -2,8 +2,10 @@
 // PreToolUse (Bash) hook: blocks `git checkout|switch <anything but main>` in the
 // MAIN worktree, which is read-only and stays on `main` (AGENTS.md §2.2.5;
 // incident 2026-05-31: a later `git merge` advanced the wrong branch there).
-// Deliberately a regex, not a shell parser. Allowed: commands that `cd`
-// elsewhere, `git -C <path> …` (never matches: `-C` precedes the subcommand),
+// Deliberately a regex, not a shell parser. Each switch is checked against the
+// directory it runs in: the last literal `cd` before it, else the hook's cwd
+// (a `cd` target with `$`, `~` or backticks is unresolvable → allowed).
+// Allowed: `git -C <path> …` (never matches: `-C` precedes the subcommand),
 // file restores (`git checkout [<ref>] -- <paths>`, `--theirs`/`--ours`/`-p`,
 // `git checkout .`), linked worktrees,
 // malformed payloads, and git errors.
@@ -18,15 +20,30 @@ const MOVES = new Set(["-", "-b", "-B", "-c", "-C", "--create", "--orphan", "--d
 // Flags that only make sense with paths, so the command restores files.
 const FILE_FLAGS = new Set(["--", "--theirs", "--ours", "-p", "--patch", "--pathspec-from-file"]);
 
+const CD = /(?:^|[;&|(\n])\s*cd\s+("[^"]*"|'[^']*'|[^\s;&|)]+)/g;
+
+/** Directory a command position runs in, or null when a `cd` target can't be resolved. */
+function dirAt(command, index, cwd) {
+  const cds = [...command.slice(0, index).matchAll(CD)];
+  if (cds.length === 0) return cwd;
+  const target = cds[cds.length - 1][1].replace(/^["']|["']$/g, "");
+  return /[$~`]/.test(target) ? null : path.resolve(cwd, target);
+}
+
 /** The offending `git checkout|switch …` text, or "" when the command is fine. */
-function findBranchSwitch(command) {
-  if (/\bcd\s/.test(command)) return "";
-  for (const [, match, rest] of command.matchAll(SWITCH)) {
+function findBranchSwitch(command, cwd) {
+  // Single-quoted text is literal (a grep pattern, a test string), so blank it
+  // out; keeping the length keeps match indices valid for dirAt.
+  const visible = command.replace(/'[^']*'/g, (q) => `'${" ".repeat(q.length - 2)}'`);
+  for (const m of visible.matchAll(SWITCH)) {
+    const [, match, rest] = m;
     const args = rest.split(/\s+/).filter(Boolean).map((a) => a.replace(/^["']|["']$/g, ""));
     if (args.some((a) => FILE_FLAGS.has(a))) continue;
     const target = args.find((a) => !a.startsWith("-"));
     if (target === ".") continue;
-    if (args.some((a) => MOVES.has(a)) || (target && target !== "main")) return match.trim();
+    if (!(args.some((a) => MOVES.has(a)) || (target && target !== "main"))) continue;
+    const dir = dirAt(command, m.index, cwd);
+    if (dir && isMainWorktree(dir)) return match.trim();
   }
   return "";
 }
@@ -52,8 +69,9 @@ process.stdin.on("end", () => {
   } catch {
     // Malformed payload → allow.
   }
-  const detail = payload.tool_name === "Bash" ? findBranchSwitch(String(payload.tool_input?.command ?? "")) : "";
-  if (!detail || !isMainWorktree(payload.cwd || process.cwd())) return;
+  const cwd = payload.cwd || process.cwd();
+  const detail = payload.tool_name === "Bash" ? findBranchSwitch(String(payload.tool_input?.command ?? ""), cwd) : "";
+  if (!detail) return;
   console.error(
     `Branch switch blocked in the MAIN worktree: ${detail}. The root checkout is read-only and stays on \`main\` ` +
       `(AGENTS.md §2.2.5) — switching it off main lets a later \`git merge\` advance the wrong branch and clobber ` +
