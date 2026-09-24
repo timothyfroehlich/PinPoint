@@ -193,6 +193,7 @@ record_phrase() {
   local checker=$1 reviewer=$2 detail=$3
   case "$checker:$detail" in
     coderabbit:APPROVED) printf 'CodeRabbit GitHub approval\n' ;;
+    coderabbit:SUMMARY_REVIEWED) printf 'CodeRabbit incremental review after prior approval\n' ;;
     coderabbit:*) printf 'CodeRabbit GitHub review (%s)\n' "$detail" ;;
     codex:APPROVED) printf 'Codex GitHub approval\n' ;;
     codex:NO_FINDINGS) printf 'Codex clean review comment\n' ;;

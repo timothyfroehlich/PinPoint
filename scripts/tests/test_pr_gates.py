@@ -81,6 +81,30 @@ def clean_codex_comment(
     }
 
 
+def coderabbit_summary(
+    sha: str = HEAD_SHA,
+    *,
+    login: str = CODERABBIT_BOT,
+    app: str = "coderabbitai",
+    kind: str = "reviewed",
+    covered_sha: str | None = None,
+) -> dict:
+    covered = covered_sha or sha
+    return {
+        "user": {"login": login},
+        "performed_via_github_app": {"slug": app},
+        "body": (
+            "<!-- This is an auto-generated comment: summarize by coderabbit.ai -->\n"
+            f'<!-- change_assessment_commit:"{sha}" -->\n'
+            "<!-- final_review_risk_coverage:{"
+            f'"sourceCommitId":"{sha}","coveredCommitId":"{covered}",'
+            f'"kind":"{kind}"'
+            "} -->"
+        ),
+        "updated_at": "2026-08-22T12:04:00Z",
+    }
+
+
 def clean_codex_reaction_witness(
     sha: str = HEAD_SHA,
     *,
@@ -334,6 +358,65 @@ def test_later_coderabbit_changes_request_supersedes_approval() -> None:
         ),
     ]
     with gate_env(review_pages=[reviews]) as env:
+        summary = review_summary(env)
+    assert summary["label"] == "changes requested"
+    assert summary["checkers"]["coderabbit"]["verdict"] == "changes_requested"
+
+
+def test_coderabbit_incremental_summary_covers_after_prior_approval() -> None:
+    approved = codex_review(
+        sha=OTHER_SHA, login=CODERABBIT_BOT, submitted_at="2026-08-22T12:00:00Z"
+    )
+    with gate_env(
+        review_pages=[[approved]], comment_pages=[[coderabbit_summary()]]
+    ) as env:
+        result = run_gate("check_review_happened", env)
+        summary = review_summary(env)
+    assert result.returncode == 0, result.stdout
+    assert "CodeRabbit incremental review covers head SHA" in result.stdout
+    assert summary["coverage"]["form"] == "summary_review"
+    assert summary["coverage"]["inherited_from"] == OTHER_SHA
+
+
+@pytest.mark.parametrize(
+    "comment",
+    [
+        coderabbit_summary(login="other[bot]"),
+        coderabbit_summary(app="other-app"),
+        coderabbit_summary(kind="skipped"),
+        coderabbit_summary(covered_sha=OTHER_SHA),
+        coderabbit_summary(sha=OTHER_SHA),
+    ],
+)
+def test_coderabbit_incremental_summary_requires_trusted_exact_head_evidence(
+    comment: dict,
+) -> None:
+    approved = codex_review(sha=OTHER_SHA, login=CODERABBIT_BOT)
+    with gate_env(review_pages=[[approved]], comment_pages=[[comment]]) as env:
+        summary = review_summary(env)
+    assert summary["label"] == "stale review"
+    assert summary["coverage"] is None
+
+
+def test_coderabbit_summary_without_prior_native_approval_does_not_cover() -> None:
+    with gate_env(comment_pages=[[coderabbit_summary()]]) as env:
+        summary = review_summary(env)
+    assert summary["label"] == "not reviewed"
+
+
+def test_coderabbit_current_head_changes_request_beats_summary() -> None:
+    reviews = [
+        codex_review(sha=OTHER_SHA, login=CODERABBIT_BOT),
+        codex_review(
+            sha=HEAD_SHA,
+            login=CODERABBIT_BOT,
+            state="CHANGES_REQUESTED",
+            submitted_at="2026-08-22T12:02:00Z",
+        ),
+    ]
+    with gate_env(
+        review_pages=[reviews], comment_pages=[[coderabbit_summary()]]
+    ) as env:
         summary = review_summary(env)
     assert summary["label"] == "changes requested"
     assert summary["checkers"]["coderabbit"]["verdict"] == "changes_requested"

@@ -20,9 +20,11 @@ set -euo pipefail
 readonly CODEX_REVIEW_BOT="chatgpt-codex-connector[bot]"
 readonly CODEX_REVIEW_APP_SLUG="chatgpt-codex-connector"
 readonly CODEX_CLEAN_REVIEW_PREFIX="Codex Review: Didn't find any major issues."
-# CodeRabbit is the default reviewer. Its exact-head APPROVED review covers the
-# head; finding threads are adjudicated through the separate thread gate.
+# CodeRabbit is the default reviewer. Its exact-head APPROVED review or trusted
+# incremental summary after a prior approval covers head; finding threads use
+# the separate thread gate.
 readonly CODERABBIT_REVIEW_BOT="coderabbitai[bot]"
+readonly CODERABBIT_REVIEW_APP_SLUG="coderabbitai"
 readonly GITHUB_ACTIONS_BOT="github-actions[bot]"
 readonly GITHUB_ACTIONS_APP_SLUG="github-actions"
 readonly CODEX_REACTION_WITNESS_PREFIX="<!-- pinpoint-codex-reaction-witness:"
@@ -52,6 +54,7 @@ _repo_slug() {
 #
 # Lists (each sorted by `at`):
 #   coderabbit      native reviews from the exact CodeRabbit App account
+#   coderabbit_summary  CodeRabbit's exact-head incremental review marker
 #   codex_native    native reviews from the exact Codex App account
 #   codex_clean     Codex's "no major issues" issue comment, SHA-pinned by its
 #                   "Reviewed commit" line (10- or 40-char)
@@ -89,7 +92,7 @@ _review_evidence() {
 
   jq -n --arg head "$head" \
       --arg codex_bot "$CODEX_REVIEW_BOT" --arg codex_app "$CODEX_REVIEW_APP_SLUG" \
-      --arg coderabbit_bot "$CODERABBIT_REVIEW_BOT" \
+      --arg coderabbit_bot "$CODERABBIT_REVIEW_BOT" --arg coderabbit_app "$CODERABBIT_REVIEW_APP_SLUG" \
       --arg actions_bot "$GITHUB_ACTIONS_BOT" --arg actions_app "$GITHUB_ACTIONS_APP_SLUG" \
       --arg witness_prefix "$CODEX_REACTION_WITNESS_PREFIX" \
       --arg clean_prefix "$CODEX_CLEAN_REVIEW_PREFIX" --arg prefix "$REVIEW_MARKER_PREFIX" \
@@ -108,6 +111,19 @@ _review_evidence() {
     {
       head: $head,
       coderabbit: native($coderabbit_bot),
+      coderabbit_summary: ([ $comments[]
+        | (.body // "") as $body
+        | select(.user.login? == $coderabbit_bot
+                 and .performed_via_github_app.slug? == $coderabbit_app
+                 and ($body | startswith("<!-- This is an auto-generated comment: summarize by coderabbit.ai -->")))
+        | ($body | [scan("(?m)^<!-- change_assessment_commit:\"([0-9a-f]{40})\" -->$")] | flatten | last // "") as $assessed
+        | ($body | [scan("(?m)^<!-- final_review_risk_coverage:(\\{[^\\n]*\\}) -->$")] | flatten | last // "" | fromjson?) as $coverage
+        | select($coverage != null and $coverage.kind == "reviewed"
+                 and $coverage.sourceCommitId == $assessed
+                 and $coverage.coveredCommitId == $assessed)
+        | { sha: $assessed, reviewer: (.user.login // ""), detail: "SUMMARY_REVIEWED",
+            at: (.updated_at // .created_at // ""), summary: "CodeRabbit incremental review covered head" }
+      ] | sort_by(.at)),
       codex_native: native($codex_bot),
       codex_clean: ([ $comments[]
         | (.body // "") as $body
@@ -204,15 +220,20 @@ readonly _JQ_LATEST='
 
 # CodeRabbit: COMMENTED reviews are non-decisive. CodeRabbit may post an empty
 # COMMENTED review after an APPROVED review on the same head; it does not revoke
-# that approval. CHANGES_REQUESTED and DISMISSED remain decisive.
+# that approval. CHANGES_REQUESTED and DISMISSED remain decisive. After a prior
+# native approval, CodeRabbit can review a later merge commit without posting a
+# new native review; its trusted exact-head summary then supplies coverage.
 _coderabbit_check() {
   jq -c "$_JQ_LATEST"'
     .head as $head
     | latest([.coderabbit[] | select(.detail != "COMMENTED")]; $head) as $r
-    | if $r == null then empty_verdict("coderabbit")
-      elif $r.sha == $head and $r.detail == "APPROVED" then $r + { checker: "coderabbit", verdict: "covers", form: "approval" }
+    | ([.coderabbit_summary[] | select(.sha == $head)] | last) as $summary
+    | if $r != null and $r.sha == $head and $r.detail == "APPROVED" then $r + { checker: "coderabbit", verdict: "covers", form: "approval" }
       elif $r.sha == $head and $r.detail == "CHANGES_REQUESTED" then $r + { checker: "coderabbit", verdict: "changes_requested", form: "" }
-      elif $r.sha == $head then $r + { checker: "coderabbit", verdict: "none", form: "" }
+      elif $r != null and $r.sha == $head then $r + { checker: "coderabbit", verdict: "none", form: "" }
+      elif $r != null and $r.detail == "APPROVED" and $summary != null and $summary.at >= $r.at then
+        $summary + { checker: "coderabbit", verdict: "covers", form: "summary_review", inherited_from: $r.sha }
+      elif $r == null then empty_verdict("coderabbit")
       else $r + { checker: "coderabbit", verdict: "stale", form: "" }
       end'
 }
@@ -590,7 +611,13 @@ check_review_happened() {
       suffix=" (inherited from ${from_sha:0:7}; pure merge from main)"
     fi
     case "$who" in
-      coderabbit) echo "PASS: reviewed: CodeRabbit approved head SHA ${RS_HEAD_SHA:0:7}${suffix}" ;;
+      coderabbit)
+        if [[ $(jq -r '.coverage.form' <<< "$RS_SUMMARY") == "summary_review" ]]; then
+          echo "PASS: reviewed: CodeRabbit incremental review covers head SHA ${RS_HEAD_SHA:0:7}; prior approval on $(jq -r '.coverage.inherited_from[0:7]' <<< "$RS_SUMMARY")"
+        else
+          echo "PASS: reviewed: CodeRabbit approved head SHA ${RS_HEAD_SHA:0:7}${suffix}"
+        fi
+        ;;
       codex)
         case "$(jq -r '.coverage.form' <<< "$RS_SUMMARY")" in
           approval) echo "PASS: reviewed: Codex approved head SHA ${RS_HEAD_SHA:0:7}${suffix}" ;;
