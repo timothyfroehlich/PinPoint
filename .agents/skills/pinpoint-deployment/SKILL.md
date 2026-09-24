@@ -3,7 +3,7 @@ name: pinpoint-deployment
 description: >-
   Deployment reference for PinPoint — Postgres Supavisor poolers, Drizzle
   migration loop, resolving drizzle/meta conflicts, Vercel production builds,
-  TTL preview branches, and audit-override workflows. Use when changing the
+  TTL preview branches, and the pnpm audit gate. Use when changing the
   schema or writing a migration; touching src/server/db/**,
   scripts/migrate-production.ts, or scripts/lib/pg-client.mjs; resolving
   drizzle/meta conflicts; when a production deploy fails or env vars change;
@@ -13,7 +13,7 @@ description: >-
 
 # PinPoint Deployment
 
-Merged reference covering PinPoint's deployment-adjacent operational surfaces: DB connections/pooling, the day-to-day migration loop, getting the local stack to start, migration-conflict resolution, production deploys, preview deployments, and the audit-gate override. Four of these sections were previously their own skills (`pinpoint-db-connections`, `pinpoint-migration-conflicts`, `pinpoint-preview-deployments`, `pinpoint-audit-override`) and are reproduced here verbatim; **Database Migrations (day-to-day)** was absorbed from the retired patterns docs (PP-22e4), **Production Deploys (Vercel)** from two beads memories demoted in the 2026-08-09 review (PP-p4ek), and **Local stack won't start on an SELinux host** from the PP-9mg0 investigation.
+Merged reference covering PinPoint's deployment-adjacent operational surfaces: DB connections/pooling, the day-to-day migration loop, getting the local stack to start, migration-conflict resolution, production deploys, preview deployments, and the pnpm audit gate. Four of these sections were previously their own skills (`pinpoint-db-connections`, `pinpoint-migration-conflicts`, `pinpoint-preview-deployments`, `pinpoint-audit-override`) and are reproduced here verbatim; **Database Migrations (day-to-day)** was absorbed from the retired patterns docs (PP-22e4), **Production Deploys (Vercel)** from two beads memories demoted in the 2026-08-09 review (PP-p4ek), and **Local stack won't start on an SELinux host** from the PP-9mg0 investigation.
 
 ## DB Connections
 
@@ -139,22 +139,16 @@ Native Supabase auto-branching is **disabled** — no PR gets a preview by defau
 - **Control surface = PR comments** (from authors with write access only):
   - `/preview` — create (or restart after expiry) a branch, migrate + seed it, wire creds into the Vercel preview, and post a sticky status comment with the live URL + 48h expiry.
   - `/preview extend` — push expiry +48h (no DB work). `/preview stop` — tear down now.
+  - Later pushes do not re-migrate the branch. After pushing a migration or seed change, comment `/preview` again — it resets the live branch and re-runs migrate + seed from the new head.
 - **State**: one sticky bot comment per PR (keyed `<!-- pinpoint-preview-status -->`) holds the `Expires:` timestamp — the TTL source of truth.
 - **Reaper**: `Preview Reaper` runs hourly; deletes branches past expiry or on closed/merged PRs, and flips the sticky comment to "expired — comment `/preview` to restart."
 - **Implementation** (workflows, the Vercel git-integration wiring, and required secrets): `.github/workflows/preview-control.yaml`, `preview-reaper.yaml`, `scripts/workflow/preview/*.sh` (including the pinned Vercel CLI wrapper `scripts/workflow/preview/vercel-cli.sh`, PP-h2ui.7).
 
 Vercel preview migrations: preview deployments skip `migrate:production` (branch DB user lacks `CREATE SCHEMA`). The on-demand `Preview Controller` workflow migrates + seeds the branch DB before building the preview. Production deploys still migrate.
 
-## Audit-Gate Override
+## pnpm audit gate
 
-When `pnpm audit --audit-level=high` goes RED on a freshly-published advisory **unrelated** to a PR's changes (a transitive dev-dep CVE, or a fix that's major-bump-only), the audit job cascades into CI Gate and blocks the PR. The proper fix is still a dependency-bump PR — but `/audit-override` is the escape hatch so an unrelated repo-wide advisory doesn't force an admin-merge.
-
-- **Control surface = PR comments** (from authors with write access only):
-  - `/audit-override <reason>` — bypass the `pnpm audit` gate for the PR's **current head commit**. Records a `pinpoint-audit-override` commit status + a sticky bot comment (who/when/why) and re-runs the failed CI so the gate re-evaluates immediately.
-  - `/audit-override clear` — re-arm the gate.
-- **Commit-bound, not PR-bound**: the override is a commit status on the head SHA. **Pushing a new commit drops it** — the gate re-fires and the override must be re-issued, so a newly-introduced real vulnerability is never silently masked. It only bypasses the audit gate; any other failing check stays red.
-- **Scope**: single PR only; never changes repo-wide audit policy or any other PR. No secrets required (default `GITHUB_TOKEN`).
-- **Implementation**: `.github/workflows/audit-override.yaml`, `scripts/workflow/audit-override/*.sh`; the consuming check is the `Run pnpm audit` step in `ci.yml` (`gate.sh check`).
+CI runs `pnpm audit --audit-level=high` only when a PR changes `pnpm-lock.yaml` or `pnpm-workspace.yaml` — the only change that can bring a new advisory in. Advisories already on `main` are Dependabot's job (its security-updates group), not a reason to block unrelated PRs, so there is no per-PR override.
 
 ### Resolving advisories via overrides
 

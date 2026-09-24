@@ -47,7 +47,7 @@ jobs:
   # (.husky/**, .vscode/**, pinpoint.code-workspace, .gitattributes, .gitignore),
   # test/linter configs (pytest.ini, ruff.toml, .yamllint.yml, .gitleaks.toml),
   # and non-PR GitHub Action configs/workflows (dependabot.yml, renovate.json,
-  # CODEOWNERS, ownerless-renovate-issues.yaml, preview-*.yaml, audit-override.yaml,
+  # CODEOWNERS, ownerless-renovate-issues.yaml, preview-*.yaml,
   # codex-reaction-witness.yaml).
   #
   # Note: under scripts/, only TS/JS (.ts/.mjs) counts as code. Python and shell
@@ -129,12 +129,10 @@ jobs:
               - '!.github/dependabot.yml'
               - '!.github/renovate.json'
               - '!.github/CODEOWNERS'
-              - '!.github/workflows/audit-override.yaml'
               - '!.github/workflows/codex-reaction-witness.yaml'
               - '!.github/workflows/ownerless-renovate-issues.yaml'
               - '!.github/workflows/preview-control.yaml'
               - '!.github/workflows/preview-reaper.yaml'
-              - '!.github/workflows/preview-sync.yaml'
       # Separate filter for dependency changes using default "some" quantifier
       # so deps=true when ANY changed file is a dependency file (not ALL).
       - id: deps-filter
@@ -446,7 +444,6 @@ jobs:
             .github/workflows/ci.yml
             .github/workflows/preview-control.yaml
             .github/workflows/preview-reaper.yaml
-            .github/workflows/preview-sync.yaml
 
   build:
     name: Build
@@ -1077,7 +1074,10 @@ jobs:
   pnpm-audit:
     name: pnpm audit
     runs-on: ubuntu-latest
-    needs: setup
+    needs: changes
+    # Only a dependency change can bring a new advisory into a PR; advisories
+    # already on main are Dependabot's job (dependabot.yml security updates).
+    if: needs.changes.outputs.deps == 'true'
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # ratchet:step-security/harden-runner@v2.21.1
@@ -1090,48 +1090,21 @@ jobs:
           persist-credentials: false
 
       - name: Setup locked mise toolchain
-        id: toolchain
         uses: ./.github/actions/setup-mise
 
-      - name: Restore node_modules
-        id: cache-restore
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # ratchet:actions/cache/restore@v6.1.0
-        with:
-          path: node_modules
-          key: ${{ steps.toolchain.outputs.node-modules-key }}
-
-      - name: Install dependencies (if cache miss)
-        if: steps.cache-restore.outputs.cache-hit != 'true'
-        run: pnpm install --frozen-lockfile
-
+      # pnpm audit reads the lockfile only; no node_modules needed.
       - name: Run pnpm audit
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
-          # PR head commit on pull_request events (github.sha is the ephemeral
-          # merge commit there); the pushed commit on push events.
-          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           registry_errors="ERR_PNPM_AUDIT_BAD_RESPONSE"
           registry_errors+="|ERR_PNPM_AUDIT_REGISTRY"
           registry_errors+="|ECONNREFUSED|EAI_AGAIN|ETIMEDOUT"
           output=$(pnpm audit --audit-level=high 2>&1) || {
+            echo "$output"
             if echo "$output" | grep -qE "$registry_errors"; then
               echo "::warning::pnpm audit skipped: registry error"
-              echo "$output"
               exit 0
             fi
-            echo "$output"
-            # Per-PR escape hatch: a maintainer may bypass this gate for the
-            # current commit via `/audit-override <reason>` (see
-            # .github/workflows/audit-override.yaml). The override is a commit
-            # status bound to HEAD_SHA, so it never carries to a new commit —
-            # a newly-introduced advisory is never silently masked.
-            if bash scripts/workflow/audit-override/gate.sh check "$HEAD_SHA"; then
-              echo "::warning::pnpm audit bypassed by an active /audit-override on ${HEAD_SHA}. See the audit-override sticky comment for who/why."
-              exit 0
-            fi
-            echo "::error::pnpm audit found advisories at or above 'high'. Fix them, or a maintainer can bypass for this PR with '/audit-override <reason>'."
+            echo "::error::pnpm audit found advisories at or above 'high' in this dependency change."
             exit 1
           }
           echo "$output"

@@ -40,7 +40,6 @@ CI_WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "ci.yml"
 MISE_ACTION_PATH = REPO_ROOT / ".github" / "actions" / "setup-mise" / "action.yml"
 PREVIEW_CONTROL_PATH = REPO_ROOT / ".github" / "workflows" / "preview-control.yaml"
 PREVIEW_REAPER_PATH = REPO_ROOT / ".github" / "workflows" / "preview-reaper.yaml"
-PREVIEW_SYNC_PATH = REPO_ROOT / ".github" / "workflows" / "preview-sync.yaml"
 
 MINIMUM_MISE_VERSION = (2026, 8, 11)
 MISE_MANAGED_TOOLS = ("node", "python", "ruff", "supabase", "zizmor")
@@ -992,7 +991,6 @@ def test_workflows_use_mise_without_legacy_setup_actions() -> None:
         CI_WORKFLOW_PATH: "uses: ./.github/actions/setup-mise",
         PREVIEW_REAPER_PATH: "uses: ./.github/actions/setup-mise",
         PREVIEW_CONTROL_PATH: ("uses: ./.pinpoint-workflow/.github/actions/setup-mise"),
-        PREVIEW_SYNC_PATH: "uses: ./.pinpoint-workflow/.github/actions/setup-mise",
     }
     for path, action_ref in expected_action_refs.items():
         content = path.read_text(encoding="utf-8")
@@ -1018,7 +1016,6 @@ def test_ci_jobs_share_runtime_aware_dependency_cache() -> None:
         "test-e2e-smoke-mobile-chrome",
         "test-e2e-full-chromium",
         "test-e2e-comprehensive",
-        "pnpm-audit",
     )
     supabase_jobs = {
         "test-migrations",
@@ -1046,10 +1043,9 @@ def test_ci_jobs_share_runtime_aware_dependency_cache() -> None:
 def test_preview_mise_compatibility_and_ordering() -> None:
     """Preview orchestration keeps Node 22 explicit without moving deploy ownership."""
     control = PREVIEW_CONTROL_PATH.read_text(encoding="utf-8")
-    sync = PREVIEW_SYNC_PATH.read_text(encoding="utf-8")
     reaper = PREVIEW_REAPER_PATH.read_text(encoding="utf-8")
 
-    for workflow in (control, sync):
+    for workflow in (control,):
         assert 'node-version: "22"' in workflow
         assert 'install-args: "--locked node pnpm supabase"' in workflow
         assert "name: Checkout trusted workflow action" in workflow
@@ -1073,12 +1069,6 @@ def test_preview_mise_compatibility_and_ordering() -> None:
     )
     assert control.index("Setup locked Supabase CLI for stop") < control.index(
         "name: Destroy preview"
-    )
-    assert (
-        sync.index("name: Checkout trusted workflow action")
-        < sync.index("Setup locked preview toolchain")
-        < sync.index("name: Install dependencies")
-        < sync.index("name: Re-sync preview branch")
     )
 
     for workflow in (control, reaper):

@@ -243,9 +243,9 @@ How Tim wants agents to behave. (§1 has the one-line version; this is the detai
 
 Native Supabase auto-branching is **disabled** — no PR gets a preview by default. Previews are created on demand via the `/preview` PR-comment command and torn down on a TTL by an hourly reaper. Full control-surface reference and implementation pointers: `pinpoint-deployment` skill.
 
-### Audit-gate override (per-PR `/audit-override`)
+### pnpm audit gate
 
-When `pnpm audit --audit-level=high` goes RED on a freshly-published advisory **unrelated** to a PR's changes, `/audit-override <reason>` is the escape hatch so it doesn't force an admin-merge — commit-bound, dropped on every new push. Full protocol: `pinpoint-deployment` skill.
+CI runs `pnpm audit --audit-level=high` only on PRs that change `pnpm-lock.yaml` or `pnpm-workspace.yaml`; advisories already on `main` are Dependabot's job. See `pinpoint-deployment`.
 
 ## 8. Documentation
 
