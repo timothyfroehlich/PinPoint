@@ -10,7 +10,7 @@ Run the watcher as a non-blocking background command via Subway:
 subway watch --pr <PR> --phase <ci|review> --expected-head <SHA>
 ```
 
-`subway watch` directly invokes `scripts/workflow/pr-watch.py` without LLM mediation, saving 100% of context tokens during passive waiting. On failure, it automatically injects a `failure_summary` into the terminal JSON on `stdout`.
+`subway watch` directly invokes `scripts/workflow/pr-watch.py` without LLM mediation, saving 100% of context tokens during passive waiting. On a CI failure the terminal JSON carries `failure_artifact`, the path of the saved failed-step log.
 
 ## Fallback: Named Agent
 

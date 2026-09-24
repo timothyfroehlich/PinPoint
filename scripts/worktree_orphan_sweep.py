@@ -65,11 +65,11 @@ def get_active_worktree_branches(repo_dir: Path) -> dict[str, str]:
             check=True,
         )
     except subprocess.CalledProcessError as exc:
-        print(
-            f"Warning: `git worktree list` failed: {exc.stderr.strip()}",
-            file=sys.stderr,
+        # Without the worktree list every Supabase project would look orphaned,
+        # and --apply would delete live stacks. Stop instead.
+        sys.exit(
+            f"worktree-orphan-sweep: `git worktree list` failed: {exc.stderr.strip()}"
         )
-        return {}
 
     worktrees: dict[str, str] = {}
     current_path = ""

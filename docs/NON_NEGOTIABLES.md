@@ -651,7 +651,7 @@ If all Yes → ship it. Perfect is the enemy of done.
 
 - CORE‑TS‑001..008: Type system
 - CORE‑SSR‑001..007: Supabase SSR and auth
-- CORE‑SEC‑001..008: Security
+- CORE‑SEC‑001..010: Security
 - CORE‑PERF‑001..003: Performance (incl. image priority + preconnect)
 - CORE‑TEST‑001..006: Testing
 - CORE‑ARCH‑001, 004..012: Architecture (002, 003 retired)
@@ -666,4 +666,3 @@ If all Yes → ship it. Perfect is the enemy of done.
 - Testing patterns: `pinpoint-testing` skill (`.agents/skills/pinpoint-testing/SKILL.md`)
 - Product requirements: approved documents in `docs/feature-specs/`
 - Technical architecture: the relevant `.agents/skills/` guidance and source code
-- Discipline guidelines: `docs/DISCIPLINE.md`

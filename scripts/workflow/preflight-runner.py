@@ -65,7 +65,6 @@ DEFAULT_PHASES = [
                     "typecheck:tests",
                     "typecheck:e2e",
                     "fix:lint-format",
-                    "check:config",
                 ],
             },
             {

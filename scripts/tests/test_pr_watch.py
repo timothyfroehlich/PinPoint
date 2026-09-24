@@ -1280,7 +1280,8 @@ def test_watch_phase_ci_undetermined_on_api_error(monkeypatch):
 
 
 @pytest.mark.unit
-def test_watch_phase_ci_undetermined_when_merge_state_stays_unknown(monkeypatch):
+def test_watch_phase_ci_treats_unknown_merge_state_as_not_conflicting(monkeypatch):
+    """GitHub recomputes mergeability after every push to main; UNKNOWN is not an error."""
     fake = snapshot_gh([ci_snapshot(gate=_gate("SUCCESS"))], merge_state="UNKNOWN")
     monkeypatch.setattr(pr_watch, "gh", fake)
     monkeypatch.setattr(pr_watch.time, "sleep", lambda _seconds: None)
@@ -1294,11 +1295,8 @@ def test_watch_phase_ci_undetermined_when_merge_state_stays_unknown(monkeypatch)
         state_sink=lambda *args, **kwargs: states.append((args, kwargs)),
     )
 
-    assert exit_code == pr_watch.EXIT_UNDETERMINED
-    last_args, last_kwargs = states[-1]
-    assert last_args[1] == "undetermined"
-    assert last_kwargs.get("outcome") == "undetermined"
-    assert last_kwargs.get("merge_state") == "UNKNOWN"
+    assert exit_code == 0
+    assert states[-1][1].get("outcome") == "passed"
 
 
 @pytest.mark.unit
@@ -1515,7 +1513,9 @@ def test_watch_phase_review_exits_conflicting_on_conflict(monkeypatch):
 
 
 @pytest.mark.unit
-def test_watch_phase_review_undetermined_when_merge_state_stays_unknown(monkeypatch):
+def test_watch_phase_review_treats_unknown_merge_state_as_not_conflicting(
+    monkeypatch,
+):
     monkeypatch.setattr(pr_watch, "gh", make_gh(merge_state="UNKNOWN"))
     use_summaries(monkeypatch, fake_summary("approved"))
     monkeypatch.setattr(pr_watch.time, "sleep", lambda _seconds: None)
@@ -1529,11 +1529,8 @@ def test_watch_phase_review_undetermined_when_merge_state_stays_unknown(monkeypa
         state_sink=lambda *args, **kwargs: states.append((args, kwargs)),
     )
 
-    assert exit_code == pr_watch.EXIT_UNDETERMINED
-    last_args, last_kwargs = states[-1]
-    assert last_args[1] == "undetermined"
-    assert last_kwargs.get("outcome") == "undetermined"
-    assert last_kwargs.get("merge_state") == "UNKNOWN"
+    assert exit_code == 0
+    assert states[-1][1].get("outcome") == "passed"
 
 
 @pytest.mark.unit

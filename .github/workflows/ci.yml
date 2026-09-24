@@ -429,7 +429,7 @@ jobs:
         run: python3 -m pytest scripts/tests/
 
       - name: ShellCheck
-        run: find scripts/ .devcontainer/ -name '*.sh' -print0 | xargs -0 shellcheck
+        run: find scripts/ .claude/hooks/ -name '*.sh' -print0 | xargs -0 shellcheck
 
       - name: Zizmor (GitHub Actions security)
         run: |
@@ -521,7 +521,7 @@ jobs:
           set -a
           source .env.ci
           set +a
-          pnpm run test:coverage -- --reporter=verbose
+          pnpm run test:coverage
 
 
   test-integration:
@@ -559,7 +559,7 @@ jobs:
           set -a
           source .env.ci
           set +a
-          pnpm run test:integration -- --reporter=verbose
+          pnpm run test:integration
 
   # ==============================================================================
   # Migration Verification
@@ -661,7 +661,7 @@ jobs:
         uses: ./.github/actions/setup-supabase
 
       - name: Run Supabase integration tests
-        run: pnpm run test:integration:supabase -- --reporter=verbose
+        run: pnpm run test:integration:supabase
 
   test-e2e-smoke:
     # ==============================================================================

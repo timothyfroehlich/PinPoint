@@ -39,9 +39,9 @@ PinPoint scopes: `issues`, `machines`, `auth`, `ui`, `db`, `e2e`, `agents`, `wor
 
 Prefer MCP `create_pull_request` for typed argument handling, or `gh pr create` if you're
 already in a shell. Open every agent-created PR as a **GitHub draft**, regardless of
-size (`gh pr create --draft ...`). GitHub draft/ready state controls whether a manual
-Codex review request is eligible; it is separate from the PinPoint `ready-for-review`
-label applied only at the end of Phase 3.
+size (`gh pr create --draft ...`). Promoting the draft (`gh pr ready`) is what triggers
+CodeRabbit's review; it is separate from the PinPoint `ready-for-review` label applied
+only at the end of Phase 3.
 
 ### Agent origin
 
@@ -124,7 +124,7 @@ on the current head commit. A green run for an older SHA does not qualify.
 **Handling the CI result**:
 
 - `outcome: "passed"` (exit 0): CI Gate passed on `HEAD_SHA`. If the PR is draft, run `gh pr ready <PR>` (which auto-triggers CodeRabbit review), then proceed to monitor review in 3.4.
-- `outcome: "failed"` (exit 1): A run or CI Gate failed. Subway automatically extracts the failed steps log and provides `failure_summary` in the terminal JSON (and saves the full report to `failure_artifact` under `tmp/gh-monitor/`). Address the failure, commit, and push.
+- `outcome: "failed"` (exit 1): A run or CI Gate failed. The watcher saves the failed-step log and returns its path as `failure_artifact` (under `tmp/gh-monitor/`). Address the failure, commit, and push.
   - If judged to be a GitHub Actions **infra** flake (network timeout, runner loss, download 5xx, container start): log it with `bash scripts/workflow/log-gha-flake.sh <pr> <run-id> <class> "<symptom>"` before retrying.
 - `outcome: "stale"` (exit 1): The PR head moved away from `expected_head`. The owner re-checks branch state.
 - `outcome: "conflicting"` (exit 1): Merge conflict developed (`DIRTY` or `CONFLICTING`). Merge `origin/main` into the branch and push.
@@ -245,8 +245,9 @@ That posts the sticky SHA-pinned marker `<!-- pinpoint-review: {head_sha} -->` t
 
 #### Pushing after the review
 
-Any push invalidates a clean Codex result or marker for the previous SHA. Wait for
-replacement current-head CI, then request one Codex review for the new head. Never copy
+Any push invalidates review coverage for the previous SHA — except a pure merge of `main`,
+which the gate carries coverage across (PP-ojoj). Wait for replacement current-head CI, then
+re-request review for the new head (see 3.4). Never copy
 or refresh a marker over code that the named local review did not inspect. Historical
 `claude-code:trivial` markers remain readable for old PRs, but agents must not create new
 self-attestations: the exact-head Codex review or Tim-run local review must inspect every

@@ -56,7 +56,7 @@ Code work still happens **in a worktree** — the root checkout is read-only (AG
 ### `subagent-driven-development`
 
 - Superpowers says "never pause between tasks, dispatch a fresh subagent per task." PinPoint gates multi-agent orchestration: **before launching, state the subagent count + rough cost and get Tim's explicit yes** — including worst-case fan-out. The built-in `/code-review` workflow is the only exemption.
-- Caps: ~2–4 subagents per task; **simple PRs (<5 files) ≤ 2 subagents** (CLAUDE.md). Don't fan out on straightforward work.
+- Caps: ~2–4 subagents per task; **simple PRs (<5 files) ≤ 2 subagents**. Don't fan out on straightforward work.
 - After the gate clears, run SDD's fresh-subagent-per-task + between-task review as written.
 
 ### `requesting-code-review` / `receiving-code-review`
