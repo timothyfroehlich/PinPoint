@@ -562,6 +562,12 @@ def resolve_supabase_backend(env_file: Path) -> tuple[str, str]:
         return backend, "localhost"
 
     host = os.environ.get(REMOTE_HOST_ENV_KEY, "").strip()
+    if not host and _read_managed_value(env_file, BACKEND_ENV_KEY) == "remote":
+        # A stored remote choice survives a shell without the remote settings
+        # (e.g. a hook in a non-login shell): falling back to local would
+        # repoint the worktree at an empty stack and let cleanup miss its
+        # remote volumes. The last generated host is authoritative.
+        host = (_read_managed_value(env_file, "MAILPIT_HOST") or "").strip()
     if not host:
         print(
             f"worktree_setup: warning: {REMOTE_HOST_ENV_KEY} is unset; using the local backend",

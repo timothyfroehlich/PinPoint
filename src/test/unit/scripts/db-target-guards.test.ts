@@ -112,9 +112,10 @@ describe("db-target — isPinPointProductionTarget (exact project)", () => {
   it("matches every spelling of a production connection", () => {
     expect(isPinPointProductionTarget(PROD_POOLER_URL)).toBe(true);
     expect(isPinPointProductionTarget(PROD_DIRECT_URL)).toBe(true);
-    // The API URL is the case the host regex misses entirely: ".supabase.co"
-    // does not contain the substring "supabase.com".
-    expect(isCloudDatabaseUrl(PROD_API_URL)).toBe(false);
+    // The coarse host regex also covers ".supabase.co" (direct and API
+    // hosts), but only the project ref says which project it is.
+    expect(isCloudDatabaseUrl(PROD_DIRECT_URL)).toBe(true);
+    expect(isCloudDatabaseUrl(PROD_API_URL)).toBe(true);
     expect(isPinPointProductionTarget(PROD_API_URL)).toBe(true);
   });
 
@@ -220,6 +221,15 @@ describe("local-only guards — PINPOINT_DEV_DB_HOSTS dev-stack allowlist", () =
       expect(stderr).toContain("ENOTFOUND");
     });
   }
+
+  it("still refuses a direct Supabase database host even when it is listed", () => {
+    const { status, stderr } = runScript("supabase/seed-collections.mjs", {
+      POSTGRES_URL: PROD_DIRECT_URL,
+      PINPOINT_DEV_DB_HOSTS: `db.${PRODUCTION_PROJECT_REF}.supabase.co`,
+    });
+    expect(status).toBe(2);
+    expect(stderr).toContain("Refusing to run destructive DB script");
+  });
 
   it("still refuses a managed cloud host even when it is listed", () => {
     const { status, stderr } = runScript("supabase/seed-collections.mjs", {

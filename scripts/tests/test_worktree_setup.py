@@ -325,6 +325,18 @@ class TestSupabaseBackend:
         )
         assert "PINPOINT_REMOTE_SUPABASE_HOST is unset" in capsys.readouterr().err
 
+    def test_stored_remote_keeps_its_host_without_the_shell_setting(
+        self, tmp_path: Path
+    ) -> None:
+        (tmp_path / ".env.local").write_text(
+            "PINPOINT_SUPABASE_BACKEND=remote\nMAILPIT_HOST=bazzite\n"
+        )
+
+        assert resolve_supabase_backend(tmp_path / ".env.local") == (
+            "remote",
+            "bazzite",
+        )
+
     def test_unknown_backend_falls_back_to_local(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:

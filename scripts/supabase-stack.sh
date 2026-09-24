@@ -99,7 +99,8 @@ stack_start() {
   select_backend "$backend"
   [[ $backend == local ]] || check_remote_network
   echo "Starting $backend Supabase stack $project_id..."
-  supabase start "${supabase_args[@]}" >/dev/null ||
+  # ${a[@]+...}: macOS bash 3.2 treats an empty array as unbound under set -u.
+  supabase start ${supabase_args[@]+"${supabase_args[@]}"} >/dev/null ||
     fail "supabase start failed; re-run 'supabase start' with the same environment for details"
   echo "Supabase is running at $api_url."
 }
@@ -148,7 +149,10 @@ case $command in
     # Validate the target's settings before touching the running stack.
     (select_backend "$target")
     stack_stop "$backend" || echo "supabase-stack: no running $backend stack to stop" >&2
-    PINPOINT_SET_SUPABASE_BACKEND=$target python3 scripts/worktree_setup.py
+    PINPOINT_SET_SUPABASE_BACKEND=$target python3 scripts/worktree_setup.py ||
+      echo "supabase-stack: worktree_setup.py reported an incomplete setup" >&2
+    [[ $(env_value PINPOINT_SUPABASE_BACKEND) == "$target" ]] ||
+      fail "backend switch did not take effect; .env.local still selects '$(env_value PINPOINT_SUPABASE_BACKEND)'"
     echo "Switched to the $target backend. Data does not move between backends:"
     echo "run 'pnpm supabase:start' (and 'pnpm db:reset' for a new stack), then restart 'pnpm dev'."
     ;;
