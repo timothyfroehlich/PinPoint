@@ -2,7 +2,7 @@
 
 import type React from "react";
 import { useState } from "react";
-import { CreditCard } from "lucide-react";
+import { AlertTriangle, CreditCard } from "lucide-react";
 
 import { Button } from "~/components/ui/button";
 import { APRON_CARD_SIZES } from "~/lib/machines/apron-card";
@@ -49,9 +49,13 @@ export function ApronCardEntry({
   ...card
 }: ApronCardEntryProps): React.JSX.Element {
   const [open, setOpen] = useState(false);
+  // The saved card can stop fitting after it was saved (e.g. the machine's
+  // main description grew on the Info tab), so re-check it here: a card that
+  // does not fit cannot be exported (spec §3.5).
+  const [overflowing, setOverflowing] = useState(false);
   const { saved, savedAt } = card;
   const savedContent = draftContent(card.identity, card.mainDescription, saved);
-  const exportable = savedAt !== null && saved.size !== null;
+  const exportable = savedAt !== null && saved.size !== null && !overflowing;
 
   const thumbnail =
     saved.size === null ? (
@@ -64,9 +68,18 @@ export function ApronCardEntry({
           content={savedContent}
           size={saved.size}
           scanUrl={card.scanUrl}
+          onOverflowChange={setOverflowing}
         />
       </div>
     );
+
+  const overflowNotice =
+    overflowing && saved.size !== null ? (
+      <p className="flex items-center gap-1.5 text-xs text-warning">
+        <AlertTriangle className="size-3.5" aria-hidden="true" />
+        Text too long for the card
+      </p>
+    ) : null;
 
   const actions = (
     <div className="flex flex-wrap items-center gap-2">
@@ -114,6 +127,9 @@ export function ApronCardEntry({
               {summary(saved)}
             </p>
           ) : null}
+          {overflowNotice ? (
+            <div className="mt-1.5">{overflowNotice}</div>
+          ) : null}
           <div className="mt-2.5">{actions}</div>
         </section>
       ) : (
@@ -134,6 +150,7 @@ export function ApronCardEntry({
                     {summary(saved)}
                   </p>
                 ) : null}
+                {overflowNotice}
                 {actions}
               </div>
             </div>

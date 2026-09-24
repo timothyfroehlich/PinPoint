@@ -132,6 +132,21 @@ test.describe("Apron card export", () => {
     });
   });
 
+  test.describe("when the saved text no longer fits", () => {
+    test.use({ storageState: STORAGE_STATE.member });
+
+    test("blocks export and says why", async ({ page }) => {
+      await seedSavedApronCard(machine.id, { description: LONG_TEXT });
+
+      await page.goto(`/m/${machine.initials}/maintenance`);
+      const entry = page.getByTestId("apron-card-entry");
+      await expect(entry.getByText("Text too long for the card")).toBeVisible();
+      await expect(
+        entry.getByRole("button", { name: "Export" })
+      ).toBeDisabled();
+    });
+  });
+
   test("a signed-out visitor sees no card and cannot print", async ({
     page,
   }) => {
