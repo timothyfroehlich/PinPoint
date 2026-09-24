@@ -48,6 +48,12 @@ PinPoint E2E tests run in parallel against a **shared database**.
 3.  **Unique Machines**: Create a fresh machine for your test.
 4.  **Unique Titles**: Use `getTestIssueTitle("My Title")` to prefix issues with `[w0_xyz]`.
 
+### Cross-project failures
+
+Running without `--project=chromium` runs every browser project concurrently against one database, so a spec that mutates a seeded row and never restores it passes in whichever project is scheduled first and fails in the rest. **Read that red as a real bug, not a local-setup artifact.** PP-168u was ten such failures and every one traced to a spec leaking seeded state — a seeded issue reassigned away for good, the seeded guest left promoted to member, a settings set left on a shared machine.
+
+The three required PR E2E jobs each run a single project against their own database and so cannot see this class at all; the only job that can is the post-merge `E2E Comprehensive Tests`, which runs chromium + Mobile Chrome + Mobile Safari in **one** Playwright process against **one** database. It is push-to-main only, so it cannot gate a PR merge — but its `failure` fails the required `CI Gate` check **on the main commit** (PP-x0ke), so a red post-merge full-matrix verdict alarms at merge time instead of hiding behind a green main. On a `pull_request` event it is skipped and passes.
+
 ## Selector Strategy
 
 1. **Prefer**: Accessibility roles and labels (`getByRole`, `getByLabel`)

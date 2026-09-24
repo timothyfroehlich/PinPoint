@@ -321,7 +321,7 @@ WEBSITE_SAMPLE_FILES = [
     "src/server/services/issues.ts",
     "src/lib/auth.ts",
     "src/types/index.ts",
-    "src/middleware.ts",
+    "src/proxy.ts",
     "src/instrumentation.ts",
     "public/logo.svg",
     "content/about.mdx",
