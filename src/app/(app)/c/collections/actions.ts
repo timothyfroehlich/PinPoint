@@ -22,6 +22,9 @@ import {
 type ActionResult<T = undefined> =
   { success: true; data?: T } | { success: false; error: string };
 
+type DeleteCollectionResult =
+  { success: true } | { success: false; error: string; code?: "not_found" };
+
 async function resolveActor(): Promise<{
   userId: string;
   role: UserRole;
@@ -266,11 +269,17 @@ export async function setCollectionSharingAction(input: {
 
 export async function deleteCollectionAction(input: {
   collectionId: string;
-}): Promise<ActionResult> {
+}): Promise<DeleteCollectionResult> {
   const actor = await resolveActor();
   if (!actor) return { success: false, error: "Not authenticated" };
   const collection = await loadOwner(input.collectionId);
-  if (!collection) return { success: false, error: "Not found" };
+  if (!collection)
+    return {
+      success: false,
+      error:
+        "This collection is no longer available. It may already have been deleted.",
+      code: "not_found",
+    };
   if (!canManageCollection(collection, { userId: actor.userId })) {
     return { success: false, error: "Forbidden" };
   }

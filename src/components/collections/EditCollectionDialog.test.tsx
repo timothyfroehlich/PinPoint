@@ -116,6 +116,31 @@ describe("EditCollectionDialog", () => {
     expect(push).not.toHaveBeenCalled();
   });
 
+  it("offers a route back when the collection is already gone", async () => {
+    deleteAction.mockResolvedValue({
+      success: false,
+      error:
+        "This collection is no longer available. It may already have been deleted.",
+      code: "not_found",
+    });
+    renderDialog();
+
+    await userEvent.click(screen.getByTestId("collection-edit-trigger"));
+    await userEvent.click(screen.getByTestId("collection-delete-trigger"));
+    await userEvent.click(screen.getByTestId("collection-delete-confirm"));
+
+    const alertDialog = screen.getByRole("alertdialog");
+    expect(await within(alertDialog).findByRole("alert")).toHaveTextContent(
+      "This collection is no longer available. It may already have been deleted."
+    );
+    expect(
+      within(alertDialog).getByRole("link", { name: "Back to collections" })
+    ).toHaveAttribute("href", "/c/collections");
+    expect(
+      within(alertDialog).queryByTestId("collection-delete-confirm")
+    ).not.toBeInTheDocument();
+  });
+
   it("keeps the confirmation open while deletion is pending so a failure stays visible", async () => {
     let settleDelete: (result: {
       success: false;

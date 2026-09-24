@@ -1,6 +1,7 @@
 "use client";
 
 import type React from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import { Button } from "~/components/ui/button";
@@ -59,7 +60,10 @@ export function EditCollectionDialog({
   const [name, setName] = useState(currentName);
   const [selected, setSelected] = useState<string[]>(currentIds);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<{
+    message: string;
+    code: "not_found" | undefined;
+  } | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [savePending, startSave] = useTransition();
   const [deletePending, startDelete] = useTransition();
@@ -95,7 +99,8 @@ export function EditCollectionDialog({
     setDeleteError(null);
     startDelete(async () => {
       const result = await deleteCollectionAction({ collectionId });
-      if (!result.success) setDeleteError(result.error);
+      if (!result.success)
+        setDeleteError({ message: result.error, code: result.code });
       else router.push("/c/collections");
     });
   }
@@ -166,7 +171,7 @@ export function EditCollectionDialog({
                     role="alert"
                     className="mb-4 rounded-md border border-destructive/20 bg-destructive/10 p-4 text-destructive-text"
                   >
-                    <p className="text-sm font-medium">{deleteError}</p>
+                    <p className="text-sm font-medium">{deleteError.message}</p>
                   </div>
                 )}
                 <AlertDialogHeader>
@@ -178,18 +183,26 @@ export function EditCollectionDialog({
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter className="gap-2 sm:gap-0">
-                  <AlertDialogCancel disabled={deletePending}>
-                    Keep collection
-                  </AlertDialogCancel>
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    onClick={remove}
-                    disabled={deletePending}
-                    data-testid="collection-delete-confirm"
-                  >
-                    {deletePending ? "Deleting…" : "Delete collection"}
-                  </Button>
+                  {deleteError?.code === "not_found" ? (
+                    <Button asChild>
+                      <Link href="/c/collections">Back to collections</Link>
+                    </Button>
+                  ) : (
+                    <>
+                      <AlertDialogCancel disabled={deletePending}>
+                        Keep collection
+                      </AlertDialogCancel>
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        onClick={remove}
+                        disabled={deletePending}
+                        data-testid="collection-delete-confirm"
+                      >
+                        {deletePending ? "Deleting…" : "Delete collection"}
+                      </Button>
+                    </>
+                  )}
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
