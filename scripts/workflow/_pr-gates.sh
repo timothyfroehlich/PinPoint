@@ -360,15 +360,14 @@ _is_pure_merge_from_main() {
 # thread with either an owner reply or a later change to the commented file.
 # A review with body-only findings has no such evidence and stays blocked.
 _coderabbit_finding_adjudicated() {
-  local pr=$1 record=$2
+  local pr=$1 record=$2 head=$3
   local review_id expected owner_repo raw findings count owner repo cursor="" has_next=true threads='[]'
-  local head reviewed_sha replies comment id path changed
+  local reviewed_sha replies comment id path changed current_head
   review_id=$(jq -r '.review_id // .id // empty' <<< "$record")
   expected=$(jq -r '.actionable_count // 0' <<< "$record")
   [[ "$review_id" =~ ^[0-9]+$ && "$expected" =~ ^[0-9]+$ && "$expected" -gt 0 ]] || return 1
-  head=$(gh pr view "$pr" --json headRefOid --jq .headRefOid) || return 1
   reviewed_sha=$(jq -r '.inherited_from // .sha // empty' <<< "$record")
-  [[ "$reviewed_sha" =~ ^[0-9a-f]{40}$ ]] || return 1
+  [[ "$head" =~ ^[0-9a-f]{40}$ && "$reviewed_sha" =~ ^[0-9a-f]{40}$ ]] || return 1
   owner_repo=$(_repo_slug) || return 1
   raw=$(gh api --paginate "repos/${owner_repo}/pulls/${pr}/reviews/${review_id}/comments") || return 1
   findings=$(jq -s '[.[] | flatten | .[] | select(.in_reply_to_id == null) | {id, path}] | unique_by(.id)' <<< "$raw") || return 1
@@ -413,7 +412,8 @@ _coderabbit_finding_adjudicated() {
     git diff --quiet "$reviewed_sha" "$head" -- "$path" || changed=$?
     [[ "$changed" -eq 1 ]] || return 1
   done < <(jq -c '.[]' <<< "$findings")
-  return 0
+  current_head=$(gh pr view "$pr" --json headRefOid --jq .headRefOid) || return 1
+  [[ "$current_head" == "$head" ]]
 }
 
 # ---------------------------------------------------------------------------------
@@ -455,7 +455,7 @@ _review_summary() {
   # thread is explicitly adjudicated and resolved. The thread gate remains a
   # separate requirement and blocks while any thread is unresolved.
   if [[ "$unresolved" == "0" && $(jq -r '.verdict' <<< "$coderabbit") == "changes_requested" ]] && \
-      _coderabbit_finding_adjudicated "$pr" "$coderabbit"; then
+      _coderabbit_finding_adjudicated "$pr" "$coderabbit" "$head"; then
     coderabbit=$(jq -c '
       . + { verdict: "covers", form: (if .form == "summary_review" then .form else "reviewed" end) }
     ' <<< "$coderabbit")

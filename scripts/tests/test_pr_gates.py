@@ -205,6 +205,7 @@ def gate_env(
     pull_comments: list[dict] | None = None,
     changed_paths: list[str] | None = None,
     head_sha: str = HEAD_SHA,
+    head_after_first_read: str | None = None,
     base_ref: str = "main",
     rollup: list[dict] | None = None,
 ) -> Iterator[dict]:
@@ -258,7 +259,11 @@ def gate_env(
             'args="$*"\n'
             'printf "%s\\n" "$args" >> "$STUB_CALLS"\n'
             'case "$args" in\n'
-            '  *"--jq .headRefOid"*) printf "%s\\n" "$STUB_HEAD_SHA" ;;\n'
+            '  *"--jq .headRefOid"*)\n'
+            '    if [[ -n "$STUB_SECOND_HEAD_SHA" ]]; then\n'
+            '      if [[ -e "$STUB_HEAD_SEEN" ]]; then printf "%s\\n" "$STUB_SECOND_HEAD_SHA";\n'
+            '      else touch "$STUB_HEAD_SEEN"; printf "%s\\n" "$STUB_HEAD_SHA"; fi\n'
+            '    else printf "%s\\n" "$STUB_HEAD_SHA"; fi ;;\n'
             '  *"baseRefName"*) printf "%s\\n" "$STUB_BASE_REF" ;;\n'
             '  *"--json statusCheckRollup --jq"*) jq -r "${@: -1}" < "$STUB_ROLLUP" ;;\n'
             '  *"nameWithOwner"*) printf "acme/widget\\n" ;;\n'
@@ -293,6 +298,8 @@ def gate_env(
         env = dict(os.environ)
         env["PATH"] = f"{tmp}{os.pathsep}{env.get('PATH', '')}"
         env["STUB_HEAD_SHA"] = head_sha
+        env["STUB_SECOND_HEAD_SHA"] = head_after_first_read or ""
+        env["STUB_HEAD_SEEN"] = str(tmp_path / "head-seen")
         env["STUB_BASE_REF"] = base_ref
         env["STUB_REVIEWS"] = str(tmp_path / "reviews.json")
         env["STUB_COMMENTS"] = str(tmp_path / "comments.json")
@@ -811,6 +818,24 @@ def test_silently_resolved_coderabbit_finding_stays_blocked() -> None:
         review_pages=[[review]],
         threads=[thread(resolved=True, author=CODERABBIT_BOT)],
         review_comments=[{"id": 42, "path": "src/example.ts", "in_reply_to_id": None}],
+    ) as env:
+        summary = review_summary(env)
+    assert summary["label"] == "changes requested"
+    assert summary["coverage"] is None
+
+
+def test_head_moving_during_finding_adjudication_stays_blocked() -> None:
+    review = codex_review(
+        login=CODERABBIT_BOT, state="CHANGES_REQUESTED", actionable_count=1
+    )
+    with gate_env(
+        review_pages=[[review]],
+        threads=[thread(resolved=True, author=CODERABBIT_BOT)],
+        review_comments=[{"id": 42, "path": "src/example.ts", "in_reply_to_id": None}],
+        pull_comments=[
+            {"id": 43, "in_reply_to_id": 42, "user": {"login": "acme"}, "body": "Fixed"}
+        ],
+        head_after_first_read=OTHER_SHA,
     ) as env:
         summary = review_summary(env)
     assert summary["label"] == "changes requested"
