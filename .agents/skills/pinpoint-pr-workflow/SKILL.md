@@ -158,7 +158,7 @@ $$\text{CodeRabbit (Default)} \longrightarrow \text{Codex (Secondary / Fallback)
   ```
   CodeRabbit edits its acknowledgement comment in place — "Review triggered" can become "Review rate limited", so check current status.
 - **Hourly Quota & Rate Limiting:** We have an allowance of 5 CodeRabbit reviews per rolling hour. When rate-limited, CodeRabbit posts an issue comment containing `Review rate limited.`
-- **Quota Fallback to Codex:** Read the trusted CodeRabbit reply to the latest SHA-tagged manual request on the current head. When it says `Review rate limited`, pass that reply's issue-comment ID to the Codex request helper below. If draft promotion was rate-limited, use the helper to make one SHA-tagged manual CodeRabbit request on the same head, then wait for its rate-limit reply. The auto-trigger reply alone does not authorize Codex. A pending review or a `Review finished` reply without a native approval is a CodeRabbit follow-up, not quota exhaustion. If Codex is also out of quota or unavailable, alert Tim and recommend either performing a local review attestation or waiting until the next CodeRabbit review slot becomes available.
+- **Quota Fallback to Codex:** Read the trusted CodeRabbit reply to the latest SHA-tagged manual request on the current head. When it says `Review rate limited`, pass that reply's issue-comment ID to the Codex request helper below. If draft promotion was rate-limited, use the helper to make one SHA-tagged manual CodeRabbit request on the same head, then wait for its rate-limit reply. The auto-trigger reply alone does not authorize Codex. A pending review, or a `Review finished` reply without native approval or trusted exact-head incremental summary coverage, is a CodeRabbit follow-up, not quota exhaustion. If Codex is also out of quota or unavailable, alert Tim and recommend either performing a local review attestation or waiting until the next CodeRabbit review slot becomes available.
 
 #### 2. Codex: Secondary Reviewer & Rate-Limit Fallback
 
@@ -186,7 +186,7 @@ subway watch --pr <PR> --phase review --expected-head <HEAD_SHA>
 
 **Handling the review result**:
 
-- `outcome: "passed"` (exit 0): The gate label is `approved` (exact head covered by CodeRabbit approval, Codex evidence, or local attestation) AND 0 unresolved threads remain.
+- `outcome: "passed"` (exit 0): The gate label is `approved` (exact head covered by CodeRabbit evidence, Codex evidence, or local attestation) AND 0 unresolved threads remain.
   - If `concurrent_review_in_progress` is non-null, note the trailing reviewer and check its output when finished.
   - Proceed to UI screenshots in 3.5, apply the `ready-for-review` label in 3.6, then enter Phase 4 merge handoff.
 - `outcome: "action_required"` (exit 1): Either `approved` with unresolved threads (>0), or the review state is `changes requested`.
