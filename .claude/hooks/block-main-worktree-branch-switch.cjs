@@ -1,243 +1,60 @@
 #!/usr/bin/env node
-// .claude/hooks/block-main-worktree-branch-switch.cjs
-// PreToolUse hook: hard-blocks git branch switches in the MAIN worktree unless
-// the target branch is `main`. The root checkout is read-only and stays on main
-// (AGENTS.md §2.2.5). Branch work belongs in a dedicated worktree.
-//
-// Incident (2026-05-31): a `git checkout <feature-branch>` ran in the MAIN
-// worktree, switching it off `main`; a later `git merge --ff-only origin/main`
-// then advanced the wrong branch and clobbered another session's state.
-//
-// Bypass: presence of .claude-worktree-switch-bypass in repo root (single-use,
-// deleted on fire).
-//
-// Fails OPEN in every ambiguous case: non-Bash tools, malformed payloads,
-// non-git commands, git errors, and (critically) linked worktrees all ALLOW.
+// PreToolUse (Bash) hook: blocks `git checkout|switch <anything but main>` in the
+// MAIN worktree, which is read-only and stays on `main` (AGENTS.md §2.2.5;
+// incident 2026-05-31: a later `git merge` advanced the wrong branch there).
+// Deliberately a regex, not a shell parser. Allowed: commands that `cd`
+// elsewhere, `git -C <path> …` (never matches: `-C` precedes the subcommand),
+// file restores (`git checkout [<ref>] -- <paths>`), linked worktrees,
+// malformed payloads, and git errors.
 
-const fs = require("node:fs");
 const path = require("node:path");
 const { execFileSync } = require("node:child_process");
-const { resolveCommand } = require("./lib/resolve-command.cjs");
 
-// --- Pure classifier (unit-testable without git) -----------------------------
-// Decide whether a shell command string should be BLOCKED because it switches
-// the current checkout to a branch other than `main`.
-//
-// Returns { block: boolean, detail: string }.
-//
-// Rules (a command BLOCKS if ANY of its segments blocks):
-//   - File restore  → ALLOW: a `git checkout` segment containing a `--` token.
-//   - Target = main  → ALLOW: `git checkout main`, `git switch main`.
-//   - Otherwise BLOCK: `git checkout <other-branch>`, `git switch <other-branch>`,
-//     `git checkout -b|-B <name>`, `git switch -c|-C|--create <name>`,
-//     `git checkout -`, `git switch -`.
-//
-// Command resolution — "is this segment actually a `git` invocation?" — is
-// delegated to lib/resolve-command.cjs (PP-6t3c). That shared primitive is what
-// keeps `echo git checkout x` / `rg 'git checkout'` from reading as git, while
-// wrapper and quoting shapes this hook's own tokenizer used to fold on
-// (`sudo -u root git checkout x`, `eval "git checkout x"`, `sh -c "git switch x"`)
-// now resolve correctly.
-//
-// POSTURE ON `unresolvable`: FAIL OPEN, consistent with every other ambiguous
-// case in this hook (non-git commands, git errors, linked worktrees all ALLOW).
-// This guard has a documented single-use bypass sentinel and only fires in the
-// main worktree, so over-blocking costs more here than the residual risk of a
-// dynamically-constructed `git checkout` in the root checkout.
-function classifyCommand(command) {
-  const { segments } = resolveCommand(String(command || ""));
+// `git checkout|switch <args>` at command position, up to the next shell operator;
+// MOVES are flags that leave main even without a positional target.
+const SWITCH = /(?:^|[;&|(\n])\s*(git\s+(?:checkout|switch)\b([^;&|)\n]*))/g;
+const MOVES = new Set(["-", "-b", "-B", "-c", "-C", "--create", "--orphan", "--detach"]);
 
-  for (const segment of segments) {
-    if (segment.name !== "git") continue;
-
-    const tokens = segment.args;
-
-    // Git global options that consume the NEXT token as their value
-    // (e.g. `git -C path checkout`, `git --git-dir=... ` uses `=` so is self-contained).
-    const optsWithSeparateArg = new Set([
-      "-C",
-      "-c",
-      "--git-dir",
-      "--work-tree",
-      "--namespace",
-      "--exec-path",
-      "--super-prefix",
-      "--config-env",
-    ]);
-
-    let subIdx = -1;
-    let sub = "";
-    for (let i = 0; i < tokens.length; i++) {
-      const t = tokens[i];
-      if (t === "checkout" || t === "switch") {
-        subIdx = i;
-        sub = t;
-        break;
-      }
-      if (t.startsWith("-")) {
-        // A global option. If it consumes a separate argument, skip that too.
-        if (optsWithSeparateArg.has(t)) i++;
-        continue;
-      }
-      // First non-option, non-value token after `git` that isn't checkout/switch
-      // → this isn't a checkout/switch invocation.
-      break;
-    }
-    if (subIdx === -1) continue;
-
-    // Arguments after the subcommand.
-    const args = tokens.slice(subIdx + 1);
-
-    // File restore: presence of a bare `--` token means path-restore form.
-    // ALLOW: `git checkout -- path`, `git checkout <ref> -- path`.
-    if (args.includes("--")) {
-      continue;
-    }
-
-    // Branch-creation flags → always a branch switch → BLOCK.
-    const createFlags =
-      sub === "checkout"
-        ? new Set(["-b", "-B"])
-        : new Set(["-c", "-C", "--create"]);
-
-    let hasCreateFlag = false;
-    let target = "";
-    for (const a of args) {
-      if (createFlags.has(a)) {
-        hasCreateFlag = true;
-        continue;
-      }
-      if (a.startsWith("-")) {
-        // Other flag (e.g. --quiet, --detach, -). `-` alone is the
-        // previous-branch shorthand and is NOT a generic flag — handle below.
-        if (a === "-") {
-          // `git checkout -` / `git switch -` → switch to previous branch → BLOCK.
-          return {
-            block: true,
-            detail: `git ${sub} - (previous branch)`,
-          };
-        }
-        continue;
-      }
-      // First positional non-flag token is the target ref/branch.
-      target = a;
-      break;
-    }
-
-    if (hasCreateFlag) {
-      return {
-        block: true,
-        detail: `git ${sub} ${sub === "checkout" ? "-b/-B" : "-c/-C/--create"} ${target || "<name>"}`.trim(),
-      };
-    }
-
-    if (target === "") {
-      // `git switch` with no target is invalid; `git checkout` with no positional
-      // and no create flag (e.g. `git checkout --quiet`) is unusual. Be safe but
-      // do not block a no-op — nothing to switch to. ALLOW.
-      continue;
-    }
-
-    // Quotes are already stripped by the shared tokenizer, so `git checkout "main"`
-    // and `git checkout 'main'` both arrive here as `main` and ALLOW.
-    if (target === "main") {
-      continue; // ALLOW switching to main.
-    }
-
-    return { block: true, detail: `git ${sub} ${target}` };
+/** The offending `git checkout|switch …` text, or "" when the command is fine. */
+function findBranchSwitch(command) {
+  if (/\bcd\s/.test(command)) return "";
+  for (const [, match, rest] of command.matchAll(SWITCH)) {
+    const args = rest.split(/\s+/).filter(Boolean).map((a) => a.replace(/^["']|["']$/g, ""));
+    if (args.includes("--")) continue;
+    const target = args.find((a) => !a.startsWith("-"));
+    if (args.some((a) => MOVES.has(a)) || (target && target !== "main")) return match.trim();
   }
-
-  return { block: false, detail: "" };
+  return "";
 }
 
-module.exports = { classifyCommand };
-
-// --- Git-backed main-worktree detection --------------------------------------
-// MAIN worktree ⟺ git-dir === git-common-dir. Linked worktrees differ.
-// Fails OPEN (returns false → ALLOW) on any git error / non-repo.
+// MAIN worktree ⟺ git-dir === git-common-dir (also true from a subdirectory).
 function isMainWorktree(cwd) {
   try {
-    const out = execFileSync(
-      "git",
-      ["rev-parse", "--git-dir", "--git-common-dir"],
-      { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }
-    );
-    const lines = out.split("\n").map((l) => l.trim()).filter(Boolean);
-    if (lines.length < 2) return false;
-    const gitDir = path.resolve(cwd, lines[0]);
-    const gitCommonDir = path.resolve(cwd, lines[1]);
-    return gitDir === gitCommonDir;
+    const opts = { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] };
+    const out = execFileSync("git", ["rev-parse", "--git-dir", "--git-common-dir"], opts);
+    const [gitDir, commonDir] = out.trim().split("\n");
+    return path.resolve(cwd, gitDir) === path.resolve(cwd, commonDir);
   } catch {
-    return false; // Not a repo / git failed → fail open.
+    return false;
   }
 }
 
-// --- Hook entrypoint ----------------------------------------------------------
-// Only run as a hook when invoked directly (not when require()'d by a test).
-if (require.main === module) {
-  let input = "";
-  process.stdin.on("data", (c) => (input += c));
-  process.stdin.on("end", () => {
-    let payload;
-    try {
-      payload = JSON.parse(input);
-    } catch {
-      // Malformed payload — fail open to avoid breaking other hooks.
-      process.exit(0);
-    }
-
-    if ((payload.tool_name || "") !== "Bash") {
-      process.exit(0);
-    }
-
-    const cmd = String((payload.tool_input || {}).command || "");
-
-    // 1. Cheap pre-filter: no git checkout/switch anywhere → allow without git calls.
-    if (!/\bgit\b[\s\S]*\b(?:checkout|switch)\b/.test(cmd)) {
-      process.exit(0);
-    }
-
-    // Use the per-invocation working directory from the stdin payload, NOT
-    // CLAUDE_PROJECT_DIR (a stable project-root path). Worktree detection must
-    // reflect where the command actually runs: a lead relocated via EnterWorktree
-    // or a worktree-isolated subagent operates in a LINKED worktree whose root
-    // differs from the project root — using CLAUDE_PROJECT_DIR would misclassify
-    // them as the MAIN worktree and wrongly block legit switches. Fall back to
-    // process.cwd() when payload.cwd is absent.
-    const detectCwd = payload.cwd || process.cwd();
-
-    // 2. Single-use bypass sentinel. In the main worktree the cwd and root
-    // coincide, so the sentinel lives at the cwd root — same detectCwd.
-    const sentinel = path.join(detectCwd, ".claude-worktree-switch-bypass");
-    if (fs.existsSync(sentinel)) {
-      try {
-        fs.unlinkSync(sentinel);
-      } catch {
-        // Best-effort cleanup
-      }
-      process.exit(0);
-    }
-
-    // 3. Main-worktree detection. Linked worktree / non-repo / git error → allow.
-    if (!isMainWorktree(detectCwd)) {
-      process.exit(0);
-    }
-
-    // 4. Classify.
-    const { block, detail } = classifyCommand(cmd);
-    if (!block) {
-      process.exit(0);
-    }
-
-    // 5. Block.
-    console.error(
-      `Branch switch blocked in the MAIN worktree: ${detail}. ` +
-        `The root checkout is read-only and stays on \`main\` (AGENTS.md §2.2.5) — ` +
-        `switching it off main lets a later \`git merge\` advance the wrong branch and clobber another session's state. ` +
-        `Do branch work in a dedicated worktree: \`git worktree add <path> -b <branch> origin/main\`, ` +
-        `or dispatch an Agent(isolation:"worktree"). ` +
-        `Override with: touch .claude-worktree-switch-bypass (single-use sentinel, auto-deleted on hook fire).`
-    );
-    process.exit(2);
-  });
-}
+let input = "";
+process.stdin.on("data", (c) => (input += c));
+process.stdin.on("end", () => {
+  let payload = {};
+  try {
+    payload = JSON.parse(input) ?? {};
+  } catch {
+    // Malformed payload → allow.
+  }
+  const detail = payload.tool_name === "Bash" ? findBranchSwitch(String(payload.tool_input?.command ?? "")) : "";
+  if (!detail || !isMainWorktree(payload.cwd || process.cwd())) return;
+  console.error(
+    `Branch switch blocked in the MAIN worktree: ${detail}. The root checkout is read-only and stays on \`main\` ` +
+      `(AGENTS.md §2.2.5) — switching it off main lets a later \`git merge\` advance the wrong branch and clobber ` +
+      `another session's state. Do branch work in a dedicated worktree: ` +
+      `\`git worktree add <path> -b <branch> origin/main\`, or dispatch an Agent(isolation:"worktree").`
+  );
+  process.exitCode = 2;
+});
