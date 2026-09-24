@@ -172,20 +172,20 @@
 - **Do:** Use Zod for all form data and user inputs
 - **Don't:** Trust FormData or query params without validation
 
-**CORE-SEC-003:** Security headers via middleware
+**CORE-SEC-003:** Security headers via Proxy
 
 - **Severity:** Critical
 - **Why:** Defense-in-depth protection against XSS, clickjacking, and protocol downgrade attacks
-- **Do:** Set security headers in `middleware.ts` (CSP with nonces) and `next.config.ts` (static headers)
-- **Don't:** Remove or weaken Content-Security-Policy, rely on 'unsafe-inline' or 'unsafe-eval'
-- **Reference:** `middleware.ts` and `next.config.ts` are the configuration; `pinpoint-security` covers how to author a CSP change, and `docs/SECURITY.md` records the threat-model decisions and known gaps
+- **Do:** Set security headers in `src/proxy.ts` (CSP with nonces) and `next.config.ts` (static headers). Local development may allow `'unsafe-eval'` for Next.js debugging when `NODE_ENV=development` and `VERCEL_ENV` is neither `preview` nor `production`.
+- **Don't:** Remove Content-Security-Policy, allow script `'unsafe-inline'`, or allow `'unsafe-eval'` in preview or production
+- **Reference:** `src/proxy.ts` and `next.config.ts` are the configuration; `pinpoint-security` covers how to author a CSP change, and `docs/SECURITY.md` records the threat-model decisions and known gaps
 
 **CORE-SEC-004:** Nonce-based CSP
 
 - **Severity:** High
 - **Why:** Prevents XSS by blocking unauthorized scripts
-- **Do:** Generate unique nonce per request, use Web Crypto API in Edge Runtime
-- **Don't:** Use 'unsafe-inline' or 'unsafe-eval' in script-src, hardcode nonces
+- **Do:** Generate a unique nonce per request in the Node.js Proxy and forward its CSP to Next.js so rendered scripts receive that nonce
+- **Don't:** Use script `'unsafe-inline'`, hardcode nonces, or allow script `'unsafe-eval'` outside the local development exception in CORE-SEC-003
 - **Rationale:** Modern CSP with 'strict-dynamic' allows Next.js dynamic imports while blocking malicious scripts
 
 **CORE-SEC-005:** No hardcoded hostnames or ports
