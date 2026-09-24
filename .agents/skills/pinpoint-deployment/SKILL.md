@@ -117,7 +117,7 @@ Vercel does not promote a failed build, so production keeps serving the **previo
 
 ### Stuck migration fix
 
-`MARK_MIGRATION_FORCE_PRODUCTION=1 POSTGRES_URL=<prod_url> tsx scripts/mark-migration-applied.ts <n>`. The token is required — the script refuses a remote target without it, and prompts once more when run in a TTY. It writes to `drizzle.__drizzle_migrations` without running the migration, so a wrong number makes prod's schema diverge from history permanently.
+`MARK_MIGRATION_FORCE_PRODUCTION=1 POSTGRES_URL=<prod_url> tsx scripts/mark-migration-applied.ts <n>`. The token is required — the script refuses a remote target without it, and prompts once more when run in a TTY. It writes to `drizzle.__drizzle_migrations` without running the migration's SQL, so later `db:migrate` runs skip it: verify every schema effect of that migration already exists in prod before using it. A wrong number makes prod's schema diverge from history permanently.
 
 ### Diagnosing a failed production deploy without build logs
 
