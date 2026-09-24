@@ -272,7 +272,7 @@ approved it on 2026-08-21, from the `/code-review medium` finding on #1931.)
 The `mark-review.sh` entry is there for a sharper reason: the command was intermittently
 denied. On 2026-08-03 an auto-mode session was refused with `Blocked by classifier` on PR #1815, while the same command succeeded four times across 2026-08-09/10 (PRs #1832, #1828, #1829, #1848). The block was contextual, not a standing rule — which is the worst shape for a required step, because it fails only sometimes and leaves the PR sitting at `unreviewed` with no path forward. A background subagent has no human to hand the command to at all. Rules are evaluated deny → ask → allow, and an explicit allow resolves the call before the classifier is consulted, so the entry makes the step deterministic. (PP-yx97. A new tool permission needs Tim's explicit approval each time; he gave it on 2026-08-11. This is not a CORE-SEC-010 surface — that rule governs prod-mutating Supabase tools, and its ban on `allow` applies to those.)
 
-**What the rule does not do is make the attestation true.** It removes the harness's opinion about whether you earned the marker, which means your own judgement is now the only thing standing between a false attestation and the merge gate. The honesty model above is not softened by the allow rule; it is the entire remaining check. The merge decision stays Tim's regardless (PP-wi85) — even when an agent runs `merge-pr.sh`, the hook prompts him to approve — so a marker you should not have posted misleads Tim into approving rather than merging anything by itself. That is a smaller failure, not a harmless one: his approval at the prompt is the last backstop, and a false marker is exactly what erodes it.
+**What the rule does not do is make the attestation true.** It removes the harness's opinion about whether you earned the marker. An incorrect marker can make the gate claim a review that never happened. In Claude Code and Codex, the merge hook may prompt Tim again; his direct merge request authorizes the agent to initiate the guarded merge in every harness. Neither changes the requirement that the review evidence be honest and exact-head.
 
 Two limits worth knowing:
 
@@ -307,7 +307,7 @@ Requires the local dev server (`pnpm run dev`) and Supabase (`supabase start`) r
 
 Once CI green + either exact-head Codex coverage (including an adjudicated finding-bearing review per 3.4) or manual attestation of head + zero unresolved review threads + no merge conflict + the screenshot requirement or documented opt-out in 3.5 satisfied, apply the label via `mcp__github__issue_write(method: "update", …)` or `gh pr edit <PR> --add-label ready-for-review`.
 
-The label is a hint to Tim that the PR is ready for **him** to merge — it does not authorize an agent to merge. `merge-pr.sh --human` re-checks all gates when Tim runs it.
+The label signals readiness, not merge authorization. A direct request from Tim in the active task authorizes the owning agent to run the guarded merge script; the script rechecks all gates.
 
 **The label does not get the PR reviewed.** Applying it on a PR whose head is past its last review — or that was never reviewed at all — just moves the failure to merge time.
 
@@ -315,11 +315,11 @@ The label is a hint to Tim that the PR is ready for **him** to merge — it does
 
 ## Phase 4: Merge — Tim's decision (PP-wi85)
 
-**The PinPoint merge decision is Tim's, always.** An agent MAY run the gate-enforced script `bash scripts/workflow/merge-pr.sh <PR> --human`, but the `block-direct-merge.cjs` PreToolUse hook turns that invocation into an **approval prompt** — Tim approves before the merge runs (PP-wi85, reversed for the script only, per Tim 2026-08-19). A hook `ask` decision prompts in **every** permission mode, including bypassPermissions, so a subagent cannot merge silently. Raw PinPoint channels — `gh pr merge`, `gh api PUT .../merge`, MCP `merge_pull_request` — stay **hard-blocked** for agents, because they skip the script's gate re-checks (CI green, review pins head, threads resolved, no conflict). This boundary applies to implicit current-repository targets and explicit `timothyfroehlich/PinPoint` targets; a non-PinPoint target statically explicit in command arguments or MCP input follows that repository's policy and the user's authorization. Environment-only selectors remain fail-closed. The old `.claude-merge-bypass` sentinel was removed entirely. To sanity-check PinPoint gate state without merging, read the PR via MCP (`pull_request_read`), or run `merge-pr.sh <PR> --dry-run` — it also prompts for approval but takes no action.
+**Tim decides whether to merge.** If he explicitly requests it in the active task (for example, “merge it” with one unambiguous PR), the owning agent in any harness runs `bash scripts/workflow/merge-pr.sh <PR> --human`. The flag records Tim’s authorization; he need not repeat it in a shell. The script rechecks CI, exact-head review, unresolved threads, and conflicts. Claude Code and Codex may additionally prompt through `block-direct-merge.cjs`; the direct user request authorizes the agent to initiate the guarded merge in every harness. If the PR target is ambiguous, clarify it. If a gate fails, stop and report the blocker. Raw channels (`gh pr merge`, `gh api PUT .../merge`, MCP `merge_pull_request`) remain prohibited for agents because they skip the gates. This applies to implicit current-repository and explicit `timothyfroehlich/PinPoint` targets; statically explicit non-PinPoint targets follow their own policy. Environment-only selectors fail closed.
 
-### 4.1 Agent's terminal state: hand off (the default), or run it and let Tim approve
+### 4.1 Handoff by default; merge on explicit request
 
-Once 3.1–3.6 are satisfied (CI green, a review whose `commit_id` matches head per 3.4, threads resolved, no conflict, and the screenshot requirement or documented opt-out satisfied), your job on this PR is done. The **default and preferred** close is a handoff: **run the handoff report and paste its output** — do not write the summary yourself. (You may instead run `bash scripts/workflow/merge-pr.sh <PR> --human` and let Tim approve the prompt; the handoff report is still the better hand-off because it shows him the state he is approving.)
+Once 3.1–3.6 are satisfied, hand off with the report below if Tim has not requested a merge. If he has directly requested it, run the guarded script instead and verify the PR reached `MERGED`; do not ask him to repeat the request. Readiness alone never authorizes merging.
 
 ```bash
 bash scripts/workflow/merge-handoff.sh <PR>
@@ -337,11 +337,11 @@ It prints what Tim needs to decide whether to merge — which review ran and whe
 ! scripts/workflow/merge-pr.sh <PR> --human --automerge
 ```
 
-Never say "ready to push when you are" — you push. Never say a PR is "merged" or that you merged it — only Tim runs the merge; say "ready for Tim to merge" and give him the command. (A `!`-prefixed command in Claude Code is a human-typed shell passthrough — it does not generate a PreToolUse event, so it is the only channel this hook cannot see. That is by design: it is the human channel.)
+Push completed work. Without an explicit merge request, report that the PR is ready for Tim and give the guarded command. After his explicit request, run the script and say “merged” only after verifying its result.
 
 ### 4.2 Escape hatches (Tim decides; you can inform, not invoke)
 
-`merge-pr.sh` evaluates **4 gates**: `ci`, `threads`, `reviewed`, `no_conflict`. `--force` bypasses the review-state pair (`threads` + `reviewed`); `--bypass-merge-requirements` bypasses `ci` and passes `--admin`. Both require manual permission approval — treat the approval prompt as an "are you sure?" checkpoint. The `no_conflict` gate is NEVER bypassable; GitHub rejects conflicting merges regardless of `--admin`.
+`merge-pr.sh` evaluates **4 gates**: `ci`, `threads`, `reviewed`, `no_conflict`. `--force` bypasses the review-state pair (`threads` + `reviewed`); `--bypass-merge-requirements` bypasses `ci` and passes `--admin`. Each bypass requires a separate explicit request from Tim; “merge it” alone authorizes neither. The `no_conflict` gate is NEVER bypassable; GitHub rejects conflicting merges regardless of `--admin`.
 
 **On any FAIL the script removes the `ready-for-review` label if present** (and likewise on the `--automerge` RED path). The label's contract is "click-merge-without-thinking"; if a gate fails at merge time that contract is broken, so the label goes. Practical consequence: after Tim reports a FAIL, fix the underlying issue, push, and **re-apply the label** (3.6) before re-handing him the `--human` command — don't assume it survived.
 
@@ -351,7 +351,7 @@ Never say "ready to push when you are" — you push. Never say a PR is "merged" 
 
 ### 4.3 If `merge-pr.sh` itself is broken
 
-An agent can run `merge-pr.sh` (with Tim's approval at the prompt), but that does not help when the script _itself_ is broken — the raw channels stay hard-blocked, and there is no hook bypass (PP-wi85). If a hotfix genuinely can't wait for the script to be fixed, that's Tim's call, made in his own shell (`gh pr merge <PR> --squash` run by him directly, or a fixed `--human` run). Document why in the merge commit or a follow-up comment. An agent should not look for a workaround here — flag the breakage and let Tim decide.
+An owning agent can run `merge-pr.sh` after Tim’s explicit request, but that does not help when the script itself is broken. Raw channels remain prohibited for agents. If a hotfix genuinely cannot wait for a script fix, tell Tim why and let him choose a manual path in his own shell; do not work around the guard.
 
 ### 4.4 Dependabot PRs: rebase before merging back-to-back
 
