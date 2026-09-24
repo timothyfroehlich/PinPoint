@@ -36,6 +36,28 @@
       "mcp__claude_ai_Supabase__merge_branch",
       "mcp__claude_ai_Supabase__rebase_branch",
       "mcp__claude_ai_Supabase__reset_branch",
+      "mcp__Supabase__execute_sql",
+      "mcp__Supabase__apply_migration",
+      "mcp__Supabase__deploy_edge_function",
+      "mcp__Supabase__pause_project",
+      "mcp__Supabase__restore_project",
+      "mcp__Supabase__create_project",
+      "mcp__Supabase__create_branch",
+      "mcp__Supabase__delete_branch",
+      "mcp__Supabase__merge_branch",
+      "mcp__Supabase__rebase_branch",
+      "mcp__Supabase__reset_branch",
+      "mcp__plugin_supabase_supabase__execute_sql",
+      "mcp__plugin_supabase_supabase__apply_migration",
+      "mcp__plugin_supabase_supabase__deploy_edge_function",
+      "mcp__plugin_supabase_supabase__pause_project",
+      "mcp__plugin_supabase_supabase__restore_project",
+      "mcp__plugin_supabase_supabase__create_project",
+      "mcp__plugin_supabase_supabase__create_branch",
+      "mcp__plugin_supabase_supabase__delete_branch",
+      "mcp__plugin_supabase_supabase__merge_branch",
+      "mcp__plugin_supabase_supabase__rebase_branch",
+      "mcp__plugin_supabase_supabase__reset_branch",
       "Bash(rm -rf:*)",
       "Bash(rm -fr *)",
       "Bash(docker rm:*)",
@@ -71,7 +93,7 @@
           {
             "type": "command",
             "command": "node \"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/inject-beads-actor.cjs",
-            "timeout": 5000
+            "timeout": 5
           }
         ]
       },
@@ -81,7 +103,7 @@
           {
             "type": "command",
             "command": "node \"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/block-direct-merge.cjs",
-            "timeout": 5000
+            "timeout": 5
           }
         ]
       },
@@ -91,7 +113,7 @@
           {
             "type": "command",
             "command": "node \"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/block-main-worktree-branch-switch.cjs",
-            "timeout": 5000
+            "timeout": 5
           }
         ]
       },
@@ -101,7 +123,7 @@
           {
             "type": "command",
             "command": "node \"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/block-gh-pr-checkout.cjs",
-            "timeout": 5000
+            "timeout": 5
           }
         ]
       },
@@ -111,7 +133,7 @@
           {
             "type": "command",
             "command": "node \"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/block-direct-pr-watch.cjs",
-            "timeout": 5000
+            "timeout": 5
           }
         ]
       }
@@ -123,7 +145,7 @@
           {
             "type": "command",
             "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/preflight-reminder.sh",
-            "timeout": 5000
+            "timeout": 5
           }
         ]
       },
@@ -133,7 +155,7 @@
           {
             "type": "command",
             "command": "node \"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/ui-screenshot-reminder.cjs",
-            "timeout": 5000
+            "timeout": 5
           }
         ]
       }
@@ -144,7 +166,7 @@
           {
             "type": "command",
             "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/worktree-create.sh",
-            "timeout": 240000
+            "timeout": 240
           }
         ]
       }
@@ -155,7 +177,7 @@
           {
             "type": "command",
             "command": "python3 \"${CLAUDE_PROJECT_DIR:-.}/scripts/worktree_cleanup.py\" --claude-hook",
-            "timeout": 60000
+            "timeout": 60
           }
         ]
       }
@@ -166,7 +188,7 @@
           {
             "type": "command",
             "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/scripts/hooks/prototype-mode-poll.sh",
-            "timeout": 5000
+            "timeout": 5
           }
         ]
       }
@@ -178,22 +200,22 @@
           {
             "type": "command",
             "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/session-start-orphan-sweep.sh",
-            "timeout": 15000
+            "timeout": 15
           },
           {
             "type": "command",
             "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/scripts/hooks/prototype-mode-poll.sh",
-            "timeout": 5000
+            "timeout": 5
           },
           {
             "type": "command",
             "command": "node \"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/verify-guard-stack.cjs",
-            "timeout": 5000
+            "timeout": 5
           },
           {
             "type": "command",
             "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/session-start-chores-nag.sh",
-            "timeout": 5000
+            "timeout": 5
           }
         ]
       }

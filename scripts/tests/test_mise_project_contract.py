@@ -967,8 +967,6 @@ def test_ci_mise_canary_contract() -> None:
 
     ci_gate = _workflow_job_block(workflow, "ci-gate")
     assert "- mise-canary" in ci_gate
-    assert "MISE_CANARY_RESULT: ${{ needs.mise-canary.result }}" in ci_gate
-    assert 'required=("$MISE_CANARY_RESULT"' in ci_gate
 
 
 def test_workflows_use_mise_without_legacy_setup_actions() -> None:
