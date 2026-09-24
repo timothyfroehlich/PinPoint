@@ -266,8 +266,7 @@ def test_scripts_ts_js_trigger_tests(
         "scripts/migrate-production.ts",
         "scripts/lib/pg-client.mjs",
         "scripts/lib/drizzle-push-guard.ts",
-        "scripts/workflow/pr-watcher-mcp.ts",
-        "scripts/workflow/pr-watcher-mcp.test.ts",
+        "scripts/workflow/pr-screenshots.mjs",
     ]
     for f in code_files:
         has_code, _ = paths_filter.evaluate([f])
