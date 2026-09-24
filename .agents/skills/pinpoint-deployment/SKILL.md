@@ -107,13 +107,17 @@ Before merging any migration PR: every new `.sql` has a matching `_snapshot.json
 
 ## Production Deploys (Vercel)
 
-Vercel's production build runs `pnpm run vercel-build` — which is `migrate:production && next build` (`package.json`). Two of the three notes below follow from that ordering.
+Vercel's production build runs `pnpm run vercel-build` — which is `migrate:production && next build` (`package.json`). Two of the notes below follow from that ordering.
 
 ### Migrations run first, so a failed build may already have migrated prod
 
 `migrate:production` finishes **before** `next build` starts. A build that dies later — on the `next.config.ts` env assertion (`assertVercelDeploymentEnv`), on a compile error, on anything — has **already applied the PR's migrations to production**.
 
 Vercel does not promote a failed build, so production keeps serving the **previous** deployment and stays healthy (curl it before assuming an outage). But if the PR carried migrations, prod's database is now migrated while prod's code is still the old build. Verify the new schema is forward-compatible with that old code rather than assuming nothing happened.
+
+### Stuck migration fix
+
+`MARK_MIGRATION_FORCE_PRODUCTION=1 POSTGRES_URL=<prod_url> tsx scripts/mark-migration-applied.ts <n>`. The token is required — the script refuses a remote target without it, and prompts once more when run in a TTY. It writes to `drizzle.__drizzle_migrations` without running the migration, so a wrong number makes prod's schema diverge from history permanently.
 
 ### Diagnosing a failed production deploy without build logs
 
