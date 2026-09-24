@@ -53,10 +53,23 @@ bare `supabase start` or `supabase db reset` targets this machine's Docker.
 `python3 scripts/worktree_cleanup.py <worktree>` stops a remote worktree's
 stack and removes its volumes on the remote daemon. It needs
 `PINPOINT_REMOTE_DOCKER_HOST` in the environment; without it the script keeps
-the worktree and slot and exits non-zero, because `worktree_orphan_sweep.py`
-only covers the local daemon. Every remote container and volume carries the
-`com.supabase.cli.project` and `com.supabase.cli.workdir` labels, which name
-the owning project and worktree path.
+the worktree and slot and exits non-zero rather than strand the remote stack.
+
+Every remote resource carries the `com.supabase.cli.project` label. Containers
+also carry `com.supabase.cli.workdir` (the worktree path); volumes do not.
+
+`python3 scripts/worktree_orphan_sweep.py` covers the remote daemon too when
+`PINPOINT_REMOTE_DOCKER_HOST` is set. It only considers projects whose
+container workdir is a path on this machine, skipping Crabbox runner projects
+and the remote host's own paths. A project whose workdir is gone and whose
+`project_id` has no live worktree is an orphan; `--apply` removes its
+containers and volumes by name. An orphan slot is freed only once no remote
+project still references its path, so a reused slot never collides with a
+leftover stack's ports. When this machine uses the remote backend (a remote
+setting in the shell, or a live worktree whose `.env.local` says `remote`) but
+the remote daemon can't be queried, those slots are reported as UNKNOWN and
+kept. A stopped remote stack has volumes only, so the sweep can't tell whose it
+is: it lists those volumes and leaves them for a person to remove.
 
 ## Port slots and other stacks on the remote host
 
