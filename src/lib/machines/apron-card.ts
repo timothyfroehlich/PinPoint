@@ -208,7 +208,6 @@ export function cardParagraphs(text: string): string[] {
     .map((p) => p.trim())
     .filter(Boolean);
 }
-
 /** A size's physical dimensions in CSS px (96 per inch). */
 export function apronCardPixelSize(size: ApronCardSize): {
   width: number;
