@@ -268,7 +268,7 @@ def test_coderabbit_changes_requested_on_head_is_changes_requested(run_dashboard
 
 
 @pytest.mark.unit
-def test_resolved_coderabbit_finding_is_approved(run_dashboard):
+def test_coderabbit_body_only_finding_stays_changes_requested(run_dashboard):
     result, _calls = run_dashboard(
         [
             list_rule([pr_node(1)]),
@@ -280,7 +280,7 @@ def test_resolved_coderabbit_finding_is_approved(run_dashboard):
     )
 
     assert result.returncode == 0, result.stderr
-    assert review_column(result) == "approved"
+    assert review_column(result) == "changes requested"
 
 
 @pytest.mark.unit

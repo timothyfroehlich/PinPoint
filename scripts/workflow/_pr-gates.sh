@@ -102,7 +102,9 @@ _review_evidence() {
     def native($bot):
       [ $reviews[]
         | select(.user.login? == $bot)
-        | { sha: (.commit_id // ""),
+        | { id: (.id // null),
+            actionable_count: ((.body // "") | [scan("(?m)^\\*\\*Actionable comments posted: ([0-9]+)\\*\\*$")] | flatten | (.[0] // "") | if . == "" then null else tonumber end),
+            sha: (.commit_id // ""),
             reviewer: (.user.login // ""),
             detail: (.state // "UNKNOWN"),
             at: (.submitted_at // ""),
@@ -235,7 +237,8 @@ _coderabbit_check() {
            and $summary != null and $summary.at >= $r.at then
         $summary + { checker: "coderabbit",
                      verdict: (if $r.detail == "APPROVED" then "covers" else "changes_requested" end),
-                     form: "summary_review", inherited_from: $r.sha }
+                     form: "summary_review", inherited_from: $r.sha,
+                     review_id: $r.id, actionable_count: $r.actionable_count }
       elif $r == null then empty_verdict("coderabbit")
       else $r + { checker: "coderabbit", verdict: "stale", form: "" }
       end'
@@ -352,6 +355,47 @@ _is_pure_merge_from_main() {
   return 0
 }
 
+# A CHANGES_REQUESTED review is adjudicated only when CodeRabbit named inline
+# findings and every comment from that specific review belongs to a resolved
+# thread. A review with body-only findings has no such evidence and stays blocked.
+_coderabbit_finding_adjudicated() {
+  local pr=$1 record=$2
+  local review_id expected owner_repo raw ids count owner repo cursor="" has_next=true matched=0
+  review_id=$(jq -r '.review_id // .id // empty' <<< "$record")
+  expected=$(jq -r '.actionable_count // 0' <<< "$record")
+  [[ "$review_id" =~ ^[0-9]+$ && "$expected" =~ ^[0-9]+$ && "$expected" -gt 0 ]] || return 1
+  owner_repo=$(_repo_slug) || return 1
+  raw=$(gh api --paginate "repos/${owner_repo}/pulls/${pr}/reviews/${review_id}/comments") || return 1
+  ids=$(jq -s '[.[] | flatten | .[] | select(.in_reply_to_id == null) | .id] | unique' <<< "$raw") || return 1
+  count=$(jq 'length' <<< "$ids")
+  [[ "$count" -eq "$expected" ]] || return 1
+  owner=${owner_repo%%/*}
+  repo=${owner_repo#*/}
+  while [[ "$has_next" == "true" ]]; do
+    local after_arg="" resp page_matched
+    [[ -n "$cursor" ]] && after_arg=", after: \"$cursor\""
+    resp=$(gh api graphql -f query="
+      query {
+        repository(owner: \"$owner\", name: \"$repo\") {
+          pullRequest(number: $pr) {
+            reviewThreads(first: 100$after_arg) {
+              pageInfo { hasNextPage endCursor }
+              nodes { isResolved comments(first: 1) { nodes { databaseId } } }
+            }
+          }
+        }
+      }") || return 1
+    page_matched=$(jq --argjson ids "$ids" '
+      [.data.repository.pullRequest.reviewThreads.nodes[]
+       | select(.isResolved == true and (.comments.nodes[0].databaseId as $id | $ids | index($id) != null))] | length
+    ' <<< "$resp") || return 1
+    matched=$((matched + page_matched))
+    has_next=$(jq -r '.data.repository.pullRequest.reviewThreads.pageInfo.hasNextPage' <<< "$resp")
+    cursor=$(jq -r '.data.repository.pullRequest.reviewThreads.pageInfo.endCursor // empty' <<< "$resp")
+  done
+  [[ "$matched" -eq "$expected" ]]
+}
+
 # ---------------------------------------------------------------------------------
 # Review summary — the one JSON document every consumer reads (Gate 3, merge-handoff,
 # request-codex-review, pr-watch, pr-dashboard). Computed once per call.
@@ -390,7 +434,8 @@ _review_summary() {
   # A finding-bearing CodeRabbit review covers the exact head after every
   # thread is explicitly adjudicated and resolved. The thread gate remains a
   # separate requirement and blocks while any thread is unresolved.
-  if [[ "$unresolved" == "0" && $(jq -r '.verdict' <<< "$coderabbit") == "changes_requested" ]]; then
+  if [[ "$unresolved" == "0" && $(jq -r '.verdict' <<< "$coderabbit") == "changes_requested" ]] && \
+      _coderabbit_finding_adjudicated "$pr" "$coderabbit"; then
     coderabbit=$(jq -c '
       . + { verdict: "covers", form: (if .form == "summary_review" then .form else "reviewed" end) }
     ' <<< "$coderabbit")

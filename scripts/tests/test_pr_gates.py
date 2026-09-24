@@ -35,13 +35,19 @@ def codex_review(
     state: str = "APPROVED",
     submitted_at: str = "2026-08-22T12:00:00Z",
     login: str = CODEX_BOT,
+    review_id: int = 77,
+    actionable_count: int | None = None,
 ) -> dict:
+    body = "Codex review summary"
+    if actionable_count is not None:
+        body = f"**Actionable comments posted: {actionable_count}**\n\nReview summary"
     return {
+        "id": review_id,
         "user": {"login": login},
         "state": state,
         "commit_id": sha,
         "submitted_at": submitted_at,
-        "body": "Codex review summary",
+        "body": body,
     }
 
 
@@ -179,10 +185,12 @@ def claude_two_axis_review(
     }
 
 
-def thread(*, resolved: bool, author: str) -> dict:
+def thread(*, resolved: bool, author: str, comment_id: int = 42) -> dict:
     return {
         "isResolved": resolved,
-        "comments": {"nodes": [{"author": {"login": author}}]},
+        "comments": {
+            "nodes": [{"databaseId": comment_id, "author": {"login": author}}]
+        },
     }
 
 
@@ -193,6 +201,7 @@ def gate_env(
     comment_pages: list[list[dict]] | None = None,
     threads: list[dict] | None = None,
     commits: list[dict] | None = None,
+    review_comments: list[dict] | None = None,
     head_sha: str = HEAD_SHA,
     base_ref: str = "main",
     rollup: list[dict] | None = None,
@@ -212,6 +221,9 @@ def gate_env(
         )
         (tmp_path / "comments.json").write_text(
             "\n".join(json.dumps(page) for page in (comment_pages or [[]]))
+        )
+        (tmp_path / "review-comments.json").write_text(
+            json.dumps(review_comments or [])
         )
         (tmp_path / "commits.json").write_text(json.dumps(commits or []))
         (tmp_path / "threads.json").write_text(
@@ -247,6 +259,7 @@ def gate_env(
             '  *"--json statusCheckRollup --jq"*) jq -r "${@: -1}" < "$STUB_ROLLUP" ;;\n'
             '  *"nameWithOwner"*) printf "acme/widget\\n" ;;\n'
             '  *"api graphql"*) cat "$STUB_THREADS" ;;\n'
+            '  *"/reviews/"*"/comments"*) cat "$STUB_REVIEW_COMMENTS" ;;\n'
             '  *"/pulls/"*"/reviews"*) cat "$STUB_REVIEWS" ;;\n'
             '  *"/issues/"*"/comments"*) cat "$STUB_COMMENTS" ;;\n'
             '  *"commits"*) cat "$STUB_COMMITS" ;;\n'
@@ -263,6 +276,7 @@ def gate_env(
         env["STUB_BASE_REF"] = base_ref
         env["STUB_REVIEWS"] = str(tmp_path / "reviews.json")
         env["STUB_COMMENTS"] = str(tmp_path / "comments.json")
+        env["STUB_REVIEW_COMMENTS"] = str(tmp_path / "review-comments.json")
         env["STUB_COMMITS"] = str(tmp_path / "commits.json")
         env["STUB_THREADS"] = str(tmp_path / "threads.json")
         env["STUB_ROLLUP"] = str(tmp_path / "rollup.json")
@@ -408,12 +422,16 @@ def test_coderabbit_summary_without_prior_native_approval_does_not_cover() -> No
 
 def test_coderabbit_incremental_summary_covers_adjudicated_prior_finding() -> None:
     finding = codex_review(
-        sha=OTHER_SHA, login=CODERABBIT_BOT, state="CHANGES_REQUESTED"
+        sha=OTHER_SHA,
+        login=CODERABBIT_BOT,
+        state="CHANGES_REQUESTED",
+        actionable_count=1,
     )
     with gate_env(
         review_pages=[[finding]],
         comment_pages=[[coderabbit_summary()]],
         threads=[thread(resolved=True, author=CODERABBIT_BOT)],
+        review_comments=[{"id": 42, "in_reply_to_id": None}],
     ) as env:
         summary = review_summary(env)
     assert summary["label"] == "approved"
@@ -422,7 +440,10 @@ def test_coderabbit_incremental_summary_covers_adjudicated_prior_finding() -> No
 
 def test_coderabbit_incremental_summary_waits_for_unresolved_prior_finding() -> None:
     finding = codex_review(
-        sha=OTHER_SHA, login=CODERABBIT_BOT, state="CHANGES_REQUESTED"
+        sha=OTHER_SHA,
+        login=CODERABBIT_BOT,
+        state="CHANGES_REQUESTED",
+        actionable_count=1,
     )
     with gate_env(
         review_pages=[[finding]],
@@ -734,15 +755,27 @@ def test_coderabbit_changes_requested_on_head_is_changes_requested() -> None:
 
 
 def test_resolved_coderabbit_finding_covers_head_without_second_review() -> None:
-    review = codex_review(login=CODERABBIT_BOT, state="CHANGES_REQUESTED")
+    review = codex_review(
+        login=CODERABBIT_BOT, state="CHANGES_REQUESTED", actionable_count=1
+    )
     with gate_env(
-        review_pages=[[review]], threads=[thread(resolved=True, author=CODERABBIT_BOT)]
+        review_pages=[[review]],
+        threads=[thread(resolved=True, author=CODERABBIT_BOT)],
+        review_comments=[{"id": 42, "in_reply_to_id": None}],
     ) as env:
         result = run_gate("check_review_happened", env)
         summary = review_summary(env)
     assert result.returncode == 0, result.stdout
     assert "CodeRabbit finding review covers head SHA" in result.stdout
     assert summary["coverage"]["form"] == "reviewed"
+
+
+def test_body_only_coderabbit_finding_stays_blocked_without_inline_evidence() -> None:
+    review = codex_review(login=CODERABBIT_BOT, state="CHANGES_REQUESTED")
+    with gate_env(review_pages=[[review]]) as env:
+        summary = review_summary(env)
+    assert summary["label"] == "changes requested"
+    assert summary["coverage"] is None
 
 
 def test_unresolved_threads_make_uncovered_head_changes_requested() -> None:
