@@ -1,6 +1,9 @@
 import { describe, it, expect, beforeAll, afterEach } from "vitest";
 import { createClient } from "@supabase/supabase-js";
-import { confirmTestUserEmail } from "~/test/helpers/supabase";
+import {
+  confirmTestUserEmail,
+  expectLocalSupabaseUrl,
+} from "~/test/helpers/supabase";
 
 /**
  * Integration tests for auth page redirect logic
@@ -31,7 +34,7 @@ describe("Auth Pages - Server Component Auth Logic", () => {
 
   beforeAll(() => {
     // Ensure we're in a test environment
-    expect(supabaseUrl).toMatch(/127\.0\.0\.1|localhost/);
+    expectLocalSupabaseUrl(supabaseUrl);
   });
 
   afterEach(async () => {

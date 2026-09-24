@@ -1,6 +1,9 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { createClient } from "@supabase/supabase-js";
-import { confirmTestUserEmail } from "~/test/helpers/supabase";
+import {
+  confirmTestUserEmail,
+  expectLocalSupabaseUrl,
+} from "~/test/helpers/supabase";
 
 /**
  * Integration tests for authentication actions
@@ -26,8 +29,8 @@ const adminSupabase = createClient(supabaseUrl, serviceRoleKey);
 
 describe("Authentication Integration Tests", () => {
   beforeAll(() => {
-    // Ensure we're in a test environment (Supabase may return 127.0.0.1 or localhost)
-    expect(supabaseUrl).toMatch(/127\.0\.0\.1|localhost/);
+    // Ensure we are pointed at a local dev stack, never a cloud project
+    expectLocalSupabaseUrl(supabaseUrl);
   });
 
   describe("Signup flow", () => {

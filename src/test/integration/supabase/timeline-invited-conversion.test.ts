@@ -22,6 +22,7 @@ import {
   resolvePerson,
   type PersonResolverInput,
 } from "~/lib/timeline/resolve-person";
+import { expectLocalSupabaseUrl } from "~/test/helpers/supabase";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -46,7 +47,7 @@ let newUserId: string | undefined;
 
 describe("invited→real timeline conversion (PP-tv9l)", () => {
   beforeAll(async () => {
-    expect(supabaseUrl).toMatch(/127\.0\.0\.1|localhost/);
+    expectLocalSupabaseUrl(supabaseUrl);
 
     const [invited] = await sql`
       INSERT INTO invited_users (email, first_name, last_name, role)

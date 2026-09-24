@@ -12,6 +12,7 @@ import {
   resetPasswordAction,
   forgotPasswordAction,
 } from "~/app/(auth)/actions";
+import { expectLocalSupabaseUrl } from "~/test/helpers/supabase";
 
 /**
  * Integration tests for auth Server Action error paths
@@ -59,7 +60,7 @@ describe("Auth Actions - Error Path Integration Tests", () => {
 
   beforeAll(() => {
     // Ensure we're in a test environment
-    expect(supabaseUrl).toMatch(/127\.0\.0\.1|localhost/);
+    expectLocalSupabaseUrl(supabaseUrl);
   });
 
   afterEach(async () => {
