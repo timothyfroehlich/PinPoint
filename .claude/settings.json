@@ -2,8 +2,7 @@
   "permissions": {
     "allow": [
       "Bash(bash scripts/workflow/mark-review.sh *)",
-      "Bash(bash scripts/workflow/review-preflight.sh *)",
-      "mcp__pr_lifecycle_watch__watch_pr_lifecycle"
+      "Bash(bash scripts/workflow/review-preflight.sh *)"
     ],
     "deny": [
       "Bash(supabase db push:*)",
@@ -123,16 +122,6 @@
           {
             "type": "command",
             "command": "node \"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/block-gh-pr-checkout.cjs",
-            "timeout": 5
-          }
-        ]
-      },
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/block-direct-pr-watch.cjs",
             "timeout": 5
           }
         ]

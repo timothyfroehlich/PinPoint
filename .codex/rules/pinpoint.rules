@@ -101,7 +101,6 @@ prefix_rule(
     ],
 )
 # Trusted PinPoint workflow entry points and routine local validation.
-prefix_rule(pattern=["subway", "watch"], decision="allow", justification="Monitor a PinPoint pull request through Subway")
 prefix_rule(pattern=["./scripts/workflow/pr-watch.py"], decision="allow", justification="Monitor a PinPoint pull request through the repository workflow")
 prefix_rule(pattern=["python3", "scripts/workflow/pr-watch.py"], decision="allow", justification="Monitor a PinPoint pull request through the repository workflow")
 prefix_rule(pattern=["bash", "scripts/workflow/merge-handoff.sh"], decision="allow", justification="Generate the read-only PinPoint merge handoff")

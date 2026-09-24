@@ -54,52 +54,25 @@ It rejects PinPoint targets case-insensitively; after Tim's explicit request, Pi
 
 ### PR Monitoring
 
-| Script                                        | Purpose                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pr-dashboard.sh [PR...]`                     | Status table: CI checks, review state, merge state, draft state. All open PRs if no args. One repository GraphQL snapshot batches metadata and checks; the Review column is the merge gate's own label (`_review_summary`, run once per PR): `approved`, `changes requested`, `stale review`, `not reviewed`, or `?` when the gate could not answer.                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| `pr-watch.py <PR>`                            | Stream CI or review events. One timestamped line per event (logs to stderr in `--json` mode; stdout reserved strictly for terminal JSON). The first host process for a repository+PR+watch mode holds the XDG-state lock and polls GitHub; concurrent invocations with the same precheck semantics follow its atomic local state with zero GitHub reads. Normal and `--force` watches have separate owners. CI and review phases use distinct locks (`...-<pr>-ci.lock`, `...-<pr>-review.lock`). Writes failure artifacts and watcher telemetry to `tmp/gh-monitor/`. Unresolved threads persist in shared state so every follower prints the reminder, but do **not** stop the CI watch. `--check-ready` remains a direct readiness snapshot rather than a shared monitor. |
-| `pr-watcher-mcp.ts`                           | Local stdio MCP server exposing only `watch_pr_lifecycle`. It validates a five-field envelope, verifies the absolute worktree matches its own current Git worktree, then runs the exact delegated `pr-watch.py` argv without a shell.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| `request-codex-review.sh <PR>`                | Request exactly one manual Codex review for the current head. Refuses non-owner auth, draft/closed PRs, non-green current-head CI, heads already reviewed/requested, and a head that moves during validation. Posts the SHA-bound `@codex review` comment consumed by the trusted reaction witness.                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| `codex-reaction-witness.sh <PR> <SHA> <TIME>` | Trusted helper for `.github/workflows/codex-reaction-witness.yaml`. After the SHA-bound manual request it waits for the connector bot's `+1` on that request comment, checking that the named SHA remains head, then posts a SHA-pinned witness. (`eyes` is not required: Codex replaces it with `+1`, so a fast review may never show it.) A native exact-head review supersedes the need for a witness.                                                                                                                                                                                                                                                                                                                                                                    |
+| Script                                        | Purpose                                                                                                                                                                                                                                                                                                                                                                                                   |
+| --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pr-dashboard.sh [PR...]`                     | Status table: CI checks, review state, merge state, draft state. All open PRs if no args. One repository GraphQL snapshot batches metadata and checks; the Review column is the merge gate's own label (`_review_summary`, run once per PR): `approved`, `changes requested`, `stale review`, `not reviewed`, or `?` when the gate could not answer.                                                      |
+| `pr-watch.py <PR>`                            | Wait on one PR head: `--phase ci\|review --expected-head <SHA>` polls every 30s until a terminal verdict (1h ceiling). Progress goes to stderr; stdout is exactly one terminal JSON verdict. A CI failure writes `tmp/gh-monitor/failure-<run>.md`. `--check-ready` prints a readiness snapshot instead.                                                                                                  |
+| `request-codex-review.sh <PR>`                | Request exactly one manual Codex review for the current head. Refuses non-owner auth, draft/closed PRs, non-green current-head CI, heads already reviewed/requested, and a head that moves during validation. Posts the SHA-bound `@codex review` comment consumed by the trusted reaction witness.                                                                                                       |
+| `codex-reaction-witness.sh <PR> <SHA> <TIME>` | Trusted helper for `.github/workflows/codex-reaction-witness.yaml`. After the SHA-bound manual request it waits for the connector bot's `+1` on that request comment, checking that the named SHA remains head, then posts a SHA-pinned witness. (`eyes` is not required: Codex replaces it with `+1`, so a fast review may never show it.) A native exact-head review supersedes the need for a witness. |
 
-#### `pr-watch.py` flags and delegated watcher contract
-
-Named harness agents call the watcher through `watch_pr_lifecycle`, never by accepting
-or constructing a command in their prompt. Its strict input is exactly:
-
-```json
-{
-  "worktree": "/absolute/path/to/the-server-worktree",
-  "pr": 1234,
-  "title": "Exact PR title",
-  "phase": "ci",
-  "expected_head": "40-character-lowercase-head-sha"
-}
-```
-
-`title` is context only. The tool rejects extra fields, a relative or mismatched
-worktree, non-positive PR numbers, empty titles, unknown phases, and non-full lowercase
-SHAs. It can launch only the exact second command below with `shell: false`. Exits 0,
-1, and 2 return valid terminal watcher JSON unchanged; malformed stdout, startup
-failure, or any other exit is an MCP tool error. Child stderr stays on server stderr
-and never contaminates the returned JSON. Harness and resolved-model telemetry arrive
-through `GH_MONITOR_HARNESS` and `GH_MONITOR_MODEL`; the server fixes
-`GH_MONITOR_WAKES=1` while preserving the rest of the environment.
+#### `pr-watch.py` flags and terminal verdict
 
 ```bash
-./scripts/workflow/pr-watch.py <PR> [--verbose] [--force]
-python3 scripts/workflow/pr-watch.py <PR> --phase <ci|review> --expected-head <FULL_SHA> --json
+python3 scripts/workflow/pr-watch.py <PR> --phase <ci|review> --expected-head <FULL_SHA>
+python3 scripts/workflow/pr-watch.py <PR> --check-ready
 ```
 
-Delegated mode is the second form: `--phase`, `--expected-head`, and `--json` are
-required together, and the expected head must be a full lowercase 40-character SHA.
-The no-flag legacy form keeps following replacement heads for interactive use.
+Run the first form as a background command. `--phase` and `--expected-head` (full lowercase 40-character SHA) are required together; `--check-ready` takes neither. Usage errors exit 2 with nothing on stdout.
 
-- `--phase <ci|review>`: Phase to watch. Defaults to `ci` (or legacy watch if neither `--phase` nor `--expected-head` nor `--json` is given).
-  - `ci`: Polls CI Gate for `expected_head`. Terminal outcomes: `passed` (exit 0), `failed` (exit 1), `stale` (exit 1), `conflicting` (exit 1), `timed_out` (exit 2), `undetermined` (exit 2).
-  - `review`: Polls the merge gate's review label for `expected_head`. Terminal outcomes: `passed` (`approved` AND 0 unresolved threads; exit 0), `action_required` (`approved` BUT unresolved threads > 0, OR `changes requested`; exit 1), `stale` (PR head moved away from `expected_head`; exit 1), `conflicting` (exit 1), `timed_out` (exit 2), `undetermined` (exit 2, including a gate failure). In-progress labels (`not reviewed`, `stale review`) sleep until a terminal verdict or timeout.
-- `--expected-head <SHA>`: Pins watch to the intended commit SHA. If the PR head moves, the watch immediately terminates with outcome `stale` (exit 1) rather than chasing replacement heads.
-- `--json`: Enables machine-readable output with strict stream separation: `stdout` outputs ONLY the final compact single-line JSON payload upon exit. All progressive logs, error notices, and diagnostic messages are emitted to `stderr`.
+- `--phase ci`: polls CI Gate for the expected head. Terminal outcomes: `passed` (exit 0), `failed` / `stale` / `conflicting` (exit 1), `timed_out` / `undetermined` (exit 2).
+- `--phase review`: polls the merge gate's review label for the expected head. `passed` = `approved` AND 0 unresolved threads (exit 0); `action_required` = unresolved threads or `changes requested` (exit 1); `stale` / `conflicting` (exit 1); `timed_out` / `undetermined` (exit 2).
+- `--expected-head <SHA>`: if the PR head moves, the watch ends `stale` rather than following the new head. GitHub's transient `UNKNOWN` merge state is not treated as a conflict.
 
 Terminal JSON schema (`stdout`):
 
@@ -127,10 +100,6 @@ Terminal JSON schema (`stdout`):
 - **0**: `passed` (clean gate verdict or exact-head review with 0 unresolved threads).
 - **1**: Action required or failure (`failed`, `action_required`, `stale`, `conflicting`).
 - **2**: Undetermined / unavailable evidence (`undetermined`, `timed_out`). Exit 2 is not a red CI: re-run the watch once evidence is available rather than hunting for a broken test. (PP-qkl8)
-
-Shared monitor state lives under `$XDG_STATE_HOME/pinpoint/pr-watch/` (falling back to `~/.local/state`) and carries schema version, repository, PR, current head, leader PID, status, timestamp, short detail, and an optional failure-artifact path. The process-held lock is the liveness proof; JSON alone is never ownership or reusable terminal evidence.
-
-Watcher run telemetry is recorded under `tmp/gh-monitor/watcher-run-<pr>-<phase>-<timestamp>-<pid>-<nonce>.json` with harness, resolved model, expected/observed heads, elapsed wait, and terminal outcome.
 
 ### Compact Validation Progress
 
@@ -219,7 +188,7 @@ The pinpoint-pr-workflow skill defaults to MCP tools for per-operation reads and
 | Read PR metadata, reviews, threads, check_runs | `pull_request_read(method: ...)`               | —                                                                                  |
 | Apply/remove PR label                          | `issue_write(method: "update", labels: [...])` | —                                                                                  |
 | Get failed CI logs                             | `get_job_logs(failed_only, tail_lines)`        | —                                                                                  |
-| Stream CI runs in real time                    | —                                              | `pr-watch.py`                                                                      |
+| Wait on CI or review for one PR head           | —                                              | `pr-watch.py`                                                                      |
 | Request one Codex review for current head      | —                                              | `request-codex-review.sh`                                                          |
 | Merge a PR                                     | —                                              | `merge-pr.sh --human` after Tim explicitly requests that PR; script rechecks gates |
 | Composite gate evaluation                      | —                                              | `merge-handoff.sh` (read-only); merge script rechecks before a requested merge     |

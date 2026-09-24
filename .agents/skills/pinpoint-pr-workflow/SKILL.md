@@ -95,31 +95,29 @@ Closes #N (if applicable)
 
 ## Phase 3: Review (CI + review + label)
 
-### Delegated Watcher Architecture (Subway Watch)
+### Waiting on CI or review
 
-Watching CI and awaiting review are passive waits that consume 0 LLM reasoning tokens. Launch `subway watch` in the background:
+Run the watcher as a background command (Claude Code: Bash with `run_in_background`; other harnesses: their background-task equivalent) so the wait costs no tokens:
 
 ```bash
-subway watch --pr <PR> --phase <ci|review> --expected-head <HEAD_SHA>
+python3 scripts/workflow/pr-watch.py <PR> --phase <ci|review> --expected-head <HEAD_SHA>
 ```
 
-Alternatively, you may invoke the project-scoped named agent `pr-lifecycle-watcher` with the five-field envelope (see `references/native-pr-lifecycle-watcher.md`). Parent-agent hooks reject direct `pr-watch.py` calls to prevent blocking polling loops.
+It polls until a terminal verdict, then prints one JSON object on stdout (progress goes to stderr) and exits 0 passed / 1 act on it / 2 timed out or undetermined. Never hand-roll a polling loop.
 
 ---
 
 ### 3.1 Watch CI
 
-After pushing a commit at `HEAD_SHA`, launch `subway watch` with `phase: "ci"`:
+After pushing a commit at `HEAD_SHA`, watch CI in the background:
 
 ```bash
-subway watch --pr <PR> --phase ci --expected-head <HEAD_SHA>
+python3 scripts/workflow/pr-watch.py <PR> --phase ci --expected-head <HEAD_SHA>
 ```
 
 For a new draft PR, keep it draft until `CI Gate` succeeds for the current head, then
 run `gh pr ready <PR>`. Promotion out of draft automatically triggers CodeRabbit review
 on the current head commit. A green run for an older SHA does not qualify.
-
-**Stream discipline**: Progressive logs go to `stderr`, and `stdout` receives strictly the terminal JSON object upon exit. Background tasks run silently without token-wasting intermediate wakeups.
 
 **Handling the CI result**:
 
@@ -171,29 +169,22 @@ $$\text{CodeRabbit (Default)} \longrightarrow \text{Codex (Secondary / Fallback)
 
 #### 3. Concurrent Review Execution & Adjudication
 
-Both CodeRabbit and Codex can be in progress on the same commit head simultaneously:
+Both CodeRabbit and Codex can review the same head. The review watch passes on the first qualifying review of the exact head and does not track the other reviewer; if a second review lands later, adjudicate its findings like any other — unresolved threads block the gate whoever opened them.
 
-- **First-Success Resolution:** `subway watch --phase review` passes as soon as the first reviewer reports qualifying coverage on the exact head (`reviewer: "coderabbit"` or `"codex"`).
-- **Trailing Review Notification:** If a second reviewer is still in progress when the first succeeds, `subway watch` logs a notice and records `concurrent_review_in_progress` (and `pending_reviewers`). The owning agent must inspect the secondary reviewer's results once complete.
-- **Changes Requested:** If one reviewer requests changes while another is running, `subway watch` reports `outcome: "action_required"` while preserving the in-progress tracking of the second reviewer.
-- **Dual Completion:** If both complete successfully, CodeRabbit takes precedence as the primary covering reviewer.
-
-#### 4. Monitor Review via `subway watch`
+#### 4. Monitor review
 
 ```bash
-subway watch --pr <PR> --phase review --expected-head <HEAD_SHA>
+python3 scripts/workflow/pr-watch.py <PR> --phase review --expected-head <HEAD_SHA>
 ```
 
 **Handling the review result**:
 
 - `outcome: "passed"` (exit 0): The gate label is `approved` (exact head covered by CodeRabbit approval, Codex evidence, or local attestation) AND 0 unresolved threads remain.
-  - If `concurrent_review_in_progress` is non-null, note the trailing reviewer and check its output when finished.
   - Proceed to UI screenshots in 3.5, apply the `ready-for-review` label in 3.6, then enter Phase 4 merge handoff.
 - `outcome: "action_required"` (exit 1): Either `approved` with unresolved threads (>0), or the review state is `changes requested`.
-  - For CodeRabbit, `subway watch` extracts the AI agent prompt directly into `review_summary` and actionable comment count into `actionable_comments`.
   - Adjudicate findings: fix code or reply/decline threads.
   - If code changed, push fixes, wait for replacement CI, and re-request review.
-  - If rate-limited (`coderabbit_rate_limited: true`), fall back to requesting Codex review. If Codex is also unavailable, alert Tim.
+  - The watch does not detect CodeRabbit rate limiting — a rate-limited review runs to `timed_out`. If CodeRabbit's comment says `Review rate limited`, fall back to Codex; if Codex is also unavailable, alert Tim.
 - `outcome: "stale"` (exit 1): Branch head moved; re-orient to the new head.
 - `outcome: "conflicting"` (exit 1): Merge conflict; merge `origin/main` into the branch and push.
 - `outcome: "timed_out"` / `"undetermined"` (exit 2): Re-run watch or inspect GitHub API reachability.
