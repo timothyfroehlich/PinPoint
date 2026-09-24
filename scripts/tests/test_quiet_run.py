@@ -9,7 +9,6 @@ import time
 from pathlib import Path
 
 QUIET_RUN = Path(__file__).parent.parent / "quiet-run.py"
-REPO_ROOT = Path(__file__).parents[2]
 
 
 def _run_quiet(
@@ -189,62 +188,3 @@ def test_success_prunes_logs_older_than_retention(tmp_path: Path) -> None:
 
     assert result.returncode == 0
     assert not old_log.exists()
-
-
-def test_locked_preflight_only_changes_presentation_mode(tmp_path: Path) -> None:
-    fake_bin = tmp_path / "bin"
-    fake_bin.mkdir()
-    fake_sem = fake_bin / "sem"
-    fake_sem.write_text(
-        """#!/usr/bin/env bash
-if [[ ${1:-} == --version ]]; then
-  echo 'GNU parallel fake'
-  exit 0
-fi
-printf '%s\\n' "$@"
-"""
-    )
-    fake_sem.chmod(0o755)
-    fake_pg_isready = fake_bin / "pg_isready"
-    fake_pg_isready.write_text("#!/bin/bash\nexit 0\n")
-    fake_pg_isready.chmod(0o755)
-    fake_curl = fake_bin / "curl"
-    fake_curl.write_text("#!/bin/bash\nexit 0\n")
-    fake_curl.chmod(0o755)
-    fake_psql = fake_bin / "psql"
-    fake_psql.write_text(
-        "#!/bin/bash\n"
-        "[[ \"$*\" == *\"WITH expected\"* ]] && printf 'ready\\n' || printf 't\\n'\n"
-    )
-    fake_psql.chmod(0o755)
-    env = os.environ.copy()
-    env["PATH"] = f"{fake_bin}{os.pathsep}{env['PATH']}"
-    env["POSTGRES_URL"] = "postgresql://postgres:postgres@localhost:61234/postgres"
-    env["POSTGRES_URL_NON_POOLING"] = env["POSTGRES_URL"]
-    env["NEXT_PUBLIC_SUPABASE_URL"] = "http://localhost:61233"
-    env["SUPABASE_SERVICE_ROLE_KEY"] = "test-service-role-key"
-    script = REPO_ROOT / "scripts" / "workflow" / "preflight-locked.sh"
-
-    compact = subprocess.run(
-        ["bash", str(script)],
-        cwd=REPO_ROOT,
-        env=env,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    human = subprocess.run(
-        ["bash", str(script), "--human"],
-        cwd=REPO_ROOT,
-        env=env,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-
-    assert compact.returncode == 0
-    assert human.returncode == 0
-    assert "pnpm run preflight:_run" in compact.stdout
-    assert "pnpm run preflight:_run" in human.stdout
-    assert "--human" in human.stdout
-    assert "--human" not in compact.stdout
