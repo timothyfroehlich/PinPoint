@@ -575,6 +575,13 @@
       "when": 1790120608413,
       "tag": "0081_pinballmap-catalog-refresh-attempt",
       "breakpoints": true
+    },
+    {
+      "idx": 82,
+      "version": "7",
+      "when": 1790135626663,
+      "tag": "0082_add-machine-apron-card",
+      "breakpoints": true
     }
   ]
 }
