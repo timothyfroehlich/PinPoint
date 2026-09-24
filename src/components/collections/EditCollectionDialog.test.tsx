@@ -134,6 +134,14 @@ describe("EditCollectionDialog", () => {
       "This collection is no longer available. It may already have been deleted."
     );
     expect(
+      within(alertDialog).getByRole("heading", {
+        name: "Collection unavailable",
+      })
+    ).toBeInTheDocument();
+    expect(
+      within(alertDialog).queryByText("Delete this collection?")
+    ).not.toBeInTheDocument();
+    expect(
       within(alertDialog).getByRole("link", { name: "Back to collections" })
     ).toHaveAttribute("href", "/c/collections");
     expect(

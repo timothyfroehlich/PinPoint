@@ -166,22 +166,28 @@ export function EditCollectionDialog({
                   if (deletePending) event.preventDefault();
                 }}
               >
+                <AlertDialogHeader>
+                  <AlertDialogTitle>
+                    {deleteError?.code === "not_found"
+                      ? "Collection unavailable"
+                      : "Delete this collection?"}
+                  </AlertDialogTitle>
+                  {deleteError?.code !== "not_found" && (
+                    <AlertDialogDescription>
+                      This removes the collection and its machine list. The
+                      machines themselves and their issues are not affected.
+                      This cannot be undone.
+                    </AlertDialogDescription>
+                  )}
+                </AlertDialogHeader>
                 {deleteError && (
                   <div
                     role="alert"
-                    className="mb-4 rounded-md border border-destructive/20 bg-destructive/10 p-4 text-destructive-text"
+                    className="rounded-md border border-destructive/20 bg-destructive/10 p-4 text-destructive-text"
                   >
                     <p className="text-sm font-medium">{deleteError.message}</p>
                   </div>
                 )}
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Delete this collection?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    This removes the collection and its machine list. The
-                    machines themselves and their issues are not affected. This
-                    cannot be undone.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
                 <AlertDialogFooter className="gap-2 sm:gap-0">
                   {deleteError?.code === "not_found" ? (
                     <Button asChild>
