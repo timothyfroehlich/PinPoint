@@ -537,13 +537,18 @@ def resolve_supabase_backend(env_file: Path) -> tuple[str, str]:
     """Return (backend, service_host) for this worktree.
 
     Precedence: an explicit switch, then the stored choice, then the
-    environment default, then "local". A remote choice without a configured
-    host falls back to local with a warning rather than failing the checkout.
+    environment default, then "local". The environment default applies only
+    to a worktree without an .env.local yet: an existing worktree that
+    predates the backend key has its stack and data on this machine, so it
+    stays local until someone switches it. A remote choice without a
+    configured host falls back to local with a warning rather than failing
+    the checkout.
     """
+    new_worktree = not env_file.exists()
     candidates = (
         os.environ.get(BACKEND_SWITCH_ENV_KEY),
         _read_managed_value(env_file, BACKEND_ENV_KEY),
-        os.environ.get(BACKEND_ENV_KEY),
+        os.environ.get(BACKEND_ENV_KEY) if new_worktree else "local",
     )
     backend = next((c.strip() for c in candidates if c and c.strip()), "local")
     if backend not in SUPABASE_BACKENDS:

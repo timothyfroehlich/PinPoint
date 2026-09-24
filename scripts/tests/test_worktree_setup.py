@@ -284,6 +284,21 @@ class TestSupabaseBackend:
             "localhost",
         )
 
+    def test_existing_worktree_without_a_stored_choice_stays_local(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Its stack and data live on this machine; the default must not move it."""
+        (tmp_path / ".env.local").write_text(
+            "NEXT_PUBLIC_SUPABASE_URL=http://localhost:54321\n"
+        )
+        monkeypatch.setenv("PINPOINT_SUPABASE_BACKEND", "remote")
+        monkeypatch.setenv("PINPOINT_REMOTE_SUPABASE_HOST", "bazzite")
+
+        assert resolve_supabase_backend(tmp_path / ".env.local") == (
+            "local",
+            "localhost",
+        )
+
     def test_explicit_switch_replaces_the_stored_choice(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
