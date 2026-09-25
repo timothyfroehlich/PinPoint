@@ -17,6 +17,7 @@
 
 import { test, expect } from "../support/fixtures.js";
 import { STORAGE_STATE } from "../support/auth-state.js";
+import { TEST_USERS } from "../support/constants.js";
 import { getTestMachineInitials } from "../support/test-isolation.js";
 import { cleanupTestEntities } from "../support/cleanup.js";
 import {
@@ -45,7 +46,9 @@ test.describe("Pinball Map Insider Connected row (PP-o355.59)", () => {
       const base = Math.floor(Math.random() * 9_000_000) * 10;
       const titleId = 910_000_000 + base;
       const lmxId = 810_000_000 + base;
-      const technicianId = await getProfileIdByEmail("technician@test.com");
+      const technicianId = await getProfileIdByEmail(
+        TEST_USERS.technician.email
+      );
 
       try {
         await createTestMachine(technicianId, initials);
