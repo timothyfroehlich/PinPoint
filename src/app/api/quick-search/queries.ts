@@ -39,9 +39,16 @@ export async function searchQuickNavigation(
   const modelIdentity = sql<
     string | null
   >`coalesce(${pinballmapCatalog.name}, ${machines.modelName})`;
-  const modelManufacturer = sql<
-    string | null
-  >`coalesce(${pinballmapCatalog.manufacturer}, ${machines.manufacturer})`;
+  // The current manufacturer (spec collections-and-tags 8.1), matching what
+  // the machine page and Machine View display.
+  const modelManufacturer = sql<string | null>`case
+    when ${machines.pinballmapMachineId} is not null then
+      case when ${pinballmapCatalog.pinballmapMachineId} is not null
+        then ${pinballmapCatalog.manufacturer}
+        else ${machines.manufacturer}
+      end
+    when ${machines.pinballmapExcluded} then ${machines.manufacturer}
+  end`;
   const modelYear = sql<
     string | null
   >`coalesce(${pinballmapCatalog.year}, ${machines.year})::text`;

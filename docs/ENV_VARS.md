@@ -131,7 +131,8 @@ the degradation is a known, documented choice — not an oversight.
 > us, not data modification. **Deliberately not
 > build-gated:** without it PBM sync degrades and every other surface works, so it
 > fails the §4.1 "is PinPoint broken without this?" test. Setting it does not turn
-> PBM on — `pinballmap_state.enabled` gates that separately (PP-o355.10).
+> PBM on — a stored `pinballmap_state.location_id` gates that separately
+> (`docs/feature-specs/pinballmap.md` §10.5).
 >
 > The one local exception is the manual, GET-only fixture refresh script. Do not
 > add the token to `.env.local`, another file, or a command literal. Inject it
