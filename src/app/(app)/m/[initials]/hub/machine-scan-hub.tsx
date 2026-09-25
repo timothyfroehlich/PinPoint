@@ -93,8 +93,10 @@ function IdentityLink({
  * the hub leaves free (`flex-1` from a zero basis), capped at the image's own
  * height at full width, and never below 120px — below that the hub scrolls.
  * When the band is shorter than the image, the image shrinks to fit
- * (`object-contain`) and a blurred copy fills the sides. Full-bleed on phones;
- * a rounded 390px column from `sm`, matching the hub's width there.
+ * (`object-contain`) and a blurred copy fills the sides. Below `md` it bleeds
+ * 16px past the hub column on each side — viewport-wide on phones, at most
+ * 390 + 32 = 422px — so the height cap uses that width; from `md` it is the
+ * hub's rounded 390px column.
  */
 function ArtworkBand({
   artwork,
@@ -114,7 +116,7 @@ function ArtworkBand({
     <figure
       data-testid="hub-artwork-band"
       style={style}
-      className="relative m-0 -mx-4 -mt-4 min-h-[120px] max-h-[calc(100vw*var(--art-ratio))] flex-1 basis-0 overflow-hidden bg-card sm:mx-0 sm:mt-0 sm:max-h-[calc(390px*var(--art-ratio))] sm:rounded-xl"
+      className="relative m-0 -mx-4 -mt-4 max-h-[calc(min(100vw,422px)*var(--art-ratio))] min-h-[120px] flex-1 basis-0 overflow-hidden bg-card md:mx-0 md:mt-0 md:max-h-[calc(390px*var(--art-ratio))] md:rounded-xl"
     >
       <Image
         src={artwork.url}
@@ -129,7 +131,7 @@ function ArtworkBand({
         src={artwork.url}
         alt=""
         fill
-        sizes="(min-width: 640px) 390px, 100vw"
+        sizes="(min-width: 768px) 390px, 100vw"
         unoptimized
         priority
         className="object-contain"
