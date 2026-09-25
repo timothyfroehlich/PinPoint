@@ -3,6 +3,7 @@ import { eq, notInArray, sql } from "drizzle-orm";
 import { db } from "~/server/db";
 import { machines, issues } from "~/server/db/schema";
 import { CLOSED_STATUSES } from "~/lib/issues/status";
+import { getCurrentManufacturer } from "~/lib/machines/manufacturer";
 
 /**
  * Shared layout data for `/m/[initials]/*`.
@@ -59,6 +60,7 @@ export const getMachineForLayout = cache(async (initials: string) => {
             name: true,
             machineGroupId: true,
             groupName: true,
+            manufacturer: true,
             opdbImageUrl: true,
             opdbImageWidth: true,
             opdbImageHeight: true,
@@ -78,6 +80,10 @@ export const getMachineForLayout = cache(async (initials: string) => {
           ...machine,
           artwork: resolveArtwork(machine.pinballmapTitle),
           modelTitle: resolveModelTitle(machine),
+          // Displayed everywhere on the machine's page so it always matches
+          // the machine's manufacturer tag (spec collections-and-tags 8.5).
+          // `manufacturer` stays the raw stored value for the edit form.
+          currentManufacturer: getCurrentManufacturer(machine),
         }
       : undefined,
     totalIssuesCount: totalIssuesCountResult[0]?.count ?? 0,

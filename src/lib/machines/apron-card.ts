@@ -1,4 +1,8 @@
 import { docToPlainText, type ProseMirrorDoc } from "~/lib/tiptap/types";
+import {
+  getCurrentManufacturer,
+  type MachineManufacturerSource,
+} from "~/lib/machines/manufacturer";
 
 export const APRON_CARD_SIZES = {
   stern: {
@@ -28,9 +32,8 @@ export interface ApronCardContent {
   tipEnabled: boolean;
 }
 
-interface ApronMachineSource {
+interface ApronMachineSource extends MachineManufacturerSource {
   name: string;
-  manufacturer: string | null;
   year: number | null;
   description: ProseMirrorDoc | null;
   apronUseCustomDescription: boolean;
@@ -42,12 +45,16 @@ interface ApronMachineSource {
     name: string;
     machineGroupId: number | null;
     groupName: string | null;
+    manufacturer: string | null;
   } | null;
 }
 
 /** Only grouped Pinball Map families supply edition metadata. */
 export function groupedEdition(
-  title: ApronMachineSource["pinballmapTitle"]
+  title: Pick<
+    NonNullable<ApronMachineSource["pinballmapTitle"]>,
+    "name" | "machineGroupId" | "groupName"
+  > | null
 ): string | null {
   if (title?.machineGroupId === null || !title?.groupName) return null;
   if (!title.name.startsWith(`${title.groupName} `)) return null;
@@ -72,7 +79,8 @@ export function apronCardContent(
   return {
     name: machine.name,
     edition: groupedEdition(machine.pinballmapTitle),
-    manufacturer: machine.manufacturer,
+    // The same manufacturer the machine page and its tag show (spec 8.5).
+    manufacturer: getCurrentManufacturer(machine),
     year: machine.year,
     ownerName: machine.owner?.name ?? null,
     description: machine.apronUseCustomDescription

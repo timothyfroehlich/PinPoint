@@ -18,6 +18,10 @@ import type {
   MachineViewScope,
 } from "~/lib/types";
 import type { TimelineTag } from "~/lib/timeline/machine-tags";
+import {
+  getCurrentManufacturer,
+  groupManufacturerTags,
+} from "~/lib/machines/manufacturer";
 import { getMachineViewPreset, planMachineViewDependencies } from "./config";
 import {
   applyMachineViewState,
@@ -59,7 +63,7 @@ async function machineIdsForScope(
   tx: DbTransaction,
   scope: MachineViewScope
 ): Promise<string[] | null> {
-  if (scope.kind === "all" || scope.kind === "owner") return null;
+  if (scope.kind !== "collection") return null;
   const rows = await tx
     .select({ machineId: collectionMachines.machineId })
     .from(collectionMachines)
@@ -92,6 +96,8 @@ export async function getMachineViewBaseRows(
       modelName: true,
       manufacturer: true,
       year: true,
+      pinballmapMachineId: true,
+      pinballmapExcluded: true,
     },
     with: {
       owner: { columns: { id: true, name: true } },
@@ -102,7 +108,20 @@ export async function getMachineViewBaseRows(
     },
   });
 
-  return rows.map((machine) => {
+  const withManufacturer = rows.map((machine) => ({
+    machine,
+    manufacturer: getCurrentManufacturer(machine),
+  }));
+  // Manufacturer tag membership is derived, so a manufacturer scope loads every
+  // machine and keeps only the tag's members before any filter or search runs.
+  const scopedRows =
+    scope.kind === "manufacturer"
+      ? (groupManufacturerTags(withManufacturer).find(
+          (tag) => tag.slug === scope.slug
+        )?.machines ?? [])
+      : withManufacturer;
+
+  return scopedRows.map(({ machine, manufacturer }) => {
     const owner = machine.owner ?? machine.invitedOwner;
     return {
       id: machine.id,
@@ -112,10 +131,7 @@ export async function getMachineViewBaseRows(
       createdAt: machine.createdAt,
       ownerId: owner?.id ?? null,
       ownerName: owner?.name ?? "Unassigned",
-      manufacturer:
-        machine.pinballmapTitle?.manufacturer ??
-        machine.manufacturer ??
-        "Unknown",
+      manufacturer: manufacturer ?? "Unknown",
       year: machine.pinballmapTitle?.year ?? machine.year,
       canonicalModelName: machine.pinballmapTitle?.name ?? "",
       legacyModelName: machine.modelName ?? "",
@@ -325,25 +341,51 @@ export async function loadMachineViewFromDatabase(
   };
 }
 
+/**
+ * `cache()` keys on argument identity, so a scope crosses it as a kind plus
+ * one id string. These two functions are the only place that pairing lives.
+ */
+function scopeId(scope: MachineViewScope): string {
+  switch (scope.kind) {
+    case "all":
+      return "";
+    case "collection":
+      return scope.collectionId;
+    case "owner":
+      return scope.ownerId;
+    case "manufacturer":
+      return scope.slug;
+  }
+}
+
+function scopeFromId(
+  kind: MachineViewScope["kind"],
+  id: string
+): MachineViewScope {
+  switch (kind) {
+    case "all":
+      return { kind: "all" };
+    case "collection":
+      return { kind: "collection", collectionId: id };
+    case "owner":
+      return { kind: "owner", ownerId: id };
+    case "manufacturer":
+      return { kind: "manufacturer", slug: id };
+  }
+}
+
 const loadMachineViewCached = cache(
   async (
     scopeKind: MachineViewScope["kind"],
-    scopeId: string,
+    id: string,
     preset: MachineViewPresetId,
     serializedSearchParams: string
-  ): Promise<MachineViewResult> => {
-    const scope: MachineViewScope =
-      scopeKind === "all"
-        ? { kind: "all" }
-        : scopeKind === "collection"
-          ? { kind: "collection", collectionId: scopeId }
-          : { kind: "owner", ownerId: scopeId };
-    return loadMachineViewFromDatabase(db, {
-      scope,
+  ): Promise<MachineViewResult> =>
+    loadMachineViewFromDatabase(db, {
+      scope: scopeFromId(scopeKind, id),
       preset,
       searchParams: new URLSearchParams(serializedSearchParams),
-    });
-  }
+    })
 );
 
 export function loadMachineView({
@@ -351,15 +393,9 @@ export function loadMachineView({
   preset,
   searchParams,
 }: LoadMachineViewArgs): Promise<MachineViewResult> {
-  const scopeId =
-    scope.kind === "collection"
-      ? scope.collectionId
-      : scope.kind === "owner"
-        ? scope.ownerId
-        : "";
   return loadMachineViewCached(
     scope.kind,
-    scopeId,
+    scopeId(scope),
     preset,
     searchParams.toString()
   );
