@@ -34,8 +34,10 @@ UNKNOWN: it is printed and nothing is removed on its strength. A dry run exits
 failed or anything it would have acted on was UNKNOWN.
 
 `--branch` limits the run to one worktree and skips orphans (merge-pr.sh).
-`--quiet` prints one nudge line and gives all gh/docker calls a shared time
-budget (the SessionStart hook).
+`--quiet` prints one nudge line (the SessionStart hook). A dry run gives all
+its gh/docker calls a shared time budget, so an unreachable remote daemon reads
+as UNKNOWN instead of stalling the hook or the briefing; `--apply` has none, so
+a removal is never cut off halfway.
 """
 
 import argparse
@@ -79,9 +81,10 @@ TIER_REAP, TIER_REVIEW, TIER_KEEP = "REAP", "REVIEW", "KEEP"
 #: An empty worktree younger than this may be an agent that has not committed.
 EMPTY_MIN_AGE_HOURS = 24
 GH_CONCURRENCY = 12
-#: Under --quiet every gh/docker call shares this budget, so the SessionStart
-#: hook (hard cap 23s inside its 25s settings.json timeout) gets a report.
-QUIET_BUDGET_SECONDS = 20.0
+#: In a dry run every gh/docker call shares this budget, so the SessionStart
+#: hook (hard cap 23s inside its 25s settings.json timeout) and the briefing
+#: get a report even when the remote daemon is asleep.
+REPORT_BUDGET_SECONDS = 20.0
 
 PROJECT_LABEL = "com.supabase.cli.project"
 REMOTE_DOCKER_HOST_ENV = "PINPOINT_REMOTE_DOCKER_HOST"
@@ -571,8 +574,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--quiet",
         action="store_true",
-        help="One nudge line when something is reclaimable or UNKNOWN, plus failures;"
-        f" all gh/docker calls share a {QUIET_BUDGET_SECONDS:.0f}s budget.",
+        help="One nudge line when something is reclaimable or UNKNOWN, plus failures.",
     )
     parser.add_argument("--branch", help="Only this branch's worktree; no orphans.")
     parser.add_argument(
@@ -589,7 +591,7 @@ def main() -> int:
         os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd()
     )
     quiet, apply = args.quiet, args.apply
-    deadline = time.monotonic() + QUIET_BUDGET_SECONDS if quiet else None
+    deadline = None if apply else time.monotonic() + REPORT_BUDGET_SECONDS
 
     def log(message: str) -> None:
         if not quiet:

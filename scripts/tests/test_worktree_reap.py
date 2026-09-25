@@ -785,18 +785,21 @@ def test_an_unreadable_remote_is_unknown_and_holds_slots(
     assert world.slots() == {gone: 5}
 
 
-def test_quiet_bounds_every_docker_call_for_the_session_start_hook(
-    world: World,
+@pytest.mark.parametrize("flags", [("--quiet",), ()], ids=["session-start", "briefing"])
+def test_a_dry_run_bounds_every_docker_call(
+    world: World, flags: tuple[str, ...]
 ) -> None:
-    """A hung remote daemon must read as UNKNOWN before the hook's cap."""
-    world.mp.setattr(reap, "QUIET_BUDGET_SECONDS", 1.0)
+    """A hung remote daemon must read as UNKNOWN before the SessionStart hook's
+    cap, and must not stall the briefing's plain dry run either."""
+    world.mp.setattr(reap, "REPORT_BUDGET_SECONDS", 1.0)
     world.mp.setenv("PINPOINT_REMOTE_DOCKER_HOST", REMOTE)
     world.daemon(REMOTE)["sleep"] = 30
     world.save_docker()
     started = time.monotonic()
 
-    code, _, err = world.run("--quiet")
+    code, _, err = world.run(*flags)
 
     assert time.monotonic() - started < 10
     assert code == reap.EXIT_OK
-    assert f"UNKNOWN, not zero: Supabase stacks on {REMOTE}" in err
+    assert f"Supabase stacks on {REMOTE}" in err
+    assert "UNKNOWN, not zero" in err

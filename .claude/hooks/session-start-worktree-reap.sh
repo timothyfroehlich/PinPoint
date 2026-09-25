@@ -53,12 +53,13 @@ touch "$throttle_file" 2>/dev/null || true
 
 # Hard wall-clock ceiling. macOS doesn't ship coreutils `timeout` by default
 # but `gtimeout` exists when coreutils is installed, and `perl` works
-# everywhere. stdout is discarded; the nudge goes to stderr.
+# everywhere. The script prints its nudge on stderr, but Claude Code only
+# shows a SessionStart hook's stdout, so stderr is sent there.
 reap=(python3 "$reap_script" --quiet --repo-dir "$project_dir")
 if command -v timeout >/dev/null; then
-  timeout 23 "${reap[@]}" >/dev/null || true
+  timeout 23 "${reap[@]}" 2>&1 || true
 elif command -v gtimeout >/dev/null; then
-  gtimeout 23 "${reap[@]}" >/dev/null || true
+  gtimeout 23 "${reap[@]}" 2>&1 || true
 else
   perl -e '
     use strict;
@@ -66,7 +67,7 @@ else
     alarm 23;
     setpgrp 0, 0;
     exec @ARGV
-  ' "${reap[@]}" >/dev/null || true
+  ' "${reap[@]}" 2>&1 || true
 fi
 
 exit 0
