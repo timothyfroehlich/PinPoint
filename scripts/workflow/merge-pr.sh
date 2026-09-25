@@ -111,7 +111,9 @@ fi
 source "$(dirname "$0")/_pr-gates.sh"
 
 # --- PR info (one read, shared by the merged short-circuit and the gates) ---
-PR_INFO=$(gh pr view "$PR" --json author,title,url,labels,headRefOid,mergeable,state,mergedAt,mergeCommit)
+# Read at top level, not in $(...): if GraphQL is refused (Claude Code cloud), this is
+# where _gh-transport.sh switches to REST, and every later read inherits the switch.
+_gh_pr_view_to PR_INFO "$PR" author,title,url,labels,headRefOid,mergeable,state,mergedAt,mergeCommit
 PR_AUTHOR=$(jq -r .author.login <<< "$PR_INFO")
 PR_TITLE=$(jq -r .title <<< "$PR_INFO")
 PR_URL=$(jq -r .url <<< "$PR_INFO")
@@ -231,7 +233,7 @@ run_all_gates() {
   # this is what "the commit the gates approved" means — and it is what
   # --match-head-commit must pin. Merging a head read *after* the loop would hand
   # GitHub a commit that inherited another commit's CI, review and thread state.
-  POLL_HEAD_SHA=$(gh pr view "$PR" --json headRefOid --jq .headRefOid)
+  _gh_pr_view_to POLL_HEAD_SHA "$PR" headRefOid .headRefOid
   run_gate ci          check_ci                  admin
   run_gate threads     check_unresolved_threads  force
   run_gate reviewed    check_review_happened     force
@@ -244,7 +246,7 @@ run_all_gates() {
 # returns control to run_all_gates for a complete exact-head audit.
 poll_waiting_gates() {
   local expected_head=$1 data current_head gate_name
-  if ! data=$(gh pr view "$PR" --json headRefOid,statusCheckRollup,mergeable); then
+  if ! _gh_pr_view_to data "$PR" headRefOid,statusCheckRollup,mergeable; then
     GATE_REPORT="FAIL: polling: could not read compact PR status snapshot"$'\n'
     GATE_FAILURES=("polling")
     GATE_WAITS=()
@@ -313,10 +315,14 @@ drop_ready_label() {
   # command. A stale snapshot would silently skip the removal and break the
   # documented RED contract.
   local labels
-  labels=$(gh pr view "$PR" --json labels --jq '.labels | map(.name) | join(",")' 2>/dev/null || echo "$PR_LABELS")
+  labels=$(_gh_pr_view "$PR" labels '.labels | map(.name) | join(",")' 2>/dev/null || echo "$PR_LABELS")
   if [[ ",$labels," == *",ready-for-review,"* ]]; then
     echo "Removing ready-for-review label..."
-    gh pr edit "$PR" --remove-label ready-for-review 2>/dev/null || true
+    if _gh_rest_mode; then
+      gh api -X DELETE "repos/$(_repo_slug)/issues/${PR}/labels/ready-for-review" >/dev/null 2>&1 || true
+    else
+      gh pr edit "$PR" --remove-label ready-for-review 2>/dev/null || true
+    fi
   fi
 }
 
@@ -452,8 +458,20 @@ if [ "$BYPASS_REQS" = "true" ]; then
   MERGE_ARGS+=(--admin)
 fi
 
+# REST merge (GraphQL refused, Claude Code cloud). `sha` is REST's --match-head-commit:
+# GitHub rejects the merge if head moved. REST has no --admin; a bypass applies only if
+# the token's account is on the ruleset's bypass list, so it is announced, not assumed.
+REST_MERGE_ARGS=()
+if _gh_rest_mode; then
+  REST_MERGE_ARGS=(-X PUT "repos/$(_repo_slug)/pulls/${PR}/merge" -f merge_method=squash -f "sha=$PR_HEAD_SHA")
+fi
+
 if [ "$DRY_RUN" = "true" ]; then
-  echo "DRY RUN: would run: gh pr merge $PR ${MERGE_ARGS[*]}"
+  if _gh_rest_mode; then
+    echo "DRY RUN: would run: gh api ${REST_MERGE_ARGS[*]}"
+  else
+    echo "DRY RUN: would run: gh pr merge $PR ${MERGE_ARGS[*]}"
+  fi
   exit 0
 fi
 
@@ -463,7 +481,14 @@ fi
 # Claude Code and Codex may also show a permission prompt. This `gh pr merge`
 # runs as a subprocess of the script, so the harness deny rules for raw merges
 # never see it; --human is the same-tool guard for that layer.
-gh pr merge "$PR" "${MERGE_ARGS[@]}"
+if _gh_rest_mode; then
+  if [ "$BYPASS_REQS" = "true" ]; then
+    echo "NOTE: REST merge has no --admin; branch-protection bypass depends on the token's ruleset bypass rights."
+  fi
+  gh api "${REST_MERGE_ARGS[@]}" --jq '.message // "merged"'
+else
+  gh pr merge "$PR" "${MERGE_ARGS[@]}"
+fi
 echo "MERGED: PR #$PR"
 
 # --- Reap the merged PR's worktree (fail-open) ---
@@ -481,7 +506,7 @@ echo "MERGED: PR #$PR"
   set +o pipefail
   _REAP_SCRIPT="$(dirname "$0")/../worktree_reap.py"
   [[ -f "$_REAP_SCRIPT" ]] || exit 0
-  _HEAD_REF=$(gh pr view "$PR" --json headRefName --jq .headRefName 2>/dev/null)
+  _HEAD_REF=$(_gh_pr_view "$PR" headRefName .headRefName 2>/dev/null)
   [[ -n "$_HEAD_REF" ]] || exit 0
   _REPO_DIR=$(cd "$(dirname "$0")/../.." && pwd)
   python3 "$_REAP_SCRIPT" --apply --quiet --branch "$_HEAD_REF" --repo-dir "$_REPO_DIR"

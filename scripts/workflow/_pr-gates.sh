@@ -13,6 +13,10 @@
 
 set -euo pipefail
 
+# shellcheck source=./_gh-transport.sh
+# shellcheck disable=SC1091
+source "$(dirname "${BASH_SOURCE[0]}")/_gh-transport.sh"
+
 # The GitHub App identity Codex uses for native pull-request reviews. The account is
 # deliberately exact: accepting an arbitrary bot (or a human who happens to include
 # "codex" in a login) would let a review be forged. A qualifying approval must also name
@@ -36,7 +40,7 @@ readonly CODEX_REACTION_WITNESS_PREFIX="<!-- pinpoint-codex-reaction-witness:"
 _REPO_SLUG_CACHE=""
 _repo_slug() {
   if [ -z "$_REPO_SLUG_CACHE" ]; then
-    _REPO_SLUG_CACHE=$(gh repo view --json nameWithOwner --jq .nameWithOwner) || return 1
+    _REPO_SLUG_CACHE=$(_gh_repo_slug) || return 1
   fi
   printf '%s\n' "$_REPO_SLUG_CACHE"
 }
@@ -292,8 +296,8 @@ _review_summary() {
   local pr=$1
   local owner_repo head base_ref evidence coderabbit codex unresolved pr_view
   owner_repo=$(_repo_slug) || return 1
-  head=$(gh pr view "$pr" --json headRefOid --jq .headRefOid) || return 1
-  pr_view=$(gh pr view "$pr" --json baseRefName 2>/dev/null || true)
+  _gh_pr_view_to head "$pr" headRefOid .headRefOid || return 1
+  _gh_pr_view_to pr_view "$pr" baseRefName 2>/dev/null || pr_view=""
   if jq -e '.baseRefName' <<< "$pr_view" >/dev/null 2>&1; then
     base_ref=$(jq -r '.baseRefName' <<< "$pr_view")
   elif [[ "$pr_view" =~ ^[a-zA-Z0-9._/-]+$ ]]; then
@@ -398,7 +402,7 @@ readonly CI_GATE_SELECT_JQ='
 check_ci() {
   local pr=$1
   local rollup
-  rollup=$(gh pr view "$pr" --json statusCheckRollup --jq "${CI_GATE_SELECT_JQ} // empty")
+  _gh_pr_view_to rollup "$pr" statusCheckRollup "${CI_GATE_SELECT_JQ} // empty"
   if [ -z "$rollup" ]; then
     # Not a failure — GitHub has simply not registered the check run yet, which is
     # the normal state for the first seconds after `gh pr create`. Reporting it as a
@@ -435,12 +439,17 @@ check_ci() {
 
 
 # Number of unresolved review threads, from ANY author, via GraphQL with cursor
-# pagination. Shared by Gate 2 and the review summary's label.
+# pagination. Shared by Gate 2 and the review summary's label. When GraphQL is refused
+# (Claude Code cloud), the count comes from the proxy's REST thread route instead.
 _unresolved_thread_count() {
   local pr=$1
   local owner_repo cursor=""
   local unresolved=0
   local has_next=true
+  if _gh_rest_mode; then
+    _gh_rest_unresolved_thread_count "$pr"
+    return
+  fi
   owner_repo=$(_repo_slug)
   local owner repo
   owner=$(cut -d/ -f1 <<< "$owner_repo")
@@ -449,8 +458,8 @@ _unresolved_thread_count() {
   while [ "$has_next" = "true" ]; do
     local after_arg=""
     [ -n "$cursor" ] && after_arg=", after: \"$cursor\""
-    local resp
-    resp=$(gh api graphql -f query="
+    local resp rc=0
+    _gh_graphql_to resp gh api graphql -f query="
       query {
         repository(owner: \"$owner\", name: \"$repo\") {
           pullRequest(number: $pr) {
@@ -460,7 +469,12 @@ _unresolved_thread_count() {
             }
           }
         }
-      }") || return 1
+      }" || rc=$?
+    if [ "$rc" -eq 99 ]; then
+      _gh_rest_unresolved_thread_count "$pr"
+      return
+    fi
+    [ "$rc" -eq 0 ] || return 1
     local page_unresolved
     page_unresolved=$(jq '[.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved == false)] | length' <<< "$resp")
     unresolved=$((unresolved + page_unresolved))
@@ -559,7 +573,7 @@ check_review_happened() {
 check_no_merge_conflict() {
   local pr=$1
   local mergeable
-  mergeable=$(gh pr view "$pr" --json mergeable --jq .mergeable)
+  _gh_pr_view_to mergeable "$pr" mergeable .mergeable
   case "$mergeable" in
     MERGEABLE)
       echo "PASS: no_conflict: MERGEABLE"
