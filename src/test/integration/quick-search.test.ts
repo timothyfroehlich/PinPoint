@@ -116,6 +116,12 @@ describe("quick search queries", () => {
         manufacturer: "The Bally Company",
         year: 1987,
       }),
+      // Neither linked nor uncataloged: its stored copy is not a manufacturer.
+      createTestMachine({
+        initials: "UND",
+        name: "Q Cabinet",
+        manufacturer: "Bally",
+      }),
     ]);
 
     expect(

@@ -55,7 +55,9 @@ describe("groupedEdition", () => {
 describe("apronCardContent", () => {
   const machine = {
     name: "Godzilla",
-    manufacturer: "Stern",
+    manufacturer: "Old Copy",
+    pinballmapMachineId: 3416,
+    pinballmapExcluded: false,
     year: 2021,
     description: plainTextToDoc("Main description"),
     apronUseCustomDescription: false,
@@ -67,6 +69,7 @@ describe("apronCardContent", () => {
       name: "Godzilla (Premium)",
       machineGroupId: 10,
       groupName: "Godzilla",
+      manufacturer: "Stern",
     },
   };
 
@@ -77,6 +80,10 @@ describe("apronCardContent", () => {
       tip: "Aim for the scoop",
       tipEnabled: false,
     });
+  });
+
+  it("prints the current manufacturer rather than the stored copy", () => {
+    expect(apronCardContent(machine).manufacturer).toBe("Stern");
   });
 
   it("uses the custom description only when selected", () => {

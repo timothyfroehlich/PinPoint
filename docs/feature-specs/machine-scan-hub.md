@@ -49,13 +49,6 @@
 
 - **6.1** Post a score uses the primary token. Report a problem uses the existing `warning` token (amber) with dark text — the color family the Major severity label already uses. No new token is introduced.
 
-## Known divergences
-
-| Requirement | Code today | Resolution |
-| :-- | :-- | :-- |
-| §3.1, §3.6–§3.7, §5.4 | The hub shows no artwork band. | PP-o355.60 |
-| §5.2 | The Open issues card collapses to one row on short screens. | PP-o355.60 |
-
 ## Changelog
 
 | Date | Change |
