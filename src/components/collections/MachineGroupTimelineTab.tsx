@@ -34,7 +34,7 @@ const PAGE_SIZE = 25;
  * - every row carries a B1 machine-attribution line (machineLabel prop)
  * - read-only in v1: no composer, comment rows get canEdit/canDelete false
  *   (the "New Note" + machine picker is PP-slrd.2)
- * - a machine multi-select (?m=GZ,MM) narrows WITHIN the collection
+ * - a machine multi-select (?m=GZ,MM) narrows WITHIN the group
  *
  * Bucketing stays a presentational pass over the fetched page so PP-ynff's
  * day × machine grouped view can drop in as an alternate strategy.
@@ -62,19 +62,19 @@ export async function MachineGroupTimelineTab({
         .flatMap((r) => (r.success ? [r.data] : []))
     : [];
 
-  // Machine scope: `?m=GZ,MM` narrows WITHIN the collection — initials
+  // Machine scope: `?m=GZ,MM` narrows WITHIN the group — initials
   // outside the set are dropped, so the filter can never widen the scope.
-  const collectionByInitials = new Map(machines.map((m) => [m.initials, m]));
+  const groupByInitials = new Map(machines.map((m) => [m.initials, m]));
   const requestedInitials = machineParam
     ? machineParam
         .split(",")
         .map((s) => s.trim())
-        .filter((s) => collectionByInitials.has(s))
+        .filter((s) => groupByInitials.has(s))
     : [];
   const scopedMachines =
     requestedInitials.length > 0
       ? requestedInitials
-          .map((i) => collectionByInitials.get(i))
+          .map((i) => groupByInitials.get(i))
           .filter((m): m is NonNullable<typeof m> => m !== undefined)
       : machines;
 

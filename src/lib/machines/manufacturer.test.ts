@@ -2,9 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   getCurrentManufacturer,
   groupManufacturerTags,
+  manufacturerTagHref,
   manufacturerTagKey,
-  manufacturerTagLink,
-  manufacturerTagSlug,
 } from "./manufacturer";
 
 describe("current machine manufacturer", () => {
@@ -72,10 +71,6 @@ describe("current machine manufacturer", () => {
 });
 
 describe("manufacturer tag groups", () => {
-  it("builds a readable URL segment from the tag key", () => {
-    expect(manufacturerTagSlug("stern electronics")).toBe("stern-electronics");
-  });
-
   it("groups spellings of one manufacturer and names the tag by majority", () => {
     const groups = groupManufacturerTags([
       { id: "a", manufacturer: "Stern" },
@@ -103,18 +98,24 @@ describe("manufacturer tag groups", () => {
     ]);
     expect(group?.name).toBe("Bally");
   });
-});
 
-describe("manufacturer tag link", () => {
-  it("links a machine's manufacturer to its tag page", () => {
-    expect(manufacturerTagLink("Stern Electronics")).toEqual({
-      name: "Stern Electronics",
-      href: "/c/tags/manufacturer/stern-electronics",
-    });
+  it("keeps names that differ only by a hyphen apart with unique addresses", () => {
+    const groups = groupManufacturerTags([
+      { id: "hyphen", manufacturer: "Stern-Electronics" },
+      { id: "space", manufacturer: "Stern Electronics" },
+    ]);
+    expect(
+      groups.map((group) => ({
+        slug: group.slug,
+        ids: group.machines.map((machine) => machine.id),
+      }))
+    ).toEqual([
+      { slug: "stern-electronics", ids: ["space"] },
+      { slug: "stern-electronics-2", ids: ["hyphen"] },
+    ]);
   });
 
-  it("has no link without a manufacturer", () => {
-    expect(manufacturerTagLink(null)).toBeNull();
-    expect(manufacturerTagLink("Unknown")).toBeNull();
+  it("links a tag's page by its URL-encoded address", () => {
+    expect(manufacturerTagHref("a&b")).toBe("/c/tags/manufacturer/a%26b");
   });
 });

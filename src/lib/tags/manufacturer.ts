@@ -62,3 +62,16 @@ export async function getManufacturerTag(
   const tags = await listManufacturerTags(tx);
   return tags.find((tag) => tag.slug === slug) ?? null;
 }
+
+/** The tag a machine belongs to, or null when it has no current manufacturer. */
+export async function getManufacturerTagForMachine(
+  tx: DbTransaction = db,
+  machineId: string
+): Promise<ManufacturerTag | null> {
+  const tags = await listManufacturerTags(tx);
+  return (
+    tags.find((tag) =>
+      tag.machines.some((machine) => machine.id === machineId)
+    ) ?? null
+  );
+}

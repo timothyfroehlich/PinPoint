@@ -19,7 +19,7 @@ export default async function ManufacturerTagOverviewPage({
   if (!tag) notFound();
 
   const result = await loadMachineView({
-    scope: { kind: "tag", tagType: "manufacturer", slug: tag.slug },
+    scope: { kind: "manufacturer", slug: tag.slug },
     preset: "collection",
     searchParams: toMachineViewSearchParams(rawSearchParams),
   });

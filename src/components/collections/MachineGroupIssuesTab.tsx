@@ -27,11 +27,11 @@ export async function MachineGroupIssuesTab({
   });
   const filters = parseIssueFilters(urlParams);
 
-  // Force-scope to the collection. Requested machine filters narrow WITHIN
+  // Force-scope to the group. Requested machine filters narrow WITHIN
   // the set; they can never widen it. Empty scope -> no query (an empty
   // machine[] is dropped by buildWhereConditions, which would unscope).
-  const collectionInitials = machines.map((m) => m.initials);
-  if (collectionInitials.length === 0) {
+  const groupInitials = machines.map((m) => m.initials);
+  if (groupInitials.length === 0) {
     return (
       <p className="py-8 text-center text-sm text-muted-foreground">
         This collection has no machines yet.
@@ -42,14 +42,14 @@ export async function MachineGroupIssuesTab({
   const requested = filters.machine ?? [];
   const scoped =
     requested.length > 0
-      ? requested.filter((i) => collectionInitials.includes(i))
-      : collectionInitials;
+      ? requested.filter((i) => groupInitials.includes(i))
+      : groupInitials;
 
   if (scoped.length === 0) {
-    // The collection has machines, but the requested ?machine= filter selects
+    // The group has machines, but the requested ?machine= filter selects
     // none of them (a stale bookmark or hand-edited param — the filter UI only
-    // offers this collection's machines). Name the cause rather than implying
-    // the collection itself is empty.
+    // offers this group's machines). Name the cause rather than implying
+    // the group itself is empty.
     return (
       <p className="py-8 text-center text-sm text-muted-foreground">
         No issues match the selected machine filter.

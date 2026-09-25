@@ -12,8 +12,11 @@ vi.mock("~/server/db", async () => {
 
 const { loadMachineViewFromDatabase } =
   await import("~/lib/machines/view/queries");
-const { getManufacturerTag, listManufacturerTags } =
-  await import("~/lib/tags/manufacturer");
+const {
+  getManufacturerTag,
+  getManufacturerTagForMachine,
+  listManufacturerTags,
+} = await import("~/lib/tags/manufacturer");
 const { getMachineForLayout } = await import("~/app/(app)/m/[initials]/_data");
 
 /**
@@ -111,11 +114,7 @@ describe("manufacturer tags", () => {
   it("scopes Machine View to the tag's members and lets filters only narrow", async () => {
     const db = await getTestDb();
     const tx = asDbOrTx(db);
-    const scope: MachineViewScope = {
-      kind: "tag",
-      tagType: "manufacturer",
-      slug: "stern",
-    };
+    const scope: MachineViewScope = { kind: "manufacturer", slug: "stern" };
 
     const all = await loadMachineViewFromDatabase(tx, {
       scope,
@@ -184,5 +183,51 @@ describe("manufacturer tags", () => {
     const { machine } = await getMachineForLayout("LNK");
     expect(machine?.currentManufacturer).toBe("Stern");
     expect(machine?.manufacturer).toBe("Old Copy");
+  });
+
+  it("names a machine's tag by the tag's spelling, not the machine's", async () => {
+    const db = await getTestDb();
+    const excluded = await db.query.machines.findFirst({
+      where: (machine, { eq }) => eq(machine.initials, "EXC"),
+      columns: { id: true },
+    });
+    const tag = await getManufacturerTagForMachine(
+      asDbOrTx(db),
+      excluded?.id ?? ""
+    );
+    expect(tag).toMatchObject({ slug: "stern", name: "Stern" });
+  });
+
+  it("scopes a hyphenated name to its own tag", async () => {
+    const db = await getTestDb();
+    await db.insert(machines).values(
+      createTestMachine({
+        initials: "HYP",
+        name: "Hyphenated",
+        pinballmapExcluded: true,
+        manufacturer: "Stern-Electronics",
+      })
+    );
+    await db.insert(machines).values(
+      createTestMachine({
+        initials: "SPC",
+        name: "Spaced",
+        pinballmapExcluded: true,
+        manufacturer: "Stern Electronics",
+      })
+    );
+    const tx = asDbOrTx(db);
+    const load = (slug: string) =>
+      loadMachineViewFromDatabase(tx, {
+        scope: { kind: "manufacturer", slug },
+        preset: "collection",
+        searchParams: new URLSearchParams({ columns: "machine" }),
+      });
+    expect(
+      (await load("stern-electronics")).rows.map((row) => row.initials)
+    ).toEqual(["SPC"]);
+    expect(
+      (await load("stern-electronics-2")).rows.map((row) => row.initials)
+    ).toEqual(["HYP"]);
   });
 });
