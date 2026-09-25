@@ -32,9 +32,10 @@ import { InfoRail } from "./info-rail";
  * player's landing (redesign PP-5sgt.2).
  *
  * Reading order (both breakpoints): Hero (status + presence + Report button +
- * known-issues peek) → reference cluster (Details card: machine description +
- * owner, then Tags / PinballMap placeholders) → recent-activity peek. Desktop
- * is a main column + 320px rail; mobile folds the rail inline after the hero.
+ * known-issues peek) → Description (when set) → reference cluster (Details
+ * card: Model / Pinball Map + owner, then Top Scores / Tags) → recent-activity
+ * peek. Desktop is a main column + 320px rail; mobile folds the rail inline
+ * after the hero.
  *
  * Maintainer/owner-private tools (QR code, Owner's Requirements) live on the
  * Service tab (the maintainer's workbench, PP-5sgt.3) — not here. The player
@@ -80,14 +81,26 @@ export default async function MachineInfoTab({
 
   const machineStatus = deriveMachineStatus(openIssues);
 
-  // Description renders read-only inside the Details card; editing happens on
-  // the Edit Machine page (not inline). Gate on docIsEmpty rather than just
-  // `!== null`: a legacy or semantically-empty ProseMirror doc renders nothing
-  // in RichTextDisplay, but a truthy slot still paints an empty prose block and
-  // a stray divider above the owner row. docIsEmpty covers null, undefined, and
-  // whitespace-only docs.
-  const descriptionSlot = !docIsEmpty(machine.description) ? (
-    <RichTextDisplay content={machine.description} />
+  // Description renders read-only in the main column, under the hero so a long
+  // one never pushes the Report button down; editing happens on the Edit
+  // Machine page (not inline). It lived in the 320px rail until a long one
+  // stretched the rail far below everything in the main column. Gate on docIsEmpty rather than just `!== null`: a legacy or
+  // semantically-empty ProseMirror doc renders nothing in RichTextDisplay, but
+  // the card would still paint an empty box. docIsEmpty covers null, undefined,
+  // and whitespace-only docs.
+  const descriptionCard = !docIsEmpty(machine.description) ? (
+    <section
+      aria-label="Description"
+      data-testid="machine-description-card"
+      className="rounded-xl border border-outline-variant bg-card p-4"
+    >
+      <p className="mb-3 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+        Description
+      </p>
+      <div className="text-sm text-muted-foreground">
+        <RichTextDisplay content={machine.description} />
+      </div>
+    </section>
   ) : null;
 
   // Model — the game's identity, shown to everyone. Unlike the PinballMap card
@@ -180,7 +193,6 @@ export default async function MachineInfoTab({
       owner={machine.owner}
       invitedOwner={machine.invitedOwner}
       addedAt={machine.createdAt}
-      descriptionSlot={descriptionSlot}
       modelName={modelName}
       manufacturer={machine.manufacturer}
       year={machine.year}
@@ -206,10 +218,10 @@ export default async function MachineInfoTab({
     />
   );
 
-  // Single grid in DOM reading order: Hero → reference rail (Details card:
-  // description + owner, then Tags / PinballMap) → recent activity. On mobile
-  // it's one flex column (the rail folds inline after the hero). On desktop the
-  // rail is pinned to the 320px right column, spanning the main column's rows;
+  // Single grid in DOM reading order: Hero → Description → reference rail
+  // (Details card: Model / Pinball Map + owner, then Top Scores / Tags) →
+  // recent activity. On mobile it's one flex column (the rail folds inline
+  // after the description). On desktop the rail is pinned to the 320px right column, spanning the main column's rows;
   // everything else auto-flows down column 1. Rendered once so test ids stay
   // unique.
   return (
@@ -222,6 +234,8 @@ export default async function MachineInfoTab({
         reportHref={`/report?machine=${machine.initials}`}
         serviceHref={`/m/${machine.initials}/maintenance`}
       />
+
+      {descriptionCard}
 
       <aside className="flex flex-col gap-6 md:col-start-2 md:row-start-1 md:row-span-6">
         {rail}

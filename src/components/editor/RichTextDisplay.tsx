@@ -3,6 +3,7 @@ import React from "react";
 import { renderDocToHtml, RENDER_FAILED_SENTINEL } from "~/lib/tiptap/render";
 import { type ProseMirrorDoc } from "~/lib/tiptap/types";
 import { cn } from "~/lib/utils";
+import { RICH_TEXT_CLASSES } from "~/components/editor/rich-text-classes";
 import { RenderFailedPlaceholder } from "~/components/editor/RenderFailedPlaceholder";
 
 interface RichTextDisplayProps {
@@ -40,7 +41,7 @@ export function RichTextDisplay({
 
   return (
     <div
-      className={cn("prose prose-sm prose-invert max-w-none", className)}
+      className={cn(RICH_TEXT_CLASSES, className)}
       dangerouslySetInnerHTML={{ __html: html }}
     />
   );

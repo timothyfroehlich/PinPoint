@@ -23,6 +23,7 @@ import { MentionList, type MentionListRef } from "./MentionList";
 import { EditorToolbar } from "./EditorToolbar";
 import { type ProseMirrorDoc } from "~/lib/tiptap/types";
 import { cn } from "~/lib/utils";
+import { RICH_TEXT_CLASSES } from "~/components/editor/rich-text-classes";
 
 export interface RichTextEditorHandle {
   clear: () => void;
@@ -177,13 +178,13 @@ export const RichTextEditor = forwardRef<
     editorProps: {
       attributes: {
         class: cn(
-          "prose prose-sm prose-invert focus:outline-none max-w-none px-3 py-2",
+          RICH_TEXT_CLASSES,
+          "focus:outline-none px-3 py-2",
           // One line in compact mode, ~3 lines otherwise. Mutually exclusive
           // so the arbitrary-value min-heights never both apply (which made
           // the winner depend on stylesheet order). Compact is "jot" mode, so
-          // it also drops prose's airy rhythm (1.71 leading + tall paragraph
-          // margins) for snug utility-text spacing.
-          compact ? "min-h-[40px] !leading-snug [&_p]:!my-1" : "min-h-[100px]"
+          // it also drops the tall paragraph margins.
+          compact ? "min-h-[40px] [&_p]:!my-1" : "min-h-[100px]"
         ),
         "aria-label": ariaLabel ?? placeholder,
       },

@@ -21,7 +21,10 @@ export function OwnerRequirementsCallout({
     <Alert variant="warning" data-testid="owner-requirements-callout">
       <AlertTriangle className="size-4" />
       <AlertTitle>Owner&apos;s Requirements for {machineName}</AlertTitle>
-      <AlertDescription>
+      {/* Overrides the alert's own paragraph leading so this rich text matches
+          every other rich-text surface (cn's tailwind-merge drops the alert's
+          conflicting class). */}
+      <AlertDescription className="[&_p]:leading-normal">
         <RichTextDisplay content={ownerRequirements} />
       </AlertDescription>
     </Alert>
