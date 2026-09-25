@@ -156,7 +156,7 @@
           {
             "type": "command",
             "command": "python3 \"${CLAUDE_PROJECT_DIR:-.}/scripts/worktree_cleanup.py\" --claude-hook",
-            "timeout": 60
+            "timeout": 400
           }
         ]
       }
@@ -179,7 +179,7 @@
           {
             "type": "command",
             "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/session-start-orphan-sweep.sh",
-            "timeout": 15
+            "timeout": 25
           },
           {
             "type": "command",
