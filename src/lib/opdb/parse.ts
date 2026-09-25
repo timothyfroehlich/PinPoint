@@ -88,15 +88,22 @@ export function parseOpdbEntry(raw: unknown): OpdbMachine | null {
  * The export is `{ entries: [...] }`. A payload without that array throws: it
  * is not an empty export, it is the wrong document, and the caller must keep
  * the copy it already has.
+ *
+ * Entries are unique by OPDB ID, the later one winning. A repeated ID would
+ * otherwise fail the whole upsert, since one statement cannot update the same
+ * row twice, and every daily refresh after it would fail the same way.
  */
 export function parseOpdbExport(raw: unknown): OpdbMachine[] {
   const entries = asRecord(raw)?.["entries"];
   if (!Array.isArray(entries)) {
     throw new Error("OPDB export payload missing entries array");
   }
-  return entries
-    .map(parseOpdbEntry)
-    .filter((m): m is OpdbMachine => m !== null);
+  const byId = new Map<string, OpdbMachine>();
+  for (const entry of entries) {
+    const machine = parseOpdbEntry(entry);
+    if (machine) byId.set(machine.opdbId, machine);
+  }
+  return [...byId.values()];
 }
 
 /**

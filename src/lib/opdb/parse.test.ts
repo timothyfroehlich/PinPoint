@@ -75,6 +75,14 @@ describe("parseOpdbExport", () => {
     ).toHaveLength(1);
   });
 
+  it("keeps one entry per OPDB ID, the later one winning", () => {
+    const parsed = parseOpdbExport({
+      entries: [funhouse, { ...funhouse, playerCount: 2 }],
+    });
+    expect(parsed).toHaveLength(1);
+    expect(parsed[0]?.playerCount).toBe(2);
+  });
+
   it("throws on a payload that is not the export", () => {
     expect(() => parseOpdbExport({ machines: [] })).toThrow(/entries/);
     expect(() => parseOpdbExport([funhouse])).toThrow(/entries/);
