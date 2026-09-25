@@ -45,6 +45,10 @@ interface Props {
  * carries the Pinball Map mark and the commenter is a Pinball Map username,
  * not a PinPoint profile, so it is plain text rather than a hover card.
  *
+ * A comment whose Pinball Map entry has ended for good carries a note beside
+ * the tag (spec 7.3, 10.9), so a reader knows it may no longer describe the
+ * game before reading it.
+ *
  * The footer carries, in order: the required attribution linking to the
  * location's Pinball Map listing (9.1), the other cabinets showing the same
  * comment when the entry is shared (7.6), and the one conversion — either the
@@ -86,6 +90,11 @@ export function MachineTimelinePinballMapCommentRow({
               {pinballmapCommenterName(comment.username)}
             </span>
             <TagPill tag="pinballmap" />
+            {comment.previousListing ? (
+              <span className="inline-flex items-center rounded-md border border-border px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                Note: From a Previous Listing
+              </span>
+            ) : null}
           </div>
           {rightMeta ? (
             <span className="ml-auto whitespace-nowrap tabular-nums text-muted-foreground">
