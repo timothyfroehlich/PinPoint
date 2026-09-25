@@ -27,12 +27,9 @@ from pathlib import Path
 # Constants
 # =============================================================================
 
-DEFAULT_INSTALL_TIMEOUT = 120  # seconds
-
 # Failure classes for dependency setup
 FAILURE_CLASS_MISSING_TOOL = "missing-tool"
 FAILURE_CLASS_TIMEOUT = "timeout"
-FAILURE_CLASS_NETWORK = "network"
 FAILURE_CLASS_INSTALL = "install"
 FAILURE_CLASS_TOOLCHAIN_CONFIG = "toolchain-config"
 
@@ -178,18 +175,6 @@ class PortConfig:
 # =============================================================================
 
 
-def load_manifest() -> dict[str, int]:
-    """Load the slot manifest, creating it if missing. Tolerates corruption."""
-    if not MANIFEST_PATH.exists():
-        MANIFEST_PATH.parent.mkdir(parents=True, exist_ok=True)
-        MANIFEST_PATH.write_text(json.dumps({"version": 1, "slots": {}}, indent=2))
-    try:
-        data = json.loads(MANIFEST_PATH.read_text())
-        return data.get("slots", {})
-    except (json.JSONDecodeError, KeyError):
-        return {}
-
-
 def slot_ports_in_use(slot: int) -> bool:
     """Whether the slot's Supabase API or DB port still accepts a connection.
 
@@ -258,7 +243,7 @@ def reserved_slots() -> set[int]:
 
 
 def allocate_slot(worktree_path: str) -> int:
-    """Allocate the lowest free slot for a worktree, with file locking."""
+    """Return the worktree's slot, allocating the lowest free one if it has none."""
     MANIFEST_PATH.parent.mkdir(parents=True, exist_ok=True)
 
     if not MANIFEST_PATH.exists():
@@ -283,12 +268,6 @@ def allocate_slot(worktree_path: str) -> int:
             raise RuntimeError(f"No free port slots (all {MAX_SLOT} in use)")
         finally:
             fcntl.flock(f, fcntl.LOCK_UN)
-
-
-def get_existing_slot(worktree_path: str) -> int | None:
-    """Get the slot for a worktree that's already in the manifest."""
-    slots = load_manifest()
-    return slots.get(worktree_path)
 
 
 # =============================================================================
@@ -878,10 +857,13 @@ def _probe_version(
 
 def collect_runtime_diagnostics(
     toolchain: BootstrapToolchain | None = None,
-    *,
-    probe_path_tools: bool = True,
 ) -> RuntimeDiagnostics:
-    """Collect paths and versions for python, node, pnpm, and git."""
+    """Collect paths and versions for python, node, pnpm, and git.
+
+    Node and pnpm come only from the resolved toolchain, never from PATH: this
+    runs in a branch-controlled worktree, where probing PATH could re-enter an
+    untrusted mise shim.
+    """
     py_info = RuntimeInfo(path=sys.executable, version=platform.python_version())
 
     if toolchain is not None:
@@ -891,14 +873,6 @@ def collect_runtime_diagnostics(
         pnpm_info = RuntimeInfo(
             path=str(toolchain.pnpm_path), version=toolchain.pnpm_version
         )
-    elif probe_path_tools:
-        node_path = shutil.which("node")
-        node_ver = _probe_version(node_path, ["--version"]) if node_path else None
-        node_info = RuntimeInfo(path=node_path, version=node_ver)
-
-        pnpm_path = shutil.which("pnpm")
-        pnpm_ver = _probe_version(pnpm_path, ["--version"]) if pnpm_path else None
-        pnpm_info = RuntimeInfo(path=pnpm_path, version=pnpm_ver)
     else:
         node_info = RuntimeInfo(path=None, version=None)
         pnpm_info = RuntimeInfo(path=None, version=None)
@@ -1076,39 +1050,13 @@ def resolve_preinstalled_toolchain(
     return toolchain, None, None
 
 
-NETWORK_ERROR_PATTERNS = [
-    re.compile(r"\bENOTFOUND\b", re.IGNORECASE),
-    re.compile(r"\bETIMEDOUT\b", re.IGNORECASE),
-    re.compile(r"\bECONNREFUSED\b", re.IGNORECASE),
-    re.compile(r"\bECONNRESET\b", re.IGNORECASE),
-    re.compile(r"\bEAI_AGAIN\b", re.IGNORECASE),
-    re.compile(r"\bgetaddrinfo\b", re.IGNORECASE),
-    re.compile(r"fetch failed", re.IGNORECASE),
-    re.compile(r"ERR_PNPM_FETCH_", re.IGNORECASE),
-    re.compile(r"network error", re.IGNORECASE),
-    re.compile(r"request to .* failed", re.IGNORECASE),
-    re.compile(r"CERT_HAS_EXPIRED", re.IGNORECASE),
-]
-
-
-def classify_install_failure(returncode: int, stdout: str, stderr: str) -> str:
-    """Classify the failure reason of a dependency install invocation."""
-    combined = f"{stdout}\n{stderr}"
-    for pat in NETWORK_ERROR_PATTERNS:
-        if pat.search(combined):
-            return FAILURE_CLASS_NETWORK
-    return FAILURE_CLASS_INSTALL
-
-
 DEFAULT_INSTALL_TIMEOUT: int = 120
 MAX_INSTALL_TIMEOUT: int = 150
 
 
 def resolve_install_timeout() -> int:
     """Determine the install timeout budget in seconds (capped at MAX_INSTALL_TIMEOUT)."""
-    env_val = os.environ.get("PINPOINT_WORKTREE_INSTALL_TIMEOUT") or os.environ.get(
-        "WORKTREE_INSTALL_TIMEOUT"
-    )
+    env_val = os.environ.get("PINPOINT_WORKTREE_INSTALL_TIMEOUT")
     if env_val:
         try:
             val = int(env_val)
@@ -1158,12 +1106,11 @@ def install_dependencies(
         if res.returncode == 0:
             return True, None, None
 
-        failure_class = classify_install_failure(res.returncode, res.stdout, res.stderr)
         lines = (res.stderr or res.stdout).strip().splitlines()
         last_line = lines[-1] if lines else f"exit code {res.returncode}"
         return (
             False,
-            failure_class,
+            FAILURE_CLASS_INSTALL,
             f"pnpm install failed (exit {res.returncode}): {last_line}",
         )
     except subprocess.TimeoutExpired:
@@ -1382,23 +1329,13 @@ def main() -> int:
         )
         toolchain_failure = (failure_class, detail)
 
-    # Never probe Node or pnpm through PATH from this branch-controlled
-    # worktree. A failed exact resolution can otherwise re-enter an untrusted
-    # mise shim merely while formatting diagnostics.
-    diagnostics = collect_runtime_diagnostics(toolchain, probe_path_tools=False)
+    diagnostics = collect_runtime_diagnostics(toolchain)
     print(f"worktree_setup: runtimes: {diagnostics.format_summary()}", file=sys.stderr)
 
     branch = get_branch()
     configure_branch_tracking(branch, worktree_path)
     project_id = resolve_project_id(worktree_path, branch)
-    worktree_key = str(worktree_path)
-
-    # Check if we already have a slot (branch switch) or need a new one (fresh worktree)
-    existing_slot = get_existing_slot(worktree_key)
-    if existing_slot is not None:
-        slot = existing_slot
-    else:
-        slot = allocate_slot(worktree_key)
+    slot = allocate_slot(str(worktree_path))
 
     port_config = PortConfig(slot=slot, project_id=project_id, name=branch)
 

@@ -18,7 +18,6 @@ from worktree_setup import (
     EXIT_READY,
     FAILURE_CLASS_INSTALL,
     FAILURE_CLASS_MISSING_TOOL,
-    FAILURE_CLASS_NETWORK,
     FAILURE_CLASS_TIMEOUT,
     FAILURE_CLASS_TOOLCHAIN_CONFIG,
     LOCAL_SUPABASE_PUBLISHABLE_KEY,
@@ -32,13 +31,11 @@ from worktree_setup import (
     RuntimeInfo,
     allocate_slot,
     branch_to_project_id,
-    classify_install_failure,
     collect_runtime_diagnostics,
     derive_project_id,
     generate_config_toml,
     generate_launch_json,
     install_dependencies,
-    load_manifest,
     main,
     merge_env_local,
     parse_env_file,
@@ -630,12 +627,6 @@ class TestManifest:
 
         monkeypatch.setattr("worktree_setup.socket.create_connection", fake_connect)
 
-    def test_load_creates_file_if_missing(self) -> None:
-        assert not self.manifest_path.exists()
-        slots = load_manifest()
-        assert slots == {}
-        assert self.manifest_path.exists()
-
     def test_prune_removes_nonexistent_paths(self, tmp_path: Path) -> None:
         existing_dir = tmp_path / "exists"
         existing_dir.mkdir()
@@ -992,23 +983,6 @@ class TestRuntimeDiagnostics:
         assert isinstance(diag.pnpm, RuntimeInfo)
         assert isinstance(diag.git, RuntimeInfo)
 
-    def test_path_tool_probes_can_be_disabled(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        original_which = shutil.which
-
-        def guarded_which(tool: str) -> str | None:
-            if tool in {"node", "pnpm"}:
-                pytest.fail(f"must not probe {tool} through PATH")
-            return original_which(tool)
-
-        monkeypatch.setattr("worktree_setup.shutil.which", guarded_which)
-
-        diag = collect_runtime_diagnostics(probe_path_tools=False)
-
-        assert diag.node == RuntimeInfo(path=None, version=None)
-        assert diag.pnpm == RuntimeInfo(path=None, version=None)
-
     def test_format_summary_with_all_runtimes(self) -> None:
         diag = RuntimeDiagnostics(
             python=RuntimeInfo(path="/usr/bin/python3", version="3.14.0"),
@@ -1032,35 +1006,6 @@ class TestRuntimeDiagnostics:
         summary = diag.format_summary()
         assert "node=<not found>" in summary
         assert "pnpm=<not found>" in summary
-
-
-class TestClassifyInstallFailure:
-    """Test failure classification of install outcomes."""
-
-    @pytest.mark.parametrize(
-        "error_snippet",
-        [
-            "getaddrinfo ENOTFOUND registry.npmjs.org",
-            "ETIMEDOUT connecting to registry",
-            "ECONNREFUSED 127.0.0.1:4873",
-            "ECONNRESET by peer",
-            "EAI_AGAIN failed to resolve host",
-            "ERR_PNPM_FETCH_404 registry error",
-            "TypeError: fetch failed",
-            "network error while downloading tarball",
-            "request to https://registry.npmjs.org failed",
-            "CERT_HAS_EXPIRED",
-        ],
-    )
-    def test_classifies_network_failures(self, error_snippet: str) -> None:
-        result = classify_install_failure(1, "", error_snippet)
-        assert result == FAILURE_CLASS_NETWORK
-
-    def test_classifies_general_install_failure(self) -> None:
-        result = classify_install_failure(
-            1, "", "ERR_PNPM_OUTDATED_LOCKFILE Cannot install with --frozen-lockfile"
-        )
-        assert result == FAILURE_CLASS_INSTALL
 
 
 class TestBootstrapToolVersions:
@@ -1290,28 +1235,6 @@ class TestInstallDependencies:
         assert failure_class == FAILURE_CLASS_INSTALL
         assert "pnpm install failed (exit 1)" in (detail or "")
 
-    def test_network_failure_classified(
-        self,
-        tmp_path: Path,
-        monkeypatch: pytest.MonkeyPatch,
-        toolchain: BootstrapToolchain,
-    ) -> None:
-        import subprocess
-
-        mock_res = subprocess.CompletedProcess(
-            args=["pnpm", "install"],
-            returncode=1,
-            stdout="",
-            stderr="getaddrinfo ENOTFOUND registry.npmjs.org\n",
-        )
-        monkeypatch.setattr(
-            "worktree_setup.subprocess.run", lambda *args, **kwargs: mock_res
-        )
-
-        is_ready, failure_class, detail = install_dependencies(tmp_path, toolchain)
-        assert is_ready is False
-        assert failure_class == FAILURE_CLASS_NETWORK
-
     def test_timeout_returns_timeout_failure(
         self,
         tmp_path: Path,
@@ -1343,10 +1266,6 @@ class TestInstallDependencies:
         assert resolve_install_timeout() == MAX_INSTALL_TIMEOUT
 
         monkeypatch.delenv("PINPOINT_WORKTREE_INSTALL_TIMEOUT", raising=False)
-        monkeypatch.setenv("WORKTREE_INSTALL_TIMEOUT", "75")
-        assert resolve_install_timeout() == 75
-
-        monkeypatch.delenv("WORKTREE_INSTALL_TIMEOUT", raising=False)
         assert resolve_install_timeout() == DEFAULT_INSTALL_TIMEOUT
 
 
