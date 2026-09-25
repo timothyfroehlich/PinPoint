@@ -70,6 +70,13 @@ export type MachineTimelineEventData =
         | "accepted_removal";
       lmxId: number | null;
     }
+  // === sourceType='pinballmap' — imported Pinball Map comment (PP-o355.4) ===
+  //
+  // One copy per covering machine timeline (pinballmap spec 7.1). The row
+  // carries only the Pinball Map condition id; the comment itself, its author,
+  // and its conversion live once in `pinballmap_comments` and are resolved at
+  // read time, so every copy shows the same conversion (spec 7.8).
+  | { kind: "pinballmap_comment"; conditionId: number }
   // === sourceType='issue' (duplicate-written from issue actions) ===
   | {
       kind: "issue_opened";
@@ -164,10 +171,16 @@ export type MachineIssueEventData = Extract<
   { kind: MachineIssueEventKind }
 >;
 
+/** Imported Pinball Map comment copy (rendered by MachineTimelinePinballMapCommentRow). */
+export type MachinePinballMapCommentEventData = Extract<
+  MachineTimelineEventData,
+  { kind: "pinballmap_comment" }
+>;
+
 /** Lifecycle event variants (rendered by MachineTimelineSystemRow). */
 export type MachineLifecycleEventData = Exclude<
   MachineTimelineEventData,
-  { kind: MachineIssueEventKind }
+  { kind: MachineIssueEventKind | "pinballmap_comment" }
 >;
 
 /**
@@ -194,4 +207,11 @@ export function isMachineIssueEvent(
     default:
       return false;
   }
+}
+
+/** Type predicate: narrow MachineTimelineEventData to an imported Pinball Map comment. */
+export function isPinballMapCommentEvent(
+  data: MachineTimelineEventData
+): data is MachinePinballMapCommentEventData {
+  return data.kind === "pinballmap_comment";
 }

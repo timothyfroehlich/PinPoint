@@ -4,7 +4,7 @@ import { z } from "zod";
  * Tag enum for `timeline_events.tag`.
  *
  * Ordered by family so the dropdown reads coherently:
- *   - Reserved (system-emitted): lifecycle, issue
+ *   - Reserved (system-emitted): lifecycle, issue, settings, pinballmap
  *   - Hands-on work:             maintenance, adjustment, parts, upgrade
  *   - Care:                      cleaning
  *   - Observation:               inspection, note
@@ -18,6 +18,7 @@ export const TIMELINE_TAGS = [
   "lifecycle",
   "issue",
   "settings",
+  "pinballmap",
   "maintenance",
   "adjustment",
   "parts",
@@ -48,6 +49,7 @@ export const RESERVED_TAGS = [
   "lifecycle",
   "issue",
   "settings",
+  "pinballmap",
 ] as const satisfies readonly TimelineTag[];
 
 export type ReservedTag = (typeof RESERVED_TAGS)[number];
@@ -66,6 +68,7 @@ const TAG_LABELS: Record<TimelineTag, string> = {
   lifecycle: "Lifecycle",
   issue: "Issue",
   settings: "Settings",
+  pinballmap: "Pinball Map",
   maintenance: "Maintenance",
   adjustment: "Adjustment",
   parts: "Parts",

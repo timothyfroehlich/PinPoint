@@ -2,10 +2,14 @@ import type React from "react";
 
 import { MachineTimelineCommentRow } from "./MachineTimelineCommentRow";
 import { MachineTimelineIssueRow } from "./MachineTimelineIssueRow";
+import { MachineTimelinePinballMapCommentRow } from "./MachineTimelinePinballMapCommentRow";
 import { MachineTimelineSystemRow } from "./MachineTimelineSystemRow";
 import { MachineTimelineTombstoneRow } from "./MachineTimelineTombstoneRow";
 import type { MachineLabel } from "./MachineAttributionLine";
-import { isMachineIssueEvent } from "~/lib/timeline/machine-event-types";
+import {
+  isMachineIssueEvent,
+  isPinballMapCommentEvent,
+} from "~/lib/timeline/machine-event-types";
 import type { MachineTimelineRow } from "~/lib/timeline/machine-events";
 
 interface TimelineRowProps {
@@ -30,11 +34,17 @@ interface TimelineRowProps {
    */
   commentCanEdit: boolean;
   commentCanDelete: boolean;
+  /**
+   * Whether the viewer may convert an imported Pinball Map comment to an issue
+   * (pinballmap spec 7.5). Read-only feeds omit it.
+   */
+  canConvertPinballMapComment?: boolean;
 }
 
 /**
  * Dispatches a single timeline row to the right presentational row component
- * (tombstone / comment / issue-event / system) and builds its props. Shared by
+ * (tombstone / comment / Pinball Map comment / issue-event / system) and
+ * builds its props. Shared by
  * the per-machine and collection timeline pages so the row-shape mapping lives
  * in one place; each page supplies only the per-row inputs that legitimately
  * differ — attribution line, initials source, and comment permissions.
@@ -47,6 +57,7 @@ export function TimelineRow({
   machineInitials,
   commentCanEdit,
   commentCanDelete,
+  canConvertPinballMapComment = false,
 }: TimelineRowProps): React.JSX.Element | null {
   const labelProp = machineLabel !== undefined ? { machineLabel } : {};
   const dateLabelProp = rowDateLabel !== undefined ? { rowDateLabel } : {};
@@ -85,9 +96,27 @@ export function TimelineRow({
     );
   }
 
+  // Imported Pinball Map comment (PP-o355.4).
+  if (row.pinballmapComment && row.machineId) {
+    return (
+      <MachineTimelinePinballMapCommentRow
+        row={{
+          id: row.id,
+          machineId: row.machineId,
+          createdAt: row.createdAt,
+          comment: row.pinballmapComment,
+        }}
+        canConvert={canConvertPinballMapComment}
+        showRelativeTime={showRelativeTime}
+        {...dateLabelProp}
+        {...labelProp}
+      />
+    );
+  }
+
   // Issue-side events get the two-line treatment (`AFM-03 Title` + badges);
   // lifecycle events keep the single-line system row.
-  if (row.eventData) {
+  if (row.eventData && !isPinballMapCommentEvent(row.eventData)) {
     if (isMachineIssueEvent(row.eventData)) {
       return (
         <MachineTimelineIssueRow

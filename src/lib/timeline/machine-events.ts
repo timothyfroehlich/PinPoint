@@ -33,7 +33,9 @@ import type { ProseMirrorDoc } from "~/lib/tiptap/types";
 import { db, type DbTransaction } from "~/server/db";
 import {
   invitedUsers,
+  issues,
   machines,
+  pinballmapComments,
   timelineEventPeople,
   timelineEvents,
   userProfiles,
@@ -54,7 +56,8 @@ export type TimelinePersonRef =
  * All valid values for `timeline_events.source_type`. Used as the column's
  * `$type` annotation in the schema so reads/writes are statically checked.
  */
-export type TimelineEventSourceType = SystemSourceType | "comment";
+export type TimelineEventSourceType =
+  SystemSourceType | "comment" | "pinballmap";
 
 export interface CreateTimelineEventArgs {
   sourceType: SystemSourceType;
@@ -288,6 +291,28 @@ export interface ResolvedMachineRef {
   initials: string;
 }
 
+/**
+ * An imported Pinball Map comment, resolved from `pinballmap_comments` for one
+ * timeline copy (PP-o355.4). Every copy of the same comment resolves to the
+ * same conversion (pinballmap spec 7.8).
+ */
+export interface ResolvedPinballMapComment {
+  conditionId: number;
+  comment: string;
+  /** Pinball Map username; null for operator/admin entries. */
+  username: string | null;
+  /** The Pinball Map location the comment was left at — its attribution link. */
+  locationId: number;
+  /** The issue this comment was converted to, at its current machine. */
+  convertedIssue: {
+    machineInitials: string;
+    issueNumber: number;
+    title: string;
+  } | null;
+  /** Other machines whose timelines carry a copy of this comment (spec 7.6). */
+  otherCopies: ResolvedMachineRef[];
+}
+
 export interface MachineTimelineRow {
   id: string;
   machineId: string | null;
@@ -316,6 +341,102 @@ export interface MachineTimelineRow {
    * keyed by machine id. `{}` for events that reference no other machine.
    */
   machineRefs: Record<string, ResolvedMachineRef>;
+  /** The imported comment for a `pinballmap` row; null for every other row. */
+  pinballmapComment: ResolvedPinballMapComment | null;
+}
+
+interface PinballMapCommentCopy extends ResolvedMachineRef {
+  machineId: string;
+}
+
+type ResolvedPinballMapCommentRecord = Omit<
+  ResolvedPinballMapComment,
+  "otherCopies"
+> & { copies: PinballMapCommentCopy[] };
+
+/**
+ * Resolve the imported Pinball Map comments behind a page of timeline rows:
+ * the comment itself, its conversion, and the other machines holding a copy.
+ * Keyed by condition id. Two queries regardless of page size.
+ */
+async function resolvePinballMapComments(
+  tx: DbTransaction,
+  rows: readonly {
+    machineId: string | null;
+    eventData: MachineTimelineEventData | null;
+  }[]
+): Promise<Map<number, ResolvedPinballMapCommentRecord>> {
+  const conditionIds = [
+    ...new Set(
+      rows.flatMap((r) =>
+        r.eventData?.kind === "pinballmap_comment"
+          ? [r.eventData.conditionId]
+          : []
+      )
+    ),
+  ];
+  const out = new Map<number, ResolvedPinballMapCommentRecord>();
+  if (conditionIds.length === 0) return out;
+
+  const commentRows = await tx
+    .select({
+      conditionId: pinballmapComments.conditionId,
+      comment: pinballmapComments.comment,
+      username: pinballmapComments.username,
+      locationId: pinballmapComments.locationId,
+      issueInitials: issues.machineInitials,
+      issueNumber: issues.issueNumber,
+      issueTitle: issues.title,
+    })
+    .from(pinballmapComments)
+    .leftJoin(issues, eq(pinballmapComments.convertedIssueId, issues.id))
+    .where(inArray(pinballmapComments.conditionId, conditionIds));
+
+  const conditionIdText = sql<string>`${timelineEvents.eventData}->>'conditionId'`;
+  const copyRows = await tx
+    .select({
+      conditionId: conditionIdText,
+      machineId: machines.id,
+      name: machines.name,
+      initials: machines.initials,
+    })
+    .from(timelineEvents)
+    .innerJoin(machines, eq(timelineEvents.machineId, machines.id))
+    .where(
+      and(
+        eq(timelineEvents.sourceType, "pinballmap"),
+        inArray(conditionIdText, conditionIds.map(String))
+      )
+    )
+    .orderBy(machines.initials);
+  const copiesByCondition = new Map<number, PinballMapCommentCopy[]>();
+  for (const c of copyRows) {
+    const conditionId = Number(c.conditionId);
+    const list = copiesByCondition.get(conditionId) ?? [];
+    list.push({ machineId: c.machineId, name: c.name, initials: c.initials });
+    copiesByCondition.set(conditionId, list);
+  }
+
+  for (const c of commentRows) {
+    out.set(c.conditionId, {
+      conditionId: c.conditionId,
+      comment: c.comment,
+      username: c.username,
+      locationId: c.locationId,
+      convertedIssue:
+        c.issueInitials !== null &&
+        c.issueNumber !== null &&
+        c.issueTitle !== null
+          ? {
+              machineInitials: c.issueInitials,
+              issueNumber: c.issueNumber,
+              title: c.issueTitle,
+            }
+          : null,
+      copies: copiesByCondition.get(c.conditionId) ?? [],
+    });
+  }
+  return out;
 }
 
 /**
@@ -452,6 +573,8 @@ export async function getMachineTimeline(
     }
   }
 
+  const pinballmapByCondition = await resolvePinballMapComments(tx, rows);
+
   // Validate `tag` against the enum at this read boundary — the DB column is
   // unconstrained `text` (`$type<TimelineTag>()` is a compile-time hint only),
   // so a legacy/manual row could carry an out-of-enum value. Drop it rather
@@ -473,11 +596,27 @@ export async function getMachineTimeline(
       const m = machineById.get(refId);
       if (m) machineRefs[refId] = m;
     }
+    let pinballmapComment: ResolvedPinballMapComment | null = null;
+    if (ed?.kind === "pinballmap_comment") {
+      const resolved = pinballmapByCondition.get(ed.conditionId);
+      // A copy whose comment record is missing has nothing to show; drop it
+      // rather than render an empty row.
+      if (!resolved) continue;
+      const { copies, ...comment } = resolved;
+      // "Other" depends on which machine's timeline is reading the copy.
+      pinballmapComment = {
+        ...comment,
+        otherCopies: copies
+          .filter((m) => m.machineId !== r.machineId)
+          .map(({ name, initials }) => ({ name, initials })),
+      };
+    }
     out.push({
       ...r,
       tag: parsedTag.data,
       people: peopleByEvent.get(r.id) ?? {},
       machineRefs,
+      pinballmapComment,
     });
   }
   return out;
