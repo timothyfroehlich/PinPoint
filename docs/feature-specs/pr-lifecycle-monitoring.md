@@ -101,7 +101,10 @@
 - **8.9** Re-evaluating an updated commit head with CodeRabbit requires an explicit re-review request (`@coderabbitai review`).
 - **8.10** Codex never initiates a review automatically on draft promotion or commit push; Codex reviews are triggered strictly via explicit manual request (`@codex review`).
 - **8.11** A review request is anchored to an exact 40-character commit head SHA and is never issued more than once for the same commit head.
-- **8.12** Pushing new commits to a pull request branch immediately invalidates all previous review coverage; the updated head requires replacement review evidence.
+- **8.12** Pushing new commits to a pull request branch immediately invalidates all previous review coverage; the updated head requires replacement review evidence. Two exceptions: a commit that only merges main keeps an earlier approval, and §8.15 describes when a review keeps covering a minor-fix commit.
+- **8.13** Before promoting a pull request out of draft, the owning agent runs a local Claude Code review (`/code-review` at medium effort) on the current head and fixes or declines each finding. The local review is not review coverage (§8.3).
+- **8.14** The owning agent promotes a pull request out of draft only after that local review is complete and CI passes on the head that results.
+- **8.15** A CodeRabbit review of an earlier commit keeps covering a later head when all of these hold: every finding in that review is labeled Minor severity and Quick win effort; every CodeRabbit thread from that review has a reply and is resolved; every later commit either only merges main or changes only files that carry a CodeRabbit thread from that review, with at most 30 changed lines in total; and CI passes on the later head.
 
 ---
 
@@ -144,6 +147,8 @@
 | 7.4 | Local execution telemetry (harness, model, wake count, elapsed duration) | Removed 2026-09-24 with the MCP wrapper and watcher agents, the only sources of harness, model, and wake data; nothing read the `tmp/gh-monitor/watcher-run-*.json` records. | Delete 7.4 (requirement diff needs Tim's approval) |
 | 9.2–9.4 | The review monitor flags CodeRabbit rate limiting and directs the Codex fallback | `pr-watch.py` does not read CodeRabbit's `Review rate limited` comment; a rate-limited review runs the watch to `timed_out`, and the owning agent reads the comment and falls back to Codex by hand (`pinpoint-pr-workflow` §3.4) | Detect the rate-limit comment in `pr-watch.py --phase review` and return an actionable verdict naming the Codex fallback |
 | 10.1–10.5 | Concurrent in-progress review detection and notification | `pr-watch.py` and `_review_summary` report individual checker records without in-progress status checks or concurrent notices | Add concurrent status tracking to `pr-watch.py --phase review` and `_review_summary` |
+| 8.13–8.14 | Local Claude Code review before draft promotion | Agent instructions (AGENTS.md §5, `pinpoint-pr-workflow` Phase 3) still promote a draft as soon as CI passes | Update the agent instructions (PP-nsa2) |
+| 8.15 | A Minor, Quick-win CodeRabbit review keeps covering minor-fix commits | The merge gate treats any later non-merge commit as uncovered | Implement in the review gate (PP-u00n) |
 | 11.1–11.2 | Actionable prompt and comment count extraction | Reviewers' raw markdown bodies are not parsed into terminal payloads | Implement CodeRabbit prompt extraction in `pr-watch.py --phase review` |
 
 ---
@@ -152,6 +157,7 @@
 
 | Date | Amendment |
 | :-- | :-- |
+| 2026-09-24 | Local Claude Code review before draft promotion (§8.13–§8.14); a Minor, Quick-win CodeRabbit review keeps covering minor-fix commits (§8.15); §8.12 names the main-merge and minor-fix exceptions. |
 | 2026-09-24 | Drop local owner attestation as a review provider (§1, §8.3, §8.4, §9.3): only CodeRabbit and Codex cover a head; the owner merges a PR without that coverage by directing a forced merge. |
 | 2026-09-16 | Amend spec to add automated review requirements (§8–§11): CodeRabbit default review, draft-promotion auto-trigger, manual re-reviews and Codex requests, 5/hr rate limits and fallback, concurrent review first-success reporting with in-progress notices, and prompt extraction. |
 | 2026-09-12 | Clarify §2.1: watch is defined by four core parameters with optional title for diagnostic logging. |
