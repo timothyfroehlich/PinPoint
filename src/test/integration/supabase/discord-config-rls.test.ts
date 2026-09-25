@@ -150,8 +150,15 @@ describe("Discord integration config RLS", () => {
     expect(error).toBeNull();
     expect(Array.isArray(data)).toBe(true);
     expect(data?.length).toBe(1);
-    // Expand migration compatibility: the previous serving deployment still
-    // expects this return column until the follow-up contract migration.
-    expect(data?.[0]).toHaveProperty("enabled");
+    // 0085 removed the legacy enabled flag from the row shape; configuration
+    // presence (guild_id + bot_token) is the only activation signal.
+    expect(Object.keys(data?.[0] ?? {}).sort()).toEqual([
+      "bot_health_status",
+      "bot_token",
+      "guild_id",
+      "invite_link",
+      "last_bot_check_at",
+      "updated_at",
+    ]);
   });
 });
