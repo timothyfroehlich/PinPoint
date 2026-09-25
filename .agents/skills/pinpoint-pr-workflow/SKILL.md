@@ -193,6 +193,8 @@ python3 scripts/workflow/pr-watch.py <PR> --phase review --expected-head <HEAD_S
 
 The owning agent stays assigned through the whole loop: monitor current-head CI and review, address or explicitly decline every finding, resolve every thread, push fixes, and request a replacement review only after replacement CI succeeds. Never request the same head twice or hand off an unreviewed PR.
 
+An exact-head finding-bearing **Codex** review is also terminal once every thread is explicitly adjudicated and resolved; declining a finding without a push does not require another review. CodeRabbit covers a head only with its native `APPROVED` review; its finding-bearing review never does, even after every thread is resolved.
+
 #### Merging without a review
 
 Only CodeRabbit and Codex cover a head. When Tim reviewed a PR himself, or wants it merged without a review, he says so explicitly, and you run the guarded merge with `--force`:

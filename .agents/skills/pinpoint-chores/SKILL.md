@@ -76,7 +76,7 @@ Then work the checklist. For each item, note findings as a comment on the bead (
 2. **TypeScript compiler maintenance**
    - TypeScript 7 is installed as `typescript`; its native `tsc` runs the app, test, E2E, and Next build type checks. Read `docs/plans/2026-06-27-typescript-7-upgrade-plan.md` only for the rollout record.
    - When bumping `typescript`, run `pnpm run typecheck`, `pnpm run typecheck:tests`, `pnpm run typecheck:e2e`, and `pnpm run build`.
-   - When bumping `oxlint` / `oxlint-tsgolint`, run `pnpm run lint` (the sole lint engine; see `AGENTS.md` § "Lint engine (Oxlint)").
+   - When bumping `oxlint` / `oxlint-tsgolint`, run `pnpm run lint` (the sole lint engine).
 
 3. **Dependabot updates**
    - Review open Dependabot PRs (`gh pr list --author "app/dependabot"`). Merge the safe ones via the normal PR workflow; file a bead for any that need real work.
