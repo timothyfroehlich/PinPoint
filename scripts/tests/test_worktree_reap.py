@@ -1,22 +1,22 @@
-"""Classifier tests for worktree_reap.py (PP-49x5).
+"""End-to-end tests for worktree_reap.py (PP-49x5, PP-5o7b).
 
-This script deletes worktrees, so the only thing worth testing hard is the
-predicate that decides which ones. Two mistakes in it destroy real work:
+The command deletes worktrees and Docker resources, so these tests pin the
+predicates that decide what goes:
 
-1. **Treating "no open PR + clean" as finished.** That rule is indistinguishable
-   from an agent that is working right now and has not opened its PR yet. A reap
-   must rest on *positive proof* — merged-SHA equality, or zero commits ahead of
-   `origin/main` — never on the absence of a PR.
-2. **Testing mergedness with `git merge-base --is-ancestor`.** PinPoint
-   squash-merges, so a merged branch's commits are never ancestors of `main`.
-   An is-ancestor implementation returns "not merged" for *every* merged branch
-   — it fails safe, but it also makes the tool useless, and the temptation to
-   then relax the predicate is how the destructive version gets written.
-   `test_squash_merged_branch_is_still_reaped` is the guard.
+- A finished worktree is reaped only on positive proof: merged-SHA equality
+  (never `merge-base --is-ancestor`: PinPoint squash-merges, so a merged tip is
+  never an ancestor of `main`), or "carries nothing" (clean, zero commits ahead,
+  a day old). The absence of a PR proves nothing — an agent mid-task has none.
+- An orphan is a project_id no live worktree claims, and a slot is released
+  only once its stack is gone and its ports are closed.
+- A failed `gh` or Docker query is UNKNOWN, never zero: it is reported, and
+  nothing is removed on its strength.
 
-Real throwaway git repositories with real worktrees, so the commit graph
-questions get real answers; `gh` is stubbed on PATH, so no test ever reaches
-GitHub. `worktree_cleanup.py` is stubbed too — nothing here removes anything.
+Real throwaway git repositories and worktrees. `gh` and `docker` are stubs on
+PATH — the docker stub plays both daemons (keyed by DOCKER_HOST) and, like
+Podman, rejects `volume ls --format '{{.Label ...}}'`. `worktree_cleanup.py` is
+a stub and the slot manifest a temp file: nothing here reaches GitHub, a real
+Docker daemon, or the real manifest.
 """
 
 import json
@@ -25,6 +25,7 @@ import stat
 import subprocess
 import sys
 import time
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -33,7 +34,10 @@ pytestmark = pytest.mark.integration
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+import worktree_cleanup  # noqa: E402
 import worktree_reap as reap  # noqa: E402
+
+REMOTE = "ssh://bazzite"
 
 GH_STUB = """#!/usr/bin/env bash
 printf "%s\\n" "$PWD" >> "$GH_STUB_CWDS"
@@ -51,6 +55,39 @@ file="$GH_STUB_DIR/${branch//\\//__}.json"
 if [[ -f "$file" ]]; then cat "$file"; else echo "[]"; fi
 """
 
+DOCKER_STUB = """#!PYTHON
+import json, os, sys, time
+args = sys.argv[1:]
+host = os.environ.get("DOCKER_HOST", "local")
+with open(os.environ["DOCKER_STUB_LOG"], "a") as log:
+    log.write(json.dumps([host, *args]) + "\\n")
+daemon = json.load(open(os.environ["DOCKER_STUB_STATE"])).get(host, {})
+time.sleep(daemon.get("sleep", 0))
+kind = args[0] if args[0] in ("ps", "rm") else " ".join(args[:2])
+if kind in daemon.get("fail", {}):
+    code, message = daemon["fail"][kind]
+    print(message, file=sys.stderr)
+    sys.exit(code)
+if kind == "volume ls" and any(".Label" in a for a in args):
+    print("Error: template: ls:1:23: executing \\"ls\\" at <.Label>: can't evaluate "
+          "field Label in type *types.VolumeListReport", file=sys.stderr)
+    sys.exit(125)
+volumes = dict(daemon.get("volumes", []))
+if kind == "volume ls":
+    print("\\n".join(volumes))
+elif kind == "volume inspect":
+    print("\\n".join(f"{n}|{volumes[n]}" for n in args[4:] if n in volumes))
+elif kind == "ps":
+    print("\\n".join("|".join(row) for row in daemon.get("containers", [])))
+"""
+
+FAKE_CLEANUP = """import json, sys
+target = sys.argv[1]
+open(CALLS, "a").write(target + "\\n")
+print("fake cleanup ran for " + target, file=sys.stderr)
+sys.exit(json.load(open(CODES)).get(target, 0))
+"""
+
 
 def git(*args: str, cwd: Path) -> str:
     result = subprocess.run(
@@ -59,65 +96,72 @@ def git(*args: str, cwd: Path) -> str:
     return result.stdout.strip()
 
 
-def age(worktree: Path, hours: float) -> Path:
-    """Backdate the worktree's `.git` file, which reap reads as its creation time."""
-    stamp = time.time() - hours * 3600
-    os.utime(worktree / ".git", (stamp, stamp))
-    return worktree
+def executable(path: Path, content: str) -> None:
+    path.write_text(content)
+    path.chmod(path.stat().st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
 
 
 class World:
-    """An origin + a checkout + as many worktrees as a test needs."""
+    """An origin, a checkout, its worktrees, and stubbed gh/docker/cleanup."""
 
-    def __init__(self, tmp_path: Path) -> None:
-        self.root = tmp_path
-        self.origin = tmp_path / "origin.git"
-        self.repo = tmp_path / "repo"
-        self.worktrees = tmp_path / "worktrees"
-        self.gh_data = tmp_path / "ghdata"
-        self.gh_cwds = tmp_path / "gh-cwds"
-        self.gh_data.mkdir()
-        self.worktrees.mkdir()
-
+    def __init__(self, root: Path) -> None:
+        self.root = root
+        self.repo = root / "repo"
+        self.bin = root / "bin"
+        self.gh_data = root / "ghdata"
+        self.gh_cwds = root / "gh-cwds"
+        self.docker_state_file = root / "docker-state.json"
+        self.docker_log = root / "docker-log.jsonl"
+        self.manifest = root / "worktree-slots.json"
+        self.cleanup_calls_file = root / "cleanup-calls"
+        self.cleanup_codes = root / "cleanup-codes.json"
+        self.cleanup_script = root / "fake_cleanup.py"
+        self.open_slots: set[int] = set()
+        self.mp: pytest.MonkeyPatch
+        self.capsys: pytest.CaptureFixture[str]
+        self.docker: dict[str, dict[str, object]] = {}
+        for directory in (self.repo, self.bin, self.gh_data):
+            directory.mkdir()
         subprocess.run(
-            ["git", "init", "--bare", "-b", "main", str(self.origin)],
+            ["git", "init", "--bare", "-b", "main", str(root / "origin.git")],
             check=True,
             capture_output=True,
         )
-        self.repo.mkdir()
         git("init", "-b", "main", cwd=self.repo)
         git("config", "user.email", "test@example.invalid", cwd=self.repo)
         git("config", "user.name", "Test", cwd=self.repo)
         git("config", "commit.gpgsign", "false", cwd=self.repo)
-        git("remote", "add", "origin", str(self.origin), cwd=self.repo)
+        git("remote", "add", "origin", str(root / "origin.git"), cwd=self.repo)
         self.commit_on_main("README.md", "hello\n")
-        git("push", "-u", "origin", "main", cwd=self.repo)
+        executable(self.bin / "gh", GH_STUB)
+        executable(self.bin / "docker", DOCKER_STUB.replace("PYTHON", sys.executable))
+        self.cleanup_script.write_text(
+            f"CALLS = {str(self.cleanup_calls_file)!r}\n"
+            f"CODES = {str(self.cleanup_codes)!r}\n" + FAKE_CLEANUP
+        )
+        self.fake_cleanup({})
+        self.save_docker()
 
-        bin_dir = tmp_path / "bin"
-        bin_dir.mkdir()
-        gh = bin_dir / "gh"
-        gh.write_text(GH_STUB)
-        gh.chmod(gh.stat().st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
-        self.bin_dir = bin_dir
+    # --- git and gh ---
 
-    def commit_on_main(self, name: str, content: str) -> str:
+    def commit_on_main(self, name: str, content: str) -> None:
+        (self.repo / name).parent.mkdir(parents=True, exist_ok=True)
         (self.repo / name).write_text(content)
         git("add", name, cwd=self.repo)
         git("commit", "-m", f"main: {name}", cwd=self.repo)
-        return git("rev-parse", "HEAD", cwd=self.repo)
+        git("push", "-u", "origin", "main", cwd=self.repo)
 
     def add_worktree(
         self, branch: str, path: Path | None = None, age_hours: float = 48
     ) -> Path:
-        path = path or self.worktrees / branch.replace("/", "__")
+        """A worktree on a new `branch`, or detached at origin/main for ""."""
+        path = path or self.root / "worktrees" / (branch.replace("/", "__") or "head")
         path.parent.mkdir(parents=True, exist_ok=True)
-        git("worktree", "add", str(path), "-b", branch, cwd=self.repo)
-        return age(path, age_hours)
-
-    def add_detached_worktree(self, name: str) -> Path:
-        path = self.worktrees / name
-        git("worktree", "add", "--detach", str(path), "origin/main", cwd=self.repo)
-        return age(path, 48)
+        where = ["-b", branch, str(path)] if branch else ["--detach", str(path)]
+        git("worktree", "add", *where, "origin/main", cwd=self.repo)
+        stamp = time.time() - age_hours * 3600  # reap reads `.git`'s mtime as age
+        os.utime(path / ".git", (stamp, stamp))
+        return path
 
     def commit_in(self, worktree: Path, name: str, content: str) -> str:
         (worktree / name).write_text(content)
@@ -130,734 +174,629 @@ class World:
         target.write_text(json.dumps(list(prs)))
 
     def add_prototype_scaffold_to_main(self) -> None:
-        prototype_root = self.repo / "src/app/(dev)/prototype"
-        prototype_root.mkdir(parents=True)
-        self.commit_on_main(
-            "src/app/(dev)/prototype/layout.tsx", "export default null;\n"
-        )
+        self.commit_on_main("src/app/(dev)/prototype/layout.tsx", "export {};\n")
         self.commit_on_main(
             ".gitignore",
             ".prototype-mode\n"
             "/src/app/(dev)/prototype/**\n"
             "!/src/app/(dev)/prototype/layout.tsx\n",
         )
-        git("push", "origin", "main", cwd=self.repo)
+
+    def fake_cleanup(self, codes: dict[str, int]) -> None:
+        self.cleanup_codes.write_text(json.dumps(codes))
+
+    def cleanup_calls(self) -> list[str]:
+        if not self.cleanup_calls_file.exists():
+            return []
+        return self.cleanup_calls_file.read_text().splitlines()
+
+    # --- docker and slots ---
+
+    def daemon(self, host: str) -> dict[str, object]:
+        return self.docker.setdefault(host, {"containers": [], "volumes": []})
+
+    def save_docker(self) -> None:
+        self.docker_state_file.write_text(json.dumps(self.docker))
+
+    def add_stack(
+        self, pid: str, workdir: str = "", host: str = "local", running: bool = True
+    ) -> None:
+        """A project with one db volume and, unless stopped, one container."""
+        daemon = self.daemon(host)
+        if running:
+            daemon["containers"].append([f"supabase_db_{pid}", pid, workdir])  # type: ignore[union-attr]
+        daemon["volumes"].append([f"supabase_db_{pid}", pid])  # type: ignore[union-attr]
+        self.save_docker()
+
+    def fail(self, kind: str, code: int, message: str, host: str = "local") -> None:
+        self.daemon(host).setdefault("fail", {})[kind] = [code, message]  # type: ignore[index]
+        self.save_docker()
+
+    def docker_calls(self, host: str = "local") -> list[list[str]]:
+        if not self.docker_log.exists():
+            return []
+        rows = [json.loads(line) for line in self.docker_log.read_text().splitlines()]
+        return [row[1:] for row in rows if row[0] == host]
+
+    def removals(self, host: str = "local") -> list[list[str]]:
+        return [
+            call
+            for call in self.docker_calls(host)
+            if call[0] == "rm" or call[:2] in (["network", "rm"], ["volume", "rm"])
+        ]
+
+    def run(self, *extra: str) -> tuple[int, str, str]:
+        """Run reap in-process; returns (exit code, stdout, stderr)."""
+        argv = ["worktree_reap.py", "--repo-dir", str(self.repo), *extra]
+        self.mp.setattr(sys, "argv", argv)
+        code = reap.main()
+        captured = self.capsys.readouterr()
+        return code, captured.out, captured.err
+
+    def gone(self, name: str) -> str:
+        """A worktree path on this machine (under HOME) that no longer exists."""
+        return str(self.root / "gone" / name)
+
+    def set_slots(self, slots: dict[str, int]) -> None:
+        self.manifest.write_text(json.dumps({"version": 1, "slots": slots}))
+
+    def slots(self) -> dict[str, int]:
+        return json.loads(self.manifest.read_text())["slots"]
 
 
 @pytest.fixture
-def world(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> World:
+def world(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> World:
     built = World(tmp_path)
-    monkeypatch.setenv("PATH", f"{built.bin_dir}{os.pathsep}{os.environ['PATH']}")
+    monkeypatch.setenv("PATH", f"{built.bin}{os.pathsep}{os.environ['PATH']}")
     monkeypatch.setenv("GH_STUB_DIR", str(built.gh_data))
     monkeypatch.setenv("GH_STUB_CWDS", str(built.gh_cwds))
-    monkeypatch.delenv("GH_STUB_FAIL", raising=False)
-    # The cwd guard would otherwise depend on where pytest was launched from.
-    monkeypatch.chdir(tmp_path)
-    # Defence-in-depth only, and a real /proc scan makes results depend on what
-    # else is running on the host. Tests that care about it patch it back.
+    monkeypatch.setenv("DOCKER_STUB_STATE", str(built.docker_state_file))
+    monkeypatch.setenv("DOCKER_STUB_LOG", str(built.docker_log))
+    # Gone worktree paths under tmp_path count as this machine's.
+    monkeypatch.setenv("HOME", str(tmp_path))
+    for name in (
+        "GH_STUB_FAIL",
+        "DOCKER_HOST",
+        "DOCKER_CONTEXT",
+        "PINPOINT_REMOTE_DOCKER_HOST",
+        "PINPOINT_REMOTE_SUPABASE_HOST",
+        "PINPOINT_SUPABASE_BACKEND",
+    ):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setattr(worktree_cleanup, "MANIFEST_PATH", built.manifest)
+    monkeypatch.setattr(reap, "CLEANUP_SCRIPT", built.cleanup_script)
+    monkeypatch.setattr(
+        reap, "slot_ports_in_use", lambda slot: slot in built.open_slots
+    )
+    # A real /proc scan depends on the host; tests that care patch it back.
     monkeypatch.setattr(reap, "live_process_cwds", lambda: (set(), None))
+    monkeypatch.chdir(tmp_path)  # the cwd guard must not see pytest's cwd
+    built.mp, built.capsys = monkeypatch, capsys
     return built
 
 
-def run_reap(
-    world: World,
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-    *extra: str,
-) -> tuple[int, str, str]:
-    monkeypatch.setattr(
-        sys, "argv", ["worktree_reap.py", "--repo-dir", str(world.repo), *extra]
-    )
-    code = reap.main()
-    captured = capsys.readouterr()
-    return code, captured.out, captured.err
-
-
 def tier_of(stderr: str, branch: str) -> str:
-    """Read one branch's tier back out of the dry-run report."""
+    """Read one branch's tier back out of the report."""
     section = None
     for line in stderr.splitlines():
-        if line.startswith("REAP ("):
-            section = reap.TIER_REAP
-        elif line.startswith("REVIEW —"):
-            section = reap.TIER_REVIEW
-        elif line.startswith("KEEP —"):
-            section = reap.TIER_KEEP
-        elif line.strip().startswith(f"- {branch} ["):
+        for tier in (reap.TIER_REAP, reap.TIER_REVIEW, reap.TIER_KEEP):
+            if line.startswith(f"{tier} ") or line.startswith(f"{tier}:"):
+                section = tier
+        if line.strip().startswith(f"- {branch} ["):
             assert section is not None
             return section
     raise AssertionError(f"{branch} not present in report:\n{stderr}")
 
 
-class TestMergedTier:
-    """A merged PR only earns a reap when HEAD *is* the SHA that merged."""
+def merged(number: int, sha: str) -> dict[str, object]:
+    return {"number": number, "state": "MERGED", "headRefOid": sha}
 
-    def test_merged_pr_at_the_merged_sha_with_a_clean_tree_is_reaped(
-        self,
-        world: World,
-        monkeypatch: pytest.MonkeyPatch,
-        capsys: pytest.CaptureFixture[str],
-    ) -> None:
-        wt = world.add_worktree("feat/landed")
-        sha = world.commit_in(wt, "feature.py", "print(1)\n")
-        world.set_prs(
-            "feat/landed",
-            {"number": 10, "state": "MERGED", "headRefOid": sha},
-        )
 
-        code, _, err = run_reap(world, monkeypatch, capsys)
+# --- Finished worktrees ------------------------------------------------------
 
-        assert code == reap.EXIT_OK, err
-        assert tier_of(err, "feat/landed") == reap.TIER_REAP
-        assert "[merged" in err
 
-    def test_squash_merged_branch_is_still_reaped(
-        self,
-        world: World,
-        monkeypatch: pytest.MonkeyPatch,
-        capsys: pytest.CaptureFixture[str],
-    ) -> None:
-        """The regression guard: an is-ancestor implementation FAILS this.
-
-        The squash commit on `main` carries the same content under a different
-        SHA, so the branch tip is not reachable from `origin/main` — exactly the
-        shape of every merged PinPoint branch. SHA equality against the PR's
-        `headRefOid` is the only test that answers correctly here.
-        """
-        wt = world.add_worktree("feat/squashed")
-        sha = world.commit_in(wt, "feature.py", "print(1)\n")
-        world.set_prs(
-            "feat/squashed",
-            {"number": 11, "state": "MERGED", "headRefOid": sha},
-        )
-        # The squash landing: same content, new SHA, on main.
-        world.commit_on_main("feature.py", "print(1)\n")
-        git("push", "origin", "main", cwd=world.repo)
-
-        ancestor = subprocess.run(
-            ["git", "-C", str(wt), "merge-base", "--is-ancestor", sha, "origin/main"],
-            capture_output=True,
-        )
-        assert ancestor.returncode != 0, "premise: a squashed tip is not an ancestor"
-
-        code, _, err = run_reap(world, monkeypatch, capsys)
-
-        assert code == reap.EXIT_OK, err
-        assert tier_of(err, "feat/squashed") == reap.TIER_REAP
-
-    def test_commits_after_the_merge_downgrade_to_review(
-        self,
-        world: World,
-        monkeypatch: pytest.MonkeyPatch,
-        capsys: pytest.CaptureFixture[str],
-    ) -> None:
-        wt = world.add_worktree("feat/kept-going")
-        merged_sha = world.commit_in(wt, "feature.py", "print(1)\n")
-        world.set_prs(
-            "feat/kept-going",
-            {"number": 12, "state": "MERGED", "headRefOid": merged_sha},
-        )
-        world.commit_in(wt, "more.py", "print(2)\n")
-
-        code, _, err = run_reap(world, monkeypatch, capsys)
-
-        assert code == reap.EXIT_OK, err
-        assert tier_of(err, "feat/kept-going") == reap.TIER_REVIEW
-        assert "commits after the merge" in err
-
-    def test_dirty_tree_downgrades_a_merged_worktree_to_review(
-        self,
-        world: World,
-        monkeypatch: pytest.MonkeyPatch,
-        capsys: pytest.CaptureFixture[str],
-    ) -> None:
-        wt = world.add_worktree("feat/dirty")
-        sha = world.commit_in(wt, "feature.py", "print(1)\n")
-        world.set_prs(
-            "feat/dirty", {"number": 13, "state": "MERGED", "headRefOid": sha}
-        )
-        (wt / "feature.py").write_text("print(1)\nprint('uncommitted')\n")
-
-        code, _, err = run_reap(world, monkeypatch, capsys)
-
-        assert code == reap.EXIT_OK, err
-        assert tier_of(err, "feat/dirty") == reap.TIER_REVIEW
-        assert "working tree is dirty" in err
-
-
-class TestEmptyTier:
-    """No PR is never itself evidence — only "carries nothing" is."""
-
-    def test_no_pr_and_zero_commits_ahead_is_reaped(
-        self,
-        world: World,
-        monkeypatch: pytest.MonkeyPatch,
-        capsys: pytest.CaptureFixture[str],
-    ) -> None:
-        world.add_worktree("worktree-bridge-idle")
-
-        code, _, err = run_reap(world, monkeypatch, capsys)
-
-        assert code == reap.EXIT_OK, err
-        assert tier_of(err, "worktree-bridge-idle") == reap.TIER_REAP
-        assert "[empty" in err
-
-    def test_an_empty_worktree_younger_than_a_day_is_kept(
-        self,
-        world: World,
-        monkeypatch: pytest.MonkeyPatch,
-        capsys: pytest.CaptureFixture[str],
-    ) -> None:
-        """A running agent's brand-new worktree has no commits yet. It must survive."""
-        world.add_worktree("worktree-agent-just-started", age_hours=1)
-
-        code, _, err = run_reap(world, monkeypatch, capsys)
-
-        assert code == reap.EXIT_OK, err
-        assert tier_of(err, "worktree-agent-just-started") == reap.TIER_KEEP
-        assert "no commits yet, created 1h ago" in err
-
-    def test_no_pr_with_a_commit_is_review_not_reap(
-        self,
-        world: World,
-        monkeypatch: pytest.MonkeyPatch,
-        capsys: pytest.CaptureFixture[str],
-    ) -> None:
-        """An agent mid-task has commits and no PR yet. It must survive."""
-        wt = world.add_worktree("feat/in-progress")
-        world.commit_in(wt, "wip.py", "print('wip')\n")
-
-        code, _, err = run_reap(world, monkeypatch, capsys)
-
-        assert code == reap.EXIT_OK, err
-        assert tier_of(err, "feat/in-progress") == reap.TIER_REVIEW
-        assert "1 commit(s) ahead of origin/main" in err
-
-    def test_a_closed_unmerged_pr_is_not_evidence_that_anything_landed(
-        self,
-        world: World,
-        monkeypatch: pytest.MonkeyPatch,
-        capsys: pytest.CaptureFixture[str],
-    ) -> None:
-        """CLOSED is judged exactly like "no PR" — on what the branch carries."""
-        wt = world.add_worktree("feat/abandoned")
-        sha = world.commit_in(wt, "wip.py", "print('wip')\n")
-        world.set_prs(
-            "feat/abandoned", {"number": 14, "state": "CLOSED", "headRefOid": sha}
-        )
-
-        code, _, err = run_reap(world, monkeypatch, capsys)
-
-        assert code == reap.EXIT_OK, err
-        assert tier_of(err, "feat/abandoned") == reap.TIER_REVIEW
-        assert "1 commit(s) ahead of origin/main" in err
-
-    def test_a_detached_worktree_at_origin_main_is_reaped_as_empty(
-        self,
-        world: World,
-        monkeypatch: pytest.MonkeyPatch,
-        capsys: pytest.CaptureFixture[str],
-    ) -> None:
-        """No branch means no ref a PR could point at — a known "no PR", not unknown."""
-        world.add_detached_worktree("detached-residue")
-
-        code, _, err = run_reap(world, monkeypatch, capsys)
-
-        assert code == reap.EXIT_OK, err
-        assert tier_of(err, "(detached)") == reap.TIER_REAP
-        assert "[empty" in err
-
-    def test_untracked_file_alone_blocks_the_empty_reap(
-        self,
-        world: World,
-        monkeypatch: pytest.MonkeyPatch,
-        capsys: pytest.CaptureFixture[str],
-    ) -> None:
-        """The sharpest real case: a plan doc that exists nowhere else on disk.
-
-        Zero commits ahead and no PR, so every other signal says "residue". The
-        untracked file is the only thing standing between it and deletion.
-        """
-        wt = world.add_worktree("worktree-bridge-with-notes")
-        (wt / "PLAN.md").write_text("the only copy of this document\n")
-
-        code, _, err = run_reap(world, monkeypatch, capsys)
-
-        assert code == reap.EXIT_OK, err
-        assert tier_of(err, "worktree-bridge-with-notes") == reap.TIER_REVIEW
-        assert (wt / "PLAN.md").exists()
-
-    def test_gitignored_files_do_not_count_as_dirt(
-        self,
-        world: World,
-        monkeypatch: pytest.MonkeyPatch,
-        capsys: pytest.CaptureFixture[str],
-    ) -> None:
-        """Every worktree carries generated `.env.local` / `supabase/config.toml`.
-
-        If those read as dirt, nothing is ever reapable and the tool is inert.
-        """
-        world.commit_on_main(".gitignore", ".env.local\n")
-        git("push", "origin", "main", cwd=world.repo)
-        wt = world.add_worktree("worktree-bridge-generated")
-        (wt / ".env.local").write_text("PORT=3010\n")
-
-        code, _, err = run_reap(world, monkeypatch, capsys)
-
-        assert code == reap.EXIT_OK, err
-        assert tier_of(err, "worktree-bridge-generated") == reap.TIER_REAP
-
-    def test_permanent_prototype_layout_does_not_block_the_empty_reap(
-        self,
-        world: World,
-        monkeypatch: pytest.MonkeyPatch,
-        capsys: pytest.CaptureFixture[str],
-    ) -> None:
-        world.add_prototype_scaffold_to_main()
-        world.add_worktree("worktree-bridge-prototype-layout")
-
-        code, _, err = run_reap(world, monkeypatch, capsys)
-
-        assert code == reap.EXIT_OK, err
-        assert tier_of(err, "worktree-bridge-prototype-layout") == reap.TIER_REAP
-
-    def test_ignored_prototype_marker_blocks_the_empty_reap(
-        self,
-        world: World,
-        monkeypatch: pytest.MonkeyPatch,
-        capsys: pytest.CaptureFixture[str],
-    ) -> None:
-        world.add_prototype_scaffold_to_main()
-        wt = world.add_worktree("worktree-bridge-prototype-marker")
-        marker = wt / ".prototype-mode"
-        marker.write_text("# Prototype mode\n")
-        assert git("status", "--porcelain", cwd=wt) == ""
-
-        code, _, err = run_reap(world, monkeypatch, capsys)
-
-        assert code == reap.EXIT_OK, err
-        assert tier_of(err, "worktree-bridge-prototype-marker") == reap.TIER_REVIEW
-        assert marker.exists()
-
-    def test_ignored_disposable_prototype_route_blocks_the_empty_reap(
-        self,
-        world: World,
-        monkeypatch: pytest.MonkeyPatch,
-        capsys: pytest.CaptureFixture[str],
-    ) -> None:
-        world.add_prototype_scaffold_to_main()
-        wt = world.add_worktree("worktree-bridge-prototype-route")
-        route = wt / "src/app/(dev)/prototype/region-alerts/page.tsx"
-        route.parent.mkdir()
-        route.write_text("export default null;\n")
-        assert git("status", "--porcelain", cwd=wt) == ""
-
-        code, _, err = run_reap(world, monkeypatch, capsys)
-
-        assert code == reap.EXIT_OK, err
-        assert tier_of(err, "worktree-bridge-prototype-route") == reap.TIER_REVIEW
-        assert route.exists()
-
-
-class TestKeepTier:
-    def test_open_pr_is_kept(
-        self,
-        world: World,
-        monkeypatch: pytest.MonkeyPatch,
-        capsys: pytest.CaptureFixture[str],
-    ) -> None:
-        wt = world.add_worktree("feat/under-review")
-        sha = world.commit_in(wt, "feature.py", "print(1)\n")
-        world.set_prs(
-            "feat/under-review", {"number": 20, "state": "OPEN", "headRefOid": sha}
-        )
-
-        code, _, err = run_reap(world, monkeypatch, capsys)
-
-        assert code == reap.EXIT_OK, err
-        assert tier_of(err, "feat/under-review") == reap.TIER_KEEP
-        assert "open PR #20" in err
-
-    def test_an_open_pr_outranks_an_older_merged_one_on_the_same_branch(
-        self,
-        world: World,
-        monkeypatch: pytest.MonkeyPatch,
-        capsys: pytest.CaptureFixture[str],
-    ) -> None:
-        wt = world.add_worktree("feat/reused")
-        sha = world.commit_in(wt, "feature.py", "print(1)\n")
-        world.set_prs(
-            "feat/reused",
-            {"number": 21, "state": "MERGED", "headRefOid": sha},
-            {"number": 22, "state": "OPEN", "headRefOid": sha},
-        )
-
-        code, _, err = run_reap(world, monkeypatch, capsys)
-
-        assert code == reap.EXIT_OK, err
-        assert tier_of(err, "feat/reused") == reap.TIER_KEEP
-
-    def test_a_live_process_cwd_keeps_an_otherwise_reapable_worktree(
-        self,
-        world: World,
-        monkeypatch: pytest.MonkeyPatch,
-        capsys: pytest.CaptureFixture[str],
-    ) -> None:
-        wt = world.add_worktree("worktree-bridge-busy")
-        monkeypatch.setattr(
-            reap, "live_process_cwds", lambda: ({str(wt / "src")}, None)
-        )
-
-        code, _, err = run_reap(world, monkeypatch, capsys)
-
-        assert code == reap.EXIT_OK, err
-        assert tier_of(err, "worktree-bridge-busy") == reap.TIER_KEEP
-
-    def test_the_invoking_processs_own_worktree_is_never_reaped(
-        self,
-        world: World,
-        monkeypatch: pytest.MonkeyPatch,
-        capsys: pytest.CaptureFixture[str],
-    ) -> None:
-        wt = world.add_worktree("worktree-bridge-self")
-        monkeypatch.chdir(wt)
-
-        code, _, err = run_reap(world, monkeypatch, capsys)
-
-        assert code == reap.EXIT_OK, err
-        assert tier_of(err, "worktree-bridge-self") == reap.TIER_KEEP
-        assert "invoking process's cwd" in err
-
-    def test_the_main_worktree_is_not_even_considered(
-        self,
-        world: World,
-        monkeypatch: pytest.MonkeyPatch,
-        capsys: pytest.CaptureFixture[str],
-    ) -> None:
-        world.add_worktree("worktree-bridge-idle")
-
-        _, _, err = run_reap(world, monkeypatch, capsys)
-
-        assert str(world.repo) not in err
-
-
-class TestRepoContext:
-    def test_git_inventory_includes_every_harness_path_shape(
-        self,
-        world: World,
-        monkeypatch: pytest.MonkeyPatch,
-        capsys: pytest.CaptureFixture[str],
-    ) -> None:
-        paths = {
-            "claude-task": world.root / ".claude/worktrees/agent-123",
-            "codex-task": world.root / ".codex/worktrees/74f7/PinPoint",
-            "antigravity-task": (
-                world.root / ".gemini/antigravity/worktrees/PinPoint/feature"
-            ),
-        }
-        for branch, path in paths.items():
-            world.add_worktree(branch, path)
-
-        code, _, err = run_reap(world, monkeypatch, capsys)
-
-        assert code == reap.EXIT_OK, err
-        for branch, path in paths.items():
-            assert tier_of(err, branch) == reap.TIER_REAP
-            assert str(path.resolve()) in err
-
-    def test_gh_is_asked_from_the_repo_not_the_callers_cwd(
-        self,
-        world: World,
-        monkeypatch: pytest.MonkeyPatch,
-        capsys: pytest.CaptureFixture[str],
-    ) -> None:
-        """`gh` resolves which repo to query from its OWN cwd, not `--repo-dir`.
-
-        This script is invoked with an arbitrary cwd — a SessionStart hook, or
-        `merge-pr.sh` from wherever the shell happens to be. Inheriting that cwd
-        would at best make every branch UNKNOWN, and at worst answer from a
-        *different* repository, where a same-named branch with a merged PR
-        would read as proof that this repo's worktree had landed.
-        """
-        outside = world.root / "somewhere-else"
-        outside.mkdir()
-        monkeypatch.chdir(outside)
-        wt = world.add_worktree("feat/landed")
-        sha = world.commit_in(wt, "feature.py", "print(1)\n")
-        world.set_prs(
-            "feat/landed", {"number": 50, "state": "MERGED", "headRefOid": sha}
-        )
-
-        code, _, err = run_reap(world, monkeypatch, capsys)
-
-        assert code == reap.EXIT_OK, err
-        assert tier_of(err, "feat/landed") == reap.TIER_REAP
-        cwds = set(world.gh_cwds.read_text().split())
-        assert cwds == {str(world.repo)}, (
-            f"gh ran from {cwds}, not the repo — it would query the wrong repository"
-        )
-
-
-class TestGhUnavailable:
-    def test_an_unreachable_gh_reaps_nothing_and_still_reports(
-        self,
-        world: World,
-        monkeypatch: pytest.MonkeyPatch,
-        capsys: pytest.CaptureFixture[str],
-    ) -> None:
-        """Absence of evidence is never evidence of mergedness.
-
-        Note what the "empty" worktree does here: with `gh` down it has zero
-        commits ahead and a clean tree, which is the whole of the empty
-        predicate — but its PR state is UNKNOWN, not "no PR", so it must NOT be
-        reaped. That distinction is the difference between a `gh` outage being
-        a no-op and being a mass deletion.
-
-        A dry run still exits 0: orchestration-status.sh drops the whole report
-        on a non-zero exit, and the UNKNOWN branches are named in it.
-        """
-        wt = world.add_worktree("feat/landed")
-        sha = world.commit_in(wt, "feature.py", "print(1)\n")
-        world.set_prs(
-            "feat/landed", {"number": 30, "state": "MERGED", "headRefOid": sha}
-        )
-        world.add_worktree("worktree-bridge-idle")
-        monkeypatch.setenv("GH_STUB_FAIL", "1")
-
-        code, _, err = run_reap(world, monkeypatch, capsys)
-
-        assert code == reap.EXIT_OK
-        assert "REAP (0 merged, 0 empty): 0" in err
-        assert "PR state UNKNOWN for 2 branch(es)" in err
-        assert "- feat/landed [PR state UNKNOWN" in err
-        assert tier_of(err, "feat/landed") == reap.TIER_REVIEW
-        assert tier_of(err, "worktree-bridge-idle") == reap.TIER_REVIEW
-
-    def test_apply_with_an_unreachable_gh_removes_nothing(
-        self,
-        world: World,
-        monkeypatch: pytest.MonkeyPatch,
-        capsys: pytest.CaptureFixture[str],
-    ) -> None:
-        world.add_worktree("worktree-bridge-idle")
-        monkeypatch.setenv("GH_STUB_FAIL", "1")
-        cleanup, calls = fake_cleanup(world, monkeypatch, exit_code=0)
-
-        code, out, _ = run_reap(world, monkeypatch, capsys, "--apply")
-
-        assert code == reap.EXIT_FAILED
-        assert not calls.exists(), f"cleanup must not run: {cleanup}"
-        assert "REAPED:" not in out
-
-
-def fake_cleanup(
-    world: World,
-    monkeypatch: pytest.MonkeyPatch,
-    *,
-    exit_code: int,
-    per_path: dict[str, int] | None = None,
-) -> tuple[Path, Path]:
-    """Stand in for worktree_cleanup.py, recording paths and returning a code."""
-    calls = world.root / "cleanup-calls"
-    script = world.root / "fake_cleanup.py"
-    script.write_text(
-        "import sys\n"
-        f"calls = {str(calls)!r}\n"
-        f"per_path = {per_path or {}!r}\n"
-        "target = sys.argv[1]\n"
-        "open(calls, 'a').write(target + '\\n')\n"
-        "print('fake cleanup ran for ' + target, file=sys.stderr)\n"
-        f"sys.exit(per_path.get(target, {exit_code}))\n"
+def squash_merged(w: World) -> None:
+    """The regression guard: an is-ancestor implementation fails this one."""
+    wt = w.add_worktree("feat/squashed")
+    sha = w.commit_in(wt, "feature.py", "print(1)\n")
+    w.set_prs("feat/squashed", merged(11, sha))
+    w.commit_on_main("feature.py", "print(1)\n")  # the squash: same content, new SHA
+    premise = subprocess.run(
+        ["git", "-C", str(wt), "merge-base", "--is-ancestor", sha, "origin/main"]
     )
-    monkeypatch.setattr(reap, "CLEANUP_SCRIPT", script)
-    return script, calls
+    assert premise.returncode != 0, "a squashed tip is not an ancestor of main"
 
 
-class TestApply:
-    def test_apply_delegates_to_worktree_cleanup_and_announces_on_stdout(
-        self,
-        world: World,
-        monkeypatch: pytest.MonkeyPatch,
-        capsys: pytest.CaptureFixture[str],
-    ) -> None:
-        wt = world.add_worktree("worktree-bridge-idle")
-        _, calls = fake_cleanup(world, monkeypatch, exit_code=0)
-
-        code, out, _ = run_reap(world, monkeypatch, capsys, "--apply")
-
-        assert code == reap.EXIT_OK
-        assert calls.read_text().splitlines() == [str(wt)]
-        # stdout, so merge-pr.sh can surface it next to `MERGED:`.
-        assert f"REAPED: {wt}" in out
-
-    def test_apply_leaves_review_worktrees_alone(
-        self,
-        world: World,
-        monkeypatch: pytest.MonkeyPatch,
-        capsys: pytest.CaptureFixture[str],
-    ) -> None:
-        wt = world.add_worktree("feat/in-progress")
-        world.commit_in(wt, "wip.py", "print('wip')\n")
-        _, calls = fake_cleanup(world, monkeypatch, exit_code=0)
-
-        code, _, _ = run_reap(world, monkeypatch, capsys, "--apply")
-
-        assert code == reap.EXIT_OK
-        assert not calls.exists()
-
-    def test_a_failed_cleanup_fails_the_run_and_relays_its_output(
-        self,
-        world: World,
-        monkeypatch: pytest.MonkeyPatch,
-        capsys: pytest.CaptureFixture[str],
-    ) -> None:
-        """Cleanup's stderr is the only record of what leaked; --quiet keeps it."""
-        wt = world.add_worktree("worktree-bridge-idle")
-        fake_cleanup(world, monkeypatch, exit_code=1)
-
-        code, out, err = run_reap(world, monkeypatch, capsys, "--apply", "--quiet")
-
-        assert code == reap.EXIT_FAILED
-        assert f"| fake cleanup ran for {wt}" in err
-        assert f"{wt}: worktree_cleanup.py FAILED (exit 1)" in err
-        assert "REAPED:" not in out
-
-    def test_an_unlaunchable_cleanup_is_not_reported_as_cleanup_failing(
-        self,
-        world: World,
-        monkeypatch: pytest.MonkeyPatch,
-        capsys: pytest.CaptureFixture[str],
-    ) -> None:
-        """Nothing ran, so there is no cleanup verdict — say that, not "exited 1"."""
-        world.add_worktree("worktree-bridge-idle")
-        real_run = reap.subprocess.run
-
-        def fail_only_the_cleanup(args, **kwargs):  # type: ignore[no-untyped-def]
-            if args[:1] == [sys.executable]:
-                raise OSError("Exec format error")
-            return real_run(args, **kwargs)
-
-        monkeypatch.setattr(reap.subprocess, "run", fail_only_the_cleanup)
-
-        code, out, err = run_reap(world, monkeypatch, capsys, "--apply")
-
-        assert code == reap.EXIT_FAILED
-        assert "could not run worktree_cleanup.py" in err
-        assert "REAPED:" not in out
-
-    def test_two_failures_count_as_two(
-        self,
-        world: World,
-        monkeypatch: pytest.MonkeyPatch,
-        capsys: pytest.CaptureFixture[str],
-    ) -> None:
-        """The summary counts worktrees, not distinct failures."""
-        first = world.add_worktree("worktree-bridge-a")
-        second = world.add_worktree("worktree-bridge-b")
-        fake_cleanup(
-            world,
-            monkeypatch,
-            exit_code=0,
-            per_path={str(first): 1, str(second): 1},
-        )
-
-        code, _, err = run_reap(world, monkeypatch, capsys, "--apply")
-
-        assert code == reap.EXIT_FAILED
-        assert "Reaped 0 of 2 worktree(s)." in err
-
-    def test_one_failure_among_successes_still_fails_the_run(
-        self,
-        world: World,
-        monkeypatch: pytest.MonkeyPatch,
-        capsys: pytest.CaptureFixture[str],
-    ) -> None:
-        first = world.add_worktree("worktree-bridge-a")
-        second = world.add_worktree("worktree-bridge-b")
-        fake_cleanup(world, monkeypatch, exit_code=0, per_path={str(first): 1})
-
-        code, out, err = run_reap(world, monkeypatch, capsys, "--apply")
-
-        assert code == reap.EXIT_FAILED
-        assert f"{first}: worktree_cleanup.py FAILED" in err
-        assert f"REAPED: {second}" in out
-        assert "Reaped 1 of 2 worktree(s)." in err
+def commits_after_merge(w: World) -> None:
+    wt = w.add_worktree("feat/kept-going")
+    w.set_prs("feat/kept-going", merged(12, w.commit_in(wt, "a.py", "1\n")))
+    w.commit_in(wt, "b.py", "2\n")
 
 
-class TestBranchFilter:
-    def test_branch_filter_scopes_the_run_to_one_worktree(
-        self,
-        world: World,
-        monkeypatch: pytest.MonkeyPatch,
-        capsys: pytest.CaptureFixture[str],
-    ) -> None:
-        """merge-pr.sh reaps exactly the branch it just merged, nothing else."""
-        target = world.add_worktree("feat/landed")
-        sha = world.commit_in(target, "feature.py", "print(1)\n")
-        world.set_prs(
-            "feat/landed", {"number": 40, "state": "MERGED", "headRefOid": sha}
-        )
-        world.add_worktree("worktree-bridge-idle")
-        _, calls = fake_cleanup(world, monkeypatch, exit_code=0)
-
-        code, out, _ = run_reap(
-            world, monkeypatch, capsys, "--apply", "--branch", "feat/landed"
-        )
-
-        assert code == reap.EXIT_OK
-        assert calls.read_text().splitlines() == [str(target)]
-        assert "worktree-bridge-idle" not in out
-
-    def test_a_branch_with_no_worktree_is_a_silent_no_op(
-        self,
-        world: World,
-        monkeypatch: pytest.MonkeyPatch,
-        capsys: pytest.CaptureFixture[str],
-    ) -> None:
-        world.add_worktree("worktree-bridge-idle")
-        _, calls = fake_cleanup(world, monkeypatch, exit_code=0)
-
-        code, out, _ = run_reap(
-            world, monkeypatch, capsys, "--apply", "--quiet", "--branch", "feat/gone"
-        )
-
-        assert code == reap.EXIT_OK
-        assert not calls.exists()
-        assert out == ""
+def dirty_merged(w: World) -> None:
+    wt = w.add_worktree("feat/dirty")
+    w.set_prs("feat/dirty", merged(13, w.commit_in(wt, "a.py", "1\n")))
+    (wt / "a.py").write_text("uncommitted\n")
 
 
-class TestQuiet:
-    def test_quiet_dry_run_prints_one_nudge_and_never_shells_out_to_du(
-        self,
-        world: World,
-        monkeypatch: pytest.MonkeyPatch,
-        capsys: pytest.CaptureFixture[str],
-    ) -> None:
-        """The SessionStart hook runs this under a 10s cap; `du` over 60 GB blows it."""
-        world.add_worktree("worktree-bridge-idle")
-        monkeypatch.setattr(
-            reap,
-            "directory_size_kib",
-            lambda _path: pytest.fail("--quiet must not call du"),
-        )
+def untracked_only(w: World) -> None:
+    """Empty and old, but a plan doc that exists nowhere else blocks the reap."""
+    (w.add_worktree("worktree-notes") / "PLAN.md").write_text("the only copy\n")
 
-        code, _, err = run_reap(world, monkeypatch, capsys, "--quiet")
 
-        assert code == reap.EXIT_OK
-        assert "1 worktree(s) already landed and reclaimable" in err
-        assert "python3 scripts/worktree_reap.py --apply" in err
+def gitignored_generated(w: World) -> None:
+    """Every worktree has generated `.env.local`; if it were dirt, nothing reaps."""
+    w.commit_on_main(".gitignore", ".env.local\n")
+    (w.add_worktree("worktree-generated") / ".env.local").write_text("PORT=3010\n")
 
-    def test_quiet_dry_run_is_silent_when_there_is_nothing_to_reclaim(
-        self,
-        world: World,
-        monkeypatch: pytest.MonkeyPatch,
-        capsys: pytest.CaptureFixture[str],
-    ) -> None:
-        wt = world.add_worktree("feat/in-progress")
-        world.commit_in(wt, "wip.py", "print('wip')\n")
 
-        code, out, err = run_reap(world, monkeypatch, capsys, "--quiet")
+def prototype_layout(w: World) -> None:
+    w.add_prototype_scaffold_to_main()
+    w.add_worktree("worktree-proto-layout")
 
-        assert code == reap.EXIT_OK
-        assert out == ""
-        assert err == ""
+
+def prototype_marker(w: World) -> None:
+    w.add_prototype_scaffold_to_main()
+    wt = w.add_worktree("worktree-proto-marker")
+    (wt / ".prototype-mode").write_text("# Prototype mode\n")
+    assert git("status", "--porcelain", cwd=wt) == "", "premise: the marker is ignored"
+
+
+def prototype_route(w: World) -> None:
+    w.add_prototype_scaffold_to_main()
+    wt = w.add_worktree("worktree-proto-route")
+    route = wt / "src/app/(dev)/prototype/alerts/page.tsx"
+    route.parent.mkdir()
+    route.write_text("export default null;\n")
+    assert git("status", "--porcelain", cwd=wt) == "", "premise: the route is ignored"
+
+
+def open_pr(w: World) -> None:
+    wt = w.add_worktree("feat/review")
+    sha = w.commit_in(wt, "a.py", "1\n")
+    w.set_prs("feat/review", {"number": 20, "state": "OPEN", "headRefOid": sha})
+
+
+def open_outranks_merged(w: World) -> None:
+    sha = w.commit_in(w.add_worktree("feat/reused"), "a.py", "1\n")
+    w.set_prs(
+        "feat/reused",
+        merged(21, sha),
+        {"number": 22, "state": "OPEN", "headRefOid": sha},
+    )
+
+
+def commit_without_pr(w: World) -> None:
+    """An agent mid-task: commits, no PR yet. It must survive."""
+    w.commit_in(w.add_worktree("feat/wip"), "wip.py", "1\n")
+
+
+def closed_unmerged(w: World) -> None:
+    sha = w.commit_in(w.add_worktree("feat/abandoned"), "wip.py", "1\n")
+    w.set_prs("feat/abandoned", {"number": 14, "state": "CLOSED", "headRefOid": sha})
+
+
+def young_empty(w: World) -> None:
+    """A running agent's brand-new worktree has no commits yet."""
+    w.add_worktree("worktree-just-started", age_hours=1)
+
+
+def detached_empty(w: World) -> None:
+    w.add_worktree("")
+
+
+def live_process(w: World) -> None:
+    wt = w.add_worktree("worktree-busy")
+    w.mp.setattr(reap, "live_process_cwds", lambda: ({str(wt / "src")}, None))
+
+
+def own_cwd(w: World) -> None:
+    w.mp.chdir(w.add_worktree("worktree-self"))
+
+
+Setup = Callable[[World], None]
+SCENARIOS: list[tuple[Setup, str, str, str]] = [
+    (squash_merged, "feat/squashed", reap.TIER_REAP, "[merged]"),
+    (commits_after_merge, "feat/kept-going", reap.TIER_REVIEW, "after the merge"),
+    (dirty_merged, "feat/dirty", reap.TIER_REVIEW, "working tree is dirty"),
+    (untracked_only, "worktree-notes", reap.TIER_REVIEW, "working tree is dirty"),
+    (gitignored_generated, "worktree-generated", reap.TIER_REAP, "[empty]"),
+    (prototype_layout, "worktree-proto-layout", reap.TIER_REAP, "[empty]"),
+    (prototype_marker, "worktree-proto-marker", reap.TIER_REVIEW, "dirty"),
+    (prototype_route, "worktree-proto-route", reap.TIER_REVIEW, "dirty"),
+    (open_pr, "feat/review", reap.TIER_KEEP, "open PR #20"),
+    (open_outranks_merged, "feat/reused", reap.TIER_KEEP, "open PR #22"),
+    (commit_without_pr, "feat/wip", reap.TIER_REVIEW, "1 commit(s) ahead"),
+    (closed_unmerged, "feat/abandoned", reap.TIER_REVIEW, "1 commit(s) ahead"),
+    (young_empty, "worktree-just-started", reap.TIER_KEEP, "created 1h ago"),
+    (detached_empty, "(detached)", reap.TIER_REAP, "[empty]"),
+    (live_process, "worktree-busy", reap.TIER_KEEP, "live process cwd"),
+    (own_cwd, "worktree-self", reap.TIER_KEEP, "invoking process's cwd"),
+]
+
+
+@pytest.mark.parametrize(
+    ("setup", "branch", "tier", "reason"),
+    SCENARIOS,
+    ids=[scenario[0].__name__ for scenario in SCENARIOS],
+)
+def test_classification(
+    world: World,
+    setup: Setup,
+    branch: str,
+    tier: str,
+    reason: str,
+) -> None:
+    setup(world)
+
+    code, _, err = world.run()
+
+    assert code == reap.EXIT_OK, err
+    assert tier_of(err, branch) == tier, err
+    assert reason in err
+
+
+def test_every_harness_path_is_inventoried_and_the_main_worktree_never(
+    world: World,
+) -> None:
+    paths = {
+        "claude-task": world.root / ".claude/worktrees/agent-123",
+        "codex-task": world.root / ".codex/worktrees/74f7/PinPoint",
+        "antigravity-task": world.root / ".gemini/antigravity/worktrees/PinPoint/x",
+    }
+    for branch, path in paths.items():
+        world.add_worktree(branch, path)
+
+    code, _, err = world.run()
+
+    assert code == reap.EXIT_OK, err
+    report = {line.strip() for line in err.splitlines()}
+    for branch, path in paths.items():
+        assert tier_of(err, branch) == reap.TIER_REAP
+        assert str(path.resolve()) in report
+    assert str(world.repo.resolve()) not in report
+
+
+def test_gh_is_asked_from_the_repo_and_only_when_it_could_matter(world: World) -> None:
+    """`gh` picks the repository from its own cwd, and this runs from anywhere:
+    another repo's same-named merged branch would read as proof. A settled-empty
+    worktree needs no lookup at all — that is the GitHub quota saving."""
+    elsewhere = world.root / "somewhere-else"
+    elsewhere.mkdir()
+    world.mp.chdir(elsewhere)
+    wt = world.add_worktree("feat/landed")
+    world.set_prs("feat/landed", merged(50, world.commit_in(wt, "a.py", "1\n")))
+    world.add_worktree("worktree-idle")
+
+    code, _, err = world.run()
+
+    assert code == reap.EXIT_OK, err
+    assert tier_of(err, "feat/landed") == reap.TIER_REAP
+    assert tier_of(err, "worktree-idle") == reap.TIER_REAP
+    assert world.gh_cwds.read_text().splitlines() == [str(world.repo)]
+
+
+def test_an_unreachable_gh_reaps_nothing_that_needed_it(world: World) -> None:
+    """Unknown is never mergedness. The dry run still exits 0 with its report:
+    orchestration-status.sh drops the whole report on a non-zero exit."""
+    landed = world.add_worktree("feat/landed")
+    world.set_prs("feat/landed", merged(30, world.commit_in(landed, "a.py", "1\n")))
+    idle = world.add_worktree("worktree-idle")
+    world.mp.setenv("GH_STUB_FAIL", "1")
+
+    code, _, err = world.run()
+
+    assert code == reap.EXIT_OK
+    assert "PR state UNKNOWN for 1 branch(es) (feat/landed)" in err
+    assert "- feat/landed [PR state UNKNOWN" in err
+    assert tier_of(err, "feat/landed") == reap.TIER_REVIEW
+    assert tier_of(err, "worktree-idle") == reap.TIER_REAP  # asked nothing of gh
+
+    code, out, _ = world.run("--apply")
+
+    assert code == reap.EXIT_FAILED
+    assert world.cleanup_calls() == [str(idle)]
+    assert f"REAPED: {landed}" not in out
+
+
+def test_apply_reaps_through_cleanup_and_a_failure_fails_the_run(world: World) -> None:
+    """Cleanup's stderr is the only record of what leaked; --quiet keeps it.
+    REAPED goes to stdout, where merge-pr.sh shows it next to `MERGED:`."""
+    first = world.add_worktree("worktree-a")
+    second = world.add_worktree("worktree-b")
+    world.commit_in(world.add_worktree("feat/wip"), "wip.py", "1\n")
+    world.fake_cleanup({str(first): 1})
+
+    code, out, err = world.run("--apply", "--quiet")
+
+    assert code == reap.EXIT_FAILED
+    assert world.cleanup_calls() == [str(first), str(second)]  # never REVIEW
+    assert f"| fake cleanup ran for {first}" in err
+    assert f"{first}: worktree_cleanup.py FAILED (exit 1)" in err
+    assert out == f"REAPED: {second}\n"
+
+
+def test_branch_scopes_the_run_to_one_worktree_and_skips_orphans(world: World) -> None:
+    """merge-pr.sh reaps exactly the branch it just merged, nothing else."""
+    target = world.add_worktree("feat/landed")
+    world.set_prs("feat/landed", merged(40, world.commit_in(target, "a.py", "1\n")))
+    world.add_worktree("worktree-idle")
+    world.add_stack("pinpoint-dead")
+    world.set_slots({world.gone("dead"): 5})
+
+    code, out, _ = world.run("--apply", "--quiet", "--branch", "feat/landed")
+
+    assert code == reap.EXIT_OK
+    assert world.cleanup_calls() == [str(target)]
+    assert out == f"REAPED: {target}\n"
+    assert world.docker_calls() == []
+    assert world.slots() == {world.gone("dead"): 5}
+
+    code, out, err = world.run("--apply", "--quiet", "--branch", "feat/gone")
+
+    assert (code, out, err) == (reap.EXIT_OK, "", "")
+
+
+def test_quiet_prints_one_nudge_line_and_only_when_there_is_something(
+    world: World,
+) -> None:
+    world.commit_in(world.add_worktree("feat/wip"), "wip.py", "1\n")
+
+    assert world.run("--quiet") == (reap.EXIT_OK, "", "")
+
+    world.add_worktree("worktree-idle")
+
+    code, out, err = world.run("--quiet")
+
+    assert (code, out) == (reap.EXIT_OK, "")
+    assert err.splitlines() == [
+        "worktree-reap: 1 finished worktree(s), 0 orphan stack(s) and 0 orphan "
+        "slot(s) reclaimable (dry-run). Run `python3 scripts/worktree_reap.py` for "
+        "the report, `--apply` to reclaim."
+    ]
+
+
+# --- Orphans -----------------------------------------------------------------
+
+
+def test_a_local_orphan_is_reported_then_removed_in_order(world: World) -> None:
+    """The local daemon runs only this machine's stacks, so a foreign-looking
+    workdir label does not protect one. Volumes are listed by label filter —
+    the stub, like Podman, rejects `volume ls --format '{{.Label ...}}'`."""
+    world.add_stack("pinpoint-dead", workdir="/Users/someone/Code/PinPoint/x")
+
+    code, _, err = world.run()
+
+    assert code == reap.EXIT_OK, err
+    assert "Supabase stacks on local Docker: 1 orphan(s)" in err
+    assert "pinpoint-dead: 1 container(s), 1 volume(s)" in err
+    assert world.removals() == []
+    ls = next(c for c in world.docker_calls() if c[:2] == ["volume", "ls"])
+    assert "label=com.supabase.cli.project" in ls
+    assert not any(".Label" in arg for arg in ls)
+
+    code, _, err = world.run("--apply")
+
+    assert code == reap.EXIT_OK, err
+    assert world.removals() == [
+        ["rm", "-f", "supabase_db_pinpoint-dead"],
+        ["network", "rm", "supabase_network_pinpoint-dead"],
+        ["volume", "rm", "supabase_db_pinpoint-dead"],
+    ]
+
+
+def test_stacks_of_live_worktrees_and_the_main_worktree_are_never_orphans(
+    world: World,
+) -> None:
+    """Every stack here is stopped (volumes only): "no container" must never
+    mean orphaned. The config.toml id wins; otherwise setup's derived id. A
+    stopped stack's network is already gone, which is not a failure."""
+    pinned = world.add_worktree("feat/renamed", age_hours=1)
+    (pinned / "supabase").mkdir()
+    (pinned / "supabase/config.toml").write_text('project_id = "pinpoint-pinned"\n')
+    derived = world.add_worktree("feat/derived", age_hours=1)
+    detached = world.add_worktree("")
+    for pid in (
+        "pinpoint-pinned",
+        reap.derive_project_id(derived, "feat/derived"),
+        reap.derive_project_id(detached, "HEAD"),
+        "pinpoint-main",  # the main worktree's derived id
+        "pinpoint-dead",
+    ):
+        world.add_stack(pid, running=False)
+    world.fail("network rm", 1, "Error: network supabase_network_x not found")
+
+    code, _, err = world.run("--apply")
+
+    assert code == reap.EXIT_OK, err
+    assert "FAILED" not in err
+    assert world.removals() == [
+        ["network", "rm", "supabase_network_pinpoint-dead"],
+        ["volume", "rm", "supabase_db_pinpoint-dead"],
+    ]
+
+
+def test_a_failed_container_removal_keeps_network_volumes_and_slot(
+    world: World,
+) -> None:
+    gone = world.gone("dead")
+    world.add_stack("pinpoint-dead", workdir=gone)
+    world.set_slots({gone: 5})
+    world.fail("rm", 1, "permission denied")
+
+    code, _, err = world.run("--apply")
+
+    assert code == reap.EXIT_FAILED
+    assert "FAILED removing pinpoint-dead's container(s) on local Docker" in err
+    assert "permission denied" in err
+    assert world.removals() == [["rm", "-f", "supabase_db_pinpoint-dead"]]
+    assert world.slots() == {gone: 5}
+
+
+@pytest.mark.parametrize("query", ["volume ls", "volume inspect", "ps"])
+def test_a_failed_docker_query_is_unknown_never_zero(
+    world: World,
+    query: str,
+) -> None:
+    """PP-5o7b: a swallowed failure once read as `0 volume(s)`, and ~557 MB of
+    orphan volumes piled up behind a silent nudge."""
+    gone = world.gone("dead")
+    world.add_stack("pinpoint-dead", workdir=gone)
+    world.set_slots({gone: 5})
+    world.fail(query, 1, "Cannot connect to the Docker daemon")
+
+    code, _, err = world.run()
+
+    assert code == reap.EXIT_OK
+    assert "Supabase stacks on local Docker: UNKNOWN, not zero" in err
+    assert "Cannot connect to the Docker daemon" in err
+    assert "orphan(s)" not in err
+    assert f"slot 5 {gone}: held — Docker state UNKNOWN on local Docker" in err
+
+    code, _, err = world.run("--quiet")
+
+    assert code == reap.EXIT_OK
+    assert "UNKNOWN, not zero: Supabase stacks on local Docker" in err
+
+    code, _, _ = world.run("--apply")
+
+    assert code == reap.EXIT_FAILED
+    assert world.removals() == []
+    assert world.slots() == {gone: 5}
+
+
+def test_a_slot_is_released_only_once_its_stack_is_gone_and_its_ports_closed(
+    world: World,
+) -> None:
+    """A reused slot must never collide with a leftover stack's ports."""
+    free, busy, stacked = world.gone("free"), world.gone("busy"), world.gone("stacked")
+    live = world.add_worktree("feat/live", age_hours=1)
+    world.set_slots({free: 1, busy: 2, stacked: 3, str(live): 4})
+    world.open_slots.add(2)
+    world.add_stack("pinpoint-stacked", workdir=f"{stacked}/.agent/tmp")
+
+    code, _, err = world.run()
+
+    assert code == reap.EXIT_OK, err
+    assert f"slot 1 {free}: reclaimable" in err
+    assert f"slot 2 {busy}: held — its Supabase ports are still open" in err
+    assert f"slot 3 {stacked}: held — stack pinpoint-stacked still references it" in err
+    assert f"slot 4 {live}" not in err
+    assert len(world.slots()) == 4
+
+    code, _, err = world.run("--apply")
+
+    assert code == reap.EXIT_OK, err
+    assert world.slots() == {busy: 2, str(live): 4}
+
+
+# --- Remote backend ----------------------------------------------------------
+
+
+def test_a_remote_orphan_is_removed_through_docker_host_and_its_slot_freed(
+    world: World,
+) -> None:
+    world.mp.setenv("PINPOINT_REMOTE_DOCKER_HOST", REMOTE)
+    gone = world.gone("dead")
+    world.add_stack("pinpoint-dead", workdir=gone, host=REMOTE)
+    world.set_slots({gone: 5})
+
+    code, _, err = world.run("--apply")
+
+    assert code == reap.EXIT_OK, err
+    assert f"Supabase stacks on {REMOTE}: 1 orphan(s)" in err
+    assert world.removals(REMOTE) == [
+        ["rm", "-f", "supabase_db_pinpoint-dead"],
+        ["network", "rm", "supabase_network_pinpoint-dead"],
+        ["volume", "rm", "supabase_db_pinpoint-dead"],
+    ]
+    assert world.removals() == []
+    assert world.slots() == {}
+
+
+def test_remote_stacks_that_are_not_this_machines_orphans_are_never_removed(
+    world: World,
+) -> None:
+    """Crabbox runners (even under this machine's paths), the remote host's own
+    checkouts, and a live worktree whose labels point at its old path. A stopped
+    stack has volumes only and volumes carry no workdir label, so it cannot be
+    attributed: it is reported for a person, and it holds no slot."""
+    world.mp.setenv("PINPOINT_REMOTE_DOCKER_HOST", REMOTE)
+    world.add_stack("pinpoint-stopped", host=REMOTE, running=False)
+    world.set_slots({world.gone("stopped"): 6})
+    moved = world.add_worktree("feat/moved", age_hours=1)
+    (moved / "supabase").mkdir()
+    (moved / "supabase/config.toml").write_text('project_id = "pinpoint-moved"\n')
+    world.add_stack("pinpoint-moved", workdir=world.gone("old-path"), host=REMOTE)
+    world.add_stack(
+        "pinpoint-runner-crabbox-2", workdir=world.gone("crabbox"), host=REMOTE
+    )
+    world.add_stack(
+        "pinpoint-bazzite-checkout", workdir="/var/home/froeht/PinPoint", host=REMOTE
+    )
+
+    code, _, err = world.run("--apply")
+
+    assert code == reap.EXIT_OK, err
+    assert f"Supabase stacks on {REMOTE}: 0 orphan(s)" in err
+    assert "pinpoint-stopped: 1 volume(s) with no workdir label" in err
+    assert world.removals(REMOTE) == []
+    assert "crabbox" not in err
+    assert "bazzite-checkout" not in err
+    assert world.slots() == {}  # nothing references the path; its ports are closed
+
+
+@pytest.mark.parametrize(
+    ("setup", "reason"),
+    [
+        ("unreachable", "ssh: connect to host bazzite port 22: Operation timed out"),
+        ("docker-host-unset", "PINPOINT_REMOTE_DOCKER_HOST is unset"),
+    ],
+)
+def test_an_unreadable_remote_is_unknown_and_holds_slots(
+    world: World,
+    setup: str,
+    reason: str,
+) -> None:
+    gone = world.gone("dead")
+    world.set_slots({gone: 5})
+    if setup == "unreachable":
+        world.mp.setenv("PINPOINT_REMOTE_DOCKER_HOST", REMOTE)
+        world.add_stack("pinpoint-dead", workdir=gone, host=REMOTE)
+        world.fail("volume ls", 255, reason, host=REMOTE)
+    else:  # a live worktree's .env.local proves the remote backend is in use
+        live = world.add_worktree("feat/remote", age_hours=1)
+        (live / ".env.local").write_text("PINPOINT_SUPABASE_BACKEND=remote\n")
+
+    code, _, err = world.run("--quiet")
+
+    assert code == reap.EXIT_OK
+    assert "UNKNOWN, not zero: Supabase stacks on" in err
+
+    code, _, err = world.run("--apply")
+
+    assert code == reap.EXIT_FAILED
+    assert reason in err
+    assert world.removals(REMOTE) == []
+    assert world.slots() == {gone: 5}
+
+
+def test_quiet_bounds_every_docker_call_for_the_session_start_hook(
+    world: World,
+) -> None:
+    """A hung remote daemon must read as UNKNOWN before the hook's cap."""
+    world.mp.setattr(reap, "QUIET_BUDGET_SECONDS", 1.0)
+    world.mp.setenv("PINPOINT_REMOTE_DOCKER_HOST", REMOTE)
+    world.daemon(REMOTE)["sleep"] = 30
+    world.save_docker()
+    started = time.monotonic()
+
+    code, _, err = world.run("--quiet")
+
+    assert time.monotonic() - started < 10
+    assert code == reap.EXIT_OK
+    assert f"UNKNOWN, not zero: Supabase stacks on {REMOTE}" in err

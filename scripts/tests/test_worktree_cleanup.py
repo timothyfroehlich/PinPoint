@@ -11,8 +11,8 @@ the path absent from BOTH `git worktree list` and the slot manifest.
 non-zero exit was warned about and then collapsed into `volumes = []`,
 indistinguishable from "this project has no volumes". Teardown continued,
 removed the worktree, deallocated the slot, and exited 0 while the volumes
-stayed on disk. Same false-zero class as PP-5o7b / PR #1746 in
-`worktree_orphan_sweep.py`, whose UNKNOWN-not-zero shape this follows.
+stayed on disk. Same false-zero class as PP-5o7b / PR #1746 in the orphan
+section of `worktree_reap.py`, whose UNKNOWN-not-zero shape this follows.
 
 **PP-rbbp — the project id used to be derived from the branch.** PP-4936 pinned
 each worktree's Supabase project id in its `supabase/config.toml` so it stops
@@ -411,7 +411,7 @@ class TestMissingTarget:
         err = capsys.readouterr().err
         assert exit_code == cleanup.EXIT_FAILED
         assert "slot manifest" in err
-        assert "worktree_orphan_sweep.py --apply" in err
+        assert "worktree_reap.py --apply" in err
         # Nothing was reclaimed, and nothing was claimed to be.
         assert stub.calls_of("volume_ls") == []
         assert stub.calls_of("worktree_remove") == []
@@ -719,10 +719,10 @@ class TestMainTeardown:
         assert "Cannot connect to the Docker daemon" in err
         assert "Docker volume(s)" not in err  # no "Removed 0 Docker volume(s)"
         assert "Cleaned up worktree" not in err
-        assert "worktree_orphan_sweep.py --apply" in err
+        assert "worktree_reap.py --apply" in err
         # No volume removal was attempted against a set we couldn't enumerate...
         assert stub.calls_of("volume_rm") == []
-        # ...but the worktree and slot are still reclaimed, so the sweep can
+        # ...but the worktree and slot are still reclaimed, so worktree_reap.py can
         # find the leaked project by its Docker label (delayed, not permanent).
         assert stub.calls_of("worktree_remove") != []
         assert deallocated == [str(fake_worktree)]
@@ -807,14 +807,14 @@ class TestMainTeardown:
 
         err = capsys.readouterr().err
         assert exit_code == cleanup.EXIT_FAILED
-        # The slot is still reclaimed, so the sweep can find any leaked volumes by
+        # The slot is still reclaimed, so worktree_reap.py finds any leaked volumes by
         # their Docker label — a delayed leak, not a permanent one.
         assert deallocated == [str(worktree)]
         assert f"residual directory at {worktree}" in err
         assert "preserve anything needed" in err
         assert "remove it manually" in err
         assert "git worktree prune" in err
-        assert "worktree_orphan_sweep.py --apply" in err
+        assert "worktree_reap.py --apply" in err
         assert "INCOMPLETE" in err
         assert "no .git marker" in err
         assert "Cleaned up worktree" not in err

@@ -842,7 +842,7 @@ class TestPinnedProjectId:
     @pytest.mark.parametrize(
         "value",
         [
-            "not-pinpoint-prefixed",  # invisible to worktree_orphan_sweep.py
+            "not-pinpoint-prefixed",  # invisible to worktree_reap.py
             "pinpoint-Has-Uppercase",  # not a legal Docker/Supabase id
             "pinpoint-has_underscore",
             "pinpoint-" + "a" * 40,  # over MAX_PROJECT_ID_LEN

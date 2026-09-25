@@ -7,8 +7,7 @@ Existing worktrees get their configs regenerated on branch switch. Also run
 directly as `python3 scripts/worktree_setup.py` (scripts/supabase-stack.sh
 does, to switch backends); it takes no arguments and operates on $PWD.
 
-Also holds the helpers worktree_cleanup.py, worktree_orphan_sweep.py and
-worktree_reap.py share.
+Also holds the helpers worktree_cleanup.py and worktree_reap.py share.
 """
 
 import fcntl
@@ -205,7 +204,7 @@ def prune_manifest(slots: dict[str, int]) -> dict[str, int]:
     A worktree removed without the cleanup hook (`rm -rf`), or one whose stack
     runs on the remote host, can leave a stack holding the slot's ports. Handing
     that slot to a new worktree would make its `supabase start` fail on busy
-    ports, so the entry stays until the orphan sweep reclaims the stack.
+    ports, so the entry stays until worktree_reap.py reclaims the stack.
     """
     return {
         path: slot
@@ -343,9 +342,9 @@ def derive_project_id(worktree_path: Path, branch: str) -> str:
 _PINNED_PROJECT_ID_RE = re.compile(r'^project_id\s*=\s*"([^"]+)"', re.MULTILINE)
 
 # A pinned id is only honored when it has the shape derive_project_id emits.
-# worktree_orphan_sweep.py identifies PinPoint-owned Supabase resources by the
+# worktree_reap.py identifies PinPoint-owned Supabase resources by the
 # "pinpoint-" prefix, so honoring a hand-written id outside that shape would
-# make the worktree's containers invisible to the sweep. This also rejects the
+# make the worktree's containers invisible to its orphan section. This also rejects the
 # template's bare `project_id = "pinpoint"`, so a config.toml copied straight
 # from the template still gets a real per-worktree id. Matched with fullmatch:
 # `$` would accept a trailing newline, which would corrupt the id we write back.
@@ -356,8 +355,8 @@ def read_config_project_id(worktree_path: Path) -> str | None:
     """The project_id line of the worktree's config.toml, as written, or None.
 
     None when the file is absent, unreadable or has no project_id. Unlike
-    read_pinned_project_id this does not check the id's shape: the orphan
-    sweep must protect whatever id a running stack was started under.
+    read_pinned_project_id this does not check the id's shape: worktree_reap.py
+    must protect whatever id a running stack was started under.
     """
     try:
         content = (worktree_path / "supabase" / "config.toml").read_text()
@@ -372,7 +371,7 @@ def read_pinned_project_id(worktree_path: Path) -> str | None:
 
     The generated `supabase/config.toml` is the file the Supabase CLI itself
     reads, so it is the authoritative record of the id the worktree's stack was
-    started under — the same assumption worktree_orphan_sweep.py makes.
+    started under — the same assumption worktree_reap.py makes.
 
     Returns None when the file is absent (fresh worktree — nothing to preserve),
     unreadable, has no project_id, or carries an id that doesn't match the shape
@@ -1125,7 +1124,7 @@ def install_dependencies(
 
 
 # =============================================================================
-# Shared with worktree_cleanup.py, worktree_orphan_sweep.py, worktree_reap.py
+# Shared with worktree_cleanup.py and worktree_reap.py
 # =============================================================================
 
 
@@ -1137,7 +1136,7 @@ class DockerUnavailableError(RuntimeError):
     """Docker is installed but could not be enumerated.
 
     Callers MUST surface this as *unknown*, never as an empty result. Swallowing
-    it into `[]` is the false zero behind PP-5o7b (the sweep) and PP-3w4g
+    it into `[]` is the false zero behind PP-5o7b (orphan volumes) and PP-3w4g
     (cleanup): the resources were reported as zero and then leaked.
     """
 
