@@ -22,7 +22,6 @@ import {
 import { listSurfacingAbandonedForMachine } from "~/lib/pinballmap/abandoned-listings";
 import { getCatalogEntry } from "~/lib/pinballmap/catalog";
 import { PinballmapListingControl } from "~/components/machines/PinballmapListingControl";
-import { PinballmapInsiderConnected } from "~/components/machines/PinballmapInsiderConnected";
 import { deriveInsiderConnectedView } from "~/lib/pinballmap/insider-connected";
 import { PinballmapAbandonedEntries } from "~/components/machines/PinballmapAbandonedEntries";
 import { getUnifiedUsers } from "~/lib/users/queries";
@@ -334,14 +333,8 @@ export default async function MachineEditPage({
                 canRefresh={canRefresh}
                 writeEnabled={writeEnabled}
                 modelName={pinballmapTitleName}
+                insiderConnected={insiderConnectedView}
               />
-              {insiderConnectedView !== null ? (
-                <PinballmapInsiderConnected
-                  machineId={machine.id}
-                  view={insiderConnectedView}
-                  canChange={canPush && writeEnabled}
-                />
-              ) : null}
             </PinballmapDirtyGate>
           )}
 

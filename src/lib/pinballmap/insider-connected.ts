@@ -12,8 +12,6 @@ export interface PbmInsiderConnectedView {
   /** The entry the setting belongs to, resolved from the stored lineup by title. */
   lmxId: number;
   setting: PbmInsiderConnectedSetting;
-  /** The state the offered action would set: on turns off; off and not set turn on. */
-  target: boolean;
 }
 
 /**
@@ -50,5 +48,5 @@ export function deriveInsiderConnectedView(args: {
 
   const setting: PbmInsiderConnectedSetting =
     lmx.icEnabled === null ? "not_set" : lmx.icEnabled ? "on" : "off";
-  return { lmxId: lmx.id, setting, target: setting !== "on" };
+  return { lmxId: lmx.id, setting };
 }

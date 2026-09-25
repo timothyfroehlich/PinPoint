@@ -16,9 +16,11 @@ import {
   addMachineToPinballMapAction,
   refreshPinballmapLineupAction,
   removeMachineFromPinballMapAction,
+  setInsiderConnectedAction,
   setPinballmapIntentAction,
 } from "~/app/(app)/m/pinballmap-actions";
 import { Button } from "~/components/ui/button";
+import { Switch } from "~/components/ui/switch";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -32,6 +34,7 @@ import {
 } from "~/components/ui/alert-dialog";
 import { RelativeTime } from "~/components/issues/RelativeTime";
 import { useRelativeNow } from "~/components/issues/RelativeTimeProvider";
+import type { PbmInsiderConnectedView } from "~/lib/pinballmap/insider-connected";
 import type {
   PbmListingIntent,
   PbmListingView,
@@ -102,6 +105,12 @@ export interface PinballmapListingControlProps {
   writeEnabled: boolean;
   /** Catalog title, so a confirm names the game rather than "this machine". */
   modelName: string | null;
+  /**
+   * The entry's Insider Connected setting (spec 3.8), or null when 3.8 shows
+   * nothing — ineligible title, intent not On, or entry absent. Derived on the
+   * server by `deriveInsiderConnectedView`.
+   */
+  insiderConnected: PbmInsiderConnectedView | null;
 }
 
 const INTENT_OPTIONS: readonly { value: PbmListingIntent; label: string }[] = [
@@ -123,6 +132,7 @@ export function PinballmapListingControl({
   canRefresh,
   writeEnabled,
   modelName,
+  insiderConnected,
 }: PinballmapListingControlProps): React.JSX.Element {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -205,6 +215,23 @@ export function PinballmapListingControl({
             </span>
           ) : null}
         </Row>
+
+        {insiderConnected !== null ? (
+          <Row label="Insider Connected">
+            <InsiderConnectedSwitch
+              view={insiderConnected}
+              // Same gate as the status row's pushes: the capability plus a
+              // provisioned credential (8.2). Otherwise status only.
+              readOnly={!canWriteOut}
+              pending={pending}
+              onChange={(enabled) => {
+                run(setInsiderConnectedAction, {
+                  enabled: enabled ? "true" : "false",
+                });
+              }}
+            />
+          </Row>
+        ) : null}
 
         <Row label="Status">
           <div className="flex min-w-0 flex-1 items-center gap-2">
@@ -436,7 +463,7 @@ function Row({
         dimmed && "opacity-45"
       )}
       {...(dimmed ? { inert: true } : {})}
-      data-testid={`pbm-listing-row-${label.toLowerCase()}`}
+      data-testid={`pbm-listing-row-${label.toLowerCase().replace(/\s+/g, "-")}`}
     >
       <span className="w-20 shrink-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
         {label}
@@ -520,6 +547,57 @@ function IntentToggle({
         </span>
       ) : null}
     </>
+  );
+}
+
+const INSIDER_CONNECTED_LABEL = {
+  on: "On",
+  off: "Off",
+  not_set: "Not set",
+} as const;
+
+/**
+ * The entry's Insider Connected setting as a switch (spec 3.8). Checked only
+ * when Pinball Map records it on; Not set reads as an unchecked switch with its
+ * own label, since nobody has chosen off.
+ *
+ * The server sends the switch's new position as the target value, never a
+ * flip, so a stale page cannot invert the setting. Controlled from the stored
+ * lineup: the switch moves when the page revalidates with Pinball Map's
+ * reported result, not optimistically.
+ */
+function InsiderConnectedSwitch({
+  view,
+  readOnly,
+  pending,
+  onChange,
+}: {
+  view: PbmInsiderConnectedView;
+  readOnly: boolean;
+  pending: boolean;
+  onChange: (enabled: boolean) => void;
+}): React.JSX.Element {
+  return (
+    <div className="flex items-center gap-2">
+      <Switch
+        checked={view.setting === "on"}
+        onCheckedChange={onChange}
+        disabled={readOnly || pending}
+        aria-label="Insider Connected"
+        data-testid="pbm-insider-connected-switch"
+      />
+      <span
+        className={cn(
+          "text-sm",
+          view.setting === "not_set"
+            ? "text-muted-foreground"
+            : "text-foreground"
+        )}
+        data-testid="pbm-insider-connected-setting"
+      >
+        {INSIDER_CONNECTED_LABEL[view.setting]}
+      </span>
+    </div>
   );
 }
 

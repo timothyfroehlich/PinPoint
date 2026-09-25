@@ -9,7 +9,7 @@
 
 import type React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { act, render, screen } from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom/vitest";
 
@@ -18,6 +18,7 @@ import {
   checkRemovalCommentsAction,
   refreshPinballmapLineupAction,
   removeMachineFromPinballMapAction,
+  setInsiderConnectedAction,
   setPinballmapIntentAction,
 } from "~/app/(app)/m/pinballmap-actions";
 import type {
@@ -32,6 +33,7 @@ vi.mock("~/app/(app)/m/pinballmap-actions", () => ({
   checkRemovalCommentsAction: vi.fn(),
   refreshPinballmapLineupAction: vi.fn(),
   removeMachineFromPinballMapAction: vi.fn(),
+  setInsiderConnectedAction: vi.fn(),
   setPinballmapIntentAction: vi.fn(),
 }));
 
@@ -142,6 +144,7 @@ function renderControl(overrides: Partial<Props> = {}): {
         canRefresh={true}
         writeEnabled={true}
         modelName="Medieval Madness"
+        insiderConnected={null}
         {...overrides}
       />
     </RelativeTimeProvider>
@@ -173,6 +176,10 @@ beforeEach(() => {
   vi.mocked(setPinballmapIntentAction).mockResolvedValue({
     ok: true,
     value: { intent: "on" },
+  });
+  vi.mocked(setInsiderConnectedAction).mockResolvedValue({
+    ok: true,
+    value: { icEnabled: true },
   });
   vi.mocked(refreshPinballmapLineupAction).mockResolvedValue({
     ok: true,
@@ -218,6 +225,7 @@ describe("the status sentence", () => {
           canRefresh
           writeEnabled
           modelName="Medieval Madness"
+          insiderConnected={{ lmxId: 1, setting: "not_set" }}
         />
       );
       expect(
@@ -473,6 +481,103 @@ describe("the intent toggle", () => {
     }
     // …but Refresh stays available to them (8.3).
     expect(screen.getByTestId("pbm-listing-refresh")).toBeEnabled();
+  });
+});
+
+describe("the Insider Connected row (3.8)", () => {
+  it("is absent when 3.8 shows nothing", () => {
+    renderControl({ view: VIEWS.on });
+    expect(
+      screen.queryByTestId("pbm-listing-row-insider-connected")
+    ).not.toBeInTheDocument();
+  });
+
+  it("sits between the intent and status rows", () => {
+    renderControl({
+      view: VIEWS.on,
+      insiderConnected: { lmxId: 1, setting: "on" },
+    });
+    const rows = within(screen.getByTestId("pbm-listing-rows"))
+      .getAllByTestId(/^pbm-listing-row-/)
+      .map((row) => row.getAttribute("data-testid"));
+    expect(rows).toEqual([
+      "pbm-listing-row-intent",
+      "pbm-listing-row-insider-connected",
+      "pbm-listing-row-status",
+    ]);
+  });
+
+  it.each([
+    ["on", true, "On"],
+    ["off", false, "Off"],
+    ["not_set", false, "Not set"],
+  ] as const)(
+    "shows %s as a switch that is checked=%s, labelled %s",
+    (setting, checked, label) => {
+      renderControl({
+        view: VIEWS.on,
+        insiderConnected: { lmxId: 1, setting },
+      });
+      const toggle = screen.getByRole("switch", { name: "Insider Connected" });
+      if (checked) expect(toggle).toBeChecked();
+      else expect(toggle).not.toBeChecked();
+      expect(
+        screen.getByTestId("pbm-insider-connected-setting")
+      ).toHaveTextContent(label);
+    }
+  );
+
+  it("sends the switch's new position as the target", async () => {
+    const user = userEvent.setup();
+    renderControl({
+      view: VIEWS.on,
+      insiderConnected: { lmxId: 1, setting: "not_set" },
+    });
+    await user.click(screen.getByRole("switch", { name: "Insider Connected" }));
+
+    const formData = vi.mocked(setInsiderConnectedAction).mock.calls[0]?.[1];
+    expect(formData?.get("machineId")).toBe("m-1");
+    expect(formData?.get("enabled")).toBe("true");
+  });
+
+  it("is read-only without a provisioned credential", () => {
+    renderControl({
+      view: VIEWS.on,
+      writeEnabled: false,
+      insiderConnected: { lmxId: 1, setting: "off" },
+    });
+    expect(
+      screen.getByRole("switch", { name: "Insider Connected" })
+    ).toBeDisabled();
+  });
+
+  it("is read-only without the push capability", () => {
+    renderControl({
+      view: VIEWS.on,
+      canPush: false,
+      insiderConnected: { lmxId: 1, setting: "off" },
+    });
+    expect(
+      screen.getByRole("switch", { name: "Insider Connected" })
+    ).toBeDisabled();
+  });
+
+  it("surfaces a failed change", async () => {
+    const user = userEvent.setup();
+    vi.mocked(setInsiderConnectedAction).mockResolvedValue({
+      ok: false,
+      code: "PBM_UNCLEAR",
+      message: "Pinball Map didn't confirm the change.",
+    });
+    renderControl({
+      view: VIEWS.on,
+      insiderConnected: { lmxId: 1, setting: "on" },
+    });
+    await user.click(screen.getByRole("switch", { name: "Insider Connected" }));
+
+    expect(await screen.findByTestId("pbm-listing-error")).toHaveTextContent(
+      "Pinball Map didn't confirm the change."
+    );
   });
 });
 

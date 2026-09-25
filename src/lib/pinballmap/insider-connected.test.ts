@@ -64,15 +64,12 @@ function derive(opts: {
 
 describe("deriveInsiderConnectedView", () => {
   it.each([
-    [true, "on", false],
-    [false, "off", true],
-    [null, "not_set", true],
-  ] as const)(
-    "reads PBM's %s as %s and offers the other state",
-    (icEnabled, setting, target) => {
-      expect(derive({ icEnabled })).toEqual({ lmxId: LMX, setting, target });
-    }
-  );
+    [true, "on"],
+    [false, "off"],
+    [null, "not_set"],
+  ] as const)("reads PBM's %s as %s", (icEnabled, setting) => {
+    expect(derive({ icEnabled })).toEqual({ lmxId: LMX, setting });
+  });
 
   it("shows nothing for a title the catalog does not mark eligible", () => {
     // Even with a recorded value: eligibility comes only from the catalog flag.
