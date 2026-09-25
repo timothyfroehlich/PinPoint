@@ -1,25 +1,17 @@
 #!/bin/bash
 # Claude Code hook: PostToolUse (Bash)
-# Non-blocking reminder to run preflight after pushing.
-# Always exits 0 — this is a nudge, not a gate.
+# Non-blocking reminder after `git push`. Always exits 0 — a nudge, not a gate.
+# PostToolUse stderr is never shown to the model, so the reminder goes out as
+# JSON additionalContext on stdout.
 
-# If jq is not available, exit successfully to keep this hook non-blocking.
 if ! command -v jq >/dev/null 2>&1; then
   exit 0
 fi
 
-INPUT=$(cat)
-COMMAND=$(echo "$INPUT" | jq -r '.tool_input.command // empty')
+COMMAND=$(jq -r '.tool_input.command // empty')
 
-# Only trigger on git push commands
-if ! echo "$COMMAND" | grep -qE '(^|[[:space:]]|;|&&)[[:space:]]*git[[:space:]]+push'; then
+if ! grep -qE '(^|[[:space:]]|;|&&)[[:space:]]*git[[:space:]]+push' <<<"$COMMAND"; then
   exit 0
 fi
 
-cat >&2 <<'MSG'
-📋 Reminder: Did you run `pnpm run preflight` before pushing?
-   - For code changes: run preflight before marking the task done.
-   - For trivial changes (comments, docs, formatting): carry on — CI will validate.
-MSG
-
-exit 0
+jq -n '{hookSpecificOutput: {hookEventName: "PostToolUse", additionalContext: "Pushed. If this change touches migrations, auth, server actions, middleware or the DB schema, run `pnpm run preflight` before handing off; otherwise CI covers it (AGENTS.md §2.2)."}}'

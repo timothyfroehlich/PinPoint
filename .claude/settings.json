@@ -1,10 +1,5 @@
 {
   "permissions": {
-    "allow": [
-      "Bash(bash scripts/workflow/mark-review.sh *)",
-      "Bash(bash scripts/workflow/review-preflight.sh *)",
-      "mcp__pr_lifecycle_watch__watch_pr_lifecycle"
-    ],
     "deny": [
       "Bash(supabase db push:*)",
       "Bash(supabase projects delete:*)",
@@ -16,11 +11,25 @@
       "Bash(gh repo delete *)",
       "Bash(shutdown:*)",
       "Bash(reboot:*)",
-      "Bash(mkfs:*)"
+      "Bash(mkfs:*)",
+      "Bash(gh pr merge*)",
+      "Bash(gh pr -* merge)",
+      "Bash(gh pr -* merge *)",
+      "Bash(gh api *pulls/*/merge*)",
+      "Bash(gh api *mergePullRequest*)",
+      "Bash(gh api *enablePullRequestAutoMerge*)",
+      "Bash(gh pr checkout*)",
+      "Bash(gh pr co *)",
+      "Bash(gh co *)",
+      "mcp__github__merge_pull_request",
+      "mcp__github__enable_pr_auto_merge",
+      "mcp__claude_ai_GitHub__merge_pull_request",
+      "mcp__claude_ai_GitHub__enable_pr_auto_merge",
+      "mcp__plugin_github_github__merge_pull_request",
+      "mcp__plugin_github_github__enable_pr_auto_merge"
     ],
     "ask": [
-      "Bash(*merge-pr.sh*--force*)",
-      "Bash(*merge-pr.sh*--bypass-merge-requirements*)",
+      "Bash(*merge-pr.sh *)",
       "Bash(supabase db reset:*)",
       "Bash(supabase db remote commit:*)",
       "Bash(supabase migration repair:*)",
@@ -36,6 +45,28 @@
       "mcp__claude_ai_Supabase__merge_branch",
       "mcp__claude_ai_Supabase__rebase_branch",
       "mcp__claude_ai_Supabase__reset_branch",
+      "mcp__Supabase__execute_sql",
+      "mcp__Supabase__apply_migration",
+      "mcp__Supabase__deploy_edge_function",
+      "mcp__Supabase__pause_project",
+      "mcp__Supabase__restore_project",
+      "mcp__Supabase__create_project",
+      "mcp__Supabase__create_branch",
+      "mcp__Supabase__delete_branch",
+      "mcp__Supabase__merge_branch",
+      "mcp__Supabase__rebase_branch",
+      "mcp__Supabase__reset_branch",
+      "mcp__plugin_supabase_supabase__execute_sql",
+      "mcp__plugin_supabase_supabase__apply_migration",
+      "mcp__plugin_supabase_supabase__deploy_edge_function",
+      "mcp__plugin_supabase_supabase__pause_project",
+      "mcp__plugin_supabase_supabase__restore_project",
+      "mcp__plugin_supabase_supabase__create_project",
+      "mcp__plugin_supabase_supabase__create_branch",
+      "mcp__plugin_supabase_supabase__delete_branch",
+      "mcp__plugin_supabase_supabase__merge_branch",
+      "mcp__plugin_supabase_supabase__rebase_branch",
+      "mcp__plugin_supabase_supabase__reset_branch",
       "Bash(rm -rf:*)",
       "Bash(rm -fr *)",
       "Bash(docker rm:*)",
@@ -71,17 +102,7 @@
           {
             "type": "command",
             "command": "node \"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/inject-beads-actor.cjs",
-            "timeout": 5000
-          }
-        ]
-      },
-      {
-        "matcher": "Bash|mcp__github__merge_pull_request",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/block-direct-merge.cjs",
-            "timeout": 5000
+            "timeout": 5
           }
         ]
       },
@@ -91,27 +112,7 @@
           {
             "type": "command",
             "command": "node \"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/block-main-worktree-branch-switch.cjs",
-            "timeout": 5000
-          }
-        ]
-      },
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/block-gh-pr-checkout.cjs",
-            "timeout": 5000
-          }
-        ]
-      },
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/block-direct-pr-watch.cjs",
-            "timeout": 5000
+            "timeout": 5
           }
         ]
       }
@@ -123,7 +124,7 @@
           {
             "type": "command",
             "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/preflight-reminder.sh",
-            "timeout": 5000
+            "timeout": 5
           }
         ]
       },
@@ -133,7 +134,7 @@
           {
             "type": "command",
             "command": "node \"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/ui-screenshot-reminder.cjs",
-            "timeout": 5000
+            "timeout": 5
           }
         ]
       }
@@ -144,7 +145,7 @@
           {
             "type": "command",
             "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/worktree-create.sh",
-            "timeout": 240000
+            "timeout": 240
           }
         ]
       }
@@ -155,7 +156,7 @@
           {
             "type": "command",
             "command": "python3 \"${CLAUDE_PROJECT_DIR:-.}/scripts/worktree_cleanup.py\" --claude-hook",
-            "timeout": 60000
+            "timeout": 60
           }
         ]
       }
@@ -166,7 +167,7 @@
           {
             "type": "command",
             "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/scripts/hooks/prototype-mode-poll.sh",
-            "timeout": 5000
+            "timeout": 5
           }
         ]
       }
@@ -178,22 +179,22 @@
           {
             "type": "command",
             "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/session-start-orphan-sweep.sh",
-            "timeout": 15000
+            "timeout": 15
           },
           {
             "type": "command",
             "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/scripts/hooks/prototype-mode-poll.sh",
-            "timeout": 5000
+            "timeout": 5
           },
           {
             "type": "command",
             "command": "node \"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/verify-guard-stack.cjs",
-            "timeout": 5000
+            "timeout": 5
           },
           {
             "type": "command",
             "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/session-start-chores-nag.sh",
-            "timeout": 5000
+            "timeout": 5
           }
         ]
       }

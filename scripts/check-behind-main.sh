@@ -45,7 +45,7 @@ fi
 # Format the warning so it's hard to miss.
 {
   echo ""
-  echo "⚠️  Branch is $behind commit(s) behind origin/main."
+  echo "⚠️  warning: branch is $behind commit(s) behind origin/main."
   if [[ "$conflicts" -eq 1 ]]; then
     echo "   ⛔ Merge conflicts detected. GitHub Actions WILL NOT run the CI"
     echo "      workflow on a 'pull_request:synchronize' event while the PR is"

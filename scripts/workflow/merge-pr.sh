@@ -16,7 +16,7 @@
 #   -a, --automerge               Poll the gates instead of evaluating them once, and merge
 #                                 as soon as they all pass. Fire it while CI is still
 #                                 running — that is what it is for. It does NOT wait out
-#                                 an unreviewed head: `reviewed` never WAITs. An unattested
+#                                 an unreviewed head: `reviewed` never WAITs. An unreviewed
 #                                 head hard-fails on the FIRST poll and the run ends. Get
 #                                 fresh exact-head review coverage BEFORE firing this.
 #                                 Terminates on exactly three outcomes, each
@@ -42,16 +42,18 @@
 # no_conflict gate is NEVER bypassable — GitHub rejects conflicting merges regardless of --admin.
 # Authorship gate has no bypass; this script operates only on PRs you authored OR PRs authored
 # by trusted dependency-bot identities (Dependabot or the hosted Renovate App).
-# Both --force and --bypass-merge-requirements require manual permission approval
-# (settings.json permissions.ask).
+# Every invocation, including --force and --bypass-merge-requirements, prompts
+# for approval in Claude Code (settings.json permissions.ask) and Codex
+# (.codex/rules/pinpoint.rules).
 #
 # Defense-in-depth note (PP-wi85): Tim's direct, unambiguous merge request in
 # the active task is the authorization boundary in every harness. The --human
 # flag is a same-tool guard against accidental/scripted invocation; it does not
-# independently verify that request. Claude Code and Codex may also use
-# block-direct-merge.cjs to prompt before running this script. Every harness
-# must honor the active-task request whether or not the hook is present. Raw merge channels (gh pr merge, gh api PUT
-# .../merge, MCP merge) remain prohibited for agents because they skip gates.
+# independently verify that request. Claude Code and Codex may also prompt
+# before running this script. Every harness must honor the active-task request
+# whether or not it prompts. Raw merge channels (gh pr merge, gh api PUT
+# .../merge, MCP merge) remain prohibited for agents because they skip gates;
+# Claude Code and Codex deny them outright.
 
 set -euo pipefail
 
@@ -64,7 +66,7 @@ AUTOMERGE=false
 
 # Automerge polling budget. Defaults sized for this repo: the full E2E suite runs
 # ~10-15 min, so an hour covers a normal PR with room for a CI re-run. It is not
-# sized to wait out a review — the review must already be attested before this runs.
+# sized to wait out a review — the review must already cover head before this runs.
 AUTOMERGE_TIMEOUT=${AUTOMERGE_TIMEOUT:-3600}
 AUTOMERGE_POLL_INTERVAL=${AUTOMERGE_POLL_INTERVAL:-30}
 
@@ -95,9 +97,9 @@ fi
 
 # --human is required to actually merge (PP-wi85). --dry-run is exempt.
 # An agent may invoke this script after Tim directly requests the unambiguous
-# merge in the active task. Claude Code and Codex may also prompt through the
-# block-direct-merge.cjs hook. --human is a same-tool guard against accidental
-# or scripted calls, not an independent authorization check.
+# merge in the active task. Claude Code and Codex may also show a permission
+# prompt. --human is a same-tool guard against accidental or scripted calls,
+# not an independent authorization check.
 if [ "$DRY_RUN" != "true" ] && [ "$HUMAN" != "true" ]; then
   echo "REFUSE: merges require Tim's direct request in the active task and --human." >&2
   echo "        If requested, run scripts/workflow/merge-pr.sh $PR --human; otherwise use merge-handoff.sh $PR. --dry-run previews without merging." >&2
@@ -458,9 +460,9 @@ fi
 # --- Execute merge ---
 # Reaching this line already required --human and all merge gates above. Tim's
 # direct request in the active task authorizes the owning agent in any harness;
-# Claude Code and Codex may also prompt through block-direct-merge.cjs. This
-# `gh pr merge` runs as a subprocess of the script, so the hook does not see
-# it directly; --human is the same-tool guard for that layer.
+# Claude Code and Codex may also show a permission prompt. This `gh pr merge`
+# runs as a subprocess of the script, so the harness deny rules for raw merges
+# never see it; --human is the same-tool guard for that layer.
 gh pr merge "$PR" "${MERGE_ARGS[@]}"
 echo "MERGED: PR #$PR"
 

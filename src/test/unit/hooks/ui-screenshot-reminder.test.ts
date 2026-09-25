@@ -77,10 +77,10 @@ describe("ui-screenshot-reminder.cjs", () => {
   it("reminds when a commit touches src/components", () => {
     const dir = makeRepo();
     commitFile(dir, "src/components/Foo.tsx", "export const Foo = 1;\n");
-    const { status, stderr } = runHook(dir);
+    const { status, stdout } = runHook(dir);
     expect(status).toBe(0);
-    expect(stderr).toContain("UI-touching change");
-    expect(stderr).toContain("pr-screenshots.mjs");
+    expect(stdout).toContain("UI-touching change");
+    expect(stdout).toContain("pr-screenshots.mjs");
   });
 
   it("reminds when a commit touches a src/app tsx page", () => {
@@ -90,33 +90,33 @@ describe("ui-screenshot-reminder.cjs", () => {
       "src/app/dashboard/page.tsx",
       "export default function P(){}\n"
     );
-    const { status, stderr } = runHook(dir);
+    const { status, stdout } = runHook(dir);
     expect(status).toBe(0);
-    expect(stderr).toContain("UI-touching change");
+    expect(stdout).toContain("UI-touching change");
   });
 
   it("reminds when a commit touches a css file", () => {
     const dir = makeRepo();
     commitFile(dir, "src/app/globals.css", "body{}\n");
-    const { status, stderr } = runHook(dir);
+    const { status, stdout } = runHook(dir);
     expect(status).toBe(0);
-    expect(stderr).toContain("UI-touching change");
+    expect(stdout).toContain("UI-touching change");
   });
 
   it("stays silent for a non-UI commit", () => {
     const dir = makeRepo();
     commitFile(dir, "scripts/workflow/foo.sh", "#!/usr/bin/env bash\n");
-    const { status, stderr } = runHook(dir);
+    const { status, stdout } = runHook(dir);
     expect(status).toBe(0);
-    expect(stderr).toBe("");
+    expect(stdout).toBe("");
   });
 
   it("stays silent for a non-commit Bash command", () => {
     const dir = makeRepo();
     commitFile(dir, "src/components/Foo.tsx", "export const Foo = 1;\n");
-    const { status, stderr } = runHook(dir, "git status");
+    const { status, stdout } = runHook(dir, "git status");
     expect(status).toBe(0);
-    expect(stderr).toBe("");
+    expect(stdout).toBe("");
   });
 
   it("fails open when origin/main is unavailable", () => {
@@ -131,9 +131,9 @@ describe("ui-screenshot-reminder.cjs", () => {
     execFileSync("git", ["add", "README.md"], { cwd: dir });
     execFileSync("git", ["commit", "-q", "-m", "base"], { cwd: dir });
     // No origin/main ref created — the hook must not throw/exit non-zero.
-    const { status, stderr } = runHook(dir);
+    const { status, stdout } = runHook(dir);
     expect(status).toBe(0);
-    expect(stderr).toBe("");
+    expect(stdout).toBe("");
   });
 
   it("stays silent for malformed JSON on stdin", () => {
