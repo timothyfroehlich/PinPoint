@@ -32,6 +32,7 @@
       "Bash(bash scripts/workflow/merge-pr.sh *)",
       "Bash(bash ./scripts/workflow/merge-pr.sh *)",
       "Bash(bash /*/scripts/workflow/merge-pr.sh *)",
+      "Bash(bash -x *scripts/workflow/merge-pr.sh *)",
       "Bash(scripts/workflow/merge-pr.sh *)",
       "Bash(./scripts/workflow/merge-pr.sh *)",
       "Bash(/*/scripts/workflow/merge-pr.sh *)",
