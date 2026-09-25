@@ -132,6 +132,7 @@ describe("/api/unsubscribe", () => {
       emailNotifyOnNewComment: false,
       emailNotifyOnNewIssue: false,
       emailWatchNewIssuesGlobal: false,
+      emailNotifyOnPinballMapComment: false,
     });
     expect(updateWhereMock).toHaveBeenCalledTimes(1);
   });

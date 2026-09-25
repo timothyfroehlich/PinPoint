@@ -6,9 +6,11 @@ Stops Supabase, removes Docker volumes, removes/prunes the git worktree, then
 deallocates its manifest slot. Call it directly with one worktree path, or use
 `--claude-hook` to read Claude Code's `worktree_path` JSON field from stdin.
 
-The exit code is load-bearing: this script's caller (Claude Code's
-WorktreeRemove hook) has no other way to learn that a worktree leaked. Two
-rules follow from that, both of them regressions we have actually shipped:
+Exit 0 means the teardown is complete; 1 means anything else — a refusal, a
+failure, or something left behind — with the reason on stderr. The caller
+(Claude Code's WorktreeRemove hook) has no other way to learn that a worktree
+leaked. Two rules follow from that, both of them regressions we have actually
+shipped:
 
 - **A missing target is never a silent success** (PP-omz3). Being handed a path
   that isn't there used to warn and `return`, i.e. exit 0, so a wrong or
@@ -16,8 +18,8 @@ rules follow from that, both of them regressions we have actually shipped:
   slot deallocation — while everything upstream believed the worktree was
   cleaned. Exit 0 now requires *evidence* of a clean state: the path absent
   from both `git worktree list` and the slot manifest.
-- **Unknown is never zero** (PP-3w4g, mirroring PP-5o7b / PR #1746 in
-  `worktree_orphan_sweep.py`). A failed `docker volume ls` used to collapse
+- **Unknown is never zero** (PP-3w4g, mirroring PP-5o7b / PR #1746 in the
+  orphan section of `worktree_reap.py`). A failed `docker volume ls` used to collapse
   into `volumes = []`, indistinguishable from "no volumes exist", after which
   the worktree was removed and the slot deallocated while the volumes leaked.
   An unqueryable Docker now yields an explicit unknown and a non-zero exit — as
@@ -34,82 +36,39 @@ query filtered on a label nothing carries returns a clean, wrong zero.
 import fcntl
 import json
 import os
-import shlex
 import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
 
 # Reuse the project-id resolution from worktree_setup so cleanup targets the
-# same container/volume names that setup created. (Python auto-adds this
-# script's directory to sys.path when invoked as `python3 worktree_cleanup.py`.)
-from worktree_setup import branch_to_project_id, read_pinned_project_id  # noqa: E402
+# same container/volume names that setup created: the pinned id in the
+# worktree's config.toml wins, and only a worktree without one falls back to
+# the branch (or, when detached, the path). Deriving from the branch alone
+# would target a label no volume carries after a branch rename (PP-rbbp).
+# (Python auto-adds this script's directory to sys.path when invoked as
+# `python3 worktree_cleanup.py`.)
+from worktree_setup import (  # noqa: E402
+    DockerNotInstalledError,
+    DockerUnavailableError,
+    list_worktrees,
+    read_stored_backend,
+    resolve_project_id,
+    run_docker,
+)
 
 MANIFEST_PATH = Path.home() / ".config" / "pinpoint" / "worktree-slots.json"
 
 SUPABASE_PROJECT_LABEL = "com.supabase.cli.project"
 
-SWEEP_HINT = "python3 scripts/worktree_orphan_sweep.py --apply"
+REAP_HINT = "python3 scripts/worktree_reap.py --apply"
 
 #: Everything cleaned up (or verifiably nothing to clean up).
 EXIT_OK = 0
-#: Usage error, the git worktree removal itself failed, or a remote-backend
-#: worktree was refused because PINPOINT_REMOTE_DOCKER_HOST is unset.
+#: Anything else: a usage error, a refusal (main worktree, remote backend
+#: without PINPOINT_REMOTE_DOCKER_HOST), a failed removal, a missing target
+#: with residue, or Supabase volumes whose state is unknown. stderr says which.
 EXIT_FAILED = 1
-#: Refused to operate: the target is the main worktree.
-EXIT_MAIN_WORKTREE = 2
-#: The target path does not exist *and* residue for it still exists (a slot
-#: manifest entry, a git worktree registration, or an unreadable source of
-#: truth for either). Nothing was reclaimed, so this must not read as success.
-EXIT_STALE_TARGET = 3
-#: Cleanup ran but the Supabase volumes were neither counted nor removed —
-#: either Docker could not be enumerated, or it was never queried because no
-#: branch yielded a project_id (the `.git`-less PP-qlzu path, PP-ew10). Either
-#: way `worktree_orphan_sweep.py` is the backstop. The `.git`-less case must
-#: prune any stale Git registration first so the sweep no longer treats that
-#: project's retained config as active.
-#: NOTE: `worktree_orphan_sweep.py` spells its equivalent `EXIT_DOCKER_UNKNOWN = 1`
-#: — the same name with a different value, deliberately. In that script 1 is free;
-#: here it already means "failed", and callers distinguish these codes per script.
-EXIT_DOCKER_UNKNOWN = 4
-
-
-def resolve_project_id(worktree_path: Path, branch: str) -> str:
-    """Pick the Supabase project id whose containers and volumes to tear down.
-
-    A pinned id recorded in the worktree's `supabase/config.toml` always wins.
-    That file is what the Supabase CLI itself reads, so it is the authoritative
-    record of the id the stack was started under — and since PP-4936 it survives
-    a `git checkout -b` inside a live worktree instead of following the branch.
-    Deriving from the branch here would then target a label no volume carries,
-    the `docker volume ls --filter` query would return an honest-looking zero,
-    and the volumes would leak (PP-rbbp).
-
-    Falls back to `branch_to_project_id(branch)` only when there is no usable
-    pinned id — a worktree set up before PP-4936, or a config.toml that is
-    missing, unreadable, or carries an id outside the shape setup generates.
-    Same precedence as `worktree_orphan_sweep.get_active_project_ids()`.
-
-    This deliberately does not call `worktree_setup.resolve_project_id`, whose
-    precedence is identical: its divergence message is written for the setup
-    path ("keeping pinned … renaming it would orphan this worktree's running
-    stack"), which is the wrong story to tell during a teardown. Two callers is
-    below the Rule of Three; if a third appears, hoist the shared body and pass
-    the message in.
-    """
-    derived = branch_to_project_id(branch)
-    pinned = read_pinned_project_id(worktree_path)
-    if pinned is None:
-        return derived
-    if pinned != derived:
-        print(
-            f"Note: tearing down pinned Supabase project_id '{pinned}' from "
-            f"{worktree_path / 'supabase' / 'config.toml'} — branch '{branch}' "
-            f"would derive '{derived}', but the running stack and its volumes "
-            "are labelled with the pinned id.",
-            file=sys.stderr,
-        )
-    return pinned
 
 
 def deallocate_slot(worktree_path: str) -> None:
@@ -168,46 +127,20 @@ def registered_worktree_paths() -> set[str] | None:
     """
     repo_dir = Path(__file__).resolve().parent.parent
     try:
-        result = subprocess.run(
-            ["git", "-C", str(repo_dir), "worktree", "list", "--porcelain"],
-            capture_output=True,
-            text=True,
-            check=True,
-        )
+        worktrees = list_worktrees(repo_dir)
     except (OSError, subprocess.CalledProcessError):
         return None
-    prefix = "worktree "
-    return {
-        str(Path(line[len(prefix) :]).resolve())
-        for line in result.stdout.splitlines()
-        if line.startswith(prefix)
-    }
+    return {str(Path(path).resolve()) for path in worktrees}
 
 
 def main_worktree_path(worktree_path: Path) -> Path | None:
     """Return Git's main worktree, which remains usable after target removal."""
     try:
-        result = subprocess.run(
-            [
-                "git",
-                "-C",
-                str(worktree_path),
-                "worktree",
-                "list",
-                "--porcelain",
-            ],
-            capture_output=True,
-            text=True,
-            check=True,
-        )
+        worktrees = list_worktrees(worktree_path)
     except (OSError, subprocess.CalledProcessError):
         return None
-
-    prefix = "worktree "
-    for line in result.stdout.splitlines():
-        if line.startswith(prefix):
-            return Path(line[len(prefix) :]).resolve()
-    return None
+    main = next(iter(worktrees), None)
+    return Path(main).resolve() if main is not None else None
 
 
 def report_missing_target(worktree_path: Path) -> int:
@@ -252,65 +185,16 @@ def report_missing_target(worktree_path: Path) -> int:
         + "; ".join(residue)
         + ". Nothing was reclaimed: no `supabase stop`, no Docker volume removal, "
         "no slot deallocation. Check the path you passed (a wrong or mangled path "
-        f"lands here), then re-run with the real path or sweep with `{SWEEP_HINT}`.",
+        f"lands here), then re-run with the real path or reclaim orphans with `{REAP_HINT}`.",
         file=sys.stderr,
     )
-    return EXIT_STALE_TARGET
-
-
-# These three mirror `worktree_orphan_sweep.py` by name and behaviour on
-# purpose: two scripts touching the same Docker resources should fail the same
-# way. The duplication is deliberate and stays until there's a third caller —
-# the sweep already imports from this module, so hoisting later is a one-liner,
-# but doing it now would mean editing the sweep for no behaviour change.
-class DockerNotInstalledError(RuntimeError):
-    """The `docker` binary is absent, so there are genuinely no volumes."""
+    return EXIT_FAILED
 
 
 #: Upper bound for each `supabase`/`docker` call during teardown. With the
 #: remote backend these run over SSH, and a sleeping host or a lossy link would
 #: otherwise hang the WorktreeRemove hook and merge-pr.sh's reap indefinitely.
 TEARDOWN_TIMEOUT_SECONDS = 120
-
-
-class DockerUnavailableError(RuntimeError):
-    """Docker is installed but could not be enumerated.
-
-    Callers MUST surface this as *unknown*, never as an empty result. Swallowing
-    it into `[]` is the false zero PP-3w4g reports: the worktree was then
-    removed and the slot deallocated while the volumes stayed on disk.
-    """
-
-
-def _run_docker(args: list[str], env: dict[str, str] | None = None) -> str:
-    """Run a docker command and return stdout, or raise rather than return empty."""
-    try:
-        result = subprocess.run(
-            args,
-            capture_output=True,
-            text=True,
-            check=True,
-            env=env,
-            timeout=TEARDOWN_TIMEOUT_SECONDS,
-        )
-    except FileNotFoundError as exc:
-        raise DockerNotInstalledError("`docker` is not installed") from exc
-    except subprocess.TimeoutExpired as exc:
-        raise DockerUnavailableError(
-            f"`{shlex.join(args)}` timed out after {exc.timeout:.0f}s"
-        ) from exc
-    except OSError as exc:
-        raise DockerUnavailableError(
-            f"could not run `{shlex.join(args)}`: {exc}"
-        ) from exc
-    except subprocess.CalledProcessError as exc:
-        detail = (
-            (exc.stderr or "").strip()
-            or (exc.stdout or "").strip()
-            or f"exit status {exc.returncode}"
-        )
-        raise DockerUnavailableError(f"`{shlex.join(args)}` failed: {detail}") from exc
-    return result.stdout
 
 
 @dataclass(frozen=True)
@@ -342,11 +226,11 @@ def list_project_volumes(
 
     The `--filter label=<k>=<v>` + `-q` form is honoured by both Docker and
     Podman, so this query does NOT need the two-call `volume inspect` dance that
-    PP-5o7b forced on `worktree_orphan_sweep.py`. Only the error handling is
+    PP-5o7b forced on `worktree_reap.py`. Only the error handling is
     shared with it: a query that didn't run must never look like an empty one.
     """
     try:
-        stdout = _run_docker(
+        stdout = run_docker(
             [
                 "docker",
                 "volume",
@@ -356,6 +240,7 @@ def list_project_volumes(
                 "-q",
             ],
             env,
+            TEARDOWN_TIMEOUT_SECONDS,
         )
     except DockerNotInstalledError as exc:
         # No docker binary means there are genuinely no volumes on this host,
@@ -380,12 +265,12 @@ def supabase_backend_env(worktree_path: Path) -> tuple[dict[str, str], str | Non
     """
     env = os.environ.copy()
     env["SUPABASE_TELEMETRY_DISABLED"] = "1"
-    env_file = worktree_path / ".env.local"
-    backend = "local"
-    if env_file.is_file():
-        for line in env_file.read_text().splitlines():
-            if line.startswith("PINPOINT_SUPABASE_BACKEND="):
-                backend = line.partition("=")[2].strip() or "local"
+    backend = read_stored_backend(worktree_path)
+    if backend is None:
+        return (
+            env,
+            "its .env.local could not be read, so its Supabase backend is unknown",
+        )
     if backend != "remote":
         return env, None
     docker_host = os.environ.get("PINPOINT_REMOTE_DOCKER_HOST", "").strip()
@@ -443,10 +328,11 @@ def stop_and_remove_supabase(
     query = list_project_volumes(project_id, supabase_env)
     if query.is_unknown:
         volumes_unknown_reason = query.unknown_reason
+        # No recovery hint here: it depends on the backend, and the caller
+        # prints the right one (reap for a local stack, re-run for a remote one).
         print(
             f"Warning: Supabase volumes for {project_id} are UNKNOWN, not zero — "
-            f"{query.unknown_reason}. None were removed; if any exist they are now "
-            f"orphaned. Reclaim them with `{SWEEP_HINT}`.",
+            f"{query.unknown_reason}. None were removed.",
             file=sys.stderr,
         )
     elif query.volumes:
@@ -507,19 +393,19 @@ def cleanup_worktree(worktree_path: Path) -> int:
             "worktree_cleanup.py is for additional (git worktree add) worktrees only.",
             file=sys.stderr,
         )
-        return EXIT_MAIN_WORKTREE
+        return EXIT_FAILED
 
     # PP-qlzu: when .git is missing (partial removal, rm -rf without the hook,
     # Claude in Web sandbox sessions), we can't derive the branch and therefore
     # can't safely target the Supabase project_id. Skip the Docker/Supabase
     # phase but still deallocate the slot — otherwise the manifest entry leaks
     # forever. After any stale Git registration is pruned,
-    # worktree_orphan_sweep.py picks up any leaked Docker resources.
+    # worktree_reap.py picks up any leaked Docker resources.
     #
     # PP-ew10: skipping that phase means the volumes were never queried, so their
     # state is UNKNOWN — the same "success without evidence" shape as PP-omz3 and
     # PP-3w4g, reached from a third direction. Record it as unknown here so the run
-    # returns EXIT_DOCKER_UNKNOWN and points at the sweep, instead of a false
+    # returns EXIT_FAILED and points at worktree_reap.py, instead of a false
     # EXIT_OK for a teardown that never touched Docker.
     git_marker_present = git_marker.is_file()
 
@@ -567,12 +453,13 @@ def cleanup_worktree(worktree_path: Path) -> int:
         # slot deallocation.
         supabase_env, backend_problem = supabase_backend_env(worktree_path)
         if backend_problem is not None:
-            # The orphan sweep covers the local daemon only, so removing the
-            # worktree now would strand its remote volumes for good.
+            # Nothing here can reach the remote stack, and worktree_reap.py
+            # never removes a stopped one (its volumes carry no workdir label),
+            # so removing the worktree now could strand its remote volumes.
             print(
                 f"Refusing cleanup of {worktree_path}: {backend_problem}. "
-                "Keeping the worktree and slot; re-run with the remote Docker "
-                "settings exported (docs/runbooks/remote-supabase.md).",
+                "Keeping the worktree and slot; fix that and re-run "
+                "(docs/runbooks/remote-supabase.md).",
                 file=sys.stderr,
             )
             return EXIT_FAILED
@@ -580,6 +467,17 @@ def cleanup_worktree(worktree_path: Path) -> int:
         volumes_unknown_reason = stop_and_remove_supabase(
             worktree_path, project_id, supabase_env
         )
+        if volumes_unknown_reason and read_stored_backend(worktree_path) == "remote":
+            # A stopped remote stack's volumes carry no workdir label, so
+            # worktree_reap.py could never attribute them once the worktree is
+            # gone. Keep the worktree and slot until they can be removed here.
+            print(
+                f"Refusing to remove {worktree_path}: its remote Supabase volumes "
+                f"are UNKNOWN ({volumes_unknown_reason}). Keeping the worktree and "
+                "slot; re-run this cleanup once the remote Docker host is reachable.",
+                file=sys.stderr,
+            )
+            return EXIT_FAILED
 
     # Unlock first. Claude Code agent runtimes lock worktrees while in use,
     # and the lock persists after the agent finishes; `git worktree remove
@@ -642,7 +540,7 @@ def cleanup_worktree(worktree_path: Path) -> int:
 
     if volumes_unknown_reason is not None:
         # The slot is deallocated and (when we had a .git marker) the worktree
-        # removed, so the sweep — which matches on the Docker label, not the
+        # removed, so worktree_reap.py — which matches on the Docker label, not the
         # manifest — will still find any leaked volumes: a delayed leak, not a
         # permanent one. But this run did NOT finish the job, so it must not
         # report success to the WorktreeRemove hook.
@@ -650,7 +548,7 @@ def cleanup_worktree(worktree_path: Path) -> int:
             print(
                 f"Removed worktree {worktree_path} and deallocated its slot, but Supabase "
                 "volume state was UNKNOWN — cleanup is INCOMPLETE. Run "
-                f"`{SWEEP_HINT}` once Docker is reachable.",
+                f"`{REAP_HINT}` once Docker is reachable.",
                 file=sys.stderr,
             )
         else:
@@ -664,10 +562,10 @@ def cleanup_worktree(worktree_path: Path) -> int:
                 "volumes that exist are still on disk. Inspect the residual directory "
                 f"at {worktree_path}, preserve anything needed, and remove it manually. "
                 "Then remove any stale Git registration with `git worktree prune` and "
-                f"reclaim Docker resources with `{SWEEP_HINT}`.",
+                f"reclaim Docker resources with `{REAP_HINT}`.",
                 file=sys.stderr,
             )
-        return EXIT_DOCKER_UNKNOWN
+        return EXIT_FAILED
 
     print(f"Cleaned up worktree: {worktree_path}", file=sys.stderr)
     return EXIT_OK

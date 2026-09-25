@@ -614,8 +614,15 @@
     {
       "idx": 87,
       "version": "7",
-      "when": 1790349734059,
-      "tag": "0087_add-catalog-ic-eligible",
+      "when": 1790349796306,
+      "tag": "0087_pinballmap-comment-notifications",
+      "breakpoints": true
+    },
+    {
+      "idx": 88,
+      "version": "7",
+      "when": 1790365243006,
+      "tag": "0088_add-catalog-ic-eligible",
       "breakpoints": true
     }
   ]

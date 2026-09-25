@@ -179,8 +179,6 @@ Replacing the tracked location is a rare, near-never operation — PinPoint trac
 | Spec | Code today | Resolution |
 | :-- | :-- | :-- |
 | 7.3 comment marking on removal | Not implemented | PP-o355.36 |
-| 7.4 watcher notifications after baseline | Comments import with a silent per-location backfill and each new copy is identified, but no notification is sent | PP-o355.63 |
-| 7.7 one notification per watched cabinet | No comment notification exists | PP-o355.63 |
 | 10.9 comment re-marking on location change | Comments import, but copies from a previous location are not marked | PP-o355.36 |
 | 3.6–3.7 lineup confirmation | The client method exists, but no app action exposes venue-lineup confirmation | PP-o355.58 (confirm lineup, needs `/fleet` base PP-o355.7.1); condition-comment posting deferred (PP-o355.57) |
 | 8.2, 8.4–8.6 per-member account linking | Writes use one admin-provisioned operator credential; no member linking, relink state, or link prompt exists | PP-o355.6 |

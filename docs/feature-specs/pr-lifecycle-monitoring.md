@@ -135,7 +135,6 @@
 | 6.1–6.3 | Host coordination: concurrent watches coalesce under one polling leader | Removed 2026-09-24 in the watcher simplification: each watch polls GitHub on its own. The XDG lock, state-file, and leader/follower machinery cost more code than the duplicate polling it saved. | Delete §6 (requirement diff needs Tim's approval) |
 | 7.4 | Local execution telemetry (harness, model, wake count, elapsed duration) | Removed 2026-09-24 with the MCP wrapper and watcher agents, the only sources of harness, model, and wake data; nothing read the `tmp/gh-monitor/watcher-run-*.json` records. | Delete 7.4 (requirement diff needs Tim's approval) |
 | 8.3 | Only a review record provides coverage | The gate still accepts a CodeRabbit approval or Codex review on the exact head | Remove the CodeRabbit and Codex checkers once both subscriptions end |
-| 8.5–8.6, 8.13–8.20 | Local review, review record, and promotion after review | The gate does not read review records; agents promote on green CI and wait for CodeRabbit | PP-l4k4 |
 
 ---
 

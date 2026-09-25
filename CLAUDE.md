@@ -18,9 +18,8 @@ PinPoint uses single-context domain documentation. See `docs/agents/domain.md`.
 
 `REVIEW.md` at the repo root is the canonical review rubric. Read it before launching the code-review skill.
 
-Review flow (CodeRabbit by default on draft promotion; Codex as the manual fallback) and
-exact-head mechanics are canonical in AGENTS.md §5 "Getting a PR reviewed" and
-`pinpoint-pr-workflow` Phase 3.
+Review flow (a local `/code-review` whose review record covers the exact head) is
+canonical in AGENTS.md §5 "Getting a PR reviewed" and `pinpoint-pr-workflow` Phase 3.4.
 
 ### Sandbox network isolation
 

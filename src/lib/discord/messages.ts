@@ -7,6 +7,7 @@ import type { IssueStatus } from "~/lib/issues/status";
 import type { IssueFrequency, IssueSeverity } from "~/lib/types";
 import type { RecipientReason } from "~/lib/notifications/events";
 import { buildResourceUrl } from "~/lib/notifications/resource-url";
+import { pinballmapLocationUrl } from "~/lib/pinballmap/public-url";
 
 export {
   formatDiscordImprovementNotice,
@@ -54,6 +55,18 @@ export type DiscordMessageInput =
       machineName: string | undefined;
       machineInitials: string | undefined;
       ownershipChange: "added" | "removed";
+    }
+  | {
+      type: "pinballmap_comment";
+      siteUrl: string;
+      resourceType: "machine";
+      machineName: string | undefined;
+      machineInitials: string | undefined;
+      commenterName: string | undefined;
+      commentContent: string | undefined;
+      /** For the required link back to the location's listing (spec 9.1). */
+      pinballmapLocationId: number | undefined;
+      recipientReason: RecipientReason;
     };
 
 export function formatDiscordMessage(input: DiscordMessageInput): string {
@@ -85,6 +98,28 @@ function formatDiscordMessageBody(input: DiscordMessageInput): string {
         ? machine
         : `${machine.slice(0, Math.max(0, machineBudget - 1))}…`;
     return `${prefix}${linkedMachine}${suffix}`;
+  }
+
+  if (input.type === "pinballmap_comment") {
+    const url = buildResourceUrl({ ...input, machineTab: "timeline" });
+    const machine = clampDiscordText(
+      sanitizeDiscordText(input.machineName ?? "a machine"),
+      DISCORD_MAX_ACTOR_LABEL_LENGTH
+    );
+    const commenter = clampDiscordText(
+      sanitizeDiscordText(input.commenterName ?? "Pinball Map user"),
+      DISCORD_MAX_ACTOR_LABEL_LENGTH
+    );
+    const attribution =
+      input.pinballmapLocationId === undefined
+        ? "via Pinball Map"
+        : `[via Pinball Map](${pinballmapLocationUrl(input.pinballmapLocationId)})`;
+    return formatCommentMessage(
+      `**[${machine}](${url}) — ${commenter} commented on Pinball Map**`,
+      [`${attribution} · ${formatRecipientReason(input.recipientReason)}`],
+      input.commentContent,
+      0
+    );
   }
 
   const url = buildResourceUrl(input);
