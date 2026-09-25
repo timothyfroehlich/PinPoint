@@ -1,7 +1,47 @@
 import { describe, it, expect } from "vitest";
 import regionLmxFixture from "./fixtures/region-austin-lmxes.json";
 import regionLocationFixture from "./fixtures/region-austin-locations.json";
-import { parseRegionLmxes, parseRegionLocations } from "./parse";
+import { parseCatalog, parseRegionLmxes, parseRegionLocations } from "./parse";
+
+describe("parseCatalog image metadata", () => {
+  it("accepts the OPDB image URL and dimensions from Pinball Map", () => {
+    const [machine] = parseCatalog({
+      machines: [
+        {
+          id: 7,
+          name: "Godzilla (Premium)",
+          opdb_img: "https://img.opdb.org/example-medium.jpg",
+          opdb_img_width: 640,
+          opdb_img_height: 445,
+        },
+      ],
+    });
+
+    expect(machine).toMatchObject({
+      opdbImageUrl: "https://img.opdb.org/example-medium.jpg",
+      opdbImageWidth: 640,
+      opdbImageHeight: 445,
+    });
+  });
+
+  it("discards non-OPDB image origins and invalid dimensions", () => {
+    const [machine] = parseCatalog([
+      {
+        id: 8,
+        name: "Unknown",
+        opdb_img: "https://example.org/image.jpg",
+        opdb_img_width: -1,
+        opdb_img_height: "445",
+      },
+    ]);
+
+    expect(machine).toMatchObject({
+      opdbImageUrl: null,
+      opdbImageWidth: null,
+      opdbImageHeight: null,
+    });
+  });
+});
 
 /**
  * Contract tests for the region readers, against CAPTURED REAL PAYLOADS.
