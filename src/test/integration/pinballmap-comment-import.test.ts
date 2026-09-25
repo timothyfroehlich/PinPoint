@@ -29,7 +29,7 @@ import {
   userProfiles,
 } from "~/server/db/schema";
 import type { CommentImportResult } from "~/lib/pinballmap/comment-import";
-import type { PbmCondition } from "~/lib/pinballmap/types";
+import type { LocationSnapshot, PbmCondition } from "~/lib/pinballmap/types";
 
 vi.mock("~/server/db", async () => {
   const { getTestDb } = await import("~/test/setup/pglite");
@@ -74,7 +74,7 @@ function condition(id: number, comment: string): PbmCondition {
   };
 }
 
-function snapshotFor(locationId: number, entries: Entry[]): never {
+function snapshotFor(locationId: number, entries: Entry[]): LocationSnapshot {
   return {
     locationId,
     name: "APC",
@@ -90,7 +90,7 @@ function snapshotFor(locationId: number, entries: Entry[]): never {
     })),
     fetchedAtIso: new Date().toISOString(),
     raw: { mock: true },
-  } as never;
+  };
 }
 
 async function seedState(

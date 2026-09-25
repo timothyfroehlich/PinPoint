@@ -16,6 +16,7 @@
 
 import { test, expect } from "../support/fixtures.js";
 import { STORAGE_STATE } from "../support/auth-state.js";
+import { TEST_USERS } from "../support/constants.js";
 import { getTestIssueTitle, getTestPrefix } from "../support/test-isolation.js";
 import { cleanupTestEntities } from "../support/cleanup.js";
 import {
@@ -39,7 +40,7 @@ test.describe("Pinball Map comment conversion (PP-o355.4)", () => {
     const machineIds: string[] = [];
 
     try {
-      const memberId = await getProfileIdByEmail("member@test.com");
+      const memberId = await getProfileIdByEmail(TEST_USERS.member.email);
       const first = await createTestMachine(memberId);
       const second = await createTestMachine(memberId);
       machineIds.push(first.id, second.id);
