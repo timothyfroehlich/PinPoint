@@ -182,7 +182,7 @@ Replacing the tracked location is a rare, near-never operation — PinPoint trac
 | 7.4 watcher notifications after baseline | Comments import with a silent per-location backfill and each new copy is identified, but no notification is sent | PP-o355.63 |
 | 7.7 one notification per watched cabinet | No comment notification exists | PP-o355.63 |
 | 10.9 comment re-marking on location change | Comments import, but copies from a previous location are not marked | PP-o355.36 |
-| 3.6–3.8 additional outbound actions | Client methods exist, but no app actions expose venue-lineup confirmation or Insider Connected changes | PP-o355.58 (confirm lineup, needs `/fleet` base PP-o355.7.1), PP-o355.59 (Insider Connected); condition-comment posting deferred (PP-o355.57) |
+| 3.6–3.8 additional outbound actions | Client methods exist, but no app actions expose venue-lineup confirmation or Insider Connected changes; the Insider Connected client flips the setting instead of sending a target state, and the catalog mirror does not store eligibility | PP-o355.58 (confirm lineup, needs `/fleet` base PP-o355.7.1), PP-o355.59 (Insider Connected); condition-comment posting deferred (PP-o355.57) |
 | 8.2, 8.4–8.6 per-member account linking | Writes use one admin-provisioned operator credential; no member linking, relink state, or link prompt exists | PP-o355.6 |
 
 ---
