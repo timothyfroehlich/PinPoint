@@ -16,7 +16,7 @@
 - **Terminal verdict** — an authoritative, machine-readable JSON object emitted upon completion that gives the main agent everything needed to take its next step without follow-up queries.
 - **Failure artifact** — a targeted markdown summary of failed CI steps and errors written to disk, sparing the main agent from fetching or parsing raw workflow logs.
 - **Automated reviewer** — an AI evaluation service (CodeRabbit or Codex) that inspects PR changes against repository standards and provides reviews or comments.
-- **Review hierarchy** — the strict order of review preference: CodeRabbit first, falling back to Codex when CodeRabbit is unavailable or rate-limited.
+- **Review hierarchy** — the strict order of review preference: CodeRabbit first, falling back to Codex when CodeRabbit is rate-limited.
 - **Draft gate** — the policy boundary where automated review evaluation is suspended while a pull request is marked as a GitHub draft.
 - **Promotion trigger** — the automatic initiation of a CodeRabbit review when a pull request transitions from draft to ready for review.
 - **Re-review request** — an explicit, human- or agent-initiated command (`@coderabbitai review` or `@codex review`) requesting a new evaluation on an updated commit head.
@@ -91,7 +91,7 @@
 ## 8. Reviewer hierarchy & triggers
 
 - **8.1** CodeRabbit is the default automated reviewer for all pull requests.
-- **8.2** Codex is the secondary automated reviewer, invoked when CodeRabbit review quota is exhausted or when explicitly requested by an operator or agent.
+- **8.2** Codex is the secondary automated reviewer, invoked only when CodeRabbit reports quota exhaustion (`Review rate limited`) in reply to a SHA-tagged re-review request on the current head.
 - **8.3** Only CodeRabbit and Codex provide review coverage. A pull request without it merges only when the owner explicitly directs a forced merge, which bypasses the review gate.
 - **8.4** Review satisfaction follows the priority chain: a qualifying CodeRabbit approval takes precedence over Codex.
 - **8.5** Any single reviewer providing exact-head coverage satisfies Gate 3 (Review Gate) for pull request mergeability.
@@ -147,6 +147,7 @@
 | 7.4 | Local execution telemetry (harness, model, wake count, elapsed duration) | Removed 2026-09-24 with the MCP wrapper and watcher agents, the only sources of harness, model, and wake data; nothing read the `tmp/gh-monitor/watcher-run-*.json` records. | Delete 7.4 (requirement diff needs Tim's approval) |
 | 9.2–9.4 | The review monitor flags CodeRabbit rate limiting and directs the Codex fallback | `pr-watch.py` does not read CodeRabbit's `Review rate limited` comment; a rate-limited review runs the watch to `timed_out`, and the owning agent reads the comment and falls back to Codex by hand (`pinpoint-pr-workflow` §3.4) | Detect the rate-limit comment in `pr-watch.py --phase review` and return an actionable verdict naming the Codex fallback |
 | 10.1–10.5 | Concurrent in-progress review detection and notification | `pr-watch.py` and `_review_summary` report individual checker records without in-progress status checks or concurrent notices | Add concurrent status tracking to `pr-watch.py --phase review` and `_review_summary` |
+| 8.2 | Codex runs only after a CodeRabbit rate-limit reply to a SHA-tagged request | `request-codex-review.sh` requests Codex without checking for a CodeRabbit rate-limit reply | Gate the Codex request on that reply (#2205, PP-q2zx) |
 | 8.13–8.14 | Local Claude Code review before draft promotion | Agent instructions (AGENTS.md §5, `pinpoint-pr-workflow` Phase 3) still promote a draft as soon as CI passes | Update the agent instructions (PP-nsa2) |
 | 8.15 | A Minor, Quick-win CodeRabbit review keeps covering minor-fix commits | The merge gate treats any later non-merge commit as uncovered | Implement in the review gate (PP-u00n) |
 | 11.1–11.2 | Actionable prompt and comment count extraction | Reviewers' raw markdown bodies are not parsed into terminal payloads | Implement CodeRabbit prompt extraction in `pr-watch.py --phase review` |
@@ -157,7 +158,7 @@
 
 | Date | Amendment |
 | :-- | :-- |
-| 2026-09-24 | Local Claude Code review before draft promotion (§8.13–§8.14); a Minor, Quick-win CodeRabbit review keeps covering minor-fix commits (§8.15); §8.12 names the main-merge and minor-fix exceptions. |
+| 2026-09-24 | Codex runs only after CodeRabbit reports a rate limit on a SHA-tagged request for the current head (§1 Review hierarchy, §8.2); local Claude Code review before draft promotion (§8.13–§8.14); a Minor, Quick-win CodeRabbit review keeps covering minor-fix commits (§8.15); §8.12 names the main-merge and minor-fix exceptions. |
 | 2026-09-24 | Drop local owner attestation as a review provider (§1, §8.3, §8.4, §9.3): only CodeRabbit and Codex cover a head; the owner merges a PR without that coverage by directing a forced merge. |
 | 2026-09-16 | Amend spec to add automated review requirements (§8–§11): CodeRabbit default review, draft-promotion auto-trigger, manual re-reviews and Codex requests, 5/hr rate limits and fallback, concurrent review first-success reporting with in-progress notices, and prompt extraction. |
 | 2026-09-12 | Clarify §2.1: watch is defined by four core parameters with optional title for diagnostic logging. |
