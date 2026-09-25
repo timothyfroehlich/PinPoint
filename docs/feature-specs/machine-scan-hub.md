@@ -4,7 +4,7 @@
 
 **What this document is.** The requirements for the machine scan hub: the player-facing page a machine's apron-card QR opens. No implementation detail — design records and code carry that. It describes the intended final state only; what the code does or used to do lives solely in the Known divergences table. Each requirement is numbered for citation. When code and spec disagree, either the code is wrong or this document gets amended — never silently neither.
 
-**Related records.** [machine-scan-hub-mockup.html](machine-scan-hub-mockup.html) (visual reference, locked 2026-09-18; canvas https://claude.ai/artifact/Fc7Qm1iMQ6o9MKkwvaUCg2, board "A3-Tim · View all on [iScored logo]"; unlinked state: canvas https://claude.ai/artifact/UhqRBvz9vM1yphnSXtgYZd, board "Unlinked · sentence only"). `docs/feature-specs/apron-cards.md` (the card whose QR opens the hub), `docs/feature-specs/iscored.md` (Top Scores card, score entry link), `docs/feature-specs/reporting.md` (Quick report). Bead PP-cov9 (build tracking); PP-a0be (pinTips on the hub, deferred).
+**Related records.** [machine-scan-hub-mockup.html](machine-scan-hub-mockup.html) (visual reference, locked 2026-09-18; canvas https://claude.ai/artifact/Fc7Qm1iMQ6o9MKkwvaUCg2, board "A3-Tim · View all on [iScored logo]"; unlinked state: canvas https://claude.ai/artifact/UhqRBvz9vM1yphnSXtgYZd, board "Unlinked · sentence only"; artwork band: canvas https://claude.ai/artifact/LVMtxXzPLCHucYPFwsmEr8, boards "H5 ·", locked 2026-09-24). `docs/feature-specs/apron-cards.md` (the card whose QR opens the hub), `docs/feature-specs/iscored.md` (Top Scores card, score entry link), `docs/feature-specs/reporting.md` (Quick report). Bead PP-cov9 (build tracking); PP-a0be (pinTips on the hub, deferred); PP-o355.60 (artwork band).
 
 ---
 
@@ -23,11 +23,13 @@
 
 ## 3. Content, top to bottom
 
-- **3.1** **Identity block** — the machine's name, then manufacturer · year · owner display name on one line. The block links to the machine's Info page and carries a "Details" affordance. The owner is shown by display name only (CORE-SEC-007).
+- **3.1** **Identity block** — the machine's name, then manufacturer · year · owner display name on one line. The block links to the machine's Info page and carries a "Details" affordance. The owner is shown by display name only (CORE-SEC-007). When the machine has artwork (§3.6), the identity block sits over the bottom edge of the artwork band.
 - **3.2** **Top scores card** — a reduced form of the iScored Top Scores card (iScored spec §4): the "Top scores" label, three ranked rows, a "View all on" link carrying the iScored logo, and the card's empty and unlinked states (§4.4–§4.5). In the unlinked state the card keeps its label and the iScored logo (as a plain image) and shows one sentence — no iScored game is linked to this machine — to every viewer; it never renders the Manage link. It carries no Add score control — that action is the hub's Post a score button (§3.4). The hub never shows more than three scores.
 - **3.3** **Open issues card** — the count of open issues in its label and the three newest open issues as rows (severity label, title, age), with a "See all" link to the machine's issues. With zero open issues it shows a quiet "No open issues" state.
 - **3.4** **Action buttons** — two equal-size buttons side by side in the thumb zone, icon above label: **Post a score** (left) and **Report a problem** (right).
 - **3.5** The hub shows no machine status indicator (Playable / Needs attention / Out of order) and no maintainer or owner tools.
+- **3.6** **Artwork band** — when the machine's catalog entry has game artwork, the hub opens with a full-width band showing the whole image, never cropped, with an "Image: OPDB" credit linking to the image. Without artwork there is no band.
+- **3.7** The artwork band takes the height the rest of the hub leaves free, up to the image's own height at full width. When less height is free, the image shrinks and a blurred copy of it fills the band's sides.
 
 ## 4. Actions
 
@@ -39,17 +41,26 @@
 ## 5. Fit
 
 - **5.1** On the reference phone (390×844 CSS px) the hub fits without scrolling with three scores, three issues, and both buttons at full size.
-- **5.2** On the smallest supported phone (375×667) the hub still fits without scrolling: the Open issues card collapses to a single row — count, the newest issue's severity and title, "+N more" — and the whole card links to the machine's issues. Scores and buttons keep their size.
+- **5.2** On the smallest supported phone (375×667) the hub still fits without scrolling, with three scores, three issues, and both buttons; the artwork band shrinks to make room (§3.7).
 - **5.3** Below 375×667, scrolling is permitted; nothing is hidden.
+- **5.4** The artwork band has a minimum height. When the hub cannot fit with the band at that height, the page scrolls rather than shrinking the band further.
 
 ## 6. Color
 
 - **6.1** Post a score uses the primary token. Report a problem uses the existing `warning` token (amber) with dark text — the color family the Major severity label already uses. No new token is introduced.
 
+## Known divergences
+
+| Requirement | Code today | Resolution |
+| :-- | :-- | :-- |
+| §3.1, §3.6–§3.7, §5.4 | The hub shows no artwork band. | PP-o355.60 |
+| §5.2 | The Open issues card collapses to one row on short screens. | PP-o355.60 |
+
 ## Changelog
 
 | Date | Change |
 | :-- | :-- |
+| 2026-09-24 | §3.6–§3.7 added: artwork band at the top of the hub, whole image, sized to the free height with a blurred fill. §3.1: the identity block sits over the band. §5.2: the Open issues card no longer collapses on the smallest phone; the band shrinks instead. §5.4 added: the band's minimum height. |
 | 2026-09-22 | §3.2: the unlinked state shows the sentence only, to everyone — the hub never renders the Manage link (resolves the conflict with §3.5). Unlinked-state mockup added. |
 | 2026-09-21 | §3.2 narrowed: the hub's Top scores card is a reduced iScored card — no Add score control (Post a score is the thumb-zone button), "View all on" link carries the iScored logo. Mockup board reference updated. |
 | 2026-09-18 | Initial draft: route and shell, content order, actions, fit on the reference and smallest phones, color. Design locked on canvas board "A3-Tim · amber". |
