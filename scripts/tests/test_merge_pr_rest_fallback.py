@@ -84,6 +84,7 @@ def cloud_stub(
     reviews: list[dict] | None = None,
     threads: object = None,
     threads_exit: int = 0,
+    checks_exit: int = 0,
     graphql_error: str = GRAPHQL_403,
 ) -> Iterator[dict]:
     with tempfile.TemporaryDirectory() as tmp:
@@ -123,7 +124,7 @@ def cloud_stub(
             'cat "$STUB/threads.json"; exit "$STUB_THREADS_EXIT" ;;\n'
             '  "api --paginate repos/acme/widget/commits/'
             + HEAD_SHA
-            + '/check-runs"*) cat "$STUB/checks.json" ;;\n'
+            + '/check-runs"*) cat "$STUB/checks.json"; exit "$STUB_CHECKS_EXIT" ;;\n'
             '  "api --paginate repos/acme/widget/pulls/123/reviews") cat "$STUB/reviews.json" ;;\n'
             '  "api --paginate repos/acme/widget/issues/123/comments") printf "[]\\n" ;;\n'
             '  "api repos/acme/widget/pulls/123") cat "$STUB/pull.json" ;;\n'
@@ -143,6 +144,7 @@ def cloud_stub(
         env["PATH"] = f"{tmp}{os.pathsep}{env.get('PATH', '')}"
         env["STUB"] = tmp
         env["STUB_THREADS_EXIT"] = str(threads_exit)
+        env["STUB_CHECKS_EXIT"] = str(checks_exit)
         env["GH_REPO"] = "acme/widget"
         yield {"env": env, "dir": t}
 
@@ -200,6 +202,18 @@ def test_automerge_waits_on_running_ci_then_stops_at_timeout() -> None:
     assert "TIMED OUT" in result.stdout
     assert side["merged"] is None
     assert len(graphql_attempts(side["calls"])) == 1
+
+
+def test_failed_check_runs_read_waits_like_graphql() -> None:
+    # A transient REST failure on the CI read must behave as it does on the GraphQL
+    # path (WAIT, merge blocked), not abort the gate as an unbound variable.
+    with cloud_stub(checks_exit=1) as ctx:
+        result, side = run(ctx, "--human")
+
+    assert result.returncode == 1
+    assert "WAIT: ci: CI Gate check not reported yet" in result.stdout
+    assert "unbound variable" not in result.stderr
+    assert side["merged"] is None
 
 
 def test_red_ci_blocks_and_drops_label_through_rest() -> None:

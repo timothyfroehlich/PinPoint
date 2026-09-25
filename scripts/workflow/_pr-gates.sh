@@ -446,7 +446,9 @@ readonly CI_GATE_SELECT_JQ='
 # "COMPLETED\nCOMPLETED", never equalled COMPLETED, and parked the gate in WAIT forever.
 check_ci() {
   local pr=$1
-  local rollup
+  # Initialized: a failed read must leave "" (WAIT, as on the GraphQL path), not an
+  # unbound variable that aborts the gate under `set -u`.
+  local rollup=""
   _gh_pr_view_to rollup "$pr" statusCheckRollup "${CI_GATE_SELECT_JQ} // empty"
   if [ -z "$rollup" ]; then
     # Not a failure — GitHub has simply not registered the check run yet, which is
@@ -617,7 +619,7 @@ check_review_happened() {
 # Gate 4: PR has no merge conflict. UNKNOWN returned once; caller may retry.
 check_no_merge_conflict() {
   local pr=$1
-  local mergeable
+  local mergeable=""
   _gh_pr_view_to mergeable "$pr" mergeable .mergeable
   case "$mergeable" in
     MERGEABLE)
