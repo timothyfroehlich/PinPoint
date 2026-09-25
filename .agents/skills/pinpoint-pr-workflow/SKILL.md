@@ -320,6 +320,8 @@ After Tim merges, consider watching the deployment — only if the PR could brea
 
 Close the bead, file genuine follow-up beads, and hand off freely. For destructive cleanup (removing worktrees, deleting branches/volumes), wait for explicit confirmation.
 
+**Stop the merged branch's services.** Once the PR merges, stop the dev server you started (by PID, or `preview_stop`) and the worktree's Supabase stack (`pnpm supabase:stop` from inside the worktree — data is kept, `pnpm supabase:start` brings it back). A merged branch's stack is idle memory on a host running several of them. Skip it when you have a concrete reason the stack is still in use: follow-up work in this same worktree is next, Tim is still looking at the preview, or another session shares the stack. Say which you did in the hand-off. If `merge-pr.sh` already reaped the worktree, the stack and its volumes are already gone.
+
 ### 5.3 Hand off
 
 Hand off for the next session, and post to the huddle daily bead if other sessions need to know what landed.

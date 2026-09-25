@@ -87,7 +87,7 @@ Start what you need yourself rather than pausing the user.
 - **Supabase down?** From the current worktree: `pnpm supabase:start`, which targets whichever backend the worktree uses. Ports are isolated, so this won't affect anyone else.
 - **Fresh worktree database?** `pnpm supabase:start && pnpm run db:migrate` is the non-destructive bootstrap. `preflight` checks this state before costly work and prints the isolated Postgres port when it is missing; it never starts or migrates services implicitly.
 
-Leave the stack running afterward — the user can stop it. Hand off what's running. If you can't start it (port collisions, stuck containers), ask the user — don't fall back to "let CI tell us."
+Leave the stack running while the branch's work is in flight, and hand off what's running. Once its PR merges, stop the dev server and stack (`pinpoint-pr-workflow` Phase 5.2). If you can't start it (port collisions, stuck containers), ask the user — don't fall back to "let CI tell us."
 
 ### Process safety
 
