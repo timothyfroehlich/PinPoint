@@ -119,7 +119,11 @@ export function createDiscordChannel(config: DiscordConfig): DeliveryChannel {
       }
       if (result.reason === "blocked" || result.reason === "no_shared_server") {
         log.warn(
-          { userId: ctx.userId, action: "discord.deliver" },
+          {
+            userId: ctx.userId,
+            action: "discord.deliver",
+            reason: result.reason,
+          },
           "Discord DM blocked"
         );
         return { ok: false, reason: "permanent" };
