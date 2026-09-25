@@ -267,6 +267,12 @@ class DockerNotInstalledError(RuntimeError):
     """The `docker` binary is absent, so there are genuinely no volumes."""
 
 
+#: Upper bound for each `supabase`/`docker` call during teardown. With the
+#: remote backend these run over SSH, and a sleeping host or a lossy link would
+#: otherwise hang the WorktreeRemove hook and merge-pr.sh's reap indefinitely.
+TEARDOWN_TIMEOUT_SECONDS = 120
+
+
 class DockerUnavailableError(RuntimeError):
     """Docker is installed but could not be enumerated.
 
@@ -280,10 +286,19 @@ def _run_docker(args: list[str], env: dict[str, str] | None = None) -> str:
     """Run a docker command and return stdout, or raise rather than return empty."""
     try:
         result = subprocess.run(
-            args, capture_output=True, text=True, check=True, env=env
+            args,
+            capture_output=True,
+            text=True,
+            check=True,
+            env=env,
+            timeout=TEARDOWN_TIMEOUT_SECONDS,
         )
     except FileNotFoundError as exc:
         raise DockerNotInstalledError("`docker` is not installed") from exc
+    except subprocess.TimeoutExpired as exc:
+        raise DockerUnavailableError(
+            f"`{shlex.join(args)}` timed out after {exc.timeout:.0f}s"
+        ) from exc
     except OSError as exc:
         raise DockerUnavailableError(
             f"could not run `{shlex.join(args)}`: {exc}"
@@ -402,6 +417,7 @@ def stop_and_remove_supabase(
             capture_output=True,
             text=True,
             env=supabase_env,
+            timeout=TEARDOWN_TIMEOUT_SECONDS,
         )
         if stop_result.returncode != 0:
             print(
@@ -409,6 +425,12 @@ def stop_and_remove_supabase(
                 f"{stop_result.stderr.strip() or stop_result.stdout.strip()}",
                 file=sys.stderr,
             )
+    except subprocess.TimeoutExpired as exc:
+        print(
+            f"Warning: `supabase stop` timed out after {exc.timeout:.0f}s — "
+            "continuing cleanup",
+            file=sys.stderr,
+        )
     except (FileNotFoundError, OSError) as exc:
         print(
             f"Warning: failed to invoke `supabase stop` ({exc}) — continuing cleanup",
@@ -434,6 +456,7 @@ def stop_and_remove_supabase(
                 capture_output=True,
                 text=True,
                 env=supabase_env,
+                timeout=TEARDOWN_TIMEOUT_SECONDS,
             )
             if rm_result.returncode != 0:
                 err_msg = (
@@ -449,6 +472,14 @@ def stop_and_remove_supabase(
                     f"Removed {len(query.volumes)} Docker volume(s)",
                     file=sys.stderr,
                 )
+        except subprocess.TimeoutExpired as exc:
+            print(
+                f"Warning: `docker volume rm` timed out after {exc.timeout:.0f}s",
+                file=sys.stderr,
+            )
+            volumes_unknown_reason = (
+                f"`docker volume rm` timed out after {exc.timeout:.0f}s"
+            )
         except (FileNotFoundError, OSError) as exc:
             print(
                 f"Warning: failed to invoke `docker volume rm` ({exc})",

@@ -146,6 +146,10 @@ case $command in
       echo "Already using the $backend backend."
       exit 0
     fi
+    # worktree_setup.py leaves the main worktree's .env.local alone, so a
+    # switch there would stop the stack and then change nothing.
+    [[ $(git rev-parse --path-format=absolute --git-dir) != "$(git rev-parse --path-format=absolute --git-common-dir)" ]] ||
+      fail "the main worktree always uses the local backend; switch backends in an additional worktree"
     # Validate the target's settings before touching the running stack.
     (select_backend "$target")
     stack_stop "$backend" || echo "supabase-stack: no running $backend stack to stop" >&2

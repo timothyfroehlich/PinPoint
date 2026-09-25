@@ -118,7 +118,7 @@ fi
 # loopback or a dev-stack host listed in PINPOINT_DEV_DB_HOSTS, never a cloud
 # host (scripts/assert-local-db.mjs). It prints its own refusal.
 guard_module="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/assert-local-db.mjs"
-if ! GUARD_MODULE="$guard_module" node --input-type=module -e \
+if ! GUARD_MODULE="$guard_module" POSTGRES_URL="$POSTGRES_URL" node --input-type=module -e \
     'const { assertLocalDatabase } = await import(process.env.GUARD_MODULE); assertLocalDatabase(process.env.POSTGRES_URL);'; then
     echo -e "${RED}   Refusing to reset a non-local database.${NC}"
     exit 1

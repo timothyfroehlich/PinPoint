@@ -727,6 +727,62 @@ class TestMainTeardown:
         assert stub.calls_of("worktree_remove") != []
         assert deallocated == [str(fake_worktree)]
 
+    def test_hung_remote_teardown_times_out_as_unknown(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        fake_worktree: Path,
+        deallocated: list[str],
+    ) -> None:
+        """A sleeping remote host must not hang the hook or crash the script."""
+        timeout = cleanup.TEARDOWN_TIMEOUT_SECONDS
+        stub = install(
+            monkeypatch,
+            RunStub(
+                rev_parse=(0, f"{BRANCH}\n", ""),
+                supabase=subprocess.TimeoutExpired(["supabase", "stop"], timeout),
+                volume_ls=subprocess.TimeoutExpired(["docker"], timeout),
+            ),
+        )
+
+        exit_code = _run_main(monkeypatch, fake_worktree)
+
+        err = capsys.readouterr().err
+        assert exit_code == cleanup.EXIT_DOCKER_UNKNOWN
+        assert f"`supabase stop` timed out after {timeout}s" in err
+        assert "UNKNOWN, not zero" in err
+        assert f"timed out after {timeout}s" in err
+        assert stub.kwargs_of("supabase")[0]["timeout"] == timeout
+        assert stub.kwargs_of("volume_ls")[0]["timeout"] == timeout
+        assert stub.calls_of("worktree_remove") != []
+        assert deallocated == [str(fake_worktree)]
+
+    def test_hung_volume_removal_is_unknown(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        fake_worktree: Path,
+        deallocated: list[str],
+    ) -> None:
+        timeout = cleanup.TEARDOWN_TIMEOUT_SECONDS
+        stub = install(
+            monkeypatch,
+            RunStub(
+                rev_parse=(0, f"{BRANCH}\n", ""),
+                volume_ls=(0, f"supabase_db_{PROJECT_ID}\n", ""),
+                volume_rm=subprocess.TimeoutExpired(["docker"], timeout),
+            ),
+        )
+
+        exit_code = _run_main(monkeypatch, fake_worktree)
+
+        err = capsys.readouterr().err
+        assert exit_code == cleanup.EXIT_DOCKER_UNKNOWN
+        assert f"`docker volume rm` timed out after {timeout}s" in err
+        assert "Cleaned up worktree" not in err
+        assert stub.kwargs_of("volume_rm")[0]["timeout"] == timeout
+        assert deallocated == [str(fake_worktree)]
+
     def test_missing_git_marker_is_incomplete_not_success(
         self,
         monkeypatch: pytest.MonkeyPatch,
