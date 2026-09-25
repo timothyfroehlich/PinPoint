@@ -44,8 +44,8 @@ const STATUS_DOT: Record<MachineStatus, string> = {
  * health (derived status + presence), a prominent "Report a problem" button
  * routing to the report page, and a peek at the open issues with a link to the
  * Service tab for the full list. Reading-order position: the top of the Info
- * tab; the reference cluster (Details card with the machine description + owner,
- * then Tags / PinballMap) follows.
+ * tab; the machine description (when set), then the reference cluster (Details card with Model / Pinball Map + owner, then Top
+ * Scores / Tags) follows.
  */
 export function InfoHero({
   machineInitials,

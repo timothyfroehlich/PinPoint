@@ -1,5 +1,39 @@
 {/* This file is auto-updated by the weekly changelog workflow. Newest entries at top. */}
 
+## September 21, 2026
+
+### New Features
+
+- **Quick Search** — A search box now sits in the header (and behind a search button on phones): start typing a machine's initials, part of its name, or an issue's ID and jump straight to it
+- **Scan a Machine, See Everything** — The QR code on a machine's apron now opens a player page for that game — what it is, its top scores, what's already been reported broken on it, and a one-tap way to report something new
+- **Faster Issue Reporting** — Reporting is now a short form by default: pick the machine, see what's already been reported on it, describe the problem in a line, say how often it happens, and submit. The full form is one tap away under Detailed, and reporting several issues at once lives under Multiple
+- **One Machine List Everywhere** — The machine directory and collection pages now share the same list, with filters, sorting, columns you choose, and paging. The view you set stays in the page address, so you can bookmark it or send it to someone
+- **Clearer Discord Messages** — Discord now sends one compact message per notification instead of several overlapping ones, each saying what happened and linking straight to the issue. Linking your Discord account sends you a welcome message and switches your Discord notifications on; you can change them any time in notification settings
+
+### Bug Fixes
+
+- A second status change or reassignment on the same issue now actually sends its email — repeat events on one issue were colliding and being dropped
+- A machine leaving a venue is announced in the Discord region alert on the first sync that misses it instead of waiting for a second one, and those alerts no longer expand into large link previews
+- Exporting a machine's issues to CSV now shows an "Exporting issues…" state so you can't start the same export twice, and says so when your browser can't download the file instead of doing nothing
+- A machine settings field no longer shows a phantom Save button, or warns about unsaved changes, when its value was changed somewhere else while you had the page open
+
+---
+
+## September 14, 2026
+
+### New Features
+
+- **Top Scores on Machine Pages** — A machine's Info tab now shows the top three scores from iScored, with links to the full leaderboard and to enter a new score
+- **Linking a Machine to iScored** — The Manage tab and the new-machine form now pick an iScored game from a searchable list, suggesting a match from the machine's name instead of asking for a game ID
+- **Pinball Map Location Setup** — Admins can set and verify the collective's Pinball Map location from the integrations page, check what it's currently linked to, and start a sync on demand
+- **Region Alert Setup** — Admins can choose which Pinball Map region to watch and which Discord channel gets the alerts, send a test message, and see whether the last alert actually posted
+
+### Improvements
+
+- Pinball Map region alerts in Discord are now grouped under the venue they happened at, with ❇️ for a machine arriving and ❌ for one leaving, instead of one flat list
+
+---
+
 ## September 7, 2026
 
 ### New Features

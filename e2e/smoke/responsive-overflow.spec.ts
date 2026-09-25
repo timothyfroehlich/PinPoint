@@ -71,6 +71,7 @@ const authenticatedRoutes = [
 const publicRoutes = [
   "/report",
   `/m/${seededMachines.attackFromMars.initials}/hub?source=apron`,
+  `/m/${seededMachines.medievalMadness.initials}/hub`,
   "/help",
   "/about",
   "/whats-new",

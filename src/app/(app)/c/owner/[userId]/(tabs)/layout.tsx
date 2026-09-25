@@ -1,13 +1,8 @@
 import type React from "react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { PageContainer } from "~/components/layout/PageContainer";
-import { CollectionHeader } from "~/components/collections/CollectionHeader";
-import { CollectionTabStrip } from "~/components/collections/CollectionTabStrip";
-import { summarizeCollection } from "~/lib/collections/summary";
-import { getMachineViewHealth } from "~/lib/machines/view/queries";
+import { MachineGroupShell } from "~/components/collections/MachineGroupShell";
 import { getOwnerCollectionForLayout } from "../_data";
-import { db } from "~/server/db";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -36,32 +31,13 @@ export default async function CollectionLayout({
   const collection = await getOwnerCollectionForLayout(userId);
   if (!collection) notFound();
 
-  const health = await getMachineViewHealth(
-    db,
-    collection.machines.map((machine) => machine.initials)
-  );
-  const summary = summarizeCollection(collection.machines, health);
-  const worstStatus =
-    summary.unplayable > 0
-      ? "unplayable"
-      : summary.needsService > 0
-        ? "needs_service"
-        : "operational";
-
   return (
-    <PageContainer size="standard">
-      <div className="space-y-2">
-        <CollectionHeader
-          title={`${collection.owner.name}'s Machines`}
-          summary={summary}
-        />
-        <CollectionTabStrip
-          basePath={`/c/owner/${collection.owner.id}`}
-          openIssueCount={summary.openIssues}
-          status={worstStatus}
-        />
-        <div className="pt-2">{children}</div>
-      </div>
-    </PageContainer>
+    <MachineGroupShell
+      title={`${collection.owner.name}'s Machines`}
+      machines={collection.machines}
+      basePath={`/c/owner/${collection.owner.id}`}
+    >
+      {children}
+    </MachineGroupShell>
   );
 }
