@@ -109,7 +109,21 @@ reviews:
         resource predicate here that delegates its role dimension to it. Flag
         standalone permission checks defined outside this directory and
         hardcoded role comparisons used as authorization gates. If a change
-        touches the matrix, verify the server action still enforces it.
+        touches the matrix, verify the server action still enforces it, that
+        the permission's `description` still says what it now guards, and
+        that `src/app/(app)/help/` still matches (REVIEW.md "Help-page
+        accuracy").
+
+    - path: "src/app/**/*actions.ts"
+      instructions: |
+        Checks that span files are the ones most often missed here. If this
+        change adds or changes a permission check, open
+        `src/lib/permissions/matrix.ts` and confirm the permission's
+        `description` still says what it guards, confirm the check gets the
+        ownership context the matrix entry needs (an owner must not be
+        denied on their own machine), and check `src/app/(app)/help/` for
+        text that is now stale. If a spec in `docs/feature-specs/` covers
+        this behavior, check the change against its numbered requirements.
 
     - path: "drizzle/**"
       instructions: |
