@@ -155,7 +155,7 @@ Never resolve `drizzle/meta` conflicts manually — the folder holds binary-like
 
 ### Getting a PR reviewed
 
-**CodeRabbit is the default automated reviewer.** Open every agent-created PR as a GitHub draft; promote it only after the current-head `CI Gate` succeeds (`gh pr ready <PR>`). Draft promotion automatically triggers a CodeRabbit review on the current head commit. Subsequent commits do not automatically trigger re-reviews; re-evaluating an updated head requires an explicit request: `gh pr comment <PR> --body "@coderabbitai review"`. CodeRabbit has an hourly quota ceiling of 5 reviews/hr. When rate-limited, fall back to requesting a manual Codex review via `bash scripts/workflow/request-codex-review.sh <PR>`. If Codex is also out of quota or unavailable, alert Tim and recommend waiting for the next CodeRabbit review slot, or a forced merge at his direction.
+**The reviewer is a local Claude Code `/code-review` run by the owning agent.** Open every agent-created PR as a GitHub draft. After current-head `CI Gate` succeeds, run `/code-review` at the level `bash scripts/workflow/claude-review-level.sh` prints (`ask` means ask Tim first), fix or decline every finding, and re-review each new head until a round raises nothing new. Then `bash scripts/workflow/record-claude-review.sh <PR> --level <level> --findings <file>` posts the SHA-pinned review record the merge gate counts and promotes the draft. Any push other than a clean merge of `main` needs a new round and a new record. Spec: `docs/feature-specs/pr-lifecycle-monitoring.md` §8.
 
 Request and state-transition rules: `pinpoint-pr-workflow` skill Phase 3.
 

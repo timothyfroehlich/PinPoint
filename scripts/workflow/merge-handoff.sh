@@ -163,12 +163,14 @@ review_summary=$(_review_summary "$pr")
 rv_label=$(jq -r '.label' <<< "$review_summary")
 rv_covered=$(jq -r '.coverage != null' <<< "$review_summary")
 
-# What one checker record is, in words: "CodeRabbit GitHub approval", "Codex clean
+# What one checker record is, in words: "Claude Code review record (medium)",
+# "CodeRabbit GitHub approval", "Codex clean
 # review comment", … Keyed on `detail` (the review state or the evidence kind) so a
 # stale record reads the same as the covering one it used to be.
 record_phrase() {
-  local checker=$1 detail=$2
+  local checker=$1 detail=$2 level=${3:-}
   case "$checker:$detail" in
+    claude:*) printf 'Claude Code review record (%s)\n' "$level" ;;
     coderabbit:APPROVED) printf 'CodeRabbit GitHub approval\n' ;;
     coderabbit:*) printf 'CodeRabbit GitHub review (%s)\n' "$detail" ;;
     codex:APPROVED) printf 'Codex GitHub approval\n' ;;
@@ -189,7 +191,8 @@ if [[ "$rv_covered" == "true" ]]; then
   cv_at=$(jq -r '.coverage.at' <<< "$review_summary")
   cv_inherited=$(jq -r '.coverage.inherited // false' <<< "$review_summary")
   cv_inherited_from=$(jq -r '.coverage.inherited_from // ""' <<< "$review_summary")
-  review_desc="$(record_phrase "$cv_checker" "$cv_detail") · ${cv_at} · covers head ${short_head}"
+  cv_level=$(jq -r '.coverage.level // ""' <<< "$review_summary")
+  review_desc="$(record_phrase "$cv_checker" "$cv_detail" "$cv_level") · ${cv_at} · covers head ${short_head}"
   if [[ "$cv_inherited" == "true" && -n "$cv_inherited_from" ]]; then
     review_desc+=" (inherited from ${cv_inherited_from:0:7}; pure merge from main)"
   fi
@@ -205,7 +208,7 @@ else
     st_detail=$(jq -r '.detail' <<< "$stale")
     st_at=$(jq -r '.at' <<< "$stale")
     st_sha=$(jq -r '.sha' <<< "$stale")
-    st_phrase=$(record_phrase "$st_checker" "$st_detail")
+    st_phrase=$(record_phrase "$st_checker" "$st_detail" "$(jq -r '.level // ""' <<< "$stale")")
     if git cat-file -e "${st_sha}^{commit}" 2>/dev/null \
       && git merge-base --is-ancestor "$st_sha" "$head_sha" 2>/dev/null; then
       behind=$(git rev-list --count "${st_sha}..${head_sha}")
@@ -459,10 +462,10 @@ if [[ "$rv_covered" != "true" ]]; then
   if [[ "$(jq -r '.codex_request_pending' <<< "$review_summary")" == "true" ]]; then
     add_block "reviewed: ${rv_label} — the manual Codex review for this head was already requested; do not request it again; wait for exact-head evidence"
   else
-    add_block "reviewed: ${rv_label} — after current-head CI succeeds, mark the PR ready to trigger CodeRabbit review (or request re-review via @coderabbitai review), or run request-codex-review.sh ${pr} as fallback; a new head requires replacement CI and a new review"
+    add_block "reviewed: ${rv_label} — after current-head CI succeeds, run /code-review at the level claude-review-level.sh prints, fix or decline every finding, re-review each new head until clean, then record-claude-review.sh ${pr}"
   fi
 fi
-if [[ "$is_draft" == "true" ]]; then add_block "draft: wait for current-head CI Gate success, then mark the PR ready"; fi
+if [[ "$is_draft" == "true" ]]; then add_block "draft: record-claude-review.sh promotes the PR once the review record is posted"; fi
 if [[ "$pr_state" != "OPEN" ]]; then add_block "state: PR is ${pr_state}, not open"; fi
 # The gate answers came from `gh` at one SHA and the diff from git at another, so no
 # combination of them is a statement about a single tree. Nothing is merged on that.
