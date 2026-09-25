@@ -201,20 +201,24 @@ describe("setInsiderConnectedAction (PGlite)", () => {
     expect(await storedIcEnabled()).toBe(true);
   });
 
-  it("makes no call when the stored setting already matches the target", async () => {
+  it("still writes when the stored setting already matches the target", async () => {
+    // The stored lineup can be stale: PBM was changed to on after the last
+    // refresh, and the person asks for off.
     const { setInsiderConnectedAction } =
       await import("~/app/(app)/m/pinballmap-actions");
     const admin = await createUser("admin");
     await mockAuthAs(admin.id);
     const machineId = await seed({ stored: false });
+    pbm.icEnabled = true;
 
     const result = await setInsiderConnectedAction(
       undefined,
       form(machineId, "false")
     );
 
-    expect(result.ok).toBe(true);
-    expect(pbm.calls).toEqual([]);
+    expect(result).toEqual({ ok: true, value: { icEnabled: false } });
+    expect(pbm.calls).toEqual([{ lmxId: LMX_ID, enabled: false }]);
+    expect(pbm.icEnabled).toBe(false);
   });
 
   it("refuses a title the catalog does not mark eligible", async () => {

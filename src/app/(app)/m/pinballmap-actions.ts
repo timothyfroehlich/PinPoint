@@ -1042,8 +1042,9 @@ export type SetInsiderConnectedResult = Result<
  * **Sends the target value, never a flip.** PBM's `ic_toggle` inverts the
  * setting when called without `ic_enabled`, so a flip from a stale page or a
  * double click would undo what the person asked for. With the target in the
- * request the write is idempotent. A stored setting that already matches the
- * target skips the call entirely.
+ * request the write is idempotent, so it is sent even when the stored setting
+ * already matches: the stored lineup can be an hour stale, and a person may
+ * have changed the setting on pinballmap.com since.
  *
  * **An unclear outcome is never retried.** A transient failure (network error,
  * 5xx) or a success body with no IC state may or may not have changed the
@@ -1099,9 +1100,6 @@ export async function setInsiderConnectedAction(
       "VALIDATION",
       "Pinball Map doesn't offer Insider Connected for this game."
     );
-
-  // Already there — a stale page or a second click. Nothing to write.
-  if (lmx.icEnabled === enabled) return ok({ icEnabled: enabled });
 
   // --- non-transactional effects, both BEFORE the transaction ---
   const credentials = await getPinballMapWriteCredentials();
