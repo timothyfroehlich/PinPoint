@@ -151,6 +151,18 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
           admin: true,
         },
       },
+      {
+        id: "issues.report.default_mode",
+        label: "Set report navigation preferences",
+        description: "Choose report screens for mobile and header actions",
+        access: {
+          unauthenticated: false,
+          guest: true,
+          member: true,
+          technician: true,
+          admin: true,
+        },
+      },
       // Report-time field permissions control which fields are VISIBLE in the
       // report form. When a restricted user (unauth/guest) reports an issue,
       // these fields use server-side defaults: status="open", priority=null,

@@ -13,14 +13,14 @@
 - **Report draft** — an unsaved description of an operational problem associated with a machine. It becomes an issue only when submitted.
 - **Report template** — a reusable, player-facing description of an observable machine problem. It seeds a report draft and may provide guidance before submission.
 - **Report mode** — one of three ways to prepare issue reports: **Quick report**, **Detailed report**, or **Multiple issues**.
-- **Quick report** — the minimum-input path for reporting one observable problem and the fallback when no available saved default applies.
+- **Quick report** — the minimum-input path for reporting one observable problem and the destination of direct `/report` links.
 - **Detailed report** — the complete single-issue form for reporters who need to add context or control additional issue fields.
 - **Multiple issues** — the batch-authoring mode for preparing and submitting reports about more than one problem.
 - **Deflection guidance** — advice that may resolve an immediate problem without creating an issue while preserving a path to report a recurring or unresolved problem.
 
 ## 2. Reporting surface and modes
 
-- **2.1** Opening `/report` starts in the signed-in reporter's saved default report mode when that mode is available; otherwise it starts in Quick report.
+- **2.1** Opening `/report` directly starts in Quick report.
 - **2.2** Quick report is the primary path rather than one of several equally weighted top-level tabs.
 - **2.3** The Quick report surface places its report templates before the actions for entering Detailed report or Multiple issues.
 - **2.4** A reporter can expand a Quick report draft into Detailed report.
@@ -30,9 +30,11 @@
 - **2.8** A draft moved into Multiple issues becomes its first issue row.
 - **2.9** Quick report and Detailed report are available to anyone permitted to report an issue.
 - **2.10** Multiple issues is shown only to people with the batch-reporting capability.
-- **2.11** A signed-in user can choose Quick report, Detailed report, or Multiple issues as the default report mode in account settings.
-- **2.12** Account settings offers Multiple issues as a default only when the user has the batch-reporting capability.
-- **2.13** If a saved default is no longer available to the reporter, opening `/report` starts in Quick report without exposing the unavailable mode.
+- **2.11** A signed-in user can independently choose the report mode opened by the mobile bottom-bar Report action and the tablet/desktop header Report action in account settings.
+- **2.12** Each setting offers Quick report and Detailed report, and offers Multiple issues only when the user has the batch-reporting capability.
+- **2.13** If a saved mode is no longer available, its Report action falls back to Quick report on mobile or Detailed report in the header.
+- **2.14** The mobile bottom-bar Report action opens Quick report by default.
+- **2.15** The tablet/desktop header Report action opens Detailed report by default.
 
 ## 3. Quick report
 
@@ -145,7 +147,6 @@
 
 | Requirement | Code today | Resolution |
 | :-- | :-- | :-- |
-| §2.1, §2.11–§2.13 | Account settings has no default-report-mode preference, and `/report` does not resolve a saved preference or unavailable-mode fallback. | `PP-ek0e.4` |
 | §2.3, §3.5–§3.11, §4.1, §4.3–§4.4, §5–§6 | Quick report templates, progressive problem selection, template values and confirmation, and deflection guidance do not exist. | `PP-ek0e.3` |
 | §9.1, §9.6 | Detailed report still shows five recent issues on desktop and lets its panel collapse; Quick report shows three and is always visible. | `PP-ek0e` follow-up decision; preserve Detailed behavior in `PP-ek0e.2` |
 
@@ -153,6 +154,7 @@
 
 | Date | Change |
 | :-- | :-- |
+| 2026-09-22 | Split the report-mode preference into mobile bottom-bar and tablet/desktop header settings with distinct defaults and fallbacks; clarified that direct `/report` links remain Quick. |
 | 2026-09-12 | Added a per-user default report mode with a capability-safe fallback, and made recent open issues always visible. |
 | 2026-09-06 | Aligned batch-row behavior and divergence coverage with the existing report flow after conformance review. |
 | 2026-09-05 | Initial draft: three report modes, draft continuity, Quick report templates and defaults, deflection, and recent-open-issue behavior. |

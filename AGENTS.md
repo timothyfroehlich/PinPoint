@@ -24,7 +24,7 @@
 ### 2.2 Process rules
 
 1. **Escape parentheses in paths**: `src/app/\(app\)/page.tsx`.
-2. **Run `pnpm run check` before committing** (~9s — the default floor). It is a **static** gate: types, lint, format, and the shell/YAML/Python linters. **It does not run unit tests, and does not run pytest** (PP-4zcj) — unit tests run in CI's always-on `static` job, part of `preflight`, and available via `pnpm run test`; the Python hook/script tests are a required CI job (`linters`) and available via `pnpm run check:python`. Reserve `pnpm run preflight` (the slower static checks + unit + DB reset + build + integration + smoke) for **non-trivial changes**: migrations, security/auth, server actions, middleware, DB schema. Preflight is the exception, not the per-commit rule.
+2. **Run `pnpm run check` before committing** (~9s — the default floor). It is a **static** gate: types, lint, format, and the shell/YAML/Python linters. **It does not run unit tests, and does not run pytest** (PP-4zcj). Reserve `pnpm run preflight` (the slower static checks + unit + DB reset + build + integration + smoke) for **non-trivial changes**: migrations, security/auth, server actions, middleware, DB schema. Preflight is the exception, not the per-commit rule.
 3. **Don't kill processes you didn't start** — see §4 Process safety.
 4. **Sync with merge, never rebase** — see §5 Branches.
 5. **Root checkout is read-only.** It stays on `main`. All work — including planning docs — happens in a worktree. Dispatch a subagent or switch into an existing worktree. (PP-46z, PP-bg45.)
@@ -62,7 +62,7 @@ registered identity.
 
 One-time install for tools the workflow scripts depend on:
 
-- **mise** — version `2026.8.11` or newer. `mise.toml` is the exact authority for project Node, Python, Ruff, and the Supabase CLI; `package.json#packageManager` is the single pnpm version and SHA-512 authority; `mise.lock` records resolved artifacts. Run `mise install --locked` rather than installing competing project copies. Keep project commands in `package.json#scripts`, not duplicated as mise tasks. The Supabase declaration owns only the CLI executable — not production migration behavior, service images, containers, or generated worktree state. In pnpm 11, dependency `overrides`, `peerDependencyRules`, and package settings live in `pnpm-workspace.yaml` (never in `package.json`). When pinning transitive dependencies or resolving audit advisories, update `pnpm-workspace.yaml#overrides`, run `pnpm install`, and verify with `pnpm why <pkg>`.
+- **mise** — version `2026.8.11` or newer. `mise.toml` is the exact authority for project Node, Python, Ruff, and the Supabase CLI; `package.json#packageManager` is the single pnpm version and SHA-512 authority; `mise.lock` records resolved artifacts. Run `mise install --locked` rather than installing competing project copies. Keep project commands in `package.json#scripts`, not duplicated as mise tasks. In pnpm 11, dependency `overrides`, `peerDependencyRules`, and package settings live in `pnpm-workspace.yaml` (never in `package.json`).
 - **GNU parallel** (optional) — provides `sem`, which `scripts/workflow/heavy-run.sh` uses to cap heavy commands (full unit runs, build, integration, smoke) at 2 concurrent host-wide. Without it they run uncapped.
 - **pytest** — `pnpm run check:python` runs the hook/script tests with it under the mise-selected Python. Install it with `mise exec -- python3 -m pip install -r scripts/requirements.txt`; if absent from that interpreter, `check:pytest` fails with this install hint rather than using a pytest bound to another Python.
 
@@ -113,23 +113,13 @@ are private (`0600`) under `tmp/validation-logs/` and expire after seven days.
 | `pnpm run db:migrate`                                                                | Apply schema changes locally                                                                                                                                                                                                                                                                                                                            |
 | `pnpm run db:backup`                                                                 | Manual prod dump → `~/.pinpoint/db-backups` (data-only dev seed, **not** a DR artifact)                                                                                                                                                                                                                                                                 |
 | `pnpm run db:seed:from-prod`                                                         | Reset local + seed from latest prod backup                                                                                                                                                                                                                                                                                                              |
-| `pnpm run chores:backups`                                                            | Verify prod Supabase daily physical backups exist + retention is intact (weekly chore; hits prod, not part of `check`)                                                                                                                                                                                                                                  |
 | `node scripts/query-readonly.mjs "<sql>"`                                            | Query prod (or any DB) through `POSTGRES_URL_READONLY` — a dedicated `pinpoint_readonly` role with no write grants, so investigating a bug means reading prod without service-role write authority. One-time setup: `scripts/sql/readonly-role.sql`. Falls back to `POSTGRES_URL` (can write) if the role isn't set up. (PP-xdvw.)                      |
-| `ruff check && ruff format`                                                          | Python lint/format (no venv needed)                                                                                                                                                                                                                                                                                                                     |
 | `python3 scripts/workflow/pr-watch.py <PR> --phase ci\|review --expected-head <SHA>` | Wait on CI or review for one PR head (`pinpoint-pr-workflow` Phase 3). Run it as a background command; stdout is one terminal JSON verdict (exit 0 passed / 1 act on it / 2 undetermined). Never hand-roll a polling loop.                                                                                                                              |
 | `pnpm run dev:status`                                                                | Check whether Next.js / Supabase / Postgres are up — one command, worktree-port aware. Use it instead of ad-hoc `curl` health checks against localhost.                                                                                                                                                                                                 |
 
-### Type-check engine (TS 7)
-
-`typescript` is TypeScript 7.0, whose Go-native `tsc` runs the `typecheck`, `typecheck:tests`, and `typecheck:e2e` gates. `next build` uses CLI mode to run the same compiler against `tsconfig.app.json`; Next 16.2.x needs this because its API mode requires a JavaScript compiler API, while 16.3+ defaults to CLI mode. The CLI emits raw `tsc` diagnostics rather than Next code frames. History and validation record: `docs/plans/2026-06-27-typescript-7-upgrade-plan.md` (PRs #1586, PP-xu96, PP-8mv1, PP-sc77.5).
-
-### Lint engine (Oxlint)
-
-`oxlint` is the sole, authoritative lint engine (PP-sc77). It runs type-aware via `oxlint-tsgolint`, alongside native plugins (`typescript`, `unicorn`, `react`, `jsx-a11y`, `promise`) and JS plugins (`pinpoint`, `eslint-plugin-better-tailwindcss`).
-
 ### Prototype mode (rapid iteration)
 
-When the user explicitly asks for "prototype mode" / "rapid iteration" / "just explore" **for UI/UX work**, load the `pinpoint-prototype-mode` skill and enter it. It's scoped to **presentation only** — layout, components, styling, page structure, interaction/flow — and explicitly **not** for backend/internal work (data layer, server-action logic, auth, permissions, migrations), which keep full rigor; stub data rather than building it. Within that scope it relaxes the §2 rigor (skip preflight/tests before showing work, defer lint/type fixes, defer coverage and DRY) while logging every skipped item to a `.prototype-mode` debt ledger. It changes **agent behavior only** — pre-commit and `preflight` hooks still run on any real commit, which is fine because prototype work stays local and uncommitted. Never self-elect into it; full rigor is the default. A `UserPromptSubmit`/`SessionStart` hook reminds the agent while the marker exists, so the mode survives compaction. Exit on "exit prototype mode" / "make this real" — then repay the ledger.
+When the user explicitly asks for "prototype mode" / "rapid iteration" / "just explore" **for UI/UX work**, load the `pinpoint-prototype-mode` skill and enter it. It's scoped to **presentation only** — layout, components, styling, page structure, interaction/flow — and explicitly **not** for backend/internal work (data layer, server-action logic, auth, permissions, migrations), which keep full rigor; stub data rather than building it. Never self-elect into it; full rigor is the default.
 
 ### Which tests to run
 
@@ -142,16 +132,7 @@ When the user explicitly asks for "prototype mode" / "rapid iteration" / "just e
 7. DB schema / migrations → `pnpm run preflight`
 8. Final pre-review → push and let **CI** run the full suite; don't sweep locally.
 
-### Early UI review gate (pre-E2E) (PP-4c4b)
-
-When building or modifying user interfaces:
-
-- **Fast logic first:** write/update component unit tests (`pnpm run test`) to verify props, state, and rendering fundamentals.
-- **Surface rendered visuals early:** before investing time authoring or fixing Playwright/E2E specs or running preflight, capture screenshots (via local dev server preview or `node scripts/workflow/pr-screenshots.mjs <PR>`) and ask Tim for visual sign-off on layout, spacing, and styling.
-- **Why:** eliminates throwaway test work when visual layout or interaction hierarchy needs rework.
-- **Proceed after sign-off:** once Tim approves the visual presentation, proceed to author/update smoke and E2E specs, run preflight, and prepare the PR.
-
-**Never** invoke `pnpm exec playwright test` with no spec path — it runs every spec in one Playwright process and cross-contaminates seed state. The full suite (`e2e:full` / `e2e:all`) is CI's job by default — roughly 8–10 minutes of three parallel workers plus a Supabase stack and a Next server, peaking at several GB. Run it locally when you actually want the signal and the host has the headroom. **Pass `--project=chromium`** for targeted runs, and for `e2e:full` unless you specifically want cross-browser signal (`e2e:all` already pins it). A spec that passes in one browser project and fails in another is a real bug, not a local-setup artifact — most often a spec leaking seeded state; see `pinpoint-e2e` "Cross-project failures". Use `--headed` to debug visually. Report flaky tests; don't retry in a loop.
+**Never** invoke `pnpm exec playwright test` with no spec path — it runs every spec in one Playwright process and cross-contaminates seed state. Report flaky tests; don't retry in a loop.
 
 ### Reproducing CI failures locally
 
@@ -166,7 +147,6 @@ Always try local first — seconds vs minutes, full devtools. If a single-test r
 
 - **Check for conflicts first**: `gh pr view <PR> --json mergeable,mergeStateStatus`. `DIRTY`/`CONFLICTING` means GitHub silently skips workflow runs until you resolve. `pnpm run check` includes a `check:behind-main` warning.
 - **Required check**: only `CI Gate` (ruleset `6326455`). Vercel is not required. `BLOCKED` while E2E is still running is normal.
-- **Vercel preview migrations**: preview deployments skip `migrate:production` (branch DB user lacks `CREATE SCHEMA`). The on-demand `Preview Controller` workflow migrates + seeds the branch DB before building the preview (see §7 "Preview deployments"). Production deploys still migrate.
 
 ### Migration conflicts
 
@@ -176,9 +156,7 @@ Never resolve `drizzle/meta` conflicts manually — the folder holds binary-like
 
 **CodeRabbit is the default automated reviewer.** Open every agent-created PR as a GitHub draft; promote it only after the current-head `CI Gate` succeeds (`gh pr ready <PR>`). Draft promotion automatically triggers a CodeRabbit review on the current head commit. Subsequent commits do not automatically trigger re-reviews; re-evaluating an updated head requires an explicit request: `gh pr comment <PR> --body "@coderabbitai review"`. CodeRabbit has an hourly quota ceiling of 5 reviews/hr. When rate-limited, fall back to requesting a manual Codex review via `bash scripts/workflow/request-codex-review.sh <PR>`. If Codex is also out of quota or unavailable, alert Tim and recommend waiting for the next CodeRabbit review slot, or a forced merge at his direction.
 
-The owning agent monitors CI, draft promotion, review execution, findings, and corrective pushes until one accepted checker — CodeRabbit approval or Codex evidence — covers the exact current head and every review thread is resolved. An exact-head finding-bearing **Codex** review is also terminal once every thread is explicitly adjudicated and resolved; declining a finding without a push does not require another review. CodeRabbit covers a head only with its native `APPROVED` review; its finding-bearing review never does, even after every thread is resolved. Never request the same head twice. A corrective push invalidates prior coverage: wait for replacement current-head CI, then request or trigger a new review for the new head. A pure merge of `main` into the branch does not — the gate carries review coverage across it (PP-ojoj).
-
-The gate accepts CodeRabbit's native exact-head approval, Codex's native GitHub approval, its exact-bot/exact-app clean comment pinned to head, a trusted GitHub Actions witness that pins Codex's `+1` on the SHA-tagged request to head, or an exact-head `COMMENTED`/`CHANGES_REQUESTED` review after every finding thread is adjudicated and resolved — two independent checkers following the priority **CodeRabbit $\longrightarrow$ Codex**, either of which passes the gate; the label is one of `approved` / `changes requested` / `stale review` / `not reviewed`. When concurrent reviews run, the gate resolves on the first qualifying review; check the other reviewer's findings when it lands. They are the only review providers: a local review (`/code-review`, `/codex:review`) is not coverage, and a PR without CodeRabbit or Codex coverage merges only when Tim explicitly directs `merge-pr.sh <PR> --human --force`. Request and state-transition rules: `pinpoint-pr-workflow` skill Phase 3.
+Request and state-transition rules: `pinpoint-pr-workflow` skill Phase 3.
 
 ### The `ownerless` label
 
@@ -194,22 +172,13 @@ Don't write the handoff summary — **run it and paste it**:
 bash scripts/workflow/merge-handoff.sh <PR>
 ```
 
-It computes what Tim needs in order to merge without re-deriving anything: which review covered head and how many commits back it was, CI, threads, mergeable + distance behind main, when main was last merged in, the diff split src / tests / docs / other, migrations, newly-registered env vars, UI + screenshots — then two `!`-prefixed commands, one to re-run the report (it is a snapshot) and one to merge. The merge command is printed **only** when all four gates pass; otherwise the block names what is blocking, so an un-ready PR cannot be handed over as ready. Every field is a claim an agent would otherwise be making from memory. (PP-9onv.)
-
 ### Review comments
 
 The canonical review rubric is `REVIEW.md` at the repo root. If a PR accumulates review comments (from Tim or another agent): fix the code, OR decline with a one-sentence reply (`add_reply_to_pull_request_comment`) and resolve the thread (`pull_request_review_write(method: "resolve_thread")`). Sign replies with your agent name (`—Claude`, `—Codex`, `—Antigravity`). Declined comments must get a reply — no silent ignores.
 
 ### Superpowers lifecycle → beads
 
-When you run the superpowers plugin lifecycle (`brainstorming → writing-plans → subagent-driven-development → finishing-a-development-branch`), load `pinpoint-superpowers-bridge` — several superpowers steps conflict with PinPoint rules (local merge, raw `git worktree remove`, generic test commands, uncapped subagent dispatch, the plugin's own review-reply flow) and the skill spells out the overrides. Superpowers specs and plans are **working documents, not repo artifacts** (decision 2026-08-16): draft them outside the repo tree (the session scratchpad), store the content in the bead. Files under `docs/superpowers/` committed before the decision stay as records (§8); no new files go there. Durable requirements belong in `docs/feature-specs/` (§8), not in superpowers docs. Bead fields:
-
-- `--spec-id` = the feature spec path (`docs/feature-specs/<feature>.md`), when the work has one
-- `--design` = the **full plan text**, stored when the plan is written and refreshed when it materially changes
-- `--acceptance` = distilled success criteria
-- `--notes` = landing breadcrumbs (PR #, branch, migration state, follow-ups)
-
-Plan-file checkboxes are within-PR execution state, **not** durable task tracking — the bead is the cross-session source of truth. Single-PR work gets one bead (no per-task sliver-beads); only multi-PR epics decompose into children.
+When you run the superpowers plugin lifecycle (`brainstorming → writing-plans → subagent-driven-development → finishing-a-development-branch`), load `pinpoint-superpowers-bridge` — several superpowers steps conflict with PinPoint rules (local merge, raw `git worktree remove`, generic test commands, uncapped subagent dispatch, the plugin's own review-reply flow) and the skill spells out the overrides.
 
 ## 6. Working style
 
@@ -232,7 +201,7 @@ How Tim wants agents to behave. (§1 has the one-line version; this is the detai
 
 - **`pinpoint-prod`** (Live, Pro plan): **real user data — strict safety.** Daily backups, 7-day retention, no PITR — so the recovery floor is the previous nightly snapshot. That posture is asserted weekly by `pnpm run chores:backups` (chores checklist item 9); it verifies backups exist and are retained, not that they restore.
 - **Local**: `db:reset` OK. **Prod: NEVER `db:reset`. Only `db:migrate`.**
-- **Prod-mutating Supabase surfaces are gated in `.claude/settings.json`** (CORE-SEC-010): prod is the only project in the org, and MCP calls bypass both the Bash hook stack and the script-level `assertLocalDatabase` / `assertNotDrizzlePush` guards. So: every write-capable MCP tool (`execute_sql`, `apply_migration`, `deploy_edge_function`, `pause_project`, `restore_project`, `create_project`, the branch mutators) is on `permissions.ask`; the destructive CLI verbs `supabase db reset` / `db remote commit` / `migration repair` / `branches delete` are on `ask`, and `supabase db push` / `projects delete` on `deny`. Read-only MCP tools stay unprompted. These are prefix matchers over the command string — a speed bump against accidents, not a security boundary — and they don't reach child processes, so `pnpm run db:reset` and the E2E global-setup are unaffected. Add new write surfaces to the lists as the connector or CLI grows.
+- **Prod-mutating Supabase surfaces are gated in `.claude/settings.json`** (CORE-SEC-010).
 - **Connection**: app + scripts use `POSTGRES_URL` — the Supavisor **transaction** pooler (`…pooler.supabase.com:6543`, IPv4), with `prepare:false` set on every porsager client that connects there (`src/server/db/index.ts`, `scripts/lib/pg-client.mjs`) — the transaction pooler does not support prepared statements, and a resolved incident (PP-d8l8) traced silent prod commit loss to this exact setting missing on the runtime client. **Never reintroduce `prepare:true` on a `:6543` client.** Full pooler/endpoint reference, connection string format, and the incident writeup: `pinpoint-deployment` skill.
 
 ### Vercel
