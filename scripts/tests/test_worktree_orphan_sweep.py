@@ -108,6 +108,8 @@ def _kind(args: list[str]) -> str:
         return "volume_inspect"
     if head == ("volume", "rm"):
         return "volume_rm"
+    if head == ("network", "rm"):
+        return "network_rm"
     if args[1] == "ps":
         return "ps"
     if args[1] == "rm":
@@ -490,6 +492,64 @@ class TestMainOrphanClassification:
         ]
         assert "1 volume(s)" in err
 
+    def test_apply_removes_the_projects_network_after_its_containers(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        isolated_main,
+    ) -> None:
+        """`supabase start` creates supabase_network_<id>; `docker rm` leaves it."""
+        isolated_main(active=set(), orphan_slots=[])
+        stub = install(
+            monkeypatch,
+            DockerStub(
+                volume_ls=(0, "supabase_db_pinpoint-dead\n", ""),
+                volume_inspect=(0, "supabase_db_pinpoint-dead|pinpoint-dead\n", ""),
+                ps=(0, "supabase_db_pinpoint-dead|pinpoint-dead\n", ""),
+            ),
+        )
+
+        assert _run_main(monkeypatch, "--apply") == 0
+
+        removals = [
+            c
+            for c in stub.calls
+            if _kind(c) in {"container_rm", "network_rm", "volume_rm"}
+        ]
+        assert removals == [
+            ["docker", "rm", "-f", "supabase_db_pinpoint-dead"],
+            ["docker", "network", "rm", "supabase_network_pinpoint-dead"],
+            ["docker", "volume", "rm", "supabase_db_pinpoint-dead"],
+        ]
+
+    def test_a_missing_network_is_not_a_failure(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        isolated_main,
+    ) -> None:
+        """A stack stopped with `supabase stop` already took its network down."""
+        isolated_main(active=set(), orphan_slots=[])
+        stub = install(
+            monkeypatch,
+            DockerStub(
+                volume_ls=(0, "supabase_db_pinpoint-dead\n", ""),
+                volume_inspect=(0, "supabase_db_pinpoint-dead|pinpoint-dead\n", ""),
+                network_rm=(
+                    1,
+                    "",
+                    "Error response from daemon: network "
+                    "supabase_network_pinpoint-dead not found",
+                ),
+            ),
+        )
+
+        assert _run_main(monkeypatch, "--apply") == 0
+
+        assert "Warning" not in capsys.readouterr().err
+        assert stub.calls_of("volume_rm") == [
+            ["docker", "volume", "rm", "supabase_db_pinpoint-dead"]
+        ]
+
     def test_dry_run_reports_volume_count_without_removing(
         self,
         monkeypatch: pytest.MonkeyPatch,
@@ -599,8 +659,12 @@ class TestRemoteOrphans:
         assert stub.remote_calls_of("volume_rm") == [
             ["docker", "volume", "rm", "supabase_db_pinpoint-dead"]
         ]
+        assert stub.remote_calls_of("network_rm") == [
+            ["docker", "network", "rm", "supabase_network_pinpoint-dead"]
+        ]
         # Every remote call went to the remote daemon, never the local one.
         assert stub.calls_of("container_rm") == []
+        assert stub.calls_of("network_rm") == []
         assert stub.calls_of("volume_rm") == []
         assert REMOTE_HOST in stub.docker_hosts
         # The stack holding the slot's ports is gone, so the slot is released.

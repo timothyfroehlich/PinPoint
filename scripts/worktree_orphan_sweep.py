@@ -20,7 +20,7 @@ This script reconciles three sources of truth:
   starts with `pinpoint-` (the prefix `derive_project_id` always emits)
 
 Defaults to dry-run; pass `--apply` to actually deallocate orphan slots and
-remove orphan Docker containers/volumes.
+remove orphan Docker containers, networks and volumes.
 
 **Remote backend.** A worktree can run its Supabase stack on another host's
 Docker (docs/runbooks/remote-supabase.md). When `PINPOINT_REMOTE_DOCKER_HOST`
@@ -622,17 +622,22 @@ def _remove_project_resources(
     env: dict[str, str] | None = None,
     where: str = "",
 ) -> bool:
-    """`docker rm -f` then `docker volume rm` one project's named resources.
+    """Remove one project's containers, its network, then its volumes.
 
-    Names come from a label-filtered enumeration; nothing here prunes. Returns
-    True when every removal that was needed succeeded.
+    Container and volume names come from a label-filtered enumeration; nothing
+    here prunes. The network is the one `supabase start` creates per project,
+    `supabase_network_<project_id>`, which removing the containers leaves
+    behind; it is missing when the stack was stopped properly or ran on a
+    shared network (the remote backend's `--network-id`). Returns True when
+    every removal that was needed succeeded.
     """
     ok = True
     for kind, argv, names in (
         ("container", ["docker", "rm", "-f"], containers),
+        ("network", ["docker", "network", "rm"], [f"supabase_network_{pid}"]),
         ("volume", ["docker", "volume", "rm"], volumes),
     ):
-        if not names:
+        if not names or (kind == "network" and not ok):
             continue
         try:
             rm = subprocess.run(
@@ -645,6 +650,9 @@ def _remove_project_resources(
             failure = rm.stderr.strip() if rm.returncode != 0 else None
         except (OSError, subprocess.SubprocessError) as exc:
             failure = str(exc)
+        if kind == "network" and failure is not None:
+            if re.search(r"not found|no such network", failure, re.IGNORECASE):
+                continue  # already gone, or the stack used a shared network
         if failure is not None:
             ok = False
             print(
