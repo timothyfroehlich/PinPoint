@@ -5,16 +5,15 @@
  */
 
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
-import { after, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { type NextRequest } from "next/server";
 import type { EmailOtpType, SupabaseClient } from "@supabase/supabase-js";
+import { eq } from "drizzle-orm";
+import { db } from "~/server/db";
+import { userProfiles } from "~/server/db/schema";
 import { getSupabaseEnv } from "~/lib/supabase/env";
 import { getSiteUrl, isInternalUrl } from "~/lib/url";
 import { reportError } from "~/lib/observability/report-error";
-import {
-  sendDiscordWelcome,
-  syncDiscordIdentityAndClaimOnboarding,
-} from "~/lib/discord/onboarding";
 
 export function resolveRedirectPath(nextParam: string | null): string {
   const fallback = "/";
@@ -190,23 +189,10 @@ async function syncDiscordIdentity(supabase: SupabaseClient): Promise<void> {
       discord.identity_data?.provider_id ?? discord.identity_data?.sub ?? null;
     if (!discordUserId) return;
 
-    const shouldSendWelcome = await syncDiscordIdentityAndClaimOnboarding(
-      user.id,
-      discordUserId
-    );
-    if (shouldSendWelcome) {
-      after(async () => {
-        try {
-          await sendDiscordWelcome(discordUserId);
-        } catch (error) {
-          reportError(error, {
-            action: "auth.callback.discordWelcome",
-            bestEffort: true,
-            userId: user.id,
-          });
-        }
-      });
-    }
+    await db
+      .update(userProfiles)
+      .set({ discordUserId })
+      .where(eq(userProfiles.id, user.id));
   } catch (error) {
     reportError(error, {
       action: "auth.callback.syncDiscordIdentity",

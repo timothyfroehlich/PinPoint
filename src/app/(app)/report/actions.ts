@@ -27,7 +27,7 @@ import {
   issueImages,
   issues as issuesTable,
 } from "~/server/db/schema";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import { createClient } from "~/lib/supabase/server";
 import type { ActionState } from "./unified-report-form";
 import { imagesMetadataArraySchema } from "../issues/schemas";
@@ -48,7 +48,6 @@ import type {
 } from "~/lib/types";
 import { checkPermission } from "~/lib/permissions/helpers";
 import { getUserAccessLevel } from "~/lib/permissions/access";
-import { OPEN_STATUSES } from "~/lib/issues/status";
 
 const recentIssuesParamsSchema = z.object({
   machineInitials: z
@@ -470,10 +469,7 @@ export async function getRecentIssuesAction(
 
   try {
     const rows = await db.query.issues.findMany({
-      where: and(
-        eq(issuesTable.machineInitials, parsed.data.machineInitials),
-        inArray(issuesTable.status, OPEN_STATUSES)
-      ),
+      where: eq(issuesTable.machineInitials, parsed.data.machineInitials),
       orderBy: [desc(issuesTable.createdAt)],
       limit: parsed.data.limit,
       columns: {

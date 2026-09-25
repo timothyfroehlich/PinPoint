@@ -229,8 +229,6 @@ export interface CreateMachineParams {
    * the insert. Callers gate this on `admin.users.promote.guestToMember`.
    */
   promoteGuest?: PromoteGuest | null | undefined;
-  /** Linked iScored game ID string, or null/undefined for none. */
-  iscoredGameId?: string | null | undefined;
 }
 
 /**
@@ -251,7 +249,6 @@ export async function createMachine({
   description,
   pbmColumns,
   promoteGuest,
-  iscoredGameId,
 }: CreateMachineParams): Promise<{
   machine: Machine;
   deliveryPlan: DeliveryPlan;
@@ -287,7 +284,6 @@ export async function createMachine({
         ...(presenceStatus !== undefined && { presenceStatus }),
         ...(description !== undefined &&
           description !== null && { description }),
-        ...(iscoredGameId !== undefined && { iscoredGameId }),
         ...(pbmColumns ?? {}),
       })
       .returning();
@@ -333,11 +329,10 @@ export async function createMachine({
             type: "machine_ownership_changed",
             resourceId: machine.id,
             resourceType: "machine",
-            eventId: machine.id,
             actorId: actorUserId,
             includeActor: false,
             machineName: machine.name,
-            ownershipChange: "added",
+            newStatus: "added",
             additionalRecipientIds: [promoteGuest.userId],
           },
           tx,
@@ -450,7 +445,7 @@ export async function updateMachineOwner({
 
     // Lifecycle: emit only `owner_changed`. Name is passed unchanged and
     // presence is left `undefined` so no spurious name/presence events fire.
-    const ownerEventId = await emitMachineUpdated(
+    await emitMachineUpdated(
       tx,
       {
         id: machineId,
@@ -467,26 +462,21 @@ export async function updateMachineOwner({
       actorUserId
     );
 
-    if (willNotify && ownerEventId === null) {
-      throw new Error("Owner changed without a timeline event");
-    }
-
     // Notifications planned in-tx (transactional in-app rows), delivered by the
     // caller post-commit. Best-effort: a planning failure never rolls back the
     // committed owner change.
     const deliveries: DeliveryPlan["deliveries"] = [];
     try {
-      if (ownerEventId && oldOwnerId && oldOwnerId !== newOwnerId) {
+      if (oldOwnerId && oldOwnerId !== newOwnerId) {
         const removed = await planNotification(
           {
             type: "machine_ownership_changed",
             resourceId: machine.id,
             resourceType: "machine",
-            eventId: ownerEventId,
             actorId: actorUserId,
             includeActor: false,
             machineName: machine.name,
-            ownershipChange: "removed",
+            newStatus: "removed",
             additionalRecipientIds: [oldOwnerId],
           },
           tx,
@@ -494,17 +484,16 @@ export async function updateMachineOwner({
         );
         deliveries.push(...removed.deliveries);
       }
-      if (ownerEventId && newOwnerId && newOwnerId !== oldOwnerId) {
+      if (newOwnerId && newOwnerId !== oldOwnerId) {
         const added = await planNotification(
           {
             type: "machine_ownership_changed",
             resourceId: machine.id,
             resourceType: "machine",
-            eventId: ownerEventId,
             actorId: actorUserId,
             includeActor: false,
             machineName: machine.name,
-            ownershipChange: "added",
+            newStatus: "added",
             additionalRecipientIds: [newOwnerId],
           },
           tx,

@@ -51,10 +51,6 @@ function prefs(
     discordNotifyOnNewIssue: false,
     discordWatchNewIssuesGlobal: false,
     discordDmBlockedAt: null,
-    discordOnboardedAt: null,
-    discordNoticeVersion: 0,
-    discordNoticeLeaseId: null,
-    discordNoticeLeaseExpiresAt: null,
     ...overrides,
   };
 }
@@ -64,7 +60,6 @@ function ctx(overrides: Partial<ChannelContext> = {}): ChannelContext {
     userId: "u1",
     type: "issue_assigned",
     resourceId: "issue-1",
-    eventId: "event-1",
     resourceType: "issue",
     email: "u@example.com",
     discordUserId: "discord-1",
@@ -73,7 +68,6 @@ function ctx(overrides: Partial<ChannelContext> = {}): ChannelContext {
     formattedIssueId: "AFM-01",
     commentContent: undefined,
     newStatus: undefined,
-    recipientReason: "assignee",
     issueDescription: undefined,
     ...overrides,
   };
@@ -163,15 +157,6 @@ describe("discordChannel.deliver", () => {
 
   it("maps blocked → permanent (don't retry futile sends)", async () => {
     vi.mocked(sendDm).mockResolvedValueOnce({ ok: false, reason: "blocked" });
-    const result = await channel.deliver(ctx());
-    expect(result).toEqual({ ok: false, reason: "permanent" });
-  });
-
-  it("maps no shared server → permanent (joining a server requires member action)", async () => {
-    vi.mocked(sendDm).mockResolvedValueOnce({
-      ok: false,
-      reason: "no_shared_server",
-    });
     const result = await channel.deliver(ctx());
     expect(result).toEqual({ ok: false, reason: "permanent" });
   });

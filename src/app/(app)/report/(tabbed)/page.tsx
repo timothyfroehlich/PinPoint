@@ -3,12 +3,11 @@ import { eq } from "drizzle-orm";
 import { db } from "~/server/db";
 import { userProfiles } from "~/server/db/schema";
 import { resolveDefaultMachineId } from "../default-machine";
+import { UnifiedReportForm } from "../unified-report-form";
 import { createClient } from "~/lib/supabase/server";
 import { getAccessLevel } from "~/lib/permissions/helpers";
 import { getRecentIssuesAction, type RecentIssueData } from "../actions";
-import { getReportMachines } from "../report-data";
-import { QuickReportForm } from "~/app/(app)/report/quick-report-form";
-import { checkPermission } from "~/lib/permissions/helpers";
+import { getReportMachines, getReportAssignees } from "../report-data";
 
 // Avoid SSG hitting Supabase during builds that run parallel to db resets
 export const dynamic = "force-dynamic";
@@ -33,6 +32,9 @@ export default async function PublicReportPage({
     source?: string | string[];
   }>;
 }): Promise<React.JSX.Element> {
+  // Machines + assignees come from the shared request-deduped loaders (also
+  // called by the layout), so /report doesn't fetch them twice. Assignees are
+  // matrix-gated inside the loader (technicians included). (PP-2m17 #1/#3)
   const machinesListPromise = getReportMachines();
 
   // Auth context for the form
@@ -50,14 +52,15 @@ export default async function PublicReportPage({
   }
 
   const accessLevel = getAccessLevel(userProfile?.role);
-  const canMultiple =
-    Boolean(user) && checkPermission("issues.report.quick", accessLevel);
+  const assignees = await getReportAssignees(accessLevel);
 
   const machinesList = await machinesListPromise;
 
   const params = await searchParams;
   const errorMessage =
-    typeof params.error === "string" ? params.error : undefined;
+    typeof params.error === "string"
+      ? decodeURIComponent(params.error)
+      : undefined;
 
   const machineIdFromQuery = params.machineId;
   const machineInitialsFromQuery = params.machine;
@@ -73,15 +76,19 @@ export default async function PublicReportPage({
   // Pre-fetch initial issues for the selected machine (avoids first-load skeleton flash)
   let initialIssues: RecentIssueData[] | null = null;
   if (selectedMachine) {
-    const result = await getRecentIssuesAction(selectedMachine.initials, 3);
+    const result = await getRecentIssuesAction(selectedMachine.initials, 5);
     initialIssues = result.ok ? result.value : null;
   }
 
   return (
-    <QuickReportForm
+    /* CORE-SEC-006: Pass minimal user shape, not full Supabase user. Page
+       chrome (container, header, tab bar) is owned by report/layout.tsx. */
+    <UnifiedReportForm
       machinesList={machinesList}
       defaultMachineId={defaultMachineId}
-      canMultiple={canMultiple}
+      userAuthenticated={Boolean(user)}
+      accessLevel={accessLevel}
+      assignees={assignees}
       initialError={errorMessage}
       initialIssues={initialIssues}
       initialMachineInitials={selectedMachine?.initials ?? ""}

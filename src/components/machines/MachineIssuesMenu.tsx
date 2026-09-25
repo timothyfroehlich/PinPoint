@@ -1,6 +1,6 @@
 "use client";
 
-import * as React from "react";
+import type React from "react";
 import Link from "next/link";
 import { Check, Download, ListFilter, MoreHorizontal } from "lucide-react";
 import { toast } from "sonner";
@@ -41,11 +41,7 @@ export function MachineIssuesMenu({
   machineInitials,
   view,
 }: MachineIssuesMenuProps): React.JSX.Element {
-  const [isExporting, setIsExporting] = React.useState(false);
-
   async function handleExport(): Promise<void> {
-    if (isExporting) return;
-    setIsExporting(true);
     try {
       const result = await exportIssuesAction({ machineInitials });
       if (!result.ok) {
@@ -59,8 +55,6 @@ export function MachineIssuesMenu({
       triggerCsvDownload(result.value.csv, result.value.fileName);
     } catch {
       toast.error("Export failed. Please try again.");
-    } finally {
-      setIsExporting(false);
     }
   }
 
@@ -96,17 +90,12 @@ export function MachineIssuesMenu({
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem
-          onSelect={(e) => {
-            if (isExporting) {
-              e.preventDefault();
-              return;
-            }
+          onSelect={() => {
             void handleExport();
           }}
-          disabled={isExporting}
         >
           <Download className="size-4" aria-hidden="true" />
-          {isExporting ? "Exporting issues…" : "Export all issues (CSV)"}
+          Export all issues (CSV)
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
@@ -137,12 +126,7 @@ function ViewToggleItem({
 
 /** Blob → download of a generated CSV. No-op when the browser lacks the API. */
 function triggerCsvDownload(csv: string, fileName: string): void {
-  if (typeof URL.createObjectURL !== "function") {
-    toast.error(
-      "Download failed. Your browser may not support file downloads."
-    );
-    return;
-  }
+  if (typeof URL.createObjectURL !== "function") return;
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");

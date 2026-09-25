@@ -221,20 +221,6 @@ describe("machine mutation services (PP-u4ab.1)", () => {
       expect(machine.description).toEqual(description);
     });
 
-    it("persists iscoredGameId when provided", async () => {
-      const actorId = await makeUser("admin");
-      const initials = nextInitials();
-
-      const { machine } = await createMachine({
-        name: "Medieval Madness",
-        initials,
-        actorUserId: actorId,
-        iscoredGameId: "77956",
-      });
-
-      expect(machine.iscoredGameId).toBe("77956");
-    });
-
     it("records an invited owner without adding a watcher row", async () => {
       const actorId = await makeUser("admin");
       const invitedOwnerId = await makeInvited("member");

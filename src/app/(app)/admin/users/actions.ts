@@ -15,7 +15,6 @@ import { sendInviteEmail } from "~/lib/email/invite";
 import { requireSiteUrl } from "~/lib/url";
 import { inviteUserSchema, updateUserRoleSchema } from "./schema";
 import { log } from "~/lib/logger";
-import { errorMessage } from "~/lib/errors";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import { type Result, ok, err } from "~/lib/result";
 
@@ -245,7 +244,7 @@ export async function updateUserRole(
     log.error(
       {
         action: "updateUserRole",
-        err: errorMessage(error, "Unknown"),
+        err: error instanceof Error ? error.message : "Unknown",
       },
       "Failed to update user role"
     );
@@ -410,7 +409,7 @@ export async function inviteUser(
     log.error(
       {
         action: "inviteUser",
-        err: errorMessage(error, "Unknown"),
+        err: error instanceof Error ? error.message : "Unknown",
         stack: error instanceof Error ? error.stack : undefined,
       },
       "Invite user failed"
@@ -475,7 +474,7 @@ export async function removeInvitedUser(
       {
         action: "removeInvitedUser",
         userId,
-        err: errorMessage(error, "Unknown"),
+        err: error instanceof Error ? error.message : "Unknown",
         stack: error instanceof Error ? error.stack : undefined,
       },
       "Remove invited user failed"
@@ -557,7 +556,7 @@ export async function resendInvite(userId: string): Promise<{ ok: boolean }> {
       {
         action: "resendInvite",
         userId,
-        err: errorMessage(error, "Unknown"),
+        err: error instanceof Error ? error.message : "Unknown",
         stack: error instanceof Error ? error.stack : undefined,
       },
       "Resend invite failed"

@@ -212,12 +212,7 @@ if [[ "$rv_covered" == "true" ]]; then
   cv_reviewer=$(jq -r '.coverage.reviewer' <<< "$review_summary")
   cv_detail=$(jq -r '.coverage.detail' <<< "$review_summary")
   cv_at=$(jq -r '.coverage.at' <<< "$review_summary")
-  cv_inherited=$(jq -r '.coverage.inherited // false' <<< "$review_summary")
-  cv_inherited_from=$(jq -r '.coverage.inherited_from // ""' <<< "$review_summary")
   review_desc="$(record_phrase "$cv_checker" "$cv_reviewer" "$cv_detail") · ${cv_at} · covers head ${short_head}"
-  if [[ "$cv_inherited" == "true" && -n "$cv_inherited_from" ]]; then
-    review_desc+=" (inherited from ${cv_inherited_from:0:7}; pure merge from main)"
-  fi
   if [[ "$cv_form" == "reviewed" ]]; then
     review_desc+="; threads adjudicated separately"
   fi

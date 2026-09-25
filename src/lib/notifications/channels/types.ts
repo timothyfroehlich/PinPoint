@@ -1,10 +1,5 @@
 import type { notificationPreferences } from "~/server/db/schema";
-import type { IssueStatus } from "~/lib/issues/status";
-import type { IssueFrequency, IssueSeverity } from "~/lib/types";
-import type {
-  NotificationType,
-  RecipientReason,
-} from "~/lib/notifications/events";
+import type { NotificationType } from "~/lib/notifications/dispatch";
 
 /**
  * Preferences row shape — matches Drizzle's inferred select type for
@@ -42,15 +37,7 @@ export interface ChannelContext {
   machineInitials?: string | undefined;
   formattedIssueId?: string | undefined;
   commentContent?: string | undefined;
-  commentId?: string | undefined;
-  attachmentCount?: number | undefined;
-  oldStatus?: IssueStatus | undefined;
-  newStatus?: IssueStatus | undefined;
-  severity?: IssueSeverity | undefined;
-  frequency?: IssueFrequency | undefined;
-  ownershipChange?: "added" | "removed" | undefined;
-  actorName?: string | undefined;
-  recipientReason: RecipientReason;
+  newStatus?: string | undefined;
   issueDescription?: string | undefined;
   /**
    * Stable per-event identifier that discriminates distinct occurrences of the
@@ -59,10 +46,13 @@ export interface ChannelContext {
    * Without it, two different comments on the same issue produce the same
    * email idempotency key and Resend silently drops the second email (PP-pfyf).
    *
-   * Every notification carries the persisted ID of the occurrence that caused
-   * it. A later transition back to the same state is a different occurrence.
+   * Pass the comment UUID for new_comment / mentioned events. For event types
+   * that are structurally unique per resource-state transition (new_issue,
+   * issue_status_changed, issue_assigned, machine_ownership_changed) this field
+   * is absent and the key remains discriminated by resourceId alone, which is
+   * correct for those cases.
    */
-  eventId: string;
+  eventId?: string | undefined;
 }
 
 /**
@@ -88,8 +78,7 @@ export interface NotificationChannel {
    */
   shouldDeliver(
     prefs: NotificationPreferencesRow,
-    type: NotificationType,
-    recipientReason?: RecipientReason
+    type: NotificationType
   ): boolean;
   /**
    * Perform the actual external delivery (email/Discord HTTP). Run AFTER the

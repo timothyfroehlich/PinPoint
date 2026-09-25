@@ -1,8 +1,5 @@
 import type { NotificationChannel, NotificationPreferencesRow } from "./types";
-import type {
-  NotificationType,
-  RecipientReason,
-} from "~/lib/notifications/events";
+import type { NotificationType } from "~/lib/notifications/dispatch";
 
 /**
  * In-app is a *transactional* channel: its `notifications` row is written
@@ -14,8 +11,7 @@ export const inAppChannel: NotificationChannel = {
   key: "in_app",
   shouldDeliver(
     prefs: NotificationPreferencesRow,
-    type: NotificationType,
-    recipientReason?: RecipientReason
+    type: NotificationType
   ): boolean {
     if (!prefs.inAppEnabled) return false;
     switch (type) {
@@ -26,10 +22,6 @@ export const inAppChannel: NotificationChannel = {
       case "new_comment":
         return prefs.inAppNotifyOnNewComment;
       case "new_issue":
-        if (recipientReason === "global_watcher") {
-          return prefs.inAppWatchNewIssuesGlobal;
-        }
-        if (recipientReason) return prefs.inAppNotifyOnNewIssue;
         return prefs.inAppNotifyOnNewIssue || prefs.inAppWatchNewIssuesGlobal;
       case "machine_ownership_changed":
         return true;

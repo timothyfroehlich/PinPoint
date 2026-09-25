@@ -48,25 +48,6 @@ export const proseMirrorDocValueSchema = z.custom<ProseMirrorDoc>(
 );
 
 /**
- * Runtime guard for a ProseMirror document. Persisted content arrives as
- * `unknown` from JSONB, and even a value typed `ProseMirrorDoc` can be
- * structurally malformed at runtime (a bare stored `{ type: "doc" }` has no
- * `content` array), so callers narrow with this before walking `content`.
- * Consolidates the hand-rolled `type === "doc" && Array.isArray(content)` shape
- * check that was `as ProseMirrorDoc`-cast in three places (CORE-TS-007).
- */
-export function isProseMirrorDoc(value: unknown): value is ProseMirrorDoc {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    "type" in value &&
-    value.type === "doc" &&
-    "content" in value &&
-    Array.isArray(value.content)
-  );
-}
-
-/**
  * Convert plain text to a minimal ProseMirror document.
  * Splits on double newlines for paragraphs. Single newlines become hard breaks.
  */
@@ -117,10 +98,17 @@ export function plainTextToDoc(text: string): ProseMirrorDoc {
 export function extractMentions(
   doc: ProseMirrorDoc | null | undefined
 ): string[] {
-  if (!isProseMirrorDoc(doc)) {
+  const d = doc as unknown;
+  if (
+    !d ||
+    typeof d !== "object" ||
+    (d as Record<string, unknown>)["type"] !== "doc" ||
+    !Array.isArray((d as Record<string, unknown>)["content"])
+  ) {
     return [];
   }
 
+  const validDoc = d as ProseMirrorDoc;
   const ids = new Set<string>();
 
   function walk(nodes: ProseMirrorNode[] | undefined): void {
@@ -135,7 +123,7 @@ export function extractMentions(
     }
   }
 
-  walk(doc.content);
+  walk(validDoc.content);
   return Array.from(ids);
 }
 
@@ -148,8 +136,18 @@ export function docToPlainText(
 ): string {
   if (!doc) return "";
   if (typeof doc === "string") return doc;
-  if (!isProseMirrorDoc(doc)) return "";
 
+  const d = doc as unknown;
+  if (
+    !d ||
+    typeof d !== "object" ||
+    (d as Record<string, unknown>)["type"] !== "doc" ||
+    !Array.isArray((d as Record<string, unknown>)["content"])
+  ) {
+    return "";
+  }
+
+  const validDoc = d as ProseMirrorDoc;
   const parts: string[] = [];
 
   function walk(nodes: ProseMirrorNode[] | undefined): void {
@@ -181,7 +179,7 @@ export function docToPlainText(
     }
   }
 
-  walk(doc.content);
+  walk(validDoc.content);
 
   return parts.join("").trim();
 }

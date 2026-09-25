@@ -170,7 +170,6 @@ def gate_env(
     threads: list[dict] | None = None,
     commits: list[dict] | None = None,
     head_sha: str = HEAD_SHA,
-    base_ref: str = "main",
     rollup: list[dict] | None = None,
 ) -> Iterator[dict]:
     """Yield an environment whose gh executable serves paginated review records.
@@ -219,7 +218,6 @@ def gate_env(
             'printf "%s\\n" "$args" >> "$STUB_CALLS"\n'
             'case "$args" in\n'
             '  *"--jq .headRefOid"*) printf "%s\\n" "$STUB_HEAD_SHA" ;;\n'
-            '  *"baseRefName"*) printf "%s\\n" "$STUB_BASE_REF" ;;\n'
             '  *"--json statusCheckRollup --jq"*) jq -r "${@: -1}" < "$STUB_ROLLUP" ;;\n'
             '  *"nameWithOwner"*) printf "acme/widget\\n" ;;\n'
             '  *"api graphql"*) cat "$STUB_THREADS" ;;\n'
@@ -236,7 +234,6 @@ def gate_env(
         env = dict(os.environ)
         env["PATH"] = f"{tmp}{os.pathsep}{env.get('PATH', '')}"
         env["STUB_HEAD_SHA"] = head_sha
-        env["STUB_BASE_REF"] = base_ref
         env["STUB_REVIEWS"] = str(tmp_path / "reviews.json")
         env["STUB_COMMENTS"] = str(tmp_path / "comments.json")
         env["STUB_COMMITS"] = str(tmp_path / "commits.json")
@@ -246,20 +243,17 @@ def gate_env(
         yield env
 
 
-def run_gate(
-    fn: str, env: dict, *, cwd: Path | None = None
-) -> subprocess.CompletedProcess:
+def run_gate(fn: str, env: dict) -> subprocess.CompletedProcess:
     return subprocess.run(
         ["bash", "-c", f'source "{GATES_PATH}"; {fn} 123'],
         capture_output=True,
         text=True,
         env=env,
-        cwd=cwd,
         timeout=60,
     )
 
 
-def review_summary(env: dict, *, cwd: Path | None = None) -> dict:
+def review_summary(env: dict) -> dict:
     """`_review_summary 123` as a dict — the document every consumer reads."""
     result = subprocess.run(
         [
@@ -270,7 +264,6 @@ def review_summary(env: dict, *, cwd: Path | None = None) -> dict:
         capture_output=True,
         text=True,
         env=env,
-        cwd=cwd,
         timeout=60,
     )
     assert result.returncode == 0, result.stderr
@@ -1104,268 +1097,3 @@ def test_resolved_threads_do_not_block() -> None:
     with gate_env(threads=[thread(resolved=True, author="codex")]) as env:
         result = run_gate("check_unresolved_threads", env)
     assert result.returncode == 0, result.stdout
-
-
-# ---------------------------------------------------------------------------------
-# Pure merge review approval inheritance (PP-ojoj)
-# ---------------------------------------------------------------------------------
-
-GIT_ENV = {
-    "GIT_AUTHOR_NAME": "Test",
-    "GIT_AUTHOR_EMAIL": "test@example.com",
-    "GIT_COMMITTER_NAME": "Test",
-    "GIT_COMMITTER_EMAIL": "test@example.com",
-}
-
-
-def git_cmd(*args: str, cwd: Path) -> str:
-    result = subprocess.run(
-        ["git", *args],
-        cwd=cwd,
-        capture_output=True,
-        text=True,
-        env={**os.environ, **GIT_ENV},
-        timeout=60,
-        check=True,
-    )
-    return result.stdout.strip()
-
-
-@contextmanager
-def git_repo_with_merge(
-    *,
-    extra_feature_commit: bool = False,
-    conflict_in_merge: bool = False,
-    merge_unrelated_branch: bool = False,
-) -> Iterator[tuple[Path, str, str]]:
-    """Create a temporary git repo with a branch, an approved commit, and a merge from main.
-
-    Yields (repo_path, approved_sha, head_sha).
-    """
-    with tempfile.TemporaryDirectory() as tmp:
-        repo = Path(tmp) / "repo"
-        repo.mkdir()
-        subprocess.run(["git", "init", "-q", "-b", "main", str(repo)], check=True)
-
-        (repo / "base.txt").write_text("base\n")
-        git_cmd("add", "-A", cwd=repo)
-        git_cmd("commit", "-qm", "initial commit", cwd=repo)
-
-        # Feature branch
-        git_cmd("checkout", "-qb", "feat", cwd=repo)
-        (repo / "feat.txt").write_text("feature content\n")
-        git_cmd("add", "-A", cwd=repo)
-        git_cmd("commit", "-qm", "feature commit (approved)", cwd=repo)
-        approved_sha = git_cmd("rev-parse", "HEAD", cwd=repo)
-
-        if extra_feature_commit:
-            (repo / "feat2.txt").write_text("extra unreviewed feature work\n")
-            git_cmd("add", "-A", cwd=repo)
-            git_cmd("commit", "-qm", "unreviewed feature commit", cwd=repo)
-
-        # Advance main
-        git_cmd("checkout", "-q", "main", cwd=repo)
-        (repo / "main.txt").write_text("main update\n")
-        if conflict_in_merge:
-            (repo / "feat.txt").write_text("conflict in main\n")
-        git_cmd("add", "-A", cwd=repo)
-        git_cmd("commit", "-qm", "main advances", cwd=repo)
-
-        if merge_unrelated_branch:
-            git_cmd("checkout", "-qb", "unrelated", cwd=repo)
-            (repo / "unrelated.txt").write_text("unrelated\n")
-            git_cmd("add", "-A", cwd=repo)
-            git_cmd("commit", "-qm", "unrelated branch commit", cwd=repo)
-            git_cmd("checkout", "-q", "feat", cwd=repo)
-            git_cmd(
-                "merge", "-q", "--no-ff", "-m", "Merge unrelated", "unrelated", cwd=repo
-            )
-        elif conflict_in_merge:
-            git_cmd("checkout", "-q", "feat", cwd=repo)
-            subprocess.run(
-                ["git", "merge", "-q", "--no-ff", "main"], cwd=repo, check=False
-            )
-            (repo / "feat.txt").write_text("manual conflict resolution\n")
-            git_cmd("add", "-A", cwd=repo)
-            git_cmd("commit", "-qm", "Merge main with conflict resolution", cwd=repo)
-        else:
-            git_cmd("checkout", "-q", "feat", cwd=repo)
-            git_cmd(
-                "merge", "-q", "--no-ff", "-m", "Merge main into feat", "main", cwd=repo
-            )
-
-        head_sha = git_cmd("rev-parse", "HEAD", cwd=repo)
-        yield repo, approved_sha, head_sha
-
-
-def test_pure_merge_from_main_inherits_coderabbit_approval() -> None:
-    with git_repo_with_merge() as (repo, approved_sha, head_sha):
-        with gate_env(
-            review_pages=[[codex_review(sha=approved_sha, login=CODERABBIT_BOT)]],
-            head_sha=head_sha,
-        ) as env:
-            summary = review_summary(env, cwd=repo)
-            run = run_gate("check_review_happened", env, cwd=repo)
-
-    assert summary["label"] == "approved"
-    assert summary["coverage"]["checker"] == "coderabbit"
-    assert summary["coverage"]["inherited"] is True
-    assert summary["coverage"]["inherited_from"] == approved_sha
-    assert run.returncode == 0
-    assert (
-        f"CodeRabbit approved head SHA {head_sha[:7]} (inherited from {approved_sha[:7]}; pure merge from main)"
-        in run.stdout
-    )
-
-
-def test_pure_merge_from_main_inherits_codex_native_approval() -> None:
-    with git_repo_with_merge() as (repo, approved_sha, head_sha):
-        with gate_env(
-            review_pages=[[codex_review(sha=approved_sha, state="APPROVED")]],
-            head_sha=head_sha,
-        ) as env:
-            summary = review_summary(env, cwd=repo)
-            run = run_gate("check_review_happened", env, cwd=repo)
-
-    assert summary["label"] == "approved"
-    assert summary["coverage"]["checker"] == "codex"
-    assert summary["coverage"]["form"] == "approval"
-    assert summary["coverage"]["inherited"] is True
-    assert summary["coverage"]["inherited_from"] == approved_sha
-    assert run.returncode == 0
-    assert (
-        f"Codex approved head SHA {head_sha[:7]} (inherited from {approved_sha[:7]}; pure merge from main)"
-        in run.stdout
-    )
-
-
-def test_pure_merge_from_main_inherits_codex_clean_comment() -> None:
-    with git_repo_with_merge() as (repo, approved_sha, head_sha):
-        with gate_env(
-            comment_pages=[[clean_codex_comment(sha=approved_sha[:10])]],
-            head_sha=head_sha,
-        ) as env:
-            summary = review_summary(env, cwd=repo)
-            run = run_gate("check_review_happened", env, cwd=repo)
-
-    assert summary["label"] == "approved"
-    assert summary["coverage"]["checker"] == "codex"
-    assert summary["coverage"]["form"] == "clean_comment"
-    assert summary["coverage"]["inherited"] is True
-    assert run.returncode == 0
-    assert (
-        f"Codex found no major issues on head SHA {head_sha[:7]} (inherited from {approved_sha[:7]}; pure merge from main)"
-        in run.stdout
-    )
-
-
-def test_pure_merge_from_main_inherits_codex_reaction_witness() -> None:
-    with git_repo_with_merge() as (repo, approved_sha, head_sha):
-        with gate_env(
-            comment_pages=[[clean_codex_reaction_witness(sha=approved_sha)]],
-            head_sha=head_sha,
-        ) as env:
-            summary = review_summary(env, cwd=repo)
-            run = run_gate("check_review_happened", env, cwd=repo)
-
-    assert summary["label"] == "approved"
-    assert summary["coverage"]["checker"] == "codex"
-    assert summary["coverage"]["form"] == "clean_reaction"
-    assert summary["coverage"]["inherited"] is True
-    assert run.returncode == 0
-    assert (
-        f"trusted workflow witnessed Codex clean reaction on head SHA {head_sha[:7]} (inherited from {approved_sha[:7]}; pure merge from main)"
-        in run.stdout
-    )
-
-
-def test_pure_merge_from_main_inherits_manual_marker() -> None:
-    with git_repo_with_merge() as (repo, approved_sha, head_sha):
-        with gate_env(
-            comment_pages=[[manual_marker(sha=approved_sha)]],
-            head_sha=head_sha,
-        ) as env:
-            summary = review_summary(env, cwd=repo)
-            run = run_gate("check_review_happened", env, cwd=repo)
-
-    assert summary["label"] == "approved"
-    assert summary["coverage"]["checker"] == "marker"
-    assert summary["coverage"]["inherited"] is True
-    assert run.returncode == 0
-    assert (
-        f"review marker pins head SHA {head_sha[:7]} (inherited from {approved_sha[:7]}; pure merge from main)"
-        in run.stdout
-    )
-
-
-def test_merge_with_conflict_resolution_is_not_pure_merge_and_remains_stale() -> None:
-    with git_repo_with_merge(conflict_in_merge=True) as (repo, approved_sha, head_sha):
-        with gate_env(
-            review_pages=[[codex_review(sha=approved_sha, login=CODERABBIT_BOT)]],
-            head_sha=head_sha,
-        ) as env:
-            summary = review_summary(env, cwd=repo)
-            run = run_gate("check_review_happened", env, cwd=repo)
-
-    assert summary["label"] == "stale review"
-    assert run.returncode == 1
-    assert "FAIL: reviewed: stale review" in run.stdout
-
-
-def test_merge_with_extra_feature_commits_is_not_pure_merge_and_remains_stale() -> None:
-    with git_repo_with_merge(extra_feature_commit=True) as (
-        repo,
-        approved_sha,
-        head_sha,
-    ):
-        with gate_env(
-            review_pages=[[codex_review(sha=approved_sha, login=CODERABBIT_BOT)]],
-            head_sha=head_sha,
-        ) as env:
-            summary = review_summary(env, cwd=repo)
-            run = run_gate("check_review_happened", env, cwd=repo)
-
-    assert summary["label"] == "stale review"
-    assert run.returncode == 1
-    assert "FAIL: reviewed: stale review" in run.stdout
-
-
-def test_merge_of_unrelated_branch_is_not_pure_merge_and_remains_stale() -> None:
-    with git_repo_with_merge(merge_unrelated_branch=True) as (
-        repo,
-        approved_sha,
-        head_sha,
-    ):
-        with gate_env(
-            review_pages=[[codex_review(sha=approved_sha, login=CODERABBIT_BOT)]],
-            head_sha=head_sha,
-        ) as env:
-            summary = review_summary(env, cwd=repo)
-            run = run_gate("check_review_happened", env, cwd=repo)
-
-    assert summary["label"] == "stale review"
-    assert run.returncode == 1
-    assert "FAIL: reviewed: stale review" in run.stdout
-
-
-def test_non_approved_review_is_not_inherited() -> None:
-    with git_repo_with_merge() as (repo, approved_sha, head_sha):
-        with gate_env(
-            review_pages=[
-                [
-                    codex_review(
-                        sha=approved_sha,
-                        state="CHANGES_REQUESTED",
-                        login=CODERABBIT_BOT,
-                    )
-                ]
-            ],
-            head_sha=head_sha,
-        ) as env:
-            summary = review_summary(env, cwd=repo)
-            run = run_gate("check_review_happened", env, cwd=repo)
-
-    assert summary["label"] == "stale review"
-    assert summary["coverage"] is None
-    assert run.returncode == 1
-    assert "FAIL: reviewed: stale review" in run.stdout
