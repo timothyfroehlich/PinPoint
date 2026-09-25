@@ -35,13 +35,14 @@ def codex_review(
     state: str = "APPROVED",
     submitted_at: str = "2026-08-22T12:00:00Z",
     login: str = CODEX_BOT,
+    body: str = "Codex review summary",
 ) -> dict:
     return {
         "user": {"login": login},
         "state": state,
         "commit_id": sha,
         "submitted_at": submitted_at,
-        "body": "Codex review summary",
+        "body": body,
     }
 
 
@@ -508,6 +509,62 @@ def test_coderabbit_changes_requested_on_head_is_changes_requested() -> None:
     assert "FAIL: reviewed: changes requested" in result.stdout
     assert f"CodeRabbit: requested changes on head {HEAD_SHA[:7]}" in result.stdout
     assert summary["label"] == "changes requested"
+
+
+@pytest.mark.parametrize("body", ["", "  \n"])
+def test_empty_coderabbit_comment_after_approval_keeps_coverage(body: str) -> None:
+    """PR #2192: CodeRabbit's reply inside a resolved thread arrives as an empty
+    COMMENTED review after its approval; it must not hide that approval."""
+    approval = codex_review(login=CODERABBIT_BOT, submitted_at="2026-08-22T12:00:00Z")
+    reply = codex_review(
+        login=CODERABBIT_BOT,
+        state="COMMENTED",
+        submitted_at="2026-08-22T12:01:00Z",
+        body=body,
+    )
+    with gate_env(review_pages=[[approval, reply]]) as env:
+        result = run_gate("check_review_happened", env)
+        summary = review_summary(env)
+    assert result.returncode == 0, result.stdout
+    assert summary["label"] == "approved"
+    assert summary["coverage"]["checker"] == "coderabbit"
+    assert summary["coverage"]["detail"] == "APPROVED"
+
+
+def test_coderabbit_comment_with_body_after_approval_revokes_coverage() -> None:
+    approval = codex_review(login=CODERABBIT_BOT, submitted_at="2026-08-22T12:00:00Z")
+    comment = codex_review(
+        login=CODERABBIT_BOT,
+        state="COMMENTED",
+        submitted_at="2026-08-22T12:01:00Z",
+        body="**Actionable comments posted: 1**",
+    )
+    with gate_env(review_pages=[[approval, comment]]) as env:
+        result = run_gate("check_review_happened", env)
+        summary = review_summary(env)
+    assert result.returncode == 1, result.stdout
+    assert summary["label"] == "not reviewed"
+    assert verdicts(summary)["coderabbit"] == "none"
+
+
+def test_empty_coderabbit_comment_after_changes_requested_keeps_changes_requested() -> (
+    None
+):
+    changes = codex_review(
+        login=CODERABBIT_BOT,
+        state="CHANGES_REQUESTED",
+        submitted_at="2026-08-22T12:00:00Z",
+    )
+    reply = codex_review(
+        login=CODERABBIT_BOT,
+        state="COMMENTED",
+        submitted_at="2026-08-22T12:01:00Z",
+        body="",
+    )
+    with gate_env(review_pages=[[changes, reply]]) as env:
+        summary = review_summary(env)
+    assert summary["label"] == "changes requested"
+    assert verdicts(summary)["coderabbit"] == "changes_requested"
 
 
 def test_unresolved_threads_make_uncovered_head_changes_requested() -> None:
