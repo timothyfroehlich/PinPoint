@@ -59,6 +59,21 @@ def test_git_inventory_keeps_all_harness_worktree_paths(
     assert sweep.get_active_worktree_branches(tmp_path) == paths
 
 
+def test_git_inventory_failure_aborts_instead_of_reporting_no_worktrees(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """An empty inventory would mark every live stack as an orphan for --apply."""
+
+    def fail(*args, **_kwargs):
+        raise subprocess.CalledProcessError(128, args[0], "", "not a git repository")
+
+    monkeypatch.setattr(sweep.subprocess, "run", fail)
+
+    with pytest.raises(SystemExit) as exc:
+        sweep.get_active_worktree_branches(tmp_path)
+    assert "not a git repository" in str(exc.value.code)
+
+
 def _kind(args: list[str]) -> str:
     """Classify a docker argv so the stub can answer per-subcommand."""
     if not args or args[0] != "docker":

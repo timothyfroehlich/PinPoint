@@ -3,8 +3,10 @@
 #
 # A GitHub reaction has no commit SHA. This script is therefore run only from the
 # trusted issue_comment workflow on main: it requires the repository owner's exact
-# SHA-bound review request, then observes a fresh Codex `eyes` to `+1` transition
-# without any head movement and posts a SHA-pinned github-actions comment.
+# SHA-bound review request, then waits for Codex's `+1` on that request comment
+# while the head has not moved, and posts a SHA-pinned github-actions comment.
+# Codex replaces its `eyes` with `+1`, so `eyes` is never required: a review that
+# finished before the first poll would otherwise never be witnessed.
 
 set -euo pipefail
 
@@ -76,11 +78,10 @@ current_native_review_state() {
 }
 
 post_witness() {
-  local eyes_at=$1 clean_at=$2 marker body comment_id
+  local clean_at=$1 marker body comment_id
   marker="${WITNESS_PREFIX} ${EXPECTED_HEAD} -->"
-  body=$(printf '%s\n%s\n%s\n\n%s\n' \
+  body=$(printf '%s\n%s\n\n%s\n' \
     "$marker" \
-    "<!-- pinpoint-codex-eyes-at: ${eyes_at} -->" \
     "<!-- pinpoint-codex-clean-at: ${clean_at} -->" \
     "Codex clean-review reaction witnessed on commit \`${EXPECTED_HEAD:0:10}\`.")
 
@@ -105,7 +106,6 @@ post_witness() {
   echo "Witnessed clean Codex review for ${EXPECTED_HEAD}."
 }
 
-eyes_at=""
 for ((attempt = 1; attempt <= MAX_ATTEMPTS; attempt++)); do
   current_head=$(gh pr view "$PR_NUMBER" --repo "$OWNER_REPO" \
     --json headRefOid --jq .headRefOid)
@@ -122,19 +122,10 @@ for ((attempt = 1; attempt <= MAX_ATTEMPTS; attempt++)); do
       ;;
   esac
 
-  if [[ -z "$eyes_at" ]]; then
-    eyes_at=$(reaction_at eyes "$TRIGGERED_AT")
-    if [[ -n "$eyes_at" ]]; then
-      echo "Observed fresh Codex eyes reaction at ${eyes_at}."
-    fi
-  fi
-
-  if [[ -n "$eyes_at" ]]; then
-    clean_at=$(reaction_at +1 "$eyes_at")
-    if [[ -n "$clean_at" ]]; then
-      post_witness "$eyes_at" "$clean_at"
-      exit 0
-    fi
+  clean_at=$(reaction_at +1 "$TRIGGERED_AT")
+  if [[ -n "$clean_at" ]]; then
+    post_witness "$clean_at"
+    exit 0
   fi
 
   if ((attempt < MAX_ATTEMPTS)); then
@@ -142,5 +133,5 @@ for ((attempt = 1; attempt <= MAX_ATTEMPTS; attempt++)); do
   fi
 done
 
-echo "::warning::No commit-safe Codex reaction transition was observed for ${EXPECTED_HEAD}."
+echo "::warning::No commit-safe Codex +1 reaction was observed for ${EXPECTED_HEAD}."
 exit 0

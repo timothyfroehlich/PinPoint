@@ -1,7 +1,12 @@
 import { test, expect } from "../support/fixtures.js";
 import { loginAs } from "../support/actions.js";
 import { TEST_USERS, seededMachines } from "../support/constants.js";
-import { getTestIssueTitle } from "../support/test-isolation.js";
+import {
+  createTestUser,
+  deleteTestUser,
+  updateUserRole,
+} from "../support/supabase-admin.js";
+import { getTestEmail, getTestIssueTitle } from "../support/test-isolation.js";
 
 const afm = seededMachines.attackFromMars;
 
@@ -106,5 +111,66 @@ test.describe("report mode handoffs", () => {
     await page.goto("/report/quick");
     await expect(page).toHaveURL(/\/report\/multiple$/);
     await expect(page.getByTestId("quick-report-grid")).toBeVisible();
+  });
+});
+
+test.describe("default report form preferences", () => {
+  // A throwaway member: the test saves profile preferences, and the seeded
+  // member is shared across parallel workers.
+  let email: string;
+  let userId: string;
+
+  test.beforeAll(async () => {
+    email = getTestEmail("report-defaults@test.com");
+    const user = await createTestUser(email);
+    userId = user.id;
+    await updateUserRole(userId, "member");
+  });
+
+  test.afterAll(async () => {
+    await deleteTestUser(userId).catch(() => {});
+  });
+
+  test("saved preferences drive the header and bottom-bar Report actions", async ({
+    page,
+  }, testInfo) => {
+    await loginAs(page, testInfo, { email, password: "TestPassword123" });
+    await page.goto("/settings");
+
+    const mobile = page.getByRole("group", { name: "Mobile report form" });
+    const desktop = page.getByRole("group", {
+      name: "Desktop / Tablet report form",
+    });
+    await expect(mobile.getByRole("radio", { name: "Quick" })).toBeChecked();
+    await expect(
+      desktop.getByRole("radio", { name: "Detailed" })
+    ).toBeChecked();
+
+    const saveStatus = page.getByRole("status").filter({ hasText: /Sav/ });
+    await mobile.getByText("Multiple", { exact: true }).click();
+    await expect(saveStatus).toHaveText("Saved");
+    await desktop.getByText("Quick", { exact: true }).click();
+    await expect(saveStatus).toHaveText("Saved");
+
+    await page.goto("/dashboard");
+    if (testInfo.project.name.includes("Mobile")) {
+      const report = page
+        .getByTestId("bottom-tab-bar")
+        .getByRole("link", { name: /report/i });
+      await expect(report).toHaveAttribute("href", "/report/multiple");
+      await report.click();
+      await expect(page).toHaveURL(/\/report\/multiple$/);
+      await expect(page.getByTestId("quick-report-grid")).toBeVisible();
+    } else {
+      await expect(page.getByTestId("nav-report-issue")).toHaveAttribute(
+        "href",
+        "/report"
+      );
+      await page.getByTestId("nav-report-issue").click();
+      await expect(page).toHaveURL(/\/report$/);
+      await expect(
+        page.getByRole("textbox", { name: "Problem" })
+      ).toBeVisible();
+    }
   });
 });

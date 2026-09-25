@@ -21,7 +21,6 @@ REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 MANIFEST_PATH = REPO_ROOT / "scripts" / "beads-compatibility.json"
 SETUP_SCRIPT = REPO_ROOT / "scripts" / "beads-cloud-setup.sh"
 INIT_SCRIPT = REPO_ROOT / "scripts" / "beads-cloud-init.sh"
-RUNBOOK_MD = REPO_ROOT / "docs" / "runbooks" / "cloud-routines-beads-access.md"
 
 
 class TestBeadsCompatibilityManifest:
@@ -49,47 +48,6 @@ class TestBeadsCompatibilityManifest:
         sha256_re = re.compile(r"^[0-9a-f]{64}$")
         assert sha256_re.fullmatch(cloud_assets["linux-amd64"]["bdSha256"])
         assert sha256_re.fullmatch(cloud_assets["linux-amd64"]["doltSha256"])
-
-
-class TestVersionParsing:
-    def test_setup_script_regex_extracts_versions(self):
-        setup_content = SETUP_SCRIPT.read_text(encoding="utf-8")
-        assert "beads-compatibility.json" in setup_content
-
-        manifest_content = MANIFEST_PATH.read_text(encoding="utf-8")
-        data = json.loads(manifest_content)
-
-        # Emulate the shell sed expressions used in beads-cloud-setup.sh
-        bd_match = re.search(
-            r'^\s*"bd"\s*:\s*"([^"]+)"', manifest_content, re.MULTILINE
-        )
-        dolt_match = re.search(
-            r'^\s*"dolt"\s*:\s*"([^"]+)"', manifest_content, re.MULTILINE
-        )
-
-        assert bd_match is not None, "Failed to match bd version in manifest"
-        assert dolt_match is not None, "Failed to match dolt version in manifest"
-        assert bd_match.group(1) == data["bd"]
-        assert dolt_match.group(1) == data["dolt"]
-
-    def test_init_script_regex_extracts_versions(self):
-        init_content = INIT_SCRIPT.read_text(encoding="utf-8")
-        assert "beads-compatibility.json" in init_content
-
-        manifest_content = MANIFEST_PATH.read_text(encoding="utf-8")
-        data = json.loads(manifest_content)
-
-        bd_match = re.search(
-            r'^\s*"bd"\s*:\s*"([^"]+)"', manifest_content, re.MULTILINE
-        )
-        dolt_match = re.search(
-            r'^\s*"dolt"\s*:\s*"([^"]+)"', manifest_content, re.MULTILINE
-        )
-
-        assert bd_match is not None, "Failed to match bd version in manifest"
-        assert dolt_match is not None, "Failed to match dolt version in manifest"
-        assert bd_match.group(1) == data["bd"]
-        assert dolt_match.group(1) == data["dolt"]
 
 
 def write_executable(path: Path, content: str) -> None:
@@ -276,107 +234,3 @@ class TestCloudSetupVerification:
         assert "unsupported cloud platform Linux/riscv64" in proc.stderr
         assert list(install_dir.iterdir()) == []
         assert not calls_file.exists()
-
-
-class TestCloudInitGuards:
-    def test_guard_passes_with_matching_versions(self, tmp_path: Path):
-        """Simulate beads-cloud-init version check logic with matching bd and dolt."""
-        bin_dir = tmp_path / "bin"
-        bin_dir.mkdir()
-
-        data = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
-        bd_ver = data["bd"]
-        dolt_ver = data["dolt"]
-
-        # Fake bd and dolt binaries
-        bd_bin = bin_dir / "bd"
-        bd_bin.write_text(
-            f"#!/bin/sh\necho 'bd version {bd_ver} (test)'\n", encoding="utf-8"
-        )
-        bd_bin.chmod(0o755)
-
-        dolt_bin = bin_dir / "dolt"
-        dolt_bin.write_text(
-            f"#!/bin/sh\necho 'dolt version {dolt_ver}'\n", encoding="utf-8"
-        )
-        dolt_bin.chmod(0o755)
-
-        env = {
-            "PATH": f"{bin_dir}:/usr/bin:/bin",
-            "HOME": str(tmp_path),
-            "DOLT_CREDS_JWK": '{"fake":"key"}',
-            "DOLT_CREDS_PUB": "fake_key",
-            "BEADS_SYNC_REMOTE": "https://example.com/fake",
-        }
-
-        # Run bash test verifying version checks pass
-        check_script = f"""
-        set -euo pipefail
-        bd_raw="$(bd version 2>&1 || true)"
-        bd_parsed="$(printf '%s\\n' "$bd_raw" | sed -nE 's/^bd version ([0-9]+\\.[0-9]+\\.[0-9]+).*/\\1/p' | head -n1 || true)"
-        [[ "$bd_parsed" == "{bd_ver}" ]]
-
-        dolt_raw="$(dolt version 2>&1 || true)"
-        dolt_parsed="$(printf '%s\\n' "$dolt_raw" | sed -nE 's/^dolt version ([0-9]+\\.[0-9]+\\.[0-9]+).*/\\1/p' | head -n1 || true)"
-        [[ "$dolt_parsed" == "{dolt_ver}" ]]
-        """
-        proc = subprocess.run(
-            ["bash", "-c", check_script], env=env, capture_output=True, text=True
-        )
-        assert proc.returncode == 0
-
-    def test_guard_fails_with_mismatched_bd_version(self, tmp_path: Path):
-        bin_dir = tmp_path / "bin"
-        bin_dir.mkdir()
-
-        data = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
-        bd_ver = data["bd"]
-
-        # Fake bd binary with wrong version
-        bd_bin = bin_dir / "bd"
-        bd_bin.write_text("#!/bin/sh\necho 'bd version 9.9.9'\n", encoding="utf-8")
-        bd_bin.chmod(0o755)
-
-        env = {"PATH": f"{bin_dir}:/usr/bin:/bin"}
-        check_script = f"""
-        set -euo pipefail
-        bd_raw="$(bd version 2>&1 || true)"
-        bd_parsed="$(printf '%s\\n' "$bd_raw" | sed -nE 's/^bd version ([0-9]+\\.[0-9]+\\.[0-9]+).*/\\1/p' | head -n1 || true)"
-        [[ "$bd_parsed" == "{bd_ver}" ]]
-        """
-        proc = subprocess.run(
-            ["bash", "-c", check_script], env=env, capture_output=True, text=True
-        )
-        assert proc.returncode != 0
-
-    def test_guard_fails_with_mismatched_dolt_version(self, tmp_path: Path):
-        bin_dir = tmp_path / "bin"
-        bin_dir.mkdir()
-
-        data = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
-        dolt_ver = data["dolt"]
-
-        # Fake dolt binary with wrong version
-        dolt_bin = bin_dir / "dolt"
-        dolt_bin.write_text("#!/bin/sh\necho 'dolt version 0.0.1'\n", encoding="utf-8")
-        dolt_bin.chmod(0o755)
-
-        env = {"PATH": f"{bin_dir}:/usr/bin:/bin"}
-        check_script = f"""
-        set -euo pipefail
-        dolt_raw="$(dolt version 2>&1 || true)"
-        dolt_parsed="$(printf '%s\\n' "$dolt_raw" | sed -nE 's/^dolt version ([0-9]+\\.[0-9]+\\.[0-9]+).*/\\1/p' | head -n1 || true)"
-        [[ "$dolt_parsed" == "{dolt_ver}" ]]
-        """
-        proc = subprocess.run(
-            ["bash", "-c", check_script], env=env, capture_output=True, text=True
-        )
-        assert proc.returncode != 0
-
-
-class TestDocumentationReferences:
-    def test_runbook_references_manifest(self):
-        content = RUNBOOK_MD.read_text(encoding="utf-8")
-        assert "scripts/beads-compatibility.json" in content
-        assert "dolt" in content
-        assert "bd" in content

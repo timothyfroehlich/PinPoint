@@ -237,11 +237,18 @@ describe("AppHeader", () => {
       ).toBeInTheDocument();
     });
 
-    it("renders Report Issue button linking to /report", () => {
+    it("opens Detailed report by default from the header", () => {
       render(<AppHeader {...defaultAuthProps} />);
       expect(screen.getByTestId("nav-report-issue")).toBeInTheDocument();
       const reportLink = screen.getByTestId("nav-report-issue").closest("a");
-      expect(reportLink).toHaveAttribute("href", "/report");
+      expect(reportLink).toHaveAttribute("href", "/report/detailed");
+    });
+
+    it("uses the saved header report destination", () => {
+      render(<AppHeader {...defaultAuthProps} reportHref="/report/multiple" />);
+      expect(
+        screen.getByTestId("nav-report-issue").closest("a")
+      ).toHaveAttribute("href", "/report/multiple");
     });
 
     it("has a single report entry point — no separate Quick button (PP-idrb)", () => {
