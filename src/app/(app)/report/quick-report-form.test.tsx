@@ -118,6 +118,27 @@ describe("QuickReportForm", () => {
     );
   });
 
+  it("submits apron source and keeps it when opening Detailed", () => {
+    render(
+      <ReportDraftProvider machines={[MACHINE]} assignees={[]}>
+        <QuickReportForm
+          machinesList={[MACHINE]}
+          defaultMachineId={MACHINE.id}
+          canMultiple={false}
+          initialIssues={[]}
+          initialMachineInitials="AFM"
+          source="apron"
+        />
+      </ReportDraftProvider>
+    );
+
+    expect(document.querySelector('input[name="source"]')).toHaveValue("apron");
+    expect(screen.getByRole("link", { name: "Add details" })).toHaveAttribute(
+      "href",
+      "/report/detailed?machine=AFM&source=apron"
+    );
+  });
+
   it("hides Multiple without capability and shows it when permitted", () => {
     const { unmount } = render(
       <ReportDraftProvider machines={[MACHINE]} assignees={[]}>

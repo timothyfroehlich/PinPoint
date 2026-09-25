@@ -90,6 +90,8 @@ export type MachineTimelineEventData =
       // the snapshot is missing.
       severity?: IssueSeverity;
       frequency?: IssueFrequency;
+      /** Validated scan entry point retained for report attribution. */
+      reportSource?: "apron";
     }
   | {
       kind: "issue_closed";

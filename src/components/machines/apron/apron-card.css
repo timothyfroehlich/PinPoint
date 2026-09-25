@@ -1,0 +1,300 @@
+/*
+ * Apron card face (PP-esta). A printed artifact, not app UI: it keeps its own
+ * fixed ink palette (light card, dark identity panel) in both the dark app and
+ * on paper, so it does not use the app's semantic tokens. Geometry comes from
+ * the approved design canvas; sizes that differ per apron size arrive as
+ * custom properties from APRON_CARD_LAYOUTS.
+ */
+.apron-card {
+  --apron-ink: #0f0f11;
+  --apron-paper: #ffffff;
+  --apron-accent: #4ade80;
+  --apron-accent-ink: #15803d;
+  --apron-on-panel: #f8fafc;
+  --apron-on-panel-muted: #a1a1aa;
+  --apron-body-text: #27272a;
+  --apron-label: #71717a;
+  --apron-rule: #e4e4e7;
+
+  display: flex;
+  box-sizing: border-box;
+  overflow: hidden;
+  width: var(--apron-width);
+  height: var(--apron-height);
+  /* The panel colour is painted by the card itself, not only by the panel
+     box: the card's physical height is fractional in CSS px (75mm =
+     283.46px), and a separately painted panel can leave a hairline of paper
+     showing along its bottom edge once scaled or rasterized. */
+  background: linear-gradient(
+    to right,
+    var(--apron-ink) var(--apron-panel-width),
+    var(--apron-paper) var(--apron-panel-width)
+  );
+  color: var(--apron-ink);
+  font-family: var(--apron-font-body), "Helvetica Neue", Arial, sans-serif;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.apron-card *,
+.apron-card *::before,
+.apron-card *::after {
+  box-sizing: border-box;
+}
+
+.apron-card__panel {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  justify-content: space-between;
+  gap: 12px;
+  width: var(--apron-panel-width);
+  padding: var(--apron-panel-padding);
+  background: var(--apron-ink);
+}
+
+.apron-card__identity {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.apron-card__display {
+  font-family:
+    var(--apron-font-display), "Barlow Condensed", "Arial Narrow", sans-serif;
+  text-transform: uppercase;
+}
+
+.apron-card__title {
+  margin: 0;
+  font-weight: 800;
+  line-height: 0.9;
+  color: var(--apron-accent);
+  text-wrap: balance;
+  overflow-wrap: normal;
+}
+
+.apron-card__edition {
+  margin-top: 2px;
+  font-weight: 700;
+  font-size: 15px;
+  line-height: 1;
+  letter-spacing: 0.12em;
+  color: var(--apron-on-panel);
+}
+
+.apron-card__meta,
+.apron-card__owner {
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+.apron-card__meta {
+  font-weight: 500;
+  color: var(--apron-on-panel-muted);
+}
+
+.apron-card__owner {
+  font-weight: 600;
+  color: var(--apron-on-panel);
+}
+
+.apron-card__logo {
+  display: block;
+  align-self: center;
+  width: var(--apron-logo-width);
+  height: auto;
+}
+
+.apron-card__body {
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+  gap: 10px;
+  min-width: 0;
+  padding: var(--apron-body-padding);
+}
+
+.apron-card__scan {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.apron-card__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.apron-card__scan-heading {
+  font-weight: 800;
+  font-size: 16px;
+  line-height: 1;
+  letter-spacing: 0.02em;
+}
+
+.apron-card__action {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-family:
+    var(--apron-font-display), "Barlow Condensed", "Arial Narrow", sans-serif;
+  font-weight: 700;
+  font-size: 13.5px;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.apron-card__action svg {
+  display: block;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+}
+
+.apron-card__iscored {
+  color: var(--apron-accent-ink);
+}
+
+.apron-card__qr {
+  display: block;
+  flex-shrink: 0;
+  width: var(--apron-qr-size);
+  height: var(--apron-qr-size);
+}
+
+.apron-card__rule {
+  height: 0;
+  border-top: 1px solid var(--apron-rule);
+}
+
+.apron-card__text {
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+  gap: 8px;
+  min-height: 0;
+  overflow: hidden;
+  font-size: var(--apron-body-font);
+  line-height: 1.4;
+  color: var(--apron-body-text);
+  text-wrap: pretty;
+}
+
+.apron-card__text p {
+  margin: 0;
+  /* The app's global paragraph rhythm must not leak onto the card. */
+  font-size: inherit;
+  line-height: inherit;
+}
+
+.apron-card__text p + p {
+  margin-top: 5px;
+}
+
+.apron-card__label {
+  margin-bottom: 3px;
+  font-weight: 700;
+  font-size: 10.5px;
+  line-height: 1;
+  letter-spacing: 0.14em;
+  color: var(--apron-label);
+}
+
+/* Print sheet (print route and PDF export): white margin around the card,
+ * 2mm of panel bleed past the left, top, and bottom trim edges, and corner
+ * crop marks set 3mm out from the trim so they clear the bleed. */
+.apron-sheet {
+  --apron-bleed: 2mm;
+  --apron-crop-gap: 3mm;
+  --apron-crop-len: 5mm;
+
+  display: inline-block;
+  padding: var(--apron-sheet-margin);
+  background: #ffffff;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.apron-sheet__trim {
+  position: relative;
+}
+
+.apron-sheet__trim > .apron-card {
+  position: relative;
+}
+
+.apron-sheet__bleed {
+  position: absolute;
+  top: calc(-1 * var(--apron-bleed));
+  bottom: calc(-1 * var(--apron-bleed));
+  left: calc(-1 * var(--apron-bleed));
+  width: calc(var(--apron-bleed-panel-width) + var(--apron-bleed));
+  background: #0f0f11;
+}
+
+.apron-sheet__mark {
+  position: absolute;
+  background: #000000;
+}
+
+.apron-sheet__mark.is-top-left-h,
+.apron-sheet__mark.is-top-right-h,
+.apron-sheet__mark.is-bottom-left-h,
+.apron-sheet__mark.is-bottom-right-h {
+  width: var(--apron-crop-len);
+  height: 0.25pt;
+}
+
+.apron-sheet__mark.is-top-left-v,
+.apron-sheet__mark.is-top-right-v,
+.apron-sheet__mark.is-bottom-left-v,
+.apron-sheet__mark.is-bottom-right-v {
+  width: 0.25pt;
+  height: var(--apron-crop-len);
+}
+
+.apron-sheet__mark.is-top-left-h,
+.apron-sheet__mark.is-bottom-left-h {
+  right: calc(100% + var(--apron-crop-gap));
+}
+
+.apron-sheet__mark.is-top-right-h,
+.apron-sheet__mark.is-bottom-right-h {
+  left: calc(100% + var(--apron-crop-gap));
+}
+
+.apron-sheet__mark.is-top-left-h,
+.apron-sheet__mark.is-top-right-h {
+  top: 0;
+}
+
+.apron-sheet__mark.is-bottom-left-h,
+.apron-sheet__mark.is-bottom-right-h {
+  bottom: 0;
+}
+
+.apron-sheet__mark.is-top-left-v,
+.apron-sheet__mark.is-top-right-v {
+  bottom: calc(100% + var(--apron-crop-gap));
+}
+
+.apron-sheet__mark.is-bottom-left-v,
+.apron-sheet__mark.is-bottom-right-v {
+  top: calc(100% + var(--apron-crop-gap));
+}
+
+.apron-sheet__mark.is-top-left-v,
+.apron-sheet__mark.is-bottom-left-v {
+  left: 0;
+}
+
+.apron-sheet__mark.is-top-right-v,
+.apron-sheet__mark.is-bottom-right-v {
+  right: 0;
+}

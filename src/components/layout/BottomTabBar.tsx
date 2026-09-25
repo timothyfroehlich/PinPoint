@@ -28,6 +28,7 @@ import { X } from "lucide-react";
 import { openFeedbackForm } from "~/components/feedback/FeedbackWidget";
 import { isNavItemActive } from "~/components/layout/nav-utils";
 import { NAV_ITEMS, type NavItem } from "~/components/layout/nav-config";
+import { MobileQuickSearchTrigger } from "~/components/layout/QuickSearch";
 import type { UserRole } from "~/lib/types";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 
@@ -35,13 +36,14 @@ interface BottomTabBarProps {
   role?: UserRole | undefined;
   /** The issues link path, read from cookie on the server */
   issuesPath?: string | undefined;
+  reportHref?: string | undefined;
 }
 
 // Items flagged hideFromBottomBar (e.g. Collections) live in the "More" sheet
 // instead — the bottom bar keeps just the core destinations plus Report.
 const bottomTabs = [
   ...(NAV_ITEMS as readonly NavItem[]).filter(
-    (item) => !item.hideFromBottomBar
+    (item) => !item.hideFromBottomBar && item.href !== "/dashboard"
   ),
   { title: "Report", href: "/report", icon: Plus },
 ];
@@ -54,6 +56,7 @@ const sheetItemClass =
 export function BottomTabBar({
   role,
   issuesPath,
+  reportHref = "/report",
 }: BottomTabBarProps): React.JSX.Element {
   const [moreOpen, setMoreOpen] = useState(false);
   const pathname = usePathname();
@@ -68,8 +71,15 @@ export function BottomTabBar({
         className="md:hidden fixed bottom-0 left-0 right-0 z-50 flex border-t border-primary/50 bg-card/90 backdrop-blur-sm shadow-[0_-4px_15px_color-mix(in_srgb,var(--color-primary)_25%,transparent)]"
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
+        <MobileQuickSearchTrigger className={tabBaseClass} />
+
         {bottomTabs.map((tab) => {
-          const href = tab.href === "/issues" ? resolvedIssuesPath : tab.href;
+          const href =
+            tab.href === "/issues"
+              ? resolvedIssuesPath
+              : tab.href === "/report"
+                ? reportHref
+                : tab.href;
           const active = isNavItemActive(
             tab.href,
             pathname,
@@ -145,13 +155,13 @@ export function BottomTabBar({
 
             {checkPermission("issues.report.quick", getAccessLevel(role)) && (
               <Link
-                href="/report/quick"
+                href="/report/multiple"
                 onClick={() => setMoreOpen(false)}
                 className={sheetItemClass}
-                data-testid="more-sheet-quick-report"
+                data-testid="more-sheet-multiple-issues"
               >
                 <ListPlus className="size-5 shrink-0" aria-hidden="true" />
-                <span>Quick report</span>
+                <span>Multiple issues</span>
               </Link>
             )}
 

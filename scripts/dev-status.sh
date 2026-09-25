@@ -66,11 +66,11 @@ probe_nextjs() {
 }
 
 probe_supabase() {
-  curl -fsS --max-time 1 "${SUPABASE_URL}/auth/v1/health" >/dev/null 2>&1
+  curl -fsS --max-time 5 "${SUPABASE_URL}/auth/v1/health" >/dev/null 2>&1
 }
 
 probe_postgres() {
-  pg_isready -d "$POSTGRES_URL" -t 1 >/dev/null 2>&1
+  pg_isready -d "$POSTGRES_URL" -t 10 >/dev/null 2>&1
 }
 
 compact_status() {
@@ -86,7 +86,7 @@ compact_status() {
   if [ "$supabase_up" = true ]; then
     parts+=("Supabase API=up")
   else
-    parts+=("Supabase API=down (start: supabase start)")
+    parts+=("Supabase API=down (start: pnpm supabase:start)")
   fi
   if [ -n "$postgres_skip_reason" ]; then
     parts+=("Postgres=skipped ($postgres_skip_reason)")

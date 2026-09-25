@@ -12,5 +12,5 @@ supabase/ @timothyfroehlich
 drizzle/ @timothyfroehlich
 
 # Auth, routing, and permission enforcement
-src/middleware.ts @timothyfroehlich
+src/proxy.ts @timothyfroehlich
 src/lib/permissions/ @timothyfroehlich

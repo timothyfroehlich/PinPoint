@@ -1,21 +1,23 @@
 import type React from "react";
 import { notFound } from "next/navigation";
-import { getLatestTimelineEventPerMachine } from "~/lib/collections/latest-activity";
-import { deriveMachineStatus } from "~/lib/machines/status";
+import { MachineView } from "~/components/machines/view";
+import { loadMachineView } from "~/lib/machines/view/queries";
+import { toMachineViewSearchParams } from "~/lib/machines/view/state";
 import { getOwnerCollectionForLayout } from "../_data";
-import {
-  CollectionOverviewTable,
-  type CollectionOverviewRow,
-} from "~/components/collections/CollectionOverviewTable";
 
 interface PageProps {
   params: Promise<{ userId: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
 export default async function CollectionOverviewPage({
   params,
+  searchParams,
 }: PageProps): Promise<React.JSX.Element> {
-  const { userId } = await params;
+  const [{ userId }, rawSearchParams] = await Promise.all([
+    params,
+    searchParams,
+  ]);
   const collection = await getOwnerCollectionForLayout(userId);
   if (!collection) notFound();
 
@@ -27,26 +29,10 @@ export default async function CollectionOverviewPage({
     );
   }
 
-  const latest = await getLatestTimelineEventPerMachine(
-    undefined,
-    collection.machines.map((m) => m.id)
-  );
-
-  const rows: CollectionOverviewRow[] = collection.machines.map((m) => ({
-    id: m.id,
-    initials: m.initials,
-    name: m.name,
-    status: deriveMachineStatus(m.issues),
-    openCount: m.issues.length,
-    lastActivity: latest.get(m.id) ?? null,
-    // `issues` is open-only (filtered in the resolver), so the minimum
-    // createdAt is the longest-outstanding open issue.
-    oldestOpenAt:
-      m.issues.length > 0
-        ? new Date(Math.min(...m.issues.map((i) => i.createdAt.getTime())))
-        : null,
-    presence: m.presenceStatus,
-  }));
-
-  return <CollectionOverviewTable rows={rows} />;
+  const result = await loadMachineView({
+    scope: { kind: "owner", ownerId: collection.owner.id },
+    preset: "collection",
+    searchParams: toMachineViewSearchParams(rawSearchParams),
+  });
+  return <MachineView result={result} preset="collection" />;
 }

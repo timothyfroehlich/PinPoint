@@ -195,6 +195,8 @@ describe("updateSession public route access", () => {
     "/m/TAF",
     "/m/TAF/i/1",
     "/m/AFM/i/42",
+    "/machines/00000000-0000-4000-8000-000000000000",
+    "/machines/not-a-uuid",
     "/login",
     "/signup",
     "/forgot-password",
@@ -265,5 +267,100 @@ describe("updateSession public route access", () => {
     const next = new URL(location!).searchParams.get("next");
     // `next` decodes back to the full path+query, not just the pathname.
     expect(next).toBe("/oauth/consent?authorization_id=abc123");
+  });
+
+  it("preserves cleared session cookies on a login redirect", async () => {
+    createServerClientMock.mockImplementation(
+      (
+        _url: string,
+        _key: string,
+        options: {
+          cookies: {
+            setAll: (
+              cookies: {
+                name: string;
+                value: string;
+                options: { path: string; maxAge: number };
+              }[]
+            ) => void;
+          };
+        }
+      ) => ({
+        auth: {
+          getUser: () => {
+            options.cookies.setAll([
+              {
+                name: "sb-test-auth-token",
+                value: "",
+                options: { path: "/", maxAge: 0 },
+              },
+            ]);
+            return { data: { user: null }, error: null };
+          },
+        },
+      })
+    );
+
+    const response = await updateSession(
+      makeRequest("http://localhost/settings")
+    );
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toBe(
+      "http://localhost/login?next=%2Fsettings"
+    );
+    expect(response.headers.get("set-cookie")).toContain("sb-test-auth-token=");
+    expect(response.headers.get("set-cookie")).toContain("Max-Age=0");
+  });
+
+  it("preserves forwarded CSP and nonce when session cookies replace the response", async () => {
+    process.env.DEV_AUTOLOGIN_ENABLED = "false";
+    createServerClientMock.mockImplementation(
+      (
+        _url: string,
+        _key: string,
+        options: {
+          cookies: {
+            setAll: (
+              cookies: {
+                name: string;
+                value: string;
+                options: { path: string };
+              }[]
+            ) => void;
+          };
+        }
+      ) => ({
+        auth: {
+          getUser: () => {
+            options.cookies.setAll([
+              {
+                name: "sb-test-auth-token",
+                value: "refreshed",
+                options: { path: "/" },
+              },
+            ]);
+            return { data: { user: null }, error: null };
+          },
+        },
+      })
+    );
+
+    const response = await updateSession(
+      makeRequest("http://localhost/login", {
+        "content-security-policy": "script-src 'nonce-trusted'",
+        "x-nonce": "trusted",
+      })
+    );
+
+    expect(
+      response.headers.get("x-middleware-request-content-security-policy")
+    ).toBe("script-src 'nonce-trusted'");
+    expect(response.headers.get("x-middleware-request-x-nonce")).toBe(
+      "trusted"
+    );
+    expect(response.headers.get("set-cookie")).toContain(
+      "sb-test-auth-token=refreshed"
+    );
   });
 });

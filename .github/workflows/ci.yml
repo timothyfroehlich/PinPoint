@@ -39,41 +39,21 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Detect which files changed to skip expensive jobs for non-website PRs.
-  # "Non-website" covers: docs (docs/**, **/*.md), beads (.beads/**), agent
-  # configs (.agent[s]/**, .claude/**, .codex/**), the non-TS/JS files under
-  # scripts/ (scripts/**/*.{py,sh,sql,json,txt} and the whole scripts/tests/**
-  # tree), editor / IDE / git configs
-  # (.husky/**, .vscode/**, pinpoint.code-workspace, .gitattributes, .gitignore),
-  # test/linter configs (pytest.ini, ruff.toml, .yamllint.yml, .gitleaks.toml),
-  # and non-PR GitHub Action configs/workflows (dependabot.yml, renovate.json,
-  # CODEOWNERS, ownerless-renovate-issues.yaml, preview-*.yaml, audit-override.yaml,
-  # codex-reaction-witness.yaml).
+  # Detect which files changed so non-website PRs skip the expensive jobs
+  # (integration, migrations, Supabase, E2E). `static` and `linters` always
+  # run, so a hole in this filter can skip E2E but never type-check, lint,
+  # unit tests or the build.
   #
-  # Note: under scripts/, only TS/JS (.ts/.mjs) counts as code. Python and shell
-  # are excluded (the always-running `linters` job covers them: pytest
-  # scripts/tests/, ruff, shellcheck), and .sql/.json/.txt plus the whole
-  # scripts/tests/** tree are excluded as data/config the site build can't
-  # depend on. TS/JS is NOT excluded because it is real code
-  # (scripts/migrate-production.ts runs on every Vercel prod build,
-  # scripts/lib/pg-client.mjs is the PP-d8l8 prod commit-loss file,
-  # tsconfig.app.json includes some, scripts/workflow/pr-watcher-mcp.ts has a
-  # vitest spec) that the linters job never touches, so it must get typecheck,
-  # lint, test, and build. package.json is likewise NOT excluded — a
-  # package.json-only edit (packageManager pin, a script, an engines bump) with no
-  # lockfile change must still re-run setup and the full suite. (PP-9jar)
+  # "Non-website": docs and *.md, .beads, agent configs (.agent[s], .claude,
+  # .codex), non-TS/JS files under scripts/ (py/sh/sql/json/txt and
+  # scripts/tests/**), editor/git configs, test/linter configs, and the
+  # GitHub configs/workflows that don't affect this workflow. TS/JS under
+  # scripts/ and package.json count as code (scripts/migrate-production.ts runs
+  # on every prod build; PP-9jar). ci.yml and .github/actions/** always count.
   #
-  # .github/workflows/ci.yml and .github/actions/** are intentionally NOT excluded —
-  # any change to the CI workflow or its composite actions directly affects what
-  # CI runs, so we keep triggering full CI to validate it.
-  #
-  # Uses predicate-quantifier: 'every' with a positive '**' plus negative
-  # exclusions. A changed file counts as "code" only when it matches every
-  # pattern — i.e. it matches '**' (always) AND is NOT under any excluded
-  # path. `has_code` is true if at least one changed file is "code". A
-  # PR touching only excluded paths produces has_code=false and downstream
-  # expensive jobs cascade-skip via `setup`'s `if:` gate. New / unknown
-  # directories default to running full CI — the safe failure mode.
+  # predicate-quantifier 'every' with a positive '**' plus negative exclusions:
+  # a file is "code" only if it is excluded by none of them. New or unknown
+  # paths default to running full CI.
   #
   # Why 'every' and not 'some': under 'some', the positive '**' matches every
   # file by itself, short-circuiting the negative exclusions and forcing
@@ -129,12 +109,10 @@ jobs:
               - '!.github/dependabot.yml'
               - '!.github/renovate.json'
               - '!.github/CODEOWNERS'
-              - '!.github/workflows/audit-override.yaml'
               - '!.github/workflows/codex-reaction-witness.yaml'
               - '!.github/workflows/ownerless-renovate-issues.yaml'
               - '!.github/workflows/preview-control.yaml'
               - '!.github/workflows/preview-reaper.yaml'
-              - '!.github/workflows/preview-sync.yaml'
       # Separate filter for dependency changes using default "some" quantifier
       # so deps=true when ANY changed file is a dependency file (not ALL).
       - id: deps-filter
@@ -155,10 +133,11 @@ jobs:
             echo "code=false" >> "$GITHUB_OUTPUT"
           fi
 
-  # Required parallel canary for the locked mise toolchain. Keep the existing
-  # job graph intact until the later cutover so it remains the rollback path.
-  mise-canary:
-    name: mise Toolchain Canary
+  # Static checks, unit tests and build. Always runs (no path filter), so a
+  # change that only touches files the filter treats as non-code still gets
+  # type-checked, linted and unit-tested.
+  static:
+    name: Static checks, unit tests, build
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -178,38 +157,6 @@ jobs:
         with:
           install-args: "--locked"
 
-      - name: Verify locked toolchain versions
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          assert_version() {
-            local tool="$1"
-            local expected="$2"
-            local actual="$3"
-            if [[ "$actual" != "$expected" ]]; then
-              echo "::error::${tool} version mismatch: expected ${expected}, got ${actual}"
-              exit 1
-            fi
-            echo "${tool} ${actual}"
-          }
-
-          node_version="$(node --version)"
-          node_version="${node_version#v}"
-          pnpm_version="$(pnpm --version)"
-          python_version="$(python3 -c 'import platform; print(platform.python_version())')"
-          supabase_version="$(supabase --version)"
-
-          expected_node="$(python3 -c 'import tomllib; print(tomllib.load(open("mise.toml", "rb"))["tools"]["node"])')"
-          expected_pnpm="$(python3 -c 'import json; value=json.load(open("package.json"))["packageManager"]; print(value.split("@", 1)[1].split("+", 1)[0])')"
-          expected_python="$(python3 -c 'import tomllib; print(tomllib.load(open("mise.toml", "rb"))["tools"]["python"])')"
-          expected_supabase="$(python3 -c 'import tomllib; print(tomllib.load(open("mise.toml", "rb"))["tools"]["supabase"])')"
-
-          assert_version node "$expected_node" "$node_version"
-          assert_version pnpm "$expected_pnpm" "$pnpm_version"
-          assert_version python "$expected_python" "$python_version"
-          assert_version supabase "$expected_supabase" "$supabase_version"
-
       - name: Cache node_modules
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # ratchet:actions/cache@v6.1.0
         with:
@@ -219,21 +166,24 @@ jobs:
       - name: Install dependencies from lockfile
         run: pnpm install --frozen-lockfile
 
-      - name: Run representative static checks
+      - name: Type check
         run: |
           pnpm run typecheck
           pnpm run typecheck:tests
-          pnpm run lint
-          pnpm run format
-          ruff check scripts/
-          ruff format --check scripts/
+          pnpm run typecheck:e2e
 
-      - name: Run representative unit tests
+      - name: Lint
+        run: pnpm run lint
+
+      - name: Format check
+        run: pnpm run format
+
+      - name: Unit tests
         run: |
           set -a
           source .env.ci
           set +a
-          pnpm run test
+          pnpm run test:_run
 
       - name: Build application
         run: |
@@ -271,108 +221,6 @@ jobs:
         with:
           path: node_modules
           key: ${{ steps.toolchain.outputs.node-modules-key }}
-
-  typecheck:
-    name: TypeScript Type Check
-    runs-on: ubuntu-latest
-    needs: setup
-    steps:
-      - name: Harden Runner
-        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # ratchet:step-security/harden-runner@v2.21.1
-        with:
-          egress-policy: audit
-
-      - name: Checkout code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # ratchet:actions/checkout@v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Setup locked mise toolchain
-        id: toolchain
-        uses: ./.github/actions/setup-mise
-
-      - name: Restore node_modules
-        id: cache-restore
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # ratchet:actions/cache/restore@v6.1.0
-        with:
-          path: node_modules
-          key: ${{ steps.toolchain.outputs.node-modules-key }}
-
-      - name: Install dependencies (if cache miss)
-        if: steps.cache-restore.outputs.cache-hit != 'true'
-        run: pnpm install --frozen-lockfile
-
-      - name: Run type checking
-        run: pnpm run typecheck
-
-      - name: Run test type checking (native tsc)
-        run: pnpm run typecheck:tests
-
-  lint:
-    name: Oxlint
-    runs-on: ubuntu-latest
-    needs: setup
-    steps:
-      - name: Harden Runner
-        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # ratchet:step-security/harden-runner@v2.21.1
-        with:
-          egress-policy: audit
-
-      - name: Checkout code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # ratchet:actions/checkout@v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Setup locked mise toolchain
-        id: toolchain
-        uses: ./.github/actions/setup-mise
-
-      - name: Restore node_modules
-        id: cache-restore
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # ratchet:actions/cache/restore@v6.1.0
-        with:
-          path: node_modules
-          key: ${{ steps.toolchain.outputs.node-modules-key }}
-
-      - name: Install dependencies (if cache miss)
-        if: steps.cache-restore.outputs.cache-hit != 'true'
-        run: pnpm install --frozen-lockfile
-
-      - name: Run linting
-        run: pnpm run lint
-
-  format:
-    name: Prettier Format Check
-    runs-on: ubuntu-latest
-    needs: setup
-    steps:
-      - name: Harden Runner
-        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # ratchet:step-security/harden-runner@v2.21.1
-        with:
-          egress-policy: audit
-
-      - name: Checkout code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # ratchet:actions/checkout@v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Setup locked mise toolchain
-        id: toolchain
-        uses: ./.github/actions/setup-mise
-
-      - name: Restore node_modules
-        id: cache-restore
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # ratchet:actions/cache/restore@v6.1.0
-        with:
-          path: node_modules
-          key: ${{ steps.toolchain.outputs.node-modules-key }}
-
-      - name: Install dependencies (if cache miss)
-        if: steps.cache-restore.outputs.cache-hit != 'true'
-        run: pnpm install --frozen-lockfile
-
-      - name: Check formatting
-        run: pnpm run format
 
   # Fast linters that always run — cheap enough to never skip.
   linters:
@@ -429,7 +277,7 @@ jobs:
         run: python3 -m pytest scripts/tests/
 
       - name: ShellCheck
-        run: find scripts/ .devcontainer/ -name '*.sh' -print0 | xargs -0 shellcheck
+        run: find scripts/ .claude/hooks/ -name '*.sh' -print0 | xargs -0 shellcheck
 
       - name: Zizmor (GitHub Actions security)
         run: |
@@ -446,83 +294,6 @@ jobs:
             .github/workflows/ci.yml
             .github/workflows/preview-control.yaml
             .github/workflows/preview-reaper.yaml
-            .github/workflows/preview-sync.yaml
-
-  build:
-    name: Build
-    runs-on: ubuntu-latest
-    needs: [setup, typecheck, lint, format, linters, test-unit, test-integration]
-    steps:
-      - name: Harden Runner
-        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # ratchet:step-security/harden-runner@v2.21.1
-        with:
-          egress-policy: audit
-
-      - name: Checkout code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # ratchet:actions/checkout@v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Setup locked mise toolchain
-        id: toolchain
-        uses: ./.github/actions/setup-mise
-
-      - name: Restore node_modules
-        id: cache-restore
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # ratchet:actions/cache/restore@v6.1.0
-        with:
-          path: node_modules
-          key: ${{ steps.toolchain.outputs.node-modules-key }}
-
-      - name: Install dependencies (if cache miss)
-        if: steps.cache-restore.outputs.cache-hit != 'true'
-        run: pnpm install --frozen-lockfile
-
-      - name: Build application
-        run: |
-          # Load CI environment variables for build-time evaluation
-          set -a
-          source .env.ci
-          set +a
-          pnpm run build
-
-  test-unit:
-    name: Unit Tests
-    runs-on: ubuntu-latest
-    needs: setup
-    steps:
-      - name: Harden Runner
-        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # ratchet:step-security/harden-runner@v2.21.1
-        with:
-          egress-policy: audit
-
-      - name: Checkout code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # ratchet:actions/checkout@v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Setup locked mise toolchain
-        id: toolchain
-        uses: ./.github/actions/setup-mise
-
-      - name: Restore node_modules
-        id: cache-restore
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # ratchet:actions/cache/restore@v6.1.0
-        with:
-          path: node_modules
-          key: ${{ steps.toolchain.outputs.node-modules-key }}
-
-      - name: Install dependencies (if cache miss)
-        if: steps.cache-restore.outputs.cache-hit != 'true'
-        run: pnpm install --frozen-lockfile
-
-      - name: Run unit tests with coverage
-        run: |
-          set -a
-          source .env.ci
-          set +a
-          pnpm run test:coverage -- --reporter=verbose
-
 
   test-integration:
     name: Integration Tests
@@ -559,7 +330,7 @@ jobs:
           set -a
           source .env.ci
           set +a
-          pnpm run test:integration -- --reporter=verbose
+          pnpm run test:integration
 
   # ==============================================================================
   # Migration Verification
@@ -625,7 +396,7 @@ jobs:
     name: Supabase Integration Tests
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'pull_request' && (needs.changes.outputs.code == 'true' || needs.changes.outputs.deps == 'true') }}
-    needs: [changes, setup, typecheck, lint, format, linters, test-unit, test-integration, test-migrations]
+    needs: [changes, setup, static, linters, test-integration, test-migrations]
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # ratchet:step-security/harden-runner@v2.21.1
@@ -661,7 +432,7 @@ jobs:
         uses: ./.github/actions/setup-supabase
 
       - name: Run Supabase integration tests
-        run: pnpm run test:integration:supabase -- --reporter=verbose
+        run: pnpm run test:integration:supabase
 
   test-e2e-smoke:
     # ==============================================================================
@@ -672,7 +443,7 @@ jobs:
     name: E2E Smoke Tests (Chromium)
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'pull_request' && (needs.changes.outputs.code == 'true' || needs.changes.outputs.deps == 'true') }}
-    needs: [changes, setup, typecheck, lint, format, linters, test-unit, test-integration, test-migrations]
+    needs: [changes, setup, static, linters, test-integration, test-migrations]
     timeout-minutes: 15
     steps:
       - name: Harden Runner
@@ -746,7 +517,7 @@ jobs:
     name: E2E Smoke Tests (Mobile Chrome)
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'pull_request' && (needs.changes.outputs.code == 'true' || needs.changes.outputs.deps == 'true') }}
-    needs: [changes, setup, typecheck, lint, format, linters, test-unit, test-integration, test-migrations]
+    needs: [changes, setup, static, linters, test-integration, test-migrations]
     timeout-minutes: 15
     steps:
       - name: Harden Runner
@@ -820,7 +591,7 @@ jobs:
     name: E2E Full Tests (Chromium)
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'pull_request' && (needs.changes.outputs.code == 'true' || needs.changes.outputs.deps == 'true') }}
-    needs: [changes, setup, typecheck, lint, format, linters, test-unit, test-integration, test-migrations]
+    needs: [changes, setup, static, linters, test-integration, test-migrations]
     timeout-minutes: 15
     steps:
       - name: Harden Runner
@@ -898,7 +669,7 @@ jobs:
     # leaning on the `setup`-skip cascade to keep it off docs-only main pushes —
     # an implicit guard a future refactor could break. (PP-x0ke.)
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && (needs.changes.outputs.code == 'true' || needs.changes.outputs.deps == 'true') }}
-    needs: [changes, setup, typecheck, lint, format, linters, test-unit, test-integration, test-migrations]
+    needs: [changes, setup, static, linters, test-integration, test-migrations]
     # Backstop only — the real limits are per-step (see the comment above the
     # Playwright steps). Must stay above setup + both step timeouts, or a job
     # cancellation silently swallows the verdict again. (PP-jxhy.)
@@ -1077,7 +848,12 @@ jobs:
   pnpm-audit:
     name: pnpm audit
     runs-on: ubuntu-latest
-    needs: setup
+    needs: changes
+    # Fails only on high/critical advisories the change adds over its base.
+    # One published against a version already locked on main is Dependabot's
+    # job (dependabot.yml security updates) and must not block unrelated
+    # dependency PRs.
+    if: needs.changes.outputs.deps == 'true'
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # ratchet:step-security/harden-runner@v2.21.1
@@ -1088,105 +864,87 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # ratchet:actions/checkout@v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0  # the base commit's lockfile
 
       - name: Setup locked mise toolchain
-        id: toolchain
         uses: ./.github/actions/setup-mise
 
-      - name: Restore node_modules
-        id: cache-restore
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # ratchet:actions/cache/restore@v6.1.0
-        with:
-          path: node_modules
-          key: ${{ steps.toolchain.outputs.node-modules-key }}
-
-      - name: Install dependencies (if cache miss)
-        if: steps.cache-restore.outputs.cache-hit != 'true'
-        run: pnpm install --frozen-lockfile
-
+      # pnpm audit reads the lockfile only; no node_modules needed. `--dir`
+      # keeps pnpm's mise shim resolving from the checkout.
       - name: Run pnpm audit
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
-          # PR head commit on pull_request events (github.sha is the ephemeral
-          # merge commit there); the pushed commit on push events.
-          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: |
-          registry_errors="ERR_PNPM_AUDIT_BAD_RESPONSE"
-          registry_errors+="|ERR_PNPM_AUDIT_REGISTRY"
-          registry_errors+="|ECONNREFUSED|EAI_AGAIN|ETIMEDOUT"
-          output=$(pnpm audit --audit-level=high 2>&1) || {
-            if echo "$output" | grep -qE "$registry_errors"; then
-              echo "::warning::pnpm audit skipped: registry error"
-              echo "$output"
-              exit 0
-            fi
-            echo "$output"
-            # Per-PR escape hatch: a maintainer may bypass this gate for the
-            # current commit via `/audit-override <reason>` (see
-            # .github/workflows/audit-override.yaml). The override is a commit
-            # status bound to HEAD_SHA, so it never carries to a new commit —
-            # a newly-introduced advisory is never silently masked.
-            if bash scripts/workflow/audit-override/gate.sh check "$HEAD_SHA"; then
-              echo "::warning::pnpm audit bypassed by an active /audit-override on ${HEAD_SHA}. See the audit-override sticky comment for who/why."
-              exit 0
-            fi
-            echo "::error::pnpm audit found advisories at or above 'high'. Fix them, or a maintainer can bypass for this PR with '/audit-override <reason>'."
-            exit 1
+          # Writes "<id> <package>: <title>" per high/critical advisory in the
+          # lockfile at $1 to $RUNNER_TEMP/$2.ids; fails when there is no report.
+          audit() {
+            local out="$RUNNER_TEMP/$2"
+            pnpm --dir "$1" --pm-on-fail=ignore audit --json >"$out.json" 2>"$out.err" || true
+            jq -e '.advisories | type == "object"' "$out.json" >/dev/null 2>&1 || return 1
+            jq -r '.advisories | to_entries[]
+              | select(.value.severity == "high" or .value.severity == "critical")
+              | "\(.key) \(.value.module_name): \(.value.title)"' "$out.json" >"$out.ids"
           }
-          echo "$output"
+
+          if ! audit . head; then
+            cat "$RUNNER_TEMP/head.json" "$RUNNER_TEMP/head.err"
+            registry_errors="ERR_PNPM_AUDIT_BAD_RESPONSE|ERR_PNPM_AUDIT_REGISTRY"
+            registry_errors+="|ECONNREFUSED|EAI_AGAIN|ETIMEDOUT"
+            if grep -qE "$registry_errors" "$RUNNER_TEMP/head.json" "$RUNNER_TEMP/head.err"; then
+              echo "::warning::pnpm audit skipped: registry error"
+              exit 0
+            fi
+            echo "::error::pnpm audit produced no report."
+            exit 1
+          fi
+
+          base="$RUNNER_TEMP/base"
+          mkdir -p "$base"
+          for f in package.json pnpm-lock.yaml pnpm-workspace.yaml; do
+            git show "$BASE_SHA:$f" >"$base/$f" 2>/dev/null || rm -f "$base/$f"
+          done
+          if ! audit "$base" base; then
+            echo "::warning::Could not audit the base lockfile; every advisory counts as new."
+            : >"$RUNNER_TEMP/base.ids"
+          fi
+
+          new=$(awk 'FILENAME == ARGV[1] { seen[$1]; next } !($1 in seen)' \
+            "$RUNNER_TEMP/base.ids" "$RUNNER_TEMP/head.ids")
+          if [[ -s "$RUNNER_TEMP/base.ids" ]]; then
+            echo "Already on the base (Dependabot's job):"
+            cat "$RUNNER_TEMP/base.ids"
+          fi
+          if [[ -n "$new" ]]; then
+            echo "::error::This change adds high/critical advisories:"
+            echo "$new"
+            exit 1
+          fi
+          echo "No high/critical advisories added over the base."
 
   # ==============================================================================
-  # CI Gate (Aggregator)
+  # CI Gate (Aggregator) — the only required check.
   #
-  # Two tiers of required jobs:
+  # Fails if any job it needs failed or was cancelled; `skipped` passes.
+  #   - Path-filtered jobs skip on docs-only PRs, and test-e2e-comprehensive
+  #     skips on pull_request events, so `skipped` must pass.
+  #   - `cancelled` fails because a job that hits its timeout-minutes reports
+  #     `cancelled` — a hung E2E run must not leave the gate green (PP-jxhy).
+  #   - `changes` and `setup` are listed so a failure there, which skips every
+  #     downstream job, cannot pass as a skip.
   #
-  #   1. ALWAYS-RUNS (must succeed): mise-canary, linters, gitleaks
-  #      These run on every PR including docs-only changes. Their `success` is
-  #      strictly required - failure or cancellation fails the gate.
-  #
-  #   2. PATH-FILTERED (optional outcomes): build, lint, format, typecheck,
-  #      test-*, pnpm-audit
-  #      These only run when source changes. On docs-only PRs they cascade-skip
-  #      because they depend on `setup` which is gated by `changes.outputs.code`.
-  #      `skipped` and `cancelled` pass; only `failure` fails the gate.
-  #
-  # Why allow `cancelled`?
-  #   - Cascade-skips from a gated `needs:` chain can surface as `cancelled`
-  #     instead of `skipped` depending on how the runner schedules them.
-  #   - Concurrency cancel-in-progress (when a new push supersedes an old run)
-  #     marks queued jobs `cancelled`. The replacement run becomes the
-  #     authoritative status, so it is safe to treat the cancelled run as pass.
-  #
-  # Post-merge full-matrix alarm (PP-x0ke) — a tier-3 job, see below:
-  #   `test-e2e-comprehensive` is push-to-main only (it runs the full E2E matrix
-  #   — chromium + Mobile Chrome + Mobile Safari, smoke + full — against one DB,
-  #   the only job that covers the Mobile-Chrome/Mobile-Safari a11y specs and
-  #   the seed-leak class). On a `pull_request` event it is skipped, and
-  #   `skipped` passes, so it never blocks a PR merge (nor could it — it does
-  #   not run on PRs, so it cannot be a ruleset-required check without wedging
-  #   every PR on a check that never reports). On a push to main it runs, and a
-  #   `failure` OR a `cancelled` (its 90-min backstop firing on a hang) now
-  #   fails CI Gate — turning a red or hung post-merge full-matrix verdict into
-  #   a red required check on the main commit, instead of a green main hiding a
-  #   red/hung non-required job. That is the alarm; blocking is impossible
-  #   post-merge. It gets its own tier-3 rule precisely because tier 2 passes
-  #   `cancelled` and comprehensive must not. Catching a full-matrix-only
-  #   regression BEFORE merge would mean running comprehensive on `pull_request`
-  #   too (~30 min/PR) — deliberately not done; see PP-x0ke.
+  # On push to main this also carries the post-merge full-matrix verdict
+  # (test-e2e-comprehensive, PP-x0ke): a red or hung run turns CI Gate red on
+  # the main commit. It cannot block a merge; it is the alarm.
   # ==============================================================================
   ci-gate:
     name: CI Gate
     if: always()
     needs:
-      - mise-canary
+      - changes
+      - setup
+      - static
       - linters
       - gitleaks
-      - build
-      - lint
-      - format
-      - typecheck
-      - test-unit
       - test-integration
       - test-migrations
       - test-integration-supabase
@@ -1202,82 +960,14 @@ jobs:
         with:
           egress-policy: audit
 
-      - name: Check required job results
+      - name: Fail on any failed or cancelled job
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
         env:
-          # Tier 1: always-runs jobs - must be `success`.
-          MISE_CANARY_RESULT: ${{ needs.mise-canary.result }}
-          LINTERS_RESULT: ${{ needs.linters.result }}
-          GITLEAKS_RESULT: ${{ needs.gitleaks.result }}
-          # Tier 2: path-filtered jobs - `failure` fails the gate;
-          # `success`, `skipped`, and `cancelled` all pass.
-          BUILD_RESULT: ${{ needs.build.result }}
-          LINT_RESULT: ${{ needs.lint.result }}
-          FORMAT_RESULT: ${{ needs.format.result }}
-          TYPECHECK_RESULT: ${{ needs.typecheck.result }}
-          TEST_UNIT_RESULT: ${{ needs.test-unit.result }}
-          TEST_INTEGRATION_RESULT: ${{ needs.test-integration.result }}
-          TEST_MIGRATIONS_RESULT: ${{ needs.test-migrations.result }}
-          TEST_INTEGRATION_SUPABASE_RESULT: ${{ needs.test-integration-supabase.result }}
-          TEST_E2E_SMOKE_RESULT: ${{ needs.test-e2e-smoke.result }}
-          TEST_E2E_SMOKE_MOBILE_CHROME_RESULT: ${{ needs.test-e2e-smoke-mobile-chrome.result }}
-          TEST_E2E_FULL_CHROMIUM_RESULT: ${{ needs.test-e2e-full-chromium.result }}
-          # Push-to-main only; skipped (→ pass) on PRs, `failure` fails the gate
-          # on main. See the Post-merge full-matrix alarm note above (PP-x0ke).
-          TEST_E2E_COMPREHENSIVE_RESULT: ${{ needs.test-e2e-comprehensive.result }}
-          PNPM_AUDIT_RESULT: ${{ needs.pnpm-audit.result }}
+          RESULTS: ${{ toJSON(needs) }}
         run: |
-          # Tier 1: always-runs jobs - must be `success`.
-          required=("$MISE_CANARY_RESULT" "$LINTERS_RESULT" "$GITLEAKS_RESULT")
-          for r in "${required[@]}"; do
-            if [[ "$r" != "success" ]]; then
-              echo "::error::Always-runs job did not succeed (result=$r)"
-              exit 1
-            fi
-          done
+          echo "::error::A required job failed or was cancelled (a timeout reports as cancelled)."
+          echo "$RESULTS" | jq -r 'to_entries[] | select(.value.result != "success" and .value.result != "skipped") | "  \(.key): \(.value.result)"'
+          exit 1
 
-          # Tier 2: path-filtered jobs - `failure` fails; `success`, `skipped`,
-          # and `cancelled` all pass. Cascade-skips on docs-only PRs and
-          # concurrency cancellations are intentional and should not block merge.
-          optional=("$BUILD_RESULT" "$LINT_RESULT" \
-                    "$FORMAT_RESULT" "$TYPECHECK_RESULT" \
-                    "$TEST_UNIT_RESULT" "$TEST_INTEGRATION_RESULT" \
-                    "$TEST_MIGRATIONS_RESULT" "$TEST_INTEGRATION_SUPABASE_RESULT" \
-                    "$TEST_E2E_SMOKE_RESULT" "$TEST_E2E_SMOKE_MOBILE_CHROME_RESULT" \
-                    "$TEST_E2E_FULL_CHROMIUM_RESULT" "$PNPM_AUDIT_RESULT")
-          for r in "${optional[@]}"; do
-            if [[ "$r" == "failure" ]]; then
-              echo "::error::Path-filtered job failed (result=$r)"
-              exit 1
-            fi
-          done
-
-          # Tier 3: test-e2e-comprehensive — like tier 2 but `cancelled` FAILS.
-          #
-          # The generic tier-2 rule passes `cancelled` so a concurrency-
-          # superseded run does not block. That is wrong for comprehensive: its
-          # 90-minute job backstop (PP-jxhy) surfaces a HANG — a stuck install,
-          # browser download, or runner stall in an untimed phase — as
-          # result=cancelled, and the entire point of PP-x0ke is that a hung or
-          # red post-merge full-matrix run must not leave a green CI Gate on
-          # main. Passing `cancelled` here would reopen that exact silent
-          # swallow. So `success` and `skipped` pass (skipped = a PR event or a
-          # docs-only main push, where it correctly does not run); everything
-          # else — `failure` and `cancelled` — fails the gate.
-          #
-          # Tradeoff: a manually-cancelled main run now alarms. That is
-          # acceptable and arguably correct (someone killed the verdict). It is
-          # NOT a false-alarm risk from concurrency: the workflow concurrency
-          # group appends github.sha on push (see top of file), so each main
-          # commit has its own group and a main run is never cancelled by a
-          # later main push. On push, `cancelled` therefore means the backstop
-          # (a real hang) or a manual cancel — both of which should alarm.
-          case "$TEST_E2E_COMPREHENSIVE_RESULT" in
-            success | skipped) ;;
-            *)
-              echo "::error::Post-merge E2E Comprehensive did not pass (result=$TEST_E2E_COMPREHENSIVE_RESULT)."
-              echo "::error::A hung (cancelled) or failed full-matrix run must not leave CI Gate green on main. See PP-x0ke."
-              exit 1
-              ;;
-          esac
-
-          echo "All required jobs passed; path-filtered jobs passed, were skipped, or were cancelled"
+      - name: All jobs passed or were skipped
+        run: echo "All required jobs passed or were skipped."

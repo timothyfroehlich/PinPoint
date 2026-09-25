@@ -1,18 +1,15 @@
-import { asc, eq, notInArray } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db, type DbTransaction } from "~/server/db";
-import { issues, machines, userProfiles } from "~/server/db/schema";
-import { CLOSED_STATUSES } from "~/lib/issues/status";
-import type { IssueSeverity, IssueStatus } from "~/lib/types";
+import { machines, userProfiles } from "~/server/db/schema";
 import type { MachinePresenceStatus } from "~/lib/machines/presence";
 
-/** One machine in a resolved collection. `issues` contains OPEN issues only. */
+/** Minimal identity used to scope the collection's tabs and edit controls. */
 export interface CollectionMachine {
   id: string;
   initials: string;
   name: string;
   presenceStatus: MachinePresenceStatus;
-  issues: { status: IssueStatus; severity: IssueSeverity; createdAt: Date }[];
 }
 
 export interface OwnerCollection {
@@ -50,12 +47,6 @@ export async function getOwnerCollection(
     tx.query.machines.findMany({
       where: eq(machines.ownerId, userId),
       columns: { id: true, initials: true, name: true, presenceStatus: true },
-      with: {
-        issues: {
-          where: notInArray(issues.status, [...CLOSED_STATUSES]),
-          columns: { status: true, severity: true, createdAt: true },
-        },
-      },
       orderBy: [asc(machines.name)],
     }),
   ]);

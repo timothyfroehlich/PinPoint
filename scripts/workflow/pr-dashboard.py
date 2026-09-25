@@ -2,8 +2,8 @@
 """Render the PR dashboard from one repository-level GraphQL snapshot.
 
 CI and merge state come from the GraphQL snapshot. The Review column is the merge
-gate's own label — `_review_summary` in `_pr-gates.sh` runs three checkers
-(CodeRabbit approval, Codex evidence, local attestation) and names the result with
+gate's own label — `_review_summary` in `_pr-gates.sh` runs two checkers
+(CodeRabbit approval, Codex evidence) and names the result with
 one of four words: approved, changes requested, stale review, not reviewed. The
 dashboard shells out to it per PR rather than keeping a Python copy of that logic.
 """

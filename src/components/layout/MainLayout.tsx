@@ -14,6 +14,13 @@ import { AppHeader } from "./AppHeader";
 import { BottomTabBar } from "./BottomTabBar";
 import changelogMeta from "@content/changelog-meta.json";
 import { getLastIssuesPath, getChangelogSeen } from "~/lib/cookies/preferences";
+import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
+import {
+  reportModePath,
+  resolveDefaultReportMode,
+} from "~/lib/report/default-mode";
+import type { ReportMode } from "~/lib/types/user";
+import { QuickSearchProvider } from "./QuickSearch";
 
 export async function MainLayout({
   children,
@@ -39,7 +46,12 @@ export async function MainLayout({
 
   let enrichedNotifications: EnrichedNotification[] = [];
   let userProfile:
-    | { name: string; role: "guest" | "member" | "technician" | "admin" }
+    | {
+        name: string;
+        role: "guest" | "member" | "technician" | "admin";
+        mobileReportMode: ReportMode;
+        desktopReportMode: ReportMode;
+      }
     | undefined;
 
   if (user) {
@@ -103,7 +115,12 @@ export async function MainLayout({
 
     userProfile = await db.query.userProfiles.findFirst({
       where: eq(userProfiles.id, user.id),
-      columns: { name: true, role: true },
+      columns: {
+        name: true,
+        role: true,
+        mobileReportMode: true,
+        desktopReportMode: true,
+      },
     });
 
     if (!userProfile) {
@@ -113,40 +130,70 @@ export async function MainLayout({
       // Refetch profile after healing
       userProfile = await db.query.userProfiles.findFirst({
         where: eq(userProfiles.id, user.id),
-        columns: { name: true, role: true },
+        columns: {
+          name: true,
+          role: true,
+          mobileReportMode: true,
+          desktopReportMode: true,
+        },
       });
     }
   }
 
+  const canMultiple =
+    Boolean(user) &&
+    checkPermission("issues.report.quick", getAccessLevel(userProfile?.role));
+  const mobileReportHref = reportModePath(
+    resolveDefaultReportMode(
+      userProfile?.mobileReportMode ?? "quick",
+      canMultiple,
+      "quick"
+    )
+  );
+  const desktopReportHref = reportModePath(
+    resolveDefaultReportMode(
+      userProfile?.desktopReportMode ?? "detailed",
+      canMultiple,
+      "detailed"
+    )
+  );
+
   return (
-    <div className="flex h-full flex-col bg-background text-foreground">
-      {/* Unified AppHeader — always rendered, adapts at md: breakpoint */}
-      <AppHeader
-        isAuthenticated={!!user}
-        userName={userProfile?.name ?? "User"}
-        role={userProfile?.role}
-        userId={user?.id}
-        notifications={enrichedNotifications}
-        issuesPath={issuesPath}
-        newChangelogCount={newChangelogCount}
-      />
+    <QuickSearchProvider>
+      <div className="flex h-full flex-col bg-background text-foreground">
+        {/* Unified AppHeader — always rendered, adapts at md: breakpoint */}
+        <AppHeader
+          isAuthenticated={!!user}
+          userName={userProfile?.name ?? "User"}
+          role={userProfile?.role}
+          userId={user?.id}
+          notifications={enrichedNotifications}
+          issuesPath={issuesPath}
+          newChangelogCount={newChangelogCount}
+          reportHref={desktopReportHref}
+        />
 
-      {/* Main Content */}
-      {/* scroll-pt-14: reserves space for the 56px sticky AppHeader so
-          browser scroll-into-view doesn't place interactive elements under it. */}
-      <main
-        id="main-content"
-        tabIndex={-1}
-        className="flex-1 overflow-y-auto scroll-pt-14 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
-      >
-        {/* Extra bottom padding on mobile so content isn't hidden behind the fixed tab bar */}
-        <div className="@container px-4 sm:px-8 lg:px-10 pb-[calc(88px+env(safe-area-inset-bottom))] md:pb-0">
-          {children}
-        </div>
-      </main>
+        {/* Main Content */}
+        {/* scroll-pt-14: reserves space for the 56px sticky AppHeader so
+            browser scroll-into-view doesn't place interactive elements under it. */}
+        <main
+          id="main-content"
+          tabIndex={-1}
+          className="flex-1 overflow-y-auto scroll-pt-14 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+        >
+          {/* Extra bottom padding on mobile so content isn't hidden behind the fixed tab bar */}
+          <div className="@container px-4 sm:px-8 lg:px-10 pb-[calc(88px+env(safe-area-inset-bottom))] [&:has([data-machine-scan-hub])]:pb-0 md:pb-0">
+            {children}
+          </div>
+        </main>
 
-      {/* Fixed bottom tab bar — mobile only (md:hidden is applied inside the component) */}
-      <BottomTabBar role={userProfile?.role} issuesPath={issuesPath} />
-    </div>
+        {/* Fixed bottom tab bar — mobile only (md:hidden is applied inside the component) */}
+        <BottomTabBar
+          role={userProfile?.role}
+          issuesPath={issuesPath}
+          reportHref={mobileReportHref}
+        />
+      </div>
+    </QuickSearchProvider>
   );
 }

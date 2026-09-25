@@ -32,6 +32,7 @@
  *   Re-runs are no-ops.
  */
 
+import { isLocalDatabaseUrl } from "../scripts/assert-local-db.mjs";
 import {
   createScriptClient,
   resolveScriptDatabaseUrl,
@@ -40,13 +41,16 @@ import {
 const databaseUrl = resolveScriptDatabaseUrl();
 
 // Production safety guard: refuse to run against non-local hosts unless the
-// caller has explicitly opted in. This mirrors seed-timeline-demo's guard.
+// caller has explicitly opted in. Local means loopback or a dev-stack host in
+// PINPOINT_DEV_DB_HOSTS (see scripts/assert-local-db.mjs).
 // For the intentional production one-shot run:
 //   ALLOW_NONLOCAL_BACKFILL=1 node --env-file=<prod-env> supabase/seed-timeline-backfill.mjs
 {
   const url = new URL(databaseUrl);
-  const isLocal = url.hostname === "localhost" || url.hostname === "127.0.0.1";
-  if (!isLocal && !process.env.ALLOW_NONLOCAL_BACKFILL) {
+  if (
+    !isLocalDatabaseUrl(databaseUrl) &&
+    !process.env.ALLOW_NONLOCAL_BACKFILL
+  ) {
     console.error(
       `❌ seed-timeline-backfill refuses non-local DB (${url.hostname}) without ALLOW_NONLOCAL_BACKFILL=1`
     );

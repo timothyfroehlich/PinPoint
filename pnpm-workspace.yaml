@@ -11,6 +11,8 @@
 # undecided build scripts.
 allowBuilds:
   '@sentry/cli': false
+  # core-js (via jspdf → canvg) only prints a funding banner on postinstall.
+  core-js: false
   esbuild: false
   sharp: false
 

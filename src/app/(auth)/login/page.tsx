@@ -39,9 +39,13 @@ export default async function LoginPage({
       <CardContent className="space-y-6">
         <OAuthButtonList />
 
-        {/* Only enable test admin button in non-production environments */}
+        {/* Preview users have random passwords; the fixed test login is local-only. */}
         <LoginForm
-          enableTestAdmin={process.env["VERCEL_ENV"] !== "production"}
+          enableTestAdmin={
+            process.env.NODE_ENV === "development" &&
+            process.env["VERCEL_ENV"] !== "preview" &&
+            process.env["VERCEL_ENV"] !== "production"
+          }
           next={next}
         />
       </CardContent>

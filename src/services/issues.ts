@@ -87,6 +87,8 @@ export interface CreateIssueParams {
   reporterEmail?: string | null;
   assignedTo?: string | null;
   autoWatchReporter?: boolean | undefined;
+  /** Where the public report was launched, when it came from a tracked entry point. */
+  reportSource?: "apron" | undefined;
   /**
    * Client-generated UUID, stable across submission retries. When present and a
    * row already carries this key, createIssue returns the existing issue
@@ -194,6 +196,7 @@ export async function createIssue({
   reporterEmail,
   assignedTo,
   autoWatchReporter = true,
+  reportSource,
   idempotencyKey,
 }: CreateIssueParams): Promise<{
   issue: Issue;
@@ -375,6 +378,7 @@ export async function createIssue({
           ? { guestReporterName: reporterName }
           : {}),
       ...(reportedBy ? { actorId: reportedBy } : {}),
+      ...(reportSource ? { reportSource } : {}),
     });
 
     // 6. Notifications — planned inside the transaction (transactional in-app

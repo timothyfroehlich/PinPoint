@@ -82,7 +82,7 @@ export const getMachineForLayout = cache(async (initials: string) => {
         // out. Null here for an unmatched machine, and also for a matched one
         // whose title has left the mirror; `resolveModelTitle` separates those.
         pinballmapTitle: {
-          columns: { name: true },
+          columns: { name: true, machineGroupId: true, groupName: true },
         },
       },
     }),

@@ -24,7 +24,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
-import { issues, machines, userProfiles } from "~/server/db/schema";
+import {
+  issues,
+  machines,
+  timelineEvents,
+  userProfiles,
+} from "~/server/db/schema";
 import { createTestUser, createTestMachine } from "~/test/helpers/factories";
 import { getTestDb, setupTestDb } from "~/test/setup/pglite";
 
@@ -191,6 +196,26 @@ describe("submitPublicIssueAction — assignedTo permission handling (integratio
 
     const assignedTo = await getPersistedAssignedTo(machine.initials);
     expect(assignedTo).toBe(assignee.id);
+  });
+
+  it("retains apron scan attribution on the committed issue-opened event", async () => {
+    const reporter = await seedUser("member");
+    const machine = await seedMachine(reporter.id);
+    mockGetUser.mockResolvedValue({ data: { user: { id: reporter.id } } });
+
+    const formData = makeFormData({ machineId: machine.id });
+    formData.set("source", "apron");
+    const result = await submitPublicIssueAction({ error: "" }, formData);
+
+    expect(result).toMatchObject({ success: true });
+    const db = await getTestDb();
+    const event = await db.query.timelineEvents.findFirst({
+      where: eq(timelineEvents.machineId, machine.id),
+    });
+    expect(event?.eventData).toMatchObject({
+      kind: "issue_opened",
+      reportSource: "apron",
+    });
   });
 
   it("admin can assign issue to another user", async () => {

@@ -93,6 +93,8 @@ describe("e2e/global-setup", () => {
     endMock.mockReset();
     process.env = {
       ...envBackup,
+      // A developer shell may select the remote backend; tests opt in.
+      PINPOINT_SUPABASE_BACKEND: "local",
       NEXT_PUBLIC_SUPABASE_URL: "http://localhost:54321",
       POSTGRES_URL: "postgresql://postgres:postgres@localhost:54322/postgres",
       // Keep the Docker readiness retry loop fast and deterministic in tests:
@@ -161,6 +163,55 @@ describe("e2e/global-setup", () => {
     expect(execSyncMock).toHaveBeenCalledWith("pnpm run db:_seed-users", {
       stdio: "inherit",
       env: process.env,
+    });
+  });
+
+  it("bounds the Supabase and Postgres probes at ten seconds", async () => {
+    execSyncMock.mockReturnValue(undefined);
+    const timeoutSpy = vi.spyOn(AbortSignal, "timeout");
+    const { default: postgresMock } = await import("postgres");
+    const setup = await loadSetup();
+
+    await setup(EMPTY_CONFIG);
+
+    expect(timeoutSpy).toHaveBeenCalledWith(10_000);
+    expect(postgresMock).toHaveBeenCalledWith(expect.any(String), {
+      connect_timeout: 10,
+    });
+    timeoutSpy.mockRestore();
+  });
+
+  describe("remote Supabase backend", () => {
+    beforeEach(() => {
+      process.env.PINPOINT_SUPABASE_BACKEND = "remote";
+    });
+
+    it("skips the local Docker check and still probes Supabase", async () => {
+      execSyncMock.mockReturnValue(undefined);
+      const setup = await loadSetup();
+
+      await setup(EMPTY_CONFIG);
+
+      expect(spawnSyncMock).not.toHaveBeenCalled();
+      expect(fetchMock).toHaveBeenCalled();
+    });
+
+    it("falls back to pnpm run db:reset, never a bare supabase db reset", async () => {
+      execSyncMock
+        .mockReturnValueOnce(undefined) // db:migrate
+        .mockImplementationOnce(() => {
+          throw new Error("fast reset failed"); // db:fast-reset
+        })
+        .mockReturnValue(undefined);
+      const setup = await loadSetup();
+
+      await setup(EMPTY_CONFIG);
+
+      expect(execSyncMock).toHaveBeenCalledTimes(3);
+      expect(execSyncMock).toHaveBeenLastCalledWith("pnpm run db:reset", {
+        stdio: "inherit",
+        env: process.env,
+      });
     });
   });
 

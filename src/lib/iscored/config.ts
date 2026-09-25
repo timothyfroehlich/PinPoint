@@ -2,6 +2,8 @@
  * Configuration and URL helpers for the iScored integration.
  */
 
+import { LOCAL_AFM_DEMO_GAME_ID } from "./local-demo";
+
 /** Upstream iScored service base URL. */
 export const ISCORED_BASE_URL = "https://www.iscored.info";
 
@@ -48,7 +50,7 @@ export function getScoreEntryUrl(
   const resolvedUser = (user ?? getIscoredUser())?.trim();
   const trimmedId = iscoredGameId.trim();
 
-  if (!resolvedUser || !trimmedId) {
+  if (!resolvedUser || !trimmedId || trimmedId === LOCAL_AFM_DEMO_GAME_ID) {
     return null;
   }
 
@@ -70,7 +72,7 @@ export function getGameUrl(
   const resolvedUser = (user ?? getIscoredUser())?.trim();
   const trimmedId = iscoredGameId.trim();
 
-  if (!resolvedUser || !trimmedId) {
+  if (!resolvedUser || !trimmedId || trimmedId === LOCAL_AFM_DEMO_GAME_ID) {
     return null;
   }
 
