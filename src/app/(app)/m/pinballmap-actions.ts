@@ -24,7 +24,11 @@ import {
   recordAbandonedListing,
   retireAbandonmentForLmx,
 } from "~/lib/pinballmap/abandoned-listings";
-import { getPinballMapWriteCredentials } from "~/lib/pinballmap/credentials";
+import {
+  getLinkedPinballMapCredentials,
+  markPinballMapLinkNeedsRelink,
+  type LinkedPinballMapCredentials,
+} from "~/lib/pinballmap/user-credentials";
 import { withLmxAdded, withLmxRemoved } from "~/lib/pinballmap/snapshot-edit";
 import { getPinballMapClient } from "~/lib/pinballmap/client";
 import type { LocationSnapshot, PbmWriteFailure } from "~/lib/pinballmap/types";
@@ -411,7 +415,7 @@ function pbmWriteFailureMessage(failure: PbmWriteFailure): string {
     case "rate_limited":
       return "Pinball Map is rate-limiting us. Try again in a few minutes.";
     case "unauthorized":
-      return "Pinball Map rejected our operator account. An admin needs to re-provision it.";
+      return "Pinball Map rejected your saved sign-in. Relink your Pinball Map account in Settings.";
     case "not_found":
       return "Pinball Map couldn't find that entry. It may already be gone.";
     case "rejected":
@@ -419,6 +423,27 @@ function pbmWriteFailureMessage(failure: PbmWriteFailure): string {
     case "transient":
       return "Pinball Map didn't respond properly. Try again.";
   }
+}
+
+/** Returned when the pushing member has no usable Pinball Map link (8.2). */
+const NOT_LINKED_MESSAGE =
+  "Link your Pinball Map account in Settings to change the lineup from here.";
+
+/**
+ * Turn a rejected push into the action's error, marking the member's link
+ * Needs relink when Pinball Map refused the token itself (spec 8.5). That
+ * rejection is the only time PinPoint learns a token is dead — it never polls.
+ */
+async function pushRejected(
+  userId: string,
+  linked: LinkedPinballMapCredentials,
+  failure: PbmWriteFailure
+): Promise<Result<never, "PBM_REJECTED">> {
+  if (failure.reason === "unauthorized") {
+    await markPinballMapLinkNeedsRelink(userId, linked.tokenVaultId);
+    revalidatePath("/settings");
+  }
+  return err("PBM_REJECTED", pbmWriteFailureMessage(failure));
 }
 
 /**
@@ -509,7 +534,7 @@ export type ListPinballmapResult = Result<
   // Availability forbids being on the lineup (6.2) — the same refusal the
   // intent toggle gives, on the push that would otherwise get there anyway.
   | "BLOCKED"
-  | "NOT_PROVISIONED"
+  | "NOT_LINKED"
   | "PBM_REJECTED"
   | "SERVER"
 >;
@@ -607,12 +632,8 @@ export async function addMachineToPinballMapAction(
   }
 
   // --- non-transactional effects, both BEFORE the transaction ---
-  const credentials = await getPinballMapWriteCredentials();
-  if (!credentials)
-    return err(
-      "NOT_PROVISIONED",
-      "No Pinball Map operator account is set up yet, so PinPoint can't write to Pinball Map."
-    );
+  const linked = await getLinkedPinballMapCredentials(userId);
+  if (!linked) return err("NOT_LINKED", NOT_LINKED_MESSAGE);
 
   const lease = await claimPinballMapMutationLease(
     locationId,
@@ -627,7 +648,7 @@ export async function addMachineToPinballMapAction(
   try {
     const client = await getPinballMapClient();
     const written = await client.addMachine({
-      credentials,
+      credentials: linked.credentials,
       locationId,
       machineId: titleId,
     });
@@ -636,7 +657,7 @@ export async function addMachineToPinballMapAction(
         { reason: written.reason, action: "pinballmap.addMachine" },
         "PinballMap add rejected"
       );
-      return err("PBM_REJECTED", pbmWriteFailureMessage(written));
+      return await pushRejected(userId, linked, written);
     }
     const lmxId = written.lmxId;
     // --- transaction: local state only ---
@@ -698,7 +719,7 @@ export type UnlistPinballmapResult = Result<
   | "VALIDATION"
   | "UNAUTHORIZED"
   | "NOT_FOUND"
-  | "NOT_PROVISIONED"
+  | "NOT_LINKED"
   | "PBM_REJECTED"
   | "SERVER"
 >;
@@ -830,12 +851,9 @@ export async function removeMachineFromPinballMapAction(
       );
 
     // --- non-transactional effects, both BEFORE the transaction ---
-    const credentials = await getPinballMapWriteCredentials();
-    if (!credentials)
-      return err(
-        "NOT_PROVISIONED",
-        "No Pinball Map operator account is set up yet, so PinPoint can't write to Pinball Map."
-      );
+    const linked = await getLinkedPinballMapCredentials(userId);
+    if (!linked) return err("NOT_LINKED", NOT_LINKED_MESSAGE);
+    const { credentials } = linked;
 
     const client = await getPinballMapClient();
     let deletedLmxId = liveLmxId;
@@ -849,7 +867,7 @@ export async function removeMachineFromPinballMapAction(
         { reason: written.reason, action: "pinballmap.removeMachine" },
         "PinballMap remove rejected"
       );
-      return err("PBM_REJECTED", pbmWriteFailureMessage(written));
+      return await pushRejected(userId, linked, written);
     }
 
     // `not_found` is ambiguous — already gone, or our handle was stale and the
@@ -926,7 +944,7 @@ export async function removeMachineFromPinballMapAction(
             { reason: written.reason, action: "pinballmap.removeMachine" },
             "PinballMap remove rejected on the re-resolved lmx"
           );
-          return err("PBM_REJECTED", pbmWriteFailureMessage(written));
+          return await pushRejected(userId, linked, written);
         }
       } else {
         // Confirmed absent from a lineup we just re-fetched. Finish the job

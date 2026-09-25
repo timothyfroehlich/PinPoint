@@ -48,7 +48,7 @@ describe("PinballmapAbandonedEntries", () => {
         machineId="machine-1"
         entries={entries}
         canPush={true}
-        writeEnabled={false}
+        accountLinked={false}
       />
     );
 
@@ -71,7 +71,7 @@ describe("PinballmapAbandonedEntries", () => {
         machineId="machine-1"
         entries={entries}
         canPush={false}
-        writeEnabled={true}
+        accountLinked={true}
       />
     );
 
@@ -103,7 +103,7 @@ describe("PinballmapAbandonedEntries", () => {
         machineId="machine-1"
         entries={[entries[0]]}
         canPush={true}
-        writeEnabled={true}
+        accountLinked={true}
       />
     );
 
@@ -150,7 +150,7 @@ describe("PinballmapAbandonedEntries", () => {
         machineId="machine-1"
         entries={[entries[0]]}
         canPush={true}
-        writeEnabled={true}
+        accountLinked={true}
       />
     );
     await user.click(screen.getByTestId("pbm-abandoned-remove-101"));
@@ -168,7 +168,7 @@ describe("PinballmapAbandonedEntries", () => {
         machineId="machine-1"
         entries={[entries[1]]}
         canPush={true}
-        writeEnabled={true}
+        accountLinked={true}
       />
     );
 

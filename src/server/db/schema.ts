@@ -1677,6 +1677,43 @@ export const pinballmapLocationChecks = pgTable(
 ).enableRLS();
 
 /**
+ * A member's linked Pinball Map account (pinballmap spec 8.4–8.5, PP-o355.6).
+ *
+ * At most one per member. Pushes to Pinball Map run as the pushing member, so
+ * Pinball Map credits the edit to them (8.2). The member signs in once with
+ * their Pinball Map login and password; PinPoint exchanges those for the
+ * account's token and keeps only the token, encrypted in Supabase Vault — this
+ * row holds the Vault reference, never the token, and the password is never
+ * stored anywhere.
+ *
+ * `pbmEmail` is what writes send as `user_email`: Pinball Map resolves the
+ * writer by email, so it is kept as Pinball Map reported it at link time, not
+ * as the member typed their login.
+ *
+ * `needsRelinkAt` is set when Pinball Map rejects a write as unauthorized
+ * (8.5). PinPoint never probes the token otherwise. Relinking replaces the row.
+ *
+ * `tokenVaultId` references `vault.secrets.id` — no FK (Drizzle cannot express
+ * cross-schema references). Deleting the row does not delete the secret; the
+ * unlink and account-deletion paths delete both.
+ */
+export const pinballmapUserCredentials = pgTable(
+  "pinballmap_user_credentials",
+  {
+    userId: uuid("user_id")
+      .primaryKey()
+      .references(() => userProfiles.id, { onDelete: "cascade" }),
+    pbmUsername: text("pbm_username").notNull(),
+    pbmEmail: text("pbm_email").notNull(),
+    tokenVaultId: uuid("token_vault_id").notNull(),
+    linkedAt: timestamp("linked_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    needsRelinkAt: timestamp("needs_relink_at", { withTimezone: true }),
+  }
+).enableRLS();
+
+/**
  * Pinball Map condition comments PinPoint has observed (PP-o355.4).
  *
  * One row per underlying Pinball Map comment — the identity every timeline

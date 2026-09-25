@@ -140,7 +140,7 @@ function renderControl(overrides: Partial<Props> = {}): {
         canSetIntent={true}
         canPush={true}
         canRefresh={true}
-        writeEnabled={true}
+        linkStatus="linked"
         modelName="Medieval Madness"
         {...overrides}
       />
@@ -216,7 +216,7 @@ describe("the status sentence", () => {
           canSetIntent
           canPush
           canRefresh
-          writeEnabled
+          linkStatus="linked"
           modelName="Medieval Madness"
         />
       );
@@ -253,19 +253,23 @@ describe("push actions", () => {
     }
   );
 
-  it("withholds the push and links out when no credential is provisioned", async () => {
-    // A control that cannot perform its action must not be rendered
-    // (CORE-ARCH-012, spec 4.4). The link is the real route.
-    renderControl({
-      view: VIEWS.missing,
-      writeEnabled: false,
-    });
-    expect(screen.queryByTestId("pbm-listing-add")).not.toBeInTheDocument();
-    expect(
-      await screen.findByRole("link", { name: "Add it on Pinball Map" })
-    ).toBeInTheDocument();
-    expect(status()).toContain("then Refresh to update");
-  });
+  it.each(["not_linked", "needs_relink"] as const)(
+    "withholds the push and links out when the viewer is %s",
+    async (linkStatus) => {
+      // Pushes run as the viewer's own linked account (spec 8.2); without a
+      // usable one the push is absent, not present-and-failing (CORE-ARCH-012,
+      // spec 4.4). The link is the real route.
+      renderControl({
+        view: VIEWS.missing,
+        linkStatus,
+      });
+      expect(screen.queryByTestId("pbm-listing-add")).not.toBeInTheDocument();
+      expect(
+        await screen.findByRole("link", { name: "Add it on Pinball Map" })
+      ).toBeInTheDocument();
+      expect(status()).toContain("then Refresh to update");
+    }
+  );
 
   it.each([
     ["missing", "pbm-listing-add", "Add it on Pinball Map"],

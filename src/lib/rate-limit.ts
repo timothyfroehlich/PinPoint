@@ -11,6 +11,7 @@
  * - Public Issue (anonymous): 5 submissions per IP per 15 min
  * - Authenticated Issue: 20 submissions per user per 15 min
  * - MCP: 120 authenticated requests/minute and 20 mutations/minute per user+client
+ * - Pinball Map account link: 5 sign-in attempts per user per 15 min
  *
  * @see https://github.com/timothyfroehlich/PinPoint/issues/536
  * @see https://github.com/timothyfroehlich/PinPoint/issues/537
@@ -202,6 +203,28 @@ function createAuthenticatedIssueLimiter(): Ratelimit | null {
     redis,
     limiter: Ratelimit.slidingWindow(20, "15 m"),
     prefix: "ratelimit:report:user",
+    analytics: true,
+  });
+}
+
+/**
+ * Pinball Map account-link limiter (pinballmap spec 8.4)
+ * - User-based: 5 sign-in attempts per 15 minutes (fixed window)
+ *
+ * Each attempt forwards a login and password to Pinball Map's auth_details,
+ * which Pinball Map itself caps at 40 per 5 minutes for our whole API token.
+ * Without a per-member cap, PinPoint would be an unthrottled password-guessing
+ * proxy against Pinball Map accounts, and one member could spend the shared
+ * allowance for everyone. Same shape as the login account limiter.
+ */
+function createPinballMapLinkLimiter(): Ratelimit | null {
+  const redis = getRedis();
+  if (!redis) return null;
+
+  return new Ratelimit({
+    redis,
+    limiter: Ratelimit.fixedWindow(5, "15 m"),
+    prefix: "ratelimit:pinballmap-link:user",
     analytics: true,
   });
 }
@@ -418,6 +441,18 @@ function hashIdentifier(identifier: string): string {
 export const checkAuthenticatedIssueLimit = makeLimitChecker(
   createAuthenticatedIssueLimiter,
   { label: "Authenticated issue", keyType: "user" }
+);
+
+/**
+ * Check the Pinball Map account-link rate limit (user-based)
+ *
+ * @param userId - User ID (UUID)
+ * @returns Allow/deny result. Fails closed in production, and open in
+ *   development, when rate limiting is unavailable.
+ */
+export const checkPinballMapLinkLimit = makeLimitChecker(
+  createPinballMapLinkLimiter,
+  { label: "Pinball Map link", keyType: "user" }
 );
 
 /**

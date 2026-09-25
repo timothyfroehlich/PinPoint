@@ -135,17 +135,45 @@ export function createMockClient(): PinballMapClient {
     },
 
     authDetails(login: string, password: string): Promise<PbmAuthResult> {
+      // Fixed logins drive the failure paths from dev and E2E without a live
+      // account: "disabled" is a disabled account, the password "wrong" is a
+      // rejected sign-in, and "revoked" links fine but its token is refused by
+      // every later write (see isRevokedToken), which is how Needs relink is
+      // reached (spec 8.5).
       if (!login || !password) {
-        return Promise.resolve({ ok: false, reason: "invalid_credentials" });
+        return Promise.resolve({
+          ok: false,
+          reason: "invalid_credentials",
+          message: "login and password are required fields",
+        });
       }
+      if (login === "disabled") {
+        return Promise.resolve({
+          ok: false,
+          reason: "account_disabled",
+          message: "account_disabled",
+        });
+      }
+      if (password === "wrong") {
+        return Promise.resolve({
+          ok: false,
+          reason: "invalid_credentials",
+          message: "Incorrect password",
+        });
+      }
+      const username = login.includes("@")
+        ? (login.split("@")[0] ?? login)
+        : login;
       return Promise.resolve({
         ok: true,
-        token: `mock-token-${login}`,
-        username: login,
+        token: `mock-token-${username}`,
+        username,
+        email: login.includes("@") ? login : `${login}@example.com`,
       });
     },
 
-    addMachine({ machineId }): Promise<PbmAddMachineResult> {
+    addMachine({ credentials, machineId }): Promise<PbmAddMachineResult> {
+      if (isRevokedToken(credentials.token)) return Promise.resolve(REVOKED);
       // PBM's create is find-or-create: re-adding a machine already at the
       // location returns the existing lmx rather than a duplicate.
       const existing = lmxes.find((l) => l.machineId === machineId);
@@ -162,7 +190,8 @@ export function createMockClient(): PinballMapClient {
       return Promise.resolve({ ok: true, lmxId: id });
     },
 
-    removeMachine({ lmxId }): Promise<PbmWriteResult> {
+    removeMachine({ credentials, lmxId }): Promise<PbmWriteResult> {
+      if (isRevokedToken(credentials.token)) return Promise.resolve(REVOKED);
       const idx = lmxes.findIndex((l) => l.id === lmxId);
       if (idx === -1) {
         return Promise.resolve({
@@ -214,6 +243,18 @@ export function createMockClient(): PinballMapClient {
     },
   };
 }
+
+/** The token the mock mints for the "revoked" login; every write refuses it. */
+function isRevokedToken(token: string): boolean {
+  return token === "mock-token-revoked";
+}
+
+/** Pinball Map's reply to a write whose user_token no longer matches. */
+const REVOKED = {
+  ok: false,
+  reason: "unauthorized",
+  message: "Authentication is required for this action.",
+} as const;
 
 let singleton: PinballMapClient | null = null;
 export function getMockClient(): PinballMapClient {

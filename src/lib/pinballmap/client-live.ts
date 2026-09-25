@@ -586,27 +586,41 @@ export function createLiveClient(apiToken: string | null): PinballMapClient {
       }
       const body = await readBody(res);
       const message = pbmErrorMessage(body);
-      // Disabled account is the one status-based case: 401 + {"error":"..."}.
-      if (res.status === 401) {
+      // Wire shape, from pinballmap/pbm `Api::V1::UsersController#auth_details`
+      // and its request spec (verified 2026-09-25 against main, last touched
+      // 2026-09-01):
+      //   - disabled account: 403 + {"error":"account_disabled"} — the one
+      //     status-based case. It is 403 (`:forbidden`), not 401.
+      //   - missing field, unknown user, wrong password, unconfirmed: 200 +
+      //     {"errors":"..."}.
+      //   - success: 200 + {"user":{"id",…,"username","email",
+      //     "authentication_token"}} — `return_response(user, "user", …)` nests
+      //     the fields under a `user` root, never at the top level.
+      if (res.status === 401 || res.status === 403) {
         return {
           ok: false,
           reason: "account_disabled",
           message: message ?? "account_disabled",
         };
       }
-      // Everything else PBM rejects (wrong password, unknown user, unconfirmed)
-      // comes back as HTTP 200 + {"errors":"..."}.
       if (message) {
         return { ok: false, reason: "invalid_credentials", message };
       }
-      const token =
-        typeof body?.["authentication_token"] === "string"
-          ? body["authentication_token"]
-          : null;
-      if (!token) return { ok: false, reason: "transient" };
+      const user = asRecord(body?.["user"]);
+      const token = user?.["authentication_token"];
+      const email = user?.["email"];
+      // A success body missing the token or the email cannot be written with:
+      // writes identify the author by `user_email`. Report it as a failed
+      // exchange rather than storing half a credential.
+      if (typeof token !== "string" || token.length === 0) {
+        return { ok: false, reason: "transient" };
+      }
+      if (typeof email !== "string" || email.length === 0) {
+        return { ok: false, reason: "transient" };
+      }
       const username =
-        typeof body?.["username"] === "string" ? body["username"] : login;
-      return { ok: true, token, username };
+        typeof user?.["username"] === "string" ? user["username"] : login;
+      return { ok: true, token, username, email };
     },
 
     addMachine({

@@ -37,6 +37,7 @@ import type {
   PbmListingView,
   PbmSibling,
 } from "~/lib/pinballmap/listing-state";
+import type { PinballMapLinkState } from "~/lib/pinballmap/types";
 import type { Result } from "~/lib/result";
 import { cn } from "~/lib/utils";
 import {
@@ -94,12 +95,12 @@ export interface PinballmapListingControlProps {
   /** Viewer holds `machines.pinballmap.sync` (8.3) — may press Refresh. */
   canRefresh: boolean;
   /**
-   * An operator credential is provisioned. Without one the outbound writes
-   * cannot run, so the status row links out instead of showing a button that
-   * would fail (4.4, CORE-ARCH-012). Read off `pinballmap_state` columns — the
-   * token is never decrypted to answer this.
+   * The viewer's own Pinball Map account link, which pushes run as (spec 8.2).
+   * Only `linked` can push; otherwise the status row links out instead of
+   * showing a button that would fail (4.4, CORE-ARCH-012). Read off the link
+   * row — the token is never decrypted to answer this.
    */
-  writeEnabled: boolean;
+  linkStatus: PinballMapLinkState;
   /** Catalog title, so a confirm names the game rather than "this machine". */
   modelName: string | null;
 }
@@ -121,7 +122,7 @@ export function PinballmapListingControl({
   canSetIntent,
   canPush,
   canRefresh,
-  writeEnabled,
+  linkStatus,
   modelName,
 }: PinballmapListingControlProps): React.JSX.Element {
   const [pending, startTransition] = useTransition();
@@ -149,8 +150,9 @@ export function PinballmapListingControl({
   }
 
   const game = modelName ?? "this machine";
-  const canWriteOut = canPush && writeEnabled && locationUrl !== null;
-  const showExternalFallback = canPush && !writeEnabled && locationUrl !== null;
+  const linked = linkStatus === "linked";
+  const canWriteOut = canPush && linked && locationUrl !== null;
+  const showExternalFallback = canPush && !linked && locationUrl !== null;
   const disabled = view.disabled !== null;
 
   return (

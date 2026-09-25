@@ -18,12 +18,14 @@ import { getTestDb, setupTestDb } from "~/test/setup/pglite";
 import {
   machines,
   userProfiles,
+  pinballmapUserCredentials,
   authUsers,
   timelineEvents,
   pinballmapState,
   pinballmapAbandonedListings,
 } from "~/server/db/schema";
 import type { LocationSnapshot, PbmWriteFailure } from "~/lib/pinballmap/types";
+import type * as UserCredentialsModule from "~/lib/pinballmap/user-credentials";
 
 vi.mock("~/server/db", async () => {
   const { getTestDb } = await import("~/test/setup/pglite");
@@ -36,8 +38,11 @@ vi.mock("~/lib/logger", () => ({
   log: { error: vi.fn(), info: vi.fn(), warn: vi.fn(), debug: vi.fn() },
 }));
 
-vi.mock("~/lib/pinballmap/credentials", () => ({
-  getPinballMapWriteCredentials: vi.fn(),
+// Only the Vault decrypt is stubbed; marking a link Needs relink runs for real
+// against PGlite so the tests assert the stored row (spec 8.5).
+vi.mock("~/lib/pinballmap/user-credentials", async (importOriginal) => ({
+  ...(await importOriginal<typeof UserCredentialsModule>()),
+  getLinkedPinballMapCredentials: vi.fn(),
 }));
 
 // Controllable PBM write seam. `lineup` is what PBM currently shows; the
@@ -130,6 +135,22 @@ async function createUser(role: "admin" | "member"): Promise<{ id: string }> {
   return user;
 }
 
+const LINKED_VAULT_ID = "00000000-0000-4000-8000-000000000001";
+
+/** Store a Pinball Map link row for the user, as linking would (8.4). */
+async function seedLink(
+  userId: string,
+  tokenVaultId = LINKED_VAULT_ID
+): Promise<void> {
+  const db = await getTestDb();
+  await db.insert(pinballmapUserCredentials).values({
+    userId,
+    pbmUsername: "ssw",
+    pbmEmail: "ops@example.com",
+    tokenVaultId,
+  });
+}
+
 async function mockAuthAs(userId: string): Promise<void> {
   const { createClient } = await import("~/lib/supabase/server");
   vi.mocked(createClient).mockResolvedValue({
@@ -175,11 +196,11 @@ describe("PinballMap outbound writes (PGlite)", () => {
     pbm.beforeAdd = null;
     pbm.beforeRemove = null;
     pbm.fetchError = null;
-    const { getPinballMapWriteCredentials } =
-      await import("~/lib/pinballmap/credentials");
-    vi.mocked(getPinballMapWriteCredentials).mockResolvedValue({
-      email: "ops@example.com",
-      token: "tok_123",
+    const { getLinkedPinballMapCredentials } =
+      await import("~/lib/pinballmap/user-credentials");
+    vi.mocked(getLinkedPinballMapCredentials).mockResolvedValue({
+      credentials: { email: "ops@example.com", token: "tok_123" },
+      tokenVaultId: LINKED_VAULT_ID,
     });
   });
 
@@ -465,11 +486,11 @@ describe("PinballMap outbound writes (PGlite)", () => {
     expect(pbm.lineup).toEqual([]);
   });
 
-  it("refuses without an operator credential, before calling PinballMap", async () => {
+  it("refuses a pusher without a linked account, before calling PinballMap", async () => {
     const db = await getTestDb();
-    const { getPinballMapWriteCredentials } =
-      await import("~/lib/pinballmap/credentials");
-    vi.mocked(getPinballMapWriteCredentials).mockResolvedValue(null);
+    const { getLinkedPinballMapCredentials } =
+      await import("~/lib/pinballmap/user-credentials");
+    vi.mocked(getLinkedPinballMapCredentials).mockResolvedValue(null);
     const { addMachineToPinballMapAction } =
       await import("~/app/(app)/m/pinballmap-actions");
     const admin = await createUser("admin");
@@ -492,7 +513,7 @@ describe("PinballMap outbound writes (PGlite)", () => {
     );
 
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.code).toBe("NOT_PROVISIONED");
+    if (!result.ok) expect(result.code).toBe("NOT_LINKED");
     expect(pbm.lineup).toEqual([]);
   });
 
@@ -1227,5 +1248,98 @@ describe("PinballMap outbound writes (PGlite)", () => {
     expect(state?.locationId).toBe(99999);
     expect(state?.snapshotJson?.lmxes.map((lmx) => lmx.id)).toEqual([500]);
     expect(await db.select().from(pinballmapAbandonedListings)).toHaveLength(1);
+  });
+
+  it("marks the pusher's link Needs relink when PinballMap rejects the token", async () => {
+    const db = await getTestDb();
+    const { addMachineToPinballMapAction } =
+      await import("~/app/(app)/m/pinballmap-actions");
+    const admin = await createUser("admin");
+    await mockAuthAs(admin.id);
+    await seedLink(admin.id);
+    await seedState([]);
+    pbm.addResult = { ok: false, reason: "unauthorized" };
+
+    const [machine] = await db
+      .insert(machines)
+      .values({
+        name: "Godzilla",
+        initials: "GZ",
+        pinballmapMachineId: TITLE_ID,
+      })
+      .returning();
+    if (!machine) throw new Error("failed to seed machine");
+
+    const result = await addMachineToPinballMapAction(
+      undefined,
+      form(machine.id)
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("PBM_REJECTED");
+      expect(result.message).toMatch(/Relink/);
+    }
+    const link = await db.query.pinballmapUserCredentials.findFirst({
+      where: eq(pinballmapUserCredentials.userId, admin.id),
+    });
+    expect(link?.needsRelinkAt).not.toBeNull();
+  });
+
+  it("does not mark a link that was replaced while the push was in flight", async () => {
+    const db = await getTestDb();
+    const { addMachineToPinballMapAction } =
+      await import("~/app/(app)/m/pinballmap-actions");
+    const admin = await createUser("admin");
+    await mockAuthAs(admin.id);
+    // The row now holds a newer token than the one the push decrypted.
+    await seedLink(admin.id, "00000000-0000-4000-8000-000000000002");
+    await seedState([]);
+    pbm.addResult = { ok: false, reason: "unauthorized" };
+
+    const [machine] = await db
+      .insert(machines)
+      .values({
+        name: "Godzilla",
+        initials: "GZ",
+        pinballmapMachineId: TITLE_ID,
+      })
+      .returning();
+    if (!machine) throw new Error("failed to seed machine");
+
+    await addMachineToPinballMapAction(undefined, form(machine.id));
+
+    const link = await db.query.pinballmapUserCredentials.findFirst({
+      where: eq(pinballmapUserCredentials.userId, admin.id),
+    });
+    expect(link?.needsRelinkAt).toBeNull();
+  });
+
+  it("leaves the link alone when PinballMap rejects for another reason", async () => {
+    const db = await getTestDb();
+    const { addMachineToPinballMapAction } =
+      await import("~/app/(app)/m/pinballmap-actions");
+    const admin = await createUser("admin");
+    await mockAuthAs(admin.id);
+    await seedLink(admin.id);
+    await seedState([]);
+    pbm.addResult = { ok: false, reason: "rate_limited" };
+
+    const [machine] = await db
+      .insert(machines)
+      .values({
+        name: "Godzilla",
+        initials: "GZ",
+        pinballmapMachineId: TITLE_ID,
+      })
+      .returning();
+    if (!machine) throw new Error("failed to seed machine");
+
+    await addMachineToPinballMapAction(undefined, form(machine.id));
+
+    const link = await db.query.pinballmapUserCredentials.findFirst({
+      where: eq(pinballmapUserCredentials.userId, admin.id),
+    });
+    expect(link?.needsRelinkAt).toBeNull();
   });
 });

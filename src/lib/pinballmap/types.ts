@@ -211,7 +211,19 @@ export type PbmAddMachineResult = { ok: true; lmxId: number } | PbmWriteFailure;
 export type PbmToggleResult =
   { ok: true; icEnabled: boolean | null } | PbmWriteFailure;
 
-/** Result of exchanging a login+password for an API token (bead F). */
+/**
+ * A member's Pinball Map account link (spec 8.4–8.5): not linked, linked, or
+ * marked Needs relink after Pinball Map rejected its token as unauthorized.
+ */
+export type PinballMapLinkState = "not_linked" | "linked" | "needs_relink";
+
+/**
+ * Result of exchanging a login+password for an API token (spec 8.4, PP-o355.6).
+ *
+ * `email` is what later writes send as `user_email`: Pinball Map resolves the
+ * writer by email, never by username, so the login a member typed (which may be
+ * a username) is not enough to write with.
+ */
 export type PbmAuthFailureReason =
   "invalid_credentials" | "account_disabled" | "rate_limited" | "transient";
 
@@ -222,7 +234,7 @@ export interface PbmAuthFailure {
 }
 
 export type PbmAuthResult =
-  { ok: true; token: string; username: string } | PbmAuthFailure;
+  { ok: true; token: string; username: string; email: string } | PbmAuthFailure;
 
 /**
  * The single seam wrapping all PBM HTTP. Live and mock implementations both
