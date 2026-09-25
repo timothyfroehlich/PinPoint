@@ -91,7 +91,7 @@ Leave the stack running while the branch's work is in flight, and hand off what'
 
 ### Process safety
 
-Only stop services you started in this session, by specific PID or via worktree-local commands (e.g. `pnpm supabase:stop` inside the worktree). Forbidden without explicit permission: `supabase stop --all`, `pkill`/`killall` against process names, `docker stop` on containers you didn't start. The system runs many environments in parallel; broad kills wipe out other agents' work.
+Only stop services you started in this session, by specific PID or via worktree-local commands (e.g. `pnpm supabase:stop` inside the worktree). One exception: after your PR merges, you may stop your own worktree's stack even if an earlier session started it, provided no session is still using it (`pinpoint-pr-workflow` Phase 5.2). Forbidden without explicit permission: `supabase stop --all`, `pkill`/`killall` against process names, `docker stop` on containers you didn't start. The system runs many environments in parallel; broad kills wipe out other agents' work.
 
 ## 5. Workflow
 
