@@ -1758,11 +1758,36 @@ export const pinballmapComments = pgTable(
     convertedBy: uuid("converted_by").references(() => userProfiles.id, {
       onDelete: "set null",
     }),
+    // When a sync first saw the comment's entry missing from the tracked
+    // location's lineup; cleared when the entry is seen again. Starts the
+    // restoration window (spec 7.2) from our observation, which is never
+    // earlier than Pinball Map's removal.
+    entryMissingSince: timestamp("entry_missing_since", {
+      withTimezone: true,
+    }),
+    // Set when the comment's entry has ended for good (spec 7.3, 10.9):
+    // removed past the restoration window, replaced by a new entry for the
+    // same title, or left behind by a tracked-location change. The first two
+    // are cleared if the entry comes back; a location change never is.
+    previousListingReason: text("previous_listing_reason", {
+      enum: ["removed", "replaced", "location_changed"],
+    }),
+    previousListingAt: timestamp("previous_listing_at", {
+      withTimezone: true,
+    }),
   },
   (t) => ({
     convertedIssueIdx: uniqueIndex("pinballmap_comments_converted_issue_idx")
       .on(t.convertedIssueId)
       .where(sql`${t.convertedIssueId} IS NOT NULL`),
+    previousListingReasonCheck: check(
+      "pinballmap_comments_previous_listing_reason_check",
+      sql`previous_listing_reason IN ('removed', 'replaced', 'location_changed')`
+    ),
+    previousListingPairCheck: check(
+      "pinballmap_comments_previous_listing_pair",
+      sql`(previous_listing_reason IS NULL) = (previous_listing_at IS NULL)`
+    ),
   })
 ).enableRLS();
 
