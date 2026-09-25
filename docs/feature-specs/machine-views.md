@@ -4,14 +4,14 @@
 
 **What this document is.** The requirements for PinPoint's shared machine-list experience on `/m`, standard Collections, and owner Collections. It describes the intended final state only; what the code does or used to do lives solely in the Known divergences table. Each requirement is numbered for citation. When code and spec disagree, either the code is wrong or this document gets amended — never silently neither.
 
-**Related records.** `docs/feature-specs/fleet.md` (the existing Fleet and Pinball Map dashboard requirements; unchanged by this spec).
+**Related records.** `docs/feature-specs/fleet.md` (the existing Fleet and Pinball Map dashboard requirements; unchanged by this spec), `docs/feature-specs/collections-and-tags.md` (Collection, Owner Collection, and Tag membership and access).
 
 ---
 
 ## 1. Concepts
 
 - **Machine View** — the shared, machine-specific listing module used by Machines and Collections. It owns validated view state, conditional data enrichment, filtering, sorting, pagination, and responsive presentation.
-- **View Scope** — the authoritative set of machines a route may show: all machines, one standard Collection's exact membership, or one owner's exact machine set. Filtering can narrow a scope but never widen it.
+- **View Scope** — the authoritative set of machines a route may show, supplied by that route. Filtering can narrow a scope but never widen it.
 - **Page Preset** — a route-owned configuration defining default filters, displayed fields, sorting, and permitted fields without allowing the route to assemble query dependencies itself.
 - **Displayed Field** — a Machine View field selected for display. Displayed fields, active filters, sorting, and search determine which optional data enrichments Machine View loads.
 - **Bookmarkable View** — the complete displayed-field, filter, sort, and pagination state encoded in the URL so reopening or copying it restores the same view.
@@ -21,8 +21,8 @@
 
 ## 2. Shared Module and Scoping
 
-- **2.1** `/m`, standard Collection overviews, and owner Collection overviews use one domain-specific Machine View implementation rather than separate card, table, or query pipelines.
-- **2.2** Machine View supports all-machines, standard-collection, and owner scopes. Standard Collections use exact membership rows; owner Collections use exact owner identity. No scope may leak machines from outside its authoritative set.
+- **2.1** `/m` and every page that lists a group of machines use one domain-specific Machine View implementation rather than separate card, table, or query pipelines.
+- **2.2** Machine View shows exactly the machines in the scope its route supplies; the feature that owns each machine group defines its membership. No scope may leak machines from outside its authoritative set.
 - **2.3** Machines and Collections define separate Page Presets. A preset owns default filters, displayed fields, sorting, and permitted fields; route callers supply only scope, preset, and URL search parameters.
 - **2.4** The module remains machine-specific rather than becoming a generic grid. Future tags and locations may add Machine View scopes or presets without changing the machine row model.
 - **2.5** Unmatched external integration entries are not Machine rows. Their representation remains deferred until the Integrations design and must not be introduced as a premature generic row union.
@@ -101,4 +101,5 @@ _None currently recorded._
 
 | Date | Change |
 | :-- | :-- |
+| 2026-09-24 | Made View Scope route-supplied; machine-group membership moved to the specs that own each group. |
 | 2026-09-21 | Created. Establishes one machine-specific view for `/m` and Collections, conditional enrichment, bookmarkable URL state, shared responsive presentation, route-preservation requirements, and explicit deferred integrations/saved-view work. |
