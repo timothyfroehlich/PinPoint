@@ -162,6 +162,6 @@ knowledge_base:
       - files: ".agents/skills/pinpoint-environment/SKILL.md"
         applyTo: "next.config.ts,.env.example,.env.ci,.github/workflows/**,vercel.json,playwright.config.ts"
       - files: ".agents/skills/pinpoint-pinballmap/SKILL.md"
-        applyTo: "src/lib/pinballmap/**,src/app/api/cron/pinballmap-*/**,src/app/**/integrations/pinballmap/**"
+        applyTo: "src/lib/pinballmap/**,src/app/api/cron/pinballmap-*/**,src/app/**/integrations/pinballmap/**,scripts/pinballmap/**,**/*pinballmap*,**/*Pinballmap*,**/*PinballMap*"
       - files: ".agents/skills/pinpoint-pr-workflow/SKILL.md"
         applyTo: "scripts/workflow/**"
