@@ -61,10 +61,10 @@ problems=$(jq -r '
       elif (($f.summary // "") | type) != "string" or ($f.summary // "") == "" then "finding \($i + 1) has no summary"
       elif ($f.round | type) != "number" or $f.round < 1 then "finding \($i + 1) has no round number"
       elif $f.disposition == "fixed" then
-        (if (($f.commit // "") | tostring | test("^[0-9a-f]{7,40}$")) then empty
+        (if ($f.commit | type) == "string" and ($f.commit | test("^[0-9a-f]{7,40}$")) then empty
          else "finding \($i + 1) is fixed but names no commit" end)
       elif $f.disposition == "declined" then
-        (if (($f.reason // "") | tostring | test("\\S")) then empty
+        (if ($f.reason | type) == "string" and ($f.reason | test("\\S")) then empty
          else "finding \($i + 1) is declined without a reason" end)
       else "finding \($i + 1) is neither fixed nor declined" end
   end' <<< "$findings")

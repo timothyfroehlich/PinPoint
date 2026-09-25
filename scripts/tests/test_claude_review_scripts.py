@@ -332,6 +332,32 @@ def test_dry_run_prints_the_record_without_posting(tmp_path: Path) -> None:
             id="declined-without-reason",
         ),
         pytest.param(
+            [
+                {
+                    "round": 1,
+                    "file": "a",
+                    "summary": "s",
+                    "disposition": "declined",
+                    "reason": [],
+                }
+            ],
+            "finding 1 is declined without a reason",
+            id="declined-with-non-string-reason",
+        ),
+        pytest.param(
+            [
+                {
+                    "round": 1,
+                    "file": "a",
+                    "summary": "s",
+                    "disposition": "fixed",
+                    "commit": ["abcdef1"],
+                }
+            ],
+            "finding 1 is fixed but names no commit",
+            id="fixed-with-non-string-commit",
+        ),
+        pytest.param(
             [{"round": 1, "file": "a", "summary": "s"}],
             "finding 1 is neither fixed nor declined",
             id="open-finding",
