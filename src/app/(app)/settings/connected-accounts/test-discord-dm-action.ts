@@ -11,6 +11,11 @@ export type TestDmResult =
   | { ok: true }
   | {
       ok: false;
+      reason: "no_shared_server";
+      inviteUrl: string | null;
+    }
+  | {
+      ok: false;
       reason:
         | "not_authenticated"
         | "not_linked"
@@ -46,6 +51,13 @@ export async function testDiscordDmAction(): Promise<TestDmResult> {
   if (result.ok) return { ok: true };
   if (result.reason === "not_configured") {
     return { ok: false, reason: "not_configured" };
+  }
+  if (result.reason === "no_shared_server") {
+    return {
+      ok: false,
+      reason: "no_shared_server",
+      inviteUrl: config.inviteLink,
+    };
   }
   return { ok: false, reason: result.reason };
 }
