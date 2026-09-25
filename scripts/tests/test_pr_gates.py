@@ -1,9 +1,10 @@
-"""Regression tests for the merge gate's two review checkers.
+"""Regression tests for the merge gate's three review checkers.
 
-Gate 3 passes when EITHER checker covers the exact head: CodeRabbit's native approval,
-or Codex's evidence (native approval, exact-head finding review, trusted clean comment,
-or trusted reaction witness). `_review_summary` is the
-one JSON document every consumer reads; its label is one of four words.
+Gate 3 passes when ANY checker covers the exact head: a Claude review record posted by
+the owner (spec pr-lifecycle-monitoring §8.18), CodeRabbit's native approval, or
+Codex's evidence (native approval, exact-head finding review, trusted clean comment,
+or trusted reaction witness). `_review_summary` is the one JSON document every
+consumer reads; its label is one of four words.
 """
 
 import json
@@ -89,6 +90,23 @@ def manual_review_request(
         "user": {"login": login},
         "body": f"@codex review\n<!-- pinpoint-codex-review-head: {sha} -->",
         "created_at": created_at,
+    }
+
+
+def claude_review_record(
+    sha: str = HEAD_SHA,
+    *,
+    level: str = "medium",
+    login: str = "acme",
+    updated_at: str = "2026-08-22T12:10:00Z",
+    prefix: str = "",
+) -> dict:
+    return {
+        "user": {"login": login},
+        "body": f"{prefix}<!-- pinpoint-claude-review: {sha} level={level} -->\n"
+        "## Claude Code review\n\nNo findings.",
+        "created_at": updated_at,
+        "updated_at": updated_at,
     }
 
 
@@ -211,7 +229,13 @@ def review_summary(env: dict, *, cwd: Path | None = None) -> dict:
 
 
 def verdicts(summary: dict) -> dict[str, str]:
-    return {name: record["verdict"] for name, record in summary["checkers"].items()}
+    """CodeRabbit and Codex verdicts. The Claude checker is asserted directly by the
+    review-record tests, so the older fixtures need not spell out its "none"."""
+    return {
+        name: record["verdict"]
+        for name, record in summary["checkers"].items()
+        if name != "claude"
+    }
 
 
 # ---------------------------------------------------------------------------------
@@ -394,8 +418,8 @@ def test_delayed_old_head_review_does_not_override_current_native_approval() -> 
 
 
 def test_local_review_markers_are_not_evidence() -> None:
-    # Only CodeRabbit and Codex cover a head. The retired local-review markers, even
-    # posted by the owner and pinned to head, are not coverage; a PR reviewed that way
+    # The retired pre-2026-09-24 local-review markers are not the Claude review
+    # record's marker, so even    # posted by the owner and pinned to head, are not coverage; a PR reviewed that way
     # merges only through merge-pr.sh --force at Tim's direction.
     comments = [
         {
@@ -416,7 +440,8 @@ def test_local_review_markers_are_not_evidence() -> None:
         summary = review_summary(env)
     assert result.returncode == 1, result.stdout
     assert summary["label"] == "not reviewed"
-    assert set(summary["checkers"]) == {"coderabbit", "codex"}
+    assert set(summary["checkers"]) == {"claude", "coderabbit", "codex"}
+    assert summary["checkers"]["claude"]["verdict"] == "none"
     assert "merge-pr.sh --force" in result.stdout
 
 
@@ -619,9 +644,8 @@ def test_stale_codex_approval_reports_both_commits_and_the_request_remedy() -> N
         f"Codex: newest evidence names {OTHER_SHA[:7]}, head is {HEAD_SHA[:7]}"
         in result.stdout
     )
-    assert "request-codex-review.sh 123 once instead" in result.stdout
-    assert "`@coderabbitai review` once for this head" in result.stdout
-    assert "just promoted from draft" in result.stdout
+    assert "record-claude-review.sh 123" in result.stdout
+    assert "already requested" not in result.stdout
     assert summary["label"] == "stale review"
 
 
@@ -663,6 +687,7 @@ def test_current_head_review_request_is_pending_not_recommended_again() -> None:
     assert "already requested" in result.stdout
     assert "do not request the same head again" in result.stdout
     assert "request-codex-review.sh" not in result.stdout
+    assert "record-claude-review.sh 123" in result.stdout
 
 
 @pytest.mark.parametrize(
@@ -680,7 +705,8 @@ def test_old_or_untrusted_review_request_does_not_mark_current_head_requested(
         summary = review_summary(env)
     assert result.returncode == 1, result.stdout
     assert summary["codex_request_pending"] is False
-    assert "request-codex-review.sh 123 once instead" in result.stdout
+    assert "already requested" not in result.stdout
+    assert "record-claude-review.sh 123" in result.stdout
 
 
 @pytest.mark.parametrize("state", ["DISMISSED", "PENDING", "UNKNOWN"])
@@ -762,7 +788,7 @@ def test_review_summary_shape() -> None:
         "unresolved_threads",
     }
     assert summary["head"] == HEAD_SHA
-    assert set(summary["checkers"]) == {"coderabbit", "codex"}
+    assert set(summary["checkers"]) == {"claude", "coderabbit", "codex"}
     coverage = summary["coverage"]
     assert (coverage["sha"], coverage["reviewer"], coverage["detail"]) == (
         HEAD_SHA,
@@ -771,6 +797,104 @@ def test_review_summary_shape() -> None:
     )
     assert coverage["at"] == "2026-08-22T12:00:00Z"
     assert coverage["summary"] == "Codex review summary"
+
+
+# ---------------------------------------------------------------------------------
+# The Claude review record (spec pr-lifecycle-monitoring §8)
+# ---------------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("level", ["low", "medium", "high"])
+def test_owner_review_record_of_head_passes(level: str) -> None:
+    with gate_env(comment_pages=[[claude_review_record(level=level)]]) as env:
+        result = run_gate("check_review_happened", env)
+        summary = review_summary(env)
+    assert result.returncode == 0, result.stdout
+    assert (
+        f"PASS: reviewed: Claude Code review ({level}) covers head SHA {HEAD_SHA[:7]}"
+        in result.stdout
+    )
+    assert summary["label"] == "approved"
+    coverage = summary["coverage"]
+    assert (coverage["checker"], coverage["form"], coverage["level"]) == (
+        "claude",
+        "review_record",
+        level,
+    )
+    assert coverage["detail"] == "LOCAL_REVIEW"
+
+
+@pytest.mark.parametrize(
+    "record",
+    [
+        pytest.param(claude_review_record(login="someone-else"), id="not-the-owner"),
+        pytest.param(claude_review_record(level="max"), id="unknown-level"),
+        pytest.param(claude_review_record(HEAD_SHA[:10]), id="short-sha"),
+        pytest.param(claude_review_record(prefix="quoted:\n"), id="marker-not-first"),
+    ],
+)
+def test_malformed_or_untrusted_review_record_does_not_cover(record: dict) -> None:
+    with gate_env(comment_pages=[[record]]) as env:
+        result = run_gate("check_review_happened", env)
+        summary = review_summary(env)
+    assert result.returncode == 1, result.stdout
+    assert summary["label"] == "not reviewed"
+    assert summary["checkers"]["claude"]["verdict"] == "none"
+
+
+def test_review_record_of_an_older_head_is_stale() -> None:
+    with gate_env(comment_pages=[[claude_review_record(OTHER_SHA)]]) as env:
+        result = run_gate("check_review_happened", env)
+        summary = review_summary(env)
+    assert result.returncode == 1, result.stdout
+    assert summary["label"] == "stale review"
+    assert summary["checkers"]["claude"]["verdict"] == "stale"
+    assert (
+        f"Claude review: newest evidence names {OTHER_SHA[:7]}, head is {HEAD_SHA[:7]}"
+        in result.stdout
+    )
+    assert "record-claude-review.sh 123" in result.stdout
+
+
+def test_newer_record_of_an_older_head_does_not_hide_the_head_record() -> None:
+    records = [
+        claude_review_record(updated_at="2026-08-22T12:00:00Z"),
+        claude_review_record(OTHER_SHA, updated_at="2026-08-22T13:00:00Z"),
+    ]
+    with gate_env(comment_pages=[records]) as env:
+        summary = review_summary(env)
+    assert summary["label"] == "approved"
+    assert summary["coverage"]["checker"] == "claude"
+
+
+def test_review_record_takes_precedence_over_coderabbit() -> None:
+    with gate_env(
+        review_pages=[[codex_review(login=CODERABBIT_BOT)]],
+        comment_pages=[[claude_review_record()]],
+    ) as env:
+        summary = review_summary(env)
+    assert summary["coverage"]["checker"] == "claude"
+
+
+def test_review_record_covers_despite_coderabbit_changes_requested() -> None:
+    with gate_env(
+        review_pages=[[codex_review(login=CODERABBIT_BOT, state="CHANGES_REQUESTED")]],
+        comment_pages=[[claude_review_record()]],
+    ) as env:
+        summary = review_summary(env)
+    assert summary["label"] == "approved"
+    assert summary["checkers"]["coderabbit"]["verdict"] == "changes_requested"
+
+
+def test_review_record_does_not_override_unresolved_threads_gate() -> None:
+    with gate_env(
+        comment_pages=[[claude_review_record()]],
+        threads=[thread(resolved=False, author="acme")],
+    ) as env:
+        review = run_gate("check_review_happened", env)
+        threads = run_gate("check_unresolved_threads", env)
+    assert review.returncode == 0, review.stdout
+    assert threads.returncode == 1, threads.stdout
 
 
 # ---------------------------------------------------------------------------------
@@ -1034,6 +1158,40 @@ def test_pure_merge_from_main_inherits_coderabbit_approval() -> None:
         f"CodeRabbit approved head SHA {head_sha[:7]} (inherited from {approved_sha[:7]}; pure merge from main)"
         in run.stdout
     )
+
+
+def test_pure_merge_from_main_inherits_review_record() -> None:
+    with git_repo_with_merge() as (repo, reviewed_sha, head_sha):
+        with gate_env(
+            comment_pages=[[claude_review_record(reviewed_sha)]],
+            head_sha=head_sha,
+        ) as env:
+            summary = review_summary(env, cwd=repo)
+            run = run_gate("check_review_happened", env, cwd=repo)
+
+    assert summary["label"] == "approved"
+    assert summary["coverage"]["checker"] == "claude"
+    assert summary["coverage"]["inherited_from"] == reviewed_sha
+    assert run.returncode == 0
+    assert (
+        f"Claude Code review (medium) covers head SHA {head_sha[:7]} "
+        f"(inherited from {reviewed_sha[:7]}; pure merge from main)" in run.stdout
+    )
+
+
+def test_review_record_is_not_inherited_across_feature_commits() -> None:
+    with git_repo_with_merge(extra_feature_commit=True) as (
+        repo,
+        reviewed_sha,
+        head_sha,
+    ):
+        with gate_env(
+            comment_pages=[[claude_review_record(reviewed_sha)]],
+            head_sha=head_sha,
+        ) as env:
+            summary = review_summary(env, cwd=repo)
+    assert summary["label"] == "stale review"
+    assert summary["checkers"]["claude"]["verdict"] == "stale"
 
 
 def test_pure_merge_from_main_inherits_codex_native_approval() -> None:
