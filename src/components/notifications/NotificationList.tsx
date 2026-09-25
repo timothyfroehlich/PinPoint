@@ -77,6 +77,10 @@ export function NotificationList({
         return `New comment on ${issueId}`;
       case "mentioned":
         return `Mentioned in ${issueId}`;
+      case "pinballmap_comment":
+        return n.machineInitials
+          ? `Pinball Map comment on ${n.machineInitials}`
+          : "New Pinball Map comment";
       default:
         return "New notification";
     }

@@ -2,6 +2,12 @@ import "server-only";
 import { and, eq, inArray, isNotNull } from "drizzle-orm";
 
 import { log } from "~/lib/logger";
+import {
+  dispatchNotification,
+  getChannels,
+  planNotification,
+  type DeliveryPlan,
+} from "~/lib/notifications/dispatch";
 import { db } from "~/server/db";
 import {
   machines,
@@ -9,6 +15,7 @@ import {
   pinballmapState,
   timelineEvents,
 } from "~/server/db/schema";
+import { pinballmapCommenterName } from "./comment-conversion";
 import type { PbmCondition, PbmLmx } from "./types";
 
 /**
@@ -27,6 +34,11 @@ import type { PbmCondition, PbmLmx } from "./types";
  *
  * A copy is dated with the comment's own Pinball Map timestamp, so a
  * historical backfill lands where it happened rather than at import time.
+ *
+ * Each new copy notifies the owner and watchers of its machine (spec 7.4,
+ * 7.7): one notification per copy, so someone watching two covering machines
+ * hears about each. In-app rows are written with the copies; email and Discord
+ * go out after the import commits.
  */
 
 /** A timeline copy this run created. */
@@ -39,6 +51,8 @@ export interface ImportedCommentCopy {
    * receives only because its coverage changed, are false.
    */
   isNew: boolean;
+  /** The copy's timeline event; identifies its notifications (spec 7.7). */
+  timelineEventId: string;
 }
 
 export interface CommentImportResult {
@@ -95,7 +109,12 @@ function datedConditions(lmxes: readonly PbmLmx[]): DatedCondition[] {
  * tracked (a lineup must never be attributed to the wrong venue).
  */
 export async function importPinballMapComments(): Promise<CommentImportResult> {
-  return db.transaction(async (tx) => {
+  // Resolved before the transaction: the Discord channel reads its config
+  // through a Vault RPC, which must not run inside one (CORE-ARCH-011).
+  const channels = await getChannels();
+  const deliveries: DeliveryPlan["deliveries"] = [];
+
+  const result = await db.transaction(async (tx) => {
     // Row lock: serializes the backfill decision against a concurrent import
     // and against a configuration change swapping the location underneath.
     const [state] = await tx
@@ -143,6 +162,8 @@ export async function importPinballMapComments(): Promise<CommentImportResult> {
         : await tx
             .select({
               id: machines.id,
+              name: machines.name,
+              initials: machines.initials,
               pinballmapMachineId: machines.pinballmapMachineId,
             })
             .from(machines)
@@ -181,6 +202,7 @@ export async function importPinballMapComments(): Promise<CommentImportResult> {
         .values(batch)
         .onConflictDoNothing()
         .returning({
+          id: timelineEvents.id,
           machineId: timelineEvents.machineId,
           eventData: timelineEvents.eventData,
         });
@@ -196,7 +218,37 @@ export async function importPinballMapComments(): Promise<CommentImportResult> {
           machineId: row.machineId,
           conditionId,
           isNew: !backfill && newlyObserved.has(conditionId),
+          timelineEventId: row.id,
         });
+      }
+    }
+
+    const newCopies = copies.filter((copy) => copy.isNew);
+    if (newCopies.length > 0) {
+      const machineById = new Map(covering.map((m) => [m.id, m]));
+      const conditionById = new Map(
+        conditions.map(({ condition }) => [condition.id, condition])
+      );
+      for (const copy of newCopies) {
+        const condition = conditionById.get(copy.conditionId);
+        const machine = machineById.get(copy.machineId);
+        if (!condition) continue;
+        const plan = await planNotification(
+          {
+            type: "pinballmap_comment",
+            resourceType: "machine",
+            resourceId: copy.machineId,
+            machineName: machine?.name,
+            machineInitials: machine?.initials,
+            commentContent: condition.comment,
+            actorName: pinballmapCommenterName(condition.username),
+            pinballmapLocationId: locationId,
+            eventId: copy.timelineEventId,
+          },
+          tx,
+          channels
+        );
+        deliveries.push(...plan.deliveries);
       }
     }
 
@@ -209,6 +261,9 @@ export async function importPinballMapComments(): Promise<CommentImportResult> {
 
     return { commentsObserved: newlyObserved.size, copies, backfill };
   });
+
+  await dispatchNotification({ deliveries });
+  return result;
 }
 
 /**

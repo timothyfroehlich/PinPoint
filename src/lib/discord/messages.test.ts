@@ -42,6 +42,30 @@ describe("formatDiscordMessage", () => {
     expect(out).toContain("https://app.example.com/m/MM");
   });
 
+  it("renders a Pinball Map comment linked to the machine timeline, with attribution", () => {
+    const out = formatDiscordMessage({
+      type: "pinballmap_comment",
+      siteUrl: "https://app.example.com",
+      resourceType: "machine",
+      machineName: "Godzilla (Premium)",
+      machineInitials: "GDZ2",
+      commenterName: "pbm_user",
+      commentContent: "Left flipper weak\nneeds a coil sleeve",
+      pinballmapLocationId: 26454,
+      recipientReason: "machine_watcher",
+    });
+
+    expect(out).toBe(
+      [
+        "**[Godzilla (Premium)](https://app.example.com/m/GDZ2/timeline) — pbm\\_user commented on Pinball Map**",
+        "[via Pinball Map](https://pinballmap.com/map/?by_location_id=26454) · You’re watching this machine",
+        "",
+        "> Left flipper weak",
+        "> needs a coil sleeve",
+      ].join("\n")
+    );
+  });
+
   it("falls back to the machine list when initials are missing", () => {
     const out = formatDiscordMessage({
       type: "machine_ownership_changed",

@@ -35,6 +35,9 @@ export interface NotificationPreferencesData {
   emailWatchNewIssuesGlobal: boolean;
   inAppWatchNewIssuesGlobal: boolean;
   discordWatchNewIssuesGlobal: boolean;
+  emailNotifyOnPinballMapComment: boolean;
+  inAppNotifyOnPinballMapComment: boolean;
+  discordNotifyOnPinballMapComment: boolean;
 }
 
 interface NotificationPreferencesFormProps {
@@ -119,6 +122,9 @@ export function NotificationPreferencesForm({
     preferences.emailWatchNewIssuesGlobal,
     preferences.inAppWatchNewIssuesGlobal,
     preferences.discordWatchNewIssuesGlobal,
+    preferences.emailNotifyOnPinballMapComment,
+    preferences.inAppNotifyOnPinballMapComment,
+    preferences.discordNotifyOnPinballMapComment,
   ]);
 
   const showDiscord = discordIntegrationEnabled;
@@ -215,6 +221,20 @@ export function NotificationPreferencesForm({
         email: preferences.emailNotifyOnMentioned,
         inApp: preferences.inAppNotifyOnMentioned,
         discord: preferences.discordNotifyOnMentioned,
+      },
+    },
+    {
+      label: "Pinball Map Comments",
+      description: "New Pinball Map comments on machines you own or watch",
+      ids: {
+        email: "emailNotifyOnPinballMapComment",
+        inApp: "inAppNotifyOnPinballMapComment",
+        discord: "discordNotifyOnPinballMapComment",
+      },
+      defaults: {
+        email: preferences.emailNotifyOnPinballMapComment,
+        inApp: preferences.inAppNotifyOnPinballMapComment,
+        discord: preferences.discordNotifyOnPinballMapComment,
       },
     },
   ] as const;

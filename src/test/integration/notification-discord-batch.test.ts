@@ -46,6 +46,8 @@ function discordPreferenceEnabled(
       return prefs.discordNotifyOnStatusChange;
     case "machine_ownership_changed":
       return true;
+    case "pinballmap_comment":
+      return prefs.discordNotifyOnPinballMapComment;
   }
 }
 

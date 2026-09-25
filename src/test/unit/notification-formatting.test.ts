@@ -12,6 +12,42 @@ vi.mock("~/lib/url", () => ({
 }));
 
 describe("Notification Formatting", () => {
+  describe("pinballmap_comment email", () => {
+    it("names the cabinet in the subject so shared-entry copies differ", () => {
+      expect(
+        getEmailSubject(
+          "pinballmap_comment",
+          undefined,
+          "Godzilla (Premium)",
+          undefined,
+          undefined,
+          "GDZ2"
+        )
+      ).toBe("[Godzilla (Premium)] New Pinball Map comment on GDZ2");
+    });
+
+    it("escapes the comment, attributes the location, and links the timeline", () => {
+      const html = getEmailHtml({
+        type: "pinballmap_comment",
+        machineName: "Godzilla (Premium)",
+        machineInitials: "GDZ2",
+        commentContent: "<b>tilt</b> & bob\nsticks",
+        actorName: "pbm_user",
+        pinballmapLocationId: 26454,
+      });
+
+      expect(html).toContain("&lt;b&gt;tilt&lt;/b&gt; &amp; bob<br/>sticks");
+      expect(html).not.toContain("<b>tilt</b>");
+      expect(html).toContain(
+        '<a href="https://pinballmap.com/map/?by_location_id=26454">Pinball Map</a>'
+      );
+      expect(html).toContain(
+        '<a href="http://test.com/m/GDZ2/timeline">View Timeline</a>'
+      );
+      expect(html).toContain("Pinball Map Comment");
+    });
+  });
+
   describe("getEmailHtml", () => {
     it("should sanitize comment content to prevent XSS", () => {
       const maliciousContent =
