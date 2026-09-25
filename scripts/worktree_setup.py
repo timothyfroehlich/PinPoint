@@ -15,6 +15,7 @@ import platform
 import re
 import shlex
 import shutil
+import socket
 import stat
 import subprocess
 import sys
@@ -189,9 +190,40 @@ def load_manifest() -> dict[str, int]:
         return {}
 
 
+def slot_ports_in_use(slot: int) -> bool:
+    """Whether the slot's Supabase API or DB port still accepts a connection.
+
+    Checks localhost and, when PINPOINT_REMOTE_SUPABASE_HOST is set, the remote
+    host, which publishes a remote-backend stack's ports on its own address.
+    """
+    ports = PortConfig(slot=slot, project_id="", name="")
+    hosts = ["localhost"]
+    remote_host = os.environ.get(REMOTE_HOST_ENV_KEY, "").strip()
+    if remote_host:
+        hosts.append(remote_host)
+    for host in hosts:
+        for port in (ports.api_port, ports.db_port):
+            try:
+                with socket.create_connection((host, port), timeout=1):
+                    return True
+            except OSError:
+                pass
+    return False
+
+
 def prune_manifest(slots: dict[str, int]) -> dict[str, int]:
-    """Remove entries whose worktree directories no longer exist."""
-    return {path: slot for path, slot in slots.items() if Path(path).is_dir()}
+    """Drop entries whose worktree is gone and whose Supabase ports are closed.
+
+    A worktree removed without the cleanup hook (`rm -rf`), or one whose stack
+    runs on the remote host, can leave a stack holding the slot's ports. Handing
+    that slot to a new worktree would make its `supabase start` fail on busy
+    ports, so the entry stays until the orphan sweep reclaims the stack.
+    """
+    return {
+        path: slot
+        for path, slot in slots.items()
+        if Path(path).is_dir() or slot_ports_in_use(slot)
+    }
 
 
 MAX_SLOT = 96  # slot 96 → offset 9600 → max port 63921 (within integration test range)
@@ -236,16 +268,11 @@ def allocate_slot(worktree_path: str) -> int:
         fcntl.flock(f, fcntl.LOCK_EX)
         try:
             slots = _read_manifest_locked(f)
-            pruned = prune_manifest(slots)
-            changed = pruned != slots
-            slots = pruned
-
-            # Return existing slot (persist prune if needed)
             if worktree_path in slots:
-                if changed:
-                    _write_manifest_locked(f, slots)
                 return slots[worktree_path]
 
+            # Prune only when allocating: it may probe ports on gone entries.
+            slots = prune_manifest(slots)
             used = set(slots.values()) | reserved_slots()
             for candidate in range(1, MAX_SLOT + 1):
                 if candidate not in used:

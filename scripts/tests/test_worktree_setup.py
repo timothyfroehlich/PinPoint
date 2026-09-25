@@ -1,5 +1,6 @@
 """Unit tests for worktree_setup.py env merging and port allocation."""
 
+import contextlib
 import json
 import re
 import shutil
@@ -609,9 +610,25 @@ class TestManifest:
     def _use_tmp_manifest(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """Redirect MANIFEST_PATH to a temp directory for each test."""
+        """Redirect MANIFEST_PATH to a temp directory for each test.
+
+        Also fake the port probe: a real one would see whatever Supabase stacks
+        the developer has running. Ports in `self.open_ports` answer; the rest
+        refuse.
+        """
         self.manifest_path = tmp_path / "worktree-slots.json"
         monkeypatch.setattr("worktree_setup.MANIFEST_PATH", self.manifest_path)
+        self.open_ports: set[tuple[str, int]] = set()
+        self.probed: list[tuple[str, int]] = []
+
+        def fake_connect(address: tuple[str, int], timeout: float) -> object:
+            assert timeout == 1
+            self.probed.append(address)
+            if address in self.open_ports:
+                return contextlib.nullcontext()
+            raise ConnectionRefusedError(address)
+
+        monkeypatch.setattr("worktree_setup.socket.create_connection", fake_connect)
 
     def test_load_creates_file_if_missing(self) -> None:
         assert not self.manifest_path.exists()
@@ -654,6 +671,38 @@ class TestManifest:
         wt3.mkdir()
         slot3 = allocate_slot(str(wt3))
         assert slot3 == 1  # Reuses the freed slot
+
+    def test_gone_worktree_with_closed_ports_is_pruned(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("PINPOINT_REMOTE_SUPABASE_HOST", "bazzite")
+
+        assert prune_manifest({"/gone/worktree": 2}) == {}
+        # Slot 2: API 54521, DB 54522, on this machine and on the remote host.
+        assert self.probed == [
+            ("localhost", 54521),
+            ("localhost", 54522),
+            ("bazzite", 54521),
+            ("bazzite", 54522),
+        ]
+
+    def test_gone_worktree_whose_stack_still_answers_keeps_its_slot(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """rm -rf skips cleanup; the stack still holds the slot's ports."""
+        monkeypatch.setenv("PINPOINT_REMOTE_SUPABASE_HOST", "bazzite")
+        gone = tmp_path / "gone"
+        gone.mkdir()
+        assert allocate_slot(str(gone)) == 1
+        gone.rmdir()
+        self.open_ports.add(("bazzite", 54422))  # slot 1's DB port, remote
+
+        fresh = tmp_path / "fresh"
+        fresh.mkdir()
+
+        assert allocate_slot(str(fresh)) == 2
+        slots = json.loads(self.manifest_path.read_text())["slots"]
+        assert slots == {str(gone): 1, str(fresh): 2}
 
     def test_allocate_skips_reserved_slots(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
