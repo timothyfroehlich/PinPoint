@@ -183,7 +183,7 @@ Replacing the tracked location is a rare, near-never operation — PinPoint trac
 | 7.5 explicit Convert to issue | No comment import or conversion action exists | PP-o355.4; shared-comment identity PP-o355.54.14 |
 | 10.9 comment re-marking on location change | No comment import exists | PP-o355.4 (import); permanent mark-on-location-change after |
 | 3.6–3.8 additional outbound actions | Client methods exist, but no app actions expose venue-lineup confirmation or Insider Connected changes | PP-o355.58 (confirm lineup, needs `/fleet` base PP-o355.7.1), PP-o355.59 (Insider Connected); condition-comment posting deferred (PP-o355.57) |
-| 8.2, 8.4–8.6 per-member account linking | Writes use one admin-provisioned operator credential; no member linking, relink state, or link prompt exists, and the sign-in exchange misreads Pinball Map's current response and disabled-account status | PP-o355.6 |
+| 8.2, 8.4–8.6 per-member account linking | Writes use one admin-provisioned operator credential; no member linking, relink state, or link prompt exists | PP-o355.6 |
 
 ---
 
