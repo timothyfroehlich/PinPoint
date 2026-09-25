@@ -1,2 +1,0 @@
-ALTER TABLE "notification_preferences" ADD COLUMN "discord_notice_lease_id" uuid;--> statement-breakpoint
-ALTER TABLE "notification_preferences" ADD COLUMN "discord_notice_lease_expires_at" timestamp with time zone;

@@ -35,13 +35,13 @@ Documentation sources:
 
 All endpoints use HTTP GET (except `submitScore` and event controls which use POST) against the base URL `https://www.iscored.info/api/`.
 
-| Endpoint                                  | Method | Params / Query                        | Description                                                                                                                                                    |
-| :---------------------------------------- | :----: | :------------------------------------ | :------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `/api/{user}`                             |  GET   | None                                  | Returns gameroom metadata and an array of all configured games with GameIDs, visual CSS styling, logo/background paths, tags, and visibility flags.            |
-| `/api/{user}/getAllScores`                |  GET   | None                                  | Returns an object with a `scores` array containing all high scores across all games in the gameroom (`{ "scores": [...] }`). Does not currently support `max`. |
-| `/api/{user}/{gameNameOrId}`              |  GET   | `?max={N}`                            | Returns top scores for a single game. Accepts either the numeric `gameID` or URL-encoded `gameName`. `max` defaults to 10 (`max=0` returns all).               |
-| `/api/{user}/{gameNameOrId}/submitScore`  |  POST  | `playerName`, `score` (body or query) | Submits a score. Player name max 25 chars. Score must be integer (or ms for time). Denied if player's existing score is higher.                                |
-| `/?mode=public&user={user}&game={gameID}` |  GET   | Standard web URL                      | Public mobile score-entry page for players scanning a QR code at the machine.                                                                                  |
+| Endpoint                                  | Method | Params / Query                        | Description                                                                                                                                         |
+| :---------------------------------------- | :----: | :------------------------------------ | :-------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/api/{user}`                             |  GET   | None                                  | Returns gameroom metadata and an array of all configured games with GameIDs, visual CSS styling, logo/background paths, tags, and visibility flags. |
+| `/api/{user}/getAllScores`                |  GET   | None                                  | Returns a flat array of all high scores across all games in the gameroom. Does not currently support `max`.                                         |
+| `/api/{user}/{gameNameOrId}`              |  GET   | `?max={N}`                            | Returns top scores for a single game. Accepts either the numeric `gameID` or URL-encoded `gameName`. `max` defaults to 10 (`max=0` returns all).    |
+| `/api/{user}/{gameNameOrId}/submitScore`  |  POST  | `playerName`, `score` (body or query) | Submits a score. Player name max 25 chars. Score must be integer (or ms for time). Denied if player's existing score is higher.                     |
+| `/?mode=public&user={user}&game={gameID}` |  GET   | Standard web URL                      | Public mobile score-entry page for players scanning a QR code at the machine.                                                                       |
 
 ---
 
@@ -142,25 +142,23 @@ Testing verified that both `/api/Apcscore/79220` and `/api/Apcscore/Domino%20(Go
 
 ### 3.3 All Scores Batch (`GET /api/Apcscore/getAllScores`)
 
-Returns an object with a `scores` array containing entries across the whole gameroom:
+Returns an array of score entries across the whole gameroom:
 
 ```json
-{
-  "scores": [
-    {
-      "name": "Evan S",
-      "id": 340428,
-      "game": 79615,
-      "event": null,
-      "gameName": "Slick Chick (Gottlieb 1963)",
-      "date": "2026-08-09 15:55:04",
-      "wins": 0,
-      "losses": 0,
-      "email": "player@example.com",
-      "score": 1076
-    }
-  ]
-}
+[
+  {
+    "name": "Evan S",
+    "id": 340428,
+    "game": 79615,
+    "event": null,
+    "gameName": "Slick Chick (Gottlieb 1963)",
+    "date": "2026-08-09 15:55:04",
+    "wins": 0,
+    "losses": 0,
+    "email": "evansstaggs@gmail.com",
+    "score": 1076
+  }
+]
 ```
 
 > [!CAUTION]

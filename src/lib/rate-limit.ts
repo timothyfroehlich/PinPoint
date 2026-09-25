@@ -22,7 +22,6 @@ import { Redis } from "@upstash/redis";
 import { headers } from "next/headers";
 import { createHash } from "node:crypto";
 import { log } from "~/lib/logger";
-import { errorMessage } from "~/lib/errors";
 import { maskEmail } from "~/lib/logging/mask";
 import { BLOB_CONFIG } from "~/lib/blob/config";
 
@@ -314,9 +313,9 @@ function makeLimitChecker(
 
     const normalizedKey =
       keyType === "email"
-        ? hashIdentifier(limitKey.trim().toLowerCase())
+        ? limitKey.toLowerCase()
         : keyType === "user"
-          ? hashIdentifier(limitKey)
+          ? hashUserId(limitKey)
           : limitKey;
 
     try {
@@ -328,7 +327,7 @@ function makeLimitChecker(
         reset: result.reset,
       };
     } catch (error) {
-      const err = errorMessage(error, "Unknown");
+      const err = error instanceof Error ? error.message : "Unknown";
       log.error(
         keyType === "email"
           ? { err, email: maskEmail(limitKey) }
@@ -402,11 +401,11 @@ export const checkPublicIssueLimit = makeLimitChecker(
 );
 
 /**
- * Hashes an identifier to a pseudonymous string so raw user identifiers
+ * Hashes a user ID to a pseudonymous string so raw user identifiers
  * are never stored in external rate-limit caches (CORE-SEC-007).
  */
-function hashIdentifier(identifier: string): string {
-  return createHash("sha256").update(identifier, "utf8").digest("hex");
+function hashUserId(userId: string): string {
+  return createHash("sha256").update(userId, "utf8").digest("hex");
 }
 
 /**

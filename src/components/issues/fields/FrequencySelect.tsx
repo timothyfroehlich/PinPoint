@@ -9,7 +9,7 @@ import {
   SelectValue,
 } from "~/components/ui/select";
 import { FREQUENCY_CONFIG } from "~/lib/issues/status";
-import { ISSUE_FREQUENCY_VALUES, type IssueFrequency } from "~/lib/types";
+import { type IssueFrequency } from "~/lib/types";
 
 interface FrequencySelectProps {
   value: IssueFrequency | "";
@@ -21,7 +21,11 @@ interface FrequencySelectProps {
   testId?: string;
 }
 
-const frequencyOptions: readonly IssueFrequency[] = ISSUE_FREQUENCY_VALUES;
+const frequencyOptions: IssueFrequency[] = [
+  "intermittent",
+  "frequent",
+  "constant",
+];
 
 export function FrequencySelect({
   value,

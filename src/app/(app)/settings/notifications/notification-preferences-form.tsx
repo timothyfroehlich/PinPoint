@@ -131,8 +131,8 @@ export function NotificationPreferencesForm({
 
   const NEW_ISSUE_ROWS = [
     {
-      label: "Owned or Watched Machines",
-      description: "New issues on machines you own or watch",
+      label: "Owned Machines",
+      description: "New issues on machines you own",
       ids: {
         email: "emailNotifyOnNewIssue",
         inApp: "inAppNotifyOnNewIssue",

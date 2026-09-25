@@ -8,7 +8,7 @@ import {
 } from "~/app/(app)/issues/actions";
 import { FrequencySelect } from "~/components/issues/fields/FrequencySelect";
 import { MetadataDrawer } from "~/components/issues/fields/MetadataDrawer";
-import { ISSUE_FREQUENCY_VALUES, type IssueFrequency } from "~/lib/types";
+import { type IssueFrequency } from "~/lib/types";
 import { IssueBadge } from "~/components/issues/IssueBadge";
 import { FREQUENCY_CONFIG } from "~/lib/issues/status";
 import {
@@ -33,7 +33,11 @@ interface UpdateIssueFrequencyFormProps {
   compact?: boolean;
 }
 
-const frequencyOptions: readonly IssueFrequency[] = ISSUE_FREQUENCY_VALUES;
+const frequencyOptions: IssueFrequency[] = [
+  "intermittent",
+  "frequent",
+  "constant",
+];
 
 export function UpdateIssueFrequencyForm({
   issueId,

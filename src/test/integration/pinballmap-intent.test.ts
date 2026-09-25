@@ -396,10 +396,7 @@ describe("setPinballmapIntentAction (PGlite)", () => {
       intentFd(machine.id, "maybe")
     );
     expect(res.ok).toBe(false);
-    if (!res.ok) {
-      expect(res.code).toBe("VALIDATION");
-      expect(res.message).toBe("Unknown lineup setting");
-    }
+    if (!res.ok) expect(res.code).toBe("VALIDATION");
   });
 });
 

@@ -19,19 +19,16 @@ export interface EmailParams {
    * Idempotency key sent to Resend as the `Idempotency-Key` header. A retried
    * post-commit dispatch that produces the same key is deduped by Resend (24h
    * window) so the recipient is not double-emailed. Derived deterministically
-   * per recipient + resource + notification type + event occurrence.
+   * per recipient + resource + notification type. (PP-2053.7)
    */
   idempotencyKey?: string | undefined;
 }
 
-export type EmailResult =
-  | { success: true; data?: unknown; error?: never; reason?: never }
-  | {
-      success: false;
-      error: unknown;
-      data?: never;
-      reason: "transient" | "permanent" | "skipped";
-    };
+export interface EmailResult {
+  success: boolean;
+  data?: unknown;
+  error?: unknown;
+}
 
 /**
  * Email transport interface
@@ -93,13 +90,6 @@ export class ResendTransport implements EmailTransport {
         // is the sole report site, so a failure is captured exactly once.
         // (PP-okmw, PP-l4fd)
         return {
-          reason:
-            error.name === "concurrent_idempotent_requests" ||
-            error.statusCode === 429 ||
-            error.statusCode === null ||
-            error.statusCode >= 500
-              ? "transient"
-              : "permanent",
           success: false,
           error: new Error(`Resend rejected send: ${error.message}`, {
             cause: error,
@@ -110,7 +100,7 @@ export class ResendTransport implements EmailTransport {
       return { success: true, data };
     } catch (error) {
       // Reporting is done once by sendEmail on any !success result. (PP-l4fd)
-      return { success: false, error, reason: "transient" };
+      return { success: false, error };
     }
   }
 }
@@ -156,7 +146,7 @@ export class SMTPTransport implements EmailTransport {
       return { success: true, data: info };
     } catch (error) {
       // Reporting is done once by sendEmail on any !success result. (PP-l4fd)
-      return { success: false, error, reason: "transient" };
+      return { success: false, error };
     }
   }
 }

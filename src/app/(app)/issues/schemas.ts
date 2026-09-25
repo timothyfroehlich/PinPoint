@@ -6,7 +6,6 @@
  */
 
 import { z } from "zod";
-import { ISSUE_FREQUENCY_VALUES } from "~/lib/types";
 import { ISSUE_STATUS_VALUES } from "~/lib/issues/status";
 
 const uuidish = z
@@ -53,7 +52,7 @@ export const updateIssuePrioritySchema = z.object({
  */
 export const updateIssueFrequencySchema = z.object({
   issueId: uuidish,
-  frequency: z.enum(ISSUE_FREQUENCY_VALUES, {
+  frequency: z.enum(["intermittent", "frequent", "constant"], {
     message: "Invalid frequency level",
   }),
 });

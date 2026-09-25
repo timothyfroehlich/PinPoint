@@ -1,12 +1,8 @@
 import { describe, it, expect } from "vitest";
-import {
-  formatDiscordImprovementNotice,
-  formatDiscordMessage,
-  formatDiscordWelcomeMessage,
-} from "./messages";
+import { formatDiscordMessage } from "./messages";
 
 describe("formatDiscordMessage", () => {
-  it("renders the compact issue-first assignment DM", () => {
+  it("renders an issue_assigned DM with title, formatted id, and footer link", () => {
     const out = formatDiscordMessage({
       type: "issue_assigned",
       siteUrl: "https://app.example.com",
@@ -14,28 +10,29 @@ describe("formatDiscordMessage", () => {
       formattedIssueId: "AFM-07",
       resourceType: "issue",
       machineName: "Attack From Mars",
-      actorName: "Paul",
-      recipientReason: "assignee",
-      severity: "unplayable",
+      machineInitials: undefined,
+      newStatus: undefined,
+      commentContent: undefined,
     });
 
     expect(out).toContain("AFM-07");
     expect(out).toContain("Pop bumper not working");
     expect(out).toContain("assigned");
     expect(out).toContain("https://app.example.com/m/AFM/i/7");
-    expect(out).toBe(
-      "**[AFM-07](https://app.example.com/m/AFM/i/7) assigned to you**\nPop bumper not working · Attack From Mars · Unplayable\nAssigned by Paul"
-    );
+    expect(out).toMatch(/Manage notifications.*\/settings\/notifications/i);
   });
 
   it("renders a machine_ownership_changed DM scoped to the machine", () => {
     const out = formatDiscordMessage({
       type: "machine_ownership_changed",
       siteUrl: "https://app.example.com",
+      issueTitle: undefined,
+      formattedIssueId: undefined,
       resourceType: "machine",
       machineName: "Medieval Madness",
       machineInitials: "MM",
-      ownershipChange: "added",
+      newStatus: undefined,
+      commentContent: undefined,
     });
 
     expect(out).toContain("Medieval Madness");
@@ -46,28 +43,16 @@ describe("formatDiscordMessage", () => {
     const out = formatDiscordMessage({
       type: "machine_ownership_changed",
       siteUrl: "https://app.example.com",
+      issueTitle: undefined,
+      formattedIssueId: undefined,
       resourceType: "machine",
       machineName: "Medieval Madness",
       machineInitials: undefined,
-      ownershipChange: "removed",
+      newStatus: undefined,
+      commentContent: undefined,
     });
 
-    expect(out).toContain("[Medieval Madness](https://app.example.com/m)");
-  });
-
-  it("preserves the machine link when a long ownership label is truncated", () => {
-    const out = formatDiscordMessage({
-      type: "machine_ownership_changed",
-      siteUrl: "https://app.example.com",
-      resourceType: "machine",
-      machineName: "x".repeat(5000),
-      machineInitials: "MM",
-      ownershipChange: "removed",
-    });
-
-    expect(out).toHaveLength(2000);
-    expect(out).toContain("…](https://app.example.com/m/MM)**");
-    expect(out).toContain("You won’t receive owner notifications");
+    expect(out).toContain("https://app.example.com/m\n");
   });
 
   it("falls back to the issue list when the formatted id is unparseable", () => {
@@ -79,14 +64,12 @@ describe("formatDiscordMessage", () => {
       formattedIssueId: "X-1",
       resourceType: "issue",
       machineName: undefined,
-      actorName: "Paul",
-      recipientReason: "issue_watcher",
+      machineInitials: undefined,
+      newStatus: undefined,
       commentContent: undefined,
-      commentId: "comment-1",
-      attachmentCount: 0,
     });
 
-    expect(out).toContain("https://app.example.com/issues#comment-comment-1");
+    expect(out).toContain("https://app.example.com/issues\n");
   });
 
   it("includes new status when issue_status_changed", () => {
@@ -97,31 +80,13 @@ describe("formatDiscordMessage", () => {
       formattedIssueId: "TWD-03",
       resourceType: "issue",
       machineName: "Walking Dead",
-      actorName: "Paul",
-      recipientReason: "issue_watcher",
-      oldStatus: "confirmed",
-      newStatus: "in_progress",
+      machineInitials: undefined,
+      newStatus: "Resolved",
+      commentContent: undefined,
     });
 
-    expect(out).toBe(
-      "**[TWD-03](https://app.example.com/m/TWD/i/3) moved to In Progress**\nFlippers weak · Walking Dead · previously Confirmed\nChanged by Paul · You’re watching this issue"
-    );
-  });
-
-  it("uses Anonymous when an actor name is unavailable", () => {
-    const out = formatDiscordMessage({
-      type: "issue_assigned",
-      siteUrl: "https://app.example.com",
-      issueTitle: "Flippers weak",
-      formattedIssueId: "TWD-03",
-      resourceType: "issue",
-      machineName: "Walking Dead",
-      actorName: undefined,
-      recipientReason: "assignee",
-      severity: "minor",
-    });
-
-    expect(out).toContain("Assigned by Anonymous");
+    expect(out).toContain("TWD-03");
+    expect(out).toContain("Resolved");
   });
 
   it("breaks @everyone / @here so they don't ping", () => {
@@ -132,9 +97,9 @@ describe("formatDiscordMessage", () => {
       formattedIssueId: "X-1",
       resourceType: "issue",
       machineName: undefined,
-      actorName: "Paul",
-      recipientReason: "assignee",
-      severity: undefined,
+      machineInitials: undefined,
+      newStatus: undefined,
+      commentContent: undefined,
     });
 
     expect(out).not.toMatch(/(^|\s)@everyone(\s|$)/);
@@ -156,9 +121,9 @@ describe("formatDiscordMessage", () => {
       formattedIssueId: "X-1",
       resourceType: "issue",
       machineName: undefined,
-      actorName: "Paul",
-      recipientReason: "assignee",
-      severity: undefined,
+      machineInitials: undefined,
+      newStatus: undefined,
+      commentContent: undefined,
     });
 
     // None of the raw mention forms render — every `<` gets a ZWSP after it.
@@ -178,13 +143,19 @@ describe("formatDiscordMessage", () => {
       formattedIssueId: "X-1",
       resourceType: "issue",
       machineName: undefined,
-      actorName: "Paul",
-      recipientReason: "assignee",
-      severity: undefined,
+      machineInitials: undefined,
+      newStatus: undefined,
+      commentContent: undefined,
     });
 
     // None of the raw Markdown markers should appear unescaped in the body.
-    for (const marker of ["_italic_", "`code`", "~strike~", "|spoiler|"]) {
+    for (const marker of [
+      "**",
+      "_italic_",
+      "`code`",
+      "~strike~",
+      "|spoiler|",
+    ]) {
       expect(out).not.toContain(marker);
     }
     // Backslash-escaped versions should be present.
@@ -192,7 +163,7 @@ describe("formatDiscordMessage", () => {
     expect(out).toContain("\\_italic\\_");
   });
 
-  it("uses the issue id as the only routine link", () => {
+  it("does not escape characters in the link or footer", () => {
     const out = formatDiscordMessage({
       type: "new_issue",
       siteUrl: "https://app.example.com",
@@ -200,16 +171,14 @@ describe("formatDiscordMessage", () => {
       formattedIssueId: "WW-01",
       resourceType: "issue",
       machineName: "Whitewater",
-      actorName: "Paul",
-      recipientReason: "machine_owner",
-      severity: "minor",
-      frequency: "intermittent",
+      machineInitials: undefined,
+      newStatus: undefined,
+      commentContent: undefined,
     });
 
     expect(out).toContain("https://app.example.com/m/WW/i/1");
-    expect(out).not.toContain("settings/notifications");
-    expect(out).toBe(
-      "**[WW-01](https://app.example.com/m/WW/i/1) — ok**\nWhitewater · Minor · Intermittent\nReported by Paul · You own this machine"
+    expect(out).toContain(
+      "Manage notifications: https://app.example.com/settings/notifications"
     );
   });
 
@@ -217,139 +186,21 @@ describe("formatDiscordMessage", () => {
     const out = formatDiscordMessage({
       type: "new_comment",
       siteUrl: "https://app.example.com",
-      issueTitle: "Long investigation",
+      issueTitle: "x".repeat(5000),
       formattedIssueId: "XX-12",
       resourceType: "issue",
       machineName: undefined,
-      actorName: "Paul",
-      recipientReason: "issue_watcher",
-      commentContent: "x".repeat(5000),
-      commentId: "comment-12",
-      attachmentCount: 0,
+      machineInitials: undefined,
+      newStatus: undefined,
+      commentContent: undefined,
     });
 
     expect(out.length).toBeLessThanOrEqual(2000);
-    expect(out).toContain(
-      "https://app.example.com/m/XX/i/12#comment-comment-12"
-    );
-    expect(out).toContain("…");
-  });
-
-  it("preserves the attachment notice when comment context is oversized", () => {
-    const out = formatDiscordMessage({
-      type: "new_comment",
-      siteUrl: "https://app.example.com",
-      issueTitle: "t".repeat(5000),
-      formattedIssueId: "XX-14",
-      resourceType: "issue",
-      machineName: "m".repeat(5000),
-      actorName: "a".repeat(5000),
-      recipientReason: "issue_watcher",
-      commentContent: "A useful comment that must be budgeted.",
-      commentId: "comment-14",
-      attachmentCount: 2,
-    });
-
-    expect(out.length).toBeLessThanOrEqual(2000);
-    expect(out).toContain(
-      "https://app.example.com/m/XX/i/14#comment-comment-14"
-    );
-    expect(out).toContain("Added 2 photos.");
-    expect(out.endsWith("Added 2 photos.")).toBe(true);
-  });
-
-  it("clamps non-comment messages to Discord's 2000-character limit", () => {
-    const out = formatDiscordMessage({
-      type: "new_issue",
-      siteUrl: "https://app.example.com",
-      issueTitle: "x".repeat(5000),
-      formattedIssueId: "XX-13",
-      resourceType: "issue",
-      machineName: "A very long machine name",
-      actorName: "Paul",
-      recipientReason: "machine_owner",
-      severity: "minor",
-      frequency: "intermittent",
-    });
-
-    expect(out).toHaveLength(2000);
-    expect(out).toContain("https://app.example.com/m/XX/i/13");
-    expect(out.endsWith("…")).toBe(true);
-  });
-
-  it("includes comment text and targets the specific comment", () => {
-    const out = formatDiscordMessage({
-      type: "new_comment",
-      siteUrl: "https://app.example.com",
-      issueTitle: "Ball stuck in trough",
-      formattedIssueId: "AFM-07",
-      resourceType: "issue",
-      machineName: "Attack From Mars",
-      actorName: "Paul",
-      recipientReason: "issue_watcher",
-      commentContent: "Reseated the connector.\nPlease test again.",
-      commentId: "123",
-      attachmentCount: 0,
-    });
-
-    expect(out).toContain(
-      "**[AFM-07](https://app.example.com/m/AFM/i/7#comment-123) — Paul commented**"
-    );
-    expect(out).toContain(
-      "Ball stuck in trough · Attack From Mars\nYou’re watching this issue"
-    );
-    expect(out).toContain("> Reseated the connector.\n> Please test again.");
-  });
-
-  it("describes an attachment-only mention", () => {
-    const out = formatDiscordMessage({
-      type: "mentioned",
-      siteUrl: "https://app.example.com",
-      issueTitle: "Ball stuck in trough",
-      formattedIssueId: "AFM-07",
-      resourceType: "issue",
-      machineName: "Attack From Mars",
-      actorName: "Paul",
-      recipientReason: "mentioned",
-      commentContent: "",
-      commentId: "124",
-      attachmentCount: 2,
-    });
-
-    expect(out).toContain(
-      "**[AFM-07](https://app.example.com/m/AFM/i/7#comment-124) — Paul mentioned you**"
-    );
-    expect(out).toContain("Added 2 photos — open the issue to view.");
-  });
-
-  it("preserves an attachment-only notice when context is oversized", () => {
-    const out = formatDiscordMessage({
-      type: "new_comment",
-      siteUrl: "https://app.example.com",
-      issueTitle: "t".repeat(5000),
-      formattedIssueId: "XX-15",
-      resourceType: "issue",
-      machineName: "m".repeat(5000),
-      actorName: "a".repeat(5000),
-      recipientReason: "issue_watcher",
-      commentContent: "",
-      commentId: "comment-15",
-      attachmentCount: 3,
-    });
-
-    expect(out.length).toBeLessThanOrEqual(2000);
-    expect(out).toContain(
-      "https://app.example.com/m/XX/i/15#comment-comment-15"
-    );
-    expect(out.endsWith("Added 3 photos — open the issue to view.")).toBe(true);
-  });
-
-  it("formats onboarding and rollout settings links", () => {
-    expect(formatDiscordWelcomeMessage("https://app.example.com")).toContain(
-      "[Review notification settings](https://app.example.com/settings/notifications)"
-    );
-    expect(formatDiscordImprovementNotice("https://app.example.com")).toContain(
-      "[Review or disable Discord notifications](https://app.example.com/settings/notifications)"
-    );
+    // Link and footer both preserved.
+    expect(out).toContain("https://app.example.com/m/XX/i/12");
+    expect(out).toContain("/settings/notifications");
+    // Body was truncated — should end the body section with an ellipsis
+    // before the link starts.
+    expect(out).toMatch(/…\nhttps:\/\/app\.example\.com\/m\/XX\/i\/12/);
   });
 });

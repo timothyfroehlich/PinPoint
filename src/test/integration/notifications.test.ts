@@ -6,7 +6,6 @@ import {
   type DeliveryPlan,
 } from "~/lib/notifications";
 import { sendEmail } from "~/lib/email/client";
-import { emailChannel } from "~/lib/notifications/channels/email-channel";
 import { log } from "~/lib/logger";
 import { reportError } from "~/lib/observability/report-error";
 import type * as ReportErrorModule from "~/lib/observability/report-error";
@@ -29,7 +28,7 @@ import {
 
 // Only mock external services (Email)
 vi.mock("~/lib/email/client", () => ({
-  sendEmail: vi.fn().mockResolvedValue({ success: true }),
+  sendEmail: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock("~/lib/logger", () => ({
@@ -82,7 +81,6 @@ describe("notification delivery (planNotification + dispatchNotification)", () =
         {
           type: "new_comment",
           resourceId: issue.id,
-          eventId: issue.id,
           resourceType: "issue",
           actorId: actor.id,
           includeActor: false, // Explicitly test actor exclusion
@@ -132,7 +130,6 @@ describe("notification delivery (planNotification + dispatchNotification)", () =
         {
           type: "new_comment",
           resourceId: issue.id,
-          eventId: issue.id,
           resourceType: "issue",
           actorId: actor.id,
           commentContent: "Test comment",
@@ -198,7 +195,6 @@ describe("notification delivery (planNotification + dispatchNotification)", () =
         {
           type: "new_comment",
           resourceId: issue.id,
-          eventId: issue.id,
           resourceType: "issue",
           actorId: actor.id,
           includeActor: false, // Exclude actor to test recipient preferences
@@ -261,7 +257,6 @@ describe("notification delivery (planNotification + dispatchNotification)", () =
         {
           type: "new_comment",
           resourceId: issue.id,
-          eventId: issue.id,
           resourceType: "issue",
           actorId: actor.id,
           includeActor: false, // Exclude actor to test recipient granular toggles
@@ -324,7 +319,6 @@ describe("notification delivery (planNotification + dispatchNotification)", () =
         {
           type: "new_comment",
           resourceId: issue.id,
-          eventId: issue.id,
           resourceType: "issue",
           actorId: actor.id,
           commentContent: "Test comment",
@@ -383,7 +377,6 @@ describe("notification delivery (planNotification + dispatchNotification)", () =
         {
           type: "issue_assigned",
           resourceId: issue.id,
-          eventId: issue.id,
           resourceType: "issue",
           actorId: actor.id,
           includeActor: false,
@@ -434,7 +427,6 @@ describe("notification delivery (planNotification + dispatchNotification)", () =
         {
           type: "issue_assigned",
           resourceId: issue.id,
-          eventId: issue.id,
           resourceType: "issue",
           actorId: actor.id,
           includeActor: false,
@@ -490,7 +482,6 @@ describe("notification delivery (planNotification + dispatchNotification)", () =
         {
           type: "new_comment",
           resourceId: issue.id,
-          eventId: issue.id,
           resourceType: "issue",
           actorId: actor.id,
           includeActor: true,
@@ -542,7 +533,6 @@ describe("notification delivery (planNotification + dispatchNotification)", () =
         {
           type: "new_comment",
           resourceId: issue.id,
-          eventId: issue.id,
           resourceType: "issue",
           actorId: actor.id,
           includeActor: true,
@@ -597,7 +587,6 @@ describe("notification delivery (planNotification + dispatchNotification)", () =
         {
           type: "new_issue",
           resourceId: issue.id,
-          eventId: issue.id,
           resourceType: "issue",
           issueTitle: "New Machine Issue",
           machineName: machine.name,
@@ -654,7 +643,6 @@ describe("notification delivery (planNotification + dispatchNotification)", () =
         {
           type: "new_issue",
           resourceId: issue.id,
-          eventId: issue.id,
           resourceType: "issue",
           issueTitle: issue.title,
           machineName: machine.name,
@@ -702,11 +690,10 @@ describe("notification delivery (planNotification + dispatchNotification)", () =
         {
           type: "machine_ownership_changed",
           resourceId: machine.id,
-          eventId: machine.id,
           resourceType: "machine",
           actorId: actor.id,
           machineName: machine.name,
-          ownershipChange: "added",
+          newStatus: "added",
           additionalRecipientIds: [recipient.id],
         },
         asDbOrTx(db)
@@ -760,12 +747,11 @@ describe("notification delivery (planNotification + dispatchNotification)", () =
         {
           type: "machine_ownership_changed",
           resourceId: machine.id,
-          eventId: machine.id,
           resourceType: "machine",
           actorId: admin.id,
           includeActor: false,
           machineName: machine.name,
-          ownershipChange: "added",
+          newStatus: "added",
           additionalRecipientIds: [newOwner.id],
         },
         asDbOrTx(db)
@@ -811,7 +797,6 @@ describe("notification delivery (planNotification + dispatchNotification)", () =
           {
             type: "mentioned",
             resourceId: issue.id,
-            eventId: issue.id,
             resourceType: "issue",
             actorId: actor.id,
             includeActor: false,
@@ -865,7 +850,6 @@ describe("notification delivery (planNotification + dispatchNotification)", () =
           {
             type: "mentioned",
             resourceId: issue.id,
-            eventId: issue.id,
             resourceType: "issue",
             actorId: actor.id,
             includeActor: false,
@@ -931,7 +915,6 @@ describe("notification delivery (planNotification + dispatchNotification)", () =
         {
           type: "new_comment",
           resourceId: issue.id,
-          eventId: issue.id,
           resourceType: "issue",
           actorId: actor.id,
           includeActor: false,
@@ -994,7 +977,6 @@ describe("notification delivery (planNotification + dispatchNotification)", () =
         {
           type: "new_comment",
           resourceId: issue.id,
-          eventId: issue.id,
           resourceType: "issue",
           actorId: actor.id,
           includeActor: false,
@@ -1055,35 +1037,6 @@ describe("notification delivery (planNotification + dispatchNotification)", () =
       // A returned {ok:false} is an expected outcome, not a thrown bug.
       expect(reportError).not.toHaveBeenCalled();
     });
-
-    it("passes a rejected email result through to the dispatcher", async () => {
-      vi.mocked(sendEmail).mockResolvedValueOnce({
-        success: false,
-        error: new Error("Resend rejected send"),
-        reason: "permanent",
-      });
-      await dispatchNotification({
-        deliveries: [
-          () =>
-            emailChannel.deliver({
-              userId: "recipient-1",
-              type: "new_issue",
-              resourceId: "issue-1",
-              resourceType: "issue",
-              eventId: "event-1",
-              email: "recipient@example.com",
-              discordUserId: null,
-              recipientReason: "issue_watcher",
-            }),
-        ],
-      });
-
-      expect(log.warn).toHaveBeenCalledWith(
-        { reason: "permanent", action: "notifications.dispatch.fanout" },
-        "Notification delivery failed"
-      );
-      expect(reportError).not.toHaveBeenCalled();
-    });
   });
 
   // PP-pfyf: email idempotency key must include a per-event discriminator so
@@ -1091,40 +1044,6 @@ describe("notification delivery (planNotification + dispatchNotification)", () =
   // genuine retry of the SAME comment keeps the same key (allowing Resend to
   // dedup it). Without the discriminator, Resend drops the second email silently.
   describe("email idempotency key (PP-pfyf)", () => {
-    it.each([
-      ["issue_status_changed", "issue", "new"],
-      ["machine_ownership_changed", "machine", "added"],
-    ] as const)(
-      "uses distinct keys for repeated %s occurrences",
-      async (type, resourceType, state) => {
-        const context = {
-          userId: "recipient-1",
-          type,
-          resourceId: "resource-1",
-          resourceType,
-          email: "recipient@example.com",
-          discordUserId: null,
-          recipientReason: "issue_watcher" as const,
-          ...(type === "issue_status_changed"
-            ? { newStatus: state }
-            : { ownershipChange: state }),
-        };
-
-        await emailChannel.deliver({ ...context, eventId: "occurrence-1" });
-        await emailChannel.deliver({ ...context, eventId: "occurrence-2" });
-
-        const [first, second] = vi
-          .mocked(sendEmail)
-          .mock.calls.map(([params]) => params);
-        expect(first?.idempotencyKey).toBe(
-          `notif:${resourceType}:resource-1:${type}:recipient-1:occurrence-1`
-        );
-        expect(second?.idempotencyKey).toBe(
-          `notif:${resourceType}:resource-1:${type}:recipient-1:occurrence-2`
-        );
-      }
-    );
-
     it("two distinct comments on the same issue produce distinct idempotency keys", async () => {
       const db = await getTestDb();
 
@@ -1231,7 +1150,7 @@ describe("notification delivery (planNotification + dispatchNotification)", () =
             type: "new_comment",
             resourceId: issue.id,
             resourceType: "issue",
-            commentContent: "Same comment",
+            commentContent: "Same comment, first attempt",
             eventId: SAME_EVENT_ID,
           },
           asDbOrTx(db)
@@ -1243,7 +1162,7 @@ describe("notification delivery (planNotification + dispatchNotification)", () =
             type: "new_comment",
             resourceId: issue.id,
             resourceType: "issue",
-            commentContent: "Same comment",
+            commentContent: "Same comment, retry attempt",
             eventId: SAME_EVENT_ID,
           },
           asDbOrTx(db)
@@ -1258,7 +1177,6 @@ describe("notification delivery (planNotification + dispatchNotification)", () =
       ];
       // Both calls must produce the SAME key — Resend uses it to dedup the retry.
       expect(firstCall[0].idempotencyKey).toBe(secondCall[0].idempotencyKey);
-      expect(firstCall[0]).toEqual(secondCall[0]);
     });
   });
 });

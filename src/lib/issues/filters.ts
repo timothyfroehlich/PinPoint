@@ -4,7 +4,6 @@ import type {
   IssuePriority,
   IssueFrequency,
 } from "~/lib/types";
-import { ISSUE_FREQUENCY_VALUES } from "~/lib/types";
 import { ALL_ISSUE_STATUSES } from "~/lib/issues/status";
 
 export const ISSUE_PAGE_SIZES = [15, 25, 50] as const;
@@ -39,7 +38,11 @@ const VALID_SEVERITIES: IssueSeverity[] = [
   "unplayable",
 ];
 const VALID_PRIORITIES: IssuePriority[] = ["low", "medium", "high"];
-const VALID_FREQUENCIES: readonly IssueFrequency[] = ISSUE_FREQUENCY_VALUES;
+const VALID_FREQUENCIES: IssueFrequency[] = [
+  "intermittent",
+  "frequent",
+  "constant",
+];
 
 /**
  * Parses URLSearchParams into a type-safe IssueFilters object

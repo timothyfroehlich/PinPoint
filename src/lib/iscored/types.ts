@@ -38,11 +38,3 @@ export interface IscoredScore {
   date: string;
   rank: number;
 }
-
-/**
- * Game summary record from iScored gameroom list (`/api/{user}`).
- */
-export interface IscoredGame {
-  gameId: string;
-  gameName: string;
-}
