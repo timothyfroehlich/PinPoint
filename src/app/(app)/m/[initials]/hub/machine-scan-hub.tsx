@@ -123,7 +123,7 @@ function ArtworkBand({
         fill
         sizes="390px"
         unoptimized
-        className="scale-125 object-cover blur-2xl brightness-50"
+        className="object-cover blur-2xl brightness-50"
       />
       <Image
         src={artwork.url}
