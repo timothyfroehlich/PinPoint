@@ -62,6 +62,7 @@ export const getMachineForLayout = cache(async (initials: string) => {
             opdbImageUrl: true,
             opdbImageWidth: true,
             opdbImageHeight: true,
+            icEligible: true,
           },
         },
       },

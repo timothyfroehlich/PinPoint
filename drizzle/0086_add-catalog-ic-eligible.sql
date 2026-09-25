@@ -1,0 +1,1 @@
+ALTER TABLE "pinballmap_catalog" ADD COLUMN "ic_eligible" boolean DEFAULT false NOT NULL;

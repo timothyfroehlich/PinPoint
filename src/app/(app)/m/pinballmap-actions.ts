@@ -24,7 +24,11 @@ import {
   retireAbandonmentForLmx,
 } from "~/lib/pinballmap/abandoned-listings";
 import { getPinballMapWriteCredentials } from "~/lib/pinballmap/credentials";
-import { withLmxAdded, withLmxRemoved } from "~/lib/pinballmap/snapshot-edit";
+import {
+  withLmxAdded,
+  withLmxIcEnabled,
+  withLmxRemoved,
+} from "~/lib/pinballmap/snapshot-edit";
 import { getPinballMapClient } from "~/lib/pinballmap/client";
 import type { LocationSnapshot, PbmWriteFailure } from "~/lib/pinballmap/types";
 import { log } from "~/lib/logger";
@@ -1007,6 +1011,174 @@ export async function removeMachineFromPinballMapAction(
   } finally {
     await releasePinballMapMutationLease(lease.id);
   }
+}
+
+export type SetInsiderConnectedResult = Result<
+  { icEnabled: boolean },
+  | "VALIDATION"
+  | "UNAUTHORIZED"
+  | "NOT_FOUND"
+  | "NOT_PROVISIONED"
+  | "PBM_REJECTED"
+  // The write may or may not have landed. Not retried; the lineup is re-read
+  // so the page shows what Pinball Map actually has (spec 3.8).
+  | "PBM_UNCLEAR"
+  | "SERVER"
+>;
+
+/**
+ * Turn an entry's Insider Connected setting on or off on Pinball Map (spec 3.8).
+ *
+ * Offered only where `deriveInsiderConnectedView` shows the line: intent On,
+ * entry present, title eligible in Pinball Map's catalog. Each of those is
+ * re-checked here against stored state, because the page that sent the request
+ * may be stale.
+ *
+ * **Sends the target value, never a flip.** PBM's `ic_toggle` inverts the
+ * setting when called without `ic_enabled`, so a flip from a stale page or a
+ * double click would undo what the person asked for. With the target in the
+ * request the write is idempotent. A stored setting that already matches the
+ * target skips the call entirely.
+ *
+ * **An unclear outcome is never retried.** A transient failure (network error,
+ * 5xx) or a success body with no IC state may or may not have changed the
+ * setting. Retrying is safe only because the write is a setter, but the spec
+ * asks for the actual state instead: the lineup is re-read through the shared
+ * refresh allowance and the page repaints with what Pinball Map reports.
+ *
+ * Same ordering as the other pushes: credential decrypt and PBM call before the
+ * transaction (CORE-ARCH-011).
+ */
+export async function setInsiderConnectedAction(
+  _prev: SetInsiderConnectedResult | undefined,
+  formData: FormData
+): Promise<SetInsiderConnectedResult> {
+  const rawEnabled = formData.get("enabled");
+  const enabled =
+    rawEnabled === "true" ? true : rawEnabled === "false" ? false : null;
+  if (enabled === null)
+    return err("VALIDATION", "Unknown Insider Connected setting");
+
+  const authed = await authorizeListingAction(
+    formData,
+    "machines.pinballmap.push"
+  );
+  if (!authed.ok) return authed.result;
+  const { userId, machine } = authed;
+  const titleId = machine.pinballmapMachineId;
+  if (titleId === null)
+    return err("VALIDATION", "Machine isn't linked to a Pinball Map title yet");
+
+  if (machine.pinballmapIntent !== "on")
+    return err(
+      "VALIDATION",
+      "Insider Connected can only be changed while this machine is set On the lineup."
+    );
+
+  const state = await getPinballMapState();
+  if (state?.locationId === null || state?.locationId === undefined)
+    return err("SERVER", "Pinball Map isn't configured yet");
+  const locationId = state.locationId;
+  const lmx = state.snapshotJson
+    ? findLmxForMachine(state.snapshotJson, titleId)
+    : null;
+  if (!lmx)
+    return err(
+      "VALIDATION",
+      "This machine's entry is not on the location's lineup."
+    );
+
+  const catalogEntry = await getCatalogEntry(titleId);
+  if (!catalogEntry?.icEligible)
+    return err(
+      "VALIDATION",
+      "Pinball Map doesn't offer Insider Connected for this game."
+    );
+
+  // Already there — a stale page or a second click. Nothing to write.
+  if (lmx.icEnabled === enabled) return ok({ icEnabled: enabled });
+
+  // --- non-transactional effects, both BEFORE the transaction ---
+  const credentials = await getPinballMapWriteCredentials();
+  if (!credentials)
+    return err(
+      "NOT_PROVISIONED",
+      "No Pinball Map operator account is set up yet, so PinPoint can't write to Pinball Map."
+    );
+
+  const lease = await claimPinballMapMutationLease(
+    locationId,
+    state.configurationGeneration
+  );
+  if (!lease)
+    return err(
+      "SERVER",
+      "The tracked Pinball Map location is being changed. Reload the page and try again."
+    );
+
+  try {
+    const client = await getPinballMapClient();
+    const written = await client.setInsiderConnected({
+      credentials,
+      lmxId: lmx.id,
+      enabled,
+    });
+
+    if (!written.ok && written.reason !== "transient") {
+      log.error(
+        { reason: written.reason, action: "pinballmap.setInsiderConnected" },
+        "PinballMap Insider Connected change rejected"
+      );
+      return err("PBM_REJECTED", pbmWriteFailureMessage(written));
+    }
+
+    if (written.ok && written.icEnabled !== null) {
+      const reported = written.icEnabled;
+      // --- transaction: local state only ---
+      const committed = await db.transaction(async (tx) => {
+        if (!(await mutationLeaseOwnsLocation(tx, lease))) return false;
+        await editStoredSnapshot(tx, locationId, (snapshot) =>
+          withLmxIcEnabled(snapshot, lmx.id, reported)
+        );
+        return true;
+      });
+      if (!committed)
+        return err(
+          "SERVER",
+          "The tracked Pinball Map location changed while this change was running. Reload the page."
+        );
+      revalidatePath(`/m/${machine.initials}`);
+      // Same-title cabinets share the entry, so their pages show the same line.
+      revalidatePath("/m", "layout");
+      return ok({ icEnabled: reported });
+    }
+
+    log.warn(
+      {
+        lmxId: lmx.id,
+        machineId: machine.id,
+        action: "pinballmap.setInsiderConnected",
+      },
+      "PinballMap Insider Connected outcome unclear — re-reading the lineup instead of retrying"
+    );
+  } finally {
+    await releasePinballMapMutationLease(lease.id);
+  }
+
+  // Only the unclear outcome reaches here. Outside the lease: the refresh
+  // claims its own place at the sync chokepoint.
+  const refreshed = await syncLocationSnapshot({
+    updatedBy: userId,
+    trigger: "manual",
+  });
+  if (refreshed.ok) await reconcileAfterSync();
+  revalidatePath("/m", "layout");
+  return err(
+    "PBM_UNCLEAR",
+    refreshed.ok
+      ? "Pinball Map didn't confirm the change. The setting shown is what it reports now."
+      : "Pinball Map didn't confirm the change, and PinPoint couldn't re-read it. Refresh to see the current setting."
+  );
 }
 
 export type RemovalCommentCheckResult = Result<

@@ -22,6 +22,8 @@ import {
 import { listSurfacingAbandonedForMachine } from "~/lib/pinballmap/abandoned-listings";
 import { getCatalogEntry } from "~/lib/pinballmap/catalog";
 import { PinballmapListingControl } from "~/components/machines/PinballmapListingControl";
+import { PinballmapInsiderConnected } from "~/components/machines/PinballmapInsiderConnected";
+import { deriveInsiderConnectedView } from "~/lib/pinballmap/insider-connected";
 import { PinballmapAbandonedEntries } from "~/components/machines/PinballmapAbandonedEntries";
 import { getUnifiedUsers } from "~/lib/users/queries";
 import { getMachineForLayout } from "~/app/(app)/m/[initials]/_data";
@@ -179,6 +181,15 @@ export default async function MachineEditPage({
     siblings: sameTitle,
   });
 
+  // Shown only for an eligible title with intent On and its entry on the
+  // lineup (spec 3.8). Eligibility is the catalog's flag, joined by the loader.
+  const insiderConnectedView = deriveInsiderConnectedView({
+    listing: listingView,
+    pinballmapMachineId: machine.pinballmapMachineId,
+    icEligible: machine.pinballmapTitle?.icEligible ?? false,
+    snapshot,
+  });
+
   // Whether an operator credential exists at all — read off the two columns the
   // state row already carries, never by decrypting the token. Without one the
   // outbound writes cannot run, so Add / Remove are absent rather than present
@@ -324,6 +335,13 @@ export default async function MachineEditPage({
                 writeEnabled={writeEnabled}
                 modelName={pinballmapTitleName}
               />
+              {insiderConnectedView !== null ? (
+                <PinballmapInsiderConnected
+                  machineId={machine.id}
+                  view={insiderConnectedView}
+                  canChange={canPush && writeEnabled}
+                />
+              ) : null}
             </PinballmapDirtyGate>
           )}
 

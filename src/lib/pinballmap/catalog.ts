@@ -78,6 +78,7 @@ export async function refreshCatalog(): Promise<number> {
       opdbImageWidth: m.opdbImageWidth,
       opdbImageHeight: m.opdbImageHeight,
       machineGroupId: m.machineGroupId,
+      icEligible: m.icEligible,
       groupName:
         m.machineGroupId !== null
           ? (groupNames.get(m.machineGroupId) ?? null)
@@ -100,6 +101,7 @@ export async function refreshCatalog(): Promise<number> {
           opdbImageHeight: sql`excluded.opdb_image_height`,
           machineGroupId: sql`excluded.machine_group_id`,
           groupName: sql`excluded.group_name`,
+          icEligible: sql`excluded.ic_eligible`,
           refreshedAt: sql`excluded.refreshed_at`,
         },
       });

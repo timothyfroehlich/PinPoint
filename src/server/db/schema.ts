@@ -353,6 +353,11 @@ export const pinballmapCatalog = pgTable(
     // join. Null for standalone/ungrouped titles (most older machines).
     machineGroupId: integer("machine_group_id"),
     groupName: text("group_name"),
+    // PBM's own Insider Connected eligibility for the title (spec 3.8). An
+    // entry's `ic_enabled` cannot answer this: null there means "never set" on
+    // eligible and ineligible titles alike. False until the catalog refresh
+    // reports otherwise, so nothing is offered on a title PBM would refuse.
+    icEligible: boolean("ic_eligible").notNull().default(false),
     refreshedAt: timestamp("refreshed_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

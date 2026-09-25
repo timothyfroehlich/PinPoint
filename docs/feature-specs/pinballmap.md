@@ -179,7 +179,7 @@ Replacing the tracked location is a rare, near-never operation — PinPoint trac
 | 7.4 watcher notifications after baseline | No comment import or notification exists | PP-o355.4; shared-comment identity PP-o355.54.14 |
 | 7.5 explicit Convert to issue | No comment import or conversion action exists | PP-o355.4; shared-comment identity PP-o355.54.14 |
 | 10.9 comment re-marking on location change | No comment import exists | PP-o355.4 (import); permanent mark-on-location-change after |
-| 3.6–3.8 additional outbound actions | Client methods exist, but no app actions expose venue-lineup confirmation or Insider Connected changes | PP-o355.58 (confirm lineup, needs `/fleet` base PP-o355.7.1), PP-o355.59 (Insider Connected); condition-comment posting deferred (PP-o355.57) |
+| 3.6–3.7 lineup confirmation | The client method exists, but no app action exposes venue-lineup confirmation | PP-o355.58 (confirm lineup, needs `/fleet` base PP-o355.7.1); condition-comment posting deferred (PP-o355.57) |
 
 ---
 
