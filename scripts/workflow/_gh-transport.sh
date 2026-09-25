@@ -152,26 +152,19 @@ _gh_repo_slug() {
 }
 
 # Count unresolved threads from the proxy's review-thread route. GitHub has no public
-# REST endpoint for thread resolution; the Claude Code proxy serves one at
-# /pulls/{n}/ccr/review_threads. Its payload is read strictly: every thread must carry
-# a boolean resolution flag, and any other shape is an error, never a zero.
+# REST field for thread resolution; the Claude Code proxy serves
+# /pulls/{n}/ccr/review_threads, a top-level array with one
+# {resolved, outdated, path, line, comment_ids} object per thread. It is read strictly:
+# any other shape, or a thread whose `resolved` is not a boolean, is an error, never a
+# zero.
 _gh_rest_unresolved_thread_count() {
   local pr=$1 slug raw
   slug=$(_gh_rest_repo_slug) || return 1
   raw=$(gh api --paginate "repos/${slug}/pulls/${pr}/ccr/review_threads") || return 1
-  jq -s -e '
-    def threads:
-      if type == "array" then .
-      elif type == "object" then
-        (.review_threads // .reviewThreads // .threads // .nodes
-         // .data.repository.pullRequest.reviewThreads.nodes // error("unrecognized review_threads payload"))
-        | if type == "object" then (.nodes // error("unrecognized review_threads payload")) else . end
-      else error("unrecognized review_threads payload") end;
-    def resolved:
-      (if has("isResolved") then .isResolved
-       elif has("is_resolved") then .is_resolved
-       elif has("resolved") then .resolved
-       else null end)
-      | if type == "boolean" then . else error("review thread without a boolean resolution flag") end;
-    [ .[] | threads | .[] | resolved | select(. == false) ] | length' <<< "$raw"
+  jq -s '
+    [ .[]
+      | if type == "array" then .[] else error("review_threads page is not an array") end
+      | if (type == "object" and (.resolved | type) == "boolean") then .resolved
+        else error("review thread without a boolean resolved flag") end
+      | select(. == false) ] | length' <<< "$raw"
 }

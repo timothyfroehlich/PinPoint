@@ -56,6 +56,17 @@ def pull(*, mergeable: bool | None = True, labels: list[str] | None = None) -> d
     }
 
 
+def thread(*, resolved: object) -> dict:
+    """One element of the proxy's ccr/review_threads array (claude-toolbox#134)."""
+    return {
+        "resolved": resolved,
+        "outdated": False,
+        "path": "src/a.ts",
+        "line": 3,
+        "comment_ids": [1],
+    }
+
+
 APPROVAL = {
     "commit_id": HEAD_SHA,
     "state": "APPROVED",
@@ -205,7 +216,7 @@ def test_red_ci_blocks_and_drops_label_through_rest() -> None:
 
 
 def test_unresolved_thread_blocks() -> None:
-    threads = [{"id": "t1", "is_resolved": True}, {"id": "t2", "is_resolved": False}]
+    threads = [thread(resolved=True), thread(resolved=False)]
     with cloud_stub(threads=threads) as ctx:
         result, side = run(ctx, "--human")
 
@@ -225,7 +236,7 @@ def test_thread_route_failure_fails_closed() -> None:
 
 def test_unrecognized_thread_payload_fails_closed() -> None:
     # A thread without a boolean resolution flag must never count as resolved.
-    with cloud_stub(threads=[{"id": "t1", "state": "open"}]) as ctx:
+    with cloud_stub(threads=[thread(resolved="no")]) as ctx:
         result, side = run(ctx, "--human")
 
     assert result.returncode == 1
@@ -233,9 +244,18 @@ def test_unrecognized_thread_payload_fails_closed() -> None:
     assert side["merged"] is None
 
 
-def test_wrapped_thread_payload_is_read() -> None:
-    threads = {"review_threads": [{"isResolved": True}, {"isResolved": True}]}
-    with cloud_stub(threads=threads) as ctx:
+def test_wrapped_thread_payload_fails_closed() -> None:
+    # The route returns a top-level array; an object wrapper is an unknown shape.
+    with cloud_stub(threads={"review_threads": [thread(resolved=True)]}) as ctx:
+        result, side = run(ctx, "--human")
+
+    assert result.returncode == 1
+    assert "FAIL: threads: could not read review threads" in result.stdout
+    assert side["merged"] is None
+
+
+def test_resolved_threads_pass() -> None:
+    with cloud_stub(threads=[thread(resolved=True), thread(resolved=True)]) as ctx:
         result, _ = run(ctx, "--human")
 
     assert "PASS: threads: 0 unresolved review threads" in result.stdout
