@@ -25,6 +25,9 @@ Main worktree uses default ports (slot 0). All others get dynamically allocated 
 ## Scripts
 
 - **`worktree_setup.py`** — Called by post-checkout hook. Allocates ports, generates configs.
+- **`worktree_reap.py`** — Finds worktrees whose work already landed (merged PR at `HEAD`, or zero commits ahead with no PR) and removes them through `worktree_cleanup.py`; dry-run by default, `--apply` to act.
+- **`worktree_orphan_sweep.py`** — Reclaims what a worktree left behind after its directory is gone: orphan slot entries and Supabase containers, networks and volumes (local and remote); dry-run by default, `--apply` to act, exit `1` when Docker state is unknown.
+- **`supabase-stack.sh`** — Starts, stops, and reports this worktree's Supabase stack on its local or remote backend (`pnpm supabase:start|stop|status|use`); see `docs/runbooks/remote-supabase.md`.
 - **`worktree_cleanup.py`** — The complete teardown entry point for Claude, Codex, reap, and manual callers: `python3 scripts/worktree_cleanup.py <worktree-path>`. Claude uses `--claude-hook`; configure Codex cleanup as `python3 scripts/worktree_cleanup.py .`. It stops Supabase, removes volumes, removes/prunes the Git worktree, then releases the slot. Exit `0` means complete; `1` means anything else — a refusal (the main worktree, or a remote backend without `PINPOINT_REMOTE_DOCKER_HOST`), a failed removal, a missing target with residue, or unknown Docker state — and stderr says which. Never treat `1` as done.
 
 ## Python Toolchain & Testing

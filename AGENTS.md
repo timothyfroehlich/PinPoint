@@ -68,7 +68,7 @@ One-time install for tools the workflow scripts depend on:
 
 ### Worktrees & ports
 
-Each git worktree gets isolated Supabase ports automatically. The Husky `post-checkout` hook runs `scripts/worktree_setup.py`, which allocates a slot from `~/.config/pinpoint/worktree-slots.json` and generates read-only `supabase/config.toml`, `.env.local`, `.claude/launch.json`.
+Each git worktree gets isolated Supabase ports automatically. The Husky `post-checkout` hook runs `scripts/worktree_setup.py`, which allocates a slot from `~/.config/pinpoint/worktree-slots.json` and generates read-only `supabase/config.toml` and `.env.local`, plus `.claude/launch.json`.
 
 - **Create**: `git worktree add /path -b branch origin/main` — the hook handles the rest.
 - **Cleanup**: `python3 scripts/worktree_cleanup.py <worktree-path>` is the complete teardown command: it stops the pinned Supabase project, removes its volumes, unlocks/removes/prunes the Git worktree, then releases its slot. Claude's `WorktreeRemove` hook calls the same module via `--claude-hook`; configure Codex cleanup as `python3 scripts/worktree_cleanup.py .`. Plain `git worktree remove` or `rm -rf` bypasses it and leaks resources; `scripts/worktree_orphan_sweep.py --apply` reconciles those.

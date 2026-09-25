@@ -32,10 +32,6 @@
 #   }
 #   The hook derives `BRANCH = worktree-${NAME}` to match Claude Code's native
 #   pre-hook naming convention.
-#
-# TODO (Tim): If you ever want to invoke this script directly (not via the hook),
-#   run: chmod +x .claude/hooks/worktree-create.sh
-#   That chmod is auto-denied to subagents per CLAUDE.md.
 
 set -euo pipefail
 
@@ -73,8 +69,8 @@ else
   NAME="$NAME_FIELD"
 fi
 
-# Match Claude Code's pre-hook native naming so existing tooling (cleanup hook,
-# worktree manifest, orchestrator skill) continues to recognize the worktree.
+# Match Claude Code's native naming so existing tooling (the cleanup hook, the
+# slot manifest) keeps recognizing the worktree.
 BRANCH="worktree-${NAME}"
 
 if [ -n "$WORKTREE_PATH_FIELD" ]; then

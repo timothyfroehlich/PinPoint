@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
 """
-Worktree port setup — called by .husky/post-checkout.
+Worktree port setup — run by .husky/post-checkout on every branch checkout.
 
 Detects fresh worktrees and configures them with unique Supabase ports.
-Existing worktrees get their configs regenerated on branch switch.
-Not a CLI tool — no argparse, no subcommands. Operates on $PWD.
+Existing worktrees get their configs regenerated on branch switch. Also run
+directly as `python3 scripts/worktree_setup.py` (scripts/supabase-stack.sh
+does, to switch backends); it takes no arguments and operates on $PWD.
+
+Also holds the helpers worktree_cleanup.py, worktree_orphan_sweep.py and
+worktree_reap.py share.
 """
 
 import fcntl
