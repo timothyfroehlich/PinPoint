@@ -17,7 +17,9 @@ This script reconciles three sources of truth:
 - active git worktrees (`git worktree list --porcelain`)
 - slot manifest entries (`~/.config/pinpoint/worktree-slots.json`)
 - Docker resources with the `com.supabase.cli.project` label whose value
-  starts with `pinpoint-` (the prefix `derive_project_id` always emits)
+  starts with `pinpoint-` (the prefix `derive_project_id` always emits),
+  except Crabbox runner projects and stacks whose `com.supabase.cli.workdir`
+  label is another machine's path — on either daemon, those are never ours
 
 Defaults to dry-run; pass `--apply` to actually deallocate orphan slots and
 remove orphan Docker containers, networks and volumes.
@@ -243,14 +245,19 @@ def _run_docker(
     return result.stdout
 
 
-def _parse_name_project_pairs(stdout: str) -> list[tuple[str, str]]:
-    """Parse `name|project_id` lines, keeping only PinPoint-owned projects."""
-    pairs: list[tuple[str, str]] = []
+def _parse_rows(stdout: str) -> list[tuple[str, str, str]]:
+    """Parse `name|project_id[|workdir]` lines for PinPoint's non-Crabbox projects."""
+    rows: list[tuple[str, str, str]] = []
     for line in stdout.splitlines():
-        name, sep, project = line.partition("|")
-        if sep and project.startswith("pinpoint-"):
-            pairs.append((name, project))
-    return pairs
+        name, sep, rest = line.partition("|")
+        project, _, workdir = rest.partition("|")
+        name, project, workdir = name.strip(), project.strip(), workdir.strip()
+        if not sep or not project.startswith("pinpoint-"):
+            continue
+        if project.startswith(CRABBOX_PROJECT_PREFIX):
+            continue
+        rows.append((name, project, workdir))
+    return rows
 
 
 def get_supabase_volumes() -> list[tuple[str, str]]:
@@ -302,16 +309,16 @@ def get_supabase_volumes() -> list[tuple[str, str]]:
         capture_output=True,
         text=True,
     )
-    pairs = _parse_name_project_pairs(inspect.stdout)
+    pairs = [(name, project) for name, project, _ in _parse_rows(inspect.stdout)]
     if inspect.returncode != 0 and not pairs:
         detail = (inspect.stderr or "").strip() or f"exit status {inspect.returncode}"
         raise DockerUnavailableError(f"`docker volume inspect` failed: {detail}")
     return pairs
 
 
-def get_supabase_containers() -> list[tuple[str, str]]:
-    """Return `(container_name, project_id)` for every Supabase-CLI-labeled container."""
-    return _parse_name_project_pairs(
+def get_supabase_containers() -> list[tuple[str, str, str]]:
+    """Return `(container_name, project_id, workdir)` for every Supabase container."""
+    return _parse_rows(
         _run_docker(
             [
                 "docker",
@@ -320,7 +327,12 @@ def get_supabase_containers() -> list[tuple[str, str]]:
                 "--filter",
                 f"label={SUPABASE_PROJECT_LABEL}",
                 "--format",
-                '{{.Names}}|{{.Label "' + SUPABASE_PROJECT_LABEL + '"}}',
+                "{{.Names}}|"
+                + '{{.Label "'
+                + SUPABASE_PROJECT_LABEL
+                + '"}}|{{.Label "'
+                + SUPABASE_WORKDIR_LABEL
+                + '"}}',
             ]
         )
     )
@@ -346,11 +358,21 @@ def get_supabase_resources_by_project(not_quiet: bool) -> DockerSweepResult:
         return DockerSweepResult(unknown_reason=str(exc))
 
     grouped: dict[str, dict[str, list[str]]] = {}
-    for kind, pairs in (("volumes", volumes), ("containers", containers)):
-        for name, project in pairs:
-            grouped.setdefault(project, {"volumes": [], "containers": []})
-            grouped[project][kind].append(name)
-    return DockerSweepResult(by_project=grouped)
+    foreign: set[str] = set()
+    for name, project in volumes:
+        grouped.setdefault(project, {"volumes": [], "containers": []})
+        grouped[project]["volumes"].append(name)
+    for name, project, workdir in containers:
+        grouped.setdefault(project, {"volumes": [], "containers": []})
+        grouped[project]["containers"].append(name)
+        if workdir and not _is_this_machine_path(workdir):
+            foreign.add(project)
+    # Same rule as the remote half: a daemon can run another machine's stacks
+    # (Bazzite's runs the Mac's remote-backend stacks), and those are not ours.
+    # A stack without a workdir label is judged as before.
+    return DockerSweepResult(
+        by_project={p: r for p, r in grouped.items() if p not in foreign}
+    )
 
 
 def _is_main_worktree_path(path: str) -> bool:

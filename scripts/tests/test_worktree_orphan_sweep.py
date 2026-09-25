@@ -1033,3 +1033,74 @@ class TestNoRemoteBackendIsUnchanged:
             "0 Supabase Docker project orphan(s) (dry-run). "
             "Run: python3 scripts/worktree_orphan_sweep.py --apply\n"
         )
+
+
+class TestLocalOwnership:
+    """The local half applies the remote half's ownership filters (N2)."""
+
+    def test_another_machines_and_crabbox_stacks_are_never_touched(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        isolated_main,
+        remote_home: Path,
+    ) -> None:
+        """Bazzite's own daemon also runs the Mac's remote stacks and Crabbox's."""
+        isolated_main(active=set(), orphan_slots=[])
+        mac_path = "/Users/froeht/Code/PinPoint/.claude/worktrees/x"
+        stub = install(
+            monkeypatch,
+            DockerStub(
+                volume_ls=(
+                    0,
+                    "supabase_db_pinpoint-mac\nsupabase_db_pinpoint-runner-crabbox\n",
+                    "",
+                ),
+                volume_inspect=(
+                    0,
+                    "supabase_db_pinpoint-mac|pinpoint-mac\n"
+                    "supabase_db_pinpoint-runner-crabbox|pinpoint-runner-crabbox\n",
+                    "",
+                ),
+                ps=(
+                    0,
+                    f"supabase_db_pinpoint-mac|pinpoint-mac|{mac_path}\n"
+                    "supabase_db_pinpoint-runner-crabbox|pinpoint-runner-crabbox|"
+                    f"{_gone(remote_home, 'crabbox')}\n",
+                    "",
+                ),
+            ),
+        )
+
+        exit_code = _run_main(monkeypatch, "--apply")
+
+        err = capsys.readouterr().err
+        assert exit_code == 0
+        assert stub.calls_of("container_rm") == []
+        assert stub.calls_of("volume_rm") == []
+        assert "No orphans found." in err
+
+    def test_a_stack_labelled_with_this_machines_path_is_still_an_orphan(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        isolated_main,
+        remote_home: Path,
+    ) -> None:
+        isolated_main(active=set(), orphan_slots=[])
+        gone = _gone(remote_home, "dead")
+        stub = install(
+            monkeypatch,
+            DockerStub(
+                volume_ls=(0, "supabase_db_pinpoint-dead\n", ""),
+                volume_inspect=(0, "supabase_db_pinpoint-dead|pinpoint-dead\n", ""),
+                ps=(0, f"supabase_db_pinpoint-dead|pinpoint-dead|{gone}\n", ""),
+            ),
+        )
+
+        assert _run_main(monkeypatch, "--apply") == 0
+        assert stub.calls_of("container_rm") == [
+            ["docker", "rm", "-f", "supabase_db_pinpoint-dead"]
+        ]
+        assert stub.calls_of("volume_rm") == [
+            ["docker", "volume", "rm", "supabase_db_pinpoint-dead"]
+        ]
