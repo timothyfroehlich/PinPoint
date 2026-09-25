@@ -24,6 +24,7 @@ import os
 import stat
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -56,6 +57,13 @@ def git(*args: str, cwd: Path) -> str:
         ["git", *args], cwd=cwd, capture_output=True, text=True, check=True
     )
     return result.stdout.strip()
+
+
+def age(worktree: Path, hours: float) -> Path:
+    """Backdate the worktree's `.git` file, which reap reads as its creation time."""
+    stamp = time.time() - hours * 3600
+    os.utime(worktree / ".git", (stamp, stamp))
+    return worktree
 
 
 class World:
@@ -98,16 +106,18 @@ class World:
         git("commit", "-m", f"main: {name}", cwd=self.repo)
         return git("rev-parse", "HEAD", cwd=self.repo)
 
-    def add_worktree(self, branch: str, path: Path | None = None) -> Path:
+    def add_worktree(
+        self, branch: str, path: Path | None = None, age_hours: float = 48
+    ) -> Path:
         path = path or self.worktrees / branch.replace("/", "__")
         path.parent.mkdir(parents=True, exist_ok=True)
         git("worktree", "add", str(path), "-b", branch, cwd=self.repo)
-        return path
+        return age(path, age_hours)
 
     def add_detached_worktree(self, name: str) -> Path:
         path = self.worktrees / name
         git("worktree", "add", "--detach", str(path), "origin/main", cwd=self.repo)
-        return path
+        return age(path, 48)
 
     def commit_in(self, worktree: Path, name: str, content: str) -> str:
         (worktree / name).write_text(content)
@@ -291,6 +301,21 @@ class TestEmptyTier:
         assert code == reap.EXIT_OK, err
         assert tier_of(err, "worktree-bridge-idle") == reap.TIER_REAP
         assert "[empty" in err
+
+    def test_an_empty_worktree_younger_than_a_day_is_kept(
+        self,
+        world: World,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """A running agent's brand-new worktree has no commits yet. It must survive."""
+        world.add_worktree("worktree-agent-just-started", age_hours=1)
+
+        code, _, err = run_reap(world, monkeypatch, capsys)
+
+        assert code == reap.EXIT_OK, err
+        assert tier_of(err, "worktree-agent-just-started") == reap.TIER_KEEP
+        assert "no commits yet, created 1h ago" in err
 
     def test_no_pr_with_a_commit_is_review_not_reap(
         self,

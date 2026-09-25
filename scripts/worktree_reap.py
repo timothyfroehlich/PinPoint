@@ -17,8 +17,10 @@ reaps only on *positive proof that the work is already on `main`*:
   branches are squash-merged, so their commits are never ancestors of `main`
   and an `is-ancestor` test gives a false negative on every one of them. A
   `HEAD` that moved past the merged SHA is post-merge work → REVIEW.
-- REAP/empty — no merged or open PR, clean tree, and *zero* commits ahead of
-  `origin/main`. Nothing unique exists on the branch, so there is nothing to lose.
+- REAP/empty — no merged or open PR, clean tree, *zero* commits ahead of
+  `origin/main`, and the worktree is at least a day old. Nothing unique exists
+  on the branch, so there is nothing to lose; the age floor keeps a running
+  agent's brand-new worktree (no commits yet) out of reach.
 - REVIEW — anything with unmerged commits or a dirty tree (untracked files
   count). Reported every run, never touched.
 - KEEP — an open PR, or a live process whose cwd is inside the worktree.
@@ -43,6 +45,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
@@ -71,6 +74,10 @@ GH_CONCURRENCY = 12
 TIER_REAP = "REAP"
 TIER_REVIEW = "REVIEW"
 TIER_KEEP = "KEEP"
+
+# An empty worktree younger than this may belong to an agent that has not
+# committed yet, so it is kept rather than reaped.
+EMPTY_MIN_AGE_HOURS = 24
 
 
 @dataclass(frozen=True)
@@ -116,6 +123,7 @@ class GitState:
     head: str | None = None
     dirty: bool | None = None
     ahead: int | None = None
+    age_hours: float | None = None
 
 
 @dataclass(frozen=True)
@@ -256,7 +264,17 @@ def read_git_state(worktree: Path) -> GitState:
     except ValueError:
         return GitState(head=head, dirty=dirty)
 
-    return GitState(head=head, dirty=dirty, ahead=ahead)
+    return GitState(
+        head=head, dirty=dirty, ahead=ahead, age_hours=worktree_age_hours(worktree)
+    )
+
+
+def worktree_age_hours(worktree: Path) -> float | None:
+    """Hours since `git worktree add` wrote the worktree's `.git` file."""
+    try:
+        return (time.time() - (worktree / ".git").stat().st_mtime) / 3600
+    except OSError:
+        return None
 
 
 def _prototype_state(worktree: Path) -> bool | None:
@@ -380,6 +398,16 @@ def classify(
             path, branch, TIER_REVIEW, "commits ahead of origin/main unknown"
         )
     if git.ahead == 0:
+        if git.age_hours is None:
+            return Verdict(path, branch, TIER_REVIEW, "worktree age unknown")
+        if git.age_hours < EMPTY_MIN_AGE_HOURS:
+            return Verdict(
+                path,
+                branch,
+                TIER_KEEP,
+                f"no commits yet, created {git.age_hours:.0f}h ago "
+                f"(empty worktrees are reaped after {EMPTY_MIN_AGE_HOURS}h)",
+            )
         return Verdict(path, branch, TIER_REAP, "empty")
     return Verdict(
         path,
