@@ -66,7 +66,7 @@ export function MachineDetailHeader({
     <header>
       <div className="flex items-center gap-3.5 md:gap-4">
         {artwork != null ? (
-          <span className="relative size-[72px] shrink-0 md:size-[88px]">
+          <span className="relative -my-2 size-[104px] shrink-0 md:my-0 md:size-[88px]">
             <Image
               src={artwork.url}
               alt={`${machine.name} game artwork`}
