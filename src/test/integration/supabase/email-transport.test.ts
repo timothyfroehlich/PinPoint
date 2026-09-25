@@ -40,7 +40,7 @@ describe("Email Transport Integration", () => {
       mailpitApiPort =
         mailpitApiPort ?? ports.apiPort ?? ports.smtpPort ?? "57324";
       mailpitSmtpPort = mailpitSmtpPort ?? ports.smtpPort ?? "57325";
-      mailpitApiUrl = `http://127.0.0.1:${mailpitApiPort}/api/v1`;
+      mailpitApiUrl = `http://${process.env.MAILPIT_HOST ?? "127.0.0.1"}:${mailpitApiPort}/api/v1`;
 
       // Main: 54xxx, worktrees: 54xxx-63xxx (slot 1-96)
       expect(mailpitApiPort).toMatch(/^(5[4-9]\d{3}|6[0-3]\d{3})$/);
