@@ -14,7 +14,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from worktree_setup import (
     DEFAULT_INSTALL_TIMEOUT,
-    EXIT_INCOMPLETE,
     EXIT_READY,
     FAILURE_CLASS_INSTALL,
     FAILURE_CLASS_MISSING_TOOL,
@@ -1315,7 +1314,7 @@ class TestWorktreeSetupMainReadiness:
         assert (self.linked_wt / "supabase/config.toml").exists()
         assert (self.linked_wt / ".claude/launch.json").exists()
 
-    def test_linked_worktree_incomplete_on_install_failure(
+    def test_install_failure_warns_but_keeps_the_worktree(
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
     ) -> None:
         toolchain = BootstrapToolchain(
@@ -1337,10 +1336,14 @@ class TestWorktreeSetupMainReadiness:
             ),
         )
         code = main()
-        assert code == EXIT_INCOMPLETE
+        # Exit 0: a failing post-checkout hook makes WorktreeCreate delete the
+        # worktree, so a failed install only warns.
+        assert code == EXIT_READY
         captured = capsys.readouterr()
-        assert "status=incomplete" in captured.err
+        assert "status=ready" in captured.err
+        assert "WARNING dependencies not installed" in captured.err
         assert "failure_class=missing-tool" in captured.err
+        assert "pnpm install --frozen-lockfile" in captured.err
         # Generated files must still be written with 444 permissions
         assert (self.linked_wt / ".env.local").exists()
         assert (self.linked_wt / "supabase" / "config.toml").exists()
@@ -1367,8 +1370,9 @@ class TestWorktreeSetupMainReadiness:
 
         code = main()
 
-        assert code == EXIT_INCOMPLETE
+        assert code == EXIT_READY
         captured = capsys.readouterr()
+        assert "WARNING dependencies not installed" in captured.err
         assert "node=<not found>" in captured.err
         assert "pnpm=<not found>" in captured.err
         assert "failure_class=missing-tool" in captured.err

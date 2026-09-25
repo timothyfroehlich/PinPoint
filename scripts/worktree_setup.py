@@ -39,7 +39,6 @@ FAILURE_CLASS_TOOLCHAIN_CONFIG = "toolchain-config"
 
 # Exit codes for worktree_setup.py
 EXIT_READY = 0
-EXIT_INCOMPLETE = 1
 
 BASE_PORT_NEXTJS = 3000
 BASE_PORT_API = 54321
@@ -1376,28 +1375,26 @@ def main() -> int:
     else:
         is_ready, failure_class, detail = install_dependencies(worktree_path, toolchain)
 
-    if is_ready:
-        print(
-            f"worktree_setup: status=ready "
-            f"slot={slot} "
-            f"supabase={parse_env_file(env_path).get(BACKEND_ENV_KEY)} "
-            f"project_id={port_config.project_id} "
-            f"nextjs={port_config.nextjs_port} "
-            f"api={port_config.api_port} "
-            f"db={port_config.db_port}",
-            file=sys.stderr,
-        )
-        return EXIT_READY
-
     print(
-        f"worktree_setup: status=incomplete "
-        f"failure_class={failure_class} "
-        f"detail={detail} "
+        f"worktree_setup: status=ready "
         f"slot={slot} "
-        f"project_id={port_config.project_id}",
+        f"supabase={parse_env_file(env_path).get(BACKEND_ENV_KEY)} "
+        f"project_id={port_config.project_id} "
+        f"nextjs={port_config.nextjs_port} "
+        f"api={port_config.api_port} "
+        f"db={port_config.db_port}",
         file=sys.stderr,
     )
-    return EXIT_INCOMPLETE
+    if not is_ready:
+        # Best-effort: a failed install must not fail the post-checkout hook,
+        # which would make the WorktreeCreate hook delete the new worktree.
+        print(
+            f"worktree_setup: WARNING dependencies not installed "
+            f"(failure_class={failure_class} detail={detail}). "
+            "Run `pnpm install --frozen-lockfile` in this worktree.",
+            file=sys.stderr,
+        )
+    return EXIT_READY
 
 
 if __name__ == "__main__":
