@@ -71,5 +71,11 @@
     "route": "/admin/integrations",
     "authRole": "admin",
     "seedNeeds": "default seed; the form renders with or without stored Discord configuration"
+  },
+  "settings": {
+    "label": "Settings",
+    "route": "/settings",
+    "authRole": "member",
+    "seedNeeds": "seeded member profile (default report-form preferences)"
   }
 }
