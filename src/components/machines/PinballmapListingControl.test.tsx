@@ -485,7 +485,7 @@ describe("the intent toggle", () => {
 });
 
 describe("the Insider Connected row (3.8)", () => {
-  it("is absent when 3.8 shows nothing", () => {
+  it("is absent for an ineligible title", () => {
     renderControl({ view: VIEWS.on });
     expect(
       screen.queryByTestId("pbm-listing-row-insider-connected")
@@ -505,6 +505,21 @@ describe("the Insider Connected row (3.8)", () => {
       "pbm-listing-row-insider-connected",
       "pbm-listing-row-status",
     ]);
+  });
+
+  it("keeps its place with a dash and no switch when 3.8 shows no setting", () => {
+    // An eligible title always has the row, so the control keeps its height
+    // across states (4.1).
+    renderControl({
+      view: VIEWS.on,
+      insiderConnected: { setting: "unavailable" },
+    });
+    expect(
+      screen.getByTestId("pbm-insider-connected-unavailable")
+    ).toHaveTextContent("—");
+    expect(
+      screen.queryByRole("switch", { name: "Insider Connected" })
+    ).not.toBeInTheDocument();
   });
 
   it.each([

@@ -106,9 +106,10 @@ export interface PinballmapListingControlProps {
   /** Catalog title, so a confirm names the game rather than "this machine". */
   modelName: string | null;
   /**
-   * The entry's Insider Connected setting (spec 3.8), or null when 3.8 shows
-   * nothing — ineligible title, intent not On, or entry absent. Derived on the
-   * server by `deriveInsiderConnectedView`.
+   * The Insider Connected row (spec 3.8), or null for an ineligible title. An
+   * eligible title always has the row so the control keeps its height (4.1);
+   * without a setting to show it reads "—". Derived on the server by
+   * `deriveInsiderConnectedView`.
    */
   insiderConnected: PbmInsiderConnectedView | null;
 }
@@ -218,18 +219,28 @@ export function PinballmapListingControl({
 
         {insiderConnected !== null ? (
           <Row label="Insider Connected">
-            <InsiderConnectedSwitch
-              view={insiderConnected}
-              // Same gate as the status row's pushes: the capability plus a
-              // provisioned credential (8.2). Otherwise status only.
-              readOnly={!canWriteOut}
-              pending={pending}
-              onChange={(enabled) => {
-                run(setInsiderConnectedAction, {
-                  enabled: enabled ? "true" : "false",
-                });
-              }}
-            />
+            {insiderConnected.setting === "unavailable" ? (
+              <span
+                className="text-sm text-muted-foreground"
+                data-testid="pbm-insider-connected-unavailable"
+              >
+                <span aria-hidden="true">—</span>
+                <span className="sr-only">Not available</span>
+              </span>
+            ) : (
+              <InsiderConnectedSwitch
+                view={insiderConnected}
+                // Same gate as the status row's pushes: the capability plus a
+                // provisioned credential (8.2). Otherwise status only.
+                readOnly={!canWriteOut}
+                pending={pending}
+                onChange={(enabled) => {
+                  run(setInsiderConnectedAction, {
+                    enabled: enabled ? "true" : "false",
+                  });
+                }}
+              />
+            )}
           </Row>
         ) : null}
 
@@ -579,7 +590,7 @@ function InsiderConnectedSwitch({
   pending,
   onChange,
 }: {
-  view: PbmInsiderConnectedView;
+  view: Extract<PbmInsiderConnectedView, { lmxId: number }>;
   readOnly: boolean;
   pending: boolean;
   onChange: (enabled: boolean) => void;

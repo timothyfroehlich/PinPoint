@@ -1034,7 +1034,7 @@ export type SetInsiderConnectedResult = Result<
 /**
  * Turn an entry's Insider Connected setting on or off on Pinball Map (spec 3.8).
  *
- * Offered only where `deriveInsiderConnectedView` shows the line: intent On,
+ * Offered only where `deriveInsiderConnectedView` shows a setting: intent On,
  * entry present, title eligible in Pinball Map's catalog. Each of those is
  * re-checked here against stored state, because the page that sent the request
  * may be stale.

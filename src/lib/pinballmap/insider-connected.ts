@@ -8,20 +8,25 @@ import type { LocationSnapshot } from "./types";
  */
 export type PbmInsiderConnectedSetting = "on" | "off" | "not_set";
 
-export interface PbmInsiderConnectedView {
-  /** The entry the setting belongs to, resolved from the stored lineup by title. */
-  lmxId: number;
-  setting: PbmInsiderConnectedSetting;
-}
+export type PbmInsiderConnectedView =
+  | {
+      setting: PbmInsiderConnectedSetting;
+      /** The entry the setting belongs to, resolved from the stored lineup by title. */
+      lmxId: number;
+    }
+  /** Eligible title, but 3.8 shows no setting: intent not On, entry absent,
+   *  or no usable lineup yet. The row stays so the control keeps its height (4.1). */
+  | { setting: "unavailable" };
 
 /**
- * The Insider Connected line for a machine's Pinball Map section, or null when
- * spec 3.8 shows nothing.
+ * The Insider Connected row for a machine's Pinball Map section, or null when
+ * the title is not eligible and the row is absent.
  *
- * Shown only on a cabinet with intent On whose entry is present, and only when
- * Pinball Map's catalog marks the title eligible. Eligibility comes from that
- * flag alone — an entry's `ic_enabled` cannot supply it, because null there
- * means "never set" on eligible and ineligible titles alike.
+ * The row's presence depends only on the title, so it never changes between
+ * states on one machine (spec 4.1). Its setting shows only on a cabinet with
+ * intent On whose entry is present (3.8). Eligibility comes from Pinball Map's
+ * catalog flag alone — an entry's `ic_enabled` cannot supply it, because null
+ * there means "never set" on eligible and ineligible titles alike.
  *
  * Pure: derived from the stored lineup and catalog row, never discovered by
  * calling Pinball Map (spec 3.4).
@@ -33,18 +38,19 @@ export function deriveInsiderConnectedView(args: {
   snapshot: LocationSnapshot | null;
 }): PbmInsiderConnectedView | null {
   const { listing, pinballmapMachineId, icEligible, snapshot } = args;
+  if (!icEligible || pinballmapMachineId === null) return null;
+
+  const unavailable = { setting: "unavailable" } as const;
   if (
-    !icEligible ||
     listing.disabled !== null ||
     listing.intent !== "on" ||
     !listing.observed ||
-    pinballmapMachineId === null ||
     snapshot === null
   )
-    return null;
+    return unavailable;
 
   const lmx = findLmxForMachine(snapshot, pinballmapMachineId);
-  if (!lmx) return null;
+  if (!lmx) return unavailable;
 
   const setting: PbmInsiderConnectedSetting =
     lmx.icEnabled === null ? "not_set" : lmx.icEnabled ? "on" : "off";

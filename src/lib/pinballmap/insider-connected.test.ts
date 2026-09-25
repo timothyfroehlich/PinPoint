@@ -1,5 +1,5 @@
 /**
- * Unit: when the Insider Connected line shows and what it offers (spec 3.8).
+ * Unit: when the Insider Connected row exists (4.1) and what it shows (3.8).
  */
 
 import { describe, it, expect } from "vitest";
@@ -71,23 +71,27 @@ describe("deriveInsiderConnectedView", () => {
     expect(derive({ icEnabled })).toEqual({ lmxId: LMX, setting });
   });
 
-  it("shows nothing for a title the catalog does not mark eligible", () => {
+  it("has no row for a title the catalog does not mark eligible", () => {
     // Even with a recorded value: eligibility comes only from the catalog flag.
     expect(derive({ icEnabled: true, icEligible: false })).toBeNull();
   });
 
   it.each(["off", "no_sync"] as const)(
-    "shows nothing when intent is %s",
+    "keeps the row without a setting when intent is %s",
     (intent) => {
-      expect(derive({ icEnabled: true, intent })).toBeNull();
+      expect(derive({ icEnabled: true, intent })).toEqual({
+        setting: "unavailable",
+      });
     }
   );
 
-  it("shows nothing when the entry is not on the lineup", () => {
-    expect(derive({ present: false })).toBeNull();
+  it("keeps the row without a setting when the entry is not on the lineup", () => {
+    expect(derive({ present: false })).toEqual({ setting: "unavailable" });
   });
 
-  it("shows nothing while the integration is not configured", () => {
-    expect(derive({ icEnabled: true, configured: false })).toBeNull();
+  it("keeps the row without a setting while the integration is not configured", () => {
+    expect(derive({ icEnabled: true, configured: false })).toEqual({
+      setting: "unavailable",
+    });
   });
 });
