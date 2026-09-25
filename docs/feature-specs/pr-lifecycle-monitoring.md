@@ -15,16 +15,12 @@
 - **Expected head** — the commit SHA the watch is anchored to. Detects PR branch updates so agents never act on stale commits.
 - **Terminal verdict** — an authoritative, machine-readable JSON object emitted upon completion that gives the main agent everything needed to take its next step without follow-up queries.
 - **Failure artifact** — a targeted markdown summary of failed CI steps and errors written to disk, sparing the main agent from fetching or parsing raw workflow logs.
-- **Automated reviewer** — an AI evaluation service (CodeRabbit or Codex) that inspects PR changes against repository standards and provides reviews or comments.
-- **Review hierarchy** — the strict order of review preference: CodeRabbit first, falling back to Codex when CodeRabbit is unavailable or rate-limited.
-- **Draft gate** — the policy boundary where automated review evaluation is suspended while a pull request is marked as a GitHub draft.
-- **Promotion trigger** — the automatic initiation of a CodeRabbit review when a pull request transitions from draft to ready for review.
-- **Re-review request** — an explicit, human- or agent-initiated command (`@coderabbitai review` or `@codex review`) requesting a new evaluation on an updated commit head.
-- **Review quota** — an external velocity cap (5 CodeRabbit reviews per hour) that bounds automated review consumption.
-- **In-progress review** — an active review execution detected via pending commit status, pending check run, or acknowledged request without a terminal verdict.
-- **Concurrent review** — an execution state where two distinct automated reviewers are actively evaluating the same commit head simultaneously.
-- **First-success verdict** — the immediate reporting of review gate satisfaction when any eligible reviewer covers head, accompanied by an explicit notice identifying any trailing in-progress reviewer that still requires inspection.
-- **Actionable review prompt** — a consolidated instruction block extracted from reviewer findings containing file paths, line ranges, and actionable remediation tasks for implementing agents.
+- **Local review** — a Claude Code `/code-review` run by the owning agent in its own session against the pull request's exact head.
+- **Review level** — the effort a local review runs at (low, medium, or high), chosen from the weighted diff size.
+- **Weighted diff size** — the pull request's changed lines against its base branch, with generated and fixture content left out and test code counted at half weight (§8.15).
+- **Review record** — the pull request comment the owning agent posts after a clean local review, pinned to the reviewed head and listing every finding with its disposition.
+- **Draft gate** — the policy boundary that keeps a pull request a GitHub draft until a review record covers its head.
+- _Retired 2026-09-24:_ automated reviewer, review hierarchy, promotion trigger, re-review request, review quota, in-progress review, concurrent review, first-success verdict, and actionable review prompt. CodeRabbit and Codex no longer provide review coverage; the local review replaced them.
 
 ---
 
@@ -40,7 +36,7 @@
 ## 3. Terminal verdicts
 
 - **3.1** Every watch terminates with exactly one structured JSON verdict emitted to standard output.
-- **3.2** A terminal verdict contains the complete decision state: PR number, phase, expected and observed head SHAs, outcome, CI gate status, review state, unresolved thread count, merge state, timestamp, and optional failure artifact path. For the review phase, the verdict also includes the covering reviewer, any concurrent in-progress reviewer, the list of pending reviewers, diagnostic review notices, actionable comment counts, extracted review prompts, and rate-limit fallback signals.
+- **3.2** A terminal verdict contains the complete decision state: PR number, phase, expected and observed head SHAs, outcome, CI gate status, review state, unresolved thread count, merge state, timestamp, and optional failure artifact path. For the review phase, the verdict also includes the covering review record.
 - **3.3** Outcomes belong to a closed set:
   - CI phase: **passed**, **failed**, **stale**, **conflicting**, **timed_out**, **undetermined**.
   - Review phase: **passed**, **action_required**, **stale**, **conflicting**, **timed_out**, **undetermined**.
@@ -88,50 +84,46 @@
 
 ---
 
-## 8. Reviewer hierarchy & triggers
+## 8. Local review & review coverage
 
-- **8.1** CodeRabbit is the default automated reviewer for all pull requests.
-- **8.2** Codex is the secondary automated reviewer, invoked when CodeRabbit review quota is exhausted or when explicitly requested by an operator or agent.
-- **8.3** Only CodeRabbit and Codex provide review coverage. A pull request without it merges only when the owner explicitly directs a forced merge, which bypasses the review gate.
-- **8.4** Review satisfaction follows the priority chain: a qualifying CodeRabbit approval takes precedence over Codex.
-- **8.5** Any single reviewer providing exact-head coverage satisfies Gate 3 (Review Gate) for pull request mergeability.
-- **8.6** New pull requests are created in draft state; automated reviews are suppressed while a pull request remains in draft.
-- **8.7** Promoting a pull request out of draft (`gh pr ready`) triggers an automatic CodeRabbit review on the current head commit.
-- **8.8** CodeRabbit never automatically initiates a re-review when new commits are pushed to an open pull request.
-- **8.9** Re-evaluating an updated commit head with CodeRabbit requires an explicit re-review request (`@coderabbitai review`).
-- **8.10** Codex never initiates a review automatically on draft promotion or commit push; Codex reviews are triggered strictly via explicit manual request (`@codex review`).
-- **8.11** A review request is anchored to an exact 40-character commit head SHA and is never issued more than once for the same commit head.
-- **8.12** Pushing new commits to a pull request branch immediately invalidates all previous review coverage; the updated head requires replacement review evidence.
+- **8.1** _Retired 2026-09-24._ CodeRabbit was the default automated reviewer; the local review (8.13) replaced it. Number kept so older citations don't dangle.
+- **8.2** _Retired 2026-09-24._ Codex was the fallback reviewer; there is no fallback reviewer. Number kept so older citations don't dangle.
+- **8.3** Only a review record posted from the owner's account provides review coverage. A pull request without it merges only when the owner explicitly directs a forced merge, which bypasses the review gate.
+- **8.4** _Retired 2026-09-24._ The priority chain between CodeRabbit and Codex; there is one reviewer. Number kept so older citations don't dangle.
+- **8.5** A review record pinned to the exact head satisfies Gate 3 (Review Gate) for pull request mergeability.
+- **8.6** New pull requests are created in draft state and stay in draft until a review record covers the head, or until the owner directs a forced merge (8.3), which promotes the pull request first.
+- **8.7** _Retired 2026-09-24._ Draft promotion no longer triggers a review; the owning agent promotes after the review (8.20). Number kept so older citations don't dangle.
+- **8.8** _Retired 2026-09-24._ CodeRabbit re-review behavior. Number kept so older citations don't dangle.
+- **8.9** _Retired 2026-09-24._ CodeRabbit re-review requests. Number kept so older citations don't dangle.
+- **8.10** _Retired 2026-09-24._ Codex review requests. Number kept so older citations don't dangle.
+- **8.11** _Retired 2026-09-24._ Anchoring review requests to a head; the review record names its reviewed head instead (8.18). Number kept so older citations don't dangle.
+- **8.12** Pushing new commits to a pull request branch invalidates previous review coverage, and the updated head requires a new local review. The one exception: a head whose only new commits are clean merges of the base branch keeps the earlier coverage.
+- **8.13** The owning agent runs a local review after CI passes on the current head.
+- **8.14** The review level follows the weighted diff size: low below 50 lines, medium from 50 up to 1,500, and high from 1,500 through 3,000. Above 3,000, the owning agent asks the owner before reviewing.
+- **8.15** The weighted diff size counts added plus deleted lines against the base branch. It leaves out the lockfile, migration snapshots, test fixtures, binary files, and feature specs, and counts test code at half weight.
+- **8.16** The owning agent fixes or declines every finding; a decline carries a one-sentence reason.
+- **8.17** After fixing findings, the owning agent re-runs the local review on the new head at the same level, and repeats until a round raises no finding that is not already declined. A finding re-raised after being declined stays declined.
+- **8.18** After a clean round, the owning agent posts a review record pinned to the head it reviewed, which must be the pull request's current head. The record lists the review level and every finding from every round with its disposition: fixed, with the commit, or declined, with the reason.
+- **8.19** The owning agent never posts a review record for a head it did not review.
+- **8.20** The owning agent promotes the pull request out of draft after posting the review record.
 
 ---
 
 ## 9. Quota & rate-limit management
 
-- **9.1** The system enforces an hourly quota ceiling of 5 CodeRabbit reviews per rolling hour.
-- **9.2** When CodeRabbit indicates quota exhaustion (`Review rate limited`), the review monitor flags CodeRabbit as rate-limited on the pull request.
-- **9.3** Upon detecting CodeRabbit rate-limiting, the review monitor directs the owning agent to fall back to Codex review. If Codex is also out of quota or unavailable, the system alerts the user and recommends waiting for the next CodeRabbit review slot, or a forced merge at the user's direction.
-- **9.4** An active CodeRabbit rate-limit flag clears automatically when a subsequent CodeRabbit review successfully completes on the pull request or after the rolling quota window expires.
+- **9.1–9.4** _Retired 2026-09-24._ CodeRabbit quota and Codex fallback; the local review has no quota. Numbers kept so older citations don't dangle.
 
 ---
 
 ## 10. Concurrent review adjudication
 
-- **10.1** The review monitor actively detects whether CodeRabbit, Codex, or both are currently in progress on the expected commit head.
-- **10.2** An in-progress review is identified by a pending commit status, pending check run, or acknowledged request comment lacking a matching terminal verdict.
-- **10.3** When two automated reviewers are in progress simultaneously, the review gate passes as soon as the first reviewer reports success covering the exact head.
-- **10.4** When concluding on a first success with a concurrent review still active, the monitor explicitly identifies the winning reviewer and reports the secondary reviewer as running in progress.
-- **10.5** The terminal verdict for a first success includes a dedicated notification alerting the owning agent that the concurrent review is still running and must be checked when complete.
-- **10.6** If one concurrent reviewer requests changes while the second reviewer is still in progress, the monitor reports an actionable failure while preserving the in-progress status of the second reviewer.
-- **10.7** If both concurrent reviewers complete successfully, the primary reviewer in the hierarchy (CodeRabbit) is recorded as the authoritative covering reviewer.
+- **10.1–10.7** _Retired 2026-09-24._ Adjudication between concurrent CodeRabbit and Codex reviews; there is one reviewer. Numbers kept so older citations don't dangle.
 
 ---
 
 ## 11. Review findings & agent handoff
 
-- **11.1** When a reviewer requests changes or posts actionable comments, the monitor extracts the consolidated AI agent prompt block directly from the review body.
-- **11.2** The extracted prompt block and the count of actionable comments are returned in the monitor's terminal verdict.
-- **11.3** Review findings extraction fails open: network failures or unexpected review formatting never crash the monitor or alter process exit codes.
-- **11.4** Implementing agents ingest review findings directly from the terminal verdict without executing exploratory GitHub API queries.
+- **11.1–11.4** _Retired 2026-09-24._ Extracting reviewer prompts into the watch verdict; the local review hands findings to the owning agent directly. Numbers kept so older citations don't dangle.
 
 ---
 
@@ -142,9 +134,8 @@
 | 2.1, 2.3 | Worktree and title launch parameters; corrupt-worktree rejection at launch | `pr-watch.py` takes the PR number, phase, and expected head. The worktree is the process's working directory; there is no title parameter and no worktree validation. Both lived only in the MCP wrapper, removed 2026-09-24 in the watcher simplification Tim approved (one CLI, no wrapper layers). | Amend 2.1 and 2.3 to the three-parameter CLI (requirement diff needs Tim's approval) |
 | 6.1–6.3 | Host coordination: concurrent watches coalesce under one polling leader | Removed 2026-09-24 in the watcher simplification: each watch polls GitHub on its own. The XDG lock, state-file, and leader/follower machinery cost more code than the duplicate polling it saved. | Delete §6 (requirement diff needs Tim's approval) |
 | 7.4 | Local execution telemetry (harness, model, wake count, elapsed duration) | Removed 2026-09-24 with the MCP wrapper and watcher agents, the only sources of harness, model, and wake data; nothing read the `tmp/gh-monitor/watcher-run-*.json` records. | Delete 7.4 (requirement diff needs Tim's approval) |
-| 9.2–9.4 | The review monitor flags CodeRabbit rate limiting and directs the Codex fallback | `pr-watch.py` does not read CodeRabbit's `Review rate limited` comment; a rate-limited review runs the watch to `timed_out`, and the owning agent reads the comment and falls back to Codex by hand (`pinpoint-pr-workflow` §3.4) | Detect the rate-limit comment in `pr-watch.py --phase review` and return an actionable verdict naming the Codex fallback |
-| 10.1–10.5 | Concurrent in-progress review detection and notification | `pr-watch.py` and `_review_summary` report individual checker records without in-progress status checks or concurrent notices | Add concurrent status tracking to `pr-watch.py --phase review` and `_review_summary` |
-| 11.1–11.2 | Actionable prompt and comment count extraction | Reviewers' raw markdown bodies are not parsed into terminal payloads | Implement CodeRabbit prompt extraction in `pr-watch.py --phase review` |
+| 8.3 | Only a review record provides coverage | The gate still accepts a CodeRabbit approval or Codex review on the exact head | Remove the CodeRabbit and Codex checkers once both subscriptions end |
+| 8.5–8.6, 8.13–8.20 | Local review, review record, and promotion after review | The gate does not read review records; agents promote on green CI and wait for CodeRabbit | PP-l4k4 |
 
 ---
 
@@ -152,6 +143,7 @@
 
 | Date | Amendment |
 | :-- | :-- |
+| 2026-09-24 | Replace CodeRabbit and Codex with a local Claude Code review (§1, §3.2, §8, §9–§11): the owning agent reviews at a level set by weighted diff size, re-reviews after fixes until clean, posts a review record pinned to the head, then promotes; a forced merge promotes a draft first; §8.12 keeps coverage across clean base-branch merges; §9–§11 retired. |
 | 2026-09-24 | Drop local owner attestation as a review provider (§1, §8.3, §8.4, §9.3): only CodeRabbit and Codex cover a head; the owner merges a PR without that coverage by directing a forced merge. |
 | 2026-09-16 | Amend spec to add automated review requirements (§8–§11): CodeRabbit default review, draft-promotion auto-trigger, manual re-reviews and Codex requests, 5/hr rate limits and fallback, concurrent review first-success reporting with in-progress notices, and prompt extraction. |
 | 2026-09-12 | Clarify §2.1: watch is defined by four core parameters with optional title for diagnostic logging. |
