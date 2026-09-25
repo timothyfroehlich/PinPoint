@@ -43,6 +43,7 @@ def _run_readiness(
 case "$STUB_MODE" in
   unmigrated) echo 'ERROR:  relation "drizzle.__drizzle_migrations" does not exist' >&2; exit 1 ;;
   psql_error) echo 'FATAL:  password authentication failed' >&2; exit 2 ;;
+  missing_column) echo 'ERROR:  column "hash" does not exist' >&2; exit 1 ;;
   behind) echo '1000 hash_a' ;;
   diverged) printf '1000 hash_a\n3000 hash_other\n' ;;
   recovered) printf '1000 hash_a\n1790000000000 0001_b\n' ;;
@@ -137,6 +138,16 @@ def test_a_psql_failure_is_not_reported_as_unmigrated(tmp_path: Path) -> None:
     assert result.stderr.splitlines() == [
         "FAIL: preflight readiness — could not read migrations at localhost:61234: "
         "FATAL:  password authentication failed. Run: python3 scripts/worktree_setup.py"
+    ]
+
+
+def test_only_a_missing_migrations_table_counts_as_unmigrated(tmp_path: Path) -> None:
+    result = _run_readiness(tmp_path, "missing_column")
+
+    assert result.returncode == 1
+    assert result.stderr.splitlines() == [
+        "FAIL: preflight readiness — could not read migrations at localhost:61234: "
+        'ERROR:  column "hash" does not exist. Run: python3 scripts/worktree_setup.py'
     ]
 
 

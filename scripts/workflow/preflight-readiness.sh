@@ -45,7 +45,7 @@ curl -fsS --max-time 10 "${NEXT_PUBLIC_SUPABASE_URL}/auth/v1/health" >/dev/null 
 command -v psql >/dev/null || fail "psql is not installed" "install the PostgreSQL client"
 if ! applied=$(psql "$POSTGRES_URL" -XqAt -F ' ' \
   -c "SELECT created_at, hash FROM drizzle.__drizzle_migrations" 2>&1); then
-  [[ "$applied" == *"does not exist"* ]] \
+  [[ "$applied" == *'relation "drizzle.__drizzle_migrations" does not exist'* ]] \
     || fail "could not read migrations at ${db_target}: ${applied}" "python3 scripts/worktree_setup.py"
   applied=""
 fi
