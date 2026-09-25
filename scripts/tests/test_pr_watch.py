@@ -109,7 +109,7 @@ def fake_summary(
             "summary": "",
         }
 
-    none = {name: record("none", "") for name in ("coderabbit", "codex", "marker")}
+    none = {name: record("none", "") for name in ("coderabbit", "codex")}
     checkers = dict(none)
     if label == "approved":
         checkers[checker] = record("covers", head)
@@ -921,7 +921,6 @@ def test_review_state_reports_the_gate_label_verbatim(monkeypatch, label):
     [
         ("coderabbit", "CodeRabbit approval"),
         ("codex", "Codex evidence"),
-        ("marker", "local review attestation"),
     ],
 )
 def test_review_state_names_the_covering_checker(monkeypatch, checker, who):
@@ -936,9 +935,10 @@ def test_review_state_not_reviewed_recommends_one_request(monkeypatch):
     use_summaries(monkeypatch, fake_summary("not reviewed"))
     state, detail = pr_watch.review_state(PR)
     assert state == "not reviewed"
-    assert "CodeRabbit: none; Codex: none; local attestation: none" in detail
-    assert f"request-codex-review.sh #{PR} exactly once" in detail
-    assert "CodeRabbit request or a local review" in detail
+    assert "CodeRabbit: none; Codex: none" in detail
+    assert "`@coderabbitai review` once for this head" in detail
+    assert f"request-codex-review.sh {PR} once instead" in detail
+    assert "Tim's explicit --force" in detail
 
 
 @pytest.mark.unit
@@ -982,7 +982,6 @@ def test_review_state_changes_requested_names_the_reviewer(monkeypatch):
         fake_summary("not reviewed"),
         fake_summary("stale review"),
         fake_summary("approved"),
-        fake_summary("approved", checker="marker", form="marker"),
     ],
 )
 def test_run_audit_reports_the_review_state_without_gating_on_it(

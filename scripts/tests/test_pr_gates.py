@@ -1,8 +1,8 @@
-"""Regression tests for the merge gate's three review checkers.
+"""Regression tests for the merge gate's two review checkers.
 
-Gate 3 passes when ANY checker covers the exact head: CodeRabbit's native approval,
-Codex's evidence (native approval, exact-head finding review, trusted clean comment,
-or trusted reaction witness), or a local review attestation. `_review_summary` is the
+Gate 3 passes when EITHER checker covers the exact head: CodeRabbit's native approval,
+or Codex's evidence (native approval, exact-head finding review, trusted clean comment,
+or trusted reaction witness). `_review_summary` is the
 one JSON document every consumer reads; its label is one of four words.
 """
 
@@ -42,25 +42,6 @@ def codex_review(
         "commit_id": sha,
         "submitted_at": submitted_at,
         "body": "Codex review summary",
-    }
-
-
-def manual_marker(
-    sha: str = HEAD_SHA,
-    *,
-    reviewer: str = "claude-code",
-    detail: str = "medium",
-    updated_at: str = "2026-08-22T12:00:00Z",
-    login: str = "acme",
-) -> dict:
-    return {
-        "user": {"login": login},
-        "body": (
-            f"<!-- pinpoint-review: {sha} -->\n"
-            f"<!-- pinpoint-reviewer: {reviewer} -->\n"
-            f"<!-- pinpoint-review-detail: {detail} -->\nreviewed"
-        ),
-        "updated_at": updated_at,
     }
 
 
@@ -110,51 +91,6 @@ def manual_review_request(
     }
 
 
-def legacy_claude_marker(sha: str = HEAD_SHA, detail: str = "high") -> dict:
-    return {
-        "user": {"login": "acme"},
-        "body": (
-            f"<!-- pinpoint-claude-review: {sha} -->\n"
-            f"<!-- pinpoint-review-depth: {detail} -->\n"
-            f"Claude review of head {sha[:7]} — `/code-review {detail}`"
-        ),
-        "updated_at": "2026-08-22T12:00:00Z",
-    }
-
-
-def claude_two_axis_review(
-    sha: str | None = HEAD_SHA[:8],
-    *,
-    login: str = "acme",
-    base: str = "origin/main",
-    standards_findings: str = "No breaches of documented standards.",
-    spec_findings: str = "Faithful to bead.",
-    summary: str = "Standards: 0 hard, Spec: 0 findings.",
-    updated_at: str = "2026-08-22T12:00:00Z",
-    reviewer_sig: str = "—Claude",
-) -> dict:
-    if sha is not None:
-        preamble = f"Reviewed `{base}...{sha}` across **Standards** and **Spec** in parallel sub-agents."
-    else:
-        preamble = f"Two-axis review against merge-base `{base}`. Docs-only."
-
-    body = (
-        f"## Code review — PR #123 (two-axis)\n\n"
-        f"{preamble}\n\n"
-        f"## Standards\n\n{standards_findings}\n\n"
-        f"## Spec\n\n{spec_findings}\n\n"
-        f"---\n\n"
-        f"**Summary** — {summary}\n\n"
-        f"{reviewer_sig}"
-    )
-    return {
-        "user": {"login": login},
-        "body": body,
-        "created_at": updated_at,
-        "updated_at": updated_at,
-    }
-
-
 def thread(*, resolved: bool, author: str) -> dict:
     return {
         "isResolved": resolved,
@@ -168,7 +104,6 @@ def gate_env(
     review_pages: list[list[dict]] | None = None,
     comment_pages: list[list[dict]] | None = None,
     threads: list[dict] | None = None,
-    commits: list[dict] | None = None,
     head_sha: str = HEAD_SHA,
     base_ref: str = "main",
     rollup: list[dict] | None = None,
@@ -189,7 +124,6 @@ def gate_env(
         (tmp_path / "comments.json").write_text(
             "\n".join(json.dumps(page) for page in (comment_pages or [[]]))
         )
-        (tmp_path / "commits.json").write_text(json.dumps(commits or []))
         (tmp_path / "threads.json").write_text(
             json.dumps(
                 {
@@ -225,7 +159,6 @@ def gate_env(
             '  *"api graphql"*) cat "$STUB_THREADS" ;;\n'
             '  *"/pulls/"*"/reviews"*) cat "$STUB_REVIEWS" ;;\n'
             '  *"/issues/"*"/comments"*) cat "$STUB_COMMENTS" ;;\n'
-            '  *"commits"*) cat "$STUB_COMMITS" ;;\n'
             '  *) printf "UNEXPECTED gh call: %s\\n" "$args" >&2; exit 1 ;;\n'
             "esac\n"
         )
@@ -239,7 +172,6 @@ def gate_env(
         env["STUB_BASE_REF"] = base_ref
         env["STUB_REVIEWS"] = str(tmp_path / "reviews.json")
         env["STUB_COMMENTS"] = str(tmp_path / "comments.json")
-        env["STUB_COMMITS"] = str(tmp_path / "commits.json")
         env["STUB_THREADS"] = str(tmp_path / "threads.json")
         env["STUB_ROLLUP"] = str(tmp_path / "rollup.json")
         env["STUB_CALLS"] = str(calls_path)
@@ -357,39 +289,9 @@ def test_current_head_finding_review_passes_and_defers_to_the_thread_gate() -> N
     assert summary["coverage"]["form"] == "reviewed"
 
 
-def test_manual_attestation_of_head_passes() -> None:
-    with gate_env(comment_pages=[[manual_marker()]]) as env:
-        result = run_gate("check_review_happened", env)
-        summary = review_summary(env)
-    assert result.returncode == 0, result.stdout
-    assert f"review marker pins head SHA {HEAD_SHA[:7]}" in result.stdout
-    assert summary["coverage"]["checker"] == "marker"
-    assert (summary["coverage"]["reviewer"], summary["coverage"]["detail"]) == (
-        "claude-code",
-        "medium",
-    )
-
-
-@pytest.mark.parametrize("order", [[OTHER_SHA, HEAD_SHA], [HEAD_SHA, OTHER_SHA]])
-def test_any_manual_marker_pinning_head_passes(order: list[str]) -> None:
-    with gate_env(comment_pages=[[manual_marker(sha) for sha in order]]) as env:
-        result = run_gate("check_review_happened", env)
-    assert result.returncode == 0, result.stdout
-
-
 # ---------------------------------------------------------------------------------
 # Checkers are independent: one reviewer's verdict never masks another's
 # ---------------------------------------------------------------------------------
-
-
-def test_manual_attestation_covers_despite_codex_changes_requested() -> None:
-    with gate_env(
-        review_pages=[[codex_review(state="CHANGES_REQUESTED")]],
-        comment_pages=[[manual_marker()]],
-    ) as env:
-        result = run_gate("check_review_happened", env)
-    assert result.returncode == 0, result.stdout
-    assert "review marker pins head SHA" in result.stdout
 
 
 def test_coderabbit_approval_covers_despite_stale_codex_approval() -> None:
@@ -405,7 +307,6 @@ def test_coderabbit_approval_covers_despite_stale_codex_approval() -> None:
     assert verdicts(summary) == {
         "coderabbit": "covers",
         "codex": "stale",
-        "marker": "none",
     }
 
 
@@ -491,6 +392,33 @@ def test_delayed_old_head_review_does_not_override_current_native_approval() -> 
 # ---------------------------------------------------------------------------------
 
 
+def test_local_review_markers_are_not_evidence() -> None:
+    # Only CodeRabbit and Codex cover a head. The retired local-review markers, even
+    # posted by the owner and pinned to head, are not coverage; a PR reviewed that way
+    # merges only through merge-pr.sh --force at Tim's direction.
+    comments = [
+        {
+            "user": {"login": "acme"},
+            "body": f"<!-- pinpoint-review: {HEAD_SHA} -->\nreviewed by hand",
+            "created_at": "2026-08-22T12:00:00Z",
+            "updated_at": "2026-08-22T12:00:00Z",
+        },
+        {
+            "user": {"login": "acme"},
+            "body": f"## Code review\n\nhead `{HEAD_SHA[:7]}`\n\n## Standards\nok\n\n## Spec\nok",
+            "created_at": "2026-08-22T12:05:00Z",
+            "updated_at": "2026-08-22T12:05:00Z",
+        },
+    ]
+    with gate_env(comment_pages=[comments]) as env:
+        result = run_gate("check_review_happened", env)
+        summary = review_summary(env)
+    assert result.returncode == 1, result.stdout
+    assert summary["label"] == "not reviewed"
+    assert set(summary["checkers"]) == {"coderabbit", "codex"}
+    assert "merge-pr.sh --force" in result.stdout
+
+
 @pytest.mark.parametrize(
     "reviews",
     [
@@ -503,7 +431,7 @@ def test_delayed_old_head_review_does_not_override_current_native_approval() -> 
         ),
     ],
 )
-def test_no_qualifying_review_without_manual_attestation_fails(
+def test_no_qualifying_review_fails(
     reviews: list[dict],
 ) -> None:
     with gate_env(review_pages=[reviews]) as env:
@@ -568,7 +496,6 @@ def test_coderabbit_non_approval_on_head_is_not_reviewed(state: str) -> None:
     assert verdicts(summary) == {
         "coderabbit": "none",
         "codex": "none",
-        "marker": "none",
     }
 
 
@@ -635,8 +562,8 @@ def test_stale_codex_approval_reports_both_commits_and_the_request_remedy() -> N
         f"Codex: newest evidence names {OTHER_SHA[:7]}, head is {HEAD_SHA[:7]}"
         in result.stdout
     )
-    assert "request-codex-review.sh 123 exactly once" in result.stdout
-    assert "CodeRabbit request or a local review" in result.stdout
+    assert "request-codex-review.sh 123 once instead" in result.stdout
+    assert "`@coderabbitai review` once for this head" in result.stdout
     assert summary["label"] == "stale review"
 
 
@@ -661,32 +588,6 @@ def test_old_unusable_codex_review_is_stale(state: str) -> None:
         OTHER_SHA,
         state,
     )
-
-
-def test_newest_stale_manual_marker_is_reported_when_no_marker_pins_head() -> None:
-    older_sha = "1111111111111111111111111111111111111111"
-    with gate_env(
-        comment_pages=[
-            [
-                manual_marker(older_sha, updated_at="2026-08-22T12:00:00Z"),
-                manual_marker(OTHER_SHA, updated_at="2026-08-22T12:01:00Z"),
-            ]
-        ]
-    ) as env:
-        summary = review_summary(env)
-    marker = summary["checkers"]["marker"]
-    assert (marker["verdict"], marker["sha"]) == ("stale", OTHER_SHA)
-
-
-def test_stale_manual_marker_does_not_hide_the_current_finding_review() -> None:
-    with gate_env(
-        review_pages=[[codex_review(state="CHANGES_REQUESTED")]],
-        comment_pages=[[manual_marker(OTHER_SHA, updated_at="2026-08-22T12:01:00Z")]],
-    ) as env:
-        summary = review_summary(env)
-    assert summary["label"] == "approved"
-    assert summary["coverage"]["checker"] == "codex"
-    assert verdicts(summary)["marker"] == "stale"
 
 
 # ---------------------------------------------------------------------------------
@@ -721,7 +622,7 @@ def test_old_or_untrusted_review_request_does_not_mark_current_head_requested(
         summary = review_summary(env)
     assert result.returncode == 1, result.stdout
     assert summary["codex_request_pending"] is False
-    assert "request-codex-review.sh 123 exactly once" in result.stdout
+    assert "request-codex-review.sh 123 once instead" in result.stdout
 
 
 @pytest.mark.parametrize("state", ["DISMISSED", "PENDING", "UNKNOWN"])
@@ -756,7 +657,6 @@ def test_reviews_and_comments_are_read_across_all_pages() -> None:
     with gate_env(review_pages=[[], [codex_review(login=CODERABBIT_BOT)]]) as env:
         assert run_gate("check_review_happened", env).returncode == 0
     for comment in (
-        manual_marker(),
         clean_codex_comment(),
         clean_codex_reaction_witness(),
     ):
@@ -792,29 +692,6 @@ def test_failed_comment_fetch_fails_the_summary_rather_than_reading_as_empty() -
     assert result.stdout.strip() == ""
 
 
-def test_failed_commit_lookup_fails_the_summary_rather_than_dating_the_review_to_nothing() -> (
-    None
-):
-    # A two-axis comment with no explicit SHA is dated to a commit. If that lookup
-    # fails, the review must not silently become "no evidence".
-    comment = claude_two_axis_review(sha=None, updated_at="2026-08-22T12:05:00Z")
-    with gate_env(comment_pages=[[comment]]) as env:
-        env["STUB_COMMITS"] = str(Path(env["STUB_COMMITS"]).parent / "missing.json")
-        result = subprocess.run(
-            [
-                "bash",
-                "-c",
-                f'set -euo pipefail; source "{GATES_PATH}"; _review_summary 123',
-            ],
-            capture_output=True,
-            text=True,
-            env=env,
-            timeout=60,
-        )
-    assert result.returncode != 0
-    assert result.stdout.strip() == ""
-
-
 def test_review_summary_shape() -> None:
     with gate_env(review_pages=[[codex_review()]]) as env:
         summary = review_summary(env)
@@ -827,7 +704,7 @@ def test_review_summary_shape() -> None:
         "unresolved_threads",
     }
     assert summary["head"] == HEAD_SHA
-    assert set(summary["checkers"]) == {"coderabbit", "codex", "marker"}
+    assert set(summary["checkers"]) == {"coderabbit", "codex"}
     coverage = summary["coverage"]
     assert (coverage["sha"], coverage["reviewer"], coverage["detail"]) == (
         HEAD_SHA,
@@ -836,123 +713,6 @@ def test_review_summary_shape() -> None:
     )
     assert coverage["at"] == "2026-08-22T12:00:00Z"
     assert coverage["summary"] == "Codex review summary"
-
-
-def test_manual_marker_record_retains_reviewer_and_detail() -> None:
-    with gate_env(
-        comment_pages=[[manual_marker(reviewer="codex-plugin-cc", detail="base-main")]]
-    ) as env:
-        coverage = review_summary(env)["coverage"]
-    assert (
-        coverage["checker"],
-        coverage["sha"],
-        coverage["reviewer"],
-        coverage["detail"],
-    ) == (
-        "marker",
-        HEAD_SHA,
-        "codex-plugin-cc",
-        "base-main",
-    )
-
-
-def test_canonical_marker_without_metadata_is_unrecorded() -> None:
-    bare = {
-        "user": {"login": "acme"},
-        "body": f"<!-- pinpoint-review: {HEAD_SHA} -->\nreviewed by hand",
-        "updated_at": "2026-08-22T12:00:00Z",
-    }
-    with gate_env(comment_pages=[[bare]]) as env:
-        coverage = review_summary(env)["coverage"]
-    assert (coverage["reviewer"], coverage["detail"]) == ("unrecorded", "unrecorded")
-
-
-def test_legacy_marker_and_trivial_detail_remain_readable() -> None:
-    with gate_env(comment_pages=[[legacy_claude_marker(detail="trivial")]]) as env:
-        coverage = review_summary(env)["coverage"]
-    assert (coverage["checker"], coverage["reviewer"], coverage["detail"]) == (
-        "marker",
-        "claude-code",
-        "trivial",
-    )
-
-
-def test_marker_text_quoted_in_a_comment_is_not_a_marker() -> None:
-    quoted = {
-        "user": {"login": "acme"},
-        "body": f"maybe post <!-- pinpoint-review: {HEAD_SHA} -->",
-    }
-    with gate_env(comment_pages=[[quoted]]) as env:
-        result = run_gate("check_review_happened", env)
-    assert result.returncode == 1, result.stdout
-
-
-def test_marker_from_anyone_but_the_owner_is_not_evidence() -> None:
-    # The repo is public; a marker-shaped comment from a stranger must not pass Gate 3.
-    with gate_env(comment_pages=[[manual_marker(login="stranger")]]) as env:
-        result = run_gate("check_review_happened", env)
-        summary = review_summary(env)
-    assert result.returncode == 1, result.stdout
-    assert verdicts(summary)["marker"] == "none"
-
-
-# ---------------------------------------------------------------------------------
-# Two-axis review comments are local attestations
-# ---------------------------------------------------------------------------------
-
-
-def test_claude_two_axis_review_with_explicit_short_sha_pins_head() -> None:
-    comment = claude_two_axis_review(sha=HEAD_SHA[:8])
-    with gate_env(comment_pages=[[comment]]) as env:
-        coverage = review_summary(env)["coverage"]
-        gate_res = run_gate("check_review_happened", env)
-    assert coverage["checker"] == "marker"
-    assert coverage["sha"] == HEAD_SHA[:8]
-    assert (coverage["reviewer"], coverage["detail"]) == ("claude-code", "two-axis")
-    assert "Standards: 0 hard, Spec: 0 findings" in coverage["summary"]
-    assert gate_res.returncode == 0, gate_res.stdout
-    assert f"review marker pins head SHA {HEAD_SHA[:7]}" in gate_res.stdout
-
-
-def test_claude_two_axis_review_with_merge_base_only_correlates_commit_timestamp() -> (
-    None
-):
-    comment = claude_two_axis_review(sha=None, updated_at="2026-08-22T12:05:00Z")
-    commits = [
-        {
-            "oid": "1111111111111111111111111111111111111111",
-            "committedDate": "2026-08-22T12:00:00Z",
-        },
-        {"oid": HEAD_SHA, "committedDate": "2026-08-22T12:04:00Z"},
-    ]
-    with gate_env(comment_pages=[[comment]], commits=commits) as env:
-        coverage = review_summary(env)["coverage"]
-        gate_res = run_gate("check_review_happened", env)
-    assert coverage["checker"] == "marker"
-    assert coverage["sha"] == HEAD_SHA
-    assert gate_res.returncode == 0, gate_res.stdout
-
-
-def test_claude_two_axis_review_becomes_stale_when_head_moves() -> None:
-    comment = claude_two_axis_review(sha=OTHER_SHA[:8])
-    with gate_env(comment_pages=[[comment]]) as env:
-        summary = review_summary(env)
-        gate_res = run_gate("check_review_happened", env)
-    marker = summary["checkers"]["marker"]
-    assert (marker["verdict"], marker["sha"]) == ("stale", OTHER_SHA[:8])
-    assert summary["label"] == "stale review"
-    assert gate_res.returncode == 1, gate_res.stdout
-    assert (
-        f"local attestation: newest evidence names {OTHER_SHA[:7]}, head is {HEAD_SHA[:7]}"
-        in gate_res.stdout
-    )
-
-
-def test_antigravity_two_axis_review_records_antigravity_reviewer() -> None:
-    comment = claude_two_axis_review(sha=HEAD_SHA[:8], reviewer_sig="—Antigravity")
-    with gate_env(comment_pages=[[comment]]) as env:
-        coverage = review_summary(env)["coverage"]
-    assert (coverage["reviewer"], coverage["detail"]) == ("antigravity", "two-axis")
 
 
 # ---------------------------------------------------------------------------------
@@ -1275,25 +1035,6 @@ def test_pure_merge_from_main_inherits_codex_reaction_witness() -> None:
     assert run.returncode == 0
     assert (
         f"trusted workflow witnessed Codex clean reaction on head SHA {head_sha[:7]} (inherited from {approved_sha[:7]}; pure merge from main)"
-        in run.stdout
-    )
-
-
-def test_pure_merge_from_main_inherits_manual_marker() -> None:
-    with git_repo_with_merge() as (repo, approved_sha, head_sha):
-        with gate_env(
-            comment_pages=[[manual_marker(sha=approved_sha)]],
-            head_sha=head_sha,
-        ) as env:
-            summary = review_summary(env, cwd=repo)
-            run = run_gate("check_review_happened", env, cwd=repo)
-
-    assert summary["label"] == "approved"
-    assert summary["coverage"]["checker"] == "marker"
-    assert summary["coverage"]["inherited"] is True
-    assert run.returncode == 0
-    assert (
-        f"review marker pins head SHA {head_sha[:7]} (inherited from {approved_sha[:7]}; pure merge from main)"
         in run.stdout
     )
 

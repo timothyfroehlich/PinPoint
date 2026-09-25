@@ -110,7 +110,7 @@ fetch_pr_head
 # Tested by SHA inequality, not by "is the object missing": the fetch brings down the new
 # head's whole ancestry, and in the race being guarded against the SHA `gh` named IS an
 # ancestor of what was fetched — so an existence check always passes and the guard never
-# fires. That is the dangerous direction. The gate answers (review marker, CI, threads)
+# fires. That is the dangerous direction. The gate answers (review, CI, threads)
 # come from `gh` at one SHA while the diff comes from git at another, and the report would
 # then hand over a merge command for a head Codex never approved, which is the exact false
 # green this script exists to prevent.
@@ -163,34 +163,11 @@ review_summary=$(_review_summary "$pr")
 rv_label=$(jq -r '.label' <<< "$review_summary")
 rv_covered=$(jq -r '.coverage != null' <<< "$review_summary")
 
-# Manual attestation metadata describes which review actually happened. Preserve it in
-# the handoff rather than flattening a `/code-review high` or the trivial exception into
-# the generic phrase "manual review attestation".
-review_phrase() {
-  case "$1:$2" in
-    codex-plugin-cc:base-main) printf 'codex review, branch diff vs main\n' ;;
-    claude-code:trivial) printf 'attested trivial (no /code-review run)\n' ;;
-    claude-code:unrecorded) printf 'depth unrecorded (legacy marker predates PP-9onv)\n' ;;
-    claude-code:two-axis) printf 'Claude review (two-axis)\n' ;;
-    claude-code:low | claude-code:medium | claude-code:high | claude-code:xhigh | claude-code:max | claude-code:ultra)
-      printf '/code-review %s\n' "$2"
-      ;;
-    antigravity:trivial) printf 'attested trivial (no Antigravity review run)\n' ;;
-    antigravity:two-axis) printf 'Antigravity review (two-axis)\n' ;;
-    antigravity:low | antigravity:medium | antigravity:high | antigravity:xhigh | antigravity:max | antigravity:ultra)
-      printf 'Antigravity review (%s)\n' "$2"
-      ;;
-    antigravity:*) printf 'Antigravity review (%s)\n' "$2" ;;
-    unrecorded:*) printf 'reviewer/detail unrecorded\n' ;;
-    *) printf '%s %s\n' "$1" "$2" ;;
-  esac
-}
-
 # What one checker record is, in words: "CodeRabbit GitHub approval", "Codex clean
-# review comment", "/code-review high", … Keyed on `detail` (the review state or the
-# evidence kind) so a stale record reads the same as the covering one it used to be.
+# review comment", … Keyed on `detail` (the review state or the evidence kind) so a
+# stale record reads the same as the covering one it used to be.
 record_phrase() {
-  local checker=$1 reviewer=$2 detail=$3
+  local checker=$1 detail=$2
   case "$checker:$detail" in
     coderabbit:APPROVED) printf 'CodeRabbit GitHub approval\n' ;;
     coderabbit:*) printf 'CodeRabbit GitHub review (%s)\n' "$detail" ;;
@@ -198,7 +175,6 @@ record_phrase() {
     codex:NO_FINDINGS) printf 'Codex clean review comment\n' ;;
     codex:REACTION_WITNESS) printf 'Codex clean reaction witness\n' ;;
     codex:*) printf 'Codex GitHub review (%s)\n' "$detail" ;;
-    marker:*) review_phrase "$reviewer" "$detail" ;;
     *) printf '%s %s\n' "$checker" "$detail" ;;
   esac
 }
@@ -209,12 +185,11 @@ since_review_note=""
 if [[ "$rv_covered" == "true" ]]; then
   cv_checker=$(jq -r '.coverage.checker' <<< "$review_summary")
   cv_form=$(jq -r '.coverage.form' <<< "$review_summary")
-  cv_reviewer=$(jq -r '.coverage.reviewer' <<< "$review_summary")
   cv_detail=$(jq -r '.coverage.detail' <<< "$review_summary")
   cv_at=$(jq -r '.coverage.at' <<< "$review_summary")
   cv_inherited=$(jq -r '.coverage.inherited // false' <<< "$review_summary")
   cv_inherited_from=$(jq -r '.coverage.inherited_from // ""' <<< "$review_summary")
-  review_desc="$(record_phrase "$cv_checker" "$cv_reviewer" "$cv_detail") · ${cv_at} · covers head ${short_head}"
+  review_desc="$(record_phrase "$cv_checker" "$cv_detail") · ${cv_at} · covers head ${short_head}"
   if [[ "$cv_inherited" == "true" && -n "$cv_inherited_from" ]]; then
     review_desc+=" (inherited from ${cv_inherited_from:0:7}; pure merge from main)"
   fi
@@ -227,11 +202,10 @@ else
   stale=$(jq -c '[.checkers[] | select(.verdict == "stale")] | sort_by(.at) | last // empty' <<< "$review_summary")
   if [[ -n "$stale" ]]; then
     st_checker=$(jq -r '.checker' <<< "$stale")
-    st_reviewer=$(jq -r '.reviewer' <<< "$stale")
     st_detail=$(jq -r '.detail' <<< "$stale")
     st_at=$(jq -r '.at' <<< "$stale")
     st_sha=$(jq -r '.sha' <<< "$stale")
-    st_phrase=$(record_phrase "$st_checker" "$st_reviewer" "$st_detail")
+    st_phrase=$(record_phrase "$st_checker" "$st_detail")
     if git cat-file -e "${st_sha}^{commit}" 2>/dev/null \
       && git merge-base --is-ancestor "$st_sha" "$head_sha" 2>/dev/null; then
       behind=$(git rev-list --count "${st_sha}..${head_sha}")

@@ -90,8 +90,6 @@ class Scenario:
     clean_reaction_sha: str = "head"
     manual_request: bool = False
     manual_review: bool = False
-    manual_reviewer: str = "claude-code"
-    manual_detail: str = "medium"
     gh_head: str = "head"
     threads: list[dict] = field(default_factory=list)
     comments: list[dict] = field(default_factory=list)
@@ -222,11 +220,7 @@ def repo_with_pr(
             comments.append(
                 {
                     "user": {"login": "acme"},
-                    "body": (
-                        f"<!-- pinpoint-review: {head_sha} -->\n"
-                        f"<!-- pinpoint-reviewer: {scenario.manual_reviewer} -->\n"
-                        f"<!-- pinpoint-review-detail: {scenario.manual_detail} -->\nreviewed"
-                    ),
+                    "body": f"<!-- pinpoint-review: {head_sha} -->\nreviewed by hand",
                     "updated_at": "2026-08-02T20:43:19Z",
                 }
             )
@@ -861,35 +855,15 @@ def test_a_clean_codex_comment_covering_head_is_merge_ready() -> None:
         assert MERGE_CMD in run.stdout, run.stdout
 
 
-def test_a_manual_attestation_covering_head_is_merge_ready() -> None:
+def test_a_local_review_marker_is_not_coverage() -> None:
+    # Only CodeRabbit and Codex cover a head; a PR reviewed locally merges only
+    # through merge-pr.sh --force at Tim's direction, never via the printed command.
     with repo_with_pr(
         branch_changes={"src/lib/thing.ts": "x\n"},
         scenario=Scenario(manual_review=True),
     ) as (_head, run):
-        assert MERGE_CMD in run.stdout, run.stdout
-        assert "/code-review medium" in run.stdout, run.stdout
-
-
-def test_a_claude_two_axis_review_is_named_in_the_handoff() -> None:
-    with repo_with_pr(
-        branch_changes={"src/lib/thing.ts": "x\n"},
-        scenario=Scenario(manual_review=True, manual_detail="two-axis"),
-    ) as (_head, run):
-        assert "Claude review (two-axis)" in run.stdout, run.stdout
-        assert MERGE_CMD in run.stdout, run.stdout
-
-
-def test_an_antigravity_two_axis_review_is_named_in_the_handoff() -> None:
-    with repo_with_pr(
-        branch_changes={"src/lib/thing.ts": "x\n"},
-        scenario=Scenario(
-            manual_review=True,
-            manual_reviewer="antigravity",
-            manual_detail="two-axis",
-        ),
-    ) as (_head, run):
-        assert "Antigravity review (two-axis)" in run.stdout, run.stdout
-        assert MERGE_CMD in run.stdout, run.stdout
+        assert MERGE_CMD not in run.stdout, run.stdout
+        assert "not reviewed" in run.stdout, run.stdout
 
 
 def test_a_codex_review_with_no_open_threads_is_merge_ready() -> None:

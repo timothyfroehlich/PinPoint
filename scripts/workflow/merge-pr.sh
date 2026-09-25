@@ -16,7 +16,7 @@
 #   -a, --automerge               Poll the gates instead of evaluating them once, and merge
 #                                 as soon as they all pass. Fire it while CI is still
 #                                 running — that is what it is for. It does NOT wait out
-#                                 an unreviewed head: `reviewed` never WAITs. An unattested
+#                                 an unreviewed head: `reviewed` never WAITs. An unreviewed
 #                                 head hard-fails on the FIRST poll and the run ends. Get
 #                                 fresh exact-head review coverage BEFORE firing this.
 #                                 Terminates on exactly three outcomes, each
@@ -66,7 +66,7 @@ AUTOMERGE=false
 
 # Automerge polling budget. Defaults sized for this repo: the full E2E suite runs
 # ~10-15 min, so an hour covers a normal PR with room for a CI re-run. It is not
-# sized to wait out a review — the review must already be attested before this runs.
+# sized to wait out a review — the review must already cover head before this runs.
 AUTOMERGE_TIMEOUT=${AUTOMERGE_TIMEOUT:-3600}
 AUTOMERGE_POLL_INTERVAL=${AUTOMERGE_POLL_INTERVAL:-30}
 

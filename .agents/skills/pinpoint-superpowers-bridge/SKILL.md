@@ -61,8 +61,8 @@ Code work still happens **in a worktree** — the root checkout is read-only (AG
 
 ### `requesting-code-review` / `receiving-code-review`
 
-- Superpowers' reviewer-subagent is fine as an **optional local self-check**. The **authoritative** gate is current-head `CI Gate` plus the exact-head Codex review requested through `pinpoint-pr-workflow`. A superpowers review alone does not satisfy it.
-- **`requesting-code-review` does not satisfy the merge gate by itself.** Own the GitHub draft/CI/review loop through exact-head coverage with every finding thread adjudicated and resolved. After current-head CI succeeds and the PR is ready, run `bash scripts/workflow/request-codex-review.sh <PR>` exactly once for that head. A corrective push requires replacement CI and one new request for the new head. Local attestations still require Tim to run the named local review. Full rules: `pinpoint-pr-workflow` Phase 3.4.
+- Superpowers' reviewer-subagent is fine as an **optional local self-check**. The **authoritative** gate is current-head `CI Gate` plus exact-head CodeRabbit or Codex coverage, obtained through `pinpoint-pr-workflow`. A superpowers review alone does not satisfy it.
+- **`requesting-code-review` does not satisfy the merge gate by itself.** Own the GitHub draft/CI/review loop through exact-head coverage with every finding thread adjudicated and resolved. After current-head CI succeeds and the PR is ready, comment `@coderabbitai review` once for that head (or run `bash scripts/workflow/request-codex-review.sh <PR>` once when CodeRabbit is rate-limited). A corrective push requires replacement CI and one new request for the new head. Full rules: `pinpoint-pr-workflow` Phase 3.4.
 - **Reply to review comments via MCP** (`add_reply_to_pull_request_comment` + resolve the thread with `pull_request_review_write method:"resolve_thread"`), **signed with your agent name** (`—Claude` / `—Gemini` / `—Codex` / `—Antigravity`, per AGENTS.md §5 "Review comments"). Declined comments still get a one-sentence reply — no silent ignores. Do not use the plugin's own reply flow.
 
 ### `finishing-a-development-branch` — the biggest override

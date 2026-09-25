@@ -64,10 +64,10 @@ CI_GATE_NAME = "CI Gate"
 GATES_SCRIPT = Path(__file__).resolve().parent / "_pr-gates.sh"
 REVIEW_LABELS = ("approved", "changes requested", "stale review", "not reviewed")
 REVIEW_HINT = (
-    "after current-head CI succeeds and the PR is ready, run "
-    "request-codex-review.sh #{pr} exactly once for this head, or ask Tim for a "
-    "CodeRabbit request or a local review; a new head requires replacement CI and "
-    "a new review"
+    "after current-head CI succeeds and the PR is ready, comment "
+    "`@coderabbitai review` once for this head (if CodeRabbit is rate-limited, run "
+    "request-codex-review.sh {pr} once instead); a new head requires replacement CI "
+    "and a new review; merging without a review takes Tim's explicit --force"
 )
 REVIEW_REQUESTED_HINT = (
     "the manual Codex review for this head was already requested; wait for exact-head "
@@ -194,8 +194,8 @@ def review_summary(pr: int, *, timeout: float | None = None) -> dict:
     """The review summary for a PR, computed by the bash gate.
 
     `_review_summary` in scripts/workflow/_pr-gates.sh is the single implementation
-    of review evidence — three checkers (CodeRabbit approval, Codex evidence, local
-    attestation) and a four-word label. This watcher and the dashboard read its JSON
+    of review evidence — two checkers (CodeRabbit approval, Codex evidence) and a
+    four-word label. This watcher and the dashboard read its JSON
     instead of mirroring the logic, so no Python copy can drift from the merge gate.
 
     `timeout` bounds the gate's `gh` calls; the review-phase watcher passes what is
@@ -230,11 +230,7 @@ def review_summary(pr: int, *, timeout: float | None = None) -> dict:
 
 def _checker_lines(summary: dict) -> str:
     head = str(summary.get("head") or "")[:7]
-    names = {
-        "coderabbit": "CodeRabbit",
-        "codex": "Codex",
-        "marker": "local attestation",
-    }
+    names = {"coderabbit": "CodeRabbit", "codex": "Codex"}
     parts: list[str] = []
     for key, name in names.items():
         record = (summary.get("checkers") or {}).get(key) or {}
@@ -266,7 +262,6 @@ def review_state(pr: int) -> tuple[str, str]:
         who = {
             "coderabbit": "CodeRabbit approval",
             "codex": "Codex evidence",
-            "marker": "local review attestation",
         }.get(str(coverage.get("checker")), "review")
         return label, f"{who} covers head {head}"
     lines = _checker_lines(summary)
