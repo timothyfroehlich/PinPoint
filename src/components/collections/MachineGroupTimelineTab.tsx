@@ -20,7 +20,12 @@ interface MachineGroupTimelineTabProps {
   machines: CollectionMachine[];
   /** Base path for the timeline route, e.g. `/c/<id>/timeline`. */
   basePath: string;
-  searchParams: { tag?: string; page?: string; m?: string };
+  searchParams: Record<string, string | string[] | undefined>;
+}
+
+/** A repeated key (`?m=A&m=B`) arrives as an array; treat it as one CSV value. */
+function csvParam(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value.join(",") : value;
 }
 
 const PAGE_SIZE = 25;
@@ -44,7 +49,10 @@ export async function MachineGroupTimelineTab({
   basePath,
   searchParams,
 }: MachineGroupTimelineTabProps): Promise<React.JSX.Element> {
-  const { tag: tagParam, page: pageParam, m: machineParam } = searchParams;
+  const tagParam = csvParam(searchParams["tag"]);
+  const machineParam = csvParam(searchParams["m"]);
+  const rawPage = searchParams["page"];
+  const pageParam = Array.isArray(rawPage) ? rawPage[0] : rawPage;
 
   // `?page=N` (1-indexed). Anything not a positive integer collapses to page 1.
   const parsedPage = pageParam ? Number.parseInt(pageParam, 10) : 1;

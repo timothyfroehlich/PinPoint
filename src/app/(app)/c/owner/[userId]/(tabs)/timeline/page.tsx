@@ -5,7 +5,7 @@ import { getOwnerCollectionForLayout } from "~/app/(app)/c/owner/[userId]/_data"
 
 interface PageProps {
   params: Promise<{ userId: string }>;
-  searchParams: Promise<{ tag?: string; page?: string; m?: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
 export default async function CollectionTimelinePage({

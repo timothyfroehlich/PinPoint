@@ -6,7 +6,7 @@ import { getManufacturerTagForLayout } from "~/app/(app)/c/tags/manufacturer/[sl
 
 interface PageProps {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ tag?: string; page?: string; m?: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
 export default async function ManufacturerTagTimelinePage({

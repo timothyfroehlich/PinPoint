@@ -5,7 +5,7 @@ import { getCollectionForLayout } from "~/app/(app)/c/[id]/_data";
 
 interface PageProps {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ tag?: string; page?: string; m?: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
 export default async function CollectionTimelinePage({
