@@ -1,5 +1,8 @@
 {
   "permissions": {
+    "allow": [
+      "Bash(bash scripts/workflow/record-claude-review.sh:*)"
+    ],
     "deny": [
       "Bash(supabase db push:*)",
       "Bash(supabase projects delete:*)",
