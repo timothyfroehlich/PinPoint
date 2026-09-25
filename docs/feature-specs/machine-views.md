@@ -49,7 +49,7 @@
 
 ## 4. URL State and Presets
 
-- **4.1** Canonical Machine View URL state uses `q`, `presence`, `status`, `owner`, `sort`, `dir`, `page`, `pageSize`, and `columns`.
+- **4.1** Canonical Machine View URL state uses `q`, `presence`, `status`, `owner`, `sort`, `dir`, `page`, `pageSize`, `columns`, and `view`.
 - **4.2** Multi-values serialize as comma-separated canonical values. Owner filters use stable IDs plus the `unassigned` sentinel. Page sizes are limited to 25, 50, and 100.
 - **4.3** Invalid values are ignored, positive pages are clamped, and preset defaults are omitted from the URL.
 - **4.4** Search, filter, sort, and page-size changes reset to page 1. Displayed-field changes retain the current page when that page remains valid.
@@ -59,6 +59,7 @@
 - **4.8** Collections include every member presence state by default and sort worst playability first.
 - **4.9** Reopening or copying a canonical URL restores displayed fields, search, filters, sorting, page size, and page.
 - **4.10** Canonical URLs are always expressed relative to the Page Preset, never relative to a viewer's Saved Views, so the same URL shows every viewer the same configuration.
+- **4.11** `view` names the Saved View the configuration came from, or `preset` for the Page Preset. It never changes the configuration a URL shows, and a viewer who does not own the named Saved View ignores it.
 
 ---
 
@@ -129,6 +130,6 @@
 
 | Date | Change |
 | :-- | :-- |
-| 2026-09-25 | Added Surfaces, Saved Views, and Default Saved Views (§8); URLs are canonical relative to the Page Preset (§4.10); retired §7.1; deferred Saved View record sharing (§7.6). |
+| 2026-09-25 | Added Surfaces, Saved Views, and Default Saved Views (§8); URLs are canonical relative to the Page Preset (§4.10) and carry a `view` parameter naming their Saved View or the Page Preset (§4.1, §4.11); retired §7.1; deferred Saved View record sharing (§7.6). |
 | 2026-09-24 | Made View Scope route-supplied; machine-group membership moved to the specs that own each group. |
 | 2026-09-21 | Created. Establishes one machine-specific view for `/m` and Collections, conditional enrichment, bookmarkable URL state, shared responsive presentation, route-preservation requirements, and explicit deferred integrations/saved-view work. |
