@@ -541,8 +541,9 @@ check_review_happened() {
   else
     echo "  remedy: a PR just promoted from draft already has CodeRabbit's automatic"
     echo "          review running; wait for it. Otherwise, after current-head CI"
-    echo "          succeeds, comment \`@coderabbitai review\` once for this head. If"
-    echo "          CodeRabbit is rate-limited, run request-codex-review.sh ${pr} once instead."
+    echo "          succeeds, run request-coderabbit-review.sh ${pr} once for this head."
+    echo "          If CodeRabbit replies \`Review rate limited\` to that request, run"
+    echo "          request-codex-review.sh ${pr} <reply-ID> once instead."
     echo "          A new head requires replacement CI and a new review."
     echo "          Merging without a review takes Tim's explicit direction to use"
     echo "          merge-pr.sh --force."

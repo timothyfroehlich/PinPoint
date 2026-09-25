@@ -1,4 +1,4 @@
-"""Tests for the one-per-head manual Codex review request guard."""
+"""Tests for the one-per-head CodeRabbit and Codex review request guards."""
 
 import json
 import os
@@ -11,8 +11,40 @@ import pytest
 pytestmark = pytest.mark.integration
 
 SCRIPT = Path(__file__).parent.parent / "workflow" / "request-codex-review.sh"
+CODERABBIT_SCRIPT = (
+    Path(__file__).parent.parent / "workflow" / "request-coderabbit-review.sh"
+)
 HEAD = "a" * 40
 OTHER_HEAD = "b" * 40
+
+
+def coderabbit_request(
+    created_at: str = "2026-09-05T12:01:00Z", sha: str = HEAD
+) -> dict:
+    return {
+        "user": {"login": "acme"},
+        "body": f"@coderabbitai review\n<!-- pinpoint-coderabbit-review-head: {sha} -->",
+        "created_at": created_at,
+    }
+
+
+def rate_limit_response(
+    *,
+    login: str = "coderabbitai[bot]",
+    app: str = "coderabbitai",
+    issue_url: str = "https://api.github.com/repos/acme/widget/issues/123",
+    body: str = "Review rate limited.",
+    created_at: str = "2026-09-05T12:01:01Z",
+    updated_at: str = "2026-09-05T12:01:05Z",
+) -> dict:
+    return {
+        "user": {"login": login},
+        "performed_via_github_app": {"slug": app},
+        "issue_url": issue_url,
+        "body": body,
+        "created_at": created_at,
+        "updated_at": updated_at,
+    }
 
 
 def run_request(
@@ -26,7 +58,10 @@ def run_request(
     ci_gates: list[dict] | None = None,
     reviews: list[dict] | None = None,
     comments: list[dict] | None = None,
+    rate_limit_comment: dict | None = None,
+    rate_limit_comment_id: str | None = "456",
     latest_head: str = HEAD,
+    script: Path = SCRIPT,
 ) -> tuple[subprocess.CompletedProcess[str], list[str]]:
     posts = tmp_path / "posts.jsonl"
     gh = tmp_path / "gh"
@@ -45,6 +80,8 @@ def run_request(
         "elif args[:2] == ['api', 'graphql']:\n"
         "    print(json.dumps({'data': {'repository': {'pullRequest': {'reviewThreads': "
         "{'pageInfo': {'hasNextPage': False, 'endCursor': None}, 'nodes': []}}}}}))\n"
+        "elif any('/issues/comments/' in arg for arg in args):\n"
+        "    print(os.environ['STUB_RATE_LIMIT_COMMENT'])\n"
         "elif any('/pulls/' in arg and '/reviews' in arg for arg in args):\n"
         "    print(os.environ['STUB_REVIEWS'])\n"
         "elif any('/issues/' in arg and '/comments' in arg for arg in args) and '--method' not in args:\n"
@@ -79,12 +116,24 @@ def run_request(
         "STUB_ACTOR": actor,
         "STUB_METADATA": json.dumps(metadata),
         "STUB_LATEST_HEAD": latest_head,
+        "STUB_RATE_LIMIT_COMMENT": json.dumps(
+            rate_limit_comment
+            if rate_limit_comment is not None
+            else rate_limit_response()
+        ),
         "STUB_REVIEWS": json.dumps(reviews or []),
-        "STUB_COMMENTS": json.dumps(comments or []),
+        "STUB_COMMENTS": json.dumps(
+            comments if comments is not None else [coderabbit_request()]
+        ),
         "STUB_POSTS": str(posts),
     }
     result = subprocess.run(
-        ["bash", str(SCRIPT), "123"],
+        [
+            "bash",
+            str(script),
+            "123",
+            *([rate_limit_comment_id] if rate_limit_comment_id else []),
+        ],
         capture_output=True,
         text=True,
         env=env,
@@ -123,6 +172,160 @@ def test_requests_sha_bound_review_after_green_ci(tmp_path: Path) -> None:
     assert result.stderr == ""
     assert posts == [f"@codex review\n<!-- pinpoint-codex-review-head: {HEAD} -->"]
     assert f"head {HEAD[:7]}" in result.stdout
+
+
+def test_accepts_coderabbit_ack_edited_after_request(tmp_path: Path) -> None:
+    result, posts = run_request(
+        tmp_path,
+        rate_limit_comment=rate_limit_response(created_at="2026-09-05T11:59:00Z"),
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert len(posts) == 1
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "message"),
+    [
+        ({"rate_limit_comment_id": None}, "Usage:"),
+        ({"comments": []}, "no SHA-tagged CodeRabbit request"),
+        (
+            {"comments": [coderabbit_request(sha=OTHER_HEAD)]},
+            "no SHA-tagged CodeRabbit request",
+        ),
+        (
+            {"comments": [{**coderabbit_request(), "body": "@coderabbitai review"}]},
+            "no SHA-tagged CodeRabbit request",
+        ),
+        (
+            {"comments": [{**coderabbit_request(), "user": {"login": "someone"}}]},
+            "no SHA-tagged CodeRabbit request",
+        ),
+        (
+            {"comments": [coderabbit_request("2026-09-05T12:02:00Z")]},
+            "does not prove CodeRabbit usage exhaustion",
+        ),
+        (
+            {"rate_limit_comment": rate_limit_response(login="other[bot]")},
+            "does not prove CodeRabbit usage exhaustion",
+        ),
+        (
+            {"rate_limit_comment": rate_limit_response(app="other-app")},
+            "does not prove CodeRabbit usage exhaustion",
+        ),
+        (
+            {
+                "rate_limit_comment": rate_limit_response(
+                    issue_url="https://api.github.com/repos/acme/widget/issues/124"
+                )
+            },
+            "does not prove CodeRabbit usage exhaustion",
+        ),
+        (
+            {"rate_limit_comment": rate_limit_response(body="Review finished.")},
+            "does not prove CodeRabbit usage exhaustion",
+        ),
+        (
+            {
+                "rate_limit_comment": rate_limit_response(
+                    updated_at="2026-09-05T11:59:00Z"
+                )
+            },
+            "does not prove CodeRabbit usage exhaustion",
+        ),
+    ],
+)
+def test_requires_current_head_coderabbit_usage_limit(
+    tmp_path: Path, kwargs: dict[str, object], message: str
+) -> None:
+    result, posts = run_request(tmp_path, **kwargs)
+
+    assert result.returncode != 0
+    assert message in result.stderr
+    assert posts == []
+
+
+def test_coderabbit_helper_posts_head_bound_request(tmp_path: Path) -> None:
+    result, posts = run_request(
+        tmp_path,
+        script=CODERABBIT_SCRIPT,
+        rate_limit_comment_id=None,
+        comments=[],
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert posts == [
+        f"@coderabbitai review\n<!-- pinpoint-coderabbit-review-head: {HEAD} -->"
+    ]
+    assert f"head {HEAD[:7]}" in result.stdout
+
+
+def test_coderabbit_helper_requests_new_head_after_older_request(
+    tmp_path: Path,
+) -> None:
+    result, posts = run_request(
+        tmp_path,
+        script=CODERABBIT_SCRIPT,
+        rate_limit_comment_id=None,
+        comments=[coderabbit_request(sha=OTHER_HEAD)],
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert len(posts) == 1
+
+
+def test_coderabbit_helper_refuses_same_head_duplicate(tmp_path: Path) -> None:
+    result, posts = run_request(
+        tmp_path,
+        script=CODERABBIT_SCRIPT,
+        rate_limit_comment_id=None,
+    )
+
+    assert result.returncode == 1
+    assert "already requested" in result.stderr
+    assert posts == []
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "message"),
+    [
+        ({"actor": "someone-else"}, "not repository owner"),
+        ({"draft": True}, "is draft"),
+        ({"state": "CLOSED"}, "not OPEN"),
+        ({"ci_status": "IN_PROGRESS"}, "status=IN_PROGRESS"),
+        ({"ci_conclusion": "FAILURE"}, "conclusion=FAILURE"),
+        ({"latest_head": OTHER_HEAD}, "head moved"),
+        ({"reviews": [approval()]}, "already has exact-head review coverage"),
+        (
+            {
+                "ci_gates": [
+                    {
+                        "name": "CI Gate",
+                        "status": "COMPLETED",
+                        "conclusion": "SUCCESS",
+                        "startedAt": "2026-09-05T12:00:00Z",
+                    },
+                    {"context": "CodeRabbit", "state": "PENDING"},
+                ]
+            },
+            "already in progress",
+        ),
+    ],
+)
+def test_coderabbit_helper_refuses_ineligible_request(
+    tmp_path: Path, kwargs: dict[str, object], message: str
+) -> None:
+    result, posts = run_request(
+        tmp_path,
+        script=CODERABBIT_SCRIPT,
+        rate_limit_comment_id=None,
+        comments=[],
+        **kwargs,
+    )
+
+    assert result.returncode == 1
+    assert message in result.stderr
+    assert posts == []
 
 
 @pytest.mark.parametrize(

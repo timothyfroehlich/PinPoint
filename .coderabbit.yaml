@@ -49,9 +49,9 @@ reviews:
     # out of draft (`gh pr ready`) triggers an automatic review. CodeRabbit does
     # NOT automatically re-review on subsequent commit pushes; re-evaluating
     # updated commits requires an explicit request:
-    #   gh pr comment <PR> --body "@coderabbitai review"
+    #   bash scripts/workflow/request-coderabbit-review.sh <PR>
     # Quota ceiling is 5 reviews per hour. When rate-limited, fall back to Codex
-    # (@codex review).
+    # (scripts/workflow/request-codex-review.sh <PR> <reply-comment-ID>).
     enabled: true
     drafts: false
     auto_incremental_review: false

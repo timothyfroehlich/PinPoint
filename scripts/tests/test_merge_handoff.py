@@ -645,7 +645,8 @@ def test_an_unreviewed_head_is_named_as_the_blocker() -> None:
     with repo_with_pr(branch_changes={"src/lib/thing.ts": "x\n"}) as (_head, run):
         assert MERGE_CMD not in run.stdout, run.stdout
         assert "reviewed: not reviewed" in run.stdout
-        assert "request-codex-review.sh 123 as fallback" in run.stdout
+        assert "request-coderabbit-review.sh 123 for a later head" in run.stdout
+        assert "request-codex-review.sh 123 <reply-ID>" in run.stdout
         assert "a new head requires replacement CI and a new review" in run.stdout
 
 

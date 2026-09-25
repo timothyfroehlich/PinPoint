@@ -154,20 +154,20 @@ These are the only two review providers. A local review (`/code-review`, `/codex
   Draft promotion automatically triggers a CodeRabbit review on the current head commit.
 - **No auto re-reviews on commit push:** Pushing subsequent commits to an open PR does **not** automatically trigger a CodeRabbit re-review. Wait for replacement CI to succeed on the new head, then explicitly request a re-review:
   ```bash
-  gh pr comment <PR> --body "@coderabbitai review"
+  bash scripts/workflow/request-coderabbit-review.sh <PR>
   ```
-  CodeRabbit edits its acknowledgement comment in place — "Review triggered" can become "Review rate limited", so check current status.
+  The helper posts one SHA-tagged `@coderabbitai review` for the current head and refuses a second request for the same head. CodeRabbit edits its acknowledgement comment in place — "Review triggered" can become "Review rate limited", so check current status.
 - **Hourly Quota & Rate Limiting:** We have an allowance of 5 CodeRabbit reviews per rolling hour. When rate-limited, CodeRabbit posts an issue comment containing `Review rate limited.`
-- **Quota Fallback to Codex:** When CodeRabbit is rate-limited, immediately fall back to requesting a Codex review (see below). If Codex is also out of quota or unavailable, alert Tim and recommend waiting for the next CodeRabbit review slot, or a forced merge at his direction.
+- **Quota Fallback to Codex:** Codex is for CodeRabbit usage exhaustion only: a CodeRabbit reply saying `Review rate limited` to the SHA-tagged request on the current head. Pass that reply's issue-comment ID to the Codex helper below. The draft-promotion auto-review is not SHA-tagged, so when it is rate-limited, run `request-coderabbit-review.sh` once on the same head and wait for its reply. A pending review, or a finished review without approval, is CodeRabbit follow-up, not exhaustion. If Codex is also out of quota or unavailable, alert Tim and recommend waiting for the next CodeRabbit review slot, or a forced merge at his direction.
 
 #### 2. Codex: Secondary Reviewer & Rate-Limit Fallback
 
 - **Manual request only:** Codex reviews are triggered strictly via explicit manual request and never run automatically on draft promotion or commit push.
 - To request Codex review on the current head (after current-head CI passes):
   ```bash
-  bash scripts/workflow/request-codex-review.sh <PR>
+  bash scripts/workflow/request-codex-review.sh <PR> <CodeRabbit-reply-comment-ID>
   ```
-  This helper verifies that the authenticated account is the repository owner, the PR is open and ready, current-head CI passed, and the head lacks review coverage. It posts the SHA-pinned `@codex review` trigger with a hidden marker binding the trusted reaction witness to that SHA. Never request the same head twice.
+  This helper verifies that the authenticated account is the repository owner, the PR is open and ready, current-head CI passed, the head lacks review coverage, and the named comment is CodeRabbit's rate-limit reply (exact bot and app, this PR, updated after the owner's SHA-tagged request for this head). It posts the SHA-pinned `@codex review` trigger with a hidden marker binding the trusted reaction witness to that SHA. Never request the same head twice.
 
 #### 3. Concurrent Review Execution & Adjudication
 
@@ -186,7 +186,7 @@ python3 scripts/workflow/pr-watch.py <PR> --phase review --expected-head <HEAD_S
 - `outcome: "action_required"` (exit 1): Either `approved` with unresolved threads (>0), or the review state is `changes requested`.
   - Adjudicate findings: fix code or reply/decline threads.
   - If code changed, push fixes, wait for replacement CI, and re-request review.
-  - The watch does not detect CodeRabbit rate limiting — a rate-limited review runs to `timed_out`. If CodeRabbit's comment says `Review rate limited`, fall back to Codex; if Codex is also unavailable, alert Tim.
+  - The watch does not detect CodeRabbit rate limiting — a rate-limited review runs to `timed_out`. If CodeRabbit's reply to the SHA-tagged request says `Review rate limited`, pass its comment ID to the Codex helper; if Codex is also unavailable, alert Tim.
 - `outcome: "stale"` (exit 1): Branch head moved; re-orient to the new head.
 - `outcome: "conflicting"` (exit 1): Merge conflict; merge `origin/main` into the branch and push.
 - `outcome: "timed_out"` / `"undetermined"` (exit 2): Re-run watch or inspect GitHub API reachability.

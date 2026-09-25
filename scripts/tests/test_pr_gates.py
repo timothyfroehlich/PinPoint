@@ -562,8 +562,8 @@ def test_stale_codex_approval_reports_both_commits_and_the_request_remedy() -> N
         f"Codex: newest evidence names {OTHER_SHA[:7]}, head is {HEAD_SHA[:7]}"
         in result.stdout
     )
-    assert "request-codex-review.sh 123 once instead" in result.stdout
-    assert "`@coderabbitai review` once for this head" in result.stdout
+    assert "request-codex-review.sh 123 <reply-ID> once instead" in result.stdout
+    assert "request-coderabbit-review.sh 123 once for this head" in result.stdout
     assert "just promoted from draft" in result.stdout
     assert summary["label"] == "stale review"
 
@@ -623,7 +623,7 @@ def test_old_or_untrusted_review_request_does_not_mark_current_head_requested(
         summary = review_summary(env)
     assert result.returncode == 1, result.stdout
     assert summary["codex_request_pending"] is False
-    assert "request-codex-review.sh 123 once instead" in result.stdout
+    assert "request-codex-review.sh 123 <reply-ID> once instead" in result.stdout
 
 
 @pytest.mark.parametrize("state", ["DISMISSED", "PENDING", "UNKNOWN"])
