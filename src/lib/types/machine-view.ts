@@ -76,3 +76,38 @@ export interface MachineViewResult {
   ownerOptions: MachineViewOwnerOption[];
   permittedFields: MachineViewFieldId[];
 }
+
+/**
+ * The configuration a Saved View stores (spec §8.2): everything in
+ * {@link MachineViewState} except the page number.
+ */
+export type MachineViewSavedState = Omit<MachineViewState, "page">;
+
+/**
+ * Where Machine View appears and where Saved Views belong (spec §1 Surface),
+ * as the page and its Server Actions name it. A standard Collection is named
+ * by the handle in its URL (its id or its view token), so a view-token visitor
+ * never learns the internal id; the server resolves it and checks access.
+ */
+export type MachineViewSurfaceRef =
+  | { kind: "machines" }
+  | { kind: "collection"; handle: string }
+  | { kind: "owner"; ownerId: string };
+
+export interface MachineViewSavedViewSummary {
+  id: string;
+  name: string;
+  isDefault: boolean;
+  state: MachineViewSavedState;
+}
+
+/**
+ * The signed-in account's Saved Views for one Surface. `activeViewId` is the
+ * validated `view` URL reference (spec §4.11): an owned Saved View id, the
+ * Page Preset reference, or null.
+ */
+export interface MachineViewSavedViews {
+  surface: MachineViewSurfaceRef;
+  views: MachineViewSavedViewSummary[];
+  activeViewId: string | null;
+}

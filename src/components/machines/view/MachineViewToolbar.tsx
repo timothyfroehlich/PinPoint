@@ -68,6 +68,9 @@ interface MachineViewToolbarProps {
   onSearchChange: (value: string) => void;
   onStateChange: (next: MachineViewState) => void;
   onMobileModeChange: (mode: "compact" | "table") => void;
+  /** Renders the Saved Views menu for a layout; absent when unavailable. */
+  renderSavedViewsMenu?:
+    ((layout: "desktop" | "mobile") => React.ReactNode) | undefined;
 }
 
 function parsePageSize(value: string): MachineViewPageSize | null {
@@ -95,6 +98,7 @@ export function MachineViewToolbar({
   onSearchChange,
   onStateChange,
   onMobileModeChange,
+  renderSavedViewsMenu,
 }: MachineViewToolbarProps): React.JSX.Element {
   const defaults = getMachineViewPreset(preset).defaultState;
   const presenceOptions: Option[] = VALID_MACHINE_PRESENCE_STATUSES.map(
@@ -296,6 +300,11 @@ export function MachineViewToolbar({
           <span className="rounded bg-muted px-1.5 py-0.5 text-xs font-bold text-muted-foreground">
             {totalCount}
           </span>
+          {renderSavedViewsMenu ? (
+            <div className="ml-1 hidden md:block">
+              {renderSavedViewsMenu("desktop")}
+            </div>
+          ) : null}
         </div>
         <div className="flex items-center gap-4">
           <PaginationControls
@@ -469,6 +478,9 @@ export function MachineViewToolbar({
           </DropdownMenu>
         </div>
       </div>
+      {renderSavedViewsMenu ? (
+        <div className="px-1 md:hidden">{renderSavedViewsMenu("mobile")}</div>
+      ) : null}
     </div>
   );
 }

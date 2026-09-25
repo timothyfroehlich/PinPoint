@@ -28,6 +28,7 @@ import { type TimelineTag } from "~/lib/timeline/machine-tags";
 import { type SettingsSection } from "~/lib/machines/settings-types";
 import type { LocationSnapshot } from "~/lib/pinballmap/types";
 import { REPORT_MODE_VALUES } from "~/lib/types/user";
+import type { MachineViewSavedState } from "~/lib/types/machine-view";
 
 /**
  * ⚠️ IMPORTANT: When adding new tables to this schema file,
@@ -1020,6 +1021,79 @@ export const collectionCollaborators = pgTable(
   (t) => ({
     pk: primaryKey({ columns: [t.collectionId, t.userId] }),
     userIdx: index("idx_collection_collaborators_user").on(t.userId),
+  })
+).enableRLS();
+
+/**
+ * Personal Machine View Saved Views (spec machine-views.md §8, PP-8bh6).
+ *
+ * A row belongs to one account (`user_id`) and one Surface: Machines, one
+ * standard Collection (`collection_id`), or one owner Collection
+ * (`owner_collection_user_id`, the machine owner whose Collection it is).
+ * Deleting the Collection or either account deletes the row (§8.16). `state`
+ * is the Machine View configuration minus the page number (§8.2); it is
+ * re-validated through the URL parser whenever it is applied (§8.15).
+ */
+export const machineViewSavedViews = pgTable(
+  "machine_view_saved_views",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => userProfiles.id, { onDelete: "cascade" }),
+    surface: text("surface", {
+      enum: ["machines", "collection", "owner"],
+    }).notNull(),
+    collectionId: uuid("collection_id").references(() => collections.id, {
+      onDelete: "cascade",
+    }),
+    ownerCollectionUserId: uuid("owner_collection_user_id").references(
+      () => userProfiles.id,
+      { onDelete: "cascade" }
+    ),
+    name: text("name").notNull(),
+    state: jsonb("state").$type<MachineViewSavedState>().notNull(),
+    isDefault: boolean("is_default").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    // No Drizzle $onUpdate — every UPDATE sets this explicitly in the action.
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    surfaceCheck: check(
+      "machine_view_saved_views_surface_check",
+      sql`(${t.surface} = 'machines' AND ${t.collectionId} IS NULL AND ${t.ownerCollectionUserId} IS NULL)
+        OR (${t.surface} = 'collection' AND ${t.collectionId} IS NOT NULL AND ${t.ownerCollectionUserId} IS NULL)
+        OR (${t.surface} = 'owner' AND ${t.collectionId} IS NULL AND ${t.ownerCollectionUserId} IS NOT NULL)`
+    ),
+    nameNotBlank: check(
+      "machine_view_saved_views_name_not_blank",
+      sql`length(btrim(${t.name})) > 0`
+    ),
+    // §8.8: names are unique per account and Surface, ignoring case.
+    nameUnique: uniqueIndex("uq_machine_view_saved_views_name").on(
+      t.userId,
+      t.surface,
+      sql`coalesce(${t.collectionId}, ${t.ownerCollectionUserId}, '00000000-0000-0000-0000-000000000000'::uuid)`,
+      sql`lower(${t.name})`
+    ),
+    // §8.10: at most one Default Saved View per account and Surface.
+    oneDefault: uniqueIndex("uq_machine_view_saved_views_default")
+      .on(
+        t.userId,
+        t.surface,
+        sql`coalesce(${t.collectionId}, ${t.ownerCollectionUserId}, '00000000-0000-0000-0000-000000000000'::uuid)`
+      )
+      .where(sql`${t.isDefault}`),
+    collectionIdx: index("idx_machine_view_saved_views_collection").on(
+      t.collectionId
+    ),
+    ownerCollectionIdx: index(
+      "idx_machine_view_saved_views_owner_collection"
+    ).on(t.ownerCollectionUserId),
   })
 ).enableRLS();
 

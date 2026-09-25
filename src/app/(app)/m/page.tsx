@@ -1,6 +1,7 @@
 import type React from "react";
 import Link from "next/link";
 import { eq } from "drizzle-orm";
+import { redirect } from "next/navigation";
 import { Plus } from "lucide-react";
 import { MachineView } from "~/components/machines/view";
 import { PageContainer } from "~/components/layout/PageContainer";
@@ -13,6 +14,7 @@ import { toMachineViewSearchParams } from "~/lib/machines/view/state";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
 import { userProfiles } from "~/server/db/schema";
+import { loadMachineViewSurfacePageState } from "./saved-view-surface";
 
 interface MachinesPageProps {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -38,10 +40,16 @@ export default async function MachinesPage({
     : null;
   const accessLevel = getAccessLevel(userProfile?.role);
   const canCreateMachine = checkPermission("machines.create", accessLevel);
+  const viewSearchParams = toMachineViewSearchParams(rawSearchParams);
+  const { savedViews, redirectTo } = await loadMachineViewSurfacePageState(
+    { kind: "machines" },
+    viewSearchParams
+  );
+  if (redirectTo) redirect(redirectTo);
   const result = await loadMachineView({
     scope: { kind: "all" },
     preset: "machines",
-    searchParams: toMachineViewSearchParams(rawSearchParams),
+    searchParams: viewSearchParams,
   });
   const addMachineButton = canCreateMachine ? (
     <Button
@@ -83,7 +91,11 @@ export default async function MachinesPage({
           }
         />
       ) : (
-        <MachineView result={result} preset="machines" />
+        <MachineView
+          result={result}
+          preset="machines"
+          savedViews={savedViews}
+        />
       )}
     </PageContainer>
   );

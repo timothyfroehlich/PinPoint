@@ -44,7 +44,11 @@ export {
   type MachineViewPresetId,
   type MachineViewResult,
   type MachineViewRow,
+  type MachineViewSavedState,
+  type MachineViewSavedViews,
+  type MachineViewSavedViewSummary,
   type MachineViewScope,
+  type MachineViewSurfaceRef,
   type MachineViewSortDirection,
   type MachineViewState,
 } from "./machine-view";

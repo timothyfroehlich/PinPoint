@@ -102,6 +102,7 @@ export default defineConfig({
     "machine_settings_sets",
     "collections",
     "collection_machines",
+    "machine_view_saved_views",
   ],
   schemaFilter: ["public"],
   verbose: true,
