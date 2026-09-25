@@ -225,7 +225,8 @@ export function NotificationPreferencesForm({
     },
     {
       label: "Pinball Map Comments",
-      description: "New Pinball Map comments on machines you own or watch",
+      description:
+        "When Pinball Map comments appear on machines you own or watch",
       ids: {
         email: "emailNotifyOnPinballMapComment",
         inApp: "inAppNotifyOnPinballMapComment",

@@ -44,6 +44,7 @@ describe("Notification Formatting", () => {
       expect(html).toContain(
         '<a href="http://test.com/m/GDZ2/timeline">View Timeline</a>'
       );
+      expect(html).toContain("<h2>[Godzilla (Premium)] GDZ2</h2>");
       expect(html).toContain("Pinball Map Comment");
     });
   });

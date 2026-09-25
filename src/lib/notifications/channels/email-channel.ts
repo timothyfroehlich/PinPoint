@@ -323,7 +323,7 @@ export function getEmailHtml({
   const showDescription = !!sanitizedDescription;
 
   return `
-      <h2>${machinePrefix}${sanitizedIssueId ? `${sanitizedIssueId}: ` : ""}${sanitizedIssueTitle}</h2>
+      <h2>${machinePrefix}${sanitizedIssueId ? `${sanitizedIssueId}: ` : ""}${sanitizedIssueTitle}${isPinballMapComment && machineInitials ? sanitizeHtml(machineInitials, EMAIL_SANITIZE_OPTIONS) : ""}</h2>
       ${eventLabel ? `<h3 style="color: #555; font-weight: 600; margin-bottom: 8px;">${eventLabel}</h3>` : ""}
       <div>${body}</div>
       ${showDescription ? `<blockquote>${sanitizedDescription}</blockquote>` : ""}
