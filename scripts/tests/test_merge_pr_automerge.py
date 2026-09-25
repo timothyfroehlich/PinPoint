@@ -462,7 +462,7 @@ def test_automerge_requires_human() -> None:
         out = run_and_snapshot(ctx, "--automerge")
 
     assert out.returncode == 1
-    assert "REFUSE: merges are human-authorized only" in out.stderr
+    assert "REFUSE: merges require Tim's direct request" in out.stderr
     assert not out.merged
 
 

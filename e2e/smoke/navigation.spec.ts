@@ -92,7 +92,7 @@ test.describe("Navigation", () => {
 });
 
 test.describe("Bottom Tab Bar (mobile only)", () => {
-  test("tab bar is visible on mobile and links to correct routes", async ({
+  test("tab bar opens search and links to core routes", async ({
     page,
   }, testInfo) => {
     const isMobile = testInfo.project.name.includes("Mobile");
@@ -105,10 +105,20 @@ test.describe("Bottom Tab Bar (mobile only)", () => {
     const tabBar = page.getByTestId("bottom-tab-bar");
     await expect(tabBar).toBeVisible();
 
-    // Verify tab links point to correct hrefs
+    // Search replaces the dashboard link in the mobile tab bar.
+    await expect(tabBar.getByRole("link", { name: /dashboard/i })).toHaveCount(
+      0
+    );
+    await tabBar
+      .getByRole("button", { name: "Search" })
+      .getByText("Search")
+      .click();
     await expect(
-      tabBar.getByRole("link", { name: /dashboard/i })
-    ).toHaveAttribute("href", "/dashboard");
+      page.getByRole("dialog", { name: "Quick search" })
+    ).toBeVisible();
+    await page.keyboard.press("Escape");
+
+    // Verify the remaining tab links point to their destinations.
     await expect(tabBar.getByRole("link", { name: /issues/i })).toHaveAttribute(
       "href",
       /\/issues/

@@ -37,7 +37,9 @@ test.describe("Collection edit sharing (PP-wqit.7)", () => {
     await page.getByRole("option", { name: /Slick Chick/ }).click();
     await page.keyboard.press("Escape");
     await page.getByTestId("collection-add-machines").click();
-    await expect(page.getByTestId("collection-overview-body")).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "Slick Chick", exact: true })
+    ).toBeVisible();
 
     // --- Owner grants Technician User editor access -----------------------
     await page.getByTestId("collection-share-trigger").click();
@@ -76,13 +78,15 @@ test.describe("Collection edit sharing (PP-wqit.7)", () => {
       await ed.getByTestId("collection-edit-trigger").click();
       await expect(ed.getByTestId("collection-delete-trigger")).toHaveCount(0);
       await ed.getByTestId("collection-machines-multiselect").click();
-      await ed.getByPlaceholder("Search machines…").fill("Hyperball");
+      // The populated Overview also has the Machine View search. The picker
+      // input is portaled after it, so target the open picker's search.
+      await ed.getByPlaceholder("Search machines…").last().fill("Hyperball");
       await ed.getByRole("option", { name: /Hyperball/ }).click();
       await ed.keyboard.press("Escape");
       await ed.getByTestId("collection-save").click();
-      const overview = ed.getByTestId("collection-overview-body");
-      await expect(overview).toBeVisible();
-      await expect(overview.getByText(/Hyperball/)).toBeVisible();
+      await expect(
+        ed.getByRole("link", { name: "Hyperball", exact: true })
+      ).toBeVisible();
     } finally {
       await editorCtx.close();
     }
@@ -106,7 +110,7 @@ test.describe("Collection edit sharing (PP-wqit.7)", () => {
       ).toHaveCount(0);
       // Direct navigation 404s (a uuid is not a capability for a non-collaborator).
       await rv.goto(collectionUrl);
-      await expect(rv.getByTestId("collection-overview-body")).toHaveCount(0);
+      await expect(rv.getByTestId("collection-summary")).toHaveCount(0);
     } finally {
       await revokedCtx.close();
     }

@@ -67,7 +67,9 @@
 
 ## Known divergences
 
-_None — nothing has been built against this spec yet._
+| Requirement | Current implementation gap |
+| :-- | :-- |
+| §4.2 | Automatic apron-size fill from a Pinball Map match is intentionally deferred. Editors choose Stern/SPIKE or WPC manually for now; unmatched machines still have no default. |
 
 ## Changelog
 

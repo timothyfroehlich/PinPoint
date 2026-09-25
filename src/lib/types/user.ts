@@ -5,6 +5,9 @@
 export const USER_ROLES = ["admin", "technician", "member", "guest"] as const;
 export type UserRole = (typeof USER_ROLES)[number];
 
+export const REPORT_MODE_VALUES = ["quick", "detailed", "multiple"] as const;
+export type ReportMode = (typeof REPORT_MODE_VALUES)[number];
+
 export interface UserContext {
   id: string;
   role: UserRole;

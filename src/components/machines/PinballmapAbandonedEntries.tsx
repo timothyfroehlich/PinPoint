@@ -5,6 +5,11 @@ import { useState, useTransition } from "react";
 import { TriangleAlert } from "lucide-react";
 
 import { removeMachineFromPinballMapAction } from "~/app/(app)/m/pinballmap-actions";
+import {
+  RemovalCommentNotice,
+  useRemovalCommentCheck,
+  type RemovalCommentState,
+} from "~/components/machines/PinballmapRemovalComments";
 import { Alert, AlertDescription } from "~/components/ui/alert";
 import { Button } from "~/components/ui/button";
 import {
@@ -26,7 +31,9 @@ export interface AbandonedEntry {
   locationUrl: string;
   /** Catalog title at the time, or null if the mirror no longer carries it. */
   title: string | null;
-  /** Comments on the entry, for the remove confirm (spec 4.6). */
+  /** Older locations cannot be refreshed through the tracked-location seam. */
+  currentLocation: boolean;
+  /** Existing confirmation data for older-location entries, when available. */
   commentCount: number | null;
 }
 
@@ -96,6 +103,7 @@ export function PinballmapAbandonedEntries({
             </span>
             {canPush && writeEnabled ? (
               <RemoveEntryButton
+                machineId={machineId}
                 entry={entry}
                 pending={pending}
                 onConfirm={() => {
@@ -143,26 +151,40 @@ export function PinballmapAbandonedEntries({
   );
 }
 
-/** Same confirm as the control's Remove, including the comment count (4.6). */
+/** Refreshes tracked-location counts; older-location cleanup remains PP-o355.49. */
 function RemoveEntryButton({
+  machineId,
   entry,
   pending,
   onConfirm,
 }: {
+  machineId: string;
   entry: AbandonedEntry;
   pending: boolean;
   onConfirm: () => void;
 }): React.JSX.Element {
+  const [open, setOpen] = useState(false);
+  const comments = useRemovalCommentCheck();
   const game = entry.title ?? `Pinball Map entry #${String(entry.lmxId)}`;
-  const consequence =
-    entry.commentCount === null
-      ? "PinPoint could not read this entry's comments just now, so it can't say how many would be lost. Refresh first if that matters."
+
+  function handleOpenChange(nextOpen: boolean): void {
+    setOpen(nextOpen);
+    if (!entry.currentLocation) return;
+    if (nextOpen) comments.start({ machineId, lmxId: String(entry.lmxId) });
+    else comments.cancel();
+  }
+
+  // Older locations keep the stored count (PP-o355.49); a zero needs no notice.
+  const notice: RemovalCommentState | null = entry.currentLocation
+    ? comments.state
+    : entry.commentCount === null
+      ? { kind: "unavailable" }
       : entry.commentCount === 0
         ? null
-        : `The entry has ${String(entry.commentCount)} ${entry.commentCount === 1 ? "comment" : "comments"}. They are recoverable only if the game is re-added within 7 days; after that the history is permanently lost.`;
+        : { kind: "count", count: entry.commentCount, lastKnown: null };
 
   return (
-    <AlertDialog>
+    <AlertDialog open={open} onOpenChange={handleOpenChange}>
       <AlertDialogTrigger asChild>
         <Button
           variant="outline"
@@ -181,20 +203,18 @@ function RemoveEntryButton({
             will no longer be publicly visible.
           </AlertDialogDescription>
         </AlertDialogHeader>
-        {consequence !== null ? (
-          <p className="rounded-r-md border-l-[3px] border-warning bg-warning-container/40 px-3 py-2 text-sm text-on-warning-container">
-            {consequence}
-          </p>
+        {notice !== null ? (
+          <RemovalCommentNotice state={notice} testId="pbm-abandoned-remove" />
         ) : null}
         <AlertDialogFooter>
           <AlertDialogCancel disabled={pending}>Cancel</AlertDialogCancel>
           <AlertDialogAction
             type="button"
             variant="destructive"
-            disabled={pending}
+            disabled={pending || (entry.currentLocation && !comments.ready)}
             onClick={onConfirm}
           >
-            Remove machine
+            {comments.lastKnown ? "Remove anyway" : "Remove machine"}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

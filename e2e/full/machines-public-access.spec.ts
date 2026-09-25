@@ -20,14 +20,13 @@ test.describe("Machines Public Access", () => {
     await expect(page).toHaveURL(/\/m(?:\?.*)?$/);
     await expect(page.getByRole("heading", { name: "Machines" })).toBeVisible();
 
-    // Verify machines are displayed
-    const machineCards = page.getByTestId("machine-card");
-    const cardCount = await machineCards.count();
-    expect(cardCount).toBeGreaterThan(0);
-
-    // Verify status badges are visible (sanity check for machine list rendering)
+    // The public directory presents a table on desktop and a compact list on
+    // phones. The machine link is visible in both layouts.
     await expect(
-      machineCards.first().getByText(/Operational|Needs Service|Unplayable/)
+      page.getByRole("link", {
+        name: seededMachines.attackFromMars.name,
+        exact: true,
+      })
     ).toBeVisible();
   });
 

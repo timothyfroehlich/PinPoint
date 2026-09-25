@@ -1,12 +1,15 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { createClient } from "@supabase/supabase-js";
-import { confirmTestUserEmail } from "~/test/helpers/supabase";
+import {
+  confirmTestUserEmail,
+  expectLocalSupabaseUrl,
+} from "~/test/helpers/supabase";
 
 /**
  * Integration tests for authentication actions
  *
  * These tests validate auth actions against a real Supabase instance.
- * Requires Supabase to be running (supabase start).
+ * Requires Supabase to be running (pnpm supabase:start).
  *
  * Note: Validation schemas are covered by unit tests; this file focuses on
  * Supabase behavior (auth flows) against a real instance.
@@ -26,8 +29,8 @@ const adminSupabase = createClient(supabaseUrl, serviceRoleKey);
 
 describe("Authentication Integration Tests", () => {
   beforeAll(() => {
-    // Ensure we're in a test environment (Supabase may return 127.0.0.1 or localhost)
-    expect(supabaseUrl).toMatch(/127\.0\.0\.1|localhost/);
+    // Ensure we are pointed at a local dev stack, never a cloud project
+    expectLocalSupabaseUrl(supabaseUrl);
   });
 
   describe("Signup flow", () => {

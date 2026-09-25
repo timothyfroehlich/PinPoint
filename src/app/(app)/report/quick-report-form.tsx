@@ -33,6 +33,7 @@ interface QuickReportFormProps {
   initialMachineInitials: string;
   canMultiple: boolean;
   initialError?: string | undefined;
+  source?: "apron" | undefined;
 }
 
 const FALLBACK_ENTRY = defaultEntry("00000000-0000-0000-0000-000000000000");
@@ -107,6 +108,7 @@ export function QuickReportForm({
   initialMachineInitials,
   canMultiple,
   initialError,
+  source,
 }: QuickReportFormProps): React.JSX.Element {
   const searchParams = useSearchParams();
   const formRef = React.useRef<HTMLFormElement>(null);
@@ -158,6 +160,13 @@ export function QuickReportForm({
     () => machinesList.find((machine) => machine.id === entry.machineId),
     [entry.machineId, machinesList]
   );
+  const detailsParams = new URLSearchParams();
+  if (selectedMachine) detailsParams.set("machine", selectedMachine.initials);
+  if (source) detailsParams.set("source", source);
+  const detailsQuery = detailsParams.toString();
+  const detailsHref = detailsQuery
+    ? `/report/detailed?${detailsQuery}`
+    : "/report/detailed";
   const currentInitials = selectedMachine?.initials ?? "";
 
   React.useEffect(() => {
@@ -281,6 +290,14 @@ export function QuickReportForm({
           );
         }}
       >
+        {source ? (
+          <input
+            type="hidden"
+            name="source"
+            value={source}
+            data-testid="report-source"
+          />
+        ) : null}
         <input
           type="text"
           name="website"
@@ -382,7 +399,7 @@ export function QuickReportForm({
               </Button>
               <div className="space-y-2 border-t border-outline-variant pt-4">
                 <Button asChild variant="outline" className="h-11 w-full">
-                  <Link href="/report/detailed">
+                  <Link href={detailsHref}>
                     <FilePenLine aria-hidden="true" />
                     Add details
                   </Link>

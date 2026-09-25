@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import type React from "react";
 import { cookies } from "next/headers";
+import { connection } from "next/server";
 import "./globals.css";
 import { Toaster } from "sonner";
 import { ClientLogger } from "~/components/dev/client-logger";
@@ -63,6 +64,9 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>): Promise<React.JSX.Element> {
+  // A response-wide nonce must be generated for each request, including auth
+  // pages that otherwise qualify for static rendering.
+  await connection();
   const isDevelopment = process.env.NODE_ENV === "development";
 
   const isProduction =
@@ -81,6 +85,7 @@ export default async function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        <link rel="preconnect" href="https://img.opdb.org" />
         {blobHostname !== null && (
           <link rel="preconnect" href={`https://${blobHostname}`} />
         )}

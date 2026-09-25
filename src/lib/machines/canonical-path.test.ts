@@ -21,6 +21,7 @@ describe("canonicalMachinePath", () => {
     );
     expect(canonicalMachinePath("/m/afm/i/12")).toBe("/m/AFM/i/12");
     expect(canonicalMachinePath("/m/afm/edit")).toBe("/m/AFM/edit");
+    expect(canonicalMachinePath("/m/aFm/hub")).toBe("/m/AFM/hub");
     // A trailing slash is part of the path, not an empty extra segment to drop.
     expect(canonicalMachinePath("/m/afm/")).toBe("/m/AFM/");
   });

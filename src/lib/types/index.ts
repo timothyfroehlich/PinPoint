@@ -24,7 +24,8 @@ export {
 } from "./database";
 
 export type { UserContext, UserRole } from "./user";
-export { USER_ROLES } from "./user";
+export type { ReportMode } from "./user";
+export { USER_ROLES, REPORT_MODE_VALUES } from "./user";
 
 export type {
   IssueCommentWithAuthor,
@@ -33,3 +34,17 @@ export type {
 } from "./issue";
 
 export type { UnifiedUser, UserStatus, MachineOwner } from "./user";
+
+export {
+  MACHINE_VIEW_FIELD_IDS,
+  type MachineViewFieldId,
+  type MachineViewHealth,
+  type MachineViewOwnerOption,
+  type MachineViewPageSize,
+  type MachineViewPresetId,
+  type MachineViewResult,
+  type MachineViewRow,
+  type MachineViewScope,
+  type MachineViewSortDirection,
+  type MachineViewState,
+} from "./machine-view";

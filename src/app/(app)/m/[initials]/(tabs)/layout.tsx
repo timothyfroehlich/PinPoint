@@ -12,7 +12,8 @@ import {
 import { PageContainer } from "~/components/layout/PageContainer";
 import { MachineDetailHeader } from "~/components/machines/MachineDetailHeader";
 import { MachineTabStrip } from "~/components/machines/MachineTabStrip";
-import { MachineBackboxTranslite } from "~/components/machines/MachineBackboxTranslite";
+import { MachineArtworkHero } from "~/components/machines/MachineArtworkHero";
+import { MachineHeaderSwitch } from "~/components/machines/MachineHeaderSwitch";
 import { deriveMachineStatus } from "~/lib/machines/status";
 import { getMachineForLayout } from "../_data";
 
@@ -62,25 +63,19 @@ export default async function MachineDetailLayout({
   return (
     <PageContainer size="standard">
       <div className="space-y-2">
-        {/* Header zone: identity + tab strip in a left column, with the
-            desktop-only translite stretched alongside both (it spans the
-            header AND the tab strip, flush to the strip's bottom border and
-            the content's right edge). Mobile: single column, translite
-            hidden — unchanged from the plain stacked layout. */}
-        <div className="md:flex md:items-stretch">
-          <div className="min-w-0 flex-1 space-y-2">
-            <MachineDetailHeader machine={machine} />
-            <MachineTabStrip
-              initials={machine.initials}
-              maintenance={maintenance}
-              canManage={canManage}
-            />
-          </div>
-          <MachineBackboxTranslite
-            imageUrl={machine.backboxImageUrl}
-            name={machine.name}
-          />
-        </div>
+        <MachineHeaderSwitch
+          hero={
+            machine.artwork != null ? (
+              <MachineArtworkHero machine={machine} />
+            ) : null
+          }
+          header={<MachineDetailHeader machine={machine} />}
+        />
+        <MachineTabStrip
+          initials={machine.initials}
+          maintenance={maintenance}
+          canManage={canManage}
+        />
         <div className="pt-2">{children}</div>
       </div>
     </PageContainer>

@@ -8,7 +8,8 @@
  *
  * Usage: pnpm run db:_seed-users
  *
- * Password for all test users: "TestPassword123"
+ * Local password for all test users: "TestPassword123". Hosted previews pass
+ * --preview to use random passwords that are never printed.
  * DO NOT use these in production!
  *
  * Remote-capable ON PURPOSE: preview-migrate-seed.sh runs this against an
@@ -20,6 +21,7 @@
  * DIFFERENT variable from POSTGRES_URL and could be pointed at prod on its own.
  */
 
+import { randomBytes } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 import { assertNotPinPointProduction } from "../scripts/lib/db-target.mjs";
 import { createScriptClient } from "../scripts/lib/pg-client.mjs";
@@ -72,6 +74,7 @@ function wrapTextInProseMirror(text) {
 }
 
 const TEST_USERS = Object.entries(usersData);
+const previewSeed = process.argv.includes("--preview");
 
 async function seedUsersAndData() {
   console.log("🌱 Seeding test users and data...\n");
@@ -84,7 +87,11 @@ async function seedUsersAndData() {
       // Create user using Supabase Admin API
       const { data, error } = await supabase.auth.admin.createUser({
         email: user.email,
-        password: user.password,
+        // Hosted previews enforce leaked-password checks. Use a unique secret
+        // for each ephemeral account rather than the published local fixture.
+        password: previewSeed
+          ? randomBytes(32).toString("base64url")
+          : user.password,
         email_confirm: true, // Auto-confirm email for test users
         user_metadata: {
           name: user.name,
@@ -152,6 +159,13 @@ async function seedUsersAndData() {
     } catch (err) {
       console.error(`❌ Error processing ${user.email}:`, err);
     }
+  }
+
+  const missingUsers = TEST_USERS.filter(([key]) => !userIds[key]);
+  if (missingUsers.length > 0) {
+    throw new Error(
+      `Could not seed required test users: ${missingUsers.map(([, user]) => user.email).join(", ")}`
+    );
   }
 
   // 2. Seed Invited Users (for testing invited reporter display)
@@ -299,7 +313,7 @@ async function seedUsersAndData() {
       EBD: "Bally's 1981 sequel to the EM-era Eight Ball trades relays for solid-state electronics and adds voice synthesis, its pool-hall callouts novel for their time. Twelve drop targets across two banks carry the theme through combo shots and bonus building. On free play; the speech board's original chip is showing its age, so the callouts occasionally slur before clearing up.",
       TAF: "Pat Lawlor's 1992 design for Bally remains the best-selling solid-state pinball ever built, with more than 20,000 units sold. The animatronic Thing's hand reaches from a mailbox to capture the ball and launch multiball, while the bookcase target bank and film dialogue from Raul Julia and Anjelica Huston tie the ruleset to the movie. On free play; Thing's hand grip loosens with heavy play, so it gets a spring check each season.",
       AFM: "Bally 1995 DMD-era classic — blow up the mothership, rescue the cows, and save the planets across a fast, flowing layout. On free play; the left-ramp diverter can stick now and then, so give it a firm, committed shot.",
-      MM: 'Brian Eddy\'s 1997 widebody for Williams centers on a motorized castle whose towers "explode" and drawbridge drops as players catapult balls into it, building toward the four-ball Battle for the Kingdom multiball; a pair of pop-up troll heads add a satisfying target to bash between shots. On free play; the castle mechanism sees heavy use, so the gate motor gets a lubrication check every few months.',
+      MM: "Brian Eddy's 1997 Williams game has players batter a motorized castle until its drawbridge drops and its walls crumble, while a pair of trolls pop up from the playfield to be bashed between shots. On free play; the castle mechanism sees heavy use, so the gate motor gets a lubrication check every few months.",
       SM: "Stern's 2016 Vault Edition reissues Steve Ritchie and Lyman Sheats' 2007 design, drawing its villain lineup from the Sam Raimi film trilogy: Doc Ock's magnet grabs the ball for a simulated \"fusion malfunction,\" the Green Goblin hovers over pumpkin-bomb targets, and Sandman's whirlwind of standup targets rounds out the rogues' gallery. On free play; the Doc Ock magnet's hold time can drift, so it gets recalibrated during routine maintenance.",
       GDZ: "Keith Elwin's 2021 Stern design pits Godzilla against Mechagodzilla around a motorized, collapsing skyscraper bash toy and the debut of Magna Grab, a magnetic ball lock that releases the ball back into play on the player's cue. Stern's Insider Connected system layers online leaderboards and remote tournaments onto the ruleset. On free play; the building's collapse mechanism gets a monthly check to keep the motor timing crisp.",
       GDZ2: "Keith Elwin's 2021 Stern design pits Godzilla against Mechagodzilla around a motorized, collapsing skyscraper bash toy and the debut of Magna Grab, a magnetic ball lock that releases the ball on the player's cue. This is the club's second cabinet, acquired newer than the original. On free play; its playfield glass rides looser in the channel than cabinet one's, so reseat it after opening the coin door.",
@@ -929,7 +943,11 @@ async function seedUsersAndData() {
   console.log("  guest@test.com (Guest role)");
   console.log("  testuser@pinpoint.internal (Username account, Member role)");
   console.log("    └─ Login with username: testuser");
-  console.log(`  Password: ${usersData.admin.password}`);
+  if (previewSeed) {
+    console.log("  Preview passwords are random and are not logged.");
+  } else {
+    console.log(`  Password: ${usersData.admin.password}`);
+  }
 
   await sql.end();
   process.exit(0);

@@ -266,8 +266,7 @@ def test_scripts_ts_js_trigger_tests(
         "scripts/migrate-production.ts",
         "scripts/lib/pg-client.mjs",
         "scripts/lib/drizzle-push-guard.ts",
-        "scripts/workflow/pr-watcher-mcp.ts",
-        "scripts/workflow/pr-watcher-mcp.test.ts",
+        "scripts/workflow/pr-screenshots.mjs",
     ]
     for f in code_files:
         has_code, _ = paths_filter.evaluate([f])
@@ -302,7 +301,7 @@ def test_scripts_non_code_files_bypass_tests(
 def test_ts_unit_tests_trigger_ci_tests(
     paths_filter: PathsFilterSimulator,
 ) -> None:
-    """TypeScript/Vitest unit tests under src/test/unit/** must trigger CI test-unit job."""
+    """TypeScript/Vitest unit tests under src/test/unit/** must trigger the path-filtered CI jobs."""
     pr_2070_ts_tests = [
         "src/test/unit/hooks/block-direct-pr-watch.test.ts",
         "src/test/unit/hooks/verify-guard-stack.test.ts",
@@ -321,7 +320,7 @@ WEBSITE_SAMPLE_FILES = [
     "src/server/services/issues.ts",
     "src/lib/auth.ts",
     "src/types/index.ts",
-    "src/middleware.ts",
+    "src/proxy.ts",
     "src/instrumentation.ts",
     "public/logo.svg",
     "content/about.mdx",

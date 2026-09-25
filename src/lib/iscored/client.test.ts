@@ -76,6 +76,29 @@ describe("iscored client", () => {
 
   const mockScoresPayload = (scores: unknown[] = mockApiScores) => ({ scores });
 
+  describe("local AFM screenshot fixture", () => {
+    it("serves synthetic scores only with the development opt-in", async () => {
+      vi.stubEnv("NODE_ENV", "development");
+      process.env.ISCORED_DEMO_AFMSCORES = "1";
+      const fetchSpy = vi.spyOn(globalThis, "fetch");
+
+      const scores = await getTopScoresForMachine("local-afm-demo");
+      expect(scores).toHaveLength(3);
+      expect(scores[0]?.gameName).toBe("Attack from Mars");
+      expect(fetchSpy).not.toHaveBeenCalled();
+    });
+
+    it("cannot serve synthetic scores in production even when opted in", async () => {
+      vi.stubEnv("NODE_ENV", "production");
+      process.env.ISCORED_DEMO_AFMSCORES = "1";
+      vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+        new Response(JSON.stringify(mockScoresPayload([])), { status: 200 })
+      );
+
+      expect(await getTopScoresForMachine("local-afm-demo")).toEqual([]);
+    });
+  });
+
   describe("parsing, ranking, and PII email stripping (CORE-SEC-007)", () => {
     it("parses scores, normalizes numeric game to string, and strips emails at client boundary", async () => {
       vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(

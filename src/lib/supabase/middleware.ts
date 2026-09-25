@@ -116,6 +116,8 @@ export async function updateSession(
     path === "/" ||
     path === "/m" ||
     path.startsWith("/m/") ||
+    // Legacy id-addressed links redirect to public /m/<initials> pages.
+    path.startsWith("/machines/") ||
     path.startsWith("/issues") ||
     isPublicCollectionView ||
     path.startsWith("/login") ||
@@ -144,7 +146,13 @@ export async function updateSession(
     // so an inner "?"/"&" can't leak into the login URL as sibling params — do
     // NOT hand-build this as `?next=${path}${search}` (that would mis-encode).
     url.searchParams.set("next", `${path}${request.nextUrl.search}`);
-    return NextResponse.redirect(url);
+    const redirectResponse = NextResponse.redirect(url);
+    // getUser() may have cleared an expired session before this redirect.
+    // Preserve those Set-Cookie updates so the browser does not keep sending it.
+    supabaseResponse.cookies
+      .getAll()
+      .forEach((cookie) => redirectResponse.cookies.set(cookie));
+    return redirectResponse;
   }
 
   return supabaseResponse;

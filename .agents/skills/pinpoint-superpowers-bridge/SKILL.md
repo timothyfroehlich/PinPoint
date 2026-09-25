@@ -56,20 +56,20 @@ Code work still happens **in a worktree** — the root checkout is read-only (AG
 ### `subagent-driven-development`
 
 - Superpowers says "never pause between tasks, dispatch a fresh subagent per task." PinPoint gates multi-agent orchestration: **before launching, state the subagent count + rough cost and get Tim's explicit yes** — including worst-case fan-out. The built-in `/code-review` workflow is the only exemption.
-- Caps: ~2–4 subagents per task; **simple PRs (<5 files) ≤ 2 subagents** (CLAUDE.md). Don't fan out on straightforward work.
+- Caps: ~2–4 subagents per task; **simple PRs (<5 files) ≤ 2 subagents**. Don't fan out on straightforward work.
 - After the gate clears, run SDD's fresh-subagent-per-task + between-task review as written.
 
 ### `requesting-code-review` / `receiving-code-review`
 
-- Superpowers' reviewer-subagent is fine as an **optional local self-check**. The **authoritative** gate is current-head `CI Gate` plus the exact-head Codex review requested through `pinpoint-pr-workflow`. A superpowers review alone does not satisfy it.
-- **`requesting-code-review` does not satisfy the merge gate by itself.** Own the GitHub draft/CI/review loop through exact-head coverage with every finding thread adjudicated and resolved. After current-head CI succeeds and the PR is ready, run `bash scripts/workflow/request-codex-review.sh <PR>` exactly once for that head. A corrective push requires replacement CI and one new request for the new head. Local attestations still require Tim to run the named local review. Full rules: `pinpoint-pr-workflow` Phase 3.4.
+- Superpowers' reviewer-subagent is fine as an **optional local self-check**. The **authoritative** gate is current-head `CI Gate` plus exact-head CodeRabbit or Codex coverage, obtained through `pinpoint-pr-workflow`. A superpowers review alone does not satisfy it.
+- **`requesting-code-review` does not satisfy the merge gate by itself.** Own the GitHub draft/CI/review loop through exact-head coverage with every finding thread adjudicated and resolved. Promoting the draft after current-head CI succeeds triggers CodeRabbit's review of that head automatically; wait for it rather than requesting it again. A corrective push requires replacement CI and one `@coderabbitai review` request for the new head (or `bash scripts/workflow/request-codex-review.sh <PR>` once when CodeRabbit is rate-limited). Full rules: `pinpoint-pr-workflow` Phase 3.4.
 - **Reply to review comments via MCP** (`add_reply_to_pull_request_comment` + resolve the thread with `pull_request_review_write method:"resolve_thread"`), **signed with your agent name** (`—Claude` / `—Gemini` / `—Codex` / `—Antigravity`, per AGENTS.md §5 "Review comments"). Declined comments still get a one-sentence reply — no silent ignores. Do not use the plugin's own reply flow.
 
 ### `finishing-a-development-branch` — the biggest override
 
 Superpowers presents a 4-option menu led by "1. Merge back to `<base>` locally". **In PinPoint that menu does not apply.** There is exactly one finish path:
 
-- **Never merge locally and never push/merge to `main`; the merge decision is Tim's.** Ship through a draft PR and follow `pinpoint-pr-workflow` through current-head CI, one manual Codex request for the head, final labeling, and screenshots before handing Tim `! scripts/workflow/merge-pr.sh <PR> --human` — or running that script in Claude Code, where the hook requires his approval (PP-wi85). The raw channels — `gh pr merge`, `gh api PUT .../merge`, MCP merge — stay hard-blocked for agents.
+- **Never merge locally or push directly to `main`.** Ship through a draft PR and follow `pinpoint-pr-workflow` through current-head CI, exact-head review, final labeling, and screenshots. Without Tim’s explicit merge request, hand off. When he directly requests the unambiguous PR’s merge, the owning agent in any harness runs the gate-enforced `merge-pr.sh <PR> --human`; Claude Code and Codex also show a permission prompt. Raw merge channels remain prohibited (PP-wi85).
 - **Tests:** use PinPoint's tiered commands, listed in **AGENTS.md §5 "Which tests to run"** (`pnpm run check` is the **static** floor and runs no tests; `pnpm run test` is the unit suite; `pnpm run check:python` covers `scripts/` and `.claude/hooks/`; `pnpm run preflight` for migrations/auth/server-actions/middleware/schema; `pnpm run smoke` for UI) — **not** `npm test` / `pytest`. The full E2E suite (`e2e:full` / `e2e:all`) is CI's job by default; it peaks at several GB, so run it locally only when the host has the headroom.
 - **Worktree cleanup is destructive → wait for explicit confirmation** (`pinpoint-pr-workflow` Phase 5.2 "Cleanup"). When confirmed, cleanup goes through the `WorktreeRemove` hook / `scripts/worktree_cleanup.py` (dealloc slot + Docker volumes) — **never raw `git worktree remove`/`rm -rf`**, which leaks the slot manifest and volumes.
 - **"Discard" is not a routine option.** Abandoning work is a deliberate, confirmed action, not a menu pick.
@@ -86,7 +86,7 @@ Superpowers presents a 4-option menu led by "1. Merge back to `<base>` locally".
 | Worktree create          | `EnterWorktree` / `Agent(isolation:"worktree")`                                                   |
 | SDD dispatch             | clear the scale gate (count + cost, Tim's yes) first                                              |
 | Code review              | CI Gate + `pinpoint-pr-workflow` head-commit review; replies via MCP, signed with your agent name |
-| Finish: "merge locally"  | ❌ prohibited → PR + `merge-pr.sh --human` (Tim approves the hook prompt) + landing-the-plane     |
+| Finish: "merge locally"  | ❌ prohibited → PR; guarded `merge-pr.sh --human` only on Tim’s explicit request                  |
 | Finish: tests            | AGENTS.md §5's tiered `check`/`test`/`preflight`/`smoke`, not `npm test`                          |
 | Finish: worktree cleanup | `WorktreeRemove` hook / `worktree_cleanup.py`, on confirmation                                    |
 | Close bead               | only after merge                                                                                  |

@@ -27,6 +27,7 @@ import { type TimelineEventSourceType } from "~/lib/timeline/machine-events";
 import { type TimelineTag } from "~/lib/timeline/machine-tags";
 import { type SettingsSection } from "~/lib/machines/settings-types";
 import type { LocationSnapshot } from "~/lib/pinballmap/types";
+import { REPORT_MODE_VALUES } from "~/lib/types/user";
 
 /**
  * ⚠️ IMPORTANT: When adding new tables to this schema file,
@@ -102,6 +103,16 @@ export const userProfiles = pgTable(
     role: text("role", { enum: ["guest", "member", "technician", "admin"] })
       .notNull()
       .default("guest"), // Default for new signups (no invitation)
+    mobileReportMode: text("mobile_report_mode", {
+      enum: REPORT_MODE_VALUES,
+    })
+      .notNull()
+      .default("quick"),
+    desktopReportMode: text("desktop_report_mode", {
+      enum: REPORT_MODE_VALUES,
+    })
+      .notNull()
+      .default("detailed"),
     termsAcceptedAt: timestamp("terms_accepted_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
@@ -114,6 +125,14 @@ export const userProfiles = pgTable(
     roleCheck: check(
       "user_profiles_role_check",
       sql`role IN ('guest', 'member', 'technician', 'admin')`
+    ),
+    mobileReportModeCheck: check(
+      "user_profiles_mobile_report_mode_check",
+      sql`mobile_report_mode IN ('quick', 'detailed', 'multiple')`
+    ),
+    desktopReportModeCheck: check(
+      "user_profiles_desktop_report_mode_check",
+      sql`desktop_report_mode IN ('quick', 'detailed', 'multiple')`
     ),
     /**
      * NOT NULL never forbade '', which is how every OAuth signup landed
@@ -184,6 +203,16 @@ export const machines = pgTable(
       .notNull()
       .defaultNow(),
     description: jsonb("description").$type<ProseMirrorDoc>(),
+    // The card's layout is selected explicitly per cabinet. Description and
+    // tip are independent of size; a disabled tip keeps its saved text.
+    apronSize: text("apron_size", { enum: ["stern", "wpc"] }),
+    apronUseCustomDescription: boolean("apron_use_custom_description")
+      .notNull()
+      .default(false),
+    apronDescription: text("apron_description"),
+    apronTip: text("apron_tip"),
+    apronTipEnabled: boolean("apron_tip_enabled").notNull().default(false),
+    apronSavedAt: timestamp("apron_saved_at", { withTimezone: true }),
     ownerRequirements: jsonb("owner_requirements").$type<ProseMirrorDoc>(),
     // Machine-level "Before you change anything": the owner's honor-system
     // requests for how people should handle THIS machine's settings ("ask me
@@ -315,6 +344,9 @@ export const pinballmapCatalog = pgTable(
     year: integer("year"),
     opdbId: text("opdb_id"),
     ipdbId: integer("ipdb_id"),
+    opdbImageUrl: text("opdb_image_url"),
+    opdbImageWidth: integer("opdb_image_width"),
+    opdbImageHeight: integer("opdb_image_height"),
     // PBM groups editions of one title (e.g. Godzilla Pro/Premium/LE) under a
     // machine_group_id; the group's display name lives in a separate endpoint,
     // so we denormalize it here to power the family→edition picker without a

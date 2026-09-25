@@ -69,7 +69,8 @@ EXIT_OK = 0
 #: reading a propagated 1.
 CLEANUP_EXIT_MEANINGS = {
     0: "cleaned up",
-    1: "FAILED — usage error, or the worktree removal itself failed; the slot "
+    1: "FAILED — usage error, the worktree removal itself failed, or a "
+    "remote-backend worktree without PINPOINT_REMOTE_DOCKER_HOST; the slot "
     "manifest entry is kept in that case to avoid a port collision",
     2: "REFUSED — target is the main worktree",
     3: "STALE TARGET — path gone but slot/git residue remains",

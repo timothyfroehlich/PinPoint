@@ -89,7 +89,7 @@ test.describe("Machine Details Redesign", () => {
     test("should display machine list page without horizontal overflow", async ({
       page,
     }) => {
-      await page.goto("/m?availability=all");
+      await page.goto("/m?presence=all");
       await expect(
         page.getByRole("heading", { name: "Machines" })
       ).toBeVisible();

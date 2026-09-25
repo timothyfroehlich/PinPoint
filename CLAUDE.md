@@ -18,9 +18,9 @@ PinPoint uses single-context domain documentation. See `docs/agents/domain.md`.
 
 `REVIEW.md` at the repo root is the canonical review rubric. Read it before launching the code-review skill.
 
-Codex review is manual-only: request it once after current-head CI succeeds, and request
-one replacement review after CI for any corrective push. Author-side draft/CI/review
-ownership and exact-head mechanics are canonical in `pinpoint-pr-workflow` Phase 3.
+Review flow (CodeRabbit by default on draft promotion; Codex as the manual fallback) and
+exact-head mechanics are canonical in AGENTS.md §5 "Getting a PR reviewed" and
+`pinpoint-pr-workflow` Phase 3.
 
 ### Sandbox network isolation
 
@@ -37,4 +37,4 @@ ownership and exact-head mechanics are canonical in `pinpoint-pr-workflow` Phase
 
 ### Session Completion (Claude Code specifics)
 
-The "Landing the plane" checklist (`pinpoint-pr-workflow` skill, Phases 4–5) applies to the lead agent and solo sessions.
+The merge handoff and post-merge steps (`pinpoint-pr-workflow` skill, Phases 4–5) apply to the lead agent and solo sessions.

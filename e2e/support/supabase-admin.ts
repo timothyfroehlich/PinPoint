@@ -594,3 +594,22 @@ export async function removeLmxFromStoredLineup(lmxIds: number[]) {
     .eq("id", "singleton");
   if (writeError) throw writeError;
 }
+
+/** Store a saved Stern apron card on a machine, as the editor would (PP-esta). */
+export async function seedSavedApronCard(
+  machineId: string,
+  card: { description: string; tip?: string }
+): Promise<void> {
+  const { error } = await supabaseAdmin
+    .from("machines")
+    .update({
+      apron_size: "stern",
+      apron_use_custom_description: true,
+      apron_description: card.description,
+      apron_tip: card.tip ?? null,
+      apron_tip_enabled: card.tip !== undefined,
+      apron_saved_at: new Date().toISOString(),
+    })
+    .eq("id", machineId);
+  if (error) throw error;
+}

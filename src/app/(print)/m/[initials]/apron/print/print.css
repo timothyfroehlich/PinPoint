@@ -1,0 +1,57 @@
+/* Apron card print route (PP-esta). On screen: a toolbar above the card. On
+ * paper: only the card sheet (ApronCardSheet — card at physical size, panel
+ * bleed, crop marks), inside the page margin most printers need. The root
+ * layout's full-height, overflow-hidden body is undone so nothing clips. */
+@page {
+  margin: 12mm;
+}
+
+.apron-print {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+  height: 100%;
+  overflow: auto;
+  padding: 24px 16px;
+}
+
+.apron-print__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  max-width: 640px;
+}
+
+.apron-print__sheet {
+  flex-shrink: 0;
+}
+
+@media print {
+  html,
+  body {
+    height: auto !important;
+    overflow: visible !important;
+    background: #ffffff !important;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+
+  .apron-print__sheet,
+  .apron-print__sheet * {
+    visibility: visible;
+  }
+
+  .apron-print__sheet {
+    position: absolute;
+    top: 0;
+    left: 0;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+}

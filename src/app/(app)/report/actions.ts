@@ -129,6 +129,7 @@ export async function submitPublicIssueAction(
     frequency,
     status,
     assignedTo,
+    reportSource,
     watchIssue,
     idempotencyKey,
   } = parsedValue.data;
@@ -265,6 +266,7 @@ export async function submitPublicIssueAction(
       reporterEmail,
       assignedTo: finalAssignedTo ?? null,
       autoWatchReporter: watchIssue,
+      reportSource,
       // Empty string (JS-disabled / legacy client) → null: no dedup, normal insert.
       idempotencyKey:
         idempotencyKey && idempotencyKey.length > 0 ? idempotencyKey : null,

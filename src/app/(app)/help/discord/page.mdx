@@ -56,7 +56,7 @@ Pasting a fresh token into the admin form for every new worktree gets tedious. F
 
 Sign in with Discord (the OAuth login button, separate from the bot) is driven by `DISCORD_CLIENT_ID` / `DISCORD_CLIENT_SECRET` in `.env.local`, wired through `supabase/config.toml`.
 
-> **Gotcha: restart Supabase after editing `.env.local`.** The `env(...)` substitution in `config.toml` — including the Discord OAuth `client_id` / `secret` — is resolved only when the Supabase containers **start**. Editing `.env.local` while Supabase is already running has no effect until you restart it (`supabase stop && supabase start` in the worktree). If the "Sign in with Discord" button stays hidden after you add the client credentials, an un-restarted stack is the usual cause.
+> **Gotcha: restart Supabase after editing `.env.local`.** The `env(...)` substitution in `config.toml` — including the Discord OAuth `client_id` / `secret` — is resolved only when the Supabase containers **start**. Editing `.env.local` while Supabase is already running has no effect until you restart it (`pnpm supabase:stop && pnpm supabase:start` in the worktree). If the "Sign in with Discord" button stays hidden after you add the client credentials, an un-restarted stack is the usual cause.
 
 ## Troubleshooting
 

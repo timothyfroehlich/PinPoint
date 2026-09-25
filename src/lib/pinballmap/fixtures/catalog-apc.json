@@ -914,6 +914,9 @@
     "manufacturer": "Williams",
     "year": 1997,
     "opdb_id": "G5pe4-MePZv",
+    "opdb_img": "https://img.opdb.org/0fd1477a-cf84-49d6-8495-d58d26c34529-medium.jpg",
+    "opdb_img_width": 640,
+    "opdb_img_height": 444,
     "ipdb_id": 4032,
     "machine_group_id": 18
   },

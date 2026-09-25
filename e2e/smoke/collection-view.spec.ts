@@ -38,7 +38,9 @@ test.describe("Collection view (PP-slrd.1)", () => {
       /\/c\/owner\//
     );
     await expect(page.getByTestId("collection-summary")).toBeVisible();
-    await expect(page.getByTestId("collection-overview-body")).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "Attack from Mars", exact: true })
+    ).toBeVisible();
     await assertNoHorizontalOverflow(page);
     await assertNoA11yViolations(page);
   });

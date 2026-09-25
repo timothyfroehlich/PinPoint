@@ -12,6 +12,7 @@ import {
   getScoreEntryUrl,
 } from "./config";
 import type { IscoredGame, IscoredScore } from "./types";
+import { getLocalAfmDemoScores } from "./local-demo";
 
 export { getGameroomUrl, getGameUrl, getScoreEntryUrl };
 export type { IscoredGame, IscoredScore };
@@ -262,6 +263,11 @@ export const getAllScoresForMachine = reactCache(
     const trimmedId = iscoredGameId.trim();
     if (!trimmedId) {
       return [];
+    }
+
+    const localDemoScores = getLocalAfmDemoScores(trimmedId);
+    if (localDemoScores) {
+      return localDemoScores;
     }
 
     const user = getIscoredUser();
