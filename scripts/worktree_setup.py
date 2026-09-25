@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 """
-Worktree port setup — called by .husky/post-checkout.
+Worktree port setup — run by .husky/post-checkout on every branch checkout.
 
 Detects fresh worktrees and configures them with unique Supabase ports.
-Existing worktrees get their configs regenerated on branch switch.
-Not a CLI tool — no argparse, no subcommands. Operates on $PWD.
+Existing worktrees get their configs regenerated on branch switch. Also run
+directly as `python3 scripts/worktree_setup.py` (scripts/supabase-stack.sh
+does, to switch backends); it takes no arguments and operates on $PWD.
+
+Also holds the helpers worktree_cleanup.py and worktree_reap.py share.
 """
 
 import fcntl
@@ -15,9 +18,11 @@ import platform
 import re
 import shlex
 import shutil
+import socket
 import stat
 import subprocess
 import sys
+import time
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
@@ -26,18 +31,14 @@ from pathlib import Path
 # Constants
 # =============================================================================
 
-DEFAULT_INSTALL_TIMEOUT = 120  # seconds
-
 # Failure classes for dependency setup
 FAILURE_CLASS_MISSING_TOOL = "missing-tool"
 FAILURE_CLASS_TIMEOUT = "timeout"
-FAILURE_CLASS_NETWORK = "network"
 FAILURE_CLASS_INSTALL = "install"
 FAILURE_CLASS_TOOLCHAIN_CONFIG = "toolchain-config"
 
 # Exit codes for worktree_setup.py
 EXIT_READY = 0
-EXIT_INCOMPLETE = 1
 
 BASE_PORT_NEXTJS = 3000
 BASE_PORT_API = 54321
@@ -177,21 +178,55 @@ class PortConfig:
 # =============================================================================
 
 
-def load_manifest() -> dict[str, int]:
-    """Load the slot manifest, creating it if missing. Tolerates corruption."""
-    if not MANIFEST_PATH.exists():
-        MANIFEST_PATH.parent.mkdir(parents=True, exist_ok=True)
-        MANIFEST_PATH.write_text(json.dumps({"version": 1, "slots": {}}, indent=2))
-    try:
-        data = json.loads(MANIFEST_PATH.read_text())
-        return data.get("slots", {})
-    except (json.JSONDecodeError, KeyError):
-        return {}
+def slot_ports_in_use(slot: int, timeout: float = 1.0) -> bool:
+    """Whether the slot's Supabase API or DB port may still be in use.
+
+    Checks this machine and, when PINPOINT_REMOTE_SUPABASE_HOST is set, the
+    remote host, which publishes a remote-backend stack's ports on its own
+    address. Only a refused connection proves a port free; a timeout or an
+    unreachable host counts as in use, so a slot is never handed out on a guess.
+    """
+    ports = PortConfig(slot=slot, project_id="", name="")
+    hosts = ["127.0.0.1"]
+    remote_host = os.environ.get(REMOTE_HOST_ENV_KEY, "").strip()
+    if remote_host:
+        hosts.append(remote_host)
+    for host in hosts:
+        for port in (ports.api_port, ports.db_port):
+            try:
+                with socket.create_connection((host, port), timeout=timeout):
+                    return True
+            except ConnectionRefusedError:
+                continue
+            except OSError:
+                return True
+    return False
+
+
+#: allocate_slot probes gone worktrees' ports while it holds the manifest lock,
+#: so the probing is capped; an entry there was no time to probe is kept.
+PRUNE_PROBE_BUDGET_SECONDS = 3.0
 
 
 def prune_manifest(slots: dict[str, int]) -> dict[str, int]:
-    """Remove entries whose worktree directories no longer exist."""
-    return {path: slot for path, slot in slots.items() if Path(path).is_dir()}
+    """Drop entries whose worktree is gone and whose Supabase ports are free.
+
+    A worktree removed without the cleanup hook (`rm -rf`), or one whose stack
+    runs on the remote host, can leave a stack holding the slot's ports. Handing
+    that slot to a new worktree would make its `supabase start` fail on busy
+    ports, so the entry stays until worktree_reap.py reclaims the stack.
+    """
+    deadline = time.monotonic() + PRUNE_PROBE_BUDGET_SECONDS
+    kept: dict[str, int] = {}
+    for path, slot in slots.items():
+        left = deadline - time.monotonic()
+        if (
+            Path(path).is_dir()
+            or left <= 0
+            or slot_ports_in_use(slot, timeout=min(1.0, left))
+        ):
+            kept[path] = slot
+    return kept
 
 
 MAX_SLOT = 96  # slot 96 → offset 9600 → max port 63921 (within integration test range)
@@ -226,7 +261,7 @@ def reserved_slots() -> set[int]:
 
 
 def allocate_slot(worktree_path: str) -> int:
-    """Allocate the lowest free slot for a worktree, with file locking."""
+    """Return the worktree's slot, allocating the lowest free one if it has none."""
     MANIFEST_PATH.parent.mkdir(parents=True, exist_ok=True)
 
     if not MANIFEST_PATH.exists():
@@ -236,16 +271,11 @@ def allocate_slot(worktree_path: str) -> int:
         fcntl.flock(f, fcntl.LOCK_EX)
         try:
             slots = _read_manifest_locked(f)
-            pruned = prune_manifest(slots)
-            changed = pruned != slots
-            slots = pruned
-
-            # Return existing slot (persist prune if needed)
             if worktree_path in slots:
-                if changed:
-                    _write_manifest_locked(f, slots)
                 return slots[worktree_path]
 
+            # Prune only when allocating: it may probe ports on gone entries.
+            slots = prune_manifest(slots)
             used = set(slots.values()) | reserved_slots()
             for candidate in range(1, MAX_SLOT + 1):
                 if candidate not in used:
@@ -256,12 +286,6 @@ def allocate_slot(worktree_path: str) -> int:
             raise RuntimeError(f"No free port slots (all {MAX_SLOT} in use)")
         finally:
             fcntl.flock(f, fcntl.LOCK_UN)
-
-
-def get_existing_slot(worktree_path: str) -> int | None:
-    """Get the slot for a worktree that's already in the manifest."""
-    slots = load_manifest()
-    return slots.get(worktree_path)
 
 
 # =============================================================================
@@ -306,6 +330,23 @@ def branch_to_project_id(branch_name: str) -> str:
     return f"{readable}-{digest}"
 
 
+def derive_project_id(worktree_path: Path, branch: str) -> str:
+    """The project id a worktree gets when config.toml has none pinned yet.
+
+    Named branches use branch_to_project_id. A detached HEAD reports its branch
+    as "HEAD", which would give every detached worktree the same stack, so it
+    uses the worktree path instead: up to 20 characters of the directory name
+    plus a hash of the full path (Codex worktrees all end in /PinPoint).
+    """
+    if branch != "HEAD":
+        return branch_to_project_id(branch)
+    path = str(worktree_path.resolve())
+    name = re.sub(r"-+", "-", re.sub(r"[^a-z0-9-]", "-", worktree_path.name.lower()))
+    name = name.strip("-")[:20].rstrip("-")
+    digest = hashlib.sha256(path.encode("utf-8")).hexdigest()[:HASH_SUFFIX_LEN]
+    return f"pinpoint-{name}-{digest}" if name else f"pinpoint-{digest}"
+
+
 # A worktree's project id is pinned on first setup and reused from then on,
 # rather than re-derived from the branch on every checkout. Supabase names its
 # containers and labels its volumes after the project id, so re-deriving it
@@ -316,14 +357,29 @@ def branch_to_project_id(branch_name: str) -> str:
 # the new id leaves the old ones behind. (PP-4936.)
 _PINNED_PROJECT_ID_RE = re.compile(r'^project_id\s*=\s*"([^"]+)"', re.MULTILINE)
 
-# A pinned id is only honored when it has the shape branch_to_project_id emits.
-# worktree_orphan_sweep.py identifies PinPoint-owned Supabase resources by the
+# A pinned id is only honored when it has the shape derive_project_id emits.
+# worktree_reap.py identifies PinPoint-owned Supabase resources by the
 # "pinpoint-" prefix, so honoring a hand-written id outside that shape would
-# make the worktree's containers invisible to the sweep. This also rejects the
+# make the worktree's containers invisible to its orphan section. This also rejects the
 # template's bare `project_id = "pinpoint"`, so a config.toml copied straight
 # from the template still gets a real per-worktree id. Matched with fullmatch:
 # `$` would accept a trailing newline, which would corrupt the id we write back.
 _PINNABLE_PROJECT_ID_RE = re.compile(r"pinpoint-[a-z0-9-]*")
+
+
+def read_config_project_id(worktree_path: Path) -> str | None:
+    """The project_id line of the worktree's config.toml, as written, or None.
+
+    None when the file is absent, unreadable or has no project_id. Unlike
+    read_pinned_project_id this does not check the id's shape: worktree_reap.py
+    must protect whatever id a running stack was started under.
+    """
+    try:
+        content = (worktree_path / "supabase" / "config.toml").read_text()
+    except (OSError, UnicodeDecodeError):
+        return None
+    match = _PINNED_PROJECT_ID_RE.search(content)
+    return match.group(1) if match else None
 
 
 def read_pinned_project_id(worktree_path: Path) -> str | None:
@@ -331,23 +387,16 @@ def read_pinned_project_id(worktree_path: Path) -> str | None:
 
     The generated `supabase/config.toml` is the file the Supabase CLI itself
     reads, so it is the authoritative record of the id the worktree's stack was
-    started under — the same assumption worktree_orphan_sweep.py makes.
+    started under — the same assumption worktree_reap.py makes.
 
     Returns None when the file is absent (fresh worktree — nothing to preserve),
     unreadable, has no project_id, or carries an id that doesn't match the shape
     this script generates. Never raises: this runs from the post-checkout hook,
     where an exception would skip the rest of the worktree's config generation.
     """
-    try:
-        content = (worktree_path / "supabase" / "config.toml").read_text()
-    except (OSError, UnicodeDecodeError):
+    candidate = read_config_project_id(worktree_path)
+    if candidate is None:
         return None
-
-    match = _PINNED_PROJECT_ID_RE.search(content)
-    if match is None:
-        return None
-
-    candidate = match.group(1)
     if len(candidate) > MAX_PROJECT_ID_LEN:
         return None
     if not _PINNABLE_PROJECT_ID_RE.fullmatch(candidate):
@@ -358,19 +407,21 @@ def read_pinned_project_id(worktree_path: Path) -> str | None:
 def resolve_project_id(worktree_path: Path, branch: str) -> str:
     """Pick the Supabase project id for a worktree — a pinned id always wins.
 
-    Falls back to deriving one from the branch name for a fresh worktree (or a
-    config.toml we can't read an id out of). Logs when the two disagree, since
-    that means the branch was renamed after the worktree was set up.
+    Falls back to derive_project_id for a fresh worktree (or a config.toml we
+    can't read an id out of). Logs when the two disagree, since that means the
+    branch was renamed after the worktree was set up. Setup and cleanup both
+    call this, so teardown targets the same containers and volumes setup named.
     """
-    derived = branch_to_project_id(branch)
+    derived = derive_project_id(worktree_path, branch)
     pinned = read_pinned_project_id(worktree_path)
     if pinned is None:
         return derived
     if pinned != derived:
         print(
-            f"worktree_setup: keeping pinned Supabase project_id '{pinned}' "
-            f"(branch '{branch}' would derive '{derived}') — renaming it would "
-            "orphan this worktree's running stack",
+            f"Note: using the pinned Supabase project_id '{pinned}' from "
+            f"{worktree_path / 'supabase' / 'config.toml'} — branch '{branch}' "
+            f"would derive '{derived}', but the stack's containers and volumes "
+            "carry the pinned id.",
             file=sys.stderr,
         )
     return pinned
@@ -531,6 +582,16 @@ def _resolve_unsubscribe_secret(worktree_path: Path, main_path: Path | None) -> 
         if value and value != UNSUBSCRIBE_SIGNING_SECRET_PLACEHOLDER:
             return value
     return UNSUBSCRIBE_SIGNING_SECRET_PLACEHOLDER
+
+
+def read_stored_backend(worktree_path: Path) -> str | None:
+    """The Supabase backend a worktree's .env.local selects: "local" when the
+    file or key is absent, None when the file exists but cannot be read."""
+    try:
+        backend = _read_managed_value(worktree_path / ".env.local", BACKEND_ENV_KEY)
+    except (OSError, UnicodeDecodeError):
+        return None
+    return backend or "local"
 
 
 def resolve_supabase_backend(env_file: Path) -> tuple[str, str]:
@@ -815,10 +876,13 @@ def _probe_version(
 
 def collect_runtime_diagnostics(
     toolchain: BootstrapToolchain | None = None,
-    *,
-    probe_path_tools: bool = True,
 ) -> RuntimeDiagnostics:
-    """Collect paths and versions for python, node, pnpm, and git."""
+    """Collect paths and versions for python, node, pnpm, and git.
+
+    Node and pnpm come only from the resolved toolchain, never from PATH: this
+    runs in a branch-controlled worktree, where probing PATH could re-enter an
+    untrusted mise shim.
+    """
     py_info = RuntimeInfo(path=sys.executable, version=platform.python_version())
 
     if toolchain is not None:
@@ -828,14 +892,6 @@ def collect_runtime_diagnostics(
         pnpm_info = RuntimeInfo(
             path=str(toolchain.pnpm_path), version=toolchain.pnpm_version
         )
-    elif probe_path_tools:
-        node_path = shutil.which("node")
-        node_ver = _probe_version(node_path, ["--version"]) if node_path else None
-        node_info = RuntimeInfo(path=node_path, version=node_ver)
-
-        pnpm_path = shutil.which("pnpm")
-        pnpm_ver = _probe_version(pnpm_path, ["--version"]) if pnpm_path else None
-        pnpm_info = RuntimeInfo(path=pnpm_path, version=pnpm_ver)
     else:
         node_info = RuntimeInfo(path=None, version=None)
         pnpm_info = RuntimeInfo(path=None, version=None)
@@ -1013,39 +1069,13 @@ def resolve_preinstalled_toolchain(
     return toolchain, None, None
 
 
-NETWORK_ERROR_PATTERNS = [
-    re.compile(r"\bENOTFOUND\b", re.IGNORECASE),
-    re.compile(r"\bETIMEDOUT\b", re.IGNORECASE),
-    re.compile(r"\bECONNREFUSED\b", re.IGNORECASE),
-    re.compile(r"\bECONNRESET\b", re.IGNORECASE),
-    re.compile(r"\bEAI_AGAIN\b", re.IGNORECASE),
-    re.compile(r"\bgetaddrinfo\b", re.IGNORECASE),
-    re.compile(r"fetch failed", re.IGNORECASE),
-    re.compile(r"ERR_PNPM_FETCH_", re.IGNORECASE),
-    re.compile(r"network error", re.IGNORECASE),
-    re.compile(r"request to .* failed", re.IGNORECASE),
-    re.compile(r"CERT_HAS_EXPIRED", re.IGNORECASE),
-]
-
-
-def classify_install_failure(returncode: int, stdout: str, stderr: str) -> str:
-    """Classify the failure reason of a dependency install invocation."""
-    combined = f"{stdout}\n{stderr}"
-    for pat in NETWORK_ERROR_PATTERNS:
-        if pat.search(combined):
-            return FAILURE_CLASS_NETWORK
-    return FAILURE_CLASS_INSTALL
-
-
 DEFAULT_INSTALL_TIMEOUT: int = 120
 MAX_INSTALL_TIMEOUT: int = 150
 
 
 def resolve_install_timeout() -> int:
     """Determine the install timeout budget in seconds (capped at MAX_INSTALL_TIMEOUT)."""
-    env_val = os.environ.get("PINPOINT_WORKTREE_INSTALL_TIMEOUT") or os.environ.get(
-        "WORKTREE_INSTALL_TIMEOUT"
-    )
+    env_val = os.environ.get("PINPOINT_WORKTREE_INSTALL_TIMEOUT")
     if env_val:
         try:
             val = int(env_val)
@@ -1095,12 +1125,11 @@ def install_dependencies(
         if res.returncode == 0:
             return True, None, None
 
-        failure_class = classify_install_failure(res.returncode, res.stdout, res.stderr)
         lines = (res.stderr or res.stdout).strip().splitlines()
         last_line = lines[-1] if lines else f"exit code {res.returncode}"
         return (
             False,
-            failure_class,
+            FAILURE_CLASS_INSTALL,
             f"pnpm install failed (exit {res.returncode}): {last_line}",
         )
     except subprocess.TimeoutExpired:
@@ -1112,22 +1141,91 @@ def install_dependencies(
 
 
 # =============================================================================
+# Shared with worktree_cleanup.py and worktree_reap.py
+# =============================================================================
+
+
+class DockerNotInstalledError(RuntimeError):
+    """The `docker` binary is absent, so there are genuinely no Docker resources."""
+
+
+class DockerUnavailableError(RuntimeError):
+    """Docker is installed but could not be enumerated.
+
+    Callers MUST surface this as *unknown*, never as an empty result. Swallowing
+    it into `[]` is the false zero behind PP-5o7b (orphan volumes) and PP-3w4g
+    (cleanup): the resources were reported as zero and then leaked.
+    """
+
+
+def run_docker(
+    args: list[str],
+    env: dict[str, str] | None = None,
+    timeout: float | None = None,
+) -> str:
+    """Run a docker command and return stdout, or raise rather than return empty."""
+    try:
+        result = subprocess.run(
+            args, capture_output=True, text=True, check=True, env=env, timeout=timeout
+        )
+    except FileNotFoundError as exc:
+        raise DockerNotInstalledError("`docker` is not installed") from exc
+    except subprocess.TimeoutExpired as exc:
+        raise DockerUnavailableError(
+            f"`{shlex.join(args)}` timed out after {exc.timeout:.0f}s"
+        ) from exc
+    except OSError as exc:
+        raise DockerUnavailableError(
+            f"could not run `{shlex.join(args)}`: {exc}"
+        ) from exc
+    except subprocess.CalledProcessError as exc:
+        detail = (
+            (exc.stderr or "").strip()
+            or (exc.stdout or "").strip()
+            or f"exit status {exc.returncode}"
+        )
+        raise DockerUnavailableError(f"`{shlex.join(args)}` failed: {detail}") from exc
+    return result.stdout
+
+
+def list_worktrees(repo_dir: Path | None = None) -> dict[str, str]:
+    """{path: branch} from `git worktree list --porcelain`, main worktree first.
+
+    The branch is "" for a detached HEAD. Paths are as git reports them.
+    Raises CalledProcessError (or OSError) when git cannot be asked; each
+    caller decides what an unreadable inventory means for it.
+    """
+    args = ["git", "worktree", "list", "--porcelain"]
+    if repo_dir is not None:
+        args[1:1] = ["-C", str(repo_dir)]
+    result = subprocess.run(args, capture_output=True, text=True, check=True)
+    worktrees: dict[str, str] = {}
+    current = ""
+    for line in result.stdout.splitlines():
+        if line.startswith("worktree "):
+            current = line[len("worktree ") :]
+            worktrees[current] = ""
+        elif line.startswith("branch refs/heads/") and current:
+            worktrees[current] = line[len("branch refs/heads/") :]
+    return worktrees
+
+
+def is_main_worktree(path: str | Path) -> bool:
+    """The main worktree has `.git` as a directory; linked ones have a file."""
+    return (Path(path) / ".git").is_dir()
+
+
+# =============================================================================
 # Main
 # =============================================================================
 
 
 def get_main_worktree() -> Path:
     """Get the path to the main (first) worktree."""
-    result = subprocess.run(
-        ["git", "worktree", "list", "--porcelain"],
-        capture_output=True,
-        text=True,
-        check=True,
-    )
-    for line in result.stdout.splitlines():
-        if line.startswith("worktree "):
-            return Path(line[9:])
-    raise RuntimeError("Could not determine main worktree")
+    worktrees = list_worktrees()
+    if not worktrees:
+        raise RuntimeError("Could not determine main worktree")
+    return Path(next(iter(worktrees)))
 
 
 def get_branch() -> str:
@@ -1139,95 +1237,6 @@ def get_branch() -> str:
         check=True,
     )
     return result.stdout.strip()
-
-
-def get_current_upstream(branch: str, worktree_path: Path) -> str | None:
-    """Return current upstream ref (e.g. 'origin/main') or None if unset."""
-    result = subprocess.run(
-        [
-            "git",
-            "-C",
-            str(worktree_path),
-            "rev-parse",
-            "--abbrev-ref",
-            "--symbolic-full-name",
-            f"{branch}@{{u}}",
-        ],
-        capture_output=True,
-        text=True,
-    )
-    if result.returncode != 0:
-        return None
-    return result.stdout.strip() or None
-
-
-def configure_branch_tracking(branch: str, worktree_path: Path) -> None:
-    """Set the worktree branch's upstream to origin/<branch> if it exists.
-
-    Preserves custom upstreams; only fixes the stale origin/main default that
-    `git worktree add -b` leaves behind. Prints a reminder if no remote ref
-    yet. Failures are non-fatal.
-    """
-    if branch in ("main", "master", "HEAD"):
-        return
-
-    current = get_current_upstream(branch, worktree_path)
-    if current and current not in ("origin/main", "origin/master", f"origin/{branch}"):
-        return  # respect existing custom upstream
-
-    has_remote = (
-        subprocess.run(
-            [
-                "git",
-                "-C",
-                str(worktree_path),
-                "rev-parse",
-                "--verify",
-                "--quiet",
-                f"refs/remotes/origin/{branch}",
-            ],
-            capture_output=True,
-        ).returncode
-        == 0
-    )
-
-    if not has_remote:
-        # Clear the stale origin/main upstream so `git pull` doesn't pull from main.
-        if current in ("origin/main", "origin/master"):
-            subprocess.run(
-                ["git", "-C", str(worktree_path), "branch", "--unset-upstream", branch],
-                capture_output=True,
-            )
-        print(
-            f"worktree_setup: '{branch}' has no remote yet — "
-            f"run `git push -u origin {shlex.quote(branch)}` on first push",
-            file=sys.stderr,
-        )
-        return
-
-    if current == f"origin/{branch}":
-        return
-
-    result = subprocess.run(
-        [
-            "git",
-            "-C",
-            str(worktree_path),
-            "branch",
-            f"--set-upstream-to=origin/{branch}",
-            branch,
-        ],
-        capture_output=True,
-        text=True,
-    )
-    if result.returncode == 0:
-        print(f"worktree_setup: '{branch}' tracks origin/{branch}", file=sys.stderr)
-    else:
-        print(
-            f"worktree_setup: warning: failed to set upstream for '{branch}' "
-            f"(exit {result.returncode}): {result.stderr.strip()}",
-            file=sys.stderr,
-        )
 
 
 def main() -> int:
@@ -1250,23 +1259,12 @@ def main() -> int:
         )
         toolchain_failure = (failure_class, detail)
 
-    # Never probe Node or pnpm through PATH from this branch-controlled
-    # worktree. A failed exact resolution can otherwise re-enter an untrusted
-    # mise shim merely while formatting diagnostics.
-    diagnostics = collect_runtime_diagnostics(toolchain, probe_path_tools=False)
+    diagnostics = collect_runtime_diagnostics(toolchain)
     print(f"worktree_setup: runtimes: {diagnostics.format_summary()}", file=sys.stderr)
 
     branch = get_branch()
-    configure_branch_tracking(branch, worktree_path)
     project_id = resolve_project_id(worktree_path, branch)
-    worktree_key = str(worktree_path)
-
-    # Check if we already have a slot (branch switch) or need a new one (fresh worktree)
-    existing_slot = get_existing_slot(worktree_key)
-    if existing_slot is not None:
-        slot = existing_slot
-    else:
-        slot = allocate_slot(worktree_key)
+    slot = allocate_slot(str(worktree_path))
 
     port_config = PortConfig(slot=slot, project_id=project_id, name=branch)
 
@@ -1303,28 +1301,26 @@ def main() -> int:
     else:
         is_ready, failure_class, detail = install_dependencies(worktree_path, toolchain)
 
-    if is_ready:
-        print(
-            f"worktree_setup: status=ready "
-            f"slot={slot} "
-            f"supabase={parse_env_file(env_path).get(BACKEND_ENV_KEY)} "
-            f"project_id={port_config.project_id} "
-            f"nextjs={port_config.nextjs_port} "
-            f"api={port_config.api_port} "
-            f"db={port_config.db_port}",
-            file=sys.stderr,
-        )
-        return EXIT_READY
-
     print(
-        f"worktree_setup: status=incomplete "
-        f"failure_class={failure_class} "
-        f"detail={detail} "
+        f"worktree_setup: status=ready "
         f"slot={slot} "
-        f"project_id={port_config.project_id}",
+        f"supabase={parse_env_file(env_path).get(BACKEND_ENV_KEY)} "
+        f"project_id={port_config.project_id} "
+        f"nextjs={port_config.nextjs_port} "
+        f"api={port_config.api_port} "
+        f"db={port_config.db_port}",
         file=sys.stderr,
     )
-    return EXIT_INCOMPLETE
+    if not is_ready:
+        # Best-effort: a failed install must not fail the post-checkout hook,
+        # which would make the WorktreeCreate hook delete the new worktree.
+        print(
+            f"worktree_setup: WARNING dependencies not installed "
+            f"(failure_class={failure_class} detail={detail}). "
+            "Run `pnpm install --frozen-lockfile` in this worktree.",
+            file=sys.stderr,
+        )
+    return EXIT_READY
 
 
 if __name__ == "__main__":

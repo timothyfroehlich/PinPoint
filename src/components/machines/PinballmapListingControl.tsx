@@ -207,56 +207,63 @@ export function PinballmapListingControl({
         </Row>
 
         <Row label="Status">
-          <div className="flex min-w-0 flex-1 items-center gap-2">
-            <StatusIcon view={view} />
-            {/* A span, not a <p>: globals.css gives every paragraph
-                `leading-7 not-first:mt-4` for prose, and both are wrong for one
-                line of UI text sitting beside a 16px icon — the margin pushed
-                the sentence 16px below the icon it belongs to, and the 28px
-                leading stretched the row past its fixed height (4.1). */}
-            <span
-              className="text-sm text-foreground"
-              data-testid="pbm-listing-status"
-            >
-              {statusSentence(view, locationUrl, showExternalFallback)}
-            </span>
-          </div>
-
-          {view.pushAction !== null && canWriteOut ? (
-            <div className="ml-auto shrink-0">
-              {view.pushAction === "add" ? (
-                <ConfirmButton
-                  testId="pbm-listing-add"
-                  pending={pending}
-                  onConfirm={() => {
-                    run(addMachineToPinballMapAction);
-                  }}
-                  copy={{
-                    title: "Add to Pinball Map?",
-                    body: `Adds ${game} to the location's lineup on pinballmap.com, where it will be publicly visible.`,
-                    action: "Add machine",
-                  }}
-                  label="Add machine to Pinball Map"
-                />
-              ) : (
-                <ConfirmButton
-                  testId="pbm-listing-remove"
-                  pending={pending}
-                  destructive
-                  removalMachineId={machineId}
-                  onConfirm={() => {
-                    run(removeMachineFromPinballMapAction);
-                  }}
-                  copy={{
-                    title: "Remove from Pinball Map?",
-                    body: `Removes ${game} from the location's lineup on pinballmap.com. It will no longer be publicly visible.`,
-                    action: "Remove machine",
-                  }}
-                  label="Remove machine from Pinball Map"
-                />
-              )}
+          {/* Sentence and push share one wrapping column beside the label. The
+              sentence claims a 12rem basis, so on a phone the push drops under
+              it instead of squeezing it to one word per line (PP-o355.61). A
+              zero basis let the unshrinkable button take the whole line and the
+              words overflowed into it. */}
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-2">
+            <div className="flex min-w-0 flex-[1_1_12rem] items-center gap-2">
+              <StatusIcon view={view} />
+              {/* A span, not a <p>: globals.css gives every paragraph
+                  `leading-7 not-first:mt-4` for prose, and both are wrong for
+                  one line of UI text sitting beside a 16px icon — the margin
+                  pushed the sentence 16px below the icon it belongs to, and the
+                  28px leading stretched the row past its fixed height (4.1). */}
+              <span
+                className="text-sm text-foreground"
+                data-testid="pbm-listing-status"
+              >
+                {statusSentence(view, locationUrl, showExternalFallback)}
+              </span>
             </div>
-          ) : null}
+
+            {view.pushAction !== null && canWriteOut ? (
+              <div className="ml-auto shrink-0">
+                {view.pushAction === "add" ? (
+                  <ConfirmButton
+                    testId="pbm-listing-add"
+                    pending={pending}
+                    onConfirm={() => {
+                      run(addMachineToPinballMapAction);
+                    }}
+                    copy={{
+                      title: "Add to Pinball Map?",
+                      body: `Adds ${game} to the location's lineup on pinballmap.com, where it will be publicly visible.`,
+                      action: "Add machine",
+                    }}
+                    label="Add machine to Pinball Map"
+                  />
+                ) : (
+                  <ConfirmButton
+                    testId="pbm-listing-remove"
+                    pending={pending}
+                    destructive
+                    removalMachineId={machineId}
+                    onConfirm={() => {
+                      run(removeMachineFromPinballMapAction);
+                    }}
+                    copy={{
+                      title: "Remove from Pinball Map?",
+                      body: `Removes ${game} from the location's lineup on pinballmap.com. It will no longer be publicly visible.`,
+                      action: "Remove machine",
+                    }}
+                    label="Remove machine from Pinball Map"
+                  />
+                )}
+              </div>
+            ) : null}
+          </div>
         </Row>
       </div>
 

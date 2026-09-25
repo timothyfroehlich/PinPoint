@@ -101,7 +101,14 @@ export async function MainLayout({
       } else {
         // If not an issue, it must be a machine based on resourceType enum
         const machine = machinesData.find((m) => m.id === n.resourceId);
-        if (machine) link = `/m/${machine.initials}`;
+        if (machine) {
+          // A Pinball Map comment lands on the machine's timeline.
+          link =
+            n.type === "pinballmap_comment"
+              ? `/m/${machine.initials}/timeline`
+              : `/m/${machine.initials}`;
+          machineInitials = machine.initials;
+        }
       }
       return {
         id: n.id,

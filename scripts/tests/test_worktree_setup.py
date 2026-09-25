@@ -1,5 +1,6 @@
 """Unit tests for worktree_setup.py env merging and port allocation."""
 
+import contextlib
 import json
 import re
 import shutil
@@ -13,11 +14,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from worktree_setup import (
     DEFAULT_INSTALL_TIMEOUT,
-    EXIT_INCOMPLETE,
     EXIT_READY,
     FAILURE_CLASS_INSTALL,
     FAILURE_CLASS_MISSING_TOOL,
-    FAILURE_CLASS_NETWORK,
     FAILURE_CLASS_TIMEOUT,
     FAILURE_CLASS_TOOLCHAIN_CONFIG,
     LOCAL_SUPABASE_PUBLISHABLE_KEY,
@@ -31,12 +30,11 @@ from worktree_setup import (
     RuntimeInfo,
     allocate_slot,
     branch_to_project_id,
-    classify_install_failure,
     collect_runtime_diagnostics,
+    derive_project_id,
     generate_config_toml,
     generate_launch_json,
     install_dependencies,
-    load_manifest,
     main,
     merge_env_local,
     parse_env_file,
@@ -608,15 +606,28 @@ class TestManifest:
     def _use_tmp_manifest(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """Redirect MANIFEST_PATH to a temp directory for each test."""
+        """Redirect MANIFEST_PATH to a temp directory for each test.
+
+        Also fake the port probe: a real one would see whatever Supabase stacks
+        the developer has running. Ports in `self.open_ports` answer; the rest
+        refuse.
+        """
         self.manifest_path = tmp_path / "worktree-slots.json"
         monkeypatch.setattr("worktree_setup.MANIFEST_PATH", self.manifest_path)
+        self.open_ports: set[tuple[str, int]] = set()
+        self.unreachable: set[str] = set()
+        self.probed: list[tuple[str, int]] = []
 
-    def test_load_creates_file_if_missing(self) -> None:
-        assert not self.manifest_path.exists()
-        slots = load_manifest()
-        assert slots == {}
-        assert self.manifest_path.exists()
+        def fake_connect(address: tuple[str, int], timeout: float) -> object:
+            assert 0 < timeout <= 1
+            self.probed.append(address)
+            if address in self.open_ports:
+                return contextlib.nullcontext()
+            if address[0] in self.unreachable:
+                raise TimeoutError(address)
+            raise ConnectionRefusedError(address)
+
+        monkeypatch.setattr("worktree_setup.socket.create_connection", fake_connect)
 
     def test_prune_removes_nonexistent_paths(self, tmp_path: Path) -> None:
         existing_dir = tmp_path / "exists"
@@ -653,6 +664,59 @@ class TestManifest:
         wt3.mkdir()
         slot3 = allocate_slot(str(wt3))
         assert slot3 == 1  # Reuses the freed slot
+
+    def test_gone_worktree_with_closed_ports_is_pruned(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("PINPOINT_REMOTE_SUPABASE_HOST", "bazzite")
+
+        assert prune_manifest({"/gone/worktree": 2}) == {}
+        # Slot 2: API 54521, DB 54522, on this machine and on the remote host.
+        assert self.probed == [
+            ("127.0.0.1", 54521),
+            ("127.0.0.1", 54522),
+            ("bazzite", 54521),
+            ("bazzite", 54522),
+        ]
+
+    def test_an_unreachable_remote_host_keeps_the_slot(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Only a refused connection proves a port free; a timeout is a guess."""
+        monkeypatch.setenv("PINPOINT_REMOTE_SUPABASE_HOST", "bazzite")
+        self.unreachable.add("bazzite")
+
+        assert prune_manifest({"/gone/worktree": 2}) == {"/gone/worktree": 2}
+
+    def test_probing_is_capped_and_unprobed_entries_are_kept(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """allocate_slot holds the manifest lock while it prunes."""
+        monkeypatch.setattr("worktree_setup.PRUNE_PROBE_BUDGET_SECONDS", 0)
+
+        assert prune_manifest({"/gone/a": 2, "/gone/b": 3}) == {
+            "/gone/a": 2,
+            "/gone/b": 3,
+        }
+        assert self.probed == []
+
+    def test_gone_worktree_whose_stack_still_answers_keeps_its_slot(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """rm -rf skips cleanup; the stack still holds the slot's ports."""
+        monkeypatch.setenv("PINPOINT_REMOTE_SUPABASE_HOST", "bazzite")
+        gone = tmp_path / "gone"
+        gone.mkdir()
+        assert allocate_slot(str(gone)) == 1
+        gone.rmdir()
+        self.open_ports.add(("bazzite", 54422))  # slot 1's DB port, remote
+
+        fresh = tmp_path / "fresh"
+        fresh.mkdir()
+
+        assert allocate_slot(str(fresh)) == 2
+        slots = json.loads(self.manifest_path.read_text())["slots"]
+        assert slots == {str(gone): 1, str(fresh): 2}
 
     def test_allocate_skips_reserved_slots(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -802,7 +866,7 @@ class TestPinnedProjectId:
     @pytest.mark.parametrize(
         "value",
         [
-            "not-pinpoint-prefixed",  # invisible to worktree_orphan_sweep.py
+            "not-pinpoint-prefixed",  # invisible to worktree_reap.py
             "pinpoint-Has-Uppercase",  # not a legal Docker/Supabase id
             "pinpoint-has_underscore",
             "pinpoint-" + "a" * 40,  # over MAX_PROJECT_ID_LEN
@@ -883,6 +947,53 @@ class TestPinnedProjectId:
         assert resolve_project_id(tmp_path, "feat/renamed") == first.project_id
 
 
+class TestDetachedProjectId:
+    """A detached HEAD reports branch "HEAD"; its id must come from the path."""
+
+    def test_detached_worktrees_at_different_paths_get_different_ids(
+        self, tmp_path: Path
+    ) -> None:
+        # Codex worktrees all end in /PinPoint, so the basename is not enough.
+        first = tmp_path / "codex" / "1a2b" / "PinPoint"
+        second = tmp_path / "codex" / "3c4d" / "PinPoint"
+        first.mkdir(parents=True)
+        second.mkdir(parents=True)
+
+        first_id = resolve_project_id(first, "HEAD")
+        second_id = resolve_project_id(second, "HEAD")
+
+        assert first_id != second_id
+        for project_id in (first_id, second_id):
+            assert re.fullmatch(r"pinpoint-pinpoint-[0-9a-f]{8}", project_id)
+            # Setup must be able to pin what it derives.
+            config = tmp_path / "pin" / "supabase" / "config.toml"
+            config.parent.mkdir(parents=True, exist_ok=True)
+            config.write_text(f'project_id = "{project_id}"\n')
+            assert read_pinned_project_id(tmp_path / "pin") == project_id
+
+    def test_long_basename_stays_within_the_id_cap(self, tmp_path: Path) -> None:
+        worktree = tmp_path / ("Very_Long.Worktree-Name-" * 3)
+        worktree.mkdir()
+
+        project_id = derive_project_id(worktree, "HEAD")
+
+        assert len(project_id) <= 40
+        assert re.fullmatch(r"pinpoint-[a-z0-9-]{1,20}-[0-9a-f]{8}", project_id)
+
+    def test_named_branches_still_derive_from_the_branch(self, tmp_path: Path) -> None:
+        assert resolve_project_id(tmp_path, "feat/thing") == branch_to_project_id(
+            "feat/thing"
+        )
+
+    def test_existing_pinned_id_still_wins_when_detached(self, tmp_path: Path) -> None:
+        # A stack started before this rule keeps running under its old id.
+        config = tmp_path / "supabase" / "config.toml"
+        config.parent.mkdir()
+        config.write_text('project_id = "pinpoint-head"\n')
+
+        assert resolve_project_id(tmp_path, "HEAD") == "pinpoint-head"
+
+
 class TestRuntimeDiagnostics:
     """Test runtime path and version diagnostics collection."""
 
@@ -894,23 +1005,6 @@ class TestRuntimeDiagnostics:
         assert isinstance(diag.node, RuntimeInfo)
         assert isinstance(diag.pnpm, RuntimeInfo)
         assert isinstance(diag.git, RuntimeInfo)
-
-    def test_path_tool_probes_can_be_disabled(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        original_which = shutil.which
-
-        def guarded_which(tool: str) -> str | None:
-            if tool in {"node", "pnpm"}:
-                pytest.fail(f"must not probe {tool} through PATH")
-            return original_which(tool)
-
-        monkeypatch.setattr("worktree_setup.shutil.which", guarded_which)
-
-        diag = collect_runtime_diagnostics(probe_path_tools=False)
-
-        assert diag.node == RuntimeInfo(path=None, version=None)
-        assert diag.pnpm == RuntimeInfo(path=None, version=None)
 
     def test_format_summary_with_all_runtimes(self) -> None:
         diag = RuntimeDiagnostics(
@@ -935,35 +1029,6 @@ class TestRuntimeDiagnostics:
         summary = diag.format_summary()
         assert "node=<not found>" in summary
         assert "pnpm=<not found>" in summary
-
-
-class TestClassifyInstallFailure:
-    """Test failure classification of install outcomes."""
-
-    @pytest.mark.parametrize(
-        "error_snippet",
-        [
-            "getaddrinfo ENOTFOUND registry.npmjs.org",
-            "ETIMEDOUT connecting to registry",
-            "ECONNREFUSED 127.0.0.1:4873",
-            "ECONNRESET by peer",
-            "EAI_AGAIN failed to resolve host",
-            "ERR_PNPM_FETCH_404 registry error",
-            "TypeError: fetch failed",
-            "network error while downloading tarball",
-            "request to https://registry.npmjs.org failed",
-            "CERT_HAS_EXPIRED",
-        ],
-    )
-    def test_classifies_network_failures(self, error_snippet: str) -> None:
-        result = classify_install_failure(1, "", error_snippet)
-        assert result == FAILURE_CLASS_NETWORK
-
-    def test_classifies_general_install_failure(self) -> None:
-        result = classify_install_failure(
-            1, "", "ERR_PNPM_OUTDATED_LOCKFILE Cannot install with --frozen-lockfile"
-        )
-        assert result == FAILURE_CLASS_INSTALL
 
 
 class TestBootstrapToolVersions:
@@ -1193,28 +1258,6 @@ class TestInstallDependencies:
         assert failure_class == FAILURE_CLASS_INSTALL
         assert "pnpm install failed (exit 1)" in (detail or "")
 
-    def test_network_failure_classified(
-        self,
-        tmp_path: Path,
-        monkeypatch: pytest.MonkeyPatch,
-        toolchain: BootstrapToolchain,
-    ) -> None:
-        import subprocess
-
-        mock_res = subprocess.CompletedProcess(
-            args=["pnpm", "install"],
-            returncode=1,
-            stdout="",
-            stderr="getaddrinfo ENOTFOUND registry.npmjs.org\n",
-        )
-        monkeypatch.setattr(
-            "worktree_setup.subprocess.run", lambda *args, **kwargs: mock_res
-        )
-
-        is_ready, failure_class, detail = install_dependencies(tmp_path, toolchain)
-        assert is_ready is False
-        assert failure_class == FAILURE_CLASS_NETWORK
-
     def test_timeout_returns_timeout_failure(
         self,
         tmp_path: Path,
@@ -1246,10 +1289,6 @@ class TestInstallDependencies:
         assert resolve_install_timeout() == MAX_INSTALL_TIMEOUT
 
         monkeypatch.delenv("PINPOINT_WORKTREE_INSTALL_TIMEOUT", raising=False)
-        monkeypatch.setenv("WORKTREE_INSTALL_TIMEOUT", "75")
-        assert resolve_install_timeout() == 75
-
-        monkeypatch.delenv("WORKTREE_INSTALL_TIMEOUT", raising=False)
         assert resolve_install_timeout() == DEFAULT_INSTALL_TIMEOUT
 
 
@@ -1273,9 +1312,6 @@ class TestWorktreeSetupMainReadiness:
 
         monkeypatch.setattr("worktree_setup.get_main_worktree", lambda: self.main_wt)
         monkeypatch.setattr("worktree_setup.get_branch", lambda: "feat/my-branch")
-        monkeypatch.setattr(
-            "worktree_setup.configure_branch_tracking", lambda branch, path: None
-        )
         monkeypatch.setattr("worktree_setup.Path.cwd", lambda: self.linked_wt)
 
     def test_main_worktree_noop_returns_ready(
@@ -1299,7 +1335,7 @@ class TestWorktreeSetupMainReadiness:
         assert (self.linked_wt / "supabase/config.toml").exists()
         assert (self.linked_wt / ".claude/launch.json").exists()
 
-    def test_linked_worktree_incomplete_on_install_failure(
+    def test_install_failure_warns_but_keeps_the_worktree(
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
     ) -> None:
         toolchain = BootstrapToolchain(
@@ -1321,10 +1357,14 @@ class TestWorktreeSetupMainReadiness:
             ),
         )
         code = main()
-        assert code == EXIT_INCOMPLETE
+        # Exit 0: a failing post-checkout hook makes WorktreeCreate delete the
+        # worktree, so a failed install only warns.
+        assert code == EXIT_READY
         captured = capsys.readouterr()
-        assert "status=incomplete" in captured.err
+        assert "status=ready" in captured.err
+        assert "WARNING dependencies not installed" in captured.err
         assert "failure_class=missing-tool" in captured.err
+        assert "pnpm install --frozen-lockfile" in captured.err
         # Generated files must still be written with 444 permissions
         assert (self.linked_wt / ".env.local").exists()
         assert (self.linked_wt / "supabase" / "config.toml").exists()
@@ -1351,8 +1391,9 @@ class TestWorktreeSetupMainReadiness:
 
         code = main()
 
-        assert code == EXIT_INCOMPLETE
+        assert code == EXIT_READY
         captured = capsys.readouterr()
+        assert "WARNING dependencies not installed" in captured.err
         assert "node=<not found>" in captured.err
         assert "pnpm=<not found>" in captured.err
         assert "failure_class=missing-tool" in captured.err

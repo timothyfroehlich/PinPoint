@@ -77,7 +77,7 @@ process.stdin.on("end", () => {
       `(AGENTS.md §2.2.5) — switching it off main lets a later \`git merge\` advance the wrong branch and clobber ` +
       `another session's state. Restoring files? Use \`git checkout -- <paths>\` or \`git restore\`. ` +
       `Do branch work in a dedicated worktree: ` +
-      `\`git worktree add <path> -b <branch> origin/main\`, or dispatch an Agent(isolation:"worktree").`
+      `\`git worktree add --no-track -b <branch> <path> origin/main\`, or dispatch an Agent(isolation:"worktree").`
   );
   process.exitCode = 2;
 });
