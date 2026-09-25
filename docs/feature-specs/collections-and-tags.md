@@ -83,6 +83,8 @@
 - **7.4** A machine's page links to each tag the machine belongs to.
 - **7.5** A tag's page and address stay the same while its membership changes.
 - **7.6** Tag membership is computed from data PinPoint already stores. Showing a tag, a tag page, or the tag browse never calls an external service.
+- **7.7** Each tag type has a public page listing its tags. A tag's page identifies it as a tag and links to its tag type's page, and the tag browse links each tag type's section to that page.
+- **7.8** A tag type whose membership PinPoint derives from machine data, rather than people assigning it, is marked automatic on its page and in the tag browse.
 
 ---
 
@@ -112,11 +114,9 @@
 
 ## Known divergences (code vs spec)
 
-| Requirement | Divergence | Resolution |
-| :-- | :-- | :-- |
-| 6.2 | Owner Collections require sign-in. | PP-wqit.9 |
-| 7.1–7.6, 8.1–8.6 | Tags are not built; the machine page shows a "Tags — Coming soon!" placeholder. | PP-wqit.6 |
-| 8.5 | Machine View falls back to a machine's own stored manufacturer when a linked catalog title has none, and shows it for machines that are neither linked nor uncataloged; the machine Info page shows the stored manufacturer directly. | PP-wqit.6 |
+| Requirement | Divergence                         | Resolution |
+| :---------- | :--------------------------------- | :--------- |
+| 6.2         | Owner Collections require sign-in. | PP-wqit.9  |
 
 ---
 
@@ -124,4 +124,5 @@
 
 | Date | Change |
 | :-- | :-- |
+| 2026-09-25 | Added tag type pages and automatic tag type marking. |
 | 2026-09-24 | Created from as-built Collections behavior, with Owner Collections made public and manufacturer tags as the first tag type. |

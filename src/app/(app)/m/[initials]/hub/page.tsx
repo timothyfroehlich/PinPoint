@@ -31,7 +31,7 @@ export default async function MachineScanHubPage({
       machine={{
         initials: machine.initials,
         name: machine.name,
-        manufacturer: machine.manufacturer,
+        manufacturer: machine.currentManufacturer,
         year: machine.year,
         owner: machine.owner ? { name: machine.owner.name } : null,
         invitedOwner: machine.invitedOwner
@@ -44,6 +44,7 @@ export default async function MachineScanHubPage({
           title: issue.title,
           createdAt: issue.createdAt,
         })),
+        artwork: machine.artwork,
       }}
       scores={scores}
       scoreHref={

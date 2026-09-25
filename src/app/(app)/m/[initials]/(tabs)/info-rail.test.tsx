@@ -29,6 +29,7 @@ function renderRail(overrides: Partial<RailProps> = {}): void {
       modelName="Medieval Madness"
       manufacturer="Williams"
       year={1997}
+      manufacturerTag={null}
       pinballmap={{
         locationUrl: LOCATION_URL,
         onLineup: true,
@@ -61,29 +62,40 @@ describe("InfoRail", () => {
     expect(screen.getByText(/no owner assigned/i)).toBeInTheDocument();
   });
 
-  it("renders description and edit slots inside the Details card", () => {
+  it("renders the edit slot inside the Details card", () => {
     renderRail({
-      descriptionSlot: <p>A classic widebody.</p>,
       editSlot: <button type="button">Edit machine</button>,
     });
     const card = screen.getByTestId("machine-owner-card");
     expect(within(card).getByText("Details")).toBeInTheDocument();
-    expect(within(card).getByText("A classic widebody.")).toBeInTheDocument();
     expect(
       within(card).getByRole("button", { name: /edit machine/i })
     ).toBeInTheDocument();
   });
 
-  it("keeps the owner divider even with no description above", () => {
-    // The Model block now always renders between the two, so the divider is
-    // unconditional — unlike before, when it hung off `descriptionSlot`.
+  it("divides the owner from the Model block above", () => {
     renderRail();
     expect(screen.getByTestId("owner-block")).toHaveClass("border-t");
   });
 
-  it("renders the Tags placeholder", () => {
-    renderRail();
-    expect(screen.getByTestId("machine-tags-placeholder")).toBeInTheDocument();
+  it("links the manufacturer tag in the Tags card", () => {
+    renderRail({
+      manufacturerTag: {
+        name: "Williams",
+        href: "/c/tags/manufacturer/williams",
+      },
+    });
+    const card = screen.getByTestId("machine-tags");
+    expect(
+      within(card).getByRole("link", { name: "Williams" })
+    ).toHaveAttribute("href", "/c/tags/manufacturer/williams");
+  });
+
+  it("says a machine without a manufacturer has no tags", () => {
+    renderRail({ manufacturerTag: null });
+    expect(
+      within(screen.getByTestId("machine-tags")).getByText("No tags")
+    ).toBeInTheDocument();
   });
 
   describe("model row", () => {

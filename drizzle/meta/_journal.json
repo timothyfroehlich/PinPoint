@@ -596,6 +596,13 @@
       "when": 1790304914531,
       "tag": "0084_add-opdb-catalog-images",
       "breakpoints": true
+    },
+    {
+      "idx": 85,
+      "version": "7",
+      "when": 1790310603203,
+      "tag": "0085_drop-legacy-integration-enable-columns",
+      "breakpoints": true
     }
   ]
 }

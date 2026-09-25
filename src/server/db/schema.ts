@@ -403,10 +403,7 @@ export const pinballmapAbandonedListings = pgTable(
     // actionable across a tracked-location change, and only records for the
     // currently synced location may be reconciled against that lineup
     // (pinballmap spec 10.11–10.12).
-    // Expand-deploy compatibility: the previous runtime omits this column when
-    // it records an abandonment. Keep the APC default until the contract
-    // migration after this writer is serving, then drop only the default.
-    locationId: integer("location_id").notNull().default(26454),
+    locationId: integer("location_id").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -1466,10 +1463,6 @@ export const discordIntegrationConfig = pgTable(
   "discord_integration_config",
   {
     id: text("id").primaryKey().default("singleton"),
-    // Deploy-order compatibility only: the current runtime no longer reads or
-    // writes this column. Keep it until the follow-up contract migration lands
-    // after this runtime is serving everywhere.
-    enabled: boolean("enabled").notNull().default(false),
     guildId: text("guild_id"),
     inviteLink: text("invite_link"),
     // UUID reference to vault.secrets.id — no FK (Drizzle cannot cross-schema)
@@ -1523,10 +1516,6 @@ export const pinballmapState = pgTable(
   "pinballmap_state",
   {
     id: text("id").primaryKey().default("singleton"),
-    // Deploy-order compatibility only: locationId is authoritative for the
-    // current runtime. Keep this column until the follow-up contract migration
-    // lands after this runtime is serving everywhere.
-    enabled: boolean("enabled").notNull().default(false),
     // A configured location is the integration's sole activation signal.
     // Null retains the dormant state without permitting any Pinball Map calls.
     locationId: integer("location_id"),

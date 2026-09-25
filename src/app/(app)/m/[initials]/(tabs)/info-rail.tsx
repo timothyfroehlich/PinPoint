@@ -9,11 +9,6 @@ interface InfoRailProps {
   owner: { id: string; name: string; avatarUrl: string | null } | null;
   invitedOwner: { name: string } | null;
   addedAt: Date;
-  /**
-   * Machine description, rendered inside the Details card above the owner row.
-   * Pass `null` to omit the Description section entirely (empty + non-editable).
-   */
-  descriptionSlot?: React.ReactNode;
   /** Edit-machine control (dialog trigger or denied tooltip), shown in the owner card footer. */
   editSlot?: React.ReactNode;
   /** Top scores card slot, rendered below Details and above Tags placeholder. */
@@ -44,6 +39,11 @@ interface InfoRailProps {
    */
   manufacturer: string | null;
   year: number | null;
+  /**
+   * The machine's manufacturer tag, or null when it has no current
+   * manufacturer (spec collections-and-tags 7.4, 8.4).
+   */
+  manufacturerTag: { name: string; href: string } | null;
   /**
    * The machine's standing on Pinball Map, rendered as one unlabelled line
    * under Model.
@@ -95,19 +95,19 @@ interface InfoRailProps {
 }
 
 const CARD = "rounded-xl border border-outline-variant bg-card p-4";
-const PLACEHOLDER_CARD =
-  "rounded-xl border border-dashed border-secondary/50 bg-card p-4";
 const LABEL =
   "text-[10px] font-bold uppercase tracking-wider text-muted-foreground";
-const COMING_SOON = "text-sm text-muted-foreground";
 
 /**
- * InfoRail — the Info tab's reference cluster: the Details card (description,
- * Model, Pinball Map standing, owner, Edit), then Tags. Renders as the desktop
+ * InfoRail — the Info tab's reference cluster: the Details card (Model,
+ * Pinball Map standing, owner, Edit), then Tags. The machine description is
+ * not here: it leads the main column, because a long one stretched this
+ * 320px rail far past the main column's height. Renders as the desktop
  * right rail and folds inline on mobile (the caller controls placement + gap;
  * this returns the cards as a fragment).
  *
- * Tags is still a reserved placeholder (Collections fills it later).
+ * Tags links each tag the machine belongs to; manufacturer is the only tag
+ * type so far.
  *
  * PP-o355.21 removed the standalone Pinball Map card that PP-o355.3 introduced
  * and PP-l81u last extended. A whole card for two facts hid them: a reader
@@ -119,19 +119,18 @@ export function InfoRail({
   owner,
   invitedOwner,
   addedAt,
-  descriptionSlot,
   editSlot,
   topScoresSlot,
   modelName,
   manufacturer,
   year,
+  manufacturerTag,
   pinballmap,
 }: InfoRailProps): React.JSX.Element {
   return (
     <>
-      {/* Details — reading order: the machine description (primary content;
-          read-only, edited on the Manage tab), then the machine's identity
-          (Model + its Pinball Map standing), then the owner in a distinct panel
+      {/* Details — reading order: the machine's identity (Model + its Pinball
+          Map standing), then the owner in a distinct panel
           with an explicit role badge (name only, never email per CORE-SEC-007),
           then the Edit-machine control.
 
@@ -142,22 +141,10 @@ export function InfoRail({
       <div className={`@container ${CARD}`} data-testid="machine-owner-card">
         <p className={`mb-3 ${LABEL}`}>Details</p>
 
-        {descriptionSlot ? (
-          <div className="text-sm text-muted-foreground">{descriptionSlot}</div>
-        ) : null}
-
-        {/* Model + Pinball Map — the machine's identity, under a soft divider
-            from the description. Model is labelled; the Pinball Map line is
-            not, because a "Pinball Map" key beside a "View on Pinball Map"
-            value says the same words twice. */}
-        <div
-          data-testid="machine-model-block"
-          className={
-            descriptionSlot
-              ? "mt-4 border-t border-outline-variant pt-4"
-              : undefined
-          }
-        >
+        {/* Model + Pinball Map — the machine's identity. Model is labelled;
+            the Pinball Map line is not, because a "Pinball Map" key beside a
+            "View on Pinball Map" value says the same words twice. */}
+        <div data-testid="machine-model-block">
           <p className="text-sm">
             <span className="font-semibold text-muted-foreground">Model</span>{" "}
             {modelName === null ? (
@@ -266,8 +253,7 @@ export function InfoRail({
         </div>
 
         {/* Owner — under a soft divider from the Model block above, which always
-            renders, so the divider is no longer conditional on a description
-            being present. A plain "Owner" label leads the name (link; name
+            renders. A plain "Owner" label leads the name (link; name
             only, never email per CORE-SEC-007), with the added date below. */}
         <div
           data-testid="owner-block"
@@ -308,10 +294,22 @@ export function InfoRail({
 
       {topScoresSlot}
 
-      {/* Tags — reserved slot for the future Collections feature. */}
-      <div className={PLACEHOLDER_CARD} data-testid="machine-tags-placeholder">
+      <div className={CARD} data-testid="machine-tags">
         <p className={`mb-2 ${LABEL}`}>Tags</p>
-        <p className={COMING_SOON}>Coming soon!</p>
+        {manufacturerTag ? (
+          <ul className="flex flex-wrap gap-2">
+            <li>
+              <Link
+                href={manufacturerTag.href}
+                className="inline-flex items-center rounded-full bg-secondary-container px-3 py-1 text-sm font-medium text-on-secondary-container hover:bg-secondary-container/80"
+              >
+                {manufacturerTag.name}
+              </Link>
+            </li>
+          </ul>
+        ) : (
+          <p className="text-sm text-muted-foreground">No tags</p>
+        )}
       </div>
     </>
   );

@@ -204,10 +204,8 @@ export async function getRefreshAllowance(
 }
 
 /**
- * These raw upserts intentionally name only the post-contract columns. Drizzle
- * inserts every schema-declared column (using DEFAULT for omitted values), which
- * would still mention `enabled` after the follow-up migration drops it while
- * this deployment is serving. The error path omits the last good snapshot and
+ * These raw upserts name only the columns a sync owns, so a write never touches
+ * configuration or lease state. The error path omits the last good snapshot and
  * timestamp so an unsuccessful fetch cannot clobber them. The serialized JSON
  * is cast through text before jsonb so postgres-js cannot double-encode it.
  */
