@@ -64,7 +64,7 @@ Launch these six groups simultaneously:
 ./scripts/workflow/orchestration-status.sh
 ```
 
-Covers: open PRs (CI + merge), the location-agnostic `worktree_reap.py` dry-run, beads ready/in-progress, and Dependabot alerts. The output template's "Open PRs" and "Worktree Health" sections are filled from this one call — don't re-run those reports separately.
+Covers: open PRs (CI + merge), the location-agnostic `worktree_reap.py` dry-run (finished worktrees, plus orphan slots and Supabase stacks), beads ready/in-progress, and Dependabot alerts. The output template's "Open PRs" and "Worktree Health" sections are filled from this one call — don't re-run those reports separately.
 
 ### Group B: Security Audit
 
