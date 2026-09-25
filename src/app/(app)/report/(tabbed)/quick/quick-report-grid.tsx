@@ -7,7 +7,7 @@ import { formatIssueId } from "~/lib/issues/utils";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
-import { Switch } from "~/components/ui/switch";
+import { Checkbox } from "~/components/ui/checkbox";
 import { ChevronDown, Check, Trash2 } from "lucide-react";
 import {
   AlertDialog,
@@ -516,17 +516,20 @@ function QuickRow({
                 ))}
               </select>
             </Field>
-            <div className="flex h-9 items-center gap-2 text-sm">
-              <Switch
+            <div className="flex h-9 items-center gap-3 text-sm">
+              <Checkbox
                 id={`${entry.idempotencyKey}-watch`}
                 checked={entry.watch}
-                onCheckedChange={(v) => onPatch({ watch: v })}
+                onCheckedChange={(checked) =>
+                  onPatch({ watch: checked === true })
+                }
+                className="mt-0.5 border-outline-variant data-[state=checked]:border-primary"
               />
               <Label
                 htmlFor={`${entry.idempotencyKey}-watch`}
-                className="cursor-pointer"
+                className="text-sm font-medium text-foreground cursor-pointer"
               >
-                Watch
+                Watch this issue
               </Label>
             </div>
             <div className="flex items-center gap-2 @[640px]:justify-self-end">
