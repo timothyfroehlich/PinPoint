@@ -369,7 +369,7 @@ def isolated_main(monkeypatch: pytest.MonkeyPatch):
         monkeypatch.setattr(sweep, "get_active_worktree_branches", lambda _repo: {})
         monkeypatch.setattr(sweep, "get_active_project_ids", lambda _wt: active)
         monkeypatch.setattr(sweep, "get_orphan_slot_paths", lambda: orphan_slots)
-        monkeypatch.setattr(sweep, "_is_main_worktree_path", lambda _p: False)
+        monkeypatch.setattr(sweep, "is_main_worktree", lambda _p: False)
         monkeypatch.setattr(sweep, "deallocate_slot", deallocated.append)
         return deallocated
 

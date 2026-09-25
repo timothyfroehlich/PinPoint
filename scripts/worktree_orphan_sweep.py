@@ -49,7 +49,6 @@ import fcntl
 import json
 import os
 import re
-import shlex
 import subprocess
 import sys
 import time
@@ -59,9 +58,17 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from worktree_cleanup import MANIFEST_PATH, deallocate_slot  # noqa: E402
-from worktree_setup import derive_project_id  # noqa: E402
-
-_PROJECT_ID_LINE_RE = re.compile(r'^project_id\s*=\s*"([^"]+)"')
+from worktree_setup import (  # noqa: E402
+    BACKEND_ENV_KEY,
+    DockerNotInstalledError,
+    DockerUnavailableError,
+    derive_project_id,
+    is_main_worktree,
+    list_worktrees,
+    read_config_project_id,
+    read_stored_backend,
+    run_docker,
+)
 
 SUPABASE_PROJECT_LABEL = "com.supabase.cli.project"
 SUPABASE_WORKDIR_LABEL = "com.supabase.cli.workdir"
@@ -71,7 +78,6 @@ SUPABASE_WORKDIR_LABEL = "com.supabase.cli.workdir"
 #: this machine uses the remote backend at all.
 REMOTE_DOCKER_HOST_ENV = "PINPOINT_REMOTE_DOCKER_HOST"
 REMOTE_SUPABASE_HOST_ENV = "PINPOINT_REMOTE_SUPABASE_HOST"
-BACKEND_ENV_KEY = "PINPOINT_SUPABASE_BACKEND"
 
 #: The remote host runs its own Supabase stacks for Crabbox runners. They are
 #: not this machine's worktrees and must never be reported or removed.
@@ -94,33 +100,13 @@ EXIT_DOCKER_UNKNOWN = 1
 def get_active_worktree_branches(repo_dir: Path) -> dict[str, str]:
     """Return {path: branch} for all current git worktrees of repo_dir."""
     try:
-        result = subprocess.run(
-            ["git", "-C", str(repo_dir), "worktree", "list", "--porcelain"],
-            capture_output=True,
-            text=True,
-            check=True,
-        )
+        return list_worktrees(repo_dir)
     except subprocess.CalledProcessError as exc:
         # Without the worktree list every Supabase project would look orphaned,
         # and --apply would delete live stacks. Stop instead.
         sys.exit(
             f"worktree-orphan-sweep: `git worktree list` failed: {exc.stderr.strip()}"
         )
-
-    worktrees: dict[str, str] = {}
-    current_path = ""
-    current_branch = ""
-    for line in result.stdout.splitlines():
-        if line.startswith("worktree "):
-            if current_path:
-                worktrees[current_path] = current_branch
-            current_path = line[len("worktree ") :]
-            current_branch = ""
-        elif line.startswith("branch refs/heads/"):
-            current_branch = line[len("branch refs/heads/") :]
-    if current_path:
-        worktrees[current_path] = current_branch
-    return worktrees
 
 
 def get_active_project_ids(worktrees: dict[str, str]) -> set[str]:
@@ -129,25 +115,15 @@ def get_active_project_ids(worktrees: dict[str, str]) -> set[str]:
     Reads `<worktree>/supabase/config.toml` directly when present — that file
     is the authoritative source for the project_id that Supabase containers
     actually use, and it works for detached worktrees and for worktrees whose
-    branch was renamed after setup. When the config.toml is missing, falls back
-    to the id setup would derive: from the branch, or from the path when the
-    worktree is detached (`derive_project_id`).
+    branch was renamed after setup. When the config.toml is missing (or has no
+    project_id), falls back to the id setup would derive: from the branch, or
+    from the path when the worktree is detached (`derive_project_id`).
     """
-    project_ids: set[str] = set()
-    for path_str, branch in worktrees.items():
-        config_path = Path(path_str) / "supabase" / "config.toml"
-        if config_path.is_file():
-            try:
-                for line in config_path.read_text().splitlines():
-                    match = _PROJECT_ID_LINE_RE.match(line)
-                    if match:
-                        project_ids.add(match.group(1))
-                        break
-            except OSError:
-                pass
-        else:
-            project_ids.add(derive_project_id(Path(path_str), branch or "HEAD"))
-    return project_ids
+    return {
+        read_config_project_id(Path(path))
+        or derive_project_id(Path(path), branch or "HEAD")
+        for path, branch in worktrees.items()
+    }
 
 
 def get_orphan_slot_paths() -> list[str]:
@@ -183,20 +159,6 @@ def get_orphan_slot_paths() -> list[str]:
     return orphans
 
 
-class DockerNotInstalledError(RuntimeError):
-    """The `docker` binary is absent, so there are genuinely no Docker resources."""
-
-
-class DockerUnavailableError(RuntimeError):
-    """Docker is installed but could not be enumerated.
-
-    Callers MUST surface this as *unknown*, never as an empty result. Swallowing
-    it into `[]` is what produced the `0 volume(s)` false zero in PP-5o7b:
-    `--apply` then removed the containers, reported success, and left the
-    volumes on disk.
-    """
-
-
 @dataclass(frozen=True)
 class DockerSweepResult:
     """Supabase Docker resources grouped by project_id, or an explicit unknown.
@@ -215,36 +177,6 @@ class DockerSweepResult:
         return self.unknown_reason is not None
 
 
-def _run_docker(
-    args: list[str],
-    env: dict[str, str] | None = None,
-    timeout: float | None = None,
-) -> str:
-    """Run a docker command and return stdout, or raise rather than return empty."""
-    try:
-        result = subprocess.run(
-            args, capture_output=True, text=True, check=True, env=env, timeout=timeout
-        )
-    except FileNotFoundError as exc:
-        raise DockerNotInstalledError("`docker` is not installed") from exc
-    except OSError as exc:
-        raise DockerUnavailableError(
-            f"could not run `{shlex.join(args)}`: {exc}"
-        ) from exc
-    except subprocess.TimeoutExpired as exc:
-        raise DockerUnavailableError(
-            f"`{shlex.join(args)}` timed out after {exc.timeout:.0f}s"
-        ) from exc
-    except subprocess.CalledProcessError as exc:
-        detail = (
-            (exc.stderr or "").strip()
-            or (exc.stdout or "").strip()
-            or f"exit status {exc.returncode}"
-        )
-        raise DockerUnavailableError(f"`{shlex.join(args)}` failed: {detail}") from exc
-    return result.stdout
-
-
 def _parse_rows(stdout: str) -> list[tuple[str, str, str]]:
     """Parse `name|project_id[|workdir]` lines for PinPoint's non-Crabbox projects."""
     rows: list[tuple[str, str, str]] = []
@@ -260,8 +192,19 @@ def _parse_rows(stdout: str) -> list[tuple[str, str, str]]:
     return rows
 
 
-def get_supabase_volumes() -> list[tuple[str, str]]:
-    """Return `(volume_name, project_id)` for every Supabase-CLI-labeled volume.
+def _timeout(deadline: float | None) -> float | None:
+    """Seconds left before `deadline` (at least 0.1), or None for no limit."""
+    return None if deadline is None else max(0.1, deadline - time.monotonic())
+
+
+def get_supabase_volumes(
+    env: dict[str, str] | None = None, deadline: float | None = None
+) -> list[tuple[str, str]]:
+    """Return `(volume_name, project_id)` for every PinPoint Supabase volume.
+
+    `env` points `docker` at a daemon (None: the local one); `deadline` bounds
+    both calls (None: no limit). Volumes carry no workdir label — the Supabase
+    CLI sets it on containers only — so none is read here.
 
     Deliberately two calls. `docker volume ls --format '{{.Label "..."}}'` is NOT
     portable: Podman's `*types.VolumeListReport` has no `Label` method, so the
@@ -271,7 +214,7 @@ def get_supabase_volumes() -> list[tuple[str, str]]:
     """
     names = [
         line.strip()
-        for line in _run_docker(
+        for line in run_docker(
             [
                 "docker",
                 "volume",
@@ -280,7 +223,9 @@ def get_supabase_volumes() -> list[tuple[str, str]]:
                 f"label={SUPABASE_PROJECT_LABEL}",
                 "--format",
                 "{{.Name}}",
-            ]
+            ],
+            env,
+            _timeout(deadline),
         ).splitlines()
         if line.strip()
     ]
@@ -292,23 +237,30 @@ def get_supabase_volumes() -> list[tuple[str, str]]:
     # one racing removal shouldn't blind the whole sweep. `inspect` still writes
     # the volumes it did resolve to stdout, so those pairs stay trustworthy.
     #
-    # Anything that leaves stdout empty is reported as unknown instead: a
-    # template or daemon failure, and also the (rare) case where every named
-    # volume raced away at once. Calling that last one "unknown" rather than
-    # "zero" is deliberate — under-claiming knowledge is the whole point of
-    # PP-5o7b, and the next sweep resolves it.
-    inspect = subprocess.run(
-        [
-            "docker",
-            "volume",
-            "inspect",
-            "--format",
-            '{{.Name}}|{{index .Labels "' + SUPABASE_PROJECT_LABEL + '"}}',
-            *names,
-        ],
-        capture_output=True,
-        text=True,
-    )
+    # Anything that leaves no PinPoint volume in stdout is reported as unknown
+    # instead: a template or daemon failure, and also the (rare) case where
+    # every named volume raced away at once. Calling that last one "unknown"
+    # rather than "zero" is deliberate — under-claiming knowledge is the whole
+    # point of PP-5o7b, and the next sweep resolves it.
+    try:
+        inspect = subprocess.run(
+            [
+                "docker",
+                "volume",
+                "inspect",
+                "--format",
+                '{{.Name}}|{{index .Labels "' + SUPABASE_PROJECT_LABEL + '"}}',
+                *names,
+            ],
+            capture_output=True,
+            text=True,
+            env=env,
+            timeout=_timeout(deadline),
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise DockerUnavailableError(
+            f"could not run `docker volume inspect`: {exc}"
+        ) from exc
     pairs = [(name, project) for name, project, _ in _parse_rows(inspect.stdout)]
     if inspect.returncode != 0 and not pairs:
         detail = (inspect.stderr or "").strip() or f"exit status {inspect.returncode}"
@@ -316,10 +268,12 @@ def get_supabase_volumes() -> list[tuple[str, str]]:
     return pairs
 
 
-def get_supabase_containers() -> list[tuple[str, str, str]]:
-    """Return `(container_name, project_id, workdir)` for every Supabase container."""
+def get_supabase_containers(
+    env: dict[str, str] | None = None, deadline: float | None = None
+) -> list[tuple[str, str, str]]:
+    """Return `(container_name, project_id, workdir)` for every PinPoint container."""
     return _parse_rows(
-        _run_docker(
+        run_docker(
             [
                 "docker",
                 "ps",
@@ -333,7 +287,9 @@ def get_supabase_containers() -> list[tuple[str, str, str]]:
                 + '"}}|{{.Label "'
                 + SUPABASE_WORKDIR_LABEL
                 + '"}}',
-            ]
+            ],
+            env,
+            _timeout(deadline),
         )
     )
 
@@ -375,25 +331,7 @@ def get_supabase_resources_by_project(not_quiet: bool) -> DockerSweepResult:
     )
 
 
-def _is_main_worktree_path(path: str) -> bool:
-    """Main worktree has .git as a directory; additional worktrees have .git as a file."""
-    return (Path(path) / ".git").is_dir()
-
-
 # --- Remote backend -------------------------------------------------------
-
-
-def _worktree_uses_remote_backend(worktree_path: str) -> bool:
-    """True when a live worktree's .env.local selects the remote backend."""
-    env_file = Path(worktree_path) / ".env.local"
-    try:
-        lines = env_file.read_text().splitlines()
-    except OSError:
-        return False
-    for line in lines:
-        if line.startswith(f"{BACKEND_ENV_KEY}="):
-            return line.partition("=")[2].strip() == "remote"
-    return False
 
 
 def remote_backend_in_use(worktrees: dict[str, str]) -> bool:
@@ -410,7 +348,7 @@ def remote_backend_in_use(worktrees: dict[str, str]) -> bool:
         return True
     if os.environ.get(BACKEND_ENV_KEY, "").strip() == "remote":
         return True
-    return any(_worktree_uses_remote_backend(path) for path in worktrees)
+    return any(read_stored_backend(Path(path)) == "remote" for path in worktrees)
 
 
 def remote_docker_env(docker_host: str) -> dict[str, str]:
@@ -486,109 +424,6 @@ class RemoteSweepResult:
         )
 
 
-def _parse_remote_rows(stdout: str) -> list[tuple[str, str, str]]:
-    """Parse `name|project_id|workdir` lines for this repo's non-Crabbox projects."""
-    rows: list[tuple[str, str, str]] = []
-    for line in stdout.splitlines():
-        parts = line.split("|", 2)
-        if len(parts) != 3:
-            continue
-        name, project, workdir = (part.strip() for part in parts)
-        if not project.startswith("pinpoint-"):
-            continue
-        if project.startswith(CRABBOX_PROJECT_PREFIX):
-            continue
-        rows.append((name, project, workdir))
-    return rows
-
-
-def get_remote_supabase_rows(
-    env: dict[str, str], budget: float = REMOTE_QUERY_BUDGET_SECONDS
-) -> tuple[list[tuple[str, str, str]], list[tuple[str, str, str]]]:
-    """Return `(volumes, containers)` rows of `(name, project_id, workdir)`.
-
-    Same two-call volume enumeration and partial-failure tolerance as
-    `get_supabase_volumes()`; the remote daemon is only ever filtered by label.
-    All three calls share `budget` seconds; running out raises
-    DockerUnavailableError like any other failed query.
-    """
-    deadline = time.monotonic() + budget
-
-    def remaining() -> float:
-        return max(0.1, deadline - time.monotonic())
-
-    label_fields = (
-        '{{index .Labels "'
-        + SUPABASE_PROJECT_LABEL
-        + '"}}|{{index .Labels "'
-        + SUPABASE_WORKDIR_LABEL
-        + '"}}'
-    )
-    names = [
-        line.strip()
-        for line in _run_docker(
-            [
-                "docker",
-                "volume",
-                "ls",
-                "--filter",
-                f"label={SUPABASE_PROJECT_LABEL}",
-                "--format",
-                "{{.Name}}",
-            ],
-            env,
-            remaining(),
-        ).splitlines()
-        if line.strip()
-    ]
-    volumes: list[tuple[str, str, str]] = []
-    if names:
-        args = [
-            "docker",
-            "volume",
-            "inspect",
-            "--format",
-            "{{.Name}}|" + label_fields,
-            *names,
-        ]
-        try:
-            inspect = subprocess.run(
-                args, capture_output=True, text=True, env=env, timeout=remaining()
-            )
-        except (OSError, subprocess.SubprocessError) as exc:
-            raise DockerUnavailableError(
-                f"could not run `docker volume inspect`: {exc}"
-            ) from exc
-        if inspect.returncode != 0 and not inspect.stdout.strip():
-            detail = (
-                inspect.stderr or ""
-            ).strip() or f"exit status {inspect.returncode}"
-            raise DockerUnavailableError(f"`docker volume inspect` failed: {detail}")
-        volumes = _parse_remote_rows(inspect.stdout)
-
-    containers = _parse_remote_rows(
-        _run_docker(
-            [
-                "docker",
-                "ps",
-                "-a",
-                "--filter",
-                f"label={SUPABASE_PROJECT_LABEL}",
-                "--format",
-                "{{.Names}}|"
-                + '{{.Label "'
-                + SUPABASE_PROJECT_LABEL
-                + '"}}|{{.Label "'
-                + SUPABASE_WORKDIR_LABEL
-                + '"}}',
-            ],
-            env,
-            remaining(),
-        )
-    )
-    return volumes, containers
-
-
 def get_remote_sweep(
     worktrees: dict[str, str], budget: float = REMOTE_QUERY_BUDGET_SECONDS
 ) -> RemoteSweepResult | None:
@@ -597,7 +432,8 @@ def get_remote_sweep(
     Returns None when nothing suggests this machine uses the remote backend,
     so the caller keeps today's local-only behaviour. Projects whose workdir
     is a path on the remote host itself are dropped entirely, as are Crabbox
-    runner projects (`_parse_remote_rows`).
+    runner projects (`_parse_rows`). All enumeration calls share `budget`
+    seconds; running out reads as UNKNOWN like any other failed query.
     """
     if not remote_backend_in_use(worktrees):
         return None
@@ -610,22 +446,24 @@ def get_remote_sweep(
                 f"{REMOTE_DOCKER_HOST_ENV} is unset"
             ),
         )
+    env = remote_docker_env(docker_host)
+    deadline = time.monotonic() + budget
     try:
-        volumes, containers = get_remote_supabase_rows(
-            remote_docker_env(docker_host), budget
-        )
+        volumes = get_supabase_volumes(env, deadline)
+        containers = get_supabase_containers(env, deadline)
     except (DockerNotInstalledError, DockerUnavailableError) as exc:
         # A missing docker CLI is a real zero only for the local daemon; the
         # remote host's resources exist regardless of this machine's tooling.
         return RemoteSweepResult(docker_host=docker_host, unknown_reason=str(exc))
 
     grouped: dict[str, RemoteProject] = {}
-    for kind, rows in (("volumes", volumes), ("containers", containers)):
-        for name, project, workdir in rows:
-            entry = grouped.setdefault(project, RemoteProject())
-            getattr(entry, kind).append(name)
-            if workdir:
-                entry.workdirs.add(workdir)
+    for name, project in volumes:
+        grouped.setdefault(project, RemoteProject()).volumes.append(name)
+    for name, project, workdir in containers:
+        entry = grouped.setdefault(project, RemoteProject())
+        entry.containers.append(name)
+        if workdir:
+            entry.workdirs.add(workdir)
     # A project with any workdir outside this machine belongs to the remote
     # host (or another machine); it is not ours to report or remove.
     owned = {
@@ -893,7 +731,7 @@ def main() -> int:
         return EXIT_DOCKER_UNKNOWN if any_unknown else 0
 
     def _free_slot(path_str: str) -> None:
-        if _is_main_worktree_path(path_str):
+        if is_main_worktree(path_str):
             print(
                 f"Skipping main worktree {path_str} (should not be in slot manifest).",
                 file=sys.stderr,

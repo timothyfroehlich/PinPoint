@@ -50,6 +50,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from worktree_orphan_sweep import get_active_worktree_branches  # noqa: E402
+from worktree_setup import is_main_worktree  # noqa: E402
 
 CLEANUP_SCRIPT = Path(__file__).resolve().parent / "worktree_cleanup.py"
 PROTOTYPE_MARKER = ".prototype-mode"
@@ -388,11 +389,6 @@ def classify(
     )
 
 
-def _is_main_worktree(path: str) -> bool:
-    """Main worktree has `.git` as a directory; linked worktrees have a file."""
-    return (Path(path) / ".git").is_dir()
-
-
 def directory_size_kib(path: str) -> int | None:
     try:
         result = subprocess.run(["du", "-sk", path], capture_output=True, text=True)
@@ -493,8 +489,7 @@ def main() -> int:
     worktrees = {
         path: branch
         for path, branch in get_active_worktree_branches(repo_dir).items()
-        if not _is_main_worktree(path)
-        and (args.branch is None or branch == args.branch)
+        if not is_main_worktree(path) and (args.branch is None or branch == args.branch)
     }
     if not worktrees:
         if not_quiet:

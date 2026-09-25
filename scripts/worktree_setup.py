@@ -370,6 +370,21 @@ _PINNED_PROJECT_ID_RE = re.compile(r'^project_id\s*=\s*"([^"]+)"', re.MULTILINE)
 _PINNABLE_PROJECT_ID_RE = re.compile(r"pinpoint-[a-z0-9-]*")
 
 
+def read_config_project_id(worktree_path: Path) -> str | None:
+    """The project_id line of the worktree's config.toml, as written, or None.
+
+    None when the file is absent, unreadable or has no project_id. Unlike
+    read_pinned_project_id this does not check the id's shape: the orphan
+    sweep must protect whatever id a running stack was started under.
+    """
+    try:
+        content = (worktree_path / "supabase" / "config.toml").read_text()
+    except (OSError, UnicodeDecodeError):
+        return None
+    match = _PINNED_PROJECT_ID_RE.search(content)
+    return match.group(1) if match else None
+
+
 def read_pinned_project_id(worktree_path: Path) -> str | None:
     """Return the project_id already recorded in this worktree's config.toml.
 
@@ -382,16 +397,9 @@ def read_pinned_project_id(worktree_path: Path) -> str | None:
     this script generates. Never raises: this runs from the post-checkout hook,
     where an exception would skip the rest of the worktree's config generation.
     """
-    try:
-        content = (worktree_path / "supabase" / "config.toml").read_text()
-    except (OSError, UnicodeDecodeError):
+    candidate = read_config_project_id(worktree_path)
+    if candidate is None:
         return None
-
-    match = _PINNED_PROJECT_ID_RE.search(content)
-    if match is None:
-        return None
-
-    candidate = match.group(1)
     if len(candidate) > MAX_PROJECT_ID_LEN:
         return None
     if not _PINNABLE_PROJECT_ID_RE.fullmatch(candidate):
@@ -577,6 +585,15 @@ def _resolve_unsubscribe_secret(worktree_path: Path, main_path: Path | None) -> 
         if value and value != UNSUBSCRIBE_SIGNING_SECRET_PLACEHOLDER:
             return value
     return UNSUBSCRIBE_SIGNING_SECRET_PLACEHOLDER
+
+
+def read_stored_backend(worktree_path: Path) -> str:
+    """The Supabase backend a worktree's .env.local selects; "local" if none."""
+    try:
+        backend = _read_managed_value(worktree_path / ".env.local", BACKEND_ENV_KEY)
+    except (OSError, UnicodeDecodeError):
+        return "local"
+    return backend or "local"
 
 
 def resolve_supabase_backend(env_file: Path) -> tuple[str, str]:
@@ -1158,22 +1175,91 @@ def install_dependencies(
 
 
 # =============================================================================
+# Shared with worktree_cleanup.py, worktree_orphan_sweep.py, worktree_reap.py
+# =============================================================================
+
+
+class DockerNotInstalledError(RuntimeError):
+    """The `docker` binary is absent, so there are genuinely no Docker resources."""
+
+
+class DockerUnavailableError(RuntimeError):
+    """Docker is installed but could not be enumerated.
+
+    Callers MUST surface this as *unknown*, never as an empty result. Swallowing
+    it into `[]` is the false zero behind PP-5o7b (the sweep) and PP-3w4g
+    (cleanup): the resources were reported as zero and then leaked.
+    """
+
+
+def run_docker(
+    args: list[str],
+    env: dict[str, str] | None = None,
+    timeout: float | None = None,
+) -> str:
+    """Run a docker command and return stdout, or raise rather than return empty."""
+    try:
+        result = subprocess.run(
+            args, capture_output=True, text=True, check=True, env=env, timeout=timeout
+        )
+    except FileNotFoundError as exc:
+        raise DockerNotInstalledError("`docker` is not installed") from exc
+    except subprocess.TimeoutExpired as exc:
+        raise DockerUnavailableError(
+            f"`{shlex.join(args)}` timed out after {exc.timeout:.0f}s"
+        ) from exc
+    except OSError as exc:
+        raise DockerUnavailableError(
+            f"could not run `{shlex.join(args)}`: {exc}"
+        ) from exc
+    except subprocess.CalledProcessError as exc:
+        detail = (
+            (exc.stderr or "").strip()
+            or (exc.stdout or "").strip()
+            or f"exit status {exc.returncode}"
+        )
+        raise DockerUnavailableError(f"`{shlex.join(args)}` failed: {detail}") from exc
+    return result.stdout
+
+
+def list_worktrees(repo_dir: Path | None = None) -> dict[str, str]:
+    """{path: branch} from `git worktree list --porcelain`, main worktree first.
+
+    The branch is "" for a detached HEAD. Paths are as git reports them.
+    Raises CalledProcessError (or OSError) when git cannot be asked; each
+    caller decides what an unreadable inventory means for it.
+    """
+    args = ["git", "worktree", "list", "--porcelain"]
+    if repo_dir is not None:
+        args[1:1] = ["-C", str(repo_dir)]
+    result = subprocess.run(args, capture_output=True, text=True, check=True)
+    worktrees: dict[str, str] = {}
+    current = ""
+    for line in result.stdout.splitlines():
+        if line.startswith("worktree "):
+            current = line[len("worktree ") :]
+            worktrees[current] = ""
+        elif line.startswith("branch refs/heads/") and current:
+            worktrees[current] = line[len("branch refs/heads/") :]
+    return worktrees
+
+
+def is_main_worktree(path: str | Path) -> bool:
+    """The main worktree has `.git` as a directory; linked ones have a file."""
+    return (Path(path) / ".git").is_dir()
+
+
+# =============================================================================
 # Main
 # =============================================================================
 
 
 def get_main_worktree() -> Path:
     """Get the path to the main (first) worktree."""
-    result = subprocess.run(
-        ["git", "worktree", "list", "--porcelain"],
-        capture_output=True,
-        text=True,
-        check=True,
-    )
-    for line in result.stdout.splitlines():
-        if line.startswith("worktree "):
-            return Path(line[9:])
-    raise RuntimeError("Could not determine main worktree")
+    worktrees = list_worktrees()
+    if not worktrees:
+        raise RuntimeError("Could not determine main worktree")
+    return Path(next(iter(worktrees)))
 
 
 def get_branch() -> str:

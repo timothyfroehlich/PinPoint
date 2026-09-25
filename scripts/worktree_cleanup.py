@@ -36,7 +36,6 @@ query filtered on a label nothing carries returns a clean, wrong zero.
 import fcntl
 import json
 import os
-import shlex
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -49,7 +48,14 @@ from pathlib import Path
 # would target a label no volume carries after a branch rename (PP-rbbp).
 # (Python auto-adds this script's directory to sys.path when invoked as
 # `python3 worktree_cleanup.py`.)
-from worktree_setup import resolve_project_id  # noqa: E402
+from worktree_setup import (  # noqa: E402
+    DockerNotInstalledError,
+    DockerUnavailableError,
+    list_worktrees,
+    read_stored_backend,
+    resolve_project_id,
+    run_docker,
+)
 
 MANIFEST_PATH = Path.home() / ".config" / "pinpoint" / "worktree-slots.json"
 
@@ -121,46 +127,20 @@ def registered_worktree_paths() -> set[str] | None:
     """
     repo_dir = Path(__file__).resolve().parent.parent
     try:
-        result = subprocess.run(
-            ["git", "-C", str(repo_dir), "worktree", "list", "--porcelain"],
-            capture_output=True,
-            text=True,
-            check=True,
-        )
+        worktrees = list_worktrees(repo_dir)
     except (OSError, subprocess.CalledProcessError):
         return None
-    prefix = "worktree "
-    return {
-        str(Path(line[len(prefix) :]).resolve())
-        for line in result.stdout.splitlines()
-        if line.startswith(prefix)
-    }
+    return {str(Path(path).resolve()) for path in worktrees}
 
 
 def main_worktree_path(worktree_path: Path) -> Path | None:
     """Return Git's main worktree, which remains usable after target removal."""
     try:
-        result = subprocess.run(
-            [
-                "git",
-                "-C",
-                str(worktree_path),
-                "worktree",
-                "list",
-                "--porcelain",
-            ],
-            capture_output=True,
-            text=True,
-            check=True,
-        )
+        worktrees = list_worktrees(worktree_path)
     except (OSError, subprocess.CalledProcessError):
         return None
-
-    prefix = "worktree "
-    for line in result.stdout.splitlines():
-        if line.startswith(prefix):
-            return Path(line[len(prefix) :]).resolve()
-    return None
+    main = next(iter(worktrees), None)
+    return Path(main).resolve() if main is not None else None
 
 
 def report_missing_target(worktree_path: Path) -> int:
@@ -211,59 +191,10 @@ def report_missing_target(worktree_path: Path) -> int:
     return EXIT_FAILED
 
 
-# These three mirror `worktree_orphan_sweep.py` by name and behaviour on
-# purpose: two scripts touching the same Docker resources should fail the same
-# way. The duplication is deliberate and stays until there's a third caller —
-# the sweep already imports from this module, so hoisting later is a one-liner,
-# but doing it now would mean editing the sweep for no behaviour change.
-class DockerNotInstalledError(RuntimeError):
-    """The `docker` binary is absent, so there are genuinely no volumes."""
-
-
 #: Upper bound for each `supabase`/`docker` call during teardown. With the
 #: remote backend these run over SSH, and a sleeping host or a lossy link would
 #: otherwise hang the WorktreeRemove hook and merge-pr.sh's reap indefinitely.
 TEARDOWN_TIMEOUT_SECONDS = 120
-
-
-class DockerUnavailableError(RuntimeError):
-    """Docker is installed but could not be enumerated.
-
-    Callers MUST surface this as *unknown*, never as an empty result. Swallowing
-    it into `[]` is the false zero PP-3w4g reports: the worktree was then
-    removed and the slot deallocated while the volumes stayed on disk.
-    """
-
-
-def _run_docker(args: list[str], env: dict[str, str] | None = None) -> str:
-    """Run a docker command and return stdout, or raise rather than return empty."""
-    try:
-        result = subprocess.run(
-            args,
-            capture_output=True,
-            text=True,
-            check=True,
-            env=env,
-            timeout=TEARDOWN_TIMEOUT_SECONDS,
-        )
-    except FileNotFoundError as exc:
-        raise DockerNotInstalledError("`docker` is not installed") from exc
-    except subprocess.TimeoutExpired as exc:
-        raise DockerUnavailableError(
-            f"`{shlex.join(args)}` timed out after {exc.timeout:.0f}s"
-        ) from exc
-    except OSError as exc:
-        raise DockerUnavailableError(
-            f"could not run `{shlex.join(args)}`: {exc}"
-        ) from exc
-    except subprocess.CalledProcessError as exc:
-        detail = (
-            (exc.stderr or "").strip()
-            or (exc.stdout or "").strip()
-            or f"exit status {exc.returncode}"
-        )
-        raise DockerUnavailableError(f"`{shlex.join(args)}` failed: {detail}") from exc
-    return result.stdout
 
 
 @dataclass(frozen=True)
@@ -299,7 +230,7 @@ def list_project_volumes(
     shared with it: a query that didn't run must never look like an empty one.
     """
     try:
-        stdout = _run_docker(
+        stdout = run_docker(
             [
                 "docker",
                 "volume",
@@ -309,6 +240,7 @@ def list_project_volumes(
                 "-q",
             ],
             env,
+            TEARDOWN_TIMEOUT_SECONDS,
         )
     except DockerNotInstalledError as exc:
         # No docker binary means there are genuinely no volumes on this host,
@@ -333,13 +265,7 @@ def supabase_backend_env(worktree_path: Path) -> tuple[dict[str, str], str | Non
     """
     env = os.environ.copy()
     env["SUPABASE_TELEMETRY_DISABLED"] = "1"
-    env_file = worktree_path / ".env.local"
-    backend = "local"
-    if env_file.is_file():
-        for line in env_file.read_text().splitlines():
-            if line.startswith("PINPOINT_SUPABASE_BACKEND="):
-                backend = line.partition("=")[2].strip() or "local"
-    if backend != "remote":
+    if read_stored_backend(worktree_path) != "remote":
         return env, None
     docker_host = os.environ.get("PINPOINT_REMOTE_DOCKER_HOST", "").strip()
     if not docker_host:
