@@ -46,7 +46,7 @@ Code work still happens **in a worktree** — the root checkout is read-only (AG
 
 ### `using-git-worktrees`
 
-- PinPoint has native worktree tooling — **prefer `EnterWorktree`** (or `Agent(isolation:"worktree")`) over raw `git worktree add`. Either way the `post-checkout` hook wires ports/env/config, so when you do need a manual worktree, `git worktree add /path -b branch origin/main` (AGENTS.md §4) is the supported fallback. 6.1.x already prefers native tools; this just names ours.
+- PinPoint has native worktree tooling — **prefer `EnterWorktree`** (or `Agent(isolation:"worktree")`) over raw `git worktree add`. Either way the `post-checkout` hook wires ports/env/config, so when you do need a manual worktree, `git worktree add --no-track -b branch /path origin/main` (AGENTS.md §4) is the supported fallback. 6.1.x already prefers native tools; this just names ours.
 
 ### `writing-plans`
 

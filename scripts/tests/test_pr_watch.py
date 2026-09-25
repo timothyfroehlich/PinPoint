@@ -109,7 +109,7 @@ def fake_summary(
             "summary": "",
         }
 
-    none = {name: record("none", "") for name in ("coderabbit", "codex")}
+    none = {name: record("none", "") for name in ("claude", "coderabbit", "codex")}
     checkers = dict(none)
     if label == "approved":
         checkers[checker] = record("covers", head)
@@ -919,6 +919,7 @@ def test_review_state_reports_the_gate_label_verbatim(monkeypatch, label):
 @pytest.mark.parametrize(
     "checker,who",
     [
+        ("claude", "Claude review record"),
         ("coderabbit", "CodeRabbit approval"),
         ("codex", "Codex evidence"),
     ],
@@ -935,10 +936,9 @@ def test_review_state_not_reviewed_recommends_one_request(monkeypatch):
     use_summaries(monkeypatch, fake_summary("not reviewed"))
     state, detail = pr_watch.review_state(PR)
     assert state == "not reviewed"
-    assert "CodeRabbit: none; Codex: none" in detail
-    assert "just promoted from draft" in detail
-    assert "`@coderabbitai review` once for this head" in detail
-    assert f"request-codex-review.sh {PR} once instead" in detail
+    assert "Claude review: none; CodeRabbit: none; Codex: none" in detail
+    assert "claude-review-level.sh" in detail
+    assert f"record-claude-review.sh {PR}" in detail
     assert "Tim's explicit --force" in detail
 
 

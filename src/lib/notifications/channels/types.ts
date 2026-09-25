@@ -49,6 +49,8 @@ export interface ChannelContext {
   severity?: IssueSeverity | undefined;
   frequency?: IssueFrequency | undefined;
   ownershipChange?: "added" | "removed" | undefined;
+  /** Pinball Map location, for the attribution link on a comment (spec 9.1). */
+  pinballmapLocationId?: number | undefined;
   actorName?: string | undefined;
   recipientReason: RecipientReason;
   issueDescription?: string | undefined;

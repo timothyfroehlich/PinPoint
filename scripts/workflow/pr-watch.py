@@ -64,11 +64,10 @@ CI_GATE_NAME = "CI Gate"
 GATES_SCRIPT = Path(__file__).resolve().parent / "_pr-gates.sh"
 REVIEW_LABELS = ("approved", "changes requested", "stale review", "not reviewed")
 REVIEW_HINT = (
-    "a PR just promoted from draft already has CodeRabbit's automatic review running; "
-    "wait for it. Otherwise, after current-head CI succeeds, comment "
-    "`@coderabbitai review` once for this head (if CodeRabbit is rate-limited, run "
-    "request-codex-review.sh {pr} once instead); a new head requires replacement CI "
-    "and a new review; merging without a review takes Tim's explicit --force"
+    "after current-head CI succeeds, run /code-review at the level "
+    "claude-review-level.sh prints, fix or decline every finding, re-review each new "
+    "head until a round is clean, then run record-claude-review.sh {pr}; merging "
+    "without a review takes Tim's explicit --force"
 )
 REVIEW_REQUESTED_HINT = (
     "the manual Codex review for this head was already requested; wait for exact-head "
@@ -231,7 +230,7 @@ def review_summary(pr: int, *, timeout: float | None = None) -> dict:
 
 def _checker_lines(summary: dict) -> str:
     head = str(summary.get("head") or "")[:7]
-    names = {"coderabbit": "CodeRabbit", "codex": "Codex"}
+    names = {"claude": "Claude review", "coderabbit": "CodeRabbit", "codex": "Codex"}
     parts: list[str] = []
     for key, name in names.items():
         record = (summary.get("checkers") or {}).get(key) or {}
@@ -261,6 +260,7 @@ def review_state(pr: int) -> tuple[str, str]:
     if label == "approved":
         coverage = summary.get("coverage") or {}
         who = {
+            "claude": "Claude review record",
             "coderabbit": "CodeRabbit approval",
             "codex": "Codex evidence",
         }.get(str(coverage.get("checker")), "review")

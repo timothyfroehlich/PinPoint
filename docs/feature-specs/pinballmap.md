@@ -48,7 +48,7 @@ The control's states (§4) are comparisons across these: _in sync_ means intent 
 
 ## 4. The listing control
 
-- **4.1** The control is two rows under one header, and **renders at the same fixed height in every state** — states swap content, never geometry. An uncataloged machine has no control at all (§4.2).
+- **4.1** The control is two rows under one header, and **renders at the same fixed height in every state** — states swap content, never geometry. The one exception is a narrow screen, where a status row's push action may wrap below its status sentence. An uncataloged machine has no control at all (§4.2).
   - **Intent row**: the tri-state toggle (On the lineup / Off the lineup / Don't sync). Changing it writes only to PinPoint, needs no confirmation, and is instantly reversible.
   - **Status row**: the observed lineup fact as a short sentence, with reconciliation actions on the right.
   - **Header**: "Pinball Map — {location name}", the name taken from their location entry and linked to the location's Pinball Map page (this link doubles as the 9.1 attribution link-back); last-refresh time and a Refresh button (3.2); an **Out of sync** alert when intent and lineup disagree. Before the first refresh the location name is unknown and the title is bare.
@@ -178,8 +178,6 @@ Replacing the tracked location is a rare, near-never operation — PinPoint trac
 | Spec | Code today | Resolution |
 | :-- | :-- | :-- |
 | 7.3 comment marking on removal | Not implemented | PP-o355.36 |
-| 7.4 watcher notifications after baseline | Comments import with a silent per-location backfill and each new copy is identified, but no notification is sent | PP-o355.63 |
-| 7.7 one notification per watched cabinet | No comment notification exists | PP-o355.63 |
 | 10.9 comment re-marking on location change | Comments import, but copies from a previous location are not marked | PP-o355.36 |
 | 3.6–3.8 additional outbound actions | Client methods exist, but no app actions expose venue-lineup confirmation or Insider Connected changes | PP-o355.58 (confirm lineup, needs `/fleet` base PP-o355.7.1), PP-o355.59 (Insider Connected); condition-comment posting deferred (PP-o355.57) |
 | 8.2, 8.4–8.6 per-member account linking | Writes use one admin-provisioned operator credential; no member linking, relink state, or link prompt exists | PP-o355.6 |
@@ -192,6 +190,7 @@ Changes to this document. Divergence-table rows are working state and are not lo
 
 | Date | Change |
 | :-- | :-- |
+| 2026-09-25 | Amended 4.1: on a narrow screen the status row's push action may wrap below its sentence, the one allowed height change (PP-o355.62). |
 | 2026-09-25 | Defined per-member Pinball Map account linking (§§8.4–8.6): sign-in exchange only, token stored and password never kept, rejected tokens marked for relink without polling, and an unlinked member's intent left Out of sync as their request. §8.2 now names the person's own linked account. |
 | 2026-09-25 | Detailed §3.6's outbound actions: lineup confirmation from the `/fleet` header (§3.7) and safe Insider Connected changes (§3.8). Deferred condition-comment posting out of full support until requested. |
 | 2026-09-23 | Clarified shared-comment copies and per-cabinet notifications (§§7.6–7.7), and tied conversion to one movable issue per Pinball Map comment (§§7.8–7.9). |
