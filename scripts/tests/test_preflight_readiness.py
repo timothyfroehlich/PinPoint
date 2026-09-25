@@ -41,15 +41,27 @@ def _run_readiness(
         bin_dir / "psql",
         """
 case "$STUB_MODE" in
-  unmigrated) echo 'relation does not exist' >&2; exit 1 ;;
-  behind) echo 1 ;;
-  *) echo 2 ;;
+  unmigrated) echo 'ERROR:  relation "drizzle.__drizzle_migrations" does not exist' >&2; exit 1 ;;
+  psql_error) echo 'FATAL:  password authentication failed' >&2; exit 2 ;;
+  behind) echo '1000 hash_a' ;;
+  diverged) printf '1000 hash_a\n3000 hash_other\n' ;;
+  recovered) printf '1000 hash_a\n1790000000000 0001_b\n' ;;
+  *) printf '1000 hash_a\n2000 hash_b\n' ;;
 esac
 """,
     )
     journal = tmp_path / "drizzle" / "meta" / "_journal.json"
     journal.parent.mkdir(parents=True)
-    journal.write_text(json.dumps({"entries": [{"tag": "0000_a"}, {"tag": "0001_b"}]}))
+    journal.write_text(
+        json.dumps(
+            {
+                "entries": [
+                    {"tag": "0000_a", "when": 1000},
+                    {"tag": "0001_b", "when": 2000},
+                ]
+            }
+        )
+    )
     if env_local is not None:
         (tmp_path / ".env.local").write_text(env_local)
     env = os.environ.copy()
@@ -98,6 +110,33 @@ def test_unready_stack_fails_with_one_actionable_line(
     assert result.stdout == ""
     assert result.stderr.splitlines() == [
         f"FAIL: preflight readiness — {problem}. {MIGRATE_HINT}"
+    ]
+
+
+def test_migrations_from_another_branch_point_at_db_reset(tmp_path: Path) -> None:
+    result = _run_readiness(tmp_path, "diverged")
+
+    assert result.returncode == 1
+    assert result.stderr.splitlines() == [
+        "FAIL: preflight readiness — applied migrations at localhost:61234 are "
+        "not this branch's. Run: pnpm run db:reset"
+    ]
+
+
+def test_a_recovery_row_recorded_by_tag_counts_as_applied(tmp_path: Path) -> None:
+    # mark-migration-applied.ts stores the tag as the hash and now() as created_at.
+    result = _run_readiness(tmp_path, "recovered")
+
+    assert result.returncode == 0, result.stderr
+
+
+def test_a_psql_failure_is_not_reported_as_unmigrated(tmp_path: Path) -> None:
+    result = _run_readiness(tmp_path, "psql_error")
+
+    assert result.returncode == 1
+    assert result.stderr.splitlines() == [
+        "FAIL: preflight readiness — could not read migrations at localhost:61234: "
+        "FATAL:  password authentication failed. Run: python3 scripts/worktree_setup.py"
     ]
 
 

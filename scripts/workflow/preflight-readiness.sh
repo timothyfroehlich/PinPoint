@@ -38,10 +38,35 @@ pg_isready -q -t 15 -d "$POSTGRES_URL" \
 curl -fsS --max-time 10 "${NEXT_PUBLIC_SUPABASE_URL}/auth/v1/health" >/dev/null 2>&1 \
   || fail "Supabase Auth is not answering at ${NEXT_PUBLIC_SUPABASE_URL}"
 
-expected=$(node -p "require('./drizzle/meta/_journal.json').entries.length")
-applied=$(psql "$POSTGRES_URL" -XqAt \
-  -c "SELECT count(*) FROM drizzle.__drizzle_migrations" 2>/dev/null || echo 0)
-[[ "$applied" == "$expected" ]] \
-  || fail "${applied} of ${expected} migrations applied at ${db_target}"
+# Applied migrations must be exactly this branch's journal: Drizzle records each
+# by its journal `when` (created_at), mark-migration-applied.ts by its tag (hash).
+# db:fast-reset only truncates data, so a schema migrated on another branch would
+# otherwise reach the tests.
+command -v psql >/dev/null || fail "psql is not installed" "install the PostgreSQL client"
+if ! applied=$(psql "$POSTGRES_URL" -XqAt -F ' ' \
+  -c "SELECT created_at, hash FROM drizzle.__drizzle_migrations" 2>&1); then
+  [[ "$applied" == *"does not exist"* ]] \
+    || fail "could not read migrations at ${db_target}: ${applied}" "python3 scripts/worktree_setup.py"
+  applied=""
+fi
+# shellcheck disable=SC2016  # a Node program, not shell
+problem=$(printf '%s\n' "$applied" | node -e '
+  const journal = require("./drizzle/meta/_journal.json").entries;
+  const byWhen = new Map(journal.map((m) => [String(m.when), m.tag]));
+  const tags = new Set(journal.map((m) => m.tag));
+  const rows = require("node:fs").readFileSync(0, "utf8").split("\n").filter(Boolean);
+  const matched = rows.map((row) => {
+    const [when, hash] = row.split(" ");
+    return byWhen.get(when) ?? (tags.has(hash) ? hash : null);
+  });
+  if (matched.includes(null) || new Set(matched).size !== matched.length) {
+    console.log("diverged");
+  } else if (matched.length < tags.size) {
+    console.log(`${matched.length} of ${tags.size} migrations applied`);
+  }
+')
+[[ "$problem" != diverged ]] \
+  || fail "applied migrations at ${db_target} are not this branch's" "pnpm run db:reset"
+[[ -z "$problem" ]] || fail "${problem} at ${db_target}"
 
 echo "PASS: preflight readiness — Postgres ready at ${db_target}"
