@@ -623,6 +623,32 @@ def test_stacks_of_live_worktrees_and_the_main_worktree_are_never_orphans(
     ]
 
 
+def test_a_live_worktree_whose_project_id_cant_be_read_makes_stacks_unknown(
+    world: World,
+) -> None:
+    """Its branch was renamed, so the derived id is not its stack's id, and a
+    stopped stack has no workdir label to tie it to the worktree. Guessing
+    would delete its database; nothing is counted or removed instead."""
+    renamed = world.add_worktree("feat/renamed-later", age_hours=1)
+    (renamed / "supabase/config.toml").mkdir(parents=True)  # unreadable
+    world.add_stack("pinpoint-feat-original-name", running=False)
+    gone = world.gone("dead")
+    world.add_stack("pinpoint-dead", workdir=gone)
+    world.set_slots({gone: 5})
+
+    code, _, err = world.run("--quiet")
+
+    assert code == reap.EXIT_OK
+    assert "UNKNOWN, not zero: Supabase stacks on local Docker" in err
+
+    code, _, err = world.run("--apply")
+
+    assert code == reap.EXIT_FAILED
+    assert f"supabase/config.toml of {renamed}" in err
+    assert world.removals() == []
+    assert world.slots() == {gone: 5}
+
+
 def test_a_failed_container_removal_keeps_network_volumes_and_slot(
     world: World,
 ) -> None:
@@ -794,6 +820,26 @@ def test_an_unreadable_remote_is_unknown_and_holds_slots(
     assert reason in err
     assert world.removals(REMOTE) == []
     assert world.slots() == {gone: 5}
+
+
+def test_an_unreadable_slot_manifest_is_unknown_never_zero(world: World) -> None:
+    """The manifest is how a deleted worktree's remote stack is known to be
+    this machine's; without it neither those stacks nor the slots are zero."""
+    world.mp.setenv("PINPOINT_REMOTE_DOCKER_HOST", REMOTE)
+    world.add_stack("pinpoint-dead", workdir=world.gone("dead"), host=REMOTE)
+    world.manifest.write_text("{not json")
+
+    code, _, err = world.run("--quiet")
+
+    assert code == reap.EXIT_OK
+    assert f"Supabase stacks on {REMOTE}, slots of deleted worktrees" in err
+
+    code, _, err = world.run("--apply")
+
+    assert code == reap.EXIT_FAILED
+    assert "the slot manifest can't be read" in err
+    assert world.removals(REMOTE) == []
+    assert world.manifest.read_text() == "{not json"
 
 
 @pytest.mark.parametrize("flags", [("--quiet",), ()], ids=["session-start", "briefing"])

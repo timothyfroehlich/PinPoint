@@ -100,8 +100,8 @@ containers, network and volumes by name. A deleted worktree's slot is freed
 only once no stack still references its path and its ports refuse connections
 (an unreachable host counts as in use), so a reused slot never collides with a
 leftover stack. When the remote daemon can't
-be queried (or `PINPOINT_REMOTE_DOCKER_HOST` is unset), its stacks are
-reported as UNKNOWN and those slots are kept. A stopped remote stack has
+be queried (or `PINPOINT_REMOTE_DOCKER_HOST` is unset, or the slot manifest
+can't be read), its stacks are reported as UNKNOWN and those slots are kept. A stopped remote stack has
 volumes only, so the command can't tell whose it is: it lists those volumes
 and leaves them for a person to remove.
 

@@ -30,8 +30,9 @@ projects whose containers' workdir label is a worktree this machine created
 never considered. A slot is released only once no stack references its path
 and its ports are free.
 
-**Unknown is never zero.** A failed `gh` or Docker query makes that part
-UNKNOWN: it is printed and nothing is removed on its strength. A dry run exits
+**Unknown is never zero.** A failed `gh` or Docker query, an unreadable slot
+manifest, or a live worktree whose config.toml has no readable project_id
+makes that part UNKNOWN: it is printed and nothing is removed on its strength. A dry run exits
 0 (orchestration-status.sh shows its report); `--apply` exits 1 when a removal
 failed or anything it would have acted on was UNKNOWN.
 
@@ -456,12 +457,21 @@ def read_remote_daemon(
             unknown_reason="this machine uses the remote Supabase backend but "
             f"{REMOTE_DOCKER_HOST_ENV} is unset",
         )
+    # Ownership is positive: a worktree this machine has, or still has a slot
+    # manifest entry for (kept while a stack references it). An unreadable
+    # manifest hides the deleted worktrees, so ownership is unknown, not empty.
+    manifest = worktree_cleanup.slot_manifest_paths()
+    if manifest is None:
+        return Daemon(
+            host,
+            remote=True,
+            deadline=deadline,
+            unknown_reason="the slot manifest can't be read, so its stacks "
+            "can't be attributed to this machine",
+        )
     env = {**os.environ, "DOCKER_HOST": host}  # as scripts/supabase-stack.sh does
     env.pop("DOCKER_CONTEXT", None)
-    # Ownership is positive: a worktree this machine has, or still has a slot
-    # manifest entry for (kept while a stack references it).
-    owned = {os.path.realpath(p) for p in worktrees}
-    owned |= worktree_cleanup.slot_manifest_paths() or set()
+    owned = {os.path.realpath(p) for p in worktrees} | manifest
     return read_daemon(Daemon(host, remote=True, deadline=deadline, env=env), owned)
 
 
@@ -519,17 +529,19 @@ def remove_project(pid: str, project: Project, daemon: Daemon, quiet: bool) -> b
     return ok
 
 
-def gone_slots() -> dict[str, int]:
-    """Manifest entries whose worktree directory (or its `.git`) is gone."""
+def gone_slots() -> dict[str, int] | None:
+    """Manifest entries whose worktree directory (or its `.git`) is gone, or
+    None when the manifest can't be read (unknown, not zero)."""
     try:
         with open(worktree_cleanup.MANIFEST_PATH) as f:
             fcntl.flock(f.fileno(), fcntl.LOCK_SH)
             slots = json.loads(f.read()).get("slots", {})
     except FileNotFoundError:
         return {}
-    except (OSError, ValueError, AttributeError) as exc:
-        print(f"Warning: slot manifest unreadable, skipped: {exc}", file=sys.stderr)
-        return {}
+    except (OSError, ValueError, AttributeError):
+        return None
+    if not isinstance(slots, dict):
+        return None
     return {
         path: slot
         for path, slot in sorted(slots.items())
@@ -631,13 +643,26 @@ def main() -> int:
     daemons: list[Daemon] = []
     orphans: list[tuple[Daemon, str, Project]] = []
     slots: dict[str, int] = {}
+    slots_unknown = False
     if args.branch is None:
-        active_ids = {
-            read_config_project_id(Path(p)) or derive_project_id(Path(p), b or "HEAD")
-            for p, b in worktrees.items()
-        }
+        active_ids: set[str] = set()
+        unreadable_ids: list[str] = []
+        for p, b in worktrees.items():
+            pid = read_config_project_id(Path(p))
+            if pid is None and (Path(p) / "supabase" / "config.toml").exists():
+                unreadable_ids.append(p)
+            active_ids.add(pid or derive_project_id(Path(p), b or "HEAD"))
         daemons = [read_daemon(Daemon("local Docker", remote=False, deadline=deadline))]
         daemons += filter(None, [read_remote_daemon(worktrees, deadline)])
+        if unreadable_ids:
+            # A guessed id can miss that worktree's stopped stack (volumes only,
+            # no workdir label), which would then look orphaned.
+            for daemon in daemons:
+                daemon.unknown_reason = daemon.unknown_reason or (
+                    "no project_id can be read from the supabase/config.toml of "
+                    f"{', '.join(unreadable_ids)}, so its stack can't be told "
+                    "from an orphan"
+                )
         log("\nOrphans of deleted worktrees")
         for daemon in daemons:
             if daemon.unknown_reason:
@@ -659,8 +684,15 @@ def main() -> int:
                     f"  - {pid}: {len(p.volumes)} volume(s) with no workdir label; "
                     "not attributable to this machine, never removed — check by hand"
                 )
-        slots = gone_slots()
-        log(f"Slots of deleted worktrees: {len(slots)}")
+        found_slots = gone_slots()
+        slots_unknown = found_slots is None
+        slots = found_slots or {}
+        log(
+            "Slots of deleted worktrees: UNKNOWN, not zero — the slot manifest "
+            "can't be read. Nothing there is counted or released."
+            if slots_unknown
+            else f"Slots of deleted worktrees: {len(slots)}"
+        )
 
     # Act: finished worktrees, orphan stacks, then the slots they held.
     reap_failed = stack_failed = slot_failed = 0
@@ -687,6 +719,8 @@ def main() -> int:
 
     # Summarise.
     unknown = [f"Supabase stacks on {d.label}" for d in daemons if d.unknown_reason]
+    if slots_unknown:
+        unknown.append("slots of deleted worktrees")
     if unknown_prs:
         unknown.insert(0, f"PR state of {len(unknown_prs)} branch(es)")
     counts = (
