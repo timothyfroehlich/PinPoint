@@ -57,7 +57,7 @@ export function MachineDetailHeader({
   machine,
   placement = "page",
 }: MachineDetailHeaderProps): React.JSX.Element {
-  const meta = [machine.modelTitle, machine.manufacturer, machine.year]
+  const meta = [machine.modelTitle, machine.currentManufacturer, machine.year]
     .filter((part) => part != null && part !== "")
     .join(" · ");
   const artwork = placement === "page" ? machine.artwork : null;

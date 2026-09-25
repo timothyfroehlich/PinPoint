@@ -2,26 +2,25 @@ import type React from "react";
 import { notFound } from "next/navigation";
 import { MachineGroupIssuesTab } from "~/components/collections/MachineGroupIssuesTab";
 import { getViewer } from "~/lib/collections/viewer";
-import { getCollectionForLayout } from "~/app/(app)/c/[id]/_data";
+import { getManufacturerTagForLayout } from "~/app/(app)/c/tags/manufacturer/[slug]/_data";
 
 interface PageProps {
-  params: Promise<{ id: string }>;
+  params: Promise<{ slug: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
-export default async function CollectionIssuesPage({
+export default async function ManufacturerTagIssuesPage({
   params,
   searchParams,
 }: PageProps): Promise<React.JSX.Element> {
-  const { id } = await params;
-  const data = await getCollectionForLayout(id);
-  if (!data) notFound();
+  const { slug } = await params;
+  const tag = await getManufacturerTagForLayout(slug);
+  if (!tag) notFound();
 
-  // Request-deduped with the layout/resolver — one getUser() + role read.
   const viewer = await getViewer();
   return (
     <MachineGroupIssuesTab
-      machines={data.collection.machines}
+      machines={tag.machines}
       searchParams={await searchParams}
       viewer={{
         userId: viewer.userId,
