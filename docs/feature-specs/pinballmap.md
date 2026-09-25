@@ -172,11 +172,10 @@ Replacing the tracked location is a rare, near-never operation — PinPoint trac
 
 | Spec | Code today | Resolution |
 | :-- | :-- | :-- |
-| 7.1 comment fan-out | No comment import exists | PP-o355.4 (reshape to fan-out); PP-o355.36 depends on it |
 | 7.3 comment marking on removal | Not implemented | PP-o355.36 |
-| 7.4 watcher notifications after baseline | No comment import or notification exists | PP-o355.4; shared-comment identity PP-o355.54.14 |
-| 7.5 explicit Convert to issue | No comment import or conversion action exists | PP-o355.4; shared-comment identity PP-o355.54.14 |
-| 10.9 comment re-marking on location change | No comment import exists | PP-o355.4 (import); permanent mark-on-location-change after |
+| 7.4 watcher notifications after baseline | Comments import with a silent per-location backfill and each new copy is identified, but no notification is sent | PP-o355.63 |
+| 7.7 one notification per watched cabinet | No comment notification exists | PP-o355.63 |
+| 10.9 comment re-marking on location change | Comments import, but copies from a previous location are not marked | PP-o355.36 |
 | 3.6 additional outbound actions | Client methods exist, but no app actions expose condition-comment posting, venue-lineup confirmation, or Insider Connected changes | PP-o355.57 (condition comment, decision PP-o355.54.13), PP-o355.58 (confirm lineup, decision PP-o355.54.10), PP-o355.59 (Insider Connected, decision PP-o355.54.11) |
 
 ---

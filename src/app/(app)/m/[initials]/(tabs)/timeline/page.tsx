@@ -97,6 +97,10 @@ export default async function MachineTimelinePage({
     "machines.timeline.comment.add",
     accessLevel
   );
+  // Converting an imported Pinball Map comment files an issue in the
+  // converter's name, so it needs a signed-in reporter (pinballmap spec 7.5).
+  const canConvertPinballMapComment =
+    currentUserId !== null && checkPermission("issues.report", accessLevel);
 
   // Capture narrowed fields — `renderRow` below closes over them and TS
   // doesn't narrow `machine` (undefined-stripped by `notFound`) across the
@@ -197,6 +201,9 @@ export default async function MachineTimelinePage({
                         machineInitials={machineInitials}
                         commentCanEdit={canEdit}
                         commentCanDelete={canDelete}
+                        canConvertPinballMapComment={
+                          canConvertPinballMapComment
+                        }
                       />
                     );
                   })}

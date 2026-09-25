@@ -814,6 +814,13 @@ export const timelineEvents = pgTable(
     idempotencyKeyIdx: uniqueIndex("idx_timeline_events_idempotency_key")
       .on(t.idempotencyKey)
       .where(sql`${t.idempotencyKey} IS NOT NULL`),
+    // One imported copy of a Pinball Map comment per machine timeline
+    // (pinballmap spec 7.1). The importer inserts ON CONFLICT DO NOTHING
+    // against this index, so repeated and concurrent syncs never duplicate a
+    // copy. (PP-o355.4)
+    pinballmapCommentIdx: uniqueIndex("idx_timeline_events_pinballmap_comment")
+      .on(t.machineId, sql`((${t.eventData}->>'conditionId'))`)
+      .where(sql`${t.sourceType} = 'pinballmap'`),
   })
 ).enableRLS();
 
@@ -1605,6 +1612,12 @@ export const pinballmapState = pgTable(
       .notNull()
       .defaultNow(),
     updatedBy: uuid("updated_by"),
+    // The location whose comments have had their silent historical import
+    // (pinballmap spec 7.4). While this differs from `locationId`, the next
+    // comment import is that location's backfill and notifies no one; after
+    // it, a comment observed for the first time is new. Null = no backfill
+    // has run yet. (PP-o355.4)
+    commentsBaselineLocationId: integer("comments_baseline_location_id"),
   },
   (_t) => ({
     singletonCheck: check("pinballmap_state_singleton", sql`id = 'singleton'`),
@@ -1652,6 +1665,51 @@ export const pinballmapLocationChecks = pgTable(
       "pinballmap_location_checks_expiry_order_check",
       sql`expires_at > checked_at`
     ),
+  })
+).enableRLS();
+
+/**
+ * Pinball Map condition comments PinPoint has observed (PP-o355.4).
+ *
+ * One row per underlying Pinball Map comment — the identity every timeline
+ * copy shares (pinballmap spec 7.1, 7.8). A comment on a shared lineup entry
+ * fans out to several machine timelines, but it can be converted to at most
+ * one PinPoint issue, so conversion lives here rather than on the copies.
+ * `conditionId` is Pinball Map's own id, globally unique there.
+ *
+ * Rows are inserted by the importer from the stored snapshot and never
+ * deleted: a comment that later leaves the lineup keeps its identity, so its
+ * timeline copies and any conversion stay intact.
+ */
+export const pinballmapComments = pgTable(
+  "pinballmap_comments",
+  {
+    conditionId: integer("condition_id").primaryKey(),
+    locationId: integer("location_id").notNull(),
+    // Catalog title of the lineup entry the comment was left on.
+    pinballmapMachineId: integer("pinballmap_machine_id").notNull(),
+    lmxId: integer("lmx_id").notNull(),
+    comment: text("comment").notNull(),
+    // Pinball Map username; null for operator/admin entries.
+    username: text("username"),
+    commentedAt: timestamp("commented_at", { withTimezone: true }).notNull(),
+    firstObservedAt: timestamp("first_observed_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    // The one issue this comment was converted to (spec 7.8). Deleting the
+    // issue releases the comment for a fresh conversion.
+    convertedIssueId: uuid("converted_issue_id").references(() => issues.id, {
+      onDelete: "set null",
+    }),
+    convertedAt: timestamp("converted_at", { withTimezone: true }),
+    convertedBy: uuid("converted_by").references(() => userProfiles.id, {
+      onDelete: "set null",
+    }),
+  },
+  (t) => ({
+    convertedIssueIdx: uniqueIndex("pinballmap_comments_converted_issue_idx")
+      .on(t.convertedIssueId)
+      .where(sql`${t.convertedIssueId} IS NOT NULL`),
   })
 ).enableRLS();
 
