@@ -521,6 +521,9 @@ describe("the Insider Connected row (3.8)", () => {
       const toggle = screen.getByRole("switch", { name: "Insider Connected" });
       if (checked) expect(toggle).toBeChecked();
       else expect(toggle).not.toBeChecked();
+      // The label is tied to the switch, so Not set is announced distinctly
+      // from Off even though both render unchecked.
+      expect(toggle).toHaveAccessibleDescription(label);
       expect(
         screen.getByTestId("pbm-insider-connected-setting")
       ).toHaveTextContent(label);

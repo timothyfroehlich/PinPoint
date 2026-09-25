@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useId, useState, useTransition } from "react";
 import Link from "next/link";
 import {
   CheckCircle2,
@@ -584,6 +584,7 @@ function InsiderConnectedSwitch({
   pending: boolean;
   onChange: (enabled: boolean) => void;
 }): React.JSX.Element {
+  const settingId = useId();
   return (
     <div className="flex items-center gap-2">
       <Switch
@@ -591,9 +592,11 @@ function InsiderConnectedSwitch({
         onCheckedChange={onChange}
         disabled={readOnly || pending}
         aria-label="Insider Connected"
+        aria-describedby={settingId}
         data-testid="pbm-insider-connected-switch"
       />
       <span
+        id={settingId}
         className={cn(
           "text-sm",
           view.setting === "not_set"
