@@ -16,6 +16,9 @@
 - **Displayed Field** — a Machine View field selected for display. Displayed fields, active filters, sorting, and search determine which optional data enrichments Machine View loads.
 - **Bookmarkable View** — the complete displayed-field, filter, sort, and pagination state encoded in the URL so reopening or copying it restores the same view.
 - **Display Mode** — the phone-only Compact list or Table presentation. Display Mode is a browser preference rather than bookmarkable URL state.
+- **Surface** — a place where Machine View appears and where Saved Views belong: Machines, Integrations, or one individual Collection. Every standard Collection and every owner Collection is its own Surface.
+- **Saved View** — a named, personal Machine View configuration owned by one account and belonging to one Surface. It holds displayed fields, search, filters, sorting, and page size.
+- **Default Saved View** — the one Saved View an account marks to open when it visits a Surface without view configuration in the URL.
 
 ---
 
@@ -55,6 +58,7 @@
 - **4.7** `/m` defaults to Presence “On the Floor” and machine-title ascending. An omitted `presence` parameter means On the Floor; `presence=all` is the explicit unfiltered state.
 - **4.8** Collections include every member presence state by default and sort worst playability first.
 - **4.9** Reopening or copying a canonical URL restores displayed fields, search, filters, sorting, page size, and page.
+- **4.10** Canonical URLs are always expressed relative to the Page Preset, never relative to a viewer's Saved Views, so the same URL shows every viewer the same configuration.
 
 ---
 
@@ -83,17 +87,41 @@
 
 ## 7. Deferred Work
 
-- **7.1** Named personal saved views, per-surface default saved views, and copied-link sharing semantics are deferred.
+- **7.1** _Moved 2026-09-25._ Saved views are specified in §8. Number kept so older citations don't dangle.
 - **7.2** Widgets and dashboard gauge relocation are deferred.
 - **7.3** The Integrations page, Pinball Map and iScored fields, integration presets, and integration remediation are deferred.
 - **7.4** Unmatched Pinball Map entries and other external-only records are deferred.
 - **7.5** Machine and issue inspection drawers are deferred.
+- **7.6** Sharing Saved View records with other accounts is deferred; copied URLs are the sharing mechanism.
+
+---
+
+## 8. Saved Views
+
+- **8.1** Any signed-in account can save the current Machine View configuration as a named Saved View on the Surface where it is working. Anonymous visitors have no Saved Views.
+- **8.2** A Saved View stores displayed fields, search, filters, sorting, and page size. It never stores a page number or Display Mode.
+- **8.3** Saved Views are personal: only the owning account can see, apply, change, or delete them.
+- **8.4** Saved Views sync across every device the owning account uses.
+- **8.5** A Saved View appears only on the Surface where it was created. A Saved View created in one Collection never appears in another Collection or on Machines.
+- **8.6** Applying a Saved View opens its configuration at page 1.
+- **8.7** While a Saved View is applied and the current configuration differs from it, Machine View offers Save changes, which overwrites that Saved View, and Save as new, which creates another. With no Saved View applied, only Save as new is offered.
+- **8.8** A Saved View name is required and must be unique, ignoring case, among the account's Saved Views on that Surface. A colliding name is rejected, never silently overwritten.
+- **8.9** A Saved Views menu in the Machine View toolbar lists the account's Saved Views for the Surface and lets the account apply, rename, delete, and set or clear the Default Saved View.
+- **8.10** An account has at most one Default Saved View per Surface. Defaults on different Surfaces are independent.
+- **8.11** A Surface URL with no view configuration other than page opens the account's Default Saved View if one exists, otherwise the Page Preset. A URL carrying any view configuration opens exactly as written and ignores the Default Saved View.
+- **8.12** When the Default Saved View opens, the address bar shows its canonical URL, so copying the address shares that configuration.
+- **8.13** The Saved Views menu always offers the Page Preset's configuration, so an account with a Default Saved View can still reach it.
+- **8.14** Deleting the Default Saved View leaves the Surface without a default; it then opens to the Page Preset.
+- **8.15** A stored field, filter value, or owner that no longer exists or is not permitted on the Surface is dropped when the Saved View is applied, exactly as an invalid URL value is (§4.3).
+- **8.16** Deleting a Collection deletes every Saved View belonging to that Collection's Surface.
 
 ---
 
 ## Known divergences (code vs spec)
 
-_None currently recorded._
+| Spec | Code today | Resolution |
+| :-- | :-- | :-- |
+| §8 Saved Views | No saved-view storage, menu, or default resolution | Saved-views implementation |
 
 ---
 
@@ -101,5 +129,6 @@ _None currently recorded._
 
 | Date | Change |
 | :-- | :-- |
+| 2026-09-25 | Added Surfaces, Saved Views, and Default Saved Views (§8); URLs are canonical relative to the Page Preset (§4.10); retired §7.1; deferred Saved View record sharing (§7.6). |
 | 2026-09-24 | Made View Scope route-supplied; machine-group membership moved to the specs that own each group. |
 | 2026-09-21 | Created. Establishes one machine-specific view for `/m` and Collections, conditional enrichment, bookmarkable URL state, shared responsive presentation, route-preservation requirements, and explicit deferred integrations/saved-view work. |
