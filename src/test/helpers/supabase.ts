@@ -1,4 +1,7 @@
 import type { SupabaseClient, User } from "@supabase/supabase-js";
+import { expect } from "vitest";
+
+import { isLocalDatabaseUrl } from "../../../scripts/assert-local-db.mjs";
 
 /**
  * Test helpers for Supabase operations
@@ -35,4 +38,17 @@ export async function confirmTestUserEmail(
   if (error) {
     throw new Error(`Failed to confirm user email: ${error.message}`);
   }
+}
+
+/**
+ * Asserts that a Supabase URL points at a local dev stack before a test writes
+ * to it: loopback, or a remote dev-stack host listed in PINPOINT_DEV_DB_HOSTS
+ * (docs/runbooks/remote-supabase.md). Same rule as the destructive-script
+ * guard in scripts/assert-local-db.mjs.
+ */
+export function expectLocalSupabaseUrl(url: string): void {
+  expect(
+    isLocalDatabaseUrl(url),
+    `${url} is not a local Supabase dev stack`
+  ).toBe(true);
 }

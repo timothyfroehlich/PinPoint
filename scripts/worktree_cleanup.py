@@ -53,7 +53,8 @@ SWEEP_HINT = "python3 scripts/worktree_orphan_sweep.py --apply"
 
 #: Everything cleaned up (or verifiably nothing to clean up).
 EXIT_OK = 0
-#: Usage error, or the git worktree removal itself failed.
+#: Usage error, the git worktree removal itself failed, or a remote-backend
+#: worktree was refused because PINPOINT_REMOTE_DOCKER_HOST is unset.
 EXIT_FAILED = 1
 #: Refused to operate: the target is the main worktree.
 EXIT_MAIN_WORKTREE = 2
@@ -266,6 +267,12 @@ class DockerNotInstalledError(RuntimeError):
     """The `docker` binary is absent, so there are genuinely no volumes."""
 
 
+#: Upper bound for each `supabase`/`docker` call during teardown. With the
+#: remote backend these run over SSH, and a sleeping host or a lossy link would
+#: otherwise hang the WorktreeRemove hook and merge-pr.sh's reap indefinitely.
+TEARDOWN_TIMEOUT_SECONDS = 120
+
+
 class DockerUnavailableError(RuntimeError):
     """Docker is installed but could not be enumerated.
 
@@ -275,12 +282,23 @@ class DockerUnavailableError(RuntimeError):
     """
 
 
-def _run_docker(args: list[str]) -> str:
+def _run_docker(args: list[str], env: dict[str, str] | None = None) -> str:
     """Run a docker command and return stdout, or raise rather than return empty."""
     try:
-        result = subprocess.run(args, capture_output=True, text=True, check=True)
+        result = subprocess.run(
+            args,
+            capture_output=True,
+            text=True,
+            check=True,
+            env=env,
+            timeout=TEARDOWN_TIMEOUT_SECONDS,
+        )
     except FileNotFoundError as exc:
         raise DockerNotInstalledError("`docker` is not installed") from exc
+    except subprocess.TimeoutExpired as exc:
+        raise DockerUnavailableError(
+            f"`{shlex.join(args)}` timed out after {exc.timeout:.0f}s"
+        ) from exc
     except OSError as exc:
         raise DockerUnavailableError(
             f"could not run `{shlex.join(args)}`: {exc}"
@@ -317,7 +335,9 @@ class VolumeQuery:
         return self.unknown_reason is not None
 
 
-def list_project_volumes(project_id: str) -> VolumeQuery:
+def list_project_volumes(
+    project_id: str, env: dict[str, str] | None = None
+) -> VolumeQuery:
     """List Supabase volumes for `project_id`, or return an explicit unknown.
 
     The `--filter label=<k>=<v>` + `-q` form is honoured by both Docker and
@@ -334,7 +354,8 @@ def list_project_volumes(project_id: str) -> VolumeQuery:
                 "--filter",
                 f"label={SUPABASE_PROJECT_LABEL}={project_id}",
                 "-q",
-            ]
+            ],
+            env,
         )
     except DockerNotInstalledError as exc:
         # No docker binary means there are genuinely no volumes on this host,
@@ -346,6 +367,126 @@ def list_project_volumes(project_id: str) -> VolumeQuery:
     return VolumeQuery(
         volumes=tuple(line.strip() for line in stdout.splitlines() if line.strip())
     )
+
+
+def supabase_backend_env(worktree_path: Path) -> tuple[dict[str, str], str | None]:
+    """Environment that points `supabase`/`docker` at this worktree's stack.
+
+    A worktree whose .env.local selects the remote backend keeps its stack on
+    another host's Docker (scripts/supabase-stack.sh). Tearing down with the
+    ambient local daemon would stop nothing there and report zero volumes, so
+    without PINPOINT_REMOTE_DOCKER_HOST the volumes are UNKNOWN, not zero.
+    Returns (env, unknown_reason).
+    """
+    env = os.environ.copy()
+    env["SUPABASE_TELEMETRY_DISABLED"] = "1"
+    env_file = worktree_path / ".env.local"
+    backend = "local"
+    if env_file.is_file():
+        for line in env_file.read_text().splitlines():
+            if line.startswith("PINPOINT_SUPABASE_BACKEND="):
+                backend = line.partition("=")[2].strip() or "local"
+    if backend != "remote":
+        return env, None
+    docker_host = os.environ.get("PINPOINT_REMOTE_DOCKER_HOST", "").strip()
+    if not docker_host:
+        return env, (
+            "the worktree uses the remote Supabase backend but "
+            "PINPOINT_REMOTE_DOCKER_HOST is unset"
+        )
+    env["DOCKER_HOST"] = docker_host
+    env.pop("DOCKER_CONTEXT", None)
+    remote_host = os.environ.get("PINPOINT_REMOTE_SUPABASE_HOST", "").strip()
+    if remote_host:
+        env["SUPABASE_SERVICES_HOSTNAME"] = remote_host
+    return env, None
+
+
+def stop_and_remove_supabase(
+    worktree_path: Path, project_id: str, supabase_env: dict[str, str]
+) -> str | None:
+    """Stop the worktree's Supabase stack and remove its volumes.
+
+    Returns why the volumes' state is unknown, or None when it is known.
+    """
+    volumes_unknown_reason: str | None = None
+    try:
+        stop_result = subprocess.run(
+            ["supabase", "stop"],
+            cwd=worktree_path,
+            capture_output=True,
+            text=True,
+            env=supabase_env,
+            timeout=TEARDOWN_TIMEOUT_SECONDS,
+        )
+        if stop_result.returncode != 0:
+            print(
+                f"Warning: `supabase stop` exited {stop_result.returncode}: "
+                f"{stop_result.stderr.strip() or stop_result.stdout.strip()}",
+                file=sys.stderr,
+            )
+    except subprocess.TimeoutExpired as exc:
+        print(
+            f"Warning: `supabase stop` timed out after {exc.timeout:.0f}s — "
+            "continuing cleanup",
+            file=sys.stderr,
+        )
+    except (FileNotFoundError, OSError) as exc:
+        print(
+            f"Warning: failed to invoke `supabase stop` ({exc}) — continuing cleanup",
+            file=sys.stderr,
+        )
+
+    # Remove Docker volumes. A query that failed is unknown, NOT zero
+    # (PP-3w4g): reporting "removed 0 volume(s)" for a query that never ran
+    # is how volumes leak permanently past a teardown that claimed success.
+    query = list_project_volumes(project_id, supabase_env)
+    if query.is_unknown:
+        volumes_unknown_reason = query.unknown_reason
+        print(
+            f"Warning: Supabase volumes for {project_id} are UNKNOWN, not zero — "
+            f"{query.unknown_reason}. None were removed; if any exist they are now "
+            f"orphaned. Reclaim them with `{SWEEP_HINT}`.",
+            file=sys.stderr,
+        )
+    elif query.volumes:
+        try:
+            rm_result = subprocess.run(
+                ["docker", "volume", "rm", *query.volumes],
+                capture_output=True,
+                text=True,
+                env=supabase_env,
+                timeout=TEARDOWN_TIMEOUT_SECONDS,
+            )
+            if rm_result.returncode != 0:
+                err_msg = (
+                    rm_result.stderr.strip() or f"exit code {rm_result.returncode}"
+                )
+                print(
+                    f"Warning: `docker volume rm` exited {rm_result.returncode}: {err_msg}",
+                    file=sys.stderr,
+                )
+                volumes_unknown_reason = f"`docker volume rm` failed: {err_msg}"
+            else:
+                print(
+                    f"Removed {len(query.volumes)} Docker volume(s)",
+                    file=sys.stderr,
+                )
+        except subprocess.TimeoutExpired as exc:
+            print(
+                f"Warning: `docker volume rm` timed out after {exc.timeout:.0f}s",
+                file=sys.stderr,
+            )
+            volumes_unknown_reason = (
+                f"`docker volume rm` timed out after {exc.timeout:.0f}s"
+            )
+        except (FileNotFoundError, OSError) as exc:
+            print(
+                f"Warning: failed to invoke `docker volume rm` ({exc})",
+                file=sys.stderr,
+            )
+            volumes_unknown_reason = f"failed to invoke `docker volume rm`: {exc}"
+    return volumes_unknown_reason
 
 
 def cleanup_worktree(worktree_path: Path) -> int:
@@ -424,68 +565,21 @@ def cleanup_worktree(worktree_path: Path) -> int:
         # Stop Supabase. Failures here are non-fatal: a missing project_ref or
         # a stack that was never started both look like errors but don't block
         # slot deallocation.
+        supabase_env, backend_problem = supabase_backend_env(worktree_path)
+        if backend_problem is not None:
+            # The orphan sweep covers the local daemon only, so removing the
+            # worktree now would strand its remote volumes for good.
+            print(
+                f"Refusing cleanup of {worktree_path}: {backend_problem}. "
+                "Keeping the worktree and slot; re-run with the remote Docker "
+                "settings exported (docs/runbooks/remote-supabase.md).",
+                file=sys.stderr,
+            )
+            return EXIT_FAILED
         print(f"Stopping Supabase for {branch}...", file=sys.stderr)
-        supabase_env = os.environ.copy()
-        supabase_env["SUPABASE_TELEMETRY_DISABLED"] = "1"
-        try:
-            stop_result = subprocess.run(
-                ["supabase", "stop"],
-                cwd=worktree_path,
-                capture_output=True,
-                text=True,
-                env=supabase_env,
-            )
-            if stop_result.returncode != 0:
-                print(
-                    f"Warning: `supabase stop` exited {stop_result.returncode}: "
-                    f"{stop_result.stderr.strip() or stop_result.stdout.strip()}",
-                    file=sys.stderr,
-                )
-        except (FileNotFoundError, OSError) as exc:
-            print(
-                f"Warning: failed to invoke `supabase stop` ({exc}) — continuing cleanup",
-                file=sys.stderr,
-            )
-
-        # Remove Docker volumes. A query that failed is unknown, NOT zero
-        # (PP-3w4g): reporting "removed 0 volume(s)" for a query that never ran
-        # is how volumes leak permanently past a teardown that claimed success.
-        query = list_project_volumes(project_id)
-        if query.is_unknown:
-            volumes_unknown_reason = query.unknown_reason
-            print(
-                f"Warning: Supabase volumes for {project_id} are UNKNOWN, not zero — "
-                f"{query.unknown_reason}. None were removed; if any exist they are now "
-                f"orphaned. Reclaim them with `{SWEEP_HINT}`.",
-                file=sys.stderr,
-            )
-        elif query.volumes:
-            try:
-                rm_result = subprocess.run(
-                    ["docker", "volume", "rm", *query.volumes],
-                    capture_output=True,
-                    text=True,
-                )
-                if rm_result.returncode != 0:
-                    err_msg = (
-                        rm_result.stderr.strip() or f"exit code {rm_result.returncode}"
-                    )
-                    print(
-                        f"Warning: `docker volume rm` exited {rm_result.returncode}: {err_msg}",
-                        file=sys.stderr,
-                    )
-                    volumes_unknown_reason = f"`docker volume rm` failed: {err_msg}"
-                else:
-                    print(
-                        f"Removed {len(query.volumes)} Docker volume(s)",
-                        file=sys.stderr,
-                    )
-            except (FileNotFoundError, OSError) as exc:
-                print(
-                    f"Warning: failed to invoke `docker volume rm` ({exc})",
-                    file=sys.stderr,
-                )
-                volumes_unknown_reason = f"failed to invoke `docker volume rm`: {exc}"
+        volumes_unknown_reason = stop_and_remove_supabase(
+            worktree_path, project_id, supabase_env
+        )
 
     # Unlock first. Claude Code agent runtimes lock worktrees while in use,
     # and the lock persists after the agent finishes; `git worktree remove

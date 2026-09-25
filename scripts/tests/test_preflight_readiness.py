@@ -10,7 +10,7 @@ import pytest
 REPO_ROOT = Path(__file__).parents[2]
 READINESS_SCRIPT = REPO_ROOT / "scripts" / "workflow" / "preflight-readiness.sh"
 INTEGRATION_SCRIPT = REPO_ROOT / "scripts" / "workflow" / "integration-test.sh"
-MIGRATE_HINT = "Run: supabase start && pnpm run db:migrate"
+MIGRATE_HINT = "Run: pnpm supabase:start && pnpm run db:migrate"
 
 
 def _write_executable(path: Path, body: str) -> None:

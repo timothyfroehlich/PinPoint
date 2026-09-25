@@ -22,6 +22,19 @@ This script reconciles three sources of truth:
 Defaults to dry-run; pass `--apply` to actually deallocate orphan slots and
 remove orphan Docker containers/volumes.
 
+**Remote backend.** A worktree can run its Supabase stack on another host's
+Docker (docs/runbooks/remote-supabase.md). When `PINPOINT_REMOTE_DOCKER_HOST`
+is set, the sweep also enumerates that daemon, keeping only projects whose
+`com.supabase.cli.workdir` label is a path on this machine and never touching
+the remote host's own stacks (Crabbox runners, host-side paths). A remote
+project whose workdir is gone and whose project_id has no active worktree is
+an orphan. A slot whose worktree is gone is only freed once no remote project
+still references that path — otherwise the next worktree to take the slot
+would fail `supabase start` with "port is already allocated". When this
+machine uses the remote backend but the remote daemon can't be queried, such
+slots are UNKNOWN and kept. Without any remote-backend signal the sweep behaves
+exactly as it always has.
+
 **Unknown is never zero.** If Docker can't be queried, this script reports the
 Docker half of the sweep as UNKNOWN and refuses to reclaim Docker resources —
 it never prints `0 volume(s)` for a query it couldn't run. A false zero reads
@@ -37,6 +50,7 @@ import re
 import shlex
 import subprocess
 import sys
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -48,6 +62,26 @@ from worktree_setup import branch_to_project_id  # noqa: E402
 _PROJECT_ID_LINE_RE = re.compile(r'^project_id\s*=\s*"([^"]+)"')
 
 SUPABASE_PROJECT_LABEL = "com.supabase.cli.project"
+SUPABASE_WORKDIR_LABEL = "com.supabase.cli.workdir"
+
+#: Remote-backend settings (docs/runbooks/remote-supabase.md). Only the Docker
+#: endpoint is needed to query the remote daemon; the others are signals that
+#: this machine uses the remote backend at all.
+REMOTE_DOCKER_HOST_ENV = "PINPOINT_REMOTE_DOCKER_HOST"
+REMOTE_SUPABASE_HOST_ENV = "PINPOINT_REMOTE_SUPABASE_HOST"
+BACKEND_ENV_KEY = "PINPOINT_SUPABASE_BACKEND"
+
+#: The remote host runs its own Supabase stacks for Crabbox runners. They are
+#: not this machine's worktrees and must never be reported or removed.
+CRABBOX_PROJECT_PREFIX = "pinpoint-runner-crabbox"
+
+#: Remote Docker goes over SSH (several seconds per call); an unreachable host
+#: must become UNKNOWN, not a hang. Enumeration shares one budget. Under
+#: --quiet it must leave the SessionStart hook's 10 s cap room for the local
+#: half, so a slow remote reads as UNKNOWN instead of killing the whole report.
+REMOTE_DOCKER_TIMEOUT_SECONDS = 60
+REMOTE_QUERY_BUDGET_SECONDS = 120.0
+QUIET_REMOTE_QUERY_BUDGET_SECONDS = 7.0
 
 #: Exit status when the Docker half of the sweep could not be enumerated. The
 #: SessionStart hook swallows exit codes, but a human (or any future caller)
@@ -181,15 +215,25 @@ class DockerSweepResult:
         return self.unknown_reason is not None
 
 
-def _run_docker(args: list[str]) -> str:
+def _run_docker(
+    args: list[str],
+    env: dict[str, str] | None = None,
+    timeout: float | None = None,
+) -> str:
     """Run a docker command and return stdout, or raise rather than return empty."""
     try:
-        result = subprocess.run(args, capture_output=True, text=True, check=True)
+        result = subprocess.run(
+            args, capture_output=True, text=True, check=True, env=env, timeout=timeout
+        )
     except FileNotFoundError as exc:
         raise DockerNotInstalledError("`docker` is not installed") from exc
     except OSError as exc:
         raise DockerUnavailableError(
             f"could not run `{shlex.join(args)}`: {exc}"
+        ) from exc
+    except subprocess.TimeoutExpired as exc:
+        raise DockerUnavailableError(
+            f"`{shlex.join(args)}` timed out after {exc.timeout:.0f}s"
         ) from exc
     except subprocess.CalledProcessError as exc:
         detail = (
@@ -316,6 +360,307 @@ def _is_main_worktree_path(path: str) -> bool:
     return (Path(path) / ".git").is_dir()
 
 
+# --- Remote backend -------------------------------------------------------
+
+
+def _worktree_uses_remote_backend(worktree_path: str) -> bool:
+    """True when a live worktree's .env.local selects the remote backend."""
+    env_file = Path(worktree_path) / ".env.local"
+    try:
+        lines = env_file.read_text().splitlines()
+    except OSError:
+        return False
+    for line in lines:
+        if line.startswith(f"{BACKEND_ENV_KEY}="):
+            return line.partition("=")[2].strip() == "remote"
+    return False
+
+
+def remote_backend_in_use(worktrees: dict[str, str]) -> bool:
+    """Whether this machine may have worktree stacks on a remote Docker daemon.
+
+    Any one signal is enough: the remote settings in the environment, the
+    shell's default backend, or a live worktree whose .env.local says remote.
+    With none of them (CI, other hosts) the sweep keeps its local-only
+    behaviour exactly.
+    """
+    if os.environ.get(REMOTE_DOCKER_HOST_ENV, "").strip():
+        return True
+    if os.environ.get(REMOTE_SUPABASE_HOST_ENV, "").strip():
+        return True
+    if os.environ.get(BACKEND_ENV_KEY, "").strip() == "remote":
+        return True
+    return any(_worktree_uses_remote_backend(path) for path in worktrees)
+
+
+def remote_docker_env(docker_host: str) -> dict[str, str]:
+    """Environment that points `docker` at the remote daemon, like supabase-stack.sh."""
+    env = os.environ.copy()
+    env["DOCKER_HOST"] = docker_host
+    env.pop("DOCKER_CONTEXT", None)
+    return env
+
+
+def _is_this_machine_path(path: str) -> bool:
+    """True for an absolute path under this machine's home or temp directories.
+
+    A remote host's own checkouts (Bazzite: `/var/home/...`) fall outside these
+    roots, so their stacks are never judged against this machine's filesystem.
+    """
+    if not path.startswith("/"):
+        return False
+    norm = os.path.normpath(path)
+    roots = (os.path.normpath(str(Path.home())), "/tmp", "/private/tmp")
+    return any(norm == root or norm.startswith(root + "/") for root in roots)
+
+
+def _is_within(child: str, parent: str) -> bool:
+    """True when `child` is `parent` or below it, comparing resolved paths."""
+    child_real = os.path.realpath(child)
+    parent_real = os.path.realpath(parent)
+    return child_real == parent_real or child_real.startswith(
+        parent_real.rstrip("/") + "/"
+    )
+
+
+@dataclass
+class RemoteProject:
+    """One Supabase project's resources on the remote daemon.
+
+    `workdirs` comes from the `com.supabase.cli.workdir` label. The Supabase
+    CLI sets it on containers but not on volumes, so a stopped stack (volumes
+    only) has no workdir and cannot be attributed to this machine.
+    """
+
+    workdirs: set[str] = field(default_factory=set)
+    containers: list[str] = field(default_factory=list)
+    volumes: list[str] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class RemoteSweepResult:
+    """This machine's Supabase projects on the remote daemon, or an explicit unknown.
+
+    Same contract as `DockerSweepResult`: with `unknown_reason` set, `by_project`
+    is empty only because we couldn't look.
+    """
+
+    docker_host: str | None
+    by_project: dict[str, RemoteProject] = field(default_factory=dict)
+    unknown_reason: str | None = None
+
+    @property
+    def is_unknown(self) -> bool:
+        return self.unknown_reason is not None
+
+    @property
+    def label(self) -> str:
+        return self.docker_host or f"remote Docker ({REMOTE_DOCKER_HOST_ENV} unset)"
+
+    def projects_referencing(self, worktree_path: str) -> list[str]:
+        """Remote projects whose workdir is `worktree_path` or inside it."""
+        return sorted(
+            pid
+            for pid, project in self.by_project.items()
+            if any(_is_within(workdir, worktree_path) for workdir in project.workdirs)
+        )
+
+
+def _parse_remote_rows(stdout: str) -> list[tuple[str, str, str]]:
+    """Parse `name|project_id|workdir` lines for this repo's non-Crabbox projects."""
+    rows: list[tuple[str, str, str]] = []
+    for line in stdout.splitlines():
+        parts = line.split("|", 2)
+        if len(parts) != 3:
+            continue
+        name, project, workdir = (part.strip() for part in parts)
+        if not project.startswith("pinpoint-"):
+            continue
+        if project.startswith(CRABBOX_PROJECT_PREFIX):
+            continue
+        rows.append((name, project, workdir))
+    return rows
+
+
+def get_remote_supabase_rows(
+    env: dict[str, str], budget: float = REMOTE_QUERY_BUDGET_SECONDS
+) -> tuple[list[tuple[str, str, str]], list[tuple[str, str, str]]]:
+    """Return `(volumes, containers)` rows of `(name, project_id, workdir)`.
+
+    Same two-call volume enumeration and partial-failure tolerance as
+    `get_supabase_volumes()`; the remote daemon is only ever filtered by label.
+    All three calls share `budget` seconds; running out raises
+    DockerUnavailableError like any other failed query.
+    """
+    deadline = time.monotonic() + budget
+
+    def remaining() -> float:
+        return max(0.1, deadline - time.monotonic())
+
+    label_fields = (
+        '{{index .Labels "'
+        + SUPABASE_PROJECT_LABEL
+        + '"}}|{{index .Labels "'
+        + SUPABASE_WORKDIR_LABEL
+        + '"}}'
+    )
+    names = [
+        line.strip()
+        for line in _run_docker(
+            [
+                "docker",
+                "volume",
+                "ls",
+                "--filter",
+                f"label={SUPABASE_PROJECT_LABEL}",
+                "--format",
+                "{{.Name}}",
+            ],
+            env,
+            remaining(),
+        ).splitlines()
+        if line.strip()
+    ]
+    volumes: list[tuple[str, str, str]] = []
+    if names:
+        args = [
+            "docker",
+            "volume",
+            "inspect",
+            "--format",
+            "{{.Name}}|" + label_fields,
+            *names,
+        ]
+        try:
+            inspect = subprocess.run(
+                args, capture_output=True, text=True, env=env, timeout=remaining()
+            )
+        except (OSError, subprocess.SubprocessError) as exc:
+            raise DockerUnavailableError(
+                f"could not run `docker volume inspect`: {exc}"
+            ) from exc
+        if inspect.returncode != 0 and not inspect.stdout.strip():
+            detail = (
+                inspect.stderr or ""
+            ).strip() or f"exit status {inspect.returncode}"
+            raise DockerUnavailableError(f"`docker volume inspect` failed: {detail}")
+        volumes = _parse_remote_rows(inspect.stdout)
+
+    containers = _parse_remote_rows(
+        _run_docker(
+            [
+                "docker",
+                "ps",
+                "-a",
+                "--filter",
+                f"label={SUPABASE_PROJECT_LABEL}",
+                "--format",
+                "{{.Names}}|"
+                + '{{.Label "'
+                + SUPABASE_PROJECT_LABEL
+                + '"}}|{{.Label "'
+                + SUPABASE_WORKDIR_LABEL
+                + '"}}',
+            ],
+            env,
+            remaining(),
+        )
+    )
+    return volumes, containers
+
+
+def get_remote_sweep(
+    worktrees: dict[str, str], budget: float = REMOTE_QUERY_BUDGET_SECONDS
+) -> RemoteSweepResult | None:
+    """Enumerate this machine's Supabase projects on the remote daemon.
+
+    Returns None when nothing suggests this machine uses the remote backend,
+    so the caller keeps today's local-only behaviour. Projects whose workdir
+    is a path on the remote host itself are dropped entirely, as are Crabbox
+    runner projects (`_parse_remote_rows`).
+    """
+    if not remote_backend_in_use(worktrees):
+        return None
+    docker_host = os.environ.get(REMOTE_DOCKER_HOST_ENV, "").strip() or None
+    if docker_host is None:
+        return RemoteSweepResult(
+            docker_host=None,
+            unknown_reason=(
+                "this machine uses the remote Supabase backend but "
+                f"{REMOTE_DOCKER_HOST_ENV} is unset"
+            ),
+        )
+    try:
+        volumes, containers = get_remote_supabase_rows(
+            remote_docker_env(docker_host), budget
+        )
+    except (DockerNotInstalledError, DockerUnavailableError) as exc:
+        # A missing docker CLI is a real zero only for the local daemon; the
+        # remote host's resources exist regardless of this machine's tooling.
+        return RemoteSweepResult(docker_host=docker_host, unknown_reason=str(exc))
+
+    grouped: dict[str, RemoteProject] = {}
+    for kind, rows in (("volumes", volumes), ("containers", containers)):
+        for name, project, workdir in rows:
+            entry = grouped.setdefault(project, RemoteProject())
+            getattr(entry, kind).append(name)
+            if workdir:
+                entry.workdirs.add(workdir)
+    # A project with any workdir outside this machine belongs to the remote
+    # host (or another machine); it is not ours to report or remove.
+    owned = {
+        pid: project
+        for pid, project in grouped.items()
+        if all(_is_this_machine_path(workdir) for workdir in project.workdirs)
+    }
+    return RemoteSweepResult(docker_host=docker_host, by_project=owned)
+
+
+def _remove_project_resources(
+    pid: str,
+    containers: list[str],
+    volumes: list[str],
+    not_quiet: bool,
+    env: dict[str, str] | None = None,
+    where: str = "",
+) -> bool:
+    """`docker rm -f` then `docker volume rm` one project's named resources.
+
+    Names come from a label-filtered enumeration; nothing here prunes. Returns
+    True when every removal that was needed succeeded.
+    """
+    ok = True
+    for kind, argv, names in (
+        ("container", ["docker", "rm", "-f"], containers),
+        ("volume", ["docker", "volume", "rm"], volumes),
+    ):
+        if not names:
+            continue
+        try:
+            rm = subprocess.run(
+                argv + names,
+                capture_output=True,
+                text=True,
+                env=env,
+                timeout=REMOTE_DOCKER_TIMEOUT_SECONDS if env is not None else None,
+            )
+            failure = rm.stderr.strip() if rm.returncode != 0 else None
+        except (OSError, subprocess.SubprocessError) as exc:
+            failure = str(exc)
+        if failure is not None:
+            ok = False
+            print(
+                f"  Warning: `{' '.join(argv)}` for {pid}{where}: {failure}",
+                file=sys.stderr,
+            )
+        elif not_quiet:
+            print(
+                f"  removed {len(names)} {kind}(s) for {pid}{where}",
+                file=sys.stderr,
+            )
+    return ok
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description=__doc__,
@@ -377,6 +722,33 @@ def main() -> int:
         if pid not in active_project_ids
     }
 
+    # Remote backend. `remote is None` means no remote-backend signal at all,
+    # and everything below degrades to the local-only behaviour.
+    remote = get_remote_sweep(
+        active,
+        REMOTE_QUERY_BUDGET_SECONDS if not_quiet else QUIET_REMOTE_QUERY_BUDGET_SECONDS,
+    )
+    remote_orphans: dict[str, RemoteProject] = {}
+    unattributed: dict[str, RemoteProject] = {}
+    # Orphan slots that must not be freed yet: path -> remote project_ids that
+    # still reference it (empty list = remote state unknown).
+    held_slots: dict[str, list[str]] = {}
+    if remote is not None:
+        if remote.is_unknown:
+            held_slots = {path: [] for path in orphan_slots}
+        else:
+            for pid, project in remote.by_project.items():
+                if pid in active_project_ids:
+                    continue
+                if not project.workdirs:
+                    unattributed[pid] = project
+                elif not any(Path(w).exists() for w in project.workdirs):
+                    remote_orphans[pid] = project
+            for path in orphan_slots:
+                holders = remote.projects_referencing(path)
+                if holders:
+                    held_slots[path] = holders
+
     if docker.is_unknown:
         # Never suppressed by --quiet: a silent false zero is worse than an error,
         # and this is the line that keeps the SessionStart nudge honest.
@@ -402,15 +774,70 @@ def main() -> int:
                 file=sys.stderr,
             )
 
-    if not orphan_slots and not orphan_projects:
+    if remote is not None and remote.is_unknown:
+        # Same rule as the local line above: never suppressed by --quiet.
+        print(
+            "worktree-orphan-sweep: remote Supabase Docker orphans on "
+            f"{remote.label} are UNKNOWN, not zero — {remote.unknown_reason}. "
+            f"Keeping {len(held_slots)} orphan slot entr(ies): a remote stack "
+            "may still hold their ports"
+            + (
+                "; --apply will not reclaim remote resources or those slots."
+                if args.apply
+                else "."
+            ),
+            file=sys.stderr,
+        )
+    elif remote is not None and not_quiet:
+        print(
+            f"Remote Supabase projects from this machine on {remote.label}: "
+            f"{len(remote.by_project)} ({len(remote_orphans)} orphaned)",
+            file=sys.stderr,
+        )
+        if remote_orphans:
+            print(
+                f"Orphan remote Supabase projects on {remote.label}: "
+                f"{len(remote_orphans)}",
+                file=sys.stderr,
+            )
+            for pid, project in sorted(remote_orphans.items()):
+                print(
+                    f"  - {pid}: {len(project.containers)} container(s), "
+                    f"{len(project.volumes)} volume(s) "
+                    f"(workdir gone: {', '.join(sorted(project.workdirs))})",
+                    file=sys.stderr,
+                )
+        for path, holders in sorted(held_slots.items()):
+            print(
+                f"  keeping slot for {path}: remote project(s) "
+                f"{', '.join(holders)} still reference it",
+                file=sys.stderr,
+            )
+        if unattributed:
+            print(
+                f"Remote Supabase projects on {remote.label} with volumes only "
+                "(no workdir label, so not attributable to this machine; "
+                "never removed by this sweep):",
+                file=sys.stderr,
+            )
+            for pid, project in sorted(unattributed.items()):
+                print(
+                    f"  - {pid}: {len(project.volumes)} volume(s)",
+                    file=sys.stderr,
+                )
+
+    remote_unknown = remote is not None and remote.is_unknown
+    any_unknown = docker.is_unknown or remote_unknown
+
+    if not orphan_slots and not orphan_projects and not remote_orphans:
         if not_quiet:
             print(
                 "No slot orphans found; Docker orphans unknown (see above)."
-                if docker.is_unknown
+                if any_unknown
                 else "No orphans found.",
                 file=sys.stderr,
             )
-        return EXIT_DOCKER_UNKNOWN if docker.is_unknown else 0
+        return EXIT_DOCKER_UNKNOWN if any_unknown else 0
 
     if not args.apply:
         if not_quiet:
@@ -423,68 +850,76 @@ def main() -> int:
                 if docker.is_unknown
                 else f"{len(orphan_projects)} Supabase Docker project orphan(s)"
             )
+            if remote is not None:
+                docker_summary += (
+                    ", remote Supabase project orphans UNKNOWN"
+                    if remote.is_unknown
+                    else f", {len(remote_orphans)} remote Supabase project orphan(s)"
+                )
             print(
                 f"worktree-orphan-sweep: found {len(orphan_slots)} slot orphan(s), "
                 f"{docker_summary} "
                 "(dry-run). Run: python3 scripts/worktree_orphan_sweep.py --apply",
                 file=sys.stderr,
             )
-        return EXIT_DOCKER_UNKNOWN if docker.is_unknown else 0
+        return EXIT_DOCKER_UNKNOWN if any_unknown else 0
 
-    for path_str in orphan_slots:
+    def _free_slot(path_str: str) -> None:
         if _is_main_worktree_path(path_str):
             print(
                 f"Skipping main worktree {path_str} (should not be in slot manifest).",
                 file=sys.stderr,
             )
-            continue
+            return
         deallocate_slot(path_str)
         if not_quiet:
             print(f"  deallocated slot: {path_str}", file=sys.stderr)
 
+    for path_str in orphan_slots:
+        if path_str not in held_slots:
+            _free_slot(path_str)
+
     for pid, res in sorted(orphan_projects.items()):
-        if res["containers"]:
-            rm = subprocess.run(
-                ["docker", "rm", "-f"] + res["containers"],
-                capture_output=True,
-                text=True,
+        _remove_project_resources(pid, res["containers"], res["volumes"], not_quiet)
+
+    if remote is not None and remote.docker_host and not remote.is_unknown:
+        env = remote_docker_env(remote.docker_host)
+        where = f" on {remote.docker_host}"
+        removed_remote = {
+            pid
+            for pid, project in sorted(remote_orphans.items())
+            if _remove_project_resources(
+                pid, project.containers, project.volumes, not_quiet, env, where
             )
-            if rm.returncode != 0:
+        }
+        # A slot held only by stacks that are now gone no longer has anything
+        # bound to its ports, so it can be released in the same run.
+        for path_str, holders in sorted(held_slots.items()):
+            if set(holders) <= removed_remote:
+                _free_slot(path_str)
+            else:
                 print(
-                    f"  Warning: `docker rm -f` for {pid}: {rm.stderr.strip()}",
-                    file=sys.stderr,
-                )
-            elif not_quiet:
-                print(
-                    f"  removed {len(res['containers'])} container(s) for {pid}",
-                    file=sys.stderr,
-                )
-        if res["volumes"]:
-            rm = subprocess.run(
-                ["docker", "volume", "rm"] + res["volumes"],
-                capture_output=True,
-                text=True,
-            )
-            if rm.returncode != 0:
-                print(
-                    f"  Warning: `docker volume rm` for {pid}: {rm.stderr.strip()}",
-                    file=sys.stderr,
-                )
-            elif not_quiet:
-                print(
-                    f"  removed {len(res['volumes'])} volume(s) for {pid}",
+                    f"  kept slot for {path_str}: remote project(s) "
+                    f"{', '.join(h for h in holders if h not in removed_remote)} "
+                    "still hold it",
                     file=sys.stderr,
                 )
 
     if docker.is_unknown:
         print(
             "Docker sweep SKIPPED (state unknown); no containers or volumes were "
-            "removed. Slot manifest orphans above were still reclaimed.",
+            "removed. Slot manifest orphans above were still reclaimed"
+            + (" except those kept for the remote backend." if held_slots else "."),
             file=sys.stderr,
         )
-        return EXIT_DOCKER_UNKNOWN
+    if remote is not None and remote.is_unknown:
+        print(
+            f"Remote Docker sweep SKIPPED (state unknown); nothing on {remote.label} "
+            f"was removed and {len(held_slots)} orphan slot entr(ies) were kept.",
+            file=sys.stderr,
+        )
 
-    return 0
+    return EXIT_DOCKER_UNKNOWN if any_unknown else 0
 
 
 if __name__ == "__main__":

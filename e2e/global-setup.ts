@@ -309,8 +309,17 @@ export default async function globalSetup(config: FullConfig): Promise<void> {
   checkBrowserBinaries(config);
   await checkBrowsersRenderText(config);
 
-  console.log("🔍 Checking Docker daemon...");
-  checkDocker();
+  // A remote Supabase backend runs on another host's Docker
+  // (scripts/supabase-stack.sh); the Supabase health check below covers it.
+  const remoteSupabase = process.env["PINPOINT_SUPABASE_BACKEND"] === "remote";
+  if (remoteSupabase) {
+    console.log(
+      "⏭️  Remote Supabase backend, skipping the local Docker check."
+    );
+  } else {
+    console.log("🔍 Checking Docker daemon...");
+    checkDocker();
+  }
 
   if (process.env["SKIP_SUPABASE_RESET"] === "true") {
     console.log("⏭️  SKIP_SUPABASE_RESET=true, skipping database setup.");
@@ -324,11 +333,15 @@ export default async function globalSetup(config: FullConfig): Promise<void> {
   const postgresUrl =
     process.env["POSTGRES_URL_NON_POOLING"] ?? process.env["POSTGRES_URL"];
 
+  // A stopped local stack refuses at once, so these probe timeouts only bound
+  // a slow answer: a remote backend over a high-latency link needs seconds.
+  const probeTimeoutSeconds = 10;
+
   // 1. Supabase API health
   console.log("🔍 Checking Supabase...");
   try {
     const res = await fetch(`${supabaseUrl}/auth/v1/health`, {
-      signal: AbortSignal.timeout(3000),
+      signal: AbortSignal.timeout(probeTimeoutSeconds * 1000),
     });
     if (!res.ok) {
       throw new Error(`HTTP ${res.status}`);
@@ -337,7 +350,7 @@ export default async function globalSetup(config: FullConfig): Promise<void> {
     const msg = error instanceof Error ? error.message : "connection failed";
     throw new Error(
       `Supabase is not reachable at ${supabaseUrl} (${msg}).\n` +
-        `  Start it with: supabase start\n` +
+        `  Start it with: pnpm supabase:start\n` +
         `  Or check that you're in the right worktree directory.`,
       { cause: error }
     );
@@ -351,7 +364,9 @@ export default async function globalSetup(config: FullConfig): Promise<void> {
     );
   }
   console.log("🔍 Checking Postgres...");
-  const client = postgres(postgresUrl, { connect_timeout: 3 });
+  const client = postgres(postgresUrl, {
+    connect_timeout: probeTimeoutSeconds,
+  });
   try {
     await client`SELECT 1`;
   } catch (error) {
@@ -359,7 +374,7 @@ export default async function globalSetup(config: FullConfig): Promise<void> {
     throw new Error(
       `Cannot connect to Postgres (${msg}).\n` +
         `  URL: ${redactUrl(postgresUrl)}\n` +
-        `  Is Supabase running? Try: supabase status`,
+        `  Is Supabase running? Try: pnpm supabase:status`,
       { cause: error }
     );
   } finally {
@@ -408,7 +423,14 @@ export default async function globalSetup(config: FullConfig): Promise<void> {
     console.warn("⚠️  Fast reset failed, falling back to full reset...");
   }
 
-  // 5. Full reset fallback (fresh checkout with empty database)
+  // 5. Full reset fallback (fresh checkout with empty database). A remote
+  // backend needs the backend-aware restart in pnpm run db:reset; a bare
+  // `supabase db reset` would target this machine's Docker.
+  if (remoteSupabase) {
+    execSync("pnpm run db:reset", { stdio: "inherit", env: process.env });
+    console.log("✅ Database ready (full reset)");
+    return;
+  }
   try {
     execSync("supabase db reset --yes", { stdio: "inherit", env: process.env });
     execSync("pnpm run db:migrate", { stdio: "inherit", env: process.env });

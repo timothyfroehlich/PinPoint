@@ -82,15 +82,16 @@ Each git worktree gets isolated Supabase ports automatically. The Husky `post-ch
 
 Start what you need yourself rather than pausing the user.
 
-- **OrbStack down?** `open -a OrbStack`, then `docker info` to confirm.
-- **Supabase down?** From the current worktree: `supabase start`. Ports are isolated, so this won't affect anyone else.
-- **Fresh worktree database?** `supabase start && pnpm run db:migrate` is the non-destructive bootstrap. `preflight` checks this state before costly work and prints the isolated Postgres port when it is missing; it never starts or migrates services implicitly.
+- **Backend**: `.env.local`'s `PINPOINT_SUPABASE_BACKEND` says where the stack runs — `local` (this machine's Docker) or `remote` (another host's Docker over the tailnet). Read [the remote Supabase runbook](docs/runbooks/remote-supabase.md) before starting, stopping, switching, or debugging a `remote` stack.
+- **OrbStack down?** (local backend) `open -a OrbStack`, then `docker info` to confirm.
+- **Supabase down?** From the current worktree: `pnpm supabase:start`, which targets whichever backend the worktree uses. Ports are isolated, so this won't affect anyone else.
+- **Fresh worktree database?** `pnpm supabase:start && pnpm run db:migrate` is the non-destructive bootstrap. `preflight` checks this state before costly work and prints the isolated Postgres port when it is missing; it never starts or migrates services implicitly.
 
 Leave the stack running afterward — the user can stop it. Hand off what's running. If you can't start it (port collisions, stuck containers), ask the user — don't fall back to "let CI tell us."
 
 ### Process safety
 
-Only stop services you started in this session, by specific PID or via worktree-local commands (e.g. `supabase stop` inside the worktree). Forbidden without explicit permission: `supabase stop --all`, `pkill`/`killall` against process names, `docker stop` on containers you didn't start. The system runs many environments in parallel; broad kills wipe out other agents' work.
+Only stop services you started in this session, by specific PID or via worktree-local commands (e.g. `pnpm supabase:stop` inside the worktree). Forbidden without explicit permission: `supabase stop --all`, `pkill`/`killall` against process names, `docker stop` on containers you didn't start. The system runs many environments in parallel; broad kills wipe out other agents' work.
 
 ## 5. Workflow
 
