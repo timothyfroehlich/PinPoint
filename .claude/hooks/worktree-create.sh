@@ -117,6 +117,9 @@ if git -C "$BASE_PATH" worktree list --porcelain 2>/dev/null | grep -Fx "worktre
 fi
 
 if add_output=$(git -C "$BASE_PATH" worktree add "$WORKTREE_PATH" -b "$BRANCH" "$BASE_REF" 2>&1); then
+  # Keep setup's output (e.g. a dependency-install warning) visible; stdout
+  # carries only the path.
+  if [ -n "$add_output" ]; then printf '%s\n' "$add_output" >&2; fi
   echo "$WORKTREE_PATH"
   exit 0
 fi

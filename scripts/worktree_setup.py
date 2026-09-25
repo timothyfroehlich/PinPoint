@@ -22,6 +22,7 @@ import socket
 import stat
 import subprocess
 import sys
+import time
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
@@ -177,40 +178,55 @@ class PortConfig:
 # =============================================================================
 
 
-def slot_ports_in_use(slot: int) -> bool:
-    """Whether the slot's Supabase API or DB port still accepts a connection.
+def slot_ports_in_use(slot: int, timeout: float = 1.0) -> bool:
+    """Whether the slot's Supabase API or DB port may still be in use.
 
-    Checks localhost and, when PINPOINT_REMOTE_SUPABASE_HOST is set, the remote
-    host, which publishes a remote-backend stack's ports on its own address.
+    Checks this machine and, when PINPOINT_REMOTE_SUPABASE_HOST is set, the
+    remote host, which publishes a remote-backend stack's ports on its own
+    address. Only a refused connection proves a port free; a timeout or an
+    unreachable host counts as in use, so a slot is never handed out on a guess.
     """
     ports = PortConfig(slot=slot, project_id="", name="")
-    hosts = ["localhost"]
+    hosts = ["127.0.0.1"]
     remote_host = os.environ.get(REMOTE_HOST_ENV_KEY, "").strip()
     if remote_host:
         hosts.append(remote_host)
     for host in hosts:
         for port in (ports.api_port, ports.db_port):
             try:
-                with socket.create_connection((host, port), timeout=1):
+                with socket.create_connection((host, port), timeout=timeout):
                     return True
+            except ConnectionRefusedError:
+                continue
             except OSError:
-                pass
+                return True
     return False
 
 
+#: allocate_slot probes gone worktrees' ports while it holds the manifest lock,
+#: so the probing is capped; an entry there was no time to probe is kept.
+PRUNE_PROBE_BUDGET_SECONDS = 3.0
+
+
 def prune_manifest(slots: dict[str, int]) -> dict[str, int]:
-    """Drop entries whose worktree is gone and whose Supabase ports are closed.
+    """Drop entries whose worktree is gone and whose Supabase ports are free.
 
     A worktree removed without the cleanup hook (`rm -rf`), or one whose stack
     runs on the remote host, can leave a stack holding the slot's ports. Handing
     that slot to a new worktree would make its `supabase start` fail on busy
     ports, so the entry stays until worktree_reap.py reclaims the stack.
     """
-    return {
-        path: slot
-        for path, slot in slots.items()
-        if Path(path).is_dir() or slot_ports_in_use(slot)
-    }
+    deadline = time.monotonic() + PRUNE_PROBE_BUDGET_SECONDS
+    kept: dict[str, int] = {}
+    for path, slot in slots.items():
+        left = deadline - time.monotonic()
+        if (
+            Path(path).is_dir()
+            or left <= 0
+            or slot_ports_in_use(slot, timeout=min(1.0, left))
+        ):
+            kept[path] = slot
+    return kept
 
 
 MAX_SLOT = 96  # slot 96 → offset 9600 → max port 63921 (within integration test range)
@@ -568,12 +584,13 @@ def _resolve_unsubscribe_secret(worktree_path: Path, main_path: Path | None) -> 
     return UNSUBSCRIBE_SIGNING_SECRET_PLACEHOLDER
 
 
-def read_stored_backend(worktree_path: Path) -> str:
-    """The Supabase backend a worktree's .env.local selects; "local" if none."""
+def read_stored_backend(worktree_path: Path) -> str | None:
+    """The Supabase backend a worktree's .env.local selects: "local" when the
+    file or key is absent, None when the file exists but cannot be read."""
     try:
         backend = _read_managed_value(worktree_path / ".env.local", BACKEND_ENV_KEY)
     except (OSError, UnicodeDecodeError):
-        return "local"
+        return None
     return backend or "local"
 
 

@@ -22,11 +22,13 @@ yet, so a worktree is reaped only on positive proof that nothing can be lost:
 
 **Orphans** of worktrees whose directory is gone: slot-manifest entries, and
 Supabase containers, networks and volumes whose project_id no live worktree
-claims. The local Docker daemon runs only this machine's stacks. With the
-remote backend (docs/runbooks/remote-supabase.md) the remote daemon is read
-too, keeping only projects whose containers' workdir label is a gone path on
-this machine; Crabbox runner projects are never considered. A slot is released
-only once no stack references its path and its ports are closed.
+claims, and whose worktree directory is gone. The local Docker daemon runs
+only this machine's stacks. With the remote backend
+(docs/runbooks/remote-supabase.md) the remote daemon is read too, keeping only
+projects whose containers' workdir label is a worktree this machine created
+(a live one, or one still in its slot manifest); Crabbox runner projects are
+never considered. A slot is released only once no stack references its path
+and its ports are free.
 
 **Unknown is never zero.** A failed `gh` or Docker query makes that part
 UNKNOWN: it is printed and nothing is removed on its strength. A dry run exits
@@ -392,9 +394,12 @@ class Daemon:
         return run_docker(["docker", *args], self.env, _time_left(self.deadline))
 
 
-def read_daemon(daemon: Daemon) -> Daemon:
+def read_daemon(daemon: Daemon, owned: set[str] | None = None) -> Daemon:
     """Fill `daemon.projects`; any failed query makes the whole daemon
-    UNKNOWN, since half an answer is a false count."""
+    UNKNOWN, since half an answer is a false count. On a remote daemon, only
+    projects whose workdirs are all in `owned` (worktrees this machine created)
+    are kept: it also runs other machines' stacks, and paths alone can't tell
+    them apart."""
     label_filter = f"label={PROJECT_LABEL}"
     try:
         names = daemon.docker("volume", "ls", "--filter", label_filter, "-q").split()
@@ -421,11 +426,11 @@ def read_daemon(daemon: Daemon) -> Daemon:
                 entry = daemon.projects.setdefault(project, Project())
                 getattr(entry, kind).append(name)
                 entry.workdirs.update({workdir} - {""})
-    if daemon.remote:  # it also runs stacks of the remote host's own checkouts
+    if daemon.remote:
         daemon.projects = {
             pid: p
             for pid, p in daemon.projects.items()
-            if all(_is_this_machine_path(w) for w in p.workdirs)
+            if all(os.path.realpath(w) in (owned or set()) for w in p.workdirs)
         }
     return daemon
 
@@ -440,7 +445,7 @@ def read_remote_daemon(
         host
         or os.environ.get(REMOTE_HOST_ENV_KEY, "").strip()
         or os.environ.get(BACKEND_ENV_KEY, "").strip() == "remote"
-        or any(read_stored_backend(Path(p)) == "remote" for p in worktrees)
+        or any(read_stored_backend(Path(p)) in ("remote", None) for p in worktrees)
     ):
         return None
     if not host:
@@ -453,17 +458,11 @@ def read_remote_daemon(
         )
     env = {**os.environ, "DOCKER_HOST": host}  # as scripts/supabase-stack.sh does
     env.pop("DOCKER_CONTEXT", None)
-    return read_daemon(Daemon(host, remote=True, deadline=deadline, env=env))
-
-
-def _is_this_machine_path(path: str) -> bool:
-    """Under this machine's home or temp directories; the remote host's own
-    checkouts (Bazzite: /var/home/...) fall outside them."""
-    norm = os.path.normpath(path)
-    roots = (os.path.normpath(str(Path.home())), "/tmp", "/private/tmp")
-    return path.startswith("/") and any(
-        norm == root or norm.startswith(root + "/") for root in roots
-    )
+    # Ownership is positive: a worktree this machine has, or still has a slot
+    # manifest entry for (kept while a stack references it).
+    owned = {os.path.realpath(p) for p in worktrees}
+    owned |= worktree_cleanup.slot_manifest_paths() or set()
+    return read_daemon(Daemon(host, remote=True, deadline=deadline, env=env), owned)
 
 
 def _is_within(child: str, parent: str) -> bool:
@@ -481,13 +480,11 @@ def orphan_projects(
     orphans: dict[str, Project] = {}
     report_only: dict[str, Project] = {}
     for pid, project in sorted(daemon.projects.items()):
-        if pid in active_ids:
-            continue
-        if not daemon.remote:
-            orphans[pid] = project
-        elif not project.workdirs:
+        if pid in active_ids or any(Path(w).exists() for w in project.workdirs):
+            continue  # claimed by a live worktree, or its directory is still here
+        if daemon.remote and not project.workdirs:
             report_only[pid] = project
-        elif not any(Path(w).exists() for w in project.workdirs):
+        else:
             orphans[pid] = project
     return orphans, report_only
 

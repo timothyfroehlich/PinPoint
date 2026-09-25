@@ -265,7 +265,13 @@ def supabase_backend_env(worktree_path: Path) -> tuple[dict[str, str], str | Non
     """
     env = os.environ.copy()
     env["SUPABASE_TELEMETRY_DISABLED"] = "1"
-    if read_stored_backend(worktree_path) != "remote":
+    backend = read_stored_backend(worktree_path)
+    if backend is None:
+        return (
+            env,
+            "its .env.local could not be read, so its Supabase backend is unknown",
+        )
+    if backend != "remote":
         return env, None
     docker_host = os.environ.get("PINPOINT_REMOTE_DOCKER_HOST", "").strip()
     if not docker_host:
@@ -451,8 +457,8 @@ def cleanup_worktree(worktree_path: Path) -> int:
             # so removing the worktree now could strand its remote volumes.
             print(
                 f"Refusing cleanup of {worktree_path}: {backend_problem}. "
-                "Keeping the worktree and slot; re-run with the remote Docker "
-                "settings exported (docs/runbooks/remote-supabase.md).",
+                "Keeping the worktree and slot; fix that and re-run "
+                "(docs/runbooks/remote-supabase.md).",
                 file=sys.stderr,
             )
             return EXIT_FAILED
@@ -460,6 +466,17 @@ def cleanup_worktree(worktree_path: Path) -> int:
         volumes_unknown_reason = stop_and_remove_supabase(
             worktree_path, project_id, supabase_env
         )
+        if volumes_unknown_reason and read_stored_backend(worktree_path) == "remote":
+            # A stopped remote stack's volumes carry no workdir label, so
+            # worktree_reap.py could never attribute them once the worktree is
+            # gone. Keep the worktree and slot until they can be removed here.
+            print(
+                f"Refusing to remove {worktree_path}: its remote Supabase volumes "
+                f"are UNKNOWN ({volumes_unknown_reason}). Keeping the worktree and "
+                "slot; re-run this cleanup once the remote Docker host is reachable.",
+                file=sys.stderr,
+            )
+            return EXIT_FAILED
 
     # Unlock first. Claude Code agent runtimes lock worktrees while in use,
     # and the lock persists after the agent finishes; `git worktree remove

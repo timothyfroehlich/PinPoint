@@ -603,6 +603,53 @@ class TestMainTeardown:
         assert stub.calls_of("worktree_remove") == []
         assert deallocated == []
 
+    def test_unreadable_backend_keeps_the_worktree(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        fake_worktree: Path,
+        deallocated: list[str],
+    ) -> None:
+        """An .env.local that exists but can't be read is not "local"."""
+        (fake_worktree / ".env.local").mkdir()  # reading it raises OSError
+        stub = install(monkeypatch, RunStub(rev_parse=(0, f"{BRANCH}\n", "")))
+
+        exit_code = _run_main(monkeypatch, fake_worktree)
+
+        assert exit_code == cleanup.EXIT_FAILED
+        assert "Supabase backend is unknown" in capsys.readouterr().err
+        assert stub.calls_of("supabase") == []
+        assert stub.calls_of("worktree_remove") == []
+        assert deallocated == []
+
+    def test_unknown_remote_volumes_keep_the_worktree(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        fake_worktree: Path,
+        deallocated: list[str],
+    ) -> None:
+        """A stopped remote stack can't be attributed by worktree_reap.py once
+        its worktree is gone, so the worktree stays until its volumes are known."""
+        (fake_worktree / ".env.local").write_text("PINPOINT_SUPABASE_BACKEND=remote\n")
+        monkeypatch.setenv("PINPOINT_REMOTE_DOCKER_HOST", "ssh://bazzite")
+        stub = install(
+            monkeypatch,
+            RunStub(
+                rev_parse=(0, f"{BRANCH}\n", ""),
+                volume_ls=(255, "", "ssh: connect to host bazzite: timed out"),
+            ),
+        )
+
+        exit_code = _run_main(monkeypatch, fake_worktree)
+
+        err = capsys.readouterr().err
+        assert exit_code == cleanup.EXIT_FAILED
+        assert "Refusing to remove" in err
+        assert "remote Supabase volumes are UNKNOWN" in err
+        assert stub.calls_of("worktree_remove") == []
+        assert deallocated == []
+
     def test_unreadable_branch_refuses_cleanup_instead_of_reporting_success(
         self,
         monkeypatch: pytest.MonkeyPatch,

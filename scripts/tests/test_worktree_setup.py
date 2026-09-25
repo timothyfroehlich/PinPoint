@@ -615,13 +615,16 @@ class TestManifest:
         self.manifest_path = tmp_path / "worktree-slots.json"
         monkeypatch.setattr("worktree_setup.MANIFEST_PATH", self.manifest_path)
         self.open_ports: set[tuple[str, int]] = set()
+        self.unreachable: set[str] = set()
         self.probed: list[tuple[str, int]] = []
 
         def fake_connect(address: tuple[str, int], timeout: float) -> object:
-            assert timeout == 1
+            assert 0 < timeout <= 1
             self.probed.append(address)
             if address in self.open_ports:
                 return contextlib.nullcontext()
+            if address[0] in self.unreachable:
+                raise TimeoutError(address)
             raise ConnectionRefusedError(address)
 
         monkeypatch.setattr("worktree_setup.socket.create_connection", fake_connect)
@@ -670,11 +673,32 @@ class TestManifest:
         assert prune_manifest({"/gone/worktree": 2}) == {}
         # Slot 2: API 54521, DB 54522, on this machine and on the remote host.
         assert self.probed == [
-            ("localhost", 54521),
-            ("localhost", 54522),
+            ("127.0.0.1", 54521),
+            ("127.0.0.1", 54522),
             ("bazzite", 54521),
             ("bazzite", 54522),
         ]
+
+    def test_an_unreachable_remote_host_keeps_the_slot(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Only a refused connection proves a port free; a timeout is a guess."""
+        monkeypatch.setenv("PINPOINT_REMOTE_SUPABASE_HOST", "bazzite")
+        self.unreachable.add("bazzite")
+
+        assert prune_manifest({"/gone/worktree": 2}) == {"/gone/worktree": 2}
+
+    def test_probing_is_capped_and_unprobed_entries_are_kept(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """allocate_slot holds the manifest lock while it prunes."""
+        monkeypatch.setattr("worktree_setup.PRUNE_PROBE_BUDGET_SECONDS", 0)
+
+        assert prune_manifest({"/gone/a": 2, "/gone/b": 3}) == {
+            "/gone/a": 2,
+            "/gone/b": 3,
+        }
+        assert self.probed == []
 
     def test_gone_worktree_whose_stack_still_answers_keeps_its_slot(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch

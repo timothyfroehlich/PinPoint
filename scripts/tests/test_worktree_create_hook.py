@@ -21,7 +21,8 @@ def mock_git(tmp_path: Path):
     # hook's fetch → rev-parse → worktree-add sequence can be exercised (PP-2cpf):
     #   * `fetch`     — exit code from $MOCK_GIT_FETCH_EXIT (default 0 = success).
     #   * `rev-parse` — print $MOCK_GIT_FETCH_SHA (default MOCK_FETCH_SHA) as FETCH_HEAD.
-    #   * anything else (e.g. `worktree add`) — exit 0.
+    #   * anything else (e.g. `worktree add`) — print $MOCK_GIT_OUTPUT (if set) to
+    #     stderr, as the post-checkout hook's output would be, and exit 0.
     # Global options like `-C <path>` are skipped when detecting the subcommand.
     git_bin_dir = tmp_path / "bin"
     git_bin_dir.mkdir()
@@ -43,7 +44,7 @@ done
 case "$sub" in
   fetch) exit ${{MOCK_GIT_FETCH_EXIT:-0}} ;;
   rev-parse) echo "${{MOCK_GIT_FETCH_SHA:-{MOCK_FETCH_SHA}}}"; exit 0 ;;
-  *) exit 0 ;;
+  *) if [ -n "${{MOCK_GIT_OUTPUT:-}}" ]; then echo "$MOCK_GIT_OUTPUT" >&2; fi; exit 0 ;;
 esac
 """)
     git_script.chmod(0o755)
@@ -203,6 +204,30 @@ def test_hook_falls_back_to_head_when_fetch_fails(
     # HEAD's SHA, not the name HEAD: `-b <new> HEAD` can write tracking config.
     add_call = _worktree_add_call(calls)
     assert add_call.endswith(f"-b worktree-agent-offline {head_sha}"), add_call
+
+
+def test_hook_keeps_setup_output_visible_and_stdout_to_the_path(
+    mock_git: dict, tmp_path: Path
+) -> None:
+    """A dependency-install warning from post-checkout must not be swallowed."""
+    stdin_data = {
+        "session_id": "test-session",
+        "transcript_path": "test-path",
+        "cwd": str(tmp_path),
+        "hook_event_name": "WorktreeCreate",
+        "name": "agent-warn",
+    }
+    warning = "worktree_setup: WARNING dependencies not installed"
+    env_mods = {
+        "PATH": f"{mock_git['bin_dir']}:{os.environ['PATH']}",
+        "MOCK_GIT_OUTPUT": warning,
+    }
+
+    return_code, stdout, stderr = run_hook(stdin_data, tmp_path, env_mods)
+
+    assert return_code == 0, f"Hook failed with stderr: {stderr}"
+    assert stdout.strip() == str(tmp_path / ".claude/worktrees/agent-warn")
+    assert warning in stderr
 
 
 def test_hook_missing_required_fields(mock_git: dict, tmp_path: Path) -> None:

@@ -256,7 +256,7 @@ def world(
     monkeypatch.setenv("GH_STUB_CWDS", str(built.gh_cwds))
     monkeypatch.setenv("DOCKER_STUB_STATE", str(built.docker_state_file))
     monkeypatch.setenv("DOCKER_STUB_LOG", str(built.docker_log))
-    # Gone worktree paths under tmp_path count as this machine's.
+    # Gone worktree paths live under HOME, like a real one would.
     monkeypatch.setenv("HOME", str(tmp_path))
     for name in (
         "GH_STUB_FAIL",
@@ -608,6 +608,9 @@ def test_stacks_of_live_worktrees_and_the_main_worktree_are_never_orphans(
         "pinpoint-dead",
     ):
         world.add_stack(pid, running=False)
+    # An id no worktree claims (config.toml unreadable, branch renamed), but its
+    # container's workdir is a worktree that still exists: never an orphan.
+    world.add_stack("pinpoint-unclaimed-but-live", workdir=str(derived))
     world.fail("network rm", 1, "Error: network supabase_network_x not found")
 
     code, _, err = world.run("--apply")
@@ -738,6 +741,9 @@ def test_remote_stacks_that_are_not_this_machines_orphans_are_never_removed(
     world.add_stack(
         "pinpoint-bazzite-checkout", workdir="/var/home/froeht/PinPoint", host=REMOTE
     )
+    # Another Mac with the same home path: gone here, but never this machine's
+    # worktree (no slot manifest entry), so a path under HOME is not ownership.
+    world.add_stack("pinpoint-other-mac", workdir=world.gone("other-mac"), host=REMOTE)
 
     code, _, err = world.run("--apply")
 
@@ -747,6 +753,7 @@ def test_remote_stacks_that_are_not_this_machines_orphans_are_never_removed(
     assert world.removals(REMOTE) == []
     assert "crabbox" not in err
     assert "bazzite-checkout" not in err
+    assert "other-mac" not in err
     assert world.slots() == {}  # nothing references the path; its ports are closed
 
 
@@ -755,6 +762,7 @@ def test_remote_stacks_that_are_not_this_machines_orphans_are_never_removed(
     [
         ("unreachable", "ssh: connect to host bazzite port 22: Operation timed out"),
         ("docker-host-unset", "PINPOINT_REMOTE_DOCKER_HOST is unset"),
+        ("backend-unreadable", "PINPOINT_REMOTE_DOCKER_HOST is unset"),
     ],
 )
 def test_an_unreadable_remote_is_unknown_and_holds_slots(
@@ -768,9 +776,12 @@ def test_an_unreadable_remote_is_unknown_and_holds_slots(
         world.mp.setenv("PINPOINT_REMOTE_DOCKER_HOST", REMOTE)
         world.add_stack("pinpoint-dead", workdir=gone, host=REMOTE)
         world.fail("volume ls", 255, reason, host=REMOTE)
-    else:  # a live worktree's .env.local proves the remote backend is in use
+    elif setup == "docker-host-unset":  # a live worktree's .env.local says remote
         live = world.add_worktree("feat/remote", age_hours=1)
         (live / ".env.local").write_text("PINPOINT_SUPABASE_BACKEND=remote\n")
+    else:  # an unreadable .env.local might say remote, so it can't count as local
+        live = world.add_worktree("feat/unreadable", age_hours=1)
+        (live / ".env.local").mkdir()
 
     code, _, err = world.run("--quiet")
 
