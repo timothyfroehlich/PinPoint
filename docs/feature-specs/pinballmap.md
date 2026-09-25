@@ -178,6 +178,7 @@ Replacing the tracked location is a rare, near-never operation — PinPoint trac
 | 7.5 explicit Convert to issue | No comment import or conversion action exists | PP-o355.4; shared-comment identity PP-o355.54.14 |
 | 10.9 comment re-marking on location change | No comment import exists | PP-o355.4 (import); permanent mark-on-location-change after |
 | 3.6 additional outbound actions | Client methods exist, but no app actions expose condition-comment posting, venue-lineup confirmation, or Insider Connected changes | PP-o355.57 (condition comment, decision PP-o355.54.13), PP-o355.58 (confirm lineup, decision PP-o355.54.10), PP-o355.59 (Insider Connected, decision PP-o355.54.11) |
+| 4.1 fixed height in every state | At phone widths the out-of-sync status row wraps the push button below the status sentence, so that row is taller than in an in-sync state | PP-o355.62 (decision: amend 4.1 to allow the phone-width wrap, or redesign the push placement) |
 
 ---
 
