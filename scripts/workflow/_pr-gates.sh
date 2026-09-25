@@ -49,7 +49,8 @@ _repo_slug() {
 # ---------------------------------------------------------------------------------
 #
 # Fields per record: sha, reviewer, detail, at, summary. `sha` is "" when GitHub
-# returned a null commit_id, never absent, so every consumer can compare it.
+# returned a null commit_id, never absent, so every consumer can compare it. Native
+# reviews also carry body_empty: true when the review body is blank or whitespace.
 #
 # Lists (each sorted by `at`):
 #   coderabbit      native reviews from the exact CodeRabbit App account
@@ -85,7 +86,8 @@ _review_evidence() {
             reviewer: (.user.login // ""),
             detail: (.state // "UNKNOWN"),
             at: (.submitted_at // ""),
-            summary: (((.body? // "") | tostring | split("\n")[0] // "") | gsub("^\\s+|\\s+$"; "")) }
+            summary: (((.body? // "") | tostring | split("\n")[0] // "") | gsub("^\\s+|\\s+$"; "")),
+            body_empty: (((.body? // "") | tostring | test("\\S")) | not) }
       ] | sort_by(.at);
     {
       head: $head,
@@ -155,11 +157,15 @@ readonly _JQ_LATEST='
 
 # CodeRabbit: only a native APPROVED pinned to head covers. CHANGES_REQUESTED on head
 # is "changes requested" (it re-approves on its own once the threads resolve). Any
-# other exact-head state is nothing; anything off-head is stale.
+# other exact-head state is nothing; anything off-head is stale. An empty-body
+# COMMENTED review is skipped: GitHub creates one to hold CodeRabbit's reply inside
+# an existing thread, and it must not hide an earlier verdict on the same head (PR
+# #2192). A new finding in it opens a thread, which the thread gate blocks on. A
+# COMMENTED review with a body still decides, and yields nothing.
 _coderabbit_check() {
   jq -c "$_JQ_LATEST"'
     .head as $head
-    | latest(.coderabbit; $head) as $r
+    | latest([ .coderabbit[] | select((.detail == "COMMENTED" and .body_empty) | not) ]; $head) as $r
     | if $r == null then empty_verdict("coderabbit")
       elif $r.sha == $head and $r.detail == "APPROVED" then $r + { checker: "coderabbit", verdict: "covers", form: "approval" }
       elif $r.sha == $head and $r.detail == "CHANGES_REQUESTED" then $r + { checker: "coderabbit", verdict: "changes_requested", form: "" }
