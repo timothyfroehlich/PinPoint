@@ -41,9 +41,13 @@ from dataclasses import dataclass
 from pathlib import Path
 
 # Reuse the project-id resolution from worktree_setup so cleanup targets the
-# same container/volume names that setup created. (Python auto-adds this
-# script's directory to sys.path when invoked as `python3 worktree_cleanup.py`.)
-from worktree_setup import branch_to_project_id, read_pinned_project_id  # noqa: E402
+# same container/volume names that setup created: the pinned id in the
+# worktree's config.toml wins, and only a worktree without one falls back to
+# the branch (or, when detached, the path). Deriving from the branch alone
+# would target a label no volume carries after a branch rename (PP-rbbp).
+# (Python auto-adds this script's directory to sys.path when invoked as
+# `python3 worktree_cleanup.py`.)
+from worktree_setup import resolve_project_id  # noqa: E402
 
 MANIFEST_PATH = Path.home() / ".config" / "pinpoint" / "worktree-slots.json"
 
@@ -72,44 +76,6 @@ EXIT_STALE_TARGET = 3
 #: — the same name with a different value, deliberately. In that script 1 is free;
 #: here it already means "failed", and callers distinguish these codes per script.
 EXIT_DOCKER_UNKNOWN = 4
-
-
-def resolve_project_id(worktree_path: Path, branch: str) -> str:
-    """Pick the Supabase project id whose containers and volumes to tear down.
-
-    A pinned id recorded in the worktree's `supabase/config.toml` always wins.
-    That file is what the Supabase CLI itself reads, so it is the authoritative
-    record of the id the stack was started under — and since PP-4936 it survives
-    a `git checkout -b` inside a live worktree instead of following the branch.
-    Deriving from the branch here would then target a label no volume carries,
-    the `docker volume ls --filter` query would return an honest-looking zero,
-    and the volumes would leak (PP-rbbp).
-
-    Falls back to `branch_to_project_id(branch)` only when there is no usable
-    pinned id — a worktree set up before PP-4936, or a config.toml that is
-    missing, unreadable, or carries an id outside the shape setup generates.
-    Same precedence as `worktree_orphan_sweep.get_active_project_ids()`.
-
-    This deliberately does not call `worktree_setup.resolve_project_id`, whose
-    precedence is identical: its divergence message is written for the setup
-    path ("keeping pinned … renaming it would orphan this worktree's running
-    stack"), which is the wrong story to tell during a teardown. Two callers is
-    below the Rule of Three; if a third appears, hoist the shared body and pass
-    the message in.
-    """
-    derived = branch_to_project_id(branch)
-    pinned = read_pinned_project_id(worktree_path)
-    if pinned is None:
-        return derived
-    if pinned != derived:
-        print(
-            f"Note: tearing down pinned Supabase project_id '{pinned}' from "
-            f"{worktree_path / 'supabase' / 'config.toml'} — branch '{branch}' "
-            f"would derive '{derived}', but the running stack and its volumes "
-            "are labelled with the pinned id.",
-            file=sys.stderr,
-        )
-    return pinned
 
 
 def deallocate_slot(worktree_path: str) -> None:

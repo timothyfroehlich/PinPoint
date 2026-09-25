@@ -17,7 +17,7 @@ This script reconciles three sources of truth:
 - active git worktrees (`git worktree list --porcelain`)
 - slot manifest entries (`~/.config/pinpoint/worktree-slots.json`)
 - Docker resources with the `com.supabase.cli.project` label whose value
-  starts with `pinpoint-` (the prefix `branch_to_project_id` always emits)
+  starts with `pinpoint-` (the prefix `derive_project_id` always emits)
 
 Defaults to dry-run; pass `--apply` to actually deallocate orphan slots and
 remove orphan Docker containers/volumes.
@@ -57,7 +57,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from worktree_cleanup import MANIFEST_PATH, deallocate_slot  # noqa: E402
-from worktree_setup import branch_to_project_id  # noqa: E402
+from worktree_setup import derive_project_id  # noqa: E402
 
 _PROJECT_ID_LINE_RE = re.compile(r'^project_id\s*=\s*"([^"]+)"')
 
@@ -127,11 +127,9 @@ def get_active_project_ids(worktrees: dict[str, str]) -> set[str]:
     Reads `<worktree>/supabase/config.toml` directly when present — that file
     is the authoritative source for the project_id that Supabase containers
     actually use, and it works for detached worktrees and for worktrees whose
-    branch was renamed after setup. Falls back to `branch_to_project_id(branch)`
-    only when the config.toml is missing and the worktree is on a named branch.
-
-    Worktrees we can't resolve (detached + missing config.toml) are intentionally
-    skipped so the caller never deletes a Docker project we don't recognize.
+    branch was renamed after setup. When the config.toml is missing, falls back
+    to the id setup would derive: from the branch, or from the path when the
+    worktree is detached (`derive_project_id`).
     """
     project_ids: set[str] = set()
     for path_str, branch in worktrees.items():
@@ -145,8 +143,8 @@ def get_active_project_ids(worktrees: dict[str, str]) -> set[str]:
                         break
             except OSError:
                 pass
-        elif branch:
-            project_ids.add(branch_to_project_id(branch))
+        else:
+            project_ids.add(derive_project_id(Path(path_str), branch or "HEAD"))
     return project_ids
 
 

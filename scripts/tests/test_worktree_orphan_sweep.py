@@ -74,6 +74,29 @@ def test_git_inventory_failure_aborts_instead_of_reporting_no_worktrees(
     assert "not a git repository" in str(exc.value.code)
 
 
+def test_active_ids_use_setups_derivation_when_config_is_missing(
+    tmp_path: Path,
+) -> None:
+    """A detached worktree (branch "") protects its path-derived id, not none."""
+    named = tmp_path / "named"
+    detached = tmp_path / "detached"
+    pinned = tmp_path / "pinned"
+    for path in (named, detached, pinned):
+        path.mkdir()
+    (pinned / "supabase").mkdir()
+    (pinned / "supabase" / "config.toml").write_text('project_id = "pinpoint-old"\n')
+
+    active = sweep.get_active_project_ids(
+        {str(named): "feat/x", str(detached): "", str(pinned): ""}
+    )
+
+    assert active == {
+        "pinpoint-feat-x",
+        sweep.derive_project_id(detached, "HEAD"),
+        "pinpoint-old",
+    }
+
+
 def _kind(args: list[str]) -> str:
     """Classify a docker argv so the stub can answer per-subcommand."""
     if not args or args[0] != "docker":

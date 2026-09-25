@@ -33,6 +33,7 @@ from worktree_setup import (
     branch_to_project_id,
     classify_install_failure,
     collect_runtime_diagnostics,
+    derive_project_id,
     generate_config_toml,
     generate_launch_json,
     install_dependencies,
@@ -881,6 +882,53 @@ class TestPinnedProjectId:
 
         assert first.project_id == "pinpoint-worktree-agent-abc"
         assert resolve_project_id(tmp_path, "feat/renamed") == first.project_id
+
+
+class TestDetachedProjectId:
+    """A detached HEAD reports branch "HEAD"; its id must come from the path."""
+
+    def test_detached_worktrees_at_different_paths_get_different_ids(
+        self, tmp_path: Path
+    ) -> None:
+        # Codex worktrees all end in /PinPoint, so the basename is not enough.
+        first = tmp_path / "codex" / "1a2b" / "PinPoint"
+        second = tmp_path / "codex" / "3c4d" / "PinPoint"
+        first.mkdir(parents=True)
+        second.mkdir(parents=True)
+
+        first_id = resolve_project_id(first, "HEAD")
+        second_id = resolve_project_id(second, "HEAD")
+
+        assert first_id != second_id
+        for project_id in (first_id, second_id):
+            assert re.fullmatch(r"pinpoint-pinpoint-[0-9a-f]{8}", project_id)
+            # Setup must be able to pin what it derives.
+            config = tmp_path / "pin" / "supabase" / "config.toml"
+            config.parent.mkdir(parents=True, exist_ok=True)
+            config.write_text(f'project_id = "{project_id}"\n')
+            assert read_pinned_project_id(tmp_path / "pin") == project_id
+
+    def test_long_basename_stays_within_the_id_cap(self, tmp_path: Path) -> None:
+        worktree = tmp_path / ("Very_Long.Worktree-Name-" * 3)
+        worktree.mkdir()
+
+        project_id = derive_project_id(worktree, "HEAD")
+
+        assert len(project_id) <= 40
+        assert re.fullmatch(r"pinpoint-[a-z0-9-]{1,20}-[0-9a-f]{8}", project_id)
+
+    def test_named_branches_still_derive_from_the_branch(self, tmp_path: Path) -> None:
+        assert resolve_project_id(tmp_path, "feat/thing") == branch_to_project_id(
+            "feat/thing"
+        )
+
+    def test_existing_pinned_id_still_wins_when_detached(self, tmp_path: Path) -> None:
+        # A stack started before this rule keeps running under its old id.
+        config = tmp_path / "supabase" / "config.toml"
+        config.parent.mkdir()
+        config.write_text('project_id = "pinpoint-head"\n')
+
+        assert resolve_project_id(tmp_path, "HEAD") == "pinpoint-head"
 
 
 class TestRuntimeDiagnostics:

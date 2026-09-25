@@ -306,6 +306,23 @@ def branch_to_project_id(branch_name: str) -> str:
     return f"{readable}-{digest}"
 
 
+def derive_project_id(worktree_path: Path, branch: str) -> str:
+    """The project id a worktree gets when config.toml has none pinned yet.
+
+    Named branches use branch_to_project_id. A detached HEAD reports its branch
+    as "HEAD", which would give every detached worktree the same stack, so it
+    uses the worktree path instead: up to 20 characters of the directory name
+    plus a hash of the full path (Codex worktrees all end in /PinPoint).
+    """
+    if branch != "HEAD":
+        return branch_to_project_id(branch)
+    path = str(worktree_path.resolve())
+    name = re.sub(r"-+", "-", re.sub(r"[^a-z0-9-]", "-", worktree_path.name.lower()))
+    name = name.strip("-")[:20].rstrip("-")
+    digest = hashlib.sha256(path.encode("utf-8")).hexdigest()[:HASH_SUFFIX_LEN]
+    return f"pinpoint-{name}-{digest}" if name else f"pinpoint-{digest}"
+
+
 # A worktree's project id is pinned on first setup and reused from then on,
 # rather than re-derived from the branch on every checkout. Supabase names its
 # containers and labels its volumes after the project id, so re-deriving it
@@ -316,7 +333,7 @@ def branch_to_project_id(branch_name: str) -> str:
 # the new id leaves the old ones behind. (PP-4936.)
 _PINNED_PROJECT_ID_RE = re.compile(r'^project_id\s*=\s*"([^"]+)"', re.MULTILINE)
 
-# A pinned id is only honored when it has the shape branch_to_project_id emits.
+# A pinned id is only honored when it has the shape derive_project_id emits.
 # worktree_orphan_sweep.py identifies PinPoint-owned Supabase resources by the
 # "pinpoint-" prefix, so honoring a hand-written id outside that shape would
 # make the worktree's containers invisible to the sweep. This also rejects the
@@ -358,19 +375,21 @@ def read_pinned_project_id(worktree_path: Path) -> str | None:
 def resolve_project_id(worktree_path: Path, branch: str) -> str:
     """Pick the Supabase project id for a worktree — a pinned id always wins.
 
-    Falls back to deriving one from the branch name for a fresh worktree (or a
-    config.toml we can't read an id out of). Logs when the two disagree, since
-    that means the branch was renamed after the worktree was set up.
+    Falls back to derive_project_id for a fresh worktree (or a config.toml we
+    can't read an id out of). Logs when the two disagree, since that means the
+    branch was renamed after the worktree was set up. Setup and cleanup both
+    call this, so teardown targets the same containers and volumes setup named.
     """
-    derived = branch_to_project_id(branch)
+    derived = derive_project_id(worktree_path, branch)
     pinned = read_pinned_project_id(worktree_path)
     if pinned is None:
         return derived
     if pinned != derived:
         print(
-            f"worktree_setup: keeping pinned Supabase project_id '{pinned}' "
-            f"(branch '{branch}' would derive '{derived}') — renaming it would "
-            "orphan this worktree's running stack",
+            f"Note: using the pinned Supabase project_id '{pinned}' from "
+            f"{worktree_path / 'supabase' / 'config.toml'} — branch '{branch}' "
+            f"would derive '{derived}', but the stack's containers and volumes "
+            "carry the pinned id.",
             file=sys.stderr,
         )
     return pinned
