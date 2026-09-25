@@ -94,6 +94,12 @@ const nextConfig: NextConfig = {
     // It checks `typescript.tsconfigPath` (tsconfig.app.json) and reports raw
     // tsc diagnostics rather than Next code frames.
     useTypeScriptCli: true,
+    // PP-shac: build cold. Vercel restores `.next/cache` between builds, and
+    // Turbopack's build cache (on by default since 16.3) kept serving the
+    // worker-thread loader chunk after builds switched to child processes,
+    // failing with "Cannot read properties of null (reading 'hasOwnProperty')".
+    // The dev cache (.next/dev/cache) is separate and stays on.
+    turbopackFileSystemCacheForBuild: false,
   },
   typescript: {
     // App-source project. The root tsconfig.json is references-only after the
