@@ -98,7 +98,9 @@ const nextConfig: NextConfig = {
     // Turbopack's build cache (on by default since 16.3) kept serving the
     // worker-thread loader chunk after builds switched to child processes,
     // failing with "Cannot read properties of null (reading 'hasOwnProperty')".
-    // The dev cache (.next/dev/cache) is separate and stays on.
+    // The dev cache (.next/dev/cache) is separate and stays on. While this is
+    // off, Vercel keeps restoring and re-saving the stale cache untouched, so
+    // re-enabling it needs one production redeploy without the build cache.
     turbopackFileSystemCacheForBuild: false,
   },
   typescript: {
@@ -176,7 +178,7 @@ const nextConfig: NextConfig = {
 // pool intermittently hands a task to the wrong transform: PostCSS gets MDX or
 // TypeScript ("CssSyntaxError" on a non-CSS file), or a webpack-loader worker
 // gets a PostCSS task ("Cannot read properties of undefined (reading 'map')").
-// Builds keep Next's defaults, which is how they built before PP-zg3q.
+// Builds use Next's defaults for both, as they did before PP-zg3q.
 const devServerExperimental: NextConfig["experimental"] = {
   turbopackMemoryEviction: "full",
   turbopackPluginRuntimeStrategy: "workerThreads",
