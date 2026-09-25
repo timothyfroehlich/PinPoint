@@ -147,7 +147,7 @@ pnpm run dev          # start dev server
 pnpm run check        # static gate: typecheck + lint + format (no tests, no Python)
 pnpm run test         # unit tests (PGlite)
 pnpm run test:integration           # PGlite integration tests
-pnpm run test:integration:supabase  # Supabase-backed integration tests (needs supabase start)
+pnpm run test:integration:supabase  # Supabase-backed integration tests (needs pnpm supabase:start)
 pnpm run check:python # ruff + pytest over scripts/ and the hooks
 pnpm run smoke        # Playwright smoke E2E tests
 pnpm run preflight    # full local CI gate before pushing

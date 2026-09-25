@@ -123,7 +123,8 @@ export class SMTPTransport implements EmailTransport {
   private transporter: Mail;
 
   constructor(config?: { host?: string; port?: number }) {
-    const host = config?.host ?? "127.0.0.1";
+    // MAILPIT_HOST names a Mailpit on another machine (remote Supabase stack).
+    const host = config?.host ?? process.env["MAILPIT_HOST"] ?? "127.0.0.1";
     const port = config?.port ?? 1025; // Mailpit SMTP default port
 
     this.transporter = nodemailer.createTransport({

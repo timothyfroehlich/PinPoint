@@ -9,7 +9,7 @@
  * cannot succeed while any reference remains).
  *
  * This MUST run against real Postgres: PGlite does not execute triggers, so
- * this lives in the supabase suite (requires `supabase start`). Setup/asserts
+ * this lives in the supabase suite (requires `pnpm supabase:start`). Setup/asserts
  * use a raw `postgres` connection; signup goes through the admin auth API,
  * which inserts into `auth.users` and fires the trigger synchronously.
  */
@@ -22,6 +22,7 @@ import {
   resolvePerson,
   type PersonResolverInput,
 } from "~/lib/timeline/resolve-person";
+import { expectLocalSupabaseUrl } from "~/test/helpers/supabase";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -46,7 +47,7 @@ let newUserId: string | undefined;
 
 describe("invited→real timeline conversion (PP-tv9l)", () => {
   beforeAll(async () => {
-    expect(supabaseUrl).toMatch(/127\.0\.0\.1|localhost/);
+    expectLocalSupabaseUrl(supabaseUrl);
 
     const [invited] = await sql`
       INSERT INTO invited_users (email, first_name, last_name, role)

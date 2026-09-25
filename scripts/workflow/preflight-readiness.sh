@@ -77,7 +77,7 @@ NEXT_PUBLIC_SUPABASE_URL="$dotenv_supabase_url"
 supabase_service_role_key="$dotenv_service_role_key"
 
 database_url="$POSTGRES_URL"
-remediation="supabase start && pnpm run db:migrate"
+remediation="pnpm supabase:start && pnpm run db:migrate"
 stack_overridden=false
 if [[ "$postgres_url_was_defined" == true \
   || "$non_pooling_url_was_defined" == true \
@@ -133,9 +133,18 @@ database_connection="${database_connection#*@}"
 database_target="${database_connection%%/*}"
 database_target="${database_target%%\?*}"
 
-if [[ ! "$database_target" =~ ^localhost:[0-9]+$ ]]; then
+# A worktree database is on localhost, or on a remote dev-stack host listed in
+# PINPOINT_DEV_DB_HOSTS (docs/runbooks/remote-supabase.md).
+database_host="${database_target%:*}"
+dev_stack_host=false
+dev_db_hosts=",${PINPOINT_DEV_DB_HOSTS:-},"
+if [[ -n "$database_host" && "${dev_db_hosts// /}" == *",${database_host},"* ]]; then
+  dev_stack_host=true
+fi
+if [[ ! "$database_target" =~ ^[A-Za-z0-9.-]+:[0-9]+$ ]] ||
+  [[ "$database_host" != localhost && "$dev_stack_host" != true ]]; then
   printf '%s\n' \
-    "FAIL: preflight readiness — POSTGRES_URL is not a localhost worktree database" \
+    "FAIL: preflight readiness — POSTGRES_URL is not a localhost or dev-stack worktree database" \
     "Run: python3 scripts/worktree_setup.py" >&2
   exit 1
 fi
@@ -156,7 +165,8 @@ if [[ "$database_connection" != */* || "$database_name" != "postgres" ]]; then
 fi
 
 database_port="${database_target##*:}"
-if [[ ! "$NEXT_PUBLIC_SUPABASE_URL" =~ ^http://localhost:([0-9]+)$ ]]; then
+if [[ "$NEXT_PUBLIC_SUPABASE_URL" != "http://${database_host}:"* ]] ||
+  [[ ! "$NEXT_PUBLIC_SUPABASE_URL" =~ ^http://[A-Za-z0-9.-]+:([0-9]+)$ ]]; then
   if [[ "$stack_overridden" == true ]]; then
     printf '%s\n' \
       "FAIL: preflight readiness — local stack overrides do not identify one worktree stack" \
@@ -169,7 +179,7 @@ if [[ ! "$NEXT_PUBLIC_SUPABASE_URL" =~ ^http://localhost:([0-9]+)$ ]]; then
   exit 1
 fi
 supabase_port="${BASH_REMATCH[1]}"
-supabase_target="localhost:${supabase_port}"
+supabase_target="${database_host}:${supabase_port}"
 if (( 10#$database_port != 10#$supabase_port + 1 )); then
   if [[ "$stack_overridden" == true ]]; then
     printf '%s\n' \
@@ -192,7 +202,7 @@ if [[ "$stack_overridden" == true ]]; then
 fi
 
 if ! command -v pg_isready >/dev/null 2>&1 \
-  || ! pg_isready -d "$database_url" -t 1 >/dev/null 2>&1; then
+  || ! pg_isready -d "$database_url" -t 15 >/dev/null 2>&1; then
   printf '%s\n' \
     "FAIL: preflight readiness — Postgres is unavailable at ${database_target}" \
     "Run: ${availability_remediation}" >&2
@@ -200,7 +210,7 @@ if ! command -v pg_isready >/dev/null 2>&1 \
 fi
 
 if ! command -v curl >/dev/null 2>&1 \
-  || ! curl -fsS --max-time 2 \
+  || ! curl -fsS --max-time 10 \
     "${NEXT_PUBLIC_SUPABASE_URL}/auth/v1/health" >/dev/null 2>&1; then
   printf '%s\n' \
     "FAIL: preflight readiness — Supabase Auth is unavailable at ${supabase_target}" \
@@ -213,7 +223,7 @@ if [[ "$stack_overridden" == true ]]; then
   credential_remediation="load the service-role key for the stack that owns ${database_target}"
 fi
 if [[ -z "$supabase_service_role_key" ]] \
-  || ! curl -fsS --max-time 2 \
+  || ! curl -fsS --max-time 10 \
     -H "apikey: ${supabase_service_role_key}" \
     -H "Authorization: Bearer ${supabase_service_role_key}" \
     "${NEXT_PUBLIC_SUPABASE_URL}/auth/v1/admin/users?page=1&per_page=1" \

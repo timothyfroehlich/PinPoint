@@ -13,7 +13,7 @@
  * (which the demo is the only source of in seed data).
  *
  * NEVER run on prod. The script refuses to run unless POSTGRES_URL points
- * at a localhost/127.0.0.1 host.
+ * at a local dev-stack host (see scripts/assert-local-db.mjs).
  */
 
 import {
