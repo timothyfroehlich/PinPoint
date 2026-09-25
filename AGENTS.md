@@ -155,7 +155,7 @@ Never resolve `drizzle/meta` conflicts manually — the folder holds binary-like
 
 ### Getting a PR reviewed
 
-**The reviewer is a local Claude Code `/code-review` run by the owning agent.** Open every agent-created PR as a GitHub draft. After current-head `CI Gate` succeeds, run `/code-review` at the level `bash scripts/workflow/claude-review-level.sh` prints (`ask` means ask Tim first), fix or decline every finding, and re-review each new head until a round raises nothing new. Then `bash scripts/workflow/record-claude-review.sh <PR> --level <level> --findings <file>` posts the SHA-pinned review record the merge gate counts and promotes the draft. Any push other than a clean merge of `main` needs a new round and a new record. Spec: `docs/feature-specs/pr-lifecycle-monitoring.md` §8.
+**The reviewer is a local Claude Code `/code-review` run by the owning agent.** Open every agent-created PR as a GitHub draft. After current-head `CI Gate` succeeds, run `/code-review <level> <PR>` at the level `bash scripts/workflow/claude-review-level.sh` prints (`ask` means ask Tim first; level before PR number, and never omit the PR number, or the review diffs against a possibly stale local `main`), fix or decline every finding, and re-review each new head until a round raises nothing new. Then `bash scripts/workflow/record-claude-review.sh <PR> --level <level> --findings <file>` posts the SHA-pinned review record the merge gate counts and promotes the draft. Any push other than a clean merge of `main` needs a new round and a new record. Spec: `docs/feature-specs/pr-lifecycle-monitoring.md` §8.
 
 Request and state-transition rules: `pinpoint-pr-workflow` skill Phase 3.
 
