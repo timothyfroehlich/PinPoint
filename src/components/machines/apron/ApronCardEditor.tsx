@@ -37,6 +37,7 @@ import {
   type ApronCardContent,
   type ApronCardSize,
 } from "~/lib/machines/apron-card";
+import { formatCreditNames } from "~/lib/opdb/credits";
 import { cn } from "~/lib/utils";
 import { saveApronCardAction } from "~/app/(app)/m/[initials]/apron/actions";
 import { ApronCardExportMenu } from "./ApronCardExportMenu";
@@ -49,12 +50,14 @@ export interface ApronCardDraft {
   customDescription: string;
   tip: string;
   tipEnabled: boolean;
+  designEnabled: boolean;
+  artEnabled: boolean;
 }
 
-/** Identity lines the editor never changes (spec §2.1). */
+/** Identity lines and credits the editor never changes (spec §2.1, §10). */
 export type ApronCardIdentity = Pick<
   ApronCardContent,
-  "name" | "edition" | "manufacturer" | "year" | "ownerName"
+  "name" | "edition" | "manufacturer" | "year" | "ownerName" | "credits"
 >;
 
 export function draftContent(
@@ -69,6 +72,8 @@ export function draftContent(
       : mainDescription,
     tip: draft.tip,
     tipEnabled: draft.tipEnabled,
+    designEnabled: draft.designEnabled,
+    artEnabled: draft.artEnabled,
   };
 }
 
@@ -78,7 +83,9 @@ function sameDraft(a: ApronCardDraft, b: ApronCardDraft): boolean {
     a.useCustomDescription === b.useCustomDescription &&
     a.customDescription === b.customDescription &&
     a.tip === b.tip &&
-    a.tipEnabled === b.tipEnabled
+    a.tipEnabled === b.tipEnabled &&
+    a.designEnabled === b.designEnabled &&
+    a.artEnabled === b.artEnabled
   );
 }
 
@@ -108,7 +115,7 @@ export function ApronCardEditor({
   const isMobile = useIsMobile();
   const title = `Apron card · ${props.identity.name}`;
   const description =
-    "Size, description, and tip for this machine's printed card.";
+    "Size, description, tip, and credits for this machine's printed card.";
 
   if (isMobile) {
     return (
@@ -227,6 +234,8 @@ function EditorBody({
         description: draft.customDescription,
         tip: draft.tip,
         tipEnabled: draft.tipEnabled,
+        designEnabled: draft.designEnabled,
+        artEnabled: draft.artEnabled,
       });
       if (!result.ok) {
         toast.error(result.message);
@@ -378,6 +387,28 @@ function EditorBody({
               rows={2}
             />
           </div>
+
+          <fieldset className="flex flex-col gap-2.5">
+            <legend className="mb-2 text-sm font-medium">Credits</legend>
+            <CreditCheckbox
+              id={`${id}-design-enabled`}
+              label="Design"
+              names={identity.credits.design}
+              checked={draft.designEnabled}
+              onCheckedChange={(checked) => {
+                update({ designEnabled: checked });
+              }}
+            />
+            <CreditCheckbox
+              id={`${id}-art-enabled`}
+              label="Art"
+              names={identity.credits.art}
+              checked={draft.artEnabled}
+              onCheckedChange={(checked) => {
+                update({ artEnabled: checked });
+              }}
+            />
+          </fieldset>
         </div>
       </div>
 
@@ -412,6 +443,40 @@ function EditorBody({
         </Button>
       </div>
     </>
+  );
+}
+
+/** One credit role's display setting, with the names it would print. */
+function CreditCheckbox({
+  id,
+  label,
+  names,
+  checked,
+  onCheckedChange,
+}: {
+  id: string;
+  label: string;
+  names: string[];
+  checked: boolean;
+  onCheckedChange: (checked: boolean) => void;
+}): React.JSX.Element {
+  return (
+    <div className="flex items-start gap-2.5">
+      <Checkbox
+        id={id}
+        checked={checked}
+        onCheckedChange={(value) => {
+          onCheckedChange(value === true);
+        }}
+        className="mt-0.5"
+      />
+      <Label htmlFor={id} className="flex-wrap gap-x-1.5 leading-snug">
+        {label}
+        <span className="font-normal text-muted-foreground">
+          {formatCreditNames(names) ?? "Unknown"}
+        </span>
+      </Label>
+    </div>
   );
 }
 
