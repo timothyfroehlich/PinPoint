@@ -603,6 +603,13 @@
       "when": 1790310603203,
       "tag": "0085_drop-legacy-integration-enable-columns",
       "breakpoints": true
+    },
+    {
+      "idx": 86,
+      "version": "7",
+      "when": 1790313568472,
+      "tag": "0086_pinballmap-comment-import",
+      "breakpoints": true
     }
   ]
 }

@@ -28,6 +28,7 @@ import {
 } from "~/lib/machines/presence";
 import { type ProseMirrorDoc } from "~/lib/tiptap/types";
 import { recordAbandonedListing } from "~/lib/pinballmap/abandoned-listings";
+import { importPinballMapCommentsAfterCoverageChange } from "~/lib/pinballmap/comment-import";
 import { createMachineTimelineEvent } from "~/lib/timeline/machine-events";
 import {
   resolvePbmLinkColumnsForUpdate,
@@ -1053,6 +1054,12 @@ export async function updateMachinePbmLink({
         };
       }
       continue;
+    }
+
+    // A cabinet that is On after this change covers its entry and is owed its
+    // comments (spec 7.1) — whether it just turned On or was re-matched.
+    if (outcome.columns.pinballmapIntent === "on") {
+      await importPinballMapCommentsAfterCoverageChange();
     }
 
     return {
