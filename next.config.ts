@@ -1,6 +1,7 @@
 import { withSentryConfig } from "@sentry/nextjs";
 import createMDX from "@next/mdx";
 import type { NextConfig } from "next";
+import { PHASE_DEVELOPMENT_SERVER } from "next/constants";
 
 // Central registry of production-required env vars (CORE-SEC-009). Fails the
 // Vercel build (rather than deploy and 500 / silently degrade at runtime) when
@@ -93,18 +94,6 @@ const nextConfig: NextConfig = {
     // It checks `typescript.tsconfigPath` (tsconfig.app.json) and reports raw
     // tsc diagnostics rather than Next code frames.
     useTypeScriptCli: true,
-    // PP-zg3q: Turbopack dev-server memory mitigations.
-    // Evict cached ASTs/snapshots aggressively after compilation to bound RSS in dev.
-    turbopackMemoryEviction: "full",
-    // Run loader transforms in worker threads rather than a child-process pool
-    // to save dev-server memory. Dev only (PP-shac): in `next build` the worker
-    // pool intermittently hands a PostCSS task to a webpack-loader (MDX)
-    // worker, which fails the build with "Cannot read properties of undefined
-    // (reading 'map')" on a CSS file. Builds keep Next's default child-process
-    // pool. `next` sets NODE_ENV per command before it loads this file.
-    ...(process.env.NODE_ENV === "development"
-      ? { turbopackPluginRuntimeStrategy: "workerThreads" as const }
-      : {}),
   },
   typescript: {
     // App-source project. The root tsconfig.json is references-only after the
@@ -175,27 +164,52 @@ const nextConfig: NextConfig = {
   },
 };
 
+// PP-zg3q: Turbopack memory mitigations for `next dev` only (PP-shac). Evict
+// cached ASTs/snapshots after each compilation, and run loader transforms in
+// worker threads instead of a child-process pool. In `next build` the worker
+// pool intermittently hands a task to the wrong transform: PostCSS gets MDX or
+// TypeScript ("CssSyntaxError" on a non-CSS file), or a webpack-loader worker
+// gets a PostCSS task ("Cannot read properties of undefined (reading 'map')").
+// Builds keep Next's defaults, which is how they built before PP-zg3q.
+const devServerExperimental: NextConfig["experimental"] = {
+  turbopackMemoryEviction: "full",
+  turbopackPluginRuntimeStrategy: "workerThreads",
+};
+
 const withMDX = createMDX();
 
-export default withSentryConfig(withMDX(nextConfig), {
-  // For all available options, see:
-  // https://www.npmjs.com/package/@sentry/webpack-plugin#options
+export default function config(phase: string) {
+  const phaseConfig: NextConfig =
+    phase === PHASE_DEVELOPMENT_SERVER
+      ? {
+          ...nextConfig,
+          experimental: {
+            ...nextConfig.experimental,
+            ...devServerExperimental,
+          },
+        }
+      : nextConfig;
 
-  org: "pinpoint-nc",
-  project: "pinpoint",
+  return withSentryConfig(withMDX(phaseConfig), {
+    // For all available options, see:
+    // https://www.npmjs.com/package/@sentry/webpack-plugin#options
 
-  // Source maps still upload to Sentry; silent only suppresses verbose CLI output
-  silent: true,
+    org: "pinpoint-nc",
+    project: "pinpoint",
 
-  // Upload a larger set of source maps for prettier stack traces (increases build time)
-  widenClientFileUpload: true,
+    // Source maps still upload to Sentry; silent only suppresses verbose CLI output
+    silent: true,
 
-  // Route browser requests to Sentry through a Next.js rewrite to circumvent ad-blockers.
-  tunnelRoute: "/monitoring",
+    // Upload a larger set of source maps for prettier stack traces (increases build time)
+    widenClientFileUpload: true,
 
-  // Automatically tree-shake Sentry logger statements to reduce bundle size
-  // @ts-ignore - treeshake is a valid but potentially untyped property in some versions
-  treeshake: {
-    removeDebugLogging: true,
-  },
-});
+    // Route browser requests to Sentry through a Next.js rewrite to circumvent ad-blockers.
+    tunnelRoute: "/monitoring",
+
+    // Automatically tree-shake Sentry logger statements to reduce bundle size
+    // @ts-ignore - treeshake is a valid but potentially untyped property in some versions
+    treeshake: {
+      removeDebugLogging: true,
+    },
+  });
+}
