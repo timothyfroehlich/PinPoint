@@ -48,7 +48,7 @@ The control's states (§4) are comparisons across these: _in sync_ means intent 
 
 ## 4. The listing control
 
-- **4.1** The control is two rows under one header, plus an Insider Connected row between them when §3.8 shows the setting, and **renders at the same fixed height in every state** — states swap content, never geometry. An uncataloged machine has no control at all (§4.2).
+- **4.1** The control is two rows under one header, plus an Insider Connected row between them when §3.8 shows the setting, and **renders at the same fixed height in every state** — states swap content, never geometry. The one exception is a narrow screen, where a status row's push action may wrap below its status sentence. An uncataloged machine has no control at all (§4.2).
   - **Intent row**: the tri-state toggle (On the lineup / Off the lineup / Don't sync). Changing it writes only to PinPoint, needs no confirmation, and is instantly reversible.
   - **Insider Connected row**: a switch showing the entry's setting, labelled On, Off, or Not set.
   - **Status row**: the observed lineup fact as a short sentence, with reconciliation actions on the right.
@@ -194,6 +194,7 @@ Changes to this document. Divergence-table rows are working state and are not lo
 | Date | Change |
 | :-- | :-- |
 | 2026-09-25 | §3.8: eligibility now comes from Pinball Map's catalog flag, so an eligible entry with no recorded value shows **Not set**; the setting is a switch in a row between intent and status (§4.1); PinPoint sends the target setting instead of flipping it, replacing the re-read-before-write rule. |
+| 2026-09-25 | Amended 4.1: on a narrow screen the status row's push action may wrap below its sentence, the one allowed height change (PP-o355.62). |
 | 2026-09-25 | Defined per-member Pinball Map account linking (§§8.4–8.6): sign-in exchange only, token stored and password never kept, rejected tokens marked for relink without polling, and an unlinked member's intent left Out of sync as their request. §8.2 now names the person's own linked account. |
 | 2026-09-25 | Detailed §3.6's outbound actions: lineup confirmation from the `/fleet` header (§3.7) and safe Insider Connected changes (§3.8). Deferred condition-comment posting out of full support until requested. |
 | 2026-09-23 | Clarified shared-comment copies and per-cabinet notifications (§§7.6–7.7), and tied conversion to one movable issue per Pinball Map comment (§§7.8–7.9). |
