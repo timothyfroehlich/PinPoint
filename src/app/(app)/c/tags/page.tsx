@@ -3,8 +3,11 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { PageContainer } from "~/components/layout/PageContainer";
 import { PageHeader } from "~/components/layout/PageHeader";
+import { AutomaticBadge } from "~/components/tags/AutomaticBadge";
+import { TagList } from "~/components/tags/TagList";
 import { manufacturerTagHref } from "~/lib/machines/manufacturer";
 import { listManufacturerTags } from "~/lib/tags/manufacturer";
+import { MANUFACTURER_TAG_TYPE } from "~/lib/tags/types";
 
 export const metadata: Metadata = {
   title: "Tags | PinPoint",
@@ -26,28 +29,23 @@ export default async function TagsPage(): Promise<React.JSX.Element> {
           <section aria-labelledby="manufacturer-tags-heading">
             <h2
               id="manufacturer-tags-heading"
-              className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+              className="mb-2 flex items-center gap-2 px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
             >
-              Manufacturer
+              <Link
+                href={MANUFACTURER_TAG_TYPE.href}
+                className="hover:text-foreground"
+              >
+                {MANUFACTURER_TAG_TYPE.label}
+              </Link>
+              {MANUFACTURER_TAG_TYPE.automatic ? <AutomaticBadge /> : null}
             </h2>
-            <ul className="divide-y divide-outline-variant rounded-md border border-outline-variant">
-              {manufacturers.map((tag) => (
-                <li key={tag.slug}>
-                  <Link
-                    href={manufacturerTagHref(tag.slug)}
-                    className="flex items-center justify-between gap-4 px-4 py-3 hover:bg-surface-variant"
-                  >
-                    <span className="font-medium text-foreground">
-                      {tag.name}
-                    </span>
-                    <span className="text-sm text-muted-foreground">
-                      {tag.machines.length}{" "}
-                      {tag.machines.length === 1 ? "machine" : "machines"}
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
+            <TagList
+              tags={manufacturers.map((tag) => ({
+                href: manufacturerTagHref(tag.slug),
+                name: tag.name,
+                machineCount: tag.machines.length,
+              }))}
+            />
           </section>
         )}
       </div>

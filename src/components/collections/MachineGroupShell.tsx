@@ -9,7 +9,7 @@ import { db } from "~/server/db";
 
 interface MachineGroupShellProps {
   title: string;
-  /** Small line above the title, e.g. a tag's type linking to the tag browse. */
+  /** Line above the title, e.g. a tag's breadcrumb. */
   eyebrow?: React.ReactNode;
   machines: CollectionMachine[];
   /** Route prefix the tabs hang off, e.g. `/c/owner/<id>`. */

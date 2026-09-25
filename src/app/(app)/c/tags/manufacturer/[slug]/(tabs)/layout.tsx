@@ -1,8 +1,9 @@
 import type React from "react";
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { MachineGroupShell } from "~/components/collections/MachineGroupShell";
+import { TagTrail } from "~/components/tags/TagTrail";
+import { MANUFACTURER_TAG_TYPE } from "~/lib/tags/types";
 import { manufacturerTagHref } from "~/lib/machines/manufacturer";
 import { getManufacturerTagForLayout } from "../_data";
 
@@ -32,11 +33,7 @@ export default async function ManufacturerTagLayout({
   return (
     <MachineGroupShell
       title={tag.name}
-      eyebrow={
-        <Link href="/c/tags" className="hover:text-foreground">
-          Manufacturer
-        </Link>
-      }
+      eyebrow={<TagTrail type={MANUFACTURER_TAG_TYPE} />}
       machines={tag.machines}
       basePath={manufacturerTagHref(tag.slug)}
     >
