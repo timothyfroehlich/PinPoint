@@ -29,9 +29,9 @@
       "mcp__plugin_github_github__enable_pr_auto_merge"
     ],
     "ask": [
-      "Bash(bash *scripts/workflow/merge-pr.sh *)",
-      "Bash(sh *scripts/workflow/merge-pr.sh *)",
-      "Bash(zsh *scripts/workflow/merge-pr.sh *)",
+      "Bash(bash scripts/workflow/merge-pr.sh *)",
+      "Bash(bash ./scripts/workflow/merge-pr.sh *)",
+      "Bash(bash /*/scripts/workflow/merge-pr.sh *)",
       "Bash(scripts/workflow/merge-pr.sh *)",
       "Bash(./scripts/workflow/merge-pr.sh *)",
       "Bash(/*/scripts/workflow/merge-pr.sh *)",
