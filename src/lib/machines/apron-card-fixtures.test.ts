@@ -96,10 +96,11 @@ describe.each(Object.entries(APRON_CARD_LAYOUTS))(
   "title fit at the %s size",
   (_size, layout) => {
     for (const fixture of APRON_STRESS_FIXTURES) {
-      const test = fixture.knownIssue ? it.fails : it;
-      const suffix = fixture.knownIssue
-        ? ` (known issue ${fixture.knownIssue})`
-        : "";
+      const known = fixture.knownIssues?.find(
+        (issue) => issue.check === "title-width"
+      );
+      const test = known ? it.fails : it;
+      const suffix = known ? ` (known issue ${known.bead})` : "";
 
       test(`${fixture.id}: every word fits the panel at a readable size${suffix}`, () => {
         const title = fixture.content.name.toUpperCase();

@@ -31,6 +31,19 @@ export interface ApronFixtureTextFill {
   words: string;
 }
 
+/** A fit check the visual review runs on every rendered card. */
+export type ApronStressCheck =
+  "title-width" | "title-size" | "panel-height" | "card-text";
+
+/**
+ * A check this fixture is known to fail, tracked by `bead`. Failures of that
+ * check report as known rather than failing; remove the entry with the fix.
+ */
+export interface ApronKnownIssue {
+  check: ApronStressCheck;
+  bead: string;
+}
+
 export interface ApronStressFixture {
   /** Stable id for test names and review-page anchors. */
   id: string;
@@ -42,9 +55,15 @@ export interface ApronStressFixture {
   /** Shown on the card once PP-tv2u lands; the face ignores it until then. */
   credits: ApronFixtureCredits;
   textFill?: ApronFixtureTextFill;
-  /** Bead tracking a known failure this fixture exposes. */
-  knownIssue?: string;
+  knownIssues?: readonly ApronKnownIssue[];
 }
+
+// Spec §6.3's panel-fit title shrink is not built yet (PP-tv2u), so a tall
+// identity panel pushes the APC logo past the card's bottom edge.
+const PANEL_FIT_NOT_BUILT: ApronKnownIssue = {
+  check: "panel-height",
+  bead: "PP-tv2u",
+};
 
 const LONG_OWNER = "Maximiliana Featherstonehaugh-Worthington";
 
@@ -89,6 +108,7 @@ export const APRON_STRESS_FIXTURES: readonly ApronStressFixture[] = [
       design: ["Steve Ritchie", "Dwight Sullivan", "Greg Freres"],
       art: ["Greg Freres"],
     },
+    knownIssues: [PANEL_FIT_NOT_BUILT],
   },
   {
     id: "indiana-jones",
@@ -127,6 +147,7 @@ export const APRON_STRESS_FIXTURES: readonly ApronStressFixture[] = [
         "George Gomez",
       ],
     },
+    knownIssues: [PANEL_FIT_NOT_BUILT],
   },
   {
     id: "star-wars-premium",
@@ -229,7 +250,7 @@ export const APRON_STRESS_FIXTURES: readonly ApronStressFixture[] = [
       design: ["Jon Norris"],
       art: ["Constantino Mitchell", "Brian R. Johnson", "Jeanine Mitchell"],
     },
-    knownIssue: "PP-xeki.1",
+    knownIssues: [{ check: "title-width", bead: "PP-xeki.1" }],
   },
   {
     id: "ali",
