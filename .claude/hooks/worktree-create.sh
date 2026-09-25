@@ -1,21 +1,11 @@
 #!/bin/bash
-# worktree-create.sh — WorktreeCreate hook with flock serialization + retry/backoff
+# worktree-create.sh — WorktreeCreate hook: create the worktree off a freshly
+# fetched origin/main and print its path on stdout (the hook contract).
 #
-# Context (PP-bg45, PP-46z): Concurrent Claude sessions sharing one repo clone race on
-# .git/config.lock when both call `git worktree add` simultaneously. This applies both
-# within a single session (N≥3 parallel Agent(isolation:worktree) calls per
-# anthropics/claude-code#47266) and cross-session (Slingshot's 2026-05-16 16:34/16:46
-# CDT repro: plain `git checkout -b` + push from one session corrupted another session's
-# HEAD; PP-cvh thread 2026-05-16 21:47-21:48).
-#
-# Fix: wrap `git worktree add` with:
-#   1. Exclusive file lock on ~/.config/pinpoint/worktree-add.lock — kernel-level flock(2)
-#      lock, serializes ALL `git worktree add` operations across every Claude session on
-#      this host (not just within-session). Uses lockf(1) on macOS or flock(1) on Linux.
-#   2. Retry + exponential backoff (5 retries, base 200ms) to absorb transient
-#      .git/config.lock contention from non-Claude git processes.
-#      Only lock-contention errors trigger a retry; permanent errors (e.g. "branch already
-#      exists", "path already exists") abort immediately with the error output.
+# No lock or retry: the worktree branches off a commit SHA, and
+# `git worktree add -b <new> <sha>` writes no branch.* config, so parallel
+# dispatches never contend on .git/config.lock. Slot allocation in the
+# post-checkout hook has its own lock (worktree_setup.allocate_slot).
 #
 # Invocation: Claude Code calls this hook as a WorktreeCreate hook. The hook contract is
 #   JSON via stdin (not positional args). Registration in .claude/settings.json:
@@ -42,9 +32,6 @@
 #   }
 #   The hook derives `BRANCH = worktree-${NAME}` to match Claude Code's native
 #   pre-hook naming convention.
-#
-# Platform: macOS uses /usr/bin/lockf (ships with macOS, backed by flock(2)).
-#   Linux uses flock(1) from util-linux. Detected at runtime.
 #
 # TODO (Tim): If you ever want to invoke this script directly (not via the hook),
 #   run: chmod +x .claude/hooks/worktree-create.sh
@@ -101,112 +88,6 @@ fi
 # but mkdir -p is cheap insurance against future name conventions.)
 mkdir -p "$(dirname "$WORKTREE_PATH")"
 
-# --- Lock file: ~/.config/pinpoint/worktree-add.lock ---
-# Shared across all Claude sessions on this host (kernel-level, not advisory-only).
-LOCK_DIR="$HOME/.config/pinpoint"
-LOCK_FILE="$LOCK_DIR/worktree-add.lock"
-mkdir -p "$LOCK_DIR"
-
-# --- Detect platform locking tool ---
-# macOS: lockf(1) — ships with macOS at /usr/bin/lockf, backed by flock(2)
-# Linux: flock(1) — from util-linux (installed by default on every major distro)
-#
-# We fail closed (exit non-zero) when neither is available. The hook's whole
-# purpose is to serialize `git worktree add` across sessions; running without
-# a lock would leave parallel dispatch racy while the docs claim it's safe —
-# the worst-of-both-worlds. A loud failure tells the user to install the tool;
-# silent unsafety would mask the very bug PP-bg45 was filed to fix.
-LOCK_TOOL=""
-if command -v lockf >/dev/null 2>&1; then
-  LOCK_TOOL="macos"
-elif command -v flock >/dev/null 2>&1; then
-  LOCK_TOOL="linux"
-else
-  echo "worktree-create.sh: ERROR — neither lockf nor flock found in PATH." >&2
-  echo "  The WorktreeCreate hook requires one to serialize parallel dispatches." >&2
-  echo "  macOS: /usr/bin/lockf ships with the OS." >&2
-  echo "  Linux: \`apt install util-linux\` or equivalent for your distro." >&2
-  exit 1
-fi
-
-# Exponential backoff: integer milliseconds, using shell arithmetic (no bc dependency).
-ms_to_sleep_args() {
-  local ms=$1
-  local secs=$((ms / 1000))
-  local frac=$(( ms % 1000 ))
-  # Format as "N.NNN" for sleep (POSIX sleep accepts decimal on macOS/GNU)
-  printf '%d.%03d' "$secs" "$frac"
-}
-
-# Error patterns that indicate transient lock contention — retry-worthy.
-is_lock_contention() {
-  local stderr_text=$1
-  echo "$stderr_text" | grep -qE "could not lock config file|lock.*exists|File exists" 2>/dev/null
-}
-
-do_worktree_add() {
-  local max_retries=5
-  local delay_ms=200
-  local attempt
-  local last_stderr=""
-  local branch_existed_before=0
-  local worktree_registered_before=0
-
-  if git -C "$BASE_PATH" rev-parse --verify --quiet "refs/heads/$BRANCH" >/dev/null 2>&1; then
-    branch_existed_before=1
-  fi
-  if git -C "$BASE_PATH" worktree list --porcelain 2>/dev/null | grep -Fx "worktree $WORKTREE_PATH" >/dev/null 2>&1; then
-    worktree_registered_before=1
-  fi
-
-  for attempt in $(seq 1 "$max_retries"); do
-    last_stderr=$(git -C "$BASE_PATH" worktree add "$WORKTREE_PATH" -b "$BRANCH" "$BASE_REF" 2>&1) && {
-      echo "$WORKTREE_PATH"
-      return 0
-    }
-
-    # Only retry on transient lock contention; abort immediately on permanent errors
-    if ! is_lock_contention "$last_stderr"; then
-      echo "worktree-create.sh: permanent error (not retrying):" >&2
-      echo "$last_stderr" >&2
-      case "$last_stderr" in
-        *post-checkout*|*"hook failed"*)
-          if [ "$worktree_registered_before" -eq 0 ] && [ -f "$BASE_PATH/scripts/worktree_cleanup.py" ]; then
-            python3 "$BASE_PATH/scripts/worktree_cleanup.py" "$WORKTREE_PATH" >&2 || true
-          fi
-          if [ "$branch_existed_before" -eq 0 ] && git -C "$BASE_PATH" rev-parse --verify --quiet "refs/heads/$BRANCH" >/dev/null 2>&1; then
-            git -C "$BASE_PATH" branch -D "$BRANCH" >&2 2>/dev/null || true
-          fi
-          ;;
-      esac
-      return 1
-    fi
-
-    if [ "$attempt" -lt "$max_retries" ]; then
-      local sleep_arg
-      sleep_arg=$(ms_to_sleep_args "$delay_ms")
-      echo "worktree-create.sh: attempt $attempt lock contention, retrying in ${delay_ms}ms..." >&2
-      sleep "$sleep_arg"
-      delay_ms=$((delay_ms * 2))
-    fi
-  done
-
-  echo "worktree-create.sh: FAILED to create worktree after $max_retries attempts" >&2
-  echo "  cwd=$BASE_PATH  branch=$BRANCH  target=$WORKTREE_PATH" >&2
-  echo "  Last error: $last_stderr" >&2
-  case "$last_stderr" in
-    *post-checkout*|*"hook failed"*)
-      if [ "$worktree_registered_before" -eq 0 ] && [ -f "$BASE_PATH/scripts/worktree_cleanup.py" ]; then
-        python3 "$BASE_PATH/scripts/worktree_cleanup.py" "$WORKTREE_PATH" >&2 || true
-      fi
-      if [ "$branch_existed_before" -eq 0 ] && git -C "$BASE_PATH" rev-parse --verify --quiet "refs/heads/$BRANCH" >/dev/null 2>&1; then
-        git -C "$BASE_PATH" branch -D "$BRANCH" >&2 2>/dev/null || true
-      fi
-      ;;
-  esac
-  return 1
-}
-
 # --- Resolve the base ref: freshly-fetched origin/main, not the (often stale) root HEAD ---
 # The root checkout ($BASE_PATH) stays on `main` but is never fast-forwarded, so its HEAD
 # routinely trails origin/main by many commits (PP-2cpf, observed 12 behind). Branching a new
@@ -215,34 +96,49 @@ do_worktree_add() {
 # sessions and Agent(isolation:worktree) dispatch come through here, so fixing it at this
 # chokepoint freshens every path.
 #
-# Best-effort: fetch origin/main and branch off the fetched SHA; fall back to HEAD when the
-# fetch fails (offline) so worktree creation never hard-depends on the network. The fetch runs
-# OUTSIDE the flock below so network latency never extends the cross-session lock hold.
-# GIT_HTTP_LOW_SPEED_* bounds a stalled fetch (<1KB/s for 15s aborts) so a flaky network
+# Best-effort: fetch origin/main and branch off the fetched SHA; fall back to HEAD's SHA when
+# the fetch fails (offline) so worktree creation never hard-depends on the network. Always a
+# SHA, never the name HEAD: with branch.autoSetupMerge=always, `-b <new> HEAD` writes tracking
+# config. GIT_HTTP_LOW_SPEED_* bounds a stalled fetch (<1KB/s for 15s aborts) so a flaky network
 # degrades to the HEAD fallback instead of hanging every worktree creation.
-BASE_REF="HEAD"
+BASE_REF=""
 if GIT_HTTP_LOW_SPEED_LIMIT=1000 GIT_HTTP_LOW_SPEED_TIME=15 \
      git -C "$BASE_PATH" fetch --quiet origin main 2>/dev/null; then
-  FETCHED_SHA=$(git -C "$BASE_PATH" rev-parse --verify --quiet FETCH_HEAD 2>/dev/null || true)
-  if [ -n "$FETCHED_SHA" ]; then
-    BASE_REF="$FETCHED_SHA"
-  fi
+  BASE_REF=$(git -C "$BASE_PATH" rev-parse --verify --quiet FETCH_HEAD 2>/dev/null || true)
+fi
+if [ -z "$BASE_REF" ]; then
+  BASE_REF=$(git -C "$BASE_PATH" rev-parse --verify --quiet HEAD 2>/dev/null || echo HEAD)
 fi
 
-export -f do_worktree_add is_lock_contention ms_to_sleep_args
-export BASE_PATH BRANCH WORKTREE_PATH BASE_REF
+# Remember what existed before, so a failed add only rolls back what it created.
+branch_existed_before=0
+worktree_registered_before=0
+if git -C "$BASE_PATH" rev-parse --verify --quiet "refs/heads/$BRANCH" >/dev/null 2>&1; then
+  branch_existed_before=1
+fi
+if git -C "$BASE_PATH" worktree list --porcelain 2>/dev/null | grep -Fx "worktree $WORKTREE_PATH" >/dev/null 2>&1; then
+  worktree_registered_before=1
+fi
 
-# --- Acquire exclusive lock and run worktree add ---
-case "$LOCK_TOOL" in
-  macos)
-    # lockf -k: keep lock file (recommended for concurrency per lockf(1) man page;
-    # prevents delete/recreate races, guarantees lock ordering).
-    # -t 30: wait up to 30s for the lock before giving up.
-    lockf -k -t 30 "$LOCK_FILE" bash -c 'do_worktree_add'
-    ;;
-  linux)
-    # flock -x: exclusive lock; -w 30: wait up to 30s.
-    # --no-fork: run in the same process (avoids a subshell overhead).
-    flock -x -w 30 "$LOCK_FILE" bash -c 'do_worktree_add'
+if add_output=$(git -C "$BASE_PATH" worktree add "$WORKTREE_PATH" -b "$BRANCH" "$BASE_REF" 2>&1); then
+  echo "$WORKTREE_PATH"
+  exit 0
+fi
+
+echo "worktree-create.sh: git worktree add failed:" >&2
+echo "  cwd=$BASE_PATH  branch=$BRANCH  target=$WORKTREE_PATH" >&2
+echo "$add_output" >&2
+# A failed post-checkout hook leaves a registered worktree and a new branch
+# behind; remove both unless they predate this call.
+case "$add_output" in
+  *post-checkout*|*"hook failed"*)
+    if [ "$worktree_registered_before" -eq 0 ] && [ -f "$BASE_PATH/scripts/worktree_cleanup.py" ]; then
+      python3 "$BASE_PATH/scripts/worktree_cleanup.py" "$WORKTREE_PATH" >&2 || true
+    fi
+    if [ "$branch_existed_before" -eq 0 ] && git -C "$BASE_PATH" rev-parse --verify --quiet "refs/heads/$BRANCH" >/dev/null 2>&1; then
+      git -C "$BASE_PATH" branch -D "$BRANCH" >&2 2>/dev/null || true
+    fi
     ;;
 esac
+exit 1
+

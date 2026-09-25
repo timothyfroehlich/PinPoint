@@ -65,8 +65,8 @@ def run_hook_raw(
     stdin_raw: str, tmp_path: Path, env_modifications: dict | None = None
 ) -> tuple[int, str, str]:
     env = os.environ.copy()
-    # Isolate HOME and XDG_CONFIG_HOME to prevent test flakiness and interference
-    # with developer's config lock file in ~/.config/pinpoint
+    # Isolate HOME and XDG_CONFIG_HOME so the hook never touches the developer's
+    # ~/.config/pinpoint.
     fake_home = tmp_path / "fake_home"
     fake_home.mkdir(parents=True, exist_ok=True)
     env["HOME"] = str(fake_home)
@@ -177,7 +177,7 @@ def test_hook_branches_off_fetched_origin_main(mock_git: dict, tmp_path: Path) -
 def test_hook_falls_back_to_head_when_fetch_fails(
     mock_git: dict, tmp_path: Path
 ) -> None:
-    """Offline (fetch fails) still creates the worktree, branching off HEAD."""
+    """Offline (fetch fails) still creates the worktree, branching off HEAD's SHA."""
     stdin_data = {
         "session_id": "test-session",
         "transcript_path": "test-path",
@@ -186,9 +186,11 @@ def test_hook_falls_back_to_head_when_fetch_fails(
         "name": "agent-offline",
     }
 
+    head_sha = "abad1dea" * 5
     env_mods = {
         "PATH": f"{mock_git['bin_dir']}:{os.environ['PATH']}",
         "MOCK_GIT_FETCH_EXIT": "1",  # simulate no network
+        "MOCK_GIT_FETCH_SHA": head_sha,  # what the mock's `rev-parse` prints
     }
 
     return_code, stdout, stderr = run_hook(stdin_data, tmp_path, env_mods)
@@ -196,8 +198,11 @@ def test_hook_falls_back_to_head_when_fetch_fails(
     assert return_code == 0, f"Hook failed with stderr: {stderr}"
 
     calls = mock_git["log_path"].read_text().splitlines()
+    assert not any("FETCH_HEAD" in c for c in calls), calls
+    assert any("rev-parse --verify --quiet HEAD" in c for c in calls), calls
+    # HEAD's SHA, not the name HEAD: `-b <new> HEAD` can write tracking config.
     add_call = _worktree_add_call(calls)
-    assert add_call.endswith("-b worktree-agent-offline HEAD"), add_call
+    assert add_call.endswith(f"-b worktree-agent-offline {head_sha}"), add_call
 
 
 def test_hook_missing_required_fields(mock_git: dict, tmp_path: Path) -> None:
@@ -277,6 +282,7 @@ case "$sub" in
     exit 0
     ;;
   worktree)
+    if [ "$target" = "list" ]; then exit 0; fi
     if [ -n "$target" ]; then
       mkdir -p "$target"
     fi
@@ -302,7 +308,7 @@ esac
 
     assert return_code != 0
     assert stdout.strip() == ""  # Must NOT print the worktree path on stdout
-    assert "permanent error (not retrying)" in stderr
+    assert "git worktree add failed" in stderr
     assert "fatal: post-checkout hook failed" in stderr
 
     # Verify worktree_cleanup.py was invoked
@@ -369,7 +375,7 @@ Path("{cleanup_log}").write_text(" ".join(sys.argv[1:]))
     return_code, stdout, stderr = run_hook(stdin_data, tmp_path, env_mods)
 
     assert return_code != 0
-    assert "permanent error (not retrying)" in stderr
+    assert "git worktree add failed" in stderr
 
     # Must NOT run worktree_cleanup.py because git worktree add did not create the worktree
     assert not cleanup_log.exists()
@@ -433,6 +439,7 @@ case "$sub" in
     exit 0
     ;;
   worktree)
+    if [ "$target" = "list" ]; then exit 0; fi
     touch "{branch_marker}"
     echo "fatal: post-checkout hook failed" >&2
     exit 1
@@ -454,7 +461,7 @@ esac
     return_code, stdout, stderr = run_hook(stdin_data, tmp_path, env_mods)
 
     assert return_code != 0
-    assert "permanent error (not retrying)" in stderr
+    assert "git worktree add failed" in stderr
 
     # Verify worktree_cleanup.py was invoked
     assert cleanup_log.exists()
