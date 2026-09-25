@@ -33,7 +33,7 @@ export default async function TagsPage(): Promise<React.JSX.Element> {
             >
               <Link
                 href={MANUFACTURER_TAG_TYPE.href}
-                className="hover:text-foreground"
+                className="text-primary hover:underline"
               >
                 {MANUFACTURER_TAG_TYPE.label}
               </Link>

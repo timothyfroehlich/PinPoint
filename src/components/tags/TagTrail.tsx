@@ -16,13 +16,16 @@ export function TagTrail({ type }: TagTrailProps): React.JSX.Element {
       className="flex items-center gap-1.5 text-sm text-muted-foreground"
     >
       <Tag aria-hidden="true" className="size-3.5" />
-      <Link href="/c/tags" className="hover:text-foreground">
+      <Link href="/c/tags" className="font-medium text-primary hover:underline">
         Tags
       </Link>
       {type ? (
         <>
           <span aria-hidden="true">/</span>
-          <Link href={type.href} className="hover:text-foreground">
+          <Link
+            href={type.href}
+            className="font-medium text-primary hover:underline"
+          >
             {type.label}
           </Link>
         </>
