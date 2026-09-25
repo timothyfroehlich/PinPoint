@@ -84,9 +84,9 @@ test.describe("Collection view (PP-slrd.1)", () => {
   }) => {
     // AFM is owned by the member user (seed-users.mjs ownerMap).
     await page.goto(`/m/${seededMachines.attackFromMars.initials}`);
-    // Scope to the owner block: the owner card can also contain a description
-    // above the owner row, and a description with links would make a bare
-    // getByRole("link") ambiguous.
+    // Scope to the owner block: the page also renders the machine description,
+    // and a description with links would make a bare getByRole("link")
+    // ambiguous.
     //
     // Retry the click rather than clicking once (PP-j1qm). Playwright runs
     // against `next dev`, and the trace from a CI failure shows the click

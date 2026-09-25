@@ -44,6 +44,7 @@ export default async function MachineScanHubPage({
           title: issue.title,
           createdAt: issue.createdAt,
         })),
+        artwork: machine.artwork,
       }}
       scores={scores}
       scoreHref={

@@ -61,22 +61,18 @@ describe("InfoRail", () => {
     expect(screen.getByText(/no owner assigned/i)).toBeInTheDocument();
   });
 
-  it("renders description and edit slots inside the Details card", () => {
+  it("renders the edit slot inside the Details card", () => {
     renderRail({
-      descriptionSlot: <p>A classic widebody.</p>,
       editSlot: <button type="button">Edit machine</button>,
     });
     const card = screen.getByTestId("machine-owner-card");
     expect(within(card).getByText("Details")).toBeInTheDocument();
-    expect(within(card).getByText("A classic widebody.")).toBeInTheDocument();
     expect(
       within(card).getByRole("button", { name: /edit machine/i })
     ).toBeInTheDocument();
   });
 
-  it("keeps the owner divider even with no description above", () => {
-    // The Model block now always renders between the two, so the divider is
-    // unconditional — unlike before, when it hung off `descriptionSlot`.
+  it("divides the owner from the Model block above", () => {
     renderRail();
     expect(screen.getByTestId("owner-block")).toHaveClass("border-t");
   });

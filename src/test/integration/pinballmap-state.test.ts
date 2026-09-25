@@ -69,39 +69,6 @@ describe("PinballMap shared read path (PGlite)", () => {
       .values({ id: "singleton", locationId: 26454 });
   });
 
-  it("uses location presence even while the compatibility flag remains", async () => {
-    const db = await getTestDb();
-    const { getPinballMapState } = await import("~/lib/pinballmap/state");
-
-    await db.update(pinballmapState).set({ enabled: false });
-
-    const state = await getPinballMapState();
-    expect(state).toMatchObject({ locationId: 26454 });
-    expect(state).not.toHaveProperty("enabled");
-  });
-
-  it("keeps reading and syncing after the compatibility column is dropped", async () => {
-    const db = await getTestDb();
-    const { getPinballMapState, syncLocationSnapshot } =
-      await import("~/lib/pinballmap/state");
-
-    await db.execute(sql`ALTER TABLE pinballmap_state DROP COLUMN enabled`);
-    try {
-      expect(await getPinballMapState()).toMatchObject({ locationId: 26454 });
-      await expect(
-        syncLocationSnapshot({ trigger: "cron" })
-      ).resolves.toMatchObject({ ok: true });
-      await expect(
-        syncLocationSnapshot({ trigger: "manual" })
-      ).resolves.toMatchObject({ ok: true });
-    } finally {
-      await db.execute(sql`
-        ALTER TABLE pinballmap_state
-        ADD COLUMN enabled boolean NOT NULL DEFAULT false
-      `);
-    }
-  });
-
   it("syncLocationSnapshot stores the snapshot and marks health ok", async () => {
     const { syncLocationSnapshot, getPinballMapState } =
       await import("~/lib/pinballmap/state");

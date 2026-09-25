@@ -78,15 +78,14 @@ export function InlineMarkdownField({
   const isEmpty = docIsEmpty(value);
   const [isEditing, setIsEditing] = useState(false);
 
-  // Both modes render body text at the same size (14px) — "compact" only kills
-  // prose's vertical rhythm so the field can sit flush with its container.
+  // Both modes render body text at the same size (14px) and the shared rich-text
+  // line height — "compact" only kills paragraph margins so the field can sit
+  // flush with its container.
   const textSize = "text-sm";
   const displayClassName = cn(
     textSize,
-    compact &&
-      "text-muted-foreground [&_*]:!my-0 [&_*]:!text-sm [&_*]:!leading-snug",
-    !compact &&
-      "max-md:leading-snug max-md:[&_p]:!my-1 max-md:[&_*]:!leading-snug"
+    compact && "text-muted-foreground [&_*]:!my-0 [&_*]:!text-sm",
+    !compact && "max-md:[&_p]:!my-1"
   );
   const wrapperClassName = compact ? undefined : "space-y-1.5";
   const labelEl = label ? (
