@@ -42,7 +42,7 @@ interface MachineDetailHeaderProps {
 export function MachineDetailHeader({
   machine,
 }: MachineDetailHeaderProps): React.JSX.Element {
-  const meta = [machine.modelTitle, machine.manufacturer, machine.year]
+  const meta = [machine.modelTitle, machine.currentManufacturer, machine.year]
     .filter((part) => part != null && part !== "")
     .join(" · ");
 

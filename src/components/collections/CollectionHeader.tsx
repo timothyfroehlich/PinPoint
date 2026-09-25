@@ -3,6 +3,8 @@ import type { CollectionSummary } from "~/lib/collections/summary";
 
 interface Props {
   title: string;
+  /** Small line above the title, e.g. a tag's type. */
+  eyebrow?: React.ReactNode;
   summary: CollectionSummary;
   /** Owner-only action slot rendered to the right of the title/count block. */
   action?: React.ReactNode;
@@ -14,6 +16,7 @@ function plural(n: number, word: string): string {
 
 export function CollectionHeader({
   title,
+  eyebrow,
   summary,
   action,
 }: Props): React.JSX.Element {
@@ -29,6 +32,11 @@ export function CollectionHeader({
   return (
     <header className="flex items-center justify-between gap-3">
       <div className="min-w-0">
+        {eyebrow ? (
+          <p className="mb-0.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            {eyebrow}
+          </p>
+        ) : null}
         <h1 className="min-w-0 truncate text-2xl font-bold text-foreground sm:text-3xl">
           {title}
         </h1>

@@ -1,5 +1,5 @@
 import { cache } from "react";
-import { asc, eq } from "drizzle-orm";
+import { asc } from "drizzle-orm";
 import { z } from "zod";
 import {
   getCollection,
@@ -12,10 +12,9 @@ import {
   canViewCollection,
 } from "~/lib/permissions/collections";
 import { isEditorCollaborator } from "~/lib/collections/collaborators";
-import type { UserRole } from "~/lib/types";
-import { createClient } from "~/lib/supabase/server";
+import { getViewer } from "~/lib/collections/viewer";
 import { db } from "~/server/db";
-import { machines as machinesTable, userProfiles } from "~/server/db/schema";
+import { machines as machinesTable } from "~/server/db/schema";
 
 export interface CollectionForLayout {
   collection: UserCollection;
@@ -40,34 +39,7 @@ export interface CollectionForLayout {
   viaViewToken: boolean;
 }
 
-/** The current viewer: their id (undefined if unauthenticated) and role. */
-export interface Viewer {
-  userId: string | undefined;
-  role: UserRole | null;
-}
-
 const uuidSchema = z.uuid();
-
-/**
- * Request-deduped current viewer (user id + role). Shared by the layout,
- * the collection resolver, and the Issues tab so a single request validates
- * the JWT (`auth.getUser()`) and reads the role row once, not per call site.
- */
-export const getViewer = cache(async (): Promise<Viewer> => {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  let role: UserRole | null = null;
-  if (user) {
-    const profile = await db.query.userProfiles.findFirst({
-      where: eq(userProfiles.id, user.id),
-      columns: { role: true },
-    });
-    role = profile?.role ?? null;
-  }
-  return { userId: user?.id, role };
-});
 
 /**
  * Request-deduped list of all machines for the collection edit/add pickers

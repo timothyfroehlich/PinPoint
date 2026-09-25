@@ -18,6 +18,11 @@ import type {
   MachineViewScope,
 } from "~/lib/types";
 import type { TimelineTag } from "~/lib/timeline/machine-tags";
+import {
+  getCurrentManufacturer,
+  manufacturerTagKey,
+  manufacturerTagSlug,
+} from "~/lib/machines/manufacturer";
 import { getMachineViewPreset, planMachineViewDependencies } from "./config";
 import {
   applyMachineViewState,
@@ -59,7 +64,7 @@ async function machineIdsForScope(
   tx: DbTransaction,
   scope: MachineViewScope
 ): Promise<string[] | null> {
-  if (scope.kind === "all" || scope.kind === "owner") return null;
+  if (scope.kind !== "collection") return null;
   const rows = await tx
     .select({ machineId: collectionMachines.machineId })
     .from(collectionMachines)
@@ -92,6 +97,8 @@ export async function getMachineViewBaseRows(
       modelName: true,
       manufacturer: true,
       year: true,
+      pinballmapMachineId: true,
+      pinballmapExcluded: true,
     },
     with: {
       owner: { columns: { id: true, name: true } },
@@ -102,7 +109,18 @@ export async function getMachineViewBaseRows(
     },
   });
 
-  return rows.map((machine) => {
+  // Tag membership is derived per machine, so a tag scope loads every machine
+  // and keeps only the tag's members before any filter or search runs.
+  const scopedRows = rows.flatMap((machine) => {
+    const manufacturer = getCurrentManufacturer(machine);
+    if (scope.kind === "tag") {
+      const key = manufacturerTagKey(manufacturer);
+      if (key === null || manufacturerTagSlug(key) !== scope.slug) return [];
+    }
+    return [{ machine, manufacturer }];
+  });
+
+  return scopedRows.map(({ machine, manufacturer }) => {
     const owner = machine.owner ?? machine.invitedOwner;
     return {
       id: machine.id,
@@ -112,10 +130,7 @@ export async function getMachineViewBaseRows(
       createdAt: machine.createdAt,
       ownerId: owner?.id ?? null,
       ownerName: owner?.name ?? "Unassigned",
-      manufacturer:
-        machine.pinballmapTitle?.manufacturer ??
-        machine.manufacturer ??
-        "Unknown",
+      manufacturer: manufacturer ?? "Unknown",
       year: machine.pinballmapTitle?.year ?? machine.year,
       canonicalModelName: machine.pinballmapTitle?.name ?? "",
       legacyModelName: machine.modelName ?? "",
@@ -337,7 +352,9 @@ const loadMachineViewCached = cache(
         ? { kind: "all" }
         : scopeKind === "collection"
           ? { kind: "collection", collectionId: scopeId }
-          : { kind: "owner", ownerId: scopeId };
+          : scopeKind === "owner"
+            ? { kind: "owner", ownerId: scopeId }
+            : { kind: "tag", tagType: "manufacturer", slug: scopeId };
     return loadMachineViewFromDatabase(db, {
       scope,
       preset,
@@ -356,7 +373,9 @@ export function loadMachineView({
       ? scope.collectionId
       : scope.kind === "owner"
         ? scope.ownerId
-        : "";
+        : scope.kind === "tag"
+          ? scope.slug
+          : "";
   return loadMachineViewCached(
     scope.kind,
     scopeId,

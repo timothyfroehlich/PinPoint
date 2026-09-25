@@ -23,7 +23,8 @@ export type MachineViewPresetId = "machines" | "collection";
 export type MachineViewScope =
   | { kind: "all" }
   | { kind: "collection"; collectionId: string }
-  | { kind: "owner"; ownerId: string };
+  | { kind: "owner"; ownerId: string }
+  | { kind: "tag"; tagType: "manufacturer"; slug: string };
 
 export type MachineViewSortDirection = "asc" | "desc";
 export type MachineViewPageSize = 25 | 50 | 100;

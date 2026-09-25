@@ -45,6 +45,11 @@ interface InfoRailProps {
   manufacturer: string | null;
   year: number | null;
   /**
+   * The machine's manufacturer tag, or null when it has no current
+   * manufacturer (spec collections-and-tags 7.4, 8.4).
+   */
+  manufacturerTag: { name: string; href: string } | null;
+  /**
    * The machine's standing on Pinball Map, rendered as one unlabelled line
    * under Model.
    *
@@ -95,11 +100,8 @@ interface InfoRailProps {
 }
 
 const CARD = "rounded-xl border border-outline-variant bg-card p-4";
-const PLACEHOLDER_CARD =
-  "rounded-xl border border-dashed border-secondary/50 bg-card p-4";
 const LABEL =
   "text-[10px] font-bold uppercase tracking-wider text-muted-foreground";
-const COMING_SOON = "text-sm text-muted-foreground";
 
 /**
  * InfoRail — the Info tab's reference cluster: the Details card (description,
@@ -107,7 +109,8 @@ const COMING_SOON = "text-sm text-muted-foreground";
  * right rail and folds inline on mobile (the caller controls placement + gap;
  * this returns the cards as a fragment).
  *
- * Tags is still a reserved placeholder (Collections fills it later).
+ * Tags links each tag the machine belongs to; manufacturer is the only tag
+ * type so far.
  *
  * PP-o355.21 removed the standalone Pinball Map card that PP-o355.3 introduced
  * and PP-l81u last extended. A whole card for two facts hid them: a reader
@@ -125,6 +128,7 @@ export function InfoRail({
   modelName,
   manufacturer,
   year,
+  manufacturerTag,
   pinballmap,
 }: InfoRailProps): React.JSX.Element {
   return (
@@ -308,10 +312,22 @@ export function InfoRail({
 
       {topScoresSlot}
 
-      {/* Tags — reserved slot for the future Collections feature. */}
-      <div className={PLACEHOLDER_CARD} data-testid="machine-tags-placeholder">
+      <div className={CARD} data-testid="machine-tags">
         <p className={`mb-2 ${LABEL}`}>Tags</p>
-        <p className={COMING_SOON}>Coming soon!</p>
+        {manufacturerTag ? (
+          <ul className="flex flex-wrap gap-2">
+            <li>
+              <Link
+                href={manufacturerTag.href}
+                className="inline-flex items-center rounded-full bg-secondary-container px-3 py-1 text-sm font-medium text-on-secondary-container hover:bg-secondary-container/80"
+              >
+                {manufacturerTag.name}
+              </Link>
+            </li>
+          </ul>
+        ) : (
+          <p className="text-sm text-muted-foreground">No tags</p>
+        )}
       </div>
     </>
   );

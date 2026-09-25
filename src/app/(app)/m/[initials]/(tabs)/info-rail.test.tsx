@@ -29,6 +29,7 @@ function renderRail(overrides: Partial<RailProps> = {}): void {
       modelName="Medieval Madness"
       manufacturer="Williams"
       year={1997}
+      manufacturerTag={null}
       pinballmap={{
         locationUrl: LOCATION_URL,
         onLineup: true,
@@ -81,9 +82,24 @@ describe("InfoRail", () => {
     expect(screen.getByTestId("owner-block")).toHaveClass("border-t");
   });
 
-  it("renders the Tags placeholder", () => {
-    renderRail();
-    expect(screen.getByTestId("machine-tags-placeholder")).toBeInTheDocument();
+  it("links the manufacturer tag in the Tags card", () => {
+    renderRail({
+      manufacturerTag: {
+        name: "Williams",
+        href: "/c/tags/manufacturer/williams",
+      },
+    });
+    const card = screen.getByTestId("machine-tags");
+    expect(
+      within(card).getByRole("link", { name: "Williams" })
+    ).toHaveAttribute("href", "/c/tags/manufacturer/williams");
+  });
+
+  it("says a machine without a manufacturer has no tags", () => {
+    renderRail({ manufacturerTag: null });
+    expect(
+      within(screen.getByTestId("machine-tags")).getByText("No tags")
+    ).toBeInTheDocument();
   });
 
   describe("model row", () => {

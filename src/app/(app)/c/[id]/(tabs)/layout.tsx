@@ -1,13 +1,9 @@
 import type React from "react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { PageContainer } from "~/components/layout/PageContainer";
-import { CollectionHeader } from "~/components/collections/CollectionHeader";
-import { CollectionTabStrip } from "~/components/collections/CollectionTabStrip";
+import { MachineGroupShell } from "~/components/collections/MachineGroupShell";
 import { EditCollectionDialog } from "~/components/collections/EditCollectionDialog";
 import { CollectionShareDialog } from "~/components/collections/CollectionShareDialog";
-import { summarizeCollection } from "~/lib/collections/summary";
-import { getMachineViewHealth } from "~/lib/machines/view/queries";
 import {
   getEditorCollaborators,
   getGrantableMembers,
@@ -44,18 +40,6 @@ export default async function CollectionLayout({
   const { id } = await params;
   const data = await getCollectionForLayout(id);
   if (!data) notFound();
-
-  const health = await getMachineViewHealth(
-    db,
-    data.collection.machines.map((machine) => machine.initials)
-  );
-  const summary = summarizeCollection(data.collection.machines, health);
-  const worstStatus =
-    summary.unplayable > 0
-      ? "unplayable"
-      : summary.needsService > 0
-        ? "needs_service"
-        : "operational";
 
   // "Edit collection" is shown to the owner AND editor collaborators; "Share"
   // and the owner-only Delete stay on the manage gate. The all-machines fetch
@@ -95,20 +79,13 @@ export default async function CollectionLayout({
   }
 
   return (
-    <PageContainer size="standard">
-      <div className="space-y-2">
-        <CollectionHeader
-          title={data.collection.name}
-          summary={summary}
-          action={headerAction}
-        />
-        <CollectionTabStrip
-          basePath={`/c/${data.handle}`}
-          openIssueCount={summary.openIssues}
-          status={worstStatus}
-        />
-        <div className="pt-2">{children}</div>
-      </div>
-    </PageContainer>
+    <MachineGroupShell
+      title={data.collection.name}
+      machines={data.collection.machines}
+      basePath={`/c/${data.handle}`}
+      action={headerAction}
+    >
+      {children}
+    </MachineGroupShell>
   );
 }

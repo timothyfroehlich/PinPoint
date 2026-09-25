@@ -26,6 +26,7 @@ import { getTopScoresForMachine } from "~/lib/iscored";
 import { TopScoresCard } from "~/components/machines/TopScoresCard";
 import { InfoHero } from "./info-hero";
 import { InfoRail } from "./info-rail";
+import { manufacturerTagLink } from "~/lib/machines/manufacturer";
 
 /**
  * Machine Info Tab (default route for /m/[initials]/) — the QR-scanning
@@ -182,7 +183,8 @@ export default async function MachineInfoTab({
       addedAt={machine.createdAt}
       descriptionSlot={descriptionSlot}
       modelName={modelName}
-      manufacturer={machine.manufacturer}
+      manufacturer={machine.currentManufacturer}
+      manufacturerTag={manufacturerTagLink(machine.currentManufacturer)}
       year={machine.year}
       topScoresSlot={
         <TopScoresCard
