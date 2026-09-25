@@ -1,6 +1,7 @@
 "use client";
 
 import type React from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import { Button } from "~/components/ui/button";
@@ -58,7 +59,12 @@ export function EditCollectionDialog({
   const [open, setOpen] = useState(false);
   const [name, setName] = useState(currentName);
   const [selected, setSelected] = useState<string[]>(currentIds);
-  const [error, setError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<{
+    message: string;
+    code: "not_found" | undefined;
+  } | null>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [savePending, startSave] = useTransition();
   const [deletePending, startDelete] = useTransition();
 
@@ -68,19 +74,20 @@ export function EditCollectionDialog({
     if (open) {
       setName(currentName);
       setSelected(currentIds);
-      setError(null);
+      setSaveError(null);
+      setDeleteError(null);
     }
   }, [open, currentName, currentIds]);
 
   function save(): void {
-    setError(null);
+    setSaveError(null);
     startSave(async () => {
       const result = await updateCollectionAction({
         collectionId,
         name,
         machineIds: selected,
       });
-      if (!result.success) setError(result.error);
+      if (!result.success) setSaveError(result.error);
       else {
         setOpen(false);
         router.refresh();
@@ -89,10 +96,11 @@ export function EditCollectionDialog({
   }
 
   function remove(): void {
-    setError(null);
+    setDeleteError(null);
     startDelete(async () => {
       const result = await deleteCollectionAction({ collectionId });
-      if (!result.success) setError(result.error);
+      if (!result.success)
+        setDeleteError({ message: result.error, code: result.code });
       else router.push("/c/collections");
     });
   }
@@ -126,15 +134,22 @@ export function EditCollectionDialog({
           idPrefix="edit-collection"
         />
 
-        {error && (
+        {saveError && (
           <p className="mt-4 text-sm text-destructive-text" role="alert">
-            {error}
+            {saveError}
           </p>
         )}
 
         <div className="@container flex flex-row items-center justify-between gap-2">
           {canDelete && (
-            <AlertDialog>
+            <AlertDialog
+              open={deleteOpen}
+              onOpenChange={(deleteOpen) => {
+                if (!deleteOpen && deletePending) return;
+                setDeleteOpen(deleteOpen);
+                if (deleteOpen) setDeleteError(null);
+              }}
+            >
               <AlertDialogTrigger asChild>
                 <Button
                   type="button"
@@ -146,26 +161,54 @@ export function EditCollectionDialog({
                   <span className="hidden @sm:inline">Delete collection</span>
                 </Button>
               </AlertDialogTrigger>
-              <AlertDialogContent>
+              <AlertDialogContent
+                onEscapeKeyDown={(event) => {
+                  if (deletePending) event.preventDefault();
+                }}
+              >
                 <AlertDialogHeader>
-                  <AlertDialogTitle>Delete this collection?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    This removes the collection and its machine list. The
-                    machines themselves and their issues are not affected. This
-                    cannot be undone.
-                  </AlertDialogDescription>
+                  <AlertDialogTitle>
+                    {deleteError?.code === "not_found"
+                      ? "Collection unavailable"
+                      : "Delete this collection?"}
+                  </AlertDialogTitle>
+                  {deleteError?.code !== "not_found" && (
+                    <AlertDialogDescription>
+                      This removes the collection and its machine list. The
+                      machines themselves and their issues are not affected.
+                      This cannot be undone.
+                    </AlertDialogDescription>
+                  )}
                 </AlertDialogHeader>
-                <AlertDialogFooter className="gap-2 sm:gap-0">
-                  <AlertDialogCancel>Keep collection</AlertDialogCancel>
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    onClick={remove}
-                    disabled={deletePending}
-                    data-testid="collection-delete-confirm"
+                {deleteError && (
+                  <div
+                    role="alert"
+                    className="rounded-md border border-destructive/20 bg-destructive/10 p-4 text-destructive-text"
                   >
-                    {deletePending ? "Deleting…" : "Delete collection"}
-                  </Button>
+                    <p className="text-sm font-medium">{deleteError.message}</p>
+                  </div>
+                )}
+                <AlertDialogFooter className="gap-2 sm:gap-0">
+                  {deleteError?.code === "not_found" ? (
+                    <Button asChild>
+                      <Link href="/c/collections">Back to collections</Link>
+                    </Button>
+                  ) : (
+                    <>
+                      <AlertDialogCancel disabled={deletePending}>
+                        Keep collection
+                      </AlertDialogCancel>
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        onClick={remove}
+                        disabled={deletePending}
+                        data-testid="collection-delete-confirm"
+                      >
+                        {deletePending ? "Deleting…" : "Delete collection"}
+                      </Button>
+                    </>
+                  )}
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>

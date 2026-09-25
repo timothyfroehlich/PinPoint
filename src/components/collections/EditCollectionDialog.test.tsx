@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -96,6 +96,108 @@ describe("EditCollectionDialog", () => {
       expect(deleteAction).toHaveBeenCalledWith({ collectionId: "c1" })
     );
     await waitFor(() => expect(push).toHaveBeenCalledWith("/c/collections"));
+  });
+
+  it("shows the error message inside the alert dialog when delete fails", async () => {
+    deleteAction.mockResolvedValue({
+      success: false,
+      error: "Cannot delete this collection",
+    });
+    renderDialog();
+
+    await userEvent.click(screen.getByTestId("collection-edit-trigger"));
+    await userEvent.click(screen.getByTestId("collection-delete-trigger"));
+    await userEvent.click(screen.getByTestId("collection-delete-confirm"));
+
+    const alertDialog = screen.getByRole("alertdialog");
+    expect(await within(alertDialog).findByRole("alert")).toHaveTextContent(
+      "Cannot delete this collection"
+    );
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it("offers a route back when the collection is already gone", async () => {
+    deleteAction.mockResolvedValue({
+      success: false,
+      error:
+        "This collection is no longer available. It may already have been deleted.",
+      code: "not_found",
+    });
+    renderDialog();
+
+    await userEvent.click(screen.getByTestId("collection-edit-trigger"));
+    await userEvent.click(screen.getByTestId("collection-delete-trigger"));
+    await userEvent.click(screen.getByTestId("collection-delete-confirm"));
+
+    const alertDialog = screen.getByRole("alertdialog");
+    expect(await within(alertDialog).findByRole("alert")).toHaveTextContent(
+      "This collection is no longer available. It may already have been deleted."
+    );
+    expect(
+      within(alertDialog).getByRole("heading", {
+        name: "Collection unavailable",
+      })
+    ).toBeInTheDocument();
+    expect(
+      within(alertDialog).queryByText("Delete this collection?")
+    ).not.toBeInTheDocument();
+    const backLink = within(alertDialog).getByRole("link", {
+      name: "Back to collections",
+    });
+    expect(backLink).toHaveAttribute("href", "/c/collections");
+    expect(
+      within(alertDialog).queryByTestId("collection-delete-confirm")
+    ).not.toBeInTheDocument();
+    await userEvent.click(backLink);
+  });
+
+  it("keeps the confirmation open while deletion is pending so a failure stays visible", async () => {
+    let settleDelete: (result: {
+      success: false;
+      error: string;
+    }) => void = () => {
+      throw new Error("Delete request was not started");
+    };
+    deleteAction.mockReturnValue(
+      new Promise<{ success: false; error: string }>((resolve) => {
+        settleDelete = resolve;
+      })
+    );
+    renderDialog();
+
+    await userEvent.click(screen.getByTestId("collection-edit-trigger"));
+    await userEvent.click(screen.getByTestId("collection-delete-trigger"));
+    await userEvent.click(screen.getByTestId("collection-delete-confirm"));
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "Keep collection" })
+      ).toBeDisabled()
+    );
+
+    await userEvent.keyboard("{Escape}");
+    expect(screen.getByRole("alertdialog")).toBeInTheDocument();
+
+    settleDelete({ success: false, error: "Cannot delete this collection" });
+    expect(
+      await within(screen.getByRole("alertdialog")).findByRole("alert")
+    ).toHaveTextContent("Cannot delete this collection");
+  });
+
+  it("does not show a stale save error in the delete confirmation", async () => {
+    updateAction.mockResolvedValue({
+      success: false,
+      error: "Unknown machine",
+    });
+    renderDialog();
+
+    await userEvent.click(screen.getByTestId("collection-edit-trigger"));
+    await userEvent.click(screen.getByTestId("collection-save"));
+    expect(await screen.findByText("Unknown machine")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByTestId("collection-delete-trigger"));
+    expect(
+      within(screen.getByRole("alertdialog")).queryByRole("alert")
+    ).not.toBeInTheDocument();
   });
 
   it("hides the delete control for an editor (canDelete=false)", async () => {

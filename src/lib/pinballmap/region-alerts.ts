@@ -27,6 +27,7 @@ import { PBM_AUSTIN_REGION, normalizeRegion } from "./config";
 import { getPinballMapState } from "./state";
 import { formatRegionAlertMessage } from "./region-alert-message";
 import type { RegionAlertEntry } from "./region-alert-message";
+import { MAX_REGION_ENTRIES, RegionPayloadTooLargeError } from "./types";
 import type { PbmRegionLmx, PbmRegionLocation } from "./types";
 import type { PinballmapRuntimeState } from "~/lib/types";
 
@@ -98,24 +99,6 @@ const PENDING_READ_LIMIT = 500;
 
 /** A killed invocation cannot strand a region indefinitely. */
 const RUN_LEASE_MS = 10 * 60 * 1000;
-
-/**
- * Abort ceiling on a single region payload — the flood guard.
- *
- * PBM's region scope fails OPEN: `LocationMachineXref.region` does
- * `Region.find_by_name(name.downcase)` and `return unless r`, and a nil-returning
- * `has_scope` leaves the relation completely unscoped, so an unknown or mis-cased
- * region hands back every xref on Earth — hundreds of thousands of rows, all of
- * which this job would treat as brand new. `normalizeRegion` removes the usual
- * trigger; this catches everything else, including PBM changing that behavior.
- *
- * The number is deliberately far above any real metro and far below a global
- * dump, so it can only fire on something pathological. Austin measured 487
- * entries on 2026-08-17 — roughly 40x of headroom, which is the point: the
- * ceiling has to stay clear of a metro that grows for years without ever being
- * mistaken for one, and an unscoped PBM query returns hundreds of thousands.
- */
-const MAX_REGION_ENTRIES = 20_000;
 
 /**
  * How many entries one non-bootstrap run may discover before it is read as a
@@ -947,7 +930,22 @@ export async function runRegionMachineAlerts(opts?: {
 
   try {
     const client = await getPinballMapClient();
-    const observed = await client.fetchRegionLmxes(region);
+    let observed: PbmRegionLmx[];
+    try {
+      observed = await client.fetchRegionLmxes(region);
+    } catch (error) {
+      if (!(error instanceof RegionPayloadTooLargeError)) throw error;
+      log.error(
+        {
+          region,
+          observedAtLeast: error.observedAtLeast,
+          ceiling: MAX_REGION_ENTRIES,
+          action: "pinballmap.regionAlerts",
+        },
+        "PinballMap region payload is implausibly large; aborting without writing"
+      );
+      return noop(region, "implausible_payload", error.observedAtLeast);
+    }
     // An empty payload is a bad read (outage, wrong region slug), not "the region
     // has no machines". Recording it would be harmless, but treating it as a
     // bootstrap on a fresh install would silence the very first real run.
@@ -1243,7 +1241,15 @@ export async function bootstrapRegion(
 
   try {
     const client = await getPinballMapClient();
-    const observed = await client.fetchRegionLmxes(region);
+    let observed: PbmRegionLmx[];
+    try {
+      observed = await client.fetchRegionLmxes(region);
+    } catch (error) {
+      if (error instanceof RegionPayloadTooLargeError) {
+        return { bootstrapped: false, discovered: 0 };
+      }
+      throw error;
+    }
     if (observed.length === 0 || observed.length > MAX_REGION_ENTRIES) {
       return { bootstrapped: false, discovered: 0 };
     }
