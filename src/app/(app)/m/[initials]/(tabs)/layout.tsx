@@ -12,7 +12,8 @@ import {
 import { PageContainer } from "~/components/layout/PageContainer";
 import { MachineDetailHeader } from "~/components/machines/MachineDetailHeader";
 import { MachineTabStrip } from "~/components/machines/MachineTabStrip";
-import { MachineBackboxTranslite } from "~/components/machines/MachineBackboxTranslite";
+import { MachineArtworkHero } from "~/components/machines/MachineArtworkHero";
+import { MachineHeaderSwitch } from "~/components/machines/MachineHeaderSwitch";
 import { deriveMachineStatus } from "~/lib/machines/status";
 import { getMachineForLayout } from "../_data";
 
@@ -62,27 +63,19 @@ export default async function MachineDetailLayout({
   return (
     <PageContainer size="standard">
       <div className="space-y-2">
-        {/* Header zone: identity, tab strip, and game artwork. Below md the
-            artwork sits beside the identity, above the full-width tab strip.
-            From md it spans the identity AND the tab strip, flush to the
-            strip's bottom border and the content's right edge. Without
-            artwork the auto column collapses and both rows are full width. */}
-        <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-y-2 [grid-template-areas:'identity_art'_'tabs_tabs'] md:[grid-template-areas:'identity_art'_'tabs_art']">
-          <div className="min-w-0 self-center [grid-area:identity]">
-            <MachineDetailHeader machine={machine} />
-          </div>
-          <div className="min-w-0 [grid-area:tabs]">
-            <MachineTabStrip
-              initials={machine.initials}
-              maintenance={maintenance}
-              canManage={canManage}
-            />
-          </div>
-          <MachineBackboxTranslite
-            imageUrl={machine.backboxImageUrl}
-            name={machine.name}
-          />
-        </div>
+        <MachineHeaderSwitch
+          hero={
+            machine.artwork != null ? (
+              <MachineArtworkHero machine={machine} />
+            ) : null
+          }
+          header={<MachineDetailHeader machine={machine} />}
+        />
+        <MachineTabStrip
+          initials={machine.initials}
+          maintenance={maintenance}
+          canManage={canManage}
+        />
         <div className="pt-2">{children}</div>
       </div>
     </PageContainer>

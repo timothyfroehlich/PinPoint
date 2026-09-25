@@ -133,6 +133,8 @@ describe("getMachineForLayout — model metadata", () => {
       pinballmapMachineId: 3416,
       name: "Godzilla (Premium)",
       opdbImageUrl: "https://img.opdb.org/godzilla-medium.jpg",
+      opdbImageWidth: 640,
+      opdbImageHeight: 444,
     });
     await db.insert(machines).values(
       createTestMachine({
@@ -144,9 +146,11 @@ describe("getMachineForLayout — model metadata", () => {
 
     const { machine } = await getMachineForLayout("GZ");
 
-    expect(machine?.backboxImageUrl).toBe(
-      "https://img.opdb.org/godzilla-medium.jpg"
-    );
+    expect(machine?.artwork).toEqual({
+      url: "https://img.opdb.org/godzilla-medium.jpg",
+      width: 640,
+      height: 444,
+    });
   });
 
   it("omits art when a machine has no matched catalog image", async () => {
@@ -157,6 +161,6 @@ describe("getMachineForLayout — model metadata", () => {
 
     const { machine } = await getMachineForLayout("BK");
 
-    expect(machine?.backboxImageUrl).toBeNull();
+    expect(machine?.artwork).toBeNull();
   });
 });

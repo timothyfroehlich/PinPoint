@@ -1,8 +1,36 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { MachineDetailHeader } from "~/components/machines/MachineDetailHeader";
+import { MachineArtworkHero } from "~/components/machines/MachineArtworkHero";
+import { MachineHeaderSwitch } from "~/components/machines/MachineHeaderSwitch";
 import type { MachineForLayout } from "~/app/(app)/m/[initials]/_data";
+
+// Plain <img> passthrough so jsdom never runs the image optimizer.
+vi.mock("next/image", () => ({
+  default: ({
+    alt,
+    src,
+    unoptimized,
+  }: {
+    alt: string;
+    src: string;
+    unoptimized?: boolean;
+  }) => <img alt={alt} src={src} data-unoptimized={unoptimized} />,
+}));
+
+const navigation = vi.hoisted((): { segment: string | null } => ({
+  segment: null,
+}));
+vi.mock("next/navigation", () => ({
+  useSelectedLayoutSegment: () => navigation.segment,
+}));
+
+const ARTWORK = {
+  url: "https://img.opdb.org/godzilla.jpg",
+  width: 640,
+  height: 444,
+};
 
 /**
  * Minimal `MachineForLayout` fixture. The header only reads identity + the
@@ -48,7 +76,7 @@ function makeMachine(
     pinballmapTitle: null,
     manufacturer: null,
     year: null,
-    backboxImageUrl: null,
+    artwork: null,
     ...overrides,
   };
 }
@@ -155,5 +183,82 @@ describe("MachineDetailHeader", () => {
     expect(
       screen.getByRole("heading", { name: "Attack from Mars" })
     ).toBeInTheDocument();
+  });
+
+  it("replaces the chip with the artwork square and credits OPDB", () => {
+    render(<MachineDetailHeader machine={makeMachine({ artwork: ARTWORK })} />);
+    const img = screen.getByRole("img", { name: "Godzilla game artwork" });
+    expect(img).toHaveAttribute("src", ARTWORK.url);
+    expect(img).toHaveAttribute("data-unoptimized", "true");
+    expect(screen.getByLabelText("Machine initials GZ")).toHaveTextContent(
+      "GZ"
+    );
+    expect(screen.getByRole("link", { name: "OPDB" })).toHaveAttribute(
+      "href",
+      ARTWORK.url
+    );
+  });
+
+  it("keeps the chip and drops the credit when drawn over the hero", () => {
+    render(
+      <MachineDetailHeader
+        machine={makeMachine({ artwork: ARTWORK })}
+        placement="overlay"
+      />
+    );
+    expect(screen.queryByRole("img")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Machine initials GZ")).toBeInTheDocument();
+  });
+});
+
+describe("MachineArtworkHero", () => {
+  it("shows the whole artwork with the identity and OPDB credit", () => {
+    render(<MachineArtworkHero machine={makeMachine({ artwork: ARTWORK })} />);
+    expect(
+      screen.getByRole("img", { name: "Godzilla game artwork" })
+    ).toHaveAttribute("src", ARTWORK.url);
+    expect(
+      screen.getByRole("heading", { name: "Godzilla" })
+    ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "OPDB" })).toHaveAttribute(
+      "href",
+      ARTWORK.url
+    );
+  });
+
+  it("renders nothing without artwork", () => {
+    const { container } = render(
+      <MachineArtworkHero machine={makeMachine({ artwork: null })} />
+    );
+    expect(container).toBeEmptyDOMElement();
+  });
+});
+
+describe("MachineHeaderSwitch", () => {
+  const hero = <p>hero</p>;
+  const header = <p>header</p>;
+
+  it("offers the hero below md on the Info tab", () => {
+    navigation.segment = null;
+    render(<MachineHeaderSwitch hero={hero} header={header} />);
+    expect(screen.getByText("hero").parentElement).toHaveClass("md:hidden");
+    expect(screen.getByText("header").parentElement).toHaveClass(
+      "hidden",
+      "md:block"
+    );
+  });
+
+  it("shows only the header on other tabs", () => {
+    navigation.segment = "settings";
+    render(<MachineHeaderSwitch hero={hero} header={header} />);
+    expect(screen.queryByText("hero")).not.toBeInTheDocument();
+    expect(screen.getByText("header")).toBeInTheDocument();
+  });
+
+  it("shows only the header when there is no artwork", () => {
+    navigation.segment = null;
+    render(<MachineHeaderSwitch hero={null} header={header} />);
+    expect(screen.getByText("header").parentElement).not.toHaveClass("hidden");
   });
 });

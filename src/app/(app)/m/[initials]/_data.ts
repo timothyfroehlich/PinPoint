@@ -60,6 +60,8 @@ export const getMachineForLayout = cache(async (initials: string) => {
             machineGroupId: true,
             groupName: true,
             opdbImageUrl: true,
+            opdbImageWidth: true,
+            opdbImageHeight: true,
           },
         },
       },
@@ -74,13 +76,40 @@ export const getMachineForLayout = cache(async (initials: string) => {
     machine: machine
       ? {
           ...machine,
-          backboxImageUrl: machine.pinballmapTitle?.opdbImageUrl ?? null,
+          artwork: resolveArtwork(machine.pinballmapTitle),
           modelTitle: resolveModelTitle(machine),
         }
       : undefined,
     totalIssuesCount: totalIssuesCountResult[0]?.count ?? 0,
   };
 });
+
+/**
+ * The matched catalog title's OPDB image, as the browser will request it —
+ * hotlinked from img.opdb.org, never fetched or re-hosted by PinPoint
+ * (PP-o355.43). Width and height are Pinball Map's reported dimensions, used
+ * only to reserve the image's shape before it loads; either may be missing.
+ */
+export interface MachineArtwork {
+  url: string;
+  width: number | null;
+  height: number | null;
+}
+
+function resolveArtwork(
+  title: {
+    opdbImageUrl: string | null;
+    opdbImageWidth: number | null;
+    opdbImageHeight: number | null;
+  } | null
+): MachineArtwork | null {
+  if (title?.opdbImageUrl == null) return null;
+  return {
+    url: title.opdbImageUrl,
+    width: title.opdbImageWidth,
+    height: title.opdbImageHeight,
+  };
+}
 
 /**
  * What game this machine IS, as one display string — the Pinball Map catalog
