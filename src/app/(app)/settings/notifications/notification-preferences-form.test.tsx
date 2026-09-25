@@ -36,6 +36,9 @@ const defaultPreferences: NotificationPreferencesData = {
   emailNotifyOnMentioned: true,
   inAppNotifyOnMentioned: true,
   discordNotifyOnMentioned: true,
+  emailNotifyOnPinballMapComment: true,
+  inAppNotifyOnPinballMapComment: true,
+  discordNotifyOnPinballMapComment: true,
 };
 
 describe("NotificationPreferencesForm", () => {

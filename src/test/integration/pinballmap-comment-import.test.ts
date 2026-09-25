@@ -10,6 +10,8 @@
  *  - 7.6 each copy knows the other cabinets carrying it.
  *  - 7.5 / 7.8 / 7.9 one conversion across every copy, and the copies follow
  *    the issue when it moves.
+ *  - 7.4 / 7.7 a new comment notifies the owner and watchers of each covering
+ *    cabinet, once per cabinet and per enabled channel (PP-o355.63).
  *
  * Everything reads the stored snapshot; no Pinball Map client is involved.
  */
@@ -22,12 +24,19 @@ import { asDbOrTx, getTestDb, setupTestDb } from "~/test/setup/pglite";
 import {
   authUsers,
   issues,
+  machineWatchers,
   machines,
+  notificationPreferences,
+  notifications,
   pinballmapComments,
   pinballmapState,
   timelineEvents,
   userProfiles,
 } from "~/server/db/schema";
+import type {
+  ChannelContext,
+  DeliveryResult,
+} from "~/lib/notifications/channels/types";
 import type { CommentImportResult } from "~/lib/pinballmap/comment-import";
 import type { LocationSnapshot, PbmCondition } from "~/lib/pinballmap/types";
 
@@ -54,6 +63,49 @@ const redirect = vi.hoisted(() =>
   })
 );
 vi.mock("next/navigation", () => ({ redirect }));
+
+// Real preference gates, recorded deliveries: the channels decide who gets
+// what exactly as in production, and nothing leaves the process.
+const deliveries = vi.hoisted(() => ({
+  email: vi.fn((_ctx: ChannelContext): Promise<DeliveryResult> =>
+    Promise.resolve({ ok: true })
+  ),
+  discord: vi.fn((_ctx: ChannelContext): Promise<DeliveryResult> =>
+    Promise.resolve({ ok: true })
+  ),
+}));
+vi.mock("~/lib/notifications/channels/registry", async () => {
+  const { inAppChannel } =
+    await import("~/lib/notifications/channels/in-app-channel");
+  const { emailChannel } =
+    await import("~/lib/notifications/channels/email-channel");
+  const { createDiscordChannel } =
+    await import("~/lib/notifications/channels/discord-channel");
+  const discord = createDiscordChannel({
+    guildId: "guild",
+    inviteLink: null,
+    botToken: "token",
+    botHealthStatus: "healthy",
+    lastBotCheckAt: null,
+    updatedAt: new Date(),
+  });
+  return {
+    getChannels: () =>
+      Promise.resolve([
+        inAppChannel,
+        {
+          key: "email",
+          shouldDeliver: emailChannel.shouldDeliver,
+          deliver: deliveries.email,
+        },
+        {
+          key: "discord",
+          shouldDeliver: discord.shouldDeliver,
+          deliver: deliveries.discord,
+        },
+      ]),
+  };
+});
 
 const LOCATION_ID = 26454;
 const TITLE = 42; // the shared title
@@ -196,6 +248,8 @@ async function importComments(): Promise<CommentImportResult> {
 
 beforeEach(() => {
   redirect.mockClear();
+  deliveries.email.mockClear();
+  deliveries.discord.mockClear();
 });
 
 describe("importPinballMapComments (PGlite)", () => {
@@ -313,7 +367,12 @@ describe("importPinballMapComments (PGlite)", () => {
     const result = await importComments();
 
     expect(result.copies).toEqual([
-      { machineId: later.id, conditionId: 1, isNew: false },
+      {
+        machineId: later.id,
+        conditionId: 1,
+        isNew: false,
+        timelineEventId: expect.any(String),
+      },
     ]);
     expect(await copiesFor(covering.id)).toEqual([1]);
   });
@@ -389,7 +448,176 @@ describe("importPinballMapComments (PGlite)", () => {
 
     expect(result.backfill).toBe(true);
     expect(result.copies).toEqual([
-      { machineId: machine.id, conditionId: 7, isNew: false },
+      {
+        machineId: machine.id,
+        conditionId: 7,
+        isNew: false,
+        timelineEventId: expect.any(String),
+      },
+    ]);
+  });
+});
+
+describe("new-comment notifications (PGlite)", () => {
+  setupTestDb();
+
+  async function watch(userId: string, machineId: string): Promise<void> {
+    const db = await getTestDb();
+    await db.insert(machineWatchers).values({ userId, machineId });
+  }
+
+  async function setOwner(machineId: string, ownerId: string): Promise<void> {
+    const db = await getTestDb();
+    await db
+      .update(machines)
+      .set({ ownerId })
+      .where(eq(machines.id, machineId));
+  }
+
+  async function inAppFor(userId: string): Promise<string[]> {
+    const db = await getTestDb();
+    const rows = await db
+      .select({ resourceId: notifications.resourceId })
+      .from(notifications)
+      .where(
+        and(
+          eq(notifications.userId, userId),
+          eq(notifications.type, "pinballmap_comment")
+        )
+      );
+    return rows.map((r) => r.resourceId).sort();
+  }
+
+  function deliveredTo(
+    channel: "email" | "discord"
+  ): { userId: string; machineId: string }[] {
+    return deliveries[channel].mock.calls
+      .map(([ctx]) => ({ userId: ctx.userId, machineId: ctx.resourceId }))
+      .sort((l, r) =>
+        `${l.userId}${l.machineId}`.localeCompare(`${r.userId}${r.machineId}`)
+      );
+  }
+
+  /** Silent backfill of comment 1, then comment 2 arrives. */
+  async function backfillThenNewComment(): Promise<void> {
+    await seedState([
+      { lmxId: 900, machineId: TITLE, conditions: [condition(1, "old")] },
+    ]);
+    await importComments();
+    await seedState([
+      {
+        lmxId: 900,
+        machineId: TITLE,
+        conditions: [condition(1, "old"), condition(2, "left flipper weak")],
+      },
+    ]);
+    await importComments();
+  }
+
+  it("keeps the historical backfill silent", async () => {
+    const machine = await seedMachine("BKA", TITLE, "on");
+    const owner = await createUser("member");
+    const watcher = await createUser("member");
+    await setOwner(machine.id, owner);
+    await watch(watcher, machine.id);
+    await seedState([
+      { lmxId: 900, machineId: TITLE, conditions: [condition(1, "old")] },
+    ]);
+
+    await importComments();
+
+    expect(await inAppFor(owner)).toEqual([]);
+    expect(await inAppFor(watcher)).toEqual([]);
+    expect(deliveries.email).not.toHaveBeenCalled();
+    expect(deliveries.discord).not.toHaveBeenCalled();
+  });
+
+  it("notifies each covering cabinet's owner and watchers once per cabinet", async () => {
+    const a = await seedMachine("NTA", TITLE, "on");
+    const b = await seedMachine("NTB", TITLE, "on");
+    const off = await seedMachine("NTC", TITLE, "off");
+    const owner = await createUser("member");
+    const watchesBoth = await createUser("member");
+    const watchesOff = await createUser("member");
+    await setOwner(a.id, owner);
+    await watch(watchesBoth, a.id);
+    await watch(watchesBoth, b.id);
+    await watch(watchesOff, off.id);
+
+    await backfillThenNewComment();
+
+    expect(await inAppFor(watchesBoth)).toEqual([a.id, b.id].sort());
+    expect(await inAppFor(owner)).toEqual([a.id]);
+    expect(await inAppFor(watchesOff)).toEqual([]);
+    const expected = [
+      { userId: owner, machineId: a.id },
+      { userId: watchesBoth, machineId: a.id },
+      { userId: watchesBoth, machineId: b.id },
+    ].sort((l, r) =>
+      `${l.userId}${l.machineId}`.localeCompare(`${r.userId}${r.machineId}`)
+    );
+    expect(deliveredTo("email")).toEqual(expected);
+    expect(deliveredTo("discord")).toEqual(expected);
+
+    const ctx = deliveries.email.mock.calls.find(
+      ([c]) => c.userId === owner
+    )?.[0];
+    expect(ctx).toMatchObject({
+      type: "pinballmap_comment",
+      resourceType: "machine",
+      machineInitials: "NTA",
+      machineName: "NTA cabinet",
+      commentContent: "left flipper weak",
+      actorName: "pbm_user",
+      pinballmapLocationId: LOCATION_ID,
+      recipientReason: "machine_owner",
+    });
+    // Each copy is its own occurrence, so the per-cabinet emails never share
+    // an idempotency key.
+    const eventIds = deliveries.email.mock.calls.map(([c]) => c.eventId);
+    expect(new Set(eventIds).size).toBe(2);
+  });
+
+  it("stays silent when a cabinet receives the entry's history by turning On", async () => {
+    const db = await getTestDb();
+    await seedMachine("LNA", TITLE, "on");
+    const later = await seedMachine("LNB", TITLE, "off");
+    const watcher = await createUser("member");
+    await watch(watcher, later.id);
+    await backfillThenNewComment();
+    deliveries.email.mockClear();
+    deliveries.discord.mockClear();
+
+    await db
+      .update(machines)
+      .set({ pinballmapIntent: "on" })
+      .where(eq(machines.id, later.id));
+    const result = await importComments();
+
+    expect(result.copies).toHaveLength(2);
+    expect(await inAppFor(watcher)).toEqual([]);
+    expect(deliveries.email).not.toHaveBeenCalled();
+    expect(deliveries.discord).not.toHaveBeenCalled();
+  });
+
+  it("honors each channel's Pinball Map comment preference", async () => {
+    const db = await getTestDb();
+    const machine = await seedMachine("PFA", TITLE, "on");
+    const watcher = await createUser("member");
+    await watch(watcher, machine.id);
+    await db.insert(notificationPreferences).values({
+      userId: watcher,
+      inAppNotifyOnPinballMapComment: false,
+      emailNotifyOnPinballMapComment: false,
+      discordNotifyOnPinballMapComment: true,
+    });
+
+    await backfillThenNewComment();
+
+    expect(await inAppFor(watcher)).toEqual([]);
+    expect(deliveries.email).not.toHaveBeenCalled();
+    expect(deliveredTo("discord")).toEqual([
+      { userId: watcher, machineId: machine.id },
     ]);
   });
 });

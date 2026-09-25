@@ -7,7 +7,8 @@ export type NotificationType =
   | "new_comment"
   | "new_issue"
   | "machine_ownership_changed"
-  | "mentioned";
+  | "mentioned"
+  | "pinballmap_comment";
 
 export type NotificationChannelKey = "email" | "in_app" | "discord";
 
@@ -77,4 +78,19 @@ export type NotificationEvent =
       machineName?: string | undefined;
       machineInitials?: string | undefined;
       ownershipChange: "added" | "removed";
+    })
+  | (NotificationEventBase & {
+      /**
+       * A Pinball Map comment first observed after the location's silent
+       * backfill, copied onto one covering machine (pinballmap spec 7.4, 7.7).
+       * One event per machine copy, so a person watching two covering machines
+       * hears about each. `actorName` carries the Pinball Map commenter.
+       */
+      type: "pinballmap_comment";
+      resourceType: "machine";
+      machineName?: string | undefined;
+      machineInitials?: string | undefined;
+      commentContent: string;
+      /** The Pinball Map location, for the required attribution link (9.1). */
+      pinballmapLocationId: number;
     });

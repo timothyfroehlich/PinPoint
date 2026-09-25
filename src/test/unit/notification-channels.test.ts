@@ -30,6 +30,9 @@ function prefs(
     discordNotifyOnMentioned: true,
     discordNotifyOnNewIssue: true,
     discordWatchNewIssuesGlobal: false,
+    emailNotifyOnPinballMapComment: true,
+    inAppNotifyOnPinballMapComment: true,
+    discordNotifyOnPinballMapComment: true,
     discordDmBlockedAt: null,
     discordOnboardedAt: null,
     discordNoticeVersion: 0,
@@ -118,5 +121,37 @@ describe("inAppChannel.shouldDeliver", () => {
     expect(
       inAppChannel.shouldDeliver(prefs(), "machine_ownership_changed")
     ).toBe(true);
+  });
+});
+
+describe("pinballmap_comment preference gates", () => {
+  it("follows each channel's own toggle", () => {
+    expect(
+      inAppChannel.shouldDeliver(
+        prefs({ inAppNotifyOnPinballMapComment: false }),
+        "pinballmap_comment",
+        "machine_watcher"
+      )
+    ).toBe(false);
+    expect(
+      emailChannel.shouldDeliver(
+        prefs({ emailNotifyOnPinballMapComment: false }),
+        "pinballmap_comment",
+        "machine_watcher"
+      )
+    ).toBe(false);
+    expect(
+      emailChannel.shouldDeliver(prefs(), "pinballmap_comment", "machine_owner")
+    ).toBe(true);
+  });
+
+  it("respects the channel's main switch", () => {
+    expect(
+      emailChannel.shouldDeliver(
+        prefs({ emailEnabled: false }),
+        "pinballmap_comment",
+        "machine_watcher"
+      )
+    ).toBe(false);
   });
 });
