@@ -589,6 +589,13 @@
       "when": 1790292983981,
       "tag": "0083_add-report-navigation-preferences",
       "breakpoints": true
+    },
+    {
+      "idx": 84,
+      "version": "7",
+      "when": 1790304914531,
+      "tag": "0084_add-opdb-catalog-images",
+      "breakpoints": true
     }
   ]
 }

@@ -59,6 +59,10 @@ const authenticatedRoutes = [
   `/m/${machineInitials}/settings`,
   `/m/${machineInitials}/maintenance`,
   `/m/${machineInitials}/timeline`,
+  // Medieval Madness carries seeded artwork: its Info tab's full-bleed hero
+  // and the artwork square on other tabs (PP-o355.43).
+  `/m/${seededMachines.medievalMadness.initials}`,
+  `/m/${seededMachines.medievalMadness.initials}/settings`,
   `/m/${ownedMachineInitials}/edit`,
   `/m/${machineInitials}/i/${issueNum}`,
   "/settings",
