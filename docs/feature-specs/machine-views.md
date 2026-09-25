@@ -119,9 +119,7 @@
 
 ## Known divergences (code vs spec)
 
-| Spec | Code today | Resolution |
-| :-- | :-- | :-- |
-| §8 Saved Views | No saved-view storage, menu, or default resolution | Saved-views implementation |
+_None currently recorded._
 
 ---
 
