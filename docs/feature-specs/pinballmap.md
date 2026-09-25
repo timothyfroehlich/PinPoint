@@ -48,7 +48,7 @@ The control's states (§4) are comparisons across these: _in sync_ means intent 
 
 ## 4. The listing control
 
-- **4.1** The control is two rows under one header, and **renders at the same fixed height in every state** — states swap content, never geometry. An uncataloged machine has no control at all (§4.2).
+- **4.1** The control is two rows under one header, and **renders at the same fixed height in every state** — states swap content, never geometry. The one exception is a narrow screen, where a status row's push action may wrap below its status sentence. An uncataloged machine has no control at all (§4.2).
   - **Intent row**: the tri-state toggle (On the lineup / Off the lineup / Don't sync). Changing it writes only to PinPoint, needs no confirmation, and is instantly reversible.
   - **Status row**: the observed lineup fact as a short sentence, with reconciliation actions on the right.
   - **Header**: "Pinball Map — {location name}", the name taken from their location entry and linked to the location's Pinball Map page (this link doubles as the 9.1 attribution link-back); last-refresh time and a Refresh button (3.2); an **Out of sync** alert when intent and lineup disagree. Before the first refresh the location name is unknown and the title is bare.
@@ -180,7 +180,6 @@ Replacing the tracked location is a rare, near-never operation — PinPoint trac
 | 7.5 explicit Convert to issue | No comment import or conversion action exists | PP-o355.4; shared-comment identity PP-o355.54.14 |
 | 10.9 comment re-marking on location change | No comment import exists | PP-o355.4 (import); permanent mark-on-location-change after |
 | 3.6–3.8 additional outbound actions | Client methods exist, but no app actions expose venue-lineup confirmation or Insider Connected changes | PP-o355.58 (confirm lineup, needs `/fleet` base PP-o355.7.1), PP-o355.59 (Insider Connected); condition-comment posting deferred (PP-o355.57) |
-| 4.1 fixed height in every state | At phone widths the out-of-sync status row wraps the push button below the status sentence, so that row is taller than in an in-sync state | PP-o355.62 (decision: amend 4.1 to allow the phone-width wrap, or redesign the push placement) |
 
 ---
 
@@ -190,6 +189,7 @@ Changes to this document. Divergence-table rows are working state and are not lo
 
 | Date | Change |
 | :-- | :-- |
+| 2026-09-25 | Amended 4.1: on a narrow screen the status row's push action may wrap below its sentence, the one allowed height change (PP-o355.62). |
 | 2026-09-25 | Detailed §3.6's outbound actions: lineup confirmation from the `/fleet` header (§3.7) and safe Insider Connected changes (§3.8). Deferred condition-comment posting out of full support until requested. |
 | 2026-09-23 | Clarified shared-comment copies and per-cabinet notifications (§§7.6–7.7), and tied conversion to one movable issue per Pinball Map comment (§§7.8–7.9). |
 | 2026-09-22 | Added §§7.4–7.5: historical comment backfill is silent, later new comments notify watchers, and Convert to issue is explicit rather than automatic. |
