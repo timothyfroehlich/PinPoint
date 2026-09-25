@@ -331,10 +331,30 @@ describe("push actions", () => {
     });
     expect(
       await screen.findByTestId("pbm-listing-remove-consequence")
-    ).toHaveTextContent("0 comments");
+    ).toHaveTextContent("No comments on this entry");
     expect(
       screen.getByRole("button", { name: "Remove machine" })
     ).toBeEnabled();
+  });
+
+  it("keeps removal blocked when the comment check fails", async () => {
+    const user = userEvent.setup();
+    vi.mocked(checkRemovalCommentsAction).mockResolvedValue({
+      ok: false,
+      code: "NOT_FOUND",
+      message: "This entry is no longer on the lineup.",
+    });
+    renderControl({ view: VIEWS.lingering });
+    await user.click(screen.getByTestId("pbm-listing-remove"));
+    expect(
+      await screen.findByTestId("pbm-listing-remove-error")
+    ).toHaveTextContent("This entry is no longer on the lineup.");
+    expect(
+      screen.queryByTestId("pbm-listing-remove-consequence")
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Remove machine" })
+    ).toBeDisabled();
   });
 
   it("marks a failed refresh count as old and offers an explicit proceed choice", async () => {
@@ -352,10 +372,8 @@ describe("push actions", () => {
     await user.click(screen.getByTestId("pbm-listing-remove"));
     expect(
       await screen.findByTestId("pbm-listing-remove-consequence")
-    ).toHaveTextContent("last-known count was checked");
-    expect(
-      screen.getByRole("button", { name: "Proceed with removal" })
-    ).toBeEnabled();
+    ).toHaveTextContent("3 comments as of 12 minutes ago");
+    expect(screen.getByRole("button", { name: "Remove anyway" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Cancel" })).toBeEnabled();
   });
 

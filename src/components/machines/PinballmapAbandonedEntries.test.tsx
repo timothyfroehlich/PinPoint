@@ -156,10 +156,8 @@ describe("PinballmapAbandonedEntries", () => {
     await user.click(screen.getByTestId("pbm-abandoned-remove-101"));
     expect(
       await screen.findByTestId("pbm-abandoned-remove-consequence")
-    ).toHaveTextContent("last-known count was checked");
-    expect(
-      screen.getByRole("button", { name: "Proceed with removal" })
-    ).toBeEnabled();
+    ).toHaveTextContent("1 comment as of 12 minutes ago");
+    expect(screen.getByRole("button", { name: "Remove anyway" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Cancel" })).toBeEnabled();
   });
 
@@ -176,9 +174,7 @@ describe("PinballmapAbandonedEntries", () => {
 
     await user.click(screen.getByTestId("pbm-abandoned-remove-202"));
     expect(checkRemovalCommentsAction).not.toHaveBeenCalled();
-    expect(
-      screen.getByText(/PinPoint could not read this entry's comments/)
-    ).toBeInTheDocument();
+    expect(screen.getByText(/Comment count unavailable/)).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Remove machine" })
     ).toBeEnabled();
