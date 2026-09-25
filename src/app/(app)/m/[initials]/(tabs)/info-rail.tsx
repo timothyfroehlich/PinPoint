@@ -9,11 +9,6 @@ interface InfoRailProps {
   owner: { id: string; name: string; avatarUrl: string | null } | null;
   invitedOwner: { name: string } | null;
   addedAt: Date;
-  /**
-   * Machine description, rendered inside the Details card above the owner row.
-   * Pass `null` to omit the Description section entirely (empty + non-editable).
-   */
-  descriptionSlot?: React.ReactNode;
   /** Edit-machine control (dialog trigger or denied tooltip), shown in the owner card footer. */
   editSlot?: React.ReactNode;
   /** Top scores card slot, rendered below Details and above Tags placeholder. */
@@ -102,8 +97,10 @@ const LABEL =
 const COMING_SOON = "text-sm text-muted-foreground";
 
 /**
- * InfoRail — the Info tab's reference cluster: the Details card (description,
- * Model, Pinball Map standing, owner, Edit), then Tags. Renders as the desktop
+ * InfoRail — the Info tab's reference cluster: the Details card (Model,
+ * Pinball Map standing, owner, Edit), then Tags. The machine description is
+ * not here: it leads the main column, because a long one stretched this
+ * 320px rail far past the main column's height. Renders as the desktop
  * right rail and folds inline on mobile (the caller controls placement + gap;
  * this returns the cards as a fragment).
  *
@@ -119,7 +116,6 @@ export function InfoRail({
   owner,
   invitedOwner,
   addedAt,
-  descriptionSlot,
   editSlot,
   topScoresSlot,
   modelName,
@@ -129,9 +125,8 @@ export function InfoRail({
 }: InfoRailProps): React.JSX.Element {
   return (
     <>
-      {/* Details — reading order: the machine description (primary content;
-          read-only, edited on the Manage tab), then the machine's identity
-          (Model + its Pinball Map standing), then the owner in a distinct panel
+      {/* Details — reading order: the machine's identity (Model + its Pinball
+          Map standing), then the owner in a distinct panel
           with an explicit role badge (name only, never email per CORE-SEC-007),
           then the Edit-machine control.
 
@@ -142,22 +137,10 @@ export function InfoRail({
       <div className={`@container ${CARD}`} data-testid="machine-owner-card">
         <p className={`mb-3 ${LABEL}`}>Details</p>
 
-        {descriptionSlot ? (
-          <div className="text-sm text-muted-foreground">{descriptionSlot}</div>
-        ) : null}
-
-        {/* Model + Pinball Map — the machine's identity, under a soft divider
-            from the description. Model is labelled; the Pinball Map line is
-            not, because a "Pinball Map" key beside a "View on Pinball Map"
-            value says the same words twice. */}
-        <div
-          data-testid="machine-model-block"
-          className={
-            descriptionSlot
-              ? "mt-4 border-t border-outline-variant pt-4"
-              : undefined
-          }
-        >
+        {/* Model + Pinball Map — the machine's identity. Model is labelled;
+            the Pinball Map line is not, because a "Pinball Map" key beside a
+            "View on Pinball Map" value says the same words twice. */}
+        <div data-testid="machine-model-block">
           <p className="text-sm">
             <span className="font-semibold text-muted-foreground">Model</span>{" "}
             {modelName === null ? (
@@ -266,8 +249,7 @@ export function InfoRail({
         </div>
 
         {/* Owner — under a soft divider from the Model block above, which always
-            renders, so the divider is no longer conditional on a description
-            being present. A plain "Owner" label leads the name (link; name
+            renders. A plain "Owner" label leads the name (link; name
             only, never email per CORE-SEC-007), with the added date below. */}
         <div
           data-testid="owner-block"
