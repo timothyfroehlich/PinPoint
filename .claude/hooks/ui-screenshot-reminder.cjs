@@ -3,7 +3,7 @@
 // PostToolUse hook (Bash): non-blocking reminder to post UI screenshots.
 //
 // Fires on `git commit`. If the branch's cumulative diff vs origin/main touches
-// a UI glob, prints one reminder line to stderr. Always exits 0 — this is a
+// a UI glob, returns one reminder as additionalContext. Always exits 0 — this is a
 // nudge, not a gate. No network calls beyond the already-local `git diff`
 // (which reads git's local knowledge of origin/main — it does not fetch).
 //
@@ -76,9 +76,16 @@ process.stdin.on("end", () => {
     process.exit(0);
   }
 
-  process.stderr.write(
-    "🖼  UI-touching change — before handing this PR to Tim, post screenshots: " +
-      "scripts/workflow/pr-screenshots.mjs <PR> (desktop+mobile).\n"
+  // PostToolUse stderr is never shown to the model; additionalContext is.
+  process.stdout.write(
+    JSON.stringify({
+      hookSpecificOutput: {
+        hookEventName: "PostToolUse",
+        additionalContext:
+          "UI-touching change — before handing this PR to Tim, post screenshots: " +
+          "scripts/workflow/pr-screenshots.mjs <PR> (desktop+mobile).",
+      },
+    })
   );
   process.exit(0);
 });

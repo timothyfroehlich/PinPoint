@@ -33,7 +33,8 @@ export class MailpitClient {
   constructor() {
     const port =
       process.env["MAILPIT_PORT"] ?? process.env["INBUCKET_PORT"] ?? "54324";
-    this.apiUrl = `http://localhost:${port}/api/v1`;
+    const host = process.env["MAILPIT_HOST"] ?? "localhost";
+    this.apiUrl = `http://${host}:${port}/api/v1`;
   }
 
   /**

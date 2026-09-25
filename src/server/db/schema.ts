@@ -27,6 +27,7 @@ import { type TimelineEventSourceType } from "~/lib/timeline/machine-events";
 import { type TimelineTag } from "~/lib/timeline/machine-tags";
 import { type SettingsSection } from "~/lib/machines/settings-types";
 import type { LocationSnapshot } from "~/lib/pinballmap/types";
+import { REPORT_MODE_VALUES } from "~/lib/types/user";
 
 /**
  * ⚠️ IMPORTANT: When adding new tables to this schema file,
@@ -102,6 +103,16 @@ export const userProfiles = pgTable(
     role: text("role", { enum: ["guest", "member", "technician", "admin"] })
       .notNull()
       .default("guest"), // Default for new signups (no invitation)
+    mobileReportMode: text("mobile_report_mode", {
+      enum: REPORT_MODE_VALUES,
+    })
+      .notNull()
+      .default("quick"),
+    desktopReportMode: text("desktop_report_mode", {
+      enum: REPORT_MODE_VALUES,
+    })
+      .notNull()
+      .default("detailed"),
     termsAcceptedAt: timestamp("terms_accepted_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
@@ -114,6 +125,14 @@ export const userProfiles = pgTable(
     roleCheck: check(
       "user_profiles_role_check",
       sql`role IN ('guest', 'member', 'technician', 'admin')`
+    ),
+    mobileReportModeCheck: check(
+      "user_profiles_mobile_report_mode_check",
+      sql`mobile_report_mode IN ('quick', 'detailed', 'multiple')`
+    ),
+    desktopReportModeCheck: check(
+      "user_profiles_desktop_report_mode_check",
+      sql`desktop_report_mode IN ('quick', 'detailed', 'multiple')`
     ),
     /**
      * NOT NULL never forbade '', which is how every OAuth signup landed

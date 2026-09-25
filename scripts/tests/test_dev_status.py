@@ -97,7 +97,7 @@ def test_single_check_is_one_actionable_failure_line(tmp_path: Path) -> None:
     assert result.stdout.count("\n") == 1
     assert result.stdout.startswith("FAIL: dev status — ")
     assert "Next.js=down (start: pnpm run dev)" in result.stdout
-    assert "Supabase API=down (start: supabase start)" in result.stdout
+    assert "Supabase API=down (start: pnpm supabase:start)" in result.stdout
     assert "Postgres=down (check POSTGRES_URL)" in result.stdout
 
 

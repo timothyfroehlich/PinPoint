@@ -35,7 +35,7 @@
 //   - Local dev server running at http://localhost:<PORT> (`pnpm run dev`).
 //     PORT is read from .env.local the same way playwright.config.ts does —
 //     worktree-aware, always localhost (CORE-SEC-008).
-//   - Local Supabase running (`supabase start`).
+//   - Supabase running (`pnpm supabase:start`).
 //   - `gh` CLI authenticated.
 //
 // First run (or any run with missing/stale storage state) invokes
@@ -207,7 +207,7 @@ function ensureAuthStorageState(rolesNeeded, forceAuth) {
   if (result.status !== 0) {
     throw new Error(
       "auth-setup failed — see output above. Ensure the dev server + Supabase " +
-        "can start locally (pnpm run dev / supabase start)."
+        "can start locally (pnpm run dev / pnpm supabase:start)."
     );
   }
 }
@@ -454,7 +454,7 @@ function buildCommentBody(repoSlug, pr, shortSha, captured) {
 function postOrUpdateStickyComment(repoSlug, pr, body) {
   // `--paginate` concatenates one JSON array per page back-to-back, which isn't
   // valid single-document JSON — slurp+flatten via jq (same approach as
-  // mark-review.sh) so a marker comment on page 2+ of a busy PR isn't missed.
+  // _pr-gates.sh) so a marker comment on page 2+ of a busy PR isn't missed.
   const raw = execFileSync(
     "gh",
     ["api", "--paginate", `repos/${repoSlug}/issues/${pr}/comments`],

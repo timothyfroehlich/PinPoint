@@ -12,12 +12,13 @@ import {
   resetPasswordAction,
   forgotPasswordAction,
 } from "~/app/(auth)/actions";
+import { expectLocalSupabaseUrl } from "~/test/helpers/supabase";
 
 /**
  * Integration tests for auth Server Action error paths
  *
  * These tests validate error handling in auth Server Actions.
- * Requires Supabase to be running (supabase start).
+ * Requires Supabase to be running (pnpm supabase:start).
  *
  * Note: Happy paths are tested in E2E tests.
  * These tests focus on error conditions that need integration with Supabase.
@@ -59,7 +60,7 @@ describe("Auth Actions - Error Path Integration Tests", () => {
 
   beforeAll(() => {
     // Ensure we're in a test environment
-    expect(supabaseUrl).toMatch(/127\.0\.0\.1|localhost/);
+    expectLocalSupabaseUrl(supabaseUrl);
   });
 
   afterEach(async () => {

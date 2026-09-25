@@ -40,7 +40,6 @@ CI_WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "ci.yml"
 MISE_ACTION_PATH = REPO_ROOT / ".github" / "actions" / "setup-mise" / "action.yml"
 PREVIEW_CONTROL_PATH = REPO_ROOT / ".github" / "workflows" / "preview-control.yaml"
 PREVIEW_REAPER_PATH = REPO_ROOT / ".github" / "workflows" / "preview-reaper.yaml"
-PREVIEW_SYNC_PATH = REPO_ROOT / ".github" / "workflows" / "preview-sync.yaml"
 
 MINIMUM_MISE_VERSION = (2026, 8, 11)
 MISE_MANAGED_TOOLS = ("node", "python", "ruff", "supabase", "zizmor")
@@ -899,76 +898,28 @@ def _workflow_job_block(workflow: str, job_name: str) -> str:
     return match.group(0)
 
 
-def test_ci_mise_canary_contract() -> None:
-    """Verify the required canary exercises the shared mise setup and caches."""
+def test_ci_static_job_contract() -> None:
+    """The always-run static job uses the shared mise setup and gates the PR."""
     workflow = CI_WORKFLOW_PATH.read_text(encoding="utf-8")
-    setup_action = MISE_ACTION_PATH.read_text(encoding="utf-8")
-    canary = _workflow_job_block(workflow, "mise-canary")
+    static = _workflow_job_block(workflow, "static")
 
-    checkout = canary.index("uses: actions/checkout@")
-    mise_action = canary.index("uses: ./.github/actions/setup-mise")
-    assert checkout < mise_action
-    assert "id: toolchain" in canary
-    assert 'install-args: "--locked"' in canary
-
-    assert "actions/setup-node" not in canary
-    assert "pnpm/action-setup" not in canary
-    assert "supabase/setup-cli" not in canary
-
-    assert (
-        "uses: jdx/mise-action@3c2e0cf82a5b2e5249f0d3635a4d83d0ae861518" in setup_action
+    assert static.index("uses: actions/checkout@") < static.index(
+        "uses: ./.github/actions/setup-mise"
     )
-    assert 'version: "2026.8.11"' in setup_action
-    assert 'default: "--locked node pnpm"' in setup_action
-    assert "cache: true" in setup_action
-    assert (
-        'cache_key: "{{default}}-compat-node-${{ inputs.node-version }}"'
-        in setup_action
-    )
-    assert "Verify Node compatibility runtime" in setup_action
-    assert "Node compatibility mismatch" in setup_action
-    assert 'default: "."' in setup_action
-    assert "working_directory: ${{ inputs.working-directory }}" in setup_action
-    assert "working-directory: ${{ inputs.working-directory }}" in setup_action
-
-    for version_command in (
-        "node --version",
-        "pnpm --version",
-        "platform.python_version()",
-        "supabase --version",
-    ):
-        assert version_command in canary
-
-    assert "pnpm store path --silent" in setup_action
-    assert "Cache pnpm store" in setup_action
-    assert "Cache node_modules" in canary
-    assert "steps.toolchain.outputs.node-modules-key" in canary
-    assert "runner.os" in setup_action
-    assert "runner.arch" in setup_action
-    assert "hashFiles('package.json')" in setup_action
-    assert "hashFiles('pnpm-lock.yaml')" in setup_action
-    assert "pnpm-store-${RUNNER_OS}-${RUNNER_ARCH}" in setup_action
-    assert "node-modules-${RUNNER_OS}-${RUNNER_ARCH}" in setup_action
-    assert "-node-${node_version}-pnpm-${pnpm_version}" in setup_action
-    assert "-${PACKAGE_HASH}-${LOCK_HASH}" in setup_action
-
+    assert "if:" not in static.split("steps:")[0], "static must always run"
     for command in (
         "pnpm install --frozen-lockfile",
         "pnpm run typecheck",
         "pnpm run typecheck:tests",
+        "pnpm run typecheck:e2e",
         "pnpm run lint",
         "pnpm run format",
-        "ruff check scripts/",
-        "ruff format --check scripts/",
-        "pnpm run test",
+        "pnpm run test:_run",
         "pnpm run build",
     ):
-        assert command in canary
+        assert command in static
 
-    ci_gate = _workflow_job_block(workflow, "ci-gate")
-    assert "- mise-canary" in ci_gate
-    assert "MISE_CANARY_RESULT: ${{ needs.mise-canary.result }}" in ci_gate
-    assert 'required=("$MISE_CANARY_RESULT"' in ci_gate
+    assert "- static" in _workflow_job_block(workflow, "ci-gate")
 
 
 def test_workflows_use_mise_without_legacy_setup_actions() -> None:
@@ -994,7 +945,6 @@ def test_workflows_use_mise_without_legacy_setup_actions() -> None:
         CI_WORKFLOW_PATH: "uses: ./.github/actions/setup-mise",
         PREVIEW_REAPER_PATH: "uses: ./.github/actions/setup-mise",
         PREVIEW_CONTROL_PATH: ("uses: ./.pinpoint-workflow/.github/actions/setup-mise"),
-        PREVIEW_SYNC_PATH: "uses: ./.pinpoint-workflow/.github/actions/setup-mise",
     }
     for path, action_ref in expected_action_refs.items():
         content = path.read_text(encoding="utf-8")
@@ -1008,11 +958,7 @@ def test_ci_jobs_share_runtime_aware_dependency_cache() -> None:
     workflow = CI_WORKFLOW_PATH.read_text(encoding="utf-8")
     dependency_jobs = (
         "setup",
-        "typecheck",
-        "lint",
-        "format",
-        "build",
-        "test-unit",
+        "static",
         "test-integration",
         "test-migrations",
         "test-integration-supabase",
@@ -1020,7 +966,6 @@ def test_ci_jobs_share_runtime_aware_dependency_cache() -> None:
         "test-e2e-smoke-mobile-chrome",
         "test-e2e-full-chromium",
         "test-e2e-comprehensive",
-        "pnpm-audit",
     )
     supabase_jobs = {
         "test-migrations",
@@ -1048,10 +993,9 @@ def test_ci_jobs_share_runtime_aware_dependency_cache() -> None:
 def test_preview_mise_compatibility_and_ordering() -> None:
     """Preview orchestration keeps Node 22 explicit without moving deploy ownership."""
     control = PREVIEW_CONTROL_PATH.read_text(encoding="utf-8")
-    sync = PREVIEW_SYNC_PATH.read_text(encoding="utf-8")
     reaper = PREVIEW_REAPER_PATH.read_text(encoding="utf-8")
 
-    for workflow in (control, sync):
+    for workflow in (control,):
         assert 'node-version: "22"' in workflow
         assert 'install-args: "--locked node pnpm supabase"' in workflow
         assert "name: Checkout trusted workflow action" in workflow
@@ -1075,12 +1019,6 @@ def test_preview_mise_compatibility_and_ordering() -> None:
     )
     assert control.index("Setup locked Supabase CLI for stop") < control.index(
         "name: Destroy preview"
-    )
-    assert (
-        sync.index("name: Checkout trusted workflow action")
-        < sync.index("Setup locked preview toolchain")
-        < sync.index("name: Install dependencies")
-        < sync.index("name: Re-sync preview branch")
     )
 
     for workflow in (control, reaper):
@@ -1134,209 +1072,3 @@ def test_offline_python_and_ruff_resolution() -> None:
     assert ruff_proc.stdout.strip() == f"ruff {expected_versions['ruff']}", (
         f"Expected ruff {expected_versions['ruff']}, got {ruff_proc.stdout.strip()}"
     )
-
-
-def _collect_setup_cli_versions(
-    workflows_dir: Path | None = None,
-) -> list[tuple[Path, int, str]]:
-    """Find every legacy `supabase/setup-cli` step across workflows.
-
-    Returns (path, line_number, version) tuples. Auto-discovers all workflow
-    files so a new job that adds a setup-cli block is covered without editing
-    this test.
-
-    The scan is bounded to the setup-cli step's own `with:` mapping: starting
-    after the `uses: supabase/setup-cli` line it reads until the next step
-    (`- ` list item) or a dedent out of the step's key level, and accepts only a
-    `version:` nested inside that step's `with:` — so neither a *later* step's
-    `version:` nor a `version:` under some other key (e.g. `env:`) of this step
-    can be misattributed to an unpinned setup-cli. YAML is parsed by hand
-    (indentation + step markers) rather than with a library because the
-    script/test suite is deliberately stdlib-only.
-
-    `workflows_dir` defaults to the repo's `.github/workflows`; the parameter
-    exists so the regression tests can point it at a fixture.
-    """
-    if workflows_dir is None:
-        workflows_dir = REPO_ROOT / ".github" / "workflows"
-    version_re = re.compile(r"^\s*version:\s*['\"]?(\d+\.\d+\.\d+)['\"]?\s*$")
-    found: list[tuple[Path, int, str]] = []
-    for wf in sorted(workflows_dir.glob("*.y*ml")):
-        lines = wf.read_text(encoding="utf-8").splitlines()
-        for idx, line in enumerate(lines):
-            if "uses: supabase/setup-cli" not in line:
-                continue
-            # Column of the `uses:` keyword; the step's sibling keys (`with:`,
-            # `env:`, `name:`) sit at this column, their children deeper. Only a
-            # `version:` nested inside this step's own `with:` mapping configures
-            # the action — a `version:` under `env:` (or any other key) does not.
-            uses_col = line.index("uses:")
-            match_line: int | None = None
-            match_version: str | None = None
-            in_with = False
-            with_child_col: int | None = None
-            offset = 1
-            while idx + offset < len(lines):
-                nxt = lines[idx + offset]
-                stripped = nxt.strip()
-                if stripped and not stripped.startswith("#"):
-                    indent = len(nxt) - len(nxt.lstrip())
-                    if stripped.startswith("- ") or stripped == "-":
-                        break  # next step in the sequence
-                    if indent < uses_col:
-                        break  # dedented out of this step's mapping
-                    if indent == uses_col:
-                        # A step-level key: entering `with:`, or leaving it for a
-                        # sibling key (`env:`, `name:`, …).
-                        in_with = stripped.startswith("with:")
-                        with_child_col = None
-                    elif in_with:
-                        if with_child_col is None:
-                            with_child_col = indent
-                        if indent == with_child_col:
-                            m = version_re.match(nxt)
-                            if m:
-                                match_line = idx + offset + 1
-                                match_version = m.group(1)
-                                break
-                offset += 1
-            if match_version is None or match_line is None:
-                raise AssertionError(
-                    f"{wf.name}:{idx + 1} uses supabase/setup-cli but the step "
-                    "declares no `version:` of its own"
-                )
-            found.append((wf, match_line, match_version))
-    return found
-
-
-def test_ci_has_no_legacy_supabase_setup_actions() -> None:
-    """The PP-h2ui.9 cutover leaves mise as the sole Supabase CLI authority."""
-    pins = _collect_setup_cli_versions()
-    assert not pins, f"legacy supabase/setup-cli action(s) remain: {pins}"
-
-
-def test_collect_setup_cli_versions_raises_on_versionless_block(tmp_path: Path) -> None:
-    """A setup-cli block with no version (incl. at EOF) must raise, not be skipped.
-
-    Regression guard for the drift check: an unpinned/default-CLI block cannot
-    be allowed to slip through just because it sits near the end of a file.
-    """
-    wf = tmp_path / "unpinned.yaml"
-    # `setup-cli` on the final line — the scan window immediately hits EOF.
-    wf.write_text(
-        "jobs:\n  x:\n    steps:\n      - uses: supabase/setup-cli\n",
-        encoding="utf-8",
-    )
-    raised = False
-    try:
-        _collect_setup_cli_versions(workflows_dir=tmp_path)
-    except AssertionError as exc:
-        raised = True
-        assert "no `version:`" in str(exc)
-    assert raised, "expected a versionless setup-cli block to raise, but it was skipped"
-
-
-def test_collect_setup_cli_versions_reads_versioned_fixture(tmp_path: Path) -> None:
-    """A well-formed setup-cli block resolves to its pinned version."""
-    wf = tmp_path / "pinned.yaml"
-    wf.write_text(
-        "jobs:\n  x:\n    steps:\n"
-        "      - uses: supabase/setup-cli@v3\n"
-        "        with:\n"
-        "          version: 9.9.9\n",
-        encoding="utf-8",
-    )
-    pins = _collect_setup_cli_versions(workflows_dir=tmp_path)
-    assert [v for _, _, v in pins] == ["9.9.9"]
-
-
-def test_collect_setup_cli_versions_ignores_later_steps_version(tmp_path: Path) -> None:
-    """A later step's `version:` must not be attributed to an unpinned setup-cli.
-
-    Regression guard: an unpinned `supabase/setup-cli` immediately followed by
-    another action carrying `version: 2.115.0` must still raise — the scan is
-    bounded to setup-cli's own step, so the neighbor's value can't stand in.
-    """
-    wf = tmp_path / "misattribution.yaml"
-    wf.write_text(
-        "jobs:\n  x:\n    steps:\n"
-        "      - uses: supabase/setup-cli@v3\n"
-        "      - uses: some/other-action@v1\n"
-        "        with:\n"
-        "          version: 2.115.0\n",
-        encoding="utf-8",
-    )
-    raised = False
-    try:
-        _collect_setup_cli_versions(workflows_dir=tmp_path)
-    except AssertionError as exc:
-        raised = True
-        assert "no `version:`" in str(exc)
-    assert raised, (
-        "expected an unpinned setup-cli to raise despite a neighbor's version:"
-    )
-
-
-def test_collect_setup_cli_versions_ignores_non_with_version(tmp_path: Path) -> None:
-    """A `version:` outside the step's `with:` (e.g. under `env:`) must not count.
-
-    Regression guard: only `with.version` configures setup-cli, so a step that
-    carries a `version:` under another key but no `with.version` is unpinned and
-    must raise.
-    """
-    wf = tmp_path / "env-version.yaml"
-    wf.write_text(
-        "jobs:\n  x:\n    steps:\n"
-        "      - uses: supabase/setup-cli@v3\n"
-        "        env:\n"
-        "          version: 2.115.0\n",
-        encoding="utf-8",
-    )
-    raised = False
-    try:
-        _collect_setup_cli_versions(workflows_dir=tmp_path)
-    except AssertionError as exc:
-        raised = True
-        assert "no `version:`" in str(exc)
-    assert raised, "expected a non-with version: to be rejected as unpinned"
-
-
-def test_collect_setup_cli_versions_ignores_block_scalar_version(
-    tmp_path: Path,
-) -> None:
-    """A version-looking line inside a block scalar is not a `with.version`."""
-    wf = tmp_path / "block-scalar-version.yaml"
-    wf.write_text(
-        "jobs:\n  x:\n    steps:\n"
-        "      - uses: supabase/setup-cli@v3\n"
-        "        with:\n"
-        "          config: |\n"
-        "            version: 2.115.0\n",
-        encoding="utf-8",
-    )
-    raised = False
-    try:
-        _collect_setup_cli_versions(workflows_dir=tmp_path)
-    except AssertionError as exc:
-        raised = True
-        assert "no `version:`" in str(exc)
-    assert raised, "expected a block-scalar version: to be rejected as unpinned"
-
-
-def test_collect_setup_cli_versions_handles_name_form_step(tmp_path: Path) -> None:
-    """The `- name:` step form (uses under the marker) resolves its own version."""
-    wf = tmp_path / "name-form.yaml"
-    wf.write_text(
-        "jobs:\n  x:\n    steps:\n"
-        "      - name: Setup Supabase CLI\n"
-        "        uses: supabase/setup-cli@v3  # ratchet:...\n"
-        "        with:\n"
-        "          version: 1.2.3\n"
-        "      - name: Next\n"
-        "        uses: some/other@v1\n"
-        "        with:\n"
-        "          version: 9.9.9\n",
-        encoding="utf-8",
-    )
-    pins = _collect_setup_cli_versions(workflows_dir=tmp_path)
-    assert [v for _, _, v in pins] == ["1.2.3"]

@@ -53,7 +53,7 @@ case "$ci_conclusion" in
     ;;
 esac
 
-# Any reviewer's coverage of this head — Codex, CodeRabbit, or a local attestation —
+# Any reviewer's coverage of this head — Codex or CodeRabbit —
 # makes a request redundant; a pending request for this head makes it a duplicate.
 summary=$(_review_summary "$pr_number")
 if [[ "$(jq -r '.label' <<< "$summary")" == "approved" ]]; then

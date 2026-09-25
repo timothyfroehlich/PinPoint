@@ -39,6 +39,10 @@ import type {
 } from "~/lib/pinballmap/listing-state";
 import type { Result } from "~/lib/result";
 import { cn } from "~/lib/utils";
+import {
+  RemovalCommentNotice,
+  useRemovalCommentCheck,
+} from "~/components/machines/PinballmapRemovalComments";
 
 /**
  * The Manage tab's Pinball Map control (PP-o355.21) — spec §4.
@@ -98,8 +102,6 @@ export interface PinballmapListingControlProps {
   writeEnabled: boolean;
   /** Catalog title, so a confirm names the game rather than "this machine". */
   modelName: string | null;
-  /** Comments on the entry, for the remove confirm's consequence line (4.6). */
-  commentCount: number | null;
 }
 
 const INTENT_OPTIONS: readonly { value: PbmListingIntent; label: string }[] = [
@@ -121,7 +123,6 @@ export function PinballmapListingControl({
   canRefresh,
   writeEnabled,
   modelName,
-  commentCount,
 }: PinballmapListingControlProps): React.JSX.Element {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -242,6 +243,7 @@ export function PinballmapListingControl({
                   testId="pbm-listing-remove"
                   pending={pending}
                   destructive
+                  removalMachineId={machineId}
                   onConfirm={() => {
                     run(removeMachineFromPinballMapAction);
                   }}
@@ -249,7 +251,6 @@ export function PinballmapListingControl({
                     title: "Remove from Pinball Map?",
                     body: `Removes ${game} from the location's lineup on pinballmap.com. It will no longer be publicly visible.`,
                     action: "Remove machine",
-                    consequence: removeConsequence(commentCount),
                   }}
                   label="Remove machine from Pinball Map"
                 />
@@ -692,27 +693,10 @@ function nameSiblings(siblings: readonly PbmSibling[]): React.ReactNode {
   );
 }
 
-/**
- * The remove confirmation's consequence line (4.6): the entry's comment count
- * and what happens to it, stated accurately.
- *
- * A null count means the lineup has not been read recently enough to know. It
- * says so rather than showing a number it cannot stand behind (CORE-ARCH-012).
- */
-function removeConsequence(commentCount: number | null): string | null {
-  if (commentCount === null) {
-    return "PinPoint could not read this entry's comments just now, so it can't say how many would be lost. Refresh first if that matters.";
-  }
-  if (commentCount === 0) return null;
-  const plural = commentCount === 1 ? "comment" : "comments";
-  return `The entry has ${String(commentCount)} ${plural}. They are recoverable only if the game is re-added within 7 days; after that the history is permanently lost.`;
-}
-
 interface ConfirmCopy {
   title: string;
   body: string;
   action: string;
-  consequence?: string | null;
 }
 
 /** Pushes confirm before acting, naming the game and the public effect (4.5). */
@@ -723,6 +707,7 @@ function ConfirmButton({
   testId,
   label,
   destructive = false,
+  removalMachineId,
 }: {
   copy: ConfirmCopy;
   onConfirm: () => void;
@@ -730,9 +715,20 @@ function ConfirmButton({
   testId: string;
   label: string;
   destructive?: boolean;
+  removalMachineId?: string;
 }): React.JSX.Element {
+  const [open, setOpen] = useState(false);
+  const comments = useRemovalCommentCheck();
+
+  function handleOpenChange(nextOpen: boolean): void {
+    setOpen(nextOpen);
+    if (removalMachineId === undefined) return;
+    if (nextOpen) comments.start({ machineId: removalMachineId });
+    else comments.cancel();
+  }
+
   return (
-    <AlertDialog>
+    <AlertDialog open={open} onOpenChange={handleOpenChange}>
       <AlertDialogTrigger asChild>
         <Button
           variant="outline"
@@ -748,23 +744,20 @@ function ConfirmButton({
           <AlertDialogTitle>{copy.title}</AlertDialogTitle>
           <AlertDialogDescription>{copy.body}</AlertDialogDescription>
         </AlertDialogHeader>
-        {copy.consequence != null ? (
-          <p
-            className="rounded-r-md border-l-[3px] border-warning bg-warning-container/40 px-3 py-2 text-sm text-on-warning-container"
-            data-testid={`${testId}-consequence`}
-          >
-            {copy.consequence}
-          </p>
+        {removalMachineId !== undefined ? (
+          <RemovalCommentNotice state={comments.state} testId={testId} />
         ) : null}
         <AlertDialogFooter>
           <AlertDialogCancel disabled={pending}>Cancel</AlertDialogCancel>
           <AlertDialogAction
             type="button"
             variant={destructive ? "destructive" : "default"}
-            disabled={pending}
+            disabled={
+              pending || (removalMachineId !== undefined && !comments.ready)
+            }
             onClick={onConfirm}
           >
-            {copy.action}
+            {comments.lastKnown ? "Remove anyway" : copy.action}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

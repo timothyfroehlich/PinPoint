@@ -77,7 +77,7 @@ describe("My Feature", () => {
 
 Tests that require a **real Supabase instance** (authentication, SSR, etc.).
 
-**Run**: `pnpm run test:integration:supabase`. A fresh worktree needs the non-destructive local bootstrap `supabase start && pnpm run db:migrate` first. Note that `pnpm run test:integration` **excludes** this directory — it is the PGlite-only project.
+**Run**: `pnpm run test:integration:supabase`. A fresh worktree needs the non-destructive local bootstrap `pnpm supabase:start && pnpm run db:migrate` first. Note that `pnpm run test:integration` **excludes** this directory — it is the PGlite-only project.
 
 **Key Points**:
 
@@ -105,7 +105,7 @@ pnpm run test:integration
 # One or more PGlite integration files (schema setup included)
 pnpm run test:integration:target -- src/test/integration/database-queries.test.ts
 
-# Supabase integration tests (fresh worktree bootstrap: supabase start && pnpm run db:migrate)
+# Supabase integration tests (fresh worktree bootstrap: pnpm supabase:start && pnpm run db:migrate)
 pnpm run test:integration:supabase
 
 # All tests (unit + integration + supabase)

@@ -322,40 +322,13 @@ def test_trusted_clean_codex_comment_is_approved_and_lookalike_is_not(run_dashbo
 
 
 @pytest.mark.unit
-def test_local_attestation_marker_is_approved_when_pinned_else_stale(run_dashboard):
+def test_local_review_marker_is_not_coverage(run_dashboard):
+    # Only CodeRabbit and Codex cover a head; a retired local marker pinned to head
+    # reads as not reviewed.
     result, _calls = run_dashboard(
         [list_rule([pr_node(1)]), *gate_rules(1, comments=[marker()])]
     )
-    assert review_column(result) == "approved"
-
-    result, _calls = run_dashboard(
-        [list_rule([pr_node(1)]), *gate_rules(1, comments=[marker(OLD)])]
-    )
-    assert review_column(result) == "stale review"
-
-
-@pytest.mark.unit
-def test_two_axis_review_comment_is_approved_when_it_names_head(run_dashboard):
-    def two_axis(sha):
-        return {
-            "user": {"login": OWNER},
-            "body": (
-                "## Code review — PR #1 (two-axis)\n\n"
-                f"Reviewed `origin/main...{sha[:8]}` across **Standards** and **Spec**."
-                "\n\n## Standards\n\nNo breaches.\n\n## Spec\n\nFaithful.\n\n—Claude"
-            ),
-            "created_at": "2026-08-30T12:01:00Z",
-        }
-
-    result, _calls = run_dashboard(
-        [list_rule([pr_node(1)]), *gate_rules(1, comments=[two_axis(HEAD)])]
-    )
-    assert review_column(result) == "approved"
-
-    result, _calls = run_dashboard(
-        [list_rule([pr_node(1)]), *gate_rules(1, comments=[two_axis(OLD)])]
-    )
-    assert review_column(result) == "stale review"
+    assert review_column(result) == "not reviewed"
 
 
 @pytest.mark.unit

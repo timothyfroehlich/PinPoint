@@ -19,8 +19,9 @@
  *     this is false for them — which is what makes it safe to enforce with NO
  *     escape hatch on the remote-capable seed scripts.
  *
- * The API-URL case is exactly why the coarse regex is not sufficient on its own:
- * `https://<ref>.supabase.co` does not contain the string "supabase.com".
+ * The coarse regex also matches `*.supabase.co`, so direct `db.<ref>` hosts and
+ * API URLs count as cloud, but it still cannot tell production from a preview
+ * branch; only the project ref can.
  */
 
 /**
@@ -34,7 +35,10 @@ export const PRODUCTION_PROJECT_REF = "udhesuizjsgxfeotqybn";
  * Managed-Postgres host shapes. Extracted verbatim from drizzle.config.ts so
  * there is one copy of this regex rather than a third divergent one.
  */
-const CLOUD_HOST_PATTERN = /supabase\.com|neon\.tech|rds\.amazonaws\.com/;
+// `supabase.co` covers direct `db.<ref>.supabase.co` hosts, which the pooler
+// spelling (`*.pooler.supabase.com`) does not.
+const CLOUD_HOST_PATTERN =
+  /supabase\.(?:com|co)|neon\.tech|rds\.amazonaws\.com/;
 
 /**
  * Is this connection string pointed at a managed cloud database (as opposed to

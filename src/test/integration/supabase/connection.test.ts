@@ -1,7 +1,7 @@
 /**
  * Integration Test: Supabase Connection
  *
- * REQUIRES: Local Supabase running (`supabase start`)
+ * REQUIRES: Local Supabase running (`pnpm supabase:start`)
  *
  * This test verifies that:
  * 1. We can connect to the local Supabase instance

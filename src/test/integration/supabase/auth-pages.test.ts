@@ -1,6 +1,9 @@
 import { describe, it, expect, beforeAll, afterEach } from "vitest";
 import { createClient } from "@supabase/supabase-js";
-import { confirmTestUserEmail } from "~/test/helpers/supabase";
+import {
+  confirmTestUserEmail,
+  expectLocalSupabaseUrl,
+} from "~/test/helpers/supabase";
 
 /**
  * Integration tests for auth page redirect logic
@@ -11,7 +14,7 @@ import { confirmTestUserEmail } from "~/test/helpers/supabase";
  * Note: We test the auth state logic, not the Server Component rendering.
  * The actual redirect behavior is tested in E2E tests.
  *
- * Requires Supabase to be running (supabase start).
+ * Requires Supabase to be running (pnpm supabase:start).
  */
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -31,7 +34,7 @@ describe("Auth Pages - Server Component Auth Logic", () => {
 
   beforeAll(() => {
     // Ensure we're in a test environment
-    expect(supabaseUrl).toMatch(/127\.0\.0\.1|localhost/);
+    expectLocalSupabaseUrl(supabaseUrl);
   });
 
   afterEach(async () => {
