@@ -99,16 +99,26 @@
 
 ---
 
-## 9. Deferred Work
+## 9. Type, Display, and Players Tags
 
-- **9.1** Tags people create and apply by hand, and who may curate them, are deferred.
-- **9.2** Tag types whose tags are mutually exclusive on one machine, beyond manufacturer, are deferred.
-- **9.3** Era tags are deferred.
-- **9.4** Collection descriptions are deferred.
-- **9.5** Saving a Collection reached through a View Link to My Collections is deferred.
-- **9.6** A public directory of Collections is deferred.
-- **9.7** Adding a machine to a Collection from the machine's own page is deferred.
-- **9.8** Writing notes from a Machine Group's Timeline is deferred.
+- **9.1** Type, Display, and Players are automatic tag types whose membership comes from the Open Pinball Database (OPDB) record of a machine's Pinball Map catalog title, read from a copy of OPDB's published data that PinPoint stores and refreshes on a schedule.
+- **9.2** A machine with no catalog title, or whose catalog title has no OPDB record, belongs to no Type, Display, or Players tag, and a value its OPDB record leaves blank produces no tag of that type.
+- **9.3** The Type tags are Electromechanical, Solid State, and Pure Mechanical.
+- **9.4** The Display tags are Reels, Lights, Alphanumeric, CGA, DMD, and LCD.
+- **9.5** A Players tag names the machine's player count: “1 Player” for one player and “N Players” otherwise, such as “4 Players”.
+- **9.6** A machine belongs to at most one tag of each of these types, and nobody applies or removes these tags by hand.
+
+---
+
+## 10. Deferred Work
+
+- **10.1** Tags people create and apply by hand, and who may curate them, are deferred.
+- **10.2** Hand-applied tag types whose tags are mutually exclusive on one machine are deferred.
+- **10.3** Collection descriptions are deferred.
+- **10.4** Saving a Collection reached through a View Link to My Collections is deferred.
+- **10.5** A public directory of Collections is deferred.
+- **10.6** Adding a machine to a Collection from the machine's own page is deferred.
+- **10.7** Writing notes from a Machine Group's Timeline is deferred.
 
 ---
 
@@ -124,5 +134,6 @@
 
 | Date | Change |
 | :-- | :-- |
+| 2026-09-25 | Added Type, Display, and Players tag types from OPDB data; dropped deferred era tags. |
 | 2026-09-25 | Added tag type pages and automatic tag type marking. |
 | 2026-09-24 | Created from as-built Collections behavior, with Owner Collections made public and manufacturer tags as the first tag type. |
