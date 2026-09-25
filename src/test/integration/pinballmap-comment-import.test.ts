@@ -12,13 +12,15 @@
  *    the issue when it moves.
  *  - 7.4 / 7.7 a new comment notifies the owner and watchers of each covering
  *    cabinet, once per cabinet and per enabled channel (PP-o355.63).
+ *  - 7.2 / 7.3 / 10.9 comments are marked as from a previous listing only
+ *    once their entry is gone for good (PP-o355.36).
  *
  * Everything reads the stored snapshot; no Pinball Map client is involved.
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { randomUUID } from "node:crypto";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 
 import { asDbOrTx, getTestDb, setupTestDb } from "~/test/setup/pglite";
 import {
@@ -650,11 +652,154 @@ describe("imported comments on the timeline (PGlite)", () => {
       locationId: LOCATION_ID,
       convertedIssue: null,
       otherCopies: [{ name: "RDB cabinet", initials: "RDB" }],
+      previousListing: null,
     });
     const [bRow] = await getMachineTimeline(asDbOrTx(db), { machineId: b.id });
     expect(bRow?.pinballmapComment?.otherCopies).toEqual([
       { name: "RDA cabinet", initials: "RDA" },
     ]);
+  });
+});
+
+describe("comments from a previous listing (PGlite)", () => {
+  setupTestDb();
+
+  const ENTRY: Entry = {
+    lmxId: 1001,
+    machineId: TITLE,
+    conditions: [condition(1, "left flipper weak")],
+  };
+
+  async function markOf(conditionId: number): Promise<{
+    reason: string | null;
+    missingSince: Date | null;
+  }> {
+    const db = await getTestDb();
+    const [row] = await db
+      .select({
+        reason: pinballmapComments.previousListingReason,
+        missingSince: pinballmapComments.entryMissingSince,
+      })
+      .from(pinballmapComments)
+      .where(eq(pinballmapComments.conditionId, conditionId));
+    if (!row) throw new Error(`no comment ${String(conditionId)}`);
+    return row;
+  }
+
+  async function ageMissingWindow(days: number): Promise<void> {
+    const db = await getTestDb();
+    await db
+      .update(pinballmapComments)
+      .set({
+        entryMissingSince: new Date(Date.now() - days * 24 * 60 * 60 * 1000),
+      })
+      .where(sql`${pinballmapComments.entryMissingSince} IS NOT NULL`);
+  }
+
+  it("keeps a missing entry's comments current inside the restoration window", async () => {
+    await seedMachine("PLA", TITLE, "on");
+    await seedState([ENTRY]);
+    await importComments();
+
+    await seedState([]);
+    await importComments();
+    await ageMissingWindow(6);
+    await importComments();
+
+    const mark = await markOf(1);
+    expect(mark.reason).toBeNull();
+    expect(mark.missingSince).not.toBeNull();
+  });
+
+  it("marks the comments on every covering cabinet once the window has passed", async () => {
+    const db = await getTestDb();
+    const a = await seedMachine("PLB", TITLE, "on");
+    const b = await seedMachine("PLC", TITLE, "on");
+    await seedState([ENTRY]);
+    await importComments();
+    await seedState([]);
+    await importComments();
+
+    await ageMissingWindow(8);
+    await importComments();
+
+    expect((await markOf(1)).reason).toBe("removed");
+    const { getMachineTimeline } =
+      await import("~/lib/timeline/machine-events");
+    for (const machine of [a, b]) {
+      const [row] = await getMachineTimeline(asDbOrTx(db), {
+        machineId: machine.id,
+      });
+      expect(row?.pinballmapComment?.previousListing).toBe("removed");
+    }
+  });
+
+  it("treats the same entry coming back as the listing resumed", async () => {
+    await seedMachine("PLD", TITLE, "on");
+    await seedState([ENTRY]);
+    await importComments();
+    await seedState([]);
+    await importComments();
+    await ageMissingWindow(8);
+    await importComments();
+    expect((await markOf(1)).reason).toBe("removed");
+
+    await seedState([ENTRY]);
+    await importComments();
+
+    expect(await markOf(1)).toEqual({ reason: null, missingSince: null });
+  });
+
+  it("marks the old entry's comments at once when a new entry replaces it", async () => {
+    await seedMachine("PLE", TITLE, "on");
+    await seedState([ENTRY]);
+    await importComments();
+
+    await seedState([
+      {
+        lmxId: 2002,
+        machineId: TITLE,
+        conditions: [condition(5, "new entry comment")],
+      },
+    ]);
+    await importComments();
+
+    expect((await markOf(1)).reason).toBe("replaced");
+    expect((await markOf(5)).reason).toBeNull();
+  });
+
+  it("never clears a location-change mark, even when the old entry is seen again", async () => {
+    const db = await getTestDb();
+    await seedMachine("PLF", TITLE, "on");
+    await seedState([ENTRY]);
+    await importComments();
+    await db
+      .update(pinballmapComments)
+      .set({
+        previousListingReason: "location_changed",
+        previousListingAt: new Date(),
+      })
+      .where(eq(pinballmapComments.conditionId, 1));
+
+    await importComments();
+
+    expect((await markOf(1)).reason).toBe("location_changed");
+  });
+
+  it("leaves comments from another location alone", async () => {
+    const db = await getTestDb();
+    await seedMachine("PLG", TITLE, "on");
+    await seedState([ENTRY]);
+    await importComments();
+    await db
+      .update(pinballmapComments)
+      .set({ locationId: 999 })
+      .where(eq(pinballmapComments.conditionId, 1));
+
+    await seedState([]);
+    await importComments();
+
+    expect(await markOf(1)).toEqual({ reason: null, missingSince: null });
   });
 });
 
