@@ -41,7 +41,12 @@ export default async function ApronCardPrintPage({
       with: {
         owner: { columns: { name: true } },
         pinballmapTitle: {
-          columns: { name: true, machineGroupId: true, groupName: true },
+          columns: {
+            name: true,
+            machineGroupId: true,
+            groupName: true,
+            manufacturer: true,
+          },
         },
       },
     }),

@@ -2,7 +2,10 @@ import type React from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { ChevronRight, CircleAlert, Trophy } from "lucide-react";
-import type { MachineForLayout } from "~/app/(app)/m/[initials]/_data";
+import type {
+  MachineArtwork,
+  MachineForLayout,
+} from "~/app/(app)/m/[initials]/_data";
 import { formatCompactAge, formatDate } from "~/lib/dates";
 import type { IscoredScore } from "~/lib/iscored/types";
 import {
@@ -20,6 +23,7 @@ interface MachineScanHubProps {
     invitedOwner: { name: string } | null;
     iscoredGameId: string | null;
     issues: HubIssue[];
+    artwork: MachineArtwork | null;
   };
   scores: IscoredScore[];
   scoreHref: string | null;
@@ -39,6 +43,109 @@ const labelClass =
 function displayScoreDate(date: string): string {
   const parsed = new Date(date);
   return Number.isNaN(parsed.getTime()) ? date : formatDate(parsed);
+}
+
+/**
+ * Shape of a standard OPDB backglass image, used when Pinball Map reported no
+ * dimensions for this one.
+ */
+const FALLBACK_ARTWORK_RATIO = 444 / 640;
+
+function IdentityLink({
+  href,
+  name,
+  metadata,
+  onArtwork,
+}: {
+  href: string;
+  name: string;
+  metadata: string;
+  onArtwork: boolean;
+}): React.JSX.Element {
+  return (
+    <Link
+      href={href}
+      className="flex min-h-16 items-center gap-2 rounded-lg text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+      aria-label={`${name} details`}
+    >
+      <div className="min-w-0 flex-1">
+        <h1 className="truncate text-[26px] leading-tight font-extrabold tracking-tight sm:text-3xl">
+          {name}
+        </h1>
+        <p
+          className={`truncate text-xs sm:text-sm ${onArtwork ? "text-foreground/85" : "text-muted-foreground"}`}
+        >
+          {metadata}
+        </p>
+      </div>
+      <span
+        className={`flex shrink-0 flex-col items-center text-[10px] font-semibold ${onArtwork ? "text-foreground/85" : "text-muted-foreground"}`}
+      >
+        <ChevronRight className="size-5" aria-hidden="true" />
+        Details
+      </span>
+    </Link>
+  );
+}
+
+/**
+ * The artwork band (spec §3.6–§3.7, §5.4). It takes the height the rest of
+ * the hub leaves free (`flex-1` from a zero basis), capped at the image's own
+ * height at full width, and never below 120px — below that the hub scrolls.
+ * When the band is shorter than the image, the image shrinks to fit
+ * (`object-contain`) and a blurred copy fills the sides. Below `md` it bleeds
+ * 16px past the hub column on each side — viewport-wide on phones, at most
+ * 390 + 32 = 422px — so the height cap uses that width; from `md` it is the
+ * hub's rounded 390px column.
+ */
+function ArtworkBand({
+  artwork,
+  children,
+}: {
+  artwork: MachineArtwork;
+  children: React.ReactNode;
+}): React.JSX.Element {
+  const ratio =
+    artwork.width != null && artwork.height != null
+      ? artwork.height / artwork.width
+      : FALLBACK_ARTWORK_RATIO;
+  const style: React.CSSProperties & Record<"--art-ratio", number> = {
+    "--art-ratio": ratio,
+  };
+  return (
+    <figure
+      data-testid="hub-artwork-band"
+      style={style}
+      className="relative m-0 -mx-4 -mt-4 max-h-[calc(min(100vw,422px)*var(--art-ratio))] min-h-[120px] flex-1 basis-0 overflow-hidden bg-card md:mx-0 md:mt-0 md:max-h-[calc(390px*var(--art-ratio))] md:rounded-xl"
+    >
+      <Image
+        src={artwork.url}
+        alt=""
+        aria-hidden="true"
+        fill
+        sizes="390px"
+        unoptimized
+        className="object-cover blur-2xl brightness-50"
+      />
+      <Image
+        src={artwork.url}
+        alt=""
+        fill
+        sizes="(min-width: 768px) 390px, 100vw"
+        unoptimized
+        priority
+        className="object-contain"
+      />
+      <div
+        aria-hidden="true"
+        className="absolute inset-x-0 bottom-0 h-24 bg-linear-to-b from-transparent to-background/95"
+      />
+      <div className="absolute inset-x-4 bottom-1">{children}</div>
+      <figcaption className="absolute top-0 right-0 rounded-bl bg-background/90 px-1.5 py-0.5 text-[10px] tracking-wide text-foreground">
+        Image: <a href={artwork.url}>OPDB</a>
+      </figcaption>
+    </figure>
+  );
 }
 
 function IssueRow({ issue }: { issue: HubIssue }): React.JSX.Element {
@@ -74,31 +181,29 @@ export function MachineScanHub({
     ownerName ? `Owned by ${ownerName}` : "Owner not listed",
   ].filter(Boolean);
   const openIssues = machine.issues;
-  const newestIssue = openIssues[0];
 
   return (
     <div
       data-machine-scan-hub
       className="mx-auto flex min-h-[calc(100dvh-112px-env(safe-area-inset-bottom))] w-full max-w-[390px] flex-col gap-3 py-4 md:min-h-[calc(100dvh-64px)]"
     >
-      <Link
-        href={infoHref}
-        className="flex min-h-16 items-center gap-2 rounded-lg text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-        aria-label={`${machine.name} details`}
-      >
-        <div className="min-w-0 flex-1">
-          <h1 className="truncate text-[26px] leading-tight font-extrabold tracking-tight sm:text-3xl">
-            {machine.name}
-          </h1>
-          <p className="truncate text-xs text-muted-foreground sm:text-sm">
-            {metadata.join(" · ")}
-          </p>
-        </div>
-        <span className="flex shrink-0 flex-col items-center text-[10px] font-semibold text-muted-foreground">
-          <ChevronRight className="size-5" aria-hidden="true" />
-          Details
-        </span>
-      </Link>
+      {machine.artwork != null ? (
+        <ArtworkBand artwork={machine.artwork}>
+          <IdentityLink
+            href={infoHref}
+            name={machine.name}
+            metadata={metadata.join(" · ")}
+            onArtwork
+          />
+        </ArtworkBand>
+      ) : (
+        <IdentityLink
+          href={infoHref}
+          name={machine.name}
+          metadata={metadata.join(" · ")}
+          onArtwork={false}
+        />
+      )}
 
       <section className={cardClass} aria-labelledby="hub-scores-heading">
         <div className="flex min-h-6 items-center justify-between gap-2">
@@ -173,10 +278,7 @@ export function MachineScanHub({
         )}
       </section>
 
-      <section
-        className={`${cardClass} [@media(max-height:700px)]:hidden`}
-        aria-labelledby="hub-issues-heading"
-      >
+      <section className={cardClass} aria-labelledby="hub-issues-heading">
         <div className="flex min-h-7 items-center justify-between gap-2">
           <h2 id="hub-issues-heading" className={labelClass}>
             Open issues · {openIssues.length}
@@ -201,55 +303,23 @@ export function MachineScanHub({
         )}
       </section>
 
-      {newestIssue ? (
-        <Link
-          href={issuesHref}
-          className={`${cardClass} hidden text-foreground [@media(max-height:700px)]:block`}
-          aria-label={`Open issues: ${openIssues.length}. See all issues for ${machine.name}`}
-        >
-          <span className={labelClass}>Open issues · {openIssues.length}</span>
-          <span className="mt-1 flex min-h-10 items-center gap-2 text-sm">
-            <span
-              className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${getIssueSeverityStyles(newestIssue.severity)}`}
-            >
-              {getIssueSeverityLabel(newestIssue.severity)}
-            </span>
-            <span className="min-w-0 flex-1 truncate">{newestIssue.title}</span>
-            {openIssues.length > 1 ? (
-              <span className="shrink-0 text-xs text-muted-foreground">
-                +{openIssues.length - 1} more
-              </span>
-            ) : null}
-          </span>
-        </Link>
-      ) : (
-        <section
-          className={`${cardClass} hidden [@media(max-height:700px)]:block`}
-          aria-label="Open issues"
-        >
-          <span className={labelClass}>Open issues · 0</span>
-          <p className="mt-1 text-sm text-muted-foreground">No open issues</p>
-        </section>
-      )}
-
-      <div className="flex-1" aria-hidden="true" />
-      <div className="flex gap-2.5 pb-2" aria-label="Machine actions">
+      <div className="mt-auto flex gap-2.5 pb-2" aria-label="Machine actions">
         {scoreHref ? (
           <a
             href={scoreHref}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex h-[100px] min-w-0 flex-1 flex-col items-center justify-center gap-2 rounded-xl bg-primary text-center text-base font-bold text-primary-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            className="flex h-[68px] min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-xl bg-primary text-center text-base font-bold text-primary-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
           >
-            <Trophy className="size-7" aria-hidden="true" />
+            <Trophy className="size-6" aria-hidden="true" />
             Post a score
           </a>
         ) : null}
         <Link
           href={reportHref}
-          className="flex h-[100px] min-w-0 flex-1 flex-col items-center justify-center gap-2 rounded-xl bg-warning text-center text-base font-bold text-primary-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          className="flex h-[68px] min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-xl bg-warning text-center text-base font-bold text-primary-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
         >
-          <CircleAlert className="size-7" aria-hidden="true" />
+          <CircleAlert className="size-6" aria-hidden="true" />
           Report a problem
         </Link>
       </div>

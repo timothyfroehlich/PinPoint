@@ -123,8 +123,11 @@ The control's states (§4) are comparisons across these: _in sync_ means intent 
 ## 8. Permissions
 
 - **8.1** Setting intent (any toggle position) requires the machine-linking capability: machine owner, technician, or admin.
-- **8.2** Pushing to Pinball Map requires the machine-linking capability (8.1) plus provisioned operator credentials. Pinball Map itself is publicly editable, so gating writes tighter than PinPoint's own bookkeeping buys nothing. Absent credentials, push buttons are not shown.
+- **8.2** Pushing to Pinball Map requires the machine-linking capability (8.1) plus the person's own linked Pinball Map account (8.4); Pinball Map attributes each write to that person. Pinball Map itself is publicly editable, so gating writes tighter than PinPoint's own bookkeeping buys nothing. Without a linked account, push buttons are not shown.
 - **8.3** Reading status in this control and using the header Refresh require signed-in membership plus machine-page access. Anonymous visitors and guests do not see the control. Refreshes stay throttled regardless of who clicks (3.2).
+- **8.4** A member links their Pinball Map account from their own settings by signing in once with their Pinball Map username or email and password. PinPoint exchanges these for the account's token, stores only the token, and never stores the password. Unlinking deletes PinPoint's copy and says that Pinball Map offers no way to revoke the token itself; relinking replaces the stored token.
+- **8.5** PinPoint checks a token only when linking and when Pinball Map rejects a write as unauthorized. A rejected token marks the link **Needs relink** in the member's settings and on the action they attempted, which then shows the no-credential guidance (4.4). PinPoint never polls Pinball Map to test tokens.
+- **8.6** A member with the machine-linking capability but no linked account still sets intent (8.1). The resulting Out of sync state is their request: any member who can push sees it and carries it out. The status row offers the unlinked member a prompt to link their account alongside the 4.4 guidance.
 
 ## 9. Conduct toward Pinball Map
 
@@ -175,12 +178,12 @@ Replacing the tracked location is a rare, near-never operation — PinPoint trac
 
 | Spec | Code today | Resolution |
 | :-- | :-- | :-- |
-| 7.1 comment fan-out | No comment import exists | PP-o355.4 (reshape to fan-out); PP-o355.36 depends on it |
 | 7.3 comment marking on removal | Not implemented | PP-o355.36 |
-| 7.4 watcher notifications after baseline | No comment import or notification exists | PP-o355.4; shared-comment identity PP-o355.54.14 |
-| 7.5 explicit Convert to issue | No comment import or conversion action exists | PP-o355.4; shared-comment identity PP-o355.54.14 |
-| 10.9 comment re-marking on location change | No comment import exists | PP-o355.4 (import); permanent mark-on-location-change after |
+| 7.4 watcher notifications after baseline | Comments import with a silent per-location backfill and each new copy is identified, but no notification is sent | PP-o355.63 |
+| 7.7 one notification per watched cabinet | No comment notification exists | PP-o355.63 |
+| 10.9 comment re-marking on location change | Comments import, but copies from a previous location are not marked | PP-o355.36 |
 | 3.6–3.7 lineup confirmation | The client method exists, but no app action exposes venue-lineup confirmation | PP-o355.58 (confirm lineup, needs `/fleet` base PP-o355.7.1); condition-comment posting deferred (PP-o355.57) |
+| 8.2, 8.4–8.6 per-member account linking | Writes use one admin-provisioned operator credential; no member linking, relink state, or link prompt exists | PP-o355.6 |
 
 ---
 
@@ -191,6 +194,7 @@ Changes to this document. Divergence-table rows are working state and are not lo
 | Date | Change |
 | :-- | :-- |
 | 2026-09-25 | §3.8: eligibility now comes from Pinball Map's catalog flag, so an eligible entry with no recorded value shows **Not set**; the setting is a switch in a row between intent and status (§4.1); PinPoint sends the target setting instead of flipping it, replacing the re-read-before-write rule. |
+| 2026-09-25 | Defined per-member Pinball Map account linking (§§8.4–8.6): sign-in exchange only, token stored and password never kept, rejected tokens marked for relink without polling, and an unlinked member's intent left Out of sync as their request. §8.2 now names the person's own linked account. |
 | 2026-09-25 | Detailed §3.6's outbound actions: lineup confirmation from the `/fleet` header (§3.7) and safe Insider Connected changes (§3.8). Deferred condition-comment posting out of full support until requested. |
 | 2026-09-23 | Clarified shared-comment copies and per-cabinet notifications (§§7.6–7.7), and tied conversion to one movable issue per Pinball Map comment (§§7.8–7.9). |
 | 2026-09-22 | Added §§7.4–7.5: historical comment backfill is silent, later new comments notify watchers, and Convert to issue is explicit rather than automatic. |

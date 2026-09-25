@@ -1,5 +1,5 @@
 {
-  "id": "2bc48466-d479-4abb-a429-803455f75ad9",
+  "id": "061968f1-2c59-49ea-beaa-97b450e807a9",
   "prevId": "33f98e7a-b405-4b01-baf0-79dde237bcc7",
   "version": "7",
   "dialect": "postgresql",
@@ -2254,13 +2254,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "ic_eligible": {
-          "name": "ic_eligible",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
         "refreshed_at": {
           "name": "refreshed_at",
           "type": "timestamp with time zone",
@@ -2302,6 +2295,122 @@
         }
       },
       "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": true
+    },
+    "public.pinballmap_comments": {
+      "name": "pinballmap_comments",
+      "schema": "",
+      "columns": {
+        "condition_id": {
+          "name": "condition_id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "location_id": {
+          "name": "location_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pinballmap_machine_id": {
+          "name": "pinballmap_machine_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "lmx_id": {
+          "name": "lmx_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "comment": {
+          "name": "comment",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "username": {
+          "name": "username",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "commented_at": {
+          "name": "commented_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "first_observed_at": {
+          "name": "first_observed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "converted_issue_id": {
+          "name": "converted_issue_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "converted_at": {
+          "name": "converted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "converted_by": {
+          "name": "converted_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "pinballmap_comments_converted_issue_idx": {
+          "name": "pinballmap_comments_converted_issue_idx",
+          "columns": [
+            {
+              "expression": "converted_issue_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"pinballmap_comments\".\"converted_issue_id\" IS NOT NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "pinballmap_comments_converted_issue_id_issues_id_fk": {
+          "name": "pinballmap_comments_converted_issue_id_issues_id_fk",
+          "tableFrom": "pinballmap_comments",
+          "tableTo": "issues",
+          "columnsFrom": ["converted_issue_id"],
+          "columnsTo": ["id"],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "pinballmap_comments_converted_by_user_profiles_id_fk": {
+          "name": "pinballmap_comments_converted_by_user_profiles_id_fk",
+          "tableFrom": "pinballmap_comments",
+          "tableTo": "user_profiles",
+          "columnsFrom": ["converted_by"],
+          "columnsTo": ["id"],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
@@ -2857,6 +2966,12 @@
           "type": "uuid",
           "primaryKey": false,
           "notNull": false
+        },
+        "comments_baseline_location_id": {
+          "name": "comments_baseline_location_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {},
@@ -3177,6 +3292,28 @@
           ],
           "isUnique": true,
           "where": "\"timeline_events\".\"idempotency_key\" IS NOT NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_timeline_events_pinballmap_comment": {
+          "name": "idx_timeline_events_pinballmap_comment",
+          "columns": [
+            {
+              "expression": "machine_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "((\"event_data\"->>'conditionId'))",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"timeline_events\".\"source_type\" = 'pinballmap'",
           "concurrently": false,
           "method": "btree",
           "with": {}

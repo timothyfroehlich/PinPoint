@@ -595,6 +595,59 @@ export async function removeLmxFromStoredLineup(lmxIds: number[]) {
   if (writeError) throw writeError;
 }
 
+/**
+ * Seed one imported Pinball Map comment and its timeline copies (PP-o355.4),
+ * as the importer would leave them: the comment's identity row plus one
+ * `pinballmap` timeline event per machine. Seeded directly rather than through
+ * a sync so the test never touches the shared stored lineup and never reaches
+ * pinballmap.com (CORE-PBM-001 / CORE-TEST-006). The importer itself is covered
+ * by `src/test/integration/pinballmap-comment-import.test.ts`.
+ */
+export async function seedImportedPinballMapComment(entry: {
+  conditionId: number;
+  comment: string;
+  username: string;
+  machineIds: string[];
+}) {
+  const commentedAt = new Date().toISOString();
+  const { error } = await supabaseAdmin.from("pinballmap_comments").insert({
+    condition_id: entry.conditionId,
+    location_id: 26454,
+    pinballmap_machine_id: 900_000_000,
+    lmx_id: 900_000_000,
+    comment: entry.comment,
+    username: entry.username,
+    commented_at: commentedAt,
+  });
+  if (error) throw error;
+
+  const { error: copyError } = await supabaseAdmin
+    .from("timeline_events")
+    .insert(
+      entry.machineIds.map((machineId) => ({
+        machine_id: machineId,
+        created_at: commentedAt,
+        source_type: "pinballmap",
+        tag: "pinballmap",
+        event_data: {
+          kind: "pinballmap_comment",
+          conditionId: entry.conditionId,
+        },
+      }))
+    );
+  if (copyError) throw copyError;
+}
+
+/** Remove comment identity rows seeded by {@link seedImportedPinballMapComment}. */
+export async function deletePinballMapComments(conditionIds: number[]) {
+  if (conditionIds.length === 0) return;
+  const { error } = await supabaseAdmin
+    .from("pinballmap_comments")
+    .delete()
+    .in("condition_id", conditionIds);
+  if (error) throw error;
+}
+
 /** Store a saved Stern apron card on a machine, as the editor would (PP-esta). */
 export async function seedSavedApronCard(
   machineId: string,

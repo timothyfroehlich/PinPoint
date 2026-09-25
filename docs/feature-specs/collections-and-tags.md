@@ -114,11 +114,9 @@
 
 ## Known divergences (code vs spec)
 
-| Requirement | Divergence | Resolution |
-| :-- | :-- | :-- |
-| 6.2 | Owner Collections require sign-in. | PP-wqit.9 |
-| 7.1–7.8, 8.1–8.6 | Tags are not built; the machine page shows a "Tags — Coming soon!" placeholder. | PP-wqit.6 |
-| 8.5 | Machine View falls back to a machine's own stored manufacturer when a linked catalog title has none, and shows it for machines that are neither linked nor uncataloged; the machine Info page shows the stored manufacturer directly. | PP-wqit.6 |
+| Requirement | Divergence                         | Resolution |
+| :---------- | :--------------------------------- | :--------- |
+| 6.2         | Owner Collections require sign-in. | PP-wqit.9  |
 
 ---
 

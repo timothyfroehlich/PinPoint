@@ -220,8 +220,8 @@ reclaimed, and every step after it (bead notes, `nightly-report`, `bd dolt
 push`) is lost. Three nightly runs went this way in September 2026: one on
 `git reset --hard` (2026-09-04), two on `bash -n scripts/workflow/merge-pr.sh`
 (2026-09-11, 2026-09-12 — a syntax check the old merge-guard hook read as
-running the script, PP-mslx; the `Bash(*merge-pr.sh *)` ask rule does not match
-it). The nightly prompt now carries the `ask`/`deny` list from
+running the script, PP-mslx; the merge-pr.sh ask rules match only a
+command that runs the script with arguments, so they do not match it). The nightly prompt now carries the `ask`/`deny` list from
 `.claude/settings.json` as a do-not-run list, and keeps `scripts/workflow/`, `.claude/hooks/`
 and the settings files out of its work scope. Keep that list in step with the
 settings file when adding an `ask` rule.

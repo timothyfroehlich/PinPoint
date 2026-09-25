@@ -18,6 +18,7 @@ import { createClient } from "~/lib/supabase/server";
 import { db, type Tx } from "~/server/db";
 import { machines, userProfiles, pinballmapState } from "~/server/db/schema";
 import { reconcileAfterSync } from "~/lib/pinballmap/sync";
+import { importPinballMapCommentsAfterCoverageChange } from "~/lib/pinballmap/comment-import";
 import {
   listSurfacingAbandonedForMachine,
   recordAbandonedListing,
@@ -295,6 +296,10 @@ export async function setPinballmapIntentAction(
       tx
     );
   });
+
+  // Turning On makes this cabinet a covering one, owed its entry's comments
+  // (spec 7.1). Copies already imported stay when it turns Off.
+  if (intent === "on") await importPinballMapCommentsAfterCoverageChange();
 
   revalidatePath(`/m/${machine.initials}`);
   // Coverage is a property of the whole same-title group, so a sibling's page
