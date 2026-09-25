@@ -22,6 +22,8 @@ import { getReassignmentTargets } from "./account-deletion";
 import { Separator } from "~/components/ui/separator";
 import { PageContainer } from "~/components/layout/PageContainer";
 import { PageHeader } from "~/components/layout/PageHeader";
+import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
+import { DefaultReportModeForm } from "./reporting/default-report-mode-form";
 export default async function SettingsPage(): Promise<React.JSX.Element> {
   const supabase = await createClient();
   const {
@@ -85,6 +87,10 @@ export default async function SettingsPage(): Promise<React.JSX.Element> {
   // the boolean here — skip the Vault decrypt that getDiscordConfig() does.
   const discordIntegrationEnabled = await isDiscordIntegrationConfigured();
   const userHasDiscord = profile.discordUserId !== null;
+  const canMultiple = checkPermission(
+    "issues.report.quick",
+    getAccessLevel(profile.role)
+  );
 
   // Check if user is the sole admin
   const isSoleAdmin =
@@ -119,6 +125,19 @@ export default async function SettingsPage(): Promise<React.JSX.Element> {
 
         <div>
           <ConnectedAccountsSection />
+        </div>
+
+        <Separator />
+
+        <div>
+          <h2 className="mb-4 text-balance text-xl font-semibold">
+            App Preferences
+          </h2>
+          <DefaultReportModeForm
+            initialMobileMode={profile.mobileReportMode}
+            initialDesktopMode={profile.desktopReportMode}
+            canMultiple={canMultiple}
+          />
         </div>
 
         <Separator />

@@ -14,6 +14,12 @@ import { AppHeader } from "./AppHeader";
 import { BottomTabBar } from "./BottomTabBar";
 import changelogMeta from "@content/changelog-meta.json";
 import { getLastIssuesPath, getChangelogSeen } from "~/lib/cookies/preferences";
+import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
+import {
+  reportModePath,
+  resolveDefaultReportMode,
+} from "~/lib/report/default-mode";
+import type { ReportMode } from "~/lib/types/user";
 import { QuickSearchProvider } from "./QuickSearch";
 
 export async function MainLayout({
@@ -40,7 +46,12 @@ export async function MainLayout({
 
   let enrichedNotifications: EnrichedNotification[] = [];
   let userProfile:
-    | { name: string; role: "guest" | "member" | "technician" | "admin" }
+    | {
+        name: string;
+        role: "guest" | "member" | "technician" | "admin";
+        mobileReportMode: ReportMode;
+        desktopReportMode: ReportMode;
+      }
     | undefined;
 
   if (user) {
@@ -104,7 +115,12 @@ export async function MainLayout({
 
     userProfile = await db.query.userProfiles.findFirst({
       where: eq(userProfiles.id, user.id),
-      columns: { name: true, role: true },
+      columns: {
+        name: true,
+        role: true,
+        mobileReportMode: true,
+        desktopReportMode: true,
+      },
     });
 
     if (!userProfile) {
@@ -114,10 +130,33 @@ export async function MainLayout({
       // Refetch profile after healing
       userProfile = await db.query.userProfiles.findFirst({
         where: eq(userProfiles.id, user.id),
-        columns: { name: true, role: true },
+        columns: {
+          name: true,
+          role: true,
+          mobileReportMode: true,
+          desktopReportMode: true,
+        },
       });
     }
   }
+
+  const canMultiple =
+    Boolean(user) &&
+    checkPermission("issues.report.quick", getAccessLevel(userProfile?.role));
+  const mobileReportHref = reportModePath(
+    resolveDefaultReportMode(
+      userProfile?.mobileReportMode ?? "quick",
+      canMultiple,
+      "quick"
+    )
+  );
+  const desktopReportHref = reportModePath(
+    resolveDefaultReportMode(
+      userProfile?.desktopReportMode ?? "detailed",
+      canMultiple,
+      "detailed"
+    )
+  );
 
   return (
     <QuickSearchProvider>
@@ -131,6 +170,7 @@ export async function MainLayout({
           notifications={enrichedNotifications}
           issuesPath={issuesPath}
           newChangelogCount={newChangelogCount}
+          reportHref={desktopReportHref}
         />
 
         {/* Main Content */}
@@ -148,7 +188,11 @@ export async function MainLayout({
         </main>
 
         {/* Fixed bottom tab bar — mobile only (md:hidden is applied inside the component) */}
-        <BottomTabBar role={userProfile?.role} issuesPath={issuesPath} />
+        <BottomTabBar
+          role={userProfile?.role}
+          issuesPath={issuesPath}
+          reportHref={mobileReportHref}
+        />
       </div>
     </QuickSearchProvider>
   );

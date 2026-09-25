@@ -24,7 +24,8 @@ export {
 } from "./database";
 
 export type { UserContext, UserRole } from "./user";
-export { USER_ROLES } from "./user";
+export type { ReportMode } from "./user";
+export { USER_ROLES, REPORT_MODE_VALUES } from "./user";
 
 export type {
   IssueCommentWithAuthor,
