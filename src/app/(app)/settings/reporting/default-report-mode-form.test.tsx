@@ -27,7 +27,7 @@ describe("DefaultReportModeForm", () => {
     );
 
     expect(
-      screen.getByRole("heading", { name: "Report button opens" })
+      screen.getByRole("heading", { name: "Default Report Form" })
     ).toBeInTheDocument();
     const desktop = screen.getByRole("group", {
       name: "Desktop / Tablet report form",

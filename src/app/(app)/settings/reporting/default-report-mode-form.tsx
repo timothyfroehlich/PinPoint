@@ -122,7 +122,7 @@ export function DefaultReportModeForm({
   return (
     <div className="@container flex flex-col gap-1">
       <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
-        Report button opens
+        Default Report Form
       </h3>
       {(
         [
