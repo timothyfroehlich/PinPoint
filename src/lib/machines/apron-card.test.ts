@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   apronCardContent,
+  type ApronMachineSource,
   apronCardPixelSize,
   cardParagraphs,
   fitTitleSize,
@@ -53,7 +54,7 @@ describe("groupedEdition", () => {
 });
 
 describe("apronCardContent", () => {
-  const machine = {
+  const machine: ApronMachineSource = {
     name: "Godzilla",
     manufacturer: "Stern",
     year: 2021,
@@ -63,6 +64,7 @@ describe("apronCardContent", () => {
     apronTip: "Aim for the scoop",
     apronTipEnabled: false,
     owner: { name: "Tim" },
+    invitedOwner: null,
     pinballmapTitle: {
       name: "Godzilla (Premium)",
       machineGroupId: 10,
@@ -84,6 +86,37 @@ describe("apronCardContent", () => {
       apronCardContent({ ...machine, apronUseCustomDescription: true })
         .description
     ).toBe("Custom description");
+  });
+
+  it("prints the registered owner's name", () => {
+    expect(apronCardContent(machine).ownerName).toBe("Tim");
+  });
+
+  it("falls back to the invited owner's name when there is no registered owner", () => {
+    expect(
+      apronCardContent({
+        ...machine,
+        owner: null,
+        invitedOwner: { name: "Casey" },
+      }).ownerName
+    ).toBe("Casey");
+  });
+
+  it("prefers the registered owner over an invited owner", () => {
+    expect(
+      apronCardContent({
+        ...machine,
+        owner: { name: "Tim" },
+        invitedOwner: { name: "Casey" },
+      }).ownerName
+    ).toBe("Tim");
+  });
+
+  it("has no owner name when neither owner is set", () => {
+    expect(
+      apronCardContent({ ...machine, owner: null, invitedOwner: null })
+        .ownerName
+    ).toBeNull();
   });
 });
 
