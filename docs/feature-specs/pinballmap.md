@@ -72,7 +72,7 @@ The control's states (§4) are comparisons across these: _in sync_ means intent 
 - **4.6** The remove confirmation shows the entry's comment count and states the consequence accurately: recoverable only by re-adding the game within Pinball Map's 7-day window (7.2), permanently lost after. If the stored lineup is over 5 minutes old, a fresh refresh runs and confirmation is blocked until the current count shows; if it fails, the last-known count and its age are shown and the person may proceed or cancel.
 - **4.7** Same-title cabinets: every intent-On cabinet shows the entry as its own (**Shared**, naming the others); an intent-Off cabinet whose siblings cover the entry shows **Covered**, quiet, with the covering cabinets linked. Sibling names always link to their machine pages.
 - **4.8** User-facing vocabulary: "listing" never appears — the object is an "entry", the set is the "lineup" (Pinball Map's word), comments are "comments", the read is "Refresh". "Sync" survives only in the relationship senses (Don't sync, Out of sync).
-- **4.9** A signed-in member without the machine-linking capability sees the header and both rows, never the status row's push actions; the toggle renders read-only. The header Refresh stays available to them (8.3).
+- **4.9** A signed-in member without the machine-linking capability sees the header and every row, never the status row's push actions; the intent toggle and the Insider Connected switch render read-only. The header Refresh stays available to them (8.3).
 - **4.10** In dense summary and table views (such as the fleet dashboard, `docs/feature-specs/fleet.md`), listing and sync states render as compact diagnostic badges:
   - **In sync**: green styling for `On`, `Off`, `Shared`, or `Covered`.
   - **Out of sync**: error/warning styling for `Missing` (intent On, absent from lineup) or `Lingering` (intent Off, present on lineup).
@@ -191,7 +191,7 @@ Changes to this document. Divergence-table rows are working state and are not lo
 
 | Date | Change |
 | :-- | :-- |
-| 2026-09-25 | §3.8: eligibility now comes from Pinball Map's catalog flag, so an eligible entry with no recorded value shows **Not set**; the setting is a switch in a row between intent and status (§4.1); PinPoint sends the target setting instead of flipping it, replacing the re-read-before-write rule. |
+| 2026-09-25 | §3.8: eligibility now comes from Pinball Map's catalog flag, so an eligible entry with no recorded value shows **Not set**; the setting is a switch in a row between intent and status (§4.1), read-only for a member without the machine-linking capability (§4.9); PinPoint sends the target setting instead of flipping it, replacing the re-read-before-write rule. |
 | 2026-09-25 | Amended 4.1: on a narrow screen the status row's push action may wrap below its sentence, the one allowed height change (PP-o355.62). |
 | 2026-09-25 | Defined per-member Pinball Map account linking (§§8.4–8.6): sign-in exchange only, token stored and password never kept, rejected tokens marked for relink without polling, and an unlinked member's intent left Out of sync as their request. §8.2 now names the person's own linked account. |
 | 2026-09-25 | Detailed §3.6's outbound actions: lineup confirmation from the `/fleet` header (§3.7) and safe Insider Connected changes (§3.8). Deferred condition-comment posting out of full support until requested. |
