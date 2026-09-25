@@ -18,6 +18,12 @@ interface ApronCardPreviewProps {
   /** Upper bound on the scale; 1 shows the card at print size. */
   maxScale?: number;
   onOverflowChange?: (overflowing: boolean) => void;
+  /**
+   * Draw the card's edge. On a dark frame the card's black identity panel
+   * otherwise runs into the background and the card reads wider than it is.
+   * Screen only; the printed and exported card has no outline.
+   */
+  outlined?: boolean;
   className?: string;
 }
 
@@ -32,6 +38,7 @@ export function ApronCardPreview({
   scanUrl,
   maxScale = 1,
   onOverflowChange,
+  outlined = false,
   className,
 }: ApronCardPreviewProps): React.JSX.Element {
   const frameRef = useRef<HTMLDivElement>(null);
@@ -58,7 +65,10 @@ export function ApronCardPreview({
   return (
     <div ref={frameRef} className={cn("w-full", className)}>
       <div
-        className="relative overflow-hidden"
+        className={cn(
+          "relative overflow-hidden",
+          outlined && "outline outline-outline-variant"
+        )}
         style={{
           width: natural.width * scale,
           height: natural.height * scale,

@@ -287,6 +287,7 @@ function EditorBody({
                 size={size}
                 scanUrl={scanUrl}
                 onOverflowChange={setOverflowing}
+                outlined
                 className="flex justify-center"
               />
             )}
