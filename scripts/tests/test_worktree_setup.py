@@ -1288,9 +1288,6 @@ class TestWorktreeSetupMainReadiness:
 
         monkeypatch.setattr("worktree_setup.get_main_worktree", lambda: self.main_wt)
         monkeypatch.setattr("worktree_setup.get_branch", lambda: "feat/my-branch")
-        monkeypatch.setattr(
-            "worktree_setup.configure_branch_tracking", lambda branch, path: None
-        )
         monkeypatch.setattr("worktree_setup.Path.cwd", lambda: self.linked_wt)
 
     def test_main_worktree_noop_returns_ready(
