@@ -28,7 +28,7 @@ export interface ApronCardContent {
   tipEnabled: boolean;
 }
 
-interface ApronMachineSource {
+export interface ApronMachineSource {
   name: string;
   manufacturer: string | null;
   year: number | null;
@@ -38,6 +38,7 @@ interface ApronMachineSource {
   apronTip: string | null;
   apronTipEnabled: boolean;
   owner: { name: string } | null;
+  invitedOwner: { name: string } | null;
   pinballmapTitle: {
     name: string;
     machineGroupId: number | null;
@@ -74,7 +75,12 @@ export function apronCardContent(
     edition: groupedEdition(machine.pinballmapTitle),
     manufacturer: machine.manufacturer,
     year: machine.year,
-    ownerName: machine.owner?.name ?? null,
+    // A machine is owned by a registered user (`owner`) or by an invited
+    // member who has not signed up yet (`invitedOwner`); the schema keeps them
+    // mutually exclusive. The card prints the owner's name in either case —
+    // the "(invited)" status marker the in-app owner block shows is an
+    // internal-workflow detail, not something the physical card carries.
+    ownerName: machine.owner?.name ?? machine.invitedOwner?.name ?? null,
     description: machine.apronUseCustomDescription
       ? (machine.apronDescription ?? "")
       : docToPlainText(machine.description),
