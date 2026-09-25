@@ -25,7 +25,7 @@
 #
 # Why SessionStart (not UserPromptSubmit): the nag should match "when I start
 # talking to you", not fire on every message. Mirrors the huddle /
-# orphan-sweep SessionStart-nudge pattern (cheap, one line, fail-open).
+# worktree-reap SessionStart-nudge pattern (cheap, one line, fail-open).
 #
 # Guardrails:
 #   - Best-effort: every failure path exits 0 silently. This hook must NEVER
@@ -63,7 +63,7 @@ fi
 
 # Look up the chores bead by its stable `weekly-chore` label. The call is ALWAYS
 # time-bounded so a cold/hung dolt server can't stall session start — using the
-# same timeout/gtimeout/perl-alarm fallback ladder as session-start-orphan-sweep.sh
+# same timeout/gtimeout/perl-alarm fallback ladder as session-start-worktree-reap.sh
 # (perl covers macOS boxes that ship neither coreutils `timeout` nor `gtimeout`).
 # Fail open on any error.
 if command -v timeout >/dev/null 2>&1; then
