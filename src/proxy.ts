@@ -64,9 +64,10 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
     ? "'self' 'unsafe-inline'"
     : "'self' 'unsafe-inline' https://vercel.live";
 
+  // img.opdb.org: machine artwork hotlinked from Pinball Map's catalog (PP-o355.43)
   const imgSrc = isProduction
-    ? "'self' data: blob: https://*.public.blob.vercel-storage.com"
-    : "'self' data: blob: https://*.public.blob.vercel-storage.com https://vercel.live https://vercel.com";
+    ? "'self' data: blob: https://*.public.blob.vercel-storage.com https://img.opdb.org"
+    : "'self' data: blob: https://*.public.blob.vercel-storage.com https://img.opdb.org https://vercel.live https://vercel.com";
 
   const fontSrc = isProduction
     ? "'self' data:"

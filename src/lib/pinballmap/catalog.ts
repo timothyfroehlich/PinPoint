@@ -38,7 +38,7 @@ export interface CatalogEdition {
 
 /**
  * Upsert at most this many catalog rows per statement. The full catalog is
- * ~10k titles; at 6 bound params/row this keeps us well under Postgres' 65535
+ * ~10k titles; at 12 bound params/row this keeps us well under Postgres' 65535
  * parameter ceiling.
  */
 const UPSERT_CHUNK = 1000;
@@ -74,6 +74,9 @@ export async function refreshCatalog(): Promise<number> {
       year: m.year,
       opdbId: m.opdbId,
       ipdbId: m.ipdbId,
+      opdbImageUrl: m.opdbImageUrl,
+      opdbImageWidth: m.opdbImageWidth,
+      opdbImageHeight: m.opdbImageHeight,
       machineGroupId: m.machineGroupId,
       groupName:
         m.machineGroupId !== null
@@ -92,6 +95,9 @@ export async function refreshCatalog(): Promise<number> {
           year: sql`excluded.year`,
           opdbId: sql`excluded.opdb_id`,
           ipdbId: sql`excluded.ipdb_id`,
+          opdbImageUrl: sql`excluded.opdb_image_url`,
+          opdbImageWidth: sql`excluded.opdb_image_width`,
+          opdbImageHeight: sql`excluded.opdb_image_height`,
           machineGroupId: sql`excluded.machine_group_id`,
           groupName: sql`excluded.group_name`,
           refreshedAt: sql`excluded.refreshed_at`,

@@ -22,7 +22,8 @@ import type {
 
 /**
  * In-memory mock PinballMap client, seeded from real captured fixtures
- * (location 26454 + its catalog slice). It mutates local state so the dev
+ * (location 26454 + its catalog slice, augmented with Medieval Madness art).
+ * It mutates local state so the dev
  * server and tests can exercise the full flow — add/remove/comment/IC/drift —
  * with no network and no credentials (CORE-TEST-006).
  *

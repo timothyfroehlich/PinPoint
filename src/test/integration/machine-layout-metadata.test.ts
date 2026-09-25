@@ -127,7 +127,33 @@ describe("getMachineForLayout — model metadata", () => {
     expect(machine?.modelTitle).toBe("Pinball Map title #99999");
   });
 
-  it("still reports no backbox art, which has no source anywhere", async () => {
+  it("resolves the matched title's image without a page-load PBM request", async () => {
+    const db = await getTestDb();
+    await db.insert(pinballmapCatalog).values({
+      pinballmapMachineId: 3416,
+      name: "Godzilla (Premium)",
+      opdbImageUrl: "https://img.opdb.org/godzilla-medium.jpg",
+      opdbImageWidth: 640,
+      opdbImageHeight: 444,
+    });
+    await db.insert(machines).values(
+      createTestMachine({
+        initials: "GZ",
+        name: "Godzilla",
+        pinballmapMachineId: 3416,
+      })
+    );
+
+    const { machine } = await getMachineForLayout("GZ");
+
+    expect(machine?.artwork).toEqual({
+      url: "https://img.opdb.org/godzilla-medium.jpg",
+      width: 640,
+      height: 444,
+    });
+  });
+
+  it("omits art when a machine has no matched catalog image", async () => {
     const db = await getTestDb();
     await db
       .insert(machines)
@@ -135,9 +161,6 @@ describe("getMachineForLayout — model metadata", () => {
 
     const { machine } = await getMachineForLayout("BK");
 
-    // The one surviving placeholder field. When PP-o355.43 gives it a source —
-    // or deletes the translite outright — this assertion is the thing that
-    // should fail and be rewritten, rather than the change landing unnoticed.
-    expect(machine?.backboxImageUrl).toBeNull();
+    expect(machine?.artwork).toBeNull();
   });
 });
