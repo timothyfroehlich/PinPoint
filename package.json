@@ -211,7 +211,7 @@
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx,mjs,cjs}": [
-      "oxlint --fix --fix-suggestions",
+      "oxlint --fix --fix-suggestions --no-error-on-unmatched-pattern",
       "prettier --write"
     ],
     "*.{json,css,md}": [
