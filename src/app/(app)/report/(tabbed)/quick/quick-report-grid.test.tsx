@@ -70,9 +70,11 @@ describe("QuickReportGrid", () => {
     const row = screen.getByTestId("quick-row");
     await userEvent.click(within(row).getByRole("button", { name: /more/i }));
 
-    const watch = within(row).getByRole("checkbox", { name: "Watch" });
+    const watch = within(row).getByRole("checkbox", {
+      name: "Watch this issue",
+    });
     expect(watch).toBeChecked();
-    await userEvent.click(within(row).getByText("Watch"));
+    await userEvent.click(within(row).getByText("Watch this issue"));
     expect(watch).not.toBeChecked();
 
     await userEvent.click(
@@ -80,7 +82,7 @@ describe("QuickReportGrid", () => {
     );
     await userEvent.click(within(row).getByRole("button", { name: /more/i }));
     expect(
-      within(row).getByRole("checkbox", { name: "Watch" })
+      within(row).getByRole("checkbox", { name: "Watch this issue" })
     ).not.toBeChecked();
   });
 

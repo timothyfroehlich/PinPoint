@@ -529,7 +529,7 @@ function QuickRow({
                 htmlFor={`${entry.idempotencyKey}-watch`}
                 className="text-sm font-medium text-foreground cursor-pointer"
               >
-                Watch
+                Watch this issue
               </Label>
             </div>
             <div className="flex items-center gap-2 @[640px]:justify-self-end">
