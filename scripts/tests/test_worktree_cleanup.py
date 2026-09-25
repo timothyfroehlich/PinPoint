@@ -647,6 +647,7 @@ class TestMainTeardown:
         assert exit_code == cleanup.EXIT_FAILED
         assert "Refusing to remove" in err
         assert "remote Supabase volumes are UNKNOWN" in err
+        assert "worktree_reap.py" not in err  # reap can't remove stopped remote volumes
         assert stub.calls_of("worktree_remove") == []
         assert deallocated == []
 

@@ -328,10 +328,11 @@ def stop_and_remove_supabase(
     query = list_project_volumes(project_id, supabase_env)
     if query.is_unknown:
         volumes_unknown_reason = query.unknown_reason
+        # No recovery hint here: it depends on the backend, and the caller
+        # prints the right one (reap for a local stack, re-run for a remote one).
         print(
             f"Warning: Supabase volumes for {project_id} are UNKNOWN, not zero — "
-            f"{query.unknown_reason}. None were removed; if any exist they are now "
-            f"orphaned. Reclaim them with `{REAP_HINT}`.",
+            f"{query.unknown_reason}. None were removed.",
             file=sys.stderr,
         )
     elif query.volumes:
