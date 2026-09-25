@@ -129,6 +129,12 @@ def test_generated_fixture_and_spec_files_are_left_out(tmp_path: Path) -> None:
     )
 
 
+def test_non_ascii_paths_still_match_the_exclusions(tmp_path: Path) -> None:
+    repo = make_repo(tmp_path)
+    commit_lines(repo, {"docs/feature-specs/caf\u00e9.md": 900, "src/app.ts": 10})
+    assert level(repo)[0] == "low"
+
+
 def test_binary_files_drop_out(tmp_path: Path) -> None:
     repo = make_repo(tmp_path)
     (repo / "logo.png").write_bytes(bytes(range(256)) * 50)

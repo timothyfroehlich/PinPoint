@@ -25,8 +25,9 @@ merge_base=$(git merge-base "$base_ref" HEAD) || {
   exit 2
 }
 
-# --no-renames keeps one plain path per line; binary files report "-" and drop out.
-git diff --numstat --no-renames "$merge_base" HEAD | awk -F'\t' '
+# --no-renames keeps one plain path per line and core.quotePath=false keeps non-ASCII
+# paths unquoted so the patterns below match them; binary files report "-" and drop out.
+git -c core.quotePath=false diff --numstat --no-renames "$merge_base" HEAD | awk -F'\t' '
   $1 == "-" { next }
   {
     n = $1 + $2; p = $3
