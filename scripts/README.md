@@ -25,7 +25,7 @@ Main worktree uses default ports (slot 0). All others get dynamically allocated 
 ## Scripts
 
 - **`worktree_setup.py`** — Called by post-checkout hook. Allocates ports, generates configs.
-- **`worktree_cleanup.py`** — The complete teardown entry point for Claude, Codex, reap, and manual callers: `python3 scripts/worktree_cleanup.py <worktree-path>`. Claude uses `--claude-hook`; configure Codex cleanup as `python3 scripts/worktree_cleanup.py .`. It stops Supabase, removes volumes, removes/prunes the Git worktree, then releases the slot. Exit `0` means complete; `1` failed, `2` refused the main worktree, `3` found a missing target with residue, and `4` removed the worktree while Docker state was unknown. Preserve non-zero codes as the leak diagnostic.
+- **`worktree_cleanup.py`** — The complete teardown entry point for Claude, Codex, reap, and manual callers: `python3 scripts/worktree_cleanup.py <worktree-path>`. Claude uses `--claude-hook`; configure Codex cleanup as `python3 scripts/worktree_cleanup.py .`. It stops Supabase, removes volumes, removes/prunes the Git worktree, then releases the slot. Exit `0` means complete; `1` means anything else — a refusal (the main worktree, or a remote backend without `PINPOINT_REMOTE_DOCKER_HOST`), a failed removal, a missing target with residue, or unknown Docker state — and stderr says which. Never treat `1` as done.
 
 ## Python Toolchain & Testing
 

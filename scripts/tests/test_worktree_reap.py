@@ -516,31 +516,6 @@ class TestKeepTier:
         assert str(world.repo) not in err
 
 
-def test_this_scripts_own_exit_codes_never_collide_with_cleanups() -> None:
-    """A propagated code has to be readable as cleanup's, unambiguously.
-
-    Surfacing `worktree_cleanup.py`'s codes verbatim is the whole point
-    (PP-r7tv), and it only works if this script mints its own statuses outside
-    cleanup's range. Sharing a value would make a top-level 1 mean either "gh
-    was unreachable" or "a cleanup failed" — the same information loss as
-    flattening, arrived at from the other direction.
-    """
-    own = [
-        reap.EXIT_CLEANUP_MIXED,
-        reap.EXIT_GH_UNAVAILABLE,
-        reap.EXIT_CLEANUP_UNRUNNABLE,
-    ]
-    reserved = set(reap.CLEANUP_EXIT_MEANINGS)
-
-    assert set(own).isdisjoint(reserved), (
-        f"{set(own) & reserved} is both ours and cleanup's"
-    )
-    assert len(set(own)) == len(own), (
-        "the self-minted codes must differ from each other"
-    )
-    assert reap.EXIT_OK not in own
-
-
 class TestRepoContext:
     def test_git_inventory_includes_every_harness_path_shape(
         self,
@@ -599,7 +574,7 @@ class TestRepoContext:
 
 
 class TestGhUnavailable:
-    def test_an_unreachable_gh_reaps_nothing_and_exits_non_zero(
+    def test_an_unreachable_gh_reaps_nothing_and_still_reports(
         self,
         world: World,
         monkeypatch: pytest.MonkeyPatch,
@@ -612,6 +587,9 @@ class TestGhUnavailable:
         predicate — but its PR state is UNKNOWN, not "no PR", so it must NOT be
         reaped. That distinction is the difference between a `gh` outage being
         a no-op and being a mass deletion.
+
+        A dry run still exits 0: orchestration-status.sh drops the whole report
+        on a non-zero exit, and the UNKNOWN branches are named in it.
         """
         wt = world.add_worktree("feat/landed")
         sha = world.commit_in(wt, "feature.py", "print(1)\n")
@@ -623,9 +601,10 @@ class TestGhUnavailable:
 
         code, _, err = run_reap(world, monkeypatch, capsys)
 
-        assert code == reap.EXIT_GH_UNAVAILABLE
+        assert code == reap.EXIT_OK
         assert "REAP (0 merged, 0 empty): 0" in err
         assert "PR state UNKNOWN for 2 branch(es)" in err
+        assert "- feat/landed [PR state UNKNOWN" in err
         assert tier_of(err, "feat/landed") == reap.TIER_REVIEW
         assert tier_of(err, "worktree-bridge-idle") == reap.TIER_REVIEW
 
@@ -641,7 +620,7 @@ class TestGhUnavailable:
 
         code, out, _ = run_reap(world, monkeypatch, capsys, "--apply")
 
-        assert code == reap.EXIT_GH_UNAVAILABLE
+        assert code == reap.EXIT_FAILED
         assert not calls.exists(), f"cleanup must not run: {cleanup}"
         assert "REAPED:" not in out
 
@@ -701,26 +680,22 @@ class TestApply:
         assert code == reap.EXIT_OK
         assert not calls.exists()
 
-    def test_cleanups_exit_code_is_propagated_not_flattened(
+    def test_a_failed_cleanup_fails_the_run_and_relays_its_output(
         self,
         world: World,
         monkeypatch: pytest.MonkeyPatch,
         capsys: pytest.CaptureFixture[str],
     ) -> None:
-        """PP-r7tv: collapsing 4 into "failed" loses the only leak signal.
+        """Cleanup's stderr is the only record of what leaked; --quiet keeps it."""
+        wt = world.add_worktree("worktree-bridge-idle")
+        fake_cleanup(world, monkeypatch, exit_code=1)
 
-        4 means the worktree WAS removed but Supabase volume state was unknown,
-        so volumes may have leaked. A caller told "failed" would go looking for
-        a worktree that is gone and never sweep for the volumes.
-        """
-        world.add_worktree("worktree-bridge-idle")
-        fake_cleanup(world, monkeypatch, exit_code=4)
+        code, out, err = run_reap(world, monkeypatch, capsys, "--apply", "--quiet")
 
-        code, _, err = run_reap(world, monkeypatch, capsys, "--apply")
-
-        assert code == 4, "must be cleanup's own code, not a generic failure"
-        assert "volume state was UNKNOWN" in err
-        assert "FAILED" not in err
+        assert code == reap.EXIT_FAILED
+        assert f"| fake cleanup ran for {wt}" in err
+        assert f"{wt}: worktree_cleanup.py FAILED (exit 1)" in err
+        assert "REAPED:" not in out
 
     def test_an_unlaunchable_cleanup_is_not_reported_as_cleanup_failing(
         self,
@@ -741,21 +716,17 @@ class TestApply:
 
         code, out, err = run_reap(world, monkeypatch, capsys, "--apply")
 
-        assert code == reap.EXIT_CLEANUP_UNRUNNABLE
+        assert code == reap.EXIT_FAILED
         assert "could not run worktree_cleanup.py" in err
         assert "REAPED:" not in out
 
-    def test_two_failures_sharing_one_code_still_count_as_two(
+    def test_two_failures_count_as_two(
         self,
         world: World,
         monkeypatch: pytest.MonkeyPatch,
         capsys: pytest.CaptureFixture[str],
     ) -> None:
-        """The summary counts worktrees; the exit status collapses to codes.
-
-        Deriving the count from the set of distinct codes would report
-        "Reaped 1 of 2" here and leave one leaked worktree unaccounted for.
-        """
+        """The summary counts worktrees, not distinct failures."""
         first = world.add_worktree("worktree-bridge-a")
         second = world.add_worktree("worktree-bridge-b")
         fake_cleanup(
@@ -767,30 +738,25 @@ class TestApply:
 
         code, _, err = run_reap(world, monkeypatch, capsys, "--apply")
 
-        assert code == 1
+        assert code == reap.EXIT_FAILED
         assert "Reaped 0 of 2 worktree(s)." in err
 
-    def test_distinct_cleanup_codes_are_reported_individually(
+    def test_one_failure_among_successes_still_fails_the_run(
         self,
         world: World,
         monkeypatch: pytest.MonkeyPatch,
         capsys: pytest.CaptureFixture[str],
     ) -> None:
-        """No single code is honest for two different failures — say so."""
         first = world.add_worktree("worktree-bridge-a")
         second = world.add_worktree("worktree-bridge-b")
-        fake_cleanup(
-            world,
-            monkeypatch,
-            exit_code=0,
-            per_path={str(first): 1, str(second): 4},
-        )
+        fake_cleanup(world, monkeypatch, exit_code=0, per_path={str(first): 1})
 
-        code, _, err = run_reap(world, monkeypatch, capsys, "--apply")
+        code, out, err = run_reap(world, monkeypatch, capsys, "--apply")
 
-        assert code == reap.EXIT_CLEANUP_MIXED
-        assert reap.CLEANUP_EXIT_MEANINGS[1] in err
-        assert reap.CLEANUP_EXIT_MEANINGS[4] in err
+        assert code == reap.EXIT_FAILED
+        assert f"{first}: worktree_cleanup.py FAILED" in err
+        assert f"REAPED: {second}" in out
+        assert "Reaped 1 of 2 worktree(s)." in err
 
 
 class TestBranchFilter:

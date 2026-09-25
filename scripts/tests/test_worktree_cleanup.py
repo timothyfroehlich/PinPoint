@@ -409,7 +409,7 @@ class TestMissingTarget:
         exit_code = _run_main(monkeypatch, gone)
 
         err = capsys.readouterr().err
-        assert exit_code == cleanup.EXIT_STALE_TARGET
+        assert exit_code == cleanup.EXIT_FAILED
         assert "slot manifest" in err
         assert "worktree_orphan_sweep.py --apply" in err
         # Nothing was reclaimed, and nothing was claimed to be.
@@ -437,7 +437,7 @@ class TestMissingTarget:
         exit_code = _run_main(monkeypatch, gone)
 
         err = capsys.readouterr().err
-        assert exit_code == cleanup.EXIT_STALE_TARGET
+        assert exit_code == cleanup.EXIT_FAILED
         assert "registered as a worktree" in err
 
     def test_unreadable_manifest_is_unknown_not_clean(
@@ -452,7 +452,7 @@ class TestMissingTarget:
 
         exit_code = _run_main(monkeypatch, tmp_path / "gone")
 
-        assert exit_code == cleanup.EXIT_STALE_TARGET
+        assert exit_code == cleanup.EXIT_FAILED
         assert "could not be read" in capsys.readouterr().err
 
     def test_failed_git_worktree_list_is_unknown_not_clean(
@@ -467,7 +467,7 @@ class TestMissingTarget:
 
         exit_code = _run_main(monkeypatch, tmp_path / "gone")
 
-        assert exit_code == cleanup.EXIT_STALE_TARGET
+        assert exit_code == cleanup.EXIT_FAILED
         assert "`git worktree list` could not be read" in capsys.readouterr().err
 
 
@@ -714,7 +714,7 @@ class TestMainTeardown:
         exit_code = _run_main(monkeypatch, fake_worktree)
 
         err = capsys.readouterr().err
-        assert exit_code == cleanup.EXIT_DOCKER_UNKNOWN
+        assert exit_code == cleanup.EXIT_FAILED
         assert "UNKNOWN, not zero" in err
         assert "Cannot connect to the Docker daemon" in err
         assert "Docker volume(s)" not in err  # no "Removed 0 Docker volume(s)"
@@ -748,7 +748,7 @@ class TestMainTeardown:
         exit_code = _run_main(monkeypatch, fake_worktree)
 
         err = capsys.readouterr().err
-        assert exit_code == cleanup.EXIT_DOCKER_UNKNOWN
+        assert exit_code == cleanup.EXIT_FAILED
         assert f"`supabase stop` timed out after {timeout}s" in err
         assert "UNKNOWN, not zero" in err
         assert f"timed out after {timeout}s" in err
@@ -777,7 +777,7 @@ class TestMainTeardown:
         exit_code = _run_main(monkeypatch, fake_worktree)
 
         err = capsys.readouterr().err
-        assert exit_code == cleanup.EXIT_DOCKER_UNKNOWN
+        assert exit_code == cleanup.EXIT_FAILED
         assert f"`docker volume rm` timed out after {timeout}s" in err
         assert "Cleaned up worktree" not in err
         assert stub.kwargs_of("volume_rm")[0]["timeout"] == timeout
@@ -806,7 +806,7 @@ class TestMainTeardown:
         exit_code = _run_main(monkeypatch, worktree)
 
         err = capsys.readouterr().err
-        assert exit_code == cleanup.EXIT_DOCKER_UNKNOWN
+        assert exit_code == cleanup.EXIT_FAILED
         # The slot is still reclaimed, so the sweep can find any leaked volumes by
         # their Docker label — a delayed leak, not a permanent one.
         assert deallocated == [str(worktree)]
@@ -904,7 +904,7 @@ class TestMainTeardown:
 
         exit_code = _run_main(monkeypatch, main_wt)
 
-        assert exit_code == cleanup.EXIT_MAIN_WORKTREE
+        assert exit_code == cleanup.EXIT_FAILED
         assert "Refusing to clean up the main worktree" in capsys.readouterr().err
         assert stub.calls == []
         assert deallocated == []

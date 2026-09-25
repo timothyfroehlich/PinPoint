@@ -14,9 +14,9 @@
 #    these by construction — a worktree that still exists is "active" to it —
 #    so without this pass they accumulate silently (PP-49x5).
 #
-# Both print a single-line nudge to stderr when there is something to reclaim,
-# and both exit non-zero when their view was incomplete; this hook deliberately
-# swallows that so session start is never blocked.
+# Both print a single-line nudge to stderr when there is something to reclaim
+# (or when part of their view is UNKNOWN). The sweep also exits non-zero then;
+# this hook deliberately swallows that so session start is never blocked.
 #
 # Why dry-run (not auto-apply): SessionStart fires on every Claude Code
 # session and can affect Docker resources and worktrees across the host; we

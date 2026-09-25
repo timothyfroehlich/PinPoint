@@ -6,9 +6,11 @@ Stops Supabase, removes Docker volumes, removes/prunes the git worktree, then
 deallocates its manifest slot. Call it directly with one worktree path, or use
 `--claude-hook` to read Claude Code's `worktree_path` JSON field from stdin.
 
-The exit code is load-bearing: this script's caller (Claude Code's
-WorktreeRemove hook) has no other way to learn that a worktree leaked. Two
-rules follow from that, both of them regressions we have actually shipped:
+Exit 0 means the teardown is complete; 1 means anything else — a refusal, a
+failure, or something left behind — with the reason on stderr. The caller
+(Claude Code's WorktreeRemove hook) has no other way to learn that a worktree
+leaked. Two rules follow from that, both of them regressions we have actually
+shipped:
 
 - **A missing target is never a silent success** (PP-omz3). Being handed a path
   that isn't there used to warn and `return`, i.e. exit 0, so a wrong or
@@ -57,25 +59,10 @@ SWEEP_HINT = "python3 scripts/worktree_orphan_sweep.py --apply"
 
 #: Everything cleaned up (or verifiably nothing to clean up).
 EXIT_OK = 0
-#: Usage error, the git worktree removal itself failed, or a remote-backend
-#: worktree was refused because PINPOINT_REMOTE_DOCKER_HOST is unset.
+#: Anything else: a usage error, a refusal (main worktree, remote backend
+#: without PINPOINT_REMOTE_DOCKER_HOST), a failed removal, a missing target
+#: with residue, or Supabase volumes whose state is unknown. stderr says which.
 EXIT_FAILED = 1
-#: Refused to operate: the target is the main worktree.
-EXIT_MAIN_WORKTREE = 2
-#: The target path does not exist *and* residue for it still exists (a slot
-#: manifest entry, a git worktree registration, or an unreadable source of
-#: truth for either). Nothing was reclaimed, so this must not read as success.
-EXIT_STALE_TARGET = 3
-#: Cleanup ran but the Supabase volumes were neither counted nor removed —
-#: either Docker could not be enumerated, or it was never queried because no
-#: branch yielded a project_id (the `.git`-less PP-qlzu path, PP-ew10). Either
-#: way `worktree_orphan_sweep.py` is the backstop. The `.git`-less case must
-#: prune any stale Git registration first so the sweep no longer treats that
-#: project's retained config as active.
-#: NOTE: `worktree_orphan_sweep.py` spells its equivalent `EXIT_DOCKER_UNKNOWN = 1`
-#: — the same name with a different value, deliberately. In that script 1 is free;
-#: here it already means "failed", and callers distinguish these codes per script.
-EXIT_DOCKER_UNKNOWN = 4
 
 
 def deallocate_slot(worktree_path: str) -> None:
@@ -221,7 +208,7 @@ def report_missing_target(worktree_path: Path) -> int:
         f"lands here), then re-run with the real path or sweep with `{SWEEP_HINT}`.",
         file=sys.stderr,
     )
-    return EXIT_STALE_TARGET
+    return EXIT_FAILED
 
 
 # These three mirror `worktree_orphan_sweep.py` by name and behaviour on
@@ -473,7 +460,7 @@ def cleanup_worktree(worktree_path: Path) -> int:
             "worktree_cleanup.py is for additional (git worktree add) worktrees only.",
             file=sys.stderr,
         )
-        return EXIT_MAIN_WORKTREE
+        return EXIT_FAILED
 
     # PP-qlzu: when .git is missing (partial removal, rm -rf without the hook,
     # Claude in Web sandbox sessions), we can't derive the branch and therefore
@@ -485,7 +472,7 @@ def cleanup_worktree(worktree_path: Path) -> int:
     # PP-ew10: skipping that phase means the volumes were never queried, so their
     # state is UNKNOWN — the same "success without evidence" shape as PP-omz3 and
     # PP-3w4g, reached from a third direction. Record it as unknown here so the run
-    # returns EXIT_DOCKER_UNKNOWN and points at the sweep, instead of a false
+    # returns EXIT_FAILED and points at the sweep, instead of a false
     # EXIT_OK for a teardown that never touched Docker.
     git_marker_present = git_marker.is_file()
 
@@ -633,7 +620,7 @@ def cleanup_worktree(worktree_path: Path) -> int:
                 f"reclaim Docker resources with `{SWEEP_HINT}`.",
                 file=sys.stderr,
             )
-        return EXIT_DOCKER_UNKNOWN
+        return EXIT_FAILED
 
     print(f"Cleaned up worktree: {worktree_path}", file=sys.stderr)
     return EXIT_OK

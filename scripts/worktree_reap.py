@@ -24,16 +24,18 @@ reaps only on *positive proof that the work is already on `main`*:
 - KEEP — an open PR, or a live process whose cwd is inside the worktree.
 
 **Unknown is never mergedness.** If `gh` cannot be queried, the affected
-branches are UNKNOWN, not "no PR": they classify REVIEW, never REAP, and the
-run exits non-zero. Same discipline as the sweep's "unknown is never zero"
-(`worktree_orphan_sweep.py:25`) and `worktree_cleanup.py`'s volume query.
+branches are UNKNOWN, not "no PR": they are listed as REVIEW with "PR state
+UNKNOWN", never REAP. Same discipline as the sweep's "unknown is never zero"
+and `worktree_cleanup.py`'s volume query.
 
 Removal delegates to `worktree_cleanup.py`, which already owns `supabase stop`,
-Docker volume removal, slot deallocation and `git worktree remove`. Its exit
-codes are reported per worktree with their meanings rather than flattened into
-"failed" — flattening them is the standing complaint in PP-r7tv.
+Docker volume removal, slot deallocation and `git worktree remove`. A failed
+cleanup's own stderr is relayed per worktree, so its reason (and any leak)
+stays visible.
 
-Dry-run by default; `--apply` to act.
+Dry-run by default; `--apply` to act. Exit 0 on success; 1 when `--apply` hit
+a failed cleanup or an UNKNOWN branch. A dry run always exits 0, so callers
+that show its report (orchestration-status.sh) never drop it.
 """
 
 import argparse
@@ -54,47 +56,11 @@ PROTOTYPE_MARKER = ".prototype-mode"
 PROTOTYPE_ROOT = Path("src/app/(dev)/prototype")
 PROTOTYPE_PERMANENT_FILES = frozenset({"layout.tsx"})
 
-#: Nothing to do, or everything asked for succeeded.
+#: Nothing to do, everything asked for succeeded, or a dry run.
 EXIT_OK = 0
-#: `worktree_cleanup.py`'s exit codes, spelled out — reserved here, never
-#: reused. A caller that collapses these into "failed" throws away the only
-#: signal that says whether anything leaked (PP-r7tv), so every one of them is
-#: surfaced verbatim, which only works if this script's *own* statuses live
-#: outside the range. Hence CLEANUP_EXIT_MEANINGS below occupies 0-4 and every
-#: code this script mints for itself starts at 5.
-#:
-#: Wordings are deliberately no more specific than `worktree_cleanup.py`'s own
-#: docstrings: 1 there is "usage error, or the git worktree removal itself
-#: failed", and narrowing it to just the removal case would mislead anyone
-#: reading a propagated 1.
-CLEANUP_EXIT_MEANINGS = {
-    0: "cleaned up",
-    1: "FAILED — usage error, the worktree removal itself failed, or a "
-    "remote-backend worktree without PINPOINT_REMOTE_DOCKER_HOST; the slot "
-    "manifest entry is kept in that case to avoid a port collision",
-    2: "REFUSED — target is the main worktree",
-    3: "STALE TARGET — path gone but slot/git residue remains",
-    4: "removed, but Supabase volume state was UNKNOWN — volumes may have leaked",
-}
-
-#: `--apply` hit more than one distinct `worktree_cleanup.py` failure code, so
-#: there is no single code to propagate. Each worktree's own code is still
-#: printed with its meaning.
-EXIT_CLEANUP_MIXED = 5
-#: At least one branch's PR state could not be determined, so the report is
-#: incomplete and nothing that depended on that state was reaped.
-#:
-#: NOT 1, even though `worktree_orphan_sweep.EXIT_DOCKER_UNKNOWN` is 1 and means
-#: the analogous "this run could not see everything". The sweep is free to use 1
-#: because it propagates nobody else's codes; this script propagates
-#: `worktree_cleanup.py`'s, where 1 already means EXIT_FAILED. Sharing the value
-#: would make a top-level 1 ambiguous — "gh was unreachable" or "a cleanup
-#: failed" — which is exactly the code-flattening this script exists not to do.
-EXIT_GH_UNAVAILABLE = 6
-#: `worktree_cleanup.py` could not be launched at all (missing, not executable
-#: by this interpreter, fork failure). Distinct from cleanup's own 1 for the
-#: same reason: nothing ran, so there is no cleanup verdict to report.
-EXIT_CLEANUP_UNRUNNABLE = 7
+#: `--apply` could not finish: a cleanup failed, or a branch's PR state was
+#: UNKNOWN so it was not considered. The per-worktree lines say which.
+EXIT_FAILED = 1
 
 #: How many `gh pr list` lookups to run at once. One process per branch, so this
 #: is bounded by process spawn cost, not by the API: ~60 branches finish in
@@ -449,13 +415,11 @@ def format_kib(kib: int) -> str:
     return f"{size:.1f} GiB"
 
 
-def run_cleanup(path: str, not_quiet: bool) -> int:
-    """Delegate removal to worktree_cleanup.py and return its exit code.
+def run_cleanup(path: str, not_quiet: bool) -> bool:
+    """Delegate removal to worktree_cleanup.py; True when it succeeded.
 
-    The return is cleanup's own code, unmodified, or EXIT_CLEANUP_UNRUNNABLE if
-    cleanup never got to run. Returning cleanup's 1 for the latter would re-open
-    the ambiguity these codes exist to avoid: "cleanup exited 1" and "cleanup
-    could not be launched" are different problems with different fixes.
+    A failed cleanup's stderr is relayed even under --quiet: it is the only
+    place that says what was left behind.
     """
     try:
         result = subprocess.run(
@@ -469,23 +433,21 @@ def run_cleanup(path: str, not_quiet: bool) -> int:
             "reclaimed for this worktree.",
             file=sys.stderr,
         )
-        return EXIT_CLEANUP_UNRUNNABLE
+        return False
     if result.stderr and (not_quiet or result.returncode != 0):
         for line in result.stderr.splitlines():
             print(f"    | {line}", file=sys.stderr)
-    meaning = CLEANUP_EXIT_MEANINGS.get(
-        result.returncode, f"unrecognized worktree_cleanup.py exit {result.returncode}"
-    )
-    if result.returncode == 0:
-        # stdout, not stderr: merge-pr.sh surfaces this line next to `MERGED:`,
-        # and the SessionStart hook discards stdout.
-        print(f"REAPED: {path}")
-    else:
+    if result.returncode != 0:
         print(
-            f"  {path}: worktree_cleanup.py exited {result.returncode} — {meaning}",
+            f"  {path}: worktree_cleanup.py FAILED (exit {result.returncode}) — "
+            "see its output above; the worktree may not be fully cleaned up",
             file=sys.stderr,
         )
-    return result.returncode
+        return False
+    # stdout, not stderr: merge-pr.sh surfaces this line next to `MERGED:`,
+    # and the SessionStart hook discards stdout.
+    print(f"REAPED: {path}")
+    return True
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -583,7 +545,11 @@ def main() -> int:
     if not_quiet:
         for title, group in (
             (f"REAP ({merged_count} merged, {empty_count} empty)", reapable),
-            ("REVIEW — unmerged commits or a dirty tree; never touched", review),
+            (
+                "REVIEW — unmerged commits, a dirty tree, or UNKNOWN PR state; "
+                "never touched",
+                review,
+            ),
             ("KEEP — open PR or live process", keep),
         ):
             print(f"\n{title}: {len(group)}", file=sys.stderr)
@@ -614,18 +580,11 @@ def main() -> int:
                 f"\nDry-run; re-run with --apply to reclaim {len(reapable)} worktree(s).",
                 file=sys.stderr,
             )
-        return EXIT_GH_UNAVAILABLE if unknown else EXIT_OK
+        # A report is still a report: exit 0 even with UNKNOWN branches, which
+        # are listed above, so callers that show it do not drop it.
+        return EXIT_OK
 
-    # The set holds distinct *codes* (for the exit status); the counter holds
-    # how many worktrees failed. Conflating the two would report "reaped 4 of 5"
-    # when two worktrees failed with the same code.
-    failures: set[int] = set()
-    failed_count = 0
-    for verdict in reapable:
-        code = run_cleanup(verdict.path, not_quiet)
-        if code != 0:
-            failures.add(code)
-            failed_count += 1
+    failed_count = sum(1 for v in reapable if not run_cleanup(v.path, not_quiet))
 
     if not_quiet:
         print(
@@ -633,21 +592,7 @@ def main() -> int:
             file=sys.stderr,
         )
 
-    if failures:
-        # Propagate the cleanup code when there is exactly one, so a caller sees
-        # *which* failure happened rather than a generic 1. Several distinct
-        # codes have no single honest answer, hence EXIT_CLEANUP_MIXED.
-        if len(failures) == 1:
-            return failures.pop()
-        print(
-            "worktree-reap: cleanup returned several distinct codes "
-            f"({', '.join(str(c) for c in sorted(failures))}); see the per-worktree "
-            "lines above.",
-            file=sys.stderr,
-        )
-        return EXIT_CLEANUP_MIXED
-
-    return EXIT_GH_UNAVAILABLE if unknown else EXIT_OK
+    return EXIT_FAILED if failed_count or unknown else EXIT_OK
 
 
 if __name__ == "__main__":
