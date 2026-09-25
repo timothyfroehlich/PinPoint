@@ -75,27 +75,35 @@ export function DefaultReportModeForm({
         const formData = new FormData();
         formData.set("mobileReportMode", submittingModes.mobileMode);
         formData.set("desktopReportMode", submittingModes.desktopMode);
-        const result = await updateDefaultReportModeAction(undefined, formData);
-        if (!result.ok) {
-          desiredModes.current = savedModes.current;
-          setSelectedModes(savedModes.current);
-          setSaveStatus("idle");
-          setErrorMessage(result.message);
-          return;
+        let failureMessage: string;
+        try {
+          const result = await updateDefaultReportModeAction(
+            undefined,
+            formData
+          );
+          if (result.ok) {
+            savedModes.current = result.value;
+            setConfirmedModes(result.value);
+            if (desiredModes.current === submittingModes) {
+              desiredModes.current = result.value;
+              setSelectedModes(result.value);
+            }
+            continue;
+          }
+          failureMessage = result.message;
+        } catch {
+          failureMessage = "Could not save your preference. Try again.";
         }
-        savedModes.current = result.value;
-        setConfirmedModes(result.value);
-        if (desiredModes.current === submittingModes) {
-          desiredModes.current = result.value;
-          setSelectedModes(result.value);
-        }
+        // A newer choice arrived while this save was in flight; it carries
+        // this one too, so submit it rather than discarding it.
+        if (desiredModes.current !== submittingModes) continue;
+        desiredModes.current = savedModes.current;
+        setSelectedModes(savedModes.current);
+        setSaveStatus("idle");
+        setErrorMessage(failureMessage);
+        return;
       }
       setSaveStatus("saved");
-    } catch {
-      desiredModes.current = savedModes.current;
-      setSelectedModes(savedModes.current);
-      setSaveStatus("idle");
-      setErrorMessage("Could not save your preference. Try again.");
     } finally {
       saveInFlight.current = false;
     }

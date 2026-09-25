@@ -200,6 +200,56 @@ describe("DefaultReportModeForm", () => {
     expect(within(desktop).getByRole("radio", { name: "Quick" })).toBeChecked();
   });
 
+  it("submits a queued choice when the save ahead of it fails", async () => {
+    let failFirst: (result: UpdateDefaultReportModeResult) => void = () => {
+      throw new Error("First save did not start");
+    };
+    vi.mocked(updateDefaultReportModeAction)
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            failFirst = resolve;
+          })
+      )
+      .mockResolvedValueOnce({
+        ok: true,
+        value: { mobileMode: "detailed", desktopMode: "quick" },
+      });
+    const user = userEvent.setup();
+    render(
+      <DefaultReportModeForm
+        initialMobileMode="quick"
+        initialDesktopMode="detailed"
+        canMultiple={false}
+      />
+    );
+
+    const mobile = screen.getByRole("group", { name: "Mobile report form" });
+    const desktop = screen.getByRole("group", {
+      name: "Desktop / Tablet report form",
+    });
+    await user.click(within(desktop).getByRole("radio", { name: "Quick" }));
+    await user.click(within(mobile).getByRole("radio", { name: "Detailed" }));
+
+    failFirst({
+      ok: false,
+      code: "SERVER",
+      message: "Your profile could not be updated. Try again.",
+    });
+    await waitFor(() => {
+      expect(updateDefaultReportModeAction).toHaveBeenCalledTimes(2);
+      expect(screen.getByRole("status")).toHaveTextContent("Saved");
+    });
+    const retried = vi.mocked(updateDefaultReportModeAction).mock.calls[1]?.[1];
+    expect(retried?.get("mobileReportMode")).toBe("detailed");
+    expect(retried?.get("desktopReportMode")).toBe("quick");
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(
+      within(mobile).getByRole("radio", { name: "Detailed" })
+    ).toBeChecked();
+    expect(within(desktop).getByRole("radio", { name: "Quick" })).toBeChecked();
+  });
+
   it("restores the confirmed choice and reports a failed save", async () => {
     vi.mocked(updateDefaultReportModeAction).mockResolvedValue({
       ok: false,
