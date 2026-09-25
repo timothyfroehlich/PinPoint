@@ -6,7 +6,7 @@ import { db } from "~/server/db";
 import { machines, userProfiles } from "~/server/db/schema";
 import { deriveMachineStatus } from "~/lib/machines/status";
 import { RichTextDisplay } from "~/components/editor/RichTextDisplay";
-import { docIsEmpty } from "~/lib/tiptap/types";
+import { docIsEmpty, docToPlainText } from "~/lib/tiptap/types";
 import { MachineRecentActivity } from "~/components/machines/timeline/MachineRecentActivity";
 import {
   getAccessLevel,
@@ -84,24 +84,30 @@ export default async function MachineInfoTab({
   // Description renders read-only in the main column, under the hero so a long
   // one never pushes the Report button down; editing happens on the Edit
   // Machine page (not inline). It lived in the 320px rail until a long one
-  // stretched the rail far below everything in the main column. Gate on docIsEmpty rather than just `!== null`: a legacy or
-  // semantically-empty ProseMirror doc renders nothing in RichTextDisplay, but
-  // the card would still paint an empty box. docIsEmpty covers null, undefined,
-  // and whitespace-only docs.
-  const descriptionCard = !docIsEmpty(machine.description) ? (
-    <section
-      aria-label="Description"
-      data-testid="machine-description-card"
-      className="rounded-xl border border-outline-variant bg-card p-4"
-    >
-      <p className="mb-3 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-        Description
-      </p>
-      <div className="text-sm text-muted-foreground">
-        <RichTextDisplay content={machine.description} />
-      </div>
-    </section>
-  ) : null;
+  // stretched the rail far below everything in the main column.
+  //
+  // Gate on both checks rather than just `!== null`: an empty doc renders
+  // nothing in RichTextDisplay, but the card would still paint an empty box.
+  // docIsEmpty covers null, undefined, and an empty paragraph; it checks
+  // structure only, so a legacy whitespace-only paragraph needs the trimmed
+  // plain-text check (saves normalize blank input to null, older rows may
+  // predate that).
+  const descriptionCard =
+    !docIsEmpty(machine.description) &&
+    docToPlainText(machine.description).trim().length > 0 ? (
+      <section
+        aria-label="Description"
+        data-testid="machine-description-card"
+        className="rounded-xl border border-outline-variant bg-card p-4"
+      >
+        <p className="mb-3 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+          Description
+        </p>
+        <div className="text-sm text-muted-foreground">
+          <RichTextDisplay content={machine.description} />
+        </div>
+      </section>
+    ) : null;
 
   // Model — the game's identity, shown to everyone. Unlike the PinballMap card
   // this replaces (PP-o355.21), it is not permission-gated: what game a cabinet
