@@ -1099,6 +1099,7 @@ export const notifications = pgTable(
         "new_issue",
         "machine_ownership_changed",
         "mentioned",
+        "pinballmap_comment",
       ],
     }).notNull(),
     resourceId: uuid("resource_id").notNull(), // Generic reference to issue or machine
@@ -1186,6 +1187,19 @@ export const notificationPreferences = pgTable(
       .notNull()
       .default(false),
 
+    // Pinball Map comments newly observed on a covering machine the person
+    // owns or watches (pinballmap spec 7.4, 7.7). On by default everywhere.
+    emailNotifyOnPinballMapComment: boolean(
+      "email_notify_on_pinballmap_comment"
+    )
+      .notNull()
+      .default(true),
+    inAppNotifyOnPinballMapComment: boolean(
+      "in_app_notify_on_pinballmap_comment"
+    )
+      .notNull()
+      .default(true),
+
     // Machine ownership change is treated as a critical event across all
     // channels: notifications fire regardless of per-event preference (only
     // the channel's main switch can opt out). The three per-event opt-out
@@ -1215,6 +1229,11 @@ export const notificationPreferences = pgTable(
     discordWatchNewIssuesGlobal: boolean("discord_watch_new_issues_global")
       .notNull()
       .default(false),
+    discordNotifyOnPinballMapComment: boolean(
+      "discord_notify_on_pinballmap_comment"
+    )
+      .notNull()
+      .default(true),
 
     // Set the first time an account gains a Discord identity. This separates
     // first-link defaults/welcome from a later re-link, which must preserve the

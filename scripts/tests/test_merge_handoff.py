@@ -641,12 +641,12 @@ def test_an_unready_pr_gets_the_reason_instead_of_the_merge_command(
 
 
 def test_an_unreviewed_head_is_named_as_the_blocker() -> None:
-    """An unreviewed head names the automated review and manual fallback route."""
+    """An unreviewed head names the local review and the record that covers it."""
     with repo_with_pr(branch_changes={"src/lib/thing.ts": "x\n"}) as (_head, run):
         assert MERGE_CMD not in run.stdout, run.stdout
         assert "reviewed: not reviewed" in run.stdout
-        assert "request-codex-review.sh 123 as fallback" in run.stdout
-        assert "a new head requires replacement CI and a new review" in run.stdout
+        assert "claude-review-level.sh" in run.stdout
+        assert "record-claude-review.sh 123" in run.stdout
 
 
 def test_a_pending_manual_request_is_not_recommended_again() -> None:

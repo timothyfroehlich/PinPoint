@@ -29,6 +29,11 @@ readonly CODERABBIT_REVIEW_BOT="coderabbitai[bot]"
 readonly GITHUB_ACTIONS_BOT="github-actions[bot]"
 readonly GITHUB_ACTIONS_APP_SLUG="github-actions"
 readonly CODEX_REACTION_WITNESS_PREFIX="<!-- pinpoint-codex-reaction-witness:"
+# The review record the owning agent posts after a clean local Claude Code
+# /code-review (spec pr-lifecycle-monitoring §8.18). record-claude-review.sh writes it;
+# only a record posted from the owner's account counts (§8.3), and it covers exactly
+# the head its marker names.
+readonly CLAUDE_REVIEW_MARKER_RE='\A<!-- pinpoint-claude-review: (?<sha>[0-9a-f]{40}) level=(?<level>low|medium|high) -->'
 
 # Parse owner/repo dynamically — avoid hardcoded slug. Memoized: several gates ask for
 # it and pr-dashboard.sh runs them once per open PR, so an unmemoized call was one
@@ -53,6 +58,8 @@ _repo_slug() {
 # reviews also carry body_empty: true when the review body is blank or whitespace.
 #
 # Lists (each sorted by `at`):
+#   claude          review records from a local Claude Code review, posted by the
+#                   owner and SHA-pinned by their marker; `level` carries the effort
 #   coderabbit      native reviews from the exact CodeRabbit App account
 #   codex_native    native reviews from the exact Codex App account
 #   codex_clean     Codex's "no major issues" issue comment, SHA-pinned by its
@@ -61,8 +68,9 @@ _repo_slug() {
 #                   SHA-pinned by the hidden marker
 #   codex_requests  the owner's manual `@codex review` request, SHA-pinned by its marker
 #
-# Only CodeRabbit and Codex provide coverage. A PR reviewed any other way merges only
-# through merge-pr.sh --force at Tim's direction.
+# A review record is the coverage the workflow produces (spec §8.3). CodeRabbit and
+# Codex evidence still counts until both subscriptions end (spec divergence row 8.3).
+# A PR reviewed any other way merges only through merge-pr.sh --force at Tim's direction.
 _review_evidence() {
   local pr=$1 owner_repo=$2 head=$3
   local raw reviews_json comments_json
@@ -78,6 +86,7 @@ _review_evidence() {
       --arg actions_bot "$GITHUB_ACTIONS_BOT" --arg actions_app "$GITHUB_ACTIONS_APP_SLUG" \
       --arg witness_prefix "$CODEX_REACTION_WITNESS_PREFIX" \
       --arg clean_prefix "$CODEX_CLEAN_REVIEW_PREFIX" --arg owner "${owner_repo%%/*}" \
+      --arg claude_re "$CLAUDE_REVIEW_MARKER_RE" \
       --argjson reviews "$reviews_json" --argjson comments "$comments_json" '
     def native($bot):
       [ $reviews[]
@@ -91,6 +100,18 @@ _review_evidence() {
       ] | sort_by(.at);
     {
       head: $head,
+      claude: ([ $comments[]
+        | (.body // "") as $body
+        | select(.user.login? == $owner)
+        | ([ $body | capture($claude_re) ] | .[0]) as $m
+        | select($m != null)
+        | { sha: $m.sha,
+            reviewer: (.user.login // ""),
+            detail: "LOCAL_REVIEW",
+            level: $m.level,
+            at: (.updated_at // .created_at // ""),
+            summary: "Claude Code review (\($m.level))" }
+      ] | sort_by(.at)),
       coderabbit: native($coderabbit_bot),
       codex_native: native($codex_bot),
       codex_clean: ([ $comments[]
@@ -154,6 +175,19 @@ readonly _JQ_LATEST='
     | if ($on_head | length) > 0 then $on_head[-1] elif ($records | length) > 0 then $records[-1] else null end;
   def empty_verdict($checker):
     { checker: $checker, verdict: "none", form: "", sha: "", reviewer: "", detail: "", at: "", summary: "" };'
+
+# Claude: a review record whose marker names head covers. The record script posts one
+# only after every finding is fixed or declined (spec §8.16–8.18), so a record never
+# carries open findings. With none on head, the newest record is stale.
+_claude_check() {
+  jq -c "$_JQ_LATEST"'
+    .head as $head
+    | latest(.claude; $head) as $r
+    | if $r == null then empty_verdict("claude")
+      elif $r.sha == $head then $r + { checker: "claude", verdict: "covers", form: "review_record" }
+      else $r + { checker: "claude", verdict: "stale", form: "" }
+      end'
+}
 
 # CodeRabbit: only a native APPROVED pinned to head covers. CHANGES_REQUESTED on head
 # is "changes requested" (it re-approves on its own once the threads resolve). Any
@@ -280,7 +314,7 @@ _is_pure_merge_from_main() {
 #   head                    current head SHA
 #   label                   approved | changes requested | stale review | not reviewed
 #   coverage                the covering checker's record, or null
-#   checkers                { coderabbit, codex } — each checker's verdict record
+#   checkers                { claude, coderabbit, codex } — each checker's verdict record
 #   codex_request_pending   the owner's manual Codex request is pinned to this head
 #   unresolved_threads      count from Gate 2's query
 #
@@ -290,7 +324,7 @@ _is_pure_merge_from_main() {
 # ---------------------------------------------------------------------------------
 _review_summary() {
   local pr=$1
-  local owner_repo head base_ref evidence coderabbit codex unresolved pr_view
+  local owner_repo head base_ref evidence claude coderabbit codex unresolved pr_view
   owner_repo=$(_repo_slug) || return 1
   head=$(gh pr view "$pr" --json headRefOid --jq .headRefOid) || return 1
   pr_view=$(gh pr view "$pr" --json baseRefName 2>/dev/null || true)
@@ -303,11 +337,20 @@ _review_summary() {
   fi
   base_ref=${base_ref:-main}
   evidence=$(_review_evidence "$pr" "$owner_repo" "$head") || return 1
+  claude=$(_claude_check <<< "$evidence")
   coderabbit=$(_coderabbit_check <<< "$evidence")
   codex=$(_codex_check <<< "$evidence")
   unresolved=$(_unresolved_thread_count "$pr") || return 1
 
-  # Check for inherited review approval across pure merges from main
+  # Check for inherited review coverage across pure merges from main (spec §8.12)
+  if [[ $(jq -r '.verdict' <<< "$claude") == "stale" ]]; then
+    local cl_sha
+    cl_sha=$(jq -r '.sha' <<< "$claude")
+    if _is_pure_merge_from_main "$pr" "$cl_sha" "$head" "$base_ref"; then
+      claude=$(jq -c '. + { verdict: "covers", form: "review_record", inherited: true, inherited_from: .sha }' <<< "$claude")
+    fi
+  fi
+
   if [[ $(jq -r '.verdict' <<< "$coderabbit") == "stale" ]]; then
     local cr_sha cr_detail
     cr_sha=$(jq -r '.sha' <<< "$coderabbit")
@@ -333,11 +376,13 @@ _review_summary() {
   fi
 
   jq -n --arg head "$head" --argjson unresolved "$unresolved" \
-      --argjson coderabbit "$coderabbit" --argjson codex "$codex" \
+      --argjson claude "$claude" --argjson coderabbit "$coderabbit" --argjson codex "$codex" \
       --argjson evidence "$evidence" '
-    [$coderabbit, $codex] as $checks
+    [$claude, $coderabbit, $codex] as $checks
     | ([ $checks[] | select(.verdict == "covers") ]
-       | (map(select(.checker == "coderabbit"))[0] // (sort_by(.at) | last))) as $coverage
+       | (map(select(.checker == "claude"))[0]
+          // map(select(.checker == "coderabbit"))[0]
+          // (sort_by(.at) | last))) as $coverage
     | {
         head: $head,
         label: (if $coverage != null then "approved"
@@ -345,7 +390,7 @@ _review_summary() {
                 elif any($checks[]; .verdict == "stale") then "stale review"
                 else "not reviewed" end),
         coverage: $coverage,
-        checkers: { coderabbit: $coderabbit, codex: $codex },
+        checkers: { claude: $claude, coderabbit: $coderabbit, codex: $codex },
         codex_request_pending: any($evidence.codex_requests[]; .sha == $head),
         unresolved_threads: $unresolved
       }'
@@ -358,7 +403,7 @@ _checker_lines() {
     .head[0:7] as $h
     | .checkers | to_entries[]
     | .key as $k | .value as $v
-    | (if $k == "coderabbit" then "CodeRabbit" else "Codex" end) as $name
+    | ({ claude: "Claude review", coderabbit: "CodeRabbit", codex: "Codex" }[$k] // $k) as $name
     | if $v.verdict == "covers" then
         (if ($v.inherited // false) then "  \($name): covers head \($h) (inherited from \($v.inherited_from[0:7]); pure merge from main)"
          else "  \($name): covers head \($h)" end)
@@ -498,9 +543,10 @@ check_unresolved_threads() {
   return 1
 }
 
-# Gate 3: some reviewer's evidence covers the exact head — a CodeRabbit approval or a
-# Codex result in any of its four shapes. Either is enough; the separate thread gate
-# owns findings. Anything else merges only through merge-pr.sh --force.
+# Gate 3: some reviewer's evidence covers the exact head — a Claude review record, a
+# CodeRabbit approval, or a Codex result in any of its four shapes. Any one is enough;
+# the separate thread gate owns threads. Anything else merges only through
+# merge-pr.sh --force.
 #
 # Sets globals for merge-handoff: RS_LABEL, RS_HEAD_SHA, RS_SUMMARY (the JSON).
 RS_LABEL=""
@@ -525,7 +571,9 @@ check_review_happened() {
       from_sha=$(jq -r '.coverage.inherited_from // .coverage.sha' <<< "$RS_SUMMARY")
       suffix=" (inherited from ${from_sha:0:7}; pure merge from main)"
     fi
-    if [ "$who" = "coderabbit" ]; then
+    if [ "$who" = "claude" ]; then
+      echo "PASS: reviewed: Claude Code review ($(jq -r '.coverage.level' <<< "$RS_SUMMARY")) covers head SHA ${RS_HEAD_SHA:0:7}${suffix}"
+    elif [ "$who" = "coderabbit" ]; then
       echo "PASS: reviewed: CodeRabbit approved head SHA ${RS_HEAD_SHA:0:7}${suffix}"
     else
       case "$(jq -r '.coverage.form' <<< "$RS_SUMMARY")" in
@@ -542,17 +590,14 @@ check_review_happened() {
   _checker_lines <<< "$RS_SUMMARY"
   if [ "$(jq -r '.codex_request_pending' <<< "$RS_SUMMARY")" = "true" ]; then
     echo "  remedy: the manual Codex review for this head was already requested; wait for"
-    echo "          exact-head evidence, do not request the same head again. A new head"
-    echo "          requires replacement CI and one new request."
-  else
-    echo "  remedy: a PR just promoted from draft already has CodeRabbit's automatic"
-    echo "          review running; wait for it. Otherwise, after current-head CI"
-    echo "          succeeds, comment \`@coderabbitai review\` once for this head. If"
-    echo "          CodeRabbit is rate-limited, run request-codex-review.sh ${pr} once instead."
-    echo "          A new head requires replacement CI and a new review."
-    echo "          Merging without a review takes Tim's explicit direction to use"
-    echo "          merge-pr.sh --force."
+    echo "          exact-head evidence, do not request the same head again, or run the"
+    echo "          local review below instead."
   fi
+  echo "  remedy: after current-head CI succeeds, run the local review at the level"
+  echo "          claude-review-level.sh prints (/code-review <level> ${pr}), fix or"
+  echo "          decline every finding, re-review each new head until a round is clean,"
+  echo "          then record-claude-review.sh ${pr}. Merging without a review takes"
+  echo "          Tim's explicit direction to use merge-pr.sh --force."
   return 1
 }
 # Gate 4: PR has no merge conflict. UNKNOWN returned once; caller may retry.
