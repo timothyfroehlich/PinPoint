@@ -96,8 +96,15 @@ const nextConfig: NextConfig = {
     // PP-zg3q: Turbopack dev-server memory mitigations.
     // Evict cached ASTs/snapshots aggressively after compilation to bound RSS in dev.
     turbopackMemoryEviction: "full",
-    // Run loader transforms in worker threads rather than a child-process pool.
-    turbopackPluginRuntimeStrategy: "workerThreads",
+    // Run loader transforms in worker threads rather than a child-process pool
+    // to save dev-server memory. Dev only (PP-shac): in `next build` the worker
+    // pool intermittently hands a PostCSS task to a webpack-loader (MDX)
+    // worker, which fails the build with "Cannot read properties of undefined
+    // (reading 'map')" on a CSS file. Builds keep Next's default child-process
+    // pool. `next` sets NODE_ENV per command before it loads this file.
+    ...(process.env.NODE_ENV === "development"
+      ? { turbopackPluginRuntimeStrategy: "workerThreads" as const }
+      : {}),
   },
   typescript: {
     // App-source project. The root tsconfig.json is references-only after the
