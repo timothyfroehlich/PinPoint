@@ -936,6 +936,7 @@ def test_review_state_not_reviewed_recommends_one_request(monkeypatch):
     state, detail = pr_watch.review_state(PR)
     assert state == "not reviewed"
     assert "CodeRabbit: none; Codex: none" in detail
+    assert "just promoted from draft" in detail
     assert "`@coderabbitai review` once for this head" in detail
     assert f"request-codex-review.sh {PR} once instead" in detail
     assert "Tim's explicit --force" in detail

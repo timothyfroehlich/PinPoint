@@ -564,6 +564,7 @@ def test_stale_codex_approval_reports_both_commits_and_the_request_remedy() -> N
     )
     assert "request-codex-review.sh 123 once instead" in result.stdout
     assert "`@coderabbitai review` once for this head" in result.stdout
+    assert "just promoted from draft" in result.stdout
     assert summary["label"] == "stale review"
 
 

@@ -116,12 +116,12 @@ chromium-only smoke. `pnpm run preflight` wraps it in `quiet-run.py`;
 
 ### Gates (evaluated by `merge-pr.sh`, defined in `_pr-gates.sh`)
 
-| Gate          | Passes when                                                                                                                                                                                     | Bypass kind |
-| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
-| `ci`          | `CI Gate` check is SUCCESS/NEUTRAL/SKIPPED                                                                                                                                                      | `admin`     |
-| `threads`     | Zero unresolved review threads, from any author                                                                                                                                                 | `force`     |
-| `reviewed`    | Hard backstop — some reviewer's evidence covers the exact head. PASS when any of the three checkers covers head (label `approved`); FAIL on `changes requested`, `stale review`, `not reviewed` | `force`     |
-| `no_conflict` | PR is MERGEABLE (never bypassable — GitHub rejects conflicting merges)                                                                                                                          | `none`      |
+| Gate          | Passes when                                                                                                                                                                               | Bypass kind |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
+| `ci`          | `CI Gate` check is SUCCESS/NEUTRAL/SKIPPED                                                                                                                                                | `admin`     |
+| `threads`     | Zero unresolved review threads, from any author                                                                                                                                           | `force`     |
+| `reviewed`    | Hard backstop — some reviewer's evidence covers the exact head. PASS when CodeRabbit or Codex covers head (label `approved`); FAIL on `changes requested`, `stale review`, `not reviewed` | `force`     |
+| `no_conflict` | PR is MERGEABLE (never bypassable — GitHub rejects conflicting merges)                                                                                                                    | `none`      |
 
 ### Review state (`reviewed`)
 

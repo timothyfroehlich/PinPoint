@@ -539,11 +539,13 @@ check_review_happened() {
     echo "          exact-head evidence, do not request the same head again. A new head"
     echo "          requires replacement CI and one new request."
   else
-    echo "  remedy: after current-head CI succeeds and the PR is ready, comment"
-    echo "          \`@coderabbitai review\` once for this head (if CodeRabbit is rate-"
-    echo "          limited, run request-codex-review.sh ${pr} once instead). A new head"
-    echo "          requires replacement CI and a new review. Merging without a"
-    echo "          review takes Tim's explicit direction to use merge-pr.sh --force."
+    echo "  remedy: a PR just promoted from draft already has CodeRabbit's automatic"
+    echo "          review running; wait for it. Otherwise, after current-head CI"
+    echo "          succeeds, comment \`@coderabbitai review\` once for this head. If"
+    echo "          CodeRabbit is rate-limited, run request-codex-review.sh ${pr} once instead."
+    echo "          A new head requires replacement CI and a new review."
+    echo "          Merging without a review takes Tim's explicit direction to use"
+    echo "          merge-pr.sh --force."
   fi
   return 1
 }
