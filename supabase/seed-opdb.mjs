@@ -42,14 +42,29 @@ const fixture = JSON.parse(
   )
 );
 
+// Same vocabularies as src/lib/opdb/types.ts; a value outside them becomes null,
+// as the parser does, instead of failing the table's CHECK constraints.
+const MACHINE_TYPES = new Set(["em", "ss", "me"]);
+const DISPLAY_TYPES = new Set([
+  "reels",
+  "lights",
+  "alphanumeric",
+  "cga",
+  "dmd",
+  "lcd",
+]);
+
 const rows = fixture.entries
   .filter((e) => typeof e.opdbId === "string" && e.opdbId.includes("-M"))
   .map((e) => ({
     opdb_id: e.opdbId,
     name: e.name,
-    type: e.type ?? null,
-    display: e.display ?? null,
-    player_count: e.playerCount > 0 ? e.playerCount : null,
+    type: MACHINE_TYPES.has(e.type) ? e.type : null,
+    display: DISPLAY_TYPES.has(e.display) ? e.display : null,
+    player_count:
+      Number.isSafeInteger(e.playerCount) && e.playerCount > 0
+        ? e.playerCount
+        : null,
     people: (e.people ?? [])
       .map((p) => ({
         personId: p.opdbPersonId,
