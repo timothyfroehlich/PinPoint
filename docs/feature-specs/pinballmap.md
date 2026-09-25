@@ -42,7 +42,9 @@ The control's states (§4) are comparisons across these: _in sync_ means intent 
 - **3.3** PinPoint never writes to Pinball Map on its own. Every outbound write is an explicit human action.
 - **3.4** The UI renders from stored data. Opening a page never triggers a call to Pinball Map, and no control requires a click to discover its own state.
 - **3.5** While configured but before a valid snapshot exists, the control is in the **Waiting** state and renders disabled — no interactive element acts against unknown data. Successfully setting the location supplies a valid snapshot; otherwise the hourly refresh and the header's manual Refresh are the paths out. Waiting may persist while attempts fail, and the header stays live with an error marker and Refresh as the escape hatch.
-- **3.6** Full support also lets an authorized person explicitly post a condition comment to an existing lineup entry, confirm the tracked location's lineup, and change an eligible entry's Insider Connected setting on Pinball Map. None of these actions runs automatically or changes PinPoint's listing intent. Their interaction, permission, and stale-state details are specified separately before delivery.
+- **3.6** Full support also lets an authorized person explicitly confirm the tracked location's lineup (3.7) and change an eligible entry's Insider Connected setting (3.8) on Pinball Map. Neither runs automatically or changes PinPoint's listing intent. Posting condition comments from PinPoint is deferred until requested and is not part of full support.
+- **3.7** The `/fleet` dashboard header offers **Confirm lineup on Pinball Map**, telling Pinball Map the tracked location's whole lineup is accurate as of today. It requires technician or admin plus provisioned operator credentials, and is not shown without them or while the integration is Not configured or Waiting. A stored lineup over 5 minutes old is refreshed first, and confirmation waits for the current snapshot; if that refresh fails, the dialog shows the last-known snapshot's age and the person may proceed or cancel. When entries are out of sync (Missing or Lingering), the dialog lists them and the person may confirm anyway or cancel. It is a venue-level statement, never a per-machine Add/Remove or a Refresh.
+- **3.8** On a cabinet with intent On whose entry is present, the Pinball Map section shows the entry's Insider Connected setting whenever Pinball Map reports one (on or off); when Pinball Map reports none, nothing is shown. Eligibility is never inferred from era or brand. A person with the machine-linking capability and provisioned credentials may change it with an action naming the target state (**Turn on / Turn off Insider Connected**). Because Pinball Map's endpoint flips the setting rather than setting a value, PinPoint re-reads the entry immediately before writing and writes only when the current value differs from the target. An unclear outcome is never retried: PinPoint re-reads and shows the actual setting.
 
 ## 4. The listing control
 
@@ -176,7 +178,7 @@ Replacing the tracked location is a rare, near-never operation — PinPoint trac
 | 7.4 watcher notifications after baseline | Comments import with a silent per-location backfill and each new copy is identified, but no notification is sent | PP-o355.63 |
 | 7.7 one notification per watched cabinet | No comment notification exists | PP-o355.63 |
 | 10.9 comment re-marking on location change | Comments import, but copies from a previous location are not marked | PP-o355.36 |
-| 3.6 additional outbound actions | Client methods exist, but no app actions expose condition-comment posting, venue-lineup confirmation, or Insider Connected changes | PP-o355.57 (condition comment, decision PP-o355.54.13), PP-o355.58 (confirm lineup, decision PP-o355.54.10), PP-o355.59 (Insider Connected, decision PP-o355.54.11) |
+| 3.6–3.8 additional outbound actions | Client methods exist, but no app actions expose venue-lineup confirmation or Insider Connected changes | PP-o355.58 (confirm lineup, needs `/fleet` base PP-o355.7.1), PP-o355.59 (Insider Connected); condition-comment posting deferred (PP-o355.57) |
 
 ---
 
@@ -186,6 +188,7 @@ Changes to this document. Divergence-table rows are working state and are not lo
 
 | Date | Change |
 | :-- | :-- |
+| 2026-09-25 | Detailed §3.6's outbound actions: lineup confirmation from the `/fleet` header (§3.7) and safe Insider Connected changes (§3.8). Deferred condition-comment posting out of full support until requested. |
 | 2026-09-23 | Clarified shared-comment copies and per-cabinet notifications (§§7.6–7.7), and tied conversion to one movable issue per Pinball Map comment (§§7.8–7.9). |
 | 2026-09-22 | Added §§7.4–7.5: historical comment backfill is silent, later new comments notify watchers, and Convert to issue is explicit rather than automatic. |
 | 2026-09-22 | Added §3.6: full support includes explicit condition-comment posting, tracked-location lineup confirmation, and eligible Insider Connected changes. Detailed workflows remain separate decisions (PP-o355.54.13, PP-o355.54.10, PP-o355.54.11). |
