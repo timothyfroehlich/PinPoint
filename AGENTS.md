@@ -87,11 +87,11 @@ Start what you need yourself rather than pausing the user.
 - **Supabase down?** From the current worktree: `pnpm supabase:start`, which targets whichever backend the worktree uses. Ports are isolated, so this won't affect anyone else.
 - **Fresh worktree database?** `pnpm supabase:start && pnpm run db:migrate` is the non-destructive bootstrap. `preflight` checks this state before costly work and prints the isolated Postgres port when it is missing; it never starts or migrates services implicitly.
 
-Leave the stack running afterward — the user can stop it. Hand off what's running. If you can't start it (port collisions, stuck containers), ask the user — don't fall back to "let CI tell us."
+Leave the stack running while the branch's work is in flight, and hand off what's running. Once its PR merges, stop the dev server and stack (`pinpoint-pr-workflow` Phase 5.2). If you can't start it (port collisions, stuck containers), ask the user — don't fall back to "let CI tell us."
 
 ### Process safety
 
-Only stop services you started in this session, by specific PID or via worktree-local commands (e.g. `pnpm supabase:stop` inside the worktree). Forbidden without explicit permission: `supabase stop --all`, `pkill`/`killall` against process names, `docker stop` on containers you didn't start. The system runs many environments in parallel; broad kills wipe out other agents' work.
+Only stop services you started in this session, by specific PID or via worktree-local commands (e.g. `pnpm supabase:stop` inside the worktree). One exception: after your PR merges, you may stop your own worktree's stack even if an earlier session started it, provided no session is still using it (`pinpoint-pr-workflow` Phase 5.2). Forbidden without explicit permission: `supabase stop --all`, `pkill`/`killall` against process names, `docker stop` on containers you didn't start. The system runs many environments in parallel; broad kills wipe out other agents' work.
 
 ## 5. Workflow
 
