@@ -6,8 +6,6 @@ import { REPORT_MODE_VALUES, type ReportMode } from "~/lib/types";
 import { cn } from "~/lib/utils";
 import { updateDefaultReportModeAction } from "./actions";
 
-const SAVED_STATUS_MS = 3000;
-
 const MODE_LABELS: Record<ReportMode, string> = {
   quick: "Quick",
   detailed: "Detailed",
@@ -46,6 +44,9 @@ export function DefaultReportModeForm({
   const hasInteracted = React.useRef(false);
   const desiredModes = React.useRef(initialModes);
   const savedModes = React.useRef(initialModes);
+  // Mirrors savedModes for rendering: a selection the server has not yet
+  // confirmed is drawn muted until this catches up.
+  const [confirmedModes, setConfirmedModes] = React.useState(initialModes);
   const availableModes = REPORT_MODE_VALUES.filter(
     (mode) => mode !== "multiple" || canMultiple
   );
@@ -59,15 +60,8 @@ export function DefaultReportModeForm({
     desiredModes.current = modes;
     savedModes.current = modes;
     setSelectedModes(modes);
+    setConfirmedModes(modes);
   }, [availableMobileMode, availableDesktopMode]);
-
-  React.useEffect(() => {
-    if (saveStatus !== "saved") return;
-    const timeout = window.setTimeout(() => {
-      setSaveStatus("idle");
-    }, SAVED_STATUS_MS);
-    return () => window.clearTimeout(timeout);
-  }, [saveStatus]);
 
   async function flushSelections(): Promise<void> {
     if (saveInFlight.current) return;
@@ -90,6 +84,7 @@ export function DefaultReportModeForm({
           return;
         }
         savedModes.current = result.value;
+        setConfirmedModes(result.value);
         if (desiredModes.current === submittingModes) {
           desiredModes.current = result.value;
           setSelectedModes(result.value);
@@ -130,16 +125,19 @@ export function DefaultReportModeForm({
             key: "mobile",
             label: "Mobile",
             selectedMode: selectedModes.mobileMode,
+            confirmedMode: confirmedModes.mobileMode,
           },
           {
             key: "desktop",
             label: "Desktop / Tablet",
             selectedMode: selectedModes.desktopMode,
+            confirmedMode: confirmedModes.desktopMode,
           },
         ] as const
       ).map((surface) => (
         <fieldset
           key={surface.key}
+          aria-busy={surface.selectedMode !== surface.confirmedMode}
           className="grid grid-cols-[7rem_minmax(0,1fr)] items-center gap-x-1 @sm:gap-x-2"
         >
           <legend className="sr-only">{surface.label} report form</legend>
@@ -165,14 +163,23 @@ export function DefaultReportModeForm({
                 <span
                   aria-hidden="true"
                   className={cn(
-                    "flex size-4 shrink-0 items-center justify-center rounded-full border peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-ring",
-                    surface.selectedMode === mode
+                    "flex size-4 shrink-0 items-center justify-center rounded-full border transition-colors duration-150 motion-reduce:transition-none peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-ring",
+                    surface.selectedMode === mode &&
+                      surface.confirmedMode === mode
                       ? "border-primary"
                       : "border-muted-foreground"
                   )}
                 >
+                  {/* Muted until the server confirms the choice, then green. */}
                   {surface.selectedMode === mode ? (
-                    <span className="size-2 rounded-full bg-primary" />
+                    <span
+                      className={cn(
+                        "size-2 rounded-full transition-colors duration-150 motion-reduce:transition-none",
+                        surface.confirmedMode === mode
+                          ? "bg-primary"
+                          : "bg-muted-foreground"
+                      )}
+                    />
                   ) : null}
                 </span>
                 <span>{MODE_LABELS[mode]}</span>
@@ -182,27 +189,20 @@ export function DefaultReportModeForm({
         </fieldset>
       ))}
 
-      {/* The status line always reserves one line of height, so the sections
-          below do not shift when feedback appears. It stays mounted so screen
-          readers announce its changes; an error takes its place. */}
-      {errorMessage ? (
-        <p role="alert" className="text-sm text-destructive-text">
-          {errorMessage}
-        </p>
-      ) : null}
-      <p
-        role="status"
-        className={cn(
-          "min-h-lh text-sm text-muted-foreground",
-          errorMessage && "hidden"
-        )}
-      >
+      {/* Sighted users read save progress from the radio color; this
+          visually hidden live region announces it to screen readers. */}
+      <p role="status" className="sr-only">
         {saveStatus === "saving"
           ? "Saving…"
           : saveStatus === "saved"
             ? "Saved"
             : null}
       </p>
+      {errorMessage ? (
+        <p role="alert" className="text-sm text-destructive-text">
+          {errorMessage}
+        </p>
+      ) : null}
     </div>
   );
 }

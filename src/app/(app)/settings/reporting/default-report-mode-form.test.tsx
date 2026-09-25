@@ -1,5 +1,5 @@
 import React from "react";
-import { act, render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -58,36 +58,41 @@ describe("DefaultReportModeForm", () => {
     ]);
   });
 
-  it("clears the saved confirmation after a few seconds", async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
-    try {
-      vi.mocked(updateDefaultReportModeAction).mockResolvedValue({
-        ok: true,
-        value: { mobileMode: "detailed", desktopMode: "detailed" },
-      });
-      const user = userEvent.setup({
-        advanceTimers: (ms) => vi.advanceTimersByTime(ms),
-      });
-      render(
-        <DefaultReportModeForm
-          initialMobileMode="quick"
-          initialDesktopMode="detailed"
-          canMultiple={false}
-        />
-      );
+  it("marks a choice pending until the server confirms it", async () => {
+    let completeSave: (result: UpdateDefaultReportModeResult) => void = () => {
+      throw new Error("Save did not start");
+    };
+    vi.mocked(updateDefaultReportModeAction).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          completeSave = resolve;
+        })
+    );
+    const user = userEvent.setup();
+    render(
+      <DefaultReportModeForm
+        initialMobileMode="quick"
+        initialDesktopMode="detailed"
+        canMultiple={false}
+      />
+    );
 
-      const mobile = screen.getByRole("group", { name: "Mobile report form" });
-      await user.click(within(mobile).getByRole("radio", { name: "Detailed" }));
-      await waitFor(() => {
-        expect(screen.getByRole("status")).toHaveTextContent("Saved");
-      });
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(3000);
-      });
-      expect(screen.getByRole("status")).toBeEmptyDOMElement();
-    } finally {
-      vi.useRealTimers();
-    }
+    const mobile = screen.getByRole("group", { name: "Mobile report form" });
+    const desktop = screen.getByRole("group", {
+      name: "Desktop / Tablet report form",
+    });
+    await user.click(within(mobile).getByRole("radio", { name: "Detailed" }));
+    expect(mobile).toHaveAttribute("aria-busy", "true");
+    expect(desktop).toHaveAttribute("aria-busy", "false");
+
+    completeSave({
+      ok: true,
+      value: { mobileMode: "detailed", desktopMode: "detailed" },
+    });
+    await waitFor(() => {
+      expect(mobile).toHaveAttribute("aria-busy", "false");
+    });
+    expect(screen.getByRole("status")).toHaveTextContent("Saved");
   });
 
   it("offers Multiple in both settings only with batch access", () => {
